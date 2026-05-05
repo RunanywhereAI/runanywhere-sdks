@@ -2,32 +2,13 @@
  * RunAnywhere React Native SDK - Services
  *
  * Core services for SDK functionality.
+ *
+ * Model registry, downloads, archive extraction, and filesystem path policy
+ * are owned by native commons (`runanywhere-commons`). The JS layer talks
+ * to commons via Nitro proto-byte calls — there is no JS-side mirror.
  */
 
-// Model Registry - Manages model discovery and registration (JS-based)
-export {
-  ModelRegistry,
-  type ModelCriteria,
-  type AddModelFromURLOptions,
-} from './ModelRegistry';
-
-// File System - Cross-platform file operations using react-native-fs
-export {
-  FileSystem,
-  MultiFileModelCache,
-  type ModelFileDescriptor,
-  type FileByteProgress,
-} from './FileSystem';
-
-// Download Service - Native-based download (delegates to native commons)
-export {
-  DownloadService,
-  DownloadState,
-  type DownloadProgress,
-  type DownloadTask,
-  type DownloadConfiguration,
-  type ProgressCallback,
-} from './DownloadService';
+export type { ModelFileDescriptor } from '@runanywhere/proto-ts/model_types';
 
 // Network Layer — HTTP transport lives in native C++ (rac_http_client_*).
 // These exports cover configuration helpers, telemetry, and endpoints only.

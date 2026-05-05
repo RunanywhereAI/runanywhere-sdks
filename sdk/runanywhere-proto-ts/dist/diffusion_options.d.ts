@@ -128,6 +128,17 @@ export declare enum DiffusionTokenizerSourceKind {
 }
 export declare function diffusionTokenizerSourceKindFromJSON(object: any): DiffusionTokenizerSourceKind;
 export declare function diffusionTokenizerSourceKindToJSON(object: DiffusionTokenizerSourceKind): string;
+export declare enum DiffusionStreamEventKind {
+    DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED = 0,
+    DIFFUSION_STREAM_EVENT_KIND_STARTED = 1,
+    DIFFUSION_STREAM_EVENT_KIND_PROGRESS = 2,
+    DIFFUSION_STREAM_EVENT_KIND_INTERMEDIATE_IMAGE = 3,
+    DIFFUSION_STREAM_EVENT_KIND_COMPLETED = 4,
+    DIFFUSION_STREAM_EVENT_KIND_ERROR = 5,
+    UNRECOGNIZED = -1
+}
+export declare function diffusionStreamEventKindFromJSON(object: any): DiffusionStreamEventKind;
+export declare function diffusionStreamEventKindToJSON(object: DiffusionStreamEventKind): string;
 /**
  * ---------------------------------------------------------------------------
  * Tokenizer source descriptor. `kind` is the preset; `custom_path` is only
@@ -283,6 +294,24 @@ export interface DiffusionGenerationOptions {
      */
     inputImageWidth: number;
     inputImageHeight: number;
+    /** Input image/mask media hints. Empty = backend infer/default. */
+    inputImageMediaType?: string | undefined;
+    maskImageMediaType?: string | undefined;
+    /** 0 = one image/backend default */
+    batchSize: number;
+    returnLatents: boolean;
+}
+export interface DiffusionGenerationRequest {
+    requestId: string;
+    options?: DiffusionGenerationOptions | undefined;
+    modelId?: string | undefined;
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface DiffusionGenerationRequest_MetadataEntry {
+    key: string;
+    value: string;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -313,6 +342,9 @@ export interface DiffusionProgress {
     /** Dimensions for intermediate_image_data when it is raw pixel data. */
     intermediateImageWidth: number;
     intermediateImageHeight: number;
+    timestampMs: number;
+    etaMs: number;
+    intermediateImageMediaType?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -362,6 +394,10 @@ export interface DiffusionResult {
     /** Failure details for result-envelope APIs. */
     errorMessage?: string | undefined;
     errorCode: number;
+    /** Output image media type, e.g. "image/png" or "image/raw-rgba". */
+    imageMediaType?: string | undefined;
+    batchImages: Uint8Array[];
+    imagesGenerated: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -409,6 +445,27 @@ export interface DiffusionCapabilities {
     isReady: boolean;
     currentModel?: string | undefined;
     safetyCheckerEnabled: boolean;
+    supportsBatchGeneration: boolean;
+    supportedOutputMediaTypes: string[];
+}
+export interface DiffusionStreamEvent {
+    seq: number;
+    timestampUs: number;
+    requestId: string;
+    kind: DiffusionStreamEventKind;
+    progress?: DiffusionProgress | undefined;
+    result?: DiffusionResult | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+export interface DiffusionServiceState {
+    isReady: boolean;
+    currentModel?: string | undefined;
+    capabilities?: DiffusionCapabilities | undefined;
+    isGenerating: boolean;
+    activeRequestId?: string | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
 }
 export declare const DiffusionTokenizerSource: {
     encode(message: DiffusionTokenizerSource, writer?: _m0.Writer): _m0.Writer;
@@ -442,6 +499,22 @@ export declare const DiffusionGenerationOptions: {
     create<I extends Exact<DeepPartial<DiffusionGenerationOptions>, I>>(base?: I): DiffusionGenerationOptions;
     fromPartial<I extends Exact<DeepPartial<DiffusionGenerationOptions>, I>>(object: I): DiffusionGenerationOptions;
 };
+export declare const DiffusionGenerationRequest: {
+    encode(message: DiffusionGenerationRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionGenerationRequest;
+    fromJSON(object: any): DiffusionGenerationRequest;
+    toJSON(message: DiffusionGenerationRequest): unknown;
+    create<I extends Exact<DeepPartial<DiffusionGenerationRequest>, I>>(base?: I): DiffusionGenerationRequest;
+    fromPartial<I extends Exact<DeepPartial<DiffusionGenerationRequest>, I>>(object: I): DiffusionGenerationRequest;
+};
+export declare const DiffusionGenerationRequest_MetadataEntry: {
+    encode(message: DiffusionGenerationRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionGenerationRequest_MetadataEntry;
+    fromJSON(object: any): DiffusionGenerationRequest_MetadataEntry;
+    toJSON(message: DiffusionGenerationRequest_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<DiffusionGenerationRequest_MetadataEntry>, I>>(base?: I): DiffusionGenerationRequest_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<DiffusionGenerationRequest_MetadataEntry>, I>>(object: I): DiffusionGenerationRequest_MetadataEntry;
+};
 export declare const DiffusionProgress: {
     encode(message: DiffusionProgress, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionProgress;
@@ -465,6 +538,22 @@ export declare const DiffusionCapabilities: {
     toJSON(message: DiffusionCapabilities): unknown;
     create<I extends Exact<DeepPartial<DiffusionCapabilities>, I>>(base?: I): DiffusionCapabilities;
     fromPartial<I extends Exact<DeepPartial<DiffusionCapabilities>, I>>(object: I): DiffusionCapabilities;
+};
+export declare const DiffusionStreamEvent: {
+    encode(message: DiffusionStreamEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionStreamEvent;
+    fromJSON(object: any): DiffusionStreamEvent;
+    toJSON(message: DiffusionStreamEvent): unknown;
+    create<I extends Exact<DeepPartial<DiffusionStreamEvent>, I>>(base?: I): DiffusionStreamEvent;
+    fromPartial<I extends Exact<DeepPartial<DiffusionStreamEvent>, I>>(object: I): DiffusionStreamEvent;
+};
+export declare const DiffusionServiceState: {
+    encode(message: DiffusionServiceState, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): DiffusionServiceState;
+    fromJSON(object: any): DiffusionServiceState;
+    toJSON(message: DiffusionServiceState): unknown;
+    create<I extends Exact<DeepPartial<DiffusionServiceState>, I>>(base?: I): DiffusionServiceState;
+    fromPartial<I extends Exact<DeepPartial<DiffusionServiceState>, I>>(object: I): DiffusionServiceState;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

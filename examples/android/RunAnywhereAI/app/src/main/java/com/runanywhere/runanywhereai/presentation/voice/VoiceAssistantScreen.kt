@@ -1,5 +1,7 @@
 package com.runanywhere.runanywhereai.presentation.voice
 
+import ai.runanywhere.proto.v1.ComponentLoadState
+import ai.runanywhere.proto.v1.PipelineState
 import android.Manifest
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
@@ -38,13 +40,13 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-import com.runanywhere.runanywhereai.domain.models.SessionState
 import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
+import com.runanywhere.sdk.public.extensions.Models.displayName
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.min
@@ -237,9 +239,9 @@ private fun VoicePipelineSetupView(
     sttModel: SelectedModel?,
     llmModel: SelectedModel?,
     ttsModel: SelectedModel?,
-    sttLoadState: ModelLoadState,
-    llmLoadState: ModelLoadState,
-    ttsLoadState: ModelLoadState,
+    sttLoadState: ComponentLoadState,
+    llmLoadState: ComponentLoadState,
+    ttsLoadState: ComponentLoadState,
     onSelectSTT: () -> Unit,
     onSelectLLM: () -> Unit,
     onSelectTTS: () -> Unit,
@@ -375,7 +377,7 @@ private fun ModelSetupCard(
     color: Color,
     selectedFramework: String?,
     selectedModel: String?,
-    loadState: ModelLoadState,
+    loadState: ComponentLoadState,
     onSelect: () -> Unit,
 ) {
     val isConfigured = selectedFramework != null && selectedModel != null
@@ -591,12 +593,12 @@ private fun MainVoiceAssistantUI(
     val currentUiState by rememberUpdatedState(uiState)
 
     // Determine if animation should be active to save battery/CPU
-    val isListening = uiState.sessionState == SessionState.LISTENING
-    val isSpeaking = uiState.sessionState == SessionState.SPEAKING
+    val isListening = uiState.isPipelineListening
+    val isSpeaking = uiState.isPipelineSpeaking
     val isAnimationNeeded = isListening || isSpeaking || amplitude > 0.001f || morphProgress > 0.001f
 
     // Animation timer (60 FPS = ~16ms) - only runs when animation is needed
-    LaunchedEffect(isAnimationNeeded, uiState.sessionState) {
+    LaunchedEffect(isAnimationNeeded, uiState.pipelineState) {
         if (isAnimationNeeded) {
             while (true) {
                 delay(16) // ~60 FPS
@@ -608,8 +610,8 @@ private fun MainVoiceAssistantUI(
 
                 // Morph: sphere → ring when listening/speaking
                 val targetMorph =
-                    if (currentUiState.sessionState == SessionState.LISTENING ||
-                        currentUiState.sessionState == SessionState.SPEAKING
+                    if (currentUiState.isPipelineListening ||
+                        currentUiState.isPipelineSpeaking
                     ) {
                         1f
                     } else {
@@ -627,8 +629,8 @@ private fun MainVoiceAssistantUI(
 
                 // Re-check if animation is still needed
                 val stillNeeded =
-                    currentUiState.sessionState == SessionState.LISTENING ||
-                        currentUiState.sessionState == SessionState.SPEAKING ||
+                    currentUiState.isPipelineListening ||
+                        currentUiState.isPipelineSpeaking ||
                         amplitude > 0.001f ||
                         morphProgress > 0.001f
                 if (!stillNeeded) break
@@ -753,7 +755,7 @@ private fun MainVoiceAssistantUI(
                 // Instruction text
                 // .caption2, .secondary.opacity(0.7)
                 Text(
-                    text = getInstructionText(uiState.sessionState),
+                    text = getInstructionText(uiState.pipelineState),
                     style = AppTypography.caption2,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     textAlign = TextAlign.Center,
@@ -776,8 +778,8 @@ private fun updateAnimation(
     amplitudeState: () -> Float,
     onAmplitudeChange: (Float) -> Unit,
 ) {
-    val isListening = uiState.sessionState == SessionState.LISTENING
-    val isSpeaking = uiState.sessionState == SessionState.SPEAKING
+    val isListening = uiState.isPipelineListening
+    val isSpeaking = uiState.isPipelineSpeaking
 
     // Audio amplitude - reactive to both input (listening) and output (speaking)
     val currentAmplitude = amplitudeState()
@@ -825,27 +827,29 @@ private fun micButtonSection(
     onStopSession: () -> Unit,
 ) {
     val isLoading =
-        uiState.sessionState == SessionState.CONNECTING ||
-            (uiState.sessionState == SessionState.PROCESSING && !uiState.isListening)
+        uiState.pipelineState == PipelineState.PIPELINE_STATE_IDLE ||
+            uiState.isPipelineProcessing
 
     Row(modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.weight(1f))
 
         MicrophoneButton(
-            isListening = uiState.isListening,
-            sessionState = uiState.sessionState,
-            isSpeechDetected = uiState.isSpeechDetected,
+            pipelineState = uiState.pipelineState,
+            isInputActive = uiState.isInputActive,
             hasPermission = hasPermission,
             isLoading = isLoading,
             onToggle = {
                 if (!hasPermission) {
                     onRequestPermission()
                 } else {
-                    val state = uiState.sessionState
-                    if (state == SessionState.LISTENING ||
-                        state == SessionState.SPEAKING ||
-                        state == SessionState.PROCESSING ||
-                        state == SessionState.CONNECTING
+                    val state = uiState.pipelineState
+                    if (state == PipelineState.PIPELINE_STATE_LISTENING ||
+                        state == PipelineState.PIPELINE_STATE_SPEAKING ||
+                        state == PipelineState.PIPELINE_STATE_PLAYING_TTS ||
+                        state == PipelineState.PIPELINE_STATE_THINKING ||
+                        state == PipelineState.PIPELINE_STATE_PROCESSING_SPEECH ||
+                        state == PipelineState.PIPELINE_STATE_GENERATING_RESPONSE ||
+                        state == PipelineState.PIPELINE_STATE_IDLE
                     ) {
                         onStopSession()
                     } else {
@@ -898,9 +902,8 @@ private fun ModelBadge(
 
 @Composable
 private fun MicrophoneButton(
-    @Suppress("UnusedParameter") isListening: Boolean,
-    sessionState: SessionState,
-    isSpeechDetected: Boolean,
+    pipelineState: PipelineState,
+    isInputActive: Boolean,
     hasPermission: Boolean,
     isLoading: Boolean = false,
     onToggle: () -> Unit,
@@ -908,15 +911,18 @@ private fun MicrophoneButton(
     val backgroundColor =
         when {
             !hasPermission -> AppColors.statusRed
-            sessionState == SessionState.CONNECTING -> AppColors.statusOrange
-            sessionState == SessionState.LISTENING -> AppColors.statusRed
-            sessionState == SessionState.PROCESSING -> AppColors.primaryAccent
-            sessionState == SessionState.SPEAKING -> AppColors.statusGreen
+            pipelineState == PipelineState.PIPELINE_STATE_IDLE -> AppColors.statusOrange
+            pipelineState == PipelineState.PIPELINE_STATE_LISTENING -> AppColors.statusRed
+            pipelineState == PipelineState.PIPELINE_STATE_PROCESSING_SPEECH ||
+                pipelineState == PipelineState.PIPELINE_STATE_THINKING ||
+                pipelineState == PipelineState.PIPELINE_STATE_GENERATING_RESPONSE -> AppColors.primaryAccent
+            pipelineState == PipelineState.PIPELINE_STATE_SPEAKING ||
+                pipelineState == PipelineState.PIPELINE_STATE_PLAYING_TTS -> AppColors.statusGreen
             else -> AppColors.primaryAccent
         }
 
     val animatedScale by animateFloatAsState(
-        targetValue = if (isSpeechDetected) 1.1f else 1f,
+        targetValue = if (isInputActive) 1.1f else 1f,
         animationSpec =
             spring(
                 dampingRatio = Spring.DampingRatioMediumBouncy,
@@ -926,8 +932,8 @@ private fun MicrophoneButton(
     )
 
     Box(contentAlignment = Alignment.Center) {
-        // Pulsing effect when speech detected
-        if (isSpeechDetected) {
+        // Pulsing effect while microphone input is active.
+        if (isInputActive) {
             val infiniteTransition = rememberInfiniteTransition(label = "pulse_transition")
             val pulseScale by infiniteTransition.animateFloat(
                 initialValue = 1f,
@@ -970,8 +976,9 @@ private fun MicrophoneButton(
                         imageVector =
                             when {
                                 !hasPermission -> Icons.Default.MicOff
-                                sessionState == SessionState.LISTENING -> Icons.Default.Mic
-                                sessionState == SessionState.SPEAKING -> Icons.AutoMirrored.Filled.VolumeUp
+                                pipelineState == PipelineState.PIPELINE_STATE_LISTENING -> Icons.Default.Mic
+                                pipelineState == PipelineState.PIPELINE_STATE_SPEAKING ||
+                                    pipelineState == PipelineState.PIPELINE_STATE_PLAYING_TTS -> Icons.AutoMirrored.Filled.VolumeUp
                                 else -> Icons.Default.Mic
                             },
                         contentDescription = "Microphone",
@@ -987,12 +994,17 @@ private fun MicrophoneButton(
 /**
  * Get instruction text
  */
-private fun getInstructionText(sessionState: SessionState): String {
-    return when (sessionState) {
-        SessionState.LISTENING -> "Listening... Pause to send"
-        SessionState.PROCESSING -> "Processing your message..."
-        SessionState.SPEAKING -> "Speaking..."
-        SessionState.CONNECTING -> "Connecting..."
+private fun getInstructionText(pipelineState: PipelineState): String {
+    return when (pipelineState) {
+        PipelineState.PIPELINE_STATE_LISTENING -> "Recording... Tap to send"
+        PipelineState.PIPELINE_STATE_PROCESSING_SPEECH,
+        PipelineState.PIPELINE_STATE_THINKING,
+        PipelineState.PIPELINE_STATE_GENERATING_RESPONSE,
+        -> "Processing your message..."
+        PipelineState.PIPELINE_STATE_SPEAKING,
+        PipelineState.PIPELINE_STATE_PLAYING_TTS,
+        -> "Speaking..."
+        PipelineState.PIPELINE_STATE_IDLE -> "Preparing voice agent..."
         else -> "Tap to start conversation"
     }
 }

@@ -92,7 +92,7 @@ class _HttpRequestResult {
 /// HTTPClientAdapter.shared.configure(
 ///   baseURL: 'https://api.runanywhere.ai',
 ///   apiKey: '...',
-///   environment: SDKEnvironment.production,
+///   environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
 /// );
 /// final resp = await HTTPClientAdapter.shared.post(
 ///   '/api/v1/devices/register',
@@ -110,7 +110,7 @@ class HTTPClientAdapter {
 
   String _baseURL = '';
   String _apiKey = '';
-  SDKEnvironment _environment = SDKEnvironment.production;
+  SDKEnvironment _environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
   String? _accessToken;
   int _timeoutMs = defaultTimeoutMs;
 
@@ -130,7 +130,7 @@ class HTTPClientAdapter {
   void configure({
     required String baseURL,
     required String apiKey,
-    SDKEnvironment environment = SDKEnvironment.production,
+    SDKEnvironment environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
     int timeoutMs = defaultTimeoutMs,
   }) {
     _baseURL = baseURL;
@@ -164,10 +164,10 @@ class HTTPClientAdapter {
 
   String? get accessToken => _accessToken;
 
-  String get baseURL =>
-      _supabaseURL.isNotEmpty && _environment == SDKEnvironment.development
-          ? _supabaseURL
-          : _baseURL;
+  String get baseURL => _supabaseURL.isNotEmpty &&
+          _environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+      ? _supabaseURL
+      : _baseURL;
 
   SDKEnvironment get environment => _environment;
 
@@ -176,7 +176,7 @@ class HTTPClientAdapter {
   String get supabaseKey => _supabaseKey;
 
   bool get isConfigured {
-    if (_environment == SDKEnvironment.development) {
+    if (_environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
       return _supabaseURL.isNotEmpty;
     }
     return _baseURL.isNotEmpty;
@@ -363,7 +363,7 @@ class HTTPClientAdapter {
   void resetForTesting() {
     _baseURL = '';
     _apiKey = '';
-    _environment = SDKEnvironment.production;
+    _environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
     _accessToken = null;
     _timeoutMs = defaultTimeoutMs;
     _supabaseURL = '';
@@ -390,7 +390,7 @@ class HTTPClientAdapter {
   /// Supabase device-registration endpoints need `on_conflict=device_id`
   /// to do an UPSERT instead of rejecting duplicates.
   String _maybeAppendSupabaseUpsert(String url, String path) {
-    if (_environment != SDKEnvironment.development) return url;
+    if (_environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) return url;
     if (!_isDeviceRegistrationPath(path)) return url;
     final separator = url.contains('?') ? '&' : '?';
     return '$url${separator}on_conflict=device_id';
@@ -415,7 +415,7 @@ class HTTPClientAdapter {
       'X-Platform': SDKConstants.platform,
     };
 
-    if (_environment == SDKEnvironment.development) {
+    if (_environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
       if (_supabaseKey.isNotEmpty) {
         headers['apikey'] = _supabaseKey;
         headers['Authorization'] = 'Bearer $_supabaseKey';

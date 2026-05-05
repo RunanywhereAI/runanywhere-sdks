@@ -16,7 +16,7 @@ import StableDiffusion
 /// Service that wraps Apple's ml-stable-diffusion StableDiffusionPipeline
 /// for on-device image generation using Core ML.
 @available(iOS 16.2, macOS 13.1, *)
-public actor DiffusionPlatformService {
+actor DiffusionPlatformService {
 
     // MARK: - Properties
 
@@ -29,7 +29,7 @@ public actor DiffusionPlatformService {
     private var modelPath: String?
 
     /// Whether the pipeline is ready
-    public var isReady: Bool {
+    var isReady: Bool {
         pipeline != nil
     }
 
@@ -38,7 +38,7 @@ public actor DiffusionPlatformService {
 
     // MARK: - Initialization
 
-    public init() {}
+    init() {}
 
     // MARK: - Lifecycle
 
@@ -48,15 +48,19 @@ public actor DiffusionPlatformService {
     ///   - reduceMemory: Whether to use reduced memory mode (recommended for iOS)
     ///   - disableSafetyChecker: Whether to disable the safety checker
     ///   - tokenizerSource: Source for downloading missing tokenizer files (defaults to SD 1.5)
-    public func initialize(
+    func initialize(
         modelPath: String,
         reduceMemory: Bool = true,
         disableSafetyChecker: Bool = false,
-        tokenizerSource: DiffusionTokenizerSource = .sd15
+        tokenizerSource: RADiffusionTokenizerSource = {
+            var s = RADiffusionTokenizerSource()
+            s.kind = .bundledSd15
+            return s
+        }()
     ) async throws {
         let modelURL = URL(filePath: modelPath)
         logger.info("Initializing diffusion pipeline from: \(modelURL.lastPathComponent)")
-        logger.info("Tokenizer source: \(tokenizerSource.description)")
+        logger.info("Tokenizer source: \(tokenizerSource.displayName)")
 
         // Verify the directory exists
         guard FileManager.default.fileExists(atPath: modelPath) else {
@@ -150,7 +154,7 @@ public actor DiffusionPlatformService {
     /// - Parameters:
     ///   - modelURL: The model directory URL
     ///   - source: The tokenizer source to use (defaults to SD 1.5)
-    private func ensureTokenizerFiles(at modelURL: URL, source: DiffusionTokenizerSource = .sd15) async throws {
+    private func ensureTokenizerFiles(at modelURL: URL, source: RADiffusionTokenizerSource) async throws {
         let fileManager = FileManager.default
 
         for filename in Self.requiredTokenizerFiles {
@@ -161,9 +165,9 @@ public actor DiffusionPlatformService {
                 continue
             }
 
-            logger.info("Downloading missing tokenizer file: \(filename) from \(source.description)")
+            logger.info("Downloading missing tokenizer file: \(filename) from \(source.displayName)")
 
-            guard let remoteURL = URL(string: "\(source.baseURL)/\(filename)") else {
+            guard let remoteURL = URL(string: "\(source.tokenizerBaseURL)/\(filename)") else {
                 throw SDKException.diffusion(.initializationFailed, "Invalid tokenizer URL for: \(filename)")
             }
 
@@ -198,7 +202,7 @@ public actor DiffusionPlatformService {
     ///   - seed: Random seed for reproducibility (nil for random)
     ///   - progressHandler: Callback for progress updates
     /// - Returns: Array of generated CGImages (may be nil if safety check triggered)
-    public func generate(
+    func generate(
         prompt: String,
         negativePrompt: String = "",
         width: Int = 512,
@@ -297,7 +301,7 @@ public actor DiffusionPlatformService {
     }
 
     /// Cancel ongoing generation
-    public func cancel() {
+    func cancel() {
         logger.info("Cancelling generation")
         isCancelled = true
     }
@@ -337,7 +341,7 @@ public actor DiffusionPlatformService {
 // MARK: - Supporting Types
 
 /// Progress information for diffusion generation
-public struct DiffusionProgressInfo: Sendable {
+struct DiffusionProgressInfo: Sendable {
     /// Current step number
     public let step: Int
 
@@ -359,7 +363,7 @@ public struct DiffusionProgressInfo: Sendable {
 }
 
 /// Result of diffusion generation
-public struct DiffusionGenerationResult: Sendable {
+struct DiffusionGenerationResult: Sendable {
     /// Generated image data in RGBA format
     public let imageData: Data?
 
@@ -389,5 +393,3 @@ public struct DiffusionGenerationResult: Sendable {
         self.safetyTriggered = safetyTriggered
     }
 }
-
-// MARK: - SDKException Extension (uses DiffusionErrorCode from DiffusionTypes.swift)

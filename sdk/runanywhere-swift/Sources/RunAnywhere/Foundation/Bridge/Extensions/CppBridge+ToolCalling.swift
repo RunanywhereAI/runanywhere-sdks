@@ -16,6 +16,16 @@
 import CRACommons
 import Foundation
 
+private enum ToolCallingGeneratedProtoABI {
+    static let parseName = "rac_tool_call_parse_proto"
+    static let formatPromptName = "rac_tool_call_format_prompt_proto"
+    static let validateName = "rac_tool_call_validate_proto"
+
+    static let parse = NativeProtoABI.load(parseName, as: NativeProtoABI.ProtoRequest.self)
+    static let formatPrompt = NativeProtoABI.load(formatPromptName, as: NativeProtoABI.ProtoRequest.self)
+    static let validate = NativeProtoABI.load(validateName, as: NativeProtoABI.ProtoRequest.self)
+}
+
 // MARK: - Tool Calling Bridge
 
 extension CppBridge {
@@ -37,53 +47,27 @@ extension CppBridge {
         ///
         /// - Parameter llmOutput: Raw LLM output text
         /// - Returns: Tuple of (cleanText, toolCall) where toolCall is nil if none found
-        public static func parseToolCall(from llmOutput: String) -> (text: String, toolCall: ToolCall?) {
-            var result = rac_tool_call_t()
-            defer { rac_tool_call_free(&result) }
+        public static func parseToolCall(
+            from llmOutput: String,
+            options: RAToolCallingOptions = RAToolCallingOptions.defaults()
+        ) throws -> (text: String, toolCall: RAToolCall?) {
+            var request = RAToolParseRequest()
+            request.text = llmOutput
+            request.options = bridgeOptions(options)
 
-            let rc = rac_tool_call_parse(llmOutput, &result)
+            let result = try NativeProtoABI.invoke(
+                request,
+                symbol: ToolCallingGeneratedProtoABI.parse,
+                symbolName: ToolCallingGeneratedProtoABI.parseName,
+                responseType: RAToolParseResult.self
+            )
+            try throwIfError(result.errorCode, message: result.errorMessage)
 
-            guard rc == RAC_SUCCESS, result.has_tool_call == RAC_TRUE else {
-                // No tool call found - return clean text
-                let cleanText: String
-                if let cleanPtr = result.clean_text {
-                    cleanText = String(cString: cleanPtr)
-                } else {
-                    cleanText = llmOutput
-                }
-                return (cleanText, nil)
+            guard result.hasToolCall_p, let firstCall = result.toolCalls.first else {
+                return (result.remainingText.isEmpty ? llmOutput : result.remainingText, nil)
             }
 
-            // Extract tool name
-            guard let toolNamePtr = result.tool_name else {
-                return (llmOutput, nil)
-            }
-            let toolName = String(cString: toolNamePtr)
-
-            // Extract arguments JSON
-            let argsJson: String
-            if let argsPtr = result.arguments_json {
-                argsJson = String(cString: argsPtr)
-            } else {
-                argsJson = "{}"
-            }
-
-            // Extract clean text
-            let cleanText: String
-            if let cleanPtr = result.clean_text {
-                cleanText = String(cString: cleanPtr)
-            } else {
-                cleanText = ""
-            }
-
-            // Parse arguments JSON to [String: ToolValue]
-            let arguments = parseArgumentsJson(argsJson)
-
-            return (cleanText, ToolCall(
-                toolName: toolName,
-                arguments: arguments,
-                callId: "call_\(result.call_id)"
-            ))
+            return (result.remainingText, hydrateArguments(firstCall))
         }
 
         // MARK: - Format Tools for Prompt (NO FALLBACK)
@@ -94,26 +78,25 @@ extension CppBridge {
         /// tool call output format.
         ///
         /// - Parameters:
-        ///   - tools: Array of tool definitions
-        ///   - format: Tool call format name (e.g., "default", "lfm2"). See `ToolCallFormatName`.
+        ///   - tools: Array of generated tool definitions
+        ///   - format: Tool call format name (e.g., "default", "lfm2").
         /// - Returns: Formatted system prompt string
         public static func formatToolsForPrompt(
-            _ tools: [ToolDefinition],
-            format: String = ToolCallFormatName.default
-        ) -> String {
+            _ tools: [RAToolDefinition],
+            format: String = "default"
+        ) throws -> String {
             guard !tools.isEmpty else { return "" }
 
-            let toolsJson = serializeToolsToJson(tools)
-            var promptPtr: UnsafeMutablePointer<CChar>?
-            defer { if let ptr = promptPtr { rac_free(ptr) } }
-
-            // Use string-based C++ API (single source of truth for format names)
-            let rc = rac_tool_call_format_prompt_json_with_format_name(toolsJson, format, &promptPtr)
-            guard rc == RAC_SUCCESS, let ptr = promptPtr else {
-                return ""
-            }
-
-            return String(cString: ptr)
+            var options = RAToolCallingOptions.defaults()
+            options.formatHint = format
+            options.format = protoFormatName(from: format)
+            let request = makePromptFormatRequest(
+                userPrompt: "",
+                tools: tools,
+                options: options
+            )
+            let result = try formatPrompt(request)
+            return try formattedPrompt(from: result)
         }
 
         // MARK: - Build Initial Prompt (NO FALLBACK)
@@ -129,46 +112,18 @@ extension CppBridge {
         /// - Returns: Complete formatted prompt
         public static func buildInitialPrompt(
             userPrompt: String,
-            tools: [ToolDefinition],
-            options: ToolCallingOptions
-        ) -> String {
-            let toolsJson = serializeToolsToJson(tools)
-            var promptPtr: UnsafeMutablePointer<CChar>?
-            defer { if let ptr = promptPtr { rac_free(ptr) } }
+            tools: [RAToolDefinition],
+            options: RAToolCallingOptions
+        ) throws -> String {
+            guard !tools.isEmpty else { return userPrompt }
 
-            // Create C options struct
-            var cOptions = rac_tool_calling_options_t()
-            cOptions.max_tool_calls = Int32(options.maxToolCalls)
-            cOptions.auto_execute = options.autoExecute ? RAC_TRUE : RAC_FALSE
-            cOptions.temperature = options.temperature ?? 0.7
-            cOptions.max_tokens = Int32(options.maxTokens ?? 1024)
-            cOptions.replace_system_prompt = options.replaceSystemPrompt ? RAC_TRUE : RAC_FALSE
-            cOptions.keep_tools_available = options.keepToolsAvailable ? RAC_TRUE : RAC_FALSE
-            // Convert string format to enum using C++ (single source of truth)
-            cOptions.format = rac_tool_call_format_from_name(options.format)
-
-            // Handle system prompt
-            if let systemPrompt = options.systemPrompt {
-                return systemPrompt.withCString { sysPtr in
-                    cOptions.system_prompt = sysPtr
-                    return toolsJson.withCString { toolsPtr in
-                        return userPrompt.withCString { userPtr in
-                            let rc = rac_tool_call_build_initial_prompt(userPtr, toolsPtr, &cOptions, &promptPtr)
-                            guard rc == RAC_SUCCESS, let ptr = promptPtr else {
-                                return userPrompt
-                            }
-                            return String(cString: ptr)
-                        }
-                    }
-                }
-            } else {
-                cOptions.system_prompt = nil
-                let rc = rac_tool_call_build_initial_prompt(userPrompt, toolsJson, &cOptions, &promptPtr)
-                guard rc == RAC_SUCCESS, let ptr = promptPtr else {
-                    return userPrompt
-                }
-                return String(cString: ptr)
-            }
+            let request = makePromptFormatRequest(
+                userPrompt: userPrompt,
+                tools: tools,
+                options: options
+            )
+            let result = try formatPrompt(request)
+            return try formattedPrompt(from: result)
         }
 
         // MARK: - Build Follow-up Prompt (NO FALLBACK)
@@ -177,147 +132,135 @@ extension CppBridge {
         ///
         /// - Parameters:
         ///   - originalPrompt: The original user prompt
-        ///   - toolsPrompt: The formatted tools prompt (nil if not keeping tools)
-        ///   - toolName: Name of the tool that was executed
-        ///   - toolResultJson: JSON string of the tool result
-        ///   - keepToolsAvailable: Whether to include tool definitions
+        ///   - tools: Available generated tool definitions.
+        ///   - toolResult: Generated tool execution result.
+        ///   - options: Generated tool-calling options.
         /// - Returns: Follow-up prompt string
         public static func buildFollowupPrompt(
             originalPrompt: String,
-            toolsPrompt: String?,
-            toolName: String,
-            toolResultJson: String,
-            keepToolsAvailable: Bool
-        ) -> String {
-            var promptPtr: UnsafeMutablePointer<CChar>?
-            defer { if let ptr = promptPtr { rac_free(ptr) } }
-
-            // IMPORTANT: The C function call MUST be inside withCString closure(s)
-            // to ensure pointers remain valid. Swift's automatic String-to-C bridging
-            // handles non-optional strings, but optional strings need explicit handling.
-            let rc: Int32
-            if let toolsPrompt = toolsPrompt {
-                rc = toolsPrompt.withCString { toolsPromptPtr in
-                    rac_tool_call_build_followup_prompt(
-                        originalPrompt,
-                        toolsPromptPtr,
-                        toolName,
-                        toolResultJson,
-                        keepToolsAvailable ? RAC_TRUE : RAC_FALSE,
-                        &promptPtr
-                    )
-                }
-            } else {
-                rc = rac_tool_call_build_followup_prompt(
-                    originalPrompt,
-                    nil,
-                    toolName,
-                    toolResultJson,
-                    keepToolsAvailable ? RAC_TRUE : RAC_FALSE,
-                    &promptPtr
-                )
-            }
-
-            guard rc == RAC_SUCCESS, let ptr = promptPtr else {
-                return ""
-            }
-
-            return String(cString: ptr)
+            tools: [RAToolDefinition],
+            toolResult: RAToolResult,
+            options: RAToolCallingOptions
+        ) throws -> String {
+            let request = makePromptFormatRequest(
+                userPrompt: originalPrompt,
+                tools: tools,
+                options: options,
+                toolResults: [toolResult]
+            )
+            let result = try formatPrompt(request)
+            return try formattedPrompt(from: result)
         }
 
-        // MARK: - JSON Normalization (NO FALLBACK)
+        public static func validateToolCall(
+            _ toolCall: RAToolCall,
+            tools: [RAToolDefinition],
+            options: RAToolCallingOptions
+        ) throws -> RAToolCallValidationResult {
+            let request = makeValidationRequest(
+                toolCall: toolCall,
+                tools: tools,
+                options: options
+            )
+            return try NativeProtoABI.invoke(
+                request,
+                symbol: ToolCallingGeneratedProtoABI.validate,
+                symbolName: ToolCallingGeneratedProtoABI.validateName,
+                responseType: RAToolCallValidationResult.self
+            )
+        }
 
-        /// Normalize JSON by adding quotes around unquoted keys using C++ implementation.
-        ///
-        /// Handles common LLM output patterns: `{tool: "name"}` → `{"tool": "name"}`
-        ///
-        /// - Parameter jsonStr: Raw JSON string possibly with unquoted keys
-        /// - Returns: Normalized JSON string with all keys quoted
-        public static func normalizeJson(_ jsonStr: String) -> String {
-            var normalizedPtr: UnsafeMutablePointer<CChar>?
-            defer { if let normalized = normalizedPtr { rac_free(normalized) } }
+        static func makePromptFormatRequest(
+            userPrompt: String,
+            tools: [RAToolDefinition],
+            options: RAToolCallingOptions,
+            toolResults: [RAToolResult] = []
+        ) -> RAToolPromptFormatRequest {
+            var request = RAToolPromptFormatRequest()
+            request.userPrompt = userPrompt
+            request.options = bridgeOptions(options, tools: tools)
+            request.toolResults = toolResults
+            return request
+        }
 
-            let rc = rac_tool_call_normalize_json(jsonStr, &normalizedPtr)
-            guard rc == RAC_SUCCESS, let ptr = normalizedPtr else {
-                return jsonStr
+        static func makeValidationRequest(
+            toolCall: RAToolCall,
+            tools: [RAToolDefinition],
+            options: RAToolCallingOptions
+        ) -> RAToolCallValidationRequest {
+            var request = RAToolCallValidationRequest()
+            request.toolCall = toolCall
+            request.options = bridgeOptions(options, tools: tools)
+            return request
+        }
+
+        static func bridgeOptions(
+            _ options: RAToolCallingOptions,
+            tools: [RAToolDefinition]? = nil
+        ) -> RAToolCallingOptions {
+            var bridged = options
+            if let tools {
+                bridged.tools = tools
             }
-
-            return String(cString: ptr)
+            let formatName = options.resolvedFormatName
+            bridged.formatHint = formatName
+            bridged.format = protoFormatName(from: formatName)
+            return bridged
         }
 
         // MARK: - Private Helpers
 
-        /// Parse arguments JSON string to [String: ToolValue] dictionary.
-        ///
-        /// Uses `ToolValue`'s Codable conformance so we never have to touch `Any`.
-        private static func parseArgumentsJson(_ json: String) -> [String: ToolValue] {
-            guard let data = json.data(using: .utf8) else { return [:] }
-            return (try? JSONDecoder().decode([String: ToolValue].self, from: data)) ?? [:]
+        private static func formatPrompt(
+            _ request: RAToolPromptFormatRequest
+        ) throws -> RAToolPromptFormatResult {
+            try NativeProtoABI.invoke(
+                request,
+                symbol: ToolCallingGeneratedProtoABI.formatPrompt,
+                symbolName: ToolCallingGeneratedProtoABI.formatPromptName,
+                responseType: RAToolPromptFormatResult.self
+            )
         }
 
-        /// Serialize tool definitions to JSON array string via Codable bridges.
-        ///
-        /// Note: We use Swift's native JSONEncoder here because:
-        /// 1. It's clean and simple — uses strongly-typed `Codable` bridges
-        /// 2. JSON serialization is just data formatting, not complex logic
-        /// 3. The "single source of truth" is already achieved for PARSING (in C++)
-        /// 4. The performance difference is negligible for typical tool counts
-        private static func serializeToolsToJson(_ tools: [ToolDefinition]) -> String {
-            let encodable = tools.map(ToolDefinitionJSON.init)
-            guard let data = try? JSONEncoder().encode(encodable),
-                  let json = String(data: data, encoding: .utf8) else {
-                return "[]"
+        private static func formattedPrompt(from result: RAToolPromptFormatResult) throws -> String {
+            try throwIfError(result.errorCode, message: result.errorMessage)
+            return result.formattedPrompt
+        }
+
+        private static func throwIfError(_ errorCode: Int32, message: String) throws {
+            guard errorCode == RAC_SUCCESS else {
+                throw SDKException.general(
+                    .processingFailed,
+                    message.isEmpty ? "Tool calling proto request failed: \(errorCode)" : message
+                )
             }
-            return json
         }
-    }
-}
 
-// MARK: - Codable JSON Bridges
+        private static func hydrateArguments(_ toolCall: RAToolCall) -> RAToolCall {
+            var hydrated = toolCall
+            if hydrated.arguments.isEmpty, !hydrated.argumentsJson.isEmpty {
+                hydrated.arguments = RAToolValue.parseObjectJSON(hydrated.argumentsJson)
+            }
+            if hydrated.argumentsJson.isEmpty, !hydrated.arguments.isEmpty {
+                hydrated.argumentsJson = RAToolValue.jsonString(from: hydrated.arguments)
+            }
+            return hydrated
+        }
 
-/// Encodable shape of a `ToolDefinition` for the C++ tool-calling bridge.
-private struct ToolDefinitionJSON: Encodable {
-    let name: String
-    let description: String
-    let parameters: [ToolParameterJSON]
-
-    init(_ tool: ToolDefinition) {
-        self.name = tool.name
-        self.description = tool.description
-        self.parameters = tool.parameters.map(ToolParameterJSON.init)
-    }
-}
-
-/// Encodable shape of a `ToolParameter` for the C++ tool-calling bridge.
-private struct ToolParameterJSON: Encodable {
-    let name: String
-    let type: String
-    let description: String
-    let required: Bool
-    let enumValues: [String]?
-
-    init(_ param: ToolParameter) {
-        self.name = param.name
-        self.type = param.type.rawValue
-        self.description = param.description
-        self.required = param.required
-        self.enumValues = param.enumValues
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case name, type, description, required, enumValues
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(name, forKey: .name)
-        try container.encode(type, forKey: .type)
-        try container.encode(description, forKey: .description)
-        try container.encode(required, forKey: .required)
-        // Omit the key entirely when there are no enum values, preserving the
-        // previous JSONSerialization output shape.
-        if let enumValues = enumValues {
-            try container.encode(enumValues, forKey: .enumValues)
+        private static func protoFormatName(from formatName: String) -> RAToolCallFormatName {
+            switch formatName.lowercased() {
+            case "lfm2", "lfm", "liquid", "pythonic", "hermes":
+                return .pythonic
+            case "openai", "openai_functions", "openai-functions":
+                return .openaiFunctions
+            case "xml":
+                return .xml
+            case "native":
+                return .native
+            case "json", "default", "auto":
+                return .json
+            default:
+                return .json
+            }
         }
     }
 }

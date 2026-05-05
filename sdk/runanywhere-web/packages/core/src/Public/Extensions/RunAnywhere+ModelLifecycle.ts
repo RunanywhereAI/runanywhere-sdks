@@ -53,11 +53,13 @@ export const ModelLifecycle = {
     return requireAdapter().unload({ modelId: '', unloadAll: true });
   },
 
-  currentModel(request: CurrentModelRequest = {}): CurrentModelResult | null {
+  currentModel(
+    request: CurrentModelRequest = { includeModelMetadata: false },
+  ): CurrentModelResult | null {
     return requireAdapter().currentModel(request);
   },
 
-  isLoaded(request: CurrentModelRequest = {}): boolean {
+  isLoaded(request: CurrentModelRequest = { includeModelMetadata: false }): boolean {
     const current = requireAdapter().currentModel(request);
     return Boolean(current?.modelId);
   },

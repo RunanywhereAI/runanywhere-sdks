@@ -8,6 +8,18 @@
  *
  * This header defines data structures only. For the service interface,
  * see rac_llm_service.h.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Public structs/callbacks (rac_llm_config_t, rac_llm_options_t,
+ *     rac_llm_result_t, rac_llm_info_t, rac_llm_token_event_t,
+ *     rac_llm_stream_*_t, rac_thinking_tag_pattern_t,
+ *     rac_structured_output_*_t, rac_llm_stream_callback_fn,
+ *     rac_llm_token_event_callback_fn): `delete after SDK migration`.
+ *     Replaced by serialized runanywhere.v1.LLMGenerateRequest /
+ *     LLMGenerationResult / LLMStreamEvent bytes via rac_llm_*_proto and
+ *     rac_llm_set_stream_proto_callback in rac_llm_stream.h.
+ *   - rac_llm_result_free: `internal` C-side memory helper kept while the
+ *     struct callbacks remain.
  */
 
 #ifndef RAC_LLM_TYPES_H

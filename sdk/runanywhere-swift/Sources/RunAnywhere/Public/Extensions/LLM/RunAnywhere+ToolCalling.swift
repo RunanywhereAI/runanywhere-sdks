@@ -25,7 +25,7 @@ private actor ToolRegistry {
 
     private var tools: [String: RegisteredTool] = [:]
 
-    func register(_ definition: ToolDefinition, executor: @escaping ToolExecutor) {
+    func register(_ definition: RAToolDefinition, executor: @escaping ToolExecutor) {
         tools[definition.name] = RegisteredTool(definition: definition, executor: executor)
     }
 
@@ -33,7 +33,7 @@ private actor ToolRegistry {
         tools.removeValue(forKey: toolName)
     }
 
-    func getAll() -> [ToolDefinition] {
+    func getAll() -> [RAToolDefinition] {
         tools.values.map(\.definition)
     }
 
@@ -60,11 +60,11 @@ public extension RunAnywhere {
     /// Example:
     /// ```swift
     /// RunAnywhere.registerTool(
-    ///     ToolDefinition(
+    ///     RAToolDefinition(
     ///         name: "get_weather",
     ///         description: "Gets current weather for a location",
     ///         parameters: [
-    ///             ToolParameter(name: "location", type: .string, description: "City name")
+    ///             RAToolParameter(name: "location", type: .string, description: "City name")
     ///         ]
     ///     )
     /// ) { args in
@@ -78,7 +78,7 @@ public extension RunAnywhere {
     ///   - definition: Tool definition (name, description, parameters)
     ///   - executor: Async closure that executes the tool
     static func registerTool(
-        _ definition: ToolDefinition,
+        _ definition: RAToolDefinition,
         executor: @escaping ToolExecutor
     ) async {
         await ToolRegistry.shared.register(definition, executor: executor)
@@ -94,7 +94,7 @@ public extension RunAnywhere {
     /// Get all registered tool definitions.
     ///
     /// - Returns: Array of registered tool definitions
-    static func getRegisteredTools() async -> [ToolDefinition] {
+    static func getRegisteredTools() async -> [RAToolDefinition] {
         await ToolRegistry.shared.getAll()
     }
 
@@ -108,34 +108,37 @@ public extension RunAnywhere {
     /// Execute a tool call.
     ///
     /// Looks up the tool in the registry and invokes its executor with the provided arguments.
-    /// Returns a `ToolResult` with success/failure status.
+    /// Returns a `RAToolResult` with success/failure status.
     ///
     /// - Parameter toolCall: The tool call to execute
     /// - Returns: Result of the tool execution
-    static func executeTool(_ toolCall: ToolCall) async -> ToolResult {
-        guard let tool = await ToolRegistry.shared.get(toolCall.toolName) else {
-            return ToolResult(
-                toolName: toolCall.toolName,
+    static func executeTool(_ toolCall: RAToolCall) async -> RAToolResult {
+        let toolName = toolCall.name
+        let toolCallID = toolCallIdentifier(toolCall)
+
+        guard let tool = await ToolRegistry.shared.get(toolName) else {
+            return makeToolResult(
+                name: toolName,
                 success: false,
-                error: "Unknown tool: \(toolCall.toolName)",
-                callId: toolCall.callId
+                error: "Unknown tool: \(toolName)",
+                toolCallID: toolCallID
             )
         }
 
         do {
             let result = try await tool.executor(toolCall.arguments)
-            return ToolResult(
-                toolName: toolCall.toolName,
+            return makeToolResult(
+                name: toolName,
                 success: true,
                 result: result,
-                callId: toolCall.callId
+                toolCallID: toolCallID
             )
         } catch {
-            return ToolResult(
-                toolName: toolCall.toolName,
+            return makeToolResult(
+                name: toolName,
                 success: false,
                 error: error.localizedDescription,
-                callId: toolCall.callId
+                toolCallID: toolCallID
             )
         }
     }
@@ -153,207 +156,176 @@ public extension RunAnywhere {
     ///
     /// - Parameters:
     ///   - prompt: The user's prompt
-    ///   - options: Generation options (optional); tool-calling behaviour is
-    ///              controlled via registered tools and `ToolCallingOptions`.
-    /// - Returns: `LLMGenerationResult` with the final text and any tool metadata.
+    ///   - options: Generated LLM generation options.
+    ///   - toolOptions: Generated tool-calling options. If omitted, the
+    ///                  `options.toolCalling` payload is used when present,
+    ///                  otherwise SDK defaults are applied.
+    /// - Returns: Generated `RAToolCallingResult` with final text, tool calls,
+    ///            and any executed tool results.
     static func generateWithTools(
-        _ prompt: String,
-        options: LLMGenerationOptions? = nil
-    ) async throws -> LLMGenerationResult {
+        prompt: String,
+        options: RALLMGenerationOptions = .defaults(),
+        toolOptions: RAToolCallingOptions? = nil
+    ) async throws -> RAToolCallingResult {
         guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         try await ensureServicesReady()
 
-        // Use registered tools; generation options control temperature/maxTokens.
-        let tcOpts = ToolCallingOptions()
+        let tcOpts = toolOptions ?? (options.hasToolCalling ? options.toolCalling : RAToolCallingOptions.defaults())
         let registeredTools = await ToolRegistry.shared.getAll()
-        let tools = tcOpts.tools ?? registeredTools
-        let genOpts = options ?? LLMGenerationOptions()
+        let tools = tcOpts.tools.isEmpty ? registeredTools : tcOpts.tools
 
-        // Extract /no_think prefix before building the full prompt.
-        let noThinkPrefix = "/no_think\n"
-        let hasNoThink = prompt.hasPrefix(noThinkPrefix)
-        let cleanPrompt = hasNoThink ? String(prompt.dropFirst(noThinkPrefix.count)) : prompt
-
-        let systemPrompt = buildToolSystemPrompt(tools: tools, options: tcOpts)
-        var fullPrompt = systemPrompt.isEmpty ? cleanPrompt : "\(systemPrompt)\n\nUser: \(cleanPrompt)"
-        if hasNoThink {
-            fullPrompt = "\(noThinkPrefix)\(fullPrompt)"
+        var fullPrompt = prompt
+        if !tools.isEmpty {
+            fullPrompt = try CppBridge.ToolCalling.buildInitialPrompt(
+                userPrompt: prompt,
+                tools: tools,
+                options: tcOpts
+            )
         }
 
         var finalText = ""
-        let startTime = Date()
+        var toolCalls: [RAToolCall] = []
+        var toolResults: [RAToolResult] = []
+        var isComplete = true
 
-        for _ in 0..<tcOpts.maxToolCalls {
+        for _ in 0..<tcOpts.maxToolCallCount {
             let responseText = try await generateAndCollect(
-                fullPrompt,
-                temperature: tcOpts.temperature ?? genOpts.temperature,
-                maxTokens: tcOpts.maxTokens ?? genOpts.maxTokens
+                prompt: fullPrompt,
+                baseOptions: options,
+                toolOptions: tcOpts
             )
 
             // Parse using C++ implementation (SINGLE SOURCE OF TRUTH - NO FALLBACK)
-            let (text, toolCall) = CppBridge.ToolCalling.parseToolCall(from: responseText)
+            let (text, toolCall) = try CppBridge.ToolCalling.parseToolCall(
+                from: responseText,
+                options: tcOpts
+            )
             finalText = text
 
-            guard let toolCall = toolCall else { break }
-
-            if !tcOpts.autoExecute { break }
-
-            let toolResult = await executeTool(toolCall)
-
-            fullPrompt = buildFollowUpPrompt(
-                prompt: cleanPrompt,
-                systemPrompt: systemPrompt,
-                toolCall: toolCall,
-                result: toolResult,
-                keepToolsAvailable: tcOpts.keepToolsAvailable
-            )
-            if hasNoThink {
-                fullPrompt = "\(noThinkPrefix)\(fullPrompt)"
+            guard let toolCall = toolCall else {
+                isComplete = true
+                break
             }
+
+            toolCalls.append(toolCall)
+
+            guard tcOpts.autoExecute else {
+                isComplete = false
+                break
+            }
+
+            let validation = try CppBridge.ToolCalling.validateToolCall(
+                toolCall,
+                tools: tools,
+                options: tcOpts
+            )
+            guard validation.isValid else {
+                let error = validation.hasErrorMessage && !validation.errorMessage.isEmpty
+                    ? validation.errorMessage
+                    : validation.validationErrors.joined(separator: "; ")
+                toolResults.append(makeToolResult(
+                    name: toolCall.name,
+                    success: false,
+                    error: error.isEmpty ? "Tool call validation failed" : error,
+                    toolCallID: toolCallIdentifier(toolCall)
+                ))
+                isComplete = false
+                break
+            }
+
+            let executableToolCall = toolCallWithValidatedArguments(
+                toolCall,
+                validation: validation
+            )
+            let toolResult = await executeTool(executableToolCall)
+            toolResults.append(toolResult)
+
+            let followUpPrompt = try CppBridge.ToolCalling.buildFollowupPrompt(
+                originalPrompt: prompt,
+                tools: tools,
+                toolResult: toolResult,
+                options: tcOpts
+            )
+            fullPrompt = followUpPrompt.isEmpty ? prompt : followUpPrompt
+            isComplete = false
         }
 
-        let latencyMs = Date().timeIntervalSince(startTime) * 1000
-        return LLMGenerationResult(
-            text: finalText,
-            thinkingContent: nil,
-            inputTokens: 0,
-            tokensUsed: 0,
-            modelUsed: await CppBridge.LLM.shared.currentModelId ?? "unknown",
-            latencyMs: latencyMs,
-            framework: "llamacpp",
-            tokensPerSecond: 0,
-            timeToFirstTokenMs: nil,
-            thinkingTokens: nil,
-            responseTokens: 0
-        )
-    }
-
-    /// Builds the system prompt with tool definitions using C++ implementation.
-    private static func buildToolSystemPrompt(
-        tools: [ToolDefinition],
-        options: ToolCallingOptions
-    ) -> String {
-        // Use C++ implementation for prompt formatting (SINGLE SOURCE OF TRUTH)
-        // Pass the format from options to generate model-specific instructions
-        let toolsPrompt = CppBridge.ToolCalling.formatToolsForPrompt(tools, format: options.format)
-
-        if options.replaceSystemPrompt, let userPrompt = options.systemPrompt {
-            return userPrompt
-        } else if let userPrompt = options.systemPrompt {
-            return "\(userPrompt)\n\n\(toolsPrompt)"
-        } else {
-            return toolsPrompt
-        }
-    }
-
-    /// Builds the follow-up prompt after a tool execution.
-    private static func buildFollowUpPrompt(
-        prompt: String,
-        systemPrompt: String,
-        toolCall: ToolCall,
-        result: ToolResult,
-        keepToolsAvailable: Bool
-    ) -> String {
-        let resultData: [String: ToolValue] = result.success
-            ? (result.result ?? [:])
-            : ["error": .string(result.error ?? "Unknown error")]
-        let resultJson = ToolValue.object(resultData).toJSONString() ?? "{}"
-
-        if keepToolsAvailable {
-            return """
-            \(systemPrompt)
-
-            User: \(prompt)
-
-            You previously used the \(toolCall.toolName) tool and received:
-            \(resultJson)
-
-            Based on this tool result, either use another tool if needed, or provide a helpful response.
-            """
-        } else {
-            return """
-            The user asked: "\(prompt)"
-
-            You used the \(toolCall.toolName) tool and received this data:
-            \(resultJson)
-
-            Now provide a helpful, natural response to the user based on this information.
-            """
-        }
-    }
-
-    /// Continue LLM generation after providing a tool result (CANONICAL_API §3).
-    ///
-    /// The canonical signature: `continueWithToolResult(toolCallId:result:) -> LLMGenerationResult`.
-    ///
-    /// After the LLM requested a tool call (identified by `toolCallId`), the
-    /// caller executes the tool and passes the stringified result here. The SDK
-    /// resumes the conversation with that context and returns the next generation
-    /// result.
-    ///
-    /// - Parameters:
-    ///   - toolCallId: The identifier of the tool call to answer (from the
-    ///                 `ToolCall.callId` in the previous generation result).
-    ///   - result: The tool's output as a string (JSON or plain text).
-    /// - Returns: `LLMGenerationResult` containing the model's response after
-    ///            seeing the tool result.
-    static func continueWithToolResult(
-        toolCallId: String,
-        result: String
-    ) async throws -> LLMGenerationResult {
-        guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
-        }
-        try await ensureServicesReady()
-
-        let continuedPrompt = """
-            Tool result for call '\(toolCallId)': \(result)
-
-            Based on this tool result, please provide your response:
-            """
-
-        let startTime = Date()
-        let responseText = try await generateAndCollect(
-            continuedPrompt,
-            temperature: Float(0.3),
-            maxTokens: 1024
-        )
-        let latencyMs = Date().timeIntervalSince(startTime) * 1000
-
-        return LLMGenerationResult(
-            text: responseText,
-            thinkingContent: nil,
-            inputTokens: 0,
-            tokensUsed: 0,
-            modelUsed: await CppBridge.LLM.shared.currentModelId ?? "unknown",
-            latencyMs: latencyMs,
-            framework: "llamacpp",
-            tokensPerSecond: 0,
-            timeToFirstTokenMs: nil,
-            thinkingTokens: nil,
-            responseTokens: 0
-        )
+        var result = RAToolCallingResult()
+        result.text = finalText
+        result.toolCalls = toolCalls
+        result.toolResults = toolResults
+        result.isComplete = isComplete
+        return result
     }
 
     // MARK: - Private Helpers
 
+    private static func toolCallIdentifier(_ toolCall: RAToolCall) -> String? {
+        if !toolCall.id.isEmpty {
+            return toolCall.id
+        }
+        if !toolCall.callID.isEmpty {
+            return toolCall.callID
+        }
+        return nil
+    }
+
+    private static func makeToolResult(
+        name: String,
+        success: Bool,
+        result: [String: RAToolValue] = [:],
+        error: String? = nil,
+        toolCallID: String? = nil
+    ) -> RAToolResult {
+        var toolResult = RAToolResult()
+        toolResult.name = name
+        toolResult.success = success
+        toolResult.result = result
+        toolResult.resultJson = RAToolValue.jsonString(from: result)
+        if let error {
+            toolResult.error = error
+        }
+        if let toolCallID {
+            toolResult.toolCallID = toolCallID
+            toolResult.callID = toolCallID
+        }
+        return toolResult
+    }
+
+    private static func toolCallWithValidatedArguments(
+        _ toolCall: RAToolCall,
+        validation: RAToolCallValidationResult
+    ) -> RAToolCall {
+        guard !validation.normalizedArgumentsJson.isEmpty else {
+            return toolCall
+        }
+
+        var normalized = toolCall
+        normalized.argumentsJson = validation.normalizedArgumentsJson
+        normalized.arguments = RAToolValue.parseObjectJSON(validation.normalizedArgumentsJson)
+        return normalized
+    }
+
     /// Generate text using streaming and collect all tokens into a single string.
     private static func generateAndCollect(
-        _ prompt: String,
-        temperature: Float?,
-        maxTokens: Int?
+        prompt: String,
+        baseOptions: RALLMGenerationOptions,
+        toolOptions: RAToolCallingOptions
     ) async throws -> String {
-        let genOptions = LLMGenerationOptions(
-            maxTokens: maxTokens ?? 1024,
-            temperature: temperature ?? 0.3  // Lower temperature for consistent tool calling
-        )
+        var genOptions = baseOptions
+        if toolOptions.hasMaxTokens, toolOptions.maxTokens > 0 {
+            genOptions.maxTokens = toolOptions.maxTokens
+        }
+        if toolOptions.hasTemperature {
+            genOptions.temperature = toolOptions.temperature
+        }
+        genOptions.streamingEnabled = true
+        var request = genOptions.toRALLMGenerateRequest(prompt: prompt)
+        request.streamingEnabled = true
 
-        // v2 close-out Phase G-2: generateStream now returns
-        // AsyncStream<RALLMStreamEvent>; collect the token text off each
-        // event and stop at the terminal is_final marker.
-        let eventStream = try await generateStream(prompt, options: genOptions)
+        let eventStream = try await generateStream(request)
 
         var responseText = ""
         for await event in eventStream {

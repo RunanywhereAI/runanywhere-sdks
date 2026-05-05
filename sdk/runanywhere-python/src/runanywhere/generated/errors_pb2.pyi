@@ -318,7 +318,7 @@ class ErrorContext(_message.Message):
     def __init__(self, metadata: _Optional[_Mapping[str, str]] = ..., source_file: _Optional[str] = ..., source_line: _Optional[int] = ..., operation: _Optional[str] = ...) -> None: ...
 
 class SDKError(_message.Message):
-    __slots__ = ("code", "category", "message", "context", "c_abi_code", "nested_message", "timestamp_ms", "severity", "component")
+    __slots__ = ("code", "category", "message", "context", "c_abi_code", "nested_message", "timestamp_ms", "severity", "component", "retryable", "remediation_hint", "correlation_id")
     CODE_FIELD_NUMBER: _ClassVar[int]
     CATEGORY_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
@@ -328,6 +328,9 @@ class SDKError(_message.Message):
     TIMESTAMP_MS_FIELD_NUMBER: _ClassVar[int]
     SEVERITY_FIELD_NUMBER: _ClassVar[int]
     COMPONENT_FIELD_NUMBER: _ClassVar[int]
+    RETRYABLE_FIELD_NUMBER: _ClassVar[int]
+    REMEDIATION_HINT_FIELD_NUMBER: _ClassVar[int]
+    CORRELATION_ID_FIELD_NUMBER: _ClassVar[int]
     code: ErrorCode
     category: ErrorCategory
     message: str
@@ -337,4 +340,7 @@ class SDKError(_message.Message):
     timestamp_ms: int
     severity: ErrorSeverity
     component: str
-    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., category: _Optional[_Union[ErrorCategory, str]] = ..., message: _Optional[str] = ..., context: _Optional[_Union[ErrorContext, _Mapping]] = ..., c_abi_code: _Optional[int] = ..., nested_message: _Optional[str] = ..., timestamp_ms: _Optional[int] = ..., severity: _Optional[_Union[ErrorSeverity, str]] = ..., component: _Optional[str] = ...) -> None: ...
+    retryable: bool
+    remediation_hint: str
+    correlation_id: str
+    def __init__(self, code: _Optional[_Union[ErrorCode, str]] = ..., category: _Optional[_Union[ErrorCategory, str]] = ..., message: _Optional[str] = ..., context: _Optional[_Union[ErrorContext, _Mapping]] = ..., c_abi_code: _Optional[int] = ..., nested_message: _Optional[str] = ..., timestamp_ms: _Optional[int] = ..., severity: _Optional[_Union[ErrorSeverity, str]] = ..., component: _Optional[str] = ..., retryable: _Optional[bool] = ..., remediation_hint: _Optional[str] = ..., correlation_id: _Optional[str] = ...) -> None: ...

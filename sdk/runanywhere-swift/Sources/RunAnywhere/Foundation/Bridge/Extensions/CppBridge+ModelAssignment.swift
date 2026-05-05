@@ -96,8 +96,8 @@ public extension CppBridge {
 
         /// Fetch model assignments from backend
         /// - Parameter forceRefresh: Force refresh even if cached
-        /// - Returns: Array of ModelInfo
-        public static func fetch(forceRefresh: Bool = false) async throws -> [ModelInfo] {
+        /// - Returns: Array of generated model metadata records.
+        public static func fetch(forceRefresh: Bool = false) async throws -> [RAModelInfo] {
             var outModels: UnsafeMutablePointer<UnsafeMutablePointer<rac_model_info_t>?>?
             var outCount: Int = 0
 
@@ -117,11 +117,11 @@ public extension CppBridge {
                 }
             }
 
-            var modelInfos: [ModelInfo] = []
+            var modelInfos: [RAModelInfo] = []
             if let models = outModels {
                 for i in 0..<outCount {
                     if let modelPtr = models[i] {
-                        modelInfos.append(ModelInfo(from: modelPtr.pointee))
+                        modelInfos.append(RAModelInfo(from: modelPtr.pointee))
                     }
                 }
             }
@@ -131,7 +131,7 @@ public extension CppBridge {
         }
 
         /// Get cached models for a specific framework
-        public static func getByFramework(_ framework: InferenceFramework) -> [ModelInfo] {
+        public static func getByFramework(_ framework: InferenceFramework) -> [RAModelInfo] {
             var outModels: UnsafeMutablePointer<UnsafeMutablePointer<rac_model_info_t>?>?
             var outCount: Int = 0
 
@@ -152,11 +152,11 @@ public extension CppBridge {
                 }
             }
 
-            var modelInfos: [ModelInfo] = []
+            var modelInfos: [RAModelInfo] = []
             if let models = outModels {
                 for i in 0..<outCount {
                     if let modelPtr = models[i] {
-                        modelInfos.append(ModelInfo(from: modelPtr.pointee))
+                        modelInfos.append(RAModelInfo(from: modelPtr.pointee))
                     }
                 }
             }
@@ -165,7 +165,7 @@ public extension CppBridge {
         }
 
         /// Get cached models for a specific category
-        public static func getByCategory(_ category: ModelCategory) -> [ModelInfo] {
+        public static func getByCategory(_ category: ModelCategory) -> [RAModelInfo] {
             var outModels: UnsafeMutablePointer<UnsafeMutablePointer<rac_model_info_t>?>?
             var outCount: Int = 0
 
@@ -187,11 +187,11 @@ public extension CppBridge {
                 }
             }
 
-            var modelInfos: [ModelInfo] = []
+            var modelInfos: [RAModelInfo] = []
             if let models = outModels {
                 for i in 0..<outCount {
                     if let modelPtr = models[i] {
-                        modelInfos.append(ModelInfo(from: modelPtr.pointee))
+                        modelInfos.append(RAModelInfo(from: modelPtr.pointee))
                     }
                 }
             }

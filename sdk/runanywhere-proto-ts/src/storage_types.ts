@@ -191,6 +191,8 @@ export interface StorageAvailability {
   availableBytes: number;
   warningMessage?: string | undefined;
   recommendation?: string | undefined;
+  shortfallBytes: number;
+  requiredToAvailableRatio: number;
 }
 
 /**
@@ -217,12 +219,14 @@ export interface StorageInfoRequest {
   includeDevice: boolean;
   includeApp: boolean;
   includeModels: boolean;
+  includeCache: boolean;
 }
 
 export interface StorageInfoResult {
   success: boolean;
   info?: StorageInfo | undefined;
   errorMessage: string;
+  warnings: string[];
 }
 
 export interface StorageAvailabilityRequest {
@@ -230,6 +234,8 @@ export interface StorageAvailabilityRequest {
   requiredBytes: number;
   safetyMargin: number;
   includeExistingModelBytes: boolean;
+  includeDeletePlan: boolean;
+  allowCacheReclamation: boolean;
 }
 
 export interface StorageAvailabilityResult {
@@ -237,6 +243,7 @@ export interface StorageAvailabilityResult {
   availability?: StorageAvailability | undefined;
   warnings: string[];
   errorMessage: string;
+  deletePlan?: StorageDeletePlan | undefined;
 }
 
 export interface StorageDeletePlanRequest {
@@ -244,6 +251,8 @@ export interface StorageDeletePlanRequest {
   requiredBytes: number;
   includeCache: boolean;
   oldestFirst: boolean;
+  allowLoadedModels: boolean;
+  includeDownloadPartials: boolean;
 }
 
 export interface StorageDeleteCandidate {
@@ -252,6 +261,9 @@ export interface StorageDeleteCandidate {
   lastUsedMs?: number | undefined;
   isLoaded: boolean;
   localPath: string;
+  requiresUnload: boolean;
+  requiresPlatformDelete: boolean;
+  storageKey: string;
 }
 
 export interface StorageDeletePlan {
@@ -261,6 +273,9 @@ export interface StorageDeletePlan {
   candidates: StorageDeleteCandidate[];
   warnings: string[];
   errorMessage: string;
+  requiresUnload: boolean;
+  requiresPlatformDelete: boolean;
+  candidateCount: number;
 }
 
 export interface StorageDeleteRequest {
@@ -269,6 +284,9 @@ export interface StorageDeleteRequest {
   clearRegistryPaths: boolean;
   unloadIfLoaded: boolean;
   dryRun: boolean;
+  plan?: StorageDeletePlan | undefined;
+  requirePlanMatch: boolean;
+  allowPlatformDelete: boolean;
 }
 
 export interface StorageDeleteResult {
@@ -278,6 +296,10 @@ export interface StorageDeleteResult {
   failedModelIds: string[];
   warnings: string[];
   errorMessage: string;
+  skippedModelIds: string[];
+  dryRun: boolean;
+  registryUpdated: boolean;
+  filesDeleted: boolean;
 }
 
 function createBaseDeviceStorageInfo(): DeviceStorageInfo {
@@ -709,6 +731,8 @@ function createBaseStorageAvailability(): StorageAvailability {
     availableBytes: 0,
     warningMessage: undefined,
     recommendation: undefined,
+    shortfallBytes: 0,
+    requiredToAvailableRatio: 0,
   };
 }
 
@@ -728,6 +752,12 @@ export const StorageAvailability = {
     }
     if (message.recommendation !== undefined) {
       writer.uint32(42).string(message.recommendation);
+    }
+    if (message.shortfallBytes !== 0) {
+      writer.uint32(48).int64(message.shortfallBytes);
+    }
+    if (message.requiredToAvailableRatio !== 0) {
+      writer.uint32(61).float(message.requiredToAvailableRatio);
     }
     return writer;
   },
@@ -774,6 +804,20 @@ export const StorageAvailability = {
 
           message.recommendation = reader.string();
           continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.shortfallBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 7:
+          if (tag !== 61) {
+            break;
+          }
+
+          message.requiredToAvailableRatio = reader.float();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -790,6 +834,10 @@ export const StorageAvailability = {
       availableBytes: isSet(object.availableBytes) ? globalThis.Number(object.availableBytes) : 0,
       warningMessage: isSet(object.warningMessage) ? globalThis.String(object.warningMessage) : undefined,
       recommendation: isSet(object.recommendation) ? globalThis.String(object.recommendation) : undefined,
+      shortfallBytes: isSet(object.shortfallBytes) ? globalThis.Number(object.shortfallBytes) : 0,
+      requiredToAvailableRatio: isSet(object.requiredToAvailableRatio)
+        ? globalThis.Number(object.requiredToAvailableRatio)
+        : 0,
     };
   },
 
@@ -810,6 +858,12 @@ export const StorageAvailability = {
     if (message.recommendation !== undefined) {
       obj.recommendation = message.recommendation;
     }
+    if (message.shortfallBytes !== 0) {
+      obj.shortfallBytes = Math.round(message.shortfallBytes);
+    }
+    if (message.requiredToAvailableRatio !== 0) {
+      obj.requiredToAvailableRatio = message.requiredToAvailableRatio;
+    }
     return obj;
   },
 
@@ -823,6 +877,8 @@ export const StorageAvailability = {
     message.availableBytes = object.availableBytes ?? 0;
     message.warningMessage = object.warningMessage ?? undefined;
     message.recommendation = object.recommendation ?? undefined;
+    message.shortfallBytes = object.shortfallBytes ?? 0;
+    message.requiredToAvailableRatio = object.requiredToAvailableRatio ?? 0;
     return message;
   },
 };
@@ -947,7 +1003,7 @@ export const StoredModel = {
 };
 
 function createBaseStorageInfoRequest(): StorageInfoRequest {
-  return { includeDevice: false, includeApp: false, includeModels: false };
+  return { includeDevice: false, includeApp: false, includeModels: false, includeCache: false };
 }
 
 export const StorageInfoRequest = {
@@ -960,6 +1016,9 @@ export const StorageInfoRequest = {
     }
     if (message.includeModels !== false) {
       writer.uint32(24).bool(message.includeModels);
+    }
+    if (message.includeCache !== false) {
+      writer.uint32(32).bool(message.includeCache);
     }
     return writer;
   },
@@ -992,6 +1051,13 @@ export const StorageInfoRequest = {
 
           message.includeModels = reader.bool();
           continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.includeCache = reader.bool();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1006,6 +1072,7 @@ export const StorageInfoRequest = {
       includeDevice: isSet(object.includeDevice) ? globalThis.Boolean(object.includeDevice) : false,
       includeApp: isSet(object.includeApp) ? globalThis.Boolean(object.includeApp) : false,
       includeModels: isSet(object.includeModels) ? globalThis.Boolean(object.includeModels) : false,
+      includeCache: isSet(object.includeCache) ? globalThis.Boolean(object.includeCache) : false,
     };
   },
 
@@ -1020,6 +1087,9 @@ export const StorageInfoRequest = {
     if (message.includeModels !== false) {
       obj.includeModels = message.includeModels;
     }
+    if (message.includeCache !== false) {
+      obj.includeCache = message.includeCache;
+    }
     return obj;
   },
 
@@ -1031,12 +1101,13 @@ export const StorageInfoRequest = {
     message.includeDevice = object.includeDevice ?? false;
     message.includeApp = object.includeApp ?? false;
     message.includeModels = object.includeModels ?? false;
+    message.includeCache = object.includeCache ?? false;
     return message;
   },
 };
 
 function createBaseStorageInfoResult(): StorageInfoResult {
-  return { success: false, info: undefined, errorMessage: "" };
+  return { success: false, info: undefined, errorMessage: "", warnings: [] };
 }
 
 export const StorageInfoResult = {
@@ -1049,6 +1120,9 @@ export const StorageInfoResult = {
     }
     if (message.errorMessage !== "") {
       writer.uint32(26).string(message.errorMessage);
+    }
+    for (const v of message.warnings) {
+      writer.uint32(34).string(v!);
     }
     return writer;
   },
@@ -1081,6 +1155,13 @@ export const StorageInfoResult = {
 
           message.errorMessage = reader.string();
           continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.warnings.push(reader.string());
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1095,6 +1176,7 @@ export const StorageInfoResult = {
       success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
       info: isSet(object.info) ? StorageInfo.fromJSON(object.info) : undefined,
       errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+      warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
     };
   },
 
@@ -1109,6 +1191,9 @@ export const StorageInfoResult = {
     if (message.errorMessage !== "") {
       obj.errorMessage = message.errorMessage;
     }
+    if (message.warnings?.length) {
+      obj.warnings = message.warnings;
+    }
     return obj;
   },
 
@@ -1122,12 +1207,20 @@ export const StorageInfoResult = {
       ? StorageInfo.fromPartial(object.info)
       : undefined;
     message.errorMessage = object.errorMessage ?? "";
+    message.warnings = object.warnings?.map((e) => e) || [];
     return message;
   },
 };
 
 function createBaseStorageAvailabilityRequest(): StorageAvailabilityRequest {
-  return { modelId: "", requiredBytes: 0, safetyMargin: 0, includeExistingModelBytes: false };
+  return {
+    modelId: "",
+    requiredBytes: 0,
+    safetyMargin: 0,
+    includeExistingModelBytes: false,
+    includeDeletePlan: false,
+    allowCacheReclamation: false,
+  };
 }
 
 export const StorageAvailabilityRequest = {
@@ -1143,6 +1236,12 @@ export const StorageAvailabilityRequest = {
     }
     if (message.includeExistingModelBytes !== false) {
       writer.uint32(32).bool(message.includeExistingModelBytes);
+    }
+    if (message.includeDeletePlan !== false) {
+      writer.uint32(40).bool(message.includeDeletePlan);
+    }
+    if (message.allowCacheReclamation !== false) {
+      writer.uint32(48).bool(message.allowCacheReclamation);
     }
     return writer;
   },
@@ -1182,6 +1281,20 @@ export const StorageAvailabilityRequest = {
 
           message.includeExistingModelBytes = reader.bool();
           continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.includeDeletePlan = reader.bool();
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.allowCacheReclamation = reader.bool();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1198,6 +1311,10 @@ export const StorageAvailabilityRequest = {
       safetyMargin: isSet(object.safetyMargin) ? globalThis.Number(object.safetyMargin) : 0,
       includeExistingModelBytes: isSet(object.includeExistingModelBytes)
         ? globalThis.Boolean(object.includeExistingModelBytes)
+        : false,
+      includeDeletePlan: isSet(object.includeDeletePlan) ? globalThis.Boolean(object.includeDeletePlan) : false,
+      allowCacheReclamation: isSet(object.allowCacheReclamation)
+        ? globalThis.Boolean(object.allowCacheReclamation)
         : false,
     };
   },
@@ -1216,6 +1333,12 @@ export const StorageAvailabilityRequest = {
     if (message.includeExistingModelBytes !== false) {
       obj.includeExistingModelBytes = message.includeExistingModelBytes;
     }
+    if (message.includeDeletePlan !== false) {
+      obj.includeDeletePlan = message.includeDeletePlan;
+    }
+    if (message.allowCacheReclamation !== false) {
+      obj.allowCacheReclamation = message.allowCacheReclamation;
+    }
     return obj;
   },
 
@@ -1228,12 +1351,14 @@ export const StorageAvailabilityRequest = {
     message.requiredBytes = object.requiredBytes ?? 0;
     message.safetyMargin = object.safetyMargin ?? 0;
     message.includeExistingModelBytes = object.includeExistingModelBytes ?? false;
+    message.includeDeletePlan = object.includeDeletePlan ?? false;
+    message.allowCacheReclamation = object.allowCacheReclamation ?? false;
     return message;
   },
 };
 
 function createBaseStorageAvailabilityResult(): StorageAvailabilityResult {
-  return { success: false, availability: undefined, warnings: [], errorMessage: "" };
+  return { success: false, availability: undefined, warnings: [], errorMessage: "", deletePlan: undefined };
 }
 
 export const StorageAvailabilityResult = {
@@ -1249,6 +1374,9 @@ export const StorageAvailabilityResult = {
     }
     if (message.errorMessage !== "") {
       writer.uint32(34).string(message.errorMessage);
+    }
+    if (message.deletePlan !== undefined) {
+      StorageDeletePlan.encode(message.deletePlan, writer.uint32(42).fork()).ldelim();
     }
     return writer;
   },
@@ -1288,6 +1416,13 @@ export const StorageAvailabilityResult = {
 
           message.errorMessage = reader.string();
           continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.deletePlan = StorageDeletePlan.decode(reader, reader.uint32());
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1303,6 +1438,7 @@ export const StorageAvailabilityResult = {
       availability: isSet(object.availability) ? StorageAvailability.fromJSON(object.availability) : undefined,
       warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
       errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+      deletePlan: isSet(object.deletePlan) ? StorageDeletePlan.fromJSON(object.deletePlan) : undefined,
     };
   },
 
@@ -1320,6 +1456,9 @@ export const StorageAvailabilityResult = {
     if (message.errorMessage !== "") {
       obj.errorMessage = message.errorMessage;
     }
+    if (message.deletePlan !== undefined) {
+      obj.deletePlan = StorageDeletePlan.toJSON(message.deletePlan);
+    }
     return obj;
   },
 
@@ -1334,12 +1473,22 @@ export const StorageAvailabilityResult = {
       : undefined;
     message.warnings = object.warnings?.map((e) => e) || [];
     message.errorMessage = object.errorMessage ?? "";
+    message.deletePlan = (object.deletePlan !== undefined && object.deletePlan !== null)
+      ? StorageDeletePlan.fromPartial(object.deletePlan)
+      : undefined;
     return message;
   },
 };
 
 function createBaseStorageDeletePlanRequest(): StorageDeletePlanRequest {
-  return { modelIds: [], requiredBytes: 0, includeCache: false, oldestFirst: false };
+  return {
+    modelIds: [],
+    requiredBytes: 0,
+    includeCache: false,
+    oldestFirst: false,
+    allowLoadedModels: false,
+    includeDownloadPartials: false,
+  };
 }
 
 export const StorageDeletePlanRequest = {
@@ -1355,6 +1504,12 @@ export const StorageDeletePlanRequest = {
     }
     if (message.oldestFirst !== false) {
       writer.uint32(32).bool(message.oldestFirst);
+    }
+    if (message.allowLoadedModels !== false) {
+      writer.uint32(40).bool(message.allowLoadedModels);
+    }
+    if (message.includeDownloadPartials !== false) {
+      writer.uint32(48).bool(message.includeDownloadPartials);
     }
     return writer;
   },
@@ -1394,6 +1549,20 @@ export const StorageDeletePlanRequest = {
 
           message.oldestFirst = reader.bool();
           continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.allowLoadedModels = reader.bool();
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.includeDownloadPartials = reader.bool();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1409,6 +1578,10 @@ export const StorageDeletePlanRequest = {
       requiredBytes: isSet(object.requiredBytes) ? globalThis.Number(object.requiredBytes) : 0,
       includeCache: isSet(object.includeCache) ? globalThis.Boolean(object.includeCache) : false,
       oldestFirst: isSet(object.oldestFirst) ? globalThis.Boolean(object.oldestFirst) : false,
+      allowLoadedModels: isSet(object.allowLoadedModels) ? globalThis.Boolean(object.allowLoadedModels) : false,
+      includeDownloadPartials: isSet(object.includeDownloadPartials)
+        ? globalThis.Boolean(object.includeDownloadPartials)
+        : false,
     };
   },
 
@@ -1426,6 +1599,12 @@ export const StorageDeletePlanRequest = {
     if (message.oldestFirst !== false) {
       obj.oldestFirst = message.oldestFirst;
     }
+    if (message.allowLoadedModels !== false) {
+      obj.allowLoadedModels = message.allowLoadedModels;
+    }
+    if (message.includeDownloadPartials !== false) {
+      obj.includeDownloadPartials = message.includeDownloadPartials;
+    }
     return obj;
   },
 
@@ -1438,12 +1617,23 @@ export const StorageDeletePlanRequest = {
     message.requiredBytes = object.requiredBytes ?? 0;
     message.includeCache = object.includeCache ?? false;
     message.oldestFirst = object.oldestFirst ?? false;
+    message.allowLoadedModels = object.allowLoadedModels ?? false;
+    message.includeDownloadPartials = object.includeDownloadPartials ?? false;
     return message;
   },
 };
 
 function createBaseStorageDeleteCandidate(): StorageDeleteCandidate {
-  return { modelId: "", reclaimableBytes: 0, lastUsedMs: undefined, isLoaded: false, localPath: "" };
+  return {
+    modelId: "",
+    reclaimableBytes: 0,
+    lastUsedMs: undefined,
+    isLoaded: false,
+    localPath: "",
+    requiresUnload: false,
+    requiresPlatformDelete: false,
+    storageKey: "",
+  };
 }
 
 export const StorageDeleteCandidate = {
@@ -1462,6 +1652,15 @@ export const StorageDeleteCandidate = {
     }
     if (message.localPath !== "") {
       writer.uint32(42).string(message.localPath);
+    }
+    if (message.requiresUnload !== false) {
+      writer.uint32(48).bool(message.requiresUnload);
+    }
+    if (message.requiresPlatformDelete !== false) {
+      writer.uint32(56).bool(message.requiresPlatformDelete);
+    }
+    if (message.storageKey !== "") {
+      writer.uint32(66).string(message.storageKey);
     }
     return writer;
   },
@@ -1508,6 +1707,27 @@ export const StorageDeleteCandidate = {
 
           message.localPath = reader.string();
           continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.requiresUnload = reader.bool();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.requiresPlatformDelete = reader.bool();
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.storageKey = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1524,6 +1744,11 @@ export const StorageDeleteCandidate = {
       lastUsedMs: isSet(object.lastUsedMs) ? globalThis.Number(object.lastUsedMs) : undefined,
       isLoaded: isSet(object.isLoaded) ? globalThis.Boolean(object.isLoaded) : false,
       localPath: isSet(object.localPath) ? globalThis.String(object.localPath) : "",
+      requiresUnload: isSet(object.requiresUnload) ? globalThis.Boolean(object.requiresUnload) : false,
+      requiresPlatformDelete: isSet(object.requiresPlatformDelete)
+        ? globalThis.Boolean(object.requiresPlatformDelete)
+        : false,
+      storageKey: isSet(object.storageKey) ? globalThis.String(object.storageKey) : "",
     };
   },
 
@@ -1544,6 +1769,15 @@ export const StorageDeleteCandidate = {
     if (message.localPath !== "") {
       obj.localPath = message.localPath;
     }
+    if (message.requiresUnload !== false) {
+      obj.requiresUnload = message.requiresUnload;
+    }
+    if (message.requiresPlatformDelete !== false) {
+      obj.requiresPlatformDelete = message.requiresPlatformDelete;
+    }
+    if (message.storageKey !== "") {
+      obj.storageKey = message.storageKey;
+    }
     return obj;
   },
 
@@ -1557,6 +1791,9 @@ export const StorageDeleteCandidate = {
     message.lastUsedMs = object.lastUsedMs ?? undefined;
     message.isLoaded = object.isLoaded ?? false;
     message.localPath = object.localPath ?? "";
+    message.requiresUnload = object.requiresUnload ?? false;
+    message.requiresPlatformDelete = object.requiresPlatformDelete ?? false;
+    message.storageKey = object.storageKey ?? "";
     return message;
   },
 };
@@ -1569,6 +1806,9 @@ function createBaseStorageDeletePlan(): StorageDeletePlan {
     candidates: [],
     warnings: [],
     errorMessage: "",
+    requiresUnload: false,
+    requiresPlatformDelete: false,
+    candidateCount: 0,
   };
 }
 
@@ -1591,6 +1831,15 @@ export const StorageDeletePlan = {
     }
     if (message.errorMessage !== "") {
       writer.uint32(50).string(message.errorMessage);
+    }
+    if (message.requiresUnload !== false) {
+      writer.uint32(56).bool(message.requiresUnload);
+    }
+    if (message.requiresPlatformDelete !== false) {
+      writer.uint32(64).bool(message.requiresPlatformDelete);
+    }
+    if (message.candidateCount !== 0) {
+      writer.uint32(72).int32(message.candidateCount);
     }
     return writer;
   },
@@ -1644,6 +1893,27 @@ export const StorageDeletePlan = {
 
           message.errorMessage = reader.string();
           continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.requiresUnload = reader.bool();
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.requiresPlatformDelete = reader.bool();
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.candidateCount = reader.int32();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1665,6 +1935,11 @@ export const StorageDeletePlan = {
         : [],
       warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
       errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+      requiresUnload: isSet(object.requiresUnload) ? globalThis.Boolean(object.requiresUnload) : false,
+      requiresPlatformDelete: isSet(object.requiresPlatformDelete)
+        ? globalThis.Boolean(object.requiresPlatformDelete)
+        : false,
+      candidateCount: isSet(object.candidateCount) ? globalThis.Number(object.candidateCount) : 0,
     };
   },
 
@@ -1688,6 +1963,15 @@ export const StorageDeletePlan = {
     if (message.errorMessage !== "") {
       obj.errorMessage = message.errorMessage;
     }
+    if (message.requiresUnload !== false) {
+      obj.requiresUnload = message.requiresUnload;
+    }
+    if (message.requiresPlatformDelete !== false) {
+      obj.requiresPlatformDelete = message.requiresPlatformDelete;
+    }
+    if (message.candidateCount !== 0) {
+      obj.candidateCount = Math.round(message.candidateCount);
+    }
     return obj;
   },
 
@@ -1702,12 +1986,24 @@ export const StorageDeletePlan = {
     message.candidates = object.candidates?.map((e) => StorageDeleteCandidate.fromPartial(e)) || [];
     message.warnings = object.warnings?.map((e) => e) || [];
     message.errorMessage = object.errorMessage ?? "";
+    message.requiresUnload = object.requiresUnload ?? false;
+    message.requiresPlatformDelete = object.requiresPlatformDelete ?? false;
+    message.candidateCount = object.candidateCount ?? 0;
     return message;
   },
 };
 
 function createBaseStorageDeleteRequest(): StorageDeleteRequest {
-  return { modelIds: [], deleteFiles: false, clearRegistryPaths: false, unloadIfLoaded: false, dryRun: false };
+  return {
+    modelIds: [],
+    deleteFiles: false,
+    clearRegistryPaths: false,
+    unloadIfLoaded: false,
+    dryRun: false,
+    plan: undefined,
+    requirePlanMatch: false,
+    allowPlatformDelete: false,
+  };
 }
 
 export const StorageDeleteRequest = {
@@ -1726,6 +2022,15 @@ export const StorageDeleteRequest = {
     }
     if (message.dryRun !== false) {
       writer.uint32(40).bool(message.dryRun);
+    }
+    if (message.plan !== undefined) {
+      StorageDeletePlan.encode(message.plan, writer.uint32(50).fork()).ldelim();
+    }
+    if (message.requirePlanMatch !== false) {
+      writer.uint32(56).bool(message.requirePlanMatch);
+    }
+    if (message.allowPlatformDelete !== false) {
+      writer.uint32(64).bool(message.allowPlatformDelete);
     }
     return writer;
   },
@@ -1772,6 +2077,27 @@ export const StorageDeleteRequest = {
 
           message.dryRun = reader.bool();
           continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.plan = StorageDeletePlan.decode(reader, reader.uint32());
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.requirePlanMatch = reader.bool();
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.allowPlatformDelete = reader.bool();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1788,6 +2114,9 @@ export const StorageDeleteRequest = {
       clearRegistryPaths: isSet(object.clearRegistryPaths) ? globalThis.Boolean(object.clearRegistryPaths) : false,
       unloadIfLoaded: isSet(object.unloadIfLoaded) ? globalThis.Boolean(object.unloadIfLoaded) : false,
       dryRun: isSet(object.dryRun) ? globalThis.Boolean(object.dryRun) : false,
+      plan: isSet(object.plan) ? StorageDeletePlan.fromJSON(object.plan) : undefined,
+      requirePlanMatch: isSet(object.requirePlanMatch) ? globalThis.Boolean(object.requirePlanMatch) : false,
+      allowPlatformDelete: isSet(object.allowPlatformDelete) ? globalThis.Boolean(object.allowPlatformDelete) : false,
     };
   },
 
@@ -1808,6 +2137,15 @@ export const StorageDeleteRequest = {
     if (message.dryRun !== false) {
       obj.dryRun = message.dryRun;
     }
+    if (message.plan !== undefined) {
+      obj.plan = StorageDeletePlan.toJSON(message.plan);
+    }
+    if (message.requirePlanMatch !== false) {
+      obj.requirePlanMatch = message.requirePlanMatch;
+    }
+    if (message.allowPlatformDelete !== false) {
+      obj.allowPlatformDelete = message.allowPlatformDelete;
+    }
     return obj;
   },
 
@@ -1821,12 +2159,28 @@ export const StorageDeleteRequest = {
     message.clearRegistryPaths = object.clearRegistryPaths ?? false;
     message.unloadIfLoaded = object.unloadIfLoaded ?? false;
     message.dryRun = object.dryRun ?? false;
+    message.plan = (object.plan !== undefined && object.plan !== null)
+      ? StorageDeletePlan.fromPartial(object.plan)
+      : undefined;
+    message.requirePlanMatch = object.requirePlanMatch ?? false;
+    message.allowPlatformDelete = object.allowPlatformDelete ?? false;
     return message;
   },
 };
 
 function createBaseStorageDeleteResult(): StorageDeleteResult {
-  return { success: false, deletedBytes: 0, deletedModelIds: [], failedModelIds: [], warnings: [], errorMessage: "" };
+  return {
+    success: false,
+    deletedBytes: 0,
+    deletedModelIds: [],
+    failedModelIds: [],
+    warnings: [],
+    errorMessage: "",
+    skippedModelIds: [],
+    dryRun: false,
+    registryUpdated: false,
+    filesDeleted: false,
+  };
 }
 
 export const StorageDeleteResult = {
@@ -1848,6 +2202,18 @@ export const StorageDeleteResult = {
     }
     if (message.errorMessage !== "") {
       writer.uint32(50).string(message.errorMessage);
+    }
+    for (const v of message.skippedModelIds) {
+      writer.uint32(58).string(v!);
+    }
+    if (message.dryRun !== false) {
+      writer.uint32(64).bool(message.dryRun);
+    }
+    if (message.registryUpdated !== false) {
+      writer.uint32(72).bool(message.registryUpdated);
+    }
+    if (message.filesDeleted !== false) {
+      writer.uint32(80).bool(message.filesDeleted);
     }
     return writer;
   },
@@ -1901,6 +2267,34 @@ export const StorageDeleteResult = {
 
           message.errorMessage = reader.string();
           continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.skippedModelIds.push(reader.string());
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.dryRun = reader.bool();
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.registryUpdated = reader.bool();
+          continue;
+        case 10:
+          if (tag !== 80) {
+            break;
+          }
+
+          message.filesDeleted = reader.bool();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1922,6 +2316,12 @@ export const StorageDeleteResult = {
         : [],
       warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
       errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+      skippedModelIds: globalThis.Array.isArray(object?.skippedModelIds)
+        ? object.skippedModelIds.map((e: any) => globalThis.String(e))
+        : [],
+      dryRun: isSet(object.dryRun) ? globalThis.Boolean(object.dryRun) : false,
+      registryUpdated: isSet(object.registryUpdated) ? globalThis.Boolean(object.registryUpdated) : false,
+      filesDeleted: isSet(object.filesDeleted) ? globalThis.Boolean(object.filesDeleted) : false,
     };
   },
 
@@ -1945,6 +2345,18 @@ export const StorageDeleteResult = {
     if (message.errorMessage !== "") {
       obj.errorMessage = message.errorMessage;
     }
+    if (message.skippedModelIds?.length) {
+      obj.skippedModelIds = message.skippedModelIds;
+    }
+    if (message.dryRun !== false) {
+      obj.dryRun = message.dryRun;
+    }
+    if (message.registryUpdated !== false) {
+      obj.registryUpdated = message.registryUpdated;
+    }
+    if (message.filesDeleted !== false) {
+      obj.filesDeleted = message.filesDeleted;
+    }
     return obj;
   },
 
@@ -1959,6 +2371,10 @@ export const StorageDeleteResult = {
     message.failedModelIds = object.failedModelIds?.map((e) => e) || [];
     message.warnings = object.warnings?.map((e) => e) || [];
     message.errorMessage = object.errorMessage ?? "";
+    message.skippedModelIds = object.skippedModelIds?.map((e) => e) || [];
+    message.dryRun = object.dryRun ?? false;
+    message.registryUpdated = object.registryUpdated ?? false;
+    message.filesDeleted = object.filesDeleted ?? false;
     return message;
   },
 };

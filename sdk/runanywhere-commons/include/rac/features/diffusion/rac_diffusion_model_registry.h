@@ -10,6 +10,11 @@
  * - CoreML backend with ANE → GPU → CPU automatic fallback
  * - Strategy pattern for extensibility
  * - Tokenizer source configuration (SD 1.5, SD 2.x, SDXL)
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal`.
+ * Built-in catalog used by the diffusion backend on Apple platforms.
+ * Public diffusion catalog crosses SDKs through runanywhere.v1.ModelInfo
+ * / ModelInfoList / model registry proto APIs, not these structs.
  */
 
 #ifndef RAC_DIFFUSION_MODEL_REGISTRY_H

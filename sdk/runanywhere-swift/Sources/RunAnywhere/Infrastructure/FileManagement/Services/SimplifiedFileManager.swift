@@ -77,8 +77,8 @@ public class SimplifiedFileManager {
     // MARK: - Model Discovery
 
     /// Get all downloaded models organized by framework.
-    /// Syncs the registry from disk via the C++ bridge, then groups the
-    /// registered models by framework — C++ owns the filesystem walk.
+    /// Reconciles the registry through the generated discovery result, then
+    /// groups the registered models by framework.
     public func getDownloadedModels() async -> [InferenceFramework: [String]] {
         _ = await CppBridge.ModelRegistry.shared.discoverDownloadedModels()
 

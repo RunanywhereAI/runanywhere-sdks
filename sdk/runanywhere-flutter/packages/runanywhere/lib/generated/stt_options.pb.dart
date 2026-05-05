@@ -9,6 +9,7 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -267,6 +268,10 @@ class STTOptions extends $pb.GeneratedMessage {
     $0.AudioFormat? audioFormat,
     $core.int? sampleRate,
     $core.int? maxAlternatives,
+    $core.int? chunkDurationMs,
+    $core.int? endpointSilenceMs,
+    $core.bool? suppressBlank,
+    $core.bool? translateToEnglish,
   }) {
     final $result = create();
     if (language != null) {
@@ -305,6 +310,18 @@ class STTOptions extends $pb.GeneratedMessage {
     if (maxAlternatives != null) {
       $result.maxAlternatives = maxAlternatives;
     }
+    if (chunkDurationMs != null) {
+      $result.chunkDurationMs = chunkDurationMs;
+    }
+    if (endpointSilenceMs != null) {
+      $result.endpointSilenceMs = endpointSilenceMs;
+    }
+    if (suppressBlank != null) {
+      $result.suppressBlank = suppressBlank;
+    }
+    if (translateToEnglish != null) {
+      $result.translateToEnglish = translateToEnglish;
+    }
     return $result;
   }
   STTOptions._() : super();
@@ -324,6 +341,10 @@ class STTOptions extends $pb.GeneratedMessage {
     ..e<$0.AudioFormat>(10, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $0.AudioFormat.valueOf, enumValues: $0.AudioFormat.values)
     ..a<$core.int>(11, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
     ..a<$core.int>(12, _omitFieldNames ? '' : 'maxAlternatives', $pb.PbFieldType.O3)
+    ..a<$core.int>(13, _omitFieldNames ? '' : 'chunkDurationMs', $pb.PbFieldType.O3)
+    ..a<$core.int>(14, _omitFieldNames ? '' : 'endpointSilenceMs', $pb.PbFieldType.O3)
+    ..aOB(15, _omitFieldNames ? '' : 'suppressBlank')
+    ..aOB(16, _omitFieldNames ? '' : 'translateToEnglish')
     ..hasRequiredFields = false
   ;
 
@@ -455,6 +476,312 @@ class STTOptions extends $pb.GeneratedMessage {
   $core.bool hasMaxAlternatives() => $_has(11);
   @$pb.TagNumber(12)
   void clearMaxAlternatives() => clearField(12);
+
+  /// Streaming/endpointer controls. 0 = backend/default.
+  @$pb.TagNumber(13)
+  $core.int get chunkDurationMs => $_getIZ(12);
+  @$pb.TagNumber(13)
+  set chunkDurationMs($core.int v) { $_setSignedInt32(12, v); }
+  @$pb.TagNumber(13)
+  $core.bool hasChunkDurationMs() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearChunkDurationMs() => clearField(13);
+
+  @$pb.TagNumber(14)
+  $core.int get endpointSilenceMs => $_getIZ(13);
+  @$pb.TagNumber(14)
+  set endpointSilenceMs($core.int v) { $_setSignedInt32(13, v); }
+  @$pb.TagNumber(14)
+  $core.bool hasEndpointSilenceMs() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearEndpointSilenceMs() => clearField(14);
+
+  @$pb.TagNumber(15)
+  $core.bool get suppressBlank => $_getBF(14);
+  @$pb.TagNumber(15)
+  set suppressBlank($core.bool v) { $_setBool(14, v); }
+  @$pb.TagNumber(15)
+  $core.bool hasSuppressBlank() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearSuppressBlank() => clearField(15);
+
+  @$pb.TagNumber(16)
+  $core.bool get translateToEnglish => $_getBF(15);
+  @$pb.TagNumber(16)
+  set translateToEnglish($core.bool v) { $_setBool(15, v); }
+  @$pb.TagNumber(16)
+  $core.bool hasTranslateToEnglish() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearTranslateToEnglish() => clearField(16);
+}
+
+enum STTAudioSource_Source {
+  audioData, 
+  fileUri, 
+  adapterHandle, 
+  notSet
+}
+
+class STTAudioSource extends $pb.GeneratedMessage {
+  factory STTAudioSource({
+    $core.List<$core.int>? audioData,
+    $core.String? fileUri,
+    $core.String? adapterHandle,
+    STTAudioEncoding? encoding,
+    $0.AudioFormat? audioFormat,
+    $core.int? sampleRate,
+    $core.int? channels,
+    $core.int? bitsPerSample,
+    $fixnum.Int64? durationMs,
+  }) {
+    final $result = create();
+    if (audioData != null) {
+      $result.audioData = audioData;
+    }
+    if (fileUri != null) {
+      $result.fileUri = fileUri;
+    }
+    if (adapterHandle != null) {
+      $result.adapterHandle = adapterHandle;
+    }
+    if (encoding != null) {
+      $result.encoding = encoding;
+    }
+    if (audioFormat != null) {
+      $result.audioFormat = audioFormat;
+    }
+    if (sampleRate != null) {
+      $result.sampleRate = sampleRate;
+    }
+    if (channels != null) {
+      $result.channels = channels;
+    }
+    if (bitsPerSample != null) {
+      $result.bitsPerSample = bitsPerSample;
+    }
+    if (durationMs != null) {
+      $result.durationMs = durationMs;
+    }
+    return $result;
+  }
+  STTAudioSource._() : super();
+  factory STTAudioSource.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory STTAudioSource.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static const $core.Map<$core.int, STTAudioSource_Source> _STTAudioSource_SourceByTag = {
+    1 : STTAudioSource_Source.audioData,
+    2 : STTAudioSource_Source.fileUri,
+    3 : STTAudioSource_Source.adapterHandle,
+    0 : STTAudioSource_Source.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'STTAudioSource', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..oo(0, [1, 2, 3])
+    ..a<$core.List<$core.int>>(1, _omitFieldNames ? '' : 'audioData', $pb.PbFieldType.OY)
+    ..aOS(2, _omitFieldNames ? '' : 'fileUri')
+    ..aOS(3, _omitFieldNames ? '' : 'adapterHandle')
+    ..e<STTAudioEncoding>(4, _omitFieldNames ? '' : 'encoding', $pb.PbFieldType.OE, defaultOrMaker: STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED, valueOf: STTAudioEncoding.valueOf, enumValues: STTAudioEncoding.values)
+    ..e<$0.AudioFormat>(5, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $0.AudioFormat.valueOf, enumValues: $0.AudioFormat.values)
+    ..a<$core.int>(6, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
+    ..a<$core.int>(7, _omitFieldNames ? '' : 'channels', $pb.PbFieldType.O3)
+    ..a<$core.int>(8, _omitFieldNames ? '' : 'bitsPerSample', $pb.PbFieldType.O3)
+    ..aInt64(9, _omitFieldNames ? '' : 'durationMs')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  STTAudioSource clone() => STTAudioSource()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  STTAudioSource copyWith(void Function(STTAudioSource) updates) => super.copyWith((message) => updates(message as STTAudioSource)) as STTAudioSource;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static STTAudioSource create() => STTAudioSource._();
+  STTAudioSource createEmptyInstance() => create();
+  static $pb.PbList<STTAudioSource> createRepeated() => $pb.PbList<STTAudioSource>();
+  @$core.pragma('dart2js:noInline')
+  static STTAudioSource getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<STTAudioSource>(create);
+  static STTAudioSource? _defaultInstance;
+
+  STTAudioSource_Source whichSource() => _STTAudioSource_SourceByTag[$_whichOneof(0)]!;
+  void clearSource() => clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  $core.List<$core.int> get audioData => $_getN(0);
+  @$pb.TagNumber(1)
+  set audioData($core.List<$core.int> v) { $_setBytes(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasAudioData() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAudioData() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get fileUri => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set fileUri($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasFileUri() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearFileUri() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get adapterHandle => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set adapterHandle($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasAdapterHandle() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAdapterHandle() => clearField(3);
+
+  @$pb.TagNumber(4)
+  STTAudioEncoding get encoding => $_getN(3);
+  @$pb.TagNumber(4)
+  set encoding(STTAudioEncoding v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasEncoding() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearEncoding() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $0.AudioFormat get audioFormat => $_getN(4);
+  @$pb.TagNumber(5)
+  set audioFormat($0.AudioFormat v) { setField(5, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasAudioFormat() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearAudioFormat() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get sampleRate => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set sampleRate($core.int v) { $_setSignedInt32(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasSampleRate() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearSampleRate() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get channels => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set channels($core.int v) { $_setSignedInt32(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasChannels() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearChannels() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get bitsPerSample => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set bitsPerSample($core.int v) { $_setSignedInt32(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasBitsPerSample() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearBitsPerSample() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $fixnum.Int64 get durationMs => $_getI64(8);
+  @$pb.TagNumber(9)
+  set durationMs($fixnum.Int64 v) { $_setInt64(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasDurationMs() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearDurationMs() => clearField(9);
+}
+
+class STTTranscriptionRequest extends $pb.GeneratedMessage {
+  factory STTTranscriptionRequest({
+    $core.String? requestId,
+    STTAudioSource? audio,
+    STTOptions? options,
+    $core.Map<$core.String, $core.String>? metadata,
+  }) {
+    final $result = create();
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (audio != null) {
+      $result.audio = audio;
+    }
+    if (options != null) {
+      $result.options = options;
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
+    }
+    return $result;
+  }
+  STTTranscriptionRequest._() : super();
+  factory STTTranscriptionRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory STTTranscriptionRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'STTTranscriptionRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aOM<STTAudioSource>(2, _omitFieldNames ? '' : 'audio', subBuilder: STTAudioSource.create)
+    ..aOM<STTOptions>(3, _omitFieldNames ? '' : 'options', subBuilder: STTOptions.create)
+    ..m<$core.String, $core.String>(4, _omitFieldNames ? '' : 'metadata', entryClassName: 'STTTranscriptionRequest.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  STTTranscriptionRequest clone() => STTTranscriptionRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  STTTranscriptionRequest copyWith(void Function(STTTranscriptionRequest) updates) => super.copyWith((message) => updates(message as STTTranscriptionRequest)) as STTTranscriptionRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static STTTranscriptionRequest create() => STTTranscriptionRequest._();
+  STTTranscriptionRequest createEmptyInstance() => create();
+  static $pb.PbList<STTTranscriptionRequest> createRepeated() => $pb.PbList<STTTranscriptionRequest>();
+  @$core.pragma('dart2js:noInline')
+  static STTTranscriptionRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<STTTranscriptionRequest>(create);
+  static STTTranscriptionRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  STTAudioSource get audio => $_getN(1);
+  @$pb.TagNumber(2)
+  set audio(STTAudioSource v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasAudio() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAudio() => clearField(2);
+  @$pb.TagNumber(2)
+  STTAudioSource ensureAudio() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  STTOptions get options => $_getN(2);
+  @$pb.TagNumber(3)
+  set options(STTOptions v) { setField(3, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasOptions() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOptions() => clearField(3);
+  @$pb.TagNumber(3)
+  STTOptions ensureOptions() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(3);
 }
 
 ///  ---------------------------------------------------------------------------
@@ -475,6 +802,7 @@ class WordTimestamp extends $pb.GeneratedMessage {
     $fixnum.Int64? startMs,
     $fixnum.Int64? endMs,
     $core.double? confidence,
+    $core.String? speakerId,
   }) {
     final $result = create();
     if (word != null) {
@@ -489,6 +817,9 @@ class WordTimestamp extends $pb.GeneratedMessage {
     if (confidence != null) {
       $result.confidence = confidence;
     }
+    if (speakerId != null) {
+      $result.speakerId = speakerId;
+    }
     return $result;
   }
   WordTimestamp._() : super();
@@ -500,6 +831,7 @@ class WordTimestamp extends $pb.GeneratedMessage {
     ..aInt64(2, _omitFieldNames ? '' : 'startMs')
     ..aInt64(3, _omitFieldNames ? '' : 'endMs')
     ..a<$core.double>(4, _omitFieldNames ? '' : 'confidence', $pb.PbFieldType.OF)
+    ..aOS(5, _omitFieldNames ? '' : 'speakerId')
     ..hasRequiredFields = false
   ;
 
@@ -559,6 +891,15 @@ class WordTimestamp extends $pb.GeneratedMessage {
   $core.bool hasConfidence() => $_has(3);
   @$pb.TagNumber(4)
   void clearConfidence() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get speakerId => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set speakerId($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasSpeakerId() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSpeakerId() => clearField(5);
 }
 
 ///  ---------------------------------------------------------------------------
@@ -775,6 +1116,10 @@ class STTOutput extends $pb.GeneratedMessage {
     $core.String? languageCode,
     $fixnum.Int64? timestampMs,
     $fixnum.Int64? durationMs,
+    $core.Iterable<$core.String>? speakerIds,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+    $core.int? segmentIndex,
   }) {
     final $result = create();
     if (text != null) {
@@ -804,6 +1149,18 @@ class STTOutput extends $pb.GeneratedMessage {
     if (durationMs != null) {
       $result.durationMs = durationMs;
     }
+    if (speakerIds != null) {
+      $result.speakerIds.addAll(speakerIds);
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    if (segmentIndex != null) {
+      $result.segmentIndex = segmentIndex;
+    }
     return $result;
   }
   STTOutput._() : super();
@@ -820,6 +1177,10 @@ class STTOutput extends $pb.GeneratedMessage {
     ..aOS(7, _omitFieldNames ? '' : 'languageCode')
     ..aInt64(8, _omitFieldNames ? '' : 'timestampMs')
     ..aInt64(9, _omitFieldNames ? '' : 'durationMs')
+    ..pPS(10, _omitFieldNames ? '' : 'speakerIds')
+    ..aOS(11, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(12, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..a<$core.int>(13, _omitFieldNames ? '' : 'segmentIndex', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
@@ -918,6 +1279,39 @@ class STTOutput extends $pb.GeneratedMessage {
   $core.bool hasDurationMs() => $_has(8);
   @$pb.TagNumber(9)
   void clearDurationMs() => clearField(9);
+
+  /// Diarization summary when available.
+  @$pb.TagNumber(10)
+  $core.List<$core.String> get speakerIds => $_getList(9);
+
+  /// Terminal error details for result-envelope APIs.
+  @$pb.TagNumber(11)
+  $core.String get errorMessage => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set errorMessage($core.String v) { $_setString(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasErrorMessage() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearErrorMessage() => clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.int get errorCode => $_getIZ(11);
+  @$pb.TagNumber(12)
+  set errorCode($core.int v) { $_setSignedInt32(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasErrorCode() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearErrorCode() => clearField(12);
+
+  /// Segment index for long-running/streaming transcription.
+  @$pb.TagNumber(13)
+  $core.int get segmentIndex => $_getIZ(12);
+  @$pb.TagNumber(13)
+  set segmentIndex($core.int v) { $_setSignedInt32(12, v); }
+  @$pb.TagNumber(13)
+  $core.bool hasSegmentIndex() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearSegmentIndex() => clearField(13);
 }
 
 ///  ---------------------------------------------------------------------------
@@ -943,6 +1337,11 @@ class STTPartialResult extends $pb.GeneratedMessage {
     $fixnum.Int64? timestampMs,
     $core.Iterable<TranscriptionAlternative>? alternatives,
     $core.String? languageCode,
+    $core.String? requestId,
+    $core.int? segmentIndex,
+    $fixnum.Int64? audioStartMs,
+    $fixnum.Int64? audioEndMs,
+    STTOutput? finalOutput,
   }) {
     final $result = create();
     if (text != null) {
@@ -969,6 +1368,21 @@ class STTPartialResult extends $pb.GeneratedMessage {
     if (languageCode != null) {
       $result.languageCode = languageCode;
     }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (segmentIndex != null) {
+      $result.segmentIndex = segmentIndex;
+    }
+    if (audioStartMs != null) {
+      $result.audioStartMs = audioStartMs;
+    }
+    if (audioEndMs != null) {
+      $result.audioEndMs = audioEndMs;
+    }
+    if (finalOutput != null) {
+      $result.finalOutput = finalOutput;
+    }
     return $result;
   }
   STTPartialResult._() : super();
@@ -984,6 +1398,11 @@ class STTPartialResult extends $pb.GeneratedMessage {
     ..aInt64(6, _omitFieldNames ? '' : 'timestampMs')
     ..pc<TranscriptionAlternative>(7, _omitFieldNames ? '' : 'alternatives', $pb.PbFieldType.PM, subBuilder: TranscriptionAlternative.create)
     ..aOS(8, _omitFieldNames ? '' : 'languageCode')
+    ..aOS(9, _omitFieldNames ? '' : 'requestId')
+    ..a<$core.int>(10, _omitFieldNames ? '' : 'segmentIndex', $pb.PbFieldType.O3)
+    ..aInt64(11, _omitFieldNames ? '' : 'audioStartMs')
+    ..aInt64(12, _omitFieldNames ? '' : 'audioEndMs')
+    ..aOM<STTOutput>(13, _omitFieldNames ? '' : 'finalOutput', subBuilder: STTOutput.create)
     ..hasRequiredFields = false
   ;
 
@@ -1074,6 +1493,418 @@ class STTPartialResult extends $pb.GeneratedMessage {
   $core.bool hasLanguageCode() => $_has(7);
   @$pb.TagNumber(8)
   void clearLanguageCode() => clearField(8);
+
+  /// Streaming correlation and endpointing metadata.
+  @$pb.TagNumber(9)
+  $core.String get requestId => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set requestId($core.String v) { $_setString(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasRequestId() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearRequestId() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get segmentIndex => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set segmentIndex($core.int v) { $_setSignedInt32(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasSegmentIndex() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearSegmentIndex() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $fixnum.Int64 get audioStartMs => $_getI64(10);
+  @$pb.TagNumber(11)
+  set audioStartMs($fixnum.Int64 v) { $_setInt64(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasAudioStartMs() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearAudioStartMs() => clearField(11);
+
+  @$pb.TagNumber(12)
+  $fixnum.Int64 get audioEndMs => $_getI64(11);
+  @$pb.TagNumber(12)
+  set audioEndMs($fixnum.Int64 v) { $_setInt64(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasAudioEndMs() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearAudioEndMs() => clearField(12);
+
+  @$pb.TagNumber(13)
+  STTOutput get finalOutput => $_getN(12);
+  @$pb.TagNumber(13)
+  set finalOutput(STTOutput v) { setField(13, v); }
+  @$pb.TagNumber(13)
+  $core.bool hasFinalOutput() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearFinalOutput() => clearField(13);
+  @$pb.TagNumber(13)
+  STTOutput ensureFinalOutput() => $_ensure(12);
+}
+
+class STTStreamEvent extends $pb.GeneratedMessage {
+  factory STTStreamEvent({
+    $fixnum.Int64? seq,
+    $fixnum.Int64? timestampUs,
+    $core.String? requestId,
+    STTStreamEventKind? kind,
+    STTPartialResult? partial,
+    STTOutput? finalOutput,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (seq != null) {
+      $result.seq = seq;
+    }
+    if (timestampUs != null) {
+      $result.timestampUs = timestampUs;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (kind != null) {
+      $result.kind = kind;
+    }
+    if (partial != null) {
+      $result.partial = partial;
+    }
+    if (finalOutput != null) {
+      $result.finalOutput = finalOutput;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  STTStreamEvent._() : super();
+  factory STTStreamEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory STTStreamEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'STTStreamEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
+    ..aOS(3, _omitFieldNames ? '' : 'requestId')
+    ..e<STTStreamEventKind>(4, _omitFieldNames ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: STTStreamEventKind.STT_STREAM_EVENT_KIND_UNSPECIFIED, valueOf: STTStreamEventKind.valueOf, enumValues: STTStreamEventKind.values)
+    ..aOM<STTPartialResult>(5, _omitFieldNames ? '' : 'partial', subBuilder: STTPartialResult.create)
+    ..aOM<STTOutput>(6, _omitFieldNames ? '' : 'finalOutput', subBuilder: STTOutput.create)
+    ..aOS(7, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(8, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  STTStreamEvent clone() => STTStreamEvent()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  STTStreamEvent copyWith(void Function(STTStreamEvent) updates) => super.copyWith((message) => updates(message as STTStreamEvent)) as STTStreamEvent;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static STTStreamEvent create() => STTStreamEvent._();
+  STTStreamEvent createEmptyInstance() => create();
+  static $pb.PbList<STTStreamEvent> createRepeated() => $pb.PbList<STTStreamEvent>();
+  @$core.pragma('dart2js:noInline')
+  static STTStreamEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<STTStreamEvent>(create);
+  static STTStreamEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get seq => $_getI64(0);
+  @$pb.TagNumber(1)
+  set seq($fixnum.Int64 v) { $_setInt64(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasSeq() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSeq() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get timestampUs => $_getI64(1);
+  @$pb.TagNumber(2)
+  set timestampUs($fixnum.Int64 v) { $_setInt64(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasTimestampUs() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTimestampUs() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get requestId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set requestId($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasRequestId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRequestId() => clearField(3);
+
+  @$pb.TagNumber(4)
+  STTStreamEventKind get kind => $_getN(3);
+  @$pb.TagNumber(4)
+  set kind(STTStreamEventKind v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasKind() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearKind() => clearField(4);
+
+  @$pb.TagNumber(5)
+  STTPartialResult get partial => $_getN(4);
+  @$pb.TagNumber(5)
+  set partial(STTPartialResult v) { setField(5, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasPartial() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearPartial() => clearField(5);
+  @$pb.TagNumber(5)
+  STTPartialResult ensurePartial() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  STTOutput get finalOutput => $_getN(5);
+  @$pb.TagNumber(6)
+  set finalOutput(STTOutput v) { setField(6, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasFinalOutput() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearFinalOutput() => clearField(6);
+  @$pb.TagNumber(6)
+  STTOutput ensureFinalOutput() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  $core.String get errorMessage => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set errorMessage($core.String v) { $_setString(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasErrorMessage() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearErrorMessage() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get errorCode => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set errorCode($core.int v) { $_setSignedInt32(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasErrorCode() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearErrorCode() => clearField(8);
+}
+
+class STTServiceState extends $pb.GeneratedMessage {
+  factory STTServiceState({
+    $core.bool? isReady,
+    $core.String? currentModel,
+    $core.bool? supportsStreaming,
+    $core.Iterable<$core.String>? supportedLanguageCodes,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (isReady != null) {
+      $result.isReady = isReady;
+    }
+    if (currentModel != null) {
+      $result.currentModel = currentModel;
+    }
+    if (supportsStreaming != null) {
+      $result.supportsStreaming = supportsStreaming;
+    }
+    if (supportedLanguageCodes != null) {
+      $result.supportedLanguageCodes.addAll(supportedLanguageCodes);
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  STTServiceState._() : super();
+  factory STTServiceState.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory STTServiceState.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'STTServiceState', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'isReady')
+    ..aOS(2, _omitFieldNames ? '' : 'currentModel')
+    ..aOB(3, _omitFieldNames ? '' : 'supportsStreaming')
+    ..pPS(4, _omitFieldNames ? '' : 'supportedLanguageCodes')
+    ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(6, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  STTServiceState clone() => STTServiceState()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  STTServiceState copyWith(void Function(STTServiceState) updates) => super.copyWith((message) => updates(message as STTServiceState)) as STTServiceState;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static STTServiceState create() => STTServiceState._();
+  STTServiceState createEmptyInstance() => create();
+  static $pb.PbList<STTServiceState> createRepeated() => $pb.PbList<STTServiceState>();
+  @$core.pragma('dart2js:noInline')
+  static STTServiceState getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<STTServiceState>(create);
+  static STTServiceState? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get isReady => $_getBF(0);
+  @$pb.TagNumber(1)
+  set isReady($core.bool v) { $_setBool(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasIsReady() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearIsReady() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get currentModel => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set currentModel($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasCurrentModel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCurrentModel() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get supportsStreaming => $_getBF(2);
+  @$pb.TagNumber(3)
+  set supportsStreaming($core.bool v) { $_setBool(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasSupportsStreaming() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSupportsStreaming() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.List<$core.String> get supportedLanguageCodes => $_getList(3);
+
+  @$pb.TagNumber(5)
+  $core.String get errorMessage => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set errorMessage($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasErrorMessage() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearErrorMessage() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get errorCode => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set errorCode($core.int v) { $_setSignedInt32(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasErrorCode() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearErrorCode() => clearField(6);
+}
+
+class STTLanguageDetectionResult extends $pb.GeneratedMessage {
+  factory STTLanguageDetectionResult({
+    STTLanguage? language,
+    $core.String? languageCode,
+    $core.double? confidence,
+    $core.Iterable<$core.String>? alternatives,
+  }) {
+    final $result = create();
+    if (language != null) {
+      $result.language = language;
+    }
+    if (languageCode != null) {
+      $result.languageCode = languageCode;
+    }
+    if (confidence != null) {
+      $result.confidence = confidence;
+    }
+    if (alternatives != null) {
+      $result.alternatives.addAll(alternatives);
+    }
+    return $result;
+  }
+  STTLanguageDetectionResult._() : super();
+  factory STTLanguageDetectionResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory STTLanguageDetectionResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'STTLanguageDetectionResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..e<STTLanguage>(1, _omitFieldNames ? '' : 'language', $pb.PbFieldType.OE, defaultOrMaker: STTLanguage.STT_LANGUAGE_UNSPECIFIED, valueOf: STTLanguage.valueOf, enumValues: STTLanguage.values)
+    ..aOS(2, _omitFieldNames ? '' : 'languageCode')
+    ..a<$core.double>(3, _omitFieldNames ? '' : 'confidence', $pb.PbFieldType.OF)
+    ..pPS(4, _omitFieldNames ? '' : 'alternatives')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  STTLanguageDetectionResult clone() => STTLanguageDetectionResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  STTLanguageDetectionResult copyWith(void Function(STTLanguageDetectionResult) updates) => super.copyWith((message) => updates(message as STTLanguageDetectionResult)) as STTLanguageDetectionResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static STTLanguageDetectionResult create() => STTLanguageDetectionResult._();
+  STTLanguageDetectionResult createEmptyInstance() => create();
+  static $pb.PbList<STTLanguageDetectionResult> createRepeated() => $pb.PbList<STTLanguageDetectionResult>();
+  @$core.pragma('dart2js:noInline')
+  static STTLanguageDetectionResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<STTLanguageDetectionResult>(create);
+  static STTLanguageDetectionResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  STTLanguage get language => $_getN(0);
+  @$pb.TagNumber(1)
+  set language(STTLanguage v) { setField(1, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasLanguage() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearLanguage() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get languageCode => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set languageCode($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasLanguageCode() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearLanguageCode() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get confidence => $_getN(2);
+  @$pb.TagNumber(3)
+  set confidence($core.double v) { $_setFloat(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasConfidence() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearConfidence() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.List<$core.String> get alternatives => $_getList(3);
+}
+
+class STTApi {
+  $pb.RpcClient _client;
+  STTApi(this._client);
+
+  $async.Future<STTOutput> transcribe($pb.ClientContext? ctx, STTTranscriptionRequest request) =>
+    _client.invoke<STTOutput>(ctx, 'STT', 'Transcribe', request, STTOutput())
+  ;
+  $async.Future<STTStreamEvent> stream($pb.ClientContext? ctx, STTTranscriptionRequest request) =>
+    _client.invoke<STTStreamEvent>(ctx, 'STT', 'Stream', request, STTStreamEvent())
+  ;
 }
 
 

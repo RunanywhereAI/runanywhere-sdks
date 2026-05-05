@@ -25,7 +25,7 @@ A production-grade, on-device AI SDK for iOS, macOS, tvOS, and watchOS. The SDK 
 
 The RunAnywhere Swift SDK enables developers to run AI models directly on Apple devices without requiring network connectivity for inference. By keeping data on-device, the SDK ensures minimal latency and maximum privacy for your users.
 
-The SDK provides a unified interface to multiple AI capabilities, including large language models (LLMs), speech-to-text (STT), text-to-speech (TTS), voice activity detection (VAD), and speaker diarization. These capabilities are delivered through pluggable backend modules that can be included as needed.
+The SDK provides a unified interface to multiple AI capabilities, including large language models (LLMs), speech-to-text (STT), text-to-speech (TTS), and voice activity detection (VAD). These capabilities are delivered through pluggable backend modules that can be included as needed.
 
 ### Key Capabilities
 
@@ -65,12 +65,6 @@ The SDK provides a unified interface to multiple AI capabilities, including larg
 - Energy-based speech detection
 - Configurable sensitivity thresholds
 - Real-time audio stream processing
-
-### Speaker Diarization
-
-- Identify multiple speakers in audio
-- Speaker segmentation and labeling
-- Integration with FluidAudio
 
 ### Voice Agent Pipeline
 
@@ -647,45 +641,42 @@ We welcome contributions to the RunAnywhere Swift SDK. This section explains how
 
 ### First-Time Setup (Build from Source)
 
-The SDK depends on native C++ libraries from `runanywhere-commons`. The setup script builds these locally so you can develop and test the SDK end-to-end.
+The SDK depends on native C++ libraries from `runanywhere-commons`. Build XCFrameworks locally so you can develop and test the SDK end-to-end.
 
 ```bash
 # 1. Clone the repository
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
-cd runanywhere-sdks/sdk/runanywhere-swift
+cd runanywhere-sdks
 
-# 2. Run first-time setup (~5-15 minutes)
-./scripts/build-swift.sh --setup
+# 2. Build XCFrameworks (~5-15 minutes)
+./scripts/build-core-xcframework.sh
 ```
 
-**What the setup script does:**
+**What the build script does:**
 1. Downloads dependencies (ONNX Runtime, Sherpa-ONNX)
 2. Builds `RACommons.xcframework` (core infrastructure)
 3. Builds `RABackendLLAMACPP.xcframework` (LLM backend)
 4. Builds `RABackendONNX.xcframework` (STT/TTS/VAD backend)
-5. Copies frameworks to `Binaries/`
-6. Sets `testLocal = true` in Package.swift (enables local framework consumption)
+5. Copies frameworks to `sdk/runanywhere-swift/Binaries/`
 
-### Understanding testLocal
+### Understanding useLocalNatives
 
-The SDK has two modes controlled by `testLocal` in `Package.swift`:
+The SDK has two modes controlled by `useLocalNatives` in `Package.swift`:
 
 | Mode | Setting | Description |
 |------|---------|-------------|
-| **Local** | `testLocal = true` | Uses XCFrameworks from `Binaries/` (for development) |
-| **Remote** | `testLocal = false` | Downloads XCFrameworks from GitHub releases (for end users) |
-
-When you run `--setup`, the script automatically sets `testLocal = true`.
+| **Local** | `useLocalNatives = true` | Uses XCFrameworks from `Binaries/` (for development) |
+| **Remote** | `useLocalNatives = false` | Downloads XCFrameworks from GitHub releases (for end users) |
 
 ### Testing with the iOS Sample App
 
 The recommended way to test SDK changes is with the sample app:
 
 ```bash
-# 1. Ensure SDK is set up (from previous step)
+# 1. Ensure XCFrameworks are built (from previous step)
 
 # 2. Navigate to the sample app
-cd ../../examples/ios/RunAnywhereAI
+cd examples/ios/RunAnywhereAI
 
 # 3. Open in Xcode
 open RunAnywhereAI.xcodeproj
@@ -693,7 +684,7 @@ open RunAnywhereAI.xcodeproj
 # 4. If Xcode shows package errors, reset caches:
 #    File > Packages > Reset Package Caches
 
-# 5. Build and Run (⌘+R)
+# 5. Build and Run (Cmd+R)
 ```
 
 The sample app's `Package.swift` references the local SDK, which in turn uses the local frameworks from `Binaries/`. This creates a complete local development loop:
@@ -701,34 +692,19 @@ The sample app's `Package.swift` references the local SDK, which in turn uses th
 ```
 Sample App → Local Swift SDK → Local XCFrameworks (Binaries/)
                                       ↑
-                         Built by build-swift.sh --setup
+                         Built by scripts/build-core-xcframework.sh
 ```
 
 ### Development Workflow
 
 **After modifying Swift SDK code:**
-- No rebuild needed—Xcode picks up changes automatically
+- No rebuild needed --- Xcode picks up changes automatically
 
 **After modifying runanywhere-commons (C++ code):**
 
 ```bash
-cd sdk/runanywhere-swift
-./scripts/build-swift.sh --local --build-commons
+./scripts/build-core-xcframework.sh
 ```
-
-### Build Script Reference
-
-| Command | Description |
-|---------|-------------|
-| `--setup` | First-time setup: downloads deps, builds all frameworks, sets `testLocal = true` |
-| `--local` | Use local frameworks from `Binaries/` |
-| `--remote` | Use remote frameworks from GitHub releases |
-| `--build-commons` | Rebuild runanywhere-commons from source |
-| `--clean` | Clean build artifacts before building |
-| `--release` | Build in release mode (default: debug) |
-| `--skip-build` | Only setup frameworks, skip swift build |
-| `--set-local` | Set `testLocal = true` in Package.swift |
-| `--set-remote` | Set `testLocal = false` in Package.swift |
 
 ### Running Tests
 

@@ -61,6 +61,14 @@ public class StorageInfoRequest(
     schemaIndex = 2,
   )
   public val include_models: Boolean = false,
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "includeCache",
+    schemaIndex = 3,
+  )
+  public val include_cache: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StorageInfoRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -77,6 +85,7 @@ public class StorageInfoRequest(
     if (include_device != other.include_device) return false
     if (include_app != other.include_app) return false
     if (include_models != other.include_models) return false
+    if (include_cache != other.include_cache) return false
     return true
   }
 
@@ -87,6 +96,7 @@ public class StorageInfoRequest(
       result = result * 37 + include_device.hashCode()
       result = result * 37 + include_app.hashCode()
       result = result * 37 + include_models.hashCode()
+      result = result * 37 + include_cache.hashCode()
       super.hashCode = result
     }
     return result
@@ -97,6 +107,7 @@ public class StorageInfoRequest(
     result += """include_device=$include_device"""
     result += """include_app=$include_app"""
     result += """include_models=$include_models"""
+    result += """include_cache=$include_cache"""
     return result.joinToString(prefix = "StorageInfoRequest{", separator = ", ", postfix = "}")
   }
 
@@ -104,9 +115,10 @@ public class StorageInfoRequest(
     include_device: Boolean = this.include_device,
     include_app: Boolean = this.include_app,
     include_models: Boolean = this.include_models,
+    include_cache: Boolean = this.include_cache,
     unknownFields: ByteString = this.unknownFields,
   ): StorageInfoRequest = StorageInfoRequest(include_device, include_app, include_models,
-      unknownFields)
+      include_cache, unknownFields)
 
   public companion object {
     @JvmField
@@ -127,6 +139,8 @@ public class StorageInfoRequest(
             value.include_app)
         if (value.include_models != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(3,
             value.include_models)
+        if (value.include_cache != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(4,
+            value.include_cache)
         return size
       }
 
@@ -137,11 +151,15 @@ public class StorageInfoRequest(
             value.include_app)
         if (value.include_models != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3,
             value.include_models)
+        if (value.include_cache != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
+            value.include_cache)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StorageInfoRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.include_cache != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
+            value.include_cache)
         if (value.include_models != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3,
             value.include_models)
         if (value.include_app != false) ProtoAdapter.BOOL.encodeWithTag(writer, 2,
@@ -154,11 +172,13 @@ public class StorageInfoRequest(
         var include_device: Boolean = false
         var include_app: Boolean = false
         var include_models: Boolean = false
+        var include_cache: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> include_device = ProtoAdapter.BOOL.decode(reader)
             2 -> include_app = ProtoAdapter.BOOL.decode(reader)
             3 -> include_models = ProtoAdapter.BOOL.decode(reader)
+            4 -> include_cache = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -166,6 +186,7 @@ public class StorageInfoRequest(
           include_device = include_device,
           include_app = include_app,
           include_models = include_models,
+          include_cache = include_cache,
           unknownFields = unknownFields
         )
       }

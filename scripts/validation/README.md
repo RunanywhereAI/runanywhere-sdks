@@ -12,7 +12,8 @@ artifact policy, and cleanup recommendations.
 | --- | --- | --- |
 | `run_global_source_checks.sh` | Runs repo source checks: short status, whitespace diff check, and IDL drift check. | `build/validation/` |
 | `run_commons_proto_checks.sh` | Configures, builds, and runs the commons proto/core CMake tests. | `build/validation/commons-proto/` |
-| `run_seven_lane_validation.sh` | Creates the seven-lane runtime evidence folder and optional preflight. | `build/validation/` |
+| `run_seven_lane_validation.sh` | Creates the seven-lane runtime evidence folder, optional preflight, and optional v2 evidence self-check. | `build/validation/` |
+| `validate_seven_lane_evidence.py` | Validates seven-lane v2 evidence files, required headers, action phases, and lane-relative screenshot/log paths. | N/A |
 
 Useful environment variables:
 
@@ -31,10 +32,20 @@ current worktree before running codegen, then fails only if codegen changes
 files relative to that dirty baseline. CI stays strict by using the committed
 Git index.
 
+**GLOBAL-04 status**: The dirty-worktree IDL drift gate is satisfied by
+`run_idl_drift_check.sh`. In `current-worktree` mode (the local default) it
+creates an isolated `GIT_INDEX_FILE` in a temp directory, snapshots all tracked
+and untracked files, runs `generate_all.sh`, then diffs the worktree against
+that baseline. Temp files are cleaned up via `trap cleanup EXIT` even on
+failure. The real Git index is never modified. Tested on a branch with 1194
+staged files and confirmed correct behavior.
+
 Examples:
 
 ```bash
 scripts/validation/run_global_source_checks.sh
 scripts/validation/run_commons_proto_checks.sh
 scripts/validation/run_seven_lane_validation.sh --with-preflight
+scripts/validation/run_seven_lane_validation.sh --dry-run
+scripts/validation/run_seven_lane_validation.sh --check-only test_workflows/logs/<run-dir>
 ```

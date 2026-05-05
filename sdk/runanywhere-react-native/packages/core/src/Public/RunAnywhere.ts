@@ -8,14 +8,11 @@
  */
 
 import { Platform } from 'react-native';
-import { EventBus } from './Events';
 import { requireNativeModule, isNativeModuleAvailable } from '../native';
 import { SDKEnvironment } from '../types';
-import { ModelRegistry } from '../services/ModelRegistry';
 import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceContainer';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 import { SDKConstants } from '../Foundation/Constants';
-import { FileSystem } from '../services/FileSystem';
 import { SecureStorageService } from '../Foundation/Security/SecureStorageService';
 import { TelemetryService } from '../services/Network';
 import {
@@ -36,8 +33,15 @@ import {
   markInitializationFailed,
   resetState,
 } from '../Foundation/Initialization';
-import type { ModelInfo, SDKInitOptions } from '../types';
-import type { DownloadProgress as ProtoDownloadProgress } from '@runanywhere/proto-ts/download_service';
+import type { SDKInitOptions } from '../types';
+import {
+  EventCategory,
+  EventDestination,
+  EventSeverity,
+  InitializationStage,
+  SDKComponent,
+  SDKEvent as SDKEventCodec,
+} from '@runanywhere/proto-ts/sdk_events';
 
 // Import extensions
 import * as TextGeneration from './Extensions/RunAnywhere+TextGeneration';
@@ -48,7 +52,6 @@ import * as VAD from './Extensions/RunAnywhere+VAD';
 import * as Storage from './Extensions/RunAnywhere+Storage';
 import * as SDKEvents from './Extensions/RunAnywhere+Events';
 import * as Lifecycle from './Extensions/RunAnywhere+Lifecycle';
-import * as Models from './Extensions/RunAnywhere+Models';
 import * as Logging from './Extensions/RunAnywhere+Logging';
 import * as VoiceAgent from './Extensions/RunAnywhere+VoiceAgent';
 // v3.1: RunAnywhere+VoiceSession.ts deleted — use VoiceAgentStreamAdapter.
@@ -56,18 +59,13 @@ import * as StructuredOutput from './Extensions/RunAnywhere+StructuredOutput';
 import * as Audio from './Extensions/RunAnywhere+Audio';
 import * as ToolCalling from './Extensions/RunAnywhere+ToolCalling';
 import * as RAG from './Extensions/RunAnywhere+RAG';
-import * as Device from './Extensions/RunAnywhere+Device';
 import * as VLM from './Extensions/RunAnywhere+VisionLanguage';
 import { lora as LoRACapability } from './Extensions/RunAnywhere+LoRA';
-import * as Diffusion from './Extensions/RunAnywhere+Diffusion';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
 import { startLiveTranscription } from './Sessions/LiveTranscriptionSession';
-// Phase D namespace extensions
-import * as Frameworks from './Extensions/RunAnywhere+Frameworks';
-import * as ModelAssignments from './Extensions/RunAnywhere+ModelAssignments';
-import * as ModelManagement from './Extensions/RunAnywhere+ModelManagement';
-import * as PluginLoader from './Extensions/RunAnywhere+PluginLoader';
 import * as VLMModels from './Extensions/RunAnywhere+VLMModels';
+import * as ModelManagement from './Extensions/RunAnywhere+ModelManagement';
+import { Hardware as HardwareNamespace } from './Extensions/RunAnywhere+Hardware';
 
 const logger = new SDKLogger('RunAnywhere');
 
@@ -77,6 +75,39 @@ const logger = new SDKLogger('RunAnywhere');
 
 let initState: InitializationState = createInitialState();
 let cachedDeviceId: string = '';
+
+const sdkEventSurface = {
+  subscribe: SDKEvents.subscribeSDKEvents,
+  publish: SDKEvents.publishSDKEvent,
+  poll: SDKEvents.pollSDKEvent,
+  publishFailure: SDKEvents.publishSDKFailure,
+};
+
+function publishInitializationEvent(
+  stage: InitializationStage,
+  error = ''
+): void {
+  void SDKEvents.publishSDKEvent(
+    SDKEventCodec.fromPartial({
+      timestampMs: Date.now(),
+      severity: error
+        ? EventSeverity.EVENT_SEVERITY_ERROR
+        : EventSeverity.EVENT_SEVERITY_INFO,
+      category: EventCategory.EVENT_CATEGORY_INITIALIZATION,
+      component: SDKComponent.SDK_COMPONENT_UNSPECIFIED,
+      id: `rn-init-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      destination: EventDestination.EVENT_DESTINATION_ALL,
+      operationId: 'sdk.initialize',
+      source: 'react_native',
+      initialization: {
+        stage,
+        source: 'react_native',
+        error,
+        version: SDKConstants.version,
+      },
+    })
+  ).catch(() => undefined);
+}
 
 // ============================================================================
 // Conversation Helper
@@ -106,90 +137,6 @@ export class Conversation {
 }
 
 // ============================================================================
-// Download Model — Streaming AsyncGenerator
-// ============================================================================
-
-/**
- * Download a model and stream `DownloadProgress` events.
- *
- * Written as `async function*` rather than an object literal with a
- * `[Symbol.asyncIterator]` method because Babel compiles
- * `Object.defineProperty(obj, Symbol.asyncIterator, fn)` to
- * `_defineProperty2.default(...)` which Hermes does not recognise as
- * async-iterable. Generators compile to code Hermes natively supports.
- *
- * Cancellation: breaking out of the `for await` loop triggers the
- * generator's `return()` path, which fires the `finally` block and
- * issues `Models.cancelDownload(modelId)` against the native cancel-token
- * registry.
- */
-async function* downloadModel(
-  modelId: string
-): AsyncGenerator<ProtoDownloadProgress, void, void> {
-  const queue: ProtoDownloadProgress[] = [];
-  let resolver: ((p: ProtoDownloadProgress | null) => void) | null = null;
-  let finished = false;
-  let dlError: Error | null = null;
-
-  const push = (progress: ProtoDownloadProgress): void => {
-    if (resolver) {
-      const r = resolver;
-      resolver = null;
-      r(progress);
-    } else {
-      queue.push(progress);
-    }
-  };
-
-  // Kick off the underlying download; `Models.downloadModel` delivers a
-  // full `runanywhere.v1.DownloadProgress` message per tick.
-  const downloadPromise = Models.downloadModel(modelId, (p) => {
-    push(p as ProtoDownloadProgress);
-  })
-    .then(() => {
-      finished = true;
-      if (resolver) {
-        const r = resolver;
-        resolver = null;
-        r(null);
-      }
-    })
-    .catch((err: unknown) => {
-      dlError = err instanceof Error ? err : new Error(String(err));
-      finished = true;
-      if (resolver) {
-        const r = resolver;
-        resolver = null;
-        r(null);
-      }
-    });
-
-  try {
-    while (!finished || queue.length > 0) {
-      if (queue.length > 0) {
-        yield queue.shift()!;
-        continue;
-      }
-      if (finished) break;
-      const next = await new Promise<ProtoDownloadProgress | null>((r) => {
-        resolver = r;
-      });
-      if (next !== null) {
-        yield next;
-      }
-    }
-    if (dlError) throw dlError;
-  } finally {
-    if (!finished) {
-      // Consumer broke out early — signal cancel and let the download
-      // promise settle so we don't leak the task.
-      void Models.cancelDownload(modelId);
-      await downloadPromise.catch(() => undefined);
-    }
-  }
-}
-
-// ============================================================================
 // RunAnywhere SDK
 // ============================================================================
 
@@ -201,7 +148,7 @@ export const RunAnywhere = {
   // Event Access
   // ============================================================================
 
-  events: EventBus,
+  events: sdkEventSurface,
 
   // ============================================================================
   // SDK State
@@ -253,7 +200,7 @@ export const RunAnywhere = {
       environment,
     };
 
-    EventBus.publish('Initialization', { type: 'started' });
+    publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_STARTED);
     logger.info('SDK initialization starting...');
 
     if (!isNativeModuleAvailable()) {
@@ -268,12 +215,6 @@ export const RunAnywhere = {
     const native = requireNativeModule();
 
     try {
-      // Get documents path for model storage (matches Swift SDK's base directory setup)
-      // Uses react-native-fs for the documents directory
-      const documentsPath = FileSystem.isAvailable()
-        ? FileSystem.getDocumentsDirectory()
-        : '';
-
       // HTTP transport is owned by native C++ (rac_http_client_*). The JS
       // layer only needs to stash the base URL / API key with the native
       // HTTPBridge so downstream native consumers (DeviceBridge, telemetry)
@@ -298,20 +239,17 @@ export const RunAnywhere = {
 
       // Initialize with config
       // Note: Backend registration (llamacpp, onnx) is done by their respective packages
+      // Document paths are owned by the native platform adapter (sandbox layout).
       const configJson = JSON.stringify({
         apiKey: effectiveApiKey,
         baseURL: effectiveBaseURL,
         environment: envString,
-        documentsPath: documentsPath, // Required for model paths (mirrors Swift SDK)
         sdkVersion: SDKConstants.version, // Centralized version for C++ layer
         supabaseURL: options.supabaseURL, // For development mode
         supabaseKey: options.supabaseKey, // For development mode
       });
 
       await native.initialize(configJson);
-
-      // Initialize model registry
-      await ModelRegistry.initialize();
 
       // Cache device ID early (uses secure storage / Keychain)
       try {
@@ -371,12 +309,15 @@ export const RunAnywhere = {
       initState = markServicesInitialized(initState);
 
       logger.info('SDK initialized successfully');
-      EventBus.publish('Initialization', { type: 'completed' });
+      publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_COMPLETED);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error(`SDK initialization failed: ${msg}`);
       initState = markInitializationFailed(initState, error as Error);
-      EventBus.publish('Initialization', { type: 'failed', error: msg });
+      publishInitializationEvent(
+        InitializationStage.INITIALIZATION_STAGE_FAILED,
+        msg
+      );
       throw error;
     }
   },
@@ -563,8 +504,6 @@ export const RunAnywhere = {
 
     try {
       const native = requireNativeModule();
-      // Re-trigger model registry hydration; native side is idempotent.
-      await ModelRegistry.initialize();
 
       // Best-effort device registration retry. Build token resolution is
       // identical to the original `initialize()` path.
@@ -583,11 +522,14 @@ export const RunAnywhere = {
       // Touch native to keep the bridge warm; ignore returned bool here.
       void native.isInitialized();
       logger.info('Services initialisation completed.');
-      EventBus.publish('Initialization', { type: 'completed' });
+      publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_COMPLETED);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error(`Services initialisation failed: ${msg}`);
-      EventBus.publish('Initialization', { type: 'failed', error: msg });
+      publishInitializationEvent(
+        InitializationStage.INITIALIZATION_STAGE_FAILED,
+        msg
+      );
       throw error;
     }
   },
@@ -658,12 +600,6 @@ export const RunAnywhere = {
   },
 
   // ============================================================================
-  // Device / NPU Chip Detection (Delegated to Extension)
-  // ============================================================================
-
-  getChip: Device.getChip,
-
-  // ============================================================================
   // Logging (Delegated to Extension)
   // ============================================================================
 
@@ -671,13 +607,14 @@ export const RunAnywhere = {
 
   // ============================================================================
   // Text Generation - LLM (Delegated to Extension)
+  //
+  // Loading is lifecycle-driven (`loadModelLifecycle(modelId)`); these
+  // surfaces only expose state introspection + inference + cancel.
   // ============================================================================
 
-  loadModel: TextGeneration.loadModel,
   isModelLoaded: TextGeneration.isModelLoaded,
   unloadModel: TextGeneration.unloadModel,
   // Canonical spec names (§3)
-  loadLLMModel: TextGeneration.loadModel,
   unloadLLMModel: TextGeneration.unloadModel,
   isLLMModelLoaded: TextGeneration.isModelLoaded,
   chat: TextGeneration.chat,
@@ -695,20 +632,13 @@ export const RunAnywhere = {
   // Speech-to-Text (Delegated to Extension)
   // ============================================================================
 
-  loadSTTModel: STT.loadSTTModel,
   isSTTModelLoaded: STT.isSTTModelLoaded,
   unloadSTTModel: STT.unloadSTTModel,
   transcribe: STT.transcribe,
   transcribeSimple: STT.transcribeSimple,
   transcribeBuffer: STT.transcribeBuffer,
   transcribeStream: STT.transcribeStream,
-  transcribeStreamAsync: STT.transcribeStreamAsync,
   transcribeFile: STT.transcribeFile,
-  // Streaming audio ingestion (§4)
-  processStreamingAudio: STT.processStreamingAudio,
-  // Streaming control (matches Swift: stopStreamingTranscription)
-  stopStreamingTranscription: STT.stopStreamingTranscription,
-  isStreamingSTT: STT.isStreamingSTT,
   // Introspection (matches Swift: currentSTTModel)
   currentSTTModel: STT.currentSTTModel,
   // Live transcription session (matches Swift: startLiveTranscription)
@@ -718,9 +648,6 @@ export const RunAnywhere = {
   // Text-to-Speech (Delegated to Extension)
   // ============================================================================
 
-  loadTTSModel: TTS.loadTTSModel,
-  loadTTSVoice: TTS.loadTTSVoice,
-  unloadTTSVoice: TTS.unloadTTSVoice,
   isTTSModelLoaded: TTS.isTTSModelLoaded,
   isTTSVoiceLoaded: TTS.isTTSVoiceLoaded,
   unloadTTSModel: TTS.unloadTTSModel,
@@ -739,25 +666,18 @@ export const RunAnywhere = {
   // Voice Activity Detection (Delegated to Extension)
   // ============================================================================
 
-  initializeVAD: VAD.initializeVAD,
-  isVADReady: VAD.isVADReady,
-  loadVADModel: VAD.loadVADModel,
   isVADModelLoaded: VAD.isVADModelLoaded,
   unloadVADModel: VAD.unloadVADModel,
   detectSpeech: VAD.detectSpeech,
   detectVoiceActivity: VAD.detectVoiceActivity,
   processVAD: VAD.processVAD,
-  startVAD: VAD.startVAD,
-  stopVAD: VAD.stopVAD,
   resetVAD: VAD.resetVAD,
-  setVADSpeechActivityCallback: VAD.setVADSpeechActivityCallback,
-  setVADAudioBufferCallback: VAD.setVADAudioBufferCallback,
-  // VAD statistics callback (§6)
-  setVADStatisticsCallback: VAD.setVADStatisticsCallback,
+  // VAD activity stream (§6) — proto-byte canonical
+  streamVADActivity: VAD.streamVADActivity,
+  // VAD statistics (§6)
+  getVADStatistics: VAD.getVADStatistics,
   // VAD streaming (§6)
   streamVAD: VAD.streamVAD,
-  cleanupVAD: VAD.cleanupVAD,
-  getVADState: VAD.getVADState,
 
   // ============================================================================
   // Voice Agent (Delegated to Extension)
@@ -802,7 +722,6 @@ export const RunAnywhere = {
   unregisterTool: ToolCalling.unregisterTool,
   getRegisteredTools: ToolCalling.getRegisteredTools,
   clearTools: ToolCalling.clearTools,
-  parseToolCall: ToolCalling.parseToolCall,
   executeTool: ToolCalling.executeTool,
   formatToolsForPromptAsync: ToolCalling.formatToolsForPromptAsync,
   generateWithTools: ToolCalling.generateWithTools,
@@ -831,21 +750,6 @@ export const RunAnywhere = {
   lora: LoRACapability,
 
   // ============================================================================
-  // Diffusion / Image Generation (Delegated to Extension)
-  // Matches Swift: RunAnywhere+Diffusion.swift
-  // ============================================================================
-
-  generateImage: Diffusion.generateImage,
-  generateImageStream: Diffusion.generateImageStream,
-  loadDiffusionModel: Diffusion.loadDiffusionModel,
-  unloadDiffusionModel: Diffusion.unloadDiffusionModel,
-  isDiffusionModelLoaded: Diffusion.isDiffusionModelLoaded,
-  currentDiffusionModelId: Diffusion.currentDiffusionModelId,
-  currentDiffusionFramework: Diffusion.currentDiffusionFramework,
-  cancelImageGeneration: Diffusion.cancelImageGeneration,
-  getDiffusionCapabilities: Diffusion.getDiffusionCapabilities,
-
-  // ============================================================================
   // RAG Pipeline (Delegated to Extension)
   // ============================================================================
 
@@ -868,6 +772,25 @@ export const RunAnywhere = {
   solutions: SolutionsCapability,
 
   // ============================================================================
+  // Model Management (Delegated to Extension) — Swift / Kotlin / Flutter / Web parity
+  // ============================================================================
+
+  registerModel: ModelManagement.registerModel,
+  registerMultiFileModel: ModelManagement.registerMultiFileModel,
+  getAvailableModels: ModelManagement.getAvailableModels,
+  getDownloadedModels: ModelManagement.getDownloadedModels,
+  downloadModel: ModelManagement.downloadModel,
+  cancelDownload: ModelManagement.cancelDownload,
+  deleteModel: ModelManagement.deleteModel,
+  loadModel: ModelManagement.loadModel,
+
+  // ============================================================================
+  // Hardware namespace (CANONICAL_API §14)
+  // ============================================================================
+
+  hardware: HardwareNamespace,
+
+  // ============================================================================
   // Storage Management (Delegated to Extension)
   // ============================================================================
 
@@ -876,7 +799,6 @@ export const RunAnywhere = {
   checkStorageAvailability: Storage.checkStorageAvailability,
   planStorageDelete: Storage.planStorageDelete,
   deleteStorage: Storage.deleteStorage,
-  getModelsDirectory: Storage.getModelsDirectory,
   clearCache: Storage.clearCache,
 
   // ============================================================================
@@ -891,44 +813,6 @@ export const RunAnywhere = {
   unloadModelLifecycle: Lifecycle.unloadModelLifecycle,
   getCurrentModel: Lifecycle.getCurrentModel,
   getComponentLifecycleSnapshot: Lifecycle.getComponentLifecycleSnapshot,
-
-  // ============================================================================
-  // Model Registry (Delegated to Extension)
-  // ============================================================================
-
-  // Canonical name §13: availableModels()
-  availableModels: Models.getAvailableModels,
-  // Legacy alias kept for internal callers already using the old name.
-  getAvailableModels: Models.getAvailableModels,
-  getModelInfo: Models.getModelInfo,
-  getModelPath: Models.getModelPath,
-  isModelDownloaded: Models.isModelDownloaded,
-  /**
-   * Download a model and stream `DownloadProgress` events.
-   *
-   * Returns an `AsyncGenerator<DownloadProgress>` per canonical spec §13.
-   * Each yielded value is a proto `DownloadProgress` object with `modelId`,
-   * `bytesDownloaded`, `totalBytes`, and a 0-1 `progress` field.
-   *
-   * The actual download is delegated to the native C++ transport
-   * (`rac_http_download_execute`). Callers can break out of the for-await
-   * at any time; cancellation is performed via `cancelDownload(modelId)`.
-   *
-   * Implemented as an `async function*` (not an object with
-   * `[Symbol.asyncIterator]`) because Babel compiles the latter through
-   * `Object.defineProperty(obj, Symbol.asyncIterator, fn)`, which Hermes
-   * does not recognise as async-iterable. Generators are emitted as a
-   * native form Hermes supports.
-   */
-  downloadModel: downloadModel,
-  cancelDownload: Models.cancelDownload,
-  deleteModel: Models.deleteModel,
-  deleteAllModels: Models.deleteAllModels,
-  checkCompatibility: Models.checkCompatibility,
-  registerModel: Models.registerModel,
-  registerMultiFileModel: Models.registerMultiFileModel,
-  // Refresh model registry (§13) — was present in Models extension but not wired to facade.
-  refreshModelRegistry: Models.refreshModelRegistry,
 
   // ============================================================================
   // Utilities
@@ -970,12 +854,6 @@ export const RunAnywhere = {
   },
 
   /**
-   * Get downloaded models
-   * @returns Array of model IDs
-   */
-  getDownloadedModels: Models.getDownloadedModels,
-
-  /**
    * Clean temporary files
    */
   async cleanTempFiles(): Promise<boolean> {
@@ -1006,34 +884,9 @@ export const RunAnywhere = {
   },
 
   // ============================================================================
-  // Phase D Namespace Extensions (Frameworks / ModelAssignments / ModelManagement /
-  // PluginLoader / VLMModels)
+  // VLM Model Overloads (mirrors Swift +VLMModels)
   // ============================================================================
 
-  // Framework discovery (mirrors Swift +Frameworks)
-  getRegisteredFrameworks: Frameworks.getRegisteredFrameworks,
-  getFrameworksForCapability: Frameworks.getFrameworks,
-  getModelsForFramework: Frameworks.getModelsForFramework,
-
-  // Model assignments (mirrors Swift +ModelAssignments)
-  fetchModelAssignments: ModelAssignments.fetchModelAssignments,
-  getModelsForCategory: ModelAssignments.getModelsForCategory,
-
-  // Model management (mirrors Swift +ModelManagement)
-  loadModelByCategory: ModelManagement.loadModelByCategory,
-  resolveModelFilePath: ModelManagement.resolveModelFilePath,
-  ensureModelDownloaded: ModelManagement.ensureModelDownloaded,
-
-  // Plugin loader — canonical `RunAnywhere.pluginLoader.*` namespace (§12).
-  pluginLoader: {
-    get apiVersion() { return PluginLoader.pluginApiVersion(); },
-    load: PluginLoader.loadPlugin,
-    unload: PluginLoader.unloadPlugin,
-    get registeredCount() { return PluginLoader.registeredPluginCount(); },
-    registeredNames: PluginLoader.registeredPluginNames,
-  },
-
-  // VLM model overloads (mirrors Swift +VLMModels)
   loadVLMModelByInfo: VLMModels.loadVLMModel,
 
   // ============================================================================
@@ -1049,6 +902,5 @@ export const RunAnywhere = {
 // Type Exports
 // ============================================================================
 
-/** @deprecated Legacy RN registry DTO; use ProtoModelInfo for new public APIs. */
-export type { ModelInfo, ModelInfoProto as ProtoModelInfo } from '../types/models';
-export type { DownloadProgress } from '../services/DownloadService';
+export type { ModelInfo } from '@runanywhere/proto-ts/model_types';
+export type { DownloadProgress } from '@runanywhere/proto-ts/download_service';

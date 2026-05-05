@@ -9,6 +9,7 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -128,6 +129,10 @@ class VLMImage extends $pb.GeneratedMessage {
     $core.int? width,
     $core.int? height,
     VLMImageFormat? format,
+    $core.String? mediaType,
+    $core.String? name,
+    $fixnum.Int64? sizeBytes,
+    $core.Map<$core.String, $core.String>? metadata,
   }) {
     final $result = create();
     if (filePath != null) {
@@ -151,6 +156,18 @@ class VLMImage extends $pb.GeneratedMessage {
     if (format != null) {
       $result.format = format;
     }
+    if (mediaType != null) {
+      $result.mediaType = mediaType;
+    }
+    if (name != null) {
+      $result.name = name;
+    }
+    if (sizeBytes != null) {
+      $result.sizeBytes = sizeBytes;
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
+    }
     return $result;
   }
   VLMImage._() : super();
@@ -173,6 +190,10 @@ class VLMImage extends $pb.GeneratedMessage {
     ..a<$core.int>(5, _omitFieldNames ? '' : 'width', $pb.PbFieldType.O3)
     ..a<$core.int>(6, _omitFieldNames ? '' : 'height', $pb.PbFieldType.O3)
     ..e<VLMImageFormat>(7, _omitFieldNames ? '' : 'format', $pb.PbFieldType.OE, defaultOrMaker: VLMImageFormat.VLM_IMAGE_FORMAT_UNSPECIFIED, valueOf: VLMImageFormat.valueOf, enumValues: VLMImageFormat.values)
+    ..aOS(8, _omitFieldNames ? '' : 'mediaType')
+    ..aOS(9, _omitFieldNames ? '' : 'name')
+    ..aInt64(10, _omitFieldNames ? '' : 'sizeBytes')
+    ..m<$core.String, $core.String>(11, _omitFieldNames ? '' : 'metadata', entryClassName: 'VLMImage.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
     ..hasRequiredFields = false
   ;
 
@@ -266,6 +287,38 @@ class VLMImage extends $pb.GeneratedMessage {
   $core.bool hasFormat() => $_has(6);
   @$pb.TagNumber(7)
   void clearFormat() => clearField(7);
+
+  /// Optional source metadata. Adapters may populate this after camera/file
+  /// picker capture without exposing native APIs to core.
+  @$pb.TagNumber(8)
+  $core.String get mediaType => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set mediaType($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasMediaType() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearMediaType() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get name => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set name($core.String v) { $_setString(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasName() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearName() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $fixnum.Int64 get sizeBytes => $_getI64(9);
+  @$pb.TagNumber(10)
+  set sizeBytes($fixnum.Int64 v) { $_setInt64(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasSizeBytes() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearSizeBytes() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(10);
 }
 
 ///  ---------------------------------------------------------------------------
@@ -470,6 +523,10 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
     VLMModelFamily? modelFamily,
     VLMChatTemplate? customChatTemplate,
     $core.String? imageMarkerOverride,
+    $fixnum.Int64? seed,
+    $core.double? repetitionPenalty,
+    $core.double? minP,
+    $core.bool? emitImageEmbeddings,
   }) {
     final $result = create();
     if (prompt != null) {
@@ -514,6 +571,18 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
     if (imageMarkerOverride != null) {
       $result.imageMarkerOverride = imageMarkerOverride;
     }
+    if (seed != null) {
+      $result.seed = seed;
+    }
+    if (repetitionPenalty != null) {
+      $result.repetitionPenalty = repetitionPenalty;
+    }
+    if (minP != null) {
+      $result.minP = minP;
+    }
+    if (emitImageEmbeddings != null) {
+      $result.emitImageEmbeddings = emitImageEmbeddings;
+    }
     return $result;
   }
   VLMGenerationOptions._() : super();
@@ -535,6 +604,10 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
     ..e<VLMModelFamily>(12, _omitFieldNames ? '' : 'modelFamily', $pb.PbFieldType.OE, defaultOrMaker: VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED, valueOf: VLMModelFamily.valueOf, enumValues: VLMModelFamily.values)
     ..aOM<VLMChatTemplate>(13, _omitFieldNames ? '' : 'customChatTemplate', subBuilder: VLMChatTemplate.create)
     ..aOS(14, _omitFieldNames ? '' : 'imageMarkerOverride')
+    ..aInt64(15, _omitFieldNames ? '' : 'seed')
+    ..a<$core.double>(16, _omitFieldNames ? '' : 'repetitionPenalty', $pb.PbFieldType.OF)
+    ..a<$core.double>(17, _omitFieldNames ? '' : 'minP', $pb.PbFieldType.OF)
+    ..aOB(18, _omitFieldNames ? '' : 'emitImageEmbeddings')
     ..hasRequiredFields = false
   ;
 
@@ -681,6 +754,139 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
   $core.bool hasImageMarkerOverride() => $_has(13);
   @$pb.TagNumber(14)
   void clearImageMarkerOverride() => clearField(14);
+
+  /// Additional llama.cpp sampling knobs and result controls.
+  @$pb.TagNumber(15)
+  $fixnum.Int64 get seed => $_getI64(14);
+  @$pb.TagNumber(15)
+  set seed($fixnum.Int64 v) { $_setInt64(14, v); }
+  @$pb.TagNumber(15)
+  $core.bool hasSeed() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearSeed() => clearField(15);
+
+  @$pb.TagNumber(16)
+  $core.double get repetitionPenalty => $_getN(15);
+  @$pb.TagNumber(16)
+  set repetitionPenalty($core.double v) { $_setFloat(15, v); }
+  @$pb.TagNumber(16)
+  $core.bool hasRepetitionPenalty() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearRepetitionPenalty() => clearField(16);
+
+  @$pb.TagNumber(17)
+  $core.double get minP => $_getN(16);
+  @$pb.TagNumber(17)
+  set minP($core.double v) { $_setFloat(16, v); }
+  @$pb.TagNumber(17)
+  $core.bool hasMinP() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearMinP() => clearField(17);
+
+  @$pb.TagNumber(18)
+  $core.bool get emitImageEmbeddings => $_getBF(17);
+  @$pb.TagNumber(18)
+  set emitImageEmbeddings($core.bool v) { $_setBool(17, v); }
+  @$pb.TagNumber(18)
+  $core.bool hasEmitImageEmbeddings() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearEmitImageEmbeddings() => clearField(18);
+}
+
+class VLMGenerationRequest extends $pb.GeneratedMessage {
+  factory VLMGenerationRequest({
+    $core.String? requestId,
+    $core.Iterable<VLMImage>? images,
+    VLMGenerationOptions? options,
+    $core.String? modelId,
+    $core.Map<$core.String, $core.String>? metadata,
+  }) {
+    final $result = create();
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (images != null) {
+      $result.images.addAll(images);
+    }
+    if (options != null) {
+      $result.options = options;
+    }
+    if (modelId != null) {
+      $result.modelId = modelId;
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
+    }
+    return $result;
+  }
+  VLMGenerationRequest._() : super();
+  factory VLMGenerationRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory VLMGenerationRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VLMGenerationRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..pc<VLMImage>(2, _omitFieldNames ? '' : 'images', $pb.PbFieldType.PM, subBuilder: VLMImage.create)
+    ..aOM<VLMGenerationOptions>(3, _omitFieldNames ? '' : 'options', subBuilder: VLMGenerationOptions.create)
+    ..aOS(4, _omitFieldNames ? '' : 'modelId')
+    ..m<$core.String, $core.String>(5, _omitFieldNames ? '' : 'metadata', entryClassName: 'VLMGenerationRequest.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  VLMGenerationRequest clone() => VLMGenerationRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  VLMGenerationRequest copyWith(void Function(VLMGenerationRequest) updates) => super.copyWith((message) => updates(message as VLMGenerationRequest)) as VLMGenerationRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VLMGenerationRequest create() => VLMGenerationRequest._();
+  VLMGenerationRequest createEmptyInstance() => create();
+  static $pb.PbList<VLMGenerationRequest> createRepeated() => $pb.PbList<VLMGenerationRequest>();
+  @$core.pragma('dart2js:noInline')
+  static VLMGenerationRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VLMGenerationRequest>(create);
+  static VLMGenerationRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.List<VLMImage> get images => $_getList(1);
+
+  @$pb.TagNumber(3)
+  VLMGenerationOptions get options => $_getN(2);
+  @$pb.TagNumber(3)
+  set options(VLMGenerationOptions v) { setField(3, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasOptions() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOptions() => clearField(3);
+  @$pb.TagNumber(3)
+  VLMGenerationOptions ensureOptions() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  $core.String get modelId => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set modelId($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasModelId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearModelId() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(4);
 }
 
 ///  ---------------------------------------------------------------------------
@@ -706,10 +912,9 @@ class VLMGenerationOptions extends $pb.GeneratedMessage {
 ///                                   image_encode_time_ms, total_time_ms,
 ///                                   tokens_per_second)
 ///
-///  Streaming note: streaming results reuse this VLMResult message; per-token
-///  text deltas are emitted on the existing LLM stream channel
-///  (llm_service.proto streaming surface). No VLM-specific stream-event message
-///  is introduced here.
+///  Streaming note: the VLM service emits VLMStreamEvent messages for
+///  per-token deltas and terminal results; this aggregate result is carried on
+///  the unary Generate RPC and on terminal stream events.
 ///  ---------------------------------------------------------------------------
 class VLMResult extends $pb.GeneratedMessage {
   factory VLMResult({
@@ -723,6 +928,10 @@ class VLMResult extends $pb.GeneratedMessage {
     $fixnum.Int64? timeToFirstTokenMs,
     $fixnum.Int64? imageEncodeTimeMs,
     $core.String? hardwareUsed,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+    $core.String? finishReason,
+    $core.int? imagesProcessed,
   }) {
     final $result = create();
     if (text != null) {
@@ -755,6 +964,18 @@ class VLMResult extends $pb.GeneratedMessage {
     if (hardwareUsed != null) {
       $result.hardwareUsed = hardwareUsed;
     }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    if (finishReason != null) {
+      $result.finishReason = finishReason;
+    }
+    if (imagesProcessed != null) {
+      $result.imagesProcessed = imagesProcessed;
+    }
     return $result;
   }
   VLMResult._() : super();
@@ -772,6 +993,10 @@ class VLMResult extends $pb.GeneratedMessage {
     ..aInt64(8, _omitFieldNames ? '' : 'timeToFirstTokenMs')
     ..aInt64(9, _omitFieldNames ? '' : 'imageEncodeTimeMs')
     ..aOS(10, _omitFieldNames ? '' : 'hardwareUsed')
+    ..aOS(11, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(12, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..aOS(13, _omitFieldNames ? '' : 'finishReason')
+    ..a<$core.int>(14, _omitFieldNames ? '' : 'imagesProcessed', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
@@ -887,6 +1112,394 @@ class VLMResult extends $pb.GeneratedMessage {
   $core.bool hasHardwareUsed() => $_has(9);
   @$pb.TagNumber(10)
   void clearHardwareUsed() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.String get errorMessage => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set errorMessage($core.String v) { $_setString(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasErrorMessage() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearErrorMessage() => clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.int get errorCode => $_getIZ(11);
+  @$pb.TagNumber(12)
+  set errorCode($core.int v) { $_setSignedInt32(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasErrorCode() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearErrorCode() => clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.String get finishReason => $_getSZ(12);
+  @$pb.TagNumber(13)
+  set finishReason($core.String v) { $_setString(12, v); }
+  @$pb.TagNumber(13)
+  $core.bool hasFinishReason() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearFinishReason() => clearField(13);
+
+  @$pb.TagNumber(14)
+  $core.int get imagesProcessed => $_getIZ(13);
+  @$pb.TagNumber(14)
+  set imagesProcessed($core.int v) { $_setSignedInt32(13, v); }
+  @$pb.TagNumber(14)
+  $core.bool hasImagesProcessed() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearImagesProcessed() => clearField(14);
+}
+
+class VLMStreamEvent extends $pb.GeneratedMessage {
+  factory VLMStreamEvent({
+    $fixnum.Int64? seq,
+    $fixnum.Int64? timestampUs,
+    $core.String? requestId,
+    VLMStreamEventKind? kind,
+    $core.String? token,
+    $core.int? tokenIndex,
+    $core.bool? isFinal,
+    $core.double? tokensPerSecond,
+    VLMResult? result,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (seq != null) {
+      $result.seq = seq;
+    }
+    if (timestampUs != null) {
+      $result.timestampUs = timestampUs;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (kind != null) {
+      $result.kind = kind;
+    }
+    if (token != null) {
+      $result.token = token;
+    }
+    if (tokenIndex != null) {
+      $result.tokenIndex = tokenIndex;
+    }
+    if (isFinal != null) {
+      $result.isFinal = isFinal;
+    }
+    if (tokensPerSecond != null) {
+      $result.tokensPerSecond = tokensPerSecond;
+    }
+    if (result != null) {
+      $result.result = result;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  VLMStreamEvent._() : super();
+  factory VLMStreamEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory VLMStreamEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VLMStreamEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
+    ..aOS(3, _omitFieldNames ? '' : 'requestId')
+    ..e<VLMStreamEventKind>(4, _omitFieldNames ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: VLMStreamEventKind.VLM_STREAM_EVENT_KIND_UNSPECIFIED, valueOf: VLMStreamEventKind.valueOf, enumValues: VLMStreamEventKind.values)
+    ..aOS(5, _omitFieldNames ? '' : 'token')
+    ..a<$core.int>(6, _omitFieldNames ? '' : 'tokenIndex', $pb.PbFieldType.O3)
+    ..aOB(7, _omitFieldNames ? '' : 'isFinal')
+    ..a<$core.double>(8, _omitFieldNames ? '' : 'tokensPerSecond', $pb.PbFieldType.OF)
+    ..aOM<VLMResult>(9, _omitFieldNames ? '' : 'result', subBuilder: VLMResult.create)
+    ..aOS(10, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(11, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  VLMStreamEvent clone() => VLMStreamEvent()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  VLMStreamEvent copyWith(void Function(VLMStreamEvent) updates) => super.copyWith((message) => updates(message as VLMStreamEvent)) as VLMStreamEvent;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VLMStreamEvent create() => VLMStreamEvent._();
+  VLMStreamEvent createEmptyInstance() => create();
+  static $pb.PbList<VLMStreamEvent> createRepeated() => $pb.PbList<VLMStreamEvent>();
+  @$core.pragma('dart2js:noInline')
+  static VLMStreamEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VLMStreamEvent>(create);
+  static VLMStreamEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get seq => $_getI64(0);
+  @$pb.TagNumber(1)
+  set seq($fixnum.Int64 v) { $_setInt64(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasSeq() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSeq() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get timestampUs => $_getI64(1);
+  @$pb.TagNumber(2)
+  set timestampUs($fixnum.Int64 v) { $_setInt64(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasTimestampUs() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTimestampUs() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get requestId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set requestId($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasRequestId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRequestId() => clearField(3);
+
+  @$pb.TagNumber(4)
+  VLMStreamEventKind get kind => $_getN(3);
+  @$pb.TagNumber(4)
+  set kind(VLMStreamEventKind v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasKind() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearKind() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get token => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set token($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasToken() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearToken() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get tokenIndex => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set tokenIndex($core.int v) { $_setSignedInt32(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasTokenIndex() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearTokenIndex() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get isFinal => $_getBF(6);
+  @$pb.TagNumber(7)
+  set isFinal($core.bool v) { $_setBool(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasIsFinal() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearIsFinal() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.double get tokensPerSecond => $_getN(7);
+  @$pb.TagNumber(8)
+  set tokensPerSecond($core.double v) { $_setFloat(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasTokensPerSecond() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearTokensPerSecond() => clearField(8);
+
+  @$pb.TagNumber(9)
+  VLMResult get result => $_getN(8);
+  @$pb.TagNumber(9)
+  set result(VLMResult v) { setField(9, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasResult() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearResult() => clearField(9);
+  @$pb.TagNumber(9)
+  VLMResult ensureResult() => $_ensure(8);
+
+  @$pb.TagNumber(10)
+  $core.String get errorMessage => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set errorMessage($core.String v) { $_setString(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasErrorMessage() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearErrorMessage() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.int get errorCode => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set errorCode($core.int v) { $_setSignedInt32(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasErrorCode() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearErrorCode() => clearField(11);
+}
+
+class VLMServiceState extends $pb.GeneratedMessage {
+  factory VLMServiceState({
+    $core.bool? isReady,
+    $core.String? currentModel,
+    $core.int? contextLength,
+    $core.bool? supportsStreaming,
+    $core.bool? supportsMultipleImages,
+    $core.String? visionEncoderType,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (isReady != null) {
+      $result.isReady = isReady;
+    }
+    if (currentModel != null) {
+      $result.currentModel = currentModel;
+    }
+    if (contextLength != null) {
+      $result.contextLength = contextLength;
+    }
+    if (supportsStreaming != null) {
+      $result.supportsStreaming = supportsStreaming;
+    }
+    if (supportsMultipleImages != null) {
+      $result.supportsMultipleImages = supportsMultipleImages;
+    }
+    if (visionEncoderType != null) {
+      $result.visionEncoderType = visionEncoderType;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  VLMServiceState._() : super();
+  factory VLMServiceState.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory VLMServiceState.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VLMServiceState', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'isReady')
+    ..aOS(2, _omitFieldNames ? '' : 'currentModel')
+    ..a<$core.int>(3, _omitFieldNames ? '' : 'contextLength', $pb.PbFieldType.O3)
+    ..aOB(4, _omitFieldNames ? '' : 'supportsStreaming')
+    ..aOB(5, _omitFieldNames ? '' : 'supportsMultipleImages')
+    ..aOS(6, _omitFieldNames ? '' : 'visionEncoderType')
+    ..aOS(7, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(8, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  VLMServiceState clone() => VLMServiceState()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  VLMServiceState copyWith(void Function(VLMServiceState) updates) => super.copyWith((message) => updates(message as VLMServiceState)) as VLMServiceState;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VLMServiceState create() => VLMServiceState._();
+  VLMServiceState createEmptyInstance() => create();
+  static $pb.PbList<VLMServiceState> createRepeated() => $pb.PbList<VLMServiceState>();
+  @$core.pragma('dart2js:noInline')
+  static VLMServiceState getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VLMServiceState>(create);
+  static VLMServiceState? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get isReady => $_getBF(0);
+  @$pb.TagNumber(1)
+  set isReady($core.bool v) { $_setBool(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasIsReady() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearIsReady() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get currentModel => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set currentModel($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasCurrentModel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCurrentModel() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get contextLength => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set contextLength($core.int v) { $_setSignedInt32(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasContextLength() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearContextLength() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get supportsStreaming => $_getBF(3);
+  @$pb.TagNumber(4)
+  set supportsStreaming($core.bool v) { $_setBool(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasSupportsStreaming() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSupportsStreaming() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get supportsMultipleImages => $_getBF(4);
+  @$pb.TagNumber(5)
+  set supportsMultipleImages($core.bool v) { $_setBool(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasSupportsMultipleImages() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSupportsMultipleImages() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get visionEncoderType => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set visionEncoderType($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasVisionEncoderType() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearVisionEncoderType() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get errorMessage => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set errorMessage($core.String v) { $_setString(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasErrorMessage() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearErrorMessage() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get errorCode => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set errorCode($core.int v) { $_setSignedInt32(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasErrorCode() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearErrorCode() => clearField(8);
+}
+
+class VLMApi {
+  $pb.RpcClient _client;
+  VLMApi(this._client);
+
+  $async.Future<VLMResult> generate($pb.ClientContext? ctx, VLMGenerationRequest request) =>
+    _client.invoke<VLMResult>(ctx, 'VLM', 'Generate', request, VLMResult())
+  ;
+  $async.Future<VLMStreamEvent> stream($pb.ClientContext? ctx, VLMGenerationRequest request) =>
+    _client.invoke<VLMStreamEvent>(ctx, 'VLM', 'Stream', request, VLMStreamEvent())
+  ;
 }
 
 

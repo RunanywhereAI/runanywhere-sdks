@@ -208,6 +208,8 @@ void publish_tts_voice_event(runanywhere::v1::VoiceEventKind kind,
     event.set_category(runanywhere::v1::EVENT_CATEGORY_TTS);
     event.set_component(runanywhere::v1::SDK_COMPONENT_TTS);
     event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    event.set_source("cpp");
+    event.set_operation_id("tts.synthesize");
     event.set_severity(error_code == RAC_SUCCESS ? runanywhere::v1::EVENT_SEVERITY_INFO
                                                  : runanywhere::v1::EVENT_SEVERITY_ERROR);
     auto* voice = event.mutable_voice();

@@ -112,7 +112,7 @@ packages/core/src/
 ├── types.ts                          # Type re-exports
 ├── types/
 │   ├── index.ts                      # Proto-ts re-exports + web ergonomic types
-│   ├── enums.ts                      # String enums: ModelCategory, ModelStatus, LLMFramework, etc.
+│   ├── enums.ts                      # Remaining web-only UI state; public model enums come from proto-ts
 │   └── models.ts                     # SDKInitOptions, ModelInfo, StorageInfo, DeviceInfoData
 ├── Public/
 │   ├── RunAnywhere.ts                # Main SDK singleton object (~900 lines)

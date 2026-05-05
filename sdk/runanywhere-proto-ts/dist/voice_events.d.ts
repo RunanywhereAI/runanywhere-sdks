@@ -195,6 +195,19 @@ export interface VoiceEvent {
     speechTurnDetection?: SpeechTurnDetectionEvent | undefined;
     turnLifecycle?: TurnLifecycleEvent | undefined;
     wakewordDetected?: WakeWordDetectedEvent | undefined;
+    audioLevel?: AudioLevelEvent | undefined;
+    componentProgress?: ComponentProgressEvent | undefined;
+    /** Correlation fields shared by streaming and one-shot voice turns. */
+    sessionId: string;
+    turnId: string;
+    requestId: string;
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface VoiceEvent_MetadataEntry {
+    key: string;
+    value: string;
 }
 /** User speech finalized by STT (is_final=false → partial hypothesis). */
 export interface UserSaidEvent {
@@ -204,6 +217,8 @@ export interface UserSaidEvent {
     confidence: number;
     audioStartUs: number;
     audioEndUs: number;
+    languageCode: string;
+    segmentIndex: number;
 }
 /**
  * Single token decoded by the LLM. is_final=true on the last token of a
@@ -213,6 +228,9 @@ export interface AssistantTokenEvent {
     text: string;
     isFinal: boolean;
     kind: TokenKind;
+    tokenId: number;
+    logprob: number;
+    finishReason: string;
 }
 /**
  * A chunk of synthesized PCM audio, ready for the sink. The frontend is
@@ -228,6 +246,8 @@ export interface AudioFrameEvent {
     encoding: AudioEncoding;
     /** True for the final audio chunk in a TTS/voice-agent audio stream. */
     isFinal: boolean;
+    chunkIndex: number;
+    durationMs: number;
 }
 /**
  * Voice Activity Detection output. Frontends usually do not need this —
@@ -266,6 +286,8 @@ export interface ErrorEvent {
     /** "llm", "stt", "tts", "vad", "pipeline", ... */
     component: string;
     isRecoverable: boolean;
+    operation: string;
+    detailsJson: string;
 }
 /** Per-primitive latency breakdown. Emitted at barge-in and at pipeline stop. */
 export interface MetricsEvent {
@@ -290,6 +312,22 @@ export interface MetricsEvent {
      * directly (2^63 ns ≈ 292 years of runtime headroom).
      */
     createdAtNs: number;
+    vadFirstSpeechMs: number;
+    sttFirstPartialMs: number;
+    llmTotalMs: number;
+    ttsTotalMs: number;
+}
+export interface AudioLevelEvent {
+    rms: number;
+    peak: number;
+    noiseFloorDb: number;
+    isSpeech: boolean;
+}
+export interface ComponentProgressEvent {
+    component: VoicePipelineComponent;
+    operation: string;
+    progress: number;
+    message: string;
 }
 /**
  * Aggregate load state across all four voice-agent components. Mirrors Swift
@@ -310,19 +348,29 @@ export interface VoiceAgentComponentStates {
     ready: boolean;
     /** Computed: true when any of the four states is COMPONENT_LOAD_STATE_LOADING. */
     anyLoading: boolean;
+    wakewordState: ComponentLoadState;
+    errorMessage?: string | undefined;
 }
 export interface VoiceSessionError {
     code: VoiceSessionErrorCode;
     message: string;
     failedComponent?: string | undefined;
+    cAbiCode: number;
+    recoverable: boolean;
 }
 export interface SessionStartedEvent {
+    sessionId: string;
 }
 export interface SessionStoppedEvent {
+    sessionId: string;
+    reason: string;
 }
 export interface AgentResponseStartedEvent {
+    turnId: string;
 }
 export interface AgentResponseCompletedEvent {
+    turnId: string;
+    responseDurationMs: number;
 }
 export interface SpeechTurnDetectionEvent {
     kind: SpeechTurnDetectionEventKind;
@@ -340,6 +388,8 @@ export interface TurnLifecycleEvent {
     transcript: string;
     response: string;
     error: string;
+    startedAtMs: number;
+    completedAtMs: number;
 }
 export interface WakeWordDetectedEvent {
     wakeWord: string;
@@ -356,6 +406,14 @@ export declare const VoiceEvent: {
     toJSON(message: VoiceEvent): unknown;
     create<I extends Exact<DeepPartial<VoiceEvent>, I>>(base?: I): VoiceEvent;
     fromPartial<I extends Exact<DeepPartial<VoiceEvent>, I>>(object: I): VoiceEvent;
+};
+export declare const VoiceEvent_MetadataEntry: {
+    encode(message: VoiceEvent_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceEvent_MetadataEntry;
+    fromJSON(object: any): VoiceEvent_MetadataEntry;
+    toJSON(message: VoiceEvent_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<VoiceEvent_MetadataEntry>, I>>(base?: I): VoiceEvent_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<VoiceEvent_MetadataEntry>, I>>(object: I): VoiceEvent_MetadataEntry;
 };
 export declare const UserSaidEvent: {
     encode(message: UserSaidEvent, writer?: _m0.Writer): _m0.Writer;
@@ -421,6 +479,22 @@ export declare const MetricsEvent: {
     create<I extends Exact<DeepPartial<MetricsEvent>, I>>(base?: I): MetricsEvent;
     fromPartial<I extends Exact<DeepPartial<MetricsEvent>, I>>(object: I): MetricsEvent;
 };
+export declare const AudioLevelEvent: {
+    encode(message: AudioLevelEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): AudioLevelEvent;
+    fromJSON(object: any): AudioLevelEvent;
+    toJSON(message: AudioLevelEvent): unknown;
+    create<I extends Exact<DeepPartial<AudioLevelEvent>, I>>(base?: I): AudioLevelEvent;
+    fromPartial<I extends Exact<DeepPartial<AudioLevelEvent>, I>>(object: I): AudioLevelEvent;
+};
+export declare const ComponentProgressEvent: {
+    encode(message: ComponentProgressEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ComponentProgressEvent;
+    fromJSON(object: any): ComponentProgressEvent;
+    toJSON(message: ComponentProgressEvent): unknown;
+    create<I extends Exact<DeepPartial<ComponentProgressEvent>, I>>(base?: I): ComponentProgressEvent;
+    fromPartial<I extends Exact<DeepPartial<ComponentProgressEvent>, I>>(object: I): ComponentProgressEvent;
+};
 export declare const VoiceAgentComponentStates: {
     encode(message: VoiceAgentComponentStates, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentComponentStates;
@@ -438,36 +512,36 @@ export declare const VoiceSessionError: {
     fromPartial<I extends Exact<DeepPartial<VoiceSessionError>, I>>(object: I): VoiceSessionError;
 };
 export declare const SessionStartedEvent: {
-    encode(_: SessionStartedEvent, writer?: _m0.Writer): _m0.Writer;
+    encode(message: SessionStartedEvent, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): SessionStartedEvent;
-    fromJSON(_: any): SessionStartedEvent;
-    toJSON(_: SessionStartedEvent): unknown;
+    fromJSON(object: any): SessionStartedEvent;
+    toJSON(message: SessionStartedEvent): unknown;
     create<I extends Exact<DeepPartial<SessionStartedEvent>, I>>(base?: I): SessionStartedEvent;
-    fromPartial<I extends Exact<DeepPartial<SessionStartedEvent>, I>>(_: I): SessionStartedEvent;
+    fromPartial<I extends Exact<DeepPartial<SessionStartedEvent>, I>>(object: I): SessionStartedEvent;
 };
 export declare const SessionStoppedEvent: {
-    encode(_: SessionStoppedEvent, writer?: _m0.Writer): _m0.Writer;
+    encode(message: SessionStoppedEvent, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): SessionStoppedEvent;
-    fromJSON(_: any): SessionStoppedEvent;
-    toJSON(_: SessionStoppedEvent): unknown;
+    fromJSON(object: any): SessionStoppedEvent;
+    toJSON(message: SessionStoppedEvent): unknown;
     create<I extends Exact<DeepPartial<SessionStoppedEvent>, I>>(base?: I): SessionStoppedEvent;
-    fromPartial<I extends Exact<DeepPartial<SessionStoppedEvent>, I>>(_: I): SessionStoppedEvent;
+    fromPartial<I extends Exact<DeepPartial<SessionStoppedEvent>, I>>(object: I): SessionStoppedEvent;
 };
 export declare const AgentResponseStartedEvent: {
-    encode(_: AgentResponseStartedEvent, writer?: _m0.Writer): _m0.Writer;
+    encode(message: AgentResponseStartedEvent, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): AgentResponseStartedEvent;
-    fromJSON(_: any): AgentResponseStartedEvent;
-    toJSON(_: AgentResponseStartedEvent): unknown;
+    fromJSON(object: any): AgentResponseStartedEvent;
+    toJSON(message: AgentResponseStartedEvent): unknown;
     create<I extends Exact<DeepPartial<AgentResponseStartedEvent>, I>>(base?: I): AgentResponseStartedEvent;
-    fromPartial<I extends Exact<DeepPartial<AgentResponseStartedEvent>, I>>(_: I): AgentResponseStartedEvent;
+    fromPartial<I extends Exact<DeepPartial<AgentResponseStartedEvent>, I>>(object: I): AgentResponseStartedEvent;
 };
 export declare const AgentResponseCompletedEvent: {
-    encode(_: AgentResponseCompletedEvent, writer?: _m0.Writer): _m0.Writer;
+    encode(message: AgentResponseCompletedEvent, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): AgentResponseCompletedEvent;
-    fromJSON(_: any): AgentResponseCompletedEvent;
-    toJSON(_: AgentResponseCompletedEvent): unknown;
+    fromJSON(object: any): AgentResponseCompletedEvent;
+    toJSON(message: AgentResponseCompletedEvent): unknown;
     create<I extends Exact<DeepPartial<AgentResponseCompletedEvent>, I>>(base?: I): AgentResponseCompletedEvent;
-    fromPartial<I extends Exact<DeepPartial<AgentResponseCompletedEvent>, I>>(_: I): AgentResponseCompletedEvent;
+    fromPartial<I extends Exact<DeepPartial<AgentResponseCompletedEvent>, I>>(object: I): AgentResponseCompletedEvent;
 };
 export declare const SpeechTurnDetectionEvent: {
     encode(message: SpeechTurnDetectionEvent, writer?: _m0.Writer): _m0.Writer;

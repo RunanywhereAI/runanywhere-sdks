@@ -173,13 +173,15 @@ const ModelSource$json = {
     {'1': 'MODEL_SOURCE_UNSPECIFIED', '2': 0},
     {'1': 'MODEL_SOURCE_REMOTE', '2': 1},
     {'1': 'MODEL_SOURCE_LOCAL', '2': 2},
+    {'1': 'MODEL_SOURCE_BUILT_IN', '2': 3},
   ],
 };
 
 /// Descriptor for `ModelSource`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List modelSourceDescriptor = $convert.base64Decode(
     'CgtNb2RlbFNvdXJjZRIcChhNT0RFTF9TT1VSQ0VfVU5TUEVDSUZJRUQQABIXChNNT0RFTF9TT1'
-    'VSQ0VfUkVNT1RFEAESFgoSTU9ERUxfU09VUkNFX0xPQ0FMEAI=');
+    'VSQ0VfUkVNT1RFEAESFgoSTU9ERUxfU09VUkNFX0xPQ0FMEAISGQoVTU9ERUxfU09VUkNFX0JV'
+    'SUxUX0lOEAM=');
 
 @$core.Deprecated('Use archiveTypeDescriptor instead')
 const ArchiveType$json = {
@@ -228,6 +230,11 @@ const ModelArtifactType$json = {
     {'1': 'MODEL_ARTIFACT_TYPE_DIRECTORY', '2': 3},
     {'1': 'MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE', '2': 4},
     {'1': 'MODEL_ARTIFACT_TYPE_CUSTOM', '2': 5},
+    {'1': 'MODEL_ARTIFACT_TYPE_ARCHIVE', '2': 6},
+    {'1': 'MODEL_ARTIFACT_TYPE_MULTI_FILE', '2': 7},
+    {'1': 'MODEL_ARTIFACT_TYPE_BUILT_IN', '2': 8},
+    {'1': 'MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE', '2': 9},
+    {'1': 'MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE', '2': 10},
   ],
 };
 
@@ -237,7 +244,10 @@ final $typed_data.Uint8List modelArtifactTypeDescriptor = $convert.base64Decode(
     'ASIwofTU9ERUxfQVJUSUZBQ1RfVFlQRV9TSU5HTEVfRklMRRABEiYKIk1PREVMX0FSVElGQUNU'
     'X1RZUEVfVEFSX0daX0FSQ0hJVkUQAhIhCh1NT0RFTF9BUlRJRkFDVF9UWVBFX0RJUkVDVE9SWR'
     'ADEiMKH01PREVMX0FSVElGQUNUX1RZUEVfWklQX0FSQ0hJVkUQBBIeChpNT0RFTF9BUlRJRkFD'
-    'VF9UWVBFX0NVU1RPTRAF');
+    'VF9UWVBFX0NVU1RPTRAFEh8KG01PREVMX0FSVElGQUNUX1RZUEVfQVJDSElWRRAGEiIKHk1PRE'
+    'VMX0FSVElGQUNUX1RZUEVfTVVMVElfRklMRRAHEiAKHE1PREVMX0FSVElGQUNUX1RZUEVfQlVJ'
+    'TFRfSU4QCBInCiNNT0RFTF9BUlRJRkFDVF9UWVBFX1RBUl9CWjJfQVJDSElWRRAJEiYKIk1PRE'
+    'VMX0FSVElGQUNUX1RZUEVfVEFSX1haX0FSQ0hJVkUQCg==');
 
 @$core.Deprecated('Use modelRegistryStatusDescriptor instead')
 const ModelRegistryStatus$json = {
@@ -547,13 +557,19 @@ const SingleFileArtifact$json = {
   '2': [
     {'1': 'required_patterns', '3': 1, '4': 3, '5': 9, '10': 'requiredPatterns'},
     {'1': 'optional_patterns', '3': 2, '4': 3, '5': 9, '10': 'optionalPatterns'},
+    {'1': 'expected_files', '3': 3, '4': 1, '5': 11, '6': '.runanywhere.v1.ExpectedModelFiles', '9': 0, '10': 'expectedFiles', '17': true},
+  ],
+  '8': [
+    {'1': '_expected_files'},
   ],
 };
 
 /// Descriptor for `SingleFileArtifact`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List singleFileArtifactDescriptor = $convert.base64Decode(
     'ChJTaW5nbGVGaWxlQXJ0aWZhY3QSKwoRcmVxdWlyZWRfcGF0dGVybnMYASADKAlSEHJlcXVpcm'
-    'VkUGF0dGVybnMSKwoRb3B0aW9uYWxfcGF0dGVybnMYAiADKAlSEG9wdGlvbmFsUGF0dGVybnM=');
+    'VkUGF0dGVybnMSKwoRb3B0aW9uYWxfcGF0dGVybnMYAiADKAlSEG9wdGlvbmFsUGF0dGVybnMS'
+    'TgoOZXhwZWN0ZWRfZmlsZXMYAyABKAsyIi5ydW5hbnl3aGVyZS52MS5FeHBlY3RlZE1vZGVsRm'
+    'lsZXNIAFINZXhwZWN0ZWRGaWxlc4gBAUIRCg9fZXhwZWN0ZWRfZmlsZXM=');
 
 @$core.Deprecated('Use archiveArtifactDescriptor instead')
 const ArchiveArtifact$json = {
@@ -563,6 +579,10 @@ const ArchiveArtifact$json = {
     {'1': 'structure', '3': 2, '4': 1, '5': 14, '6': '.runanywhere.v1.ArchiveStructure', '10': 'structure'},
     {'1': 'required_patterns', '3': 3, '4': 3, '5': 9, '10': 'requiredPatterns'},
     {'1': 'optional_patterns', '3': 4, '4': 3, '5': 9, '10': 'optionalPatterns'},
+    {'1': 'expected_files', '3': 5, '4': 1, '5': 11, '6': '.runanywhere.v1.ExpectedModelFiles', '9': 0, '10': 'expectedFiles', '17': true},
+  ],
+  '8': [
+    {'1': '_expected_files'},
   ],
 };
 
@@ -571,7 +591,9 @@ final $typed_data.Uint8List archiveArtifactDescriptor = $convert.base64Decode(
     'Cg9BcmNoaXZlQXJ0aWZhY3QSLwoEdHlwZRgBIAEoDjIbLnJ1bmFueXdoZXJlLnYxLkFyY2hpdm'
     'VUeXBlUgR0eXBlEj4KCXN0cnVjdHVyZRgCIAEoDjIgLnJ1bmFueXdoZXJlLnYxLkFyY2hpdmVT'
     'dHJ1Y3R1cmVSCXN0cnVjdHVyZRIrChFyZXF1aXJlZF9wYXR0ZXJucxgDIAMoCVIQcmVxdWlyZW'
-    'RQYXR0ZXJucxIrChFvcHRpb25hbF9wYXR0ZXJucxgEIAMoCVIQb3B0aW9uYWxQYXR0ZXJucw==');
+    'RQYXR0ZXJucxIrChFvcHRpb25hbF9wYXR0ZXJucxgEIAMoCVIQb3B0aW9uYWxQYXR0ZXJucxJO'
+    'Cg5leHBlY3RlZF9maWxlcxgFIAEoCzIiLnJ1bmFueXdoZXJlLnYxLkV4cGVjdGVkTW9kZWxGaW'
+    'xlc0gAUg1leHBlY3RlZEZpbGVziAEBQhEKD19leHBlY3RlZF9maWxlcw==');
 
 @$core.Deprecated('Use modelFileDescriptorDescriptor instead')
 const ModelFileDescriptor$json = {
@@ -586,6 +608,7 @@ const ModelFileDescriptor$json = {
     {'1': 'destination_path', '3': 7, '4': 1, '5': 9, '9': 3, '10': 'destinationPath', '17': true},
     {'1': 'role', '3': 8, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelFileRole', '9': 4, '10': 'role', '17': true},
     {'1': 'local_path', '3': 9, '4': 1, '5': 9, '9': 5, '10': 'localPath', '17': true},
+    {'1': 'checksum_sha256', '3': 10, '4': 1, '5': 9, '9': 6, '10': 'checksumSha256', '17': true},
   ],
   '8': [
     {'1': '_size_bytes'},
@@ -594,6 +617,7 @@ const ModelFileDescriptor$json = {
     {'1': '_destination_path'},
     {'1': '_role'},
     {'1': '_local_path'},
+    {'1': '_checksum_sha256'},
   ],
 };
 
@@ -605,8 +629,10 @@ final $typed_data.Uint8List modelFileDescriptorDescriptor = $convert.base64Decod
     'gBARIoCg1yZWxhdGl2ZV9wYXRoGAYgASgJSAJSDHJlbGF0aXZlUGF0aIgBARIuChBkZXN0aW5h'
     'dGlvbl9wYXRoGAcgASgJSANSD2Rlc3RpbmF0aW9uUGF0aIgBARI2CgRyb2xlGAggASgOMh0ucn'
     'VuYW55d2hlcmUudjEuTW9kZWxGaWxlUm9sZUgEUgRyb2xliAEBEiIKCmxvY2FsX3BhdGgYCSAB'
-    'KAlIBVIJbG9jYWxQYXRoiAEBQg0KC19zaXplX2J5dGVzQgsKCV9jaGVja3N1bUIQCg5fcmVsYX'
-    'RpdmVfcGF0aEITChFfZGVzdGluYXRpb25fcGF0aEIHCgVfcm9sZUINCgtfbG9jYWxfcGF0aA==');
+    'KAlIBVIJbG9jYWxQYXRoiAEBEiwKD2NoZWNrc3VtX3NoYTI1NhgKIAEoCUgGUg5jaGVja3N1bV'
+    'NoYTI1NogBAUINCgtfc2l6ZV9ieXRlc0ILCglfY2hlY2tzdW1CEAoOX3JlbGF0aXZlX3BhdGhC'
+    'EwoRX2Rlc3RpbmF0aW9uX3BhdGhCBwoFX3JvbGVCDQoLX2xvY2FsX3BhdGhCEgoQX2NoZWNrc3'
+    'VtX3NoYTI1Ng==');
 
 @$core.Deprecated('Use multiFileArtifactDescriptor instead')
 const MultiFileArtifact$json = {
@@ -660,6 +686,7 @@ const ModelQuery$json = {
     {'1': 'source', '3': 8, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelSource', '9': 6, '10': 'source', '17': true},
     {'1': 'sort_field', '3': 9, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelQuerySortField', '9': 7, '10': 'sortField', '17': true},
     {'1': 'sort_order', '3': 10, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelQuerySortOrder', '9': 8, '10': 'sortOrder', '17': true},
+    {'1': 'registry_status', '3': 11, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelRegistryStatus', '9': 9, '10': 'registryStatus', '17': true},
   ],
   '8': [
     {'1': '_framework'},
@@ -671,6 +698,7 @@ const ModelQuery$json = {
     {'1': '_source'},
     {'1': '_sort_field'},
     {'1': '_sort_order'},
+    {'1': '_registry_status'},
   ],
 };
 
@@ -686,9 +714,11 @@ final $typed_data.Uint8List modelQueryDescriptor = $convert.base64Decode(
     '4yGy5ydW5hbnl3aGVyZS52MS5Nb2RlbFNvdXJjZUgGUgZzb3VyY2WIAQESRwoKc29ydF9maWVs'
     'ZBgJIAEoDjIjLnJ1bmFueXdoZXJlLnYxLk1vZGVsUXVlcnlTb3J0RmllbGRIB1IJc29ydEZpZW'
     'xkiAEBEkcKCnNvcnRfb3JkZXIYCiABKA4yIy5ydW5hbnl3aGVyZS52MS5Nb2RlbFF1ZXJ5U29y'
-    'dE9yZGVySAhSCXNvcnRPcmRlcogBAUIMCgpfZnJhbWV3b3JrQgsKCV9jYXRlZ29yeUIJCgdfZm'
-    '9ybWF0QhIKEF9kb3dubG9hZGVkX29ubHlCEQoPX2F2YWlsYWJsZV9vbmx5QhEKD19tYXhfc2l6'
-    'ZV9ieXRlc0IJCgdfc291cmNlQg0KC19zb3J0X2ZpZWxkQg0KC19zb3J0X29yZGVy');
+    'dE9yZGVySAhSCXNvcnRPcmRlcogBARJRCg9yZWdpc3RyeV9zdGF0dXMYCyABKA4yIy5ydW5hbn'
+    'l3aGVyZS52MS5Nb2RlbFJlZ2lzdHJ5U3RhdHVzSAlSDnJlZ2lzdHJ5U3RhdHVziAEBQgwKCl9m'
+    'cmFtZXdvcmtCCwoJX2NhdGVnb3J5QgkKB19mb3JtYXRCEgoQX2Rvd25sb2FkZWRfb25seUIRCg'
+    '9fYXZhaWxhYmxlX29ubHlCEQoPX21heF9zaXplX2J5dGVzQgkKB19zb3VyY2VCDQoLX3NvcnRf'
+    'ZmllbGRCDQoLX3NvcnRfb3JkZXJCEgoQX3JlZ2lzdHJ5X3N0YXR1cw==');
 
 @$core.Deprecated('Use modelCompatibilityResultDescriptor instead')
 const ModelCompatibilityResult$json = {
@@ -723,6 +753,9 @@ const ModelRegistryRefreshRequest$json = {
     {'1': 'rescan_local', '3': 2, '4': 1, '5': 8, '10': 'rescanLocal'},
     {'1': 'prune_orphans', '3': 3, '4': 1, '5': 8, '10': 'pruneOrphans'},
     {'1': 'query', '3': 4, '4': 1, '5': 11, '6': '.runanywhere.v1.ModelQuery', '9': 0, '10': 'query', '17': true},
+    {'1': 'catalog_uri', '3': 5, '4': 1, '5': 9, '10': 'catalogUri'},
+    {'1': 'force_refresh', '3': 6, '4': 1, '5': 8, '10': 'forceRefresh'},
+    {'1': 'include_downloaded_state', '3': 7, '4': 1, '5': 8, '10': 'includeDownloadedState'},
   ],
   '8': [
     {'1': '_query'},
@@ -734,7 +767,10 @@ final $typed_data.Uint8List modelRegistryRefreshRequestDescriptor = $convert.bas
     'ChtNb2RlbFJlZ2lzdHJ5UmVmcmVzaFJlcXVlc3QSNAoWaW5jbHVkZV9yZW1vdGVfY2F0YWxvZx'
     'gBIAEoCFIUaW5jbHVkZVJlbW90ZUNhdGFsb2cSIQoMcmVzY2FuX2xvY2FsGAIgASgIUgtyZXNj'
     'YW5Mb2NhbBIjCg1wcnVuZV9vcnBoYW5zGAMgASgIUgxwcnVuZU9ycGhhbnMSNQoFcXVlcnkYBC'
-    'ABKAsyGi5ydW5hbnl3aGVyZS52MS5Nb2RlbFF1ZXJ5SABSBXF1ZXJ5iAEBQggKBl9xdWVyeQ==');
+    'ABKAsyGi5ydW5hbnl3aGVyZS52MS5Nb2RlbFF1ZXJ5SABSBXF1ZXJ5iAEBEh8KC2NhdGFsb2df'
+    'dXJpGAUgASgJUgpjYXRhbG9nVXJpEiMKDWZvcmNlX3JlZnJlc2gYBiABKAhSDGZvcmNlUmVmcm'
+    'VzaBI4ChhpbmNsdWRlX2Rvd25sb2FkZWRfc3RhdGUYByABKAhSFmluY2x1ZGVEb3dubG9hZGVk'
+    'U3RhdGVCCAoGX3F1ZXJ5');
 
 @$core.Deprecated('Use modelRegistryRefreshResultDescriptor instead')
 const ModelRegistryRefreshResult$json = {
@@ -749,6 +785,9 @@ const ModelRegistryRefreshResult$json = {
     {'1': 'refreshed_at_unix_ms', '3': 7, '4': 1, '5': 3, '10': 'refreshedAtUnixMs'},
     {'1': 'warnings', '3': 8, '4': 3, '5': 9, '10': 'warnings'},
     {'1': 'error_message', '3': 9, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'downloaded_count', '3': 10, '4': 1, '5': 5, '10': 'downloadedCount'},
+    {'1': 'available_count', '3': 11, '4': 1, '5': 5, '10': 'availableCount'},
+    {'1': 'error_count', '3': 12, '4': 1, '5': 5, '10': 'errorCount'},
   ],
 };
 
@@ -760,13 +799,16 @@ final $typed_data.Uint8List modelRegistryRefreshResultDescriptor = $convert.base
     'VudBgEIAEoBVIMdXBkYXRlZENvdW50EikKEGRpc2NvdmVyZWRfY291bnQYBSABKAVSD2Rpc2Nv'
     'dmVyZWRDb3VudBIhCgxwcnVuZWRfY291bnQYBiABKAVSC3BydW5lZENvdW50Ei8KFHJlZnJlc2'
     'hlZF9hdF91bml4X21zGAcgASgDUhFyZWZyZXNoZWRBdFVuaXhNcxIaCgh3YXJuaW5ncxgIIAMo'
-    'CVIId2FybmluZ3MSIwoNZXJyb3JfbWVzc2FnZRgJIAEoCVIMZXJyb3JNZXNzYWdl');
+    'CVIId2FybmluZ3MSIwoNZXJyb3JfbWVzc2FnZRgJIAEoCVIMZXJyb3JNZXNzYWdlEikKEGRvd2'
+    '5sb2FkZWRfY291bnQYCiABKAVSD2Rvd25sb2FkZWRDb3VudBInCg9hdmFpbGFibGVfY291bnQY'
+    'CyABKAVSDmF2YWlsYWJsZUNvdW50Eh8KC2Vycm9yX2NvdW50GAwgASgFUgplcnJvckNvdW50');
 
 @$core.Deprecated('Use modelListRequestDescriptor instead')
 const ModelListRequest$json = {
   '1': 'ModelListRequest',
   '2': [
     {'1': 'query', '3': 1, '4': 1, '5': 11, '6': '.runanywhere.v1.ModelQuery', '9': 0, '10': 'query', '17': true},
+    {'1': 'include_counts', '3': 2, '4': 1, '5': 8, '10': 'includeCounts'},
   ],
   '8': [
     {'1': '_query'},
@@ -776,7 +818,8 @@ const ModelListRequest$json = {
 /// Descriptor for `ModelListRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List modelListRequestDescriptor = $convert.base64Decode(
     'ChBNb2RlbExpc3RSZXF1ZXN0EjUKBXF1ZXJ5GAEgASgLMhoucnVuYW55d2hlcmUudjEuTW9kZW'
-    'xRdWVyeUgAUgVxdWVyeYgBAUIICgZfcXVlcnk=');
+    'xRdWVyeUgAUgVxdWVyeYgBARIlCg5pbmNsdWRlX2NvdW50cxgCIAEoCFINaW5jbHVkZUNvdW50'
+    'c0IICgZfcXVlcnk=');
 
 @$core.Deprecated('Use modelListResultDescriptor instead')
 const ModelListResult$json = {
@@ -785,6 +828,10 @@ const ModelListResult$json = {
     {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
     {'1': 'models', '3': 2, '4': 1, '5': 11, '6': '.runanywhere.v1.ModelInfoList', '10': 'models'},
     {'1': 'error_message', '3': 3, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'total_count', '3': 4, '4': 1, '5': 5, '10': 'totalCount'},
+    {'1': 'downloaded_count', '3': 5, '4': 1, '5': 5, '10': 'downloadedCount'},
+    {'1': 'available_count', '3': 6, '4': 1, '5': 5, '10': 'availableCount'},
+    {'1': 'filtered_count', '3': 7, '4': 1, '5': 5, '10': 'filteredCount'},
   ],
 };
 
@@ -792,7 +839,10 @@ const ModelListResult$json = {
 final $typed_data.Uint8List modelListResultDescriptor = $convert.base64Decode(
     'Cg9Nb2RlbExpc3RSZXN1bHQSGAoHc3VjY2VzcxgBIAEoCFIHc3VjY2VzcxI1CgZtb2RlbHMYAi'
     'ABKAsyHS5ydW5hbnl3aGVyZS52MS5Nb2RlbEluZm9MaXN0UgZtb2RlbHMSIwoNZXJyb3JfbWVz'
-    'c2FnZRgDIAEoCVIMZXJyb3JNZXNzYWdl');
+    'c2FnZRgDIAEoCVIMZXJyb3JNZXNzYWdlEh8KC3RvdGFsX2NvdW50GAQgASgFUgp0b3RhbENvdW'
+    '50EikKEGRvd25sb2FkZWRfY291bnQYBSABKAVSD2Rvd25sb2FkZWRDb3VudBInCg9hdmFpbGFi'
+    'bGVfY291bnQYBiABKAVSDmF2YWlsYWJsZUNvdW50EiUKDmZpbHRlcmVkX2NvdW50GAcgASgFUg'
+    '1maWx0ZXJlZENvdW50');
 
 @$core.Deprecated('Use modelGetRequestDescriptor instead')
 const ModelGetRequest$json = {
@@ -831,6 +881,7 @@ const ModelImportRequest$json = {
     {'1': 'copy_into_managed_storage', '3': 3, '4': 1, '5': 8, '10': 'copyIntoManagedStorage'},
     {'1': 'overwrite_existing', '3': 4, '4': 1, '5': 8, '10': 'overwriteExisting'},
     {'1': 'files', '3': 5, '4': 3, '5': 11, '6': '.runanywhere.v1.ModelFileDescriptor', '10': 'files'},
+    {'1': 'validate_before_register', '3': 6, '4': 1, '5': 8, '10': 'validateBeforeRegister'},
   ],
   '8': [
     {'1': '_model'},
@@ -843,8 +894,9 @@ final $typed_data.Uint8List modelImportRequestDescriptor = $convert.base64Decode
     'RlbEluZm9IAFIFbW9kZWyIAQESHwoLc291cmNlX3BhdGgYAiABKAlSCnNvdXJjZVBhdGgSOQoZ'
     'Y29weV9pbnRvX21hbmFnZWRfc3RvcmFnZRgDIAEoCFIWY29weUludG9NYW5hZ2VkU3RvcmFnZR'
     'ItChJvdmVyd3JpdGVfZXhpc3RpbmcYBCABKAhSEW92ZXJ3cml0ZUV4aXN0aW5nEjkKBWZpbGVz'
-    'GAUgAygLMiMucnVuYW55d2hlcmUudjEuTW9kZWxGaWxlRGVzY3JpcHRvclIFZmlsZXNCCAoGX2'
-    '1vZGVs');
+    'GAUgAygLMiMucnVuYW55d2hlcmUudjEuTW9kZWxGaWxlRGVzY3JpcHRvclIFZmlsZXMSOAoYdm'
+    'FsaWRhdGVfYmVmb3JlX3JlZ2lzdGVyGAYgASgIUhZ2YWxpZGF0ZUJlZm9yZVJlZ2lzdGVyQggK'
+    'Bl9tb2RlbA==');
 
 @$core.Deprecated('Use modelImportResultDescriptor instead')
 const ModelImportResult$json = {
@@ -856,6 +908,8 @@ const ModelImportResult$json = {
     {'1': 'imported_bytes', '3': 4, '4': 1, '5': 3, '10': 'importedBytes'},
     {'1': 'warnings', '3': 5, '4': 3, '5': 9, '10': 'warnings'},
     {'1': 'error_message', '3': 6, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'registered', '3': 7, '4': 1, '5': 8, '10': 'registered'},
+    {'1': 'copied_into_managed_storage', '3': 8, '4': 1, '5': 8, '10': 'copiedIntoManagedStorage'},
   ],
 };
 
@@ -865,7 +919,8 @@ final $typed_data.Uint8List modelImportResultDescriptor = $convert.base64Decode(
     'IgASgLMhkucnVuYW55d2hlcmUudjEuTW9kZWxJbmZvUgVtb2RlbBIdCgpsb2NhbF9wYXRoGAMg'
     'ASgJUglsb2NhbFBhdGgSJQoOaW1wb3J0ZWRfYnl0ZXMYBCABKANSDWltcG9ydGVkQnl0ZXMSGg'
     'oId2FybmluZ3MYBSADKAlSCHdhcm5pbmdzEiMKDWVycm9yX21lc3NhZ2UYBiABKAlSDGVycm9y'
-    'TWVzc2FnZQ==');
+    'TWVzc2FnZRIeCgpyZWdpc3RlcmVkGAcgASgIUgpyZWdpc3RlcmVkEj0KG2NvcGllZF9pbnRvX2'
+    '1hbmFnZWRfc3RvcmFnZRgIIAEoCFIYY29waWVkSW50b01hbmFnZWRTdG9yYWdl');
 
 @$core.Deprecated('Use modelDiscoveryRequestDescriptor instead')
 const ModelDiscoveryRequest$json = {
@@ -876,6 +931,8 @@ const ModelDiscoveryRequest$json = {
     {'1': 'link_downloaded', '3': 3, '4': 1, '5': 8, '10': 'linkDownloaded'},
     {'1': 'purge_invalid', '3': 4, '4': 1, '5': 8, '10': 'purgeInvalid'},
     {'1': 'query', '3': 5, '4': 1, '5': 11, '6': '.runanywhere.v1.ModelQuery', '9': 0, '10': 'query', '17': true},
+    {'1': 'include_built_in', '3': 6, '4': 1, '5': 8, '10': 'includeBuiltIn'},
+    {'1': 'include_user_imports', '3': 7, '4': 1, '5': 8, '10': 'includeUserImports'},
   ],
   '8': [
     {'1': '_query'},
@@ -887,8 +944,9 @@ final $typed_data.Uint8List modelDiscoveryRequestDescriptor = $convert.base64Dec
     'ChVNb2RlbERpc2NvdmVyeVJlcXVlc3QSIQoMc2VhcmNoX3Jvb3RzGAEgAygJUgtzZWFyY2hSb2'
     '90cxIcCglyZWN1cnNpdmUYAiABKAhSCXJlY3Vyc2l2ZRInCg9saW5rX2Rvd25sb2FkZWQYAyAB'
     'KAhSDmxpbmtEb3dubG9hZGVkEiMKDXB1cmdlX2ludmFsaWQYBCABKAhSDHB1cmdlSW52YWxpZB'
-    'I1CgVxdWVyeRgFIAEoCzIaLnJ1bmFueXdoZXJlLnYxLk1vZGVsUXVlcnlIAFIFcXVlcnmIAQFC'
-    'CAoGX3F1ZXJ5');
+    'I1CgVxdWVyeRgFIAEoCzIaLnJ1bmFueXdoZXJlLnYxLk1vZGVsUXVlcnlIAFIFcXVlcnmIAQES'
+    'KAoQaW5jbHVkZV9idWlsdF9pbhgGIAEoCFIOaW5jbHVkZUJ1aWx0SW4SMAoUaW5jbHVkZV91c2'
+    'VyX2ltcG9ydHMYByABKAhSEmluY2x1ZGVVc2VySW1wb3J0c0IICgZfcXVlcnk=');
 
 @$core.Deprecated('Use discoveredModelDescriptor instead')
 const DiscoveredModel$json = {
@@ -921,6 +979,8 @@ const ModelDiscoveryResult$json = {
     {'1': 'purged_count', '3': 4, '4': 1, '5': 5, '10': 'purgedCount'},
     {'1': 'warnings', '3': 5, '4': 3, '5': 9, '10': 'warnings'},
     {'1': 'error_message', '3': 6, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'scanned_count', '3': 7, '4': 1, '5': 5, '10': 'scannedCount'},
+    {'1': 'imported_count', '3': 8, '4': 1, '5': 5, '10': 'importedCount'},
   ],
 };
 
@@ -930,7 +990,9 @@ final $typed_data.Uint8List modelDiscoveryResultDescriptor = $convert.base64Deco
     'NvdmVyZWRfbW9kZWxzGAIgAygLMh8ucnVuYW55d2hlcmUudjEuRGlzY292ZXJlZE1vZGVsUhBk'
     'aXNjb3ZlcmVkTW9kZWxzEiEKDGxpbmtlZF9jb3VudBgDIAEoBVILbGlua2VkQ291bnQSIQoMcH'
     'VyZ2VkX2NvdW50GAQgASgFUgtwdXJnZWRDb3VudBIaCgh3YXJuaW5ncxgFIAMoCVIId2Fybmlu'
-    'Z3MSIwoNZXJyb3JfbWVzc2FnZRgGIAEoCVIMZXJyb3JNZXNzYWdl');
+    'Z3MSIwoNZXJyb3JfbWVzc2FnZRgGIAEoCVIMZXJyb3JNZXNzYWdlEiMKDXNjYW5uZWRfY291bn'
+    'QYByABKAVSDHNjYW5uZWRDb3VudBIlCg5pbXBvcnRlZF9jb3VudBgIIAEoBVINaW1wb3J0ZWRD'
+    'b3VudA==');
 
 @$core.Deprecated('Use modelLoadRequestDescriptor instead')
 const ModelLoadRequest$json = {
@@ -940,6 +1002,7 @@ const ModelLoadRequest$json = {
     {'1': 'category', '3': 2, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelCategory', '9': 0, '10': 'category', '17': true},
     {'1': 'framework', '3': 3, '4': 1, '5': 14, '6': '.runanywhere.v1.InferenceFramework', '9': 1, '10': 'framework', '17': true},
     {'1': 'force_reload', '3': 4, '4': 1, '5': 8, '10': 'forceReload'},
+    {'1': 'validate_availability', '3': 5, '4': 1, '5': 8, '10': 'validateAvailability'},
   ],
   '8': [
     {'1': '_category'},
@@ -952,8 +1015,9 @@ final $typed_data.Uint8List modelLoadRequestDescriptor = $convert.base64Decode(
     'ChBNb2RlbExvYWRSZXF1ZXN0EhkKCG1vZGVsX2lkGAEgASgJUgdtb2RlbElkEj4KCGNhdGVnb3'
     'J5GAIgASgOMh0ucnVuYW55d2hlcmUudjEuTW9kZWxDYXRlZ29yeUgAUghjYXRlZ29yeYgBARJF'
     'CglmcmFtZXdvcmsYAyABKA4yIi5ydW5hbnl3aGVyZS52MS5JbmZlcmVuY2VGcmFtZXdvcmtIAV'
-    'IJZnJhbWV3b3JriAEBEiEKDGZvcmNlX3JlbG9hZBgEIAEoCFILZm9yY2VSZWxvYWRCCwoJX2Nh'
-    'dGVnb3J5QgwKCl9mcmFtZXdvcms=');
+    'IJZnJhbWV3b3JriAEBEiEKDGZvcmNlX3JlbG9hZBgEIAEoCFILZm9yY2VSZWxvYWQSMwoVdmFs'
+    'aWRhdGVfYXZhaWxhYmlsaXR5GAUgASgIUhR2YWxpZGF0ZUF2YWlsYWJpbGl0eUILCglfY2F0ZW'
+    'dvcnlCDAoKX2ZyYW1ld29yaw==');
 
 @$core.Deprecated('Use modelLoadResultDescriptor instead')
 const ModelLoadResult$json = {
@@ -966,6 +1030,9 @@ const ModelLoadResult$json = {
     {'1': 'resolved_path', '3': 5, '4': 1, '5': 9, '10': 'resolvedPath'},
     {'1': 'loaded_at_unix_ms', '3': 6, '4': 1, '5': 3, '10': 'loadedAtUnixMs'},
     {'1': 'error_message', '3': 7, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'warnings', '3': 8, '4': 3, '5': 9, '10': 'warnings'},
+    {'1': 'already_loaded', '3': 9, '4': 1, '5': 8, '10': 'alreadyLoaded'},
+    {'1': 'resolved_artifacts', '3': 10, '4': 3, '5': 11, '6': '.runanywhere.v1.ModelFileDescriptor', '10': 'resolvedArtifacts'},
   ],
 };
 
@@ -976,7 +1043,10 @@ final $typed_data.Uint8List modelLoadResultDescriptor = $convert.base64Decode(
     'Q2F0ZWdvcnlSCGNhdGVnb3J5EkAKCWZyYW1ld29yaxgEIAEoDjIiLnJ1bmFueXdoZXJlLnYxLk'
     'luZmVyZW5jZUZyYW1ld29ya1IJZnJhbWV3b3JrEiMKDXJlc29sdmVkX3BhdGgYBSABKAlSDHJl'
     'c29sdmVkUGF0aBIpChFsb2FkZWRfYXRfdW5peF9tcxgGIAEoA1IObG9hZGVkQXRVbml4TXMSIw'
-    'oNZXJyb3JfbWVzc2FnZRgHIAEoCVIMZXJyb3JNZXNzYWdl');
+    'oNZXJyb3JfbWVzc2FnZRgHIAEoCVIMZXJyb3JNZXNzYWdlEhoKCHdhcm5pbmdzGAggAygJUgh3'
+    'YXJuaW5ncxIlCg5hbHJlYWR5X2xvYWRlZBgJIAEoCFINYWxyZWFkeUxvYWRlZBJSChJyZXNvbH'
+    'ZlZF9hcnRpZmFjdHMYCiADKAsyIy5ydW5hbnl3aGVyZS52MS5Nb2RlbEZpbGVEZXNjcmlwdG9y'
+    'UhFyZXNvbHZlZEFydGlmYWN0cw==');
 
 @$core.Deprecated('Use modelUnloadRequestDescriptor instead')
 const ModelUnloadRequest$json = {
@@ -985,9 +1055,11 @@ const ModelUnloadRequest$json = {
     {'1': 'model_id', '3': 1, '4': 1, '5': 9, '10': 'modelId'},
     {'1': 'category', '3': 2, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelCategory', '9': 0, '10': 'category', '17': true},
     {'1': 'unload_all', '3': 3, '4': 1, '5': 8, '10': 'unloadAll'},
+    {'1': 'framework', '3': 4, '4': 1, '5': 14, '6': '.runanywhere.v1.InferenceFramework', '9': 1, '10': 'framework', '17': true},
   ],
   '8': [
     {'1': '_category'},
+    {'1': '_framework'},
   ],
 };
 
@@ -995,7 +1067,9 @@ const ModelUnloadRequest$json = {
 final $typed_data.Uint8List modelUnloadRequestDescriptor = $convert.base64Decode(
     'ChJNb2RlbFVubG9hZFJlcXVlc3QSGQoIbW9kZWxfaWQYASABKAlSB21vZGVsSWQSPgoIY2F0ZW'
     'dvcnkYAiABKA4yHS5ydW5hbnl3aGVyZS52MS5Nb2RlbENhdGVnb3J5SABSCGNhdGVnb3J5iAEB'
-    'Eh0KCnVubG9hZF9hbGwYAyABKAhSCXVubG9hZEFsbEILCglfY2F0ZWdvcnk=');
+    'Eh0KCnVubG9hZF9hbGwYAyABKAhSCXVubG9hZEFsbBJFCglmcmFtZXdvcmsYBCABKA4yIi5ydW'
+    '5hbnl3aGVyZS52MS5JbmZlcmVuY2VGcmFtZXdvcmtIAVIJZnJhbWV3b3JriAEBQgsKCV9jYXRl'
+    'Z29yeUIMCgpfZnJhbWV3b3Jr');
 
 @$core.Deprecated('Use modelUnloadResultDescriptor instead')
 const ModelUnloadResult$json = {
@@ -1004,6 +1078,8 @@ const ModelUnloadResult$json = {
     {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
     {'1': 'unloaded_model_ids', '3': 2, '4': 3, '5': 9, '10': 'unloadedModelIds'},
     {'1': 'error_message', '3': 3, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'unloaded_at_unix_ms', '3': 4, '4': 1, '5': 3, '10': 'unloadedAtUnixMs'},
+    {'1': 'warnings', '3': 5, '4': 3, '5': 9, '10': 'warnings'},
   ],
 };
 
@@ -1011,7 +1087,8 @@ const ModelUnloadResult$json = {
 final $typed_data.Uint8List modelUnloadResultDescriptor = $convert.base64Decode(
     'ChFNb2RlbFVubG9hZFJlc3VsdBIYCgdzdWNjZXNzGAEgASgIUgdzdWNjZXNzEiwKEnVubG9hZG'
     'VkX21vZGVsX2lkcxgCIAMoCVIQdW5sb2FkZWRNb2RlbElkcxIjCg1lcnJvcl9tZXNzYWdlGAMg'
-    'ASgJUgxlcnJvck1lc3NhZ2U=');
+    'ASgJUgxlcnJvck1lc3NhZ2USLQoTdW5sb2FkZWRfYXRfdW5peF9tcxgEIAEoA1IQdW5sb2FkZW'
+    'RBdFVuaXhNcxIaCgh3YXJuaW5ncxgFIAMoCVIId2FybmluZ3M=');
 
 @$core.Deprecated('Use currentModelRequestDescriptor instead')
 const CurrentModelRequest$json = {
@@ -1019,6 +1096,7 @@ const CurrentModelRequest$json = {
   '2': [
     {'1': 'category', '3': 1, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelCategory', '9': 0, '10': 'category', '17': true},
     {'1': 'framework', '3': 2, '4': 1, '5': 14, '6': '.runanywhere.v1.InferenceFramework', '9': 1, '10': 'framework', '17': true},
+    {'1': 'include_model_metadata', '3': 3, '4': 1, '5': 8, '10': 'includeModelMetadata'},
   ],
   '8': [
     {'1': '_category'},
@@ -1030,8 +1108,9 @@ const CurrentModelRequest$json = {
 final $typed_data.Uint8List currentModelRequestDescriptor = $convert.base64Decode(
     'ChNDdXJyZW50TW9kZWxSZXF1ZXN0Ej4KCGNhdGVnb3J5GAEgASgOMh0ucnVuYW55d2hlcmUudj'
     'EuTW9kZWxDYXRlZ29yeUgAUghjYXRlZ29yeYgBARJFCglmcmFtZXdvcmsYAiABKA4yIi5ydW5h'
-    'bnl3aGVyZS52MS5JbmZlcmVuY2VGcmFtZXdvcmtIAVIJZnJhbWV3b3JriAEBQgsKCV9jYXRlZ2'
-    '9yeUIMCgpfZnJhbWV3b3Jr');
+    'bnl3aGVyZS52MS5JbmZlcmVuY2VGcmFtZXdvcmtIAVIJZnJhbWV3b3JriAEBEjQKFmluY2x1ZG'
+    'VfbW9kZWxfbWV0YWRhdGEYAyABKAhSFGluY2x1ZGVNb2RlbE1ldGFkYXRhQgsKCV9jYXRlZ29y'
+    'eUIMCgpfZnJhbWV3b3Jr');
 
 @$core.Deprecated('Use currentModelResultDescriptor instead')
 const CurrentModelResult$json = {
@@ -1040,6 +1119,12 @@ const CurrentModelResult$json = {
     {'1': 'model_id', '3': 2, '4': 1, '5': 9, '10': 'modelId'},
     {'1': 'model', '3': 3, '4': 1, '5': 11, '6': '.runanywhere.v1.ModelInfo', '10': 'model'},
     {'1': 'loaded_at_unix_ms', '3': 4, '4': 1, '5': 3, '10': 'loadedAtUnixMs'},
+    {'1': 'found', '3': 5, '4': 1, '5': 8, '10': 'found'},
+    {'1': 'error_message', '3': 6, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'category', '3': 7, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelCategory', '10': 'category'},
+    {'1': 'framework', '3': 8, '4': 1, '5': 14, '6': '.runanywhere.v1.InferenceFramework', '10': 'framework'},
+    {'1': 'resolved_path', '3': 9, '4': 1, '5': 9, '10': 'resolvedPath'},
+    {'1': 'resolved_artifacts', '3': 10, '4': 3, '5': 11, '6': '.runanywhere.v1.ModelFileDescriptor', '10': 'resolvedArtifacts'},
   ],
   '9': [
     {'1': 1, '2': 2},
@@ -1051,7 +1136,13 @@ const CurrentModelResult$json = {
 final $typed_data.Uint8List currentModelResultDescriptor = $convert.base64Decode(
     'ChJDdXJyZW50TW9kZWxSZXN1bHQSGQoIbW9kZWxfaWQYAiABKAlSB21vZGVsSWQSLwoFbW9kZW'
     'wYAyABKAsyGS5ydW5hbnl3aGVyZS52MS5Nb2RlbEluZm9SBW1vZGVsEikKEWxvYWRlZF9hdF91'
-    'bml4X21zGAQgASgDUg5sb2FkZWRBdFVuaXhNc0oECAEQAlIJaGFzX21vZGVs');
+    'bml4X21zGAQgASgDUg5sb2FkZWRBdFVuaXhNcxIUCgVmb3VuZBgFIAEoCFIFZm91bmQSIwoNZX'
+    'Jyb3JfbWVzc2FnZRgGIAEoCVIMZXJyb3JNZXNzYWdlEjkKCGNhdGVnb3J5GAcgASgOMh0ucnVu'
+    'YW55d2hlcmUudjEuTW9kZWxDYXRlZ29yeVIIY2F0ZWdvcnkSQAoJZnJhbWV3b3JrGAggASgOMi'
+    'IucnVuYW55d2hlcmUudjEuSW5mZXJlbmNlRnJhbWV3b3JrUglmcmFtZXdvcmsSIwoNcmVzb2x2'
+    'ZWRfcGF0aBgJIAEoCVIMcmVzb2x2ZWRQYXRoElIKEnJlc29sdmVkX2FydGlmYWN0cxgKIAMoCz'
+    'IjLnJ1bmFueXdoZXJlLnYxLk1vZGVsRmlsZURlc2NyaXB0b3JSEXJlc29sdmVkQXJ0aWZhY3Rz'
+    'SgQIARACUgloYXNfbW9kZWw=');
 
 @$core.Deprecated('Use modelDeleteRequestDescriptor instead')
 const ModelDeleteRequest$json = {
@@ -1081,6 +1172,7 @@ const ModelDeleteResult$json = {
     {'1': 'registry_updated', '3': 5, '4': 1, '5': 8, '10': 'registryUpdated'},
     {'1': 'was_loaded', '3': 6, '4': 1, '5': 8, '10': 'wasLoaded'},
     {'1': 'error_message', '3': 7, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'warnings', '3': 8, '4': 3, '5': 9, '10': 'warnings'},
   ],
 };
 
@@ -1090,5 +1182,63 @@ final $typed_data.Uint8List modelDeleteResultDescriptor = $convert.base64Decode(
     'lkGAIgASgJUgdtb2RlbElkEiMKDWRlbGV0ZWRfYnl0ZXMYAyABKANSDGRlbGV0ZWRCeXRlcxIj'
     'Cg1maWxlc19kZWxldGVkGAQgASgIUgxmaWxlc0RlbGV0ZWQSKQoQcmVnaXN0cnlfdXBkYXRlZB'
     'gFIAEoCFIPcmVnaXN0cnlVcGRhdGVkEh0KCndhc19sb2FkZWQYBiABKAhSCXdhc0xvYWRlZBIj'
-    'Cg1lcnJvcl9tZXNzYWdlGAcgASgJUgxlcnJvck1lc3NhZ2U=');
+    'Cg1lcnJvcl9tZXNzYWdlGAcgASgJUgxlcnJvck1lc3NhZ2USGgoId2FybmluZ3MYCCADKAlSCH'
+    'dhcm5pbmdz');
+
+const $core.Map<$core.String, $core.dynamic> ModelRegistryServiceBase$json = {
+  '1': 'ModelRegistry',
+  '2': [
+    {'1': 'Register', '2': '.runanywhere.v1.ModelInfo', '3': '.runanywhere.v1.ModelInfo'},
+    {'1': 'Update', '2': '.runanywhere.v1.ModelInfo', '3': '.runanywhere.v1.ModelInfo'},
+    {'1': 'Get', '2': '.runanywhere.v1.ModelGetRequest', '3': '.runanywhere.v1.ModelGetResult'},
+    {'1': 'List', '2': '.runanywhere.v1.ModelListRequest', '3': '.runanywhere.v1.ModelListResult'},
+    {'1': 'Remove', '2': '.runanywhere.v1.ModelDeleteRequest', '3': '.runanywhere.v1.ModelDeleteResult'},
+    {'1': 'Import', '2': '.runanywhere.v1.ModelImportRequest', '3': '.runanywhere.v1.ModelImportResult'},
+    {'1': 'Discover', '2': '.runanywhere.v1.ModelDiscoveryRequest', '3': '.runanywhere.v1.ModelDiscoveryResult'},
+    {'1': 'Refresh', '2': '.runanywhere.v1.ModelRegistryRefreshRequest', '3': '.runanywhere.v1.ModelRegistryRefreshResult'},
+  ],
+};
+
+@$core.Deprecated('Use modelRegistryServiceDescriptor instead')
+const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> ModelRegistryServiceBase$messageJson = {
+  '.runanywhere.v1.ModelInfo': ModelInfo$json,
+  '.runanywhere.v1.ModelThinkingTagPattern': ModelThinkingTagPattern$json,
+  '.runanywhere.v1.ModelInfoMetadata': ModelInfoMetadata$json,
+  '.runanywhere.v1.SingleFileArtifact': SingleFileArtifact$json,
+  '.runanywhere.v1.ExpectedModelFiles': ExpectedModelFiles$json,
+  '.runanywhere.v1.ModelFileDescriptor': ModelFileDescriptor$json,
+  '.runanywhere.v1.ArchiveArtifact': ArchiveArtifact$json,
+  '.runanywhere.v1.MultiFileArtifact': MultiFileArtifact$json,
+  '.runanywhere.v1.ModelRuntimeCompatibility': ModelRuntimeCompatibility$json,
+  '.runanywhere.v1.ModelGetRequest': ModelGetRequest$json,
+  '.runanywhere.v1.ModelGetResult': ModelGetResult$json,
+  '.runanywhere.v1.ModelListRequest': ModelListRequest$json,
+  '.runanywhere.v1.ModelQuery': ModelQuery$json,
+  '.runanywhere.v1.ModelListResult': ModelListResult$json,
+  '.runanywhere.v1.ModelInfoList': ModelInfoList$json,
+  '.runanywhere.v1.ModelDeleteRequest': ModelDeleteRequest$json,
+  '.runanywhere.v1.ModelDeleteResult': ModelDeleteResult$json,
+  '.runanywhere.v1.ModelImportRequest': ModelImportRequest$json,
+  '.runanywhere.v1.ModelImportResult': ModelImportResult$json,
+  '.runanywhere.v1.ModelDiscoveryRequest': ModelDiscoveryRequest$json,
+  '.runanywhere.v1.ModelDiscoveryResult': ModelDiscoveryResult$json,
+  '.runanywhere.v1.DiscoveredModel': DiscoveredModel$json,
+  '.runanywhere.v1.ModelRegistryRefreshRequest': ModelRegistryRefreshRequest$json,
+  '.runanywhere.v1.ModelRegistryRefreshResult': ModelRegistryRefreshResult$json,
+};
+
+/// Descriptor for `ModelRegistry`. Decode as a `google.protobuf.ServiceDescriptorProto`.
+final $typed_data.Uint8List modelRegistryServiceDescriptor = $convert.base64Decode(
+    'Cg1Nb2RlbFJlZ2lzdHJ5EkAKCFJlZ2lzdGVyEhkucnVuYW55d2hlcmUudjEuTW9kZWxJbmZvGh'
+    'kucnVuYW55d2hlcmUudjEuTW9kZWxJbmZvEj4KBlVwZGF0ZRIZLnJ1bmFueXdoZXJlLnYxLk1v'
+    'ZGVsSW5mbxoZLnJ1bmFueXdoZXJlLnYxLk1vZGVsSW5mbxJGCgNHZXQSHy5ydW5hbnl3aGVyZS'
+    '52MS5Nb2RlbEdldFJlcXVlc3QaHi5ydW5hbnl3aGVyZS52MS5Nb2RlbEdldFJlc3VsdBJJCgRM'
+    'aXN0EiAucnVuYW55d2hlcmUudjEuTW9kZWxMaXN0UmVxdWVzdBofLnJ1bmFueXdoZXJlLnYxLk'
+    '1vZGVsTGlzdFJlc3VsdBJPCgZSZW1vdmUSIi5ydW5hbnl3aGVyZS52MS5Nb2RlbERlbGV0ZVJl'
+    'cXVlc3QaIS5ydW5hbnl3aGVyZS52MS5Nb2RlbERlbGV0ZVJlc3VsdBJPCgZJbXBvcnQSIi5ydW'
+    '5hbnl3aGVyZS52MS5Nb2RlbEltcG9ydFJlcXVlc3QaIS5ydW5hbnl3aGVyZS52MS5Nb2RlbElt'
+    'cG9ydFJlc3VsdBJXCghEaXNjb3ZlchIlLnJ1bmFueXdoZXJlLnYxLk1vZGVsRGlzY292ZXJ5Um'
+    'VxdWVzdBokLnJ1bmFueXdoZXJlLnYxLk1vZGVsRGlzY292ZXJ5UmVzdWx0EmIKB1JlZnJlc2gS'
+    'Ky5ydW5hbnl3aGVyZS52MS5Nb2RlbFJlZ2lzdHJ5UmVmcmVzaFJlcXVlc3QaKi5ydW5hbnl3aG'
+    'VyZS52MS5Nb2RlbFJlZ2lzdHJ5UmVmcmVzaFJlc3VsdA==');
 

@@ -49,6 +49,38 @@ public class ModelListResult(
     schemaIndex = 2,
   )
   public val error_message: String = "",
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "totalCount",
+    schemaIndex = 3,
+  )
+  public val total_count: Int = 0,
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "downloadedCount",
+    schemaIndex = 4,
+  )
+  public val downloaded_count: Int = 0,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "availableCount",
+    schemaIndex = 5,
+  )
+  public val available_count: Int = 0,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "filteredCount",
+    schemaIndex = 6,
+  )
+  public val filtered_count: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelListResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -65,6 +97,10 @@ public class ModelListResult(
     if (success != other.success) return false
     if (models != other.models) return false
     if (error_message != other.error_message) return false
+    if (total_count != other.total_count) return false
+    if (downloaded_count != other.downloaded_count) return false
+    if (available_count != other.available_count) return false
+    if (filtered_count != other.filtered_count) return false
     return true
   }
 
@@ -75,6 +111,10 @@ public class ModelListResult(
       result = result * 37 + success.hashCode()
       result = result * 37 + (models?.hashCode() ?: 0)
       result = result * 37 + error_message.hashCode()
+      result = result * 37 + total_count.hashCode()
+      result = result * 37 + downloaded_count.hashCode()
+      result = result * 37 + available_count.hashCode()
+      result = result * 37 + filtered_count.hashCode()
       super.hashCode = result
     }
     return result
@@ -85,6 +125,10 @@ public class ModelListResult(
     result += """success=$success"""
     if (models != null) result += """models=$models"""
     result += """error_message=${sanitize(error_message)}"""
+    result += """total_count=$total_count"""
+    result += """downloaded_count=$downloaded_count"""
+    result += """available_count=$available_count"""
+    result += """filtered_count=$filtered_count"""
     return result.joinToString(prefix = "ModelListResult{", separator = ", ", postfix = "}")
   }
 
@@ -92,8 +136,13 @@ public class ModelListResult(
     success: Boolean = this.success,
     models: ModelInfoList? = this.models,
     error_message: String = this.error_message,
+    total_count: Int = this.total_count,
+    downloaded_count: Int = this.downloaded_count,
+    available_count: Int = this.available_count,
+    filtered_count: Int = this.filtered_count,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelListResult = ModelListResult(success, models, error_message, unknownFields)
+  ): ModelListResult = ModelListResult(success, models, error_message, total_count,
+      downloaded_count, available_count, filtered_count, unknownFields)
 
   public companion object {
     @JvmField
@@ -111,6 +160,14 @@ public class ModelListResult(
         if (value.models != null) size += ModelInfoList.ADAPTER.encodedSizeWithTag(2, value.models)
         if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(3,
             value.error_message)
+        if (value.total_count != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(4,
+            value.total_count)
+        if (value.downloaded_count != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(5,
+            value.downloaded_count)
+        if (value.available_count != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(6,
+            value.available_count)
+        if (value.filtered_count != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(7,
+            value.filtered_count)
         return size
       }
 
@@ -119,11 +176,25 @@ public class ModelListResult(
         if (value.models != null) ModelInfoList.ADAPTER.encodeWithTag(writer, 2, value.models)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 3,
             value.error_message)
+        if (value.total_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4, value.total_count)
+        if (value.downloaded_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 5,
+            value.downloaded_count)
+        if (value.available_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6,
+            value.available_count)
+        if (value.filtered_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
+            value.filtered_count)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelListResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.filtered_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
+            value.filtered_count)
+        if (value.available_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6,
+            value.available_count)
+        if (value.downloaded_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 5,
+            value.downloaded_count)
+        if (value.total_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4, value.total_count)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 3,
             value.error_message)
         if (value.models != null) ModelInfoList.ADAPTER.encodeWithTag(writer, 2, value.models)
@@ -134,11 +205,19 @@ public class ModelListResult(
         var success: Boolean = false
         var models: ModelInfoList? = null
         var error_message: String = ""
+        var total_count: Int = 0
+        var downloaded_count: Int = 0
+        var available_count: Int = 0
+        var filtered_count: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> models = ModelInfoList.ADAPTER.decode(reader)
             3 -> error_message = ProtoAdapter.STRING.decode(reader)
+            4 -> total_count = ProtoAdapter.INT32.decode(reader)
+            5 -> downloaded_count = ProtoAdapter.INT32.decode(reader)
+            6 -> available_count = ProtoAdapter.INT32.decode(reader)
+            7 -> filtered_count = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -146,6 +225,10 @@ public class ModelListResult(
           success = success,
           models = models,
           error_message = error_message,
+          total_count = total_count,
+          downloaded_count = downloaded_count,
+          available_count = available_count,
+          filtered_count = filtered_count,
           unknownFields = unknownFields
         )
       }

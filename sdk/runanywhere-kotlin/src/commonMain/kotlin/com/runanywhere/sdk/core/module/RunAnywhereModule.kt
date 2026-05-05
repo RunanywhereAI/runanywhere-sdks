@@ -1,7 +1,7 @@
 package com.runanywhere.sdk.core.module
 
-import com.runanywhere.sdk.core.types.InferenceFramework
-import com.runanywhere.sdk.core.types.SDKComponent
+import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.SDKComponent
 
 /**
  * Protocol for SDK modules that provide AI capabilities.

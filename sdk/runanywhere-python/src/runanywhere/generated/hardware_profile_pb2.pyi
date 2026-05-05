@@ -57,3 +57,25 @@ class HardwareProfileResult(_message.Message):
     profile: HardwareProfile
     accelerators: _containers.RepeatedCompositeFieldContainer[AcceleratorInfo]
     def __init__(self, profile: _Optional[_Union[HardwareProfile, _Mapping]] = ..., accelerators: _Optional[_Iterable[_Union[AcceleratorInfo, _Mapping]]] = ...) -> None: ...
+
+class HardwareProfileRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class HardwareAcceleratorsRequest(_message.Message):
+    __slots__ = ()
+    def __init__(self) -> None: ...
+
+class HardwareAcceleratorPreferenceRequest(_message.Message):
+    __slots__ = ("preference",)
+    PREFERENCE_FIELD_NUMBER: _ClassVar[int]
+    preference: AcceleratorPreference
+    def __init__(self, preference: _Optional[_Union[AcceleratorPreference, str]] = ...) -> None: ...
+
+class HardwareAcceleratorPreferenceResult(_message.Message):
+    __slots__ = ("success", "error_message")
+    SUCCESS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    success: bool
+    error_message: str
+    def __init__(self, success: _Optional[bool] = ..., error_message: _Optional[str] = ...) -> None: ...

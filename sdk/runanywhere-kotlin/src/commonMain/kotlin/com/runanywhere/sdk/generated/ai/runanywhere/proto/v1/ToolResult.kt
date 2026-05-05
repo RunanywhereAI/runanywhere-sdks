@@ -88,6 +88,22 @@ public class ToolResult(
     schemaIndex = 6,
   )
   public val call_id: String? = null,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "startedAtMs",
+    schemaIndex = 7,
+  )
+  public val started_at_ms: Long = 0L,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "completedAtMs",
+    schemaIndex = 8,
+  )
+  public val completed_at_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolResult, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -121,6 +137,8 @@ public class ToolResult(
     if (success != other.success) return false
     if (result != other.result) return false
     if (call_id != other.call_id) return false
+    if (started_at_ms != other.started_at_ms) return false
+    if (completed_at_ms != other.completed_at_ms) return false
     return true
   }
 
@@ -135,6 +153,8 @@ public class ToolResult(
       result_ = result_ * 37 + success.hashCode()
       result_ = result_ * 37 + result.hashCode()
       result_ = result_ * 37 + (call_id?.hashCode() ?: 0)
+      result_ = result_ * 37 + started_at_ms.hashCode()
+      result_ = result_ * 37 + completed_at_ms.hashCode()
       super.hashCode = result_
     }
     return result_
@@ -149,6 +169,8 @@ public class ToolResult(
     result_ += """success=$success"""
     if (result.isNotEmpty()) result_ += """result=$result"""
     if (call_id != null) result_ += """call_id=${sanitize(call_id)}"""
+    result_ += """started_at_ms=$started_at_ms"""
+    result_ += """completed_at_ms=$completed_at_ms"""
     return result_.joinToString(prefix = "ToolResult{", separator = ", ", postfix = "}")
   }
 
@@ -160,9 +182,11 @@ public class ToolResult(
     success: Boolean = this.success,
     result: Map<String, ToolValue> = this.result,
     call_id: String? = this.call_id,
+    started_at_ms: Long = this.started_at_ms,
+    completed_at_ms: Long = this.completed_at_ms,
     unknownFields: ByteString = this.unknownFields,
   ): ToolResult = ToolResult(tool_call_id, name, result_json, error, success, result, call_id,
-      unknownFields)
+      started_at_ms, completed_at_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -188,6 +212,10 @@ public class ToolResult(
         if (value.success != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.success)
         size += resultAdapter.encodedSizeWithTag(6, value.result)
         size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.call_id)
+        if (value.started_at_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(8,
+            value.started_at_ms)
+        if (value.completed_at_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(9,
+            value.completed_at_ms)
         return size
       }
 
@@ -200,11 +228,19 @@ public class ToolResult(
         if (value.success != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.success)
         resultAdapter.encodeWithTag(writer, 6, value.result)
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.call_id)
+        if (value.started_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 8,
+            value.started_at_ms)
+        if (value.completed_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 9,
+            value.completed_at_ms)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.completed_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 9,
+            value.completed_at_ms)
+        if (value.started_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 8,
+            value.started_at_ms)
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.call_id)
         resultAdapter.encodeWithTag(writer, 6, value.result)
         if (value.success != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.success)
@@ -223,6 +259,8 @@ public class ToolResult(
         var success: Boolean = false
         val result = mutableMapOf<String, ToolValue>()
         var call_id: String? = null
+        var started_at_ms: Long = 0L
+        var completed_at_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> tool_call_id = ProtoAdapter.STRING.decode(reader)
@@ -232,6 +270,8 @@ public class ToolResult(
             5 -> success = ProtoAdapter.BOOL.decode(reader)
             6 -> result.putAll(resultAdapter.decode(reader))
             7 -> call_id = ProtoAdapter.STRING.decode(reader)
+            8 -> started_at_ms = ProtoAdapter.INT64.decode(reader)
+            9 -> completed_at_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -243,6 +283,8 @@ public class ToolResult(
           success = success,
           result = result,
           call_id = call_id,
+          started_at_ms = started_at_ms,
+          completed_at_ms = completed_at_ms,
           unknownFields = unknownFields
         )
       }

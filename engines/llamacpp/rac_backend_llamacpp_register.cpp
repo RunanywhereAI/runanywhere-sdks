@@ -19,6 +19,7 @@
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/plugin/rac_cpu_runtime_provider.h"
+#include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_primitive.h"
 #include "rac/plugin/rac_runtime_registry.h"
@@ -107,9 +108,9 @@ void llamacpp_cpu_provider_destroy_session(rac_runtime_session_t* session) {
 }
 
 const uint32_t k_llamacpp_cpu_formats[] = {
-    1,  /* MODEL_FORMAT_GGUF */
-    2,  /* MODEL_FORMAT_GGML */
-    5,  /* MODEL_FORMAT_BIN  */
+    RAC_MODEL_FORMAT_ID_GGUF,
+    RAC_MODEL_FORMAT_ID_GGML,
+    RAC_MODEL_FORMAT_ID_BIN,
 };
 
 const rac_cpu_runtime_provider_t k_llamacpp_cpu_provider = {
@@ -305,7 +306,7 @@ rac_result_t llamacpp_llm_create_impl(const char* model_id,
 
     rac_runtime_session_desc_t desc = {};
     desc.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
-    desc.model_format = 1; /* MODEL_FORMAT_GGUF by default; CPU provider accepts compatible formats. */
+    desc.model_format = RAC_MODEL_FORMAT_ID_GGUF;
     desc.model_path = model_id;
 
     rac_runtime_session_t* runtime_session = nullptr;

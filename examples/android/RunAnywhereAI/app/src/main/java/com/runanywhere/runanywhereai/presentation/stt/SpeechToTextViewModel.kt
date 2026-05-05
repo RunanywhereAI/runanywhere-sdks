@@ -1,5 +1,9 @@
 package com.runanywhere.runanywhereai.presentation.stt
 
+import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_STT
+import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.ModelEventKind
+import ai.runanywhere.proto.v1.STTOptions
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -7,16 +11,13 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.domain.services.AudioCaptureService
-import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.events.ModelEvent
-import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_STT
-import ai.runanywhere.proto.v1.ModelEventKind
-import ai.runanywhere.proto.v1.STTOptions
+import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.currentSTTModel
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
-import com.runanywhere.sdk.public.extensions.isSTTModelLoadedSync
+import com.runanywhere.sdk.public.extensions.isSTTModelLoaded
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.transcribe
 import com.runanywhere.sdk.public.extensions.transcribeStream
@@ -241,7 +242,7 @@ class SpeechToTextViewModel : ViewModel() {
      * Uses currentSTTModel() for display name so app bar shows correct model icon.
      */
     private suspend fun checkInitialModelState() {
-        if (RunAnywhere.isSTTModelLoadedSync) {
+        if (RunAnywhere.isSTTModelLoaded) {
             val currentModel = RunAnywhere.currentSTTModel()
             val modelId = RunAnywhere.currentSTTModelId
             val displayName = currentModel?.name ?: modelId
@@ -459,14 +460,17 @@ class SpeechToTextViewModel : ViewModel() {
                                     RunAnywhere.transcribeStream(
                                         audioData = chunkData,
                                         options = options,
-                                    ).collect { partial ->
+                                    ).collect { event ->
+                                        val streamText = event.final_output?.text ?: event.partial?.text.orEmpty()
                                         // Update UI with partial result
-                                        if (partial.text.isNotBlank()) {
-                                            val newText = lastTranscription + " " + partial.text
+                                        if (streamText.isNotBlank()) {
+                                            val newText = lastTranscription + " " + streamText
                                             withContext(Dispatchers.Main) {
                                                 handleSTTStreamText(newText.trim())
                                             }
-                                            finalText = partial.text
+                                            if (event.final_output != null || event.partial?.is_final == true) {
+                                                finalText = streamText
+                                            }
                                         }
                                     }
                                     // Update with final result

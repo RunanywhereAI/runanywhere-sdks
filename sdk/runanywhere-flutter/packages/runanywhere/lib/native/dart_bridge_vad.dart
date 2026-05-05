@@ -41,6 +41,14 @@ class DartBridgeVAD {
 
   RacHandle? _handle;
   final _logger = SDKLogger('DartBridge.VAD');
+  static vad_pb.VADResult Function(vad_pb.VADProcessRequest)?
+      _processLifecycleProtoForTesting;
+
+  static void setProcessLifecycleProtoForTesting(
+    vad_pb.VADResult Function(vad_pb.VADProcessRequest)? override,
+  ) {
+    _processLifecycleProtoForTesting = override;
+  }
 
   /// Stream controller for speech activity events
   final _activityController = StreamController<VADActivityEvent>.broadcast();
@@ -237,6 +245,30 @@ class DartBridgeVAD {
 
   // MARK: - Processing
 
+  /// Process one VAD frame through the lifecycle-owned generated-proto ABI.
+  vad_pb.VADResult processLifecycleProto(vad_pb.VADProcessRequest request) {
+    _validateLifecycleRequest(request);
+
+    final override = _processLifecycleProtoForTesting;
+    if (override != null) {
+      return override(request);
+    }
+
+    final fn = RacNative.bindings.rac_vad_process_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+        'rac_vad_process_lifecycle_proto is unavailable',
+      );
+    }
+
+    return DartBridgeProtoUtils.callRequest<vad_pb.VADResult>(
+      request: request,
+      invoke: fn,
+      decode: vad_pb.VADResult.fromBuffer,
+      symbol: 'rac_vad_process_lifecycle_proto',
+    );
+  }
+
   vad_pb.VADResult processProto(
     Float32List samples, [
     vad_pb.VADOptions? options,
@@ -421,6 +453,27 @@ class DartBridgeVAD {
         'rac_vad_component_set_activity_proto_callback failed: '
         '${RacResultCode.getMessage(rc)}',
       );
+    }
+  }
+
+  void _validateLifecycleRequest(vad_pb.VADProcessRequest request) {
+    if (!request.hasAudio()) {
+      throw ArgumentError(
+        'VADProcessRequest.audio is required for lifecycle VAD',
+      );
+    }
+    switch (request.audio.whichSource()) {
+      case vad_pb.VADAudioSource_Source.audioData:
+        if (request.audio.audioData.isEmpty) {
+          throw ArgumentError('VADProcessRequest.audio.audio_data is required');
+        }
+        return;
+      case vad_pb.VADAudioSource_Source.adapterHandle:
+        throw UnsupportedError(
+          'VAD audio adapter_handle requires a platform adapter',
+        );
+      case vad_pb.VADAudioSource_Source.notSet:
+        throw ArgumentError('VADProcessRequest.audio.audio_data is required');
     }
   }
 }

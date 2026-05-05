@@ -212,6 +212,42 @@ public class DiffusionGenerationOptions(
     schemaIndex = 15,
   )
   public val input_image_height: Int = 0,
+  /**
+   * Input image/mask media hints. Empty = backend infer/default.
+   */
+  @field:WireField(
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "inputImageMediaType",
+    schemaIndex = 16,
+  )
+  public val input_image_media_type: String? = null,
+  @field:WireField(
+    tag = 18,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "maskImageMediaType",
+    schemaIndex = 17,
+  )
+  public val mask_image_media_type: String? = null,
+  /**
+   * 0 = one image/backend default
+   */
+  @field:WireField(
+    tag = 19,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "batchSize",
+    schemaIndex = 18,
+  )
+  public val batch_size: Int = 0,
+  @field:WireField(
+    tag = 20,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "returnLatents",
+    schemaIndex = 19,
+  )
+  public val return_latents: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DiffusionGenerationOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -241,6 +277,10 @@ public class DiffusionGenerationOptions(
     if (progress_stride != other.progress_stride) return false
     if (input_image_width != other.input_image_width) return false
     if (input_image_height != other.input_image_height) return false
+    if (input_image_media_type != other.input_image_media_type) return false
+    if (mask_image_media_type != other.mask_image_media_type) return false
+    if (batch_size != other.batch_size) return false
+    if (return_latents != other.return_latents) return false
     return true
   }
 
@@ -264,6 +304,10 @@ public class DiffusionGenerationOptions(
       result = result * 37 + progress_stride.hashCode()
       result = result * 37 + input_image_width.hashCode()
       result = result * 37 + input_image_height.hashCode()
+      result = result * 37 + (input_image_media_type?.hashCode() ?: 0)
+      result = result * 37 + (mask_image_media_type?.hashCode() ?: 0)
+      result = result * 37 + batch_size.hashCode()
+      result = result * 37 + return_latents.hashCode()
       super.hashCode = result
     }
     return result
@@ -287,6 +331,12 @@ public class DiffusionGenerationOptions(
     result += """progress_stride=$progress_stride"""
     result += """input_image_width=$input_image_width"""
     result += """input_image_height=$input_image_height"""
+    if (input_image_media_type != null) result +=
+        """input_image_media_type=${sanitize(input_image_media_type)}"""
+    if (mask_image_media_type != null) result +=
+        """mask_image_media_type=${sanitize(mask_image_media_type)}"""
+    result += """batch_size=$batch_size"""
+    result += """return_latents=$return_latents"""
     return result.joinToString(prefix = "DiffusionGenerationOptions{", separator = ", ", postfix =
         "}")
   }
@@ -308,11 +358,16 @@ public class DiffusionGenerationOptions(
     progress_stride: Int = this.progress_stride,
     input_image_width: Int = this.input_image_width,
     input_image_height: Int = this.input_image_height,
+    input_image_media_type: String? = this.input_image_media_type,
+    mask_image_media_type: String? = this.mask_image_media_type,
+    batch_size: Int = this.batch_size,
+    return_latents: Boolean = this.return_latents,
     unknownFields: ByteString = this.unknownFields,
   ): DiffusionGenerationOptions = DiffusionGenerationOptions(prompt, negative_prompt, width, height,
       num_inference_steps, guidance_scale, seed, scheduler, mode, input_image, mask_image,
       denoise_strength, report_intermediate_images, progress_stride, input_image_width,
-      input_image_height, unknownFields)
+      input_image_height, input_image_media_type, mask_image_media_type, batch_size, return_latents,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -353,6 +408,12 @@ public class DiffusionGenerationOptions(
             value.input_image_width)
         if (value.input_image_height != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(16,
             value.input_image_height)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(17, value.input_image_media_type)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(18, value.mask_image_media_type)
+        if (value.batch_size != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(19,
+            value.batch_size)
+        if (value.return_latents != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(20,
+            value.return_latents)
         return size
       }
 
@@ -383,11 +444,21 @@ public class DiffusionGenerationOptions(
             value.input_image_width)
         if (value.input_image_height != 0) ProtoAdapter.INT32.encodeWithTag(writer, 16,
             value.input_image_height)
+        ProtoAdapter.STRING.encodeWithTag(writer, 17, value.input_image_media_type)
+        ProtoAdapter.STRING.encodeWithTag(writer, 18, value.mask_image_media_type)
+        if (value.batch_size != 0) ProtoAdapter.INT32.encodeWithTag(writer, 19, value.batch_size)
+        if (value.return_latents != false) ProtoAdapter.BOOL.encodeWithTag(writer, 20,
+            value.return_latents)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DiffusionGenerationOptions) {
         writer.writeBytes(value.unknownFields)
+        if (value.return_latents != false) ProtoAdapter.BOOL.encodeWithTag(writer, 20,
+            value.return_latents)
+        if (value.batch_size != 0) ProtoAdapter.INT32.encodeWithTag(writer, 19, value.batch_size)
+        ProtoAdapter.STRING.encodeWithTag(writer, 18, value.mask_image_media_type)
+        ProtoAdapter.STRING.encodeWithTag(writer, 17, value.input_image_media_type)
         if (value.input_image_height != 0) ProtoAdapter.INT32.encodeWithTag(writer, 16,
             value.input_image_height)
         if (value.input_image_width != 0) ProtoAdapter.INT32.encodeWithTag(writer, 15,
@@ -433,6 +504,10 @@ public class DiffusionGenerationOptions(
         var progress_stride: Int = 0
         var input_image_width: Int = 0
         var input_image_height: Int = 0
+        var input_image_media_type: String? = null
+        var mask_image_media_type: String? = null
+        var batch_size: Int = 0
+        var return_latents: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
@@ -459,6 +534,10 @@ public class DiffusionGenerationOptions(
             14 -> progress_stride = ProtoAdapter.INT32.decode(reader)
             15 -> input_image_width = ProtoAdapter.INT32.decode(reader)
             16 -> input_image_height = ProtoAdapter.INT32.decode(reader)
+            17 -> input_image_media_type = ProtoAdapter.STRING.decode(reader)
+            18 -> mask_image_media_type = ProtoAdapter.STRING.decode(reader)
+            19 -> batch_size = ProtoAdapter.INT32.decode(reader)
+            20 -> return_latents = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -479,6 +558,10 @@ public class DiffusionGenerationOptions(
           progress_stride = progress_stride,
           input_image_width = input_image_width,
           input_image_height = input_image_height,
+          input_image_media_type = input_image_media_type,
+          mask_image_media_type = mask_image_media_type,
+          batch_size = batch_size,
+          return_latents = return_latents,
           unknownFields = unknownFields
         )
       }

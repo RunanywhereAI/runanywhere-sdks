@@ -45,7 +45,8 @@ class DartBridgeAuth {
 
   static bool _isInitialized = false;
   static String? _baseURL;
-  static SDKEnvironment _environment = SDKEnvironment.development;
+  static SDKEnvironment _environment =
+      SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
 
   /// Secure storage callbacks pointer
   static Pointer<RacSecureStorageCallbacksStruct>? _storagePtr;
@@ -111,8 +112,8 @@ class DartBridgeAuth {
   static void reset() {
     try {
       final lib = PlatformLoader.loadCommons();
-      final resetFn =
-          lib.lookupFunction<Void Function(), void Function()>('rac_auth_reset');
+      final resetFn = lib
+          .lookupFunction<Void Function(), void Function()>('rac_auth_reset');
       resetFn();
     } catch (e) {
       _logger.debug('rac_auth_reset not available: $e');
@@ -210,7 +211,8 @@ class DartBridgeAuth {
         try {
           const storage = FlutterSecureStorage(
             aOptions: AndroidOptions(encryptedSharedPreferences: true),
-            iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
+            iOptions:
+                IOSOptions(accessibility: KeychainAccessibility.first_unlock),
           );
           deviceId = await storage.read(key: 'com.runanywhere.sdk.deviceId');
           if (deviceId != null && deviceId.isNotEmpty) {
@@ -293,7 +295,8 @@ class DartBridgeAuth {
       _logger.debug('Token needs refresh');
       final result = await refreshToken();
       if (!result.isSuccess) {
-        _logger.warning('Token refresh failed', metadata: {'error': result.error});
+        _logger
+            .warning('Token refresh failed', metadata: {'error': result.error});
         // Return cached token anyway, server will reject if invalid
         return cachedToken ?? getAccessToken();
       }
@@ -310,8 +313,8 @@ class DartBridgeAuth {
   Future<void> clearAuth() async {
     try {
       final lib = PlatformLoader.loadCommons();
-      final clearFn =
-          lib.lookupFunction<Void Function(), void Function()>('rac_auth_clear');
+      final clearFn = lib
+          .lookupFunction<Void Function(), void Function()>('rac_auth_clear');
       clearFn();
     } catch (e) {
       _logger.debug('rac_auth_clear not available: $e');
@@ -338,8 +341,9 @@ class DartBridgeAuth {
   bool needsRefresh() {
     try {
       final lib = PlatformLoader.loadCommons();
-      final needsRefreshFn = lib.lookupFunction<Int32 Function(), int Function()>(
-          'rac_auth_needs_refresh');
+      final needsRefreshFn =
+          lib.lookupFunction<Int32 Function(), int Function()>(
+              'rac_auth_needs_refresh');
       return needsRefreshFn() != 0;
     } catch (e) {
       return false;
@@ -456,24 +460,22 @@ class DartBridgeAuth {
     required String deviceId,
     String? buildToken,
   }) {
-    final platformPtr =
-        (Platform.isAndroid ? 'android' : 'ios').toNativeUtf8();
+    final platformPtr = (Platform.isAndroid ? 'android' : 'ios').toNativeUtf8();
     final sdkVersionPtr = SDKConstants.version.toNativeUtf8();
     final apiKeyPtr = apiKey.toNativeUtf8();
     final deviceIdPtr = deviceId.toNativeUtf8();
-    final baseUrlPtr =
-        (_baseURL ?? _getDefaultBaseURL()).toNativeUtf8();
+    final baseUrlPtr = (_baseURL ?? _getDefaultBaseURL()).toNativeUtf8();
 
     try {
       final lib = PlatformLoader.loadCommons();
       final buildRequest = lib.lookupFunction<
-          Pointer<Utf8> Function(Pointer<RacSdkConfigStruct>),
-          Pointer<Utf8> Function(
-              Pointer<RacSdkConfigStruct>)>('rac_auth_build_authenticate_request');
+              Pointer<Utf8> Function(Pointer<RacSdkConfigStruct>),
+              Pointer<Utf8> Function(Pointer<RacSdkConfigStruct>)>(
+          'rac_auth_build_authenticate_request');
 
       final config = calloc<RacSdkConfigStruct>();
       try {
-        config.ref.environment = _environment.index;
+        config.ref.environment = _environmentToInt(_environment);
         config.ref.apiKey = apiKeyPtr;
         config.ref.baseUrl = baseUrlPtr;
         config.ref.deviceId = deviceIdPtr;
@@ -621,17 +623,17 @@ class DartBridgeAuth {
           data['access_token'] as String? ?? data['accessToken'] as String?;
       final refreshToken =
           data['refresh_token'] as String? ?? data['refreshToken'] as String?;
-      final deviceId = data['device_id'] as String? ?? data['deviceId'] as String?;
+      final deviceId =
+          data['device_id'] as String? ?? data['deviceId'] as String?;
       final userId = data['user_id'] as String? ?? data['userId'] as String?;
-      final organizationId =
-          data['organization_id'] as String? ?? data['organizationId'] as String?;
+      final organizationId = data['organization_id'] as String? ??
+          data['organizationId'] as String?;
 
       // Parse expiry - API returns expires_in (seconds until expiry)
       int? expiresAt;
       final expiresIn = data['expires_in'] as int?;
       if (expiresIn != null) {
-        expiresAt =
-            DateTime.now().millisecondsSinceEpoch ~/ 1000 + expiresIn;
+        expiresAt = DateTime.now().millisecondsSinceEpoch ~/ 1000 + expiresIn;
       } else {
         expiresAt = data['expires_at'] as int? ?? data['expiresAt'] as int?;
       }
@@ -680,17 +682,22 @@ class DartBridgeAuth {
 
       if (authData.accessToken != null && authData.accessToken!.isNotEmpty) {
         await storage.write(
-            key: 'com.runanywhere.sdk.accessToken', value: authData.accessToken);
+            key: 'com.runanywhere.sdk.accessToken',
+            value: authData.accessToken);
         _secureCache['com.runanywhere.sdk.accessToken'] = authData.accessToken!;
         storedCount++;
-        _logger.debug('Stored access token (${authData.accessToken!.length} chars)');
+        _logger.debug(
+            'Stored access token (${authData.accessToken!.length} chars)');
       }
       if (authData.refreshToken != null && authData.refreshToken!.isNotEmpty) {
         await storage.write(
-            key: 'com.runanywhere.sdk.refreshToken', value: authData.refreshToken);
-        _secureCache['com.runanywhere.sdk.refreshToken'] = authData.refreshToken!;
+            key: 'com.runanywhere.sdk.refreshToken',
+            value: authData.refreshToken);
+        _secureCache['com.runanywhere.sdk.refreshToken'] =
+            authData.refreshToken!;
         storedCount++;
-        _logger.debug('Stored refresh token (${authData.refreshToken!.length} chars)');
+        _logger.debug(
+            'Stored refresh token (${authData.refreshToken!.length} chars)');
       }
       if (authData.deviceId != null && authData.deviceId!.isNotEmpty) {
         await storage.write(
@@ -700,19 +707,23 @@ class DartBridgeAuth {
         _logger.debug('Stored device ID: ${authData.deviceId}');
       }
       if (authData.userId != null && authData.userId!.isNotEmpty) {
-        await storage.write(key: 'com.runanywhere.sdk.userId', value: authData.userId);
+        await storage.write(
+            key: 'com.runanywhere.sdk.userId', value: authData.userId);
         _secureCache['com.runanywhere.sdk.userId'] = authData.userId!;
         storedCount++;
       }
-      if (authData.organizationId != null && authData.organizationId!.isNotEmpty) {
+      if (authData.organizationId != null &&
+          authData.organizationId!.isNotEmpty) {
         await storage.write(
-            key: 'com.runanywhere.sdk.organizationId', value: authData.organizationId);
+            key: 'com.runanywhere.sdk.organizationId',
+            value: authData.organizationId);
         _secureCache['com.runanywhere.sdk.organizationId'] =
             authData.organizationId!;
         storedCount++;
       }
 
-      _logger.debug('Auth tokens stored in secure storage ($storedCount items)');
+      _logger
+          .debug('Auth tokens stored in secure storage ($storedCount items)');
     } catch (e) {
       _logger.debug('Failed to store auth tokens: $e');
     }
@@ -737,11 +748,14 @@ class DartBridgeAuth {
         iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
       );
 
-      final accessToken = await storage.read(key: 'com.runanywhere.sdk.accessToken');
-      final refreshToken = await storage.read(key: 'com.runanywhere.sdk.refreshToken');
+      final accessToken =
+          await storage.read(key: 'com.runanywhere.sdk.accessToken');
+      final refreshToken =
+          await storage.read(key: 'com.runanywhere.sdk.refreshToken');
       final deviceId = await storage.read(key: 'com.runanywhere.sdk.deviceId');
       final userId = await storage.read(key: 'com.runanywhere.sdk.userId');
-      final organizationId = await storage.read(key: 'com.runanywhere.sdk.organizationId');
+      final organizationId =
+          await storage.read(key: 'com.runanywhere.sdk.organizationId');
 
       if (accessToken != null) {
         _secureCache['com.runanywhere.sdk.accessToken'] = accessToken;
@@ -777,14 +791,29 @@ class DartBridgeAuth {
     return '/api/v1/auth/sdk/refresh';
   }
 
+  int _environmentToInt(SDKEnvironment environment) {
+    switch (environment) {
+      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
+        return 0;
+      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
+        return 1;
+      case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
+        return 2;
+      default:
+        return 0;
+    }
+  }
+
   String _getDefaultBaseURL() {
     switch (_environment) {
-      case SDKEnvironment.development:
+      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 'https://dev-api.runanywhere.ai';
-      case SDKEnvironment.staging:
+      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
         return 'https://staging-api.runanywhere.ai';
-      case SDKEnvironment.production:
+      case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 'https://api.runanywhere.ai';
+      default:
+        return 'https://dev-api.runanywhere.ai';
     }
   }
 }
@@ -818,8 +847,8 @@ int _secureStoreCallback(
 }
 
 /// Retrieve callback
-int _secureRetrieveCallback(
-    Pointer<Utf8> key, Pointer<Utf8> outValue, int bufferSize, Pointer<Void> context) {
+int _secureRetrieveCallback(Pointer<Utf8> key, Pointer<Utf8> outValue,
+    int bufferSize, Pointer<Void> context) {
   if (key == nullptr || outValue == nullptr) return -1;
 
   try {
@@ -902,8 +931,8 @@ typedef RacSecureStoreCallbackNative = Int32 Function(
     Pointer<Utf8> key, Pointer<Utf8> value, Pointer<Void> context);
 
 /// Secure storage retrieve callback
-typedef RacSecureRetrieveCallbackNative = Int32 Function(
-    Pointer<Utf8> key, Pointer<Utf8> outValue, IntPtr bufferSize, Pointer<Void> context);
+typedef RacSecureRetrieveCallbackNative = Int32 Function(Pointer<Utf8> key,
+    Pointer<Utf8> outValue, IntPtr bufferSize, Pointer<Void> context);
 
 /// Secure storage delete callback
 typedef RacSecureDeleteCallbackNative = Int32 Function(

@@ -4,6 +4,16 @@
  *
  * Actor-based VLM capability that owns model lifecycle and generation.
  * Uses lifecycle manager for unified lifecycle + analytics handling.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Component lifecycle/generation entry points
+ *     (rac_vlm_component_create, configure, load_model,
+ *     load_model_by_id, unload, cleanup, cancel, process,
+ *     process_stream, get_*, destroy): `delete after SDK migration`
+ *     for SDK callers — use rac_model_lifecycle_load_proto +
+ *     rac_vlm_*_proto.
+ *   - Helper rac_vlm_resolve_model_files: `internal` portable model
+ *     path resolver consumed by the component itself.
  */
 
 #ifndef RAC_VLM_COMPONENT_H

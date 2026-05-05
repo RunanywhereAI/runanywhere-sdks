@@ -66,6 +66,39 @@ public class RAGDocument(
   )
   public val metadata_json: String? = null,
   metadata: Map<String, String> = emptyMap(),
+  /**
+   * Adapter-normalized document source. Pickers, sandbox bookmarks, and
+   * platform file access remain SDK-owned.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "sourceUri",
+    schemaIndex = 4,
+  )
+  public val source_uri: String? = null,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "adapterHandle",
+    schemaIndex = 5,
+  )
+  public val adapter_handle: String? = null,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "mediaType",
+    schemaIndex = 6,
+  )
+  public val media_type: String? = null,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "sizeBytes",
+    schemaIndex = 7,
+  )
+  public val size_bytes: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGDocument, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -94,6 +127,10 @@ public class RAGDocument(
     if (text != other.text) return false
     if (metadata_json != other.metadata_json) return false
     if (metadata != other.metadata) return false
+    if (source_uri != other.source_uri) return false
+    if (adapter_handle != other.adapter_handle) return false
+    if (media_type != other.media_type) return false
+    if (size_bytes != other.size_bytes) return false
     return true
   }
 
@@ -105,6 +142,10 @@ public class RAGDocument(
       result = result * 37 + text.hashCode()
       result = result * 37 + (metadata_json?.hashCode() ?: 0)
       result = result * 37 + metadata.hashCode()
+      result = result * 37 + (source_uri?.hashCode() ?: 0)
+      result = result * 37 + (adapter_handle?.hashCode() ?: 0)
+      result = result * 37 + (media_type?.hashCode() ?: 0)
+      result = result * 37 + size_bytes.hashCode()
       super.hashCode = result
     }
     return result
@@ -116,6 +157,10 @@ public class RAGDocument(
     result += """text=${sanitize(text)}"""
     if (metadata_json != null) result += """metadata_json=${sanitize(metadata_json)}"""
     if (metadata.isNotEmpty()) result += """metadata=$metadata"""
+    if (source_uri != null) result += """source_uri=${sanitize(source_uri)}"""
+    if (adapter_handle != null) result += """adapter_handle=${sanitize(adapter_handle)}"""
+    if (media_type != null) result += """media_type=${sanitize(media_type)}"""
+    result += """size_bytes=$size_bytes"""
     return result.joinToString(prefix = "RAGDocument{", separator = ", ", postfix = "}")
   }
 
@@ -124,8 +169,13 @@ public class RAGDocument(
     text: String = this.text,
     metadata_json: String? = this.metadata_json,
     metadata: Map<String, String> = this.metadata,
+    source_uri: String? = this.source_uri,
+    adapter_handle: String? = this.adapter_handle,
+    media_type: String? = this.media_type,
+    size_bytes: Long = this.size_bytes,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGDocument = RAGDocument(id, text, metadata_json, metadata, unknownFields)
+  ): RAGDocument = RAGDocument(id, text, metadata_json, metadata, source_uri, adapter_handle,
+      media_type, size_bytes, unknownFields)
 
   public companion object {
     @JvmField
@@ -146,6 +196,11 @@ public class RAGDocument(
         if (value.text != "") size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.text)
         size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.metadata_json)
         size += metadataAdapter.encodedSizeWithTag(4, value.metadata)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.source_uri)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.adapter_handle)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.media_type)
+        if (value.size_bytes != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(8,
+            value.size_bytes)
         return size
       }
 
@@ -154,11 +209,19 @@ public class RAGDocument(
         if (value.text != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.text)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.metadata_json)
         metadataAdapter.encodeWithTag(writer, 4, value.metadata)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.source_uri)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.adapter_handle)
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.media_type)
+        if (value.size_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 8, value.size_bytes)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGDocument) {
         writer.writeBytes(value.unknownFields)
+        if (value.size_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 8, value.size_bytes)
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.media_type)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.adapter_handle)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.source_uri)
         metadataAdapter.encodeWithTag(writer, 4, value.metadata)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.metadata_json)
         if (value.text != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.text)
@@ -170,12 +233,20 @@ public class RAGDocument(
         var text: String = ""
         var metadata_json: String? = null
         val metadata = mutableMapOf<String, String>()
+        var source_uri: String? = null
+        var adapter_handle: String? = null
+        var media_type: String? = null
+        var size_bytes: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> id = ProtoAdapter.STRING.decode(reader)
             2 -> text = ProtoAdapter.STRING.decode(reader)
             3 -> metadata_json = ProtoAdapter.STRING.decode(reader)
             4 -> metadata.putAll(metadataAdapter.decode(reader))
+            5 -> source_uri = ProtoAdapter.STRING.decode(reader)
+            6 -> adapter_handle = ProtoAdapter.STRING.decode(reader)
+            7 -> media_type = ProtoAdapter.STRING.decode(reader)
+            8 -> size_bytes = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -184,6 +255,10 @@ public class RAGDocument(
           text = text,
           metadata_json = metadata_json,
           metadata = metadata,
+          source_uri = source_uri,
+          adapter_handle = adapter_handle,
+          media_type = media_type,
+          size_bytes = size_bytes,
           unknownFields = unknownFields
         )
       }

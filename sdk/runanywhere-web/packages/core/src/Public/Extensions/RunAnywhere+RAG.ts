@@ -1,42 +1,62 @@
 /**
  * RunAnywhere+RAG.ts
  *
- * Top-level RAG (Retrieval-Augmented Generation) API — mirrors Swift
- * `RunAnywhere+RAG.swift` and React Native's `RunAnywhere+RAG.ts`.
- *
- * As with LoRA, the Web WASM build doesn't yet ship the `rac_rag_*` C ABI;
- * methods dispatch to a `RAGProvider` installed by a backend. If no provider
- * is registered (today's state), each method throws `BackendNotAvailable`.
- *
- * Note: an alternate Web-native RAG path runs entirely in JS (see the
- * Documents view in the example app). Backends can register that JS-only
- * implementation here so the public API is the same regardless.
+ * Public RAG facade. Web views own browser file picking/reading; native or
+ * registered providers own session, ingestion, retrieval, and generation via
+ * generated proto request/result models.
  */
 
-import { SDKException } from '../../Foundation/SDKException';
+import { SDKErrorCode, SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
 import { RAGProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
 import type {
   RAGConfiguration,
+  RAGDocument,
   RAGQueryOptions,
   RAGResult,
+  RAGSearchResult,
   RAGStatistics,
 } from '@runanywhere/proto-ts/rag';
 
 const logger = new SDKLogger('RAG');
+const NATIVE_RAG_PERSISTENCE_UNAVAILABLE =
+  'Persistent Web RAG indexes require a provider with a browser storage-backed index adapter. The current native Web RAG session ABI is in-memory only.';
+
+export interface RAGDocumentSummary {
+  id: string;
+  name: string;
+  chunkCount: number;
+}
+
+export type RAGQueryOverrides = Partial<Omit<RAGQueryOptions, 'question'>>;
+
+export interface RAGProviderCapabilities {
+  native: boolean;
+  persistent: boolean;
+  documentListing: boolean;
+  documentRemoval: boolean;
+}
 
 export interface RAGProvider {
+  readonly providerKind?: 'custom' | 'wasm-session';
   ragCreatePipeline(config: RAGConfiguration): Promise<void>;
   ragDestroyPipeline(): Promise<void>;
   ragIngest(text: string, metadataJson?: string): Promise<void>;
   ragAddDocumentsBatch?(documents: Array<{ text: string; metadataJson?: string }>): Promise<void>;
-  ragQuery(question: string, options?: Omit<RAGQueryOptions, 'question'>): Promise<RAGResult>;
+  ragQuery(question: string, options?: RAGQueryOverrides): Promise<RAGResult>;
   ragClearDocuments(): Promise<void>;
   ragGetDocumentCount(): Promise<number>;
   ragGetStatistics?(): Promise<RAGStatistics>;
+  ragListDocuments?(): Promise<RAGDocumentSummary[]>;
+  ragRemoveDocument?(id: string): Promise<void>;
+  ragGetCapabilities?(): RAGProviderCapabilities;
 }
 
-export type RAGAvailabilitySource = 'provider' | 'wasm-exports' | 'unavailable';
+export type RAGAvailabilitySource =
+  | 'provider'
+  | 'wasm-session'
+  | 'wasm-exports'
+  | 'unavailable';
 
 export interface RAGAvailability {
   available: boolean;
@@ -45,18 +65,58 @@ export interface RAGAvailability {
   missingExports: string[];
 }
 
+export interface RAGNativeProviderOptions {
+  adapter?: RAGProtoAdapter;
+  session?: number;
+  config?: Partial<RAGConfiguration>;
+}
+
 let _provider: RAGProvider | null = null;
 
 export function setRAGProvider(provider: RAGProvider | null): void {
   _provider = provider;
 }
 
+export function createRAGNativeProvider(
+  options: RAGNativeProviderOptions = {},
+): RAGProvider {
+  if (options.session != null) assertNativeHandle(options.session, 'RAG.nativeProvider');
+  const adapter = options.adapter ?? RAGProtoAdapter.tryDefault();
+  if (!adapter) {
+    throw SDKException.backendNotAvailable(
+      'RAG.nativeProvider',
+      'No Web WASM module is active. Call setRunanywhereModule(...) before creating a native RAG provider.',
+    );
+  }
+  if (!adapter.supportsProtoRAG()) {
+    throw SDKException.backendNotAvailable(
+      'RAG.nativeProvider',
+      `Native RAG exports are missing: ${adapter.missingRAGExports().join(', ')}.`,
+    );
+  }
+  return new NativeRAGSessionProvider(adapter, options);
+}
+
+export function setRAGSessionHandle(
+  session: number,
+  adapter?: RAGProtoAdapter,
+): void {
+  assertNativeHandle(session, 'RAG.setSessionHandle');
+  _provider = createRAGNativeProvider({ adapter, session });
+}
+
+function activeProvider(): RAGProvider | null {
+  return _provider;
+}
+
 export function getRAGAvailability(): RAGAvailability {
   if (_provider) {
     return {
       available: true,
-      source: 'provider',
-      reason: 'RAG provider registered.',
+      source: _provider.providerKind === 'wasm-session' ? 'wasm-session' : 'provider',
+      reason: _provider.providerKind === 'wasm-session'
+        ? 'Native RAG session provider registered.'
+        : 'RAG provider registered.',
       missingExports: [],
     };
   }
@@ -66,7 +126,7 @@ export function getRAGAvailability(): RAGAvailability {
     return {
       available: false,
       source: 'unavailable',
-      reason: 'No RAG provider registered and no Web WASM module is active.',
+      reason: 'No RAG provider or native RAG session handle is registered, and no Web WASM module is active.',
       missingExports: [],
     };
   }
@@ -76,7 +136,7 @@ export function getRAGAvailability(): RAGAvailability {
     return {
       available: false,
       source: 'unavailable',
-      reason: 'RAG is unavailable in this Web WASM build. The native RAG exports are missing, likely because RAC_BACKEND_RAG=OFF.',
+      reason: 'RAG is unavailable in this Web WASM build. Native RAG exports are missing, likely because RAC_BACKEND_RAG=OFF.',
       missingExports,
     };
   }
@@ -84,7 +144,7 @@ export function getRAGAvailability(): RAGAvailability {
   return {
     available: false,
     source: 'wasm-exports',
-    reason: 'Native RAG exports are present, but no Web RAG provider is registered for the public API.',
+    reason: 'Native RAG proto exports are present, but no RAG provider or session handle is registered.',
     missingExports: [],
   };
 }
@@ -94,26 +154,335 @@ export function isRAGAvailable(): boolean {
 }
 
 function requireProvider(feature = 'RAG'): RAGProvider {
-  if (_provider == null) {
-    const availability = getRAGAvailability();
-    // Phase C-prime: throw SDKException — wraps proto-typed wire envelope.
-    throw SDKException.backendNotAvailable(
-      feature,
-      `${availability.reason}` +
-      (availability.missingExports.length > 0
-        ? ` Missing exports: ${availability.missingExports.join(', ')}.`
-        : ''),
+  const provider = activeProvider();
+  if (provider) return provider;
+  const availability = getRAGAvailability();
+  throw SDKException.backendNotAvailable(
+    feature,
+    `${availability.reason}${availability.missingExports.length > 0
+      ? ` Missing exports: ${availability.missingExports.join(', ')}.`
+      : ''}`,
+  );
+}
+
+class NativeRAGSessionProvider implements RAGProvider {
+  readonly providerKind = 'wasm-session' as const;
+  private session: number | null = null;
+  private config: RAGConfiguration;
+
+  constructor(
+    private readonly adapter: RAGProtoAdapter,
+    options: RAGNativeProviderOptions = {},
+  ) {
+    this.session = options.session != null
+      ? assertNativeHandle(options.session, 'RAG.nativeProvider')
+      : null;
+    if (options.config?.persistIndex) {
+      throw SDKException.backendNotAvailable(
+        'RAG.nativeProvider',
+        NATIVE_RAG_PERSISTENCE_UNAVAILABLE,
+      );
+    }
+    this.config = createDefaultRAGConfiguration(options.config);
+  }
+
+  async ragCreatePipeline(config: RAGConfiguration): Promise<void> {
+    validateNativeRAGConfiguration(config, 'RAG.createPipeline');
+    if (this.session != null) {
+      this.adapter.destroySession(this.session);
+      this.session = null;
+    }
+    const session = this.adapter.createSession(config);
+    if (session == null) {
+      throw SDKException.backendNotAvailable(
+        'RAG.createPipeline',
+        'Native RAG session creation returned no handle.',
+      );
+    }
+    this.session = session;
+    this.config = { ...config };
+  }
+
+  async ragDestroyPipeline(): Promise<void> {
+    if (this.session != null) {
+      this.adapter.destroySession(this.session);
+      this.session = null;
+    }
+  }
+
+  async ragIngest(text: string, metadataJson?: string): Promise<void> {
+    const session = await this.ensureSession();
+    const stats = this.adapter.ingest(session, makeRAGDocument(text, metadataJson));
+    if (!stats) {
+      throw SDKException.backendNotAvailable(
+        'RAG.ingest',
+        'Native RAG ingest returned no statistics.',
+      );
+    }
+  }
+
+  async ragAddDocumentsBatch(documents: Array<{ text: string; metadataJson?: string }>): Promise<void> {
+    for (const document of documents) {
+      await this.ragIngest(document.text, document.metadataJson);
+    }
+  }
+
+  async ragQuery(
+    question: string,
+    options: RAGQueryOverrides = {},
+  ): Promise<RAGResult> {
+    const session = await this.ensureSession();
+    if (!this.config.llmModelPath.trim()) {
+      return unavailableRAGResult(
+        question,
+        'Native Web RAG query requires RAGConfiguration.llmModelPath. A session without an LLM path can ingest but cannot generate answers.',
+      );
+    }
+    const result = this.adapter.query(session, makeRAGQuery(question, this.config, options));
+    return result ?? unavailableRAGResult(
+      question,
+      'Native RAG query returned no result.',
     );
   }
-  return _provider;
+
+  async ragClearDocuments(): Promise<void> {
+    const session = await this.ensureSession();
+    const stats = this.adapter.clear(session);
+    if (!stats) {
+      throw SDKException.backendNotAvailable(
+        'RAG.clearDocuments',
+        'Native RAG clear returned no statistics.',
+      );
+    }
+  }
+
+  async ragGetDocumentCount(): Promise<number> {
+    return (await this.statistics()).indexedDocuments;
+  }
+
+  async ragGetStatistics(): Promise<RAGStatistics> {
+    return this.statistics();
+  }
+
+  ragGetCapabilities(): RAGProviderCapabilities {
+    return {
+      native: true,
+      persistent: false,
+      documentListing: false,
+      documentRemoval: false,
+    };
+  }
+
+  private async ensureSession(): Promise<number> {
+    if (this.session != null) return this.session;
+    validateNativeRAGConfiguration(this.config, 'RAG.session');
+    await this.ragCreatePipeline(this.config);
+    return this.session!;
+  }
+
+  private async statistics(): Promise<RAGStatistics> {
+    if (this.session == null) {
+      if (this.config.persistIndex) {
+        return unavailableRAGStatistics(NATIVE_RAG_PERSISTENCE_UNAVAILABLE);
+      }
+      return emptyRAGStatistics(this.config);
+    }
+    return this.adapter.statistics(this.session) ?? unavailableRAGStatistics(
+      'Native RAG statistics returned no result.',
+    );
+  }
+}
+
+function assertNativeHandle(handle: number, feature: string): number {
+  if (!Number.isFinite(handle) || handle <= 0) {
+    throw SDKException.backendNotAvailable(
+      feature,
+      'A non-zero native RAG session handle is required.',
+    );
+  }
+  return handle;
+}
+
+function validateNativeRAGConfiguration(config: RAGConfiguration, feature: string): void {
+  if (config.persistIndex) {
+    throw SDKException.backendNotAvailable(
+      feature,
+      NATIVE_RAG_PERSISTENCE_UNAVAILABLE,
+    );
+  }
+  if (!config.embeddingModelPath.trim()) {
+    throw SDKException.backendNotAvailable(
+      feature,
+      'Native Web RAG session creation requires RAGConfiguration.embeddingModelPath or an explicit RAG.setSessionHandle(...).',
+    );
+  }
+}
+
+export function createDefaultRAGConfiguration(
+  overrides: Partial<RAGConfiguration> = {},
+): RAGConfiguration {
+  return {
+    embeddingModelPath: '',
+    llmModelPath: '',
+    embeddingDimension: 0,
+    topK: 3,
+    similarityThreshold: 0,
+    chunkSize: 256,
+    chunkOverlap: 0,
+    maxContextTokens: 0,
+    promptTemplate: undefined,
+    embeddingConfigJson: undefined,
+    llmConfigJson: undefined,
+    indexPath: undefined,
+    persistIndex: false,
+    rerankResults: false,
+    rerankerModelPath: undefined,
+    ...overrides,
+  };
+}
+
+function makeRAGQuery(
+  question: string,
+  config: RAGConfiguration,
+  options: RAGQueryOverrides,
+): RAGQueryOptions {
+  return {
+    question,
+    systemPrompt: options.systemPrompt,
+    maxTokens: options.maxTokens ?? 512,
+    temperature: options.temperature ?? 0.4,
+    topP: options.topP ?? 1,
+    topK: options.topK ?? 0,
+    retrievalTopK: options.retrievalTopK ?? config.topK,
+    similarityThreshold: options.similarityThreshold ?? config.similarityThreshold,
+    stream: options.stream ?? false,
+  };
+}
+
+function makeRAGDocument(text: string, metadataJson?: string): RAGDocument {
+  const parsed = parseMetadata(metadataJson);
+  return {
+    id: parsed.docId,
+    text,
+    metadataJson,
+    metadata: parsed.metadata,
+    sourceUri: parsed.sourceUri,
+    adapterHandle: undefined,
+    mediaType: parsed.mediaType,
+    sizeBytes: parsed.sizeBytes,
+  };
+}
+
+interface ParsedMetadata {
+  docId: string;
+  docName: string;
+  sourceUri?: string;
+  mediaType?: string;
+  sizeBytes: number;
+  metadata: Record<string, string>;
+}
+
+function parseMetadata(metadataJson?: string): ParsedMetadata {
+  const metadata = parseMetadataJson(metadataJson);
+  const docId = metadata.docId ?? metadata.id ?? createId('rag-doc');
+  const docName = metadata.docName ?? metadata.name ?? metadata.sourceDocument ?? metadata.sourceUri ?? 'Document';
+  return {
+    docId,
+    docName,
+    sourceUri: metadata.sourceUri,
+    mediaType: metadata.mediaType,
+    sizeBytes: Number(metadata.sizeBytes ?? 0),
+    metadata: {
+      ...metadata,
+      docId,
+      docName,
+    },
+  };
+}
+
+function parseMetadataJson(metadataJson?: string): Record<string, string> {
+  if (!metadataJson) return {};
+  try {
+    const parsed = JSON.parse(metadataJson) as Record<string, unknown>;
+    const metadata: Record<string, string> = {};
+    for (const [key, value] of Object.entries(parsed)) {
+      if (value != null) metadata[key] = String(value);
+    }
+    return metadata;
+  } catch {
+    return { metadataJson };
+  }
+}
+
+function emptyRAGStatistics(config: RAGConfiguration): RAGStatistics {
+  return {
+    indexedDocuments: 0,
+    indexedChunks: 0,
+    totalTokensIndexed: 0,
+    lastUpdatedMs: 0,
+    indexPath: config.indexPath,
+    statsJson: undefined,
+    vectorStoreSizeBytes: 0,
+    isPersistent: config.persistIndex,
+    lastQueryMs: 0,
+    errorMessage: undefined,
+    errorCode: 0,
+  };
+}
+
+export function unavailableRAGStatistics(reason?: string): RAGStatistics {
+  return {
+    ...emptyRAGStatistics(createDefaultRAGConfiguration()),
+    errorMessage: reason ?? getRAGAvailability().reason,
+    errorCode: SDKErrorCode.BackendNotAvailable,
+  };
+}
+
+export function unavailableRAGResult(question = '', reason?: string): RAGResult {
+  return {
+    answer: '',
+    retrievedChunks: [],
+    contextUsed: '',
+    retrievalTimeMs: 0,
+    generationTimeMs: 0,
+    totalTimeMs: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0,
+    errorMessage: reason ?? getRAGAvailability().reason,
+    errorCode: SDKErrorCode.BackendNotAvailable,
+    requestId: createId(question ? 'rag-query-unavailable' : 'rag-unavailable'),
+  };
+}
+
+function createId(prefix: string): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Math.random().toString(36).slice(2)}`;
 }
 
 // ---------------------------------------------------------------------------
-// Pipeline lifecycle
+// Public API
 // ---------------------------------------------------------------------------
 
 export async function ragCreatePipeline(config: RAGConfiguration): Promise<void> {
-  await requireProvider('RAG.createPipeline').ragCreatePipeline(config);
+  const provider = activeProvider();
+  if (provider) {
+    await provider.ragCreatePipeline(config);
+    logger.info('RAG pipeline created');
+    return;
+  }
+
+  const adapter = RAGProtoAdapter.tryDefault();
+  if (!adapter || !adapter.supportsProtoRAG()) {
+    requireProvider('RAG.createPipeline');
+    return;
+  }
+
+  const nativeProvider = new NativeRAGSessionProvider(adapter, { config });
+  await nativeProvider.ragCreatePipeline(config);
+  _provider = nativeProvider;
   logger.info('RAG pipeline created');
 }
 
@@ -121,10 +490,6 @@ export async function ragDestroyPipeline(): Promise<void> {
   await requireProvider('RAG.destroyPipeline').ragDestroyPipeline();
   logger.info('RAG pipeline destroyed');
 }
-
-// ---------------------------------------------------------------------------
-// Document ingestion
-// ---------------------------------------------------------------------------
 
 export async function ragIngest(text: string, metadataJson?: string): Promise<void> {
   await requireProvider('RAG.ingest').ragIngest(text, metadataJson);
@@ -135,7 +500,6 @@ export async function ragAddDocumentsBatch(
 ): Promise<void> {
   const p = requireProvider('RAG.addDocumentsBatch');
   if (p.ragAddDocumentsBatch) return p.ragAddDocumentsBatch(documents);
-  // Fallback: serial ingestion
   for (const d of documents) await p.ragIngest(d.text, d.metadataJson);
 }
 
@@ -143,26 +507,23 @@ export async function ragClearDocuments(): Promise<void> {
   await requireProvider('RAG.clearDocuments').ragClearDocuments();
 }
 
-/** Canonical name: `ragGetDocumentCount` (§9). */
 export async function ragGetDocumentCount(): Promise<number> {
   return requireProvider('RAG.getDocumentCount').ragGetDocumentCount();
 }
 
-// ---------------------------------------------------------------------------
-// Query
-// ---------------------------------------------------------------------------
-
 export async function ragQuery(
   question: string,
-  options?: Omit<RAGQueryOptions, 'question'>,
+  options?: RAGQueryOverrides,
 ): Promise<RAGResult> {
-  return requireProvider('RAG.query').ragQuery(question, options);
+  const provider = activeProvider();
+  if (!provider) return unavailableRAGResult(question);
+  return provider.ragQuery(question, options);
 }
 
 export async function ragGetStatistics(): Promise<RAGStatistics> {
-  const p = requireProvider('RAG.getStatistics');
+  const p = activeProvider();
+  if (!p) return unavailableRAGStatistics();
   if (p.ragGetStatistics) return p.ragGetStatistics();
-  // Synthesize minimal stats from documentCount.
   const indexedDocuments = await p.ragGetDocumentCount();
   return {
     indexedDocuments,
@@ -172,13 +533,76 @@ export async function ragGetStatistics(): Promise<RAGStatistics> {
     indexPath: undefined,
     statsJson: undefined,
     vectorStoreSizeBytes: 0,
+    isPersistent: false,
+    lastQueryMs: 0,
+    errorMessage: undefined,
+    errorCode: 0,
+  };
+}
+
+export async function ragListDocuments(): Promise<RAGDocumentSummary[]> {
+  const p = requireProvider('RAG.listDocuments');
+  if (providerCapabilities(p).documentListing && p.ragListDocuments) {
+    return p.ragListDocuments();
+  }
+  throw SDKException.backendNotAvailable(
+    'RAG.listDocuments',
+    'The active RAG provider does not expose document listing. Use RAG.getStatistics() for aggregate counts until the native document-list API is available.',
+  );
+}
+
+export async function ragRemoveDocument(id: string): Promise<void> {
+  const p = requireProvider('RAG.removeDocument');
+  if (providerCapabilities(p).documentRemoval && p.ragRemoveDocument) {
+    await p.ragRemoveDocument(id);
+    return;
+  }
+  throw SDKException.backendNotAvailable(
+    'RAG.removeDocument',
+    `The active RAG provider does not expose document-level removal for '${id}'.`,
+  );
+}
+
+export function ragGetCapabilities(): RAGProviderCapabilities {
+  return providerCapabilities(activeProvider());
+}
+
+function providerCapabilities(provider: RAGProvider | null): RAGProviderCapabilities {
+  if (!provider) {
+    return unavailableCapabilities();
+  }
+
+  const reported = provider.ragGetCapabilities?.();
+  const hasDocumentListing = typeof provider.ragListDocuments === 'function';
+  const hasDocumentRemoval = typeof provider.ragRemoveDocument === 'function';
+
+  return {
+    native: reported?.native ?? provider.providerKind === 'wasm-session',
+    persistent: reported?.persistent ?? false,
+    documentListing: (reported?.documentListing ?? hasDocumentListing) && hasDocumentListing,
+    documentRemoval: (reported?.documentRemoval ?? hasDocumentRemoval) && hasDocumentRemoval,
+  };
+}
+
+function unavailableCapabilities(): RAGProviderCapabilities {
+  return {
+    native: false,
+    persistent: false,
+    documentListing: false,
+    documentRemoval: false,
   };
 }
 
 export const RAG = {
   setProvider: setRAGProvider,
+  createNativeProvider: createRAGNativeProvider,
+  setSessionHandle: setRAGSessionHandle,
   availability: getRAGAvailability,
   isAvailable: isRAGAvailable,
+  capabilities: ragGetCapabilities,
+  defaultConfiguration: createDefaultRAGConfiguration,
+  unavailableResult: unavailableRAGResult,
+  unavailableStatistics: unavailableRAGStatistics,
   createPipeline: ragCreatePipeline,
   destroyPipeline: ragDestroyPipeline,
   ingest: ragIngest,
@@ -187,4 +611,8 @@ export const RAG = {
   clearDocuments: ragClearDocuments,
   getDocumentCount: ragGetDocumentCount,
   getStatistics: ragGetStatistics,
+  listDocuments: ragListDocuments,
+  removeDocument: ragRemoveDocument,
 };
+
+export type { RAGSearchResult };

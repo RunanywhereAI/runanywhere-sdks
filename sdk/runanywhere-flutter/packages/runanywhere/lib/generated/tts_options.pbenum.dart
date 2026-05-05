@@ -38,5 +38,30 @@ class TTSVoiceGender extends $pb.ProtobufEnum {
   const TTSVoiceGender._($core.int v, $core.String n) : super(v, n);
 }
 
+class TTSStreamEventKind extends $pb.ProtobufEnum {
+  static const TTSStreamEventKind TTS_STREAM_EVENT_KIND_UNSPECIFIED = TTSStreamEventKind._(0, _omitEnumNames ? '' : 'TTS_STREAM_EVENT_KIND_UNSPECIFIED');
+  static const TTSStreamEventKind TTS_STREAM_EVENT_KIND_STARTED = TTSStreamEventKind._(1, _omitEnumNames ? '' : 'TTS_STREAM_EVENT_KIND_STARTED');
+  static const TTSStreamEventKind TTS_STREAM_EVENT_KIND_AUDIO_CHUNK = TTSStreamEventKind._(2, _omitEnumNames ? '' : 'TTS_STREAM_EVENT_KIND_AUDIO_CHUNK');
+  static const TTSStreamEventKind TTS_STREAM_EVENT_KIND_PHONEME = TTSStreamEventKind._(3, _omitEnumNames ? '' : 'TTS_STREAM_EVENT_KIND_PHONEME');
+  static const TTSStreamEventKind TTS_STREAM_EVENT_KIND_COMPLETED = TTSStreamEventKind._(4, _omitEnumNames ? '' : 'TTS_STREAM_EVENT_KIND_COMPLETED');
+  static const TTSStreamEventKind TTS_STREAM_EVENT_KIND_ERROR = TTSStreamEventKind._(5, _omitEnumNames ? '' : 'TTS_STREAM_EVENT_KIND_ERROR');
+  static const TTSStreamEventKind TTS_STREAM_EVENT_KIND_PROGRESS = TTSStreamEventKind._(6, _omitEnumNames ? '' : 'TTS_STREAM_EVENT_KIND_PROGRESS');
+
+  static const $core.List<TTSStreamEventKind> values = <TTSStreamEventKind> [
+    TTS_STREAM_EVENT_KIND_UNSPECIFIED,
+    TTS_STREAM_EVENT_KIND_STARTED,
+    TTS_STREAM_EVENT_KIND_AUDIO_CHUNK,
+    TTS_STREAM_EVENT_KIND_PHONEME,
+    TTS_STREAM_EVENT_KIND_COMPLETED,
+    TTS_STREAM_EVENT_KIND_ERROR,
+    TTS_STREAM_EVENT_KIND_PROGRESS,
+  ];
+
+  static final $core.Map<$core.int, TTSStreamEventKind> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static TTSStreamEventKind? valueOf($core.int value) => _byValue[value];
+
+  const TTSStreamEventKind._($core.int v, $core.String n) : super(v, n);
+}
+
 
 const _omitEnumNames = $core.bool.fromEnvironment('protobuf.omit_enum_names');

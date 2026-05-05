@@ -83,6 +83,21 @@ rac_result_t publish_shutdown(void);
 rac_result_t publish_device_registered(const char* device_id);
 rac_result_t publish_device_registration_failed(rac_result_t error_code, const char* message);
 rac_result_t publish_device_registration_state_changed(bool registered);
+rac_result_t publish_auth_succeeded(const char* subject_id,
+                                    const char* provider,
+                                    const char* scope,
+                                    const char* operation,
+                                    const char* device_id);
+rac_result_t publish_auth_token_refreshed(const char* subject_id,
+                                          const char* provider,
+                                          const char* scope,
+                                          const char* operation,
+                                          const char* device_id);
+rac_result_t publish_auth_failed(rac_result_t error_code,
+                                 const char* message,
+                                 const char* provider,
+                                 const char* scope,
+                                 const char* operation);
 rac_result_t publish_hardware_profile_completed(const uint8_t* profile_bytes, size_t profile_size);
 rac_result_t publish_route_selected(rac_primitive_t primitive,
                                     const rac_engine_vtable_t* vtable,

@@ -6,7 +6,6 @@
 
 // Text Generation (LLM)
 export {
-  loadModel,
   isModelLoaded,
   unloadModel,
   chat,
@@ -22,32 +21,24 @@ export type { ThinkingExtractionResult } from './RunAnywhere+TextGeneration';
 
 // Speech-to-Text
 export {
-  loadSTTModel,
   isSTTModelLoaded,
   unloadSTTModel,
   transcribe,
   transcribeSimple,
   transcribeBuffer,
   transcribeStream,
-  transcribeStreamAsync,
   transcribeFile,
-  // Streaming audio ingestion (§4)
-  processStreamingAudio,
-  stopStreamingTranscription,
-  isStreamingSTT,
   currentSTTModel,
 } from './RunAnywhere+STT';
 
 // Text-to-Speech
 export {
-  loadTTSModel,
-  loadTTSVoice,
-  unloadTTSVoice,
   isTTSModelLoaded,
   isTTSVoiceLoaded,
   unloadTTSModel,
   synthesize,
   synthesizeStream,
+  synthesizeStreamAsync,
   speak,
   isSpeaking,
   stopSpeaking,
@@ -60,27 +51,19 @@ export {
 
 // Voice Activity Detection
 export {
-  initializeVAD,
-  isVADReady,
-  loadVADModel,
   isVADModelLoaded,
   unloadVADModel,
   detectSpeech,
   detectVoiceActivity,
   processVAD,
-  startVAD,
-  stopVAD,
   resetVAD,
-  setVADSpeechActivityCallback,
-  setVADAudioBufferCallback,
-  // VAD statistics callback (§6)
-  setVADStatisticsCallback,
+  // VAD activity stream (§6)
+  streamVADActivity,
   // VAD streaming (§6)
   streamVAD,
-  cleanupVAD,
-  getVADState,
+  // VAD statistics (§6)
+  getVADStatistics,
 } from './RunAnywhere+VAD';
-export type { VADStatisticsCallback } from './RunAnywhere+VAD';
 
 // Voice Agent
 export {
@@ -104,26 +87,29 @@ export {
   generateStructured,
   generateStructuredStream,
   extractStructuredOutput,
+  prepareStructuredOutputPrompt,
+  validateStructuredOutput,
   generate as generateStructuredType,
   extractEntities,
   classify,
 } from './RunAnywhere+StructuredOutput';
-export type {
-  StreamToken,
-} from './RunAnywhere+StructuredOutput';
 
-// Device (NPU Chip Detection)
-export { getChip } from './RunAnywhere+Device';
-
-// Hardware Profile (CANONICAL_API §14 — Wave 3 Step 3.2)
+// Hardware Profile (CANONICAL_API §14)
 export {
   getProfile as getHardwareProfile,
   getChip as getHardwareChip,
   hasNeuralEngine as hardwareHasNeuralEngine,
   accelerationMode as hardwareAccelerationMode,
+  getAccelerators as getHardwareAccelerators,
+  setAcceleratorPreference as setHardwareAcceleratorPreference,
+  getAcceleratorPreference as getHardwareAcceleratorPreference,
+  AcceleratorPreference,
   Hardware,
 } from './RunAnywhere+Hardware';
-export type { HardwareProfileResult } from './RunAnywhere+Hardware';
+export type {
+  AcceleratorInfo,
+  HardwareProfileResult,
+} from './RunAnywhere+Hardware';
 
 // Logging
 export { setLogLevel } from './RunAnywhere+Logging';
@@ -136,11 +122,13 @@ export {
   subscribeSDKEvents,
 } from './RunAnywhere+Events';
 
-// Canonical model/component lifecycle
+// Canonical model/component lifecycle (commons-driven loading)
 export {
   getComponentLifecycleSnapshot,
   getCurrentModel,
+  getLifecycleResolvedArtifactPath,
   loadModelLifecycle,
+  resolveVLMArtifactsFromLifecycleResult,
   unloadModelLifecycle,
 } from './RunAnywhere+Lifecycle';
 
@@ -153,22 +141,6 @@ export {
   getStorageInfoProto,
   planStorageDelete,
 } from './RunAnywhere+Storage';
-
-// Models
-export {
-  getAvailableModels,
-  getModelInfo,
-  getModelPath,
-  getMmprojPath,
-  isModelDownloaded,
-  downloadModel,
-  cancelDownload,
-  deleteModel,
-  deleteAllModels,
-  registerModel,
-  registerMultiFileModel,
-  refreshModelRegistry,
-} from './RunAnywhere+Models';
 
 // Audio Utilities
 export {
@@ -202,8 +174,8 @@ export {
   unregisterTool,
   getRegisteredTools,
   clearTools,
-  parseToolCall,
   executeTool,
+  validateToolCall,
   formatToolsForPromptAsync,
   generateWithTools,
   continueWithToolResult,
@@ -238,13 +210,20 @@ export {
   processImageStream,
   cancelVLMGeneration,
 } from './RunAnywhere+VisionLanguage';
+export type { VLMBackendProvider } from './RunAnywhere+VisionLanguage';
 
-// Plugin Loader (§12)
+// Model Management — register / list / download / delete / load (Swift parity)
 export {
-  pluginApiVersion,
-  loadPlugin,
-  unloadPlugin,
-  registeredPluginCount,
-  registeredPluginNames,
-} from './RunAnywhere+PluginLoader';
-export type { PluginInfo } from './RunAnywhere+PluginLoader';
+  registerModel,
+  registerMultiFileModel,
+  getAvailableModels,
+  getDownloadedModels,
+  downloadModel,
+  cancelDownload,
+  deleteModel,
+  loadModel,
+} from './RunAnywhere+ModelManagement';
+export type {
+  RegisterModelInput,
+  RegisterMultiFileModelInput,
+} from './RunAnywhere+ModelManagement';

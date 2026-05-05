@@ -20,7 +20,10 @@ import {
   SDKEnvironment as ProtoSDKEnvironment,
   AudioFormat as ProtoAudioFormat,
 } from '@runanywhere/proto-ts/model_types';
-import { SDKComponent as ProtoSDKComponent } from '@runanywhere/proto-ts/sdk_events';
+import {
+  EventCategory as ProtoEventCategory,
+  SDKComponent as ProtoSDKComponent,
+} from '@runanywhere/proto-ts/sdk_events';
 
 export {
   ProtoAccelerationPreference,
@@ -200,24 +203,20 @@ export enum ModelStatus {
  */
 export { DownloadStage, DownloadState } from '@runanywhere/proto-ts/download_service';
 
-/**
- * JS `EventBus` topic category. Maps loosely onto the `category` field
- * of proto `SDKEvent` but the proto categories are a larger set — this
- * is the Web-local subset actually emitted by `EventBus`.
- */
-export enum SDKEventType {
-  Initialization = 'initialization',
-  Configuration = 'configuration',
-  Generation = 'generation',
-  Model = 'model',
-  Voice = 'voice',
-  Storage = 'storage',
-  Framework = 'framework',
-  Device = 'device',
-  Error = 'error',
-  Performance = 'performance',
-  Network = 'network',
-}
+export const SDKEventType = {
+  Initialization: ProtoEventCategory.EVENT_CATEGORY_INITIALIZATION,
+  Configuration: ProtoEventCategory.EVENT_CATEGORY_SDK,
+  Generation: ProtoEventCategory.EVENT_CATEGORY_LLM,
+  Model: ProtoEventCategory.EVENT_CATEGORY_MODEL,
+  Voice: ProtoEventCategory.EVENT_CATEGORY_VOICE_AGENT,
+  Storage: ProtoEventCategory.EVENT_CATEGORY_STORAGE,
+  Framework: ProtoEventCategory.EVENT_CATEGORY_FRAMEWORK,
+  Device: ProtoEventCategory.EVENT_CATEGORY_DEVICE,
+  Error: ProtoEventCategory.EVENT_CATEGORY_ERROR,
+  Performance: ProtoEventCategory.EVENT_CATEGORY_PERFORMANCE,
+  Network: ProtoEventCategory.EVENT_CATEGORY_NETWORK,
+} as const;
+export type SDKEventType = ProtoEventCategory;
 
 export const AccelerationPreference = {
   Auto: ProtoAccelerationPreference.ACCELERATION_PREFERENCE_AUTO,

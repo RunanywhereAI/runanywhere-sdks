@@ -8,8 +8,8 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.ModelInfo
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.Models.ModelInfo
 
 actual suspend fun RunAnywhere.loadVLMModelInfo(model: ModelInfo) {
     loadVLMModel(model.id)

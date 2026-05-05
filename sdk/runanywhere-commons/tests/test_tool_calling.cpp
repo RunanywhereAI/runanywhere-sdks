@@ -26,6 +26,10 @@
 #include "rac/core/rac_error.h"
 #include "rac/features/llm/rac_tool_calling.h"
 
+#if defined(RAC_HAVE_PROTOBUF)
+#include "tool_calling.pb.h"
+#endif
+
 namespace {
 
 #define ASSERT_TRUE(cond) do { \
@@ -304,6 +308,228 @@ int test_tool_result_loop() {
     return 0;
 }
 
+// ---------------------------------------------------------------------------
+// 11. validate parsed call against local definitions
+// ---------------------------------------------------------------------------
+int test_validate_tool_call_definitions() {
+    rac_tool_parameter_t params[2] = {
+        {"location", RAC_TOOL_PARAM_STRING, "City name", RAC_TRUE, nullptr},
+        {"unit", RAC_TOOL_PARAM_STRING, "Temperature unit", RAC_FALSE,
+         "[\"celsius\",\"fahrenheit\"]"},
+    };
+    rac_tool_definition_t tools[1] = {
+        {"get_weather", "Get weather for a city", params, 2, "weather"},
+    };
+
+    rac_tool_call_t parsed;
+    rac_result_t rc = rac_tool_call_parse(
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\","
+        "\"unit\":\"celsius\"}}</tool_call>",
+        &parsed);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+
+    rac_tool_call_validation_t validation;
+    rc = rac_tool_call_validate(&parsed, tools, 1, &validation);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(validation.is_valid, RAC_TRUE);
+    ASSERT_SUBSTR(validation.validation_errors_json, "[]");
+    ASSERT_SUBSTR(validation.normalized_arguments_json, "\"location\":\"Tokyo\"");
+    ASSERT_SUBSTR(validation.matched_tool_json, "\"get_weather\"");
+    rac_tool_call_validation_free(&validation);
+    rac_tool_call_free(&parsed);
+
+    rc = rac_tool_call_parse(
+        "<tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"unit\":\"kelvin\"}}</tool_call>",
+        &parsed);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    rc = rac_tool_call_validate(&parsed, tools, 1, &validation);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(validation.is_valid, RAC_FALSE);
+    ASSERT_SUBSTR(validation.validation_errors_json, "Missing required argument: location");
+    ASSERT_TRUE(validation.error_message != nullptr);
+    rac_tool_call_validation_free(&validation);
+    rac_tool_call_free(&parsed);
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
+// 12. validate parsed call against generated-style JSON definitions
+// ---------------------------------------------------------------------------
+int test_validate_tool_call_json_definitions() {
+    const char* tools_json =
+        "[{\"name\":\"set_mode\",\"description\":\"Set mode\",\"parameters\":["
+        "{\"name\":\"enabled\",\"type\":\"boolean\",\"required\":true},"
+        "{\"name\":\"mode\",\"type\":\"string\",\"required\":true,"
+        "\"enum_values\":[\"fast\",\"safe\"]}]}]";
+
+    rac_tool_call_t parsed;
+    rac_result_t rc = rac_tool_call_parse(
+        "<tool_call>{\"tool\":\"set_mode\",\"arguments\":{\"enabled\":true,"
+        "\"mode\":\"fast\"}}</tool_call>",
+        &parsed);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+
+    rac_tool_call_validation_t validation;
+    rc = rac_tool_call_validate_json(&parsed, tools_json, &validation);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(validation.is_valid, RAC_TRUE);
+    ASSERT_SUBSTR(validation.normalized_arguments_json, "\"enabled\":true");
+    rac_tool_call_validation_free(&validation);
+    rac_tool_call_free(&parsed);
+
+    rc = rac_tool_call_parse(
+        "<tool_call>{\"tool\":\"set_mode\",\"arguments\":{\"enabled\":\"yes\","
+        "\"mode\":\"turbo\"}}</tool_call>",
+        &parsed);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    rc = rac_tool_call_validate_json(&parsed, tools_json, &validation);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(validation.is_valid, RAC_FALSE);
+    ASSERT_SUBSTR(validation.validation_errors_json, "enabled");
+    ASSERT_SUBSTR(validation.validation_errors_json, "mode");
+    rac_tool_call_validation_free(&validation);
+    rac_tool_call_free(&parsed);
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
+// 13. generated proto ABI: parse ToolParseRequest -> ToolParseResult
+// ---------------------------------------------------------------------------
+int test_parse_proto_round_trip() {
+#if !defined(RAC_HAVE_PROTOBUF)
+    return 0;
+#else
+    runanywhere::v1::ToolParseRequest request;
+    request.set_text(
+        "checking <tool_call>{\"tool\":\"get_weather\",\"arguments\":{\"location\":\"Tokyo\"}}</tool_call>");
+    request.mutable_options()->set_format_hint("default");
+
+    std::string request_bytes;
+    ASSERT_TRUE(request.SerializeToString(&request_bytes));
+
+    rac_proto_buffer_t result_bytes{};
+    rac_proto_buffer_init(&result_bytes);
+    const rac_result_t rc = rac_tool_call_parse_proto(
+        reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(),
+        &result_bytes);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(result_bytes.status, RAC_SUCCESS);
+    ASSERT_TRUE(result_bytes.data != nullptr);
+
+    runanywhere::v1::ToolParseResult result;
+    ASSERT_TRUE(result.ParseFromArray(result_bytes.data,
+                                      static_cast<int>(result_bytes.size)));
+    ASSERT_EQ_INT(result.has_tool_call(), true);
+    ASSERT_EQ_INT(result.tool_calls_size(), 1);
+    ASSERT_EQ_STR(result.tool_calls(0).name().c_str(), "get_weather");
+    ASSERT_SUBSTR(result.tool_calls(0).arguments_json().c_str(), "Tokyo");
+    ASSERT_SUBSTR(result.remaining_text().c_str(), "checking");
+
+    rac_proto_buffer_free(&result_bytes);
+    return 0;
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// 14. generated proto ABI: format ToolPromptFormatRequest -> Result
+// ---------------------------------------------------------------------------
+int test_format_prompt_proto_round_trip() {
+#if !defined(RAC_HAVE_PROTOBUF)
+    return 0;
+#else
+    runanywhere::v1::ToolPromptFormatRequest request;
+    auto* options = request.mutable_options();
+    options->set_format(runanywhere::v1::TOOL_CALL_FORMAT_NAME_PYTHONIC);
+    auto* tool = options->add_tools();
+    tool->set_name("get_weather");
+    tool->set_description("Get weather for a city");
+    auto* param = tool->add_parameters();
+    param->set_name("location");
+    param->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
+    param->set_description("City name");
+    param->set_required(true);
+
+    std::string request_bytes;
+    ASSERT_TRUE(request.SerializeToString(&request_bytes));
+
+    rac_proto_buffer_t result_bytes{};
+    rac_proto_buffer_init(&result_bytes);
+    const rac_result_t rc = rac_tool_call_format_prompt_proto(
+        reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(),
+        &result_bytes);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(result_bytes.status, RAC_SUCCESS);
+    ASSERT_TRUE(result_bytes.data != nullptr);
+
+    runanywhere::v1::ToolPromptFormatResult result;
+    ASSERT_TRUE(result.ParseFromArray(result_bytes.data,
+                                      static_cast<int>(result_bytes.size)));
+    ASSERT_EQ_INT(result.error_code(), RAC_SUCCESS);
+    ASSERT_EQ_STR(result.format_hint().c_str(), "lfm2");
+    ASSERT_SUBSTR(result.formatted_prompt().c_str(), "get_weather");
+    ASSERT_SUBSTR(result.formatted_prompt().c_str(), "<|tool_call_start|>");
+
+    rac_proto_buffer_free(&result_bytes);
+    return 0;
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// 15. generated proto ABI: validate ToolCallValidationRequest -> Result
+// ---------------------------------------------------------------------------
+int test_validate_proto_round_trip() {
+#if !defined(RAC_HAVE_PROTOBUF)
+    return 0;
+#else
+    runanywhere::v1::ToolCallValidationRequest request;
+    auto* call = request.mutable_tool_call();
+    call->set_name("set_mode");
+    call->set_arguments_json("{\"enabled\":true,\"mode\":\"safe\"}");
+
+    auto* options = request.mutable_options();
+    options->set_require_json_arguments(true);
+    auto* tool = options->add_tools();
+    tool->set_name("set_mode");
+    tool->set_description("Set runtime mode");
+    auto* enabled = tool->add_parameters();
+    enabled->set_name("enabled");
+    enabled->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_BOOLEAN);
+    enabled->set_required(true);
+    auto* mode = tool->add_parameters();
+    mode->set_name("mode");
+    mode->set_type(runanywhere::v1::TOOL_PARAMETER_TYPE_STRING);
+    mode->set_required(true);
+    mode->add_enum_values("fast");
+    mode->add_enum_values("safe");
+
+    std::string request_bytes;
+    ASSERT_TRUE(request.SerializeToString(&request_bytes));
+
+    rac_proto_buffer_t result_bytes{};
+    rac_proto_buffer_init(&result_bytes);
+    const rac_result_t rc = rac_tool_call_validate_proto(
+        reinterpret_cast<const uint8_t*>(request_bytes.data()), request_bytes.size(),
+        &result_bytes);
+    ASSERT_EQ_INT(rc, RAC_SUCCESS);
+    ASSERT_EQ_INT(result_bytes.status, RAC_SUCCESS);
+    ASSERT_TRUE(result_bytes.data != nullptr);
+
+    runanywhere::v1::ToolCallValidationResult result;
+    ASSERT_TRUE(result.ParseFromArray(result_bytes.data,
+                                      static_cast<int>(result_bytes.size)));
+    ASSERT_EQ_INT(result.is_valid(), true);
+    ASSERT_EQ_INT(result.error_code(), RAC_SUCCESS);
+    ASSERT_EQ_INT(result.validation_errors_size(), 0);
+    ASSERT_TRUE(result.has_matched_tool());
+    ASSERT_EQ_STR(result.matched_tool().name().c_str(), "set_mode");
+    ASSERT_SUBSTR(result.normalized_arguments_json().c_str(), "\"enabled\":true");
+    ASSERT_SUBSTR(result.normalized_arguments_json().c_str(), "\"mode\":\"safe\"");
+
+    rac_proto_buffer_free(&result_bytes);
+    return 0;
+#endif
+}
+
 struct TestCase {
     const char* name;
     int (*fn)();
@@ -328,6 +554,11 @@ int main(int argc, char** argv) {
         {"free_functions_idempotent",   test_free_functions_idempotent},
         {"format_name_round_trip",      test_format_name_round_trip},
         {"tool_result_loop",            test_tool_result_loop},
+        {"validate_tool_call_definitions", test_validate_tool_call_definitions},
+        {"validate_tool_call_json_definitions", test_validate_tool_call_json_definitions},
+        {"parse_proto_round_trip",      test_parse_proto_round_trip},
+        {"format_prompt_proto_round_trip", test_format_prompt_proto_round_trip},
+        {"validate_proto_round_trip",   test_validate_proto_round_trip},
     };
 
     int num_cases = static_cast<int>(sizeof(cases) / sizeof(cases[0]));

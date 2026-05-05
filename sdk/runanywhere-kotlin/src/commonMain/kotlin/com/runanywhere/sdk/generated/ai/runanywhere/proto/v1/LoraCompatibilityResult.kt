@@ -13,6 +13,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -24,6 +25,7 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.List
 import okio.ByteString
 
 /**
@@ -64,8 +66,25 @@ public class LoraCompatibilityResult(
     schemaIndex = 2,
   )
   public val base_model_required: String? = null,
+  warnings: List<String> = emptyList(),
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "errorCode",
+    schemaIndex = 4,
+  )
+  public val error_code: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoraCompatibilityResult, Nothing>(ADAPTER, unknownFields) {
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    schemaIndex = 3,
+  )
+  public val warnings: List<String> = immutableCopyOf("warnings", warnings)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -80,6 +99,8 @@ public class LoraCompatibilityResult(
     if (is_compatible != other.is_compatible) return false
     if (error_message != other.error_message) return false
     if (base_model_required != other.base_model_required) return false
+    if (warnings != other.warnings) return false
+    if (error_code != other.error_code) return false
     return true
   }
 
@@ -90,6 +111,8 @@ public class LoraCompatibilityResult(
       result = result * 37 + is_compatible.hashCode()
       result = result * 37 + (error_message?.hashCode() ?: 0)
       result = result * 37 + (base_model_required?.hashCode() ?: 0)
+      result = result * 37 + warnings.hashCode()
+      result = result * 37 + error_code.hashCode()
       super.hashCode = result
     }
     return result
@@ -101,6 +124,8 @@ public class LoraCompatibilityResult(
     if (error_message != null) result += """error_message=${sanitize(error_message)}"""
     if (base_model_required != null) result +=
         """base_model_required=${sanitize(base_model_required)}"""
+    if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
+    result += """error_code=$error_code"""
     return result.joinToString(prefix = "LoraCompatibilityResult{", separator = ", ", postfix = "}")
   }
 
@@ -108,9 +133,11 @@ public class LoraCompatibilityResult(
     is_compatible: Boolean = this.is_compatible,
     error_message: String? = this.error_message,
     base_model_required: String? = this.base_model_required,
+    warnings: List<String> = this.warnings,
+    error_code: Int = this.error_code,
     unknownFields: ByteString = this.unknownFields,
   ): LoraCompatibilityResult = LoraCompatibilityResult(is_compatible, error_message,
-      base_model_required, unknownFields)
+      base_model_required, warnings, error_code, unknownFields)
 
   public companion object {
     @JvmField
@@ -129,6 +156,9 @@ public class LoraCompatibilityResult(
             value.is_compatible)
         size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.error_message)
         size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.base_model_required)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(4, value.warnings)
+        if (value.error_code != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(5,
+            value.error_code)
         return size
       }
 
@@ -137,11 +167,15 @@ public class LoraCompatibilityResult(
             value.is_compatible)
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.error_message)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.base_model_required)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.warnings)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 5, value.error_code)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LoraCompatibilityResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 5, value.error_code)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.warnings)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.base_model_required)
         ProtoAdapter.STRING.encodeWithTag(writer, 2, value.error_message)
         if (value.is_compatible != false) ProtoAdapter.BOOL.encodeWithTag(writer, 1,
@@ -152,11 +186,15 @@ public class LoraCompatibilityResult(
         var is_compatible: Boolean = false
         var error_message: String? = null
         var base_model_required: String? = null
+        val warnings = mutableListOf<String>()
+        var error_code: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_compatible = ProtoAdapter.BOOL.decode(reader)
             2 -> error_message = ProtoAdapter.STRING.decode(reader)
             3 -> base_model_required = ProtoAdapter.STRING.decode(reader)
+            4 -> warnings.add(ProtoAdapter.STRING.decode(reader))
+            5 -> error_code = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -164,6 +202,8 @@ public class LoraCompatibilityResult(
           is_compatible = is_compatible,
           error_message = error_message,
           base_model_required = base_model_required,
+          warnings = warnings,
+          error_code = error_code,
           unknownFields = unknownFields
         )
       }

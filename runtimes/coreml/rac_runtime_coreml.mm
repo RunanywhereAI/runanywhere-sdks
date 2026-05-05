@@ -3,9 +3,11 @@
 #import <CoreML/CoreML.h>
 #import <Foundation/Foundation.h>
 
+#include <cstdlib>
 #include <new>
 
 #include "rac/core/rac_logger.h"
+#include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
 
@@ -19,9 +21,9 @@ const rac_device_class_t k_supported_devices[] = {
     RAC_DEVICE_CLASS_NPU,
 };
 const uint32_t k_supported_formats[] = {
-    5,  // MODEL_FORMAT_COREML
-    6,  // MODEL_FORMAT_COREML
-    8,  // MODEL_FORMAT_MLPACKAGE
+    RAC_MODEL_FORMAT_ID_COREML,
+    RAC_MODEL_FORMAT_ID_MLMODEL,
+    RAC_MODEL_FORMAT_ID_MLPACKAGE,
 };
 const rac_primitive_t k_supported_primitives[] = {
     RAC_PRIMITIVE_TRANSCRIBE,
@@ -98,6 +100,37 @@ rac_result_t coreml_capabilities(rac_runtime_capabilities_t* out) {
     return RAC_SUCCESS;
 }
 
+void coreml_release_tensor(rac_runtime_tensor_t* tensor) {
+    if (!tensor) return;
+    if (tensor->data_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->data) {
+        std::free(tensor->data);
+    }
+    if (tensor->shape_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->shape) {
+        std::free(tensor->shape);
+    }
+    *tensor = rac_runtime_tensor_t{};
+}
+
+const rac_runtime_vtable_v2_t k_coreml_vtable_v2 = {
+    /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION_V2,
+    /* .struct_size    = */ sizeof(rac_runtime_vtable_v2_t),
+    /* .run_session_v2 = */ nullptr,
+    /* .alloc_buffer   = */ nullptr,
+    /* .buffer_info    = */ nullptr,
+    /* .map_buffer     = */ nullptr,
+    /* .unmap_buffer   = */ nullptr,
+    /* .copy_buffer    = */ nullptr,
+    /* .release_tensor = */ coreml_release_tensor,
+    /* .reserved_0     = */ nullptr,
+    /* .reserved_1     = */ nullptr,
+    /* .reserved_2     = */ nullptr,
+    /* .reserved_3     = */ nullptr,
+    /* .reserved_4     = */ nullptr,
+    /* .reserved_5     = */ nullptr,
+    /* .reserved_6     = */ nullptr,
+    /* .reserved_7     = */ nullptr,
+};
+
 const rac_runtime_vtable_t k_coreml_vtable = {
     /* .metadata = */ {
         /* .abi_version             = */ RAC_RUNTIME_ABI_VERSION,
@@ -122,7 +155,7 @@ const rac_runtime_vtable_t k_coreml_vtable = {
     /* .free_buffer     = */ nullptr,
     /* .device_info     = */ coreml_device_info,
     /* .capabilities    = */ coreml_capabilities,
-    /* .reserved_slot_0 = */ nullptr,
+    /* .reserved_slot_0 = */ &k_coreml_vtable_v2,
     /* .reserved_slot_1 = */ nullptr,
     /* .reserved_slot_2 = */ nullptr,
     /* .reserved_slot_3 = */ nullptr,

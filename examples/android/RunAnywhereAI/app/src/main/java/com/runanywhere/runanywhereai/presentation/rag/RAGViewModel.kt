@@ -1,5 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.rag
 
+import ai.runanywhere.proto.v1.RAGConfig
 import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
@@ -7,7 +8,6 @@ import androidx.lifecycle.viewModelScope
 import com.runanywhere.runanywhereai.domain.services.DocumentService
 import com.runanywhere.runanywhereai.domain.services.DocumentServiceError
 import com.runanywhere.sdk.public.RunAnywhere
-import ai.runanywhere.proto.v1.RAGConfiguration
 import com.runanywhere.sdk.public.extensions.ragCreatePipeline
 import com.runanywhere.sdk.public.extensions.ragDestroyPipeline
 import com.runanywhere.sdk.public.extensions.ragIngest
@@ -112,12 +112,12 @@ class RAGViewModel : ViewModel() {
      *
      * @param context Android context for ContentResolver access
      * @param uri Content URI of the document (PDF or JSON)
-     * @param config RAG pipeline configuration with model paths and tuning parameters
+     * @param config Generated RAG configuration with model ids resolved by the SDK registry
      */
     fun loadDocument(
         context: Context,
         uri: Uri,
-        config: RAGConfiguration,
+        config: RAGConfig,
     ) {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoadingDocument = true, error = null) }

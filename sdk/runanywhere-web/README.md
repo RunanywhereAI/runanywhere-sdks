@@ -173,8 +173,8 @@ import {
   SDKError,
   SDKErrorCode,
   isSDKError,
-  type SDKInitOptions,    // canonical name (or InitializeOptions alias)
-  type GenerationOptions, // canonical name (or GenerateOptions alias)
+  type SDKInitOptions,
+  type LLMGenerationOptions,
   type ChatMessage,
   type ModelDescriptor,
 } from '@runanywhere/web';
@@ -185,8 +185,8 @@ const options: SDKInitOptions = {
 };
 await RunAnywhere.initialize(options);
 
-// Typed generation options (used by backend packages: LlamaCPP, ONNX)
-const genOptions: GenerationOptions = {
+// Typed generation options (proto-generated, used by backend packages: LlamaCPP, ONNX)
+const genOptions: Partial<LLMGenerationOptions> = {
   systemPrompt: 'You are a helpful assistant.',
   maxTokens: 256,
   temperature: 0.7,
@@ -211,7 +211,7 @@ try {
 }
 ```
 
-Note: `InitializeOptions` is a convenience alias for `SDKInitOptions`; `GenerateOptions` for `GenerationOptions`. Backend-specific APIs (e.g. `TextGeneration`, `STT`, `TTS`) live in `@runanywhere/web-llamacpp` and `@runanywhere/web-onnx` when using the split-package layout.
+Note: `LLMGenerationOptions` is the proto-generated type for LLM generation parameters. Backend-specific APIs (e.g. `TextGeneration`, `STT`, `TTS`) live in `@runanywhere/web-llamacpp` and `@runanywhere/web-onnx` when using the split-package layout.
 
 ---
 

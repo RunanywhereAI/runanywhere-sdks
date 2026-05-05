@@ -134,5 +134,28 @@ class VLMErrorCode extends $pb.ProtobufEnum {
   const VLMErrorCode._($core.int v, $core.String n) : super(v, n);
 }
 
+class VLMStreamEventKind extends $pb.ProtobufEnum {
+  static const VLMStreamEventKind VLM_STREAM_EVENT_KIND_UNSPECIFIED = VLMStreamEventKind._(0, _omitEnumNames ? '' : 'VLM_STREAM_EVENT_KIND_UNSPECIFIED');
+  static const VLMStreamEventKind VLM_STREAM_EVENT_KIND_STARTED = VLMStreamEventKind._(1, _omitEnumNames ? '' : 'VLM_STREAM_EVENT_KIND_STARTED');
+  static const VLMStreamEventKind VLM_STREAM_EVENT_KIND_IMAGE_ENCODED = VLMStreamEventKind._(2, _omitEnumNames ? '' : 'VLM_STREAM_EVENT_KIND_IMAGE_ENCODED');
+  static const VLMStreamEventKind VLM_STREAM_EVENT_KIND_TOKEN = VLMStreamEventKind._(3, _omitEnumNames ? '' : 'VLM_STREAM_EVENT_KIND_TOKEN');
+  static const VLMStreamEventKind VLM_STREAM_EVENT_KIND_COMPLETED = VLMStreamEventKind._(4, _omitEnumNames ? '' : 'VLM_STREAM_EVENT_KIND_COMPLETED');
+  static const VLMStreamEventKind VLM_STREAM_EVENT_KIND_ERROR = VLMStreamEventKind._(5, _omitEnumNames ? '' : 'VLM_STREAM_EVENT_KIND_ERROR');
+
+  static const $core.List<VLMStreamEventKind> values = <VLMStreamEventKind> [
+    VLM_STREAM_EVENT_KIND_UNSPECIFIED,
+    VLM_STREAM_EVENT_KIND_STARTED,
+    VLM_STREAM_EVENT_KIND_IMAGE_ENCODED,
+    VLM_STREAM_EVENT_KIND_TOKEN,
+    VLM_STREAM_EVENT_KIND_COMPLETED,
+    VLM_STREAM_EVENT_KIND_ERROR,
+  ];
+
+  static final $core.Map<$core.int, VLMStreamEventKind> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static VLMStreamEventKind? valueOf($core.int value) => _byValue[value];
+
+  const VLMStreamEventKind._($core.int v, $core.String n) : super(v, n);
+}
+
 
 const _omitEnumNames = $core.bool.fromEnvironment('protobuf.omit_enum_names');

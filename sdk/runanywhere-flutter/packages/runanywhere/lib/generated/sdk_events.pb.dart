@@ -9,19 +9,20 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'download_service.pb.dart' as $1;
-import 'errors.pb.dart' as $4;
-import 'hardware_profile.pb.dart' as $3;
+import 'download_service.pb.dart' as $6;
+import 'errors.pb.dart' as $8;
+import 'hardware_profile.pb.dart' as $7;
 import 'model_types.pb.dart' as $0;
 import 'model_types.pbenum.dart' as $0;
 import 'sdk_events.pbenum.dart';
-import 'storage_types.pb.dart' as $2;
-import 'voice_events.pb.dart' as $5;
+import 'storage_types.pb.dart' as $5;
+import 'voice_events.pb.dart' as $9;
 
 export 'sdk_events.pbenum.dart';
 
@@ -2240,6 +2241,11 @@ class ComponentLifecycleSnapshot extends $pb.GeneratedMessage {
     $core.String? modelId,
     $fixnum.Int64? updatedAtMs,
     $core.String? errorMessage,
+    $0.ModelCategory? category,
+    $0.InferenceFramework? framework,
+    $core.String? resolvedPath,
+    $fixnum.Int64? loadedAtUnixMs,
+    $0.ModelInfo? model,
   }) {
     final $result = create();
     if (component != null) {
@@ -2257,6 +2263,21 @@ class ComponentLifecycleSnapshot extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (category != null) {
+      $result.category = category;
+    }
+    if (framework != null) {
+      $result.framework = framework;
+    }
+    if (resolvedPath != null) {
+      $result.resolvedPath = resolvedPath;
+    }
+    if (loadedAtUnixMs != null) {
+      $result.loadedAtUnixMs = loadedAtUnixMs;
+    }
+    if (model != null) {
+      $result.model = model;
+    }
     return $result;
   }
   ComponentLifecycleSnapshot._() : super();
@@ -2269,6 +2290,11 @@ class ComponentLifecycleSnapshot extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'modelId')
     ..aInt64(4, _omitFieldNames ? '' : 'updatedAtMs')
     ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
+    ..e<$0.ModelCategory>(6, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: $0.ModelCategory.MODEL_CATEGORY_UNSPECIFIED, valueOf: $0.ModelCategory.valueOf, enumValues: $0.ModelCategory.values)
+    ..e<$0.InferenceFramework>(7, _omitFieldNames ? '' : 'framework', $pb.PbFieldType.OE, defaultOrMaker: $0.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $0.InferenceFramework.valueOf, enumValues: $0.InferenceFramework.values)
+    ..aOS(8, _omitFieldNames ? '' : 'resolvedPath')
+    ..aInt64(9, _omitFieldNames ? '' : 'loadedAtUnixMs')
+    ..aOM<$0.ModelInfo>(10, _omitFieldNames ? '' : 'model', subBuilder: $0.ModelInfo.create)
     ..hasRequiredFields = false
   ;
 
@@ -2337,6 +2363,189 @@ class ComponentLifecycleSnapshot extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(4);
   @$pb.TagNumber(5)
   void clearErrorMessage() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $0.ModelCategory get category => $_getN(5);
+  @$pb.TagNumber(6)
+  set category($0.ModelCategory v) { setField(6, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasCategory() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCategory() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $0.InferenceFramework get framework => $_getN(6);
+  @$pb.TagNumber(7)
+  set framework($0.InferenceFramework v) { setField(7, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasFramework() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearFramework() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get resolvedPath => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set resolvedPath($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasResolvedPath() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearResolvedPath() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $fixnum.Int64 get loadedAtUnixMs => $_getI64(8);
+  @$pb.TagNumber(9)
+  set loadedAtUnixMs($fixnum.Int64 v) { $_setInt64(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasLoadedAtUnixMs() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearLoadedAtUnixMs() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $0.ModelInfo get model => $_getN(9);
+  @$pb.TagNumber(10)
+  set model($0.ModelInfo v) { setField(10, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasModel() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearModel() => clearField(10);
+  @$pb.TagNumber(10)
+  $0.ModelInfo ensureModel() => $_ensure(9);
+}
+
+class ComponentLifecycleSnapshotRequest extends $pb.GeneratedMessage {
+  factory ComponentLifecycleSnapshotRequest({
+    SDKComponent? component,
+    $core.bool? includeModel,
+  }) {
+    final $result = create();
+    if (component != null) {
+      $result.component = component;
+    }
+    if (includeModel != null) {
+      $result.includeModel = includeModel;
+    }
+    return $result;
+  }
+  ComponentLifecycleSnapshotRequest._() : super();
+  factory ComponentLifecycleSnapshotRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ComponentLifecycleSnapshotRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ComponentLifecycleSnapshotRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..e<SDKComponent>(1, _omitFieldNames ? '' : 'component', $pb.PbFieldType.OE, defaultOrMaker: SDKComponent.SDK_COMPONENT_UNSPECIFIED, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values)
+    ..aOB(2, _omitFieldNames ? '' : 'includeModel')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ComponentLifecycleSnapshotRequest clone() => ComponentLifecycleSnapshotRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ComponentLifecycleSnapshotRequest copyWith(void Function(ComponentLifecycleSnapshotRequest) updates) => super.copyWith((message) => updates(message as ComponentLifecycleSnapshotRequest)) as ComponentLifecycleSnapshotRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ComponentLifecycleSnapshotRequest create() => ComponentLifecycleSnapshotRequest._();
+  ComponentLifecycleSnapshotRequest createEmptyInstance() => create();
+  static $pb.PbList<ComponentLifecycleSnapshotRequest> createRepeated() => $pb.PbList<ComponentLifecycleSnapshotRequest>();
+  @$core.pragma('dart2js:noInline')
+  static ComponentLifecycleSnapshotRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ComponentLifecycleSnapshotRequest>(create);
+  static ComponentLifecycleSnapshotRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  SDKComponent get component => $_getN(0);
+  @$pb.TagNumber(1)
+  set component(SDKComponent v) { setField(1, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasComponent() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearComponent() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get includeModel => $_getBF(1);
+  @$pb.TagNumber(2)
+  set includeModel($core.bool v) { $_setBool(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasIncludeModel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearIncludeModel() => clearField(2);
+}
+
+class ComponentLifecycleSnapshotResult extends $pb.GeneratedMessage {
+  factory ComponentLifecycleSnapshotResult({
+    $core.bool? success,
+    $core.Iterable<ComponentLifecycleSnapshot>? snapshots,
+    $core.String? errorMessage,
+  }) {
+    final $result = create();
+    if (success != null) {
+      $result.success = success;
+    }
+    if (snapshots != null) {
+      $result.snapshots.addAll(snapshots);
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    return $result;
+  }
+  ComponentLifecycleSnapshotResult._() : super();
+  factory ComponentLifecycleSnapshotResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ComponentLifecycleSnapshotResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ComponentLifecycleSnapshotResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..pc<ComponentLifecycleSnapshot>(2, _omitFieldNames ? '' : 'snapshots', $pb.PbFieldType.PM, subBuilder: ComponentLifecycleSnapshot.create)
+    ..aOS(3, _omitFieldNames ? '' : 'errorMessage')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ComponentLifecycleSnapshotResult clone() => ComponentLifecycleSnapshotResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ComponentLifecycleSnapshotResult copyWith(void Function(ComponentLifecycleSnapshotResult) updates) => super.copyWith((message) => updates(message as ComponentLifecycleSnapshotResult)) as ComponentLifecycleSnapshotResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ComponentLifecycleSnapshotResult create() => ComponentLifecycleSnapshotResult._();
+  ComponentLifecycleSnapshotResult createEmptyInstance() => create();
+  static $pb.PbList<ComponentLifecycleSnapshotResult> createRepeated() => $pb.PbList<ComponentLifecycleSnapshotResult>();
+  @$core.pragma('dart2js:noInline')
+  static ComponentLifecycleSnapshotResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ComponentLifecycleSnapshotResult>(create);
+  static ComponentLifecycleSnapshotResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool v) { $_setBool(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.List<ComponentLifecycleSnapshot> get snapshots => $_getList(1);
+
+  @$pb.TagNumber(3)
+  $core.String get errorMessage => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set errorMessage($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasErrorMessage() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearErrorMessage() => clearField(3);
 }
 
 enum ComponentLifecycleEvent_Payload {
@@ -2346,6 +2555,9 @@ enum ComponentLifecycleEvent_Payload {
   downloadProgress, 
   storageAvailability, 
   storageDeleteResult, 
+  snapshot, 
+  snapshotResult, 
+  storageDeletePlan, 
   notSet
 }
 
@@ -2362,9 +2574,12 @@ class ComponentLifecycleEvent extends $pb.GeneratedMessage {
     $0.ModelLoadResult? modelLoadResult,
     $0.ModelUnloadResult? modelUnloadResult,
     $0.ModelDeleteResult? modelDeleteResult,
-    $1.DownloadProgress? downloadProgress,
-    $2.StorageAvailabilityResult? storageAvailability,
-    $2.StorageDeleteResult? storageDeleteResult,
+    $6.DownloadProgress? downloadProgress,
+    $5.StorageAvailabilityResult? storageAvailability,
+    $5.StorageDeleteResult? storageDeleteResult,
+    ComponentLifecycleSnapshot? snapshot,
+    ComponentLifecycleSnapshotResult? snapshotResult,
+    $5.StorageDeletePlan? storageDeletePlan,
   }) {
     final $result = create();
     if (component != null) {
@@ -2400,6 +2615,15 @@ class ComponentLifecycleEvent extends $pb.GeneratedMessage {
     if (storageDeleteResult != null) {
       $result.storageDeleteResult = storageDeleteResult;
     }
+    if (snapshot != null) {
+      $result.snapshot = snapshot;
+    }
+    if (snapshotResult != null) {
+      $result.snapshotResult = snapshotResult;
+    }
+    if (storageDeletePlan != null) {
+      $result.storageDeletePlan = storageDeletePlan;
+    }
     return $result;
   }
   ComponentLifecycleEvent._() : super();
@@ -2413,10 +2637,13 @@ class ComponentLifecycleEvent extends $pb.GeneratedMessage {
     13 : ComponentLifecycleEvent_Payload.downloadProgress,
     14 : ComponentLifecycleEvent_Payload.storageAvailability,
     15 : ComponentLifecycleEvent_Payload.storageDeleteResult,
+    16 : ComponentLifecycleEvent_Payload.snapshot,
+    17 : ComponentLifecycleEvent_Payload.snapshotResult,
+    18 : ComponentLifecycleEvent_Payload.storageDeletePlan,
     0 : ComponentLifecycleEvent_Payload.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ComponentLifecycleEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18])
     ..e<SDKComponent>(1, _omitFieldNames ? '' : 'component', $pb.PbFieldType.OE, defaultOrMaker: SDKComponent.SDK_COMPONENT_UNSPECIFIED, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values)
     ..e<ComponentLifecycleState>(2, _omitFieldNames ? '' : 'previousState', $pb.PbFieldType.OE, defaultOrMaker: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: ComponentLifecycleState.valueOf, enumValues: ComponentLifecycleState.values)
     ..e<ComponentLifecycleState>(3, _omitFieldNames ? '' : 'currentState', $pb.PbFieldType.OE, defaultOrMaker: ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: ComponentLifecycleState.valueOf, enumValues: ComponentLifecycleState.values)
@@ -2425,9 +2652,12 @@ class ComponentLifecycleEvent extends $pb.GeneratedMessage {
     ..aOM<$0.ModelLoadResult>(10, _omitFieldNames ? '' : 'modelLoadResult', subBuilder: $0.ModelLoadResult.create)
     ..aOM<$0.ModelUnloadResult>(11, _omitFieldNames ? '' : 'modelUnloadResult', subBuilder: $0.ModelUnloadResult.create)
     ..aOM<$0.ModelDeleteResult>(12, _omitFieldNames ? '' : 'modelDeleteResult', subBuilder: $0.ModelDeleteResult.create)
-    ..aOM<$1.DownloadProgress>(13, _omitFieldNames ? '' : 'downloadProgress', subBuilder: $1.DownloadProgress.create)
-    ..aOM<$2.StorageAvailabilityResult>(14, _omitFieldNames ? '' : 'storageAvailability', subBuilder: $2.StorageAvailabilityResult.create)
-    ..aOM<$2.StorageDeleteResult>(15, _omitFieldNames ? '' : 'storageDeleteResult', subBuilder: $2.StorageDeleteResult.create)
+    ..aOM<$6.DownloadProgress>(13, _omitFieldNames ? '' : 'downloadProgress', subBuilder: $6.DownloadProgress.create)
+    ..aOM<$5.StorageAvailabilityResult>(14, _omitFieldNames ? '' : 'storageAvailability', subBuilder: $5.StorageAvailabilityResult.create)
+    ..aOM<$5.StorageDeleteResult>(15, _omitFieldNames ? '' : 'storageDeleteResult', subBuilder: $5.StorageDeleteResult.create)
+    ..aOM<ComponentLifecycleSnapshot>(16, _omitFieldNames ? '' : 'snapshot', subBuilder: ComponentLifecycleSnapshot.create)
+    ..aOM<ComponentLifecycleSnapshotResult>(17, _omitFieldNames ? '' : 'snapshotResult', subBuilder: ComponentLifecycleSnapshotResult.create)
+    ..aOM<$5.StorageDeletePlan>(18, _omitFieldNames ? '' : 'storageDeletePlan', subBuilder: $5.StorageDeletePlan.create)
     ..hasRequiredFields = false
   ;
 
@@ -2534,37 +2764,70 @@ class ComponentLifecycleEvent extends $pb.GeneratedMessage {
   $0.ModelDeleteResult ensureModelDeleteResult() => $_ensure(7);
 
   @$pb.TagNumber(13)
-  $1.DownloadProgress get downloadProgress => $_getN(8);
+  $6.DownloadProgress get downloadProgress => $_getN(8);
   @$pb.TagNumber(13)
-  set downloadProgress($1.DownloadProgress v) { setField(13, v); }
+  set downloadProgress($6.DownloadProgress v) { setField(13, v); }
   @$pb.TagNumber(13)
   $core.bool hasDownloadProgress() => $_has(8);
   @$pb.TagNumber(13)
   void clearDownloadProgress() => clearField(13);
   @$pb.TagNumber(13)
-  $1.DownloadProgress ensureDownloadProgress() => $_ensure(8);
+  $6.DownloadProgress ensureDownloadProgress() => $_ensure(8);
 
   @$pb.TagNumber(14)
-  $2.StorageAvailabilityResult get storageAvailability => $_getN(9);
+  $5.StorageAvailabilityResult get storageAvailability => $_getN(9);
   @$pb.TagNumber(14)
-  set storageAvailability($2.StorageAvailabilityResult v) { setField(14, v); }
+  set storageAvailability($5.StorageAvailabilityResult v) { setField(14, v); }
   @$pb.TagNumber(14)
   $core.bool hasStorageAvailability() => $_has(9);
   @$pb.TagNumber(14)
   void clearStorageAvailability() => clearField(14);
   @$pb.TagNumber(14)
-  $2.StorageAvailabilityResult ensureStorageAvailability() => $_ensure(9);
+  $5.StorageAvailabilityResult ensureStorageAvailability() => $_ensure(9);
 
   @$pb.TagNumber(15)
-  $2.StorageDeleteResult get storageDeleteResult => $_getN(10);
+  $5.StorageDeleteResult get storageDeleteResult => $_getN(10);
   @$pb.TagNumber(15)
-  set storageDeleteResult($2.StorageDeleteResult v) { setField(15, v); }
+  set storageDeleteResult($5.StorageDeleteResult v) { setField(15, v); }
   @$pb.TagNumber(15)
   $core.bool hasStorageDeleteResult() => $_has(10);
   @$pb.TagNumber(15)
   void clearStorageDeleteResult() => clearField(15);
   @$pb.TagNumber(15)
-  $2.StorageDeleteResult ensureStorageDeleteResult() => $_ensure(10);
+  $5.StorageDeleteResult ensureStorageDeleteResult() => $_ensure(10);
+
+  @$pb.TagNumber(16)
+  ComponentLifecycleSnapshot get snapshot => $_getN(11);
+  @$pb.TagNumber(16)
+  set snapshot(ComponentLifecycleSnapshot v) { setField(16, v); }
+  @$pb.TagNumber(16)
+  $core.bool hasSnapshot() => $_has(11);
+  @$pb.TagNumber(16)
+  void clearSnapshot() => clearField(16);
+  @$pb.TagNumber(16)
+  ComponentLifecycleSnapshot ensureSnapshot() => $_ensure(11);
+
+  @$pb.TagNumber(17)
+  ComponentLifecycleSnapshotResult get snapshotResult => $_getN(12);
+  @$pb.TagNumber(17)
+  set snapshotResult(ComponentLifecycleSnapshotResult v) { setField(17, v); }
+  @$pb.TagNumber(17)
+  $core.bool hasSnapshotResult() => $_has(12);
+  @$pb.TagNumber(17)
+  void clearSnapshotResult() => clearField(17);
+  @$pb.TagNumber(17)
+  ComponentLifecycleSnapshotResult ensureSnapshotResult() => $_ensure(12);
+
+  @$pb.TagNumber(18)
+  $5.StorageDeletePlan get storageDeletePlan => $_getN(13);
+  @$pb.TagNumber(18)
+  set storageDeletePlan($5.StorageDeletePlan v) { setField(18, v); }
+  @$pb.TagNumber(18)
+  $core.bool hasStorageDeletePlan() => $_has(13);
+  @$pb.TagNumber(18)
+  void clearStorageDeletePlan() => clearField(18);
+  @$pb.TagNumber(18)
+  $5.StorageDeletePlan ensureStorageDeletePlan() => $_ensure(13);
 }
 
 /// SDK session lifecycle independent of voice-agent turn sessions.
@@ -3094,11 +3357,11 @@ class DownloadEvent extends $pb.GeneratedMessage {
     $core.String? modelId,
     $core.String? taskId,
     $core.String? error,
-    $1.DownloadPlanResult? planResult,
-    $1.DownloadStartResult? startResult,
-    $1.DownloadProgress? progress,
-    $1.DownloadCancelResult? cancelResult,
-    $1.DownloadResumeResult? resumeResult,
+    $6.DownloadPlanResult? planResult,
+    $6.DownloadStartResult? startResult,
+    $6.DownloadProgress? progress,
+    $6.DownloadCancelResult? cancelResult,
+    $6.DownloadResumeResult? resumeResult,
   }) {
     final $result = create();
     if (kind != null) {
@@ -3148,11 +3411,11 @@ class DownloadEvent extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'modelId')
     ..aOS(3, _omitFieldNames ? '' : 'taskId')
     ..aOS(4, _omitFieldNames ? '' : 'error')
-    ..aOM<$1.DownloadPlanResult>(20, _omitFieldNames ? '' : 'planResult', subBuilder: $1.DownloadPlanResult.create)
-    ..aOM<$1.DownloadStartResult>(21, _omitFieldNames ? '' : 'startResult', subBuilder: $1.DownloadStartResult.create)
-    ..aOM<$1.DownloadProgress>(22, _omitFieldNames ? '' : 'progress', subBuilder: $1.DownloadProgress.create)
-    ..aOM<$1.DownloadCancelResult>(23, _omitFieldNames ? '' : 'cancelResult', subBuilder: $1.DownloadCancelResult.create)
-    ..aOM<$1.DownloadResumeResult>(24, _omitFieldNames ? '' : 'resumeResult', subBuilder: $1.DownloadResumeResult.create)
+    ..aOM<$6.DownloadPlanResult>(20, _omitFieldNames ? '' : 'planResult', subBuilder: $6.DownloadPlanResult.create)
+    ..aOM<$6.DownloadStartResult>(21, _omitFieldNames ? '' : 'startResult', subBuilder: $6.DownloadStartResult.create)
+    ..aOM<$6.DownloadProgress>(22, _omitFieldNames ? '' : 'progress', subBuilder: $6.DownloadProgress.create)
+    ..aOM<$6.DownloadCancelResult>(23, _omitFieldNames ? '' : 'cancelResult', subBuilder: $6.DownloadCancelResult.create)
+    ..aOM<$6.DownloadResumeResult>(24, _omitFieldNames ? '' : 'resumeResult', subBuilder: $6.DownloadResumeResult.create)
     ..hasRequiredFields = false
   ;
 
@@ -3217,59 +3480,59 @@ class DownloadEvent extends $pb.GeneratedMessage {
   void clearError() => clearField(4);
 
   @$pb.TagNumber(20)
-  $1.DownloadPlanResult get planResult => $_getN(4);
+  $6.DownloadPlanResult get planResult => $_getN(4);
   @$pb.TagNumber(20)
-  set planResult($1.DownloadPlanResult v) { setField(20, v); }
+  set planResult($6.DownloadPlanResult v) { setField(20, v); }
   @$pb.TagNumber(20)
   $core.bool hasPlanResult() => $_has(4);
   @$pb.TagNumber(20)
   void clearPlanResult() => clearField(20);
   @$pb.TagNumber(20)
-  $1.DownloadPlanResult ensurePlanResult() => $_ensure(4);
+  $6.DownloadPlanResult ensurePlanResult() => $_ensure(4);
 
   @$pb.TagNumber(21)
-  $1.DownloadStartResult get startResult => $_getN(5);
+  $6.DownloadStartResult get startResult => $_getN(5);
   @$pb.TagNumber(21)
-  set startResult($1.DownloadStartResult v) { setField(21, v); }
+  set startResult($6.DownloadStartResult v) { setField(21, v); }
   @$pb.TagNumber(21)
   $core.bool hasStartResult() => $_has(5);
   @$pb.TagNumber(21)
   void clearStartResult() => clearField(21);
   @$pb.TagNumber(21)
-  $1.DownloadStartResult ensureStartResult() => $_ensure(5);
+  $6.DownloadStartResult ensureStartResult() => $_ensure(5);
 
   @$pb.TagNumber(22)
-  $1.DownloadProgress get progress => $_getN(6);
+  $6.DownloadProgress get progress => $_getN(6);
   @$pb.TagNumber(22)
-  set progress($1.DownloadProgress v) { setField(22, v); }
+  set progress($6.DownloadProgress v) { setField(22, v); }
   @$pb.TagNumber(22)
   $core.bool hasProgress() => $_has(6);
   @$pb.TagNumber(22)
   void clearProgress() => clearField(22);
   @$pb.TagNumber(22)
-  $1.DownloadProgress ensureProgress() => $_ensure(6);
+  $6.DownloadProgress ensureProgress() => $_ensure(6);
 
   @$pb.TagNumber(23)
-  $1.DownloadCancelResult get cancelResult => $_getN(7);
+  $6.DownloadCancelResult get cancelResult => $_getN(7);
   @$pb.TagNumber(23)
-  set cancelResult($1.DownloadCancelResult v) { setField(23, v); }
+  set cancelResult($6.DownloadCancelResult v) { setField(23, v); }
   @$pb.TagNumber(23)
   $core.bool hasCancelResult() => $_has(7);
   @$pb.TagNumber(23)
   void clearCancelResult() => clearField(23);
   @$pb.TagNumber(23)
-  $1.DownloadCancelResult ensureCancelResult() => $_ensure(7);
+  $6.DownloadCancelResult ensureCancelResult() => $_ensure(7);
 
   @$pb.TagNumber(24)
-  $1.DownloadResumeResult get resumeResult => $_getN(8);
+  $6.DownloadResumeResult get resumeResult => $_getN(8);
   @$pb.TagNumber(24)
-  set resumeResult($1.DownloadResumeResult v) { setField(24, v); }
+  set resumeResult($6.DownloadResumeResult v) { setField(24, v); }
   @$pb.TagNumber(24)
   $core.bool hasResumeResult() => $_has(8);
   @$pb.TagNumber(24)
   void clearResumeResult() => clearField(24);
   @$pb.TagNumber(24)
-  $1.DownloadResumeResult ensureResumeResult() => $_ensure(8);
+  $6.DownloadResumeResult ensureResumeResult() => $_ensure(8);
 }
 
 enum StorageLifecycleEvent_Result {
@@ -3287,10 +3550,10 @@ class StorageLifecycleEvent extends $pb.GeneratedMessage {
     $core.String? cacheKey,
     $fixnum.Int64? bytes,
     $core.String? error,
-    $2.StorageInfoResult? infoResult,
-    $2.StorageAvailabilityResult? availabilityResult,
-    $2.StorageDeletePlan? deletePlan,
-    $2.StorageDeleteResult? deleteResult,
+    $5.StorageInfoResult? infoResult,
+    $5.StorageAvailabilityResult? availabilityResult,
+    $5.StorageDeletePlan? deletePlan,
+    $5.StorageDeleteResult? deleteResult,
   }) {
     final $result = create();
     if (kind != null) {
@@ -3340,10 +3603,10 @@ class StorageLifecycleEvent extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'cacheKey')
     ..aInt64(4, _omitFieldNames ? '' : 'bytes')
     ..aOS(5, _omitFieldNames ? '' : 'error')
-    ..aOM<$2.StorageInfoResult>(20, _omitFieldNames ? '' : 'infoResult', subBuilder: $2.StorageInfoResult.create)
-    ..aOM<$2.StorageAvailabilityResult>(21, _omitFieldNames ? '' : 'availabilityResult', subBuilder: $2.StorageAvailabilityResult.create)
-    ..aOM<$2.StorageDeletePlan>(22, _omitFieldNames ? '' : 'deletePlan', subBuilder: $2.StorageDeletePlan.create)
-    ..aOM<$2.StorageDeleteResult>(23, _omitFieldNames ? '' : 'deleteResult', subBuilder: $2.StorageDeleteResult.create)
+    ..aOM<$5.StorageInfoResult>(20, _omitFieldNames ? '' : 'infoResult', subBuilder: $5.StorageInfoResult.create)
+    ..aOM<$5.StorageAvailabilityResult>(21, _omitFieldNames ? '' : 'availabilityResult', subBuilder: $5.StorageAvailabilityResult.create)
+    ..aOM<$5.StorageDeletePlan>(22, _omitFieldNames ? '' : 'deletePlan', subBuilder: $5.StorageDeletePlan.create)
+    ..aOM<$5.StorageDeleteResult>(23, _omitFieldNames ? '' : 'deleteResult', subBuilder: $5.StorageDeleteResult.create)
     ..hasRequiredFields = false
   ;
 
@@ -3417,48 +3680,48 @@ class StorageLifecycleEvent extends $pb.GeneratedMessage {
   void clearError() => clearField(5);
 
   @$pb.TagNumber(20)
-  $2.StorageInfoResult get infoResult => $_getN(5);
+  $5.StorageInfoResult get infoResult => $_getN(5);
   @$pb.TagNumber(20)
-  set infoResult($2.StorageInfoResult v) { setField(20, v); }
+  set infoResult($5.StorageInfoResult v) { setField(20, v); }
   @$pb.TagNumber(20)
   $core.bool hasInfoResult() => $_has(5);
   @$pb.TagNumber(20)
   void clearInfoResult() => clearField(20);
   @$pb.TagNumber(20)
-  $2.StorageInfoResult ensureInfoResult() => $_ensure(5);
+  $5.StorageInfoResult ensureInfoResult() => $_ensure(5);
 
   @$pb.TagNumber(21)
-  $2.StorageAvailabilityResult get availabilityResult => $_getN(6);
+  $5.StorageAvailabilityResult get availabilityResult => $_getN(6);
   @$pb.TagNumber(21)
-  set availabilityResult($2.StorageAvailabilityResult v) { setField(21, v); }
+  set availabilityResult($5.StorageAvailabilityResult v) { setField(21, v); }
   @$pb.TagNumber(21)
   $core.bool hasAvailabilityResult() => $_has(6);
   @$pb.TagNumber(21)
   void clearAvailabilityResult() => clearField(21);
   @$pb.TagNumber(21)
-  $2.StorageAvailabilityResult ensureAvailabilityResult() => $_ensure(6);
+  $5.StorageAvailabilityResult ensureAvailabilityResult() => $_ensure(6);
 
   @$pb.TagNumber(22)
-  $2.StorageDeletePlan get deletePlan => $_getN(7);
+  $5.StorageDeletePlan get deletePlan => $_getN(7);
   @$pb.TagNumber(22)
-  set deletePlan($2.StorageDeletePlan v) { setField(22, v); }
+  set deletePlan($5.StorageDeletePlan v) { setField(22, v); }
   @$pb.TagNumber(22)
   $core.bool hasDeletePlan() => $_has(7);
   @$pb.TagNumber(22)
   void clearDeletePlan() => clearField(22);
   @$pb.TagNumber(22)
-  $2.StorageDeletePlan ensureDeletePlan() => $_ensure(7);
+  $5.StorageDeletePlan ensureDeletePlan() => $_ensure(7);
 
   @$pb.TagNumber(23)
-  $2.StorageDeleteResult get deleteResult => $_getN(8);
+  $5.StorageDeleteResult get deleteResult => $_getN(8);
   @$pb.TagNumber(23)
-  set deleteResult($2.StorageDeleteResult v) { setField(23, v); }
+  set deleteResult($5.StorageDeleteResult v) { setField(23, v); }
   @$pb.TagNumber(23)
   $core.bool hasDeleteResult() => $_has(8);
   @$pb.TagNumber(23)
   void clearDeleteResult() => clearField(23);
   @$pb.TagNumber(23)
-  $2.StorageDeleteResult ensureDeleteResult() => $_ensure(8);
+  $5.StorageDeleteResult ensureDeleteResult() => $_ensure(8);
 }
 
 class HardwareRoutingEvent extends $pb.GeneratedMessage {
@@ -3470,7 +3733,7 @@ class HardwareRoutingEvent extends $pb.GeneratedMessage {
     $core.String? route,
     $core.String? reason,
     $core.String? error,
-    $3.HardwareProfileResult? hardwareProfile,
+    $7.HardwareProfileResult? hardwareProfile,
   }) {
     final $result = create();
     if (kind != null) {
@@ -3511,7 +3774,7 @@ class HardwareRoutingEvent extends $pb.GeneratedMessage {
     ..aOS(5, _omitFieldNames ? '' : 'route')
     ..aOS(6, _omitFieldNames ? '' : 'reason')
     ..aOS(7, _omitFieldNames ? '' : 'error')
-    ..aOM<$3.HardwareProfileResult>(20, _omitFieldNames ? '' : 'hardwareProfile', subBuilder: $3.HardwareProfileResult.create)
+    ..aOM<$7.HardwareProfileResult>(20, _omitFieldNames ? '' : 'hardwareProfile', subBuilder: $7.HardwareProfileResult.create)
     ..hasRequiredFields = false
   ;
 
@@ -3600,15 +3863,15 @@ class HardwareRoutingEvent extends $pb.GeneratedMessage {
   void clearError() => clearField(7);
 
   @$pb.TagNumber(20)
-  $3.HardwareProfileResult get hardwareProfile => $_getN(7);
+  $7.HardwareProfileResult get hardwareProfile => $_getN(7);
   @$pb.TagNumber(20)
-  set hardwareProfile($3.HardwareProfileResult v) { setField(20, v); }
+  set hardwareProfile($7.HardwareProfileResult v) { setField(20, v); }
   @$pb.TagNumber(20)
   $core.bool hasHardwareProfile() => $_has(7);
   @$pb.TagNumber(20)
   void clearHardwareProfile() => clearField(20);
   @$pb.TagNumber(20)
-  $3.HardwareProfileResult ensureHardwareProfile() => $_ensure(7);
+  $7.HardwareProfileResult ensureHardwareProfile() => $_ensure(7);
 }
 
 class CapabilityOperationEvent extends $pb.GeneratedMessage {
@@ -3997,7 +4260,7 @@ class FailureEvent extends $pb.GeneratedMessage {
   factory FailureEvent({
     SDKComponent? component,
     $core.String? operation,
-    $4.SDKError? error,
+    $8.SDKError? error,
     $core.bool? recoverable,
   }) {
     final $result = create();
@@ -4022,7 +4285,7 @@ class FailureEvent extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'FailureEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..e<SDKComponent>(1, _omitFieldNames ? '' : 'component', $pb.PbFieldType.OE, defaultOrMaker: SDKComponent.SDK_COMPONENT_UNSPECIFIED, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values)
     ..aOS(2, _omitFieldNames ? '' : 'operation')
-    ..aOM<$4.SDKError>(3, _omitFieldNames ? '' : 'error', subBuilder: $4.SDKError.create)
+    ..aOM<$8.SDKError>(3, _omitFieldNames ? '' : 'error', subBuilder: $8.SDKError.create)
     ..aOB(4, _omitFieldNames ? '' : 'recoverable')
     ..hasRequiredFields = false
   ;
@@ -4067,15 +4330,15 @@ class FailureEvent extends $pb.GeneratedMessage {
   void clearOperation() => clearField(2);
 
   @$pb.TagNumber(3)
-  $4.SDKError get error => $_getN(2);
+  $8.SDKError get error => $_getN(2);
   @$pb.TagNumber(3)
-  set error($4.SDKError v) { setField(3, v); }
+  set error($8.SDKError v) { setField(3, v); }
   @$pb.TagNumber(3)
   $core.bool hasError() => $_has(2);
   @$pb.TagNumber(3)
   void clearError() => clearField(3);
   @$pb.TagNumber(3)
-  $4.SDKError ensureError() => $_ensure(2);
+  $8.SDKError ensureError() => $_ensure(2);
 
   @$pb.TagNumber(4)
   $core.bool get recoverable => $_getBF(3);
@@ -4143,11 +4406,11 @@ class SDKEvent extends $pb.GeneratedMessage {
     EventDestination? destination,
     $core.Map<$core.String, $core.String>? properties,
     VoiceLifecycleEvent? voice,
-    $5.VoiceEvent? voicePipeline,
+    $9.VoiceEvent? voicePipeline,
     ComponentLifecycleEvent? componentLifecycle,
     EventCategory? category,
     SDKComponent? component,
-    $4.SDKError? error,
+    $8.SDKError? error,
     SessionEvent? session,
     AuthEvent? auth,
     ModelRegistryEvent? modelRegistry,
@@ -4158,6 +4421,10 @@ class SDKEvent extends $pb.GeneratedMessage {
     TelemetryEvent? telemetry,
     CancellationEvent? cancellation,
     FailureEvent? failure,
+    $core.String? operationId,
+    $core.String? correlationId,
+    $core.String? source,
+    $core.String? traceId,
   }) {
     final $result = create();
     if (timestampMs != null) {
@@ -4256,6 +4523,18 @@ class SDKEvent extends $pb.GeneratedMessage {
     if (failure != null) {
       $result.failure = failure;
     }
+    if (operationId != null) {
+      $result.operationId = operationId;
+    }
+    if (correlationId != null) {
+      $result.correlationId = correlationId;
+    }
+    if (source != null) {
+      $result.source = source;
+    }
+    if (traceId != null) {
+      $result.traceId = traceId;
+    }
     return $result;
   }
   SDKEvent._() : super();
@@ -4307,11 +4586,11 @@ class SDKEvent extends $pb.GeneratedMessage {
     ..e<EventDestination>(15, _omitFieldNames ? '' : 'destination', $pb.PbFieldType.OE, defaultOrMaker: EventDestination.EVENT_DESTINATION_UNSPECIFIED, valueOf: EventDestination.valueOf, enumValues: EventDestination.values)
     ..m<$core.String, $core.String>(16, _omitFieldNames ? '' : 'properties', entryClassName: 'SDKEvent.PropertiesEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
     ..aOM<VoiceLifecycleEvent>(17, _omitFieldNames ? '' : 'voice', subBuilder: VoiceLifecycleEvent.create)
-    ..aOM<$5.VoiceEvent>(18, _omitFieldNames ? '' : 'voicePipeline', subBuilder: $5.VoiceEvent.create)
+    ..aOM<$9.VoiceEvent>(18, _omitFieldNames ? '' : 'voicePipeline', subBuilder: $9.VoiceEvent.create)
     ..aOM<ComponentLifecycleEvent>(19, _omitFieldNames ? '' : 'componentLifecycle', subBuilder: ComponentLifecycleEvent.create)
     ..e<EventCategory>(20, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: EventCategory.EVENT_CATEGORY_UNSPECIFIED, valueOf: EventCategory.valueOf, enumValues: EventCategory.values)
     ..e<SDKComponent>(21, _omitFieldNames ? '' : 'component', $pb.PbFieldType.OE, defaultOrMaker: SDKComponent.SDK_COMPONENT_UNSPECIFIED, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values)
-    ..aOM<$4.SDKError>(22, _omitFieldNames ? '' : 'error', subBuilder: $4.SDKError.create)
+    ..aOM<$8.SDKError>(22, _omitFieldNames ? '' : 'error', subBuilder: $8.SDKError.create)
     ..aOM<SessionEvent>(23, _omitFieldNames ? '' : 'session', subBuilder: SessionEvent.create)
     ..aOM<AuthEvent>(24, _omitFieldNames ? '' : 'auth', subBuilder: AuthEvent.create)
     ..aOM<ModelRegistryEvent>(25, _omitFieldNames ? '' : 'modelRegistry', subBuilder: ModelRegistryEvent.create)
@@ -4322,6 +4601,10 @@ class SDKEvent extends $pb.GeneratedMessage {
     ..aOM<TelemetryEvent>(30, _omitFieldNames ? '' : 'telemetry', subBuilder: TelemetryEvent.create)
     ..aOM<CancellationEvent>(31, _omitFieldNames ? '' : 'cancellation', subBuilder: CancellationEvent.create)
     ..aOM<FailureEvent>(32, _omitFieldNames ? '' : 'failure', subBuilder: FailureEvent.create)
+    ..aOS(33, _omitFieldNames ? '' : 'operationId')
+    ..aOS(34, _omitFieldNames ? '' : 'correlationId')
+    ..aOS(35, _omitFieldNames ? '' : 'source')
+    ..aOS(36, _omitFieldNames ? '' : 'traceId')
     ..hasRequiredFields = false
   ;
 
@@ -4528,15 +4811,15 @@ class SDKEvent extends $pb.GeneratedMessage {
   VoiceLifecycleEvent ensureVoice() => $_ensure(16);
 
   @$pb.TagNumber(18)
-  $5.VoiceEvent get voicePipeline => $_getN(17);
+  $9.VoiceEvent get voicePipeline => $_getN(17);
   @$pb.TagNumber(18)
-  set voicePipeline($5.VoiceEvent v) { setField(18, v); }
+  set voicePipeline($9.VoiceEvent v) { setField(18, v); }
   @$pb.TagNumber(18)
   $core.bool hasVoicePipeline() => $_has(17);
   @$pb.TagNumber(18)
   void clearVoicePipeline() => clearField(18);
   @$pb.TagNumber(18)
-  $5.VoiceEvent ensureVoicePipeline() => $_ensure(17);
+  $9.VoiceEvent ensureVoicePipeline() => $_ensure(17);
 
   @$pb.TagNumber(19)
   ComponentLifecycleEvent get componentLifecycle => $_getN(18);
@@ -4570,15 +4853,15 @@ class SDKEvent extends $pb.GeneratedMessage {
   /// Typed failure details for any failed event. When the event itself is
   /// only an error notification, use the failure oneof arm below.
   @$pb.TagNumber(22)
-  $4.SDKError get error => $_getN(21);
+  $8.SDKError get error => $_getN(21);
   @$pb.TagNumber(22)
-  set error($4.SDKError v) { setField(22, v); }
+  set error($8.SDKError v) { setField(22, v); }
   @$pb.TagNumber(22)
   $core.bool hasError() => $_has(21);
   @$pb.TagNumber(22)
   void clearError() => clearField(22);
   @$pb.TagNumber(22)
-  $4.SDKError ensureError() => $_ensure(21);
+  $8.SDKError ensureError() => $_ensure(21);
 
   @$pb.TagNumber(23)
   SessionEvent get session => $_getN(22);
@@ -4689,6 +4972,463 @@ class SDKEvent extends $pb.GeneratedMessage {
   void clearFailure() => clearField(32);
   @$pb.TagNumber(32)
   FailureEvent ensureFailure() => $_ensure(31);
+
+  /// Logical operation identifier for this event, e.g. "download.start",
+  /// "model.load", or "llm.generate". This is separate from the event UUID
+  /// so retry/cancel/progress/failure events can share one operation id.
+  @$pb.TagNumber(33)
+  $core.String get operationId => $_getSZ(32);
+  @$pb.TagNumber(33)
+  set operationId($core.String v) { $_setString(32, v); }
+  @$pb.TagNumber(33)
+  $core.bool hasOperationId() => $_has(32);
+  @$pb.TagNumber(33)
+  void clearOperationId() => clearField(33);
+
+  /// Cross-service correlation key supplied by the SDK/app or generated by
+  /// the portable layer. Native/Web adapters may propagate it through HTTP
+  /// headers or OS task metadata, but C++ owns the canonical event field.
+  @$pb.TagNumber(34)
+  $core.String get correlationId => $_getSZ(33);
+  @$pb.TagNumber(34)
+  set correlationId($core.String v) { $_setString(33, v); }
+  @$pb.TagNumber(34)
+  $core.bool hasCorrelationId() => $_has(33);
+  @$pb.TagNumber(34)
+  void clearCorrelationId() => clearField(34);
+
+  /// Source that emitted the event: "cpp", "swift", "kotlin", "flutter",
+  /// "react_native", "web", or a backend/plugin key. This disambiguates
+  /// platform adapter facts from portable orchestration events.
+  @$pb.TagNumber(35)
+  $core.String get source => $_getSZ(34);
+  @$pb.TagNumber(35)
+  set source($core.String v) { $_setString(34, v); }
+  @$pb.TagNumber(35)
+  $core.bool hasSource() => $_has(34);
+  @$pb.TagNumber(35)
+  void clearSource() => clearField(35);
+
+  /// Optional tracing identifier for diagnostics. Empty when tracing is not
+  /// enabled; do not use it as a business key.
+  @$pb.TagNumber(36)
+  $core.String get traceId => $_getSZ(35);
+  @$pb.TagNumber(36)
+  set traceId($core.String v) { $_setString(35, v); }
+  @$pb.TagNumber(36)
+  $core.bool hasTraceId() => $_has(35);
+  @$pb.TagNumber(36)
+  void clearTraceId() => clearField(36);
+}
+
+/// Subscription-side filter for the canonical SDKEvent stream. Empty fields are
+/// wildcards; implementations match populated fields against the envelope fields
+/// above without interpreting payload-specific data.
+class SDKEventFilter extends $pb.GeneratedMessage {
+  factory SDKEventFilter({
+    $core.Iterable<EventCategory>? categories,
+    $core.Iterable<SDKComponent>? components,
+    $core.Iterable<EventDestination>? destinations,
+    EventSeverity? minimumSeverity,
+    $core.String? sessionId,
+    $core.String? operationId,
+    $core.String? correlationId,
+    $core.String? source,
+    $core.String? traceId,
+  }) {
+    final $result = create();
+    if (categories != null) {
+      $result.categories.addAll(categories);
+    }
+    if (components != null) {
+      $result.components.addAll(components);
+    }
+    if (destinations != null) {
+      $result.destinations.addAll(destinations);
+    }
+    if (minimumSeverity != null) {
+      $result.minimumSeverity = minimumSeverity;
+    }
+    if (sessionId != null) {
+      $result.sessionId = sessionId;
+    }
+    if (operationId != null) {
+      $result.operationId = operationId;
+    }
+    if (correlationId != null) {
+      $result.correlationId = correlationId;
+    }
+    if (source != null) {
+      $result.source = source;
+    }
+    if (traceId != null) {
+      $result.traceId = traceId;
+    }
+    return $result;
+  }
+  SDKEventFilter._() : super();
+  factory SDKEventFilter.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory SDKEventFilter.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'SDKEventFilter', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..pc<EventCategory>(1, _omitFieldNames ? '' : 'categories', $pb.PbFieldType.KE, valueOf: EventCategory.valueOf, enumValues: EventCategory.values, defaultEnumValue: EventCategory.EVENT_CATEGORY_UNSPECIFIED)
+    ..pc<SDKComponent>(2, _omitFieldNames ? '' : 'components', $pb.PbFieldType.KE, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values, defaultEnumValue: SDKComponent.SDK_COMPONENT_UNSPECIFIED)
+    ..pc<EventDestination>(3, _omitFieldNames ? '' : 'destinations', $pb.PbFieldType.KE, valueOf: EventDestination.valueOf, enumValues: EventDestination.values, defaultEnumValue: EventDestination.EVENT_DESTINATION_UNSPECIFIED)
+    ..e<EventSeverity>(4, _omitFieldNames ? '' : 'minimumSeverity', $pb.PbFieldType.OE, defaultOrMaker: EventSeverity.EVENT_SEVERITY_DEBUG, valueOf: EventSeverity.valueOf, enumValues: EventSeverity.values)
+    ..aOS(5, _omitFieldNames ? '' : 'sessionId')
+    ..aOS(6, _omitFieldNames ? '' : 'operationId')
+    ..aOS(7, _omitFieldNames ? '' : 'correlationId')
+    ..aOS(8, _omitFieldNames ? '' : 'source')
+    ..aOS(9, _omitFieldNames ? '' : 'traceId')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  SDKEventFilter clone() => SDKEventFilter()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  SDKEventFilter copyWith(void Function(SDKEventFilter) updates) => super.copyWith((message) => updates(message as SDKEventFilter)) as SDKEventFilter;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SDKEventFilter create() => SDKEventFilter._();
+  SDKEventFilter createEmptyInstance() => create();
+  static $pb.PbList<SDKEventFilter> createRepeated() => $pb.PbList<SDKEventFilter>();
+  @$core.pragma('dart2js:noInline')
+  static SDKEventFilter getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SDKEventFilter>(create);
+  static SDKEventFilter? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<EventCategory> get categories => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $core.List<SDKComponent> get components => $_getList(1);
+
+  @$pb.TagNumber(3)
+  $core.List<EventDestination> get destinations => $_getList(2);
+
+  @$pb.TagNumber(4)
+  EventSeverity get minimumSeverity => $_getN(3);
+  @$pb.TagNumber(4)
+  set minimumSeverity(EventSeverity v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasMinimumSeverity() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMinimumSeverity() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get sessionId => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set sessionId($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasSessionId() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSessionId() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get operationId => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set operationId($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasOperationId() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearOperationId() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get correlationId => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set correlationId($core.String v) { $_setString(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasCorrelationId() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearCorrelationId() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get source => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set source($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasSource() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearSource() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get traceId => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set traceId($core.String v) { $_setString(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasTraceId() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearTraceId() => clearField(9);
+}
+
+class SDKEventPublishRequest extends $pb.GeneratedMessage {
+  factory SDKEventPublishRequest({
+    SDKEvent? event,
+    $core.bool? normalizeEnvelope,
+  }) {
+    final $result = create();
+    if (event != null) {
+      $result.event = event;
+    }
+    if (normalizeEnvelope != null) {
+      $result.normalizeEnvelope = normalizeEnvelope;
+    }
+    return $result;
+  }
+  SDKEventPublishRequest._() : super();
+  factory SDKEventPublishRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory SDKEventPublishRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'SDKEventPublishRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOM<SDKEvent>(1, _omitFieldNames ? '' : 'event', subBuilder: SDKEvent.create)
+    ..aOB(2, _omitFieldNames ? '' : 'normalizeEnvelope')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  SDKEventPublishRequest clone() => SDKEventPublishRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  SDKEventPublishRequest copyWith(void Function(SDKEventPublishRequest) updates) => super.copyWith((message) => updates(message as SDKEventPublishRequest)) as SDKEventPublishRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SDKEventPublishRequest create() => SDKEventPublishRequest._();
+  SDKEventPublishRequest createEmptyInstance() => create();
+  static $pb.PbList<SDKEventPublishRequest> createRepeated() => $pb.PbList<SDKEventPublishRequest>();
+  @$core.pragma('dart2js:noInline')
+  static SDKEventPublishRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SDKEventPublishRequest>(create);
+  static SDKEventPublishRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  SDKEvent get event => $_getN(0);
+  @$pb.TagNumber(1)
+  set event(SDKEvent v) { setField(1, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasEvent() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearEvent() => clearField(1);
+  @$pb.TagNumber(1)
+  SDKEvent ensureEvent() => $_ensure(0);
+
+  /// When true, the portable event layer fills missing envelope metadata such
+  /// as id, timestamp, destination, category/component defaults, source, and
+  /// correlation fields before routing the event.
+  @$pb.TagNumber(2)
+  $core.bool get normalizeEnvelope => $_getBF(1);
+  @$pb.TagNumber(2)
+  set normalizeEnvelope($core.bool v) { $_setBool(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasNormalizeEnvelope() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearNormalizeEnvelope() => clearField(2);
+}
+
+class SDKEventPublishResult extends $pb.GeneratedMessage {
+  factory SDKEventPublishResult({
+    $core.bool? accepted,
+    $core.String? eventId,
+    SDKEvent? normalizedEvent,
+    $core.String? errorMessage,
+    $8.SDKError? error,
+  }) {
+    final $result = create();
+    if (accepted != null) {
+      $result.accepted = accepted;
+    }
+    if (eventId != null) {
+      $result.eventId = eventId;
+    }
+    if (normalizedEvent != null) {
+      $result.normalizedEvent = normalizedEvent;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (error != null) {
+      $result.error = error;
+    }
+    return $result;
+  }
+  SDKEventPublishResult._() : super();
+  factory SDKEventPublishResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory SDKEventPublishResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'SDKEventPublishResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'accepted')
+    ..aOS(2, _omitFieldNames ? '' : 'eventId')
+    ..aOM<SDKEvent>(3, _omitFieldNames ? '' : 'normalizedEvent', subBuilder: SDKEvent.create)
+    ..aOS(4, _omitFieldNames ? '' : 'errorMessage')
+    ..aOM<$8.SDKError>(5, _omitFieldNames ? '' : 'error', subBuilder: $8.SDKError.create)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  SDKEventPublishResult clone() => SDKEventPublishResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  SDKEventPublishResult copyWith(void Function(SDKEventPublishResult) updates) => super.copyWith((message) => updates(message as SDKEventPublishResult)) as SDKEventPublishResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SDKEventPublishResult create() => SDKEventPublishResult._();
+  SDKEventPublishResult createEmptyInstance() => create();
+  static $pb.PbList<SDKEventPublishResult> createRepeated() => $pb.PbList<SDKEventPublishResult>();
+  @$core.pragma('dart2js:noInline')
+  static SDKEventPublishResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SDKEventPublishResult>(create);
+  static SDKEventPublishResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get accepted => $_getBF(0);
+  @$pb.TagNumber(1)
+  set accepted($core.bool v) { $_setBool(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasAccepted() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAccepted() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get eventId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set eventId($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasEventId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEventId() => clearField(2);
+
+  /// The event as accepted by the portable layer after optional envelope
+  /// normalization. This is the same typed payload that serialized-proto
+  /// bridges publish to subscribers.
+  @$pb.TagNumber(3)
+  SDKEvent get normalizedEvent => $_getN(2);
+  @$pb.TagNumber(3)
+  set normalizedEvent(SDKEvent v) { setField(3, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasNormalizedEvent() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearNormalizedEvent() => clearField(3);
+  @$pb.TagNumber(3)
+  SDKEvent ensureNormalizedEvent() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  $core.String get errorMessage => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set errorMessage($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasErrorMessage() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearErrorMessage() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $8.SDKError get error => $_getN(4);
+  @$pb.TagNumber(5)
+  set error($8.SDKError v) { setField(5, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasError() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearError() => clearField(5);
+  @$pb.TagNumber(5)
+  $8.SDKError ensureError() => $_ensure(4);
+}
+
+class SDKEventSubscribeRequest extends $pb.GeneratedMessage {
+  factory SDKEventSubscribeRequest({
+    SDKEventFilter? filter,
+    $core.bool? replayQueuedEvents,
+  }) {
+    final $result = create();
+    if (filter != null) {
+      $result.filter = filter;
+    }
+    if (replayQueuedEvents != null) {
+      $result.replayQueuedEvents = replayQueuedEvents;
+    }
+    return $result;
+  }
+  SDKEventSubscribeRequest._() : super();
+  factory SDKEventSubscribeRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory SDKEventSubscribeRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'SDKEventSubscribeRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOM<SDKEventFilter>(1, _omitFieldNames ? '' : 'filter', subBuilder: SDKEventFilter.create)
+    ..aOB(2, _omitFieldNames ? '' : 'replayQueuedEvents')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  SDKEventSubscribeRequest clone() => SDKEventSubscribeRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  SDKEventSubscribeRequest copyWith(void Function(SDKEventSubscribeRequest) updates) => super.copyWith((message) => updates(message as SDKEventSubscribeRequest)) as SDKEventSubscribeRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static SDKEventSubscribeRequest create() => SDKEventSubscribeRequest._();
+  SDKEventSubscribeRequest createEmptyInstance() => create();
+  static $pb.PbList<SDKEventSubscribeRequest> createRepeated() => $pb.PbList<SDKEventSubscribeRequest>();
+  @$core.pragma('dart2js:noInline')
+  static SDKEventSubscribeRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SDKEventSubscribeRequest>(create);
+  static SDKEventSubscribeRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  SDKEventFilter get filter => $_getN(0);
+  @$pb.TagNumber(1)
+  set filter(SDKEventFilter v) { setField(1, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasFilter() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearFilter() => clearField(1);
+  @$pb.TagNumber(1)
+  SDKEventFilter ensureFilter() => $_ensure(0);
+
+  /// Replays queued events before following live events when the backing
+  /// bridge has a poll queue. Implementations without retention may ignore it
+  /// and continue with live events only.
+  @$pb.TagNumber(2)
+  $core.bool get replayQueuedEvents => $_getBF(1);
+  @$pb.TagNumber(2)
+  set replayQueuedEvents($core.bool v) { $_setBool(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasReplayQueuedEvents() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearReplayQueuedEvents() => clearField(2);
+}
+
+class SDKEventsApi {
+  $pb.RpcClient _client;
+  SDKEventsApi(this._client);
+
+  $async.Future<SDKEventPublishResult> publish($pb.ClientContext? ctx, SDKEventPublishRequest request) =>
+    _client.invoke<SDKEventPublishResult>(ctx, 'SDKEvents', 'Publish', request, SDKEventPublishResult())
+  ;
+  $async.Future<SDKEvent> subscribe($pb.ClientContext? ctx, SDKEventSubscribeRequest request) =>
+    _client.invoke<SDKEvent>(ctx, 'SDKEvents', 'Subscribe', request, SDKEvent())
+  ;
 }
 
 

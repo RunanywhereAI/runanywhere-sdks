@@ -29,8 +29,6 @@ import 'package:runanywhere/public/capabilities/runanywhere_stt.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_tts.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_vad.dart';
 
-typedef VoiceAgentConfiguration = voice_agent_proto.VoiceAgentComposeConfig;
-
 /// Voice Agent capability surface.
 ///
 /// Access via `RunAnywhereSDK.instance.voice`.
@@ -73,11 +71,13 @@ class RunAnywhereVoice {
     }
   }
 
-  /// Initialize the voice agent from a [VoiceAgentConfiguration]. Loads
+  /// Initialize the voice agent from a [voice_agent_proto.VoiceAgentComposeConfig]. Loads
   /// the STT/LLM/TTS models referenced by the config, optionally
   /// initializes VAD, then performs the standard handle init. Mirrors
   /// Swift's `RunAnywhere.initializeVoiceAgent(_ config:)`.
-  Future<void> initializeVoiceAgent(VoiceAgentConfiguration config) async {
+  Future<void> initializeVoiceAgent(
+    voice_agent_proto.VoiceAgentComposeConfig config,
+  ) async {
     final logger = SDKLogger('RunAnywhere.VoiceAgent');
 
     if (config.hasSttModelId()) {

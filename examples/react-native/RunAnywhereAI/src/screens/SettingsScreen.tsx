@@ -47,8 +47,12 @@ import {
   SETTINGS_CONSTRAINTS,
   GENERATION_SETTINGS_KEYS,
 } from '../types/settings';
-import { LLMFramework, FrameworkDisplayNames } from '../types/model';
 import { safeEvaluateExpression } from '../utils/mathParser';
+import {
+  getFrameworkDisplayName,
+  getModelDownloadSizeBytes,
+  getPrimaryFramework,
+} from '../utils/modelDisplay';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import {
@@ -60,6 +64,14 @@ import {
   type ModelInfo,
   type HardwareProfileResult,
 } from '@runanywhere/core';
+import { ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
+
+// Canonical SDK methods (Swift / Kotlin / Flutter / Web parity).
+const cancelDownloadHelper = RunAnywhere.cancelDownload;
+const deleteModelHelper = RunAnywhere.deleteModel;
+const downloadModelHelper = RunAnywhere.downloadModel;
+const getAvailableModels = RunAnywhere.getAvailableModels;
+const getDownloadedModels = RunAnywhere.getDownloadedModels;
 
 // Storage keys for API configuration
 const STORAGE_KEYS = {
@@ -329,7 +341,7 @@ export const SettingsScreen: React.FC = () => {
     RunAnywhere.clearTools(); // Weather tool - Real API (wttr.in - no key needed)
 
     RunAnywhere.registerTool(
-      {
+      ToolDefinition.fromPartial({
         name: 'get_weather',
         description: 'Gets the current weather for a city or location',
         parameters: [
@@ -342,7 +354,7 @@ export const SettingsScreen: React.FC = () => {
             enumValues: [],
           },
         ],
-      },
+      }),
       async (args: Record<string, unknown>) => {
         const location = (args.location as string) || 'San Francisco';
         try {
@@ -367,11 +379,11 @@ export const SettingsScreen: React.FC = () => {
     ); // Time tool - Real system time
 
     RunAnywhere.registerTool(
-      {
+      ToolDefinition.fromPartial({
         name: 'get_current_time',
         description: 'Gets the current date, time, and timezone information',
         parameters: [],
-      },
+      }),
       async () => {
         const now = new Date();
         return {
@@ -384,7 +396,7 @@ export const SettingsScreen: React.FC = () => {
     ); // Calculator tool - Math evaluation
 
     RunAnywhere.registerTool(
-      {
+      ToolDefinition.fromPartial({
         name: 'calculate',
         description:
           'Performs math calculations. Supports +, -, *, /, and parentheses',
@@ -397,7 +409,7 @@ export const SettingsScreen: React.FC = () => {
             enumValues: [],
           },
         ],
-      },
+      }),
       async (args: Record<string, unknown>) => {
         const expression = (args.expression as string) || '0';
         try {
@@ -549,7 +561,7 @@ export const SettingsScreen: React.FC = () => {
       ); // Get available models from catalog
 
       try {
-        const available = await RunAnywhere.getAvailableModels();
+        const available = await getAvailableModels();
         console.warn('[Settings] Available models:', available);
         setAvailableModels(available);
       } catch (err) {
@@ -557,7 +569,7 @@ export const SettingsScreen: React.FC = () => {
       } // Get downloaded models
 
       try {
-        const downloaded = await RunAnywhere.getDownloadedModels();
+        const downloaded = await getDownloadedModels();
         console.warn('[Settings] Downloaded models:', downloaded);
         setDownloadedModels(downloaded);
       } catch (err) {
@@ -567,13 +579,15 @@ export const SettingsScreen: React.FC = () => {
       try {
         const storage = await RunAnywhere.getStorageInfo();
         console.warn('[Settings] Storage info:', storage);
-        setStorageInfo({
-          totalStorage: storage.deviceStorage.totalSpace,
-          appStorage: storage.appStorage.totalSize,
-          modelsStorage: storage.modelStorage.totalSize,
-          cacheSize: storage.cacheSize,
-          freeSpace: storage.deviceStorage.freeSpace,
-        });
+        if (storage) {
+          setStorageInfo({
+            totalStorage: storage.device?.totalBytes ?? 0,
+            appStorage: storage.app?.totalBytes ?? 0,
+            modelsStorage: storage.totalModelsBytes,
+            cacheSize: storage.app?.cacheBytes ?? 0,
+            freeSpace: storage.device?.freeBytes ?? 0,
+          });
+        }
       } catch (err) {
         console.warn('[Settings] Failed to get storage info:', err);
       }
@@ -668,7 +682,7 @@ export const SettingsScreen: React.FC = () => {
       if (downloadingModels[model.id] !== undefined) {
         // Already downloading, cancel it
         try {
-          await RunAnywhere.cancelDownload(model.id);
+          await cancelDownloadHelper(model.id);
           setDownloadingModels((prev) => {
             const updated = { ...prev };
             delete updated[model.id];
@@ -684,7 +698,7 @@ export const SettingsScreen: React.FC = () => {
 
       try {
         // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
-        const dlIter = RunAnywhere.downloadModel(model.id)[Symbol.asyncIterator]();
+        const dlIter = downloadModelHelper(model.id)[Symbol.asyncIterator]();
         let dlResult = await dlIter.next();
         while (!dlResult.done) {
           const progress = dlResult.value;
@@ -729,7 +743,7 @@ export const SettingsScreen: React.FC = () => {
       // Prefer the downloaded model's size (reported by the SDK after download)
       // over the catalog's expected downloadSize.
       const freedSize =
-        downloadedModel?.downloadSize ?? model.downloadSize ?? 0;
+        getModelDownloadSizeBytes(downloadedModel ?? model);
 
       Alert.alert(
         'Delete Model',
@@ -741,7 +755,7 @@ export const SettingsScreen: React.FC = () => {
             style: 'destructive',
             onPress: async () => {
               try {
-                await RunAnywhere.deleteModel(model.id);
+                await deleteModelHelper(model.id);
                 Alert.alert('Deleted', `${model.name} has been deleted.`);
                 loadData(); // Refresh list
               } catch (err) {
@@ -891,19 +905,12 @@ export const SettingsScreen: React.FC = () => {
   const renderCatalogModelRow = (model: ModelInfo) => {
     const isDownloading = downloadingModels[model.id] !== undefined;
     const downloadProgress = downloadingModels[model.id] || 0;
-    const isDownloaded = downloadedModels.some((m) => m.id === model.id); // Determine framework based on format
-
-    const framework =
-      String(model.format).toLowerCase().includes('onnx')
-        ? LLMFramework.ONNX
-        : LLMFramework.LlamaCpp;
-    const frameworkName = FrameworkDisplayNames[framework] || framework; // Get model size estimate based on download size (may differ from actual on-disk size)
+    const isDownloaded = downloadedModels.some((m) => m.id === model.id);
+    const frameworkName = getFrameworkDisplayName(getPrimaryFramework(model));
 
     const downloadedModel = downloadedModels.find((m) => m.id === model.id);
     const modelSize =
-      downloadedModel?.downloadSize ?? // Prefer size from downloaded model when available
-      model.downloadSize ?? // Fall back to catalog's expected download size
-      0;
+      getModelDownloadSizeBytes(downloadedModel ?? model);
     return (
       <View key={model.id} style={styles.catalogModelRow}>
         <View style={styles.catalogModelInfo}>

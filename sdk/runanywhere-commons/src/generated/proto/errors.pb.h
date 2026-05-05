@@ -794,12 +794,15 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SDKError final : public ::google::p
     kMessageFieldNumber = 3,
     kNestedMessageFieldNumber = 6,
     kComponentFieldNumber = 9,
+    kRemediationHintFieldNumber = 11,
+    kCorrelationIdFieldNumber = 12,
     kContextFieldNumber = 4,
     kCodeFieldNumber = 1,
     kCategoryFieldNumber = 2,
     kCAbiCodeFieldNumber = 5,
     kSeverityFieldNumber = 8,
     kTimestampMsFieldNumber = 7,
+    kRetryableFieldNumber = 10,
   };
   // string message = 3;
   void clear_message() ;
@@ -846,6 +849,36 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SDKError final : public ::google::p
   const ::std::string& _internal_component() const;
   PROTOBUF_ALWAYS_INLINE void _internal_set_component(const ::std::string& value);
   ::std::string* PROTOBUF_NONNULL _internal_mutable_component();
+
+  public:
+  // string remediation_hint = 11;
+  void clear_remediation_hint() ;
+  [[nodiscard]] const ::std::string& remediation_hint() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_remediation_hint(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_remediation_hint();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_remediation_hint();
+  void set_allocated_remediation_hint(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_remediation_hint() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_remediation_hint(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_remediation_hint();
+
+  public:
+  // string correlation_id = 12;
+  void clear_correlation_id() ;
+  [[nodiscard]] const ::std::string& correlation_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_correlation_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_correlation_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_correlation_id();
+  void set_allocated_correlation_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_correlation_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_correlation_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_correlation_id();
 
   public:
   // optional .runanywhere.v1.ErrorContext context = 4;
@@ -916,12 +949,22 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SDKError final : public ::google::p
   void _internal_set_timestamp_ms(::int64_t value);
 
   public:
+  // bool retryable = 10;
+  void clear_retryable() ;
+  [[nodiscard]] bool retryable() const;
+  void set_retryable(bool value);
+
+  private:
+  bool _internal_retryable() const;
+  void _internal_set_retryable(bool value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.SDKError)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<4, 9,
-                                   1, 70,
+  static const ::google::protobuf::internal::TcParseTable<4, 12,
+                                   1, 100,
                                    2>
       _table_;
 
@@ -947,12 +990,15 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED SDKError final : public ::google::p
     ::google::protobuf::internal::ArenaStringPtr message_;
     ::google::protobuf::internal::ArenaStringPtr nested_message_;
     ::google::protobuf::internal::ArenaStringPtr component_;
+    ::google::protobuf::internal::ArenaStringPtr remediation_hint_;
+    ::google::protobuf::internal::ArenaStringPtr correlation_id_;
     ::runanywhere::v1::ErrorContext* PROTOBUF_NULLABLE context_;
     int code_;
     int category_;
     ::int32_t c_abi_code_;
     int severity_;
     ::int64_t timestamp_ms_;
+    bool retryable_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1187,7 +1233,7 @@ inline void SDKError::clear_code() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.code_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000010U);
+                  0x00000040U);
 }
 inline ::runanywhere::v1::ErrorCode SDKError::code() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SDKError.code)
@@ -1195,7 +1241,7 @@ inline ::runanywhere::v1::ErrorCode SDKError::code() const {
 }
 inline void SDKError::set_code(::runanywhere::v1::ErrorCode value) {
   _internal_set_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SDKError.code)
 }
 inline ::runanywhere::v1::ErrorCode SDKError::_internal_code() const {
@@ -1212,7 +1258,7 @@ inline void SDKError::clear_category() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.category_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000020U);
+                  0x00000080U);
 }
 inline ::runanywhere::v1::ErrorCategory SDKError::category() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SDKError.category)
@@ -1220,7 +1266,7 @@ inline ::runanywhere::v1::ErrorCategory SDKError::category() const {
 }
 inline void SDKError::set_category(::runanywhere::v1::ErrorCategory value) {
   _internal_set_category(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SDKError.category)
 }
 inline ::runanywhere::v1::ErrorCategory SDKError::_internal_category() const {
@@ -1299,7 +1345,7 @@ inline void SDKError::set_allocated_message(::std::string* PROTOBUF_NULLABLE val
 
 // optional .runanywhere.v1.ErrorContext context = 4;
 inline bool SDKError::has_context() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000020U);
   PROTOBUF_ASSUME(!value || _impl_.context_ != nullptr);
   return value;
 }
@@ -1307,7 +1353,7 @@ inline void SDKError::clear_context() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.context_ != nullptr) _impl_.context_->Clear();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000008U);
+                  0x00000020U);
 }
 inline const ::runanywhere::v1::ErrorContext& SDKError::_internal_context() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -1326,16 +1372,16 @@ inline void SDKError::unsafe_arena_set_allocated_context(
   }
   _impl_.context_ = reinterpret_cast<::runanywhere::v1::ErrorContext*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.SDKError.context)
 }
 inline ::runanywhere::v1::ErrorContext* PROTOBUF_NULLABLE SDKError::release_context() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   ::runanywhere::v1::ErrorContext* released = _impl_.context_;
   _impl_.context_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -1355,7 +1401,7 @@ inline ::runanywhere::v1::ErrorContext* PROTOBUF_NULLABLE SDKError::unsafe_arena
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.SDKError.context)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   ::runanywhere::v1::ErrorContext* temp = _impl_.context_;
   _impl_.context_ = nullptr;
   return temp;
@@ -1370,7 +1416,7 @@ inline ::runanywhere::v1::ErrorContext* PROTOBUF_NONNULL SDKError::_internal_mut
 }
 inline ::runanywhere::v1::ErrorContext* PROTOBUF_NONNULL SDKError::mutable_context()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   ::runanywhere::v1::ErrorContext* _msg = _internal_mutable_context();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.SDKError.context)
   return _msg;
@@ -1387,9 +1433,9 @@ inline void SDKError::set_allocated_context(::runanywhere::v1::ErrorContext* PRO
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
   }
 
   _impl_.context_ = reinterpret_cast<::runanywhere::v1::ErrorContext*>(value);
@@ -1398,14 +1444,14 @@ inline void SDKError::set_allocated_context(::runanywhere::v1::ErrorContext* PRO
 
 // optional int32 c_abi_code = 5;
 inline bool SDKError::has_c_abi_code() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000100U);
   return value;
 }
 inline void SDKError::clear_c_abi_code() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.c_abi_code_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000040U);
+                  0x00000100U);
 }
 inline ::int32_t SDKError::c_abi_code() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SDKError.c_abi_code)
@@ -1413,7 +1459,7 @@ inline ::int32_t SDKError::c_abi_code() const {
 }
 inline void SDKError::set_c_abi_code(::int32_t value) {
   _internal_set_c_abi_code(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SDKError.c_abi_code)
 }
 inline ::int32_t SDKError::_internal_c_abi_code() const {
@@ -1499,7 +1545,7 @@ inline void SDKError::clear_timestamp_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.timestamp_ms_ = ::int64_t{0};
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000100U);
+                  0x00000400U);
 }
 inline ::int64_t SDKError::timestamp_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SDKError.timestamp_ms)
@@ -1507,7 +1553,7 @@ inline ::int64_t SDKError::timestamp_ms() const {
 }
 inline void SDKError::set_timestamp_ms(::int64_t value) {
   _internal_set_timestamp_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SDKError.timestamp_ms)
 }
 inline ::int64_t SDKError::_internal_timestamp_ms() const {
@@ -1524,7 +1570,7 @@ inline void SDKError::clear_severity() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.severity_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000080U);
+                  0x00000200U);
 }
 inline ::runanywhere::v1::ErrorSeverity SDKError::severity() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.SDKError.severity)
@@ -1532,7 +1578,7 @@ inline ::runanywhere::v1::ErrorSeverity SDKError::severity() const {
 }
 inline void SDKError::set_severity(::runanywhere::v1::ErrorSeverity value) {
   _internal_set_severity(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.SDKError.severity)
 }
 inline ::runanywhere::v1::ErrorSeverity SDKError::_internal_severity() const {
@@ -1607,6 +1653,161 @@ inline void SDKError::set_allocated_component(::std::string* PROTOBUF_NULLABLE v
     _impl_.component_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SDKError.component)
+}
+
+// bool retryable = 10;
+inline void SDKError::clear_retryable() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.retryable_ = false;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000800U);
+}
+inline bool SDKError::retryable() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SDKError.retryable)
+  return _internal_retryable();
+}
+inline void SDKError::set_retryable(bool value) {
+  _internal_set_retryable(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SDKError.retryable)
+}
+inline bool SDKError::_internal_retryable() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.retryable_;
+}
+inline void SDKError::_internal_set_retryable(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.retryable_ = value;
+}
+
+// string remediation_hint = 11;
+inline void SDKError::clear_remediation_hint() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.remediation_hint_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline const ::std::string& SDKError::remediation_hint() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SDKError.remediation_hint)
+  return _internal_remediation_hint();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void SDKError::set_remediation_hint(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  _impl_.remediation_hint_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SDKError.remediation_hint)
+}
+inline ::std::string* PROTOBUF_NONNULL SDKError::mutable_remediation_hint()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::std::string* _s = _internal_mutable_remediation_hint();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.SDKError.remediation_hint)
+  return _s;
+}
+inline const ::std::string& SDKError::_internal_remediation_hint() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.remediation_hint_.Get();
+}
+inline void SDKError::_internal_set_remediation_hint(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.remediation_hint_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL SDKError::_internal_mutable_remediation_hint() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.remediation_hint_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE SDKError::release_remediation_hint() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.SDKError.remediation_hint)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000008U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  auto* released = _impl_.remediation_hint_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.remediation_hint_.Set("", GetArena());
+  }
+  return released;
+}
+inline void SDKError::set_allocated_remediation_hint(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  _impl_.remediation_hint_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.remediation_hint_.IsDefault()) {
+    _impl_.remediation_hint_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SDKError.remediation_hint)
+}
+
+// string correlation_id = 12;
+inline void SDKError::clear_correlation_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.correlation_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000010U);
+}
+inline const ::std::string& SDKError::correlation_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.SDKError.correlation_id)
+  return _internal_correlation_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void SDKError::set_correlation_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  _impl_.correlation_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.SDKError.correlation_id)
+}
+inline ::std::string* PROTOBUF_NONNULL SDKError::mutable_correlation_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ::std::string* _s = _internal_mutable_correlation_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.SDKError.correlation_id)
+  return _s;
+}
+inline const ::std::string& SDKError::_internal_correlation_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.correlation_id_.Get();
+}
+inline void SDKError::_internal_set_correlation_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.correlation_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL SDKError::_internal_mutable_correlation_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.correlation_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE SDKError::release_correlation_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.SDKError.correlation_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  auto* released = _impl_.correlation_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.correlation_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void SDKError::set_allocated_correlation_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  }
+  _impl_.correlation_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.correlation_id_.IsDefault()) {
+    _impl_.correlation_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.SDKError.correlation_id)
 }
 
 #ifdef __GNUC__

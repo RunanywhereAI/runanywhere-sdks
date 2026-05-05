@@ -13,6 +13,30 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
+@$core.Deprecated('Use lLMGenerationStateDescriptor instead')
+const LLMGenerationState$json = {
+  '1': 'LLMGenerationState',
+  '2': [
+    {'1': 'LLM_GENERATION_STATE_UNSPECIFIED', '2': 0},
+    {'1': 'LLM_GENERATION_STATE_QUEUED', '2': 1},
+    {'1': 'LLM_GENERATION_STATE_PREFILLING', '2': 2},
+    {'1': 'LLM_GENERATION_STATE_DECODING', '2': 3},
+    {'1': 'LLM_GENERATION_STATE_TOOL_CALLING', '2': 4},
+    {'1': 'LLM_GENERATION_STATE_COMPLETED', '2': 5},
+    {'1': 'LLM_GENERATION_STATE_CANCELLED', '2': 6},
+    {'1': 'LLM_GENERATION_STATE_FAILED', '2': 7},
+  ],
+};
+
+/// Descriptor for `LLMGenerationState`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List lLMGenerationStateDescriptor = $convert.base64Decode(
+    'ChJMTE1HZW5lcmF0aW9uU3RhdGUSJAogTExNX0dFTkVSQVRJT05fU1RBVEVfVU5TUEVDSUZJRU'
+    'QQABIfChtMTE1fR0VORVJBVElPTl9TVEFURV9RVUVVRUQQARIjCh9MTE1fR0VORVJBVElPTl9T'
+    'VEFURV9QUkVGSUxMSU5HEAISIQodTExNX0dFTkVSQVRJT05fU1RBVEVfREVDT0RJTkcQAxIlCi'
+    'FMTE1fR0VORVJBVElPTl9TVEFURV9UT09MX0NBTExJTkcQBBIiCh5MTE1fR0VORVJBVElPTl9T'
+    'VEFURV9DT01QTEVURUQQBRIiCh5MTE1fR0VORVJBVElPTl9TVEFURV9DQU5DRUxMRUQQBhIfCh'
+    'tMTE1fR0VORVJBVElPTl9TVEFURV9GQUlMRUQQBw==');
+
 @$core.Deprecated('Use executionTargetDescriptor instead')
 const ExecutionTarget$json = {
   '1': 'ExecutionTarget',
@@ -48,6 +72,16 @@ const LLMGenerationOptions$json = {
     {'1': 'execution_target', '3': 12, '4': 1, '5': 14, '6': '.runanywhere.v1.ExecutionTarget', '9': 3, '10': 'executionTarget', '17': true},
     {'1': 'structured_output', '3': 13, '4': 1, '5': 11, '6': '.runanywhere.v1.StructuredOutputOptions', '9': 4, '10': 'structuredOutput', '17': true},
     {'1': 'enable_real_time_tracking', '3': 14, '4': 1, '5': 8, '10': 'enableRealTimeTracking'},
+    {'1': 'seed', '3': 15, '4': 1, '5': 3, '10': 'seed'},
+    {'1': 'frequency_penalty', '3': 16, '4': 1, '5': 2, '10': 'frequencyPenalty'},
+    {'1': 'presence_penalty', '3': 17, '4': 1, '5': 2, '10': 'presencePenalty'},
+    {'1': 'repeat_last_n', '3': 18, '4': 1, '5': 5, '10': 'repeatLastN'},
+    {'1': 'min_p', '3': 19, '4': 1, '5': 2, '10': 'minP'},
+    {'1': 'grammar', '3': 20, '4': 1, '5': 9, '9': 5, '10': 'grammar', '17': true},
+    {'1': 'response_format', '3': 21, '4': 1, '5': 9, '9': 6, '10': 'responseFormat', '17': true},
+    {'1': 'echo_prompt', '3': 22, '4': 1, '5': 8, '10': 'echoPrompt'},
+    {'1': 'n_threads', '3': 23, '4': 1, '5': 5, '10': 'nThreads'},
+    {'1': 'tool_calling', '3': 24, '4': 1, '5': 11, '6': '.runanywhere.v1.ToolCallingOptions', '9': 7, '10': 'toolCalling', '17': true},
   ],
   '8': [
     {'1': '_system_prompt'},
@@ -55,6 +89,9 @@ const LLMGenerationOptions$json = {
     {'1': '_thinking_pattern'},
     {'1': '_execution_target'},
     {'1': '_structured_output'},
+    {'1': '_grammar'},
+    {'1': '_response_format'},
+    {'1': '_tool_calling'},
   ],
 };
 
@@ -73,9 +110,16 @@ final $typed_data.Uint8List lLMGenerationOptionsDescriptor = $convert.base64Deco
     'ZWN1dGlvblRhcmdldEgDUg9leGVjdXRpb25UYXJnZXSIAQESWQoRc3RydWN0dXJlZF9vdXRwdX'
     'QYDSABKAsyJy5ydW5hbnl3aGVyZS52MS5TdHJ1Y3R1cmVkT3V0cHV0T3B0aW9uc0gEUhBzdHJ1'
     'Y3R1cmVkT3V0cHV0iAEBEjkKGWVuYWJsZV9yZWFsX3RpbWVfdHJhY2tpbmcYDiABKAhSFmVuYW'
-    'JsZVJlYWxUaW1lVHJhY2tpbmdCEAoOX3N5c3RlbV9wcm9tcHRCDgoMX2pzb25fc2NoZW1hQhMK'
-    'EV90aGlua2luZ19wYXR0ZXJuQhMKEV9leGVjdXRpb25fdGFyZ2V0QhQKEl9zdHJ1Y3R1cmVkX2'
-    '91dHB1dA==');
+    'JsZVJlYWxUaW1lVHJhY2tpbmcSEgoEc2VlZBgPIAEoA1IEc2VlZBIrChFmcmVxdWVuY3lfcGVu'
+    'YWx0eRgQIAEoAlIQZnJlcXVlbmN5UGVuYWx0eRIpChBwcmVzZW5jZV9wZW5hbHR5GBEgASgCUg'
+    '9wcmVzZW5jZVBlbmFsdHkSIgoNcmVwZWF0X2xhc3RfbhgSIAEoBVILcmVwZWF0TGFzdE4SEwoF'
+    'bWluX3AYEyABKAJSBG1pblASHQoHZ3JhbW1hchgUIAEoCUgFUgdncmFtbWFyiAEBEiwKD3Jlc3'
+    'BvbnNlX2Zvcm1hdBgVIAEoCUgGUg5yZXNwb25zZUZvcm1hdIgBARIfCgtlY2hvX3Byb21wdBgW'
+    'IAEoCFIKZWNob1Byb21wdBIbCgluX3RocmVhZHMYFyABKAVSCG5UaHJlYWRzEkoKDHRvb2xfY2'
+    'FsbGluZxgYIAEoCzIiLnJ1bmFueXdoZXJlLnYxLlRvb2xDYWxsaW5nT3B0aW9uc0gHUgt0b29s'
+    'Q2FsbGluZ4gBAUIQCg5fc3lzdGVtX3Byb21wdEIOCgxfanNvbl9zY2hlbWFCEwoRX3RoaW5raW'
+    '5nX3BhdHRlcm5CEwoRX2V4ZWN1dGlvbl90YXJnZXRCFAoSX3N0cnVjdHVyZWRfb3V0cHV0QgoK'
+    'CF9ncmFtbWFyQhIKEF9yZXNwb25zZV9mb3JtYXRCDwoNX3Rvb2xfY2FsbGluZw==');
 
 @$core.Deprecated('Use lLMGenerationResultDescriptor instead')
 const LLMGenerationResult$json = {
@@ -99,6 +143,12 @@ const LLMGenerationResult$json = {
     {'1': 'structured_output_validation', '3': 16, '4': 1, '5': 11, '6': '.runanywhere.v1.StructuredOutputValidation', '9': 6, '10': 'structuredOutputValidation', '17': true},
     {'1': 'total_tokens', '3': 17, '4': 1, '5': 5, '10': 'totalTokens'},
     {'1': 'error_message', '3': 18, '4': 1, '5': 9, '9': 7, '10': 'errorMessage', '17': true},
+    {'1': 'error_code', '3': 19, '4': 1, '5': 5, '10': 'errorCode'},
+    {'1': 'cached_prompt_tokens', '3': 20, '4': 1, '5': 5, '10': 'cachedPromptTokens'},
+    {'1': 'prompt_eval_time_ms', '3': 21, '4': 1, '5': 3, '10': 'promptEvalTimeMs'},
+    {'1': 'decode_time_ms', '3': 22, '4': 1, '5': 3, '10': 'decodeTimeMs'},
+    {'1': 'tool_calls', '3': 23, '4': 3, '5': 11, '6': '.runanywhere.v1.ToolCall', '10': 'toolCalls'},
+    {'1': 'tool_results', '3': 24, '4': 3, '5': 11, '6': '.runanywhere.v1.ToolResult', '10': 'toolResults'},
   ],
   '8': [
     {'1': '_thinking_content'},
@@ -129,9 +179,86 @@ final $typed_data.Uint8List lLMGenerationResultDescriptor = $convert.base64Decod
     'dXJlZF9vdXRwdXRfdmFsaWRhdGlvbhgQIAEoCzIqLnJ1bmFueXdoZXJlLnYxLlN0cnVjdHVyZW'
     'RPdXRwdXRWYWxpZGF0aW9uSAZSGnN0cnVjdHVyZWRPdXRwdXRWYWxpZGF0aW9uiAEBEiEKDHRv'
     'dGFsX3Rva2VucxgRIAEoBVILdG90YWxUb2tlbnMSKAoNZXJyb3JfbWVzc2FnZRgSIAEoCUgHUg'
-    'xlcnJvck1lc3NhZ2WIAQFCEwoRX3RoaW5raW5nX2NvbnRlbnRCCgoIX3R0ZnRfbXNCDAoKX2Zy'
-    'YW1ld29ya0IOCgxfanNvbl9vdXRwdXRCDgoMX3BlcmZvcm1hbmNlQg4KDF9leGVjdXRlZF9vbk'
-    'IfCh1fc3RydWN0dXJlZF9vdXRwdXRfdmFsaWRhdGlvbkIQCg5fZXJyb3JfbWVzc2FnZQ==');
+    'xlcnJvck1lc3NhZ2WIAQESHQoKZXJyb3JfY29kZRgTIAEoBVIJZXJyb3JDb2RlEjAKFGNhY2hl'
+    'ZF9wcm9tcHRfdG9rZW5zGBQgASgFUhJjYWNoZWRQcm9tcHRUb2tlbnMSLQoTcHJvbXB0X2V2YW'
+    'xfdGltZV9tcxgVIAEoA1IQcHJvbXB0RXZhbFRpbWVNcxIkCg5kZWNvZGVfdGltZV9tcxgWIAEo'
+    'A1IMZGVjb2RlVGltZU1zEjcKCnRvb2xfY2FsbHMYFyADKAsyGC5ydW5hbnl3aGVyZS52MS5Ub2'
+    '9sQ2FsbFIJdG9vbENhbGxzEj0KDHRvb2xfcmVzdWx0cxgYIAMoCzIaLnJ1bmFueXdoZXJlLnYx'
+    'LlRvb2xSZXN1bHRSC3Rvb2xSZXN1bHRzQhMKEV90aGlua2luZ19jb250ZW50QgoKCF90dGZ0X2'
+    '1zQgwKCl9mcmFtZXdvcmtCDgoMX2pzb25fb3V0cHV0Qg4KDF9wZXJmb3JtYW5jZUIOCgxfZXhl'
+    'Y3V0ZWRfb25CHwodX3N0cnVjdHVyZWRfb3V0cHV0X3ZhbGlkYXRpb25CEAoOX2Vycm9yX21lc3'
+    'NhZ2U=');
+
+@$core.Deprecated('Use lLMGenerationRequestDescriptor instead')
+const LLMGenerationRequest$json = {
+  '1': 'LLMGenerationRequest',
+  '2': [
+    {'1': 'request_id', '3': 1, '4': 1, '5': 9, '10': 'requestId'},
+    {'1': 'model_id', '3': 2, '4': 1, '5': 9, '10': 'modelId'},
+    {'1': 'prompt', '3': 3, '4': 1, '5': 9, '10': 'prompt'},
+    {'1': 'options', '3': 4, '4': 1, '5': 11, '6': '.runanywhere.v1.LLMGenerationOptions', '9': 0, '10': 'options', '17': true},
+    {'1': 'context_chunks', '3': 5, '4': 3, '5': 9, '10': 'contextChunks'},
+    {'1': 'metadata', '3': 6, '4': 3, '5': 11, '6': '.runanywhere.v1.LLMGenerationRequest.MetadataEntry', '10': 'metadata'},
+    {'1': 'conversation_id', '3': 7, '4': 1, '5': 9, '9': 1, '10': 'conversationId', '17': true},
+  ],
+  '3': [LLMGenerationRequest_MetadataEntry$json],
+  '8': [
+    {'1': '_options'},
+    {'1': '_conversation_id'},
+  ],
+};
+
+@$core.Deprecated('Use lLMGenerationRequestDescriptor instead')
+const LLMGenerationRequest_MetadataEntry$json = {
+  '1': 'MetadataEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'value', '3': 2, '4': 1, '5': 9, '10': 'value'},
+  ],
+  '7': {'7': true},
+};
+
+/// Descriptor for `LLMGenerationRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List lLMGenerationRequestDescriptor = $convert.base64Decode(
+    'ChRMTE1HZW5lcmF0aW9uUmVxdWVzdBIdCgpyZXF1ZXN0X2lkGAEgASgJUglyZXF1ZXN0SWQSGQ'
+    'oIbW9kZWxfaWQYAiABKAlSB21vZGVsSWQSFgoGcHJvbXB0GAMgASgJUgZwcm9tcHQSQwoHb3B0'
+    'aW9ucxgEIAEoCzIkLnJ1bmFueXdoZXJlLnYxLkxMTUdlbmVyYXRpb25PcHRpb25zSABSB29wdG'
+    'lvbnOIAQESJQoOY29udGV4dF9jaHVua3MYBSADKAlSDWNvbnRleHRDaHVua3MSTgoIbWV0YWRh'
+    'dGEYBiADKAsyMi5ydW5hbnl3aGVyZS52MS5MTE1HZW5lcmF0aW9uUmVxdWVzdC5NZXRhZGF0YU'
+    'VudHJ5UghtZXRhZGF0YRIsCg9jb252ZXJzYXRpb25faWQYByABKAlIAVIOY29udmVyc2F0aW9u'
+    'SWSIAQEaOwoNTWV0YWRhdGFFbnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCV'
+    'IFdmFsdWU6AjgBQgoKCF9vcHRpb25zQhIKEF9jb252ZXJzYXRpb25faWQ=');
+
+@$core.Deprecated('Use lLMGenerationStatusDescriptor instead')
+const LLMGenerationStatus$json = {
+  '1': 'LLMGenerationStatus',
+  '2': [
+    {'1': 'request_id', '3': 1, '4': 1, '5': 9, '10': 'requestId'},
+    {'1': 'state', '3': 2, '4': 1, '5': 14, '6': '.runanywhere.v1.LLMGenerationState', '10': 'state'},
+    {'1': 'prompt_tokens_processed', '3': 3, '4': 1, '5': 5, '10': 'promptTokensProcessed'},
+    {'1': 'completion_tokens_generated', '3': 4, '4': 1, '5': 5, '10': 'completionTokensGenerated'},
+    {'1': 'progress', '3': 5, '4': 1, '5': 2, '10': 'progress'},
+    {'1': 'elapsed_ms', '3': 6, '4': 1, '5': 3, '10': 'elapsedMs'},
+    {'1': 'message', '3': 7, '4': 1, '5': 9, '9': 0, '10': 'message', '17': true},
+    {'1': 'error_message', '3': 8, '4': 1, '5': 9, '9': 1, '10': 'errorMessage', '17': true},
+    {'1': 'error_code', '3': 9, '4': 1, '5': 5, '10': 'errorCode'},
+  ],
+  '8': [
+    {'1': '_message'},
+    {'1': '_error_message'},
+  ],
+};
+
+/// Descriptor for `LLMGenerationStatus`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List lLMGenerationStatusDescriptor = $convert.base64Decode(
+    'ChNMTE1HZW5lcmF0aW9uU3RhdHVzEh0KCnJlcXVlc3RfaWQYASABKAlSCXJlcXVlc3RJZBI4Cg'
+    'VzdGF0ZRgCIAEoDjIiLnJ1bmFueXdoZXJlLnYxLkxMTUdlbmVyYXRpb25TdGF0ZVIFc3RhdGUS'
+    'NgoXcHJvbXB0X3Rva2Vuc19wcm9jZXNzZWQYAyABKAVSFXByb21wdFRva2Vuc1Byb2Nlc3NlZB'
+    'I+Chtjb21wbGV0aW9uX3Rva2Vuc19nZW5lcmF0ZWQYBCABKAVSGWNvbXBsZXRpb25Ub2tlbnNH'
+    'ZW5lcmF0ZWQSGgoIcHJvZ3Jlc3MYBSABKAJSCHByb2dyZXNzEh0KCmVsYXBzZWRfbXMYBiABKA'
+    'NSCWVsYXBzZWRNcxIdCgdtZXNzYWdlGAcgASgJSABSB21lc3NhZ2WIAQESKAoNZXJyb3JfbWVz'
+    'c2FnZRgIIAEoCUgBUgxlcnJvck1lc3NhZ2WIAQESHQoKZXJyb3JfY29kZRgJIAEoBVIJZXJyb3'
+    'JDb2RlQgoKCF9tZXNzYWdlQhAKDl9lcnJvcl9tZXNzYWdl');
 
 @$core.Deprecated('Use lLMConfigurationDescriptor instead')
 const LLMConfiguration$json = {

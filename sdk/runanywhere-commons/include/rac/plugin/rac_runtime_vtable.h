@@ -17,6 +17,11 @@
  * `rac_runtime_register(vtable)` from `rac_runtime_registry.h` at load time
  * (statically via `RAC_STATIC_RUNTIME_REGISTER` or dynamically via the
  * loader, identical to the engine-plugin mechanism).
+ *
+ * ABI v2 providers expose a `rac_runtime_vtable_v2_t` extension through
+ * `rac_runtime_vtable_t::reserved_slot_0`. The remaining v1 slots are kept
+ * in the struct layout while existing in-tree callers migrate, but the
+ * registry validates ABI v2 as the canonical path.
  */
 
 #ifndef RAC_PLUGIN_RUNTIME_VTABLE_H
@@ -27,6 +32,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_primitive.h"   /* rac_runtime_id_t */
 
 #ifdef __cplusplus
@@ -49,8 +55,12 @@ extern "C" {
  *
  * Version history:
  *   1u — T4.1 initial release.
+ *   2u — CPP-RUNTIME-01 v2 extension via reserved_slot_0.
  */
-#define RAC_RUNTIME_ABI_VERSION 1u
+#define RAC_RUNTIME_ABI_VERSION_V1 1u
+#define RAC_RUNTIME_ABI_VERSION_V2 2u
+#define RAC_RUNTIME_ABI_VERSION RAC_RUNTIME_ABI_VERSION_V2
+#define RAC_RUNTIME_ABI_VERSION_MIN RAC_RUNTIME_ABI_VERSION_V2
 
 /* ===========================================================================
  * Device + capability descriptors (by-value POD, safe to include-only).
@@ -86,7 +96,8 @@ typedef struct rac_runtime_device_info {
 typedef struct rac_runtime_capabilities {
     /** Bitmask of `RAC_RUNTIME_CAP_*` flags. */
     uint64_t        capability_flags;
-    /** Supported model formats (proto `runanywhere.v1.ModelFormat` values).
+    /** Supported model formats (`RAC_MODEL_FORMAT_ID_*` values mirroring
+     *  proto `runanywhere.v1.ModelFormat`).
      *  Points into plugin-owned .rodata. MAY be NULL. */
     const uint32_t* supported_formats;
     size_t          supported_formats_count;
@@ -102,6 +113,10 @@ typedef struct rac_runtime_capabilities {
 #define RAC_RUNTIME_CAP_BF16             (1ull << 3)
 #define RAC_RUNTIME_CAP_DYNAMIC_SHAPES   (1ull << 4)
 #define RAC_RUNTIME_CAP_ZERO_COPY        (1ull << 5)
+#define RAC_RUNTIME_CAP_BUFFER_MAPPING   (1ull << 6)
+#define RAC_RUNTIME_CAP_BUFFER_COPY      (1ull << 7)
+#define RAC_RUNTIME_CAP_DEVICE_ALLOC     (1ull << 8)
+#define RAC_RUNTIME_CAP_OWNED_OUTPUTS    (1ull << 9)
 
 /* ===========================================================================
  * Opaque session + buffer handles.
@@ -113,11 +128,192 @@ typedef struct rac_runtime_capabilities {
 typedef struct rac_runtime_session rac_runtime_session_t;
 typedef struct rac_runtime_buffer  rac_runtime_buffer_t;
 
+/* ===========================================================================
+ * ABI v2 tensor and buffer descriptors.
+ *
+ * These types are runtime-only: generic tensor execution, buffer ownership,
+ * device memory selection, and buffer transfer. Platform services such as OS
+ * permissions, file pickers, HTTP, secure storage, battery/thermal, and app
+ * lifecycle APIs intentionally do not belong here.
+ * =========================================================================== */
+
+/** Stable tensor element type. Values 0-16 intentionally match ONNX tensor
+ *  element enum values where there is overlap, preserving existing Float32=1
+ *  and Int64=7 users of `rac_runtime_io_t::dtype`. */
+typedef enum rac_runtime_dtype {
+    RAC_RUNTIME_DTYPE_UNDEFINED = 0,
+    RAC_RUNTIME_DTYPE_F32       = 1,
+    RAC_RUNTIME_DTYPE_U8        = 2,
+    RAC_RUNTIME_DTYPE_I8        = 3,
+    RAC_RUNTIME_DTYPE_U16       = 4,
+    RAC_RUNTIME_DTYPE_I16       = 5,
+    RAC_RUNTIME_DTYPE_I32       = 6,
+    RAC_RUNTIME_DTYPE_I64       = 7,
+    RAC_RUNTIME_DTYPE_STRING    = 8,
+    RAC_RUNTIME_DTYPE_BOOL      = 9,
+    RAC_RUNTIME_DTYPE_F16       = 10,
+    RAC_RUNTIME_DTYPE_F64       = 11,
+    RAC_RUNTIME_DTYPE_U32       = 12,
+    RAC_RUNTIME_DTYPE_U64       = 13,
+    RAC_RUNTIME_DTYPE_BF16      = 16,
+    RAC_RUNTIME_DTYPE_U4        = 21,
+    RAC_RUNTIME_DTYPE_I4        = 22,
+} rac_runtime_dtype_t;
+
+/** Memory space for tensor data and runtime buffers. */
+typedef enum rac_runtime_memory_space {
+    RAC_RUNTIME_MEMORY_SPACE_UNSPECIFIED = 0,
+    RAC_RUNTIME_MEMORY_SPACE_HOST        = 1,
+    RAC_RUNTIME_MEMORY_SPACE_HOST_PINNED = 2,
+    RAC_RUNTIME_MEMORY_SPACE_DEVICE      = 3,
+    RAC_RUNTIME_MEMORY_SPACE_SHARED      = 4,
+    RAC_RUNTIME_MEMORY_SPACE_MANAGED     = 5,
+} rac_runtime_memory_space_t;
+
+/** Ownership contract for tensor fields returned by v2 execution. */
+typedef enum rac_runtime_ownership {
+    RAC_RUNTIME_OWNERSHIP_NONE     = 0,
+    RAC_RUNTIME_OWNERSHIP_CALLER   = 1,
+    RAC_RUNTIME_OWNERSHIP_RUNTIME  = 2,
+    RAC_RUNTIME_OWNERSHIP_EXTERNAL = 3,
+} rac_runtime_ownership_t;
+
+/** Buffer usage hints. Runtimes MAY ignore hints they do not understand. */
+#define RAC_RUNTIME_BUFFER_USAGE_INPUT      (1ull << 0)
+#define RAC_RUNTIME_BUFFER_USAGE_OUTPUT     (1ull << 1)
+#define RAC_RUNTIME_BUFFER_USAGE_TEMPORARY  (1ull << 2)
+#define RAC_RUNTIME_BUFFER_USAGE_CONSTANT   (1ull << 3)
+#define RAC_RUNTIME_BUFFER_USAGE_MAP_READ   (1ull << 4)
+#define RAC_RUNTIME_BUFFER_USAGE_MAP_WRITE  (1ull << 5)
+
+/** Map access flags. */
+#define RAC_RUNTIME_MAP_READ          (1u << 0)
+#define RAC_RUNTIME_MAP_WRITE         (1u << 1)
+#define RAC_RUNTIME_MAP_DISCARD_WRITE (1u << 2)
+
+/** Device-aware allocation request for v2 `alloc_buffer`. */
+typedef struct rac_runtime_buffer_desc {
+    size_t                     bytes;
+    rac_runtime_memory_space_t memory_space;
+    rac_device_class_t         device_class;
+    /** Runtime-specific device ordinal. 0 means the default device. */
+    uint32_t                   device_index;
+    /** Requested byte alignment. 0 means runtime default. */
+    uint32_t                   alignment;
+    /** Bitmask of `RAC_RUNTIME_BUFFER_USAGE_*`. */
+    uint64_t                   usage_flags;
+    /** Optional stable device id matching `rac_runtime_device_info_t`. */
+    const char*                device_id;
+    uint64_t                   reserved_0;
+    uint64_t                   reserved_1;
+} rac_runtime_buffer_desc_t;
+
+/** Runtime-owned buffer metadata returned by v2 `buffer_info`. */
+typedef struct rac_runtime_buffer_info {
+    size_t                     bytes;
+    rac_runtime_memory_space_t memory_space;
+    rac_device_class_t         device_class;
+    uint32_t                   device_index;
+    uint32_t                   alignment;
+    uint64_t                   usage_flags;
+    const char*                device_id;
+    /** Optional native handle (`MTLBuffer*`, CUDA pointer, etc.). MAY be NULL. */
+    void*                      native_handle;
+    uint64_t                   reserved_0;
+    uint64_t                   reserved_1;
+} rac_runtime_buffer_info_t;
+
+/** Host mapping returned by v2 `map_buffer`. */
+typedef struct rac_runtime_buffer_mapping {
+    void*                      data;
+    size_t                     bytes;
+    rac_runtime_memory_space_t memory_space;
+    uint32_t                   map_flags;
+    uint32_t                   reserved_0;
+    uint64_t                   reserved_1;
+    uint64_t                   reserved_2;
+} rac_runtime_buffer_mapping_t;
+
+/** ABI v2 tensor descriptor used by `run_session_v2`. Inputs borrow all
+ *  fields from the caller. Outputs may either use caller-supplied `data` and
+ *  `shape` storage (`*_capacity` non-zero) or return runtime-owned data,
+ *  shape, and/or buffer handles; callers release runtime-owned fields through
+ *  `rac_runtime_vtable_v2_t::release_tensor`. */
+typedef struct rac_runtime_tensor {
+    const char*                name;
+    rac_runtime_buffer_t*      buffer;
+    void*                      data;
+    size_t                     data_bytes;
+    size_t                     data_capacity_bytes;
+    rac_runtime_dtype_t        dtype;
+    rac_runtime_memory_space_t memory_space;
+    int64_t*                   shape;
+    size_t                     rank;
+    size_t                     shape_capacity;
+    rac_runtime_ownership_t    buffer_ownership;
+    rac_runtime_ownership_t    data_ownership;
+    rac_runtime_ownership_t    shape_ownership;
+    uint32_t                   reserved_0;
+    void*                      user_data;
+    uint64_t                   reserved_1;
+    uint64_t                   reserved_2;
+} rac_runtime_tensor_t;
+
+/**
+ * @brief ABI v2 extension. A v2 provider sets
+ *        `rac_runtime_vtable_t::reserved_slot_0` to this struct.
+ *
+ * `abi_version` MUST be `RAC_RUNTIME_ABI_VERSION_V2`; `struct_size` MUST be at
+ * least `RAC_RUNTIME_VTABLE_V2_MIN_SIZE`. All op slots are optional and are
+ * probed independently.
+ */
+typedef struct rac_runtime_vtable_v2 {
+    uint32_t abi_version;
+    uint32_t struct_size;
+
+    rac_result_t (*run_session_v2)(rac_runtime_session_t* session,
+                                   const rac_runtime_tensor_t* inputs,
+                                   size_t n_in,
+                                   rac_runtime_tensor_t* outputs,
+                                   size_t n_out);
+
+    rac_result_t (*alloc_buffer)(const rac_runtime_buffer_desc_t* desc,
+                                 rac_runtime_buffer_t** out);
+    rac_result_t (*buffer_info)(rac_runtime_buffer_t* buffer,
+                                rac_runtime_buffer_info_t* out);
+    rac_result_t (*map_buffer)(rac_runtime_buffer_t* buffer,
+                               size_t offset,
+                               size_t bytes,
+                               uint32_t map_flags,
+                               rac_runtime_buffer_mapping_t* out);
+    rac_result_t (*unmap_buffer)(rac_runtime_buffer_t* buffer,
+                                 rac_runtime_buffer_mapping_t* mapping);
+    rac_result_t (*copy_buffer)(rac_runtime_buffer_t* dst,
+                                size_t dst_offset,
+                                const rac_runtime_buffer_t* src,
+                                size_t src_offset,
+                                size_t bytes);
+
+    void (*release_tensor)(rac_runtime_tensor_t* tensor);
+
+    const void* reserved_0;
+    const void* reserved_1;
+    const void* reserved_2;
+    const void* reserved_3;
+    const void* reserved_4;
+    const void* reserved_5;
+    const void* reserved_6;
+    const void* reserved_7;
+} rac_runtime_vtable_v2_t;
+
+#define RAC_RUNTIME_VTABLE_V2_MIN_SIZE \
+    ((uint32_t)offsetof(rac_runtime_vtable_v2_t, reserved_0))
+
 /** Parameters for `create_session`. Stable by-value POD. */
 typedef struct rac_runtime_session_desc {
     /** Which service primitive the session serves (llm, stt, …). */
     rac_primitive_t primitive;
-    /** `runanywhere.v1.ModelFormat` enum value, or 0 when unspecified. */
+    /** `RAC_MODEL_FORMAT_ID_*` / `runanywhere.v1.ModelFormat` value, or 0 when unspecified. */
     uint32_t        model_format;
     /** Absolute path to a model file on disk. NULL when model is in memory. */
     const char*     model_path;
@@ -136,7 +332,7 @@ typedef struct rac_runtime_io {
      *  MAY copy into a device buffer internally. */
     void*       data;
     size_t      data_bytes;
-    /** Element-type enum reserved for future use (0 → runtime-defined). */
+    /** `rac_runtime_dtype_t`; 0 → runtime-defined/unspecified. */
     uint32_t    dtype;
     /** Shape, NULL-terminated-NOT; pair with `rank`. */
     const int64_t* shape;
@@ -179,7 +375,7 @@ typedef struct rac_runtime_metadata {
     /** Priority — higher wins when two plugins register the same id. */
     int32_t priority;
 
-    /** Supported `runanywhere.v1.ModelFormat` values. MAY be NULL. */
+    /** Supported `RAC_MODEL_FORMAT_ID_*` / `runanywhere.v1.ModelFormat` values. MAY be NULL. */
     const uint32_t* supported_formats;
     size_t          supported_formats_count;
 
@@ -244,8 +440,8 @@ typedef struct rac_runtime_vtable {
 
     /* ─────────── Reserved slot pool (6 slots) ─────────── */
     /*
-     * Keeps layout binary-stable as new runtime ops land. Promoting a
-     * reserved slot bumps RAC_RUNTIME_ABI_VERSION.
+     * Keeps layout binary-stable as new runtime ops land. ABI v2 uses
+     * reserved_slot_0 as `const rac_runtime_vtable_v2_t*`.
      */
     const void* reserved_slot_0;
     const void* reserved_slot_1;
@@ -254,6 +450,22 @@ typedef struct rac_runtime_vtable {
     const void* reserved_slot_4;
     const void* reserved_slot_5;
 } rac_runtime_vtable_t;
+
+static inline const rac_runtime_vtable_v2_t*
+rac_runtime_vtable_get_v2(const rac_runtime_vtable_t* vtable) {
+    if (vtable == NULL ||
+        vtable->metadata.abi_version < RAC_RUNTIME_ABI_VERSION_V2 ||
+        vtable->reserved_slot_0 == NULL) {
+        return NULL;
+    }
+    const rac_runtime_vtable_v2_t* v2 =
+        (const rac_runtime_vtable_v2_t*)vtable->reserved_slot_0;
+    if (v2->abi_version != RAC_RUNTIME_ABI_VERSION_V2 ||
+        v2->struct_size < RAC_RUNTIME_VTABLE_V2_MIN_SIZE) {
+        return NULL;
+    }
+    return v2;
+}
 
 /* ===========================================================================
  * Dynamic-loader symbol convention (parallel to rac_plugin_entry_<name>).

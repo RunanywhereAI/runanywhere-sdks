@@ -22,7 +22,7 @@ class TTSViewModel: ObservableObject {
     // Speaking State
     @Published var isSpeaking = false
     @Published var errorMessage: String?
-    @Published var lastResult: TTSSpeakResult?
+    @Published var lastResult: RATTSSpeakResult?
 
     // Voice Settings
     @Published var speechRate: Double = 1.0
@@ -62,7 +62,7 @@ class TTSViewModel: ObservableObject {
     // MARK: - Model Management
 
     /// Load a model from the unified model selection sheet
-    func loadModelFromSelection(_ model: ModelInfo) async {
+    func loadModelFromSelection(_ model: RAModelInfo) async {
         logger.info("Loading TTS model from selection: \(model.name)")
         isSpeaking = true
         errorMessage = nil
@@ -94,10 +94,9 @@ class TTSViewModel: ObservableObject {
         lastResult = nil
 
         do {
-            let options = TTSOptions(
-                rate: Float(speechRate),
-                pitch: Float(pitch)
-            )
+            var options = RATTSOptions.defaults()
+            options.speakingRate = Float(speechRate)
+            options.pitch = Float(pitch)
 
             // SDK handles everything - synthesis AND playback
             let result = try await RunAnywhere.speak(text, options: options)
@@ -147,17 +146,17 @@ class TTSViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    private func handleSDKEvent(_ event: any SDKEvent) {
-        // Events now come from C++ via generic BridgedEvent
-        guard event.category == .tts else { return }
+    private func handleSDKEvent(_ event: RASDKEvent) {
+        guard event.category == .tts || event.component == .tts else { return }
 
-        switch event.type {
-        case "tts_voice_load_completed":
-            let voiceId = event.properties["model_id"] ?? ""
+        let voiceId = event.model.modelID
+
+        switch event.model.kind {
+        case .loadCompleted:
             selectedModelId = voiceId
             selectedModelName = voiceId
             logger.info("TTS voice loaded: \(voiceId)")
-        case "tts_voice_unloaded":
+        case .unloadCompleted:
             selectedModelId = nil
             selectedModelName = nil
             selectedFramework = nil
@@ -169,7 +168,7 @@ class TTSViewModel: ObservableObject {
 
     // MARK: - Formatting Helpers
 
-    func formatBytes(_ bytes: Int) -> String {
+    func formatBytes(_ bytes: Int64) -> String {
         let kb = Double(bytes) / 1024.0
         if kb < 1024 {
             return String(format: "%.1f KB", kb)

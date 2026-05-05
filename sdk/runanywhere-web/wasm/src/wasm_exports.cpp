@@ -10,6 +10,8 @@
 
 #include <emscripten/emscripten.h>
 
+#include <cstddef>
+
 // Core
 #include "rac/core/rac_analytics_events.h"
 #include "rac/core/rac_core.h"
@@ -80,6 +82,7 @@
 #include "rac/features/rag/rac_rag_pipeline.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
+#include "rac/features/llm/rac_tool_calling.h"
 
 /**
  * WASM module initialization.
@@ -291,8 +294,6 @@ int rac_wasm_ping(void) {
 // Naming convention:
 //   rac_wasm_offsetof_<struct>_<field>()
 // =============================================================================
-
-#include <cstddef>  // offsetof
 
 // ---- rac_config_t ----
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_config_log_level(void) {

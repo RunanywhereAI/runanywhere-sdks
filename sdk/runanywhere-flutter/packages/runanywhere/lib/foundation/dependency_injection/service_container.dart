@@ -64,7 +64,7 @@ class ServiceContainer {
       environment: environment,
     );
 
-    if (environment == SDKEnvironment.development) {
+    if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
       final supabaseConfig = SupabaseConfig.configuration(environment);
       if (supabaseConfig != null) {
         HTTPClientAdapter.shared.configureDev(
@@ -84,8 +84,9 @@ class ServiceContainer {
       environment: environment,
     );
 
-    final shouldEnable = environment == SDKEnvironment.development ||
-        environment == SDKEnvironment.production;
+    final shouldEnable =
+        environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ||
+            environment == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
     final hasHttpTarget = HTTPClientAdapter.shared.isConfigured;
     if (shouldEnable && !hasHttpTarget) {
       logger.debug(

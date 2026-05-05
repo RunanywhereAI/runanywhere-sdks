@@ -11,7 +11,7 @@
  * download runner that replaces Kotlin's HttpURLConnection loop.
  *
  * v2 close-out Phase H. See `rac_http_download.h` for the contract;
- * libcurl owns the native transport implementation.
+ * platform adapters own HTTP execution.
  *
  * The runner:
  *   1. Opens the destination file (append when resuming, truncate
@@ -24,7 +24,7 @@
  *      when `req->expected_sha256_hex` is non-NULL. The hash is
  *      computed inline on the wire to avoid a second pass over the
  *      file.
- *   4. Maps libcurl / file-system errors to the
+ *   4. Maps transport / file-system errors to the
  *      `RAC_HTTP_DL_*` codes, which mirror the Kotlin
  *      `DownloadError` enum byte-for-byte.
  */
@@ -207,7 +207,7 @@ struct dl_ctx {
     bool io_error;
 };
 
-// Fires on every libcurl chunk. No time-based throttling — the
+// Fires on every adapter-delivered chunk. No time-based throttling — the
 // callback is a few hundred ns per call and cancellation has to be
 // observable mid-stream even when a transfer completes in <100 ms
 // (e.g. loopback). Callers who care about UI-update frequency throttle
@@ -286,6 +286,20 @@ extern "C" rac_http_download_status_t rac_http_download_execute(
         fs::create_directories(dest.parent_path(), ec);
         if (ec) {
             RAC_LOG_ERROR(kTag, "mkdir failed: %s", ec.message().c_str());
+            return RAC_HTTP_DL_FILE_ERROR;
+        }
+    }
+
+    if (req->resume_from_byte > 0) {
+        if (!fs::exists(dest, ec) || ec) {
+            RAC_LOG_ERROR(kTag, "resume requested but destination does not exist");
+            return RAC_HTTP_DL_FILE_ERROR;
+        }
+        uint64_t existing_size = static_cast<uint64_t>(fs::file_size(dest, ec));
+        if (ec || existing_size != req->resume_from_byte) {
+            RAC_LOG_ERROR(kTag, "resume offset mismatch: requested=%llu existing=%llu",
+                          static_cast<unsigned long long>(req->resume_from_byte),
+                          static_cast<unsigned long long>(ec ? 0 : existing_size));
             return RAC_HTTP_DL_FILE_ERROR;
         }
     }
@@ -391,8 +405,8 @@ extern "C" rac_http_download_status_t rac_http_download_execute(
     if (status != RAC_HTTP_DL_OK) {
         return status;
     }
-    // Treat an HTTP 4xx/5xx on the wire as a server error even if
-    // libcurl reported RAC_SUCCESS (status is still populated).
+    // Treat an HTTP 4xx/5xx on the wire as a server error even when
+    // the transport reports RAC_SUCCESS (status is still populated).
     if (http_status >= 400 && http_status < 600) {
         return RAC_HTTP_DL_SERVER_ERROR;
     }

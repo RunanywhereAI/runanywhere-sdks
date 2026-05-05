@@ -85,10 +85,14 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind,
                                          : runanywhere::v1::EVENT_SEVERITY_INFO);
     event.set_component(runanywhere::v1::SDK_COMPONENT_DIFFUSION);
     event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    event.set_source("cpp");
     auto* cap = event.mutable_capability();
     cap->set_kind(kind);
     cap->set_component(runanywhere::v1::SDK_COMPONENT_DIFFUSION);
-    if (operation) cap->set_operation(operation);
+    if (operation) {
+        event.set_operation_id(operation);
+        cap->set_operation(operation);
+    }
     cap->set_progress(progress);
     if (error) cap->set_error(error);
     publish_event(event);
@@ -299,6 +303,8 @@ rac_result_t rac_diffusion_cancel_proto(rac_handle_t handle) {
     requested.set_severity(runanywhere::v1::EVENT_SEVERITY_INFO);
     requested.set_component(runanywhere::v1::SDK_COMPONENT_DIFFUSION);
     requested.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    requested.set_source("cpp");
+    requested.set_operation_id("diffusion.cancel");
     auto* cancel = requested.mutable_cancellation();
     cancel->set_kind(runanywhere::v1::CANCELLATION_EVENT_KIND_REQUESTED);
     cancel->set_component(runanywhere::v1::SDK_COMPONENT_DIFFUSION);
@@ -316,6 +322,8 @@ rac_result_t rac_diffusion_cancel_proto(rac_handle_t handle) {
                                              : runanywhere::v1::EVENT_SEVERITY_ERROR);
     completed.set_component(runanywhere::v1::SDK_COMPONENT_DIFFUSION);
     completed.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    completed.set_source("cpp");
+    completed.set_operation_id("diffusion.cancel");
     auto* done = completed.mutable_cancellation();
     done->set_kind(rc == RAC_SUCCESS
                        ? runanywhere::v1::CANCELLATION_EVENT_KIND_COMPLETED

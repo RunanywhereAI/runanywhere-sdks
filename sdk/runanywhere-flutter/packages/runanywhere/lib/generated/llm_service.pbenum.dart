@@ -13,6 +13,33 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
+class LLMStreamEventKind extends $pb.ProtobufEnum {
+  static const LLMStreamEventKind LLM_STREAM_EVENT_KIND_UNSPECIFIED = LLMStreamEventKind._(0, _omitEnumNames ? '' : 'LLM_STREAM_EVENT_KIND_UNSPECIFIED');
+  static const LLMStreamEventKind LLM_STREAM_EVENT_KIND_STARTED = LLMStreamEventKind._(1, _omitEnumNames ? '' : 'LLM_STREAM_EVENT_KIND_STARTED');
+  static const LLMStreamEventKind LLM_STREAM_EVENT_KIND_TOKEN = LLMStreamEventKind._(2, _omitEnumNames ? '' : 'LLM_STREAM_EVENT_KIND_TOKEN');
+  static const LLMStreamEventKind LLM_STREAM_EVENT_KIND_THINKING = LLMStreamEventKind._(3, _omitEnumNames ? '' : 'LLM_STREAM_EVENT_KIND_THINKING');
+  static const LLMStreamEventKind LLM_STREAM_EVENT_KIND_TOOL_CALL = LLMStreamEventKind._(4, _omitEnumNames ? '' : 'LLM_STREAM_EVENT_KIND_TOOL_CALL');
+  static const LLMStreamEventKind LLM_STREAM_EVENT_KIND_PROGRESS = LLMStreamEventKind._(5, _omitEnumNames ? '' : 'LLM_STREAM_EVENT_KIND_PROGRESS');
+  static const LLMStreamEventKind LLM_STREAM_EVENT_KIND_COMPLETED = LLMStreamEventKind._(6, _omitEnumNames ? '' : 'LLM_STREAM_EVENT_KIND_COMPLETED');
+  static const LLMStreamEventKind LLM_STREAM_EVENT_KIND_ERROR = LLMStreamEventKind._(7, _omitEnumNames ? '' : 'LLM_STREAM_EVENT_KIND_ERROR');
+
+  static const $core.List<LLMStreamEventKind> values = <LLMStreamEventKind> [
+    LLM_STREAM_EVENT_KIND_UNSPECIFIED,
+    LLM_STREAM_EVENT_KIND_STARTED,
+    LLM_STREAM_EVENT_KIND_TOKEN,
+    LLM_STREAM_EVENT_KIND_THINKING,
+    LLM_STREAM_EVENT_KIND_TOOL_CALL,
+    LLM_STREAM_EVENT_KIND_PROGRESS,
+    LLM_STREAM_EVENT_KIND_COMPLETED,
+    LLM_STREAM_EVENT_KIND_ERROR,
+  ];
+
+  static final $core.Map<$core.int, LLMStreamEventKind> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static LLMStreamEventKind? valueOf($core.int value) => _byValue[value];
+
+  const LLMStreamEventKind._($core.int v, $core.String n) : super(v, n);
+}
+
 class LLMTokenKind extends $pb.ProtobufEnum {
   static const LLMTokenKind LLM_TOKEN_KIND_UNSPECIFIED = LLMTokenKind._(0, _omitEnumNames ? '' : 'LLM_TOKEN_KIND_UNSPECIFIED');
   static const LLMTokenKind LLM_TOKEN_KIND_ANSWER = LLMTokenKind._(1, _omitEnumNames ? '' : 'LLM_TOKEN_KIND_ANSWER');

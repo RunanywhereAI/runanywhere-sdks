@@ -9,6 +9,11 @@
  * This backend follows the same pattern as LlamaCPP and ONNX backends,
  * but delegates to Swift via function pointer callbacks since
  * ml-stable-diffusion is a Swift-only framework.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal` adapter
+ * contract. ml-stable-diffusion bridge — SDKs reach this backend
+ * through standard diffusion proto APIs once the platform plugin is
+ * registered.
  */
 
 #ifndef RAC_DIFFUSION_PLATFORM_H

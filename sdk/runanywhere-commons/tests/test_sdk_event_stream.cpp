@@ -133,6 +133,12 @@ int main() {
 
     rac_sdk_event_clear_queue();
     rac_state_shutdown();
+    rac_proto_buffer_t uninitialized_shutdown_poll;
+    rac_proto_buffer_init(&uninitialized_shutdown_poll);
+    CHECK(rac_sdk_event_poll(&uninitialized_shutdown_poll) == RAC_ERROR_NOT_FOUND,
+          "state shutdown before initialization emits no SDKEvent");
+    rac_proto_buffer_free(&uninitialized_shutdown_poll);
+
     rac_sdk_event_clear_queue();
     rc = rac_state_initialize(RAC_ENV_DEVELOPMENT, "api-key", "https://example.invalid",
                               "device-1");
@@ -155,6 +161,72 @@ int main() {
     CHECK(rac_sdk_event_poll(&empty_poll) == RAC_ERROR_NOT_FOUND,
           "poll reports empty queue after ordered events are consumed");
     rac_proto_buffer_free(&empty_poll);
+
+    rac_sdk_event_clear_queue();
+    rac_state_set_device_registered(true);
+    runanywhere::v1::SDKEvent device_registered;
+    CHECK(poll_event(&device_registered),
+          "device registration state true publishes SDKEvent");
+    CHECK(device_registered.category() == runanywhere::v1::EVENT_CATEGORY_DEVICE,
+          "device registration event category is canonical");
+    CHECK(device_registered.has_device(), "device registration event uses DeviceEvent");
+    CHECK(device_registered.device().kind() ==
+              runanywhere::v1::DEVICE_EVENT_KIND_DEVICE_REGISTERED,
+          "device registration true event uses registered kind");
+    CHECK(device_registered.device().property() == "registered" &&
+              device_registered.device().new_value() == "true",
+          "device registration true event carries registered=true transition");
+
+    rac_sdk_event_clear_queue();
+    rac_state_reset();
+    CHECK(!rac_state_is_device_registered(), "state reset clears device registration flag");
+    runanywhere::v1::SDKEvent reset_device;
+    CHECK(poll_event(&reset_device),
+          "state reset publishes device unregistered transition");
+    CHECK(reset_device.has_device(), "state reset event uses DeviceEvent");
+    CHECK(reset_device.device().kind() ==
+              runanywhere::v1::DEVICE_EVENT_KIND_DEVICE_STATE_CHANGED,
+          "state reset event uses state changed kind");
+    CHECK(reset_device.device().property() == "registered" &&
+              reset_device.device().new_value() == "false",
+          "state reset event carries registered=false transition");
+
+    rac_sdk_event_clear_queue();
+    rac_state_reset();
+    rac_proto_buffer_t noop_reset_poll;
+    rac_proto_buffer_init(&noop_reset_poll);
+    CHECK(rac_sdk_event_poll(&noop_reset_poll) == RAC_ERROR_NOT_FOUND,
+          "state reset without a registration transition emits no SDKEvent");
+    rac_proto_buffer_free(&noop_reset_poll);
+
+    rac_state_set_device_registered(true);
+    rac_sdk_event_clear_queue();
+    rac_state_shutdown();
+    CHECK(!rac_state_is_initialized(), "state shutdown clears initialized flag");
+    CHECK(!rac_state_is_device_registered(), "state shutdown clears device registration flag");
+    runanywhere::v1::SDKEvent shutdown_device;
+    runanywhere::v1::SDKEvent shutdown_event;
+    CHECK(poll_event(&shutdown_device),
+          "state shutdown publishes device unregistered transition first");
+    CHECK(poll_event(&shutdown_event), "state shutdown publishes shutdown event");
+    CHECK(shutdown_device.has_device() &&
+              shutdown_device.device().property() == "registered" &&
+              shutdown_device.device().new_value() == "false",
+          "state shutdown device event carries registered=false transition");
+    CHECK(shutdown_event.category() == runanywhere::v1::EVENT_CATEGORY_SHUTDOWN,
+          "state shutdown event category is canonical");
+    CHECK(shutdown_event.has_initialization() &&
+              shutdown_event.initialization().stage() ==
+                  runanywhere::v1::INITIALIZATION_STAGE_SHUTDOWN,
+          "state shutdown event uses shutdown initialization stage");
+
+    rac_sdk_event_clear_queue();
+    rac_state_shutdown();
+    rac_proto_buffer_t noop_shutdown_poll;
+    rac_proto_buffer_init(&noop_shutdown_poll);
+    CHECK(rac_sdk_event_poll(&noop_shutdown_poll) == RAC_ERROR_NOT_FOUND,
+          "state shutdown after shutdown emits no SDKEvent");
+    rac_proto_buffer_free(&noop_shutdown_poll);
 
     rac_sdk_event_clear_queue();
     uint8_t* profile_bytes = nullptr;

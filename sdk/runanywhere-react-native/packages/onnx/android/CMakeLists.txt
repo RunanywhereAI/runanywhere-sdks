@@ -82,15 +82,9 @@ if(EXISTS "${JNILIB_DIR}/librac_backend_sherpa.so")
     message(STATUS "[RunAnywhereONNX] Found rac_backend_sherpa at ${JNILIB_DIR}/librac_backend_sherpa.so")
 endif()
 
-# =============================================================================
-# Source files - ONNX bridges
-# =============================================================================
-file(GLOB BRIDGE_SOURCES "../cpp/bridges/*.cpp")
-
 add_library(${PACKAGE_NAME} SHARED
     src/main/cpp/cpp-adapter.cpp
     ../cpp/HybridRunAnywhereONNX.cpp
-    ${BRIDGE_SOURCES}
 )
 
 # =============================================================================
@@ -124,7 +118,6 @@ set(CORE_JNILIB_DIR "${RN_NODE_MODULES}/@runanywhere/core/android/src/main/jniLi
 include_directories(
     "src/main/cpp"
     "../cpp"
-    "../cpp/bridges"
     "${CMAKE_SOURCE_DIR}/include"
     # RAC API headers from core package (flat access for all subdirectories)
     "${CORE_INCLUDE_DIR}"

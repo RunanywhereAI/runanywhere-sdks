@@ -1,5 +1,7 @@
 package com.runanywhere.runanywhereai.presentation.rag
 
+import ai.runanywhere.proto.v1.ModelInfo
+import ai.runanywhere.proto.v1.RAGConfig
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,10 +30,8 @@ import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
-import com.runanywhere.sdk.public.extensions.Models.ModelInfo
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
-import ai.runanywhere.proto.v1.RAGConfiguration
-import java.io.File
+import com.runanywhere.sdk.public.extensions.Models.isDownloadedModel
 
 /**
  * Document Q&A Screen — Compose port of iOS DocumentRAGView.swift
@@ -62,8 +62,10 @@ fun DocumentRAGScreen(
     // Error banner visibility
     var isErrorBannerVisible by remember { mutableStateOf(false) }
 
-    // Mirrors iOS areModelsReady
-    val areModelsReady = selectedEmbeddingModel?.localPath != null && selectedLLMModel?.localPath != null
+    // RAG uses model ids; the SDK resolves registry descriptors for the native pipeline.
+    val areModelsReady =
+        selectedEmbeddingModel?.isDownloadedModel == true &&
+            selectedLLMModel?.isDownloadedModel == true
 
     // Show / hide error banner when error changes
     LaunchedEffect(uiState.error) {
@@ -76,7 +78,7 @@ fun DocumentRAGScreen(
             contract = ActivityResultContracts.OpenDocument(),
         ) { uri: Uri? ->
             if (uri != null) {
-                val config = buildRAGConfiguration(selectedEmbeddingModel, selectedLLMModel)
+                val config = buildRAGConfig(selectedEmbeddingModel, selectedLLMModel)
                 if (config != null) {
                     viewModel.loadDocument(context, uri, config)
                 }
@@ -683,94 +685,21 @@ private fun InputBar(
     }
 }
 
-// MARK: - Model Path Resolution
+// MARK: - RAG Configuration
 
 /**
- * Resolve the actual embedding model file path.
- * If localPath is a directory, return `"$localPath/model.onnx"`.
- * Mirrors iOS resolveEmbeddingFilePath(localPath:) exactly.
+ * Build a generated RAGConfig from selected model ids.
+ * Registry-backed descriptor resolution happens inside the SDK RAG helper.
  */
-private fun resolveEmbeddingFilePath(localPath: String): String {
-    val file = File(localPath)
-
-    // 1. If it's already a file, we are good to go
-    if (!file.isDirectory) return localPath
-
-    val files = file.listFiles() ?: return localPath
-
-    // 2. Try to find a file that explicitly has the .onnx extension
-    val onnxFile = files.firstOrNull { it.extension.lowercase() == "onnx" }
-    if (onnxFile != null) return onnxFile.absolutePath
-
-    // 3. Fallback to conventional name
-    return "$localPath/model.onnx"
-}
-
-/**
- * Resolve the actual LLM model file path.
- * If localPath is a directory, find first .gguf file inside, else return localPath.
- * Mirrors iOS resolveLLMFilePath(localPath:) exactly.
- */
-private fun resolveLLMFilePath(localPath: String): String {
-    val file = File(localPath)
-
-    // 1. If it's already a file, we are good to go
-    if (!file.isDirectory) return localPath
-
-    val files = file.listFiles() ?: return localPath
-
-    // 2. Try to find a file that explicitly has the .gguf extension
-    val ggufFile = files.firstOrNull { it.extension.lowercase() == "gguf" }
-    if (ggufFile != null) return ggufFile.absolutePath
-
-    // 3. THE BULLETPROOF FALLBACK:
-    // If the downloader stripped the extension, grab the largest file in the directory.
-    // The LLM weights will always be the largest file by a massive margin.
-    val largestFile = files.filter { it.isFile }.maxByOrNull { it.length() }
-
-    return largestFile?.absolutePath ?: localPath
-}
-
-/**
- * Resolve the vocab file path for the embedding model.
- * Multi-file models (directory): vocab.txt is inside the folder.
- * Single-file models: vocab.txt is a sibling of the model file.
- * Mirrors iOS resolveVocabPath(for:) exactly.
- */
-private fun resolveVocabPath(embeddingLocalPath: String): String? {
-    val file = File(embeddingLocalPath)
-    return if (file.isDirectory) {
-        "$embeddingLocalPath/vocab.txt"
-    } else {
-        "${file.parent}/vocab.txt"
-    }
-}
-
-/**
- * Build a RAGConfiguration from selected models, injecting the vocab path.
- * Returns null if either model is not yet selected or has no local path.
- * Mirrors iOS ragConfig + handleFileImport vocab injection exactly.
- */
-private fun buildRAGConfiguration(
+private fun buildRAGConfig(
     embeddingModel: ModelInfo?,
     llmModel: ModelInfo?,
-): RAGConfiguration? {
-    val embeddingLocalPath = embeddingModel?.localPath ?: return null
-    val llmLocalPath = llmModel?.localPath ?: return null
+): RAGConfig? {
+    val embedding = embeddingModel ?: return null
+    val llm = llmModel ?: return null
 
-    val resolvedEmbeddingPath = resolveEmbeddingFilePath(embeddingLocalPath)
-    val resolvedLLMPath = resolveLLMFilePath(llmLocalPath)
-    val vocabPath = resolveVocabPath(embeddingLocalPath)
-
-    val embeddingConfigJson =
-        if (vocabPath != null) {
-            """{"vocab_path":"$vocabPath"}"""
-        } else {
-            null
-        }
-
-    return RAGConfiguration(
-        embedding_model_path = resolvedEmbeddingPath,
-        llm_model_path = resolvedLLMPath,
+    return RAGConfig(
+        embed_model_id = embedding.id,
+        llm_model_id = llm.id,
     )
 }

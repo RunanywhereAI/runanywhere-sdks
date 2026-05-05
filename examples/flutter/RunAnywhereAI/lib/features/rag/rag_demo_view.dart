@@ -6,12 +6,11 @@
 // retrieved chunks and timing metrics.
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
-import 'package:runanywhere/generated/rag.pb.dart';
+import 'package:runanywhere/runanywhere.dart' as sdk;
 
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -74,47 +73,24 @@ class _RagDemoViewState extends State<RagDemoView> {
     _scrollToBottom();
   }
 
-  // MARK: - Path Resolution (mirrors iOS exactly)
+  // MARK: - RAG Configuration
 
-  /// Resolve the actual embedding model file path.
-  ///
-  /// Multi-file models store localPath as a directory containing model.onnx.
-  String _resolveEmbeddingFilePath(String localPath) {
-    if (Directory(localPath).existsSync()) {
-      return '$localPath/model.onnx';
-    }
-    return localPath;
-  }
-
-  /// Resolve the actual LLM model file path.
-  ///
-  /// Single-file LlamaCpp models live inside a directory — find the first .gguf file.
-  String _resolveLLMFilePath(String localPath) {
-    if (!Directory(localPath).existsSync()) {
-      return localPath;
-    }
-    final dir = Directory(localPath);
-    final ggufFile = dir.listSync().whereType<File>().firstWhere(
-          (f) => f.path.toLowerCase().endsWith('.gguf'),
-          orElse: () => File(localPath),
-        );
-    return ggufFile.path;
-  }
-
-  /// Build a [RAGConfiguration] from selected models with resolved paths.
-  RAGConfiguration? _buildRagConfig() {
-    final embeddingPath = _selectedEmbeddingModel?.localPath;
-    final llmPath = _selectedLLMModel?.localPath;
-    if (embeddingPath == null ||
-        embeddingPath.isEmpty ||
-        llmPath == null ||
-        llmPath.isEmpty) {
+  /// Build a generated [sdk.RAGConfiguration] from selected registry models.
+  Future<sdk.RAGConfiguration?> _buildRagConfig() async {
+    final embeddingModel = _selectedEmbeddingModel;
+    final llmModel = _selectedLLMModel;
+    if (embeddingModel == null || llmModel == null) {
       return null;
     }
 
-    return RAGConfiguration(
-      embeddingModelPath: _resolveEmbeddingFilePath(embeddingPath),
-      llmModelPath: _resolveLLMFilePath(llmPath),
+    final embeddingPath = await sdk.RunAnywhereSDK.instance.models
+        .resolveModelFilePath(embeddingModel);
+    final llmPath =
+        await sdk.RunAnywhereSDK.instance.models.resolveModelFilePath(llmModel);
+
+    return sdk.RAGConfiguration(
+      embeddingModelPath: embeddingPath,
+      llmModelPath: llmPath,
     );
   }
 
@@ -164,7 +140,7 @@ class _RagDemoViewState extends State<RagDemoView> {
       final filePath = result.files.first.path;
       if (filePath == null) return;
 
-      final ragConfig = _buildRagConfig();
+      final ragConfig = await _buildRagConfig();
       if (ragConfig == null) return;
 
       await _viewModel.loadDocument(filePath, ragConfig);
@@ -712,7 +688,7 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
     );
   }
 
-  Widget _buildTimingMetrics(BuildContext context, RAGResult result) {
+  Widget _buildTimingMetrics(BuildContext context, sdk.RAGResult result) {
     final retrievalMs = result.retrievalTimeMs.toInt();
     final generationS =
         (result.generationTimeMs.toInt() / 1000).toStringAsFixed(1);
@@ -729,7 +705,7 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
     );
   }
 
-  Widget _buildChunksSection(BuildContext context, RAGResult result) {
+  Widget _buildChunksSection(BuildContext context, sdk.RAGResult result) {
     final count = result.retrievedChunks.length;
 
     return Padding(
@@ -780,7 +756,7 @@ class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
     );
   }
 
-  Widget _buildChunkCard(BuildContext context, RAGSearchResult chunk) {
+  Widget _buildChunkCard(BuildContext context, sdk.RAGSearchResult chunk) {
     const maxSnippetLength = 200;
     final snippet = chunk.text.length > maxSnippetLength
         ? '${chunk.text.substring(0, maxSnippetLength)}...'

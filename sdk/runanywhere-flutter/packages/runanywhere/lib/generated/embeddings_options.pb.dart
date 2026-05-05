@@ -9,6 +9,7 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -346,6 +347,8 @@ class EmbeddingVector extends $pb.GeneratedMessage {
     $core.double? norm,
     $core.String? text,
     $core.int? dimension,
+    $core.int? inputIndex,
+    $core.Map<$core.String, $core.String>? metadata,
   }) {
     final $result = create();
     if (values != null) {
@@ -360,6 +363,12 @@ class EmbeddingVector extends $pb.GeneratedMessage {
     if (dimension != null) {
       $result.dimension = dimension;
     }
+    if (inputIndex != null) {
+      $result.inputIndex = inputIndex;
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
+    }
     return $result;
   }
   EmbeddingVector._() : super();
@@ -371,6 +380,8 @@ class EmbeddingVector extends $pb.GeneratedMessage {
     ..a<$core.double>(2, _omitFieldNames ? '' : 'norm', $pb.PbFieldType.OF)
     ..aOS(3, _omitFieldNames ? '' : 'text')
     ..a<$core.int>(4, _omitFieldNames ? '' : 'dimension', $pb.PbFieldType.O3)
+    ..a<$core.int>(5, _omitFieldNames ? '' : 'inputIndex', $pb.PbFieldType.O3)
+    ..m<$core.String, $core.String>(6, _omitFieldNames ? '' : 'metadata', entryClassName: 'EmbeddingVector.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
     ..hasRequiredFields = false
   ;
 
@@ -433,6 +444,19 @@ class EmbeddingVector extends $pb.GeneratedMessage {
   $core.bool hasDimension() => $_has(3);
   @$pb.TagNumber(4)
   void clearDimension() => clearField(4);
+
+  /// Input index in the original request and optional caller metadata.
+  @$pb.TagNumber(5)
+  $core.int get inputIndex => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set inputIndex($core.int v) { $_setSignedInt32(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasInputIndex() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearInputIndex() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(5);
 }
 
 /// ---------------------------------------------------------------------------
@@ -443,6 +467,9 @@ class EmbeddingsRequest extends $pb.GeneratedMessage {
   factory EmbeddingsRequest({
     $core.Iterable<$core.String>? texts,
     EmbeddingsOptions? options,
+    $core.String? requestId,
+    $core.String? modelId,
+    $core.Map<$core.String, $core.String>? metadata,
   }) {
     final $result = create();
     if (texts != null) {
@@ -450,6 +477,15 @@ class EmbeddingsRequest extends $pb.GeneratedMessage {
     }
     if (options != null) {
       $result.options = options;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (modelId != null) {
+      $result.modelId = modelId;
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
     }
     return $result;
   }
@@ -460,6 +496,9 @@ class EmbeddingsRequest extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'EmbeddingsRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..pPS(1, _omitFieldNames ? '' : 'texts')
     ..aOM<EmbeddingsOptions>(2, _omitFieldNames ? '' : 'options', subBuilder: EmbeddingsOptions.create)
+    ..aOS(3, _omitFieldNames ? '' : 'requestId')
+    ..aOS(4, _omitFieldNames ? '' : 'modelId')
+    ..m<$core.String, $core.String>(5, _omitFieldNames ? '' : 'metadata', entryClassName: 'EmbeddingsRequest.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
     ..hasRequiredFields = false
   ;
 
@@ -497,6 +536,27 @@ class EmbeddingsRequest extends $pb.GeneratedMessage {
   void clearOptions() => clearField(2);
   @$pb.TagNumber(2)
   EmbeddingsOptions ensureOptions() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $core.String get requestId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set requestId($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasRequestId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRequestId() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get modelId => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set modelId($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasModelId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearModelId() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(4);
 }
 
 /// ---------------------------------------------------------------------------
@@ -511,6 +571,10 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
     $core.int? dimension,
     $fixnum.Int64? processingTimeMs,
     $core.int? tokensUsed,
+    $core.String? modelId,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+    $core.String? requestId,
   }) {
     final $result = create();
     if (vectors != null) {
@@ -525,6 +589,18 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
     if (tokensUsed != null) {
       $result.tokensUsed = tokensUsed;
     }
+    if (modelId != null) {
+      $result.modelId = modelId;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
     return $result;
   }
   EmbeddingsResult._() : super();
@@ -536,6 +612,10 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
     ..a<$core.int>(2, _omitFieldNames ? '' : 'dimension', $pb.PbFieldType.O3)
     ..aInt64(3, _omitFieldNames ? '' : 'processingTimeMs')
     ..a<$core.int>(4, _omitFieldNames ? '' : 'tokensUsed', $pb.PbFieldType.O3)
+    ..aOS(5, _omitFieldNames ? '' : 'modelId')
+    ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(7, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..aOS(8, _omitFieldNames ? '' : 'requestId')
     ..hasRequiredFields = false
   ;
 
@@ -594,6 +674,174 @@ class EmbeddingsResult extends $pb.GeneratedMessage {
   $core.bool hasTokensUsed() => $_has(3);
   @$pb.TagNumber(4)
   void clearTokensUsed() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get modelId => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set modelId($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasModelId() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearModelId() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get errorMessage => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set errorMessage($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasErrorMessage() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearErrorMessage() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get errorCode => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set errorCode($core.int v) { $_setSignedInt32(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasErrorCode() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearErrorCode() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get requestId => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set requestId($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasRequestId() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearRequestId() => clearField(8);
+}
+
+class EmbeddingsServiceState extends $pb.GeneratedMessage {
+  factory EmbeddingsServiceState({
+    $core.bool? isReady,
+    $core.String? currentModel,
+    $core.int? dimension,
+    $core.int? maxTokens,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (isReady != null) {
+      $result.isReady = isReady;
+    }
+    if (currentModel != null) {
+      $result.currentModel = currentModel;
+    }
+    if (dimension != null) {
+      $result.dimension = dimension;
+    }
+    if (maxTokens != null) {
+      $result.maxTokens = maxTokens;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  EmbeddingsServiceState._() : super();
+  factory EmbeddingsServiceState.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory EmbeddingsServiceState.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'EmbeddingsServiceState', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'isReady')
+    ..aOS(2, _omitFieldNames ? '' : 'currentModel')
+    ..a<$core.int>(3, _omitFieldNames ? '' : 'dimension', $pb.PbFieldType.O3)
+    ..a<$core.int>(4, _omitFieldNames ? '' : 'maxTokens', $pb.PbFieldType.O3)
+    ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(6, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  EmbeddingsServiceState clone() => EmbeddingsServiceState()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  EmbeddingsServiceState copyWith(void Function(EmbeddingsServiceState) updates) => super.copyWith((message) => updates(message as EmbeddingsServiceState)) as EmbeddingsServiceState;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EmbeddingsServiceState create() => EmbeddingsServiceState._();
+  EmbeddingsServiceState createEmptyInstance() => create();
+  static $pb.PbList<EmbeddingsServiceState> createRepeated() => $pb.PbList<EmbeddingsServiceState>();
+  @$core.pragma('dart2js:noInline')
+  static EmbeddingsServiceState getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<EmbeddingsServiceState>(create);
+  static EmbeddingsServiceState? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get isReady => $_getBF(0);
+  @$pb.TagNumber(1)
+  set isReady($core.bool v) { $_setBool(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasIsReady() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearIsReady() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get currentModel => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set currentModel($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasCurrentModel() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCurrentModel() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get dimension => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set dimension($core.int v) { $_setSignedInt32(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasDimension() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDimension() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get maxTokens => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set maxTokens($core.int v) { $_setSignedInt32(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasMaxTokens() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMaxTokens() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get errorMessage => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set errorMessage($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasErrorMessage() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearErrorMessage() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get errorCode => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set errorCode($core.int v) { $_setSignedInt32(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasErrorCode() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearErrorCode() => clearField(6);
+}
+
+class EmbeddingsApi {
+  $pb.RpcClient _client;
+  EmbeddingsApi(this._client);
+
+  $async.Future<EmbeddingsResult> embed($pb.ClientContext? ctx, EmbeddingsRequest request) =>
+    _client.invoke<EmbeddingsResult>(ctx, 'Embeddings', 'Embed', request, EmbeddingsResult())
+  ;
+  $async.Future<EmbeddingsResult> embedBatch($pb.ClientContext? ctx, EmbeddingsRequest request) =>
+    _client.invoke<EmbeddingsResult>(ctx, 'Embeddings', 'EmbedBatch', request, EmbeddingsResult())
+  ;
 }
 
 

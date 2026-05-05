@@ -7,7 +7,9 @@
 #include <cstring>
 #include <ctime>
 
+#include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/network/rac_api_types.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 
@@ -50,6 +52,38 @@ static void free_auth_state_strings() {
 
 static int64_t current_time_seconds() {
     return (int64_t)time(nullptr);
+}
+
+static const char* auth_subject_id(const rac_auth_response_t* response) {
+    if (!response) {
+        return nullptr;
+    }
+    if (response->user_id && response->user_id[0] != '\0') {
+        return response->user_id;
+    }
+    if (response->organization_id && response->organization_id[0] != '\0') {
+        return response->organization_id;
+    }
+    return nullptr;
+}
+
+static void publish_auth_success_event(const rac_auth_response_t* response, bool refresh) {
+    const char* operation = refresh ? "auth.refresh" : "auth.authenticate";
+    if (refresh) {
+        rac::events::publish_auth_token_refreshed(auth_subject_id(response), "runanywhere", "sdk",
+                                                  operation,
+                                                  response ? response->device_id : nullptr);
+    } else {
+        rac::events::publish_auth_succeeded(auth_subject_id(response), "runanywhere", "sdk",
+                                            operation, response ? response->device_id : nullptr);
+    }
+}
+
+static void publish_auth_failure_event(const char* message, bool refresh) {
+    rac::events::publish_auth_failed(RAC_ERROR_AUTHENTICATION_FAILED,
+                                     message ? message : "Authentication failed",
+                                     "runanywhere", "sdk",
+                                     refresh ? "auth.refresh" : "auth.authenticate");
 }
 
 // =============================================================================
@@ -192,12 +226,15 @@ static int update_auth_state_from_response(const rac_auth_response_t* response) 
     return 0;
 }
 
-int rac_auth_handle_authenticate_response(const char* json) {
-    if (!json)
+static int handle_auth_response(const char* json, bool refresh) {
+    if (!json) {
+        publish_auth_failure_event("Authentication response body is missing", refresh);
         return -1;
+    }
 
     rac_auth_response_t response = {};
     if (rac_auth_response_from_json(json, &response) != 0) {
+        publish_auth_failure_event("Authentication response is invalid", refresh);
         return -1;
     }
 
@@ -206,15 +243,22 @@ int rac_auth_handle_authenticate_response(const char* json) {
     // Save to secure storage if available and successful
     if (result == 0) {
         rac_auth_save_tokens();
+        publish_auth_success_event(&response, refresh);
+    } else {
+        publish_auth_failure_event("Failed to update authentication state", refresh);
     }
 
     rac_auth_response_free(&response);
     return result;
 }
 
+int rac_auth_handle_authenticate_response(const char* json) {
+    return handle_auth_response(json, false);
+}
+
 int rac_auth_handle_refresh_response(const char* json) {
-    // Same handling as authenticate - response format is identical
-    return rac_auth_handle_authenticate_response(json);
+    // Same response format as authenticate; event semantics are distinct.
+    return handle_auth_response(json, true);
 }
 
 // =============================================================================

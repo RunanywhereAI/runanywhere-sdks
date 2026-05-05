@@ -11,7 +11,9 @@ import com.squareup.wire.ProtoReader
 import com.squareup.wire.ProtoWriter
 import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
+import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -25,6 +27,14 @@ import kotlin.Suppress
 import okio.ByteString
 
 public class AgentResponseStartedEvent(
+  @field:WireField(
+    tag = 1,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "turnId",
+    schemaIndex = 0,
+  )
+  public val turn_id: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<AgentResponseStartedEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -38,15 +48,29 @@ public class AgentResponseStartedEvent(
     if (other === this) return true
     if (other !is AgentResponseStartedEvent) return false
     if (unknownFields != other.unknownFields) return false
+    if (turn_id != other.turn_id) return false
     return true
   }
 
-  override fun hashCode(): Int = unknownFields.hashCode()
+  override fun hashCode(): Int {
+    var result = super.hashCode
+    if (result == 0) {
+      result = unknownFields.hashCode()
+      result = result * 37 + turn_id.hashCode()
+      super.hashCode = result
+    }
+    return result
+  }
 
-  override fun toString(): String = "AgentResponseStartedEvent{}"
+  override fun toString(): String {
+    val result = mutableListOf<String>()
+    result += """turn_id=${sanitize(turn_id)}"""
+    return result.joinToString(prefix = "AgentResponseStartedEvent{", separator = ", ", postfix =
+        "}")
+  }
 
-  public fun copy(unknownFields: ByteString = this.unknownFields): AgentResponseStartedEvent =
-      AgentResponseStartedEvent(unknownFields)
+  public fun copy(turn_id: String = this.turn_id, unknownFields: ByteString = this.unknownFields):
+      AgentResponseStartedEvent = AgentResponseStartedEvent(turn_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -61,20 +85,30 @@ public class AgentResponseStartedEvent(
     ) {
       override fun encodedSize(`value`: AgentResponseStartedEvent): Int {
         var size = value.unknownFields.size
+        if (value.turn_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.turn_id)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: AgentResponseStartedEvent) {
+        if (value.turn_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.turn_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: AgentResponseStartedEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.turn_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.turn_id)
       }
 
       override fun decode(reader: ProtoReader): AgentResponseStartedEvent {
-        val unknownFields = reader.forEachTag(reader::readUnknownField)
+        var turn_id: String = ""
+        val unknownFields = reader.forEachTag { tag ->
+          when (tag) {
+            1 -> turn_id = ProtoAdapter.STRING.decode(reader)
+            else -> reader.readUnknownField(tag)
+          }
+        }
         return AgentResponseStartedEvent(
+          turn_id = turn_id,
           unknownFields = unknownFields
         )
       }

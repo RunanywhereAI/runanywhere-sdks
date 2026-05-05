@@ -107,7 +107,7 @@ The entry point is `RunAnywhere` (a Kotlin `object` singleton in `commonMain/pub
 | File | Capability |
 |------|-----------|
 | `RunAnywhere+TextGeneration.kt` | `chat()`, `generate()`, `generateStream()`, `cancelGeneration()` |
-| `RunAnywhere+STT.kt` | `transcribe()`, `transcribeStream()`, streaming audio processing |
+| `RunAnywhere+STT.kt` | `transcribe()`, `transcribeStream()` generated `STTStreamEvent` flow |
 | `RunAnywhere+TTS.kt` | `synthesize()`, `speak()`, `synthesizeStream()`, voice management |
 | `RunAnywhere+VAD.kt` | `detectVoiceActivity()`, `streamVAD()`, VAD lifecycle & callbacks |
 | `RunAnywhere+VisionLanguage.kt` | `describeImage()`, `processImage()`, `processImageStream()` |

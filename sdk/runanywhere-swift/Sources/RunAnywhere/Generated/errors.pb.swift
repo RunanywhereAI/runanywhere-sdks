@@ -1267,6 +1267,12 @@ public struct RAErrorContext: Sendable {
 ///   * `nested_message` — optional. Underlying-error message as captured at
 ///     wrap time. Mirrors Swift's RunAnywhereError.underlyingError.localizedDesc
 ///     and Kotlin's Throwable.cause.message.
+///   * `retryable` — canonical retry hint. This is business-policy metadata
+///     owned by the portable layer; the platform adapter still decides how to
+///     schedule the retry through native/background APIs when appropriate.
+///   * `correlation_id` — stable cross-event/request correlation key. SDKEvent
+///     also carries this field so callers can join success/progress/failure
+///     events without parsing free-form properties.
 /// ---------------------------------------------------------------------------
 public struct RASDKError: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
@@ -1318,6 +1324,12 @@ public struct RASDKError: Sendable {
   public var severity: RAErrorSeverity = .unspecified
 
   public var component: String = String()
+
+  public var retryable: Bool = false
+
+  public var remediationHint: String = String()
+
+  public var correlationID: String = String()
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1395,7 +1407,7 @@ extension RAErrorContext: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
 
 extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SDKError"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}code\0\u{1}category\0\u{1}message\0\u{1}context\0\u{3}c_abi_code\0\u{3}nested_message\0\u{3}timestamp_ms\0\u{1}severity\0\u{1}component\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}code\0\u{1}category\0\u{1}message\0\u{1}context\0\u{3}c_abi_code\0\u{3}nested_message\0\u{3}timestamp_ms\0\u{1}severity\0\u{1}component\0\u{1}retryable\0\u{3}remediation_hint\0\u{3}correlation_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1412,6 +1424,9 @@ extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
       case 7: try { try decoder.decodeSingularInt64Field(value: &self.timestampMs) }()
       case 8: try { try decoder.decodeSingularEnumField(value: &self.severity) }()
       case 9: try { try decoder.decodeSingularStringField(value: &self.component) }()
+      case 10: try { try decoder.decodeSingularBoolField(value: &self.retryable) }()
+      case 11: try { try decoder.decodeSingularStringField(value: &self.remediationHint) }()
+      case 12: try { try decoder.decodeSingularStringField(value: &self.correlationID) }()
       default: break
       }
     }
@@ -1449,6 +1464,15 @@ extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     if !self.component.isEmpty {
       try visitor.visitSingularStringField(value: self.component, fieldNumber: 9)
     }
+    if self.retryable != false {
+      try visitor.visitSingularBoolField(value: self.retryable, fieldNumber: 10)
+    }
+    if !self.remediationHint.isEmpty {
+      try visitor.visitSingularStringField(value: self.remediationHint, fieldNumber: 11)
+    }
+    if !self.correlationID.isEmpty {
+      try visitor.visitSingularStringField(value: self.correlationID, fieldNumber: 12)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1462,6 +1486,9 @@ extension RASDKError: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     if lhs.timestampMs != rhs.timestampMs {return false}
     if lhs.severity != rhs.severity {return false}
     if lhs.component != rhs.component {return false}
+    if lhs.retryable != rhs.retryable {return false}
+    if lhs.remediationHint != rhs.remediationHint {return false}
+    if lhs.correlationID != rhs.correlationID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -27,6 +27,24 @@ namespace _pbi = ::google::protobuf::internal;
 namespace _fl = ::google::protobuf::internal::field_layout;
 namespace runanywhere {
 namespace v1 {
+template <typename>
+constexpr HardwareProfileRequest::HardwareProfileRequest(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::internal::ZeroFieldsBase(HardwareProfileRequest_class_data_.base()){}
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::internal::ZeroFieldsBase() {
+}
+#endif  // PROTOBUF_CUSTOM_VTABLE
+struct HardwareProfileRequestDefaultTypeInternal {
+  constexpr HardwareProfileRequestDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~HardwareProfileRequestDefaultTypeInternal() {}
+  union {
+    HardwareProfileRequest _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 HardwareProfileRequestDefaultTypeInternal _HardwareProfileRequest_default_instance_;
 
 inline constexpr HardwareProfile::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
@@ -69,6 +87,79 @@ struct HardwareProfileDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 HardwareProfileDefaultTypeInternal _HardwareProfile_default_instance_;
+template <typename>
+constexpr HardwareAcceleratorsRequest::HardwareAcceleratorsRequest(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::internal::ZeroFieldsBase(HardwareAcceleratorsRequest_class_data_.base()){}
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::internal::ZeroFieldsBase() {
+}
+#endif  // PROTOBUF_CUSTOM_VTABLE
+struct HardwareAcceleratorsRequestDefaultTypeInternal {
+  constexpr HardwareAcceleratorsRequestDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~HardwareAcceleratorsRequestDefaultTypeInternal() {}
+  union {
+    HardwareAcceleratorsRequest _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 HardwareAcceleratorsRequestDefaultTypeInternal _HardwareAcceleratorsRequest_default_instance_;
+
+inline constexpr HardwareAcceleratorPreferenceResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        error_message_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        success_{false} {}
+
+template <typename>
+constexpr HardwareAcceleratorPreferenceResult::HardwareAcceleratorPreferenceResult(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(HardwareAcceleratorPreferenceResult_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct HardwareAcceleratorPreferenceResultDefaultTypeInternal {
+  constexpr HardwareAcceleratorPreferenceResultDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~HardwareAcceleratorPreferenceResultDefaultTypeInternal() {}
+  union {
+    HardwareAcceleratorPreferenceResult _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 HardwareAcceleratorPreferenceResultDefaultTypeInternal _HardwareAcceleratorPreferenceResult_default_instance_;
+
+inline constexpr HardwareAcceleratorPreferenceRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        preference_{static_cast< ::runanywhere::v1::AcceleratorPreference >(0)} {}
+
+template <typename>
+constexpr HardwareAcceleratorPreferenceRequest::HardwareAcceleratorPreferenceRequest(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(HardwareAcceleratorPreferenceRequest_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct HardwareAcceleratorPreferenceRequestDefaultTypeInternal {
+  constexpr HardwareAcceleratorPreferenceRequestDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~HardwareAcceleratorPreferenceRequestDefaultTypeInternal() {}
+  union {
+    HardwareAcceleratorPreferenceRequest _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 HardwareAcceleratorPreferenceRequestDefaultTypeInternal _HardwareAcceleratorPreferenceRequest_default_instance_;
 
 inline constexpr AcceleratorInfo::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
@@ -180,6 +271,20 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HardwareProfileResult, _impl_.accelerators_),
         1,
         0,
+        0x000, // bitmap
+        0x000, // bitmap
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HardwareAcceleratorPreferenceRequest, _impl_._has_bits_),
+        4, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HardwareAcceleratorPreferenceRequest, _impl_.preference_),
+        0,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HardwareAcceleratorPreferenceResult, _impl_._has_bits_),
+        5, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HardwareAcceleratorPreferenceResult, _impl_.success_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::HardwareAcceleratorPreferenceResult, _impl_.error_message_),
+        1,
+        0,
 };
 
 static const ::_pbi::MigrationSchema
@@ -187,11 +292,19 @@ static const ::_pbi::MigrationSchema
         {0, sizeof(::runanywhere::v1::HardwareProfile)},
         {21, sizeof(::runanywhere::v1::AcceleratorInfo)},
         {30, sizeof(::runanywhere::v1::HardwareProfileResult)},
+        {37, sizeof(::runanywhere::v1::HardwareProfileRequest)},
+        {38, sizeof(::runanywhere::v1::HardwareAcceleratorsRequest)},
+        {39, sizeof(::runanywhere::v1::HardwareAcceleratorPreferenceRequest)},
+        {44, sizeof(::runanywhere::v1::HardwareAcceleratorPreferenceResult)},
 };
 static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::runanywhere::v1::_HardwareProfile_default_instance_._instance,
     &::runanywhere::v1::_AcceleratorInfo_default_instance_._instance,
     &::runanywhere::v1::_HardwareProfileResult_default_instance_._instance,
+    &::runanywhere::v1::_HardwareProfileRequest_default_instance_._instance,
+    &::runanywhere::v1::_HardwareAcceleratorsRequest_default_instance_._instance,
+    &::runanywhere::v1::_HardwareAcceleratorPreferenceRequest_default_instance_._instance,
+    &::runanywhere::v1::_HardwareAcceleratorPreferenceResult_default_instance_._instance,
 };
 const char descriptor_table_protodef_hardware_5fprofile_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
@@ -207,25 +320,39 @@ const char descriptor_table_protodef_hardware_5fprofile_2eproto[] ABSL_ATTRIBUTE
     "vailable\030\003 \001(\010\"\200\001\n\025HardwareProfileResult"
     "\0220\n\007profile\030\001 \001(\0132\037.runanywhere.v1.Hardw"
     "areProfile\0225\n\014accelerators\030\002 \003(\0132\037.runan"
-    "ywhere.v1.AcceleratorInfo*\230\001\n\025Accelerato"
-    "rPreference\022\037\n\033ACCELERATOR_PREFERENCE_AU"
-    "TO\020\000\022\036\n\032ACCELERATOR_PREFERENCE_ANE\020\001\022\036\n\032"
-    "ACCELERATOR_PREFERENCE_GPU\020\002\022\036\n\032ACCELERA"
-    "TOR_PREFERENCE_CPU\020\003B@\n\027ai.runanywhere.p"
-    "roto.v1B\024HardwareProfileProtoP\001\370\001\001\242\002\004RAV"
-    "1\272\002\002RAb\006proto3"
+    "ywhere.v1.AcceleratorInfo\"\030\n\026HardwarePro"
+    "fileRequest\"\035\n\033HardwareAcceleratorsReque"
+    "st\"a\n$HardwareAcceleratorPreferenceReque"
+    "st\0229\n\npreference\030\001 \001(\0162%.runanywhere.v1."
+    "AcceleratorPreference\"M\n#HardwareAcceler"
+    "atorPreferenceResult\022\017\n\007success\030\001 \001(\010\022\025\n"
+    "\rerror_message\030\002 \001(\t*\230\001\n\025AcceleratorPref"
+    "erence\022\037\n\033ACCELERATOR_PREFERENCE_AUTO\020\000\022"
+    "\036\n\032ACCELERATOR_PREFERENCE_ANE\020\001\022\036\n\032ACCEL"
+    "ERATOR_PREFERENCE_GPU\020\002\022\036\n\032ACCELERATOR_P"
+    "REFERENCE_CPU\020\0032\326\002\n\010Hardware\022[\n\nGetProfi"
+    "le\022&.runanywhere.v1.HardwareProfileReque"
+    "st\032%.runanywhere.v1.HardwareProfileResul"
+    "t\022e\n\017GetAccelerators\022+.runanywhere.v1.Ha"
+    "rdwareAcceleratorsRequest\032%.runanywhere."
+    "v1.HardwareProfileResult\022\205\001\n\030SetAccelera"
+    "torPreference\0224.runanywhere.v1.HardwareA"
+    "cceleratorPreferenceRequest\0323.runanywher"
+    "e.v1.HardwareAcceleratorPreferenceResult"
+    "B@\n\027ai.runanywhere.proto.v1B\024HardwarePro"
+    "fileProtoP\001\370\001\001\242\002\004RAV1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_hardware_5fprofile_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_hardware_5fprofile_2eproto = {
     false,
     false,
-    734,
+    1314,
     descriptor_table_protodef_hardware_5fprofile_2eproto,
     "hardware_profile.proto",
     &descriptor_table_hardware_5fprofile_2eproto_once,
     nullptr,
     0,
-    3,
+    7,
     schemas,
     file_default_instances,
     TableStruct_hardware_5fprofile_2eproto::offsets,
@@ -1509,6 +1636,778 @@ void HardwareProfileResult::InternalSwap(HardwareProfileResult* PROTOBUF_RESTRIC
 }
 
 ::google::protobuf::Metadata HardwareProfileResult::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class HardwareProfileRequest::_Internal {
+ public:
+};
+
+HardwareProfileRequest::HardwareProfileRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::internal::ZeroFieldsBase(arena, HardwareProfileRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.HardwareProfileRequest)
+}
+HardwareProfileRequest::HardwareProfileRequest(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const HardwareProfileRequest& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::internal::ZeroFieldsBase(arena, HardwareProfileRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  HardwareProfileRequest* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.HardwareProfileRequest)
+}
+
+inline void* PROTOBUF_NONNULL HardwareProfileRequest::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) HardwareProfileRequest(arena);
+}
+constexpr auto HardwareProfileRequest::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(HardwareProfileRequest),
+                                            alignof(HardwareProfileRequest));
+}
+constexpr auto HardwareProfileRequest::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_HardwareProfileRequest_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &HardwareProfileRequest::MergeImpl,
+          ::google::protobuf::internal::ZeroFieldsBase::GetNewImpl<HardwareProfileRequest>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &HardwareProfileRequest::SharedDtor,
+          ::google::protobuf::internal::ZeroFieldsBase::GetClearImpl<HardwareProfileRequest>(), &HardwareProfileRequest::ByteSizeLong,
+              &HardwareProfileRequest::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(HardwareProfileRequest, _impl_._cached_size_),
+          false,
+      },
+      &HardwareProfileRequest::kDescriptorMethods,
+      &descriptor_table_hardware_5fprofile_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull HardwareProfileRequest_class_data_ =
+        HardwareProfileRequest::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+HardwareProfileRequest::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&HardwareProfileRequest_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(HardwareProfileRequest_class_data_.tc_table);
+  return HardwareProfileRequest_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<0, 0, 0, 0, 2>
+HardwareProfileRequest::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(HardwareProfileRequest,
+                          _impl_._cached_size_),  // no hasbits
+    0, // no _extensions_
+    0, 0,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967295,  // skipmap
+    offsetof(decltype(_table_), field_names),  // no field_entries
+    0,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    HardwareProfileRequest_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::HardwareProfileRequest>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    {::_pbi::TcParser::MiniParse, {}},
+  }}, {{
+    65535, 65535
+  }}, // no field_entries, or aux_entries
+  {{
+  }},
+};
+
+
+
+
+
+
+
+::google::protobuf::Metadata HardwareProfileRequest::GetMetadata() const {
+  return ::google::protobuf::internal::ZeroFieldsBase::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class HardwareAcceleratorsRequest::_Internal {
+ public:
+};
+
+HardwareAcceleratorsRequest::HardwareAcceleratorsRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::internal::ZeroFieldsBase(arena, HardwareAcceleratorsRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.HardwareAcceleratorsRequest)
+}
+HardwareAcceleratorsRequest::HardwareAcceleratorsRequest(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const HardwareAcceleratorsRequest& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::internal::ZeroFieldsBase(arena, HardwareAcceleratorsRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  HardwareAcceleratorsRequest* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.HardwareAcceleratorsRequest)
+}
+
+inline void* PROTOBUF_NONNULL HardwareAcceleratorsRequest::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) HardwareAcceleratorsRequest(arena);
+}
+constexpr auto HardwareAcceleratorsRequest::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(HardwareAcceleratorsRequest),
+                                            alignof(HardwareAcceleratorsRequest));
+}
+constexpr auto HardwareAcceleratorsRequest::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_HardwareAcceleratorsRequest_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &HardwareAcceleratorsRequest::MergeImpl,
+          ::google::protobuf::internal::ZeroFieldsBase::GetNewImpl<HardwareAcceleratorsRequest>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &HardwareAcceleratorsRequest::SharedDtor,
+          ::google::protobuf::internal::ZeroFieldsBase::GetClearImpl<HardwareAcceleratorsRequest>(), &HardwareAcceleratorsRequest::ByteSizeLong,
+              &HardwareAcceleratorsRequest::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(HardwareAcceleratorsRequest, _impl_._cached_size_),
+          false,
+      },
+      &HardwareAcceleratorsRequest::kDescriptorMethods,
+      &descriptor_table_hardware_5fprofile_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull HardwareAcceleratorsRequest_class_data_ =
+        HardwareAcceleratorsRequest::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+HardwareAcceleratorsRequest::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&HardwareAcceleratorsRequest_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(HardwareAcceleratorsRequest_class_data_.tc_table);
+  return HardwareAcceleratorsRequest_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<0, 0, 0, 0, 2>
+HardwareAcceleratorsRequest::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(HardwareAcceleratorsRequest,
+                          _impl_._cached_size_),  // no hasbits
+    0, // no _extensions_
+    0, 0,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967295,  // skipmap
+    offsetof(decltype(_table_), field_names),  // no field_entries
+    0,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    HardwareAcceleratorsRequest_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::HardwareAcceleratorsRequest>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    {::_pbi::TcParser::MiniParse, {}},
+  }}, {{
+    65535, 65535
+  }}, // no field_entries, or aux_entries
+  {{
+  }},
+};
+
+
+
+
+
+
+
+::google::protobuf::Metadata HardwareAcceleratorsRequest::GetMetadata() const {
+  return ::google::protobuf::internal::ZeroFieldsBase::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class HardwareAcceleratorPreferenceRequest::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<HardwareAcceleratorPreferenceRequest>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(HardwareAcceleratorPreferenceRequest, _impl_._has_bits_);
+};
+
+HardwareAcceleratorPreferenceRequest::HardwareAcceleratorPreferenceRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, HardwareAcceleratorPreferenceRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.HardwareAcceleratorPreferenceRequest)
+}
+HardwareAcceleratorPreferenceRequest::HardwareAcceleratorPreferenceRequest(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const HardwareAcceleratorPreferenceRequest& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, HardwareAcceleratorPreferenceRequest_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(from._impl_) {
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+PROTOBUF_NDEBUG_INLINE HardwareAcceleratorPreferenceRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0} {}
+
+inline void HardwareAcceleratorPreferenceRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  _impl_.preference_ = {};
+}
+HardwareAcceleratorPreferenceRequest::~HardwareAcceleratorPreferenceRequest() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.HardwareAcceleratorPreferenceRequest)
+  SharedDtor(*this);
+}
+inline void HardwareAcceleratorPreferenceRequest::SharedDtor(MessageLite& self) {
+  HardwareAcceleratorPreferenceRequest& this_ = static_cast<HardwareAcceleratorPreferenceRequest&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL HardwareAcceleratorPreferenceRequest::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) HardwareAcceleratorPreferenceRequest(arena);
+}
+constexpr auto HardwareAcceleratorPreferenceRequest::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(HardwareAcceleratorPreferenceRequest),
+                                            alignof(HardwareAcceleratorPreferenceRequest));
+}
+constexpr auto HardwareAcceleratorPreferenceRequest::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_HardwareAcceleratorPreferenceRequest_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &HardwareAcceleratorPreferenceRequest::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<HardwareAcceleratorPreferenceRequest>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &HardwareAcceleratorPreferenceRequest::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<HardwareAcceleratorPreferenceRequest>(), &HardwareAcceleratorPreferenceRequest::ByteSizeLong,
+              &HardwareAcceleratorPreferenceRequest::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(HardwareAcceleratorPreferenceRequest, _impl_._cached_size_),
+          false,
+      },
+      &HardwareAcceleratorPreferenceRequest::kDescriptorMethods,
+      &descriptor_table_hardware_5fprofile_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull HardwareAcceleratorPreferenceRequest_class_data_ =
+        HardwareAcceleratorPreferenceRequest::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+HardwareAcceleratorPreferenceRequest::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&HardwareAcceleratorPreferenceRequest_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(HardwareAcceleratorPreferenceRequest_class_data_.tc_table);
+  return HardwareAcceleratorPreferenceRequest_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<0, 1, 0, 0, 2>
+HardwareAcceleratorPreferenceRequest::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(HardwareAcceleratorPreferenceRequest, _impl_._has_bits_),
+    0, // no _extensions_
+    1, 0,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967294,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    1,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    HardwareAcceleratorPreferenceRequest_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::HardwareAcceleratorPreferenceRequest>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // .runanywhere.v1.AcceleratorPreference preference = 1;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(HardwareAcceleratorPreferenceRequest, _impl_.preference_), 0>(),
+     {8, 0, 0,
+      PROTOBUF_FIELD_OFFSET(HardwareAcceleratorPreferenceRequest, _impl_.preference_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // .runanywhere.v1.AcceleratorPreference preference = 1;
+    {PROTOBUF_FIELD_OFFSET(HardwareAcceleratorPreferenceRequest, _impl_.preference_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+  }},
+  // no aux_entries
+  {{
+  }},
+};
+PROTOBUF_NOINLINE void HardwareAcceleratorPreferenceRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.HardwareAcceleratorPreferenceRequest)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  _impl_.preference_ = 0;
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL HardwareAcceleratorPreferenceRequest::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const HardwareAcceleratorPreferenceRequest& this_ = static_cast<const HardwareAcceleratorPreferenceRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL HardwareAcceleratorPreferenceRequest::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const HardwareAcceleratorPreferenceRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.HardwareAcceleratorPreferenceRequest)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // .runanywhere.v1.AcceleratorPreference preference = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (this_._internal_preference() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          1, this_._internal_preference(), target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.HardwareAcceleratorPreferenceRequest)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t HardwareAcceleratorPreferenceRequest::ByteSizeLong(const MessageLite& base) {
+  const HardwareAcceleratorPreferenceRequest& this_ = static_cast<const HardwareAcceleratorPreferenceRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t HardwareAcceleratorPreferenceRequest::ByteSizeLong() const {
+  const HardwareAcceleratorPreferenceRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.HardwareAcceleratorPreferenceRequest)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+   {
+    // .runanywhere.v1.AcceleratorPreference preference = 1;
+    cached_has_bits = this_._impl_._has_bits_[0];
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (this_._internal_preference() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_preference());
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void HardwareAcceleratorPreferenceRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<HardwareAcceleratorPreferenceRequest*>(&to_msg);
+  auto& from = static_cast<const HardwareAcceleratorPreferenceRequest&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.HardwareAcceleratorPreferenceRequest)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (from._internal_preference() != 0) {
+      _this->_impl_.preference_ = from._impl_.preference_;
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void HardwareAcceleratorPreferenceRequest::CopyFrom(const HardwareAcceleratorPreferenceRequest& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.HardwareAcceleratorPreferenceRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void HardwareAcceleratorPreferenceRequest::InternalSwap(HardwareAcceleratorPreferenceRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  swap(_impl_.preference_, other->_impl_.preference_);
+}
+
+::google::protobuf::Metadata HardwareAcceleratorPreferenceRequest::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class HardwareAcceleratorPreferenceResult::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<HardwareAcceleratorPreferenceResult>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(HardwareAcceleratorPreferenceResult, _impl_._has_bits_);
+};
+
+HardwareAcceleratorPreferenceResult::HardwareAcceleratorPreferenceResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, HardwareAcceleratorPreferenceResult_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.HardwareAcceleratorPreferenceResult)
+}
+PROTOBUF_NDEBUG_INLINE HardwareAcceleratorPreferenceResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::HardwareAcceleratorPreferenceResult& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        error_message_(arena, from.error_message_) {}
+
+HardwareAcceleratorPreferenceResult::HardwareAcceleratorPreferenceResult(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const HardwareAcceleratorPreferenceResult& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, HardwareAcceleratorPreferenceResult_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  HardwareAcceleratorPreferenceResult* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  _impl_.success_ = from._impl_.success_;
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.HardwareAcceleratorPreferenceResult)
+}
+PROTOBUF_NDEBUG_INLINE HardwareAcceleratorPreferenceResult::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        error_message_(arena) {}
+
+inline void HardwareAcceleratorPreferenceResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  _impl_.success_ = {};
+}
+HardwareAcceleratorPreferenceResult::~HardwareAcceleratorPreferenceResult() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.HardwareAcceleratorPreferenceResult)
+  SharedDtor(*this);
+}
+inline void HardwareAcceleratorPreferenceResult::SharedDtor(MessageLite& self) {
+  HardwareAcceleratorPreferenceResult& this_ = static_cast<HardwareAcceleratorPreferenceResult&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.error_message_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL HardwareAcceleratorPreferenceResult::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) HardwareAcceleratorPreferenceResult(arena);
+}
+constexpr auto HardwareAcceleratorPreferenceResult::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(HardwareAcceleratorPreferenceResult),
+                                            alignof(HardwareAcceleratorPreferenceResult));
+}
+constexpr auto HardwareAcceleratorPreferenceResult::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_HardwareAcceleratorPreferenceResult_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &HardwareAcceleratorPreferenceResult::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<HardwareAcceleratorPreferenceResult>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &HardwareAcceleratorPreferenceResult::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<HardwareAcceleratorPreferenceResult>(), &HardwareAcceleratorPreferenceResult::ByteSizeLong,
+              &HardwareAcceleratorPreferenceResult::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(HardwareAcceleratorPreferenceResult, _impl_._cached_size_),
+          false,
+      },
+      &HardwareAcceleratorPreferenceResult::kDescriptorMethods,
+      &descriptor_table_hardware_5fprofile_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull HardwareAcceleratorPreferenceResult_class_data_ =
+        HardwareAcceleratorPreferenceResult::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+HardwareAcceleratorPreferenceResult::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&HardwareAcceleratorPreferenceResult_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(HardwareAcceleratorPreferenceResult_class_data_.tc_table);
+  return HardwareAcceleratorPreferenceResult_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<1, 2, 0, 72, 2>
+HardwareAcceleratorPreferenceResult::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(HardwareAcceleratorPreferenceResult, _impl_._has_bits_),
+    0, // no _extensions_
+    2, 8,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967292,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    2,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    HardwareAcceleratorPreferenceResult_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::HardwareAcceleratorPreferenceResult>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // string error_message = 2;
+    {::_pbi::TcParser::FastUS1,
+     {18, 0, 0,
+      PROTOBUF_FIELD_OFFSET(HardwareAcceleratorPreferenceResult, _impl_.error_message_)}},
+    // bool success = 1;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(HardwareAcceleratorPreferenceResult, _impl_.success_), 1>(),
+     {8, 1, 0,
+      PROTOBUF_FIELD_OFFSET(HardwareAcceleratorPreferenceResult, _impl_.success_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // bool success = 1;
+    {PROTOBUF_FIELD_OFFSET(HardwareAcceleratorPreferenceResult, _impl_.success_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // string error_message = 2;
+    {PROTOBUF_FIELD_OFFSET(HardwareAcceleratorPreferenceResult, _impl_.error_message_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  // no aux_entries
+  {{
+    "\62\0\15\0\0\0\0\0"
+    "runanywhere.v1.HardwareAcceleratorPreferenceResult"
+    "error_message"
+  }},
+};
+PROTOBUF_NOINLINE void HardwareAcceleratorPreferenceResult::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.HardwareAcceleratorPreferenceResult)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    _impl_.error_message_.ClearNonDefaultToEmpty();
+  }
+  _impl_.success_ = false;
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL HardwareAcceleratorPreferenceResult::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const HardwareAcceleratorPreferenceResult& this_ = static_cast<const HardwareAcceleratorPreferenceResult&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL HardwareAcceleratorPreferenceResult::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const HardwareAcceleratorPreferenceResult& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.HardwareAcceleratorPreferenceResult)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // bool success = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (this_._internal_success() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          1, this_._internal_success(), target);
+    }
+  }
+
+  // string error_message = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_error_message().empty()) {
+      const ::std::string& _s = this_._internal_error_message();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.HardwareAcceleratorPreferenceResult.error_message");
+      target = stream->WriteStringMaybeAliased(2, _s, target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.HardwareAcceleratorPreferenceResult)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t HardwareAcceleratorPreferenceResult::ByteSizeLong(const MessageLite& base) {
+  const HardwareAcceleratorPreferenceResult& this_ = static_cast<const HardwareAcceleratorPreferenceResult&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t HardwareAcceleratorPreferenceResult::ByteSizeLong() const {
+  const HardwareAcceleratorPreferenceResult& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.HardwareAcceleratorPreferenceResult)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    // string error_message = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_error_message().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_error_message());
+      }
+    }
+    // bool success = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (this_._internal_success() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void HardwareAcceleratorPreferenceResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<HardwareAcceleratorPreferenceResult*>(&to_msg);
+  auto& from = static_cast<const HardwareAcceleratorPreferenceResult&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.HardwareAcceleratorPreferenceResult)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_error_message().empty()) {
+        _this->_internal_set_error_message(from._internal_error_message());
+      } else {
+        if (_this->_impl_.error_message_.IsDefault()) {
+          _this->_internal_set_error_message("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (from._internal_success() != 0) {
+        _this->_impl_.success_ = from._impl_.success_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void HardwareAcceleratorPreferenceResult::CopyFrom(const HardwareAcceleratorPreferenceResult& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.HardwareAcceleratorPreferenceResult)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void HardwareAcceleratorPreferenceResult::InternalSwap(HardwareAcceleratorPreferenceResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
+  swap(_impl_.success_, other->_impl_.success_);
+}
+
+::google::protobuf::Metadata HardwareAcceleratorPreferenceResult::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // @@protoc_insertion_point(namespace_scope)

@@ -31,6 +31,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_primitive.h"
 
 #ifdef __cplusplus
@@ -57,6 +58,11 @@ struct rac_diffusion_service_ops;        /* rac/features/diffusion/rac_diffusion
 
 /**
  * @brief Plugin metadata carried in every vtable.
+ *
+ * This is the ABI/routing projection of the canonical declarative manifest
+ * (`rac_engine_manifest_t`). New engine entries should define a manifest and
+ * populate this struct with `RAC_ENGINE_METADATA_FROM_MANIFEST(...)` instead
+ * of maintaining a second hand-written metadata block.
  *
  * Layout note: bumped to ABI v2 in GAP 04 Phase 11 — the previous
  * `reserved_0/_1` (8 bytes) were promoted into the routing-extension fields
@@ -108,9 +114,9 @@ typedef struct rac_engine_metadata {
     const rac_runtime_id_t* runtimes;
     size_t                  runtimes_count;
 
-    /** Model file formats this engine accepts (proto-encoded
-     *  `runanywhere.v1.ModelFormat` values cast to uint32_t). MAY be NULL.
-     *  Frontends pass the proto enum value directly via `RouteRequest.format`. */
+    /** Model file formats this engine accepts (`RAC_MODEL_FORMAT_ID_*` values
+     *  mirroring `runanywhere.v1.ModelFormat`). MAY be NULL. Frontends pass
+     *  the proto enum value directly via `RouteRequest.format`. */
     const uint32_t*         formats;
     size_t                  formats_count;
 } rac_engine_metadata_t;

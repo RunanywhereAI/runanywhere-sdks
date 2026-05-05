@@ -1,25 +1,26 @@
 package com.runanywhere.runanywhereai.presentation.settings
 
+import ai.runanywhere.proto.v1.ModelEventKind
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import ai.runanywhere.proto.v1.ModelEventKind
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
-import com.runanywhere.sdk.public.events.ModelEvent
-import com.runanywhere.sdk.public.extensions.clearCache
 import com.runanywhere.sdk.public.extensions.deleteModel
 import com.runanywhere.sdk.public.extensions.storageInfo
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.io.File
 
 /**
  * Simple stored model info for settings display
@@ -326,13 +327,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Clear cache using SDK's clearCache() API
+     * Clear app-owned cache directories with Android filesystem APIs.
      */
-    fun clearCache() {
+    fun clearAppCache() {
         viewModelScope.launch {
             try {
-                Timber.d("Clearing cache via clearCache()...")
-                RunAnywhere.clearCache()
+                Timber.d("Clearing app cache directories...")
+                clearAppOwnedCache()
                 Timber.d("Cache cleared successfully")
 
                 // Refresh storage data after clearing cache
@@ -352,9 +353,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun cleanTempFiles() {
         viewModelScope.launch {
             try {
-                Timber.d("Cleaning temp files (via clearing cache)...")
-                // Clean temp files by clearing cache
-                RunAnywhere.clearCache()
+                Timber.d("Cleaning app temporary files...")
+                clearAppOwnedCache()
                 Timber.d("Temp files cleaned successfully")
 
                 // Refresh storage data after cleaning
@@ -364,6 +364,30 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 _uiState.update {
                     it.copy(errorMessage = "Failed to clean temporary files: ${e.message}")
                 }
+            }
+        }
+    }
+
+    private suspend fun clearAppOwnedCache() {
+        val app = getApplication<Application>()
+        withContext(Dispatchers.IO) {
+            listOf(
+                app.cacheDir,
+                app.codeCacheDir,
+                app.externalCacheDir,
+            ).forEach { dir ->
+                deleteDirectoryContents(dir)
+            }
+        }
+    }
+
+    private fun deleteDirectoryContents(directory: File?) {
+        if (directory == null || !directory.exists()) return
+        directory.listFiles()?.forEach { child ->
+            if (child.isDirectory) {
+                child.deleteRecursively()
+            } else {
+                child.delete()
             }
         }
     }

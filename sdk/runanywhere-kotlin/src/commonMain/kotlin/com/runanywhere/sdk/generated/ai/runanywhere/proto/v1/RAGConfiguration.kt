@@ -158,6 +158,39 @@ public class RAGConfiguration(
     schemaIndex = 10,
   )
   public val llm_config_json: String? = null,
+  /**
+   * Index persistence and retrieval behavior. Empty path = in-memory index.
+   */
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "indexPath",
+    schemaIndex = 11,
+  )
+  public val index_path: String? = null,
+  @field:WireField(
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "persistIndex",
+    schemaIndex = 12,
+  )
+  public val persist_index: Boolean = false,
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "rerankResults",
+    schemaIndex = 13,
+  )
+  public val rerank_results: Boolean = false,
+  @field:WireField(
+    tag = 15,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "rerankerModelPath",
+    schemaIndex = 14,
+  )
+  public val reranker_model_path: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGConfiguration, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -182,6 +215,10 @@ public class RAGConfiguration(
     if (prompt_template != other.prompt_template) return false
     if (embedding_config_json != other.embedding_config_json) return false
     if (llm_config_json != other.llm_config_json) return false
+    if (index_path != other.index_path) return false
+    if (persist_index != other.persist_index) return false
+    if (rerank_results != other.rerank_results) return false
+    if (reranker_model_path != other.reranker_model_path) return false
     return true
   }
 
@@ -200,6 +237,10 @@ public class RAGConfiguration(
       result = result * 37 + (prompt_template?.hashCode() ?: 0)
       result = result * 37 + (embedding_config_json?.hashCode() ?: 0)
       result = result * 37 + (llm_config_json?.hashCode() ?: 0)
+      result = result * 37 + (index_path?.hashCode() ?: 0)
+      result = result * 37 + persist_index.hashCode()
+      result = result * 37 + rerank_results.hashCode()
+      result = result * 37 + (reranker_model_path?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -219,6 +260,11 @@ public class RAGConfiguration(
     if (embedding_config_json != null) result +=
         """embedding_config_json=${sanitize(embedding_config_json)}"""
     if (llm_config_json != null) result += """llm_config_json=${sanitize(llm_config_json)}"""
+    if (index_path != null) result += """index_path=${sanitize(index_path)}"""
+    result += """persist_index=$persist_index"""
+    result += """rerank_results=$rerank_results"""
+    if (reranker_model_path != null) result +=
+        """reranker_model_path=${sanitize(reranker_model_path)}"""
     return result.joinToString(prefix = "RAGConfiguration{", separator = ", ", postfix = "}")
   }
 
@@ -234,10 +280,15 @@ public class RAGConfiguration(
     prompt_template: String? = this.prompt_template,
     embedding_config_json: String? = this.embedding_config_json,
     llm_config_json: String? = this.llm_config_json,
+    index_path: String? = this.index_path,
+    persist_index: Boolean = this.persist_index,
+    rerank_results: Boolean = this.rerank_results,
+    reranker_model_path: String? = this.reranker_model_path,
     unknownFields: ByteString = this.unknownFields,
   ): RAGConfiguration = RAGConfiguration(embedding_model_path, llm_model_path, embedding_dimension,
       top_k, similarity_threshold, chunk_size, chunk_overlap, max_context_tokens, prompt_template,
-      embedding_config_json, llm_config_json, unknownFields)
+      embedding_config_json, llm_config_json, index_path, persist_index, rerank_results,
+      reranker_model_path, unknownFields)
 
   public companion object {
     @JvmField
@@ -269,6 +320,12 @@ public class RAGConfiguration(
         size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.prompt_template)
         size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.embedding_config_json)
         size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.llm_config_json)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.index_path)
+        if (value.persist_index != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(13,
+            value.persist_index)
+        if (value.rerank_results != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(14,
+            value.rerank_results)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(15, value.reranker_model_path)
         return size
       }
 
@@ -290,11 +347,23 @@ public class RAGConfiguration(
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.prompt_template)
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.embedding_config_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 11, value.llm_config_json)
+        ProtoAdapter.STRING.encodeWithTag(writer, 12, value.index_path)
+        if (value.persist_index != false) ProtoAdapter.BOOL.encodeWithTag(writer, 13,
+            value.persist_index)
+        if (value.rerank_results != false) ProtoAdapter.BOOL.encodeWithTag(writer, 14,
+            value.rerank_results)
+        ProtoAdapter.STRING.encodeWithTag(writer, 15, value.reranker_model_path)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGConfiguration) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 15, value.reranker_model_path)
+        if (value.rerank_results != false) ProtoAdapter.BOOL.encodeWithTag(writer, 14,
+            value.rerank_results)
+        if (value.persist_index != false) ProtoAdapter.BOOL.encodeWithTag(writer, 13,
+            value.persist_index)
+        ProtoAdapter.STRING.encodeWithTag(writer, 12, value.index_path)
         ProtoAdapter.STRING.encodeWithTag(writer, 11, value.llm_config_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.embedding_config_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.prompt_template)
@@ -326,6 +395,10 @@ public class RAGConfiguration(
         var prompt_template: String? = null
         var embedding_config_json: String? = null
         var llm_config_json: String? = null
+        var index_path: String? = null
+        var persist_index: Boolean = false
+        var rerank_results: Boolean = false
+        var reranker_model_path: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> embedding_model_path = ProtoAdapter.STRING.decode(reader)
@@ -339,6 +412,10 @@ public class RAGConfiguration(
             9 -> prompt_template = ProtoAdapter.STRING.decode(reader)
             10 -> embedding_config_json = ProtoAdapter.STRING.decode(reader)
             11 -> llm_config_json = ProtoAdapter.STRING.decode(reader)
+            12 -> index_path = ProtoAdapter.STRING.decode(reader)
+            13 -> persist_index = ProtoAdapter.BOOL.decode(reader)
+            14 -> rerank_results = ProtoAdapter.BOOL.decode(reader)
+            15 -> reranker_model_path = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -354,6 +431,10 @@ public class RAGConfiguration(
           prompt_template = prompt_template,
           embedding_config_json = embedding_config_json,
           llm_config_json = llm_config_json,
+          index_path = index_path,
+          persist_index = persist_index,
+          rerank_results = rerank_results,
+          reranker_model_path = reranker_model_path,
           unknownFields = unknownFields
         )
       }

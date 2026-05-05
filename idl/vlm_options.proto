@@ -189,6 +189,13 @@ message VLMImage {
     int32 height = 6;
 
     VLMImageFormat format = 7;
+
+    // Optional source metadata. Adapters may populate this after camera/file
+    // picker capture without exposing native APIs to core.
+    optional string media_type = 8;
+    optional string name = 9;
+    int64 size_bytes = 10;
+    map<string, string> metadata = 11;
 }
 
 // ---------------------------------------------------------------------------
@@ -258,6 +265,20 @@ message VLMGenerationOptions {
     VLMModelFamily model_family = 12;
     optional VLMChatTemplate custom_chat_template = 13;
     optional string image_marker_override = 14;
+
+    // Additional llama.cpp sampling knobs and result controls.
+    int64 seed = 15;
+    float repetition_penalty = 16;
+    float min_p = 17;
+    bool emit_image_embeddings = 18;
+}
+
+message VLMGenerationRequest {
+    string request_id = 1;
+    repeated VLMImage images = 2;
+    optional VLMGenerationOptions options = 3;
+    optional string model_id = 4;
+    map<string, string> metadata = 5;
 }
 
 // ---------------------------------------------------------------------------
@@ -283,10 +304,9 @@ message VLMGenerationOptions {
 //                                  image_encode_time_ms, total_time_ms,
 //                                  tokens_per_second)
 //
-// Streaming note: streaming results reuse this VLMResult message; per-token
-// text deltas are emitted on the existing LLM stream channel
-// (llm_service.proto streaming surface). No VLM-specific stream-event message
-// is introduced here.
+// Streaming note: the VLM service emits VLMStreamEvent messages for
+// per-token deltas and terminal results; this aggregate result is carried on
+// the unary Generate RPC and on terminal stream events.
 // ---------------------------------------------------------------------------
 message VLMResult {
     string text                = 1;
@@ -302,6 +322,11 @@ message VLMResult {
     int64  time_to_first_token_ms   = 8;
     int64  image_encode_time_ms     = 9;
     optional string hardware_used   = 10;
+
+    optional string error_message   = 11;
+    int32 error_code                = 12;
+    string finish_reason            = 13;
+    int32 images_processed          = 14;
 }
 
 // ---------------------------------------------------------------------------
@@ -337,4 +362,50 @@ enum VLMErrorCode {
     VLM_ERROR_CODE_MODEL_LOAD_FAILED  = 6;
     VLM_ERROR_CODE_PROCESSING_FAILED  = 7;
     VLM_ERROR_CODE_CANCELLED          = 8;
+}
+
+enum VLMStreamEventKind {
+    VLM_STREAM_EVENT_KIND_UNSPECIFIED = 0;
+    VLM_STREAM_EVENT_KIND_STARTED = 1;
+    VLM_STREAM_EVENT_KIND_IMAGE_ENCODED = 2;
+    VLM_STREAM_EVENT_KIND_TOKEN = 3;
+    VLM_STREAM_EVENT_KIND_COMPLETED = 4;
+    VLM_STREAM_EVENT_KIND_ERROR = 5;
+}
+
+message VLMStreamEvent {
+    uint64 seq = 1;
+    int64 timestamp_us = 2;
+    string request_id = 3;
+    VLMStreamEventKind kind = 4;
+    string token = 5;
+    int32 token_index = 6;
+    bool is_final = 7;
+    float tokens_per_second = 8;
+    optional VLMResult result = 9;
+    optional string error_message = 10;
+    int32 error_code = 11;
+}
+
+message VLMServiceState {
+    bool is_ready = 1;
+    optional string current_model = 2;
+    int32 context_length = 3;
+    bool supports_streaming = 4;
+    bool supports_multiple_images = 5;
+    optional string vision_encoder_type = 6;
+    optional string error_message = 7;
+    int32 error_code = 8;
+}
+
+// Logical VLM service contract. Native camera capture, file picking, image
+// decoding performed by OS media APIs, and backend execution remain
+// adapter-owned; C++ consumes only serialized request/result/event messages.
+service VLM {
+    // One-shot multimodal generation returning aggregate text and metrics.
+    rpc Generate(VLMGenerationRequest) returns (VLMResult);
+
+    // Server-streaming generation events: start, image preprocessing,
+    // per-token text deltas, terminal completion, and errors.
+    rpc Stream(VLMGenerationRequest) returns (stream VLMStreamEvent);
 }

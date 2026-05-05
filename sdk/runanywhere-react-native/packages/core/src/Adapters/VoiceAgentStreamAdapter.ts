@@ -38,7 +38,7 @@ export class VoiceAgentStreamAdapter {
    * Open a new event subscription. Each call returns an independent
    * AsyncIterable backed by its own C-side registration.
    */
-  stream(req: VoiceAgentRequest = { eventFilter: '' }): AsyncIterable<VoiceEvent> {
+  stream(req: VoiceAgentRequest = VoiceAgentRequest.fromPartial({ eventFilter: '' })): AsyncIterable<VoiceEvent> {
     return streamVoiceAgent(this.transport(), req);
   }
 

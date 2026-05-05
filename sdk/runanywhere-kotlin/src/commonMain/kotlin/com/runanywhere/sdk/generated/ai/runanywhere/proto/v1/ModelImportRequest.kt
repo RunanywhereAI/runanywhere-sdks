@@ -70,6 +70,17 @@ public class ModelImportRequest(
   )
   public val overwrite_existing: Boolean = false,
   files: List<ModelFileDescriptor> = emptyList(),
+  /**
+   * Validate format, expected files, and checksums before registry mutation.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "validateBeforeRegister",
+    schemaIndex = 5,
+  )
+  public val validate_before_register: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelImportRequest, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -96,6 +107,7 @@ public class ModelImportRequest(
     if (copy_into_managed_storage != other.copy_into_managed_storage) return false
     if (overwrite_existing != other.overwrite_existing) return false
     if (files != other.files) return false
+    if (validate_before_register != other.validate_before_register) return false
     return true
   }
 
@@ -108,6 +120,7 @@ public class ModelImportRequest(
       result = result * 37 + copy_into_managed_storage.hashCode()
       result = result * 37 + overwrite_existing.hashCode()
       result = result * 37 + files.hashCode()
+      result = result * 37 + validate_before_register.hashCode()
       super.hashCode = result
     }
     return result
@@ -120,6 +133,7 @@ public class ModelImportRequest(
     result += """copy_into_managed_storage=$copy_into_managed_storage"""
     result += """overwrite_existing=$overwrite_existing"""
     if (files.isNotEmpty()) result += """files=$files"""
+    result += """validate_before_register=$validate_before_register"""
     return result.joinToString(prefix = "ModelImportRequest{", separator = ", ", postfix = "}")
   }
 
@@ -129,9 +143,10 @@ public class ModelImportRequest(
     copy_into_managed_storage: Boolean = this.copy_into_managed_storage,
     overwrite_existing: Boolean = this.overwrite_existing,
     files: List<ModelFileDescriptor> = this.files,
+    validate_before_register: Boolean = this.validate_before_register,
     unknownFields: ByteString = this.unknownFields,
   ): ModelImportRequest = ModelImportRequest(model, source_path, copy_into_managed_storage,
-      overwrite_existing, files, unknownFields)
+      overwrite_existing, files, validate_before_register, unknownFields)
 
   public companion object {
     @JvmField
@@ -154,6 +169,8 @@ public class ModelImportRequest(
         if (value.overwrite_existing != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(4,
             value.overwrite_existing)
         size += ModelFileDescriptor.ADAPTER.asRepeated().encodedSizeWithTag(5, value.files)
+        if (value.validate_before_register != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(6,
+            value.validate_before_register)
         return size
       }
 
@@ -165,11 +182,15 @@ public class ModelImportRequest(
         if (value.overwrite_existing != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
             value.overwrite_existing)
         ModelFileDescriptor.ADAPTER.asRepeated().encodeWithTag(writer, 5, value.files)
+        if (value.validate_before_register != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.validate_before_register)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelImportRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.validate_before_register != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.validate_before_register)
         ModelFileDescriptor.ADAPTER.asRepeated().encodeWithTag(writer, 5, value.files)
         if (value.overwrite_existing != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
             value.overwrite_existing)
@@ -185,6 +206,7 @@ public class ModelImportRequest(
         var copy_into_managed_storage: Boolean = false
         var overwrite_existing: Boolean = false
         val files = mutableListOf<ModelFileDescriptor>()
+        var validate_before_register: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model = ModelInfo.ADAPTER.decode(reader)
@@ -192,6 +214,7 @@ public class ModelImportRequest(
             3 -> copy_into_managed_storage = ProtoAdapter.BOOL.decode(reader)
             4 -> overwrite_existing = ProtoAdapter.BOOL.decode(reader)
             5 -> files.add(ModelFileDescriptor.ADAPTER.decode(reader))
+            6 -> validate_before_register = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -201,6 +224,7 @@ public class ModelImportRequest(
           copy_into_managed_storage = copy_into_managed_storage,
           overwrite_existing = overwrite_existing,
           files = files,
+          validate_before_register = validate_before_register,
           unknownFields = unknownFields
         )
       }

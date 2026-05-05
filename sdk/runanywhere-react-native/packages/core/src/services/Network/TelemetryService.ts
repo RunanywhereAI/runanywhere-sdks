@@ -218,8 +218,8 @@ export class TelemetryService {
       return;
     }
 
-    // Note: In the full C++ implementation, this would call native.emitEvent()
-    // to route to the C++ analytics system. For now, we log a debug message.
+    // Note: In the full C++ implementation, this routes through the SDKEvent
+    // proto bridge to the C++ analytics system. For now, we log a debug message.
     // The C++ telemetry manager handles actual event tracking.
     logger.debug(`Event tracked: ${_type} (handled by C++ telemetry)`);
   }

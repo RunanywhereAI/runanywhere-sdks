@@ -16,23 +16,23 @@ extension LLMViewModel {
     /// Returns format name string (C++ is single source of truth for valid formats).
     private func detectToolCallFormat(for modelName: String?) -> String {
         guard let name = modelName?.lowercased() else {
-            return ToolCallFormatName.default
+            return "default"
         }
 
         // LFM2-Tool models use Pythonic format: <|tool_call_start|>[func(args)]<|tool_call_end|>
         if name.contains("lfm2") && name.contains("tool") {
-            return ToolCallFormatName.lfm2
+            return "lfm2"
         }
 
         // Default JSON format for general-purpose models
-        return ToolCallFormatName.default
+        return "default"
     }
 
     // MARK: - Tool Calling Generation
 
     func generateWithToolCalling(
         prompt: String,
-        options: LLMGenerationOptions,
+        options: RALLMGenerationOptions,
         messageIndex: Int
     ) async throws {
         // Auto-detect the tool calling format based on the loaded model
@@ -47,7 +47,7 @@ extension LLMViewModel {
 
         // Tool call metadata is embedded in the result text (the SDK orchestrates
         // tool call → execute → respond internally). No separate toolCalls/toolResults
-        // fields exist on LLMGenerationResult; ToolCallInfo is unavailable here.
+        // fields exist on RALLMGenerationResult; ToolCallInfo is unavailable here.
         let toolCallInfo: ToolCallInfo? = nil
 
         // Split `<think>...</think>` content from the response so the UI can render

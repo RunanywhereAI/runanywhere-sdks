@@ -765,6 +765,12 @@ function createBaseVoiceEvent() {
         speechTurnDetection: undefined,
         turnLifecycle: undefined,
         wakewordDetected: undefined,
+        audioLevel: undefined,
+        componentProgress: undefined,
+        sessionId: "",
+        turnId: "",
+        requestId: "",
+        metadata: {},
     };
 }
 export const VoiceEvent = {
@@ -835,6 +841,24 @@ export const VoiceEvent = {
         if (message.wakewordDetected !== undefined) {
             WakeWordDetectedEvent.encode(message.wakewordDetected, writer.uint32(210).fork()).ldelim();
         }
+        if (message.audioLevel !== undefined) {
+            AudioLevelEvent.encode(message.audioLevel, writer.uint32(218).fork()).ldelim();
+        }
+        if (message.componentProgress !== undefined) {
+            ComponentProgressEvent.encode(message.componentProgress, writer.uint32(226).fork()).ldelim();
+        }
+        if (message.sessionId !== "") {
+            writer.uint32(242).string(message.sessionId);
+        }
+        if (message.turnId !== "") {
+            writer.uint32(250).string(message.turnId);
+        }
+        if (message.requestId !== "") {
+            writer.uint32(258).string(message.requestId);
+        }
+        Object.entries(message.metadata).forEach(([key, value]) => {
+            VoiceEvent_MetadataEntry.encode({ key: key, value }, writer.uint32(266).fork()).ldelim();
+        });
         return writer;
     },
     decode(input, length) {
@@ -976,6 +1000,45 @@ export const VoiceEvent = {
                     }
                     message.wakewordDetected = WakeWordDetectedEvent.decode(reader, reader.uint32());
                     continue;
+                case 27:
+                    if (tag !== 218) {
+                        break;
+                    }
+                    message.audioLevel = AudioLevelEvent.decode(reader, reader.uint32());
+                    continue;
+                case 28:
+                    if (tag !== 226) {
+                        break;
+                    }
+                    message.componentProgress = ComponentProgressEvent.decode(reader, reader.uint32());
+                    continue;
+                case 30:
+                    if (tag !== 242) {
+                        break;
+                    }
+                    message.sessionId = reader.string();
+                    continue;
+                case 31:
+                    if (tag !== 250) {
+                        break;
+                    }
+                    message.turnId = reader.string();
+                    continue;
+                case 32:
+                    if (tag !== 258) {
+                        break;
+                    }
+                    message.requestId = reader.string();
+                    continue;
+                case 33:
+                    if (tag !== 266) {
+                        break;
+                    }
+                    const entry33 = VoiceEvent_MetadataEntry.decode(reader, reader.uint32());
+                    if (entry33.value !== undefined) {
+                        message.metadata[entry33.key] = entry33.value;
+                    }
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1018,6 +1081,19 @@ export const VoiceEvent = {
             wakewordDetected: isSet(object.wakewordDetected)
                 ? WakeWordDetectedEvent.fromJSON(object.wakewordDetected)
                 : undefined,
+            audioLevel: isSet(object.audioLevel) ? AudioLevelEvent.fromJSON(object.audioLevel) : undefined,
+            componentProgress: isSet(object.componentProgress)
+                ? ComponentProgressEvent.fromJSON(object.componentProgress)
+                : undefined,
+            sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
+            turnId: isSet(object.turnId) ? globalThis.String(object.turnId) : "",
+            requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+            metadata: isObject(object.metadata)
+                ? Object.entries(object.metadata).reduce((acc, [key, value]) => {
+                    acc[key] = String(value);
+                    return acc;
+                }, {})
+                : {},
         };
     },
     toJSON(message) {
@@ -1088,6 +1164,30 @@ export const VoiceEvent = {
         if (message.wakewordDetected !== undefined) {
             obj.wakewordDetected = WakeWordDetectedEvent.toJSON(message.wakewordDetected);
         }
+        if (message.audioLevel !== undefined) {
+            obj.audioLevel = AudioLevelEvent.toJSON(message.audioLevel);
+        }
+        if (message.componentProgress !== undefined) {
+            obj.componentProgress = ComponentProgressEvent.toJSON(message.componentProgress);
+        }
+        if (message.sessionId !== "") {
+            obj.sessionId = message.sessionId;
+        }
+        if (message.turnId !== "") {
+            obj.turnId = message.turnId;
+        }
+        if (message.requestId !== "") {
+            obj.requestId = message.requestId;
+        }
+        if (message.metadata) {
+            const entries = Object.entries(message.metadata);
+            if (entries.length > 0) {
+                obj.metadata = {};
+                entries.forEach(([k, v]) => {
+                    obj.metadata[k] = v;
+                });
+            }
+        }
         return obj;
     },
     create(base) {
@@ -1151,11 +1251,92 @@ export const VoiceEvent = {
         message.wakewordDetected = (object.wakewordDetected !== undefined && object.wakewordDetected !== null)
             ? WakeWordDetectedEvent.fromPartial(object.wakewordDetected)
             : undefined;
+        message.audioLevel = (object.audioLevel !== undefined && object.audioLevel !== null)
+            ? AudioLevelEvent.fromPartial(object.audioLevel)
+            : undefined;
+        message.componentProgress = (object.componentProgress !== undefined && object.componentProgress !== null)
+            ? ComponentProgressEvent.fromPartial(object.componentProgress)
+            : undefined;
+        message.sessionId = object.sessionId ?? "";
+        message.turnId = object.turnId ?? "";
+        message.requestId = object.requestId ?? "";
+        message.metadata = Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
+            if (value !== undefined) {
+                acc[key] = globalThis.String(value);
+            }
+            return acc;
+        }, {});
+        return message;
+    },
+};
+function createBaseVoiceEvent_MetadataEntry() {
+    return { key: "", value: "" };
+}
+export const VoiceEvent_MetadataEntry = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.key !== "") {
+            writer.uint32(10).string(message.key);
+        }
+        if (message.value !== "") {
+            writer.uint32(18).string(message.value);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseVoiceEvent_MetadataEntry();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.key = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.value = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            key: isSet(object.key) ? globalThis.String(object.key) : "",
+            value: isSet(object.value) ? globalThis.String(object.value) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.key !== "") {
+            obj.key = message.key;
+        }
+        if (message.value !== "") {
+            obj.value = message.value;
+        }
+        return obj;
+    },
+    create(base) {
+        return VoiceEvent_MetadataEntry.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseVoiceEvent_MetadataEntry();
+        message.key = object.key ?? "";
+        message.value = object.value ?? "";
         return message;
     },
 };
 function createBaseUserSaidEvent() {
-    return { text: "", isFinal: false, confidence: 0, audioStartUs: 0, audioEndUs: 0 };
+    return { text: "", isFinal: false, confidence: 0, audioStartUs: 0, audioEndUs: 0, languageCode: "", segmentIndex: 0 };
 }
 export const UserSaidEvent = {
     encode(message, writer = _m0.Writer.create()) {
@@ -1173,6 +1354,12 @@ export const UserSaidEvent = {
         }
         if (message.audioEndUs !== 0) {
             writer.uint32(40).int64(message.audioEndUs);
+        }
+        if (message.languageCode !== "") {
+            writer.uint32(50).string(message.languageCode);
+        }
+        if (message.segmentIndex !== 0) {
+            writer.uint32(56).int32(message.segmentIndex);
         }
         return writer;
     },
@@ -1213,6 +1400,18 @@ export const UserSaidEvent = {
                     }
                     message.audioEndUs = longToNumber(reader.int64());
                     continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.languageCode = reader.string();
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.segmentIndex = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1228,6 +1427,8 @@ export const UserSaidEvent = {
             confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
             audioStartUs: isSet(object.audioStartUs) ? globalThis.Number(object.audioStartUs) : 0,
             audioEndUs: isSet(object.audioEndUs) ? globalThis.Number(object.audioEndUs) : 0,
+            languageCode: isSet(object.languageCode) ? globalThis.String(object.languageCode) : "",
+            segmentIndex: isSet(object.segmentIndex) ? globalThis.Number(object.segmentIndex) : 0,
         };
     },
     toJSON(message) {
@@ -1247,6 +1448,12 @@ export const UserSaidEvent = {
         if (message.audioEndUs !== 0) {
             obj.audioEndUs = Math.round(message.audioEndUs);
         }
+        if (message.languageCode !== "") {
+            obj.languageCode = message.languageCode;
+        }
+        if (message.segmentIndex !== 0) {
+            obj.segmentIndex = Math.round(message.segmentIndex);
+        }
         return obj;
     },
     create(base) {
@@ -1259,11 +1466,13 @@ export const UserSaidEvent = {
         message.confidence = object.confidence ?? 0;
         message.audioStartUs = object.audioStartUs ?? 0;
         message.audioEndUs = object.audioEndUs ?? 0;
+        message.languageCode = object.languageCode ?? "";
+        message.segmentIndex = object.segmentIndex ?? 0;
         return message;
     },
 };
 function createBaseAssistantTokenEvent() {
-    return { text: "", isFinal: false, kind: 0 };
+    return { text: "", isFinal: false, kind: 0, tokenId: 0, logprob: 0, finishReason: "" };
 }
 export const AssistantTokenEvent = {
     encode(message, writer = _m0.Writer.create()) {
@@ -1275,6 +1484,15 @@ export const AssistantTokenEvent = {
         }
         if (message.kind !== 0) {
             writer.uint32(24).int32(message.kind);
+        }
+        if (message.tokenId !== 0) {
+            writer.uint32(32).uint32(message.tokenId);
+        }
+        if (message.logprob !== 0) {
+            writer.uint32(45).float(message.logprob);
+        }
+        if (message.finishReason !== "") {
+            writer.uint32(50).string(message.finishReason);
         }
         return writer;
     },
@@ -1303,6 +1521,24 @@ export const AssistantTokenEvent = {
                     }
                     message.kind = reader.int32();
                     continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.tokenId = reader.uint32();
+                    continue;
+                case 5:
+                    if (tag !== 45) {
+                        break;
+                    }
+                    message.logprob = reader.float();
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.finishReason = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1316,6 +1552,9 @@ export const AssistantTokenEvent = {
             text: isSet(object.text) ? globalThis.String(object.text) : "",
             isFinal: isSet(object.isFinal) ? globalThis.Boolean(object.isFinal) : false,
             kind: isSet(object.kind) ? tokenKindFromJSON(object.kind) : 0,
+            tokenId: isSet(object.tokenId) ? globalThis.Number(object.tokenId) : 0,
+            logprob: isSet(object.logprob) ? globalThis.Number(object.logprob) : 0,
+            finishReason: isSet(object.finishReason) ? globalThis.String(object.finishReason) : "",
         };
     },
     toJSON(message) {
@@ -1329,6 +1568,15 @@ export const AssistantTokenEvent = {
         if (message.kind !== 0) {
             obj.kind = tokenKindToJSON(message.kind);
         }
+        if (message.tokenId !== 0) {
+            obj.tokenId = Math.round(message.tokenId);
+        }
+        if (message.logprob !== 0) {
+            obj.logprob = message.logprob;
+        }
+        if (message.finishReason !== "") {
+            obj.finishReason = message.finishReason;
+        }
         return obj;
     },
     create(base) {
@@ -1339,11 +1587,22 @@ export const AssistantTokenEvent = {
         message.text = object.text ?? "";
         message.isFinal = object.isFinal ?? false;
         message.kind = object.kind ?? 0;
+        message.tokenId = object.tokenId ?? 0;
+        message.logprob = object.logprob ?? 0;
+        message.finishReason = object.finishReason ?? "";
         return message;
     },
 };
 function createBaseAudioFrameEvent() {
-    return { pcm: new Uint8Array(0), sampleRateHz: 0, channels: 0, encoding: 0, isFinal: false };
+    return {
+        pcm: new Uint8Array(0),
+        sampleRateHz: 0,
+        channels: 0,
+        encoding: 0,
+        isFinal: false,
+        chunkIndex: 0,
+        durationMs: 0,
+    };
 }
 export const AudioFrameEvent = {
     encode(message, writer = _m0.Writer.create()) {
@@ -1361,6 +1620,12 @@ export const AudioFrameEvent = {
         }
         if (message.isFinal !== false) {
             writer.uint32(40).bool(message.isFinal);
+        }
+        if (message.chunkIndex !== 0) {
+            writer.uint32(48).int32(message.chunkIndex);
+        }
+        if (message.durationMs !== 0) {
+            writer.uint32(56).int64(message.durationMs);
         }
         return writer;
     },
@@ -1401,6 +1666,18 @@ export const AudioFrameEvent = {
                     }
                     message.isFinal = reader.bool();
                     continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.chunkIndex = reader.int32();
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.durationMs = longToNumber(reader.int64());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1416,6 +1693,8 @@ export const AudioFrameEvent = {
             channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
             encoding: isSet(object.encoding) ? audioEncodingFromJSON(object.encoding) : 0,
             isFinal: isSet(object.isFinal) ? globalThis.Boolean(object.isFinal) : false,
+            chunkIndex: isSet(object.chunkIndex) ? globalThis.Number(object.chunkIndex) : 0,
+            durationMs: isSet(object.durationMs) ? globalThis.Number(object.durationMs) : 0,
         };
     },
     toJSON(message) {
@@ -1435,6 +1714,12 @@ export const AudioFrameEvent = {
         if (message.isFinal !== false) {
             obj.isFinal = message.isFinal;
         }
+        if (message.chunkIndex !== 0) {
+            obj.chunkIndex = Math.round(message.chunkIndex);
+        }
+        if (message.durationMs !== 0) {
+            obj.durationMs = Math.round(message.durationMs);
+        }
         return obj;
     },
     create(base) {
@@ -1447,6 +1732,8 @@ export const AudioFrameEvent = {
         message.channels = object.channels ?? 0;
         message.encoding = object.encoding ?? 0;
         message.isFinal = object.isFinal ?? false;
+        message.chunkIndex = object.chunkIndex ?? 0;
+        message.durationMs = object.durationMs ?? 0;
         return message;
     },
 };
@@ -1727,7 +2014,7 @@ export const StateChangeEvent = {
     },
 };
 function createBaseErrorEvent() {
-    return { code: 0, message: "", component: "", isRecoverable: false };
+    return { code: 0, message: "", component: "", isRecoverable: false, operation: "", detailsJson: "" };
 }
 export const ErrorEvent = {
     encode(message, writer = _m0.Writer.create()) {
@@ -1742,6 +2029,12 @@ export const ErrorEvent = {
         }
         if (message.isRecoverable !== false) {
             writer.uint32(32).bool(message.isRecoverable);
+        }
+        if (message.operation !== "") {
+            writer.uint32(42).string(message.operation);
+        }
+        if (message.detailsJson !== "") {
+            writer.uint32(50).string(message.detailsJson);
         }
         return writer;
     },
@@ -1776,6 +2069,18 @@ export const ErrorEvent = {
                     }
                     message.isRecoverable = reader.bool();
                     continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.operation = reader.string();
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.detailsJson = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1790,6 +2095,8 @@ export const ErrorEvent = {
             message: isSet(object.message) ? globalThis.String(object.message) : "",
             component: isSet(object.component) ? globalThis.String(object.component) : "",
             isRecoverable: isSet(object.isRecoverable) ? globalThis.Boolean(object.isRecoverable) : false,
+            operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
+            detailsJson: isSet(object.detailsJson) ? globalThis.String(object.detailsJson) : "",
         };
     },
     toJSON(message) {
@@ -1806,6 +2113,12 @@ export const ErrorEvent = {
         if (message.isRecoverable !== false) {
             obj.isRecoverable = message.isRecoverable;
         }
+        if (message.operation !== "") {
+            obj.operation = message.operation;
+        }
+        if (message.detailsJson !== "") {
+            obj.detailsJson = message.detailsJson;
+        }
         return obj;
     },
     create(base) {
@@ -1817,6 +2130,8 @@ export const ErrorEvent = {
         message.message = object.message ?? "";
         message.component = object.component ?? "";
         message.isRecoverable = object.isRecoverable ?? false;
+        message.operation = object.operation ?? "";
+        message.detailsJson = object.detailsJson ?? "";
         return message;
     },
 };
@@ -1830,6 +2145,10 @@ function createBaseMetricsEvent() {
         audioSamplesPlayed: 0,
         isOverBudget: false,
         createdAtNs: 0,
+        vadFirstSpeechMs: 0,
+        sttFirstPartialMs: 0,
+        llmTotalMs: 0,
+        ttsTotalMs: 0,
     };
 }
 export const MetricsEvent = {
@@ -1857,6 +2176,18 @@ export const MetricsEvent = {
         }
         if (message.createdAtNs !== 0) {
             writer.uint32(64).int64(message.createdAtNs);
+        }
+        if (message.vadFirstSpeechMs !== 0) {
+            writer.uint32(73).double(message.vadFirstSpeechMs);
+        }
+        if (message.sttFirstPartialMs !== 0) {
+            writer.uint32(81).double(message.sttFirstPartialMs);
+        }
+        if (message.llmTotalMs !== 0) {
+            writer.uint32(89).double(message.llmTotalMs);
+        }
+        if (message.ttsTotalMs !== 0) {
+            writer.uint32(97).double(message.ttsTotalMs);
         }
         return writer;
     },
@@ -1915,6 +2246,30 @@ export const MetricsEvent = {
                     }
                     message.createdAtNs = longToNumber(reader.int64());
                     continue;
+                case 9:
+                    if (tag !== 73) {
+                        break;
+                    }
+                    message.vadFirstSpeechMs = reader.double();
+                    continue;
+                case 10:
+                    if (tag !== 81) {
+                        break;
+                    }
+                    message.sttFirstPartialMs = reader.double();
+                    continue;
+                case 11:
+                    if (tag !== 89) {
+                        break;
+                    }
+                    message.llmTotalMs = reader.double();
+                    continue;
+                case 12:
+                    if (tag !== 97) {
+                        break;
+                    }
+                    message.ttsTotalMs = reader.double();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1933,6 +2288,10 @@ export const MetricsEvent = {
             audioSamplesPlayed: isSet(object.audioSamplesPlayed) ? globalThis.Number(object.audioSamplesPlayed) : 0,
             isOverBudget: isSet(object.isOverBudget) ? globalThis.Boolean(object.isOverBudget) : false,
             createdAtNs: isSet(object.createdAtNs) ? globalThis.Number(object.createdAtNs) : 0,
+            vadFirstSpeechMs: isSet(object.vadFirstSpeechMs) ? globalThis.Number(object.vadFirstSpeechMs) : 0,
+            sttFirstPartialMs: isSet(object.sttFirstPartialMs) ? globalThis.Number(object.sttFirstPartialMs) : 0,
+            llmTotalMs: isSet(object.llmTotalMs) ? globalThis.Number(object.llmTotalMs) : 0,
+            ttsTotalMs: isSet(object.ttsTotalMs) ? globalThis.Number(object.ttsTotalMs) : 0,
         };
     },
     toJSON(message) {
@@ -1961,6 +2320,18 @@ export const MetricsEvent = {
         if (message.createdAtNs !== 0) {
             obj.createdAtNs = Math.round(message.createdAtNs);
         }
+        if (message.vadFirstSpeechMs !== 0) {
+            obj.vadFirstSpeechMs = message.vadFirstSpeechMs;
+        }
+        if (message.sttFirstPartialMs !== 0) {
+            obj.sttFirstPartialMs = message.sttFirstPartialMs;
+        }
+        if (message.llmTotalMs !== 0) {
+            obj.llmTotalMs = message.llmTotalMs;
+        }
+        if (message.ttsTotalMs !== 0) {
+            obj.ttsTotalMs = message.ttsTotalMs;
+        }
         return obj;
     },
     create(base) {
@@ -1976,11 +2347,212 @@ export const MetricsEvent = {
         message.audioSamplesPlayed = object.audioSamplesPlayed ?? 0;
         message.isOverBudget = object.isOverBudget ?? false;
         message.createdAtNs = object.createdAtNs ?? 0;
+        message.vadFirstSpeechMs = object.vadFirstSpeechMs ?? 0;
+        message.sttFirstPartialMs = object.sttFirstPartialMs ?? 0;
+        message.llmTotalMs = object.llmTotalMs ?? 0;
+        message.ttsTotalMs = object.ttsTotalMs ?? 0;
+        return message;
+    },
+};
+function createBaseAudioLevelEvent() {
+    return { rms: 0, peak: 0, noiseFloorDb: 0, isSpeech: false };
+}
+export const AudioLevelEvent = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.rms !== 0) {
+            writer.uint32(13).float(message.rms);
+        }
+        if (message.peak !== 0) {
+            writer.uint32(21).float(message.peak);
+        }
+        if (message.noiseFloorDb !== 0) {
+            writer.uint32(29).float(message.noiseFloorDb);
+        }
+        if (message.isSpeech !== false) {
+            writer.uint32(32).bool(message.isSpeech);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseAudioLevelEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 13) {
+                        break;
+                    }
+                    message.rms = reader.float();
+                    continue;
+                case 2:
+                    if (tag !== 21) {
+                        break;
+                    }
+                    message.peak = reader.float();
+                    continue;
+                case 3:
+                    if (tag !== 29) {
+                        break;
+                    }
+                    message.noiseFloorDb = reader.float();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.isSpeech = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            rms: isSet(object.rms) ? globalThis.Number(object.rms) : 0,
+            peak: isSet(object.peak) ? globalThis.Number(object.peak) : 0,
+            noiseFloorDb: isSet(object.noiseFloorDb) ? globalThis.Number(object.noiseFloorDb) : 0,
+            isSpeech: isSet(object.isSpeech) ? globalThis.Boolean(object.isSpeech) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.rms !== 0) {
+            obj.rms = message.rms;
+        }
+        if (message.peak !== 0) {
+            obj.peak = message.peak;
+        }
+        if (message.noiseFloorDb !== 0) {
+            obj.noiseFloorDb = message.noiseFloorDb;
+        }
+        if (message.isSpeech !== false) {
+            obj.isSpeech = message.isSpeech;
+        }
+        return obj;
+    },
+    create(base) {
+        return AudioLevelEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseAudioLevelEvent();
+        message.rms = object.rms ?? 0;
+        message.peak = object.peak ?? 0;
+        message.noiseFloorDb = object.noiseFloorDb ?? 0;
+        message.isSpeech = object.isSpeech ?? false;
+        return message;
+    },
+};
+function createBaseComponentProgressEvent() {
+    return { component: 0, operation: "", progress: 0, message: "" };
+}
+export const ComponentProgressEvent = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.component !== 0) {
+            writer.uint32(8).int32(message.component);
+        }
+        if (message.operation !== "") {
+            writer.uint32(18).string(message.operation);
+        }
+        if (message.progress !== 0) {
+            writer.uint32(29).float(message.progress);
+        }
+        if (message.message !== "") {
+            writer.uint32(34).string(message.message);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseComponentProgressEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.component = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.operation = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 29) {
+                        break;
+                    }
+                    message.progress = reader.float();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.message = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            component: isSet(object.component) ? voicePipelineComponentFromJSON(object.component) : 0,
+            operation: isSet(object.operation) ? globalThis.String(object.operation) : "",
+            progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
+            message: isSet(object.message) ? globalThis.String(object.message) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.component !== 0) {
+            obj.component = voicePipelineComponentToJSON(message.component);
+        }
+        if (message.operation !== "") {
+            obj.operation = message.operation;
+        }
+        if (message.progress !== 0) {
+            obj.progress = message.progress;
+        }
+        if (message.message !== "") {
+            obj.message = message.message;
+        }
+        return obj;
+    },
+    create(base) {
+        return ComponentProgressEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseComponentProgressEvent();
+        message.component = object.component ?? 0;
+        message.operation = object.operation ?? "";
+        message.progress = object.progress ?? 0;
+        message.message = object.message ?? "";
         return message;
     },
 };
 function createBaseVoiceAgentComponentStates() {
-    return { sttState: 0, llmState: 0, ttsState: 0, vadState: 0, ready: false, anyLoading: false };
+    return {
+        sttState: 0,
+        llmState: 0,
+        ttsState: 0,
+        vadState: 0,
+        ready: false,
+        anyLoading: false,
+        wakewordState: 0,
+        errorMessage: undefined,
+    };
 }
 export const VoiceAgentComponentStates = {
     encode(message, writer = _m0.Writer.create()) {
@@ -2001,6 +2573,12 @@ export const VoiceAgentComponentStates = {
         }
         if (message.anyLoading !== false) {
             writer.uint32(48).bool(message.anyLoading);
+        }
+        if (message.wakewordState !== 0) {
+            writer.uint32(56).int32(message.wakewordState);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(66).string(message.errorMessage);
         }
         return writer;
     },
@@ -2047,6 +2625,18 @@ export const VoiceAgentComponentStates = {
                     }
                     message.anyLoading = reader.bool();
                     continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.wakewordState = reader.int32();
+                    continue;
+                case 8:
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2063,6 +2653,8 @@ export const VoiceAgentComponentStates = {
             vadState: isSet(object.vadState) ? componentLoadStateFromJSON(object.vadState) : 0,
             ready: isSet(object.ready) ? globalThis.Boolean(object.ready) : false,
             anyLoading: isSet(object.anyLoading) ? globalThis.Boolean(object.anyLoading) : false,
+            wakewordState: isSet(object.wakewordState) ? componentLoadStateFromJSON(object.wakewordState) : 0,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
         };
     },
     toJSON(message) {
@@ -2085,6 +2677,12 @@ export const VoiceAgentComponentStates = {
         if (message.anyLoading !== false) {
             obj.anyLoading = message.anyLoading;
         }
+        if (message.wakewordState !== 0) {
+            obj.wakewordState = componentLoadStateToJSON(message.wakewordState);
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
         return obj;
     },
     create(base) {
@@ -2098,11 +2696,13 @@ export const VoiceAgentComponentStates = {
         message.vadState = object.vadState ?? 0;
         message.ready = object.ready ?? false;
         message.anyLoading = object.anyLoading ?? false;
+        message.wakewordState = object.wakewordState ?? 0;
+        message.errorMessage = object.errorMessage ?? undefined;
         return message;
     },
 };
 function createBaseVoiceSessionError() {
-    return { code: 0, message: "", failedComponent: undefined };
+    return { code: 0, message: "", failedComponent: undefined, cAbiCode: 0, recoverable: false };
 }
 export const VoiceSessionError = {
     encode(message, writer = _m0.Writer.create()) {
@@ -2114,6 +2714,12 @@ export const VoiceSessionError = {
         }
         if (message.failedComponent !== undefined) {
             writer.uint32(26).string(message.failedComponent);
+        }
+        if (message.cAbiCode !== 0) {
+            writer.uint32(32).int32(message.cAbiCode);
+        }
+        if (message.recoverable !== false) {
+            writer.uint32(40).bool(message.recoverable);
         }
         return writer;
     },
@@ -2142,6 +2748,18 @@ export const VoiceSessionError = {
                     }
                     message.failedComponent = reader.string();
                     continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.cAbiCode = reader.int32();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.recoverable = reader.bool();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2155,6 +2773,8 @@ export const VoiceSessionError = {
             code: isSet(object.code) ? voiceSessionErrorCodeFromJSON(object.code) : 0,
             message: isSet(object.message) ? globalThis.String(object.message) : "",
             failedComponent: isSet(object.failedComponent) ? globalThis.String(object.failedComponent) : undefined,
+            cAbiCode: isSet(object.cAbiCode) ? globalThis.Number(object.cAbiCode) : 0,
+            recoverable: isSet(object.recoverable) ? globalThis.Boolean(object.recoverable) : false,
         };
     },
     toJSON(message) {
@@ -2168,6 +2788,12 @@ export const VoiceSessionError = {
         if (message.failedComponent !== undefined) {
             obj.failedComponent = message.failedComponent;
         }
+        if (message.cAbiCode !== 0) {
+            obj.cAbiCode = Math.round(message.cAbiCode);
+        }
+        if (message.recoverable !== false) {
+            obj.recoverable = message.recoverable;
+        }
         return obj;
     },
     create(base) {
@@ -2178,14 +2804,19 @@ export const VoiceSessionError = {
         message.code = object.code ?? 0;
         message.message = object.message ?? "";
         message.failedComponent = object.failedComponent ?? undefined;
+        message.cAbiCode = object.cAbiCode ?? 0;
+        message.recoverable = object.recoverable ?? false;
         return message;
     },
 };
 function createBaseSessionStartedEvent() {
-    return {};
+    return { sessionId: "" };
 }
 export const SessionStartedEvent = {
-    encode(_, writer = _m0.Writer.create()) {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.sessionId !== "") {
+            writer.uint32(10).string(message.sessionId);
+        }
         return writer;
     },
     decode(input, length) {
@@ -2195,6 +2826,12 @@ export const SessionStartedEvent = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.sessionId = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2203,26 +2840,36 @@ export const SessionStartedEvent = {
         }
         return message;
     },
-    fromJSON(_) {
-        return {};
+    fromJSON(object) {
+        return { sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "" };
     },
-    toJSON(_) {
+    toJSON(message) {
         const obj = {};
+        if (message.sessionId !== "") {
+            obj.sessionId = message.sessionId;
+        }
         return obj;
     },
     create(base) {
         return SessionStartedEvent.fromPartial(base ?? {});
     },
-    fromPartial(_) {
+    fromPartial(object) {
         const message = createBaseSessionStartedEvent();
+        message.sessionId = object.sessionId ?? "";
         return message;
     },
 };
 function createBaseSessionStoppedEvent() {
-    return {};
+    return { sessionId: "", reason: "" };
 }
 export const SessionStoppedEvent = {
-    encode(_, writer = _m0.Writer.create()) {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.sessionId !== "") {
+            writer.uint32(10).string(message.sessionId);
+        }
+        if (message.reason !== "") {
+            writer.uint32(18).string(message.reason);
+        }
         return writer;
     },
     decode(input, length) {
@@ -2232,6 +2879,18 @@ export const SessionStoppedEvent = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.sessionId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.reason = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2240,26 +2899,40 @@ export const SessionStoppedEvent = {
         }
         return message;
     },
-    fromJSON(_) {
-        return {};
+    fromJSON(object) {
+        return {
+            sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
+            reason: isSet(object.reason) ? globalThis.String(object.reason) : "",
+        };
     },
-    toJSON(_) {
+    toJSON(message) {
         const obj = {};
+        if (message.sessionId !== "") {
+            obj.sessionId = message.sessionId;
+        }
+        if (message.reason !== "") {
+            obj.reason = message.reason;
+        }
         return obj;
     },
     create(base) {
         return SessionStoppedEvent.fromPartial(base ?? {});
     },
-    fromPartial(_) {
+    fromPartial(object) {
         const message = createBaseSessionStoppedEvent();
+        message.sessionId = object.sessionId ?? "";
+        message.reason = object.reason ?? "";
         return message;
     },
 };
 function createBaseAgentResponseStartedEvent() {
-    return {};
+    return { turnId: "" };
 }
 export const AgentResponseStartedEvent = {
-    encode(_, writer = _m0.Writer.create()) {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.turnId !== "") {
+            writer.uint32(10).string(message.turnId);
+        }
         return writer;
     },
     decode(input, length) {
@@ -2269,6 +2942,12 @@ export const AgentResponseStartedEvent = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.turnId = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2277,26 +2956,36 @@ export const AgentResponseStartedEvent = {
         }
         return message;
     },
-    fromJSON(_) {
-        return {};
+    fromJSON(object) {
+        return { turnId: isSet(object.turnId) ? globalThis.String(object.turnId) : "" };
     },
-    toJSON(_) {
+    toJSON(message) {
         const obj = {};
+        if (message.turnId !== "") {
+            obj.turnId = message.turnId;
+        }
         return obj;
     },
     create(base) {
         return AgentResponseStartedEvent.fromPartial(base ?? {});
     },
-    fromPartial(_) {
+    fromPartial(object) {
         const message = createBaseAgentResponseStartedEvent();
+        message.turnId = object.turnId ?? "";
         return message;
     },
 };
 function createBaseAgentResponseCompletedEvent() {
-    return {};
+    return { turnId: "", responseDurationMs: 0 };
 }
 export const AgentResponseCompletedEvent = {
-    encode(_, writer = _m0.Writer.create()) {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.turnId !== "") {
+            writer.uint32(10).string(message.turnId);
+        }
+        if (message.responseDurationMs !== 0) {
+            writer.uint32(16).int64(message.responseDurationMs);
+        }
         return writer;
     },
     decode(input, length) {
@@ -2306,6 +2995,18 @@ export const AgentResponseCompletedEvent = {
         while (reader.pos < end) {
             const tag = reader.uint32();
             switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.turnId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.responseDurationMs = longToNumber(reader.int64());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2314,18 +3015,29 @@ export const AgentResponseCompletedEvent = {
         }
         return message;
     },
-    fromJSON(_) {
-        return {};
+    fromJSON(object) {
+        return {
+            turnId: isSet(object.turnId) ? globalThis.String(object.turnId) : "",
+            responseDurationMs: isSet(object.responseDurationMs) ? globalThis.Number(object.responseDurationMs) : 0,
+        };
     },
-    toJSON(_) {
+    toJSON(message) {
         const obj = {};
+        if (message.turnId !== "") {
+            obj.turnId = message.turnId;
+        }
+        if (message.responseDurationMs !== 0) {
+            obj.responseDurationMs = Math.round(message.responseDurationMs);
+        }
         return obj;
     },
     create(base) {
         return AgentResponseCompletedEvent.fromPartial(base ?? {});
     },
-    fromPartial(_) {
+    fromPartial(object) {
         const message = createBaseAgentResponseCompletedEvent();
+        message.turnId = object.turnId ?? "";
+        message.responseDurationMs = object.responseDurationMs ?? 0;
         return message;
     },
 };
@@ -2474,7 +3186,16 @@ export const SpeechTurnDetectionEvent = {
     },
 };
 function createBaseTurnLifecycleEvent() {
-    return { kind: 0, turnId: "", sessionId: "", transcript: "", response: "", error: "" };
+    return {
+        kind: 0,
+        turnId: "",
+        sessionId: "",
+        transcript: "",
+        response: "",
+        error: "",
+        startedAtMs: 0,
+        completedAtMs: 0,
+    };
 }
 export const TurnLifecycleEvent = {
     encode(message, writer = _m0.Writer.create()) {
@@ -2495,6 +3216,12 @@ export const TurnLifecycleEvent = {
         }
         if (message.error !== "") {
             writer.uint32(50).string(message.error);
+        }
+        if (message.startedAtMs !== 0) {
+            writer.uint32(56).int64(message.startedAtMs);
+        }
+        if (message.completedAtMs !== 0) {
+            writer.uint32(64).int64(message.completedAtMs);
         }
         return writer;
     },
@@ -2541,6 +3268,18 @@ export const TurnLifecycleEvent = {
                     }
                     message.error = reader.string();
                     continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.startedAtMs = longToNumber(reader.int64());
+                    continue;
+                case 8:
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.completedAtMs = longToNumber(reader.int64());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2557,6 +3296,8 @@ export const TurnLifecycleEvent = {
             transcript: isSet(object.transcript) ? globalThis.String(object.transcript) : "",
             response: isSet(object.response) ? globalThis.String(object.response) : "",
             error: isSet(object.error) ? globalThis.String(object.error) : "",
+            startedAtMs: isSet(object.startedAtMs) ? globalThis.Number(object.startedAtMs) : 0,
+            completedAtMs: isSet(object.completedAtMs) ? globalThis.Number(object.completedAtMs) : 0,
         };
     },
     toJSON(message) {
@@ -2579,6 +3320,12 @@ export const TurnLifecycleEvent = {
         if (message.error !== "") {
             obj.error = message.error;
         }
+        if (message.startedAtMs !== 0) {
+            obj.startedAtMs = Math.round(message.startedAtMs);
+        }
+        if (message.completedAtMs !== 0) {
+            obj.completedAtMs = Math.round(message.completedAtMs);
+        }
         return obj;
     },
     create(base) {
@@ -2592,6 +3339,8 @@ export const TurnLifecycleEvent = {
         message.transcript = object.transcript ?? "";
         message.response = object.response ?? "";
         message.error = object.error ?? "";
+        message.startedAtMs = object.startedAtMs ?? 0;
+        message.completedAtMs = object.completedAtMs ?? 0;
         return message;
     },
 };
@@ -2744,6 +3493,9 @@ function longToNumber(long) {
 if (_m0.util.Long !== Long) {
     _m0.util.Long = Long;
     _m0.configure();
+}
+function isObject(value) {
+    return typeof value === "object" && value !== null;
 }
 function isSet(value) {
     return value !== null && value !== undefined;

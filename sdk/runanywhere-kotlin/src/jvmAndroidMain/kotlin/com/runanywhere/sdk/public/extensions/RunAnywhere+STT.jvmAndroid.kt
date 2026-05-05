@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * JVM/Android actual implementations for Speech-to-Text operations.
- * Wave 2 KOTLIN: now uses proto-canonical STTOptions / STTOutput / STTPartialResult.
+ * Wave 2 KOTLIN: now uses proto-canonical STTOptions / STTOutput / STTStreamEvent.
  */
 
 package com.runanywhere.sdk.public.extensions
@@ -14,8 +14,7 @@ import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.STTOptions
 import ai.runanywhere.proto.v1.STTOutput
-import ai.runanywhere.proto.v1.STTPartialResult
-import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
+import ai.runanywhere.proto.v1.STTStreamEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTTProto
@@ -24,13 +23,17 @@ import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
+import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 
 private val sttLogger = SDKLogger.stt
 
 private fun currentSttModelIdFromLifecycle(): String? =
-    CppBridgeModelLifecycleProto.currentModel(
-        CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION),
-    )?.model_id?.takeIf { it.isNotEmpty() }
+    CppBridgeModelLifecycleProto
+        .currentModel(
+            CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION),
+        )?.model_id
+        ?.takeIf { it.isNotEmpty() }
 
 actual suspend fun RunAnywhere.transcribe(audioData: ByteArray): String {
     val result = transcribeWithOptions(audioData, STTOptions())
@@ -48,17 +51,16 @@ actual suspend fun RunAnywhere.unloadSTTModel() {
 
 actual val RunAnywhere.isSTTModelLoaded: Boolean
     get() =
-        CppBridgeModelLifecycleProto.snapshot(SDKComponent.SDK_COMPONENT_STT)
+        CppBridgeModelLifecycleProto
+            .snapshot(SDKComponent.SDK_COMPONENT_STT)
             ?.let {
                 it.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
                     it.model_id.isNotEmpty()
-            } ?: false
+            }
+            ?: false
 
 actual val RunAnywhere.currentSTTModelId: String?
     get() = currentSttModelIdFromLifecycle()
-
-actual val RunAnywhere.isSTTModelLoadedSync: Boolean
-    get() = isSTTModelLoaded
 
 actual suspend fun RunAnywhere.transcribeWithOptions(
     audioData: ByteArray,
@@ -76,41 +78,31 @@ actual suspend fun RunAnywhere.transcribeWithOptions(
     return result
 }
 
-@Volatile private var sttStreamingActive: Boolean = false
-
-actual val RunAnywhere.isStreamingSTT: Boolean
-    get() = sttStreamingActive
-
 actual fun RunAnywhere.transcribeStream(
     audioData: ByteArray,
     options: STTOptions,
-): Flow<STTPartialResult> =
+): Flow<STTStreamEvent> =
     callbackFlow {
         if (!isInitialized) {
-            throw SDKException.notInitialized("SDK not initialized")
+            close(SDKException.notInitialized("SDK not initialized"))
+            return@callbackFlow
         }
 
-        sttStreamingActive = true
-        CppBridgeSTTProto.transcribeStream(audioData, options) { partial ->
-            trySend(partial)
-            !partial.is_final
+        val streamJob =
+            launch {
+                try {
+                    CppBridgeSTTProto.transcribeStream(audioData, options) { event ->
+                        trySend(event).isSuccess
+                    }
+                    close()
+                } catch (e: Throwable) {
+                    close(e)
+                }
+            }
+        awaitClose {
+            streamJob.cancel()
         }
-        awaitClose { sttStreamingActive = false }
     }
-
-actual suspend fun RunAnywhere.processStreamingAudio(samples: ByteArray) {
-    if (!isInitialized) {
-        throw SDKException.notInitialized("SDK not initialized")
-    }
-
-    CppBridgeSTTProto.transcribe(samples, STTOptions())
-}
-
-actual suspend fun RunAnywhere.stopStreamingTranscription() {
-    sttStreamingActive = false
-    // STT generated-proto streaming is synchronous; cancellation is provided
-    // by closing the Flow collector.
-}
 
 // Private helper
 private fun estimateAudioLength(dataSize: Int): Double {

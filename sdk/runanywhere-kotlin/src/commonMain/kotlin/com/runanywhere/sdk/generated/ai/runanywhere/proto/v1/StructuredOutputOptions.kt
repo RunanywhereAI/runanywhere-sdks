@@ -96,6 +96,42 @@ public class StructuredOutputOptions(
     schemaIndex = 5,
   )
   public val name: String? = null,
+  @field:WireField(
+    tag = 7,
+    adapter = "ai.runanywhere.proto.v1.StructuredOutputMode#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 6,
+  )
+  public val mode: StructuredOutputMode = StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "regexPattern",
+    schemaIndex = 7,
+  )
+  public val regex_pattern: String? = null,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    schemaIndex = 8,
+  )
+  public val grammar: String? = null,
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "repairJson",
+    schemaIndex = 9,
+  )
+  public val repair_json: Boolean = false,
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "maxRetries",
+    schemaIndex = 10,
+  )
+  public val max_retries: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StructuredOutputOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -115,6 +151,11 @@ public class StructuredOutputOptions(
     if (json_schema != other.json_schema) return false
     if (type_name != other.type_name) return false
     if (name != other.name) return false
+    if (mode != other.mode) return false
+    if (regex_pattern != other.regex_pattern) return false
+    if (grammar != other.grammar) return false
+    if (repair_json != other.repair_json) return false
+    if (max_retries != other.max_retries) return false
     return true
   }
 
@@ -128,6 +169,11 @@ public class StructuredOutputOptions(
       result = result * 37 + (json_schema?.hashCode() ?: 0)
       result = result * 37 + (type_name?.hashCode() ?: 0)
       result = result * 37 + (name?.hashCode() ?: 0)
+      result = result * 37 + mode.hashCode()
+      result = result * 37 + (regex_pattern?.hashCode() ?: 0)
+      result = result * 37 + (grammar?.hashCode() ?: 0)
+      result = result * 37 + repair_json.hashCode()
+      result = result * 37 + max_retries.hashCode()
       super.hashCode = result
     }
     return result
@@ -141,6 +187,11 @@ public class StructuredOutputOptions(
     if (json_schema != null) result += """json_schema=${sanitize(json_schema)}"""
     if (type_name != null) result += """type_name=${sanitize(type_name)}"""
     if (name != null) result += """name=${sanitize(name)}"""
+    result += """mode=$mode"""
+    if (regex_pattern != null) result += """regex_pattern=${sanitize(regex_pattern)}"""
+    if (grammar != null) result += """grammar=${sanitize(grammar)}"""
+    result += """repair_json=$repair_json"""
+    result += """max_retries=$max_retries"""
     return result.joinToString(prefix = "StructuredOutputOptions{", separator = ", ", postfix = "}")
   }
 
@@ -151,9 +202,15 @@ public class StructuredOutputOptions(
     json_schema: String? = this.json_schema,
     type_name: String? = this.type_name,
     name: String? = this.name,
+    mode: StructuredOutputMode = this.mode,
+    regex_pattern: String? = this.regex_pattern,
+    grammar: String? = this.grammar,
+    repair_json: Boolean = this.repair_json,
+    max_retries: Int = this.max_retries,
     unknownFields: ByteString = this.unknownFields,
   ): StructuredOutputOptions = StructuredOutputOptions(schema, include_schema_in_prompt,
-      strict_mode, json_schema, type_name, name, unknownFields)
+      strict_mode, json_schema, type_name, name, mode, regex_pattern, grammar, repair_json,
+      max_retries, unknownFields)
 
   public companion object {
     @JvmField
@@ -175,6 +232,14 @@ public class StructuredOutputOptions(
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.json_schema)
         size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.type_name)
         size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.name)
+        if (value.mode != StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED) size +=
+            StructuredOutputMode.ADAPTER.encodedSizeWithTag(7, value.mode)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.regex_pattern)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.grammar)
+        if (value.repair_json != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(10,
+            value.repair_json)
+        if (value.max_retries != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(11,
+            value.max_retries)
         return size
       }
 
@@ -186,11 +251,25 @@ public class StructuredOutputOptions(
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.json_schema)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.type_name)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.name)
+        if (value.mode != StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED)
+            StructuredOutputMode.ADAPTER.encodeWithTag(writer, 7, value.mode)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.regex_pattern)
+        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.grammar)
+        if (value.repair_json != false) ProtoAdapter.BOOL.encodeWithTag(writer, 10,
+            value.repair_json)
+        if (value.max_retries != 0) ProtoAdapter.INT32.encodeWithTag(writer, 11, value.max_retries)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StructuredOutputOptions) {
         writer.writeBytes(value.unknownFields)
+        if (value.max_retries != 0) ProtoAdapter.INT32.encodeWithTag(writer, 11, value.max_retries)
+        if (value.repair_json != false) ProtoAdapter.BOOL.encodeWithTag(writer, 10,
+            value.repair_json)
+        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.grammar)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.regex_pattern)
+        if (value.mode != StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED)
+            StructuredOutputMode.ADAPTER.encodeWithTag(writer, 7, value.mode)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.name)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.type_name)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.json_schema)
@@ -207,6 +286,11 @@ public class StructuredOutputOptions(
         var json_schema: String? = null
         var type_name: String? = null
         var name: String? = null
+        var mode: StructuredOutputMode = StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED
+        var regex_pattern: String? = null
+        var grammar: String? = null
+        var repair_json: Boolean = false
+        var max_retries: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> schema = JSONSchema.ADAPTER.decode(reader)
@@ -215,6 +299,15 @@ public class StructuredOutputOptions(
             4 -> json_schema = ProtoAdapter.STRING.decode(reader)
             5 -> type_name = ProtoAdapter.STRING.decode(reader)
             6 -> name = ProtoAdapter.STRING.decode(reader)
+            7 -> try {
+              mode = StructuredOutputMode.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            8 -> regex_pattern = ProtoAdapter.STRING.decode(reader)
+            9 -> grammar = ProtoAdapter.STRING.decode(reader)
+            10 -> repair_json = ProtoAdapter.BOOL.decode(reader)
+            11 -> max_retries = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -225,6 +318,11 @@ public class StructuredOutputOptions(
           json_schema = json_schema,
           type_name = type_name,
           name = name,
+          mode = mode,
+          regex_pattern = regex_pattern,
+          grammar = grammar,
+          repair_json = repair_json,
+          max_retries = max_retries,
           unknownFields = unknownFields
         )
       }

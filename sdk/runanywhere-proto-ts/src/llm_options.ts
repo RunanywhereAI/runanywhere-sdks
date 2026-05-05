@@ -9,8 +9,78 @@ import Long from "long";
 import _m0 from "protobufjs/minimal";
 import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
 import { StructuredOutputOptions, StructuredOutputValidation } from "./structured_output";
+import { ToolCall, ToolCallingOptions, ToolResult } from "./tool_calling";
 
 export const protobufPackage = "runanywhere.v1";
+
+export enum LLMGenerationState {
+  LLM_GENERATION_STATE_UNSPECIFIED = 0,
+  LLM_GENERATION_STATE_QUEUED = 1,
+  LLM_GENERATION_STATE_PREFILLING = 2,
+  LLM_GENERATION_STATE_DECODING = 3,
+  LLM_GENERATION_STATE_TOOL_CALLING = 4,
+  LLM_GENERATION_STATE_COMPLETED = 5,
+  LLM_GENERATION_STATE_CANCELLED = 6,
+  LLM_GENERATION_STATE_FAILED = 7,
+  UNRECOGNIZED = -1,
+}
+
+export function lLMGenerationStateFromJSON(object: any): LLMGenerationState {
+  switch (object) {
+    case 0:
+    case "LLM_GENERATION_STATE_UNSPECIFIED":
+      return LLMGenerationState.LLM_GENERATION_STATE_UNSPECIFIED;
+    case 1:
+    case "LLM_GENERATION_STATE_QUEUED":
+      return LLMGenerationState.LLM_GENERATION_STATE_QUEUED;
+    case 2:
+    case "LLM_GENERATION_STATE_PREFILLING":
+      return LLMGenerationState.LLM_GENERATION_STATE_PREFILLING;
+    case 3:
+    case "LLM_GENERATION_STATE_DECODING":
+      return LLMGenerationState.LLM_GENERATION_STATE_DECODING;
+    case 4:
+    case "LLM_GENERATION_STATE_TOOL_CALLING":
+      return LLMGenerationState.LLM_GENERATION_STATE_TOOL_CALLING;
+    case 5:
+    case "LLM_GENERATION_STATE_COMPLETED":
+      return LLMGenerationState.LLM_GENERATION_STATE_COMPLETED;
+    case 6:
+    case "LLM_GENERATION_STATE_CANCELLED":
+      return LLMGenerationState.LLM_GENERATION_STATE_CANCELLED;
+    case 7:
+    case "LLM_GENERATION_STATE_FAILED":
+      return LLMGenerationState.LLM_GENERATION_STATE_FAILED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return LLMGenerationState.UNRECOGNIZED;
+  }
+}
+
+export function lLMGenerationStateToJSON(object: LLMGenerationState): string {
+  switch (object) {
+    case LLMGenerationState.LLM_GENERATION_STATE_UNSPECIFIED:
+      return "LLM_GENERATION_STATE_UNSPECIFIED";
+    case LLMGenerationState.LLM_GENERATION_STATE_QUEUED:
+      return "LLM_GENERATION_STATE_QUEUED";
+    case LLMGenerationState.LLM_GENERATION_STATE_PREFILLING:
+      return "LLM_GENERATION_STATE_PREFILLING";
+    case LLMGenerationState.LLM_GENERATION_STATE_DECODING:
+      return "LLM_GENERATION_STATE_DECODING";
+    case LLMGenerationState.LLM_GENERATION_STATE_TOOL_CALLING:
+      return "LLM_GENERATION_STATE_TOOL_CALLING";
+    case LLMGenerationState.LLM_GENERATION_STATE_COMPLETED:
+      return "LLM_GENERATION_STATE_COMPLETED";
+    case LLMGenerationState.LLM_GENERATION_STATE_CANCELLED:
+      return "LLM_GENERATION_STATE_CANCELLED";
+    case LLMGenerationState.LLM_GENERATION_STATE_FAILED:
+      return "LLM_GENERATION_STATE_FAILED";
+    case LLMGenerationState.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
 
 /**
  * ---------------------------------------------------------------------------
@@ -135,6 +205,32 @@ export interface LLMGenerationOptions {
    * generation telemetry. No-op for backends without a telemetry sink.
    */
   enableRealTimeTracking: boolean;
+  /** Deterministic sampling seed. 0 = backend/default random seed. */
+  seed: number;
+  /** OpenAI-compatible sampling penalties. 0.0 = disabled. */
+  frequencyPenalty: number;
+  presencePenalty: number;
+  /** Repeat-penalty lookback window. 0 = backend default. */
+  repeatLastN: number;
+  /** Minimum probability sampling. 0.0 = disabled. */
+  minP: number;
+  /** Grammar or constrained-decoding rule text (GBNF/regex/backend-specific). */
+  grammar?:
+    | string
+    | undefined;
+  /** Caller-visible format hint: "text", "json_object", "json_schema", etc. */
+  responseFormat?:
+    | string
+    | undefined;
+  /** Include prompt text in the result/stream when the backend supports echo. */
+  echoPrompt: boolean;
+  /** Per-request backend thread hint. 0 = backend/runtime default. */
+  nThreads: number;
+  /**
+   * Tool-calling contract for this generation. The SDK owns executor
+   * functions; proto carries only definitions and parser options.
+   */
+  toolCalling?: ToolCallingOptions | undefined;
 }
 
 /**
@@ -219,7 +315,50 @@ export interface LLMGenerationResult {
    * Backend error text for result-producing APIs that return a terminal
    * result envelope instead of throwing through the host language.
    */
+  errorMessage?:
+    | string
+    | undefined;
+  /** Numeric backend status code when a result envelope carries an error. */
+  errorCode: number;
+  /** Prompt/cache accounting surfaced by llama.cpp/CoreML-style backends. */
+  cachedPromptTokens: number;
+  promptEvalTimeMs: number;
+  decodeTimeMs: number;
+  /** Tool calls parsed from the final assistant response, if any. */
+  toolCalls: ToolCall[];
+  /** Tool results incorporated during auto-execute loops. */
+  toolResults: ToolResult[];
+}
+
+/**
+ * Request envelope for one non-streaming LLM generation call. This is the
+ * proto-owned DTO SDKs can use instead of parallel prompt/options tuples.
+ */
+export interface LLMGenerationRequest {
+  requestId: string;
+  modelId: string;
+  prompt: string;
+  options?: LLMGenerationOptions | undefined;
+  contextChunks: string[];
+  metadata: { [key: string]: string };
+  conversationId?: string | undefined;
+}
+
+export interface LLMGenerationRequest_MetadataEntry {
+  key: string;
+  value: string;
+}
+
+export interface LLMGenerationStatus {
+  requestId: string;
+  state: LLMGenerationState;
+  promptTokensProcessed: number;
+  completionTokensGenerated: number;
+  progress: number;
+  elapsedMs: number;
+  message?: string | undefined;
   errorMessage?: string | undefined;
+  errorCode: number;
 }
 
 /**
@@ -340,6 +479,16 @@ function createBaseLLMGenerationOptions(): LLMGenerationOptions {
     executionTarget: undefined,
     structuredOutput: undefined,
     enableRealTimeTracking: false,
+    seed: 0,
+    frequencyPenalty: 0,
+    presencePenalty: 0,
+    repeatLastN: 0,
+    minP: 0,
+    grammar: undefined,
+    responseFormat: undefined,
+    echoPrompt: false,
+    nThreads: 0,
+    toolCalling: undefined,
   };
 }
 
@@ -386,6 +535,36 @@ export const LLMGenerationOptions = {
     }
     if (message.enableRealTimeTracking !== false) {
       writer.uint32(112).bool(message.enableRealTimeTracking);
+    }
+    if (message.seed !== 0) {
+      writer.uint32(120).int64(message.seed);
+    }
+    if (message.frequencyPenalty !== 0) {
+      writer.uint32(133).float(message.frequencyPenalty);
+    }
+    if (message.presencePenalty !== 0) {
+      writer.uint32(141).float(message.presencePenalty);
+    }
+    if (message.repeatLastN !== 0) {
+      writer.uint32(144).int32(message.repeatLastN);
+    }
+    if (message.minP !== 0) {
+      writer.uint32(157).float(message.minP);
+    }
+    if (message.grammar !== undefined) {
+      writer.uint32(162).string(message.grammar);
+    }
+    if (message.responseFormat !== undefined) {
+      writer.uint32(170).string(message.responseFormat);
+    }
+    if (message.echoPrompt !== false) {
+      writer.uint32(176).bool(message.echoPrompt);
+    }
+    if (message.nThreads !== 0) {
+      writer.uint32(184).int32(message.nThreads);
+    }
+    if (message.toolCalling !== undefined) {
+      ToolCallingOptions.encode(message.toolCalling, writer.uint32(194).fork()).ldelim();
     }
     return writer;
   },
@@ -495,6 +674,76 @@ export const LLMGenerationOptions = {
 
           message.enableRealTimeTracking = reader.bool();
           continue;
+        case 15:
+          if (tag !== 120) {
+            break;
+          }
+
+          message.seed = longToNumber(reader.int64() as Long);
+          continue;
+        case 16:
+          if (tag !== 133) {
+            break;
+          }
+
+          message.frequencyPenalty = reader.float();
+          continue;
+        case 17:
+          if (tag !== 141) {
+            break;
+          }
+
+          message.presencePenalty = reader.float();
+          continue;
+        case 18:
+          if (tag !== 144) {
+            break;
+          }
+
+          message.repeatLastN = reader.int32();
+          continue;
+        case 19:
+          if (tag !== 157) {
+            break;
+          }
+
+          message.minP = reader.float();
+          continue;
+        case 20:
+          if (tag !== 162) {
+            break;
+          }
+
+          message.grammar = reader.string();
+          continue;
+        case 21:
+          if (tag !== 170) {
+            break;
+          }
+
+          message.responseFormat = reader.string();
+          continue;
+        case 22:
+          if (tag !== 176) {
+            break;
+          }
+
+          message.echoPrompt = reader.bool();
+          continue;
+        case 23:
+          if (tag !== 184) {
+            break;
+          }
+
+          message.nThreads = reader.int32();
+          continue;
+        case 24:
+          if (tag !== 194) {
+            break;
+          }
+
+          message.toolCalling = ToolCallingOptions.decode(reader, reader.uint32());
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -526,6 +775,16 @@ export const LLMGenerationOptions = {
       enableRealTimeTracking: isSet(object.enableRealTimeTracking)
         ? globalThis.Boolean(object.enableRealTimeTracking)
         : false,
+      seed: isSet(object.seed) ? globalThis.Number(object.seed) : 0,
+      frequencyPenalty: isSet(object.frequencyPenalty) ? globalThis.Number(object.frequencyPenalty) : 0,
+      presencePenalty: isSet(object.presencePenalty) ? globalThis.Number(object.presencePenalty) : 0,
+      repeatLastN: isSet(object.repeatLastN) ? globalThis.Number(object.repeatLastN) : 0,
+      minP: isSet(object.minP) ? globalThis.Number(object.minP) : 0,
+      grammar: isSet(object.grammar) ? globalThis.String(object.grammar) : undefined,
+      responseFormat: isSet(object.responseFormat) ? globalThis.String(object.responseFormat) : undefined,
+      echoPrompt: isSet(object.echoPrompt) ? globalThis.Boolean(object.echoPrompt) : false,
+      nThreads: isSet(object.nThreads) ? globalThis.Number(object.nThreads) : 0,
+      toolCalling: isSet(object.toolCalling) ? ToolCallingOptions.fromJSON(object.toolCalling) : undefined,
     };
   },
 
@@ -573,6 +832,36 @@ export const LLMGenerationOptions = {
     if (message.enableRealTimeTracking !== false) {
       obj.enableRealTimeTracking = message.enableRealTimeTracking;
     }
+    if (message.seed !== 0) {
+      obj.seed = Math.round(message.seed);
+    }
+    if (message.frequencyPenalty !== 0) {
+      obj.frequencyPenalty = message.frequencyPenalty;
+    }
+    if (message.presencePenalty !== 0) {
+      obj.presencePenalty = message.presencePenalty;
+    }
+    if (message.repeatLastN !== 0) {
+      obj.repeatLastN = Math.round(message.repeatLastN);
+    }
+    if (message.minP !== 0) {
+      obj.minP = message.minP;
+    }
+    if (message.grammar !== undefined) {
+      obj.grammar = message.grammar;
+    }
+    if (message.responseFormat !== undefined) {
+      obj.responseFormat = message.responseFormat;
+    }
+    if (message.echoPrompt !== false) {
+      obj.echoPrompt = message.echoPrompt;
+    }
+    if (message.nThreads !== 0) {
+      obj.nThreads = Math.round(message.nThreads);
+    }
+    if (message.toolCalling !== undefined) {
+      obj.toolCalling = ToolCallingOptions.toJSON(message.toolCalling);
+    }
     return obj;
   },
 
@@ -599,6 +888,18 @@ export const LLMGenerationOptions = {
       ? StructuredOutputOptions.fromPartial(object.structuredOutput)
       : undefined;
     message.enableRealTimeTracking = object.enableRealTimeTracking ?? false;
+    message.seed = object.seed ?? 0;
+    message.frequencyPenalty = object.frequencyPenalty ?? 0;
+    message.presencePenalty = object.presencePenalty ?? 0;
+    message.repeatLastN = object.repeatLastN ?? 0;
+    message.minP = object.minP ?? 0;
+    message.grammar = object.grammar ?? undefined;
+    message.responseFormat = object.responseFormat ?? undefined;
+    message.echoPrompt = object.echoPrompt ?? false;
+    message.nThreads = object.nThreads ?? 0;
+    message.toolCalling = (object.toolCalling !== undefined && object.toolCalling !== null)
+      ? ToolCallingOptions.fromPartial(object.toolCalling)
+      : undefined;
     return message;
   },
 };
@@ -623,6 +924,12 @@ function createBaseLLMGenerationResult(): LLMGenerationResult {
     structuredOutputValidation: undefined,
     totalTokens: 0,
     errorMessage: undefined,
+    errorCode: 0,
+    cachedPromptTokens: 0,
+    promptEvalTimeMs: 0,
+    decodeTimeMs: 0,
+    toolCalls: [],
+    toolResults: [],
   };
 }
 
@@ -681,6 +988,24 @@ export const LLMGenerationResult = {
     }
     if (message.errorMessage !== undefined) {
       writer.uint32(146).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(152).int32(message.errorCode);
+    }
+    if (message.cachedPromptTokens !== 0) {
+      writer.uint32(160).int32(message.cachedPromptTokens);
+    }
+    if (message.promptEvalTimeMs !== 0) {
+      writer.uint32(168).int64(message.promptEvalTimeMs);
+    }
+    if (message.decodeTimeMs !== 0) {
+      writer.uint32(176).int64(message.decodeTimeMs);
+    }
+    for (const v of message.toolCalls) {
+      ToolCall.encode(v!, writer.uint32(186).fork()).ldelim();
+    }
+    for (const v of message.toolResults) {
+      ToolResult.encode(v!, writer.uint32(194).fork()).ldelim();
     }
     return writer;
   },
@@ -818,6 +1143,48 @@ export const LLMGenerationResult = {
 
           message.errorMessage = reader.string();
           continue;
+        case 19:
+          if (tag !== 152) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+        case 20:
+          if (tag !== 160) {
+            break;
+          }
+
+          message.cachedPromptTokens = reader.int32();
+          continue;
+        case 21:
+          if (tag !== 168) {
+            break;
+          }
+
+          message.promptEvalTimeMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 22:
+          if (tag !== 176) {
+            break;
+          }
+
+          message.decodeTimeMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 23:
+          if (tag !== 186) {
+            break;
+          }
+
+          message.toolCalls.push(ToolCall.decode(reader, reader.uint32()));
+          continue;
+        case 24:
+          if (tag !== 194) {
+            break;
+          }
+
+          message.toolResults.push(ToolResult.decode(reader, reader.uint32()));
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -849,6 +1216,16 @@ export const LLMGenerationResult = {
         : undefined,
       totalTokens: isSet(object.totalTokens) ? globalThis.Number(object.totalTokens) : 0,
       errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+      cachedPromptTokens: isSet(object.cachedPromptTokens) ? globalThis.Number(object.cachedPromptTokens) : 0,
+      promptEvalTimeMs: isSet(object.promptEvalTimeMs) ? globalThis.Number(object.promptEvalTimeMs) : 0,
+      decodeTimeMs: isSet(object.decodeTimeMs) ? globalThis.Number(object.decodeTimeMs) : 0,
+      toolCalls: globalThis.Array.isArray(object?.toolCalls)
+        ? object.toolCalls.map((e: any) => ToolCall.fromJSON(e))
+        : [],
+      toolResults: globalThis.Array.isArray(object?.toolResults)
+        ? object.toolResults.map((e: any) => ToolResult.fromJSON(e))
+        : [],
     };
   },
 
@@ -908,6 +1285,24 @@ export const LLMGenerationResult = {
     if (message.errorMessage !== undefined) {
       obj.errorMessage = message.errorMessage;
     }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    if (message.cachedPromptTokens !== 0) {
+      obj.cachedPromptTokens = Math.round(message.cachedPromptTokens);
+    }
+    if (message.promptEvalTimeMs !== 0) {
+      obj.promptEvalTimeMs = Math.round(message.promptEvalTimeMs);
+    }
+    if (message.decodeTimeMs !== 0) {
+      obj.decodeTimeMs = Math.round(message.decodeTimeMs);
+    }
+    if (message.toolCalls?.length) {
+      obj.toolCalls = message.toolCalls.map((e) => ToolCall.toJSON(e));
+    }
+    if (message.toolResults?.length) {
+      obj.toolResults = message.toolResults.map((e) => ToolResult.toJSON(e));
+    }
     return obj;
   },
 
@@ -939,6 +1334,461 @@ export const LLMGenerationResult = {
         : undefined;
     message.totalTokens = object.totalTokens ?? 0;
     message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
+    message.cachedPromptTokens = object.cachedPromptTokens ?? 0;
+    message.promptEvalTimeMs = object.promptEvalTimeMs ?? 0;
+    message.decodeTimeMs = object.decodeTimeMs ?? 0;
+    message.toolCalls = object.toolCalls?.map((e) => ToolCall.fromPartial(e)) || [];
+    message.toolResults = object.toolResults?.map((e) => ToolResult.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseLLMGenerationRequest(): LLMGenerationRequest {
+  return {
+    requestId: "",
+    modelId: "",
+    prompt: "",
+    options: undefined,
+    contextChunks: [],
+    metadata: {},
+    conversationId: undefined,
+  };
+}
+
+export const LLMGenerationRequest = {
+  encode(message: LLMGenerationRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(18).string(message.modelId);
+    }
+    if (message.prompt !== "") {
+      writer.uint32(26).string(message.prompt);
+    }
+    if (message.options !== undefined) {
+      LLMGenerationOptions.encode(message.options, writer.uint32(34).fork()).ldelim();
+    }
+    for (const v of message.contextChunks) {
+      writer.uint32(42).string(v!);
+    }
+    Object.entries(message.metadata).forEach(([key, value]) => {
+      LLMGenerationRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(50).fork()).ldelim();
+    });
+    if (message.conversationId !== undefined) {
+      writer.uint32(58).string(message.conversationId);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): LLMGenerationRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLLMGenerationRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.prompt = reader.string();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.options = LLMGenerationOptions.decode(reader, reader.uint32());
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.contextChunks.push(reader.string());
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          const entry6 = LLMGenerationRequest_MetadataEntry.decode(reader, reader.uint32());
+          if (entry6.value !== undefined) {
+            message.metadata[entry6.key] = entry6.value;
+          }
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.conversationId = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): LLMGenerationRequest {
+    return {
+      requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
+      options: isSet(object.options) ? LLMGenerationOptions.fromJSON(object.options) : undefined,
+      contextChunks: globalThis.Array.isArray(object?.contextChunks)
+        ? object.contextChunks.map((e: any) => globalThis.String(e))
+        : [],
+      metadata: isObject(object.metadata)
+        ? Object.entries(object.metadata).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+        : {},
+      conversationId: isSet(object.conversationId) ? globalThis.String(object.conversationId) : undefined,
+    };
+  },
+
+  toJSON(message: LLMGenerationRequest): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.prompt !== "") {
+      obj.prompt = message.prompt;
+    }
+    if (message.options !== undefined) {
+      obj.options = LLMGenerationOptions.toJSON(message.options);
+    }
+    if (message.contextChunks?.length) {
+      obj.contextChunks = message.contextChunks;
+    }
+    if (message.metadata) {
+      const entries = Object.entries(message.metadata);
+      if (entries.length > 0) {
+        obj.metadata = {};
+        entries.forEach(([k, v]) => {
+          obj.metadata[k] = v;
+        });
+      }
+    }
+    if (message.conversationId !== undefined) {
+      obj.conversationId = message.conversationId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<LLMGenerationRequest>, I>>(base?: I): LLMGenerationRequest {
+    return LLMGenerationRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<LLMGenerationRequest>, I>>(object: I): LLMGenerationRequest {
+    const message = createBaseLLMGenerationRequest();
+    message.requestId = object.requestId ?? "";
+    message.modelId = object.modelId ?? "";
+    message.prompt = object.prompt ?? "";
+    message.options = (object.options !== undefined && object.options !== null)
+      ? LLMGenerationOptions.fromPartial(object.options)
+      : undefined;
+    message.contextChunks = object.contextChunks?.map((e) => e) || [];
+    message.metadata = Object.entries(object.metadata ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = globalThis.String(value);
+      }
+      return acc;
+    }, {});
+    message.conversationId = object.conversationId ?? undefined;
+    return message;
+  },
+};
+
+function createBaseLLMGenerationRequest_MetadataEntry(): LLMGenerationRequest_MetadataEntry {
+  return { key: "", value: "" };
+}
+
+export const LLMGenerationRequest_MetadataEntry = {
+  encode(message: LLMGenerationRequest_MetadataEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): LLMGenerationRequest_MetadataEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLLMGenerationRequest_MetadataEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): LLMGenerationRequest_MetadataEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: LLMGenerationRequest_MetadataEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<LLMGenerationRequest_MetadataEntry>, I>>(
+    base?: I,
+  ): LLMGenerationRequest_MetadataEntry {
+    return LLMGenerationRequest_MetadataEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<LLMGenerationRequest_MetadataEntry>, I>>(
+    object: I,
+  ): LLMGenerationRequest_MetadataEntry {
+    const message = createBaseLLMGenerationRequest_MetadataEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
+function createBaseLLMGenerationStatus(): LLMGenerationStatus {
+  return {
+    requestId: "",
+    state: 0,
+    promptTokensProcessed: 0,
+    completionTokensGenerated: 0,
+    progress: 0,
+    elapsedMs: 0,
+    message: undefined,
+    errorMessage: undefined,
+    errorCode: 0,
+  };
+}
+
+export const LLMGenerationStatus = {
+  encode(message: LLMGenerationStatus, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    if (message.state !== 0) {
+      writer.uint32(16).int32(message.state);
+    }
+    if (message.promptTokensProcessed !== 0) {
+      writer.uint32(24).int32(message.promptTokensProcessed);
+    }
+    if (message.completionTokensGenerated !== 0) {
+      writer.uint32(32).int32(message.completionTokensGenerated);
+    }
+    if (message.progress !== 0) {
+      writer.uint32(45).float(message.progress);
+    }
+    if (message.elapsedMs !== 0) {
+      writer.uint32(48).int64(message.elapsedMs);
+    }
+    if (message.message !== undefined) {
+      writer.uint32(58).string(message.message);
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(66).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(72).int32(message.errorCode);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): LLMGenerationStatus {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseLLMGenerationStatus();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.state = reader.int32() as any;
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.promptTokensProcessed = reader.int32();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.completionTokensGenerated = reader.int32();
+          continue;
+        case 5:
+          if (tag !== 45) {
+            break;
+          }
+
+          message.progress = reader.float();
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.elapsedMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.message = reader.string();
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): LLMGenerationStatus {
+    return {
+      requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+      state: isSet(object.state) ? lLMGenerationStateFromJSON(object.state) : 0,
+      promptTokensProcessed: isSet(object.promptTokensProcessed) ? globalThis.Number(object.promptTokensProcessed) : 0,
+      completionTokensGenerated: isSet(object.completionTokensGenerated)
+        ? globalThis.Number(object.completionTokensGenerated)
+        : 0,
+      progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
+      elapsedMs: isSet(object.elapsedMs) ? globalThis.Number(object.elapsedMs) : 0,
+      message: isSet(object.message) ? globalThis.String(object.message) : undefined,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+    };
+  },
+
+  toJSON(message: LLMGenerationStatus): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.state !== 0) {
+      obj.state = lLMGenerationStateToJSON(message.state);
+    }
+    if (message.promptTokensProcessed !== 0) {
+      obj.promptTokensProcessed = Math.round(message.promptTokensProcessed);
+    }
+    if (message.completionTokensGenerated !== 0) {
+      obj.completionTokensGenerated = Math.round(message.completionTokensGenerated);
+    }
+    if (message.progress !== 0) {
+      obj.progress = message.progress;
+    }
+    if (message.elapsedMs !== 0) {
+      obj.elapsedMs = Math.round(message.elapsedMs);
+    }
+    if (message.message !== undefined) {
+      obj.message = message.message;
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<LLMGenerationStatus>, I>>(base?: I): LLMGenerationStatus {
+    return LLMGenerationStatus.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<LLMGenerationStatus>, I>>(object: I): LLMGenerationStatus {
+    const message = createBaseLLMGenerationStatus();
+    message.requestId = object.requestId ?? "";
+    message.state = object.state ?? 0;
+    message.promptTokensProcessed = object.promptTokensProcessed ?? 0;
+    message.completionTokensGenerated = object.completionTokensGenerated ?? 0;
+    message.progress = object.progress ?? 0;
+    message.elapsedMs = object.elapsedMs ?? 0;
+    message.message = object.message ?? undefined;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
     return message;
   },
 };
@@ -1500,6 +2350,10 @@ function longToNumber(long: Long): number {
 if (_m0.util.Long !== Long) {
   _m0.util.Long = Long as any;
   _m0.configure();
+}
+
+function isObject(value: any): boolean {
+  return typeof value === "object" && value !== null;
 }
 
 function isSet(value: any): boolean {

@@ -121,6 +121,8 @@ export interface StorageAvailability {
     availableBytes: number;
     warningMessage?: string | undefined;
     recommendation?: string | undefined;
+    shortfallBytes: number;
+    requiredToAvailableRatio: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -145,29 +147,36 @@ export interface StorageInfoRequest {
     includeDevice: boolean;
     includeApp: boolean;
     includeModels: boolean;
+    includeCache: boolean;
 }
 export interface StorageInfoResult {
     success: boolean;
     info?: StorageInfo | undefined;
     errorMessage: string;
+    warnings: string[];
 }
 export interface StorageAvailabilityRequest {
     modelId: string;
     requiredBytes: number;
     safetyMargin: number;
     includeExistingModelBytes: boolean;
+    includeDeletePlan: boolean;
+    allowCacheReclamation: boolean;
 }
 export interface StorageAvailabilityResult {
     success: boolean;
     availability?: StorageAvailability | undefined;
     warnings: string[];
     errorMessage: string;
+    deletePlan?: StorageDeletePlan | undefined;
 }
 export interface StorageDeletePlanRequest {
     modelIds: string[];
     requiredBytes: number;
     includeCache: boolean;
     oldestFirst: boolean;
+    allowLoadedModels: boolean;
+    includeDownloadPartials: boolean;
 }
 export interface StorageDeleteCandidate {
     modelId: string;
@@ -175,6 +184,9 @@ export interface StorageDeleteCandidate {
     lastUsedMs?: number | undefined;
     isLoaded: boolean;
     localPath: string;
+    requiresUnload: boolean;
+    requiresPlatformDelete: boolean;
+    storageKey: string;
 }
 export interface StorageDeletePlan {
     canReclaimRequiredBytes: boolean;
@@ -183,6 +195,9 @@ export interface StorageDeletePlan {
     candidates: StorageDeleteCandidate[];
     warnings: string[];
     errorMessage: string;
+    requiresUnload: boolean;
+    requiresPlatformDelete: boolean;
+    candidateCount: number;
 }
 export interface StorageDeleteRequest {
     modelIds: string[];
@@ -190,6 +205,9 @@ export interface StorageDeleteRequest {
     clearRegistryPaths: boolean;
     unloadIfLoaded: boolean;
     dryRun: boolean;
+    plan?: StorageDeletePlan | undefined;
+    requirePlanMatch: boolean;
+    allowPlatformDelete: boolean;
 }
 export interface StorageDeleteResult {
     success: boolean;
@@ -198,6 +216,10 @@ export interface StorageDeleteResult {
     failedModelIds: string[];
     warnings: string[];
     errorMessage: string;
+    skippedModelIds: string[];
+    dryRun: boolean;
+    registryUpdated: boolean;
+    filesDeleted: boolean;
 }
 export declare const DeviceStorageInfo: {
     encode(message: DeviceStorageInfo, writer?: _m0.Writer): _m0.Writer;

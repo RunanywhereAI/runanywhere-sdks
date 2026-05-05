@@ -14,7 +14,7 @@ import RunAnywhere
 class ToolSettingsViewModel: ObservableObject {
     static let shared = ToolSettingsViewModel()
 
-    @Published var registeredTools: [ToolDefinition] = []
+    @Published var registeredTools: [RAToolDefinition] = []
     @Published var toolCallingEnabled: Bool = false {
         didSet {
             UserDefaults.standard.set(toolCallingEnabled, forKey: "toolCallingEnabled")
@@ -22,15 +22,15 @@ class ToolSettingsViewModel: ObservableObject {
     }
 
     // Built-in demo tools with REAL API implementations
-    private var demoTools: [(definition: ToolDefinition, executor: ToolExecutor)] {
+    private var demoTools: [(definition: RAToolDefinition, executor: ToolExecutor)] {
         [
             // Weather Tool - Uses Open-Meteo API (free, no API key required)
             (
-                definition: ToolDefinition(
+                definition: RAToolDefinition(
                     name: "get_weather",
                     description: "Gets the current weather for a given location using Open-Meteo API",
                     parameters: [
-                        ToolParameter(
+                        RAToolParameter(
                             name: "location",
                             type: .string,
                             description: "City name (e.g., 'San Francisco', 'London', 'Tokyo')"
@@ -39,12 +39,12 @@ class ToolSettingsViewModel: ObservableObject {
                     category: "Utility"
                 ),
                 executor: { args in
-                    try await WeatherService.fetchWeather(for: args["location"]?.stringValue ?? "San Francisco")
+                    try await WeatherService.fetchWeather(for: args["location"]?.string ?? "San Francisco")
                 }
             ),
             // Time Tool - Real system time with timezone
             (
-                definition: ToolDefinition(
+                definition: RAToolDefinition(
                     name: "get_current_time",
                     description: "Gets the current date, time, and timezone information",
                     parameters: [],
@@ -61,21 +61,21 @@ class ToolSettingsViewModel: ObservableObject {
                     timeFormatter.dateFormat = "HH:mm:ss"
 
                     return [
-                        "datetime": .string(dateFormatter.string(from: now)),
-                        "time": .string(timeFormatter.string(from: now)),
-                        "timestamp": .string(ISO8601DateFormatter().string(from: now)),
-                        "timezone": .string(timeZone.identifier),
-                        "utc_offset": .string(timeZone.abbreviation() ?? "UTC")
+                        "datetime": RAToolValue(dateFormatter.string(from: now)),
+                        "time": RAToolValue(timeFormatter.string(from: now)),
+                        "timestamp": RAToolValue(ISO8601DateFormatter().string(from: now)),
+                        "timezone": RAToolValue(timeZone.identifier),
+                        "utc_offset": RAToolValue(timeZone.abbreviation() ?? "UTC")
                     ]
                 }
             ),
             // Calculator Tool - Real math evaluation
             (
-                definition: ToolDefinition(
+                definition: RAToolDefinition(
                     name: "calculate",
                     description: "Performs math calculations. Supports +, -, *, /, and parentheses",
                     parameters: [
-                        ToolParameter(
+                        RAToolParameter(
                             name: "expression",
                             type: .string,
                             description: "Math expression (e.g., '2 + 2 * 3', '(10 + 5) / 3')"
@@ -84,25 +84,25 @@ class ToolSettingsViewModel: ObservableObject {
                     category: "Utility"
                 ),
                 executor: { args in
-                    // Extract expression from args, handling both string and number ToolValue types
+                    // Extract expression from args, handling both string and number RAToolValue types.
                     let expression: String? = {
                         let keys = ["expression", "input", "expr"]
                         for key in keys {
                             if let val = args[key] {
-                                if let str = val.stringValue { return str }
-                                if let num = val.numberValue { return "\(num)" }
+                                if let str = val.string { return str }
+                                if let num = val.number { return "\(num)" }
                             }
                         }
                         // Fallback: try any value in the dict
                         for val in args.values {
-                            if let str = val.stringValue { return str }
-                            if let num = val.numberValue { return "\(num)" }
+                            if let str = val.string { return str }
+                            if let num = val.number { return "\(num)" }
                         }
                         return nil
                     }()
                     guard let expression, !expression.isEmpty else {
                         return [
-                            "error": .string("Missing expression argument")
+                            "error": RAToolValue("Missing expression argument")
                         ]
                     }
                     print("Calculator received args: \(args), using expression: '\(expression)'")
@@ -119,13 +119,13 @@ class ToolSettingsViewModel: ObservableObject {
                     // NSExpression, whose Obj-C exceptions cannot be caught from Swift).
                     if let value = SafeMathEvaluator.evaluate(cleanedExpression) {
                         return [
-                            "result": .number(value),
-                            "expression": .string(expression)
+                            "result": RAToolValue(value),
+                            "expression": RAToolValue(expression)
                         ]
                     }
                     return [
-                        "error": .string("Could not evaluate expression: \(expression)"),
-                        "expression": .string(expression)
+                        "error": RAToolValue("Could not evaluate expression: \(expression)"),
+                        "expression": RAToolValue(expression)
                     ]
                 }
             )
@@ -278,7 +278,7 @@ struct ToolSettingsCard: View {
 // MARK: - Tool Row
 
 struct ToolRow: View {
-    let tool: ToolDefinition
+    let tool: RAToolDefinition
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -289,7 +289,7 @@ struct ToolRow: View {
                 Text(tool.name)
                     .font(AppTypography.subheadlineMedium)
             }
-            Text(tool.description)
+            Text(tool.description_p)
                 .font(AppTypography.caption)
                 .foregroundColor(AppColors.textSecondary)
                 .lineLimit(2)
@@ -324,12 +324,12 @@ enum WeatherService {
     private static let weatherURL = "https://api.open-meteo.com/v1/forecast"
 
     /// Fetch real weather data for a location
-    static func fetchWeather(for location: String) async throws -> [String: ToolValue] {
+    static func fetchWeather(for location: String) async throws -> [String: RAToolValue] {
         // Step 1: Geocode the location to get coordinates
         guard let coordinates = try await geocodeLocation(location) else {
             return [
-                "error": .string("Could not find location: \(location)"),
-                "location": .string(location)
+                "error": RAToolValue("Could not find location: \(location)"),
+                "location": RAToolValue(location)
             ]
         }
 
@@ -373,13 +373,13 @@ enum WeatherService {
         latitude: Double,
         longitude: Double,
         locationName: String
-    ) async throws -> [String: ToolValue] {
+    ) async throws -> [String: RAToolValue] {
         let urlString = "\(weatherURL)?latitude=\(latitude)&longitude=\(longitude)" +
             "&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m" +
             "&temperature_unit=fahrenheit&wind_speed_unit=mph"
 
         guard let url = URL(string: urlString) else {
-            return ["error": .string("Invalid weather API URL")]
+            return ["error": RAToolValue("Invalid weather API URL")]
         }
 
         // SAMPLE_HTTP_CARVE_OUT: external weather-tool demo call, not SDK auth/download traffic.
@@ -387,7 +387,7 @@ enum WeatherService {
 
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let current = json["current"] as? [String: Any] else {
-            return ["error": .string("Could not parse weather data")]
+            return ["error": RAToolValue("Could not parse weather data")]
         }
 
         let temperature = current["temperature_2m"] as? Double ?? 0
@@ -396,12 +396,12 @@ enum WeatherService {
         let weatherCode = current["weather_code"] as? Int ?? 0
 
         return [
-            "location": .string(locationName),
-            "temperature": .number(temperature),
-            "unit": .string("fahrenheit"),
-            "humidity": .number(humidity),
-            "wind_speed_mph": .number(windSpeed),
-            "condition": .string(weatherCodeToCondition(weatherCode))
+            "location": RAToolValue(locationName),
+            "temperature": RAToolValue(temperature),
+            "unit": RAToolValue("fahrenheit"),
+            "humidity": RAToolValue(humidity),
+            "wind_speed_mph": RAToolValue(windSpeed),
+            "condition": RAToolValue(weatherCodeToCondition(weatherCode))
         ]
     }
 

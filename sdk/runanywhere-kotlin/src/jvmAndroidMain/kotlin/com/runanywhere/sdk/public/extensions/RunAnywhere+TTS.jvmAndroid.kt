@@ -122,9 +122,6 @@ actual val RunAnywhere.isTTSVoiceLoaded: Boolean
 actual val RunAnywhere.currentTTSVoiceId: String?
     get() = currentTtsVoiceIdFromLifecycle()
 
-actual val RunAnywhere.isTTSVoiceLoadedSync: Boolean
-    get() = isTTSVoiceLoaded
-
 actual suspend fun RunAnywhere.availableTTSVoices(): List<TTSVoiceInfo> {
     return CppBridgeTTSProto.voices()
 }
@@ -148,7 +145,7 @@ actual suspend fun RunAnywhere.synthesize(
 actual fun RunAnywhere.synthesizeStream(
     text: String,
     options: TTSOptions,
-): Flow<ByteArray> =
+): Flow<TTSOutput> =
     callbackFlow {
         if (!isInitialized) {
             throw SDKException.notInitialized("SDK not initialized")
@@ -156,7 +153,7 @@ actual fun RunAnywhere.synthesizeStream(
 
         try {
             CppBridgeTTSProto.synthesizeStream(text, options) { output ->
-                trySend(output.audio_data.toByteArray())
+                trySend(output)
                 true
             }
         } finally {

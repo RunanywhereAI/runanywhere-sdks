@@ -352,6 +352,11 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_model_registry_query_proto"
     "_rac_model_registry_list_downloaded_proto"
     "_rac_model_registry_remove_proto"
+    "_rac_model_registry_get_model_proto"
+    "_rac_model_registry_list_models_proto"
+    "_rac_model_registry_import_proto"
+    "_rac_model_registry_discover_proto"
+    "_rac_model_registry_refresh_proto"
     "_rac_model_registry_proto_free"
     "_rac_model_info_is_downloaded"
     "_rac_model_info_alloc"
@@ -360,6 +365,14 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_model_info_copy"
     "_rac_model_registry_discover_downloaded"
     "_rac_discovery_result_free"
+
+    # Hardware profile/routing proto ABI. Browser/device facts remain Web-owned;
+    # commons serializes the canonical HardwareProfileResult and accelerator
+    # preference state for generated proto-ts callers.
+    "_rac_hardware_profile_get"
+    "_rac_hardware_profile_free"
+    "_rac_hardware_get_accelerators"
+    "_rac_hardware_set_accelerator_preference"
 
     # Model types
     "_rac_framework_display_name"
@@ -433,7 +446,9 @@ set(RAC_EXPORTED_FUNCTIONS
     # Tool Calling
     "_rac_tool_call_parse"
     "_rac_tool_call_parse_with_format"
+    "_rac_tool_call_parse_proto"
     "_rac_tool_call_free"
+    "_rac_tool_call_validate_proto"
     "_rac_tool_call_format_name"
     "_rac_tool_call_detect_format"
     "_rac_tool_call_format_from_name"
@@ -444,6 +459,7 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_tool_call_format_prompt_json_with_format_name"
     "_rac_tool_call_build_initial_prompt"
     "_rac_tool_call_build_followup_prompt"
+    "_rac_tool_call_format_prompt_proto"
     "_rac_tool_call_normalize_json"
     "_rac_tool_call_definitions_to_json"
     "_rac_tool_call_result_to_json"
@@ -653,9 +669,12 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_structured_output_find_matching_brace"
     "_rac_structured_output_find_matching_bracket"
     "_rac_structured_output_prepare_prompt"
+    "_rac_structured_output_prepare_prompt_proto"
     "_rac_structured_output_get_system_prompt"
     "_rac_structured_output_validate"
+    "_rac_structured_output_validate_proto"
     "_rac_structured_output_validation_free"
+    "_rac_structured_output_parse_proto"
 
     # Diffusion component
     "_rac_diffusion_generate_proto"
@@ -671,9 +690,6 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_diffusion_component_cancel"
     "_rac_diffusion_component_generate"
     "_rac_diffusion_component_generate_with_callbacks"
-    "_rac_diffusion_component_configure_json"
-    "_rac_diffusion_component_generate_json"
-    "_rac_diffusion_component_get_info_json"
     "_rac_diffusion_component_get_capabilities"
     "_rac_diffusion_component_get_info"
     "_rac_diffusion_component_get_state"
@@ -715,11 +731,17 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_rag_stats_proto"
 
     # LoRA generated-proto service
+    "_rac_get_lora_registry"
     "_rac_lora_register_proto"
+    "_rac_lora_catalog_list_proto"
+    "_rac_lora_catalog_query_proto"
+    "_rac_lora_catalog_get_proto"
+    "_rac_lora_catalog_mark_download_completed_proto"
     "_rac_lora_compatibility_proto"
-    "_rac_lora_load_proto"
+    "_rac_lora_apply_proto"
     "_rac_lora_remove_proto"
-    "_rac_lora_clear_proto"
+    "_rac_lora_list_proto"
+    "_rac_lora_state_proto"
 
     # Environment / SDK config
     "_rac_sdk_init"
@@ -901,6 +923,11 @@ target_include_directories(runanywhere_wasm PRIVATE
 target_compile_definitions(runanywhere_wasm PRIVATE
     RAC_PLATFORM_WASM=1
     RAC_PLATFORM_NAME="Emscripten"
+    # WASM exports include legacy internal event headers
+    # (rac_analytics_events.h, rac_events.h) to keep the analytics/telemetry
+    # bridge alive for in-process Web SDK shims. Marking the TU as internal
+    # avoids the public-API #warning these headers emit.
+    RAC_INTERNAL_TRANSLATION_UNIT=1
 )
 
 

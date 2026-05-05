@@ -67,33 +67,81 @@ class EmbeddingsOptions(_message.Message):
     def __init__(self, normalize: _Optional[bool] = ..., truncate: _Optional[bool] = ..., batch_size: _Optional[int] = ..., normalize_mode: _Optional[_Union[EmbeddingsNormalizeMode, str]] = ..., pooling: _Optional[_Union[EmbeddingsPoolingStrategy, str]] = ..., n_threads: _Optional[int] = ...) -> None: ...
 
 class EmbeddingVector(_message.Message):
-    __slots__ = ("values", "norm", "text", "dimension")
+    __slots__ = ("values", "norm", "text", "dimension", "input_index", "metadata")
+    class MetadataEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
     VALUES_FIELD_NUMBER: _ClassVar[int]
     NORM_FIELD_NUMBER: _ClassVar[int]
     TEXT_FIELD_NUMBER: _ClassVar[int]
     DIMENSION_FIELD_NUMBER: _ClassVar[int]
+    INPUT_INDEX_FIELD_NUMBER: _ClassVar[int]
+    METADATA_FIELD_NUMBER: _ClassVar[int]
     values: _containers.RepeatedScalarFieldContainer[float]
     norm: float
     text: str
     dimension: int
-    def __init__(self, values: _Optional[_Iterable[float]] = ..., norm: _Optional[float] = ..., text: _Optional[str] = ..., dimension: _Optional[int] = ...) -> None: ...
+    input_index: int
+    metadata: _containers.ScalarMap[str, str]
+    def __init__(self, values: _Optional[_Iterable[float]] = ..., norm: _Optional[float] = ..., text: _Optional[str] = ..., dimension: _Optional[int] = ..., input_index: _Optional[int] = ..., metadata: _Optional[_Mapping[str, str]] = ...) -> None: ...
 
 class EmbeddingsRequest(_message.Message):
-    __slots__ = ("texts", "options")
+    __slots__ = ("texts", "options", "request_id", "model_id", "metadata")
+    class MetadataEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
     TEXTS_FIELD_NUMBER: _ClassVar[int]
     OPTIONS_FIELD_NUMBER: _ClassVar[int]
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    MODEL_ID_FIELD_NUMBER: _ClassVar[int]
+    METADATA_FIELD_NUMBER: _ClassVar[int]
     texts: _containers.RepeatedScalarFieldContainer[str]
     options: EmbeddingsOptions
-    def __init__(self, texts: _Optional[_Iterable[str]] = ..., options: _Optional[_Union[EmbeddingsOptions, _Mapping]] = ...) -> None: ...
+    request_id: str
+    model_id: str
+    metadata: _containers.ScalarMap[str, str]
+    def __init__(self, texts: _Optional[_Iterable[str]] = ..., options: _Optional[_Union[EmbeddingsOptions, _Mapping]] = ..., request_id: _Optional[str] = ..., model_id: _Optional[str] = ..., metadata: _Optional[_Mapping[str, str]] = ...) -> None: ...
 
 class EmbeddingsResult(_message.Message):
-    __slots__ = ("vectors", "dimension", "processing_time_ms", "tokens_used")
+    __slots__ = ("vectors", "dimension", "processing_time_ms", "tokens_used", "model_id", "error_message", "error_code", "request_id")
     VECTORS_FIELD_NUMBER: _ClassVar[int]
     DIMENSION_FIELD_NUMBER: _ClassVar[int]
     PROCESSING_TIME_MS_FIELD_NUMBER: _ClassVar[int]
     TOKENS_USED_FIELD_NUMBER: _ClassVar[int]
+    MODEL_ID_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_CODE_FIELD_NUMBER: _ClassVar[int]
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
     vectors: _containers.RepeatedCompositeFieldContainer[EmbeddingVector]
     dimension: int
     processing_time_ms: int
     tokens_used: int
-    def __init__(self, vectors: _Optional[_Iterable[_Union[EmbeddingVector, _Mapping]]] = ..., dimension: _Optional[int] = ..., processing_time_ms: _Optional[int] = ..., tokens_used: _Optional[int] = ...) -> None: ...
+    model_id: str
+    error_message: str
+    error_code: int
+    request_id: str
+    def __init__(self, vectors: _Optional[_Iterable[_Union[EmbeddingVector, _Mapping]]] = ..., dimension: _Optional[int] = ..., processing_time_ms: _Optional[int] = ..., tokens_used: _Optional[int] = ..., model_id: _Optional[str] = ..., error_message: _Optional[str] = ..., error_code: _Optional[int] = ..., request_id: _Optional[str] = ...) -> None: ...
+
+class EmbeddingsServiceState(_message.Message):
+    __slots__ = ("is_ready", "current_model", "dimension", "max_tokens", "error_message", "error_code")
+    IS_READY_FIELD_NUMBER: _ClassVar[int]
+    CURRENT_MODEL_FIELD_NUMBER: _ClassVar[int]
+    DIMENSION_FIELD_NUMBER: _ClassVar[int]
+    MAX_TOKENS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_CODE_FIELD_NUMBER: _ClassVar[int]
+    is_ready: bool
+    current_model: str
+    dimension: int
+    max_tokens: int
+    error_message: str
+    error_code: int
+    def __init__(self, is_ready: _Optional[bool] = ..., current_model: _Optional[str] = ..., dimension: _Optional[int] = ..., max_tokens: _Optional[int] = ..., error_message: _Optional[str] = ..., error_code: _Optional[int] = ...) -> None: ...

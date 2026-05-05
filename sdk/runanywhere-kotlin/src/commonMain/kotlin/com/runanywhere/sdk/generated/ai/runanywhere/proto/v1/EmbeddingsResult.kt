@@ -15,6 +15,7 @@ import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
 import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.redactElements
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -71,6 +72,36 @@ public class EmbeddingsResult(
     schemaIndex = 3,
   )
   public val tokens_used: Int = 0,
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "modelId",
+    schemaIndex = 4,
+  )
+  public val model_id: String? = null,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "errorMessage",
+    schemaIndex = 5,
+  )
+  public val error_message: String? = null,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "errorCode",
+    schemaIndex = 6,
+  )
+  public val error_code: Int = 0,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "requestId",
+    schemaIndex = 7,
+  )
+  public val request_id: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<EmbeddingsResult, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -99,6 +130,10 @@ public class EmbeddingsResult(
     if (dimension != other.dimension) return false
     if (processing_time_ms != other.processing_time_ms) return false
     if (tokens_used != other.tokens_used) return false
+    if (model_id != other.model_id) return false
+    if (error_message != other.error_message) return false
+    if (error_code != other.error_code) return false
+    if (request_id != other.request_id) return false
     return true
   }
 
@@ -110,6 +145,10 @@ public class EmbeddingsResult(
       result = result * 37 + dimension.hashCode()
       result = result * 37 + processing_time_ms.hashCode()
       result = result * 37 + tokens_used.hashCode()
+      result = result * 37 + (model_id?.hashCode() ?: 0)
+      result = result * 37 + (error_message?.hashCode() ?: 0)
+      result = result * 37 + error_code.hashCode()
+      result = result * 37 + request_id.hashCode()
       super.hashCode = result
     }
     return result
@@ -121,6 +160,10 @@ public class EmbeddingsResult(
     result += """dimension=$dimension"""
     result += """processing_time_ms=$processing_time_ms"""
     result += """tokens_used=$tokens_used"""
+    if (model_id != null) result += """model_id=${sanitize(model_id)}"""
+    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
+    result += """error_code=$error_code"""
+    result += """request_id=${sanitize(request_id)}"""
     return result.joinToString(prefix = "EmbeddingsResult{", separator = ", ", postfix = "}")
   }
 
@@ -129,9 +172,13 @@ public class EmbeddingsResult(
     dimension: Int = this.dimension,
     processing_time_ms: Long = this.processing_time_ms,
     tokens_used: Int = this.tokens_used,
+    model_id: String? = this.model_id,
+    error_message: String? = this.error_message,
+    error_code: Int = this.error_code,
+    request_id: String = this.request_id,
     unknownFields: ByteString = this.unknownFields,
   ): EmbeddingsResult = EmbeddingsResult(vectors, dimension, processing_time_ms, tokens_used,
-      unknownFields)
+      model_id, error_message, error_code, request_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -151,6 +198,12 @@ public class EmbeddingsResult(
             value.processing_time_ms)
         if (value.tokens_used != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(4,
             value.tokens_used)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.model_id)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.error_message)
+        if (value.error_code != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(7,
+            value.error_code)
+        if (value.request_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(8,
+            value.request_id)
         return size
       }
 
@@ -160,11 +213,19 @@ public class EmbeddingsResult(
         if (value.processing_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 3,
             value.processing_time_ms)
         if (value.tokens_used != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4, value.tokens_used)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.model_id)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error_message)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7, value.error_code)
+        if (value.request_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 8, value.request_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: EmbeddingsResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.request_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 8, value.request_id)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7, value.error_code)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error_message)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.model_id)
         if (value.tokens_used != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4, value.tokens_used)
         if (value.processing_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 3,
             value.processing_time_ms)
@@ -177,12 +238,20 @@ public class EmbeddingsResult(
         var dimension: Int = 0
         var processing_time_ms: Long = 0L
         var tokens_used: Int = 0
+        var model_id: String? = null
+        var error_message: String? = null
+        var error_code: Int = 0
+        var request_id: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> vectors.add(EmbeddingVector.ADAPTER.decode(reader))
             2 -> dimension = ProtoAdapter.INT32.decode(reader)
             3 -> processing_time_ms = ProtoAdapter.INT64.decode(reader)
             4 -> tokens_used = ProtoAdapter.INT32.decode(reader)
+            5 -> model_id = ProtoAdapter.STRING.decode(reader)
+            6 -> error_message = ProtoAdapter.STRING.decode(reader)
+            7 -> error_code = ProtoAdapter.INT32.decode(reader)
+            8 -> request_id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -191,6 +260,10 @@ public class EmbeddingsResult(
           dimension = dimension,
           processing_time_ms = processing_time_ms,
           tokens_used = tokens_used,
+          model_id = model_id,
+          error_message = error_message,
+          error_code = error_code,
+          request_id = request_id,
           unknownFields = unknownFields
         )
       }

@@ -606,12 +606,25 @@ int test_rag_ingest_query_mocked_path() {
 
     rac_proto_buffer_t out;
     rac_proto_buffer_init(&out);
+    // CPP-07: drain any preexisting events so we can assert canonical
+    // ingest/query lifecycle events without false positives from earlier
+    // test sequences.
+    rac_sdk_event_clear_queue();
     rac_result_t rc =
         rac_rag_ingest_proto(session, document_bytes.data(), document_bytes.size(), &out);
     runanywhere::v1::RAGStatistics stats;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &stats), "RAG ingest returns statistics");
     CHECK(stats.indexed_chunks() >= 1, "RAG ingest indexes chunks");
     rac_proto_buffer_free(&out);
+    // CPP-07: bespoke RAG ingestion publishes the canonical SDKEvent
+    // capability lifecycle (matches what an L5 solution composing
+    // embed -> retrieve would emit on its event stream).
+    CHECK(poll_capability(
+              runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_STARTED),
+          "RAG ingest publishes RAG_INGESTION_STARTED");
+    CHECK(poll_capability(
+              runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_INGESTION_COMPLETED),
+          "RAG ingest publishes RAG_INGESTION_COMPLETED");
 
     runanywhere::v1::RAGQueryOptions query;
     query.set_question("Where does RAG live?");
@@ -619,12 +632,21 @@ int test_rag_ingest_query_mocked_path() {
     std::vector<uint8_t> query_bytes;
     CHECK(serialize(query, &query_bytes), "RAGQueryOptions serializes");
     rac_proto_buffer_init(&out);
+    rac_sdk_event_clear_queue();
     rc = rac_rag_query_proto(session, query_bytes.data(), query_bytes.size(), &out);
     runanywhere::v1::RAGResult result;
     CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result), "RAG query returns RAGResult");
     CHECK(result.answer() == "mock answer", "RAG query uses mocked LLM path");
     CHECK(result.retrieved_chunks_size() >= 1, "RAG query returns retrieved chunks");
     rac_proto_buffer_free(&out);
+    // CPP-07: bespoke RAG query path emits the canonical query lifecycle
+    // events (equivalent to an L5 retrieve -> generate solution).
+    CHECK(poll_capability(
+              runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_STARTED),
+          "RAG query publishes RAG_QUERY_STARTED");
+    CHECK(poll_capability(
+              runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_RAG_QUERY_COMPLETED),
+          "RAG query publishes RAG_QUERY_COMPLETED");
 
     rac_proto_buffer_init(&out);
     CHECK(rac_rag_clear_proto(session, &out) == RAC_SUCCESS, "RAG clear succeeds");
@@ -635,7 +657,7 @@ int test_rag_ingest_query_mocked_path() {
     return 0;
 }
 
-int test_lora_register_compat_load_remove_clear() {
+int test_lora_register_compat_apply_remove_clear() {
     auto root = temp_root("lora");
     auto adapter_path = root / "adapter.gguf";
     write_file(adapter_path, "GGUFadapter");
@@ -687,22 +709,35 @@ int test_lora_register_compat_load_remove_clear() {
     CHECK(compat.is_compatible(), "LoRA compatibility succeeds for capable backend");
     rac_proto_buffer_free(&out);
 
+    runanywhere::v1::LoRAApplyRequest apply;
+    apply.set_request_id("advanced-lora-apply");
+    *apply.add_adapters() = config;
+    std::vector<uint8_t> apply_bytes;
+    CHECK(serialize(apply, &apply_bytes), "LoRAApplyRequest serializes");
     rac_proto_buffer_init(&out);
-    rc = rac_lora_load_proto(component, config_bytes.data(), config_bytes.size(), &out);
-    runanywhere::v1::LoRAAdapterInfo info;
-    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &info), "LoRA load returns adapter info");
-    CHECK(info.applied() && info.adapter_path() == adapter_path.string(),
-          "LoRA load marks adapter applied");
+    rc = rac_lora_apply_proto(component, apply_bytes.data(), apply_bytes.size(), &out);
+    runanywhere::v1::LoRAApplyResult apply_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &apply_result),
+          "LoRA apply returns generated result");
+    CHECK(apply_result.success() && apply_result.adapters_size() == 1,
+          "LoRA apply succeeds through generated service ABI");
+    CHECK(apply_result.adapters(0).applied() &&
+              apply_result.adapters(0).adapter_path() == adapter_path.string(),
+          "LoRA apply marks adapter applied");
     rac_proto_buffer_free(&out);
 
+    runanywhere::v1::LoRARemoveRequest clear;
+    clear.set_request_id("advanced-lora-clear");
+    clear.set_clear_all(true);
+    std::vector<uint8_t> clear_bytes;
+    CHECK(serialize(clear, &clear_bytes), "LoRARemoveRequest clear serializes");
     rac_proto_buffer_init(&out);
-    CHECK(rac_lora_remove_proto(component, config_bytes.data(), config_bytes.size(), &out) ==
-              RAC_SUCCESS,
-          "LoRA remove succeeds");
-    rac_proto_buffer_free(&out);
-
-    rac_proto_buffer_init(&out);
-    CHECK(rac_lora_clear_proto(component, &out) == RAC_SUCCESS, "LoRA clear succeeds");
+    rc = rac_lora_remove_proto(component, clear_bytes.data(), clear_bytes.size(), &out);
+    runanywhere::v1::LoRAState state;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &state),
+          "LoRA remove clear_all returns generated state");
+    CHECK(!state.has_active_adapters() && state.loaded_adapters_size() == 0,
+          "LoRA remove clear_all returns empty state");
     rac_proto_buffer_free(&out);
     rac_llm_component_destroy(component);
     (void)rac_plugin_unregister("llamacpp");
@@ -746,7 +781,7 @@ int main() {
     test_embeddings_mocked_result();
     test_diffusion_progress_cancel_and_unsupported();
     test_rag_ingest_query_mocked_path();
-    test_lora_register_compat_load_remove_clear();
+    test_lora_register_compat_apply_remove_clear();
 
     std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
     return fail_count == 0 ? 0 : 1;

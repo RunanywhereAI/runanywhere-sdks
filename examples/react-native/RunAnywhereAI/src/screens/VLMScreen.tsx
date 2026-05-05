@@ -32,7 +32,7 @@ import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model/ModelSelectionSheet';
-import { FileSystem, type ModelInfo as SDKModelInfo } from '@runanywhere/core';
+import { type ModelInfo as SDKModelInfo } from '@runanywhere/core';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -61,18 +61,11 @@ const VLMScreen: React.FC = () => {
   // Handle model selection
   const handleModelSelected = useCallback(
     async (model: SDKModelInfo) => {
-      // 1. Find the projector path
-      const mmprojPath = model.localPath
-        ? await FileSystem.findMmprojForModel(model.localPath)
-        : undefined;
-
-      // 2. Load the model FIRST
-      if (model.localPath) {
-        await vlm.loadModel(model.localPath, model.name, mmprojPath);
-      }
+      // 1. Load the model FIRST
+      await vlm.loadModel(model.id, model.name);
       await vlm.checkModelStatus();
 
-      // 3. Close the modal AFTER the model is safely loaded and state is stable
+      // 2. Close the modal AFTER the model is safely loaded and state is stable
       setShowingModelSelection(false);
     },
     [vlm]

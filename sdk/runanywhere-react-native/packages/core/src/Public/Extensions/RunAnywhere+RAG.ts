@@ -116,14 +116,14 @@ export async function ragQuery(
   options?: Omit<RAGQueryOptions, 'question'>
 ): Promise<RAGResult> {
   const native = ensureNative();
-  const queryOptions: RAGQueryOptions = {
+  const queryOptions: RAGQueryOptions = RAGQueryOptionsMessage.fromPartial({
     question,
     systemPrompt: options?.systemPrompt,
     maxTokens: options?.maxTokens ?? 0,
     temperature: options?.temperature ?? 0,
     topP: options?.topP ?? 1.0,
     topK: options?.topK ?? 0,
-  };
+  });
   const resultBytes = await native.ragQueryProto(
     bytesToArrayBuffer(RAGQueryOptionsMessage.encode(queryOptions).finish())
   );

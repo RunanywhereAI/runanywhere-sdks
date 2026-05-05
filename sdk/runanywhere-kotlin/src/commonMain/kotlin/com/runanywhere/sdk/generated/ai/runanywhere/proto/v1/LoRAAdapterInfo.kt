@@ -89,6 +89,22 @@ public class LoRAAdapterInfo(
     schemaIndex = 4,
   )
   public val error_message: String? = null,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "errorCode",
+    schemaIndex = 5,
+  )
+  public val error_code: Int = 0,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "loadedAtMs",
+    schemaIndex = 6,
+  )
+  public val loaded_at_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoRAAdapterInfo, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -107,6 +123,8 @@ public class LoRAAdapterInfo(
     if (scale != other.scale) return false
     if (applied != other.applied) return false
     if (error_message != other.error_message) return false
+    if (error_code != other.error_code) return false
+    if (loaded_at_ms != other.loaded_at_ms) return false
     return true
   }
 
@@ -119,6 +137,8 @@ public class LoRAAdapterInfo(
       result = result * 37 + scale.hashCode()
       result = result * 37 + applied.hashCode()
       result = result * 37 + (error_message?.hashCode() ?: 0)
+      result = result * 37 + error_code.hashCode()
+      result = result * 37 + loaded_at_ms.hashCode()
       super.hashCode = result
     }
     return result
@@ -131,6 +151,8 @@ public class LoRAAdapterInfo(
     result += """scale=$scale"""
     result += """applied=$applied"""
     if (error_message != null) result += """error_message=${sanitize(error_message)}"""
+    result += """error_code=$error_code"""
+    result += """loaded_at_ms=$loaded_at_ms"""
     return result.joinToString(prefix = "LoRAAdapterInfo{", separator = ", ", postfix = "}")
   }
 
@@ -140,9 +162,11 @@ public class LoRAAdapterInfo(
     scale: Float = this.scale,
     applied: Boolean = this.applied,
     error_message: String? = this.error_message,
+    error_code: Int = this.error_code,
+    loaded_at_ms: Long = this.loaded_at_ms,
     unknownFields: ByteString = this.unknownFields,
   ): LoRAAdapterInfo = LoRAAdapterInfo(adapter_id, adapter_path, scale, applied, error_message,
-      unknownFields)
+      error_code, loaded_at_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -163,6 +187,10 @@ public class LoRAAdapterInfo(
         if (!value.scale.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(3, value.scale)
         if (value.applied != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.applied)
         size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.error_message)
+        if (value.error_code != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(6,
+            value.error_code)
+        if (value.loaded_at_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(7,
+            value.loaded_at_ms)
         return size
       }
 
@@ -173,11 +201,17 @@ public class LoRAAdapterInfo(
         if (!value.scale.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.scale)
         if (value.applied != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.applied)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_message)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.error_code)
+        if (value.loaded_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
+            value.loaded_at_ms)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LoRAAdapterInfo) {
         writer.writeBytes(value.unknownFields)
+        if (value.loaded_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
+            value.loaded_at_ms)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.error_code)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.error_message)
         if (value.applied != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.applied)
         if (!value.scale.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 3, value.scale)
@@ -192,6 +226,8 @@ public class LoRAAdapterInfo(
         var scale: Float = 0f
         var applied: Boolean = false
         var error_message: String? = null
+        var error_code: Int = 0
+        var loaded_at_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> adapter_id = ProtoAdapter.STRING.decode(reader)
@@ -199,6 +235,8 @@ public class LoRAAdapterInfo(
             3 -> scale = ProtoAdapter.FLOAT.decode(reader)
             4 -> applied = ProtoAdapter.BOOL.decode(reader)
             5 -> error_message = ProtoAdapter.STRING.decode(reader)
+            6 -> error_code = ProtoAdapter.INT32.decode(reader)
+            7 -> loaded_at_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -208,6 +246,8 @@ public class LoRAAdapterInfo(
           scale = scale,
           applied = applied,
           error_message = error_message,
+          error_code = error_code,
+          loaded_at_ms = loaded_at_ms,
           unknownFields = unknownFields
         )
       }

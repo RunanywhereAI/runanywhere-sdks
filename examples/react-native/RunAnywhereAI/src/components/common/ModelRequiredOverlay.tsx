@@ -18,11 +18,12 @@ import {
   IconSize,
   ButtonHeight,
 } from '../../theme/spacing';
-import { ModelModality } from '../../types/model';
+
+export type RequiredModelKind = 'llm' | 'stt' | 'tts' | 'vlm';
 
 interface ModelRequiredOverlayProps {
   /** Modality context for icon and text */
-  modality: ModelModality;
+  modality: RequiredModelKind;
   /** Title text */
   title?: string;
   /** Description text */
@@ -34,15 +35,15 @@ interface ModelRequiredOverlayProps {
 /**
  * Get icon name based on modality
  */
-const getModalityIcon = (modality: ModelModality): string => {
+const getModalityIcon = (modality: RequiredModelKind): string => {
   switch (modality) {
-    case ModelModality.LLM:
+    case 'llm':
       return 'chatbubble-ellipses-outline';
-    case ModelModality.STT:
+    case 'stt':
       return 'mic-outline';
-    case ModelModality.TTS:
+    case 'tts':
       return 'volume-high-outline';
-    case ModelModality.VLM:
+    case 'vlm':
       return 'eye-outline';
     default:
       return 'cube-outline';
@@ -52,15 +53,15 @@ const getModalityIcon = (modality: ModelModality): string => {
 /**
  * Get default title based on modality
  */
-const getDefaultTitle = (modality: ModelModality): string => {
+const getDefaultTitle = (modality: RequiredModelKind): string => {
   switch (modality) {
-    case ModelModality.LLM:
+    case 'llm':
       return 'No Language Model Selected';
-    case ModelModality.STT:
+    case 'stt':
       return 'No Speech Model Selected';
-    case ModelModality.TTS:
+    case 'tts':
       return 'No Voice Model Selected';
-    case ModelModality.VLM:
+    case 'vlm':
       return 'No Vision Model Selected';
     default:
       return 'No Model Selected';
@@ -70,15 +71,15 @@ const getDefaultTitle = (modality: ModelModality): string => {
 /**
  * Get default description based on modality
  */
-const getDefaultDescription = (modality: ModelModality): string => {
+const getDefaultDescription = (modality: RequiredModelKind): string => {
   switch (modality) {
-    case ModelModality.LLM:
+    case 'llm':
       return 'Select a language model to start chatting with AI on your device.';
-    case ModelModality.STT:
+    case 'stt':
       return 'Select a speech recognition model to transcribe audio.';
-    case ModelModality.TTS:
+    case 'tts':
       return 'Select a text-to-speech model to generate audio.';
-    case ModelModality.VLM:
+    case 'vlm':
       return 'Select a vision model to analyze images.';
     default:
       return 'Select a model to get started.';

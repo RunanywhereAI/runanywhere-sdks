@@ -72,6 +72,13 @@ public class WordTimestamp(
     schemaIndex = 3,
   )
   public val confidence: Float = 0f,
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "speakerId",
+    schemaIndex = 4,
+  )
+  public val speaker_id: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<WordTimestamp, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -89,6 +96,7 @@ public class WordTimestamp(
     if (start_ms != other.start_ms) return false
     if (end_ms != other.end_ms) return false
     if (confidence != other.confidence) return false
+    if (speaker_id != other.speaker_id) return false
     return true
   }
 
@@ -100,6 +108,7 @@ public class WordTimestamp(
       result = result * 37 + start_ms.hashCode()
       result = result * 37 + end_ms.hashCode()
       result = result * 37 + confidence.hashCode()
+      result = result * 37 + (speaker_id?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -111,6 +120,7 @@ public class WordTimestamp(
     result += """start_ms=$start_ms"""
     result += """end_ms=$end_ms"""
     result += """confidence=$confidence"""
+    if (speaker_id != null) result += """speaker_id=${sanitize(speaker_id)}"""
     return result.joinToString(prefix = "WordTimestamp{", separator = ", ", postfix = "}")
   }
 
@@ -119,8 +129,9 @@ public class WordTimestamp(
     start_ms: Long = this.start_ms,
     end_ms: Long = this.end_ms,
     confidence: Float = this.confidence,
+    speaker_id: String? = this.speaker_id,
     unknownFields: ByteString = this.unknownFields,
-  ): WordTimestamp = WordTimestamp(word, start_ms, end_ms, confidence, unknownFields)
+  ): WordTimestamp = WordTimestamp(word, start_ms, end_ms, confidence, speaker_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -139,6 +150,7 @@ public class WordTimestamp(
         if (value.end_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(3, value.end_ms)
         if (!value.confidence.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(4,
             value.confidence)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.speaker_id)
         return size
       }
 
@@ -148,11 +160,13 @@ public class WordTimestamp(
         if (value.end_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 3, value.end_ms)
         if (!value.confidence.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 4,
             value.confidence)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.speaker_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: WordTimestamp) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.speaker_id)
         if (!value.confidence.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 4,
             value.confidence)
         if (value.end_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 3, value.end_ms)
@@ -165,12 +179,14 @@ public class WordTimestamp(
         var start_ms: Long = 0L
         var end_ms: Long = 0L
         var confidence: Float = 0f
+        var speaker_id: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> word = ProtoAdapter.STRING.decode(reader)
             2 -> start_ms = ProtoAdapter.INT64.decode(reader)
             3 -> end_ms = ProtoAdapter.INT64.decode(reader)
             4 -> confidence = ProtoAdapter.FLOAT.decode(reader)
+            5 -> speaker_id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -179,6 +195,7 @@ public class WordTimestamp(
           start_ms = start_ms,
           end_ms = end_ms,
           confidence = confidence,
+          speaker_id = speaker_id,
           unknownFields = unknownFields
         )
       }

@@ -7,8 +7,6 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Storage/RunAnywhere+Storage.swift
  */
 
-import { ModelRegistry } from '../../services/ModelRegistry';
-import { FileSystem } from '../../services/FileSystem';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import {
@@ -22,6 +20,7 @@ import {
   StorageInfoResult as StorageInfoResultCodec,
 } from '@runanywhere/proto-ts/storage_types';
 import type {
+  StorageInfo,
   StorageAvailabilityResult,
   StorageDeletePlan,
   StorageDeleteResult,
@@ -40,7 +39,7 @@ export type {
   StorageDeletePlanRequest,
   StorageDeleteRequest,
   StorageDeleteResult,
-  StorageInfo as ProtoStorageInfo,
+  StorageInfo,
   StorageInfoRequest,
   StorageInfoResult,
 } from '@runanywhere/proto-ts/storage_types';
@@ -61,57 +60,6 @@ function decode<T>(
   return bytes.byteLength === 0 ? fallback : codec.decode(bytes);
 }
 
-/**
- * Device storage information
- * Matches Swift's DeviceStorageInfo
- */
-export interface DeviceStorageInfo {
-  totalSpace: number;
-  freeSpace: number;
-  usedSpace: number;
-}
-
-/**
- * App storage information
- * Matches Swift's AppStorageInfo
- */
-export interface AppStorageInfo {
-  documentsSize: number;
-  cacheSize: number;
-  appSupportSize: number;
-  totalSize: number;
-}
-
-/**
- * Model storage information
- */
-export interface ModelStorageInfo {
-  totalSize: number;
-  modelCount: number;
-}
-
-/**
- * Complete storage info structure
- * Matches Swift's StorageInfo
- */
-export interface StorageInfo {
-  deviceStorage: DeviceStorageInfo;
-  appStorage: AppStorageInfo;
-  modelStorage: ModelStorageInfo;
-  cacheSize: number;
-  totalModelsSize: number;
-}
-
-/**
- * Get models directory path on device
- * Returns: Documents/RunAnywhere/Models/
- */
-export async function getModelsDirectory(): Promise<string> {
-  if (!FileSystem.isAvailable()) {
-    return '';
-  }
-  return FileSystem.getModelsDirectory();
-}
 
 /**
  * Get canonical generated storage info from native commons.
@@ -121,6 +69,7 @@ export async function getStorageInfoProto(
     includeDevice: true,
     includeApp: true,
     includeModels: true,
+    includeCache: true,
   }
 ): Promise<StorageInfoResult> {
   if (!isNativeModuleAvailable()) {
@@ -228,48 +177,16 @@ export async function deleteStorage(
 }
 
 /**
- * Get storage information
+ * Get generated storage information.
  * Delegates to C++ FileManagerBridge for recursive directory traversal.
- * Returns structure matching Swift's StorageInfo.
  */
-export async function getStorageInfo(): Promise<StorageInfo> {
-  const emptyResult: StorageInfo = {
-    deviceStorage: { totalSpace: 0, freeSpace: 0, usedSpace: 0 },
-    appStorage: { documentsSize: 0, cacheSize: 0, appSupportSize: 0, totalSize: 0 },
-    modelStorage: { totalSize: 0, modelCount: 0 },
-    cacheSize: 0,
-    totalModelsSize: 0,
-  };
-
+export async function getStorageInfo(): Promise<StorageInfo | null> {
   try {
     const result = await getStorageInfoProto();
-    if (result.success && result.info) {
-      const info = result.info;
-      return {
-        deviceStorage: {
-          totalSpace: info.device?.totalBytes ?? 0,
-          freeSpace: info.device?.freeBytes ?? 0,
-          usedSpace: info.device?.usedBytes ?? 0,
-        },
-        appStorage: {
-          documentsSize: info.app?.documentsBytes ?? 0,
-          cacheSize: info.app?.cacheBytes ?? 0,
-          appSupportSize: info.app?.appSupportBytes ?? 0,
-          totalSize: info.app?.totalBytes ?? 0,
-        },
-        modelStorage: {
-          totalSize: info.totalModelsBytes,
-          modelCount: info.totalModels,
-        },
-        cacheSize: info.app?.cacheBytes ?? 0,
-        totalModelsSize: info.totalModelsBytes,
-      };
-    }
-
-    return emptyResult;
+    return result.success ? result.info ?? null : null;
   } catch (error) {
     logger.warning('Failed to get storage info:', { error });
-    return emptyResult;
+    return null;
   }
 }
 
@@ -278,9 +195,6 @@ export async function getStorageInfo(): Promise<StorageInfo> {
  * Delegates to C++ FileManagerBridge for file cache/temp clearing.
  */
 export async function clearCache(): Promise<void> {
-  // Clear in-memory model registry cache
-  ModelRegistry.reset();
-
   // Clear file caches via native module (C++ handles directory clearing)
   if (isNativeModuleAvailable()) {
     try {

@@ -142,7 +142,7 @@ com.runanywhere.sdk/
 │   ├── RunAnywhere.kt               # Main SDK entry point
 │   ├── events/
 │   │   ├── EventBus.kt              # Event subscription system
-│   │   └── SDKEvent.kt              # Event type definitions
+│   │   └── SDKEvent.kt              # Proto-generated event typealiases
 │   └── extensions/
 │       ├── RunAnywhere+TextGeneration.kt    # LLM APIs
 │       ├── RunAnywhere+STT.kt               # Speech-to-text APIs
@@ -151,11 +151,11 @@ com.runanywhere.sdk/
 │       ├── RunAnywhere+VoiceAgent.kt        # Voice pipeline orchestration
 │       ├── RunAnywhere+ModelManagement.kt   # Model registration/download
 │       ├── LLM/LLMTypes.kt                  # LLM type definitions
-│       ├── STT/STTTypes.kt                  # STT type definitions
-│       ├── TTS/TTSTypes.kt                  # TTS type definitions
-│       ├── VAD/VADTypes.kt                  # VAD type definitions
+│       ├── LLM/ToolCallingTypes.kt          # Tool calling type definitions
 │       ├── VoiceAgent/VoiceAgentTypes.kt    # Voice agent types
-│       └── Models/ModelTypes.kt             # Model type definitions
+│       ├── VoiceAgent/VoiceEventState.kt    # Voice event state mapping
+│       ├── Models/ModelTypes.kt             # Model type definitions
+│       └── Models/ModelPathResolution.kt    # Model path resolution
 │
 ├── core/                             # Core types and interfaces
 │   ├── types/

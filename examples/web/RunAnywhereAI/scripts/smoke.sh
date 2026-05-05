@@ -8,7 +8,12 @@ APP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${APP_ROOT}"
 
 echo "==> Checking Web SDK call coverage"
-grep -R -E "RunAnywhere\.(initialize|registerModels|restoreLocalStorage|chooseLocalStorageDirectory|importModelFromPicker|importModelFromFile)|ModelManager\.(downloadModel|loadModel|deleteModel|clearAll|getStorageInfo)|TextGeneration\.generateStream|ToolCalling\.generateWithTools|VLMWorkerBridge|transcribe|synthesize|voice" \
+# After the V2 cleanup the legacy ModelManager / TextGeneration / VLMWorkerBridge
+# facades were deleted. The example app currently exercises the canonical Phase
+# 1 init + persistent-storage chooser flow (`RunAnywhere.initialize`,
+# `RunAnywhere.restoreLocalStorage`, `RunAnywhere.chooseLocalStorageDirectory`)
+# while the proto-byte backend bridges are wired up in a follow-up.
+grep -R -E "RunAnywhere\.(initialize|restoreLocalStorage|chooseLocalStorageDirectory|requestLocalStorageAccess)|RunAnywhere\.solutions\.run|RAG\.(query|ingest|getStatistics)" \
     src >/dev/null
 
 echo "==> Building Web sample"

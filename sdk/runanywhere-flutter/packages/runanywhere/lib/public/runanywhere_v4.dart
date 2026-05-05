@@ -10,7 +10,7 @@
 //
 // Usage:
 //   final ra = RunAnywhereSDK.instance;
-//   await ra.initialize(environment: SDKEnvironment.development);
+//   await ra.initialize(environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT);
 //   await ra.llm.load('llama-3-8b');
 //   final response = await ra.llm.chat('Hello!');
 
@@ -40,6 +40,7 @@ import 'package:runanywhere/generated/stt_options.pb.dart'
 import 'package:runanywhere/generated/tts_options.pb.dart'
     show TTSOptions, TTSOutput, TTSSpeakResult, TTSVoiceInfo;
 import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
+import 'package:runanywhere/internal/sdk_event_factories.dart';
 import 'package:runanywhere/internal/sdk_init.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
@@ -68,7 +69,6 @@ import 'package:runanywhere/public/capabilities/runanywhere_voice.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_voice_agent.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
-import 'package:runanywhere/public/events/sdk_event.dart';
 
 /// RunAnywhere SDK entry point.
 ///
@@ -85,18 +85,18 @@ class RunAnywhereSDK {
 
   // --- Lifecycle -----------------------------------------------------------
 
-  /// True after [initialize] has succeeded.
-  bool get isInitialized => SdkState.shared.isInitialized;
+  /// True after [initialize] has succeeded. Sourced from the C++ commons
+  /// (`rac_state_is_initialized`); Dart does not maintain a parallel flag.
+  bool get isInitialized => DartBridge.isInitialized;
 
-  /// True if the SDK is active (initialized + has init params).
-  bool get isActive =>
-      SdkState.shared.isInitialized && SdkState.shared.initParams != null;
+  /// True if the SDK is active (initialized + has init params in commons).
+  bool get isActive => DartBridge.isInitialized && _cachedInitParams != null;
 
   /// True once Phase 2 (services) initialization has completed. Mirrors
   /// Swift's `areServicesReady`. In Flutter, Phase 2 runs eagerly inside
   /// [initialize] so this returns true alongside [isInitialized] today.
   bool get areServicesReady =>
-      SdkState.shared.isInitialized && DartBridge.servicesInitialized;
+      DartBridge.isInitialized && DartBridge.servicesInitialized;
 
   /// Cached device id — populated during initialization. Mirrors Swift's
   /// `deviceId: String`.
@@ -131,11 +131,21 @@ class RunAnywhereSDK {
   }
 
   /// Initialization params (apiKey, baseURL, environment) — null
-  /// until [initialize] runs.
-  SDKInitParams? get initParams => SdkState.shared.initParams;
+  /// until [initialize] runs. Cached from the most recent
+  /// `initializeWithParams` call so callers can introspect what was
+  /// resolved (commons stores the canonical values too via
+  /// `rac_state_*`).
+  SDKInitParams? get initParams => _cachedInitParams;
 
-  /// Current SDK environment (development / staging / production).
-  SDKEnvironment? get environment => SdkState.shared.currentEnvironment;
+  /// Current SDK environment. Sourced from `DartBridge` which mirrors
+  /// commons' canonical environment.
+  SDKEnvironment? get environment =>
+      DartBridge.isInitialized ? DartBridge.environment : null;
+
+  // Cached params from the most recent successful initializeWithParams.
+  // The canonical source is commons (rac_state_*); this is a lightweight
+  // Dart accessor for callers that want the original Uri / apiKey shape.
+  SDKInitParams? _cachedInitParams;
 
   /// SDK semver string (e.g. "4.0.0").
   String get version => SDKConstants.version;
@@ -150,11 +160,11 @@ class RunAnywhereSDK {
   Future<void> initialize({
     String? apiKey,
     String? baseURL,
-    SDKEnvironment environment = SDKEnvironment.development,
+    SDKEnvironment environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
   }) async {
     final SDKInitParams params;
 
-    if (environment == SDKEnvironment.development) {
+    if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
       if (baseURL == null || baseURL.isEmpty) {
         params = SDKInitParams.forDevelopment(apiKey: apiKey ?? '');
       } else {
@@ -203,18 +213,16 @@ class RunAnywhereSDK {
   ///   pattern. Network failures are non-critical; offline inference
   ///   still works.
   Future<void> initializeWithParams(SDKInitParams params) async {
-    if (SdkState.shared.isInitialized) return;
+    if (DartBridge.isInitialized) return;
 
     final logger = SDKLogger('RunAnywhere.Init');
-    EventBus.shared.publish(SDKInitializationStarted());
+    EventBus.shared.publish(SdkEventFactory.initializationStarted());
 
     try {
-      SdkState.shared.currentEnvironment = params.environment;
-      SdkState.shared.initParams = params;
+      _cachedInitParams = params;
 
       // --- Phase 1: Core init (sync) ---
       DartBridge.initialize(params.environment);
-      logger.debug('DartBridge initialized with platform adapter');
 
       // --- Local service setup (async, no network) ---
       await DartBridge.initializeServices(
@@ -222,7 +230,6 @@ class RunAnywhereSDK {
         baseURL: params.baseURL.toString(),
         deviceId: DartBridgeDevice.cachedDeviceId,
       );
-      logger.debug('Service bridges initialized');
 
       await DartBridge.modelPaths.setBaseDirectory();
 
@@ -232,15 +239,10 @@ class RunAnywhereSDK {
         environment: params.environment,
       );
 
-      logger.debug('Initializing model registry...');
       await DartBridgeModelRegistry.instance.initialize();
 
-      // NOTE: Discovery runs lazily on first `models.available()` call
-      // so apps have a chance to register their models first.
-
-      SdkState.shared.isInitialized = true;
-      logger.info('✅ SDK initialized (${params.environment.description})');
-      EventBus.shared.publish(SDKInitializationCompleted());
+      logger.info('SDK initialized (${params.environment.description})');
+      EventBus.shared.publish(SdkEventFactory.initializationCompleted());
 
       TelemetryService.shared.trackSDKInit(
         environment: params.environment.name,
@@ -248,13 +250,14 @@ class RunAnywhereSDK {
       );
 
       // --- Phase 2: Background services (network, fire-and-forget) ---
-      // Matches iOS Task.detached { completeServicesInitialization() }.
+      // Mirrors iOS `Task.detached { completeServicesInitialization() }`.
       // Failures are non-critical; offline inference still works.
       unawaited(_completeBackgroundServices(params, logger));
     } catch (e) {
-      logger.error('❌ SDK initialization failed: $e');
+      logger.error('SDK initialization failed: $e');
+      _cachedInitParams = null;
       SdkState.shared.reset();
-      EventBus.shared.publish(SDKInitializationFailed(e));
+      EventBus.shared.publish(SdkEventFactory.initializationFailed(e));
 
       TelemetryService.shared.trackSDKInit(
         environment: params.environment.name,
@@ -292,6 +295,7 @@ class RunAnywhereSDK {
 
     DartBridge.modelLifecycle.reset();
     SdkState.shared.reset();
+    _cachedInitParams = null;
     DartBridgeModelRegistry.instance.shutdown();
     ServiceContainer.shared.reset();
   }

@@ -91,6 +91,10 @@ class ComponentLifecycleState(int, metaclass=_enum_type_wrapper.EnumTypeWrapper)
     COMPONENT_LIFECYCLE_STATE_UNLOADING: _ClassVar[ComponentLifecycleState]
     COMPONENT_LIFECYCLE_STATE_ERROR: _ClassVar[ComponentLifecycleState]
     COMPONENT_LIFECYCLE_STATE_SHUTDOWN: _ClassVar[ComponentLifecycleState]
+    COMPONENT_LIFECYCLE_STATE_DOWNLOADING: _ClassVar[ComponentLifecycleState]
+    COMPONENT_LIFECYCLE_STATE_DELETING: _ClassVar[ComponentLifecycleState]
+    COMPONENT_LIFECYCLE_STATE_PAUSED: _ClassVar[ComponentLifecycleState]
+    COMPONENT_LIFECYCLE_STATE_UPDATING: _ClassVar[ComponentLifecycleState]
 
 class InitializationStage(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -356,6 +360,12 @@ class ModelRegistryEventKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED: _ClassVar[ModelRegistryEventKind]
     MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED: _ClassVar[ModelRegistryEventKind]
     MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED: _ClassVar[ModelRegistryEventKind]
+    MODEL_REGISTRY_EVENT_KIND_LIST_STARTED: _ClassVar[ModelRegistryEventKind]
+    MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED: _ClassVar[ModelRegistryEventKind]
+    MODEL_REGISTRY_EVENT_KIND_LIST_FAILED: _ClassVar[ModelRegistryEventKind]
+    MODEL_REGISTRY_EVENT_KIND_GET_STARTED: _ClassVar[ModelRegistryEventKind]
+    MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED: _ClassVar[ModelRegistryEventKind]
+    MODEL_REGISTRY_EVENT_KIND_GET_FAILED: _ClassVar[ModelRegistryEventKind]
 
 class DownloadEventKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -371,6 +381,8 @@ class DownloadEventKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     DOWNLOAD_EVENT_KIND_RESUMED: _ClassVar[DownloadEventKind]
     DOWNLOAD_EVENT_KIND_COMPLETED: _ClassVar[DownloadEventKind]
     DOWNLOAD_EVENT_KIND_FAILED: _ClassVar[DownloadEventKind]
+    DOWNLOAD_EVENT_KIND_PAUSED: _ClassVar[DownloadEventKind]
+    DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED: _ClassVar[DownloadEventKind]
 
 class StorageLifecycleEventKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -385,6 +397,9 @@ class StorageLifecycleEventKind(int, metaclass=_enum_type_wrapper.EnumTypeWrappe
     STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED: _ClassVar[StorageLifecycleEventKind]
     STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED: _ClassVar[StorageLifecycleEventKind]
     STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED: _ClassVar[StorageLifecycleEventKind]
+    STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED: _ClassVar[StorageLifecycleEventKind]
+    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED: _ClassVar[StorageLifecycleEventKind]
+    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED: _ClassVar[StorageLifecycleEventKind]
 
 class HardwareRoutingEventKind(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -498,6 +513,10 @@ COMPONENT_LIFECYCLE_STATE_READY: ComponentLifecycleState
 COMPONENT_LIFECYCLE_STATE_UNLOADING: ComponentLifecycleState
 COMPONENT_LIFECYCLE_STATE_ERROR: ComponentLifecycleState
 COMPONENT_LIFECYCLE_STATE_SHUTDOWN: ComponentLifecycleState
+COMPONENT_LIFECYCLE_STATE_DOWNLOADING: ComponentLifecycleState
+COMPONENT_LIFECYCLE_STATE_DELETING: ComponentLifecycleState
+COMPONENT_LIFECYCLE_STATE_PAUSED: ComponentLifecycleState
+COMPONENT_LIFECYCLE_STATE_UPDATING: ComponentLifecycleState
 INITIALIZATION_STAGE_UNSPECIFIED: InitializationStage
 INITIALIZATION_STAGE_STARTED: InitializationStage
 INITIALIZATION_STAGE_CONFIGURATION_LOADED: InitializationStage
@@ -721,6 +740,12 @@ MODEL_REGISTRY_EVENT_KIND_DISCOVERY_STARTED: ModelRegistryEventKind
 MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED: ModelRegistryEventKind
 MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED: ModelRegistryEventKind
 MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED: ModelRegistryEventKind
+MODEL_REGISTRY_EVENT_KIND_LIST_STARTED: ModelRegistryEventKind
+MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED: ModelRegistryEventKind
+MODEL_REGISTRY_EVENT_KIND_LIST_FAILED: ModelRegistryEventKind
+MODEL_REGISTRY_EVENT_KIND_GET_STARTED: ModelRegistryEventKind
+MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED: ModelRegistryEventKind
+MODEL_REGISTRY_EVENT_KIND_GET_FAILED: ModelRegistryEventKind
 DOWNLOAD_EVENT_KIND_UNSPECIFIED: DownloadEventKind
 DOWNLOAD_EVENT_KIND_PLAN_STARTED: DownloadEventKind
 DOWNLOAD_EVENT_KIND_PLAN_COMPLETED: DownloadEventKind
@@ -733,6 +758,8 @@ DOWNLOAD_EVENT_KIND_RESUME_REQUESTED: DownloadEventKind
 DOWNLOAD_EVENT_KIND_RESUMED: DownloadEventKind
 DOWNLOAD_EVENT_KIND_COMPLETED: DownloadEventKind
 DOWNLOAD_EVENT_KIND_FAILED: DownloadEventKind
+DOWNLOAD_EVENT_KIND_PAUSED: DownloadEventKind
+DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED: DownloadEventKind
 STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED: StorageLifecycleEventKind
 STORAGE_LIFECYCLE_EVENT_KIND_INFO_STARTED: StorageLifecycleEventKind
 STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED: StorageLifecycleEventKind
@@ -744,6 +771,9 @@ STORAGE_LIFECYCLE_EVENT_KIND_DELETE_FAILED: StorageLifecycleEventKind
 STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED: StorageLifecycleEventKind
 STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED: StorageLifecycleEventKind
 STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED: StorageLifecycleEventKind
+STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED: StorageLifecycleEventKind
+STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED: StorageLifecycleEventKind
+STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED: StorageLifecycleEventKind
 HARDWARE_ROUTING_EVENT_KIND_UNSPECIFIED: HardwareRoutingEventKind
 HARDWARE_ROUTING_EVENT_KIND_PROFILE_STARTED: HardwareRoutingEventKind
 HARDWARE_ROUTING_EVENT_KIND_PROFILE_COMPLETED: HardwareRoutingEventKind
@@ -1067,21 +1097,49 @@ class ComponentInitializationEvent(_message.Message):
     def __init__(self, kind: _Optional[_Union[ComponentInitializationEventKind, str]] = ..., component: _Optional[_Union[SDKComponent, str]] = ..., model_id: _Optional[str] = ..., size_bytes: _Optional[int] = ..., progress: _Optional[float] = ..., error: _Optional[str] = ..., old_state: _Optional[str] = ..., new_state: _Optional[str] = ..., components: _Optional[_Iterable[_Union[SDKComponent, str]]] = ..., ready_components: _Optional[_Iterable[_Union[SDKComponent, str]]] = ..., pending_components: _Optional[_Iterable[_Union[SDKComponent, str]]] = ..., init_success: _Optional[bool] = ..., ready_count: _Optional[int] = ..., failed_count: _Optional[int] = ..., previous_lifecycle_state: _Optional[_Union[ComponentLifecycleState, str]] = ..., current_lifecycle_state: _Optional[_Union[ComponentLifecycleState, str]] = ...) -> None: ...
 
 class ComponentLifecycleSnapshot(_message.Message):
-    __slots__ = ("component", "state", "model_id", "updated_at_ms", "error_message")
+    __slots__ = ("component", "state", "model_id", "updated_at_ms", "error_message", "category", "framework", "resolved_path", "loaded_at_unix_ms", "model")
     COMPONENT_FIELD_NUMBER: _ClassVar[int]
     STATE_FIELD_NUMBER: _ClassVar[int]
     MODEL_ID_FIELD_NUMBER: _ClassVar[int]
     UPDATED_AT_MS_FIELD_NUMBER: _ClassVar[int]
     ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    CATEGORY_FIELD_NUMBER: _ClassVar[int]
+    FRAMEWORK_FIELD_NUMBER: _ClassVar[int]
+    RESOLVED_PATH_FIELD_NUMBER: _ClassVar[int]
+    LOADED_AT_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
+    MODEL_FIELD_NUMBER: _ClassVar[int]
     component: SDKComponent
     state: ComponentLifecycleState
     model_id: str
     updated_at_ms: int
     error_message: str
-    def __init__(self, component: _Optional[_Union[SDKComponent, str]] = ..., state: _Optional[_Union[ComponentLifecycleState, str]] = ..., model_id: _Optional[str] = ..., updated_at_ms: _Optional[int] = ..., error_message: _Optional[str] = ...) -> None: ...
+    category: _model_types_pb2.ModelCategory
+    framework: _model_types_pb2.InferenceFramework
+    resolved_path: str
+    loaded_at_unix_ms: int
+    model: _model_types_pb2.ModelInfo
+    def __init__(self, component: _Optional[_Union[SDKComponent, str]] = ..., state: _Optional[_Union[ComponentLifecycleState, str]] = ..., model_id: _Optional[str] = ..., updated_at_ms: _Optional[int] = ..., error_message: _Optional[str] = ..., category: _Optional[_Union[_model_types_pb2.ModelCategory, str]] = ..., framework: _Optional[_Union[_model_types_pb2.InferenceFramework, str]] = ..., resolved_path: _Optional[str] = ..., loaded_at_unix_ms: _Optional[int] = ..., model: _Optional[_Union[_model_types_pb2.ModelInfo, _Mapping]] = ...) -> None: ...
+
+class ComponentLifecycleSnapshotRequest(_message.Message):
+    __slots__ = ("component", "include_model")
+    COMPONENT_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_MODEL_FIELD_NUMBER: _ClassVar[int]
+    component: SDKComponent
+    include_model: bool
+    def __init__(self, component: _Optional[_Union[SDKComponent, str]] = ..., include_model: _Optional[bool] = ...) -> None: ...
+
+class ComponentLifecycleSnapshotResult(_message.Message):
+    __slots__ = ("success", "snapshots", "error_message")
+    SUCCESS_FIELD_NUMBER: _ClassVar[int]
+    SNAPSHOTS_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    success: bool
+    snapshots: _containers.RepeatedCompositeFieldContainer[ComponentLifecycleSnapshot]
+    error_message: str
+    def __init__(self, success: _Optional[bool] = ..., snapshots: _Optional[_Iterable[_Union[ComponentLifecycleSnapshot, _Mapping]]] = ..., error_message: _Optional[str] = ...) -> None: ...
 
 class ComponentLifecycleEvent(_message.Message):
-    __slots__ = ("component", "previous_state", "current_state", "model_id", "timestamp_ms", "model_load_result", "model_unload_result", "model_delete_result", "download_progress", "storage_availability", "storage_delete_result")
+    __slots__ = ("component", "previous_state", "current_state", "model_id", "timestamp_ms", "model_load_result", "model_unload_result", "model_delete_result", "download_progress", "storage_availability", "storage_delete_result", "snapshot", "snapshot_result", "storage_delete_plan")
     COMPONENT_FIELD_NUMBER: _ClassVar[int]
     PREVIOUS_STATE_FIELD_NUMBER: _ClassVar[int]
     CURRENT_STATE_FIELD_NUMBER: _ClassVar[int]
@@ -1093,6 +1151,9 @@ class ComponentLifecycleEvent(_message.Message):
     DOWNLOAD_PROGRESS_FIELD_NUMBER: _ClassVar[int]
     STORAGE_AVAILABILITY_FIELD_NUMBER: _ClassVar[int]
     STORAGE_DELETE_RESULT_FIELD_NUMBER: _ClassVar[int]
+    SNAPSHOT_FIELD_NUMBER: _ClassVar[int]
+    SNAPSHOT_RESULT_FIELD_NUMBER: _ClassVar[int]
+    STORAGE_DELETE_PLAN_FIELD_NUMBER: _ClassVar[int]
     component: SDKComponent
     previous_state: ComponentLifecycleState
     current_state: ComponentLifecycleState
@@ -1104,7 +1165,10 @@ class ComponentLifecycleEvent(_message.Message):
     download_progress: _download_service_pb2.DownloadProgress
     storage_availability: _storage_types_pb2.StorageAvailabilityResult
     storage_delete_result: _storage_types_pb2.StorageDeleteResult
-    def __init__(self, component: _Optional[_Union[SDKComponent, str]] = ..., previous_state: _Optional[_Union[ComponentLifecycleState, str]] = ..., current_state: _Optional[_Union[ComponentLifecycleState, str]] = ..., model_id: _Optional[str] = ..., timestamp_ms: _Optional[int] = ..., model_load_result: _Optional[_Union[_model_types_pb2.ModelLoadResult, _Mapping]] = ..., model_unload_result: _Optional[_Union[_model_types_pb2.ModelUnloadResult, _Mapping]] = ..., model_delete_result: _Optional[_Union[_model_types_pb2.ModelDeleteResult, _Mapping]] = ..., download_progress: _Optional[_Union[_download_service_pb2.DownloadProgress, _Mapping]] = ..., storage_availability: _Optional[_Union[_storage_types_pb2.StorageAvailabilityResult, _Mapping]] = ..., storage_delete_result: _Optional[_Union[_storage_types_pb2.StorageDeleteResult, _Mapping]] = ...) -> None: ...
+    snapshot: ComponentLifecycleSnapshot
+    snapshot_result: ComponentLifecycleSnapshotResult
+    storage_delete_plan: _storage_types_pb2.StorageDeletePlan
+    def __init__(self, component: _Optional[_Union[SDKComponent, str]] = ..., previous_state: _Optional[_Union[ComponentLifecycleState, str]] = ..., current_state: _Optional[_Union[ComponentLifecycleState, str]] = ..., model_id: _Optional[str] = ..., timestamp_ms: _Optional[int] = ..., model_load_result: _Optional[_Union[_model_types_pb2.ModelLoadResult, _Mapping]] = ..., model_unload_result: _Optional[_Union[_model_types_pb2.ModelUnloadResult, _Mapping]] = ..., model_delete_result: _Optional[_Union[_model_types_pb2.ModelDeleteResult, _Mapping]] = ..., download_progress: _Optional[_Union[_download_service_pb2.DownloadProgress, _Mapping]] = ..., storage_availability: _Optional[_Union[_storage_types_pb2.StorageAvailabilityResult, _Mapping]] = ..., storage_delete_result: _Optional[_Union[_storage_types_pb2.StorageDeleteResult, _Mapping]] = ..., snapshot: _Optional[_Union[ComponentLifecycleSnapshot, _Mapping]] = ..., snapshot_result: _Optional[_Union[ComponentLifecycleSnapshotResult, _Mapping]] = ..., storage_delete_plan: _Optional[_Union[_storage_types_pb2.StorageDeletePlan, _Mapping]] = ...) -> None: ...
 
 class SessionEvent(_message.Message):
     __slots__ = ("kind", "session_id", "user_id", "reason", "error", "started_at_ms", "ended_at_ms")
@@ -1306,7 +1370,7 @@ class FailureEvent(_message.Message):
     def __init__(self, component: _Optional[_Union[SDKComponent, str]] = ..., operation: _Optional[str] = ..., error: _Optional[_Union[_errors_pb2.SDKError, _Mapping]] = ..., recoverable: _Optional[bool] = ...) -> None: ...
 
 class SDKEvent(_message.Message):
-    __slots__ = ("timestamp_ms", "severity", "category", "component", "error", "id", "session_id", "destination", "properties", "initialization", "configuration", "generation", "model", "performance", "network", "storage", "framework", "device", "component_init", "voice", "voice_pipeline", "component_lifecycle", "session", "auth", "model_registry", "download", "storage_lifecycle", "hardware_routing", "capability", "telemetry", "cancellation", "failure")
+    __slots__ = ("timestamp_ms", "severity", "category", "component", "error", "id", "session_id", "destination", "properties", "operation_id", "correlation_id", "source", "trace_id", "initialization", "configuration", "generation", "model", "performance", "network", "storage", "framework", "device", "component_init", "voice", "voice_pipeline", "component_lifecycle", "session", "auth", "model_registry", "download", "storage_lifecycle", "hardware_routing", "capability", "telemetry", "cancellation", "failure")
     class PropertiesEntry(_message.Message):
         __slots__ = ("key", "value")
         KEY_FIELD_NUMBER: _ClassVar[int]
@@ -1323,6 +1387,10 @@ class SDKEvent(_message.Message):
     SESSION_ID_FIELD_NUMBER: _ClassVar[int]
     DESTINATION_FIELD_NUMBER: _ClassVar[int]
     PROPERTIES_FIELD_NUMBER: _ClassVar[int]
+    OPERATION_ID_FIELD_NUMBER: _ClassVar[int]
+    CORRELATION_ID_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_FIELD_NUMBER: _ClassVar[int]
+    TRACE_ID_FIELD_NUMBER: _ClassVar[int]
     INITIALIZATION_FIELD_NUMBER: _ClassVar[int]
     CONFIGURATION_FIELD_NUMBER: _ClassVar[int]
     GENERATION_FIELD_NUMBER: _ClassVar[int]
@@ -1355,6 +1423,10 @@ class SDKEvent(_message.Message):
     session_id: str
     destination: EventDestination
     properties: _containers.ScalarMap[str, str]
+    operation_id: str
+    correlation_id: str
+    source: str
+    trace_id: str
     initialization: InitializationEvent
     configuration: ConfigurationEvent
     generation: GenerationEvent
@@ -1378,4 +1450,56 @@ class SDKEvent(_message.Message):
     telemetry: TelemetryEvent
     cancellation: CancellationEvent
     failure: FailureEvent
-    def __init__(self, timestamp_ms: _Optional[int] = ..., severity: _Optional[_Union[EventSeverity, str]] = ..., category: _Optional[_Union[EventCategory, str]] = ..., component: _Optional[_Union[SDKComponent, str]] = ..., error: _Optional[_Union[_errors_pb2.SDKError, _Mapping]] = ..., id: _Optional[str] = ..., session_id: _Optional[str] = ..., destination: _Optional[_Union[EventDestination, str]] = ..., properties: _Optional[_Mapping[str, str]] = ..., initialization: _Optional[_Union[InitializationEvent, _Mapping]] = ..., configuration: _Optional[_Union[ConfigurationEvent, _Mapping]] = ..., generation: _Optional[_Union[GenerationEvent, _Mapping]] = ..., model: _Optional[_Union[ModelEvent, _Mapping]] = ..., performance: _Optional[_Union[PerformanceEvent, _Mapping]] = ..., network: _Optional[_Union[NetworkEvent, _Mapping]] = ..., storage: _Optional[_Union[StorageEvent, _Mapping]] = ..., framework: _Optional[_Union[FrameworkEvent, _Mapping]] = ..., device: _Optional[_Union[DeviceEvent, _Mapping]] = ..., component_init: _Optional[_Union[ComponentInitializationEvent, _Mapping]] = ..., voice: _Optional[_Union[VoiceLifecycleEvent, _Mapping]] = ..., voice_pipeline: _Optional[_Union[_voice_events_pb2.VoiceEvent, _Mapping]] = ..., component_lifecycle: _Optional[_Union[ComponentLifecycleEvent, _Mapping]] = ..., session: _Optional[_Union[SessionEvent, _Mapping]] = ..., auth: _Optional[_Union[AuthEvent, _Mapping]] = ..., model_registry: _Optional[_Union[ModelRegistryEvent, _Mapping]] = ..., download: _Optional[_Union[DownloadEvent, _Mapping]] = ..., storage_lifecycle: _Optional[_Union[StorageLifecycleEvent, _Mapping]] = ..., hardware_routing: _Optional[_Union[HardwareRoutingEvent, _Mapping]] = ..., capability: _Optional[_Union[CapabilityOperationEvent, _Mapping]] = ..., telemetry: _Optional[_Union[TelemetryEvent, _Mapping]] = ..., cancellation: _Optional[_Union[CancellationEvent, _Mapping]] = ..., failure: _Optional[_Union[FailureEvent, _Mapping]] = ...) -> None: ...
+    def __init__(self, timestamp_ms: _Optional[int] = ..., severity: _Optional[_Union[EventSeverity, str]] = ..., category: _Optional[_Union[EventCategory, str]] = ..., component: _Optional[_Union[SDKComponent, str]] = ..., error: _Optional[_Union[_errors_pb2.SDKError, _Mapping]] = ..., id: _Optional[str] = ..., session_id: _Optional[str] = ..., destination: _Optional[_Union[EventDestination, str]] = ..., properties: _Optional[_Mapping[str, str]] = ..., operation_id: _Optional[str] = ..., correlation_id: _Optional[str] = ..., source: _Optional[str] = ..., trace_id: _Optional[str] = ..., initialization: _Optional[_Union[InitializationEvent, _Mapping]] = ..., configuration: _Optional[_Union[ConfigurationEvent, _Mapping]] = ..., generation: _Optional[_Union[GenerationEvent, _Mapping]] = ..., model: _Optional[_Union[ModelEvent, _Mapping]] = ..., performance: _Optional[_Union[PerformanceEvent, _Mapping]] = ..., network: _Optional[_Union[NetworkEvent, _Mapping]] = ..., storage: _Optional[_Union[StorageEvent, _Mapping]] = ..., framework: _Optional[_Union[FrameworkEvent, _Mapping]] = ..., device: _Optional[_Union[DeviceEvent, _Mapping]] = ..., component_init: _Optional[_Union[ComponentInitializationEvent, _Mapping]] = ..., voice: _Optional[_Union[VoiceLifecycleEvent, _Mapping]] = ..., voice_pipeline: _Optional[_Union[_voice_events_pb2.VoiceEvent, _Mapping]] = ..., component_lifecycle: _Optional[_Union[ComponentLifecycleEvent, _Mapping]] = ..., session: _Optional[_Union[SessionEvent, _Mapping]] = ..., auth: _Optional[_Union[AuthEvent, _Mapping]] = ..., model_registry: _Optional[_Union[ModelRegistryEvent, _Mapping]] = ..., download: _Optional[_Union[DownloadEvent, _Mapping]] = ..., storage_lifecycle: _Optional[_Union[StorageLifecycleEvent, _Mapping]] = ..., hardware_routing: _Optional[_Union[HardwareRoutingEvent, _Mapping]] = ..., capability: _Optional[_Union[CapabilityOperationEvent, _Mapping]] = ..., telemetry: _Optional[_Union[TelemetryEvent, _Mapping]] = ..., cancellation: _Optional[_Union[CancellationEvent, _Mapping]] = ..., failure: _Optional[_Union[FailureEvent, _Mapping]] = ...) -> None: ...
+
+class SDKEventFilter(_message.Message):
+    __slots__ = ("categories", "components", "destinations", "minimum_severity", "session_id", "operation_id", "correlation_id", "source", "trace_id")
+    CATEGORIES_FIELD_NUMBER: _ClassVar[int]
+    COMPONENTS_FIELD_NUMBER: _ClassVar[int]
+    DESTINATIONS_FIELD_NUMBER: _ClassVar[int]
+    MINIMUM_SEVERITY_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    OPERATION_ID_FIELD_NUMBER: _ClassVar[int]
+    CORRELATION_ID_FIELD_NUMBER: _ClassVar[int]
+    SOURCE_FIELD_NUMBER: _ClassVar[int]
+    TRACE_ID_FIELD_NUMBER: _ClassVar[int]
+    categories: _containers.RepeatedScalarFieldContainer[EventCategory]
+    components: _containers.RepeatedScalarFieldContainer[SDKComponent]
+    destinations: _containers.RepeatedScalarFieldContainer[EventDestination]
+    minimum_severity: EventSeverity
+    session_id: str
+    operation_id: str
+    correlation_id: str
+    source: str
+    trace_id: str
+    def __init__(self, categories: _Optional[_Iterable[_Union[EventCategory, str]]] = ..., components: _Optional[_Iterable[_Union[SDKComponent, str]]] = ..., destinations: _Optional[_Iterable[_Union[EventDestination, str]]] = ..., minimum_severity: _Optional[_Union[EventSeverity, str]] = ..., session_id: _Optional[str] = ..., operation_id: _Optional[str] = ..., correlation_id: _Optional[str] = ..., source: _Optional[str] = ..., trace_id: _Optional[str] = ...) -> None: ...
+
+class SDKEventPublishRequest(_message.Message):
+    __slots__ = ("event", "normalize_envelope")
+    EVENT_FIELD_NUMBER: _ClassVar[int]
+    NORMALIZE_ENVELOPE_FIELD_NUMBER: _ClassVar[int]
+    event: SDKEvent
+    normalize_envelope: bool
+    def __init__(self, event: _Optional[_Union[SDKEvent, _Mapping]] = ..., normalize_envelope: _Optional[bool] = ...) -> None: ...
+
+class SDKEventPublishResult(_message.Message):
+    __slots__ = ("accepted", "event_id", "normalized_event", "error_message", "error")
+    ACCEPTED_FIELD_NUMBER: _ClassVar[int]
+    EVENT_ID_FIELD_NUMBER: _ClassVar[int]
+    NORMALIZED_EVENT_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_FIELD_NUMBER: _ClassVar[int]
+    accepted: bool
+    event_id: str
+    normalized_event: SDKEvent
+    error_message: str
+    error: _errors_pb2.SDKError
+    def __init__(self, accepted: _Optional[bool] = ..., event_id: _Optional[str] = ..., normalized_event: _Optional[_Union[SDKEvent, _Mapping]] = ..., error_message: _Optional[str] = ..., error: _Optional[_Union[_errors_pb2.SDKError, _Mapping]] = ...) -> None: ...
+
+class SDKEventSubscribeRequest(_message.Message):
+    __slots__ = ("filter", "replay_queued_events")
+    FILTER_FIELD_NUMBER: _ClassVar[int]
+    REPLAY_QUEUED_EVENTS_FIELD_NUMBER: _ClassVar[int]
+    filter: SDKEventFilter
+    replay_queued_events: bool
+    def __init__(self, filter: _Optional[_Union[SDKEventFilter, _Mapping]] = ..., replay_queued_events: _Optional[bool] = ...) -> None: ...

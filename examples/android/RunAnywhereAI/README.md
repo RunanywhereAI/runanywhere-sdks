@@ -187,8 +187,7 @@ RunAnywhereAI/
 │   │   │   │
 │   │   │   ├── domain/
 │   │   │   │   ├── models/
-│   │   │   │   │   ├── ChatMessage.kt         # Message data model with analytics
-│   │   │   │   │   └── SessionState.kt        # Voice session states
+│   │   │   │   │   └── ChatMessage.kt         # Message data model with analytics
 │   │   │   │   └── services/
 │   │   │   │       └── AudioCaptureService.kt # Microphone audio capture
 │   │   │   │
@@ -445,7 +444,7 @@ if (result.speechDetected) {
 **Key SDK APIs:**
 - `RunAnywhere.storageInfo()` — Get storage details
 - `RunAnywhere.deleteModel()` — Remove downloaded model
-- `RunAnywhere.clearCache()` — Clear temporary files
+- V2 storage-plan bridge — Clear temporary files through generated/proto-backed storage actions
 
 ---
 

@@ -62,6 +62,10 @@ public class ModelFileDescriptor(
     schemaIndex = 3,
   )
   public val size_bytes: Long? = null,
+  /**
+   * Legacy checksum field kept for generated consumers that already use it.
+   * Prefer checksum_sha256 for new manifests when the algorithm is known.
+   */
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -100,6 +104,13 @@ public class ModelFileDescriptor(
     schemaIndex = 8,
   )
   public val local_path: String? = null,
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "checksumSha256",
+    schemaIndex = 9,
+  )
+  public val checksum_sha256: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelFileDescriptor, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -122,6 +133,7 @@ public class ModelFileDescriptor(
     if (destination_path != other.destination_path) return false
     if (role != other.role) return false
     if (local_path != other.local_path) return false
+    if (checksum_sha256 != other.checksum_sha256) return false
     return true
   }
 
@@ -138,6 +150,7 @@ public class ModelFileDescriptor(
       result = result * 37 + (destination_path?.hashCode() ?: 0)
       result = result * 37 + (role?.hashCode() ?: 0)
       result = result * 37 + (local_path?.hashCode() ?: 0)
+      result = result * 37 + (checksum_sha256?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -154,6 +167,7 @@ public class ModelFileDescriptor(
     if (destination_path != null) result += """destination_path=${sanitize(destination_path)}"""
     if (role != null) result += """role=$role"""
     if (local_path != null) result += """local_path=${sanitize(local_path)}"""
+    if (checksum_sha256 != null) result += """checksum_sha256=${sanitize(checksum_sha256)}"""
     return result.joinToString(prefix = "ModelFileDescriptor{", separator = ", ", postfix = "}")
   }
 
@@ -167,9 +181,10 @@ public class ModelFileDescriptor(
     destination_path: String? = this.destination_path,
     role: ModelFileRole? = this.role,
     local_path: String? = this.local_path,
+    checksum_sha256: String? = this.checksum_sha256,
     unknownFields: ByteString = this.unknownFields,
   ): ModelFileDescriptor = ModelFileDescriptor(url, filename, is_required, size_bytes, checksum,
-      relative_path, destination_path, role, local_path, unknownFields)
+      relative_path, destination_path, role, local_path, checksum_sha256, unknownFields)
 
   public companion object {
     @JvmField
@@ -194,6 +209,7 @@ public class ModelFileDescriptor(
         size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.destination_path)
         size += ModelFileRole.ADAPTER.encodedSizeWithTag(8, value.role)
         size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.local_path)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.checksum_sha256)
         return size
       }
 
@@ -208,11 +224,13 @@ public class ModelFileDescriptor(
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.destination_path)
         ModelFileRole.ADAPTER.encodeWithTag(writer, 8, value.role)
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.local_path)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.checksum_sha256)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelFileDescriptor) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.checksum_sha256)
         ProtoAdapter.STRING.encodeWithTag(writer, 9, value.local_path)
         ModelFileRole.ADAPTER.encodeWithTag(writer, 8, value.role)
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.destination_path)
@@ -235,6 +253,7 @@ public class ModelFileDescriptor(
         var destination_path: String? = null
         var role: ModelFileRole? = null
         var local_path: String? = null
+        var checksum_sha256: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> url = ProtoAdapter.STRING.decode(reader)
@@ -250,6 +269,7 @@ public class ModelFileDescriptor(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             9 -> local_path = ProtoAdapter.STRING.decode(reader)
+            10 -> checksum_sha256 = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -263,6 +283,7 @@ public class ModelFileDescriptor(
           destination_path = destination_path,
           role = role,
           local_path = local_path,
+          checksum_sha256 = checksum_sha256,
           unknownFields = unknownFields
         )
       }

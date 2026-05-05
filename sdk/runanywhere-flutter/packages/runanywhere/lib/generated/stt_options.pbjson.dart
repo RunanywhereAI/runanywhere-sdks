@@ -43,6 +43,44 @@ final $typed_data.Uint8List sTTLanguageDescriptor = $convert.base64Decode(
     'QU5HVUFHRV9JVBAJEhMKD1NUVF9MQU5HVUFHRV9QVBAKEhMKD1NUVF9MQU5HVUFHRV9BUhALEh'
     'MKD1NUVF9MQU5HVUFHRV9SVRAMEhMKD1NUVF9MQU5HVUFHRV9ISRAN');
 
+@$core.Deprecated('Use sTTAudioEncodingDescriptor instead')
+const STTAudioEncoding$json = {
+  '1': 'STTAudioEncoding',
+  '2': [
+    {'1': 'STT_AUDIO_ENCODING_UNSPECIFIED', '2': 0},
+    {'1': 'STT_AUDIO_ENCODING_PCM_S16_LE', '2': 1},
+    {'1': 'STT_AUDIO_ENCODING_PCM_F32_LE', '2': 2},
+    {'1': 'STT_AUDIO_ENCODING_CONTAINER', '2': 3},
+  ],
+};
+
+/// Descriptor for `STTAudioEncoding`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List sTTAudioEncodingDescriptor = $convert.base64Decode(
+    'ChBTVFRBdWRpb0VuY29kaW5nEiIKHlNUVF9BVURJT19FTkNPRElOR19VTlNQRUNJRklFRBAAEi'
+    'EKHVNUVF9BVURJT19FTkNPRElOR19QQ01fUzE2X0xFEAESIQodU1RUX0FVRElPX0VOQ09ESU5H'
+    'X1BDTV9GMzJfTEUQAhIgChxTVFRfQVVESU9fRU5DT0RJTkdfQ09OVEFJTkVSEAM=');
+
+@$core.Deprecated('Use sTTStreamEventKindDescriptor instead')
+const STTStreamEventKind$json = {
+  '1': 'STTStreamEventKind',
+  '2': [
+    {'1': 'STT_STREAM_EVENT_KIND_UNSPECIFIED', '2': 0},
+    {'1': 'STT_STREAM_EVENT_KIND_STARTED', '2': 1},
+    {'1': 'STT_STREAM_EVENT_KIND_PARTIAL', '2': 2},
+    {'1': 'STT_STREAM_EVENT_KIND_FINAL', '2': 3},
+    {'1': 'STT_STREAM_EVENT_KIND_ENDPOINT', '2': 4},
+    {'1': 'STT_STREAM_EVENT_KIND_ERROR', '2': 5},
+  ],
+};
+
+/// Descriptor for `STTStreamEventKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List sTTStreamEventKindDescriptor = $convert.base64Decode(
+    'ChJTVFRTdHJlYW1FdmVudEtpbmQSJQohU1RUX1NUUkVBTV9FVkVOVF9LSU5EX1VOU1BFQ0lGSU'
+    'VEEAASIQodU1RUX1NUUkVBTV9FVkVOVF9LSU5EX1NUQVJURUQQARIhCh1TVFRfU1RSRUFNX0VW'
+    'RU5UX0tJTkRfUEFSVElBTBACEh8KG1NUVF9TVFJFQU1fRVZFTlRfS0lORF9GSU5BTBADEiIKHl'
+    'NUVF9TVFJFQU1fRVZFTlRfS0lORF9FTkRQT0lOVBAEEh8KG1NUVF9TVFJFQU1fRVZFTlRfS0lO'
+    'RF9FUlJPUhAF');
+
 @$core.Deprecated('Use sTTConfigurationDescriptor instead')
 const STTConfiguration$json = {
   '1': 'STTConfiguration',
@@ -97,6 +135,10 @@ const STTOptions$json = {
     {'1': 'audio_format', '3': 10, '4': 1, '5': 14, '6': '.runanywhere.v1.AudioFormat', '10': 'audioFormat'},
     {'1': 'sample_rate', '3': 11, '4': 1, '5': 5, '10': 'sampleRate'},
     {'1': 'max_alternatives', '3': 12, '4': 1, '5': 5, '10': 'maxAlternatives'},
+    {'1': 'chunk_duration_ms', '3': 13, '4': 1, '5': 5, '10': 'chunkDurationMs'},
+    {'1': 'endpoint_silence_ms', '3': 14, '4': 1, '5': 5, '10': 'endpointSilenceMs'},
+    {'1': 'suppress_blank', '3': 15, '4': 1, '5': 8, '10': 'suppressBlank'},
+    {'1': 'translate_to_english', '3': 16, '4': 1, '5': 8, '10': 'translateToEnglish'},
   ],
   '8': [
     {'1': '_language_code'},
@@ -114,8 +156,77 @@ final $typed_data.Uint8List sTTOptionsDescriptor = $convert.base64Decode(
     'ZV9jb2RlGAggASgJSABSDGxhbmd1YWdlQ29kZYgBARInCg9kZXRlY3RfbGFuZ3VhZ2UYCSABKA'
     'hSDmRldGVjdExhbmd1YWdlEj4KDGF1ZGlvX2Zvcm1hdBgKIAEoDjIbLnJ1bmFueXdoZXJlLnYx'
     'LkF1ZGlvRm9ybWF0UgthdWRpb0Zvcm1hdBIfCgtzYW1wbGVfcmF0ZRgLIAEoBVIKc2FtcGxlUm'
-    'F0ZRIpChBtYXhfYWx0ZXJuYXRpdmVzGAwgASgFUg9tYXhBbHRlcm5hdGl2ZXNCEAoOX2xhbmd1'
-    'YWdlX2NvZGU=');
+    'F0ZRIpChBtYXhfYWx0ZXJuYXRpdmVzGAwgASgFUg9tYXhBbHRlcm5hdGl2ZXMSKgoRY2h1bmtf'
+    'ZHVyYXRpb25fbXMYDSABKAVSD2NodW5rRHVyYXRpb25NcxIuChNlbmRwb2ludF9zaWxlbmNlX2'
+    '1zGA4gASgFUhFlbmRwb2ludFNpbGVuY2VNcxIlCg5zdXBwcmVzc19ibGFuaxgPIAEoCFINc3Vw'
+    'cHJlc3NCbGFuaxIwChR0cmFuc2xhdGVfdG9fZW5nbGlzaBgQIAEoCFISdHJhbnNsYXRlVG9Fbm'
+    'dsaXNoQhAKDl9sYW5ndWFnZV9jb2Rl');
+
+@$core.Deprecated('Use sTTAudioSourceDescriptor instead')
+const STTAudioSource$json = {
+  '1': 'STTAudioSource',
+  '2': [
+    {'1': 'audio_data', '3': 1, '4': 1, '5': 12, '9': 0, '10': 'audioData'},
+    {'1': 'file_uri', '3': 2, '4': 1, '5': 9, '9': 0, '10': 'fileUri'},
+    {'1': 'adapter_handle', '3': 3, '4': 1, '5': 9, '9': 0, '10': 'adapterHandle'},
+    {'1': 'encoding', '3': 4, '4': 1, '5': 14, '6': '.runanywhere.v1.STTAudioEncoding', '10': 'encoding'},
+    {'1': 'audio_format', '3': 5, '4': 1, '5': 14, '6': '.runanywhere.v1.AudioFormat', '10': 'audioFormat'},
+    {'1': 'sample_rate', '3': 6, '4': 1, '5': 5, '10': 'sampleRate'},
+    {'1': 'channels', '3': 7, '4': 1, '5': 5, '10': 'channels'},
+    {'1': 'bits_per_sample', '3': 8, '4': 1, '5': 5, '10': 'bitsPerSample'},
+    {'1': 'duration_ms', '3': 9, '4': 1, '5': 3, '10': 'durationMs'},
+  ],
+  '8': [
+    {'1': 'source'},
+  ],
+};
+
+/// Descriptor for `STTAudioSource`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sTTAudioSourceDescriptor = $convert.base64Decode(
+    'Cg5TVFRBdWRpb1NvdXJjZRIfCgphdWRpb19kYXRhGAEgASgMSABSCWF1ZGlvRGF0YRIbCghmaW'
+    'xlX3VyaRgCIAEoCUgAUgdmaWxlVXJpEicKDmFkYXB0ZXJfaGFuZGxlGAMgASgJSABSDWFkYXB0'
+    'ZXJIYW5kbGUSPAoIZW5jb2RpbmcYBCABKA4yIC5ydW5hbnl3aGVyZS52MS5TVFRBdWRpb0VuY2'
+    '9kaW5nUghlbmNvZGluZxI+CgxhdWRpb19mb3JtYXQYBSABKA4yGy5ydW5hbnl3aGVyZS52MS5B'
+    'dWRpb0Zvcm1hdFILYXVkaW9Gb3JtYXQSHwoLc2FtcGxlX3JhdGUYBiABKAVSCnNhbXBsZVJhdG'
+    'USGgoIY2hhbm5lbHMYByABKAVSCGNoYW5uZWxzEiYKD2JpdHNfcGVyX3NhbXBsZRgIIAEoBVIN'
+    'Yml0c1BlclNhbXBsZRIfCgtkdXJhdGlvbl9tcxgJIAEoA1IKZHVyYXRpb25Nc0IICgZzb3VyY2'
+    'U=');
+
+@$core.Deprecated('Use sTTTranscriptionRequestDescriptor instead')
+const STTTranscriptionRequest$json = {
+  '1': 'STTTranscriptionRequest',
+  '2': [
+    {'1': 'request_id', '3': 1, '4': 1, '5': 9, '10': 'requestId'},
+    {'1': 'audio', '3': 2, '4': 1, '5': 11, '6': '.runanywhere.v1.STTAudioSource', '9': 0, '10': 'audio', '17': true},
+    {'1': 'options', '3': 3, '4': 1, '5': 11, '6': '.runanywhere.v1.STTOptions', '9': 1, '10': 'options', '17': true},
+    {'1': 'metadata', '3': 4, '4': 3, '5': 11, '6': '.runanywhere.v1.STTTranscriptionRequest.MetadataEntry', '10': 'metadata'},
+  ],
+  '3': [STTTranscriptionRequest_MetadataEntry$json],
+  '8': [
+    {'1': '_audio'},
+    {'1': '_options'},
+  ],
+};
+
+@$core.Deprecated('Use sTTTranscriptionRequestDescriptor instead')
+const STTTranscriptionRequest_MetadataEntry$json = {
+  '1': 'MetadataEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'value', '3': 2, '4': 1, '5': 9, '10': 'value'},
+  ],
+  '7': {'7': true},
+};
+
+/// Descriptor for `STTTranscriptionRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sTTTranscriptionRequestDescriptor = $convert.base64Decode(
+    'ChdTVFRUcmFuc2NyaXB0aW9uUmVxdWVzdBIdCgpyZXF1ZXN0X2lkGAEgASgJUglyZXF1ZXN0SW'
+    'QSOQoFYXVkaW8YAiABKAsyHi5ydW5hbnl3aGVyZS52MS5TVFRBdWRpb1NvdXJjZUgAUgVhdWRp'
+    'b4gBARI5CgdvcHRpb25zGAMgASgLMhoucnVuYW55d2hlcmUudjEuU1RUT3B0aW9uc0gBUgdvcH'
+    'Rpb25ziAEBElEKCG1ldGFkYXRhGAQgAygLMjUucnVuYW55d2hlcmUudjEuU1RUVHJhbnNjcmlw'
+    'dGlvblJlcXVlc3QuTWV0YWRhdGFFbnRyeVIIbWV0YWRhdGEaOwoNTWV0YWRhdGFFbnRyeRIQCg'
+    'NrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCVIFdmFsdWU6AjgBQggKBl9hdWRpb0IKCghf'
+    'b3B0aW9ucw==');
 
 @$core.Deprecated('Use wordTimestampDescriptor instead')
 const WordTimestamp$json = {
@@ -125,6 +236,10 @@ const WordTimestamp$json = {
     {'1': 'start_ms', '3': 2, '4': 1, '5': 3, '10': 'startMs'},
     {'1': 'end_ms', '3': 3, '4': 1, '5': 3, '10': 'endMs'},
     {'1': 'confidence', '3': 4, '4': 1, '5': 2, '10': 'confidence'},
+    {'1': 'speaker_id', '3': 5, '4': 1, '5': 9, '9': 0, '10': 'speakerId', '17': true},
+  ],
+  '8': [
+    {'1': '_speaker_id'},
   ],
 };
 
@@ -132,7 +247,8 @@ const WordTimestamp$json = {
 final $typed_data.Uint8List wordTimestampDescriptor = $convert.base64Decode(
     'Cg1Xb3JkVGltZXN0YW1wEhIKBHdvcmQYASABKAlSBHdvcmQSGQoIc3RhcnRfbXMYAiABKANSB3'
     'N0YXJ0TXMSFQoGZW5kX21zGAMgASgDUgVlbmRNcxIeCgpjb25maWRlbmNlGAQgASgCUgpjb25m'
-    'aWRlbmNl');
+    'aWRlbmNlEiIKCnNwZWFrZXJfaWQYBSABKAlIAFIJc3BlYWtlcklkiAEBQg0KC19zcGVha2VyX2'
+    'lk');
 
 @$core.Deprecated('Use transcriptionAlternativeDescriptor instead')
 const TranscriptionAlternative$json = {
@@ -181,9 +297,14 @@ const STTOutput$json = {
     {'1': 'language_code', '3': 7, '4': 1, '5': 9, '9': 0, '10': 'languageCode', '17': true},
     {'1': 'timestamp_ms', '3': 8, '4': 1, '5': 3, '10': 'timestampMs'},
     {'1': 'duration_ms', '3': 9, '4': 1, '5': 3, '10': 'durationMs'},
+    {'1': 'speaker_ids', '3': 10, '4': 3, '5': 9, '10': 'speakerIds'},
+    {'1': 'error_message', '3': 11, '4': 1, '5': 9, '9': 1, '10': 'errorMessage', '17': true},
+    {'1': 'error_code', '3': 12, '4': 1, '5': 5, '10': 'errorCode'},
+    {'1': 'segment_index', '3': 13, '4': 1, '5': 5, '10': 'segmentIndex'},
   ],
   '8': [
     {'1': '_language_code'},
+    {'1': '_error_message'},
   ],
 };
 
@@ -196,8 +317,10 @@ final $typed_data.Uint8List sTTOutputDescriptor = $convert.base64Decode(
     'dGlvbkFsdGVybmF0aXZlUgxhbHRlcm5hdGl2ZXMSQQoIbWV0YWRhdGEYBiABKAsyJS5ydW5hbn'
     'l3aGVyZS52MS5UcmFuc2NyaXB0aW9uTWV0YWRhdGFSCG1ldGFkYXRhEigKDWxhbmd1YWdlX2Nv'
     'ZGUYByABKAlIAFIMbGFuZ3VhZ2VDb2RliAEBEiEKDHRpbWVzdGFtcF9tcxgIIAEoA1ILdGltZX'
-    'N0YW1wTXMSHwoLZHVyYXRpb25fbXMYCSABKANSCmR1cmF0aW9uTXNCEAoOX2xhbmd1YWdlX2Nv'
-    'ZGU=');
+    'N0YW1wTXMSHwoLZHVyYXRpb25fbXMYCSABKANSCmR1cmF0aW9uTXMSHwoLc3BlYWtlcl9pZHMY'
+    'CiADKAlSCnNwZWFrZXJJZHMSKAoNZXJyb3JfbWVzc2FnZRgLIAEoCUgBUgxlcnJvck1lc3NhZ2'
+    'WIAQESHQoKZXJyb3JfY29kZRgMIAEoBVIJZXJyb3JDb2RlEiMKDXNlZ21lbnRfaW5kZXgYDSAB'
+    'KAVSDHNlZ21lbnRJbmRleEIQCg5fbGFuZ3VhZ2VfY29kZUIQCg5fZXJyb3JfbWVzc2FnZQ==');
 
 @$core.Deprecated('Use sTTPartialResultDescriptor instead')
 const STTPartialResult$json = {
@@ -211,9 +334,15 @@ const STTPartialResult$json = {
     {'1': 'timestamp_ms', '3': 6, '4': 1, '5': 3, '10': 'timestampMs'},
     {'1': 'alternatives', '3': 7, '4': 3, '5': 11, '6': '.runanywhere.v1.TranscriptionAlternative', '10': 'alternatives'},
     {'1': 'language_code', '3': 8, '4': 1, '5': 9, '9': 0, '10': 'languageCode', '17': true},
+    {'1': 'request_id', '3': 9, '4': 1, '5': 9, '10': 'requestId'},
+    {'1': 'segment_index', '3': 10, '4': 1, '5': 5, '10': 'segmentIndex'},
+    {'1': 'audio_start_ms', '3': 11, '4': 1, '5': 3, '10': 'audioStartMs'},
+    {'1': 'audio_end_ms', '3': 12, '4': 1, '5': 3, '10': 'audioEndMs'},
+    {'1': 'final_output', '3': 13, '4': 1, '5': 11, '6': '.runanywhere.v1.STTOutput', '9': 1, '10': 'finalOutput', '17': true},
   ],
   '8': [
     {'1': '_language_code'},
+    {'1': '_final_output'},
   ],
 };
 
@@ -225,5 +354,116 @@ final $typed_data.Uint8List sTTPartialResultDescriptor = $convert.base64Decode(
     'xhbmd1YWdlUghsYW5ndWFnZRIhCgx0aW1lc3RhbXBfbXMYBiABKANSC3RpbWVzdGFtcE1zEkwK'
     'DGFsdGVybmF0aXZlcxgHIAMoCzIoLnJ1bmFueXdoZXJlLnYxLlRyYW5zY3JpcHRpb25BbHRlcm'
     '5hdGl2ZVIMYWx0ZXJuYXRpdmVzEigKDWxhbmd1YWdlX2NvZGUYCCABKAlIAFIMbGFuZ3VhZ2VD'
-    'b2RliAEBQhAKDl9sYW5ndWFnZV9jb2Rl');
+    'b2RliAEBEh0KCnJlcXVlc3RfaWQYCSABKAlSCXJlcXVlc3RJZBIjCg1zZWdtZW50X2luZGV4GA'
+    'ogASgFUgxzZWdtZW50SW5kZXgSJAoOYXVkaW9fc3RhcnRfbXMYCyABKANSDGF1ZGlvU3RhcnRN'
+    'cxIgCgxhdWRpb19lbmRfbXMYDCABKANSCmF1ZGlvRW5kTXMSQQoMZmluYWxfb3V0cHV0GA0gAS'
+    'gLMhkucnVuYW55d2hlcmUudjEuU1RUT3V0cHV0SAFSC2ZpbmFsT3V0cHV0iAEBQhAKDl9sYW5n'
+    'dWFnZV9jb2RlQg8KDV9maW5hbF9vdXRwdXQ=');
+
+@$core.Deprecated('Use sTTStreamEventDescriptor instead')
+const STTStreamEvent$json = {
+  '1': 'STTStreamEvent',
+  '2': [
+    {'1': 'seq', '3': 1, '4': 1, '5': 4, '10': 'seq'},
+    {'1': 'timestamp_us', '3': 2, '4': 1, '5': 3, '10': 'timestampUs'},
+    {'1': 'request_id', '3': 3, '4': 1, '5': 9, '10': 'requestId'},
+    {'1': 'kind', '3': 4, '4': 1, '5': 14, '6': '.runanywhere.v1.STTStreamEventKind', '10': 'kind'},
+    {'1': 'partial', '3': 5, '4': 1, '5': 11, '6': '.runanywhere.v1.STTPartialResult', '9': 0, '10': 'partial', '17': true},
+    {'1': 'final_output', '3': 6, '4': 1, '5': 11, '6': '.runanywhere.v1.STTOutput', '9': 1, '10': 'finalOutput', '17': true},
+    {'1': 'error_message', '3': 7, '4': 1, '5': 9, '9': 2, '10': 'errorMessage', '17': true},
+    {'1': 'error_code', '3': 8, '4': 1, '5': 5, '10': 'errorCode'},
+  ],
+  '8': [
+    {'1': '_partial'},
+    {'1': '_final_output'},
+    {'1': '_error_message'},
+  ],
+};
+
+/// Descriptor for `STTStreamEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sTTStreamEventDescriptor = $convert.base64Decode(
+    'Cg5TVFRTdHJlYW1FdmVudBIQCgNzZXEYASABKARSA3NlcRIhCgx0aW1lc3RhbXBfdXMYAiABKA'
+    'NSC3RpbWVzdGFtcFVzEh0KCnJlcXVlc3RfaWQYAyABKAlSCXJlcXVlc3RJZBI2CgRraW5kGAQg'
+    'ASgOMiIucnVuYW55d2hlcmUudjEuU1RUU3RyZWFtRXZlbnRLaW5kUgRraW5kEj8KB3BhcnRpYW'
+    'wYBSABKAsyIC5ydW5hbnl3aGVyZS52MS5TVFRQYXJ0aWFsUmVzdWx0SABSB3BhcnRpYWyIAQES'
+    'QQoMZmluYWxfb3V0cHV0GAYgASgLMhkucnVuYW55d2hlcmUudjEuU1RUT3V0cHV0SAFSC2Zpbm'
+    'FsT3V0cHV0iAEBEigKDWVycm9yX21lc3NhZ2UYByABKAlIAlIMZXJyb3JNZXNzYWdliAEBEh0K'
+    'CmVycm9yX2NvZGUYCCABKAVSCWVycm9yQ29kZUIKCghfcGFydGlhbEIPCg1fZmluYWxfb3V0cH'
+    'V0QhAKDl9lcnJvcl9tZXNzYWdl');
+
+@$core.Deprecated('Use sTTServiceStateDescriptor instead')
+const STTServiceState$json = {
+  '1': 'STTServiceState',
+  '2': [
+    {'1': 'is_ready', '3': 1, '4': 1, '5': 8, '10': 'isReady'},
+    {'1': 'current_model', '3': 2, '4': 1, '5': 9, '9': 0, '10': 'currentModel', '17': true},
+    {'1': 'supports_streaming', '3': 3, '4': 1, '5': 8, '10': 'supportsStreaming'},
+    {'1': 'supported_language_codes', '3': 4, '4': 3, '5': 9, '10': 'supportedLanguageCodes'},
+    {'1': 'error_message', '3': 5, '4': 1, '5': 9, '9': 1, '10': 'errorMessage', '17': true},
+    {'1': 'error_code', '3': 6, '4': 1, '5': 5, '10': 'errorCode'},
+  ],
+  '8': [
+    {'1': '_current_model'},
+    {'1': '_error_message'},
+  ],
+};
+
+/// Descriptor for `STTServiceState`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sTTServiceStateDescriptor = $convert.base64Decode(
+    'Cg9TVFRTZXJ2aWNlU3RhdGUSGQoIaXNfcmVhZHkYASABKAhSB2lzUmVhZHkSKAoNY3VycmVudF'
+    '9tb2RlbBgCIAEoCUgAUgxjdXJyZW50TW9kZWyIAQESLQoSc3VwcG9ydHNfc3RyZWFtaW5nGAMg'
+    'ASgIUhFzdXBwb3J0c1N0cmVhbWluZxI4ChhzdXBwb3J0ZWRfbGFuZ3VhZ2VfY29kZXMYBCADKA'
+    'lSFnN1cHBvcnRlZExhbmd1YWdlQ29kZXMSKAoNZXJyb3JfbWVzc2FnZRgFIAEoCUgBUgxlcnJv'
+    'ck1lc3NhZ2WIAQESHQoKZXJyb3JfY29kZRgGIAEoBVIJZXJyb3JDb2RlQhAKDl9jdXJyZW50X2'
+    '1vZGVsQhAKDl9lcnJvcl9tZXNzYWdl');
+
+@$core.Deprecated('Use sTTLanguageDetectionResultDescriptor instead')
+const STTLanguageDetectionResult$json = {
+  '1': 'STTLanguageDetectionResult',
+  '2': [
+    {'1': 'language', '3': 1, '4': 1, '5': 14, '6': '.runanywhere.v1.STTLanguage', '10': 'language'},
+    {'1': 'language_code', '3': 2, '4': 1, '5': 9, '9': 0, '10': 'languageCode', '17': true},
+    {'1': 'confidence', '3': 3, '4': 1, '5': 2, '10': 'confidence'},
+    {'1': 'alternatives', '3': 4, '4': 3, '5': 9, '10': 'alternatives'},
+  ],
+  '8': [
+    {'1': '_language_code'},
+  ],
+};
+
+/// Descriptor for `STTLanguageDetectionResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sTTLanguageDetectionResultDescriptor = $convert.base64Decode(
+    'ChpTVFRMYW5ndWFnZURldGVjdGlvblJlc3VsdBI3CghsYW5ndWFnZRgBIAEoDjIbLnJ1bmFueX'
+    'doZXJlLnYxLlNUVExhbmd1YWdlUghsYW5ndWFnZRIoCg1sYW5ndWFnZV9jb2RlGAIgASgJSABS'
+    'DGxhbmd1YWdlQ29kZYgBARIeCgpjb25maWRlbmNlGAMgASgCUgpjb25maWRlbmNlEiIKDGFsdG'
+    'VybmF0aXZlcxgEIAMoCVIMYWx0ZXJuYXRpdmVzQhAKDl9sYW5ndWFnZV9jb2Rl');
+
+const $core.Map<$core.String, $core.dynamic> STTServiceBase$json = {
+  '1': 'STT',
+  '2': [
+    {'1': 'Transcribe', '2': '.runanywhere.v1.STTTranscriptionRequest', '3': '.runanywhere.v1.STTOutput'},
+    {'1': 'Stream', '2': '.runanywhere.v1.STTTranscriptionRequest', '3': '.runanywhere.v1.STTStreamEvent', '6': true},
+  ],
+};
+
+@$core.Deprecated('Use sTTServiceDescriptor instead')
+const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> STTServiceBase$messageJson = {
+  '.runanywhere.v1.STTTranscriptionRequest': STTTranscriptionRequest$json,
+  '.runanywhere.v1.STTAudioSource': STTAudioSource$json,
+  '.runanywhere.v1.STTOptions': STTOptions$json,
+  '.runanywhere.v1.STTTranscriptionRequest.MetadataEntry': STTTranscriptionRequest_MetadataEntry$json,
+  '.runanywhere.v1.STTOutput': STTOutput$json,
+  '.runanywhere.v1.WordTimestamp': WordTimestamp$json,
+  '.runanywhere.v1.TranscriptionAlternative': TranscriptionAlternative$json,
+  '.runanywhere.v1.TranscriptionMetadata': TranscriptionMetadata$json,
+  '.runanywhere.v1.STTStreamEvent': STTStreamEvent$json,
+  '.runanywhere.v1.STTPartialResult': STTPartialResult$json,
+};
+
+/// Descriptor for `STT`. Decode as a `google.protobuf.ServiceDescriptorProto`.
+final $typed_data.Uint8List sTTServiceDescriptor = $convert.base64Decode(
+    'CgNTVFQSUAoKVHJhbnNjcmliZRInLnJ1bmFueXdoZXJlLnYxLlNUVFRyYW5zY3JpcHRpb25SZX'
+    'F1ZXN0GhkucnVuYW55d2hlcmUudjEuU1RUT3V0cHV0ElMKBlN0cmVhbRInLnJ1bmFueXdoZXJl'
+    'LnYxLlNUVFRyYW5zY3JpcHRpb25SZXF1ZXN0Gh4ucnVuYW55d2hlcmUudjEuU1RUU3RyZWFtRX'
+    'ZlbnQwAQ==');
 

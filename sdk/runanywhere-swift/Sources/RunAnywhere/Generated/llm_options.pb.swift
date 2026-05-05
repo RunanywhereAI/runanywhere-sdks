@@ -38,6 +38,64 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
+public enum RALLMGenerationState: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case queued // = 1
+  case prefilling // = 2
+  case decoding // = 3
+  case toolCalling // = 4
+  case completed // = 5
+  case cancelled // = 6
+  case failed // = 7
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .queued
+    case 2: self = .prefilling
+    case 3: self = .decoding
+    case 4: self = .toolCalling
+    case 5: self = .completed
+    case 6: self = .cancelled
+    case 7: self = .failed
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .queued: return 1
+    case .prefilling: return 2
+    case .decoding: return 3
+    case .toolCalling: return 4
+    case .completed: return 5
+    case .cancelled: return 6
+    case .failed: return 7
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RALLMGenerationState] = [
+    .unspecified,
+    .queued,
+    .prefilling,
+    .decoding,
+    .toolCalling,
+    .completed,
+    .cancelled,
+    .failed,
+  ]
+
+}
+
 /// ---------------------------------------------------------------------------
 /// Routing destination for a generation (Web SDK ExecutionTarget in
 /// types/models.ts:79). Drives the cloud-vs-on-device dispatcher.
@@ -211,6 +269,78 @@ public struct RALLMGenerationOptions: @unchecked Sendable {
     set {_uniqueStorage()._enableRealTimeTracking = newValue}
   }
 
+  /// Deterministic sampling seed. 0 = backend/default random seed.
+  public var seed: Int64 {
+    get {_storage._seed}
+    set {_uniqueStorage()._seed = newValue}
+  }
+
+  /// OpenAI-compatible sampling penalties. 0.0 = disabled.
+  public var frequencyPenalty: Float {
+    get {_storage._frequencyPenalty}
+    set {_uniqueStorage()._frequencyPenalty = newValue}
+  }
+
+  public var presencePenalty: Float {
+    get {_storage._presencePenalty}
+    set {_uniqueStorage()._presencePenalty = newValue}
+  }
+
+  /// Repeat-penalty lookback window. 0 = backend default.
+  public var repeatLastN: Int32 {
+    get {_storage._repeatLastN}
+    set {_uniqueStorage()._repeatLastN = newValue}
+  }
+
+  /// Minimum probability sampling. 0.0 = disabled.
+  public var minP: Float {
+    get {_storage._minP}
+    set {_uniqueStorage()._minP = newValue}
+  }
+
+  /// Grammar or constrained-decoding rule text (GBNF/regex/backend-specific).
+  public var grammar: String {
+    get {_storage._grammar ?? String()}
+    set {_uniqueStorage()._grammar = newValue}
+  }
+  /// Returns true if `grammar` has been explicitly set.
+  public var hasGrammar: Bool {_storage._grammar != nil}
+  /// Clears the value of `grammar`. Subsequent reads from it will return its default value.
+  public mutating func clearGrammar() {_uniqueStorage()._grammar = nil}
+
+  /// Caller-visible format hint: "text", "json_object", "json_schema", etc.
+  public var responseFormat: String {
+    get {_storage._responseFormat ?? String()}
+    set {_uniqueStorage()._responseFormat = newValue}
+  }
+  /// Returns true if `responseFormat` has been explicitly set.
+  public var hasResponseFormat: Bool {_storage._responseFormat != nil}
+  /// Clears the value of `responseFormat`. Subsequent reads from it will return its default value.
+  public mutating func clearResponseFormat() {_uniqueStorage()._responseFormat = nil}
+
+  /// Include prompt text in the result/stream when the backend supports echo.
+  public var echoPrompt: Bool {
+    get {_storage._echoPrompt}
+    set {_uniqueStorage()._echoPrompt = newValue}
+  }
+
+  /// Per-request backend thread hint. 0 = backend/runtime default.
+  public var nThreads: Int32 {
+    get {_storage._nThreads}
+    set {_uniqueStorage()._nThreads = newValue}
+  }
+
+  /// Tool-calling contract for this generation. The SDK owns executor
+  /// functions; proto carries only definitions and parser options.
+  public var toolCalling: RAToolCallingOptions {
+    get {_storage._toolCalling ?? RAToolCallingOptions()}
+    set {_uniqueStorage()._toolCalling = newValue}
+  }
+  /// Returns true if `toolCalling` has been explicitly set.
+  public var hasToolCalling: Bool {_storage._toolCalling != nil}
+  /// Clears the value of `toolCalling`. Subsequent reads from it will return its default value.
+  public mutating func clearToolCalling() {_uniqueStorage()._toolCalling = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -377,11 +507,133 @@ public struct RALLMGenerationResult: @unchecked Sendable {
   /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
   public mutating func clearErrorMessage() {_uniqueStorage()._errorMessage = nil}
 
+  /// Numeric backend status code when a result envelope carries an error.
+  public var errorCode: Int32 {
+    get {_storage._errorCode}
+    set {_uniqueStorage()._errorCode = newValue}
+  }
+
+  /// Prompt/cache accounting surfaced by llama.cpp/CoreML-style backends.
+  public var cachedPromptTokens: Int32 {
+    get {_storage._cachedPromptTokens}
+    set {_uniqueStorage()._cachedPromptTokens = newValue}
+  }
+
+  public var promptEvalTimeMs: Int64 {
+    get {_storage._promptEvalTimeMs}
+    set {_uniqueStorage()._promptEvalTimeMs = newValue}
+  }
+
+  public var decodeTimeMs: Int64 {
+    get {_storage._decodeTimeMs}
+    set {_uniqueStorage()._decodeTimeMs = newValue}
+  }
+
+  /// Tool calls parsed from the final assistant response, if any.
+  public var toolCalls: [RAToolCall] {
+    get {_storage._toolCalls}
+    set {_uniqueStorage()._toolCalls = newValue}
+  }
+
+  /// Tool results incorporated during auto-execute loops.
+  public var toolResults: [RAToolResult] {
+    get {_storage._toolResults}
+    set {_uniqueStorage()._toolResults = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+/// Request envelope for one non-streaming LLM generation call. This is the
+/// proto-owned DTO SDKs can use instead of parallel prompt/options tuples.
+public struct RALLMGenerationRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var requestID: String = String()
+
+  public var modelID: String = String()
+
+  public var prompt: String = String()
+
+  public var options: RALLMGenerationOptions {
+    get {_options ?? RALLMGenerationOptions()}
+    set {_options = newValue}
+  }
+  /// Returns true if `options` has been explicitly set.
+  public var hasOptions: Bool {self._options != nil}
+  /// Clears the value of `options`. Subsequent reads from it will return its default value.
+  public mutating func clearOptions() {self._options = nil}
+
+  public var contextChunks: [String] = []
+
+  public var metadata: Dictionary<String,String> = [:]
+
+  public var conversationID: String {
+    get {_conversationID ?? String()}
+    set {_conversationID = newValue}
+  }
+  /// Returns true if `conversationID` has been explicitly set.
+  public var hasConversationID: Bool {self._conversationID != nil}
+  /// Clears the value of `conversationID`. Subsequent reads from it will return its default value.
+  public mutating func clearConversationID() {self._conversationID = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _options: RALLMGenerationOptions? = nil
+  fileprivate var _conversationID: String? = nil
+}
+
+public struct RALLMGenerationStatus: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var requestID: String = String()
+
+  public var state: RALLMGenerationState = .unspecified
+
+  public var promptTokensProcessed: Int32 = 0
+
+  public var completionTokensGenerated: Int32 = 0
+
+  public var progress: Float = 0
+
+  public var elapsedMs: Int64 = 0
+
+  public var message: String {
+    get {_message ?? String()}
+    set {_message = newValue}
+  }
+  /// Returns true if `message` has been explicitly set.
+  public var hasMessage: Bool {self._message != nil}
+  /// Clears the value of `message`. Subsequent reads from it will return its default value.
+  public mutating func clearMessage() {self._message = nil}
+
+  public var errorMessage: String {
+    get {_errorMessage ?? String()}
+    set {_errorMessage = newValue}
+  }
+  /// Returns true if `errorMessage` has been explicitly set.
+  public var hasErrorMessage: Bool {self._errorMessage != nil}
+  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
+  public mutating func clearErrorMessage() {self._errorMessage = nil}
+
+  public var errorCode: Int32 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _message: String? = nil
+  fileprivate var _errorMessage: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -559,13 +811,17 @@ public struct RAPerformanceMetrics: Sendable {
 
 fileprivate let _protobuf_package = "runanywhere.v1"
 
+extension RALLMGenerationState: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0LLM_GENERATION_STATE_UNSPECIFIED\0\u{1}LLM_GENERATION_STATE_QUEUED\0\u{1}LLM_GENERATION_STATE_PREFILLING\0\u{1}LLM_GENERATION_STATE_DECODING\0\u{1}LLM_GENERATION_STATE_TOOL_CALLING\0\u{1}LLM_GENERATION_STATE_COMPLETED\0\u{1}LLM_GENERATION_STATE_CANCELLED\0\u{1}LLM_GENERATION_STATE_FAILED\0")
+}
+
 extension RAExecutionTarget: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0EXECUTION_TARGET_UNSPECIFIED\0\u{1}EXECUTION_TARGET_ON_DEVICE\0\u{1}EXECUTION_TARGET_CLOUD\0\u{1}EXECUTION_TARGET_AUTO\0")
 }
 
 extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerationOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}repetition_penalty\0\u{3}stop_sequences\0\u{3}streaming_enabled\0\u{3}preferred_framework\0\u{3}system_prompt\0\u{3}json_schema\0\u{3}thinking_pattern\0\u{3}execution_target\0\u{3}structured_output\0\u{3}enable_real_time_tracking\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}repetition_penalty\0\u{3}stop_sequences\0\u{3}streaming_enabled\0\u{3}preferred_framework\0\u{3}system_prompt\0\u{3}json_schema\0\u{3}thinking_pattern\0\u{3}execution_target\0\u{3}structured_output\0\u{3}enable_real_time_tracking\0\u{1}seed\0\u{3}frequency_penalty\0\u{3}presence_penalty\0\u{3}repeat_last_n\0\u{3}min_p\0\u{1}grammar\0\u{3}response_format\0\u{3}echo_prompt\0\u{3}n_threads\0\u{3}tool_calling\0")
 
   fileprivate class _StorageClass {
     var _maxTokens: Int32 = 0
@@ -582,6 +838,16 @@ extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     var _executionTarget: RAExecutionTarget? = nil
     var _structuredOutput: RAStructuredOutputOptions? = nil
     var _enableRealTimeTracking: Bool = false
+    var _seed: Int64 = 0
+    var _frequencyPenalty: Float = 0
+    var _presencePenalty: Float = 0
+    var _repeatLastN: Int32 = 0
+    var _minP: Float = 0
+    var _grammar: String? = nil
+    var _responseFormat: String? = nil
+    var _echoPrompt: Bool = false
+    var _nThreads: Int32 = 0
+    var _toolCalling: RAToolCallingOptions? = nil
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -606,6 +872,16 @@ extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       _executionTarget = source._executionTarget
       _structuredOutput = source._structuredOutput
       _enableRealTimeTracking = source._enableRealTimeTracking
+      _seed = source._seed
+      _frequencyPenalty = source._frequencyPenalty
+      _presencePenalty = source._presencePenalty
+      _repeatLastN = source._repeatLastN
+      _minP = source._minP
+      _grammar = source._grammar
+      _responseFormat = source._responseFormat
+      _echoPrompt = source._echoPrompt
+      _nThreads = source._nThreads
+      _toolCalling = source._toolCalling
     }
   }
 
@@ -638,6 +914,16 @@ extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageI
         case 12: try { try decoder.decodeSingularEnumField(value: &_storage._executionTarget) }()
         case 13: try { try decoder.decodeSingularMessageField(value: &_storage._structuredOutput) }()
         case 14: try { try decoder.decodeSingularBoolField(value: &_storage._enableRealTimeTracking) }()
+        case 15: try { try decoder.decodeSingularInt64Field(value: &_storage._seed) }()
+        case 16: try { try decoder.decodeSingularFloatField(value: &_storage._frequencyPenalty) }()
+        case 17: try { try decoder.decodeSingularFloatField(value: &_storage._presencePenalty) }()
+        case 18: try { try decoder.decodeSingularInt32Field(value: &_storage._repeatLastN) }()
+        case 19: try { try decoder.decodeSingularFloatField(value: &_storage._minP) }()
+        case 20: try { try decoder.decodeSingularStringField(value: &_storage._grammar) }()
+        case 21: try { try decoder.decodeSingularStringField(value: &_storage._responseFormat) }()
+        case 22: try { try decoder.decodeSingularBoolField(value: &_storage._echoPrompt) }()
+        case 23: try { try decoder.decodeSingularInt32Field(value: &_storage._nThreads) }()
+        case 24: try { try decoder.decodeSingularMessageField(value: &_storage._toolCalling) }()
         default: break
         }
       }
@@ -692,6 +978,36 @@ extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       if _storage._enableRealTimeTracking != false {
         try visitor.visitSingularBoolField(value: _storage._enableRealTimeTracking, fieldNumber: 14)
       }
+      if _storage._seed != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._seed, fieldNumber: 15)
+      }
+      if _storage._frequencyPenalty.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._frequencyPenalty, fieldNumber: 16)
+      }
+      if _storage._presencePenalty.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._presencePenalty, fieldNumber: 17)
+      }
+      if _storage._repeatLastN != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._repeatLastN, fieldNumber: 18)
+      }
+      if _storage._minP.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._minP, fieldNumber: 19)
+      }
+      try { if let v = _storage._grammar {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 20)
+      } }()
+      try { if let v = _storage._responseFormat {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 21)
+      } }()
+      if _storage._echoPrompt != false {
+        try visitor.visitSingularBoolField(value: _storage._echoPrompt, fieldNumber: 22)
+      }
+      if _storage._nThreads != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._nThreads, fieldNumber: 23)
+      }
+      try { if let v = _storage._toolCalling {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 24)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -715,6 +1031,16 @@ extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageI
         if _storage._executionTarget != rhs_storage._executionTarget {return false}
         if _storage._structuredOutput != rhs_storage._structuredOutput {return false}
         if _storage._enableRealTimeTracking != rhs_storage._enableRealTimeTracking {return false}
+        if _storage._seed != rhs_storage._seed {return false}
+        if _storage._frequencyPenalty != rhs_storage._frequencyPenalty {return false}
+        if _storage._presencePenalty != rhs_storage._presencePenalty {return false}
+        if _storage._repeatLastN != rhs_storage._repeatLastN {return false}
+        if _storage._minP != rhs_storage._minP {return false}
+        if _storage._grammar != rhs_storage._grammar {return false}
+        if _storage._responseFormat != rhs_storage._responseFormat {return false}
+        if _storage._echoPrompt != rhs_storage._echoPrompt {return false}
+        if _storage._nThreads != rhs_storage._nThreads {return false}
+        if _storage._toolCalling != rhs_storage._toolCalling {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -726,7 +1052,7 @@ extension RALLMGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageI
 
 extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerationResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{3}input_tokens\0\u{3}tokens_generated\0\u{3}model_used\0\u{3}generation_time_ms\0\u{3}ttft_ms\0\u{3}tokens_per_second\0\u{1}framework\0\u{3}finish_reason\0\u{3}thinking_tokens\0\u{3}response_tokens\0\u{3}json_output\0\u{1}performance\0\u{3}executed_on\0\u{3}structured_output_validation\0\u{3}total_tokens\0\u{3}error_message\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{3}input_tokens\0\u{3}tokens_generated\0\u{3}model_used\0\u{3}generation_time_ms\0\u{3}ttft_ms\0\u{3}tokens_per_second\0\u{1}framework\0\u{3}finish_reason\0\u{3}thinking_tokens\0\u{3}response_tokens\0\u{3}json_output\0\u{1}performance\0\u{3}executed_on\0\u{3}structured_output_validation\0\u{3}total_tokens\0\u{3}error_message\0\u{3}error_code\0\u{3}cached_prompt_tokens\0\u{3}prompt_eval_time_ms\0\u{3}decode_time_ms\0\u{3}tool_calls\0\u{3}tool_results\0")
 
   fileprivate class _StorageClass {
     var _text: String = String()
@@ -747,6 +1073,12 @@ extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     var _structuredOutputValidation: RAStructuredOutputValidation? = nil
     var _totalTokens: Int32 = 0
     var _errorMessage: String? = nil
+    var _errorCode: Int32 = 0
+    var _cachedPromptTokens: Int32 = 0
+    var _promptEvalTimeMs: Int64 = 0
+    var _decodeTimeMs: Int64 = 0
+    var _toolCalls: [RAToolCall] = []
+    var _toolResults: [RAToolResult] = []
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -775,6 +1107,12 @@ extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
       _structuredOutputValidation = source._structuredOutputValidation
       _totalTokens = source._totalTokens
       _errorMessage = source._errorMessage
+      _errorCode = source._errorCode
+      _cachedPromptTokens = source._cachedPromptTokens
+      _promptEvalTimeMs = source._promptEvalTimeMs
+      _decodeTimeMs = source._decodeTimeMs
+      _toolCalls = source._toolCalls
+      _toolResults = source._toolResults
     }
   }
 
@@ -811,6 +1149,12 @@ extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
         case 16: try { try decoder.decodeSingularMessageField(value: &_storage._structuredOutputValidation) }()
         case 17: try { try decoder.decodeSingularInt32Field(value: &_storage._totalTokens) }()
         case 18: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
+        case 19: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCode) }()
+        case 20: try { try decoder.decodeSingularInt32Field(value: &_storage._cachedPromptTokens) }()
+        case 21: try { try decoder.decodeSingularInt64Field(value: &_storage._promptEvalTimeMs) }()
+        case 22: try { try decoder.decodeSingularInt64Field(value: &_storage._decodeTimeMs) }()
+        case 23: try { try decoder.decodeRepeatedMessageField(value: &_storage._toolCalls) }()
+        case 24: try { try decoder.decodeRepeatedMessageField(value: &_storage._toolResults) }()
         default: break
         }
       }
@@ -877,6 +1221,24 @@ extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
       try { if let v = _storage._errorMessage {
         try visitor.visitSingularStringField(value: v, fieldNumber: 18)
       } }()
+      if _storage._errorCode != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._errorCode, fieldNumber: 19)
+      }
+      if _storage._cachedPromptTokens != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._cachedPromptTokens, fieldNumber: 20)
+      }
+      if _storage._promptEvalTimeMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._promptEvalTimeMs, fieldNumber: 21)
+      }
+      if _storage._decodeTimeMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._decodeTimeMs, fieldNumber: 22)
+      }
+      if !_storage._toolCalls.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._toolCalls, fieldNumber: 23)
+      }
+      if !_storage._toolResults.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._toolResults, fieldNumber: 24)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -904,10 +1266,154 @@ extension RALLMGenerationResult: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
         if _storage._structuredOutputValidation != rhs_storage._structuredOutputValidation {return false}
         if _storage._totalTokens != rhs_storage._totalTokens {return false}
         if _storage._errorMessage != rhs_storage._errorMessage {return false}
+        if _storage._errorCode != rhs_storage._errorCode {return false}
+        if _storage._cachedPromptTokens != rhs_storage._cachedPromptTokens {return false}
+        if _storage._promptEvalTimeMs != rhs_storage._promptEvalTimeMs {return false}
+        if _storage._decodeTimeMs != rhs_storage._decodeTimeMs {return false}
+        if _storage._toolCalls != rhs_storage._toolCalls {return false}
+        if _storage._toolResults != rhs_storage._toolResults {return false}
         return true
       }
       if !storagesAreEqual {return false}
     }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RALLMGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LLMGenerationRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{3}model_id\0\u{1}prompt\0\u{1}options\0\u{3}context_chunks\0\u{1}metadata\0\u{3}conversation_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.prompt) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._options) }()
+      case 5: try { try decoder.decodeRepeatedStringField(value: &self.contextChunks) }()
+      case 6: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self._conversationID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.requestID.isEmpty {
+      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 1)
+    }
+    if !self.modelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 2)
+    }
+    if !self.prompt.isEmpty {
+      try visitor.visitSingularStringField(value: self.prompt, fieldNumber: 3)
+    }
+    try { if let v = self._options {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
+    if !self.contextChunks.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.contextChunks, fieldNumber: 5)
+    }
+    if !self.metadata.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 6)
+    }
+    try { if let v = self._conversationID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RALLMGenerationRequest, rhs: RALLMGenerationRequest) -> Bool {
+    if lhs.requestID != rhs.requestID {return false}
+    if lhs.modelID != rhs.modelID {return false}
+    if lhs.prompt != rhs.prompt {return false}
+    if lhs._options != rhs._options {return false}
+    if lhs.contextChunks != rhs.contextChunks {return false}
+    if lhs.metadata != rhs.metadata {return false}
+    if lhs._conversationID != rhs._conversationID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RALLMGenerationStatus: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".LLMGenerationStatus"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}state\0\u{3}prompt_tokens_processed\0\u{3}completion_tokens_generated\0\u{1}progress\0\u{3}elapsed_ms\0\u{1}message\0\u{3}error_message\0\u{3}error_code\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self.state) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.promptTokensProcessed) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.completionTokensGenerated) }()
+      case 5: try { try decoder.decodeSingularFloatField(value: &self.progress) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self.elapsedMs) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self._message) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
+      case 9: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.requestID.isEmpty {
+      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 1)
+    }
+    if self.state != .unspecified {
+      try visitor.visitSingularEnumField(value: self.state, fieldNumber: 2)
+    }
+    if self.promptTokensProcessed != 0 {
+      try visitor.visitSingularInt32Field(value: self.promptTokensProcessed, fieldNumber: 3)
+    }
+    if self.completionTokensGenerated != 0 {
+      try visitor.visitSingularInt32Field(value: self.completionTokensGenerated, fieldNumber: 4)
+    }
+    if self.progress.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.progress, fieldNumber: 5)
+    }
+    if self.elapsedMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.elapsedMs, fieldNumber: 6)
+    }
+    try { if let v = self._message {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._errorMessage {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+    } }()
+    if self.errorCode != 0 {
+      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 9)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RALLMGenerationStatus, rhs: RALLMGenerationStatus) -> Bool {
+    if lhs.requestID != rhs.requestID {return false}
+    if lhs.state != rhs.state {return false}
+    if lhs.promptTokensProcessed != rhs.promptTokensProcessed {return false}
+    if lhs.completionTokensGenerated != rhs.completionTokensGenerated {return false}
+    if lhs.progress != rhs.progress {return false}
+    if lhs.elapsedMs != rhs.elapsedMs {return false}
+    if lhs._message != rhs._message {return false}
+    if lhs._errorMessage != rhs._errorMessage {return false}
+    if lhs.errorCode != rhs.errorCode {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

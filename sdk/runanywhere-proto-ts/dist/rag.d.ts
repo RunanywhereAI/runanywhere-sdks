@@ -1,5 +1,17 @@
 import _m0 from "protobufjs/minimal";
 export declare const protobufPackage = "runanywhere.v1";
+export declare enum RAGStreamEventKind {
+    RAG_STREAM_EVENT_KIND_UNSPECIFIED = 0,
+    RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED = 1,
+    RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED = 2,
+    RAG_STREAM_EVENT_KIND_CONTEXT_READY = 3,
+    RAG_STREAM_EVENT_KIND_TOKEN = 4,
+    RAG_STREAM_EVENT_KIND_COMPLETED = 5,
+    RAG_STREAM_EVENT_KIND_ERROR = 6,
+    UNRECOGNIZED = -1
+}
+export declare function rAGStreamEventKindFromJSON(object: any): RAGStreamEventKind;
+export declare function rAGStreamEventKindToJSON(object: RAGStreamEventKind): string;
 /**
  * ---------------------------------------------------------------------------
  * RAGConfiguration — low-level pipeline config (pre-IDL hand-rolled).
@@ -39,6 +51,11 @@ export interface RAGConfiguration {
     embeddingConfigJson?: string | undefined;
     /** Backend-specific config JSON passed to the LLM provider. */
     llmConfigJson?: string | undefined;
+    /** Index persistence and retrieval behavior. Empty path = in-memory index. */
+    indexPath?: string | undefined;
+    persistIndex: boolean;
+    rerankResults: boolean;
+    rerankerModelPath?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -56,8 +73,28 @@ export interface RAGDocument {
     metadata: {
         [key: string]: string;
     };
+    /**
+     * Adapter-normalized document source. Pickers, sandbox bookmarks, and
+     * platform file access remain SDK-owned.
+     */
+    sourceUri?: string | undefined;
+    adapterHandle?: string | undefined;
+    mediaType?: string | undefined;
+    sizeBytes: number;
 }
 export interface RAGDocument_MetadataEntry {
+    key: string;
+    value: string;
+}
+export interface RAGIngestRequest {
+    requestId: string;
+    documents: RAGDocument[];
+    replaceExisting: boolean;
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface RAGIngestRequest_MetadataEntry {
     key: string;
     value: string;
 }
@@ -79,6 +116,21 @@ export interface RAGQueryOptions {
     topP: number;
     /** Top-k sampling parameter. 0 = disabled. */
     topK: number;
+    /** Retrieval overrides. 0/unset = use RAGConfiguration defaults. */
+    retrievalTopK: number;
+    similarityThreshold: number;
+    stream: boolean;
+}
+export interface RAGQueryRequest {
+    requestId: string;
+    options?: RAGQueryOptions | undefined;
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface RAGQueryRequest_MetadataEntry {
+    key: string;
+    value: string;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -110,6 +162,10 @@ export interface RAGSearchResult {
      * pass metadata without parsing it.
      */
     metadataJson?: string | undefined;
+    rank: number;
+    startOffset: number;
+    endOffset: number;
+    tokenCount: number;
 }
 export interface RAGSearchResult_MetadataEntry {
     key: string;
@@ -142,6 +198,12 @@ export interface RAGResult {
      * in milliseconds.
      */
     totalTimeMs: number;
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    errorMessage?: string | undefined;
+    errorCode: number;
+    requestId: string;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -174,6 +236,38 @@ export interface RAGStatistics {
     statsJson?: string | undefined;
     /** Approximate vector-store footprint in bytes, when known. */
     vectorStoreSizeBytes: number;
+    isPersistent: boolean;
+    lastQueryMs: number;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+export interface RAGIngestResult {
+    requestId: string;
+    documentsIngested: number;
+    chunksIngested: number;
+    statistics?: RAGStatistics | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+export interface RAGStreamEvent {
+    seq: number;
+    timestampUs: number;
+    requestId: string;
+    kind: RAGStreamEventKind;
+    chunk?: RAGSearchResult | undefined;
+    token: string;
+    result?: RAGResult | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+export interface RAGServiceState {
+    isReady: boolean;
+    statistics?: RAGStatistics | undefined;
+    isIndexing: boolean;
+    isQuerying: boolean;
+    activeRequestId?: string | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
 }
 export declare const RAGConfiguration: {
     encode(message: RAGConfiguration, writer?: _m0.Writer): _m0.Writer;
@@ -199,6 +293,22 @@ export declare const RAGDocument_MetadataEntry: {
     create<I extends Exact<DeepPartial<RAGDocument_MetadataEntry>, I>>(base?: I): RAGDocument_MetadataEntry;
     fromPartial<I extends Exact<DeepPartial<RAGDocument_MetadataEntry>, I>>(object: I): RAGDocument_MetadataEntry;
 };
+export declare const RAGIngestRequest: {
+    encode(message: RAGIngestRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): RAGIngestRequest;
+    fromJSON(object: any): RAGIngestRequest;
+    toJSON(message: RAGIngestRequest): unknown;
+    create<I extends Exact<DeepPartial<RAGIngestRequest>, I>>(base?: I): RAGIngestRequest;
+    fromPartial<I extends Exact<DeepPartial<RAGIngestRequest>, I>>(object: I): RAGIngestRequest;
+};
+export declare const RAGIngestRequest_MetadataEntry: {
+    encode(message: RAGIngestRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): RAGIngestRequest_MetadataEntry;
+    fromJSON(object: any): RAGIngestRequest_MetadataEntry;
+    toJSON(message: RAGIngestRequest_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<RAGIngestRequest_MetadataEntry>, I>>(base?: I): RAGIngestRequest_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<RAGIngestRequest_MetadataEntry>, I>>(object: I): RAGIngestRequest_MetadataEntry;
+};
 export declare const RAGQueryOptions: {
     encode(message: RAGQueryOptions, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): RAGQueryOptions;
@@ -206,6 +316,22 @@ export declare const RAGQueryOptions: {
     toJSON(message: RAGQueryOptions): unknown;
     create<I extends Exact<DeepPartial<RAGQueryOptions>, I>>(base?: I): RAGQueryOptions;
     fromPartial<I extends Exact<DeepPartial<RAGQueryOptions>, I>>(object: I): RAGQueryOptions;
+};
+export declare const RAGQueryRequest: {
+    encode(message: RAGQueryRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): RAGQueryRequest;
+    fromJSON(object: any): RAGQueryRequest;
+    toJSON(message: RAGQueryRequest): unknown;
+    create<I extends Exact<DeepPartial<RAGQueryRequest>, I>>(base?: I): RAGQueryRequest;
+    fromPartial<I extends Exact<DeepPartial<RAGQueryRequest>, I>>(object: I): RAGQueryRequest;
+};
+export declare const RAGQueryRequest_MetadataEntry: {
+    encode(message: RAGQueryRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): RAGQueryRequest_MetadataEntry;
+    fromJSON(object: any): RAGQueryRequest_MetadataEntry;
+    toJSON(message: RAGQueryRequest_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<RAGQueryRequest_MetadataEntry>, I>>(base?: I): RAGQueryRequest_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<RAGQueryRequest_MetadataEntry>, I>>(object: I): RAGQueryRequest_MetadataEntry;
 };
 export declare const RAGSearchResult: {
     encode(message: RAGSearchResult, writer?: _m0.Writer): _m0.Writer;
@@ -238,6 +364,30 @@ export declare const RAGStatistics: {
     toJSON(message: RAGStatistics): unknown;
     create<I extends Exact<DeepPartial<RAGStatistics>, I>>(base?: I): RAGStatistics;
     fromPartial<I extends Exact<DeepPartial<RAGStatistics>, I>>(object: I): RAGStatistics;
+};
+export declare const RAGIngestResult: {
+    encode(message: RAGIngestResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): RAGIngestResult;
+    fromJSON(object: any): RAGIngestResult;
+    toJSON(message: RAGIngestResult): unknown;
+    create<I extends Exact<DeepPartial<RAGIngestResult>, I>>(base?: I): RAGIngestResult;
+    fromPartial<I extends Exact<DeepPartial<RAGIngestResult>, I>>(object: I): RAGIngestResult;
+};
+export declare const RAGStreamEvent: {
+    encode(message: RAGStreamEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): RAGStreamEvent;
+    fromJSON(object: any): RAGStreamEvent;
+    toJSON(message: RAGStreamEvent): unknown;
+    create<I extends Exact<DeepPartial<RAGStreamEvent>, I>>(base?: I): RAGStreamEvent;
+    fromPartial<I extends Exact<DeepPartial<RAGStreamEvent>, I>>(object: I): RAGStreamEvent;
+};
+export declare const RAGServiceState: {
+    encode(message: RAGServiceState, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): RAGServiceState;
+    fromJSON(object: any): RAGServiceState;
+    toJSON(message: RAGServiceState): unknown;
+    create<I extends Exact<DeepPartial<RAGServiceState>, I>>(base?: I): RAGServiceState;
+    fromPartial<I extends Exact<DeepPartial<RAGServiceState>, I>>(object: I): RAGServiceState;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

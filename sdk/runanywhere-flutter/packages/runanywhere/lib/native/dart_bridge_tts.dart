@@ -11,10 +11,9 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
-import 'package:runanywhere/features/tts/tts_configuration.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/tts_options.pb.dart'
-    show TTSOptions, TTSOutput, TTSVoiceInfo;
+    show TTSOptions, TTSOutput, TTSSynthesisRequest, TTSVoiceInfo;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
@@ -28,7 +27,6 @@ import 'package:runanywhere/native/platform_loader.dart';
 /// Usage:
 /// ```dart
 /// final tts = DartBridgeTTS.shared;
-/// await tts.loadVoice('/path/to/voice', 'voice-id', 'Voice Name');
 /// final audio = await tts.synthesize('Hello world');
 /// ```
 class DartBridgeTTS {
@@ -44,6 +42,14 @@ class DartBridgeTTS {
   RacHandle? _handle;
   String? _loadedVoiceId;
   final _logger = SDKLogger('DartBridge.TTS');
+  static TTSOutput Function(TTSSynthesisRequest)?
+      _synthesizeLifecycleProtoForTesting;
+
+  static void setSynthesizeLifecycleProtoForTesting(
+    TTSOutput Function(TTSSynthesisRequest)? override,
+  ) {
+    _synthesizeLifecycleProtoForTesting = override;
+  }
 
   // MARK: - Handle Management
 
@@ -93,58 +99,6 @@ class DartBridgeTTS {
   /// Get the currently loaded voice ID.
   String? get currentVoiceId => _loadedVoiceId;
 
-  // MARK: - Voice Lifecycle
-
-  /// Load a TTS voice.
-  ///
-  /// [voicePath] - Full path to the voice model.
-  /// [voiceId] - Unique identifier for the voice.
-  /// [voiceName] - Human-readable name.
-  ///
-  /// Throws on failure.
-  Future<void> loadVoice(
-    String voicePath,
-    String voiceId,
-    String voiceName,
-  ) async {
-    final handle = getHandle();
-
-    final pathPtr = voicePath.toNativeUtf8();
-    final idPtr = voiceId.toNativeUtf8();
-    final namePtr = voiceName.toNativeUtf8();
-
-    try {
-      final result =
-          NativeFunctions.ttsLoadVoice(handle, pathPtr, idPtr, namePtr);
-
-      if (result != RAC_SUCCESS) {
-        throw StateError(
-          'Failed to load TTS voice: ${RacResultCode.getMessage(result)}',
-        );
-      }
-
-      _loadedVoiceId = voiceId;
-      _logger.info('TTS voice loaded: $voiceId');
-    } finally {
-      calloc.free(pathPtr);
-      calloc.free(idPtr);
-      calloc.free(namePtr);
-    }
-  }
-
-  /// Unload the current voice.
-  void unload() {
-    if (_handle == null) return;
-
-    try {
-      NativeFunctions.ttsCleanup(_handle!);
-      _loadedVoiceId = null;
-      _logger.info('TTS voice unloaded');
-    } catch (e) {
-      _logger.error('Failed to unload TTS voice: $e');
-    }
-  }
-
   /// Stop ongoing synthesis.
   void stop() {
     if (_handle == null) return;
@@ -158,6 +112,30 @@ class DartBridgeTTS {
   }
 
   // MARK: - Synthesis
+
+  /// Synthesize speech through the lifecycle-owned generated-proto TTS ABI.
+  TTSOutput synthesizeLifecycleProto(TTSSynthesisRequest request) {
+    _validateLifecycleRequest(request);
+
+    final override = _synthesizeLifecycleProtoForTesting;
+    if (override != null) {
+      return override(request);
+    }
+
+    final fn = RacNative.bindings.rac_tts_synthesize_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+        'rac_tts_synthesize_lifecycle_proto is unavailable',
+      );
+    }
+
+    return DartBridgeProtoUtils.callRequest<TTSOutput>(
+      request: request,
+      invoke: fn,
+      decode: TTSOutput.fromBuffer,
+      symbol: 'rac_tts_synthesize_lifecycle_proto',
+    );
+  }
 
   /// Enumerate voices via the generated-proto ABI.
   Future<List<TTSVoiceInfo>> listVoicesProto() async {
@@ -198,7 +176,10 @@ class DartBridgeTTS {
   Future<TTSOutput> synthesizeProto(String text, TTSOptions options) async {
     final handle = getHandle();
     if (!isLoaded) {
-      throw StateError('No TTS voice loaded. Call loadVoice() first.');
+      throw UnsupportedError(
+        'No TTS component handle is loaded. Public TTS uses '
+        'synthesizeLifecycleProto instead of Dart-held component handles.',
+      );
     }
 
     final fn = RacNative.bindings.rac_tts_component_synthesize_proto;
@@ -234,7 +215,10 @@ class DartBridgeTTS {
   Stream<TTSOutput> synthesizeStreamProto(String text, TTSOptions options) {
     if (!isLoaded) {
       return Stream<TTSOutput>.error(
-        StateError('No TTS voice loaded. Call loadVoice() first.'),
+        UnsupportedError(
+          'No TTS component handle is loaded. Public TTS streaming remains '
+          'unavailable until a lifecycle-owned stream ABI exists.',
+        ),
       );
     }
     final fn = RacNative.bindings.rac_tts_component_synthesize_stream_proto;
@@ -329,16 +313,13 @@ class DartBridgeTTS {
     bool useSsml = false,
     String? voiceId,
   }) async {
-    TTSComponentConfig(
-      speakingRate: rate,
-      pitch: pitch,
-      volume: volume,
-    ).validate();
-
     final handle = getHandle();
 
     if (!isLoaded) {
-      throw StateError('No TTS voice loaded. Call loadVoice() first.');
+      throw UnsupportedError(
+        'rac_tts_component_synthesize requires a Dart-held component handle '
+        'and is not used by the public lifecycle-owned TTS capability.',
+      );
     }
 
     _logger.debug(
@@ -544,6 +525,14 @@ class DartBridgeTTS {
       } catch (e) {
         _logger.error('Failed to destroy TTS component: $e');
       }
+    }
+  }
+
+  void _validateLifecycleRequest(TTSSynthesisRequest request) {
+    if (request.text.isEmpty && (!request.hasSsml() || request.ssml.isEmpty)) {
+      throw ArgumentError(
+        'TTSSynthesisRequest.text or ssml is required for lifecycle TTS',
+      );
     }
   }
 }

@@ -1,0 +1,232 @@
+/**
+ * @file test_stt_vad_stream_events.cpp
+ * @brief Focused generated STT/VAD stream-event payload coverage.
+ */
+
+#include <cstdio>
+#include <cstring>
+#include <string>
+#include <vector>
+
+#include "rac/core/rac_error.h"
+#include "rac/features/stt/rac_stt_component.h"
+#include "rac/features/stt/rac_stt_service.h"
+#include "rac/features/vad/rac_vad_component.h"
+#include "rac/foundation/rac_proto_buffer.h"
+#include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_plugin_entry.h"
+
+#if defined(RAC_HAVE_PROTOBUF)
+#include "stt_options.pb.h"
+#include "vad_options.pb.h"
+#endif
+
+namespace {
+
+int test_count = 0;
+int fail_count = 0;
+
+#define CHECK(cond, label)                                                                    \
+    do {                                                                                      \
+        ++test_count;                                                                         \
+        if (!(cond)) {                                                                        \
+            ++fail_count;                                                                     \
+            std::fprintf(stderr, "  FAIL: %s (%s:%d) - %s\n", label, __FILE__, __LINE__,      \
+                         #cond);                                                             \
+        } else {                                                                              \
+            std::fprintf(stdout, "  ok:   %s\n", label);                                     \
+        }                                                                                     \
+    } while (0)
+
+#if defined(RAC_HAVE_PROTOBUF)
+
+struct MockStt {
+    bool initialized{false};
+};
+
+template <typename T>
+bool serialize(const T& message, std::vector<uint8_t>* out) {
+    out->resize(message.ByteSizeLong());
+    return out->empty() ||
+           message.SerializeToArray(out->data(), static_cast<int>(out->size()));
+}
+
+rac_result_t mock_stt_create(const char*, const char*, void** out_impl) {
+    *out_impl = new MockStt();
+    return RAC_SUCCESS;
+}
+
+rac_result_t mock_stt_initialize(void* impl, const char*) {
+    static_cast<MockStt*>(impl)->initialized = true;
+    return RAC_SUCCESS;
+}
+
+rac_result_t mock_stt_stream(void* impl,
+                             const void* audio_data,
+                             size_t audio_size,
+                             const rac_stt_options_t*,
+                             rac_stt_stream_callback_t callback,
+                             void* user_data) {
+    if (!impl || !audio_data || audio_size == 0 || !callback) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    callback("draft", RAC_FALSE, user_data);
+    callback("final text", RAC_TRUE, user_data);
+    return RAC_SUCCESS;
+}
+
+rac_result_t mock_stt_info(void*, rac_stt_info_t* out_info) {
+    out_info->is_ready = RAC_TRUE;
+    out_info->current_model = "stream-event-mock-stt";
+    out_info->supports_streaming = RAC_TRUE;
+    return RAC_SUCCESS;
+}
+
+void mock_stt_destroy(void* impl) {
+    delete static_cast<MockStt*>(impl);
+}
+
+rac_stt_service_ops_t g_stt_ops{};
+rac_engine_vtable_t g_stt_vtable{};
+const rac_runtime_id_t k_cpu_runtime[] = {RAC_RUNTIME_CPU};
+
+void install_mock_stt_plugin() {
+    g_stt_ops = {};
+    g_stt_ops.create = mock_stt_create;
+    g_stt_ops.initialize = mock_stt_initialize;
+    g_stt_ops.transcribe_stream = mock_stt_stream;
+    g_stt_ops.get_info = mock_stt_info;
+    g_stt_ops.destroy = mock_stt_destroy;
+
+    g_stt_vtable = {};
+    g_stt_vtable.metadata.abi_version = RAC_PLUGIN_API_VERSION;
+    g_stt_vtable.metadata.name = "cpp-stream-event-stt";
+    g_stt_vtable.metadata.display_name = "CPP Stream Event Mock STT";
+    g_stt_vtable.metadata.engine_version = "0.0.0";
+    g_stt_vtable.metadata.priority = 10000;
+    g_stt_vtable.metadata.runtimes = k_cpu_runtime;
+    g_stt_vtable.metadata.runtimes_count = 1;
+    g_stt_vtable.stt_ops = &g_stt_ops;
+
+    (void)rac_plugin_unregister("cpp-stream-event-stt");
+    CHECK(rac_plugin_register(&g_stt_vtable) == RAC_SUCCESS, "mock STT plugin registers");
+}
+
+int test_stt_stream_events() {
+    install_mock_stt_plugin();
+
+    rac_handle_t stt = nullptr;
+    CHECK(rac_stt_component_create(&stt) == RAC_SUCCESS, "STT component creates");
+    CHECK(rac_stt_component_load_model(stt, "mock-stt", "mock-stt", "Mock STT") == RAC_SUCCESS,
+          "STT model loads");
+
+    runanywhere::v1::STTOptions options;
+    options.set_language(runanywhere::v1::STT_LANGUAGE_EN);
+    std::vector<uint8_t> options_bytes;
+    CHECK(serialize(options, &options_bytes), "STTOptions serializes");
+
+    std::vector<runanywhere::v1::STTStreamEvent> events;
+    auto callback = [](const uint8_t* data, size_t size, void* user_data) {
+        auto* out = static_cast<std::vector<runanywhere::v1::STTStreamEvent>*>(user_data);
+        runanywhere::v1::STTStreamEvent event;
+        if (event.ParseFromArray(data, static_cast<int>(size))) {
+            out->push_back(event);
+        }
+    };
+
+    const int16_t audio[] = {0, 1, 2, 3};
+    const rac_result_t rc = rac_stt_component_transcribe_stream_proto(
+        stt, audio, sizeof(audio), options_bytes.data(), options_bytes.size(), callback, &events);
+    CHECK(rc == RAC_SUCCESS, "STT stream proto returns success");
+    CHECK(events.size() == 3, "STT stream emits started, partial, final events");
+    if (events.size() == 3) {
+        const std::string request_id = events[0].request_id();
+        CHECK(events[0].kind() == runanywhere::v1::STT_STREAM_EVENT_KIND_STARTED,
+              "STT first event is started");
+        CHECK(events[1].kind() == runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL &&
+                  events[1].has_partial() && events[1].partial().text() == "draft",
+              "STT second event carries partial payload");
+        CHECK(events[2].kind() == runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL &&
+                  events[2].has_partial() && events[2].partial().is_final() &&
+                  events[2].has_final_output() && events[2].final_output().text() == "final text",
+              "STT final event carries generated final payload");
+        CHECK(events[0].seq() == 1 && events[1].seq() == 2 && events[2].seq() == 3,
+              "STT stream sequence is monotonic");
+        CHECK(!request_id.empty() && events[1].request_id() == request_id &&
+                  events[2].request_id() == request_id,
+              "STT stream request_id is stable");
+    }
+
+    rac_stt_component_destroy(stt);
+    return 0;
+}
+
+int test_vad_activity_stream_event() {
+    rac_handle_t vad = nullptr;
+    CHECK(rac_vad_component_create(&vad) == RAC_SUCCESS, "VAD component creates");
+
+    runanywhere::v1::VADConfiguration config;
+    config.set_sample_rate(16000);
+    config.set_frame_length_ms(100);
+    config.set_threshold(0.01f);
+    std::vector<uint8_t> config_bytes;
+    CHECK(serialize(config, &config_bytes), "VADConfiguration serializes");
+    CHECK(rac_vad_component_configure_proto(vad, config_bytes.data(), config_bytes.size()) ==
+              RAC_SUCCESS,
+          "VAD configure proto succeeds");
+
+    std::vector<runanywhere::v1::VADStreamEvent> events;
+    auto callback = [](const uint8_t* data, size_t size, void* user_data) {
+        auto* out = static_cast<std::vector<runanywhere::v1::VADStreamEvent>*>(user_data);
+        runanywhere::v1::VADStreamEvent event;
+        if (event.ParseFromArray(data, static_cast<int>(size))) {
+            out->push_back(event);
+        }
+    };
+    CHECK(rac_vad_component_set_activity_proto_callback(vad, callback, &events) == RAC_SUCCESS,
+          "VAD stream-event activity callback registers");
+    CHECK(rac_vad_component_initialize(vad) == RAC_SUCCESS, "VAD initializes");
+
+    std::vector<float> silence(1600, 0.0f);
+    std::vector<float> loud(1600, 0.5f);
+    rac_bool_t is_speech = RAC_FALSE;
+    for (int i = 0; i < 20; ++i) {
+        (void)rac_vad_component_process(vad, silence.data(), silence.size(), &is_speech);
+    }
+    (void)rac_vad_component_process(vad, loud.data(), loud.size(), &is_speech);
+
+    bool saw_started = false;
+    for (const auto& event : events) {
+        saw_started =
+            saw_started ||
+            (event.kind() == runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY &&
+             event.has_activity() &&
+             event.activity().event_type() ==
+                 runanywhere::v1::SPEECH_ACTIVITY_KIND_SPEECH_STARTED &&
+             event.seq() > 0 && event.timestamp_us() > 0 && !event.request_id().empty());
+    }
+    CHECK(saw_started, "VAD activity callback emits generated VADStreamEvent");
+
+    rac_vad_component_destroy(vad);
+    return 0;
+}
+
+#endif
+
+}  // namespace
+
+int main() {
+#if !defined(RAC_HAVE_PROTOBUF)
+    std::fprintf(stdout, "  skip: STT/VAD stream event tests (no protobuf)\n");
+    return 0;
+#else
+    test_stt_stream_events();
+    test_vad_activity_stream_event();
+    if (fail_count != 0) {
+        std::fprintf(stderr, "FAILED: %d/%d checks failed\n", fail_count, test_count);
+        return 1;
+    }
+    std::fprintf(stdout, "PASS: %d checks\n", test_count);
+    return 0;
+#endif
+}

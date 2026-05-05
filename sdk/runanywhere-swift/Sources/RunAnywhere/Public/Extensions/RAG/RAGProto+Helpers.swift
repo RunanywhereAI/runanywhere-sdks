@@ -43,6 +43,47 @@ extension RARAGConfiguration {
             )
         }
     }
+
+    public func resolvingLifecycleArtifacts(
+        embedding: RAModelLoadResult,
+        llm: RAModelLoadResult
+    ) throws -> RARAGConfiguration {
+        guard let embeddingPath = embedding.lifecyclePrimaryArtifactPath else {
+            throw SDKException.rag(
+                .modelLoadFailed,
+                "Embedding model '\(embedding.modelID)' did not return a lifecycle-resolved primary artifact"
+            )
+        }
+        guard let llmPath = llm.lifecyclePrimaryArtifactPath else {
+            throw SDKException.rag(
+                .modelLoadFailed,
+                "LLM model '\(llm.modelID)' did not return a lifecycle-resolved primary artifact"
+            )
+        }
+
+        var resolved = self
+        resolved.embeddingModelPath = embeddingPath
+        resolved.llmModelPath = llmPath
+        if let vocabularyPath = embedding.resolvedVocabularyPath {
+            resolved.embeddingConfigJson = try resolved.embeddingConfigJson.mergingRAGConfig(
+                key: "vocab_path",
+                value: vocabularyPath
+            )
+        }
+        return resolved
+    }
+}
+
+// MARK: - RARAGDocument
+
+extension RARAGDocument {
+    public init(text: String, metadataJSON: String? = nil) {
+        self.init()
+        self.text = text
+        if let metadataJSON {
+            self.metadataJson = metadataJSON
+        }
+    }
 }
 
 // MARK: - RARAGQueryOptions
@@ -73,5 +114,24 @@ extension RARAGStatistics {
     public var lastUpdated: Date? {
         guard lastUpdatedMs > 0 else { return nil }
         return Date(timeIntervalSince1970: TimeInterval(lastUpdatedMs) / 1000.0)
+    }
+}
+
+private extension String {
+    func mergingRAGConfig(key: String, value: String) throws -> String {
+        var object: [String: Any] = [:]
+        if !isEmpty {
+            let existing = try JSONSerialization.jsonObject(with: Data(self.utf8)) as? [String: Any]
+            guard let existing else {
+                throw SDKException.rag(
+                    .invalidConfiguration,
+                    "RAG embeddingConfigJson must be a JSON object to merge lifecycle artifact metadata"
+                )
+            }
+            object = existing
+        }
+        object[key] = value
+        let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+        return String(decoding: data, as: UTF8.self)
     }
 }

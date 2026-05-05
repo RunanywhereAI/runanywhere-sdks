@@ -13,6 +13,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -24,6 +25,7 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.List
 import okio.ByteString
 
 public class StorageInfoResult(
@@ -49,8 +51,17 @@ public class StorageInfoResult(
     schemaIndex = 2,
   )
   public val error_message: String = "",
+  warnings: List<String> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StorageInfoResult, Nothing>(ADAPTER, unknownFields) {
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    schemaIndex = 3,
+  )
+  public val warnings: List<String> = immutableCopyOf("warnings", warnings)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -65,6 +76,7 @@ public class StorageInfoResult(
     if (success != other.success) return false
     if (info != other.info) return false
     if (error_message != other.error_message) return false
+    if (warnings != other.warnings) return false
     return true
   }
 
@@ -75,6 +87,7 @@ public class StorageInfoResult(
       result = result * 37 + success.hashCode()
       result = result * 37 + (info?.hashCode() ?: 0)
       result = result * 37 + error_message.hashCode()
+      result = result * 37 + warnings.hashCode()
       super.hashCode = result
     }
     return result
@@ -85,6 +98,7 @@ public class StorageInfoResult(
     result += """success=$success"""
     if (info != null) result += """info=$info"""
     result += """error_message=${sanitize(error_message)}"""
+    if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
     return result.joinToString(prefix = "StorageInfoResult{", separator = ", ", postfix = "}")
   }
 
@@ -92,8 +106,9 @@ public class StorageInfoResult(
     success: Boolean = this.success,
     info: StorageInfo? = this.info,
     error_message: String = this.error_message,
+    warnings: List<String> = this.warnings,
     unknownFields: ByteString = this.unknownFields,
-  ): StorageInfoResult = StorageInfoResult(success, info, error_message, unknownFields)
+  ): StorageInfoResult = StorageInfoResult(success, info, error_message, warnings, unknownFields)
 
   public companion object {
     @JvmField
@@ -111,6 +126,7 @@ public class StorageInfoResult(
         if (value.info != null) size += StorageInfo.ADAPTER.encodedSizeWithTag(2, value.info)
         if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(3,
             value.error_message)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(4, value.warnings)
         return size
       }
 
@@ -119,11 +135,13 @@ public class StorageInfoResult(
         if (value.info != null) StorageInfo.ADAPTER.encodeWithTag(writer, 2, value.info)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 3,
             value.error_message)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.warnings)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StorageInfoResult) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.warnings)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 3,
             value.error_message)
         if (value.info != null) StorageInfo.ADAPTER.encodeWithTag(writer, 2, value.info)
@@ -134,11 +152,13 @@ public class StorageInfoResult(
         var success: Boolean = false
         var info: StorageInfo? = null
         var error_message: String = ""
+        val warnings = mutableListOf<String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> info = StorageInfo.ADAPTER.decode(reader)
             3 -> error_message = ProtoAdapter.STRING.decode(reader)
+            4 -> warnings.add(ProtoAdapter.STRING.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -146,6 +166,7 @@ public class StorageInfoResult(
           success = success,
           info = info,
           error_message = error_message,
+          warnings = warnings,
           unknownFields = unknownFields
         )
       }

@@ -36,6 +36,8 @@ enum VoiceEvent_Payload {
   speechTurnDetection, 
   turnLifecycle, 
   wakewordDetected, 
+  audioLevel, 
+  componentProgress, 
   notSet
 }
 
@@ -66,6 +68,12 @@ class VoiceEvent extends $pb.GeneratedMessage {
     SpeechTurnDetectionEvent? speechTurnDetection,
     TurnLifecycleEvent? turnLifecycle,
     WakeWordDetectedEvent? wakewordDetected,
+    AudioLevelEvent? audioLevel,
+    ComponentProgressEvent? componentProgress,
+    $core.String? sessionId,
+    $core.String? turnId,
+    $core.String? requestId,
+    $core.Map<$core.String, $core.String>? metadata,
   }) {
     final $result = create();
     if (seq != null) {
@@ -134,6 +142,24 @@ class VoiceEvent extends $pb.GeneratedMessage {
     if (wakewordDetected != null) {
       $result.wakewordDetected = wakewordDetected;
     }
+    if (audioLevel != null) {
+      $result.audioLevel = audioLevel;
+    }
+    if (componentProgress != null) {
+      $result.componentProgress = componentProgress;
+    }
+    if (sessionId != null) {
+      $result.sessionId = sessionId;
+    }
+    if (turnId != null) {
+      $result.turnId = turnId;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
+    }
     return $result;
   }
   VoiceEvent._() : super();
@@ -158,10 +184,12 @@ class VoiceEvent extends $pb.GeneratedMessage {
     24 : VoiceEvent_Payload.speechTurnDetection,
     25 : VoiceEvent_Payload.turnLifecycle,
     26 : VoiceEvent_Payload.wakewordDetected,
+    27 : VoiceEvent_Payload.audioLevel,
+    28 : VoiceEvent_Payload.componentProgress,
     0 : VoiceEvent_Payload.notSet
   };
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26])
+    ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
     ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
     ..e<VoiceEventCategory>(3, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED, valueOf: VoiceEventCategory.valueOf, enumValues: VoiceEventCategory.values)
@@ -184,6 +212,12 @@ class VoiceEvent extends $pb.GeneratedMessage {
     ..aOM<SpeechTurnDetectionEvent>(24, _omitFieldNames ? '' : 'speechTurnDetection', subBuilder: SpeechTurnDetectionEvent.create)
     ..aOM<TurnLifecycleEvent>(25, _omitFieldNames ? '' : 'turnLifecycle', subBuilder: TurnLifecycleEvent.create)
     ..aOM<WakeWordDetectedEvent>(26, _omitFieldNames ? '' : 'wakewordDetected', subBuilder: WakeWordDetectedEvent.create)
+    ..aOM<AudioLevelEvent>(27, _omitFieldNames ? '' : 'audioLevel', subBuilder: AudioLevelEvent.create)
+    ..aOM<ComponentProgressEvent>(28, _omitFieldNames ? '' : 'componentProgress', subBuilder: ComponentProgressEvent.create)
+    ..aOS(30, _omitFieldNames ? '' : 'sessionId')
+    ..aOS(31, _omitFieldNames ? '' : 'turnId')
+    ..aOS(32, _omitFieldNames ? '' : 'requestId')
+    ..m<$core.String, $core.String>(33, _omitFieldNames ? '' : 'metadata', entryClassName: 'VoiceEvent.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
     ..hasRequiredFields = false
   ;
 
@@ -452,6 +486,59 @@ class VoiceEvent extends $pb.GeneratedMessage {
   void clearWakewordDetected() => clearField(26);
   @$pb.TagNumber(26)
   WakeWordDetectedEvent ensureWakewordDetected() => $_ensure(21);
+
+  @$pb.TagNumber(27)
+  AudioLevelEvent get audioLevel => $_getN(22);
+  @$pb.TagNumber(27)
+  set audioLevel(AudioLevelEvent v) { setField(27, v); }
+  @$pb.TagNumber(27)
+  $core.bool hasAudioLevel() => $_has(22);
+  @$pb.TagNumber(27)
+  void clearAudioLevel() => clearField(27);
+  @$pb.TagNumber(27)
+  AudioLevelEvent ensureAudioLevel() => $_ensure(22);
+
+  @$pb.TagNumber(28)
+  ComponentProgressEvent get componentProgress => $_getN(23);
+  @$pb.TagNumber(28)
+  set componentProgress(ComponentProgressEvent v) { setField(28, v); }
+  @$pb.TagNumber(28)
+  $core.bool hasComponentProgress() => $_has(23);
+  @$pb.TagNumber(28)
+  void clearComponentProgress() => clearField(28);
+  @$pb.TagNumber(28)
+  ComponentProgressEvent ensureComponentProgress() => $_ensure(23);
+
+  /// Correlation fields shared by streaming and one-shot voice turns.
+  @$pb.TagNumber(30)
+  $core.String get sessionId => $_getSZ(24);
+  @$pb.TagNumber(30)
+  set sessionId($core.String v) { $_setString(24, v); }
+  @$pb.TagNumber(30)
+  $core.bool hasSessionId() => $_has(24);
+  @$pb.TagNumber(30)
+  void clearSessionId() => clearField(30);
+
+  @$pb.TagNumber(31)
+  $core.String get turnId => $_getSZ(25);
+  @$pb.TagNumber(31)
+  set turnId($core.String v) { $_setString(25, v); }
+  @$pb.TagNumber(31)
+  $core.bool hasTurnId() => $_has(25);
+  @$pb.TagNumber(31)
+  void clearTurnId() => clearField(31);
+
+  @$pb.TagNumber(32)
+  $core.String get requestId => $_getSZ(26);
+  @$pb.TagNumber(32)
+  set requestId($core.String v) { $_setString(26, v); }
+  @$pb.TagNumber(32)
+  $core.bool hasRequestId() => $_has(26);
+  @$pb.TagNumber(32)
+  void clearRequestId() => clearField(32);
+
+  @$pb.TagNumber(33)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(27);
 }
 
 /// User speech finalized by STT (is_final=false → partial hypothesis).
@@ -462,6 +549,8 @@ class UserSaidEvent extends $pb.GeneratedMessage {
     $core.double? confidence,
     $fixnum.Int64? audioStartUs,
     $fixnum.Int64? audioEndUs,
+    $core.String? languageCode,
+    $core.int? segmentIndex,
   }) {
     final $result = create();
     if (text != null) {
@@ -479,6 +568,12 @@ class UserSaidEvent extends $pb.GeneratedMessage {
     if (audioEndUs != null) {
       $result.audioEndUs = audioEndUs;
     }
+    if (languageCode != null) {
+      $result.languageCode = languageCode;
+    }
+    if (segmentIndex != null) {
+      $result.segmentIndex = segmentIndex;
+    }
     return $result;
   }
   UserSaidEvent._() : super();
@@ -491,6 +586,8 @@ class UserSaidEvent extends $pb.GeneratedMessage {
     ..a<$core.double>(3, _omitFieldNames ? '' : 'confidence', $pb.PbFieldType.OF)
     ..aInt64(4, _omitFieldNames ? '' : 'audioStartUs')
     ..aInt64(5, _omitFieldNames ? '' : 'audioEndUs')
+    ..aOS(6, _omitFieldNames ? '' : 'languageCode')
+    ..a<$core.int>(7, _omitFieldNames ? '' : 'segmentIndex', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
@@ -559,6 +656,24 @@ class UserSaidEvent extends $pb.GeneratedMessage {
   $core.bool hasAudioEndUs() => $_has(4);
   @$pb.TagNumber(5)
   void clearAudioEndUs() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get languageCode => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set languageCode($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasLanguageCode() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearLanguageCode() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get segmentIndex => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set segmentIndex($core.int v) { $_setSignedInt32(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasSegmentIndex() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearSegmentIndex() => clearField(7);
 }
 
 /// Single token decoded by the LLM. is_final=true on the last token of a
@@ -568,6 +683,9 @@ class AssistantTokenEvent extends $pb.GeneratedMessage {
     $core.String? text,
     $core.bool? isFinal,
     TokenKind? kind,
+    $core.int? tokenId,
+    $core.double? logprob,
+    $core.String? finishReason,
   }) {
     final $result = create();
     if (text != null) {
@@ -579,6 +697,15 @@ class AssistantTokenEvent extends $pb.GeneratedMessage {
     if (kind != null) {
       $result.kind = kind;
     }
+    if (tokenId != null) {
+      $result.tokenId = tokenId;
+    }
+    if (logprob != null) {
+      $result.logprob = logprob;
+    }
+    if (finishReason != null) {
+      $result.finishReason = finishReason;
+    }
     return $result;
   }
   AssistantTokenEvent._() : super();
@@ -589,6 +716,9 @@ class AssistantTokenEvent extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'text')
     ..aOB(2, _omitFieldNames ? '' : 'isFinal')
     ..e<TokenKind>(3, _omitFieldNames ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: TokenKind.TOKEN_KIND_UNSPECIFIED, valueOf: TokenKind.valueOf, enumValues: TokenKind.values)
+    ..a<$core.int>(4, _omitFieldNames ? '' : 'tokenId', $pb.PbFieldType.OU3)
+    ..a<$core.double>(5, _omitFieldNames ? '' : 'logprob', $pb.PbFieldType.OF)
+    ..aOS(6, _omitFieldNames ? '' : 'finishReason')
     ..hasRequiredFields = false
   ;
 
@@ -639,6 +769,33 @@ class AssistantTokenEvent extends $pb.GeneratedMessage {
   $core.bool hasKind() => $_has(2);
   @$pb.TagNumber(3)
   void clearKind() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get tokenId => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set tokenId($core.int v) { $_setUnsignedInt32(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasTokenId() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTokenId() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.double get logprob => $_getN(4);
+  @$pb.TagNumber(5)
+  set logprob($core.double v) { $_setFloat(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasLogprob() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearLogprob() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get finishReason => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set finishReason($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasFinishReason() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearFinishReason() => clearField(6);
 }
 
 /// A chunk of synthesized PCM audio, ready for the sink. The frontend is
@@ -650,6 +807,8 @@ class AudioFrameEvent extends $pb.GeneratedMessage {
     $core.int? channels,
     AudioEncoding? encoding,
     $core.bool? isFinal,
+    $core.int? chunkIndex,
+    $fixnum.Int64? durationMs,
   }) {
     final $result = create();
     if (pcm != null) {
@@ -667,6 +826,12 @@ class AudioFrameEvent extends $pb.GeneratedMessage {
     if (isFinal != null) {
       $result.isFinal = isFinal;
     }
+    if (chunkIndex != null) {
+      $result.chunkIndex = chunkIndex;
+    }
+    if (durationMs != null) {
+      $result.durationMs = durationMs;
+    }
     return $result;
   }
   AudioFrameEvent._() : super();
@@ -679,6 +844,8 @@ class AudioFrameEvent extends $pb.GeneratedMessage {
     ..a<$core.int>(3, _omitFieldNames ? '' : 'channels', $pb.PbFieldType.O3)
     ..e<AudioEncoding>(4, _omitFieldNames ? '' : 'encoding', $pb.PbFieldType.OE, defaultOrMaker: AudioEncoding.AUDIO_ENCODING_UNSPECIFIED, valueOf: AudioEncoding.valueOf, enumValues: AudioEncoding.values)
     ..aOB(5, _omitFieldNames ? '' : 'isFinal')
+    ..a<$core.int>(6, _omitFieldNames ? '' : 'chunkIndex', $pb.PbFieldType.O3)
+    ..aInt64(7, _omitFieldNames ? '' : 'durationMs')
     ..hasRequiredFields = false
   ;
 
@@ -748,6 +915,24 @@ class AudioFrameEvent extends $pb.GeneratedMessage {
   $core.bool hasIsFinal() => $_has(4);
   @$pb.TagNumber(5)
   void clearIsFinal() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get chunkIndex => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set chunkIndex($core.int v) { $_setSignedInt32(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasChunkIndex() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearChunkIndex() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get durationMs => $_getI64(6);
+  @$pb.TagNumber(7)
+  set durationMs($fixnum.Int64 v) { $_setInt64(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasDurationMs() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearDurationMs() => clearField(7);
 }
 
 /// Voice Activity Detection output. Frontends usually do not need this —
@@ -1025,6 +1210,8 @@ class ErrorEvent extends $pb.GeneratedMessage {
     $core.String? message,
     $core.String? component,
     $core.bool? isRecoverable,
+    $core.String? operation,
+    $core.String? detailsJson,
   }) {
     final $result = create();
     if (code != null) {
@@ -1039,6 +1226,12 @@ class ErrorEvent extends $pb.GeneratedMessage {
     if (isRecoverable != null) {
       $result.isRecoverable = isRecoverable;
     }
+    if (operation != null) {
+      $result.operation = operation;
+    }
+    if (detailsJson != null) {
+      $result.detailsJson = detailsJson;
+    }
     return $result;
   }
   ErrorEvent._() : super();
@@ -1050,6 +1243,8 @@ class ErrorEvent extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'message')
     ..aOS(3, _omitFieldNames ? '' : 'component')
     ..aOB(4, _omitFieldNames ? '' : 'isRecoverable')
+    ..aOS(5, _omitFieldNames ? '' : 'operation')
+    ..aOS(6, _omitFieldNames ? '' : 'detailsJson')
     ..hasRequiredFields = false
   ;
 
@@ -1109,6 +1304,24 @@ class ErrorEvent extends $pb.GeneratedMessage {
   $core.bool hasIsRecoverable() => $_has(3);
   @$pb.TagNumber(4)
   void clearIsRecoverable() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get operation => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set operation($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasOperation() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearOperation() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get detailsJson => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set detailsJson($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasDetailsJson() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearDetailsJson() => clearField(6);
 }
 
 /// Per-primitive latency breakdown. Emitted at barge-in and at pipeline stop.
@@ -1122,6 +1335,10 @@ class MetricsEvent extends $pb.GeneratedMessage {
     $fixnum.Int64? audioSamplesPlayed,
     $core.bool? isOverBudget,
     $fixnum.Int64? createdAtNs,
+    $core.double? vadFirstSpeechMs,
+    $core.double? sttFirstPartialMs,
+    $core.double? llmTotalMs,
+    $core.double? ttsTotalMs,
   }) {
     final $result = create();
     if (sttFinalMs != null) {
@@ -1148,6 +1365,18 @@ class MetricsEvent extends $pb.GeneratedMessage {
     if (createdAtNs != null) {
       $result.createdAtNs = createdAtNs;
     }
+    if (vadFirstSpeechMs != null) {
+      $result.vadFirstSpeechMs = vadFirstSpeechMs;
+    }
+    if (sttFirstPartialMs != null) {
+      $result.sttFirstPartialMs = sttFirstPartialMs;
+    }
+    if (llmTotalMs != null) {
+      $result.llmTotalMs = llmTotalMs;
+    }
+    if (ttsTotalMs != null) {
+      $result.ttsTotalMs = ttsTotalMs;
+    }
     return $result;
   }
   MetricsEvent._() : super();
@@ -1163,6 +1392,10 @@ class MetricsEvent extends $pb.GeneratedMessage {
     ..aInt64(6, _omitFieldNames ? '' : 'audioSamplesPlayed')
     ..aOB(7, _omitFieldNames ? '' : 'isOverBudget')
     ..aInt64(8, _omitFieldNames ? '' : 'createdAtNs')
+    ..a<$core.double>(9, _omitFieldNames ? '' : 'vadFirstSpeechMs', $pb.PbFieldType.OD)
+    ..a<$core.double>(10, _omitFieldNames ? '' : 'sttFirstPartialMs', $pb.PbFieldType.OD)
+    ..a<$core.double>(11, _omitFieldNames ? '' : 'llmTotalMs', $pb.PbFieldType.OD)
+    ..a<$core.double>(12, _omitFieldNames ? '' : 'ttsTotalMs', $pb.PbFieldType.OD)
     ..hasRequiredFields = false
   ;
 
@@ -1267,6 +1500,226 @@ class MetricsEvent extends $pb.GeneratedMessage {
   $core.bool hasCreatedAtNs() => $_has(7);
   @$pb.TagNumber(8)
   void clearCreatedAtNs() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.double get vadFirstSpeechMs => $_getN(8);
+  @$pb.TagNumber(9)
+  set vadFirstSpeechMs($core.double v) { $_setDouble(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasVadFirstSpeechMs() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearVadFirstSpeechMs() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.double get sttFirstPartialMs => $_getN(9);
+  @$pb.TagNumber(10)
+  set sttFirstPartialMs($core.double v) { $_setDouble(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasSttFirstPartialMs() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearSttFirstPartialMs() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.double get llmTotalMs => $_getN(10);
+  @$pb.TagNumber(11)
+  set llmTotalMs($core.double v) { $_setDouble(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasLlmTotalMs() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearLlmTotalMs() => clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.double get ttsTotalMs => $_getN(11);
+  @$pb.TagNumber(12)
+  set ttsTotalMs($core.double v) { $_setDouble(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasTtsTotalMs() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearTtsTotalMs() => clearField(12);
+}
+
+class AudioLevelEvent extends $pb.GeneratedMessage {
+  factory AudioLevelEvent({
+    $core.double? rms,
+    $core.double? peak,
+    $core.double? noiseFloorDb,
+    $core.bool? isSpeech,
+  }) {
+    final $result = create();
+    if (rms != null) {
+      $result.rms = rms;
+    }
+    if (peak != null) {
+      $result.peak = peak;
+    }
+    if (noiseFloorDb != null) {
+      $result.noiseFloorDb = noiseFloorDb;
+    }
+    if (isSpeech != null) {
+      $result.isSpeech = isSpeech;
+    }
+    return $result;
+  }
+  AudioLevelEvent._() : super();
+  factory AudioLevelEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory AudioLevelEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'AudioLevelEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$core.double>(1, _omitFieldNames ? '' : 'rms', $pb.PbFieldType.OF)
+    ..a<$core.double>(2, _omitFieldNames ? '' : 'peak', $pb.PbFieldType.OF)
+    ..a<$core.double>(3, _omitFieldNames ? '' : 'noiseFloorDb', $pb.PbFieldType.OF)
+    ..aOB(4, _omitFieldNames ? '' : 'isSpeech')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  AudioLevelEvent clone() => AudioLevelEvent()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  AudioLevelEvent copyWith(void Function(AudioLevelEvent) updates) => super.copyWith((message) => updates(message as AudioLevelEvent)) as AudioLevelEvent;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static AudioLevelEvent create() => AudioLevelEvent._();
+  AudioLevelEvent createEmptyInstance() => create();
+  static $pb.PbList<AudioLevelEvent> createRepeated() => $pb.PbList<AudioLevelEvent>();
+  @$core.pragma('dart2js:noInline')
+  static AudioLevelEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AudioLevelEvent>(create);
+  static AudioLevelEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.double get rms => $_getN(0);
+  @$pb.TagNumber(1)
+  set rms($core.double v) { $_setFloat(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasRms() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRms() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.double get peak => $_getN(1);
+  @$pb.TagNumber(2)
+  set peak($core.double v) { $_setFloat(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasPeak() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPeak() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get noiseFloorDb => $_getN(2);
+  @$pb.TagNumber(3)
+  set noiseFloorDb($core.double v) { $_setFloat(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasNoiseFloorDb() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearNoiseFloorDb() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get isSpeech => $_getBF(3);
+  @$pb.TagNumber(4)
+  set isSpeech($core.bool v) { $_setBool(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasIsSpeech() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearIsSpeech() => clearField(4);
+}
+
+class ComponentProgressEvent extends $pb.GeneratedMessage {
+  factory ComponentProgressEvent({
+    VoicePipelineComponent? component,
+    $core.String? operation,
+    $core.double? progress,
+    $core.String? message,
+  }) {
+    final $result = create();
+    if (component != null) {
+      $result.component = component;
+    }
+    if (operation != null) {
+      $result.operation = operation;
+    }
+    if (progress != null) {
+      $result.progress = progress;
+    }
+    if (message != null) {
+      $result.message = message;
+    }
+    return $result;
+  }
+  ComponentProgressEvent._() : super();
+  factory ComponentProgressEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ComponentProgressEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ComponentProgressEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..e<VoicePipelineComponent>(1, _omitFieldNames ? '' : 'component', $pb.PbFieldType.OE, defaultOrMaker: VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED, valueOf: VoicePipelineComponent.valueOf, enumValues: VoicePipelineComponent.values)
+    ..aOS(2, _omitFieldNames ? '' : 'operation')
+    ..a<$core.double>(3, _omitFieldNames ? '' : 'progress', $pb.PbFieldType.OF)
+    ..aOS(4, _omitFieldNames ? '' : 'message')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ComponentProgressEvent clone() => ComponentProgressEvent()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ComponentProgressEvent copyWith(void Function(ComponentProgressEvent) updates) => super.copyWith((message) => updates(message as ComponentProgressEvent)) as ComponentProgressEvent;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ComponentProgressEvent create() => ComponentProgressEvent._();
+  ComponentProgressEvent createEmptyInstance() => create();
+  static $pb.PbList<ComponentProgressEvent> createRepeated() => $pb.PbList<ComponentProgressEvent>();
+  @$core.pragma('dart2js:noInline')
+  static ComponentProgressEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ComponentProgressEvent>(create);
+  static ComponentProgressEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  VoicePipelineComponent get component => $_getN(0);
+  @$pb.TagNumber(1)
+  set component(VoicePipelineComponent v) { setField(1, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasComponent() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearComponent() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get operation => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set operation($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasOperation() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOperation() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get progress => $_getN(2);
+  @$pb.TagNumber(3)
+  set progress($core.double v) { $_setFloat(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasProgress() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearProgress() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get message => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set message($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasMessage() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMessage() => clearField(4);
 }
 
 /// Aggregate load state across all four voice-agent components. Mirrors Swift
@@ -1281,6 +1734,8 @@ class VoiceAgentComponentStates extends $pb.GeneratedMessage {
     ComponentLoadState? vadState,
     $core.bool? ready,
     $core.bool? anyLoading,
+    ComponentLoadState? wakewordState,
+    $core.String? errorMessage,
   }) {
     final $result = create();
     if (sttState != null) {
@@ -1301,6 +1756,12 @@ class VoiceAgentComponentStates extends $pb.GeneratedMessage {
     if (anyLoading != null) {
       $result.anyLoading = anyLoading;
     }
+    if (wakewordState != null) {
+      $result.wakewordState = wakewordState;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
     return $result;
   }
   VoiceAgentComponentStates._() : super();
@@ -1314,6 +1775,8 @@ class VoiceAgentComponentStates extends $pb.GeneratedMessage {
     ..e<ComponentLoadState>(4, _omitFieldNames ? '' : 'vadState', $pb.PbFieldType.OE, defaultOrMaker: ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED, valueOf: ComponentLoadState.valueOf, enumValues: ComponentLoadState.values)
     ..aOB(5, _omitFieldNames ? '' : 'ready')
     ..aOB(6, _omitFieldNames ? '' : 'anyLoading')
+    ..e<ComponentLoadState>(7, _omitFieldNames ? '' : 'wakewordState', $pb.PbFieldType.OE, defaultOrMaker: ComponentLoadState.COMPONENT_LOAD_STATE_UNSPECIFIED, valueOf: ComponentLoadState.valueOf, enumValues: ComponentLoadState.values)
+    ..aOS(8, _omitFieldNames ? '' : 'errorMessage')
     ..hasRequiredFields = false
   ;
 
@@ -1395,6 +1858,24 @@ class VoiceAgentComponentStates extends $pb.GeneratedMessage {
   $core.bool hasAnyLoading() => $_has(5);
   @$pb.TagNumber(6)
   void clearAnyLoading() => clearField(6);
+
+  @$pb.TagNumber(7)
+  ComponentLoadState get wakewordState => $_getN(6);
+  @$pb.TagNumber(7)
+  set wakewordState(ComponentLoadState v) { setField(7, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasWakewordState() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearWakewordState() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get errorMessage => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set errorMessage($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasErrorMessage() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearErrorMessage() => clearField(8);
 }
 
 class VoiceSessionError extends $pb.GeneratedMessage {
@@ -1402,6 +1883,8 @@ class VoiceSessionError extends $pb.GeneratedMessage {
     VoiceSessionErrorCode? code,
     $core.String? message,
     $core.String? failedComponent,
+    $core.int? cAbiCode,
+    $core.bool? recoverable,
   }) {
     final $result = create();
     if (code != null) {
@@ -1413,6 +1896,12 @@ class VoiceSessionError extends $pb.GeneratedMessage {
     if (failedComponent != null) {
       $result.failedComponent = failedComponent;
     }
+    if (cAbiCode != null) {
+      $result.cAbiCode = cAbiCode;
+    }
+    if (recoverable != null) {
+      $result.recoverable = recoverable;
+    }
     return $result;
   }
   VoiceSessionError._() : super();
@@ -1423,6 +1912,8 @@ class VoiceSessionError extends $pb.GeneratedMessage {
     ..e<VoiceSessionErrorCode>(1, _omitFieldNames ? '' : 'code', $pb.PbFieldType.OE, defaultOrMaker: VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_UNSPECIFIED, valueOf: VoiceSessionErrorCode.valueOf, enumValues: VoiceSessionErrorCode.values)
     ..aOS(2, _omitFieldNames ? '' : 'message')
     ..aOS(3, _omitFieldNames ? '' : 'failedComponent')
+    ..a<$core.int>(4, _omitFieldNames ? '' : 'cAbiCode', $pb.PbFieldType.O3)
+    ..aOB(5, _omitFieldNames ? '' : 'recoverable')
     ..hasRequiredFields = false
   ;
 
@@ -1473,15 +1964,42 @@ class VoiceSessionError extends $pb.GeneratedMessage {
   $core.bool hasFailedComponent() => $_has(2);
   @$pb.TagNumber(3)
   void clearFailedComponent() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get cAbiCode => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set cAbiCode($core.int v) { $_setSignedInt32(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasCAbiCode() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCAbiCode() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get recoverable => $_getBF(4);
+  @$pb.TagNumber(5)
+  set recoverable($core.bool v) { $_setBool(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasRecoverable() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearRecoverable() => clearField(5);
 }
 
 class SessionStartedEvent extends $pb.GeneratedMessage {
-  factory SessionStartedEvent() => create();
+  factory SessionStartedEvent({
+    $core.String? sessionId,
+  }) {
+    final $result = create();
+    if (sessionId != null) {
+      $result.sessionId = sessionId;
+    }
+    return $result;
+  }
   SessionStartedEvent._() : super();
   factory SessionStartedEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory SessionStartedEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'SessionStartedEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'sessionId')
     ..hasRequiredFields = false
   ;
 
@@ -1505,15 +2023,38 @@ class SessionStartedEvent extends $pb.GeneratedMessage {
   @$core.pragma('dart2js:noInline')
   static SessionStartedEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SessionStartedEvent>(create);
   static SessionStartedEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get sessionId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sessionId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasSessionId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSessionId() => clearField(1);
 }
 
 class SessionStoppedEvent extends $pb.GeneratedMessage {
-  factory SessionStoppedEvent() => create();
+  factory SessionStoppedEvent({
+    $core.String? sessionId,
+    $core.String? reason,
+  }) {
+    final $result = create();
+    if (sessionId != null) {
+      $result.sessionId = sessionId;
+    }
+    if (reason != null) {
+      $result.reason = reason;
+    }
+    return $result;
+  }
   SessionStoppedEvent._() : super();
   factory SessionStoppedEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory SessionStoppedEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'SessionStoppedEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'sessionId')
+    ..aOS(2, _omitFieldNames ? '' : 'reason')
     ..hasRequiredFields = false
   ;
 
@@ -1537,15 +2078,42 @@ class SessionStoppedEvent extends $pb.GeneratedMessage {
   @$core.pragma('dart2js:noInline')
   static SessionStoppedEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<SessionStoppedEvent>(create);
   static SessionStoppedEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get sessionId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set sessionId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasSessionId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSessionId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get reason => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set reason($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasReason() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearReason() => clearField(2);
 }
 
 class AgentResponseStartedEvent extends $pb.GeneratedMessage {
-  factory AgentResponseStartedEvent() => create();
+  factory AgentResponseStartedEvent({
+    $core.String? turnId,
+  }) {
+    final $result = create();
+    if (turnId != null) {
+      $result.turnId = turnId;
+    }
+    return $result;
+  }
   AgentResponseStartedEvent._() : super();
   factory AgentResponseStartedEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory AgentResponseStartedEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'AgentResponseStartedEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'turnId')
     ..hasRequiredFields = false
   ;
 
@@ -1569,15 +2137,38 @@ class AgentResponseStartedEvent extends $pb.GeneratedMessage {
   @$core.pragma('dart2js:noInline')
   static AgentResponseStartedEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AgentResponseStartedEvent>(create);
   static AgentResponseStartedEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get turnId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set turnId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasTurnId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTurnId() => clearField(1);
 }
 
 class AgentResponseCompletedEvent extends $pb.GeneratedMessage {
-  factory AgentResponseCompletedEvent() => create();
+  factory AgentResponseCompletedEvent({
+    $core.String? turnId,
+    $fixnum.Int64? responseDurationMs,
+  }) {
+    final $result = create();
+    if (turnId != null) {
+      $result.turnId = turnId;
+    }
+    if (responseDurationMs != null) {
+      $result.responseDurationMs = responseDurationMs;
+    }
+    return $result;
+  }
   AgentResponseCompletedEvent._() : super();
   factory AgentResponseCompletedEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
   factory AgentResponseCompletedEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'AgentResponseCompletedEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'turnId')
+    ..aInt64(2, _omitFieldNames ? '' : 'responseDurationMs')
     ..hasRequiredFields = false
   ;
 
@@ -1601,6 +2192,24 @@ class AgentResponseCompletedEvent extends $pb.GeneratedMessage {
   @$core.pragma('dart2js:noInline')
   static AgentResponseCompletedEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<AgentResponseCompletedEvent>(create);
   static AgentResponseCompletedEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get turnId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set turnId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasTurnId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearTurnId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get responseDurationMs => $_getI64(1);
+  @$pb.TagNumber(2)
+  set responseDurationMs($fixnum.Int64 v) { $_setInt64(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasResponseDurationMs() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearResponseDurationMs() => clearField(2);
 }
 
 class SpeechTurnDetectionEvent extends $pb.GeneratedMessage {
@@ -1745,6 +2354,8 @@ class TurnLifecycleEvent extends $pb.GeneratedMessage {
     $core.String? transcript,
     $core.String? response,
     $core.String? error,
+    $fixnum.Int64? startedAtMs,
+    $fixnum.Int64? completedAtMs,
   }) {
     final $result = create();
     if (kind != null) {
@@ -1765,6 +2376,12 @@ class TurnLifecycleEvent extends $pb.GeneratedMessage {
     if (error != null) {
       $result.error = error;
     }
+    if (startedAtMs != null) {
+      $result.startedAtMs = startedAtMs;
+    }
+    if (completedAtMs != null) {
+      $result.completedAtMs = completedAtMs;
+    }
     return $result;
   }
   TurnLifecycleEvent._() : super();
@@ -1778,6 +2395,8 @@ class TurnLifecycleEvent extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'transcript')
     ..aOS(5, _omitFieldNames ? '' : 'response')
     ..aOS(6, _omitFieldNames ? '' : 'error')
+    ..aInt64(7, _omitFieldNames ? '' : 'startedAtMs')
+    ..aInt64(8, _omitFieldNames ? '' : 'completedAtMs')
     ..hasRequiredFields = false
   ;
 
@@ -1855,6 +2474,24 @@ class TurnLifecycleEvent extends $pb.GeneratedMessage {
   $core.bool hasError() => $_has(5);
   @$pb.TagNumber(6)
   void clearError() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get startedAtMs => $_getI64(6);
+  @$pb.TagNumber(7)
+  set startedAtMs($fixnum.Int64 v) { $_setInt64(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasStartedAtMs() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearStartedAtMs() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $fixnum.Int64 get completedAtMs => $_getI64(7);
+  @$pb.TagNumber(8)
+  set completedAtMs($fixnum.Int64 v) { $_setInt64(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasCompletedAtMs() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearCompletedAtMs() => clearField(8);
 }
 
 class WakeWordDetectedEvent extends $pb.GeneratedMessage {

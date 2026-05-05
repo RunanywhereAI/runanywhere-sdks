@@ -381,6 +381,33 @@ public extension RAInferenceFramework {
     static var mediaPipe: RAInferenceFramework        { .mediapipe }
 }
 
+extension RAModelThinkingTagPattern: Codable {
+    public static var defaultPattern: RAModelThinkingTagPattern {
+        var pattern = RAModelThinkingTagPattern()
+        pattern.openTag = "<think>"
+        pattern.closeTag = "</think>"
+        return pattern
+    }
+
+    public init(from decoder: Swift.Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init()
+        openTag = try container.decodeIfPresent(String.self, forKey: .openTag) ?? ""
+        closeTag = try container.decodeIfPresent(String.self, forKey: .closeTag) ?? ""
+    }
+
+    public func encode(to encoder: Swift.Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(openTag, forKey: .openTag)
+        try container.encode(closeTag, forKey: .closeTag)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case openTag
+        case closeTag
+    }
+}
+
 // MARK: - ArchiveType
 
 extension RAArchiveType: Codable {
@@ -459,247 +486,256 @@ public extension RAArchiveStructure {
     }
 }
 
-// MARK: - Expected Model Files (unchanged — Swift-only domain type)
+// MARK: - Generated Model Contract Helpers
 
-/// Describes what files are expected after model extraction/download.
-public struct ExpectedModelFiles: Codable, Sendable, Equatable {
-    public let requiredPatterns: [String]
-    public let optionalPatterns: [String]
-    public let description: String?
+extension RAModelInfo: Identifiable {}
 
-    public init(
-        requiredPatterns: [String] = [],
-        optionalPatterns: [String] = [],
-        description: String? = nil
-    ) {
-        self.requiredPatterns = requiredPatterns
-        self.optionalPatterns = optionalPatterns
-        self.description = description
+public extension RAExpectedModelFiles {
+    static var none: RAExpectedModelFiles { RAExpectedModelFiles() }
+
+    var isEmptyManifest: Bool {
+        files.isEmpty
+            && rootDirectory.isEmpty
+            && requiredPatterns.isEmpty
+            && optionalPatterns.isEmpty
+            && description_p.isEmpty
     }
-
-    public static let none = ExpectedModelFiles()
 }
 
-/// Describes a file that needs to be downloaded as part of a multi-file model.
-public struct ModelFileDescriptor: Codable, Sendable, Equatable {
-    /// Full URL to download this file from.
-    public let url: URL
-    /// Filename to save as (e.g., "model.gguf" or "mmproj.gguf").
-    public let filename: String
-    /// Whether this file is required for the model to work.
-    public let isRequired: Bool
-
-    public init(url: URL, filename: String, isRequired: Bool = true) {
-        self.url = url
+public extension RAModelFileDescriptor {
+    init(url: URL, filename: String, isRequired: Bool = true) {
+        self.init()
+        self.url = url.absoluteString
         self.filename = filename
         self.isRequired = isRequired
+        self.relativePath = url.lastPathComponent
+        self.destinationPath = filename
     }
 
-    // Legacy compatibility
-    public var relativePath: String { url.lastPathComponent }
-    public var destinationPath: String { filename }
+    var urlValue: URL? {
+        guard !url.isEmpty else { return nil }
+        return URL(string: url)
+    }
+
+    var destinationFilename: String {
+        if !destinationPath.isEmpty { return destinationPath }
+        if !filename.isEmpty { return filename }
+        return relativePath
+    }
+
+    var resolvedLocalPath: String? {
+        guard !localPath.isEmpty else { return nil }
+        return localPath
+    }
 }
 
-// MARK: - Model Artifact Type (unchanged — Swift-only sugar over IDL artifact oneof)
-
-/// Describes how a model is packaged and what processing is needed after download.
-public enum ModelArtifactType: Codable, Sendable, Equatable {
-    case singleFile(expectedFiles: ExpectedModelFiles = .none)
-    case archive(ArchiveType, structure: ArchiveStructure, expectedFiles: ExpectedModelFiles = .none)
-    case multiFile([ModelFileDescriptor])
-    case custom(strategyId: String)
-    case builtIn
-
-    public var requiresExtraction: Bool {
-        if case .archive = self { return true }
-        return false
+public extension Collection where Element == RAModelFileDescriptor {
+    func resolvedModelFilePath(role: RAModelFileRole) -> String? {
+        first { $0.role == role }?.resolvedLocalPath
     }
 
-    public var requiresDownload: Bool {
-        if case .builtIn = self { return false }
-        return true
+    var resolvedPrimaryModelPath: String? {
+        resolvedModelFilePath(role: .primaryModel)
     }
 
-    public var expectedFiles: ExpectedModelFiles {
+    var resolvedVisionProjectorPath: String? {
+        resolvedModelFilePath(role: .visionProjector)
+    }
+
+    var resolvedTokenizerPath: String? {
+        resolvedModelFilePath(role: .tokenizer)
+    }
+
+    var resolvedConfigPath: String? {
+        resolvedModelFilePath(role: .config)
+    }
+
+    var resolvedVocabularyPath: String? {
+        resolvedModelFilePath(role: .vocabulary)
+    }
+}
+
+public extension RAModelLoadResult {
+    func resolvedModelFilePath(role: RAModelFileRole) -> String? {
+        resolvedArtifacts.resolvedModelFilePath(role: role)
+    }
+
+    var resolvedPrimaryModelPath: String? {
+        resolvedArtifacts.resolvedPrimaryModelPath
+    }
+
+    var resolvedVisionProjectorPath: String? {
+        resolvedArtifacts.resolvedVisionProjectorPath
+    }
+
+    var resolvedTokenizerPath: String? {
+        resolvedArtifacts.resolvedTokenizerPath
+    }
+
+    var resolvedConfigPath: String? {
+        resolvedArtifacts.resolvedConfigPath
+    }
+
+    var resolvedVocabularyPath: String? {
+        resolvedArtifacts.resolvedVocabularyPath
+    }
+
+    var lifecyclePrimaryArtifactPath: String? {
+        resolvedPrimaryModelPath ?? resolvedPath.nilIfEmpty
+    }
+}
+
+public extension RACurrentModelResult {
+    func resolvedModelFilePath(role: RAModelFileRole) -> String? {
+        resolvedArtifacts.resolvedModelFilePath(role: role)
+    }
+
+    var resolvedPrimaryModelPath: String? {
+        resolvedArtifacts.resolvedPrimaryModelPath
+    }
+
+    var resolvedVisionProjectorPath: String? {
+        resolvedArtifacts.resolvedVisionProjectorPath
+    }
+
+    var resolvedTokenizerPath: String? {
+        resolvedArtifacts.resolvedTokenizerPath
+    }
+
+    var resolvedConfigPath: String? {
+        resolvedArtifacts.resolvedConfigPath
+    }
+
+    var resolvedVocabularyPath: String? {
+        resolvedArtifacts.resolvedVocabularyPath
+    }
+
+    var lifecyclePrimaryArtifactPath: String? {
+        resolvedPrimaryModelPath ?? resolvedPath.nilIfEmpty
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
+}
+
+public extension RAModelArtifactType {
+    var requiresExtraction: Bool {
         switch self {
-        case .singleFile(let expected), .archive(_, _, let expected):
-            return expected
+        case .archive, .zipArchive, .tarGzArchive, .tarBz2Archive, .tarXzArchive:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var requiresDownload: Bool {
+        self != .builtIn
+    }
+
+    var displayName: String {
+        switch self {
+        case .singleFile:
+            return "Single File"
+        case .archive:
+            return "Archive"
+        case .zipArchive:
+            return "ZIP Archive"
+        case .tarGzArchive:
+            return "TAR.GZ Archive"
+        case .tarBz2Archive:
+            return "TAR.BZ2 Archive"
+        case .tarXzArchive:
+            return "TAR.XZ Archive"
+        case .directory:
+            return "Directory"
+        case .multiFile:
+            return "Multi-File"
+        case .custom:
+            return "Custom"
+        case .builtIn:
+            return "Built-in"
+        default:
+            return "Unspecified"
+        }
+    }
+}
+
+public extension RAModelInfo.OneOf_Artifact {
+    var artifactType: RAModelArtifactType {
+        switch self {
+        case .singleFile:
+            return .singleFile
+        case .archive(let archive):
+            return archive.type.artifactType
+        case .multiFile:
+            return .multiFile
+        case .customStrategyID:
+            return .custom
+        case .builtIn(let enabled):
+            return enabled ? .builtIn : .unspecified
+        }
+    }
+
+    var requiresExtraction: Bool {
+        if case .archive = self { return true }
+        return artifactType.requiresExtraction
+    }
+
+    var requiresDownload: Bool {
+        if case .builtIn(let enabled) = self, enabled { return false }
+        return artifactType.requiresDownload
+    }
+
+    var displayName: String {
+        switch self {
+        case .singleFile:
+            return RAModelArtifactType.singleFile.displayName
+        case .archive(let artifact):
+            return "\(artifact.type.displayName) Archive"
+        case .multiFile(let artifact):
+            return "Multi-File (\(artifact.files.count) files)"
+        case .customStrategyID(let strategyId):
+            return strategyId.isEmpty ? "Custom" : "Custom (\(strategyId))"
+        case .builtIn:
+            return RAModelArtifactType.builtIn.displayName
+        }
+    }
+
+    var archiveArtifact: RAArchiveArtifact? {
+        if case .archive(let artifact) = self { return artifact }
+        return nil
+    }
+
+    var multiFileDescriptors: [RAModelFileDescriptor] {
+        if case .multiFile(let artifact) = self { return artifact.files }
+        return []
+    }
+
+    var expectedFiles: RAExpectedModelFiles {
+        switch self {
+        case .singleFile(let artifact):
+            if artifact.hasExpectedFiles { return artifact.expectedFiles }
+            return RAExpectedModelFiles.patterns(
+                required: artifact.requiredPatterns,
+                optional: artifact.optionalPatterns
+            )
+        case .archive(let artifact):
+            if artifact.hasExpectedFiles { return artifact.expectedFiles }
+            return RAExpectedModelFiles.patterns(
+                required: artifact.requiredPatterns,
+                optional: artifact.optionalPatterns
+            )
         default:
             return .none
         }
     }
-
-    public var displayName: String {
-        switch self {
-        case .singleFile:
-            return "Single File"
-        case .archive(let type, _, _):
-            return "\(type.displayName) Archive"
-        case .multiFile(let files):
-            return "Multi-File (\(files.count) files)"
-        case .custom(let strategyId):
-            return "Custom (\(strategyId))"
-        case .builtIn:
-            return "Built-in"
-        }
-    }
-
-    /// Infer artifact type from download URL.
-    /// Note: C++ equivalent is `rac_artifact_infer_from_url()`.
-    public static func infer(from url: URL?, format _: ModelFormat) -> ModelArtifactType {
-        guard let url = url else {
-            return .singleFile(expectedFiles: .none)
-        }
-        if let archiveType = ArchiveType.from(url: url) {
-            return .archive(archiveType, structure: .unknown, expectedFiles: .none)
-        }
-        return .singleFile(expectedFiles: .none)
-    }
 }
 
-// MARK: - ModelArtifactType Codable
-
-extension ModelArtifactType {
-    fileprivate enum ArtifactCodingKeys: String, CodingKey {
-        case type, archiveType, structure, expectedFiles, files, strategyId
-    }
-
-    public init(from decoder: Swift.Decoder) throws {
-        let container = try decoder.container(keyedBy: ArtifactCodingKeys.self)
-        let type = try container.decode(String.self, forKey: ArtifactCodingKeys.type)
-
-        switch type {
-        case "singleFile":
-            let expected = try container.decodeIfPresent(ExpectedModelFiles.self, forKey: ArtifactCodingKeys.expectedFiles) ?? .none
-            self = .singleFile(expectedFiles: expected)
-        case "archive":
-            let archiveType = try container.decode(ArchiveType.self, forKey: ArtifactCodingKeys.archiveType)
-            let structure = try container.decode(ArchiveStructure.self, forKey: ArtifactCodingKeys.structure)
-            let expected = try container.decodeIfPresent(ExpectedModelFiles.self, forKey: ArtifactCodingKeys.expectedFiles) ?? .none
-            self = .archive(archiveType, structure: structure, expectedFiles: expected)
-        case "multiFile":
-            let files = try container.decode([ModelFileDescriptor].self, forKey: ArtifactCodingKeys.files)
-            self = .multiFile(files)
-        case "custom":
-            let strategyId = try container.decode(String.self, forKey: ArtifactCodingKeys.strategyId)
-            self = .custom(strategyId: strategyId)
-        case "builtIn":
-            self = .builtIn
-        default:
-            self = .singleFile()
-        }
-    }
-
-    public func encode(to encoder: Swift.Encoder) throws {
-        var container = encoder.container(keyedBy: ArtifactCodingKeys.self)
-
-        switch self {
-        case .singleFile(let expected):
-            try container.encode("singleFile", forKey: ArtifactCodingKeys.type)
-            if expected != .none {
-                try container.encode(expected, forKey: ArtifactCodingKeys.expectedFiles)
-            }
-        case .archive(let archiveType, let structure, let expected):
-            try container.encode("archive", forKey: ArtifactCodingKeys.type)
-            try container.encode(archiveType, forKey: ArtifactCodingKeys.archiveType)
-            try container.encode(structure, forKey: ArtifactCodingKeys.structure)
-            if expected != .none {
-                try container.encode(expected, forKey: ArtifactCodingKeys.expectedFiles)
-            }
-        case .multiFile(let files):
-            try container.encode("multiFile", forKey: ArtifactCodingKeys.type)
-            try container.encode(files, forKey: ArtifactCodingKeys.files)
-        case .custom(let strategyId):
-            try container.encode("custom", forKey: ArtifactCodingKeys.type)
-            try container.encode(strategyId, forKey: ArtifactCodingKeys.strategyId)
-        case .builtIn:
-            try container.encode("builtIn", forKey: ArtifactCodingKeys.type)
-        }
-    }
-}
-
-// MARK: - Model Info (unchanged — uses typealiased enums above)
-
-/// Information about a model - in-memory entity.
-public struct ModelInfo: Codable, Sendable, Identifiable {
-    // Essential identifiers
-    public let id: String
-    public let name: String
-    public let category: ModelCategory
-
-    // Format and location
-    public let format: ModelFormat
-    public let downloadURL: URL?
-    public var localPath: URL?
-
-    // Artifact type
-    public let artifactType: ModelArtifactType
-
-    // Size information
-    public let downloadSize: Int64?
-
-    // Framework
-    public let framework: InferenceFramework
-
-    // Model-specific capabilities
-    public let contextLength: Int?
-    public let supportsThinking: Bool
-    public let thinkingPattern: ThinkingTagPattern?
-
-    // Optional metadata
-    public let description: String?
-
-    // Tracking fields
-    public let source: ModelSource
-    public let createdAt: Date
-    public var updatedAt: Date
-
-    // MARK: - Computed Properties
-
-    /// Whether this model is downloaded and available locally.
-    public var isDownloaded: Bool {
-        guard let localPath = localPath else { return false }
-
-        if localPath.scheme == "builtin" {
-            return true
-        }
-
-        let (exists, isDirectory) = FileOperationsUtilities.existsWithType(at: localPath)
-
-        if exists && isDirectory {
-            return FileOperationsUtilities.isNonEmptyDirectory(at: localPath)
-        }
-
-        return exists
-    }
-
-    /// Whether this model is available for use.
-    public var isAvailable: Bool {
-        isDownloaded
-    }
-
-    /// Whether this is a built-in platform model.
-    public var isBuiltIn: Bool {
-        if artifactType == .builtIn {
-            return true
-        }
-        if let localPath = localPath, localPath.scheme == "builtin" {
-            return true
-        }
-        return framework == .foundationModels || framework == .systemTts
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case id, name, category, format, downloadURL, localPath
-        case artifactType
-        case downloadSize
-        case framework
-        case contextLength, supportsThinking, thinkingPattern
-        case description
-        case source, createdAt, updatedAt
-    }
-
-    public init(
+public extension RAModelInfo {
+    static func make(
         id: String,
         name: String,
         category: ModelCategory,
@@ -707,96 +743,193 @@ public struct ModelInfo: Codable, Sendable, Identifiable {
         framework: InferenceFramework,
         downloadURL: URL? = nil,
         localPath: URL? = nil,
-        artifactType: ModelArtifactType? = nil,
-        downloadSize: Int64? = nil,
+        artifact: RAModelInfo.OneOf_Artifact? = nil,
+        downloadSizeBytes: Int64? = nil,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
-        thinkingPattern: ThinkingTagPattern? = nil,
+        thinkingPattern: RAModelThinkingTagPattern? = nil,
         description: String? = nil,
         source: ModelSource = .remote,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
-    ) {
-        self.id = id
-        self.name = name
-        self.category = category
-        self.format = format
-        self.framework = framework
-        self.downloadURL = downloadURL
-        self.localPath = localPath
-
-        self.artifactType = artifactType ?? ModelArtifactType.infer(from: downloadURL, format: format)
-
-        self.downloadSize = downloadSize
-
-        if category.requiresContextLength {
-            self.contextLength = contextLength ?? 2048
-        } else {
-            self.contextLength = contextLength
+    ) -> RAModelInfo {
+        var model = RAModelInfo()
+        model.id = id
+        model.name = name
+        model.category = category
+        model.format = format
+        model.framework = framework
+        model.setDownloadURL(downloadURL)
+        model.setLocalPath(localPath)
+        model.downloadSizeBytes = downloadSizeBytes ?? 0
+        model.contextLength = Int32(contextLength ?? (category.requiresContextLength ? 2048 : 0))
+        model.supportsThinking = category.supportsThinking ? supportsThinking : false
+        if model.supportsThinking {
+            model.thinkingPattern = thinkingPattern ?? .defaultPattern
         }
+        model.description_p = description ?? ""
+        model.source = source
+        model.createdAtUnixMs = unixMilliseconds(from: createdAt)
+        model.updatedAtUnixMs = unixMilliseconds(from: updatedAt)
+        model.setArtifact(artifact ?? inferredArtifact(from: downloadURL, format: format))
+        model.isDownloaded = model.isDownloadedOnDisk
+        model.isAvailable = model.isAvailableForUse
+        return model
+    }
 
-        self.supportsThinking = category.supportsThinking ? supportsThinking : false
-        self.thinkingPattern = supportsThinking ? (thinkingPattern ?? .defaultPattern) : nil
+    var downloadURLValue: URL? {
+        guard !downloadURL.isEmpty else { return nil }
+        return URL(string: downloadURL)
+    }
 
-        self.description = description
-        self.source = source
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
+    var localPathURL: URL? {
+        Self.registryURL(from: localPath)
+    }
+
+    var downloadSizeHint: Int64 {
+        downloadSizeBytes
+    }
+
+    var isBuiltIn: Bool {
+        if case .builtIn(let enabled)? = artifact, enabled {
+            return true
+        }
+        if artifactType == .builtIn {
+            return true
+        }
+        if localPath.hasPrefix("builtin:") {
+            return true
+        }
+        return framework == .foundationModels || framework == .systemTts
+    }
+
+    var isDownloadedOnDisk: Bool {
+        if isBuiltIn { return true }
+        guard let localPath = localPathURL else { return false }
+
+        let (exists, isDirectory) = FileOperationsUtilities.existsWithType(at: localPath)
+        if exists && isDirectory {
+            return FileOperationsUtilities.isNonEmptyDirectory(at: localPath)
+        }
+        return exists
+    }
+
+    var isAvailableForUse: Bool {
+        isBuiltIn || isDownloadedOnDisk || isAvailable
+    }
+
+    var requiresExtraction: Bool {
+        artifact?.requiresExtraction ?? artifactType.requiresExtraction
+    }
+
+    var requiresDownload: Bool {
+        if isBuiltIn { return false }
+        return artifact?.requiresDownload ?? artifactType.requiresDownload
+    }
+
+    var artifactDisplayName: String {
+        artifact?.displayName ?? artifactType.displayName
+    }
+
+    var archiveArtifact: RAArchiveArtifact? {
+        if let artifact = artifact?.archiveArtifact {
+            return artifact
+        }
+        switch artifactType {
+        case .archive:
+            return makeArchiveArtifact(type: .zip, structure: .unknown)
+        case .zipArchive:
+            return makeArchiveArtifact(type: .zip, structure: .unknown)
+        case .tarGzArchive:
+            return makeArchiveArtifact(type: .tarGz, structure: .unknown)
+        case .tarBz2Archive:
+            return makeArchiveArtifact(type: .tarBz2, structure: .unknown)
+        case .tarXzArchive:
+            return makeArchiveArtifact(type: .tarXz, structure: .unknown)
+        default:
+            return nil
+        }
+    }
+
+    var multiFileDescriptors: [RAModelFileDescriptor] {
+        artifact?.multiFileDescriptors ?? multiFile.files
+    }
+
+    var expectedArtifactFiles: RAExpectedModelFiles {
+        if hasExpectedFiles { return expectedFiles }
+        return artifact?.expectedFiles ?? .none
+    }
+
+    mutating func setDownloadURL(_ url: URL?) {
+        downloadURL = url?.absoluteString ?? ""
+    }
+
+    mutating func setLocalPath(_ url: URL?) {
+        localPath = url.map(Self.registryPathString(from:)) ?? ""
+        isDownloaded = isDownloadedOnDisk
+        isAvailable = isAvailableForUse
+    }
+
+    mutating func setArtifact(_ artifact: RAModelInfo.OneOf_Artifact) {
+        self.artifact = artifact
+        artifactType = artifact.artifactType
+        let expected = artifact.expectedFiles
+        if !expected.isEmptyManifest {
+            expectedFiles = expected
+        }
+    }
+
+    static func inferredArtifact(from url: URL?, format _: ModelFormat) -> RAModelInfo.OneOf_Artifact {
+        guard let url, let archiveType = ArchiveType.from(url: url) else {
+            return .singleFile(RASingleFileArtifact())
+        }
+        return .archive(makeArchiveArtifact(type: archiveType, structure: .unknown))
     }
 }
 
-// MARK: - Model Info Proto Helpers
-
-public extension ModelInfo {
-    /// Convert the public Swift model metadata wrapper to the canonical
-    /// generated `ModelInfo` proto used by the native registry byte ABI.
-    var proto: RAModelInfo {
-        var proto = RAModelInfo()
-        proto.id = id
-        proto.name = name
-        proto.category = category
-        proto.format = format
-        proto.framework = framework
-        proto.downloadURL = downloadURL?.absoluteString ?? ""
-        proto.localPath = localPath.map(Self.registryPathString(from:)) ?? ""
-        proto.downloadSizeBytes = downloadSize ?? 0
-        proto.contextLength = Int32(contextLength ?? 0)
-        proto.supportsThinking = supportsThinking
-        proto.description_p = description ?? ""
-        proto.source = source
-        proto.createdAtUnixMs = Self.unixMilliseconds(from: createdAt)
-        proto.updatedAtUnixMs = Self.unixMilliseconds(from: updatedAt)
-        proto.apply(artifactType)
-        return proto
+private extension RAExpectedModelFiles {
+    static func patterns(required: [String], optional: [String]) -> RAExpectedModelFiles {
+        var files = RAExpectedModelFiles()
+        files.requiredPatterns = required
+        files.optionalPatterns = optional
+        return files
     }
+}
 
-    /// Initialize from generated `ModelInfo` proto bytes decoded from the
-    /// native registry.
-    init(proto: RAModelInfo) {
-        self.init(
-            id: proto.id,
-            name: proto.name,
-            category: proto.category,
-            format: proto.format,
-            framework: proto.framework,
-            downloadURL: proto.downloadURL.isEmpty ? nil : URL(string: proto.downloadURL),
-            localPath: Self.registryURL(from: proto.localPath),
-            artifactType: ModelArtifactType(proto: proto),
-            downloadSize: proto.downloadSizeBytes > 0 ? proto.downloadSizeBytes : nil,
-            contextLength: proto.contextLength > 0 ? Int(proto.contextLength) : nil,
-            supportsThinking: proto.supportsThinking,
-            description: proto.description_p.isEmpty ? nil : proto.description_p,
-            source: proto.source,
-            createdAt: Self.date(fromUnixMillisecondsOrSeconds: proto.createdAtUnixMs),
-            updatedAt: Self.date(fromUnixMillisecondsOrSeconds: proto.updatedAtUnixMs)
-        )
+private extension RAArchiveType {
+    var artifactType: RAModelArtifactType {
+        switch self {
+        case .zip:
+            return .zipArchive
+        case .tarGz:
+            return .tarGzArchive
+        case .tarBz2:
+            return .tarBz2Archive
+        case .tarXz:
+            return .tarXzArchive
+        default:
+            return .archive
+        }
     }
+}
 
-    private static func registryPathString(from url: URL) -> String {
+private func makeArchiveArtifact(type: RAArchiveType, structure: RAArchiveStructure) -> RAArchiveArtifact {
+    var artifact = RAArchiveArtifact()
+    artifact.type = type
+    artifact.structure = structure
+    return artifact
+}
+
+private func unixMilliseconds(from date: Date) -> Int64 {
+    Int64((date.timeIntervalSince1970 * 1_000).rounded())
+}
+
+private extension RAModelInfo {
+    static func registryPathString(from url: URL) -> String {
         url.isFileURL ? url.path : url.absoluteString
     }
 
-    private static func registryURL(from value: String) -> URL? {
+    static func registryURL(from value: String) -> URL? {
         guard !value.isEmpty else { return nil }
         if value.hasPrefix("/") {
             return URL(fileURLWithPath: value)
@@ -805,133 +938,5 @@ public extension ModelInfo {
             return url
         }
         return URL(fileURLWithPath: value)
-    }
-
-    private static func unixMilliseconds(from date: Date) -> Int64 {
-        Int64((date.timeIntervalSince1970 * 1_000).rounded())
-    }
-
-    private static func date(fromUnixMillisecondsOrSeconds value: Int64) -> Date {
-        guard value != 0 else { return Date(timeIntervalSince1970: 0) }
-        let absolute = value < 0 ? -value : value
-        let seconds = absolute > 10_000_000_000 ? Double(value) / 1_000 : Double(value)
-        return Date(timeIntervalSince1970: seconds)
-    }
-}
-
-public extension RAModelInfo {
-    /// Convert generated registry proto metadata into the public Swift wrapper.
-    var modelInfo: ModelInfo {
-        ModelInfo(proto: self)
-    }
-}
-
-private extension RAModelInfo {
-    mutating func apply(_ artifactType: ModelArtifactType) {
-        switch artifactType {
-        case .singleFile(let expectedFiles):
-            var artifact = RASingleFileArtifact()
-            artifact.requiredPatterns = expectedFiles.requiredPatterns
-            artifact.optionalPatterns = expectedFiles.optionalPatterns
-            singleFile = artifact
-            self.artifactType = .singleFile
-
-        case .archive(let archiveType, let structure, let expectedFiles):
-            var artifact = RAArchiveArtifact()
-            artifact.type = archiveType
-            artifact.structure = structure
-            artifact.requiredPatterns = expectedFiles.requiredPatterns
-            artifact.optionalPatterns = expectedFiles.optionalPatterns
-            archive = artifact
-            switch archiveType {
-            case .zip:
-                self.artifactType = .zipArchive
-            case .tarGz:
-                self.artifactType = .tarGzArchive
-            default:
-                self.artifactType = .unspecified
-            }
-
-        case .multiFile(let files):
-            var artifact = RAMultiFileArtifact()
-            artifact.files = files.map { file in
-                var descriptor = RAModelFileDescriptor()
-                descriptor.url = file.url.absoluteString
-                descriptor.filename = file.filename
-                descriptor.isRequired = file.isRequired
-                return descriptor
-            }
-            multiFile = artifact
-            self.artifactType = .directory
-
-        case .custom(let strategyId):
-            customStrategyID = strategyId
-            self.artifactType = .custom
-
-        case .builtIn:
-            builtIn = true
-        }
-    }
-}
-
-private extension ModelArtifactType {
-    init(proto: RAModelInfo) {
-        switch proto.artifact {
-        case .singleFile(let artifact):
-            self = .singleFile(
-                expectedFiles: ExpectedModelFiles(
-                    requiredPatterns: artifact.requiredPatterns,
-                    optionalPatterns: artifact.optionalPatterns
-                )
-            )
-
-        case .archive(let artifact):
-            let archiveType = artifact.type == .unspecified ? ArchiveType.zip : artifact.type
-            let structure = artifact.structure == .unspecified ? ArchiveStructure.unknown : artifact.structure
-            self = .archive(
-                archiveType,
-                structure: structure,
-                expectedFiles: ExpectedModelFiles(
-                    requiredPatterns: artifact.requiredPatterns,
-                    optionalPatterns: artifact.optionalPatterns
-                )
-            )
-
-        case .multiFile(let artifact):
-            self = .multiFile(
-                artifact.files.compactMap { descriptor in
-                    guard let url = URL(string: descriptor.url) else { return nil }
-                    return ModelFileDescriptor(
-                        url: url,
-                        filename: descriptor.filename,
-                        isRequired: descriptor.isRequired
-                    )
-                }
-            )
-
-        case .customStrategyID(let strategyId):
-            self = .custom(strategyId: strategyId)
-
-        case .builtIn(let isBuiltIn):
-            self = isBuiltIn ? .builtIn : .singleFile()
-
-        case nil:
-            self = Self.fromArtifactType(proto.artifactType)
-        }
-    }
-
-    static func fromArtifactType(_ artifactType: RAModelArtifactType) -> ModelArtifactType {
-        switch artifactType {
-        case .zipArchive:
-            return .archive(.zip, structure: .unknown)
-        case .tarGzArchive:
-            return .archive(.tarGz, structure: .unknown)
-        case .directory:
-            return .multiFile([])
-        case .custom:
-            return .custom(strategyId: "")
-        default:
-            return .singleFile()
-        }
     }
 }

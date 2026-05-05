@@ -33,6 +33,18 @@ message LLMGenerateRequest {
     string preferred_framework = 11;
     string json_schema = 12;
     string execution_target = 13;
+    string request_id = 14;
+    string model_id = 15;
+    string conversation_id = 16;
+    int64  seed = 17;
+    float  frequency_penalty = 18;
+    float  presence_penalty = 19;
+    float  min_p = 20;
+    string grammar = 21;
+    string response_format = 22;
+    bool   echo_prompt = 23;
+    int32  n_threads = 24;
+    map<string, string> metadata = 25;
 }
 
 // Aggregate result carried on the terminal LLMStreamEvent. This intentionally
@@ -49,6 +61,21 @@ message LLMStreamFinalResult {
     int64 time_to_first_token_ms = 7;
     float tokens_per_second = 8;
     string finish_reason = 9;
+    int32 error_code = 10;
+    string error_message = 11;
+    int64 prompt_eval_time_ms = 12;
+    int64 decode_time_ms = 13;
+}
+
+enum LLMStreamEventKind {
+    LLM_STREAM_EVENT_KIND_UNSPECIFIED = 0;
+    LLM_STREAM_EVENT_KIND_STARTED = 1;
+    LLM_STREAM_EVENT_KIND_TOKEN = 2;
+    LLM_STREAM_EVENT_KIND_THINKING = 3;
+    LLM_STREAM_EVENT_KIND_TOOL_CALL = 4;
+    LLM_STREAM_EVENT_KIND_PROGRESS = 5;
+    LLM_STREAM_EVENT_KIND_COMPLETED = 6;
+    LLM_STREAM_EVENT_KIND_ERROR = 7;
 }
 
 // v2 close-out Phase G-2: unified per-token streaming event. Replaces
@@ -97,6 +124,18 @@ message LLMStreamEvent {
     // Numeric backend status code when the terminal event represents a
     // failure. 0 = unset/success.
     int32 error_code = 11;
+
+    // Event classification distinct from token semantic kind.
+    LLMStreamEventKind event_kind = 12;
+
+    // Request/session correlation fields.
+    string request_id = 13;
+    string conversation_id = 14;
+
+    // Running counters for progress UIs.
+    int32 prompt_tokens_processed = 15;
+    int32 completion_tokens_generated = 16;
+    int64 elapsed_ms = 17;
 }
 
 enum LLMTokenKind {

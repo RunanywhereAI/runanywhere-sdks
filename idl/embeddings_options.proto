@@ -162,6 +162,10 @@ message EmbeddingVector {
     // Vector dimension for consumers that need per-vector sizing without
     // inspecting EmbeddingsResult.dimension.
     int32 dimension        = 4;
+
+    // Input index in the original request and optional caller metadata.
+    int32 input_index      = 5;
+    map<string, string> metadata = 6;
 }
 
 // ---------------------------------------------------------------------------
@@ -171,6 +175,9 @@ message EmbeddingVector {
 message EmbeddingsRequest {
     repeated string texts = 1;
     optional EmbeddingsOptions options = 2;
+    string request_id = 3;
+    optional string model_id = 4;
+    map<string, string> metadata = 5;
 }
 
 // ---------------------------------------------------------------------------
@@ -192,4 +199,29 @@ message EmbeddingsResult {
 
     // Total tokens consumed across all inputs (post-truncation).
     int32                    tokens_used        = 4;
+
+    optional string          model_id           = 5;
+    optional string          error_message      = 6;
+    int32                    error_code         = 7;
+    string                   request_id         = 8;
+}
+
+message EmbeddingsServiceState {
+    bool is_ready = 1;
+    optional string current_model = 2;
+    int32 dimension = 3;
+    int32 max_tokens = 4;
+    optional string error_message = 5;
+    int32 error_code = 6;
+}
+
+// Logical Embeddings service contract. Tokenizer/model execution and native
+// file handles remain adapter/backend-owned; C++ consumes only serialized
+// request/result messages.
+service Embeddings {
+    // One-shot embedding for a single text carried in EmbeddingsRequest.texts.
+    rpc Embed(EmbeddingsRequest) returns (EmbeddingsResult);
+
+    // Batch embedding for multiple input texts carried in request order.
+    rpc EmbedBatch(EmbeddingsRequest) returns (EmbeddingsResult);
 }

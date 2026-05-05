@@ -251,7 +251,7 @@ struct TextToSpeechView: View {
     }
 
     /// Speech info section showing result details
-    private func speechInfoSection(result: TTSSpeakResult) -> some View {
+    private func speechInfoSection(result: RATTSSpeakResult) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Last Speech")
                 .font(.headline)
@@ -272,13 +272,15 @@ struct TextToSpeechView: View {
                     metadataRow(
                         icon: "speaker.wave.2",
                         label: "Format",
-                        value: result.format.wireString.uppercased()
+                        value: result.audioFormat.wireString.uppercased()
                     )
                 }
                 metadataRow(
                     icon: "person.wave.2",
                     label: "Voice",
-                    value: result.metadata.voice.modelNameFromID()
+                    value: result.metadata.voiceID.isEmpty
+                        ? (viewModel.selectedModelName ?? "Current voice")
+                        : result.metadata.voiceID.modelNameFromID()
                 )
             }
             .font(.caption)

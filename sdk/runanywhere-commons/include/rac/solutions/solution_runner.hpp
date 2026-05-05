@@ -30,6 +30,7 @@
 
 #include <memory>
 #include <mutex>
+#include <string>
 
 #include "pipeline.pb.h"
 #include "rac/core/rac_error.h"
@@ -103,6 +104,8 @@ private:
     std::unique_ptr<rac::graph::GraphScheduler>   scheduler_;
     std::shared_ptr<OperatorEdge>                 root_input_;
     std::shared_ptr<OperatorEdge>                 root_output_;
+    std::string                                   root_input_payload_type_;
+    std::string                                   root_output_payload_type_;
     bool                                          started_{false};
     bool                                          joined_{false};
 };

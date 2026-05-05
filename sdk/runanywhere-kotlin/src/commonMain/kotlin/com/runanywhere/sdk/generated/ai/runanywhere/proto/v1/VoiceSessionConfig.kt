@@ -13,6 +13,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -106,6 +107,34 @@ public class VoiceSessionConfig(
     schemaIndex = 5,
   )
   public val max_tokens: Int = 0,
+  /**
+   * Maximum recording duration before forcing an end-of-turn. 0 = default.
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "maxRecordingDurationMs",
+    schemaIndex = 6,
+  )
+  public val max_recording_duration_ms: Int = 0,
+  /**
+   * Optional language/voice hints passed to STT/TTS adapters.
+   */
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "languageCode",
+    schemaIndex = 7,
+  )
+  public val language_code: String? = null,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "voiceId",
+    schemaIndex = 8,
+  )
+  public val voice_id: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceSessionConfig, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -125,6 +154,9 @@ public class VoiceSessionConfig(
     if (continuous_mode != other.continuous_mode) return false
     if (thinking_mode_enabled != other.thinking_mode_enabled) return false
     if (max_tokens != other.max_tokens) return false
+    if (max_recording_duration_ms != other.max_recording_duration_ms) return false
+    if (language_code != other.language_code) return false
+    if (voice_id != other.voice_id) return false
     return true
   }
 
@@ -138,6 +170,9 @@ public class VoiceSessionConfig(
       result = result * 37 + continuous_mode.hashCode()
       result = result * 37 + thinking_mode_enabled.hashCode()
       result = result * 37 + max_tokens.hashCode()
+      result = result * 37 + max_recording_duration_ms.hashCode()
+      result = result * 37 + (language_code?.hashCode() ?: 0)
+      result = result * 37 + (voice_id?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -151,6 +186,9 @@ public class VoiceSessionConfig(
     result += """continuous_mode=$continuous_mode"""
     result += """thinking_mode_enabled=$thinking_mode_enabled"""
     result += """max_tokens=$max_tokens"""
+    result += """max_recording_duration_ms=$max_recording_duration_ms"""
+    if (language_code != null) result += """language_code=${sanitize(language_code)}"""
+    if (voice_id != null) result += """voice_id=${sanitize(voice_id)}"""
     return result.joinToString(prefix = "VoiceSessionConfig{", separator = ", ", postfix = "}")
   }
 
@@ -161,9 +199,13 @@ public class VoiceSessionConfig(
     continuous_mode: Boolean = this.continuous_mode,
     thinking_mode_enabled: Boolean = this.thinking_mode_enabled,
     max_tokens: Int = this.max_tokens,
+    max_recording_duration_ms: Int = this.max_recording_duration_ms,
+    language_code: String? = this.language_code,
+    voice_id: String? = this.voice_id,
     unknownFields: ByteString = this.unknownFields,
   ): VoiceSessionConfig = VoiceSessionConfig(silence_duration_ms, speech_threshold, auto_play_tts,
-      continuous_mode, thinking_mode_enabled, max_tokens, unknownFields)
+      continuous_mode, thinking_mode_enabled, max_tokens, max_recording_duration_ms, language_code,
+      voice_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -190,6 +232,10 @@ public class VoiceSessionConfig(
             value.thinking_mode_enabled)
         if (value.max_tokens != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(6,
             value.max_tokens)
+        if (value.max_recording_duration_ms != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(7,
+            value.max_recording_duration_ms)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.language_code)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(9, value.voice_id)
         return size
       }
 
@@ -205,11 +251,19 @@ public class VoiceSessionConfig(
         if (value.thinking_mode_enabled != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
             value.thinking_mode_enabled)
         if (value.max_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.max_tokens)
+        if (value.max_recording_duration_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
+            value.max_recording_duration_ms)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.language_code)
+        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.voice_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceSessionConfig) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 9, value.voice_id)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.language_code)
+        if (value.max_recording_duration_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
+            value.max_recording_duration_ms)
         if (value.max_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.max_tokens)
         if (value.thinking_mode_enabled != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
             value.thinking_mode_enabled)
@@ -230,6 +284,9 @@ public class VoiceSessionConfig(
         var continuous_mode: Boolean = false
         var thinking_mode_enabled: Boolean = false
         var max_tokens: Int = 0
+        var max_recording_duration_ms: Int = 0
+        var language_code: String? = null
+        var voice_id: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> silence_duration_ms = ProtoAdapter.INT32.decode(reader)
@@ -238,6 +295,9 @@ public class VoiceSessionConfig(
             4 -> continuous_mode = ProtoAdapter.BOOL.decode(reader)
             5 -> thinking_mode_enabled = ProtoAdapter.BOOL.decode(reader)
             6 -> max_tokens = ProtoAdapter.INT32.decode(reader)
+            7 -> max_recording_duration_ms = ProtoAdapter.INT32.decode(reader)
+            8 -> language_code = ProtoAdapter.STRING.decode(reader)
+            9 -> voice_id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -248,6 +308,9 @@ public class VoiceSessionConfig(
           continuous_mode = continuous_mode,
           thinking_mode_enabled = thinking_mode_enabled,
           max_tokens = max_tokens,
+          max_recording_duration_ms = max_recording_duration_ms,
+          language_code = language_code,
+          voice_id = voice_id,
           unknownFields = unknownFields
         )
       }

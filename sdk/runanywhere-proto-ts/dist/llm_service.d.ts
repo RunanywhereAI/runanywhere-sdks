@@ -1,5 +1,18 @@
 import _m0 from "protobufjs/minimal";
 export declare const protobufPackage = "runanywhere.v1";
+export declare enum LLMStreamEventKind {
+    LLM_STREAM_EVENT_KIND_UNSPECIFIED = 0,
+    LLM_STREAM_EVENT_KIND_STARTED = 1,
+    LLM_STREAM_EVENT_KIND_TOKEN = 2,
+    LLM_STREAM_EVENT_KIND_THINKING = 3,
+    LLM_STREAM_EVENT_KIND_TOOL_CALL = 4,
+    LLM_STREAM_EVENT_KIND_PROGRESS = 5,
+    LLM_STREAM_EVENT_KIND_COMPLETED = 6,
+    LLM_STREAM_EVENT_KIND_ERROR = 7,
+    UNRECOGNIZED = -1
+}
+export declare function lLMStreamEventKindFromJSON(object: any): LLMStreamEventKind;
+export declare function lLMStreamEventKindToJSON(object: LLMStreamEventKind): string;
 export declare enum LLMTokenKind {
     LLM_TOKEN_KIND_UNSPECIFIED = 0,
     LLM_TOKEN_KIND_ANSWER = 1,
@@ -28,6 +41,24 @@ export interface LLMGenerateRequest {
     preferredFramework: string;
     jsonSchema: string;
     executionTarget: string;
+    requestId: string;
+    modelId: string;
+    conversationId: string;
+    seed: number;
+    frequencyPenalty: number;
+    presencePenalty: number;
+    minP: number;
+    grammar: string;
+    responseFormat: string;
+    echoPrompt: boolean;
+    nThreads: number;
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface LLMGenerateRequest_MetadataEntry {
+    key: string;
+    value: string;
 }
 /**
  * Aggregate result carried on the terminal LLMStreamEvent. This intentionally
@@ -45,6 +76,10 @@ export interface LLMStreamFinalResult {
     timeToFirstTokenMs: number;
     tokensPerSecond: number;
     finishReason: string;
+    errorCode: number;
+    errorMessage: string;
+    promptEvalTimeMs: number;
+    decodeTimeMs: number;
 }
 /**
  * v2 close-out Phase G-2: unified per-token streaming event. Replaces
@@ -100,6 +135,15 @@ export interface LLMStreamEvent {
      * failure. 0 = unset/success.
      */
     errorCode: number;
+    /** Event classification distinct from token semantic kind. */
+    eventKind: LLMStreamEventKind;
+    /** Request/session correlation fields. */
+    requestId: string;
+    conversationId: string;
+    /** Running counters for progress UIs. */
+    promptTokensProcessed: number;
+    completionTokensGenerated: number;
+    elapsedMs: number;
 }
 export declare const LLMGenerateRequest: {
     encode(message: LLMGenerateRequest, writer?: _m0.Writer): _m0.Writer;
@@ -108,6 +152,14 @@ export declare const LLMGenerateRequest: {
     toJSON(message: LLMGenerateRequest): unknown;
     create<I extends Exact<DeepPartial<LLMGenerateRequest>, I>>(base?: I): LLMGenerateRequest;
     fromPartial<I extends Exact<DeepPartial<LLMGenerateRequest>, I>>(object: I): LLMGenerateRequest;
+};
+export declare const LLMGenerateRequest_MetadataEntry: {
+    encode(message: LLMGenerateRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): LLMGenerateRequest_MetadataEntry;
+    fromJSON(object: any): LLMGenerateRequest_MetadataEntry;
+    toJSON(message: LLMGenerateRequest_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<LLMGenerateRequest_MetadataEntry>, I>>(base?: I): LLMGenerateRequest_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<LLMGenerateRequest_MetadataEntry>, I>>(object: I): LLMGenerateRequest_MetadataEntry;
 };
 export declare const LLMStreamFinalResult: {
     encode(message: LLMStreamFinalResult, writer?: _m0.Writer): _m0.Writer;

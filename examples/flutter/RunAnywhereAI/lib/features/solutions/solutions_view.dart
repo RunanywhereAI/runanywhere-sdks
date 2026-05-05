@@ -113,9 +113,8 @@ class _SolutionsViewState extends State<SolutionsView> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: _isRunning
-                        ? null
-                        : () => _runSolution('RAG', _ragYaml),
+                    onPressed:
+                        _isRunning ? null : () => _runSolution('RAG', _ragYaml),
                     child: const Text('RAG'),
                   ),
                 ),

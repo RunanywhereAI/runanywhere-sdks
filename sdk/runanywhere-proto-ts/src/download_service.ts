@@ -172,6 +172,13 @@ export interface DownloadProgress {
   storageKey: string;
   /** final path once known */
   localPath: string;
+  /** 0.0..1.0 across all planned files/stages */
+  overallProgress: number;
+  startedAtUnixMs: number;
+  updatedAtUnixMs: number;
+  currentFileName: string;
+  /** logical resume marker, not a native handle */
+  resumeToken: string;
 }
 
 export interface DownloadPlanRequest {
@@ -180,6 +187,10 @@ export interface DownloadPlanRequest {
   resumeExisting: boolean;
   availableStorageBytes: number;
   allowMeteredNetwork: boolean;
+  storageNamespace: string;
+  validateExistingBytes: boolean;
+  verifyChecksums: boolean;
+  requiredFreeBytesAfterDownload: number;
 }
 
 export interface DownloadFilePlan {
@@ -189,6 +200,7 @@ export interface DownloadFilePlan {
   expectedBytes: number;
   requiresExtraction: boolean;
   checksumSha256: string;
+  isResumeCandidate: boolean;
 }
 
 export interface DownloadPlanResult {
@@ -201,12 +213,17 @@ export interface DownloadPlanResult {
   resumeFromBytes: number;
   warnings: string[];
   errorMessage: string;
+  storageNamespace: string;
+  resumeToken: string;
+  requiredFreeBytesAfterDownload: number;
 }
 
 export interface DownloadStartRequest {
   modelId: string;
   plan?: DownloadPlanResult | undefined;
   resume: boolean;
+  resumeToken: string;
+  updateRegistryOnCompletion: boolean;
 }
 
 export interface DownloadStartResult {
@@ -215,6 +232,7 @@ export interface DownloadStartResult {
   modelId: string;
   initialProgress?: DownloadProgress | undefined;
   errorMessage: string;
+  resumeToken: string;
 }
 
 export interface DownloadCancelRequest {
@@ -229,12 +247,17 @@ export interface DownloadCancelResult {
   modelId: string;
   partialBytesDeleted: number;
   errorMessage: string;
+  wasRunning: boolean;
+  partialBytesPreserved: boolean;
+  resumeToken: string;
 }
 
 export interface DownloadResumeRequest {
   taskId: string;
   modelId: string;
   resumeFromBytes: number;
+  resumeToken: string;
+  validatePartialBytes: boolean;
 }
 
 export interface DownloadResumeResult {
@@ -243,6 +266,7 @@ export interface DownloadResumeResult {
   modelId: string;
   initialProgress?: DownloadProgress | undefined;
   errorMessage: string;
+  resumeToken: string;
 }
 
 function createBaseDownloadSubscribeRequest(): DownloadSubscribeRequest {
@@ -336,6 +360,11 @@ function createBaseDownloadProgress(): DownloadProgress {
     totalFiles: 0,
     storageKey: "",
     localPath: "",
+    overallProgress: 0,
+    startedAtUnixMs: 0,
+    updatedAtUnixMs: 0,
+    currentFileName: "",
+    resumeToken: "",
   };
 }
 
@@ -385,6 +414,21 @@ export const DownloadProgress = {
     }
     if (message.localPath !== "") {
       writer.uint32(122).string(message.localPath);
+    }
+    if (message.overallProgress !== 0) {
+      writer.uint32(133).float(message.overallProgress);
+    }
+    if (message.startedAtUnixMs !== 0) {
+      writer.uint32(136).int64(message.startedAtUnixMs);
+    }
+    if (message.updatedAtUnixMs !== 0) {
+      writer.uint32(144).int64(message.updatedAtUnixMs);
+    }
+    if (message.currentFileName !== "") {
+      writer.uint32(154).string(message.currentFileName);
+    }
+    if (message.resumeToken !== "") {
+      writer.uint32(162).string(message.resumeToken);
     }
     return writer;
   },
@@ -501,6 +545,41 @@ export const DownloadProgress = {
 
           message.localPath = reader.string();
           continue;
+        case 16:
+          if (tag !== 133) {
+            break;
+          }
+
+          message.overallProgress = reader.float();
+          continue;
+        case 17:
+          if (tag !== 136) {
+            break;
+          }
+
+          message.startedAtUnixMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 18:
+          if (tag !== 144) {
+            break;
+          }
+
+          message.updatedAtUnixMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 19:
+          if (tag !== 154) {
+            break;
+          }
+
+          message.currentFileName = reader.string();
+          continue;
+        case 20:
+          if (tag !== 162) {
+            break;
+          }
+
+          message.resumeToken = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -527,6 +606,11 @@ export const DownloadProgress = {
       totalFiles: isSet(object.totalFiles) ? globalThis.Number(object.totalFiles) : 0,
       storageKey: isSet(object.storageKey) ? globalThis.String(object.storageKey) : "",
       localPath: isSet(object.localPath) ? globalThis.String(object.localPath) : "",
+      overallProgress: isSet(object.overallProgress) ? globalThis.Number(object.overallProgress) : 0,
+      startedAtUnixMs: isSet(object.startedAtUnixMs) ? globalThis.Number(object.startedAtUnixMs) : 0,
+      updatedAtUnixMs: isSet(object.updatedAtUnixMs) ? globalThis.Number(object.updatedAtUnixMs) : 0,
+      currentFileName: isSet(object.currentFileName) ? globalThis.String(object.currentFileName) : "",
+      resumeToken: isSet(object.resumeToken) ? globalThis.String(object.resumeToken) : "",
     };
   },
 
@@ -577,6 +661,21 @@ export const DownloadProgress = {
     if (message.localPath !== "") {
       obj.localPath = message.localPath;
     }
+    if (message.overallProgress !== 0) {
+      obj.overallProgress = message.overallProgress;
+    }
+    if (message.startedAtUnixMs !== 0) {
+      obj.startedAtUnixMs = Math.round(message.startedAtUnixMs);
+    }
+    if (message.updatedAtUnixMs !== 0) {
+      obj.updatedAtUnixMs = Math.round(message.updatedAtUnixMs);
+    }
+    if (message.currentFileName !== "") {
+      obj.currentFileName = message.currentFileName;
+    }
+    if (message.resumeToken !== "") {
+      obj.resumeToken = message.resumeToken;
+    }
     return obj;
   },
 
@@ -600,12 +699,27 @@ export const DownloadProgress = {
     message.totalFiles = object.totalFiles ?? 0;
     message.storageKey = object.storageKey ?? "";
     message.localPath = object.localPath ?? "";
+    message.overallProgress = object.overallProgress ?? 0;
+    message.startedAtUnixMs = object.startedAtUnixMs ?? 0;
+    message.updatedAtUnixMs = object.updatedAtUnixMs ?? 0;
+    message.currentFileName = object.currentFileName ?? "";
+    message.resumeToken = object.resumeToken ?? "";
     return message;
   },
 };
 
 function createBaseDownloadPlanRequest(): DownloadPlanRequest {
-  return { modelId: "", model: undefined, resumeExisting: false, availableStorageBytes: 0, allowMeteredNetwork: false };
+  return {
+    modelId: "",
+    model: undefined,
+    resumeExisting: false,
+    availableStorageBytes: 0,
+    allowMeteredNetwork: false,
+    storageNamespace: "",
+    validateExistingBytes: false,
+    verifyChecksums: false,
+    requiredFreeBytesAfterDownload: 0,
+  };
 }
 
 export const DownloadPlanRequest = {
@@ -624,6 +738,18 @@ export const DownloadPlanRequest = {
     }
     if (message.allowMeteredNetwork !== false) {
       writer.uint32(40).bool(message.allowMeteredNetwork);
+    }
+    if (message.storageNamespace !== "") {
+      writer.uint32(50).string(message.storageNamespace);
+    }
+    if (message.validateExistingBytes !== false) {
+      writer.uint32(56).bool(message.validateExistingBytes);
+    }
+    if (message.verifyChecksums !== false) {
+      writer.uint32(64).bool(message.verifyChecksums);
+    }
+    if (message.requiredFreeBytesAfterDownload !== 0) {
+      writer.uint32(72).int64(message.requiredFreeBytesAfterDownload);
     }
     return writer;
   },
@@ -670,6 +796,34 @@ export const DownloadPlanRequest = {
 
           message.allowMeteredNetwork = reader.bool();
           continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.storageNamespace = reader.string();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.validateExistingBytes = reader.bool();
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.verifyChecksums = reader.bool();
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.requiredFreeBytesAfterDownload = longToNumber(reader.int64() as Long);
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -686,6 +840,14 @@ export const DownloadPlanRequest = {
       resumeExisting: isSet(object.resumeExisting) ? globalThis.Boolean(object.resumeExisting) : false,
       availableStorageBytes: isSet(object.availableStorageBytes) ? globalThis.Number(object.availableStorageBytes) : 0,
       allowMeteredNetwork: isSet(object.allowMeteredNetwork) ? globalThis.Boolean(object.allowMeteredNetwork) : false,
+      storageNamespace: isSet(object.storageNamespace) ? globalThis.String(object.storageNamespace) : "",
+      validateExistingBytes: isSet(object.validateExistingBytes)
+        ? globalThis.Boolean(object.validateExistingBytes)
+        : false,
+      verifyChecksums: isSet(object.verifyChecksums) ? globalThis.Boolean(object.verifyChecksums) : false,
+      requiredFreeBytesAfterDownload: isSet(object.requiredFreeBytesAfterDownload)
+        ? globalThis.Number(object.requiredFreeBytesAfterDownload)
+        : 0,
     };
   },
 
@@ -706,6 +868,18 @@ export const DownloadPlanRequest = {
     if (message.allowMeteredNetwork !== false) {
       obj.allowMeteredNetwork = message.allowMeteredNetwork;
     }
+    if (message.storageNamespace !== "") {
+      obj.storageNamespace = message.storageNamespace;
+    }
+    if (message.validateExistingBytes !== false) {
+      obj.validateExistingBytes = message.validateExistingBytes;
+    }
+    if (message.verifyChecksums !== false) {
+      obj.verifyChecksums = message.verifyChecksums;
+    }
+    if (message.requiredFreeBytesAfterDownload !== 0) {
+      obj.requiredFreeBytesAfterDownload = Math.round(message.requiredFreeBytesAfterDownload);
+    }
     return obj;
   },
 
@@ -721,6 +895,10 @@ export const DownloadPlanRequest = {
     message.resumeExisting = object.resumeExisting ?? false;
     message.availableStorageBytes = object.availableStorageBytes ?? 0;
     message.allowMeteredNetwork = object.allowMeteredNetwork ?? false;
+    message.storageNamespace = object.storageNamespace ?? "";
+    message.validateExistingBytes = object.validateExistingBytes ?? false;
+    message.verifyChecksums = object.verifyChecksums ?? false;
+    message.requiredFreeBytesAfterDownload = object.requiredFreeBytesAfterDownload ?? 0;
     return message;
   },
 };
@@ -733,6 +911,7 @@ function createBaseDownloadFilePlan(): DownloadFilePlan {
     expectedBytes: 0,
     requiresExtraction: false,
     checksumSha256: "",
+    isResumeCandidate: false,
   };
 }
 
@@ -755,6 +934,9 @@ export const DownloadFilePlan = {
     }
     if (message.checksumSha256 !== "") {
       writer.uint32(50).string(message.checksumSha256);
+    }
+    if (message.isResumeCandidate !== false) {
+      writer.uint32(56).bool(message.isResumeCandidate);
     }
     return writer;
   },
@@ -808,6 +990,13 @@ export const DownloadFilePlan = {
 
           message.checksumSha256 = reader.string();
           continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.isResumeCandidate = reader.bool();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -825,6 +1014,7 @@ export const DownloadFilePlan = {
       expectedBytes: isSet(object.expectedBytes) ? globalThis.Number(object.expectedBytes) : 0,
       requiresExtraction: isSet(object.requiresExtraction) ? globalThis.Boolean(object.requiresExtraction) : false,
       checksumSha256: isSet(object.checksumSha256) ? globalThis.String(object.checksumSha256) : "",
+      isResumeCandidate: isSet(object.isResumeCandidate) ? globalThis.Boolean(object.isResumeCandidate) : false,
     };
   },
 
@@ -848,6 +1038,9 @@ export const DownloadFilePlan = {
     if (message.checksumSha256 !== "") {
       obj.checksumSha256 = message.checksumSha256;
     }
+    if (message.isResumeCandidate !== false) {
+      obj.isResumeCandidate = message.isResumeCandidate;
+    }
     return obj;
   },
 
@@ -864,6 +1057,7 @@ export const DownloadFilePlan = {
     message.expectedBytes = object.expectedBytes ?? 0;
     message.requiresExtraction = object.requiresExtraction ?? false;
     message.checksumSha256 = object.checksumSha256 ?? "";
+    message.isResumeCandidate = object.isResumeCandidate ?? false;
     return message;
   },
 };
@@ -879,6 +1073,9 @@ function createBaseDownloadPlanResult(): DownloadPlanResult {
     resumeFromBytes: 0,
     warnings: [],
     errorMessage: "",
+    storageNamespace: "",
+    resumeToken: "",
+    requiredFreeBytesAfterDownload: 0,
   };
 }
 
@@ -910,6 +1107,15 @@ export const DownloadPlanResult = {
     }
     if (message.errorMessage !== "") {
       writer.uint32(74).string(message.errorMessage);
+    }
+    if (message.storageNamespace !== "") {
+      writer.uint32(82).string(message.storageNamespace);
+    }
+    if (message.resumeToken !== "") {
+      writer.uint32(90).string(message.resumeToken);
+    }
+    if (message.requiredFreeBytesAfterDownload !== 0) {
+      writer.uint32(96).int64(message.requiredFreeBytesAfterDownload);
     }
     return writer;
   },
@@ -984,6 +1190,27 @@ export const DownloadPlanResult = {
 
           message.errorMessage = reader.string();
           continue;
+        case 10:
+          if (tag !== 82) {
+            break;
+          }
+
+          message.storageNamespace = reader.string();
+          continue;
+        case 11:
+          if (tag !== 90) {
+            break;
+          }
+
+          message.resumeToken = reader.string();
+          continue;
+        case 12:
+          if (tag !== 96) {
+            break;
+          }
+
+          message.requiredFreeBytesAfterDownload = longToNumber(reader.int64() as Long);
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1004,6 +1231,11 @@ export const DownloadPlanResult = {
       resumeFromBytes: isSet(object.resumeFromBytes) ? globalThis.Number(object.resumeFromBytes) : 0,
       warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e: any) => globalThis.String(e)) : [],
       errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+      storageNamespace: isSet(object.storageNamespace) ? globalThis.String(object.storageNamespace) : "",
+      resumeToken: isSet(object.resumeToken) ? globalThis.String(object.resumeToken) : "",
+      requiredFreeBytesAfterDownload: isSet(object.requiredFreeBytesAfterDownload)
+        ? globalThis.Number(object.requiredFreeBytesAfterDownload)
+        : 0,
     };
   },
 
@@ -1036,6 +1268,15 @@ export const DownloadPlanResult = {
     if (message.errorMessage !== "") {
       obj.errorMessage = message.errorMessage;
     }
+    if (message.storageNamespace !== "") {
+      obj.storageNamespace = message.storageNamespace;
+    }
+    if (message.resumeToken !== "") {
+      obj.resumeToken = message.resumeToken;
+    }
+    if (message.requiredFreeBytesAfterDownload !== 0) {
+      obj.requiredFreeBytesAfterDownload = Math.round(message.requiredFreeBytesAfterDownload);
+    }
     return obj;
   },
 
@@ -1053,12 +1294,15 @@ export const DownloadPlanResult = {
     message.resumeFromBytes = object.resumeFromBytes ?? 0;
     message.warnings = object.warnings?.map((e) => e) || [];
     message.errorMessage = object.errorMessage ?? "";
+    message.storageNamespace = object.storageNamespace ?? "";
+    message.resumeToken = object.resumeToken ?? "";
+    message.requiredFreeBytesAfterDownload = object.requiredFreeBytesAfterDownload ?? 0;
     return message;
   },
 };
 
 function createBaseDownloadStartRequest(): DownloadStartRequest {
-  return { modelId: "", plan: undefined, resume: false };
+  return { modelId: "", plan: undefined, resume: false, resumeToken: "", updateRegistryOnCompletion: false };
 }
 
 export const DownloadStartRequest = {
@@ -1071,6 +1315,12 @@ export const DownloadStartRequest = {
     }
     if (message.resume !== false) {
       writer.uint32(24).bool(message.resume);
+    }
+    if (message.resumeToken !== "") {
+      writer.uint32(34).string(message.resumeToken);
+    }
+    if (message.updateRegistryOnCompletion !== false) {
+      writer.uint32(40).bool(message.updateRegistryOnCompletion);
     }
     return writer;
   },
@@ -1103,6 +1353,20 @@ export const DownloadStartRequest = {
 
           message.resume = reader.bool();
           continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.resumeToken = reader.string();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.updateRegistryOnCompletion = reader.bool();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1117,6 +1381,10 @@ export const DownloadStartRequest = {
       modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
       plan: isSet(object.plan) ? DownloadPlanResult.fromJSON(object.plan) : undefined,
       resume: isSet(object.resume) ? globalThis.Boolean(object.resume) : false,
+      resumeToken: isSet(object.resumeToken) ? globalThis.String(object.resumeToken) : "",
+      updateRegistryOnCompletion: isSet(object.updateRegistryOnCompletion)
+        ? globalThis.Boolean(object.updateRegistryOnCompletion)
+        : false,
     };
   },
 
@@ -1131,6 +1399,12 @@ export const DownloadStartRequest = {
     if (message.resume !== false) {
       obj.resume = message.resume;
     }
+    if (message.resumeToken !== "") {
+      obj.resumeToken = message.resumeToken;
+    }
+    if (message.updateRegistryOnCompletion !== false) {
+      obj.updateRegistryOnCompletion = message.updateRegistryOnCompletion;
+    }
     return obj;
   },
 
@@ -1144,12 +1418,14 @@ export const DownloadStartRequest = {
       ? DownloadPlanResult.fromPartial(object.plan)
       : undefined;
     message.resume = object.resume ?? false;
+    message.resumeToken = object.resumeToken ?? "";
+    message.updateRegistryOnCompletion = object.updateRegistryOnCompletion ?? false;
     return message;
   },
 };
 
 function createBaseDownloadStartResult(): DownloadStartResult {
-  return { accepted: false, taskId: "", modelId: "", initialProgress: undefined, errorMessage: "" };
+  return { accepted: false, taskId: "", modelId: "", initialProgress: undefined, errorMessage: "", resumeToken: "" };
 }
 
 export const DownloadStartResult = {
@@ -1168,6 +1444,9 @@ export const DownloadStartResult = {
     }
     if (message.errorMessage !== "") {
       writer.uint32(42).string(message.errorMessage);
+    }
+    if (message.resumeToken !== "") {
+      writer.uint32(50).string(message.resumeToken);
     }
     return writer;
   },
@@ -1214,6 +1493,13 @@ export const DownloadStartResult = {
 
           message.errorMessage = reader.string();
           continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.resumeToken = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1230,6 +1516,7 @@ export const DownloadStartResult = {
       modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
       initialProgress: isSet(object.initialProgress) ? DownloadProgress.fromJSON(object.initialProgress) : undefined,
       errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+      resumeToken: isSet(object.resumeToken) ? globalThis.String(object.resumeToken) : "",
     };
   },
 
@@ -1250,6 +1537,9 @@ export const DownloadStartResult = {
     if (message.errorMessage !== "") {
       obj.errorMessage = message.errorMessage;
     }
+    if (message.resumeToken !== "") {
+      obj.resumeToken = message.resumeToken;
+    }
     return obj;
   },
 
@@ -1265,6 +1555,7 @@ export const DownloadStartResult = {
       ? DownloadProgress.fromPartial(object.initialProgress)
       : undefined;
     message.errorMessage = object.errorMessage ?? "";
+    message.resumeToken = object.resumeToken ?? "";
     return message;
   },
 };
@@ -1359,7 +1650,16 @@ export const DownloadCancelRequest = {
 };
 
 function createBaseDownloadCancelResult(): DownloadCancelResult {
-  return { success: false, taskId: "", modelId: "", partialBytesDeleted: 0, errorMessage: "" };
+  return {
+    success: false,
+    taskId: "",
+    modelId: "",
+    partialBytesDeleted: 0,
+    errorMessage: "",
+    wasRunning: false,
+    partialBytesPreserved: false,
+    resumeToken: "",
+  };
 }
 
 export const DownloadCancelResult = {
@@ -1378,6 +1678,15 @@ export const DownloadCancelResult = {
     }
     if (message.errorMessage !== "") {
       writer.uint32(42).string(message.errorMessage);
+    }
+    if (message.wasRunning !== false) {
+      writer.uint32(48).bool(message.wasRunning);
+    }
+    if (message.partialBytesPreserved !== false) {
+      writer.uint32(56).bool(message.partialBytesPreserved);
+    }
+    if (message.resumeToken !== "") {
+      writer.uint32(66).string(message.resumeToken);
     }
     return writer;
   },
@@ -1424,6 +1733,27 @@ export const DownloadCancelResult = {
 
           message.errorMessage = reader.string();
           continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.wasRunning = reader.bool();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.partialBytesPreserved = reader.bool();
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.resumeToken = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1440,6 +1770,11 @@ export const DownloadCancelResult = {
       modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
       partialBytesDeleted: isSet(object.partialBytesDeleted) ? globalThis.Number(object.partialBytesDeleted) : 0,
       errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+      wasRunning: isSet(object.wasRunning) ? globalThis.Boolean(object.wasRunning) : false,
+      partialBytesPreserved: isSet(object.partialBytesPreserved)
+        ? globalThis.Boolean(object.partialBytesPreserved)
+        : false,
+      resumeToken: isSet(object.resumeToken) ? globalThis.String(object.resumeToken) : "",
     };
   },
 
@@ -1460,6 +1795,15 @@ export const DownloadCancelResult = {
     if (message.errorMessage !== "") {
       obj.errorMessage = message.errorMessage;
     }
+    if (message.wasRunning !== false) {
+      obj.wasRunning = message.wasRunning;
+    }
+    if (message.partialBytesPreserved !== false) {
+      obj.partialBytesPreserved = message.partialBytesPreserved;
+    }
+    if (message.resumeToken !== "") {
+      obj.resumeToken = message.resumeToken;
+    }
     return obj;
   },
 
@@ -1473,12 +1817,15 @@ export const DownloadCancelResult = {
     message.modelId = object.modelId ?? "";
     message.partialBytesDeleted = object.partialBytesDeleted ?? 0;
     message.errorMessage = object.errorMessage ?? "";
+    message.wasRunning = object.wasRunning ?? false;
+    message.partialBytesPreserved = object.partialBytesPreserved ?? false;
+    message.resumeToken = object.resumeToken ?? "";
     return message;
   },
 };
 
 function createBaseDownloadResumeRequest(): DownloadResumeRequest {
-  return { taskId: "", modelId: "", resumeFromBytes: 0 };
+  return { taskId: "", modelId: "", resumeFromBytes: 0, resumeToken: "", validatePartialBytes: false };
 }
 
 export const DownloadResumeRequest = {
@@ -1491,6 +1838,12 @@ export const DownloadResumeRequest = {
     }
     if (message.resumeFromBytes !== 0) {
       writer.uint32(24).int64(message.resumeFromBytes);
+    }
+    if (message.resumeToken !== "") {
+      writer.uint32(34).string(message.resumeToken);
+    }
+    if (message.validatePartialBytes !== false) {
+      writer.uint32(40).bool(message.validatePartialBytes);
     }
     return writer;
   },
@@ -1523,6 +1876,20 @@ export const DownloadResumeRequest = {
 
           message.resumeFromBytes = longToNumber(reader.int64() as Long);
           continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.resumeToken = reader.string();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.validatePartialBytes = reader.bool();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1537,6 +1904,10 @@ export const DownloadResumeRequest = {
       taskId: isSet(object.taskId) ? globalThis.String(object.taskId) : "",
       modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
       resumeFromBytes: isSet(object.resumeFromBytes) ? globalThis.Number(object.resumeFromBytes) : 0,
+      resumeToken: isSet(object.resumeToken) ? globalThis.String(object.resumeToken) : "",
+      validatePartialBytes: isSet(object.validatePartialBytes)
+        ? globalThis.Boolean(object.validatePartialBytes)
+        : false,
     };
   },
 
@@ -1551,6 +1922,12 @@ export const DownloadResumeRequest = {
     if (message.resumeFromBytes !== 0) {
       obj.resumeFromBytes = Math.round(message.resumeFromBytes);
     }
+    if (message.resumeToken !== "") {
+      obj.resumeToken = message.resumeToken;
+    }
+    if (message.validatePartialBytes !== false) {
+      obj.validatePartialBytes = message.validatePartialBytes;
+    }
     return obj;
   },
 
@@ -1562,12 +1939,14 @@ export const DownloadResumeRequest = {
     message.taskId = object.taskId ?? "";
     message.modelId = object.modelId ?? "";
     message.resumeFromBytes = object.resumeFromBytes ?? 0;
+    message.resumeToken = object.resumeToken ?? "";
+    message.validatePartialBytes = object.validatePartialBytes ?? false;
     return message;
   },
 };
 
 function createBaseDownloadResumeResult(): DownloadResumeResult {
-  return { accepted: false, taskId: "", modelId: "", initialProgress: undefined, errorMessage: "" };
+  return { accepted: false, taskId: "", modelId: "", initialProgress: undefined, errorMessage: "", resumeToken: "" };
 }
 
 export const DownloadResumeResult = {
@@ -1586,6 +1965,9 @@ export const DownloadResumeResult = {
     }
     if (message.errorMessage !== "") {
       writer.uint32(42).string(message.errorMessage);
+    }
+    if (message.resumeToken !== "") {
+      writer.uint32(50).string(message.resumeToken);
     }
     return writer;
   },
@@ -1632,6 +2014,13 @@ export const DownloadResumeResult = {
 
           message.errorMessage = reader.string();
           continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.resumeToken = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1648,6 +2037,7 @@ export const DownloadResumeResult = {
       modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
       initialProgress: isSet(object.initialProgress) ? DownloadProgress.fromJSON(object.initialProgress) : undefined,
       errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+      resumeToken: isSet(object.resumeToken) ? globalThis.String(object.resumeToken) : "",
     };
   },
 
@@ -1668,6 +2058,9 @@ export const DownloadResumeResult = {
     if (message.errorMessage !== "") {
       obj.errorMessage = message.errorMessage;
     }
+    if (message.resumeToken !== "") {
+      obj.resumeToken = message.resumeToken;
+    }
     return obj;
   },
 
@@ -1683,6 +2076,7 @@ export const DownloadResumeResult = {
       ? DownloadProgress.fromPartial(object.initialProgress)
       : undefined;
     message.errorMessage = object.errorMessage ?? "";
+    message.resumeToken = object.resumeToken ?? "";
     return message;
   },
 };

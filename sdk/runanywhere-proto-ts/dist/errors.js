@@ -1297,6 +1297,9 @@ function createBaseSDKError() {
         timestampMs: 0,
         severity: 0,
         component: "",
+        retryable: false,
+        remediationHint: "",
+        correlationId: "",
     };
 }
 export const SDKError = {
@@ -1327,6 +1330,15 @@ export const SDKError = {
         }
         if (message.component !== "") {
             writer.uint32(74).string(message.component);
+        }
+        if (message.retryable !== false) {
+            writer.uint32(80).bool(message.retryable);
+        }
+        if (message.remediationHint !== "") {
+            writer.uint32(90).string(message.remediationHint);
+        }
+        if (message.correlationId !== "") {
+            writer.uint32(98).string(message.correlationId);
         }
         return writer;
     },
@@ -1391,6 +1403,24 @@ export const SDKError = {
                     }
                     message.component = reader.string();
                     continue;
+                case 10:
+                    if (tag !== 80) {
+                        break;
+                    }
+                    message.retryable = reader.bool();
+                    continue;
+                case 11:
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.remediationHint = reader.string();
+                    continue;
+                case 12:
+                    if (tag !== 98) {
+                        break;
+                    }
+                    message.correlationId = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1410,6 +1440,9 @@ export const SDKError = {
             timestampMs: isSet(object.timestampMs) ? globalThis.Number(object.timestampMs) : 0,
             severity: isSet(object.severity) ? errorSeverityFromJSON(object.severity) : 0,
             component: isSet(object.component) ? globalThis.String(object.component) : "",
+            retryable: isSet(object.retryable) ? globalThis.Boolean(object.retryable) : false,
+            remediationHint: isSet(object.remediationHint) ? globalThis.String(object.remediationHint) : "",
+            correlationId: isSet(object.correlationId) ? globalThis.String(object.correlationId) : "",
         };
     },
     toJSON(message) {
@@ -1441,6 +1474,15 @@ export const SDKError = {
         if (message.component !== "") {
             obj.component = message.component;
         }
+        if (message.retryable !== false) {
+            obj.retryable = message.retryable;
+        }
+        if (message.remediationHint !== "") {
+            obj.remediationHint = message.remediationHint;
+        }
+        if (message.correlationId !== "") {
+            obj.correlationId = message.correlationId;
+        }
         return obj;
     },
     create(base) {
@@ -1459,6 +1501,9 @@ export const SDKError = {
         message.timestampMs = object.timestampMs ?? 0;
         message.severity = object.severity ?? 0;
         message.component = object.component ?? "";
+        message.retryable = object.retryable ?? false;
+        message.remediationHint = object.remediationHint ?? "";
+        message.correlationId = object.correlationId ?? "";
         return message;
     },
 };

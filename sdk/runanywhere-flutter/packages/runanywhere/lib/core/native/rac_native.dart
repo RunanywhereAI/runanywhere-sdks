@@ -132,6 +132,17 @@ typedef RacLlmCancelProtoNative = ffi.Int32 Function(
 );
 typedef RacLlmCancelProtoDart = int Function(ffi.Pointer<RacProtoBuffer>);
 
+typedef RacLifecycleRequestProtoNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<RacProtoBuffer>,
+);
+typedef RacLifecycleRequestProtoDart = int Function(
+  ffi.Pointer<ffi.Uint8>,
+  int,
+  ffi.Pointer<RacProtoBuffer>,
+);
+
 typedef RacSttProtoPartialCallbackNative = ffi.Void Function(
   ffi.Pointer<ffi.Uint8>,
   ffi.Size,
@@ -977,6 +988,13 @@ class RacBindings {
           () => lib.lookupFunction<RacLlmCancelProtoNative,
               RacLlmCancelProtoDart>('rac_llm_cancel_proto'),
         ),
+        rac_stt_transcribe_lifecycle_proto =
+            _lookupOptional<RacLifecycleRequestProtoDart>(
+          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart>(
+            'rac_stt_transcribe_lifecycle_proto',
+          ),
+        ),
         rac_stt_component_transcribe_proto =
             _lookupOptional<RacSttTranscribeProtoDart>(
           () => lib.lookupFunction<RacSttTranscribeProtoNative,
@@ -989,6 +1007,13 @@ class RacBindings {
           () => lib.lookupFunction<RacSttTranscribeStreamProtoNative,
               RacSttTranscribeStreamProtoDart>(
             'rac_stt_component_transcribe_stream_proto',
+          ),
+        ),
+        rac_tts_synthesize_lifecycle_proto =
+            _lookupOptional<RacLifecycleRequestProtoDart>(
+          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart>(
+            'rac_tts_synthesize_lifecycle_proto',
           ),
         ),
         rac_tts_component_list_voices_proto =
@@ -1010,6 +1035,13 @@ class RacBindings {
           () => lib.lookupFunction<RacTtsSynthesizeStreamProtoNative,
               RacTtsSynthesizeStreamProtoDart>(
             'rac_tts_component_synthesize_stream_proto',
+          ),
+        ),
+        rac_vad_process_lifecycle_proto =
+            _lookupOptional<RacLifecycleRequestProtoDart>(
+          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart>(
+            'rac_vad_process_lifecycle_proto',
           ),
         ),
         rac_vad_component_configure_proto =
@@ -1112,6 +1144,13 @@ class RacBindings {
             'rac_embeddings_embed_batch_proto',
           ),
         ),
+        rac_embeddings_embed_batch_lifecycle_proto =
+            _lookupOptional<RacLifecycleRequestProtoDart>(
+          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart>(
+            'rac_embeddings_embed_batch_lifecycle_proto',
+          ),
+        ),
         rac_embeddings_destroy = _lookupOptional<RacDestroyHandleDart>(
           () =>
               lib.lookupFunction<RacDestroyHandleNative, RacDestroyHandleDart>(
@@ -1136,6 +1175,13 @@ class RacBindings {
             _lookupOptional<RacHandleBytesToProtoDart>(
           () => lib.lookupFunction<RacHandleBytesToProtoNative,
               RacHandleBytesToProtoDart>('rac_diffusion_generate_proto'),
+        ),
+        rac_diffusion_generate_lifecycle_proto =
+            _lookupOptional<RacLifecycleRequestProtoDart>(
+          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart>(
+            'rac_diffusion_generate_lifecycle_proto',
+          ),
         ),
         rac_diffusion_generate_with_progress_proto =
             _lookupOptional<RacDiffusionGenerateWithProgressProtoDart>(
@@ -1195,22 +1241,48 @@ class RacBindings {
           () => lib.lookupFunction<RacHandleBytesToProtoNative,
               RacHandleBytesToProtoDart>('rac_lora_register_proto'),
         ),
+        rac_lora_catalog_list_proto =
+            _lookupOptional<RacHandleBytesToProtoDart>(
+          () => lib.lookupFunction<RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart>('rac_lora_catalog_list_proto'),
+        ),
+        rac_lora_catalog_query_proto =
+            _lookupOptional<RacHandleBytesToProtoDart>(
+          () => lib.lookupFunction<RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart>('rac_lora_catalog_query_proto'),
+        ),
+        rac_lora_catalog_get_proto =
+            _lookupOptional<RacHandleBytesToProtoDart>(
+          () => lib.lookupFunction<RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart>('rac_lora_catalog_get_proto'),
+        ),
+        rac_lora_catalog_mark_download_completed_proto =
+            _lookupOptional<RacHandleBytesToProtoDart>(
+          () => lib.lookupFunction<RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart>(
+            'rac_lora_catalog_mark_download_completed_proto',
+          ),
+        ),
         rac_lora_compatibility_proto =
             _lookupOptional<RacHandleBytesToProtoDart>(
           () => lib.lookupFunction<RacHandleBytesToProtoNative,
               RacHandleBytesToProtoDart>('rac_lora_compatibility_proto'),
         ),
-        rac_lora_load_proto = _lookupOptional<RacHandleBytesToProtoDart>(
+        rac_lora_apply_proto = _lookupOptional<RacHandleBytesToProtoDart>(
           () => lib.lookupFunction<RacHandleBytesToProtoNative,
-              RacHandleBytesToProtoDart>('rac_lora_load_proto'),
+              RacHandleBytesToProtoDart>('rac_lora_apply_proto'),
         ),
         rac_lora_remove_proto = _lookupOptional<RacHandleBytesToProtoDart>(
           () => lib.lookupFunction<RacHandleBytesToProtoNative,
               RacHandleBytesToProtoDart>('rac_lora_remove_proto'),
         ),
-        rac_lora_clear_proto = _lookupOptional<RacHandleOutProtoDart>(
-          () => lib.lookupFunction<RacHandleOutProtoNative,
-              RacHandleOutProtoDart>('rac_lora_clear_proto'),
+        rac_lora_list_proto = _lookupOptional<RacHandleBytesToProtoDart>(
+          () => lib.lookupFunction<RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart>('rac_lora_list_proto'),
+        ),
+        rac_lora_state_proto = _lookupOptional<RacHandleBytesToProtoDart>(
+          () => lib.lookupFunction<RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart>('rac_lora_state_proto'),
         ),
         rac_http_client_create = lib.lookupFunction<RacHttpClientCreateNative,
             RacHttpClientCreateDart>('rac_http_client_create'),
@@ -1434,10 +1506,14 @@ class RacBindings {
 
   final RacLlmCancelProtoDart? rac_llm_cancel_proto;
 
+  final RacLifecycleRequestProtoDart? rac_stt_transcribe_lifecycle_proto;
+
   final RacSttTranscribeProtoDart? rac_stt_component_transcribe_proto;
 
   final RacSttTranscribeStreamProtoDart?
       rac_stt_component_transcribe_stream_proto;
+
+  final RacLifecycleRequestProtoDart? rac_tts_synthesize_lifecycle_proto;
 
   final RacTtsListVoicesProtoDart? rac_tts_component_list_voices_proto;
 
@@ -1445,6 +1521,8 @@ class RacBindings {
 
   final RacTtsSynthesizeStreamProtoDart?
       rac_tts_component_synthesize_stream_proto;
+
+  final RacLifecycleRequestProtoDart? rac_vad_process_lifecycle_proto;
 
   final RacVadConfigureProtoDart? rac_vad_component_configure_proto;
 
@@ -1482,6 +1560,9 @@ class RacBindings {
 
   final RacHandleBytesToProtoDart? rac_embeddings_embed_batch_proto;
 
+  final RacLifecycleRequestProtoDart?
+      rac_embeddings_embed_batch_lifecycle_proto;
+
   final RacDestroyHandleDart? rac_embeddings_destroy;
 
   final RacCreateWithModelDart? rac_diffusion_create;
@@ -1491,6 +1572,8 @@ class RacBindings {
   final RacDiffusionInitializeDart? rac_diffusion_initialize;
 
   final RacHandleBytesToProtoDart? rac_diffusion_generate_proto;
+
+  final RacLifecycleRequestProtoDart? rac_diffusion_generate_lifecycle_proto;
 
   final RacDiffusionGenerateWithProgressProtoDart?
       rac_diffusion_generate_with_progress_proto;
@@ -1517,13 +1600,24 @@ class RacBindings {
 
   final RacHandleBytesToProtoDart? rac_lora_register_proto;
 
+  final RacHandleBytesToProtoDart? rac_lora_catalog_list_proto;
+
+  final RacHandleBytesToProtoDart? rac_lora_catalog_query_proto;
+
+  final RacHandleBytesToProtoDart? rac_lora_catalog_get_proto;
+
+  final RacHandleBytesToProtoDart?
+      rac_lora_catalog_mark_download_completed_proto;
+
   final RacHandleBytesToProtoDart? rac_lora_compatibility_proto;
 
-  final RacHandleBytesToProtoDart? rac_lora_load_proto;
+  final RacHandleBytesToProtoDart? rac_lora_apply_proto;
 
   final RacHandleBytesToProtoDart? rac_lora_remove_proto;
 
-  final RacHandleOutProtoDart? rac_lora_clear_proto;
+  final RacHandleBytesToProtoDart? rac_lora_list_proto;
+
+  final RacHandleBytesToProtoDart? rac_lora_state_proto;
 
   // HTTP client --------------------------------------------------------------
 

@@ -8,7 +8,7 @@ import 'dart:io';
 /// - React Native SDK: package.json (commonsVersion, coreVersion)
 class SDKConstants {
   /// SDK version
-  static const String version = '0.15.8';
+  static const String version = '0.19.13';
 
   // ==========================================================================
   // Binary Version Constants
@@ -19,11 +19,11 @@ class SDKConstants {
 
   /// RACommons version (core infrastructure)
   /// Source: https://github.com/RunanywhereAI/runanywhere-sdks/releases
-  static const String commonsVersion = '0.1.4';
+  static const String commonsVersion = '0.1.6';
 
   /// RAC Core/Backends version (LlamaCPP, ONNX)
   /// Source: https://github.com/RunanywhereAI/runanywhere-binaries/releases
-  static const String coreVersion = '0.1.4';
+  static const String coreVersion = '0.1.6';
 
   /// Platform identifier
   static String get platform {

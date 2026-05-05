@@ -26,8 +26,7 @@
  */
 
 import { LLM as NitroLLM } from '../generated/NitroLLMSpec';
-import type { LLMGenerateRequest } from '@runanywhere/proto-ts/llm_service';
-import { LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
+import { LLMGenerateRequest, LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
 import {
   generateLLM,
   type LLMStreamTransport,
@@ -47,7 +46,7 @@ export class LLMStreamAdapter {
    * AsyncIterable backed by its own C-side registration.
    */
   stream(
-    req: LLMGenerateRequest = {
+    req: LLMGenerateRequest = LLMGenerateRequest.fromPartial({
       prompt: '',
       maxTokens: 0,
       temperature: 0,
@@ -61,7 +60,7 @@ export class LLMStreamAdapter {
       preferredFramework: '',
       jsonSchema: '',
       executionTarget: '',
-    },
+    }),
   ): AsyncIterable<LLMStreamEvent> {
     return generateLLM(this.transport(), req);
   }

@@ -161,21 +161,47 @@ RAC_API rac_result_t rac_lora_register_proto(
     const uint8_t* entry_bytes,
     size_t entry_size,
     rac_proto_buffer_t* out_entry);
+RAC_API rac_result_t rac_lora_catalog_list_proto(
+    rac_lora_registry_handle_t registry,
+    const uint8_t* request_bytes,
+    size_t request_size,
+    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_lora_catalog_query_proto(
+    rac_lora_registry_handle_t registry,
+    const uint8_t* query_bytes,
+    size_t query_size,
+    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_lora_catalog_get_proto(
+    rac_lora_registry_handle_t registry,
+    const uint8_t* request_bytes,
+    size_t request_size,
+    rac_proto_buffer_t* out_result);
+RAC_API rac_result_t rac_lora_catalog_mark_download_completed_proto(
+    rac_lora_registry_handle_t registry,
+    const uint8_t* request_bytes,
+    size_t request_size,
+    rac_proto_buffer_t* out_result);
 RAC_API rac_result_t rac_lora_compatibility_proto(
     rac_handle_t llm_component,
     const uint8_t* config_bytes,
     size_t config_size,
     rac_proto_buffer_t* out_result);
-RAC_API rac_result_t rac_lora_load_proto(rac_handle_t llm_component,
-                                         const uint8_t* config_bytes,
-                                         size_t config_size,
-                                         rac_proto_buffer_t* out_info);
+RAC_API rac_result_t rac_lora_apply_proto(rac_handle_t llm_component,
+                                          const uint8_t* request_bytes,
+                                          size_t request_size,
+                                          rac_proto_buffer_t* out_result);
 RAC_API rac_result_t rac_lora_remove_proto(rac_handle_t llm_component,
-                                           const uint8_t* config_bytes,
-                                           size_t config_size,
-                                           rac_proto_buffer_t* out_info);
-RAC_API rac_result_t rac_lora_clear_proto(rac_handle_t llm_component,
-                                          rac_proto_buffer_t* out_info);
+                                           const uint8_t* request_bytes,
+                                           size_t request_size,
+                                           rac_proto_buffer_t* out_state);
+RAC_API rac_result_t rac_lora_list_proto(rac_handle_t llm_component,
+                                         const uint8_t* state_bytes,
+                                         size_t state_size,
+                                         rac_proto_buffer_t* out_state);
+RAC_API rac_result_t rac_lora_state_proto(rac_handle_t llm_component,
+                                          const uint8_t* state_bytes,
+                                          size_t state_size,
+                                          rac_proto_buffer_t* out_state);
 
 // Diffusion proto ABI.
 RAC_API rac_result_t rac_diffusion_generate_proto(

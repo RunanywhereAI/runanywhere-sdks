@@ -13,6 +13,33 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
+class LLMGenerationState extends $pb.ProtobufEnum {
+  static const LLMGenerationState LLM_GENERATION_STATE_UNSPECIFIED = LLMGenerationState._(0, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_UNSPECIFIED');
+  static const LLMGenerationState LLM_GENERATION_STATE_QUEUED = LLMGenerationState._(1, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_QUEUED');
+  static const LLMGenerationState LLM_GENERATION_STATE_PREFILLING = LLMGenerationState._(2, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_PREFILLING');
+  static const LLMGenerationState LLM_GENERATION_STATE_DECODING = LLMGenerationState._(3, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_DECODING');
+  static const LLMGenerationState LLM_GENERATION_STATE_TOOL_CALLING = LLMGenerationState._(4, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_TOOL_CALLING');
+  static const LLMGenerationState LLM_GENERATION_STATE_COMPLETED = LLMGenerationState._(5, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_COMPLETED');
+  static const LLMGenerationState LLM_GENERATION_STATE_CANCELLED = LLMGenerationState._(6, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_CANCELLED');
+  static const LLMGenerationState LLM_GENERATION_STATE_FAILED = LLMGenerationState._(7, _omitEnumNames ? '' : 'LLM_GENERATION_STATE_FAILED');
+
+  static const $core.List<LLMGenerationState> values = <LLMGenerationState> [
+    LLM_GENERATION_STATE_UNSPECIFIED,
+    LLM_GENERATION_STATE_QUEUED,
+    LLM_GENERATION_STATE_PREFILLING,
+    LLM_GENERATION_STATE_DECODING,
+    LLM_GENERATION_STATE_TOOL_CALLING,
+    LLM_GENERATION_STATE_COMPLETED,
+    LLM_GENERATION_STATE_CANCELLED,
+    LLM_GENERATION_STATE_FAILED,
+  ];
+
+  static final $core.Map<$core.int, LLMGenerationState> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static LLMGenerationState? valueOf($core.int value) => _byValue[value];
+
+  const LLMGenerationState._($core.int v, $core.String n) : super(v, n);
+}
+
 /// ---------------------------------------------------------------------------
 /// Routing destination for a generation (Web SDK ExecutionTarget in
 /// types/models.ts:79). Drives the cloud-vs-on-device dispatcher.

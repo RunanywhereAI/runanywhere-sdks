@@ -9,6 +9,7 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -256,6 +257,7 @@ class VADOptions extends $pb.GeneratedMessage {
     $core.int? minSpeechDurationMs,
     $core.int? minSilenceDurationMs,
     $core.int? maxSpeechDurationMs,
+    $core.bool? includeStatistics,
   }) {
     final $result = create();
     if (threshold != null) {
@@ -270,6 +272,9 @@ class VADOptions extends $pb.GeneratedMessage {
     if (maxSpeechDurationMs != null) {
       $result.maxSpeechDurationMs = maxSpeechDurationMs;
     }
+    if (includeStatistics != null) {
+      $result.includeStatistics = includeStatistics;
+    }
     return $result;
   }
   VADOptions._() : super();
@@ -281,6 +286,7 @@ class VADOptions extends $pb.GeneratedMessage {
     ..a<$core.int>(2, _omitFieldNames ? '' : 'minSpeechDurationMs', $pb.PbFieldType.O3)
     ..a<$core.int>(3, _omitFieldNames ? '' : 'minSilenceDurationMs', $pb.PbFieldType.O3)
     ..a<$core.int>(4, _omitFieldNames ? '' : 'maxSpeechDurationMs', $pb.PbFieldType.O3)
+    ..aOB(5, _omitFieldNames ? '' : 'includeStatistics')
     ..hasRequiredFields = false
   ;
 
@@ -350,6 +356,241 @@ class VADOptions extends $pb.GeneratedMessage {
   $core.bool hasMaxSpeechDurationMs() => $_has(3);
   @$pb.TagNumber(4)
   void clearMaxSpeechDurationMs() => clearField(4);
+
+  /// Whether to include VADStatistics in stream events when available.
+  @$pb.TagNumber(5)
+  $core.bool get includeStatistics => $_getBF(4);
+  @$pb.TagNumber(5)
+  set includeStatistics($core.bool v) { $_setBool(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasIncludeStatistics() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearIncludeStatistics() => clearField(5);
+}
+
+enum VADAudioSource_Source {
+  audioData, 
+  adapterHandle, 
+  notSet
+}
+
+class VADAudioSource extends $pb.GeneratedMessage {
+  factory VADAudioSource({
+    $core.List<$core.int>? audioData,
+    $core.String? adapterHandle,
+    VADAudioEncoding? encoding,
+    $core.int? sampleRate,
+    $core.int? channels,
+    $fixnum.Int64? frameOffsetMs,
+  }) {
+    final $result = create();
+    if (audioData != null) {
+      $result.audioData = audioData;
+    }
+    if (adapterHandle != null) {
+      $result.adapterHandle = adapterHandle;
+    }
+    if (encoding != null) {
+      $result.encoding = encoding;
+    }
+    if (sampleRate != null) {
+      $result.sampleRate = sampleRate;
+    }
+    if (channels != null) {
+      $result.channels = channels;
+    }
+    if (frameOffsetMs != null) {
+      $result.frameOffsetMs = frameOffsetMs;
+    }
+    return $result;
+  }
+  VADAudioSource._() : super();
+  factory VADAudioSource.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory VADAudioSource.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static const $core.Map<$core.int, VADAudioSource_Source> _VADAudioSource_SourceByTag = {
+    1 : VADAudioSource_Source.audioData,
+    2 : VADAudioSource_Source.adapterHandle,
+    0 : VADAudioSource_Source.notSet
+  };
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VADAudioSource', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..oo(0, [1, 2])
+    ..a<$core.List<$core.int>>(1, _omitFieldNames ? '' : 'audioData', $pb.PbFieldType.OY)
+    ..aOS(2, _omitFieldNames ? '' : 'adapterHandle')
+    ..e<VADAudioEncoding>(3, _omitFieldNames ? '' : 'encoding', $pb.PbFieldType.OE, defaultOrMaker: VADAudioEncoding.VAD_AUDIO_ENCODING_UNSPECIFIED, valueOf: VADAudioEncoding.valueOf, enumValues: VADAudioEncoding.values)
+    ..a<$core.int>(4, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
+    ..a<$core.int>(5, _omitFieldNames ? '' : 'channels', $pb.PbFieldType.O3)
+    ..aInt64(6, _omitFieldNames ? '' : 'frameOffsetMs')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  VADAudioSource clone() => VADAudioSource()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  VADAudioSource copyWith(void Function(VADAudioSource) updates) => super.copyWith((message) => updates(message as VADAudioSource)) as VADAudioSource;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VADAudioSource create() => VADAudioSource._();
+  VADAudioSource createEmptyInstance() => create();
+  static $pb.PbList<VADAudioSource> createRepeated() => $pb.PbList<VADAudioSource>();
+  @$core.pragma('dart2js:noInline')
+  static VADAudioSource getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VADAudioSource>(create);
+  static VADAudioSource? _defaultInstance;
+
+  VADAudioSource_Source whichSource() => _VADAudioSource_SourceByTag[$_whichOneof(0)]!;
+  void clearSource() => clearField($_whichOneof(0));
+
+  @$pb.TagNumber(1)
+  $core.List<$core.int> get audioData => $_getN(0);
+  @$pb.TagNumber(1)
+  set audioData($core.List<$core.int> v) { $_setBytes(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasAudioData() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAudioData() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get adapterHandle => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set adapterHandle($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasAdapterHandle() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAdapterHandle() => clearField(2);
+
+  @$pb.TagNumber(3)
+  VADAudioEncoding get encoding => $_getN(2);
+  @$pb.TagNumber(3)
+  set encoding(VADAudioEncoding v) { setField(3, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasEncoding() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEncoding() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get sampleRate => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set sampleRate($core.int v) { $_setSignedInt32(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasSampleRate() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSampleRate() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get channels => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set channels($core.int v) { $_setSignedInt32(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasChannels() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearChannels() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get frameOffsetMs => $_getI64(5);
+  @$pb.TagNumber(6)
+  set frameOffsetMs($fixnum.Int64 v) { $_setInt64(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasFrameOffsetMs() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearFrameOffsetMs() => clearField(6);
+}
+
+class VADProcessRequest extends $pb.GeneratedMessage {
+  factory VADProcessRequest({
+    $core.String? requestId,
+    VADAudioSource? audio,
+    VADOptions? options,
+    $core.Map<$core.String, $core.String>? metadata,
+  }) {
+    final $result = create();
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (audio != null) {
+      $result.audio = audio;
+    }
+    if (options != null) {
+      $result.options = options;
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
+    }
+    return $result;
+  }
+  VADProcessRequest._() : super();
+  factory VADProcessRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory VADProcessRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VADProcessRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aOM<VADAudioSource>(2, _omitFieldNames ? '' : 'audio', subBuilder: VADAudioSource.create)
+    ..aOM<VADOptions>(3, _omitFieldNames ? '' : 'options', subBuilder: VADOptions.create)
+    ..m<$core.String, $core.String>(4, _omitFieldNames ? '' : 'metadata', entryClassName: 'VADProcessRequest.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  VADProcessRequest clone() => VADProcessRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  VADProcessRequest copyWith(void Function(VADProcessRequest) updates) => super.copyWith((message) => updates(message as VADProcessRequest)) as VADProcessRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VADProcessRequest create() => VADProcessRequest._();
+  VADProcessRequest createEmptyInstance() => create();
+  static $pb.PbList<VADProcessRequest> createRepeated() => $pb.PbList<VADProcessRequest>();
+  @$core.pragma('dart2js:noInline')
+  static VADProcessRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VADProcessRequest>(create);
+  static VADProcessRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  VADAudioSource get audio => $_getN(1);
+  @$pb.TagNumber(2)
+  set audio(VADAudioSource v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasAudio() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearAudio() => clearField(2);
+  @$pb.TagNumber(2)
+  VADAudioSource ensureAudio() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  VADOptions get options => $_getN(2);
+  @$pb.TagNumber(3)
+  set options(VADOptions v) { setField(3, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasOptions() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOptions() => clearField(3);
+  @$pb.TagNumber(3)
+  VADOptions ensureOptions() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(3);
 }
 
 ///  ---------------------------------------------------------------------------
@@ -380,6 +621,9 @@ class VADResult extends $pb.GeneratedMessage {
     $fixnum.Int64? timestampMs,
     $fixnum.Int64? startTimeMs,
     $fixnum.Int64? endTimeMs,
+    VADStatistics? statistics,
+    $core.String? errorMessage,
+    $core.int? errorCode,
   }) {
     final $result = create();
     if (isSpeech != null) {
@@ -403,6 +647,15 @@ class VADResult extends $pb.GeneratedMessage {
     if (endTimeMs != null) {
       $result.endTimeMs = endTimeMs;
     }
+    if (statistics != null) {
+      $result.statistics = statistics;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
     return $result;
   }
   VADResult._() : super();
@@ -417,6 +670,9 @@ class VADResult extends $pb.GeneratedMessage {
     ..aInt64(5, _omitFieldNames ? '' : 'timestampMs')
     ..aInt64(6, _omitFieldNames ? '' : 'startTimeMs')
     ..aInt64(7, _omitFieldNames ? '' : 'endTimeMs')
+    ..aOM<VADStatistics>(8, _omitFieldNames ? '' : 'statistics', subBuilder: VADStatistics.create)
+    ..aOS(9, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(10, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
@@ -511,6 +767,36 @@ class VADResult extends $pb.GeneratedMessage {
   $core.bool hasEndTimeMs() => $_has(6);
   @$pb.TagNumber(7)
   void clearEndTimeMs() => clearField(7);
+
+  /// Optional statistics snapshot and result-envelope error details.
+  @$pb.TagNumber(8)
+  VADStatistics get statistics => $_getN(7);
+  @$pb.TagNumber(8)
+  set statistics(VADStatistics v) { setField(8, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasStatistics() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearStatistics() => clearField(8);
+  @$pb.TagNumber(8)
+  VADStatistics ensureStatistics() => $_ensure(7);
+
+  @$pb.TagNumber(9)
+  $core.String get errorMessage => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set errorMessage($core.String v) { $_setString(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasErrorMessage() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearErrorMessage() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get errorCode => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set errorCode($core.int v) { $_setSignedInt32(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasErrorCode() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearErrorCode() => clearField(10);
 }
 
 ///  ---------------------------------------------------------------------------
@@ -722,6 +1008,9 @@ class SpeechActivityEvent extends $pb.GeneratedMessage {
     SpeechActivityKind? eventType,
     $fixnum.Int64? timestampMs,
     $core.int? durationMs,
+    $core.double? confidence,
+    VADResult? result,
+    $core.String? segmentId,
   }) {
     final $result = create();
     if (eventType != null) {
@@ -733,6 +1022,15 @@ class SpeechActivityEvent extends $pb.GeneratedMessage {
     if (durationMs != null) {
       $result.durationMs = durationMs;
     }
+    if (confidence != null) {
+      $result.confidence = confidence;
+    }
+    if (result != null) {
+      $result.result = result;
+    }
+    if (segmentId != null) {
+      $result.segmentId = segmentId;
+    }
     return $result;
   }
   SpeechActivityEvent._() : super();
@@ -743,6 +1041,9 @@ class SpeechActivityEvent extends $pb.GeneratedMessage {
     ..e<SpeechActivityKind>(1, _omitFieldNames ? '' : 'eventType', $pb.PbFieldType.OE, defaultOrMaker: SpeechActivityKind.SPEECH_ACTIVITY_KIND_UNSPECIFIED, valueOf: SpeechActivityKind.valueOf, enumValues: SpeechActivityKind.values)
     ..aInt64(2, _omitFieldNames ? '' : 'timestampMs')
     ..a<$core.int>(3, _omitFieldNames ? '' : 'durationMs', $pb.PbFieldType.O3)
+    ..a<$core.double>(4, _omitFieldNames ? '' : 'confidence', $pb.PbFieldType.OF)
+    ..aOM<VADResult>(5, _omitFieldNames ? '' : 'result', subBuilder: VADResult.create)
+    ..aOS(6, _omitFieldNames ? '' : 'segmentId')
     ..hasRequiredFields = false
   ;
 
@@ -799,6 +1100,363 @@ class SpeechActivityEvent extends $pb.GeneratedMessage {
   $core.bool hasDurationMs() => $_has(2);
   @$pb.TagNumber(3)
   void clearDurationMs() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.double get confidence => $_getN(3);
+  @$pb.TagNumber(4)
+  set confidence($core.double v) { $_setFloat(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasConfidence() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearConfidence() => clearField(4);
+
+  @$pb.TagNumber(5)
+  VADResult get result => $_getN(4);
+  @$pb.TagNumber(5)
+  set result(VADResult v) { setField(5, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasResult() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearResult() => clearField(5);
+  @$pb.TagNumber(5)
+  VADResult ensureResult() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  $core.String get segmentId => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set segmentId($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasSegmentId() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearSegmentId() => clearField(6);
+}
+
+class VADStreamEvent extends $pb.GeneratedMessage {
+  factory VADStreamEvent({
+    $fixnum.Int64? seq,
+    $fixnum.Int64? timestampUs,
+    $core.String? requestId,
+    VADStreamEventKind? kind,
+    VADResult? result,
+    SpeechActivityEvent? activity,
+    VADStatistics? statistics,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (seq != null) {
+      $result.seq = seq;
+    }
+    if (timestampUs != null) {
+      $result.timestampUs = timestampUs;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (kind != null) {
+      $result.kind = kind;
+    }
+    if (result != null) {
+      $result.result = result;
+    }
+    if (activity != null) {
+      $result.activity = activity;
+    }
+    if (statistics != null) {
+      $result.statistics = statistics;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  VADStreamEvent._() : super();
+  factory VADStreamEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory VADStreamEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VADStreamEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
+    ..aOS(3, _omitFieldNames ? '' : 'requestId')
+    ..e<VADStreamEventKind>(4, _omitFieldNames ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED, valueOf: VADStreamEventKind.valueOf, enumValues: VADStreamEventKind.values)
+    ..aOM<VADResult>(5, _omitFieldNames ? '' : 'result', subBuilder: VADResult.create)
+    ..aOM<SpeechActivityEvent>(6, _omitFieldNames ? '' : 'activity', subBuilder: SpeechActivityEvent.create)
+    ..aOM<VADStatistics>(7, _omitFieldNames ? '' : 'statistics', subBuilder: VADStatistics.create)
+    ..aOS(8, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(9, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  VADStreamEvent clone() => VADStreamEvent()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  VADStreamEvent copyWith(void Function(VADStreamEvent) updates) => super.copyWith((message) => updates(message as VADStreamEvent)) as VADStreamEvent;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VADStreamEvent create() => VADStreamEvent._();
+  VADStreamEvent createEmptyInstance() => create();
+  static $pb.PbList<VADStreamEvent> createRepeated() => $pb.PbList<VADStreamEvent>();
+  @$core.pragma('dart2js:noInline')
+  static VADStreamEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VADStreamEvent>(create);
+  static VADStreamEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get seq => $_getI64(0);
+  @$pb.TagNumber(1)
+  set seq($fixnum.Int64 v) { $_setInt64(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasSeq() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSeq() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get timestampUs => $_getI64(1);
+  @$pb.TagNumber(2)
+  set timestampUs($fixnum.Int64 v) { $_setInt64(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasTimestampUs() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTimestampUs() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get requestId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set requestId($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasRequestId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRequestId() => clearField(3);
+
+  @$pb.TagNumber(4)
+  VADStreamEventKind get kind => $_getN(3);
+  @$pb.TagNumber(4)
+  set kind(VADStreamEventKind v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasKind() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearKind() => clearField(4);
+
+  @$pb.TagNumber(5)
+  VADResult get result => $_getN(4);
+  @$pb.TagNumber(5)
+  set result(VADResult v) { setField(5, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasResult() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearResult() => clearField(5);
+  @$pb.TagNumber(5)
+  VADResult ensureResult() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  SpeechActivityEvent get activity => $_getN(5);
+  @$pb.TagNumber(6)
+  set activity(SpeechActivityEvent v) { setField(6, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasActivity() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearActivity() => clearField(6);
+  @$pb.TagNumber(6)
+  SpeechActivityEvent ensureActivity() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  VADStatistics get statistics => $_getN(6);
+  @$pb.TagNumber(7)
+  set statistics(VADStatistics v) { setField(7, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasStatistics() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearStatistics() => clearField(7);
+  @$pb.TagNumber(7)
+  VADStatistics ensureStatistics() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  $core.String get errorMessage => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set errorMessage($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasErrorMessage() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearErrorMessage() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get errorCode => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set errorCode($core.int v) { $_setSignedInt32(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasErrorCode() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearErrorCode() => clearField(9);
+}
+
+class VADServiceState extends $pb.GeneratedMessage {
+  factory VADServiceState({
+    $core.bool? isReady,
+    $core.bool? isSpeechActive,
+    $core.double? energyThreshold,
+    $core.int? sampleRate,
+    $core.int? frameLengthMs,
+    $core.String? currentModel,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (isReady != null) {
+      $result.isReady = isReady;
+    }
+    if (isSpeechActive != null) {
+      $result.isSpeechActive = isSpeechActive;
+    }
+    if (energyThreshold != null) {
+      $result.energyThreshold = energyThreshold;
+    }
+    if (sampleRate != null) {
+      $result.sampleRate = sampleRate;
+    }
+    if (frameLengthMs != null) {
+      $result.frameLengthMs = frameLengthMs;
+    }
+    if (currentModel != null) {
+      $result.currentModel = currentModel;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  VADServiceState._() : super();
+  factory VADServiceState.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory VADServiceState.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VADServiceState', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'isReady')
+    ..aOB(2, _omitFieldNames ? '' : 'isSpeechActive')
+    ..a<$core.double>(3, _omitFieldNames ? '' : 'energyThreshold', $pb.PbFieldType.OF)
+    ..a<$core.int>(4, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
+    ..a<$core.int>(5, _omitFieldNames ? '' : 'frameLengthMs', $pb.PbFieldType.O3)
+    ..aOS(6, _omitFieldNames ? '' : 'currentModel')
+    ..aOS(7, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(8, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  VADServiceState clone() => VADServiceState()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  VADServiceState copyWith(void Function(VADServiceState) updates) => super.copyWith((message) => updates(message as VADServiceState)) as VADServiceState;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VADServiceState create() => VADServiceState._();
+  VADServiceState createEmptyInstance() => create();
+  static $pb.PbList<VADServiceState> createRepeated() => $pb.PbList<VADServiceState>();
+  @$core.pragma('dart2js:noInline')
+  static VADServiceState getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VADServiceState>(create);
+  static VADServiceState? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get isReady => $_getBF(0);
+  @$pb.TagNumber(1)
+  set isReady($core.bool v) { $_setBool(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasIsReady() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearIsReady() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get isSpeechActive => $_getBF(1);
+  @$pb.TagNumber(2)
+  set isSpeechActive($core.bool v) { $_setBool(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasIsSpeechActive() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearIsSpeechActive() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.double get energyThreshold => $_getN(2);
+  @$pb.TagNumber(3)
+  set energyThreshold($core.double v) { $_setFloat(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasEnergyThreshold() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearEnergyThreshold() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get sampleRate => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set sampleRate($core.int v) { $_setSignedInt32(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasSampleRate() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSampleRate() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get frameLengthMs => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set frameLengthMs($core.int v) { $_setSignedInt32(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasFrameLengthMs() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearFrameLengthMs() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get currentModel => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set currentModel($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasCurrentModel() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearCurrentModel() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get errorMessage => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set errorMessage($core.String v) { $_setString(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasErrorMessage() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearErrorMessage() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get errorCode => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set errorCode($core.int v) { $_setSignedInt32(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasErrorCode() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearErrorCode() => clearField(8);
+}
+
+class VADApi {
+  $pb.RpcClient _client;
+  VADApi(this._client);
+
+  $async.Future<VADResult> processFrame($pb.ClientContext? ctx, VADProcessRequest request) =>
+    _client.invoke<VADResult>(ctx, 'VAD', 'ProcessFrame', request, VADResult())
+  ;
+  $async.Future<VADStreamEvent> stream($pb.ClientContext? ctx, VADProcessRequest request) =>
+    _client.invoke<VADStreamEvent>(ctx, 'VAD', 'Stream', request, VADStreamEvent())
+  ;
 }
 
 

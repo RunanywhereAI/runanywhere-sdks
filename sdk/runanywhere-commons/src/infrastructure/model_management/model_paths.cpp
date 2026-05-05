@@ -17,6 +17,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <initializer_list>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -148,25 +149,55 @@ static bool has_extension(const fs::path& path, const char* extension) {
     return ext == extension;
 }
 
+static bool name_equals_any(const std::string& name, std::initializer_list<const char*> values) {
+    for (const char* value : values) {
+        if (value && name == value) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool matches_model_format(const fs::path& path, rac_model_format_t format) {
     switch (format) {
+        case RAC_MODEL_FORMAT_UNSPECIFIED:
+        case RAC_MODEL_FORMAT_UNKNOWN:
+            return has_extension(path, "gguf") || has_extension(path, "ggml") ||
+                   has_extension(path, "onnx") || has_extension(path, "ort") ||
+                   has_extension(path, "bin") || has_extension(path, "mlmodel") ||
+                   has_extension(path, "mlpackage") || has_extension(path, "mlmodelc") ||
+                   has_extension(path, "tflite") || has_extension(path, "safetensors") ||
+                   has_extension(path, "zip");
+        case RAC_MODEL_FORMAT_GGUF:
+            return has_extension(path, "gguf");
+        case RAC_MODEL_FORMAT_GGML:
+            return has_extension(path, "ggml");
         case RAC_MODEL_FORMAT_ONNX:
             return has_extension(path, "onnx");
         case RAC_MODEL_FORMAT_ORT:
             return has_extension(path, "ort");
-        case RAC_MODEL_FORMAT_GGUF:
-            return has_extension(path, "gguf");
         case RAC_MODEL_FORMAT_BIN:
         case RAC_MODEL_FORMAT_QNN_CONTEXT:
             return has_extension(path, "bin");
         case RAC_MODEL_FORMAT_COREML:
-            return has_extension(path, "mlmodel") || has_extension(path, "mlpackage") ||
-                   has_extension(path, "mlmodelc");
-        case RAC_MODEL_FORMAT_UNKNOWN:
-            return has_extension(path, "gguf") || has_extension(path, "onnx") ||
-                   has_extension(path, "ort") || has_extension(path, "bin") ||
-                   has_extension(path, "mlmodel") || has_extension(path, "mlpackage") ||
-                   has_extension(path, "mlmodelc");
+            return has_extension(path, "mlmodelc") || has_extension(path, "mlmodel") ||
+                   has_extension(path, "mlpackage");
+        case RAC_MODEL_FORMAT_MLMODEL:
+            return has_extension(path, "mlmodel");
+        case RAC_MODEL_FORMAT_MLPACKAGE:
+            return has_extension(path, "mlpackage");
+        case RAC_MODEL_FORMAT_TFLITE:
+            return has_extension(path, "tflite");
+        case RAC_MODEL_FORMAT_SAFETENSORS:
+            return has_extension(path, "safetensors");
+        case RAC_MODEL_FORMAT_ZIP:
+            return has_extension(path, "zip");
+        case RAC_MODEL_FORMAT_FOLDER: {
+            std::error_code ec;
+            return fs::is_directory(path, ec);
+        }
+        case RAC_MODEL_FORMAT_PROPRIETARY:
+            return false;
         default:
             return false;
     }
@@ -176,20 +207,28 @@ static rac_resolved_model_file_role_t infer_file_role(const fs::path& path,
                                                       rac_model_format_t format) {
     std::string name = to_lower(filename_of(path));
     if ((name.find("mmproj") != std::string::npos ||
-         name.find("vision-projector") != std::string::npos) &&
+         name.find("mm-proj") != std::string::npos ||
+         name.find("vision-projector") != std::string::npos ||
+         name.find("vision_projector") != std::string::npos ||
+         name.find("multimodal_projector") != std::string::npos ||
+         name.find("multi-modal-projector") != std::string::npos) &&
         has_extension(path, "gguf")) {
-        return RAC_RESOLVED_MODEL_FILE_ROLE_MMPROJ;
+        return RAC_RESOLVED_MODEL_FILE_ROLE_VISION_PROJECTOR;
     }
-    if (name == "tokenizer.json" || name == "tokenizer.model" || name == "tokens.txt") {
+    if (name_equals_any(name, {"tokenizer.json", "tokenizer.model", "tokenizer_config.json",
+                               "special_tokens_map.json", "added_tokens.json", "tokens.txt",
+                               "sentencepiece.bpe.model", "spm.model"})) {
         return RAC_RESOLVED_MODEL_FILE_ROLE_TOKENIZER;
     }
-    if (name == "vocab.txt" || name == "vocab.json") {
+    if (name_equals_any(name, {"vocab.txt", "vocab.json"})) {
         return RAC_RESOLVED_MODEL_FILE_ROLE_VOCABULARY;
     }
     if (name == "merges.txt") {
         return RAC_RESOLVED_MODEL_FILE_ROLE_MERGES;
     }
-    if (name == "config.json" || name == "generation_config.json") {
+    if (name_equals_any(name, {"config.json", "generation_config.json",
+                               "preprocessor_config.json", "processor_config.json",
+                               "image_processor_config.json", "model_config.json"})) {
         return RAC_RESOLVED_MODEL_FILE_ROLE_CONFIG;
     }
     if (matches_model_format(path, format)) {
@@ -231,6 +270,67 @@ struct scanned_file {
     std::string relative_path;
     rac_resolved_model_file_role_t role = RAC_RESOLVED_MODEL_FILE_ROLE_UNKNOWN;
 };
+
+static rac_resolved_model_file_role_t resolved_role_from_descriptor(
+    rac_model_file_role_t role) {
+    switch (role) {
+        case RAC_MODEL_FILE_ROLE_PRIMARY_MODEL:
+            return RAC_RESOLVED_MODEL_FILE_ROLE_PRIMARY;
+        case RAC_MODEL_FILE_ROLE_VISION_PROJECTOR:
+            return RAC_RESOLVED_MODEL_FILE_ROLE_VISION_PROJECTOR;
+        case RAC_MODEL_FILE_ROLE_TOKENIZER:
+            return RAC_RESOLVED_MODEL_FILE_ROLE_TOKENIZER;
+        case RAC_MODEL_FILE_ROLE_CONFIG:
+            return RAC_RESOLVED_MODEL_FILE_ROLE_CONFIG;
+        case RAC_MODEL_FILE_ROLE_VOCABULARY:
+            return RAC_RESOLVED_MODEL_FILE_ROLE_VOCABULARY;
+        case RAC_MODEL_FILE_ROLE_MERGES:
+            return RAC_RESOLVED_MODEL_FILE_ROLE_MERGES;
+        case RAC_MODEL_FILE_ROLE_LABELS:
+            return RAC_RESOLVED_MODEL_FILE_ROLE_LABELS;
+        case RAC_MODEL_FILE_ROLE_COMPANION:
+            return RAC_RESOLVED_MODEL_FILE_ROLE_COMPANION;
+        case RAC_MODEL_FILE_ROLE_UNSPECIFIED:
+        default:
+            return RAC_RESOLVED_MODEL_FILE_ROLE_UNKNOWN;
+    }
+}
+
+static bool file_matches_descriptor(const scanned_file& file,
+                                    const rac_model_file_descriptor_t& descriptor) {
+    std::string rel = to_lower(normalize_slashes(file.relative_path));
+    std::string name = to_lower(filename_of(file.path));
+    const char* raw = descriptor.destination_path && descriptor.destination_path[0] != '\0'
+                          ? descriptor.destination_path
+                          : descriptor.relative_path;
+    if (!raw || raw[0] == '\0') {
+        return false;
+    }
+    std::string expected = to_lower(normalize_slashes(raw));
+    return rel == expected || name == expected || glob_match_ci(expected, rel) ||
+           glob_match_ci(expected, name);
+}
+
+static void apply_descriptor_roles(std::vector<scanned_file>* files,
+                                   const rac_model_artifact_info_t* artifact) {
+    if (!files || !artifact || !artifact->file_descriptors) {
+        return;
+    }
+    for (size_t i = 0; i < artifact->file_descriptor_count; ++i) {
+        const rac_model_file_descriptor_t& descriptor = artifact->file_descriptors[i];
+        const rac_resolved_model_file_role_t role =
+            resolved_role_from_descriptor(descriptor.role);
+        if (role == RAC_RESOLVED_MODEL_FILE_ROLE_UNKNOWN) {
+            continue;
+        }
+        for (auto& file : *files) {
+            if (file_matches_descriptor(file, descriptor)) {
+                file.role = role;
+                break;
+            }
+        }
+    }
+}
 
 static std::vector<scanned_file> scan_model_files(const fs::path& root,
                                                   rac_model_format_t format) {
@@ -302,7 +402,7 @@ static const scanned_file* find_primary_file(const std::vector<scanned_file>& fi
     const char* ext = rac_model_format_extension(format);
 
     for (const auto& file : files) {
-        if (file.role == RAC_RESOLVED_MODEL_FILE_ROLE_MMPROJ) {
+        if (file.role == RAC_RESOLVED_MODEL_FILE_ROLE_VISION_PROJECTOR) {
             continue;
         }
         if (!matches_model_format(file.path, format)) {
@@ -311,11 +411,17 @@ static const scanned_file* find_primary_file(const std::vector<scanned_file>& fi
         if (!first_format_match) {
             first_format_match = &file;
         }
-        if (!wanted_prefix.empty() && ext) {
+        if (!wanted_prefix.empty()) {
             std::string name = to_lower(filename_of(file.path));
-            std::string wanted = wanted_prefix + "." + ext;
-            if (name == wanted) {
+            std::string stem = to_lower(file.path.stem().generic_string());
+            if (stem == wanted_prefix) {
                 return &file;
+            }
+            if (ext) {
+                std::string wanted = wanted_prefix + "." + ext;
+                if (name == wanted) {
+                    return &file;
+                }
             }
         }
     }
@@ -330,18 +436,50 @@ static char* dup_string(const std::string& value) {
     return out;
 }
 
-static bool file_matches_descriptor(const scanned_file& file,
-                                    const rac_model_file_descriptor_t& descriptor) {
-    std::string rel = to_lower(normalize_slashes(file.relative_path));
-    std::string name = to_lower(filename_of(file.path));
-    const char* raw = descriptor.destination_path ? descriptor.destination_path
-                                                  : descriptor.relative_path;
-    if (!raw || raw[0] == '\0') {
-        return false;
+static int role_specificity(rac_resolved_model_file_role_t role) {
+    switch (role) {
+        case RAC_RESOLVED_MODEL_FILE_ROLE_PRIMARY:
+            return 100;
+        case RAC_RESOLVED_MODEL_FILE_ROLE_VISION_PROJECTOR:
+        case RAC_RESOLVED_MODEL_FILE_ROLE_TOKENIZER:
+        case RAC_RESOLVED_MODEL_FILE_ROLE_CONFIG:
+        case RAC_RESOLVED_MODEL_FILE_ROLE_VOCABULARY:
+        case RAC_RESOLVED_MODEL_FILE_ROLE_MERGES:
+        case RAC_RESOLVED_MODEL_FILE_ROLE_LABELS:
+            return 75;
+        case RAC_RESOLVED_MODEL_FILE_ROLE_COMPANION:
+            return 25;
+        case RAC_RESOLVED_MODEL_FILE_ROLE_UNKNOWN:
+        default:
+            return 0;
     }
-    std::string expected = to_lower(normalize_slashes(raw));
-    return rel == expected || name == expected || glob_match_ci(expected, rel) ||
-           glob_match_ci(expected, name);
+}
+
+static int tokenizer_path_priority(rac_resolved_model_file_role_t role) {
+    switch (role) {
+        case RAC_RESOLVED_MODEL_FILE_ROLE_TOKENIZER:
+            return 30;
+        case RAC_RESOLVED_MODEL_FILE_ROLE_VOCABULARY:
+            return 20;
+        case RAC_RESOLVED_MODEL_FILE_ROLE_MERGES:
+            return 10;
+        default:
+            return 0;
+    }
+}
+
+static int tokenizer_path_priority_for_file(const fs::path& path,
+                                            rac_resolved_model_file_role_t role) {
+    std::string name = to_lower(filename_of(path));
+    if (name_equals_any(name, {"tokenizer.json", "tokenizer.model", "sentencepiece.bpe.model",
+                               "spm.model", "tokens.txt"})) {
+        return 40;
+    }
+    if (name_equals_any(name, {"tokenizer_config.json", "special_tokens_map.json",
+                               "added_tokens.json"})) {
+        return 30;
+    }
+    return tokenizer_path_priority(role);
 }
 
 static const scanned_file* find_matching_file(const std::vector<scanned_file>& files,
@@ -385,8 +523,12 @@ static bool append_resolved_file(rac_model_path_resolution_t* out, const std::st
     memset(file, 0, sizeof(*file));
     file->relative_path = dup_string(rel);
     file->path = dup_string(path);
-    if (!file->relative_path || !file->path)
+    if (!file->relative_path || !file->path) {
+        free(file->relative_path);
+        free(file->path);
+        memset(file, 0, sizeof(*file));
         return false;
+    }
     file->role = role;
     file->is_required = required;
     file->exists = exists;
@@ -394,13 +536,58 @@ static bool append_resolved_file(rac_model_path_resolution_t* out, const std::st
     return true;
 }
 
-static bool has_resolved_path(const rac_model_path_resolution_t* out, const std::string& path) {
+static rac_resolved_model_file_t* find_resolved_file_by_path(rac_model_path_resolution_t* out,
+                                                             const std::string& path) {
+    if (!out) {
+        return nullptr;
+    }
     for (size_t i = 0; i < out->file_count; ++i) {
         if (out->files[i].path && path == out->files[i].path) {
-            return true;
+            return &out->files[i];
         }
     }
-    return false;
+    return nullptr;
+}
+
+static const rac_resolved_model_file_t* find_resolved_file_by_path(
+    const rac_model_path_resolution_t* out, const std::string& path) {
+    if (!out) {
+        return nullptr;
+    }
+    for (size_t i = 0; i < out->file_count; ++i) {
+        if (out->files[i].path && path == out->files[i].path) {
+            return &out->files[i];
+        }
+    }
+    return nullptr;
+}
+
+static bool has_resolved_path(const rac_model_path_resolution_t* out, const std::string& path) {
+    return find_resolved_file_by_path(out, path) != nullptr;
+}
+
+static void mark_resolved_file(rac_model_path_resolution_t* out, const std::string& path,
+                               rac_resolved_model_file_role_t role, rac_bool_t required) {
+    rac_resolved_model_file_t* file = find_resolved_file_by_path(out, path);
+    if (!file) {
+        return;
+    }
+    if (required == RAC_TRUE) {
+        file->is_required = RAC_TRUE;
+    }
+    if (role_specificity(role) > role_specificity(file->role)) {
+        file->role = role;
+    }
+}
+
+static bool assign_owned_path(char** slot, const std::string& value) {
+    char* copy = dup_string(value);
+    if (!copy) {
+        return false;
+    }
+    free(*slot);
+    *slot = copy;
+    return true;
 }
 
 // Minimal SHA-256 implementation for local primary-file validation.
@@ -774,10 +961,14 @@ rac_result_t rac_model_paths_resolve_artifact(
             ? effective_model_root(input_root, model_info->format)
             : input_root;
     std::vector<scanned_file> files = scan_model_files(model_root, model_info->format);
+    apply_descriptor_roles(&files, &model_info->artifact_info);
 
     const scanned_file* primary_file = nullptr;
     if (fs::is_regular_file(model_root, ec)) {
-        primary_file = files.empty() ? nullptr : &files.front();
+        primary_file =
+            (!files.empty() && matches_model_format(files.front().path, model_info->format))
+                ? &files.front()
+                : nullptr;
     } else if (out_resolution->is_directory_based != RAC_TRUE) {
         primary_file = find_primary_file(files, model_info->id, model_info->format);
     }
@@ -796,6 +987,7 @@ rac_result_t rac_model_paths_resolve_artifact(
     }
 
     bool saw_primary_in_list = false;
+    int tokenizer_priority = 0;
     for (const auto& file : files) {
         rac_resolved_model_file_role_t role = file.role;
         if (primary_file && file.path == primary_file->path) {
@@ -812,16 +1004,29 @@ rac_result_t rac_model_paths_resolve_artifact(
             return RAC_ERROR_OUT_OF_MEMORY;
         }
 
-        if (role == RAC_RESOLVED_MODEL_FILE_ROLE_MMPROJ && !out_resolution->mmproj_path) {
-            out_resolution->mmproj_path = dup_string(abs);
+        if (role == RAC_RESOLVED_MODEL_FILE_ROLE_VISION_PROJECTOR &&
+            !out_resolution->mmproj_path) {
+            if (!assign_owned_path(&out_resolution->mmproj_path, abs)) {
+                rac_model_path_resolution_free(out_resolution);
+                return RAC_ERROR_OUT_OF_MEMORY;
+            }
         } else if ((role == RAC_RESOLVED_MODEL_FILE_ROLE_TOKENIZER ||
                     role == RAC_RESOLVED_MODEL_FILE_ROLE_VOCABULARY ||
-                    role == RAC_RESOLVED_MODEL_FILE_ROLE_MERGES) &&
-                   !out_resolution->tokenizer_path) {
-            out_resolution->tokenizer_path = dup_string(abs);
+                    role == RAC_RESOLVED_MODEL_FILE_ROLE_MERGES)) {
+            int priority = tokenizer_path_priority_for_file(file.path, role);
+            if (priority > tokenizer_priority) {
+                if (!assign_owned_path(&out_resolution->tokenizer_path, abs)) {
+                    rac_model_path_resolution_free(out_resolution);
+                    return RAC_ERROR_OUT_OF_MEMORY;
+                }
+                tokenizer_priority = priority;
+            }
         } else if (role == RAC_RESOLVED_MODEL_FILE_ROLE_CONFIG &&
                    !out_resolution->config_path) {
-            out_resolution->config_path = dup_string(abs);
+            if (!assign_owned_path(&out_resolution->config_path, abs)) {
+                rac_model_path_resolution_free(out_resolution);
+                return RAC_ERROR_OUT_OF_MEMORY;
+            }
         }
     }
 
@@ -853,12 +1058,22 @@ rac_result_t rac_model_paths_resolve_artifact(
                     rac_model_path_resolution_free(out_resolution);
                     return RAC_ERROR_OUT_OF_MEMORY;
                 }
-            } else if (match && !has_resolved_path(out_resolution, match->path.generic_string())) {
-                if (!append_resolved_file(out_resolution, match->relative_path,
-                                          match->path.generic_string(), match->role,
-                                          descriptor.is_required, RAC_TRUE)) {
-                    rac_model_path_resolution_free(out_resolution);
-                    return RAC_ERROR_OUT_OF_MEMORY;
+            } else if (match) {
+                std::string path = match->path.generic_string();
+                const rac_resolved_model_file_role_t descriptor_role =
+                    resolved_role_from_descriptor(descriptor.role);
+                const rac_resolved_model_file_role_t role =
+                    descriptor_role == RAC_RESOLVED_MODEL_FILE_ROLE_UNKNOWN
+                        ? match->role
+                        : descriptor_role;
+                if (has_resolved_path(out_resolution, path)) {
+                    mark_resolved_file(out_resolution, path, role, descriptor.is_required);
+                } else {
+                    if (!append_resolved_file(out_resolution, match->relative_path, path,
+                                              role, descriptor.is_required, RAC_TRUE)) {
+                        rac_model_path_resolution_free(out_resolution);
+                        return RAC_ERROR_OUT_OF_MEMORY;
+                    }
                 }
             }
         }
@@ -876,12 +1091,16 @@ rac_result_t rac_model_paths_resolve_artifact(
                     rac_model_path_resolution_free(out_resolution);
                     return RAC_ERROR_OUT_OF_MEMORY;
                 }
-            } else if (!has_resolved_path(out_resolution, match->path.generic_string())) {
-                if (!append_resolved_file(out_resolution, match->relative_path,
-                                          match->path.generic_string(), match->role, RAC_TRUE,
-                                          RAC_TRUE)) {
-                    rac_model_path_resolution_free(out_resolution);
-                    return RAC_ERROR_OUT_OF_MEMORY;
+            } else {
+                std::string path = match->path.generic_string();
+                if (has_resolved_path(out_resolution, path)) {
+                    mark_resolved_file(out_resolution, path, match->role, RAC_TRUE);
+                } else {
+                    if (!append_resolved_file(out_resolution, match->relative_path, path,
+                                              match->role, RAC_TRUE, RAC_TRUE)) {
+                        rac_model_path_resolution_free(out_resolution);
+                        return RAC_ERROR_OUT_OF_MEMORY;
+                    }
                 }
             }
         }
@@ -890,12 +1109,16 @@ rac_result_t rac_model_paths_resolve_artifact(
                                       ? expected->optional_patterns[i]
                                       : nullptr;
             const scanned_file* match = find_matching_file(files, pattern);
-            if (match && !has_resolved_path(out_resolution, match->path.generic_string())) {
-                if (!append_resolved_file(out_resolution, match->relative_path,
-                                          match->path.generic_string(), match->role, RAC_FALSE,
-                                          RAC_TRUE)) {
-                    rac_model_path_resolution_free(out_resolution);
-                    return RAC_ERROR_OUT_OF_MEMORY;
+            if (match) {
+                std::string path = match->path.generic_string();
+                if (has_resolved_path(out_resolution, path)) {
+                    mark_resolved_file(out_resolution, path, match->role, RAC_FALSE);
+                } else {
+                    if (!append_resolved_file(out_resolution, match->relative_path, path,
+                                              match->role, RAC_FALSE, RAC_TRUE)) {
+                        rac_model_path_resolution_free(out_resolution);
+                        return RAC_ERROR_OUT_OF_MEMORY;
+                    }
                 }
             }
         }

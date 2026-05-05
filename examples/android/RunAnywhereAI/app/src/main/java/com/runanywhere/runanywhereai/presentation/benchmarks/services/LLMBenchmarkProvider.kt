@@ -1,13 +1,13 @@
 package com.runanywhere.runanywhereai.presentation.benchmarks.services
 
+import ai.runanywhere.proto.v1.LLMGenerationOptions
+import ai.runanywhere.proto.v1.ModelInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkCategory
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkDeviceInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkMetrics
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkScenario
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
 import com.runanywhere.sdk.public.RunAnywhere
-import ai.runanywhere.proto.v1.LLMGenerationOptions
-import com.runanywhere.sdk.public.extensions.Models.ModelInfo
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.unloadLLMModel

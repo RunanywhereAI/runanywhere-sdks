@@ -90,20 +90,17 @@ export type {
   VLMImage,
   VLMConfiguration,
   VLMGenerationOptions,
-  VLMResult as VLMGenerationResult,
+  VLMGenerationRequest,
+  VLMResult,
+  VLMStreamEvent,
+  VLMServiceState,
 } from '@runanywhere/proto-ts/vlm_options';
 export {
   VLMImageFormat,
   VLMErrorCode,
+  VLMModelFamily,
+  VLMStreamEventKind,
 } from '@runanywhere/proto-ts/vlm_options';
-
-import type { VLMResult as ProtoVLMResult } from '@runanywhere/proto-ts/vlm_options';
-
-export interface VLMStreamingResult {
-  result: Promise<ProtoVLMResult>;
-  tokens: AsyncIterable<string>;
-  cancel: () => void;
-}
 
 // ---------------------------------------------------------------------------
 // STT — proto-ts canonical types
@@ -154,6 +151,7 @@ export type {
   TTSSynthesisMetadata,
 } from '@runanywhere/proto-ts/tts_options';
 export { TTSVoiceGender } from '@runanywhere/proto-ts/tts_options';
+import type { TTSOptions } from '@runanywhere/proto-ts/tts_options';
 
 // Web-only synthesis result (Float32Array PCM for direct Web Audio playback).
 export interface TTSSynthesisResult {
@@ -164,10 +162,7 @@ export interface TTSSynthesisResult {
   processingTimeMs: number;
 }
 
-export interface TTSSynthesizeOptions {
-  speakerId?: number;
-  speed?: number;
-}
+export type TTSSynthesizeOptions = Partial<TTSOptions>;
 
 // ---------------------------------------------------------------------------
 // VAD — proto-ts canonical types + Web-only ergonomic shapes
@@ -179,17 +174,10 @@ export type {
   VADStatistics,
   SpeechActivityEvent,
 } from '@runanywhere/proto-ts/vad_options';
-import { SpeechActivityKind } from '@runanywhere/proto-ts/vad_options';
 export { SpeechActivityKind } from '@runanywhere/proto-ts/vad_options';
+import type { SpeechActivityKind } from '@runanywhere/proto-ts/vad_options';
 
-export const SpeechActivity = {
-  Started: SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_STARTED,
-  Ended: SpeechActivityKind.SPEECH_ACTIVITY_KIND_SPEECH_ENDED,
-  Ongoing: SpeechActivityKind.SPEECH_ACTIVITY_KIND_ONGOING,
-} as const;
-export type SpeechActivity = SpeechActivityKind;
-
-export type SpeechActivityCallback = (activity: SpeechActivity) => void;
+export type SpeechActivityCallback = (activity: SpeechActivityKind) => void;
 
 export interface SpeechSegment {
   startTime: number;
@@ -204,7 +192,18 @@ export interface SpeechSegment {
 export type {
   LoRAAdapterConfig,
   LoRAAdapterInfo,
+  LoRAApplyRequest,
+  LoRAApplyResult,
+  LoRARemoveRequest,
+  LoRAState,
   LoraAdapterCatalogEntry,
+  LoraAdapterCatalogGetRequest,
+  LoraAdapterCatalogGetResult,
+  LoraAdapterCatalogListRequest,
+  LoraAdapterCatalogListResult,
+  LoraAdapterCatalogQuery,
+  LoraAdapterDownloadCompletedRequest,
+  LoraAdapterDownloadCompletedResult,
   LoraCompatibilityResult,
 } from '@runanywhere/proto-ts/lora_options';
 
@@ -245,41 +244,56 @@ export type {
   ComponentLifecycleEvent,
   ComponentLifecycleSnapshot,
 } from '@runanywhere/proto-ts/sdk_events';
-export {
-  ComponentLifecycleState,
-} from '@runanywhere/proto-ts/sdk_events';
-
 // ---------------------------------------------------------------------------
 // Tool Calling — pure proto re-export
 // ---------------------------------------------------------------------------
 export * from '@runanywhere/proto-ts/tool_calling';
 
 // ---------------------------------------------------------------------------
-// Web-only enums (browser-specific bits) and supporting models.
+// Canonical proto enums/messages that used to be mirrored by Web-local enums.
+// The short Web aliases (`SDKEnvironment.Development`,
+// `ModelCategory.Language`, etc.) are intentionally not re-exported here.
 // ---------------------------------------------------------------------------
 export {
   AccelerationPreference,
-  ConfigurationSource,
-  DownloadStage,
-  DownloadState,
-  FrameworkModality,
-  HardwareAcceleration,
-  LLMFramework,
+  AudioFormat,
+  InferenceFramework,
   ModelCategory,
+  ModelFileRole,
   ModelFormat,
-  ModelStatus,
+  ModelArtifactType,
+  ModelQuerySortField,
+  ModelQuerySortOrder,
+  ModelRegistryStatus,
+  ModelSource,
   RoutingPolicy,
-  SDKComponent,
   SDKEnvironment,
-  SDKEventType,
+} from '@runanywhere/proto-ts/model_types';
+export {
+  ComponentLifecycleState,
+  EventCategory,
+  EventDestination,
+  EventSeverity,
+  SDKComponent,
+} from '@runanywhere/proto-ts/sdk_events';
+export { DownloadStage, DownloadState } from '@runanywhere/proto-ts/download_service';
+export { AcceleratorPreference } from '@runanywhere/proto-ts/hardware_profile';
+
+// Web-only enums (browser UI/runtime state with no generated proto contract).
+export {
+  ComponentState,
+  FrameworkModality,
+  ModelStatus,
 } from './enums';
 
 export type {
   DeviceInfoData,
-  ModelInfoMetadata,
   ModelInfo,
   SDKInitOptions,
   StorageInfo,
   StoredModel,
-  ThinkingTagPattern,
 } from './models';
+export type {
+  ModelInfoMetadata,
+  ModelThinkingTagPattern,
+} from '@runanywhere/proto-ts/model_types';

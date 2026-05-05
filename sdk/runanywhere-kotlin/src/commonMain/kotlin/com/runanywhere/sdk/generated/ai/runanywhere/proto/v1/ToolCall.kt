@@ -90,6 +90,21 @@ public class ToolCall(
     schemaIndex = 5,
   )
   public val call_id: String? = null,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "createdAtMs",
+    schemaIndex = 6,
+  )
+  public val created_at_ms: Long = 0L,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "rawText",
+    schemaIndex = 7,
+  )
+  public val raw_text: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCall, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -122,6 +137,8 @@ public class ToolCall(
     if (type != other.type) return false
     if (arguments != other.arguments) return false
     if (call_id != other.call_id) return false
+    if (created_at_ms != other.created_at_ms) return false
+    if (raw_text != other.raw_text) return false
     return true
   }
 
@@ -135,6 +152,8 @@ public class ToolCall(
       result = result * 37 + type.hashCode()
       result = result * 37 + arguments.hashCode()
       result = result * 37 + (call_id?.hashCode() ?: 0)
+      result = result * 37 + created_at_ms.hashCode()
+      result = result * 37 + (raw_text?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -148,6 +167,8 @@ public class ToolCall(
     result += """type=${sanitize(type)}"""
     if (arguments.isNotEmpty()) result += """arguments=$arguments"""
     if (call_id != null) result += """call_id=${sanitize(call_id)}"""
+    result += """created_at_ms=$created_at_ms"""
+    if (raw_text != null) result += """raw_text=${sanitize(raw_text)}"""
     return result.joinToString(prefix = "ToolCall{", separator = ", ", postfix = "}")
   }
 
@@ -158,8 +179,11 @@ public class ToolCall(
     type: String = this.type,
     arguments: Map<String, ToolValue> = this.arguments,
     call_id: String? = this.call_id,
+    created_at_ms: Long = this.created_at_ms,
+    raw_text: String? = this.raw_text,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolCall = ToolCall(id, name, arguments_json, type, arguments, call_id, unknownFields)
+  ): ToolCall = ToolCall(id, name, arguments_json, type, arguments, call_id, created_at_ms,
+      raw_text, unknownFields)
 
   public companion object {
     @JvmField
@@ -183,6 +207,9 @@ public class ToolCall(
         if (value.type != "") size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.type)
         size += argumentsAdapter.encodedSizeWithTag(5, value.arguments)
         size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.call_id)
+        if (value.created_at_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(7,
+            value.created_at_ms)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.raw_text)
         return size
       }
 
@@ -194,11 +221,17 @@ public class ToolCall(
         if (value.type != "") ProtoAdapter.STRING.encodeWithTag(writer, 4, value.type)
         argumentsAdapter.encodeWithTag(writer, 5, value.arguments)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.call_id)
+        if (value.created_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
+            value.created_at_ms)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.raw_text)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolCall) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 8, value.raw_text)
+        if (value.created_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
+            value.created_at_ms)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.call_id)
         argumentsAdapter.encodeWithTag(writer, 5, value.arguments)
         if (value.type != "") ProtoAdapter.STRING.encodeWithTag(writer, 4, value.type)
@@ -215,6 +248,8 @@ public class ToolCall(
         var type: String = ""
         val arguments = mutableMapOf<String, ToolValue>()
         var call_id: String? = null
+        var created_at_ms: Long = 0L
+        var raw_text: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> id = ProtoAdapter.STRING.decode(reader)
@@ -223,6 +258,8 @@ public class ToolCall(
             4 -> type = ProtoAdapter.STRING.decode(reader)
             5 -> arguments.putAll(argumentsAdapter.decode(reader))
             6 -> call_id = ProtoAdapter.STRING.decode(reader)
+            7 -> created_at_ms = ProtoAdapter.INT64.decode(reader)
+            8 -> raw_text = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -233,6 +270,8 @@ public class ToolCall(
           type = type,
           arguments = arguments,
           call_id = call_id,
+          created_at_ms = created_at_ms,
+          raw_text = raw_text,
           unknownFields = unknownFields
         )
       }

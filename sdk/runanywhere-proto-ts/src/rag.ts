@@ -10,6 +10,69 @@ import _m0 from "protobufjs/minimal";
 
 export const protobufPackage = "runanywhere.v1";
 
+export enum RAGStreamEventKind {
+  RAG_STREAM_EVENT_KIND_UNSPECIFIED = 0,
+  RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED = 1,
+  RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED = 2,
+  RAG_STREAM_EVENT_KIND_CONTEXT_READY = 3,
+  RAG_STREAM_EVENT_KIND_TOKEN = 4,
+  RAG_STREAM_EVENT_KIND_COMPLETED = 5,
+  RAG_STREAM_EVENT_KIND_ERROR = 6,
+  UNRECOGNIZED = -1,
+}
+
+export function rAGStreamEventKindFromJSON(object: any): RAGStreamEventKind {
+  switch (object) {
+    case 0:
+    case "RAG_STREAM_EVENT_KIND_UNSPECIFIED":
+      return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED;
+    case 1:
+    case "RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED":
+      return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED;
+    case 2:
+    case "RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED":
+      return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED;
+    case 3:
+    case "RAG_STREAM_EVENT_KIND_CONTEXT_READY":
+      return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CONTEXT_READY;
+    case 4:
+    case "RAG_STREAM_EVENT_KIND_TOKEN":
+      return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN;
+    case 5:
+    case "RAG_STREAM_EVENT_KIND_COMPLETED":
+      return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED;
+    case 6:
+    case "RAG_STREAM_EVENT_KIND_ERROR":
+      return RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return RAGStreamEventKind.UNRECOGNIZED;
+  }
+}
+
+export function rAGStreamEventKindToJSON(object: RAGStreamEventKind): string {
+  switch (object) {
+    case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED:
+      return "RAG_STREAM_EVENT_KIND_UNSPECIFIED";
+    case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED:
+      return "RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED";
+    case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED:
+      return "RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED";
+    case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_CONTEXT_READY:
+      return "RAG_STREAM_EVENT_KIND_CONTEXT_READY";
+    case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_TOKEN:
+      return "RAG_STREAM_EVENT_KIND_TOKEN";
+    case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_COMPLETED:
+      return "RAG_STREAM_EVENT_KIND_COMPLETED";
+    case RAGStreamEventKind.RAG_STREAM_EVENT_KIND_ERROR:
+      return "RAG_STREAM_EVENT_KIND_ERROR";
+    case RAGStreamEventKind.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 /**
  * ---------------------------------------------------------------------------
  * RAGConfiguration — low-level pipeline config (pre-IDL hand-rolled).
@@ -52,7 +115,14 @@ export interface RAGConfiguration {
     | string
     | undefined;
   /** Backend-specific config JSON passed to the LLM provider. */
-  llmConfigJson?: string | undefined;
+  llmConfigJson?:
+    | string
+    | undefined;
+  /** Index persistence and retrieval behavior. Empty path = in-memory index. */
+  indexPath?: string | undefined;
+  persistIndex: boolean;
+  rerankResults: boolean;
+  rerankerModelPath?: string | undefined;
 }
 
 /**
@@ -71,9 +141,29 @@ export interface RAGDocument {
     | undefined;
   /** Typed metadata map for generated-proto callers. */
   metadata: { [key: string]: string };
+  /**
+   * Adapter-normalized document source. Pickers, sandbox bookmarks, and
+   * platform file access remain SDK-owned.
+   */
+  sourceUri?: string | undefined;
+  adapterHandle?: string | undefined;
+  mediaType?: string | undefined;
+  sizeBytes: number;
 }
 
 export interface RAGDocument_MetadataEntry {
+  key: string;
+  value: string;
+}
+
+export interface RAGIngestRequest {
+  requestId: string;
+  documents: RAGDocument[];
+  replaceExisting: boolean;
+  metadata: { [key: string]: string };
+}
+
+export interface RAGIngestRequest_MetadataEntry {
   key: string;
   value: string;
 }
@@ -98,6 +188,21 @@ export interface RAGQueryOptions {
   topP: number;
   /** Top-k sampling parameter. 0 = disabled. */
   topK: number;
+  /** Retrieval overrides. 0/unset = use RAGConfiguration defaults. */
+  retrievalTopK: number;
+  similarityThreshold: number;
+  stream: boolean;
+}
+
+export interface RAGQueryRequest {
+  requestId: string;
+  options?: RAGQueryOptions | undefined;
+  metadata: { [key: string]: string };
+}
+
+export interface RAGQueryRequest_MetadataEntry {
+  key: string;
+  value: string;
 }
 
 /**
@@ -130,6 +235,10 @@ export interface RAGSearchResult {
    * pass metadata without parsing it.
    */
   metadataJson?: string | undefined;
+  rank: number;
+  startOffset: number;
+  endOffset: number;
+  tokenCount: number;
 }
 
 export interface RAGSearchResult_MetadataEntry {
@@ -164,6 +273,12 @@ export interface RAGResult {
    * in milliseconds.
    */
   totalTimeMs: number;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  errorMessage?: string | undefined;
+  errorCode: number;
+  requestId: string;
 }
 
 /**
@@ -201,6 +316,41 @@ export interface RAGStatistics {
     | undefined;
   /** Approximate vector-store footprint in bytes, when known. */
   vectorStoreSizeBytes: number;
+  isPersistent: boolean;
+  lastQueryMs: number;
+  errorMessage?: string | undefined;
+  errorCode: number;
+}
+
+export interface RAGIngestResult {
+  requestId: string;
+  documentsIngested: number;
+  chunksIngested: number;
+  statistics?: RAGStatistics | undefined;
+  errorMessage?: string | undefined;
+  errorCode: number;
+}
+
+export interface RAGStreamEvent {
+  seq: number;
+  timestampUs: number;
+  requestId: string;
+  kind: RAGStreamEventKind;
+  chunk?: RAGSearchResult | undefined;
+  token: string;
+  result?: RAGResult | undefined;
+  errorMessage?: string | undefined;
+  errorCode: number;
+}
+
+export interface RAGServiceState {
+  isReady: boolean;
+  statistics?: RAGStatistics | undefined;
+  isIndexing: boolean;
+  isQuerying: boolean;
+  activeRequestId?: string | undefined;
+  errorMessage?: string | undefined;
+  errorCode: number;
 }
 
 function createBaseRAGConfiguration(): RAGConfiguration {
@@ -216,6 +366,10 @@ function createBaseRAGConfiguration(): RAGConfiguration {
     promptTemplate: undefined,
     embeddingConfigJson: undefined,
     llmConfigJson: undefined,
+    indexPath: undefined,
+    persistIndex: false,
+    rerankResults: false,
+    rerankerModelPath: undefined,
   };
 }
 
@@ -253,6 +407,18 @@ export const RAGConfiguration = {
     }
     if (message.llmConfigJson !== undefined) {
       writer.uint32(90).string(message.llmConfigJson);
+    }
+    if (message.indexPath !== undefined) {
+      writer.uint32(98).string(message.indexPath);
+    }
+    if (message.persistIndex !== false) {
+      writer.uint32(104).bool(message.persistIndex);
+    }
+    if (message.rerankResults !== false) {
+      writer.uint32(112).bool(message.rerankResults);
+    }
+    if (message.rerankerModelPath !== undefined) {
+      writer.uint32(122).string(message.rerankerModelPath);
     }
     return writer;
   },
@@ -341,6 +507,34 @@ export const RAGConfiguration = {
 
           message.llmConfigJson = reader.string();
           continue;
+        case 12:
+          if (tag !== 98) {
+            break;
+          }
+
+          message.indexPath = reader.string();
+          continue;
+        case 13:
+          if (tag !== 104) {
+            break;
+          }
+
+          message.persistIndex = reader.bool();
+          continue;
+        case 14:
+          if (tag !== 112) {
+            break;
+          }
+
+          message.rerankResults = reader.bool();
+          continue;
+        case 15:
+          if (tag !== 122) {
+            break;
+          }
+
+          message.rerankerModelPath = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -365,6 +559,10 @@ export const RAGConfiguration = {
         ? globalThis.String(object.embeddingConfigJson)
         : undefined,
       llmConfigJson: isSet(object.llmConfigJson) ? globalThis.String(object.llmConfigJson) : undefined,
+      indexPath: isSet(object.indexPath) ? globalThis.String(object.indexPath) : undefined,
+      persistIndex: isSet(object.persistIndex) ? globalThis.Boolean(object.persistIndex) : false,
+      rerankResults: isSet(object.rerankResults) ? globalThis.Boolean(object.rerankResults) : false,
+      rerankerModelPath: isSet(object.rerankerModelPath) ? globalThis.String(object.rerankerModelPath) : undefined,
     };
   },
 
@@ -403,6 +601,18 @@ export const RAGConfiguration = {
     if (message.llmConfigJson !== undefined) {
       obj.llmConfigJson = message.llmConfigJson;
     }
+    if (message.indexPath !== undefined) {
+      obj.indexPath = message.indexPath;
+    }
+    if (message.persistIndex !== false) {
+      obj.persistIndex = message.persistIndex;
+    }
+    if (message.rerankResults !== false) {
+      obj.rerankResults = message.rerankResults;
+    }
+    if (message.rerankerModelPath !== undefined) {
+      obj.rerankerModelPath = message.rerankerModelPath;
+    }
     return obj;
   },
 
@@ -422,12 +632,25 @@ export const RAGConfiguration = {
     message.promptTemplate = object.promptTemplate ?? undefined;
     message.embeddingConfigJson = object.embeddingConfigJson ?? undefined;
     message.llmConfigJson = object.llmConfigJson ?? undefined;
+    message.indexPath = object.indexPath ?? undefined;
+    message.persistIndex = object.persistIndex ?? false;
+    message.rerankResults = object.rerankResults ?? false;
+    message.rerankerModelPath = object.rerankerModelPath ?? undefined;
     return message;
   },
 };
 
 function createBaseRAGDocument(): RAGDocument {
-  return { id: "", text: "", metadataJson: undefined, metadata: {} };
+  return {
+    id: "",
+    text: "",
+    metadataJson: undefined,
+    metadata: {},
+    sourceUri: undefined,
+    adapterHandle: undefined,
+    mediaType: undefined,
+    sizeBytes: 0,
+  };
 }
 
 export const RAGDocument = {
@@ -444,6 +667,18 @@ export const RAGDocument = {
     Object.entries(message.metadata).forEach(([key, value]) => {
       RAGDocument_MetadataEntry.encode({ key: key as any, value }, writer.uint32(34).fork()).ldelim();
     });
+    if (message.sourceUri !== undefined) {
+      writer.uint32(42).string(message.sourceUri);
+    }
+    if (message.adapterHandle !== undefined) {
+      writer.uint32(50).string(message.adapterHandle);
+    }
+    if (message.mediaType !== undefined) {
+      writer.uint32(58).string(message.mediaType);
+    }
+    if (message.sizeBytes !== 0) {
+      writer.uint32(64).int64(message.sizeBytes);
+    }
     return writer;
   },
 
@@ -485,6 +720,34 @@ export const RAGDocument = {
             message.metadata[entry4.key] = entry4.value;
           }
           continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.sourceUri = reader.string();
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.adapterHandle = reader.string();
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.mediaType = reader.string();
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.sizeBytes = longToNumber(reader.int64() as Long);
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -505,6 +768,10 @@ export const RAGDocument = {
           return acc;
         }, {})
         : {},
+      sourceUri: isSet(object.sourceUri) ? globalThis.String(object.sourceUri) : undefined,
+      adapterHandle: isSet(object.adapterHandle) ? globalThis.String(object.adapterHandle) : undefined,
+      mediaType: isSet(object.mediaType) ? globalThis.String(object.mediaType) : undefined,
+      sizeBytes: isSet(object.sizeBytes) ? globalThis.Number(object.sizeBytes) : 0,
     };
   },
 
@@ -528,6 +795,18 @@ export const RAGDocument = {
         });
       }
     }
+    if (message.sourceUri !== undefined) {
+      obj.sourceUri = message.sourceUri;
+    }
+    if (message.adapterHandle !== undefined) {
+      obj.adapterHandle = message.adapterHandle;
+    }
+    if (message.mediaType !== undefined) {
+      obj.mediaType = message.mediaType;
+    }
+    if (message.sizeBytes !== 0) {
+      obj.sizeBytes = Math.round(message.sizeBytes);
+    }
     return obj;
   },
 
@@ -545,6 +824,10 @@ export const RAGDocument = {
       }
       return acc;
     }, {});
+    message.sourceUri = object.sourceUri ?? undefined;
+    message.adapterHandle = object.adapterHandle ?? undefined;
+    message.mediaType = object.mediaType ?? undefined;
+    message.sizeBytes = object.sizeBytes ?? 0;
     return message;
   },
 };
@@ -623,8 +906,219 @@ export const RAGDocument_MetadataEntry = {
   },
 };
 
+function createBaseRAGIngestRequest(): RAGIngestRequest {
+  return { requestId: "", documents: [], replaceExisting: false, metadata: {} };
+}
+
+export const RAGIngestRequest = {
+  encode(message: RAGIngestRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    for (const v of message.documents) {
+      RAGDocument.encode(v!, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.replaceExisting !== false) {
+      writer.uint32(24).bool(message.replaceExisting);
+    }
+    Object.entries(message.metadata).forEach(([key, value]) => {
+      RAGIngestRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(34).fork()).ldelim();
+    });
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): RAGIngestRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRAGIngestRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.documents.push(RAGDocument.decode(reader, reader.uint32()));
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.replaceExisting = reader.bool();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          const entry4 = RAGIngestRequest_MetadataEntry.decode(reader, reader.uint32());
+          if (entry4.value !== undefined) {
+            message.metadata[entry4.key] = entry4.value;
+          }
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RAGIngestRequest {
+    return {
+      requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+      documents: globalThis.Array.isArray(object?.documents)
+        ? object.documents.map((e: any) => RAGDocument.fromJSON(e))
+        : [],
+      replaceExisting: isSet(object.replaceExisting) ? globalThis.Boolean(object.replaceExisting) : false,
+      metadata: isObject(object.metadata)
+        ? Object.entries(object.metadata).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+        : {},
+    };
+  },
+
+  toJSON(message: RAGIngestRequest): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.documents?.length) {
+      obj.documents = message.documents.map((e) => RAGDocument.toJSON(e));
+    }
+    if (message.replaceExisting !== false) {
+      obj.replaceExisting = message.replaceExisting;
+    }
+    if (message.metadata) {
+      const entries = Object.entries(message.metadata);
+      if (entries.length > 0) {
+        obj.metadata = {};
+        entries.forEach(([k, v]) => {
+          obj.metadata[k] = v;
+        });
+      }
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RAGIngestRequest>, I>>(base?: I): RAGIngestRequest {
+    return RAGIngestRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RAGIngestRequest>, I>>(object: I): RAGIngestRequest {
+    const message = createBaseRAGIngestRequest();
+    message.requestId = object.requestId ?? "";
+    message.documents = object.documents?.map((e) => RAGDocument.fromPartial(e)) || [];
+    message.replaceExisting = object.replaceExisting ?? false;
+    message.metadata = Object.entries(object.metadata ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = globalThis.String(value);
+      }
+      return acc;
+    }, {});
+    return message;
+  },
+};
+
+function createBaseRAGIngestRequest_MetadataEntry(): RAGIngestRequest_MetadataEntry {
+  return { key: "", value: "" };
+}
+
+export const RAGIngestRequest_MetadataEntry = {
+  encode(message: RAGIngestRequest_MetadataEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): RAGIngestRequest_MetadataEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRAGIngestRequest_MetadataEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RAGIngestRequest_MetadataEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: RAGIngestRequest_MetadataEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RAGIngestRequest_MetadataEntry>, I>>(base?: I): RAGIngestRequest_MetadataEntry {
+    return RAGIngestRequest_MetadataEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RAGIngestRequest_MetadataEntry>, I>>(
+    object: I,
+  ): RAGIngestRequest_MetadataEntry {
+    const message = createBaseRAGIngestRequest_MetadataEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
 function createBaseRAGQueryOptions(): RAGQueryOptions {
-  return { question: "", systemPrompt: undefined, maxTokens: 0, temperature: 0, topP: 0, topK: 0 };
+  return {
+    question: "",
+    systemPrompt: undefined,
+    maxTokens: 0,
+    temperature: 0,
+    topP: 0,
+    topK: 0,
+    retrievalTopK: 0,
+    similarityThreshold: 0,
+    stream: false,
+  };
 }
 
 export const RAGQueryOptions = {
@@ -646,6 +1140,15 @@ export const RAGQueryOptions = {
     }
     if (message.topK !== 0) {
       writer.uint32(48).int32(message.topK);
+    }
+    if (message.retrievalTopK !== 0) {
+      writer.uint32(56).int32(message.retrievalTopK);
+    }
+    if (message.similarityThreshold !== 0) {
+      writer.uint32(69).float(message.similarityThreshold);
+    }
+    if (message.stream !== false) {
+      writer.uint32(72).bool(message.stream);
     }
     return writer;
   },
@@ -699,6 +1202,27 @@ export const RAGQueryOptions = {
 
           message.topK = reader.int32();
           continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.retrievalTopK = reader.int32();
+          continue;
+        case 8:
+          if (tag !== 69) {
+            break;
+          }
+
+          message.similarityThreshold = reader.float();
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.stream = reader.bool();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -716,6 +1240,9 @@ export const RAGQueryOptions = {
       temperature: isSet(object.temperature) ? globalThis.Number(object.temperature) : 0,
       topP: isSet(object.topP) ? globalThis.Number(object.topP) : 0,
       topK: isSet(object.topK) ? globalThis.Number(object.topK) : 0,
+      retrievalTopK: isSet(object.retrievalTopK) ? globalThis.Number(object.retrievalTopK) : 0,
+      similarityThreshold: isSet(object.similarityThreshold) ? globalThis.Number(object.similarityThreshold) : 0,
+      stream: isSet(object.stream) ? globalThis.Boolean(object.stream) : false,
     };
   },
 
@@ -739,6 +1266,15 @@ export const RAGQueryOptions = {
     if (message.topK !== 0) {
       obj.topK = Math.round(message.topK);
     }
+    if (message.retrievalTopK !== 0) {
+      obj.retrievalTopK = Math.round(message.retrievalTopK);
+    }
+    if (message.similarityThreshold !== 0) {
+      obj.similarityThreshold = message.similarityThreshold;
+    }
+    if (message.stream !== false) {
+      obj.stream = message.stream;
+    }
     return obj;
   },
 
@@ -753,6 +1289,195 @@ export const RAGQueryOptions = {
     message.temperature = object.temperature ?? 0;
     message.topP = object.topP ?? 0;
     message.topK = object.topK ?? 0;
+    message.retrievalTopK = object.retrievalTopK ?? 0;
+    message.similarityThreshold = object.similarityThreshold ?? 0;
+    message.stream = object.stream ?? false;
+    return message;
+  },
+};
+
+function createBaseRAGQueryRequest(): RAGQueryRequest {
+  return { requestId: "", options: undefined, metadata: {} };
+}
+
+export const RAGQueryRequest = {
+  encode(message: RAGQueryRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    if (message.options !== undefined) {
+      RAGQueryOptions.encode(message.options, writer.uint32(18).fork()).ldelim();
+    }
+    Object.entries(message.metadata).forEach(([key, value]) => {
+      RAGQueryRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(26).fork()).ldelim();
+    });
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): RAGQueryRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRAGQueryRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.options = RAGQueryOptions.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          const entry3 = RAGQueryRequest_MetadataEntry.decode(reader, reader.uint32());
+          if (entry3.value !== undefined) {
+            message.metadata[entry3.key] = entry3.value;
+          }
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RAGQueryRequest {
+    return {
+      requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+      options: isSet(object.options) ? RAGQueryOptions.fromJSON(object.options) : undefined,
+      metadata: isObject(object.metadata)
+        ? Object.entries(object.metadata).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+        : {},
+    };
+  },
+
+  toJSON(message: RAGQueryRequest): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.options !== undefined) {
+      obj.options = RAGQueryOptions.toJSON(message.options);
+    }
+    if (message.metadata) {
+      const entries = Object.entries(message.metadata);
+      if (entries.length > 0) {
+        obj.metadata = {};
+        entries.forEach(([k, v]) => {
+          obj.metadata[k] = v;
+        });
+      }
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RAGQueryRequest>, I>>(base?: I): RAGQueryRequest {
+    return RAGQueryRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RAGQueryRequest>, I>>(object: I): RAGQueryRequest {
+    const message = createBaseRAGQueryRequest();
+    message.requestId = object.requestId ?? "";
+    message.options = (object.options !== undefined && object.options !== null)
+      ? RAGQueryOptions.fromPartial(object.options)
+      : undefined;
+    message.metadata = Object.entries(object.metadata ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = globalThis.String(value);
+      }
+      return acc;
+    }, {});
+    return message;
+  },
+};
+
+function createBaseRAGQueryRequest_MetadataEntry(): RAGQueryRequest_MetadataEntry {
+  return { key: "", value: "" };
+}
+
+export const RAGQueryRequest_MetadataEntry = {
+  encode(message: RAGQueryRequest_MetadataEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): RAGQueryRequest_MetadataEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRAGQueryRequest_MetadataEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RAGQueryRequest_MetadataEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: RAGQueryRequest_MetadataEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RAGQueryRequest_MetadataEntry>, I>>(base?: I): RAGQueryRequest_MetadataEntry {
+    return RAGQueryRequest_MetadataEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RAGQueryRequest_MetadataEntry>, I>>(
+    object: I,
+  ): RAGQueryRequest_MetadataEntry {
+    const message = createBaseRAGQueryRequest_MetadataEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
     return message;
   },
 };
@@ -765,6 +1490,10 @@ function createBaseRAGSearchResult(): RAGSearchResult {
     sourceDocument: undefined,
     metadata: {},
     metadataJson: undefined,
+    rank: 0,
+    startOffset: 0,
+    endOffset: 0,
+    tokenCount: 0,
   };
 }
 
@@ -787,6 +1516,18 @@ export const RAGSearchResult = {
     });
     if (message.metadataJson !== undefined) {
       writer.uint32(50).string(message.metadataJson);
+    }
+    if (message.rank !== 0) {
+      writer.uint32(56).int32(message.rank);
+    }
+    if (message.startOffset !== 0) {
+      writer.uint32(64).int32(message.startOffset);
+    }
+    if (message.endOffset !== 0) {
+      writer.uint32(72).int32(message.endOffset);
+    }
+    if (message.tokenCount !== 0) {
+      writer.uint32(80).int32(message.tokenCount);
     }
     return writer;
   },
@@ -843,6 +1584,34 @@ export const RAGSearchResult = {
 
           message.metadataJson = reader.string();
           continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.rank = reader.int32();
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.startOffset = reader.int32();
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.endOffset = reader.int32();
+          continue;
+        case 10:
+          if (tag !== 80) {
+            break;
+          }
+
+          message.tokenCount = reader.int32();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -865,6 +1634,10 @@ export const RAGSearchResult = {
         }, {})
         : {},
       metadataJson: isSet(object.metadataJson) ? globalThis.String(object.metadataJson) : undefined,
+      rank: isSet(object.rank) ? globalThis.Number(object.rank) : 0,
+      startOffset: isSet(object.startOffset) ? globalThis.Number(object.startOffset) : 0,
+      endOffset: isSet(object.endOffset) ? globalThis.Number(object.endOffset) : 0,
+      tokenCount: isSet(object.tokenCount) ? globalThis.Number(object.tokenCount) : 0,
     };
   },
 
@@ -894,6 +1667,18 @@ export const RAGSearchResult = {
     if (message.metadataJson !== undefined) {
       obj.metadataJson = message.metadataJson;
     }
+    if (message.rank !== 0) {
+      obj.rank = Math.round(message.rank);
+    }
+    if (message.startOffset !== 0) {
+      obj.startOffset = Math.round(message.startOffset);
+    }
+    if (message.endOffset !== 0) {
+      obj.endOffset = Math.round(message.endOffset);
+    }
+    if (message.tokenCount !== 0) {
+      obj.tokenCount = Math.round(message.tokenCount);
+    }
     return obj;
   },
 
@@ -913,6 +1698,10 @@ export const RAGSearchResult = {
       return acc;
     }, {});
     message.metadataJson = object.metadataJson ?? undefined;
+    message.rank = object.rank ?? 0;
+    message.startOffset = object.startOffset ?? 0;
+    message.endOffset = object.endOffset ?? 0;
+    message.tokenCount = object.tokenCount ?? 0;
     return message;
   },
 };
@@ -994,7 +1783,20 @@ export const RAGSearchResult_MetadataEntry = {
 };
 
 function createBaseRAGResult(): RAGResult {
-  return { answer: "", retrievedChunks: [], contextUsed: "", retrievalTimeMs: 0, generationTimeMs: 0, totalTimeMs: 0 };
+  return {
+    answer: "",
+    retrievedChunks: [],
+    contextUsed: "",
+    retrievalTimeMs: 0,
+    generationTimeMs: 0,
+    totalTimeMs: 0,
+    promptTokens: 0,
+    completionTokens: 0,
+    totalTokens: 0,
+    errorMessage: undefined,
+    errorCode: 0,
+    requestId: "",
+  };
 }
 
 export const RAGResult = {
@@ -1016,6 +1818,24 @@ export const RAGResult = {
     }
     if (message.totalTimeMs !== 0) {
       writer.uint32(48).int64(message.totalTimeMs);
+    }
+    if (message.promptTokens !== 0) {
+      writer.uint32(56).int32(message.promptTokens);
+    }
+    if (message.completionTokens !== 0) {
+      writer.uint32(64).int32(message.completionTokens);
+    }
+    if (message.totalTokens !== 0) {
+      writer.uint32(72).int32(message.totalTokens);
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(82).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(88).int32(message.errorCode);
+    }
+    if (message.requestId !== "") {
+      writer.uint32(98).string(message.requestId);
     }
     return writer;
   },
@@ -1069,6 +1889,48 @@ export const RAGResult = {
 
           message.totalTimeMs = longToNumber(reader.int64() as Long);
           continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.promptTokens = reader.int32();
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.completionTokens = reader.int32();
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.totalTokens = reader.int32();
+          continue;
+        case 10:
+          if (tag !== 82) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 11:
+          if (tag !== 88) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+        case 12:
+          if (tag !== 98) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1088,6 +1950,12 @@ export const RAGResult = {
       retrievalTimeMs: isSet(object.retrievalTimeMs) ? globalThis.Number(object.retrievalTimeMs) : 0,
       generationTimeMs: isSet(object.generationTimeMs) ? globalThis.Number(object.generationTimeMs) : 0,
       totalTimeMs: isSet(object.totalTimeMs) ? globalThis.Number(object.totalTimeMs) : 0,
+      promptTokens: isSet(object.promptTokens) ? globalThis.Number(object.promptTokens) : 0,
+      completionTokens: isSet(object.completionTokens) ? globalThis.Number(object.completionTokens) : 0,
+      totalTokens: isSet(object.totalTokens) ? globalThis.Number(object.totalTokens) : 0,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+      requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
     };
   },
 
@@ -1111,6 +1979,24 @@ export const RAGResult = {
     if (message.totalTimeMs !== 0) {
       obj.totalTimeMs = Math.round(message.totalTimeMs);
     }
+    if (message.promptTokens !== 0) {
+      obj.promptTokens = Math.round(message.promptTokens);
+    }
+    if (message.completionTokens !== 0) {
+      obj.completionTokens = Math.round(message.completionTokens);
+    }
+    if (message.totalTokens !== 0) {
+      obj.totalTokens = Math.round(message.totalTokens);
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
     return obj;
   },
 
@@ -1125,6 +2011,12 @@ export const RAGResult = {
     message.retrievalTimeMs = object.retrievalTimeMs ?? 0;
     message.generationTimeMs = object.generationTimeMs ?? 0;
     message.totalTimeMs = object.totalTimeMs ?? 0;
+    message.promptTokens = object.promptTokens ?? 0;
+    message.completionTokens = object.completionTokens ?? 0;
+    message.totalTokens = object.totalTokens ?? 0;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
+    message.requestId = object.requestId ?? "";
     return message;
   },
 };
@@ -1138,6 +2030,10 @@ function createBaseRAGStatistics(): RAGStatistics {
     indexPath: undefined,
     statsJson: undefined,
     vectorStoreSizeBytes: 0,
+    isPersistent: false,
+    lastQueryMs: 0,
+    errorMessage: undefined,
+    errorCode: 0,
   };
 }
 
@@ -1163,6 +2059,18 @@ export const RAGStatistics = {
     }
     if (message.vectorStoreSizeBytes !== 0) {
       writer.uint32(56).int64(message.vectorStoreSizeBytes);
+    }
+    if (message.isPersistent !== false) {
+      writer.uint32(64).bool(message.isPersistent);
+    }
+    if (message.lastQueryMs !== 0) {
+      writer.uint32(72).int64(message.lastQueryMs);
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(82).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(88).int32(message.errorCode);
     }
     return writer;
   },
@@ -1223,6 +2131,34 @@ export const RAGStatistics = {
 
           message.vectorStoreSizeBytes = longToNumber(reader.int64() as Long);
           continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.isPersistent = reader.bool();
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.lastQueryMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 10:
+          if (tag !== 82) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 11:
+          if (tag !== 88) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1241,6 +2177,10 @@ export const RAGStatistics = {
       indexPath: isSet(object.indexPath) ? globalThis.String(object.indexPath) : undefined,
       statsJson: isSet(object.statsJson) ? globalThis.String(object.statsJson) : undefined,
       vectorStoreSizeBytes: isSet(object.vectorStoreSizeBytes) ? globalThis.Number(object.vectorStoreSizeBytes) : 0,
+      isPersistent: isSet(object.isPersistent) ? globalThis.Boolean(object.isPersistent) : false,
+      lastQueryMs: isSet(object.lastQueryMs) ? globalThis.Number(object.lastQueryMs) : 0,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
     };
   },
 
@@ -1267,6 +2207,18 @@ export const RAGStatistics = {
     if (message.vectorStoreSizeBytes !== 0) {
       obj.vectorStoreSizeBytes = Math.round(message.vectorStoreSizeBytes);
     }
+    if (message.isPersistent !== false) {
+      obj.isPersistent = message.isPersistent;
+    }
+    if (message.lastQueryMs !== 0) {
+      obj.lastQueryMs = Math.round(message.lastQueryMs);
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
     return obj;
   },
 
@@ -1282,6 +2234,505 @@ export const RAGStatistics = {
     message.indexPath = object.indexPath ?? undefined;
     message.statsJson = object.statsJson ?? undefined;
     message.vectorStoreSizeBytes = object.vectorStoreSizeBytes ?? 0;
+    message.isPersistent = object.isPersistent ?? false;
+    message.lastQueryMs = object.lastQueryMs ?? 0;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
+    return message;
+  },
+};
+
+function createBaseRAGIngestResult(): RAGIngestResult {
+  return {
+    requestId: "",
+    documentsIngested: 0,
+    chunksIngested: 0,
+    statistics: undefined,
+    errorMessage: undefined,
+    errorCode: 0,
+  };
+}
+
+export const RAGIngestResult = {
+  encode(message: RAGIngestResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    if (message.documentsIngested !== 0) {
+      writer.uint32(16).int64(message.documentsIngested);
+    }
+    if (message.chunksIngested !== 0) {
+      writer.uint32(24).int64(message.chunksIngested);
+    }
+    if (message.statistics !== undefined) {
+      RAGStatistics.encode(message.statistics, writer.uint32(34).fork()).ldelim();
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(42).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(48).int32(message.errorCode);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): RAGIngestResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRAGIngestResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.documentsIngested = longToNumber(reader.int64() as Long);
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.chunksIngested = longToNumber(reader.int64() as Long);
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.statistics = RAGStatistics.decode(reader, reader.uint32());
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RAGIngestResult {
+    return {
+      requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+      documentsIngested: isSet(object.documentsIngested) ? globalThis.Number(object.documentsIngested) : 0,
+      chunksIngested: isSet(object.chunksIngested) ? globalThis.Number(object.chunksIngested) : 0,
+      statistics: isSet(object.statistics) ? RAGStatistics.fromJSON(object.statistics) : undefined,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+    };
+  },
+
+  toJSON(message: RAGIngestResult): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.documentsIngested !== 0) {
+      obj.documentsIngested = Math.round(message.documentsIngested);
+    }
+    if (message.chunksIngested !== 0) {
+      obj.chunksIngested = Math.round(message.chunksIngested);
+    }
+    if (message.statistics !== undefined) {
+      obj.statistics = RAGStatistics.toJSON(message.statistics);
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RAGIngestResult>, I>>(base?: I): RAGIngestResult {
+    return RAGIngestResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RAGIngestResult>, I>>(object: I): RAGIngestResult {
+    const message = createBaseRAGIngestResult();
+    message.requestId = object.requestId ?? "";
+    message.documentsIngested = object.documentsIngested ?? 0;
+    message.chunksIngested = object.chunksIngested ?? 0;
+    message.statistics = (object.statistics !== undefined && object.statistics !== null)
+      ? RAGStatistics.fromPartial(object.statistics)
+      : undefined;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
+    return message;
+  },
+};
+
+function createBaseRAGStreamEvent(): RAGStreamEvent {
+  return {
+    seq: 0,
+    timestampUs: 0,
+    requestId: "",
+    kind: 0,
+    chunk: undefined,
+    token: "",
+    result: undefined,
+    errorMessage: undefined,
+    errorCode: 0,
+  };
+}
+
+export const RAGStreamEvent = {
+  encode(message: RAGStreamEvent, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.seq !== 0) {
+      writer.uint32(8).uint64(message.seq);
+    }
+    if (message.timestampUs !== 0) {
+      writer.uint32(16).int64(message.timestampUs);
+    }
+    if (message.requestId !== "") {
+      writer.uint32(26).string(message.requestId);
+    }
+    if (message.kind !== 0) {
+      writer.uint32(32).int32(message.kind);
+    }
+    if (message.chunk !== undefined) {
+      RAGSearchResult.encode(message.chunk, writer.uint32(42).fork()).ldelim();
+    }
+    if (message.token !== "") {
+      writer.uint32(50).string(message.token);
+    }
+    if (message.result !== undefined) {
+      RAGResult.encode(message.result, writer.uint32(58).fork()).ldelim();
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(66).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(72).int32(message.errorCode);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): RAGStreamEvent {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRAGStreamEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.seq = longToNumber(reader.uint64() as Long);
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.timestampUs = longToNumber(reader.int64() as Long);
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.kind = reader.int32() as any;
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.chunk = RAGSearchResult.decode(reader, reader.uint32());
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.token = reader.string();
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.result = RAGResult.decode(reader, reader.uint32());
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RAGStreamEvent {
+    return {
+      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
+      timestampUs: isSet(object.timestampUs) ? globalThis.Number(object.timestampUs) : 0,
+      requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+      kind: isSet(object.kind) ? rAGStreamEventKindFromJSON(object.kind) : 0,
+      chunk: isSet(object.chunk) ? RAGSearchResult.fromJSON(object.chunk) : undefined,
+      token: isSet(object.token) ? globalThis.String(object.token) : "",
+      result: isSet(object.result) ? RAGResult.fromJSON(object.result) : undefined,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+    };
+  },
+
+  toJSON(message: RAGStreamEvent): unknown {
+    const obj: any = {};
+    if (message.seq !== 0) {
+      obj.seq = Math.round(message.seq);
+    }
+    if (message.timestampUs !== 0) {
+      obj.timestampUs = Math.round(message.timestampUs);
+    }
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.kind !== 0) {
+      obj.kind = rAGStreamEventKindToJSON(message.kind);
+    }
+    if (message.chunk !== undefined) {
+      obj.chunk = RAGSearchResult.toJSON(message.chunk);
+    }
+    if (message.token !== "") {
+      obj.token = message.token;
+    }
+    if (message.result !== undefined) {
+      obj.result = RAGResult.toJSON(message.result);
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RAGStreamEvent>, I>>(base?: I): RAGStreamEvent {
+    return RAGStreamEvent.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RAGStreamEvent>, I>>(object: I): RAGStreamEvent {
+    const message = createBaseRAGStreamEvent();
+    message.seq = object.seq ?? 0;
+    message.timestampUs = object.timestampUs ?? 0;
+    message.requestId = object.requestId ?? "";
+    message.kind = object.kind ?? 0;
+    message.chunk = (object.chunk !== undefined && object.chunk !== null)
+      ? RAGSearchResult.fromPartial(object.chunk)
+      : undefined;
+    message.token = object.token ?? "";
+    message.result = (object.result !== undefined && object.result !== null)
+      ? RAGResult.fromPartial(object.result)
+      : undefined;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
+    return message;
+  },
+};
+
+function createBaseRAGServiceState(): RAGServiceState {
+  return {
+    isReady: false,
+    statistics: undefined,
+    isIndexing: false,
+    isQuerying: false,
+    activeRequestId: undefined,
+    errorMessage: undefined,
+    errorCode: 0,
+  };
+}
+
+export const RAGServiceState = {
+  encode(message: RAGServiceState, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.isReady !== false) {
+      writer.uint32(8).bool(message.isReady);
+    }
+    if (message.statistics !== undefined) {
+      RAGStatistics.encode(message.statistics, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.isIndexing !== false) {
+      writer.uint32(24).bool(message.isIndexing);
+    }
+    if (message.isQuerying !== false) {
+      writer.uint32(32).bool(message.isQuerying);
+    }
+    if (message.activeRequestId !== undefined) {
+      writer.uint32(42).string(message.activeRequestId);
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(50).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(56).int32(message.errorCode);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): RAGServiceState {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRAGServiceState();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.isReady = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.statistics = RAGStatistics.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.isIndexing = reader.bool();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.isQuerying = reader.bool();
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.activeRequestId = reader.string();
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RAGServiceState {
+    return {
+      isReady: isSet(object.isReady) ? globalThis.Boolean(object.isReady) : false,
+      statistics: isSet(object.statistics) ? RAGStatistics.fromJSON(object.statistics) : undefined,
+      isIndexing: isSet(object.isIndexing) ? globalThis.Boolean(object.isIndexing) : false,
+      isQuerying: isSet(object.isQuerying) ? globalThis.Boolean(object.isQuerying) : false,
+      activeRequestId: isSet(object.activeRequestId) ? globalThis.String(object.activeRequestId) : undefined,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+    };
+  },
+
+  toJSON(message: RAGServiceState): unknown {
+    const obj: any = {};
+    if (message.isReady !== false) {
+      obj.isReady = message.isReady;
+    }
+    if (message.statistics !== undefined) {
+      obj.statistics = RAGStatistics.toJSON(message.statistics);
+    }
+    if (message.isIndexing !== false) {
+      obj.isIndexing = message.isIndexing;
+    }
+    if (message.isQuerying !== false) {
+      obj.isQuerying = message.isQuerying;
+    }
+    if (message.activeRequestId !== undefined) {
+      obj.activeRequestId = message.activeRequestId;
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RAGServiceState>, I>>(base?: I): RAGServiceState {
+    return RAGServiceState.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RAGServiceState>, I>>(object: I): RAGServiceState {
+    const message = createBaseRAGServiceState();
+    message.isReady = object.isReady ?? false;
+    message.statistics = (object.statistics !== undefined && object.statistics !== null)
+      ? RAGStatistics.fromPartial(object.statistics)
+      : undefined;
+    message.isIndexing = object.isIndexing ?? false;
+    message.isQuerying = object.isQuerying ?? false;
+    message.activeRequestId = object.activeRequestId ?? undefined;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
     return message;
   },
 };

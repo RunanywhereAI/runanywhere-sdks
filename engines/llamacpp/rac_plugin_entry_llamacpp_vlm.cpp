@@ -7,8 +7,12 @@
  * Exposes `rac_plugin_entry_llamacpp_vlm()` filling only the VLM slot with
  * the existing `g_llamacpp_vlm_ops`. Separate from the LLM entry point so the
  * two can be independently gated in builds that only want one.
+ *
+ * CPP-04: declarative manifest publishes package ownership, availability and
+ * the served primitive set alongside the routing metadata.
  */
 
+#include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/features/vlm/rac_vlm_service.h"
@@ -26,23 +30,35 @@ static const rac_runtime_id_t k_llamacpp_vlm_runtimes[] = {
 };
 
 static const uint32_t k_llamacpp_vlm_formats[] = {
-    1,  /* MODEL_FORMAT_GGUF */
-    5,  /* MODEL_FORMAT_BIN  — vision projector / mmproj files */
+    RAC_MODEL_FORMAT_ID_GGUF,
+    RAC_MODEL_FORMAT_ID_BIN,  /* vision projector / mmproj files */
+};
+
+static const rac_primitive_t k_llamacpp_vlm_primitives[] = {
+    RAC_PRIMITIVE_VLM,
+};
+
+static const rac_engine_manifest_t k_llamacpp_vlm_manifest = {
+    .name             = "llamacpp_vlm",
+    .display_name     = "llama.cpp (VLM)",
+    .version          = nullptr,
+    .package_owner    = "runanywhere",
+    .package_name     = "runanywhere_llamacpp",
+    .availability     = RAC_ENGINE_AVAILABILITY_PUBLIC,
+    .priority         = 100,
+    .capability_flags = 0,
+    .primitives       = k_llamacpp_vlm_primitives,
+    .primitives_count = sizeof(k_llamacpp_vlm_primitives) / sizeof(k_llamacpp_vlm_primitives[0]),
+    .runtimes         = k_llamacpp_vlm_runtimes,
+    .runtimes_count   = sizeof(k_llamacpp_vlm_runtimes) / sizeof(k_llamacpp_vlm_runtimes[0]),
+    .formats          = k_llamacpp_vlm_formats,
+    .formats_count    = sizeof(k_llamacpp_vlm_formats) / sizeof(k_llamacpp_vlm_formats[0]),
+    .reserved_0       = 0,
+    .reserved_1       = 0,
 };
 
 static const rac_engine_vtable_t g_llamacpp_vlm_engine_vtable = {
-    /* metadata */ {
-        .abi_version      = RAC_PLUGIN_API_VERSION,
-        .name             = "llamacpp_vlm",
-        .display_name     = "llama.cpp (VLM)",
-        .engine_version   = nullptr,
-        .priority         = 100,
-        .capability_flags = 0,
-        .runtimes         = k_llamacpp_vlm_runtimes,
-        .runtimes_count   = sizeof(k_llamacpp_vlm_runtimes) / sizeof(k_llamacpp_vlm_runtimes[0]),
-        .formats          = k_llamacpp_vlm_formats,
-        .formats_count    = sizeof(k_llamacpp_vlm_formats) / sizeof(k_llamacpp_vlm_formats[0]),
-    },
+    /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_llamacpp_vlm_manifest),
     /* capability_check */ nullptr,
     /* on_unload        */ nullptr,
 
@@ -61,7 +77,8 @@ static const rac_engine_vtable_t g_llamacpp_vlm_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(llamacpp_vlm) {
-    return &g_llamacpp_vlm_engine_vtable;
+    return rac_engine_entry_with_manifest(&k_llamacpp_vlm_manifest,
+                                          &g_llamacpp_vlm_engine_vtable);
 }
 
 }  // extern "C"

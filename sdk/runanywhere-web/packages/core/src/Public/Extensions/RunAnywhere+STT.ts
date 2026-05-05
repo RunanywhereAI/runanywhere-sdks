@@ -2,103 +2,325 @@
  * RunAnywhere+STT.ts
  *
  * Speech-to-text namespace — mirrors Swift's `RunAnywhere+STT.swift`.
- * Provides `RunAnywhere.stt.*` capability surface around transcribe.
+ * Provides `RunAnywhere.stt.*` capability surface for owning STT component
+ * handles plus a top-level `RunAnywhere.transcribe(audio, options)` ergonomic
+ * shortcut.
+ *
+ * The proto-byte adapters (`STTProtoAdapter`) take a numeric `handle` argument
+ * — it comes from `_rac_stt_component_create()` followed by
+ * `_rac_stt_component_load_model()`. This facade owns those calls so the
+ * example app and external consumers never have to touch raw exports.
  */
 
-import type { STTOptions, STTOutput, STTPartialResult } from '@runanywhere/proto-ts/stt_options';
-import type { STTTranscriptionResult, STTTranscribeOptions } from '../../types/index';
-import { transcribe } from './RunAnywhere+Convenience';
+import { AudioFormat } from '@runanywhere/proto-ts/model_types';
+import {
+  STTLanguage,
+  type STTOptions,
+  type STTOutput,
+  type STTPartialResult,
+} from '@runanywhere/proto-ts/stt_options';
 import { SDKException } from '../../Foundation/SDKException';
-import { ExtensionPoint } from '../../Infrastructure/ExtensionPoint';
+import { SDKLogger } from '../../Foundation/SDKLogger';
+import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
+import {
+  tryRunanywhereModule,
+  type EmscriptenRunanywhereModule,
+} from '../../runtime/EmscriptenModule';
+import { STTProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
+import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
 
 export type { STTOptions, STTOutput, STTPartialResult };
 
-/** STT provider interface extensions for model management. */
-interface STTModelProvider {
-  loadSTTModel?(modelId: string): Promise<void>;
-  unloadSTTModel?(): Promise<void>;
-  isSTTModelLoaded?: boolean;
-  processStreamingAudio?(samples: Uint8Array): Promise<void>;
-  stopStreamingTranscription?(): Promise<void>;
-  isStreamingSTT?: boolean;
-  transcribeStream?(audio: AsyncIterable<Uint8Array>): AsyncIterable<STTPartialResult>;
+const logger = new SDKLogger('STT');
+
+/**
+ * Extra Emscripten exports the STT facade reaches into directly. The proto
+ * `transcribe`/`transcribeStream` calls go through `STTProtoAdapter`; what
+ * this facade adds is the component lifecycle (create / load_model / destroy).
+ */
+interface STTComponentModule extends EmscriptenRunanywhereModule {
+  _rac_stt_component_create?(outHandlePtr: number): number;
+  _rac_stt_component_load_model?(
+    handle: number,
+    modelPathPtr: number,
+    modelIdPtr: number,
+    modelNamePtr: number,
+  ): number;
+  _rac_stt_component_unload?(handle: number): number;
+  _rac_stt_component_destroy?(handle: number): void;
+  _rac_stt_component_is_loaded?(handle: number): number;
 }
 
-function getSTTProvider(): STTModelProvider | null {
-  return ExtensionPoint.getProvider('stt') as STTModelProvider | null;
+function requireSTTModule(feature: string): STTComponentModule {
+  const module = tryRunanywhereModule() as STTComponentModule | null;
+  if (!module) {
+    throw SDKException.backendNotAvailable(
+      feature,
+      'RunAnywhere WASM module is not initialized. Call a backend.register() first.',
+    );
+  }
+  return module;
+}
+
+function defaultSTTOptions(overrides?: Partial<STTOptions>): STTOptions {
+  return {
+    language: STTLanguage.STT_LANGUAGE_AUTO,
+    enablePunctuation: true,
+    enableDiarization: false,
+    maxSpeakers: 0,
+    vocabularyList: [],
+    enableWordTimestamps: false,
+    beamSize: 0,
+    languageCode: undefined,
+    detectLanguage: true,
+    audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
+    sampleRate: 16000,
+    maxAlternatives: 0,
+    chunkDurationMs: 0,
+    endpointSilenceMs: 0,
+    ...(overrides ?? {}),
+  } as STTOptions;
+}
+
+/**
+ * Encode a Float32Array of audio samples to little-endian Int16 PCM bytes,
+ * which is the canonical input format for `_rac_stt_component_transcribe_proto`.
+ */
+function encodeAudioToPcm16(samples: Float32Array): Uint8Array {
+  const out = new Uint8Array(samples.length * 2);
+  const view = new DataView(out.buffer);
+  for (let i = 0; i < samples.length; i += 1) {
+    let s = samples[i] ?? 0;
+    if (s > 1) s = 1;
+    if (s < -1) s = -1;
+    view.setInt16(i * 2, Math.round(s * 0x7fff), true);
+  }
+  return out;
+}
+
+function coerceAudio(audio: Uint8Array | Float32Array): Uint8Array {
+  if (audio instanceof Float32Array) return encodeAudioToPcm16(audio);
+  return audio;
+}
+
+/**
+ * Allocate the `out_handle` slot, run the create call, read the handle back.
+ * Returns the numeric component handle on success.
+ */
+function callCreate(module: STTComponentModule): number {
+  if (typeof module._rac_stt_component_create !== 'function') {
+    throw SDKException.backendNotAvailable(
+      'STT.create',
+      'Loaded WASM module does not export _rac_stt_component_create.',
+    );
+  }
+  const bridge = new ProtoWasmBridge(module, logger);
+  const outPtr = bridge.allocOutPtr();
+  if (!outPtr) {
+    throw SDKException.fromCode(
+      -180,
+      'STT.create: failed to allocate output handle slot',
+    );
+  }
+  try {
+    const rc = module._rac_stt_component_create(outPtr);
+    if (rc !== 0) {
+      throw SDKException.fromRACResult(
+        rc,
+        `rac_stt_component_create failed with code ${rc}`,
+      );
+    }
+    const handle = bridge.readU32(outPtr);
+    if (!handle) {
+      throw SDKException.componentNotReady(
+        'stt',
+        'rac_stt_component_create returned null handle',
+      );
+    }
+    return handle;
+  } finally {
+    bridge.free(outPtr);
+  }
+}
+
+function callLoadModel(
+  module: STTComponentModule,
+  handle: number,
+  modelPath: string,
+  modelId?: string,
+  modelName?: string,
+): void {
+  if (typeof module._rac_stt_component_load_model !== 'function') {
+    throw SDKException.backendNotAvailable(
+      'STT.loadModel',
+      'Loaded WASM module does not export _rac_stt_component_load_model.',
+    );
+  }
+  const bridge = new ProtoWasmBridge(module, logger);
+  const pathPtr = bridge.allocUtf8(modelPath);
+  if (!pathPtr) {
+    throw SDKException.fromCode(-180, 'STT.loadModel: failed to allocate model path');
+  }
+  const idPtr = modelId ? bridge.allocUtf8(modelId) : 0;
+  const namePtr = modelName ? bridge.allocUtf8(modelName) : 0;
+  try {
+    const rc = module._rac_stt_component_load_model(handle, pathPtr, idPtr, namePtr);
+    if (rc !== 0) {
+      throw SDKException.fromRACResult(
+        rc,
+        `rac_stt_component_load_model failed with code ${rc}`,
+      );
+    }
+  } finally {
+    bridge.free(pathPtr);
+    if (idPtr) bridge.free(idPtr);
+    if (namePtr) bridge.free(namePtr);
+  }
+}
+
+/** Top-level transcribe options for the ergonomic shortcut. */
+export interface TranscribeOptions extends Partial<STTOptions> {
+  /** Optional explicit model id. When omitted, uses the loaded STT model from lifecycle. */
+  modelId?: string;
+  /** Optional explicit model file path. Required when no STT model has been loaded yet. */
+  modelPath?: string;
 }
 
 export const STT = {
-  async transcribe(
-    audio: Float32Array | File,
-    options?: STTTranscribeOptions,
-  ): Promise<STTTranscriptionResult> {
-    return transcribe(audio, options);
+  /**
+   * Returns true when the WASM module is loaded with both the proto-byte
+   * STT exports AND the component lifecycle exports (create / load_model /
+   * destroy). The proto-byte half is what `STTProtoAdapter.supportsProtoSTT()`
+   * already checks; this adds the lifecycle slot detection.
+   */
+  supportsProtoSTT(): boolean {
+    const module = tryRunanywhereModule() as STTComponentModule | null;
+    if (!module) return false;
+    if (typeof module._rac_stt_component_create !== 'function') return false;
+    if (typeof module._rac_stt_component_load_model !== 'function') return false;
+    if (typeof module._rac_stt_component_destroy !== 'function') return false;
+    return STTProtoAdapter.tryDefault()?.supportsProtoSTT() ?? false;
   },
 
   /**
-   * Stream transcription from an audio stream (§4). Delegates to the STT
-   * provider's `transcribeStream` if available. If the provider does not
-   * implement streaming, throws `backendNotAvailable`.
+   * Create a fresh STT component handle. Caller owns lifecycle and MUST call
+   * `STT.destroy(handle)` when finished.
    */
-  transcribeStream(audio: AsyncIterable<Uint8Array>): AsyncIterable<STTPartialResult> {
-    const provider = getSTTProvider();
-    if (typeof provider?.transcribeStream === 'function') {
-      return provider.transcribeStream(audio);
+  create(): number {
+    const module = requireSTTModule('STT.create');
+    return callCreate(module);
+  },
+
+  /**
+   * Load a model into the component handle. `modelPath` is the on-device file
+   * path resolved by the C++ model lifecycle (or any path the platform adapter
+   * can serve). `modelId` and `modelName` are optional telemetry hints.
+   */
+  loadModel(handle: number, modelPath: string, modelId?: string, modelName?: string): void {
+    const module = requireSTTModule('STT.loadModel');
+    callLoadModel(module, handle, modelPath, modelId, modelName);
+  },
+
+  /** Whether the component handle has a model loaded. */
+  isLoaded(handle: number): boolean {
+    const module = tryRunanywhereModule() as STTComponentModule | null;
+    if (!module || typeof module._rac_stt_component_is_loaded !== 'function') return false;
+    return Boolean(module._rac_stt_component_is_loaded(handle));
+  },
+
+  /** Transcribe a single audio buffer through the proto-byte adapter. */
+  transcribe(
+    handle: number,
+    audio: Uint8Array | Float32Array,
+    options?: Partial<STTOptions>,
+  ): STTOutput {
+    const adapter = STTProtoAdapter.tryDefault();
+    if (!adapter || !adapter.supportsProtoSTT()) {
+      throw SDKException.backendNotAvailable(
+        'STT.transcribe',
+        'No Web WASM backend with rac_stt_*_proto exports is registered.',
+      );
     }
-    throw SDKException.backendNotAvailable(
-      'transcribeStream',
-      'The active STT provider does not implement streaming transcription.',
-    );
-  },
-
-  /** Process a streaming audio chunk (§4). */
-  async processStreamingAudio(samples: Uint8Array): Promise<void> {
-    const provider = getSTTProvider();
-    if (typeof provider?.processStreamingAudio === 'function') {
-      return provider.processStreamingAudio(samples);
+    const result = adapter.transcribe(handle, coerceAudio(audio), defaultSTTOptions(options));
+    if (!result) {
+      throw SDKException.backendNotAvailable(
+        'STT.transcribe',
+        'rac_stt_component_transcribe_proto returned no STTOutput bytes.',
+      );
     }
-    throw SDKException.backendNotAvailable(
-      'processStreamingAudio',
-      'The active STT provider does not implement streaming audio processing.',
-    );
+    return result;
   },
 
-  /** Stop streaming transcription (§4). */
-  async stopStreamingTranscription(): Promise<void> {
-    const provider = getSTTProvider();
-    if (typeof provider?.stopStreamingTranscription === 'function') {
-      return provider.stopStreamingTranscription();
+  /** Streaming transcription — yields partial events ending with isFinal=true. */
+  transcribeStream(
+    handle: number,
+    audio: Uint8Array | Float32Array,
+    options?: Partial<STTOptions>,
+  ): AsyncIterable<STTPartialResult> {
+    const adapter = STTProtoAdapter.tryDefault();
+    if (!adapter || !adapter.supportsProtoSTT()) {
+      throw SDKException.backendNotAvailable(
+        'STT.transcribeStream',
+        'No Web WASM backend with rac_stt_*_proto exports is registered.',
+      );
     }
+    return adapter.transcribeStream(handle, coerceAudio(audio), defaultSTTOptions(options));
   },
 
-  /** Whether a streaming STT session is active (§4). */
-  get isStreamingSTT(): boolean {
-    return getSTTProvider()?.isStreamingSTT ?? false;
+  /** Unload the model but keep the component handle alive. */
+  unload(handle: number): boolean {
+    const module = tryRunanywhereModule() as STTComponentModule | null;
+    if (!module || typeof module._rac_stt_component_unload !== 'function') return false;
+    const rc = module._rac_stt_component_unload(handle);
+    return rc === 0;
   },
 
-  /** Load an STT model by ID (§4). */
-  async loadSTTModel(modelId: string): Promise<void> {
-    const provider = getSTTProvider();
-    if (typeof provider?.loadSTTModel === 'function') {
-      return provider.loadSTTModel(modelId);
-    }
-    throw SDKException.backendNotAvailable(
-      'loadSTTModel',
-      'No STT provider registered. Install and register @runanywhere/web-onnx.',
-    );
-  },
-
-  /** Unload the active STT model (§4). */
-  async unloadSTTModel(): Promise<void> {
-    const provider = getSTTProvider();
-    if (typeof provider?.unloadSTTModel === 'function') {
-      return provider.unloadSTTModel();
-    }
-  },
-
-  /** Whether an STT model is currently loaded (§4). */
-  get isSTTModelLoaded(): boolean {
-    return getSTTProvider()?.isSTTModelLoaded ?? false;
+  /** Destroy the component handle. Idempotent — safe to call multiple times. */
+  destroy(handle: number): void {
+    const module = tryRunanywhereModule() as STTComponentModule | null;
+    if (!module || typeof module._rac_stt_component_destroy !== 'function') return;
+    module._rac_stt_component_destroy(handle);
   },
 };
+
+/**
+ * Top-level ergonomic shortcut: auto-creates a handle, loads the current STT
+ * model from lifecycle (if any), runs transcription, and destroys the handle.
+ * Use the namespaced `RunAnywhere.stt.*` verbs when you want to reuse a handle
+ * across calls.
+ */
+export async function transcribe(
+  audio: Uint8Array | Float32Array,
+  options?: TranscribeOptions,
+): Promise<STTOutput> {
+  const module = requireSTTModule('RunAnywhere.transcribe');
+  let modelPath = options?.modelPath;
+  let modelId = options?.modelId;
+  let modelName: string | undefined;
+
+  if (!modelPath) {
+    if (!ModelLifecycle.supportsNativeLifecycle()) {
+      throw SDKException.backendNotAvailable(
+        'RunAnywhere.transcribe',
+        'No modelPath provided and the model lifecycle proto adapter is not installed.',
+      );
+    }
+    const current = ModelLifecycle.currentModel({ includeModelMetadata: true });
+    if (!current?.modelId) {
+      throw SDKException.componentNotReady(
+        'stt',
+        'No STT model is loaded. Call ModelLifecycle.load(...) before RunAnywhere.transcribe().',
+      );
+    }
+    modelPath = current.resolvedPath || current.modelId;
+    modelId = current.modelId;
+  }
+
+  const handle = callCreate(module);
+  try {
+    callLoadModel(module, handle, modelPath, modelId, modelName);
+    return STT.transcribe(handle, audio, options);
+  } finally {
+    STT.destroy(handle);
+  }
+}

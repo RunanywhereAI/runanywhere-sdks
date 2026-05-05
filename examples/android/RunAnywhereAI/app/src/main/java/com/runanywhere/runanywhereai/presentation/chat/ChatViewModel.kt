@@ -1,13 +1,15 @@
 package com.runanywhere.runanywhereai.presentation.chat
 
+import ai.runanywhere.proto.v1.GenerationEvent
+import ai.runanywhere.proto.v1.GenerationEventKind
+import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.LLMGenerationOptions
+import ai.runanywhere.proto.v1.LoRAState
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ToolCallingOptions
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import ai.runanywhere.proto.v1.LLMGenerationOptions
-import ai.runanywhere.proto.v1.GenerationEvent
-import ai.runanywhere.proto.v1.GenerationEventKind
-import ai.runanywhere.proto.v1.ToolCallingOptions
-import ai.runanywhere.proto.v1.ToolValue
 import com.runanywhere.runanywhereai.RunAnywhereApplication
 import com.runanywhere.runanywhereai.data.ConversationStore
 import com.runanywhere.runanywhereai.domain.models.ChatMessage
@@ -20,34 +22,26 @@ import com.runanywhere.runanywhereai.domain.models.ToolCallInfo
 import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
-import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
-import com.runanywhere.sdk.public.extensions.Models.ModelCategory
+import com.runanywhere.sdk.public.extensions.Models.isDownloadedModel
 import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.cancelGeneration
 import com.runanywhere.sdk.public.extensions.currentLLMModel
-// Round 1 KOTLIN (G-A8): currentLLMModelId removed; use currentLLMModel()?.id.
 import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.generateStream
-import com.runanywhere.sdk.public.extensions.getLoadedLoraAdapters
+import com.runanywhere.sdk.public.extensions.generateWithTools
+import com.runanywhere.sdk.public.extensions.getRegisteredTools
 import com.runanywhere.sdk.public.extensions.isLLMModelLoaded
 import com.runanywhere.sdk.public.extensions.loadLLMModel
+import com.runanywhere.sdk.public.extensions.lora
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
 import timber.log.Timber
 import kotlin.math.ceil
 
@@ -224,7 +218,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     // Check if tool calling is enabled and tools are registered
                     val toolViewModel = ToolSettingsViewModel.getInstance(app)
                     val useToolCalling = toolViewModel.toolCallingEnabled
-                    val registeredTools = RunAnywhereToolCalling.getRegisteredTools()
+                    val registeredTools = RunAnywhere.getRegisteredTools()
 
                     if (useToolCalling && registeredTools.isNotEmpty()) {
                         Timber.i("🔧 Using tool calling with ${registeredTools.size} tools")
@@ -273,7 +267,11 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 )
 
             // Generate with tools
-            val result = RunAnywhereToolCalling.generateWithTools(prompt, toolOptions)
+            val result =
+                RunAnywhere.generateWithTools(
+                    prompt,
+                    LLMGenerationOptions(tool_calling = toolOptions),
+                )
             val endTime = System.currentTimeMillis()
 
             // Update the assistant message with the result
@@ -366,68 +364,68 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 .collect { event ->
-                val token = event.token
-                if (token.isEmpty()) return@collect
-                fullResponse += token
-                totalTokensReceived++
+                    val token = event.token
+                    if (token.isEmpty()) return@collect
+                    fullResponse += token
+                    totalTokensReceived++
 
-                // Track first token time
-                if (firstTokenTime == null) {
-                    firstTokenTime = System.currentTimeMillis()
-                }
-
-                // Calculate real-time tokens per second
-                if (totalTokensReceived % 10 == 0) {
-                    val elapsed = System.currentTimeMillis() - (firstTokenTime ?: startTime)
-                    if (elapsed > 0) {
-                        val currentSpeed = totalTokensReceived.toDouble() / (elapsed / 1000.0)
-                        tokensPerSecondHistory.add(currentSpeed)
+                    // Track first token time
+                    if (firstTokenTime == null) {
+                        firstTokenTime = System.currentTimeMillis()
                     }
-                }
 
-                // Handle thinking mode
-                if (fullResponse.contains("<think>") && !isInThinkingMode) {
-                    isInThinkingMode = true
-                    thinkingStartTime = System.currentTimeMillis()
-                    Timber.i("🧠 Entering thinking mode")
-                }
+                    // Calculate real-time tokens per second
+                    if (totalTokensReceived % 10 == 0) {
+                        val elapsed = System.currentTimeMillis() - (firstTokenTime ?: startTime)
+                        if (elapsed > 0) {
+                            val currentSpeed = totalTokensReceived.toDouble() / (elapsed / 1000.0)
+                            tokensPerSecondHistory.add(currentSpeed)
+                        }
+                    }
 
-                if (isInThinkingMode) {
-                    if (fullResponse.contains("</think>")) {
-                        // Extract thinking and response content
-                        val thinkingRange = fullResponse.indexOf("<think>") + 7
-                        val thinkingEndRange = fullResponse.indexOf("</think>")
+                    // Handle thinking mode
+                    if (fullResponse.contains("<think>") && !isInThinkingMode) {
+                        isInThinkingMode = true
+                        thinkingStartTime = System.currentTimeMillis()
+                        Timber.i("🧠 Entering thinking mode")
+                    }
 
-                        if (thinkingRange < thinkingEndRange) {
-                            thinkingContent = fullResponse.substring(thinkingRange, thinkingEndRange)
-                            responseContent = fullResponse.substring(thinkingEndRange + 8)
-                            isInThinkingMode = false
-                            thinkingEndTime = System.currentTimeMillis()
-                            Timber.i("🧠 Exiting thinking mode")
+                    if (isInThinkingMode) {
+                        if (fullResponse.contains("</think>")) {
+                            // Extract thinking and response content
+                            val thinkingRange = fullResponse.indexOf("<think>") + 7
+                            val thinkingEndRange = fullResponse.indexOf("</think>")
+
+                            if (thinkingRange < thinkingEndRange) {
+                                thinkingContent = fullResponse.substring(thinkingRange, thinkingEndRange)
+                                responseContent = fullResponse.substring(thinkingEndRange + 8)
+                                isInThinkingMode = false
+                                thinkingEndTime = System.currentTimeMillis()
+                                Timber.i("🧠 Exiting thinking mode")
+                            }
+                        } else {
+                            // Still in thinking mode
+                            val thinkingRange = fullResponse.indexOf("<think>") + 7
+                            if (thinkingRange < fullResponse.length) {
+                                thinkingContent = fullResponse.substring(thinkingRange)
+                            }
                         }
                     } else {
-                        // Still in thinking mode
-                        val thinkingRange = fullResponse.indexOf("<think>") + 7
-                        if (thinkingRange < fullResponse.length) {
-                            thinkingContent = fullResponse.substring(thinkingRange)
-                        }
+                        // Not in thinking mode, show response tokens directly
+                        responseContent =
+                            fullResponse
+                                .replace("<think>", "")
+                                .replace("</think>", "")
+                                .trim()
                     }
-                } else {
-                    // Not in thinking mode, show response tokens directly
-                    responseContent =
-                        fullResponse
-                            .replace("<think>", "")
-                            .replace("</think>", "")
-                            .trim()
-                }
 
-                // Update the assistant message
-                updateAssistantMessage(
-                    messageId = messageId,
-                    content = if (isInThinkingMode) "" else responseContent,
-                    thinkingContent = if (thinkingContent.isEmpty()) null else thinkingContent.trim(),
-                )
-            }
+                    // Update the assistant message
+                    updateAssistantMessage(
+                        messageId = messageId,
+                        content = if (isInThinkingMode) "" else responseContent,
+                        thinkingContent = if (thinkingContent.isEmpty()) null else thinkingContent.trim(),
+                    )
+                }
             if (streamError != null) throw RuntimeException(streamError)
         } catch (e: kotlinx.coroutines.CancellationException) {
             Timber.i("Streaming cancelled by user")
@@ -793,7 +791,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                         _uiState.value.copy(
                             isModelLoaded = true,
                             loadedModelName = displayName,
-                            currentModelSupportsLora = currentModel?.supportsLora == true,
+                            currentModelSupportsLora = currentModel?.supports_lora == true,
                         )
                     refreshLoraState()
                     addSystemMessageIfNeeded()
@@ -805,10 +803,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val allModels = RunAnywhere.availableModels()
                 val chatModel =
                     allModels.firstOrNull { model ->
-                        model.category == ModelCategory.LANGUAGE && model.isDownloaded &&
-                            model.framework == com.runanywhere.sdk.core.types.InferenceFramework.GENIE
+                        model.category == ModelCategory.MODEL_CATEGORY_LANGUAGE && model.isDownloadedModel &&
+                            model.framework == InferenceFramework.INFERENCE_FRAMEWORK_GENIE
                     } ?: allModels.firstOrNull { model ->
-                        model.category == ModelCategory.LANGUAGE && model.isDownloaded
+                        model.category == ModelCategory.MODEL_CATEGORY_LANGUAGE && model.isDownloadedModel
                     }
 
                 if (chatModel != null) {
@@ -821,7 +819,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             _uiState.value.copy(
                                 isModelLoaded = true,
                                 loadedModelName = chatModel.name,
-                                currentModelSupportsLora = chatModel.supportsLora,
+                                currentModelSupportsLora = chatModel.supports_lora,
                             )
                         refreshLoraState()
                         Timber.i("✅ Chat model loaded successfully: ${chatModel.name}")
@@ -873,8 +871,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         loraRefreshJob =
             viewModelScope.launch {
                 try {
-                    val loaded = withContext(Dispatchers.IO) { RunAnywhere.getLoadedLoraAdapters() }
-                    _uiState.value = _uiState.value.copy(hasActiveLoraAdapter = loaded.isNotEmpty())
+                    val state = withContext(Dispatchers.IO) { RunAnywhere.lora.list(LoRAState()) }
+                    _uiState.value =
+                        _uiState.value.copy(
+                            hasActiveLoraAdapter =
+                                state.error_message.isNullOrBlank() &&
+                                    state.loaded_adapters.isNotEmpty(),
+                        )
                 } catch (e: Exception) {
                     Timber.e(e, "Failed to refresh LoRA state")
                 }
@@ -955,40 +958,5 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             temperature = temperature,
             system_prompt = systemPrompt,
         )
-    }
-
-    /**
-     * Format a ToolValue map to JSON string for display.
-     * Uses kotlinx.serialization for proper JSON escaping of special characters.
-     */
-    private fun formatToolValueMapToJson(map: Map<String, ToolValue>): String {
-        val jsonObject =
-            buildJsonObject {
-                map.forEach { (key, value) ->
-                    put(key, formatToolValueToJsonElement(value))
-                }
-            }
-        return Json.encodeToString(JsonObject.serializer(), jsonObject)
-    }
-
-    /**
-     * Convert a ToolValue to the appropriate JsonElement type.
-     * Handles all ToolValue variants with proper JSON escaping.
-     */
-    private fun formatToolValueToJsonElement(value: ToolValue): JsonElement {
-        value.string_value?.let { return JsonPrimitive(it) }
-        value.number_value?.let { return JsonPrimitive(it) }
-        value.bool_value?.let { return JsonPrimitive(it) }
-        value.array_value?.let { arrayValue ->
-            return buildJsonArray {
-                arrayValue.values.forEach { add(formatToolValueToJsonElement(it)) }
-            }
-        }
-        value.object_value?.let { objectValue ->
-            return buildJsonObject {
-                objectValue.fields.forEach { (k, v) -> put(k, formatToolValueToJsonElement(v)) }
-            }
-        }
-        return JsonNull
     }
 }

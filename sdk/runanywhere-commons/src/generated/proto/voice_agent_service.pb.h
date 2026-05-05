@@ -29,6 +29,10 @@
 #include "google/protobuf/message_lite.h"
 #include "google/protobuf/repeated_field.h"  // IWYU pragma: export
 #include "google/protobuf/extension_set.h"  // IWYU pragma: export
+#include "google/protobuf/map.h"  // IWYU pragma: export
+#include "google/protobuf/map_type_handler.h"  // IWYU pragma: export
+#include "google/protobuf/map_entry.h"
+#include "google/protobuf/map_field.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "voice_events.pb.h"
 // @@protoc_insertion_point(includes)
@@ -72,6 +76,14 @@ class VoiceAgentResult;
 struct VoiceAgentResultDefaultTypeInternal;
 extern VoiceAgentResultDefaultTypeInternal _VoiceAgentResult_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull VoiceAgentResult_class_data_;
+class VoiceAgentTurnRequest;
+struct VoiceAgentTurnRequestDefaultTypeInternal;
+extern VoiceAgentTurnRequestDefaultTypeInternal _VoiceAgentTurnRequest_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull VoiceAgentTurnRequest_class_data_;
+class VoiceAgentTurnRequest_MetadataEntry_DoNotUse;
+struct VoiceAgentTurnRequest_MetadataEntry_DoNotUseDefaultTypeInternal;
+extern VoiceAgentTurnRequest_MetadataEntry_DoNotUseDefaultTypeInternal _VoiceAgentTurnRequest_MetadataEntry_DoNotUse_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull VoiceAgentTurnRequest_MetadataEntry_DoNotUse_class_data_;
 class VoiceSessionConfig;
 struct VoiceSessionConfigDefaultTypeInternal;
 extern VoiceSessionConfigDefaultTypeInternal _VoiceSessionConfig_default_instance_;
@@ -147,7 +159,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceSessionConfig final : public :
     return *reinterpret_cast<const VoiceSessionConfig*>(
         &_VoiceSessionConfig_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 2;
+  static constexpr int kIndexInFileMessages = 4;
   friend void swap(VoiceSessionConfig& a, VoiceSessionConfig& b) { a.Swap(&b); }
   inline void Swap(VoiceSessionConfig* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -237,13 +249,50 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceSessionConfig final : public :
 
   // accessors -------------------------------------------------------
   enum : int {
+    kLanguageCodeFieldNumber = 8,
+    kVoiceIdFieldNumber = 9,
     kSilenceDurationMsFieldNumber = 1,
     kSpeechThresholdFieldNumber = 2,
     kAutoPlayTtsFieldNumber = 3,
     kContinuousModeFieldNumber = 4,
     kThinkingModeEnabledFieldNumber = 5,
     kMaxTokensFieldNumber = 6,
+    kMaxRecordingDurationMsFieldNumber = 7,
   };
+  // optional string language_code = 8;
+  [[nodiscard]] bool has_language_code()
+      const;
+  void clear_language_code() ;
+  [[nodiscard]] const ::std::string& language_code() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_language_code(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_language_code();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_language_code();
+  void set_allocated_language_code(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_language_code() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_language_code(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_language_code();
+
+  public:
+  // optional string voice_id = 9;
+  [[nodiscard]] bool has_voice_id()
+      const;
+  void clear_voice_id() ;
+  [[nodiscard]] const ::std::string& voice_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_voice_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_voice_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_voice_id();
+  void set_allocated_voice_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_voice_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_voice_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_voice_id();
+
+  public:
   // int32 silence_duration_ms = 1;
   void clear_silence_duration_ms() ;
   [[nodiscard]] ::int32_t silence_duration_ms() const;
@@ -304,12 +353,22 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceSessionConfig final : public :
   void _internal_set_max_tokens(::int32_t value);
 
   public:
+  // int32 max_recording_duration_ms = 7;
+  void clear_max_recording_duration_ms() ;
+  [[nodiscard]] ::int32_t max_recording_duration_ms() const;
+  void set_max_recording_duration_ms(::int32_t value);
+
+  private:
+  ::int32_t _internal_max_recording_duration_ms() const;
+  void _internal_set_max_recording_duration_ms(::int32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VoiceSessionConfig)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<3, 6,
-                                   0, 0,
+  static const ::google::protobuf::internal::TcParseTable<4, 9,
+                                   0, 71,
                                    2>
       _table_;
 
@@ -332,12 +391,15 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceSessionConfig final : public :
         const VoiceSessionConfig& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr language_code_;
+    ::google::protobuf::internal::ArenaStringPtr voice_id_;
     ::int32_t silence_duration_ms_;
     float speech_threshold_;
     bool auto_play_tts_;
     bool continuous_mode_;
     bool thinking_mode_enabled_;
     ::int32_t max_tokens_;
+    ::int32_t max_recording_duration_ms_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -345,6 +407,45 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceSessionConfig final : public :
 };
 
 extern const ::google::protobuf::internal::ClassDataFull VoiceSessionConfig_class_data_;
+// -------------------------------------------------------------------
+
+class PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentTurnRequest_MetadataEntry_DoNotUse final
+    : public ::google::protobuf::internal::MapEntry<::std::string, ::std::string,
+                             ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
+                             ::google::protobuf::internal::WireFormatLite::TYPE_STRING> {
+ public:
+  using SuperType =
+      ::google::protobuf::internal::MapEntry<::std::string, ::std::string,
+                      ::google::protobuf::internal::WireFormatLite::TYPE_STRING,
+                      ::google::protobuf::internal::WireFormatLite::TYPE_STRING>;
+  VoiceAgentTurnRequest_MetadataEntry_DoNotUse();
+  template <typename = void>
+  explicit constexpr VoiceAgentTurnRequest_MetadataEntry_DoNotUse(::google::protobuf::internal::ConstantInitialized);
+  explicit VoiceAgentTurnRequest_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr const void* PROTOBUF_NONNULL internal_default_instance() {
+    return &_VoiceAgentTurnRequest_MetadataEntry_DoNotUse_default_instance_;
+  }
+
+
+  static constexpr auto InternalGenerateClassData_();
+
+ private:
+  friend class ::google::protobuf::MessageLite;
+  friend struct ::TableStruct_voice_5fagent_5fservice_2eproto;
+
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<1, 2,
+                                   0, 67,
+                                   2>
+      _table_;
+
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+};
+extern const ::google::protobuf::internal::ClassDataFull VoiceAgentTurnRequest_MetadataEntry_DoNotUse_class_data_;
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentRequest final : public ::google::protobuf::Message
@@ -493,8 +594,33 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentRequest final : public ::
 
   // accessors -------------------------------------------------------
   enum : int {
+    kCategoriesFieldNumber = 3,
     kEventFilterFieldNumber = 1,
+    kSessionIdFieldNumber = 2,
+    kReplayFromSeqFieldNumber = 5,
+    kMinSeverityFieldNumber = 4,
+    kIncludeAudioFieldNumber = 6,
   };
+  // repeated .runanywhere.v1.VoiceEventCategory categories = 3;
+  [[nodiscard]] int categories_size()
+      const;
+  private:
+  int _internal_categories_size() const;
+
+  public:
+  void clear_categories() ;
+  public:
+  [[nodiscard]] ::runanywhere::v1::VoiceEventCategory categories(int index) const;
+  void set_categories(int index, ::runanywhere::v1::VoiceEventCategory value);
+  void add_categories(::runanywhere::v1::VoiceEventCategory value);
+  [[nodiscard]] const ::google::protobuf::RepeatedField<int>& categories() const;
+  [[nodiscard]] ::google::protobuf::RepeatedField<int>* PROTOBUF_NONNULL mutable_categories();
+
+  private:
+  const ::google::protobuf::RepeatedField<int>& _internal_categories() const;
+  ::google::protobuf::RepeatedField<int>* PROTOBUF_NONNULL _internal_mutable_categories();
+
+  public:
   // string event_filter = 1;
   void clear_event_filter() ;
   [[nodiscard]] const ::std::string& event_filter() const;
@@ -510,12 +636,57 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentRequest final : public ::
   ::std::string* PROTOBUF_NONNULL _internal_mutable_event_filter();
 
   public:
+  // string session_id = 2;
+  void clear_session_id() ;
+  [[nodiscard]] const ::std::string& session_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_session_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_session_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_session_id();
+  void set_allocated_session_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_session_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_session_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_session_id();
+
+  public:
+  // uint64 replay_from_seq = 5;
+  void clear_replay_from_seq() ;
+  [[nodiscard]] ::uint64_t replay_from_seq() const;
+  void set_replay_from_seq(::uint64_t value);
+
+  private:
+  ::uint64_t _internal_replay_from_seq() const;
+  void _internal_set_replay_from_seq(::uint64_t value);
+
+  public:
+  // .runanywhere.v1.VoiceEventSeverity min_severity = 4;
+  void clear_min_severity() ;
+  [[nodiscard]] ::runanywhere::v1::VoiceEventSeverity min_severity() const;
+  void set_min_severity(::runanywhere::v1::VoiceEventSeverity value);
+
+  private:
+  ::runanywhere::v1::VoiceEventSeverity _internal_min_severity() const;
+  void _internal_set_min_severity(::runanywhere::v1::VoiceEventSeverity value);
+
+  public:
+  // bool include_audio = 6;
+  void clear_include_audio() ;
+  [[nodiscard]] bool include_audio() const;
+  void set_include_audio(bool value);
+
+  private:
+  bool _internal_include_audio() const;
+  void _internal_set_include_audio(bool value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VoiceAgentRequest)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<0, 1,
-                                   0, 53,
+  static const ::google::protobuf::internal::TcParseTable<3, 6,
+                                   0, 63,
                                    2>
       _table_;
 
@@ -538,7 +709,13 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentRequest final : public ::
         const VoiceAgentRequest& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::RepeatedField<int> categories_;
+    ::google::protobuf::internal::CachedSize _categories_cached_byte_size_;
     ::google::protobuf::internal::ArenaStringPtr event_filter_;
+    ::google::protobuf::internal::ArenaStringPtr session_id_;
+    ::uint64_t replay_from_seq_;
+    int min_severity_;
+    bool include_audio_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -604,7 +781,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED AudioPipelineConfig final : public 
     return *reinterpret_cast<const AudioPipelineConfig*>(
         &_AudioPipelineConfig_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 3;
+  static constexpr int kIndexInFileMessages = 5;
   friend void swap(AudioPipelineConfig& a, AudioPipelineConfig& b) { a.Swap(&b); }
   inline void Swap(AudioPipelineConfig* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -768,6 +945,313 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED AudioPipelineConfig final : public 
 extern const ::google::protobuf::internal::ClassDataFull AudioPipelineConfig_class_data_;
 // -------------------------------------------------------------------
 
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentTurnRequest final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.VoiceAgentTurnRequest) */ {
+ public:
+  inline VoiceAgentTurnRequest() : VoiceAgentTurnRequest(nullptr) {}
+  ~VoiceAgentTurnRequest() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(VoiceAgentTurnRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(VoiceAgentTurnRequest));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr VoiceAgentTurnRequest(::google::protobuf::internal::ConstantInitialized);
+
+  inline VoiceAgentTurnRequest(const VoiceAgentTurnRequest& from) : VoiceAgentTurnRequest(nullptr, from) {}
+  inline VoiceAgentTurnRequest(VoiceAgentTurnRequest&& from) noexcept
+      : VoiceAgentTurnRequest(nullptr, ::std::move(from)) {}
+  inline VoiceAgentTurnRequest& operator=(const VoiceAgentTurnRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline VoiceAgentTurnRequest& operator=(VoiceAgentTurnRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const VoiceAgentTurnRequest& default_instance() {
+    return *reinterpret_cast<const VoiceAgentTurnRequest*>(
+        &_VoiceAgentTurnRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 3;
+  friend void swap(VoiceAgentTurnRequest& a, VoiceAgentTurnRequest& b) { a.Swap(&b); }
+  inline void Swap(VoiceAgentTurnRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(VoiceAgentTurnRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] VoiceAgentTurnRequest* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<VoiceAgentTurnRequest>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const VoiceAgentTurnRequest& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const VoiceAgentTurnRequest& from) { VoiceAgentTurnRequest::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(VoiceAgentTurnRequest* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.VoiceAgentTurnRequest"; }
+
+  explicit VoiceAgentTurnRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  VoiceAgentTurnRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const VoiceAgentTurnRequest& from);
+  VoiceAgentTurnRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, VoiceAgentTurnRequest&& from) noexcept
+      : VoiceAgentTurnRequest(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kRequestIdFieldNumber = 1,
+    kSessionIdFieldNumber = 2,
+    kAudioDataFieldNumber = 3,
+    kSessionConfigFieldNumber = 7,
+    kSampleRateHzFieldNumber = 4,
+    kChannelsFieldNumber = 5,
+    kEncodingFieldNumber = 6,
+    kMetadataFieldNumber = 8,
+  };
+  // string request_id = 1;
+  void clear_request_id() ;
+  [[nodiscard]] const ::std::string& request_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_request_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_request_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_request_id();
+  void set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_request_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_request_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_request_id();
+
+  public:
+  // string session_id = 2;
+  void clear_session_id() ;
+  [[nodiscard]] const ::std::string& session_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_session_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_session_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_session_id();
+  void set_allocated_session_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_session_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_session_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_session_id();
+
+  public:
+  // bytes audio_data = 3;
+  void clear_audio_data() ;
+  [[nodiscard]] const ::std::string& audio_data() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_audio_data(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_audio_data();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_audio_data();
+  void set_allocated_audio_data(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_audio_data() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_audio_data(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_audio_data();
+
+  public:
+  // optional .runanywhere.v1.VoiceSessionConfig session_config = 7;
+  [[nodiscard]] bool has_session_config()
+      const;
+  void clear_session_config() ;
+  [[nodiscard]] const ::runanywhere::v1::VoiceSessionConfig& session_config() const;
+  [[nodiscard]] ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NULLABLE release_session_config();
+  ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NONNULL mutable_session_config();
+  void set_allocated_session_config(::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NULLABLE value);
+  void unsafe_arena_set_allocated_session_config(::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NULLABLE value);
+  ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NULLABLE unsafe_arena_release_session_config();
+
+  private:
+  const ::runanywhere::v1::VoiceSessionConfig& _internal_session_config() const;
+  ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NONNULL _internal_mutable_session_config();
+
+  public:
+  // int32 sample_rate_hz = 4;
+  void clear_sample_rate_hz() ;
+  [[nodiscard]] ::int32_t sample_rate_hz() const;
+  void set_sample_rate_hz(::int32_t value);
+
+  private:
+  ::int32_t _internal_sample_rate_hz() const;
+  void _internal_set_sample_rate_hz(::int32_t value);
+
+  public:
+  // int32 channels = 5;
+  void clear_channels() ;
+  [[nodiscard]] ::int32_t channels() const;
+  void set_channels(::int32_t value);
+
+  private:
+  ::int32_t _internal_channels() const;
+  void _internal_set_channels(::int32_t value);
+
+  public:
+  // .runanywhere.v1.AudioEncoding encoding = 6;
+  void clear_encoding() ;
+  [[nodiscard]] ::runanywhere::v1::AudioEncoding encoding() const;
+  void set_encoding(::runanywhere::v1::AudioEncoding value);
+
+  private:
+  ::runanywhere::v1::AudioEncoding _internal_encoding() const;
+  void _internal_set_encoding(::runanywhere::v1::AudioEncoding value);
+
+  public:
+  // map<string, string> metadata = 8;
+  [[nodiscard]] int metadata_size()
+      const;
+  private:
+  int _internal_metadata_size() const;
+
+  public:
+  void clear_metadata() ;
+  [[nodiscard]] const ::google::protobuf::Map<::std::string, ::std::string>& metadata() const;
+  [[nodiscard]] ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL mutable_metadata();
+
+  private:
+  const ::google::protobuf::Map<::std::string, ::std::string>& _internal_metadata() const;
+  ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL _internal_mutable_metadata();
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.VoiceAgentTurnRequest)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<3, 8,
+                                   2, 81,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const VoiceAgentTurnRequest& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr request_id_;
+    ::google::protobuf::internal::ArenaStringPtr session_id_;
+    ::google::protobuf::internal::ArenaStringPtr audio_data_;
+    ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NULLABLE session_config_;
+    ::int32_t sample_rate_hz_;
+    ::int32_t channels_;
+    int encoding_;
+    ::google::protobuf::internal::MapField<VoiceAgentTurnRequest_MetadataEntry_DoNotUse, ::std::string, ::std::string> metadata_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_voice_5fagent_5fservice_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull VoiceAgentTurnRequest_class_data_;
+// -------------------------------------------------------------------
+
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentResult final : public ::google::protobuf::Message
 /* @@protoc_insertion_point(class_definition:runanywhere.v1.VoiceAgentResult) */ {
  public:
@@ -918,11 +1402,19 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentResult final : public ::g
     kAssistantResponseFieldNumber = 3,
     kThinkingContentFieldNumber = 4,
     kSynthesizedAudioFieldNumber = 5,
+    kSessionIdFieldNumber = 10,
+    kTurnIdFieldNumber = 11,
+    kErrorMessageFieldNumber = 16,
     kFinalStateFieldNumber = 6,
     kSpeechDetectedFieldNumber = 1,
     kSynthesizedAudioSampleRateHzFieldNumber = 7,
     kSynthesizedAudioChannelsFieldNumber = 8,
     kSynthesizedAudioEncodingFieldNumber = 9,
+    kSttTimeMsFieldNumber = 12,
+    kLlmTimeMsFieldNumber = 13,
+    kTtsTimeMsFieldNumber = 14,
+    kTotalTimeMsFieldNumber = 15,
+    kErrorCodeFieldNumber = 17,
   };
   // optional string transcription = 2;
   [[nodiscard]] bool has_transcription()
@@ -992,6 +1484,53 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentResult final : public ::g
   ::std::string* PROTOBUF_NONNULL _internal_mutable_synthesized_audio();
 
   public:
+  // string session_id = 10;
+  void clear_session_id() ;
+  [[nodiscard]] const ::std::string& session_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_session_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_session_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_session_id();
+  void set_allocated_session_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_session_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_session_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_session_id();
+
+  public:
+  // string turn_id = 11;
+  void clear_turn_id() ;
+  [[nodiscard]] const ::std::string& turn_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_turn_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_turn_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_turn_id();
+  void set_allocated_turn_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_turn_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_turn_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_turn_id();
+
+  public:
+  // optional string error_message = 16;
+  [[nodiscard]] bool has_error_message()
+      const;
+  void clear_error_message() ;
+  [[nodiscard]] const ::std::string& error_message() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_error_message(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_error_message();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
+  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_error_message() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
+
+  public:
   // optional .runanywhere.v1.VoiceAgentComponentStates final_state = 6;
   [[nodiscard]] bool has_final_state()
       const;
@@ -1048,12 +1587,62 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentResult final : public ::g
   void _internal_set_synthesized_audio_encoding(::runanywhere::v1::AudioEncoding value);
 
   public:
+  // int64 stt_time_ms = 12;
+  void clear_stt_time_ms() ;
+  [[nodiscard]] ::int64_t stt_time_ms() const;
+  void set_stt_time_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_stt_time_ms() const;
+  void _internal_set_stt_time_ms(::int64_t value);
+
+  public:
+  // int64 llm_time_ms = 13;
+  void clear_llm_time_ms() ;
+  [[nodiscard]] ::int64_t llm_time_ms() const;
+  void set_llm_time_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_llm_time_ms() const;
+  void _internal_set_llm_time_ms(::int64_t value);
+
+  public:
+  // int64 tts_time_ms = 14;
+  void clear_tts_time_ms() ;
+  [[nodiscard]] ::int64_t tts_time_ms() const;
+  void set_tts_time_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_tts_time_ms() const;
+  void _internal_set_tts_time_ms(::int64_t value);
+
+  public:
+  // int64 total_time_ms = 15;
+  void clear_total_time_ms() ;
+  [[nodiscard]] ::int64_t total_time_ms() const;
+  void set_total_time_ms(::int64_t value);
+
+  private:
+  ::int64_t _internal_total_time_ms() const;
+  void _internal_set_total_time_ms(::int64_t value);
+
+  public:
+  // int32 error_code = 17;
+  void clear_error_code() ;
+  [[nodiscard]] ::int32_t error_code() const;
+  void set_error_code(::int32_t value);
+
+  private:
+  ::int32_t _internal_error_code() const;
+  void _internal_set_error_code(::int32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.VoiceAgentResult)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<4, 9,
-                                   1, 95,
+  static const ::google::protobuf::internal::TcParseTable<5, 17,
+                                   1, 133,
                                    2>
       _table_;
 
@@ -1080,11 +1669,19 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentResult final : public ::g
     ::google::protobuf::internal::ArenaStringPtr assistant_response_;
     ::google::protobuf::internal::ArenaStringPtr thinking_content_;
     ::google::protobuf::internal::ArenaStringPtr synthesized_audio_;
+    ::google::protobuf::internal::ArenaStringPtr session_id_;
+    ::google::protobuf::internal::ArenaStringPtr turn_id_;
+    ::google::protobuf::internal::ArenaStringPtr error_message_;
     ::runanywhere::v1::VoiceAgentComponentStates* PROTOBUF_NULLABLE final_state_;
     bool speech_detected_;
     ::int32_t synthesized_audio_sample_rate_hz_;
     ::int32_t synthesized_audio_channels_;
     int synthesized_audio_encoding_;
+    ::int64_t stt_time_ms_;
+    ::int64_t llm_time_ms_;
+    ::int64_t tts_time_ms_;
+    ::int64_t total_time_ms_;
+    ::int32_t error_code_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -1150,7 +1747,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentComposeConfig final : pub
     return *reinterpret_cast<const VoiceAgentComposeConfig*>(
         &_VoiceAgentComposeConfig_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 4;
+  static constexpr int kIndexInFileMessages = 6;
   friend void swap(VoiceAgentComposeConfig& a, VoiceAgentComposeConfig& b) { a.Swap(&b); }
   inline void Swap(VoiceAgentComposeConfig* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1254,6 +1851,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentComposeConfig final : pub
     kWakewordPhraseFieldNumber = 16,
     kWakewordEmbeddingModelPathFieldNumber = 18,
     kWakewordVadModelPathFieldNumber = 19,
+    kSessionIdFieldNumber = 22,
+    kDefaultLanguageCodeFieldNumber = 23,
     kSessionConfigFieldNumber = 20,
     kAudioPipelineConfigFieldNumber = 21,
     kVadSampleRateFieldNumber = 10,
@@ -1500,6 +2099,40 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentComposeConfig final : pub
   ::std::string* PROTOBUF_NONNULL _internal_mutable_wakeword_vad_model_path();
 
   public:
+  // optional string session_id = 22;
+  [[nodiscard]] bool has_session_id()
+      const;
+  void clear_session_id() ;
+  [[nodiscard]] const ::std::string& session_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_session_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_session_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_session_id();
+  void set_allocated_session_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_session_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_session_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_session_id();
+
+  public:
+  // optional string default_language_code = 23;
+  [[nodiscard]] bool has_default_language_code()
+      const;
+  void clear_default_language_code() ;
+  [[nodiscard]] const ::std::string& default_language_code() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_default_language_code(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_default_language_code();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_default_language_code();
+  void set_allocated_default_language_code(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_default_language_code() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_default_language_code(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_default_language_code();
+
+  public:
   // optional .runanywhere.v1.VoiceSessionConfig session_config = 20;
   [[nodiscard]] bool has_session_config()
       const;
@@ -1586,8 +2219,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentComposeConfig final : pub
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<5, 21,
-                                   2, 286,
+  static const ::google::protobuf::internal::TcParseTable<5, 23,
+                                   2, 317,
                                    2>
       _table_;
 
@@ -1624,6 +2257,8 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VoiceAgentComposeConfig final : pub
     ::google::protobuf::internal::ArenaStringPtr wakeword_phrase_;
     ::google::protobuf::internal::ArenaStringPtr wakeword_embedding_model_path_;
     ::google::protobuf::internal::ArenaStringPtr wakeword_vad_model_path_;
+    ::google::protobuf::internal::ArenaStringPtr session_id_;
+    ::google::protobuf::internal::ArenaStringPtr default_language_code_;
     ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NULLABLE session_config_;
     ::runanywhere::v1::AudioPipelineConfig* PROTOBUF_NULLABLE audio_pipeline_config_;
     ::int32_t vad_sample_rate_;
@@ -1660,7 +2295,7 @@ inline void VoiceAgentRequest::clear_event_filter() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.event_filter_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000001U);
+                  0x00000002U);
 }
 inline const ::std::string& VoiceAgentRequest::event_filter() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
@@ -1670,13 +2305,13 @@ inline const ::std::string& VoiceAgentRequest::event_filter() const
 template <typename Arg_, typename... Args_>
 PROTOBUF_ALWAYS_INLINE void VoiceAgentRequest::set_event_filter(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   _impl_.event_filter_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentRequest.event_filter)
 }
 inline ::std::string* PROTOBUF_NONNULL VoiceAgentRequest::mutable_event_filter()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   ::std::string* _s = _internal_mutable_event_filter();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentRequest.event_filter)
   return _s;
@@ -1696,10 +2331,10 @@ inline ::std::string* PROTOBUF_NONNULL VoiceAgentRequest::_internal_mutable_even
 inline ::std::string* PROTOBUF_NULLABLE VoiceAgentRequest::release_event_filter() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentRequest.event_filter)
-  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
     return nullptr;
   }
-  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   auto* released = _impl_.event_filter_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
     _impl_.event_filter_.Set("", GetArena());
@@ -1709,15 +2344,206 @@ inline ::std::string* PROTOBUF_NULLABLE VoiceAgentRequest::release_event_filter(
 inline void VoiceAgentRequest::set_allocated_event_filter(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
   _impl_.event_filter_.SetAllocated(value, GetArena());
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.event_filter_.IsDefault()) {
     _impl_.event_filter_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentRequest.event_filter)
+}
+
+// string session_id = 2;
+inline void VoiceAgentRequest::clear_session_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.session_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline const ::std::string& VoiceAgentRequest::session_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentRequest.session_id)
+  return _internal_session_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void VoiceAgentRequest::set_session_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.session_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentRequest.session_id)
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentRequest::mutable_session_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::std::string* _s = _internal_mutable_session_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentRequest.session_id)
+  return _s;
+}
+inline const ::std::string& VoiceAgentRequest::_internal_session_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.session_id_.Get();
+}
+inline void VoiceAgentRequest::_internal_set_session_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.session_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentRequest::_internal_mutable_session_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.session_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE VoiceAgentRequest::release_session_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentRequest.session_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  auto* released = _impl_.session_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.session_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void VoiceAgentRequest::set_allocated_session_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  _impl_.session_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.session_id_.IsDefault()) {
+    _impl_.session_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentRequest.session_id)
+}
+
+// repeated .runanywhere.v1.VoiceEventCategory categories = 3;
+inline int VoiceAgentRequest::_internal_categories_size() const {
+  return _internal_categories().size();
+}
+inline int VoiceAgentRequest::categories_size() const {
+  return _internal_categories_size();
+}
+inline void VoiceAgentRequest::clear_categories() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.categories_.Clear();
+  ClearHasBitForRepeated(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline ::runanywhere::v1::VoiceEventCategory VoiceAgentRequest::categories(int index) const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentRequest.categories)
+  return static_cast<::runanywhere::v1::VoiceEventCategory>(_internal_categories().Get(index));
+}
+inline void VoiceAgentRequest::set_categories(int index, ::runanywhere::v1::VoiceEventCategory value) {
+  _internal_mutable_categories()->Set(index, value);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentRequest.categories)
+}
+inline void VoiceAgentRequest::add_categories(::runanywhere::v1::VoiceEventCategory value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _internal_mutable_categories()->InternalAddWithArena(
+      internal_visibility(), GetArena(), value);
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000001U);
+  // @@protoc_insertion_point(field_add:runanywhere.v1.VoiceAgentRequest.categories)
+}
+inline const ::google::protobuf::RepeatedField<int>& VoiceAgentRequest::categories() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_list:runanywhere.v1.VoiceAgentRequest.categories)
+  return _internal_categories();
+}
+inline ::google::protobuf::RepeatedField<int>* PROTOBUF_NONNULL VoiceAgentRequest::mutable_categories()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000001U);
+  // @@protoc_insertion_point(field_mutable_list:runanywhere.v1.VoiceAgentRequest.categories)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _internal_mutable_categories();
+}
+inline const ::google::protobuf::RepeatedField<int>& VoiceAgentRequest::_internal_categories()
+    const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.categories_;
+}
+inline ::google::protobuf::RepeatedField<int>* PROTOBUF_NONNULL
+VoiceAgentRequest::_internal_mutable_categories() {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return &_impl_.categories_;
+}
+
+// .runanywhere.v1.VoiceEventSeverity min_severity = 4;
+inline void VoiceAgentRequest::clear_min_severity() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.min_severity_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000010U);
+}
+inline ::runanywhere::v1::VoiceEventSeverity VoiceAgentRequest::min_severity() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentRequest.min_severity)
+  return _internal_min_severity();
+}
+inline void VoiceAgentRequest::set_min_severity(::runanywhere::v1::VoiceEventSeverity value) {
+  _internal_set_min_severity(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentRequest.min_severity)
+}
+inline ::runanywhere::v1::VoiceEventSeverity VoiceAgentRequest::_internal_min_severity() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::VoiceEventSeverity>(_impl_.min_severity_);
+}
+inline void VoiceAgentRequest::_internal_set_min_severity(::runanywhere::v1::VoiceEventSeverity value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.min_severity_ = value;
+}
+
+// uint64 replay_from_seq = 5;
+inline void VoiceAgentRequest::clear_replay_from_seq() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.replay_from_seq_ = ::uint64_t{0u};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline ::uint64_t VoiceAgentRequest::replay_from_seq() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentRequest.replay_from_seq)
+  return _internal_replay_from_seq();
+}
+inline void VoiceAgentRequest::set_replay_from_seq(::uint64_t value) {
+  _internal_set_replay_from_seq(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentRequest.replay_from_seq)
+}
+inline ::uint64_t VoiceAgentRequest::_internal_replay_from_seq() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.replay_from_seq_;
+}
+inline void VoiceAgentRequest::_internal_set_replay_from_seq(::uint64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.replay_from_seq_ = value;
+}
+
+// bool include_audio = 6;
+inline void VoiceAgentRequest::clear_include_audio() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.include_audio_ = false;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000020U);
+}
+inline bool VoiceAgentRequest::include_audio() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentRequest.include_audio)
+  return _internal_include_audio();
+}
+inline void VoiceAgentRequest::set_include_audio(bool value) {
+  _internal_set_include_audio(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentRequest.include_audio)
+}
+inline bool VoiceAgentRequest::_internal_include_audio() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.include_audio_;
+}
+inline void VoiceAgentRequest::_internal_set_include_audio(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.include_audio_ = value;
 }
 
 // -------------------------------------------------------------------
@@ -1729,7 +2555,7 @@ inline void VoiceAgentResult::clear_speech_detected() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.speech_detected_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000020U);
+                  0x00000100U);
 }
 inline bool VoiceAgentResult::speech_detected() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentResult.speech_detected)
@@ -1737,7 +2563,7 @@ inline bool VoiceAgentResult::speech_detected() const {
 }
 inline void VoiceAgentResult::set_speech_detected(bool value) {
   _internal_set_speech_detected(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentResult.speech_detected)
 }
 inline bool VoiceAgentResult::_internal_speech_detected() const {
@@ -2027,7 +2853,7 @@ inline void VoiceAgentResult::set_allocated_synthesized_audio(::std::string* PRO
 
 // optional .runanywhere.v1.VoiceAgentComponentStates final_state = 6;
 inline bool VoiceAgentResult::has_final_state() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000080U);
   PROTOBUF_ASSUME(!value || _impl_.final_state_ != nullptr);
   return value;
 }
@@ -2048,16 +2874,16 @@ inline void VoiceAgentResult::unsafe_arena_set_allocated_final_state(
   }
   _impl_.final_state_ = reinterpret_cast<::runanywhere::v1::VoiceAgentComponentStates*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VoiceAgentResult.final_state)
 }
 inline ::runanywhere::v1::VoiceAgentComponentStates* PROTOBUF_NULLABLE VoiceAgentResult::release_final_state() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
   ::runanywhere::v1::VoiceAgentComponentStates* released = _impl_.final_state_;
   _impl_.final_state_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -2077,7 +2903,7 @@ inline ::runanywhere::v1::VoiceAgentComponentStates* PROTOBUF_NULLABLE VoiceAgen
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentResult.final_state)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
   ::runanywhere::v1::VoiceAgentComponentStates* temp = _impl_.final_state_;
   _impl_.final_state_ = nullptr;
   return temp;
@@ -2092,7 +2918,7 @@ inline ::runanywhere::v1::VoiceAgentComponentStates* PROTOBUF_NONNULL VoiceAgent
 }
 inline ::runanywhere::v1::VoiceAgentComponentStates* PROTOBUF_NONNULL VoiceAgentResult::mutable_final_state()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   ::runanywhere::v1::VoiceAgentComponentStates* _msg = _internal_mutable_final_state();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentResult.final_state)
   return _msg;
@@ -2109,9 +2935,9 @@ inline void VoiceAgentResult::set_allocated_final_state(::runanywhere::v1::Voice
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+    SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00000080U);
   }
 
   _impl_.final_state_ = reinterpret_cast<::runanywhere::v1::VoiceAgentComponentStates*>(value);
@@ -2123,7 +2949,7 @@ inline void VoiceAgentResult::clear_synthesized_audio_sample_rate_hz() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.synthesized_audio_sample_rate_hz_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000040U);
+                  0x00000200U);
 }
 inline ::int32_t VoiceAgentResult::synthesized_audio_sample_rate_hz() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentResult.synthesized_audio_sample_rate_hz)
@@ -2131,7 +2957,7 @@ inline ::int32_t VoiceAgentResult::synthesized_audio_sample_rate_hz() const {
 }
 inline void VoiceAgentResult::set_synthesized_audio_sample_rate_hz(::int32_t value) {
   _internal_set_synthesized_audio_sample_rate_hz(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentResult.synthesized_audio_sample_rate_hz)
 }
 inline ::int32_t VoiceAgentResult::_internal_synthesized_audio_sample_rate_hz() const {
@@ -2148,7 +2974,7 @@ inline void VoiceAgentResult::clear_synthesized_audio_channels() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.synthesized_audio_channels_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000080U);
+                  0x00000400U);
 }
 inline ::int32_t VoiceAgentResult::synthesized_audio_channels() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentResult.synthesized_audio_channels)
@@ -2156,7 +2982,7 @@ inline ::int32_t VoiceAgentResult::synthesized_audio_channels() const {
 }
 inline void VoiceAgentResult::set_synthesized_audio_channels(::int32_t value) {
   _internal_set_synthesized_audio_channels(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000400U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentResult.synthesized_audio_channels)
 }
 inline ::int32_t VoiceAgentResult::_internal_synthesized_audio_channels() const {
@@ -2173,7 +2999,7 @@ inline void VoiceAgentResult::clear_synthesized_audio_encoding() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.synthesized_audio_encoding_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000100U);
+                  0x00000800U);
 }
 inline ::runanywhere::v1::AudioEncoding VoiceAgentResult::synthesized_audio_encoding() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentResult.synthesized_audio_encoding)
@@ -2181,7 +3007,7 @@ inline ::runanywhere::v1::AudioEncoding VoiceAgentResult::synthesized_audio_enco
 }
 inline void VoiceAgentResult::set_synthesized_audio_encoding(::runanywhere::v1::AudioEncoding value) {
   _internal_set_synthesized_audio_encoding(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000800U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentResult.synthesized_audio_encoding)
 }
 inline ::runanywhere::v1::AudioEncoding VoiceAgentResult::_internal_synthesized_audio_encoding() const {
@@ -2193,6 +3019,737 @@ inline void VoiceAgentResult::_internal_set_synthesized_audio_encoding(::runanyw
   _impl_.synthesized_audio_encoding_ = value;
 }
 
+// string session_id = 10;
+inline void VoiceAgentResult::clear_session_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.session_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000010U);
+}
+inline const ::std::string& VoiceAgentResult::session_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentResult.session_id)
+  return _internal_session_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void VoiceAgentResult::set_session_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  _impl_.session_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentResult.session_id)
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentResult::mutable_session_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  ::std::string* _s = _internal_mutable_session_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentResult.session_id)
+  return _s;
+}
+inline const ::std::string& VoiceAgentResult::_internal_session_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.session_id_.Get();
+}
+inline void VoiceAgentResult::_internal_set_session_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.session_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentResult::_internal_mutable_session_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.session_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE VoiceAgentResult::release_session_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentResult.session_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000010U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  auto* released = _impl_.session_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.session_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void VoiceAgentResult::set_allocated_session_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000010U);
+  }
+  _impl_.session_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.session_id_.IsDefault()) {
+    _impl_.session_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentResult.session_id)
+}
+
+// string turn_id = 11;
+inline void VoiceAgentResult::clear_turn_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.turn_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000020U);
+}
+inline const ::std::string& VoiceAgentResult::turn_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentResult.turn_id)
+  return _internal_turn_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void VoiceAgentResult::set_turn_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  _impl_.turn_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentResult.turn_id)
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentResult::mutable_turn_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  ::std::string* _s = _internal_mutable_turn_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentResult.turn_id)
+  return _s;
+}
+inline const ::std::string& VoiceAgentResult::_internal_turn_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.turn_id_.Get();
+}
+inline void VoiceAgentResult::_internal_set_turn_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.turn_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentResult::_internal_mutable_turn_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.turn_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE VoiceAgentResult::release_turn_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentResult.turn_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000020U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  auto* released = _impl_.turn_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.turn_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void VoiceAgentResult::set_allocated_turn_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000020U);
+  }
+  _impl_.turn_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.turn_id_.IsDefault()) {
+    _impl_.turn_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentResult.turn_id)
+}
+
+// int64 stt_time_ms = 12;
+inline void VoiceAgentResult::clear_stt_time_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.stt_time_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00001000U);
+}
+inline ::int64_t VoiceAgentResult::stt_time_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentResult.stt_time_ms)
+  return _internal_stt_time_ms();
+}
+inline void VoiceAgentResult::set_stt_time_ms(::int64_t value) {
+  _internal_set_stt_time_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00001000U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentResult.stt_time_ms)
+}
+inline ::int64_t VoiceAgentResult::_internal_stt_time_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.stt_time_ms_;
+}
+inline void VoiceAgentResult::_internal_set_stt_time_ms(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.stt_time_ms_ = value;
+}
+
+// int64 llm_time_ms = 13;
+inline void VoiceAgentResult::clear_llm_time_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.llm_time_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00002000U);
+}
+inline ::int64_t VoiceAgentResult::llm_time_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentResult.llm_time_ms)
+  return _internal_llm_time_ms();
+}
+inline void VoiceAgentResult::set_llm_time_ms(::int64_t value) {
+  _internal_set_llm_time_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00002000U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentResult.llm_time_ms)
+}
+inline ::int64_t VoiceAgentResult::_internal_llm_time_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.llm_time_ms_;
+}
+inline void VoiceAgentResult::_internal_set_llm_time_ms(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.llm_time_ms_ = value;
+}
+
+// int64 tts_time_ms = 14;
+inline void VoiceAgentResult::clear_tts_time_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.tts_time_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00004000U);
+}
+inline ::int64_t VoiceAgentResult::tts_time_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentResult.tts_time_ms)
+  return _internal_tts_time_ms();
+}
+inline void VoiceAgentResult::set_tts_time_ms(::int64_t value) {
+  _internal_set_tts_time_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentResult.tts_time_ms)
+}
+inline ::int64_t VoiceAgentResult::_internal_tts_time_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.tts_time_ms_;
+}
+inline void VoiceAgentResult::_internal_set_tts_time_ms(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.tts_time_ms_ = value;
+}
+
+// int64 total_time_ms = 15;
+inline void VoiceAgentResult::clear_total_time_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.total_time_ms_ = ::int64_t{0};
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00008000U);
+}
+inline ::int64_t VoiceAgentResult::total_time_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentResult.total_time_ms)
+  return _internal_total_time_ms();
+}
+inline void VoiceAgentResult::set_total_time_ms(::int64_t value) {
+  _internal_set_total_time_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentResult.total_time_ms)
+}
+inline ::int64_t VoiceAgentResult::_internal_total_time_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.total_time_ms_;
+}
+inline void VoiceAgentResult::_internal_set_total_time_ms(::int64_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.total_time_ms_ = value;
+}
+
+// optional string error_message = 16;
+inline bool VoiceAgentResult::has_error_message() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
+  return value;
+}
+inline void VoiceAgentResult::clear_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000040U);
+}
+inline const ::std::string& VoiceAgentResult::error_message() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentResult.error_message)
+  return _internal_error_message();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void VoiceAgentResult::set_error_message(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentResult.error_message)
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentResult::mutable_error_message()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  ::std::string* _s = _internal_mutable_error_message();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentResult.error_message)
+  return _s;
+}
+inline const ::std::string& VoiceAgentResult::_internal_error_message() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.error_message_.Get();
+}
+inline void VoiceAgentResult::_internal_set_error_message(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentResult::_internal_mutable_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.error_message_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE VoiceAgentResult::release_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentResult.error_message)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000040U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  auto* released = _impl_.error_message_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  return released;
+}
+inline void VoiceAgentResult::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
+  }
+  _impl_.error_message_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentResult.error_message)
+}
+
+// int32 error_code = 17;
+inline void VoiceAgentResult::clear_error_code() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_code_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00010000U);
+}
+inline ::int32_t VoiceAgentResult::error_code() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentResult.error_code)
+  return _internal_error_code();
+}
+inline void VoiceAgentResult::set_error_code(::int32_t value) {
+  _internal_set_error_code(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00010000U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentResult.error_code)
+}
+inline ::int32_t VoiceAgentResult::_internal_error_code() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.error_code_;
+}
+inline void VoiceAgentResult::_internal_set_error_code(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_code_ = value;
+}
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
+// VoiceAgentTurnRequest
+
+// string request_id = 1;
+inline void VoiceAgentTurnRequest::clear_request_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.request_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& VoiceAgentTurnRequest::request_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentTurnRequest.request_id)
+  return _internal_request_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void VoiceAgentTurnRequest::set_request_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.request_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentTurnRequest.request_id)
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentTurnRequest::mutable_request_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_request_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentTurnRequest.request_id)
+  return _s;
+}
+inline const ::std::string& VoiceAgentTurnRequest::_internal_request_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.request_id_.Get();
+}
+inline void VoiceAgentTurnRequest::_internal_set_request_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.request_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentTurnRequest::_internal_mutable_request_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.request_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE VoiceAgentTurnRequest::release_request_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentTurnRequest.request_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.request_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.request_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void VoiceAgentTurnRequest::set_allocated_request_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.request_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.request_id_.IsDefault()) {
+    _impl_.request_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentTurnRequest.request_id)
+}
+
+// string session_id = 2;
+inline void VoiceAgentTurnRequest::clear_session_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.session_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& VoiceAgentTurnRequest::session_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentTurnRequest.session_id)
+  return _internal_session_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void VoiceAgentTurnRequest::set_session_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.session_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentTurnRequest.session_id)
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentTurnRequest::mutable_session_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_session_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentTurnRequest.session_id)
+  return _s;
+}
+inline const ::std::string& VoiceAgentTurnRequest::_internal_session_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.session_id_.Get();
+}
+inline void VoiceAgentTurnRequest::_internal_set_session_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.session_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentTurnRequest::_internal_mutable_session_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.session_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE VoiceAgentTurnRequest::release_session_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentTurnRequest.session_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.session_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.session_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void VoiceAgentTurnRequest::set_allocated_session_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.session_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.session_id_.IsDefault()) {
+    _impl_.session_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentTurnRequest.session_id)
+}
+
+// bytes audio_data = 3;
+inline void VoiceAgentTurnRequest::clear_audio_data() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.audio_data_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline const ::std::string& VoiceAgentTurnRequest::audio_data() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentTurnRequest.audio_data)
+  return _internal_audio_data();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void VoiceAgentTurnRequest::set_audio_data(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  _impl_.audio_data_.SetBytes(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentTurnRequest.audio_data)
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentTurnRequest::mutable_audio_data()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  ::std::string* _s = _internal_mutable_audio_data();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentTurnRequest.audio_data)
+  return _s;
+}
+inline const ::std::string& VoiceAgentTurnRequest::_internal_audio_data() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.audio_data_.Get();
+}
+inline void VoiceAgentTurnRequest::_internal_set_audio_data(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.audio_data_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentTurnRequest::_internal_mutable_audio_data() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.audio_data_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE VoiceAgentTurnRequest::release_audio_data() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentTurnRequest.audio_data)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000004U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  auto* released = _impl_.audio_data_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.audio_data_.Set("", GetArena());
+  }
+  return released;
+}
+inline void VoiceAgentTurnRequest::set_allocated_audio_data(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000004U);
+  }
+  _impl_.audio_data_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.audio_data_.IsDefault()) {
+    _impl_.audio_data_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentTurnRequest.audio_data)
+}
+
+// int32 sample_rate_hz = 4;
+inline void VoiceAgentTurnRequest::clear_sample_rate_hz() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.sample_rate_hz_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000010U);
+}
+inline ::int32_t VoiceAgentTurnRequest::sample_rate_hz() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentTurnRequest.sample_rate_hz)
+  return _internal_sample_rate_hz();
+}
+inline void VoiceAgentTurnRequest::set_sample_rate_hz(::int32_t value) {
+  _internal_set_sample_rate_hz(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentTurnRequest.sample_rate_hz)
+}
+inline ::int32_t VoiceAgentTurnRequest::_internal_sample_rate_hz() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.sample_rate_hz_;
+}
+inline void VoiceAgentTurnRequest::_internal_set_sample_rate_hz(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.sample_rate_hz_ = value;
+}
+
+// int32 channels = 5;
+inline void VoiceAgentTurnRequest::clear_channels() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.channels_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000020U);
+}
+inline ::int32_t VoiceAgentTurnRequest::channels() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentTurnRequest.channels)
+  return _internal_channels();
+}
+inline void VoiceAgentTurnRequest::set_channels(::int32_t value) {
+  _internal_set_channels(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentTurnRequest.channels)
+}
+inline ::int32_t VoiceAgentTurnRequest::_internal_channels() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.channels_;
+}
+inline void VoiceAgentTurnRequest::_internal_set_channels(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.channels_ = value;
+}
+
+// .runanywhere.v1.AudioEncoding encoding = 6;
+inline void VoiceAgentTurnRequest::clear_encoding() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.encoding_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000040U);
+}
+inline ::runanywhere::v1::AudioEncoding VoiceAgentTurnRequest::encoding() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentTurnRequest.encoding)
+  return _internal_encoding();
+}
+inline void VoiceAgentTurnRequest::set_encoding(::runanywhere::v1::AudioEncoding value) {
+  _internal_set_encoding(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentTurnRequest.encoding)
+}
+inline ::runanywhere::v1::AudioEncoding VoiceAgentTurnRequest::_internal_encoding() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::AudioEncoding>(_impl_.encoding_);
+}
+inline void VoiceAgentTurnRequest::_internal_set_encoding(::runanywhere::v1::AudioEncoding value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.encoding_ = value;
+}
+
+// optional .runanywhere.v1.VoiceSessionConfig session_config = 7;
+inline bool VoiceAgentTurnRequest::has_session_config() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000008U);
+  PROTOBUF_ASSUME(!value || _impl_.session_config_ != nullptr);
+  return value;
+}
+inline void VoiceAgentTurnRequest::clear_session_config() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.session_config_ != nullptr) _impl_.session_config_->Clear();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline const ::runanywhere::v1::VoiceSessionConfig& VoiceAgentTurnRequest::_internal_session_config() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  const ::runanywhere::v1::VoiceSessionConfig* p = _impl_.session_config_;
+  return p != nullptr ? *p : reinterpret_cast<const ::runanywhere::v1::VoiceSessionConfig&>(::runanywhere::v1::_VoiceSessionConfig_default_instance_);
+}
+inline const ::runanywhere::v1::VoiceSessionConfig& VoiceAgentTurnRequest::session_config() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentTurnRequest.session_config)
+  return _internal_session_config();
+}
+inline void VoiceAgentTurnRequest::unsafe_arena_set_allocated_session_config(
+    ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (GetArena() == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.session_config_);
+  }
+  _impl_.session_config_ = reinterpret_cast<::runanywhere::v1::VoiceSessionConfig*>(value);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VoiceAgentTurnRequest.session_config)
+}
+inline ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NULLABLE VoiceAgentTurnRequest::release_session_config() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::VoiceSessionConfig* released = _impl_.session_config_;
+  _impl_.session_config_ = nullptr;
+  if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
+    auto* old = reinterpret_cast<::google::protobuf::MessageLite*>(released);
+    released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    if (GetArena() == nullptr) {
+      delete old;
+    }
+  } else {
+    if (GetArena() != nullptr) {
+      released = ::google::protobuf::internal::DuplicateIfNonNull(released);
+    }
+  }
+  return released;
+}
+inline ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NULLABLE VoiceAgentTurnRequest::unsafe_arena_release_session_config() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentTurnRequest.session_config)
+
+  ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::VoiceSessionConfig* temp = _impl_.session_config_;
+  _impl_.session_config_ = nullptr;
+  return temp;
+}
+inline ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NONNULL VoiceAgentTurnRequest::_internal_mutable_session_config() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (_impl_.session_config_ == nullptr) {
+    auto* p = ::google::protobuf::Message::DefaultConstruct<::runanywhere::v1::VoiceSessionConfig>(GetArena());
+    _impl_.session_config_ = reinterpret_cast<::runanywhere::v1::VoiceSessionConfig*>(p);
+  }
+  return _impl_.session_config_;
+}
+inline ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NONNULL VoiceAgentTurnRequest::mutable_session_config()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  ::runanywhere::v1::VoiceSessionConfig* _msg = _internal_mutable_session_config();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentTurnRequest.session_config)
+  return _msg;
+}
+inline void VoiceAgentTurnRequest::set_allocated_session_config(::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (message_arena == nullptr) {
+    delete reinterpret_cast<::google::protobuf::MessageLite*>(_impl_.session_config_);
+  }
+
+  if (value != nullptr) {
+    ::google::protobuf::Arena* submessage_arena = value->GetArena();
+    if (message_arena != submessage_arena) {
+      value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
+    }
+    SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000008U);
+  }
+
+  _impl_.session_config_ = reinterpret_cast<::runanywhere::v1::VoiceSessionConfig*>(value);
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentTurnRequest.session_config)
+}
+
+// map<string, string> metadata = 8;
+inline int VoiceAgentTurnRequest::_internal_metadata_size() const {
+  return _internal_metadata().size();
+}
+inline int VoiceAgentTurnRequest::metadata_size() const {
+  return _internal_metadata_size();
+}
+inline void VoiceAgentTurnRequest::clear_metadata() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.metadata_.Clear();
+  ClearHasBitForRepeated(_impl_._has_bits_[0],
+                  0x00000080U);
+}
+inline const ::google::protobuf::Map<::std::string, ::std::string>& VoiceAgentTurnRequest::_internal_metadata() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.metadata_.GetMap();
+}
+inline const ::google::protobuf::Map<::std::string, ::std::string>& VoiceAgentTurnRequest::metadata() const ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_map:runanywhere.v1.VoiceAgentTurnRequest.metadata)
+  return _internal_metadata();
+}
+inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL VoiceAgentTurnRequest::_internal_mutable_metadata() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.metadata_.MutableMap();
+}
+inline ::google::protobuf::Map<::std::string, ::std::string>* PROTOBUF_NONNULL VoiceAgentTurnRequest::mutable_metadata()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000080U);
+  // @@protoc_insertion_point(field_mutable_map:runanywhere.v1.VoiceAgentTurnRequest.metadata)
+  return _internal_mutable_metadata();
+}
+
 // -------------------------------------------------------------------
 
 // VoiceSessionConfig
@@ -2202,7 +3759,7 @@ inline void VoiceSessionConfig::clear_silence_duration_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.silence_duration_ms_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000001U);
+                  0x00000004U);
 }
 inline ::int32_t VoiceSessionConfig::silence_duration_ms() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceSessionConfig.silence_duration_ms)
@@ -2210,7 +3767,7 @@ inline ::int32_t VoiceSessionConfig::silence_duration_ms() const {
 }
 inline void VoiceSessionConfig::set_silence_duration_ms(::int32_t value) {
   _internal_set_silence_duration_ms(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceSessionConfig.silence_duration_ms)
 }
 inline ::int32_t VoiceSessionConfig::_internal_silence_duration_ms() const {
@@ -2227,7 +3784,7 @@ inline void VoiceSessionConfig::clear_speech_threshold() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.speech_threshold_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000002U);
+                  0x00000008U);
 }
 inline float VoiceSessionConfig::speech_threshold() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceSessionConfig.speech_threshold)
@@ -2235,7 +3792,7 @@ inline float VoiceSessionConfig::speech_threshold() const {
 }
 inline void VoiceSessionConfig::set_speech_threshold(float value) {
   _internal_set_speech_threshold(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceSessionConfig.speech_threshold)
 }
 inline float VoiceSessionConfig::_internal_speech_threshold() const {
@@ -2252,7 +3809,7 @@ inline void VoiceSessionConfig::clear_auto_play_tts() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.auto_play_tts_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000004U);
+                  0x00000010U);
 }
 inline bool VoiceSessionConfig::auto_play_tts() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceSessionConfig.auto_play_tts)
@@ -2260,7 +3817,7 @@ inline bool VoiceSessionConfig::auto_play_tts() const {
 }
 inline void VoiceSessionConfig::set_auto_play_tts(bool value) {
   _internal_set_auto_play_tts(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceSessionConfig.auto_play_tts)
 }
 inline bool VoiceSessionConfig::_internal_auto_play_tts() const {
@@ -2277,7 +3834,7 @@ inline void VoiceSessionConfig::clear_continuous_mode() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.continuous_mode_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000008U);
+                  0x00000020U);
 }
 inline bool VoiceSessionConfig::continuous_mode() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceSessionConfig.continuous_mode)
@@ -2285,7 +3842,7 @@ inline bool VoiceSessionConfig::continuous_mode() const {
 }
 inline void VoiceSessionConfig::set_continuous_mode(bool value) {
   _internal_set_continuous_mode(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceSessionConfig.continuous_mode)
 }
 inline bool VoiceSessionConfig::_internal_continuous_mode() const {
@@ -2302,7 +3859,7 @@ inline void VoiceSessionConfig::clear_thinking_mode_enabled() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.thinking_mode_enabled_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000010U);
+                  0x00000040U);
 }
 inline bool VoiceSessionConfig::thinking_mode_enabled() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceSessionConfig.thinking_mode_enabled)
@@ -2310,7 +3867,7 @@ inline bool VoiceSessionConfig::thinking_mode_enabled() const {
 }
 inline void VoiceSessionConfig::set_thinking_mode_enabled(bool value) {
   _internal_set_thinking_mode_enabled(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceSessionConfig.thinking_mode_enabled)
 }
 inline bool VoiceSessionConfig::_internal_thinking_mode_enabled() const {
@@ -2327,7 +3884,7 @@ inline void VoiceSessionConfig::clear_max_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_tokens_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00000020U);
+                  0x00000080U);
 }
 inline ::int32_t VoiceSessionConfig::max_tokens() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceSessionConfig.max_tokens)
@@ -2335,7 +3892,7 @@ inline ::int32_t VoiceSessionConfig::max_tokens() const {
 }
 inline void VoiceSessionConfig::set_max_tokens(::int32_t value) {
   _internal_set_max_tokens(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00000020U);
+  SetHasBit(_impl_._has_bits_[0], 0x00000080U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceSessionConfig.max_tokens)
 }
 inline ::int32_t VoiceSessionConfig::_internal_max_tokens() const {
@@ -2345,6 +3902,169 @@ inline ::int32_t VoiceSessionConfig::_internal_max_tokens() const {
 inline void VoiceSessionConfig::_internal_set_max_tokens(::int32_t value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_tokens_ = value;
+}
+
+// int32 max_recording_duration_ms = 7;
+inline void VoiceSessionConfig::clear_max_recording_duration_ms() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.max_recording_duration_ms_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000100U);
+}
+inline ::int32_t VoiceSessionConfig::max_recording_duration_ms() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceSessionConfig.max_recording_duration_ms)
+  return _internal_max_recording_duration_ms();
+}
+inline void VoiceSessionConfig::set_max_recording_duration_ms(::int32_t value) {
+  _internal_set_max_recording_duration_ms(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000100U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceSessionConfig.max_recording_duration_ms)
+}
+inline ::int32_t VoiceSessionConfig::_internal_max_recording_duration_ms() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.max_recording_duration_ms_;
+}
+inline void VoiceSessionConfig::_internal_set_max_recording_duration_ms(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.max_recording_duration_ms_ = value;
+}
+
+// optional string language_code = 8;
+inline bool VoiceSessionConfig::has_language_code() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000001U);
+  return value;
+}
+inline void VoiceSessionConfig::clear_language_code() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.language_code_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& VoiceSessionConfig::language_code() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceSessionConfig.language_code)
+  return _internal_language_code();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void VoiceSessionConfig::set_language_code(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.language_code_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceSessionConfig.language_code)
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceSessionConfig::mutable_language_code()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_language_code();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceSessionConfig.language_code)
+  return _s;
+}
+inline const ::std::string& VoiceSessionConfig::_internal_language_code() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.language_code_.Get();
+}
+inline void VoiceSessionConfig::_internal_set_language_code(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.language_code_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceSessionConfig::_internal_mutable_language_code() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.language_code_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE VoiceSessionConfig::release_language_code() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceSessionConfig.language_code)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.language_code_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.language_code_.Set("", GetArena());
+  }
+  return released;
+}
+inline void VoiceSessionConfig::set_allocated_language_code(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.language_code_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.language_code_.IsDefault()) {
+    _impl_.language_code_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceSessionConfig.language_code)
+}
+
+// optional string voice_id = 9;
+inline bool VoiceSessionConfig::has_voice_id() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000002U);
+  return value;
+}
+inline void VoiceSessionConfig::clear_voice_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.voice_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& VoiceSessionConfig::voice_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceSessionConfig.voice_id)
+  return _internal_voice_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void VoiceSessionConfig::set_voice_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.voice_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceSessionConfig.voice_id)
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceSessionConfig::mutable_voice_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_voice_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceSessionConfig.voice_id)
+  return _s;
+}
+inline const ::std::string& VoiceSessionConfig::_internal_voice_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.voice_id_.Get();
+}
+inline void VoiceSessionConfig::_internal_set_voice_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.voice_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceSessionConfig::_internal_mutable_voice_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.voice_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE VoiceSessionConfig::release_voice_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceSessionConfig.voice_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.voice_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.voice_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void VoiceSessionConfig::set_allocated_voice_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.voice_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.voice_id_.IsDefault()) {
+    _impl_.voice_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceSessionConfig.voice_id)
 }
 
 // -------------------------------------------------------------------
@@ -3056,7 +4776,7 @@ inline void VoiceAgentComposeConfig::clear_vad_sample_rate() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.vad_sample_rate_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00010000U);
+                  0x00040000U);
 }
 inline ::int32_t VoiceAgentComposeConfig::vad_sample_rate() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComposeConfig.vad_sample_rate)
@@ -3064,7 +4784,7 @@ inline ::int32_t VoiceAgentComposeConfig::vad_sample_rate() const {
 }
 inline void VoiceAgentComposeConfig::set_vad_sample_rate(::int32_t value) {
   _internal_set_vad_sample_rate(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00010000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00040000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComposeConfig.vad_sample_rate)
 }
 inline ::int32_t VoiceAgentComposeConfig::_internal_vad_sample_rate() const {
@@ -3081,7 +4801,7 @@ inline void VoiceAgentComposeConfig::clear_vad_frame_length() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.vad_frame_length_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00020000U);
+                  0x00080000U);
 }
 inline float VoiceAgentComposeConfig::vad_frame_length() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComposeConfig.vad_frame_length)
@@ -3089,7 +4809,7 @@ inline float VoiceAgentComposeConfig::vad_frame_length() const {
 }
 inline void VoiceAgentComposeConfig::set_vad_frame_length(float value) {
   _internal_set_vad_frame_length(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00020000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00080000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComposeConfig.vad_frame_length)
 }
 inline float VoiceAgentComposeConfig::_internal_vad_frame_length() const {
@@ -3106,7 +4826,7 @@ inline void VoiceAgentComposeConfig::clear_vad_energy_threshold() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.vad_energy_threshold_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00040000U);
+                  0x00100000U);
 }
 inline float VoiceAgentComposeConfig::vad_energy_threshold() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComposeConfig.vad_energy_threshold)
@@ -3114,7 +4834,7 @@ inline float VoiceAgentComposeConfig::vad_energy_threshold() const {
 }
 inline void VoiceAgentComposeConfig::set_vad_energy_threshold(float value) {
   _internal_set_vad_energy_threshold(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00040000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00100000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComposeConfig.vad_energy_threshold)
 }
 inline float VoiceAgentComposeConfig::_internal_vad_energy_threshold() const {
@@ -3131,7 +4851,7 @@ inline void VoiceAgentComposeConfig::clear_wakeword_enabled() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.wakeword_enabled_ = false;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00080000U);
+                  0x00200000U);
 }
 inline bool VoiceAgentComposeConfig::wakeword_enabled() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComposeConfig.wakeword_enabled)
@@ -3139,7 +4859,7 @@ inline bool VoiceAgentComposeConfig::wakeword_enabled() const {
 }
 inline void VoiceAgentComposeConfig::set_wakeword_enabled(bool value) {
   _internal_set_wakeword_enabled(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00080000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00200000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComposeConfig.wakeword_enabled)
 }
 inline bool VoiceAgentComposeConfig::_internal_wakeword_enabled() const {
@@ -3363,7 +5083,7 @@ inline void VoiceAgentComposeConfig::clear_wakeword_threshold() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.wakeword_threshold_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00100000U);
+                  0x00400000U);
 }
 inline float VoiceAgentComposeConfig::wakeword_threshold() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComposeConfig.wakeword_threshold)
@@ -3371,7 +5091,7 @@ inline float VoiceAgentComposeConfig::wakeword_threshold() const {
 }
 inline void VoiceAgentComposeConfig::set_wakeword_threshold(float value) {
   _internal_set_wakeword_threshold(value);
-  SetHasBit(_impl_._has_bits_[0], 0x00100000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00400000U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComposeConfig.wakeword_threshold)
 }
 inline float VoiceAgentComposeConfig::_internal_wakeword_threshold() const {
@@ -3523,7 +5243,7 @@ inline void VoiceAgentComposeConfig::set_allocated_wakeword_vad_model_path(::std
 
 // optional .runanywhere.v1.VoiceSessionConfig session_config = 20;
 inline bool VoiceAgentComposeConfig::has_session_config() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00004000U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00010000U);
   PROTOBUF_ASSUME(!value || _impl_.session_config_ != nullptr);
   return value;
 }
@@ -3531,7 +5251,7 @@ inline void VoiceAgentComposeConfig::clear_session_config() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.session_config_ != nullptr) _impl_.session_config_->Clear();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00004000U);
+                  0x00010000U);
 }
 inline const ::runanywhere::v1::VoiceSessionConfig& VoiceAgentComposeConfig::_internal_session_config() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -3550,16 +5270,16 @@ inline void VoiceAgentComposeConfig::unsafe_arena_set_allocated_session_config(
   }
   _impl_.session_config_ = reinterpret_cast<::runanywhere::v1::VoiceSessionConfig*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00004000U);
+    SetHasBit(_impl_._has_bits_[0], 0x00010000U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00010000U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VoiceAgentComposeConfig.session_config)
 }
 inline ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NULLABLE VoiceAgentComposeConfig::release_session_config() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00010000U);
   ::runanywhere::v1::VoiceSessionConfig* released = _impl_.session_config_;
   _impl_.session_config_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -3579,7 +5299,7 @@ inline ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NULLABLE VoiceAgentCompos
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentComposeConfig.session_config)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00010000U);
   ::runanywhere::v1::VoiceSessionConfig* temp = _impl_.session_config_;
   _impl_.session_config_ = nullptr;
   return temp;
@@ -3594,7 +5314,7 @@ inline ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NONNULL VoiceAgentCompose
 }
 inline ::runanywhere::v1::VoiceSessionConfig* PROTOBUF_NONNULL VoiceAgentComposeConfig::mutable_session_config()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00010000U);
   ::runanywhere::v1::VoiceSessionConfig* _msg = _internal_mutable_session_config();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentComposeConfig.session_config)
   return _msg;
@@ -3611,9 +5331,9 @@ inline void VoiceAgentComposeConfig::set_allocated_session_config(::runanywhere:
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00004000U);
+    SetHasBit(_impl_._has_bits_[0], 0x00010000U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00010000U);
   }
 
   _impl_.session_config_ = reinterpret_cast<::runanywhere::v1::VoiceSessionConfig*>(value);
@@ -3622,7 +5342,7 @@ inline void VoiceAgentComposeConfig::set_allocated_session_config(::runanywhere:
 
 // optional .runanywhere.v1.AudioPipelineConfig audio_pipeline_config = 21;
 inline bool VoiceAgentComposeConfig::has_audio_pipeline_config() const {
-  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00008000U);
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00020000U);
   PROTOBUF_ASSUME(!value || _impl_.audio_pipeline_config_ != nullptr);
   return value;
 }
@@ -3630,7 +5350,7 @@ inline void VoiceAgentComposeConfig::clear_audio_pipeline_config() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (_impl_.audio_pipeline_config_ != nullptr) _impl_.audio_pipeline_config_->Clear();
   ClearHasBit(_impl_._has_bits_[0],
-                  0x00008000U);
+                  0x00020000U);
 }
 inline const ::runanywhere::v1::AudioPipelineConfig& VoiceAgentComposeConfig::_internal_audio_pipeline_config() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
@@ -3649,16 +5369,16 @@ inline void VoiceAgentComposeConfig::unsafe_arena_set_allocated_audio_pipeline_c
   }
   _impl_.audio_pipeline_config_ = reinterpret_cast<::runanywhere::v1::AudioPipelineConfig*>(value);
   if (value != nullptr) {
-    SetHasBit(_impl_._has_bits_[0], 0x00008000U);
+    SetHasBit(_impl_._has_bits_[0], 0x00020000U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00008000U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00020000U);
   }
   // @@protoc_insertion_point(field_unsafe_arena_set_allocated:runanywhere.v1.VoiceAgentComposeConfig.audio_pipeline_config)
 }
 inline ::runanywhere::v1::AudioPipelineConfig* PROTOBUF_NULLABLE VoiceAgentComposeConfig::release_audio_pipeline_config() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00008000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00020000U);
   ::runanywhere::v1::AudioPipelineConfig* released = _impl_.audio_pipeline_config_;
   _impl_.audio_pipeline_config_ = nullptr;
   if (::google::protobuf::internal::DebugHardenForceCopyInRelease()) {
@@ -3678,7 +5398,7 @@ inline ::runanywhere::v1::AudioPipelineConfig* PROTOBUF_NULLABLE VoiceAgentCompo
   ::google::protobuf::internal::TSanWrite(&_impl_);
   // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentComposeConfig.audio_pipeline_config)
 
-  ClearHasBit(_impl_._has_bits_[0], 0x00008000U);
+  ClearHasBit(_impl_._has_bits_[0], 0x00020000U);
   ::runanywhere::v1::AudioPipelineConfig* temp = _impl_.audio_pipeline_config_;
   _impl_.audio_pipeline_config_ = nullptr;
   return temp;
@@ -3693,7 +5413,7 @@ inline ::runanywhere::v1::AudioPipelineConfig* PROTOBUF_NONNULL VoiceAgentCompos
 }
 inline ::runanywhere::v1::AudioPipelineConfig* PROTOBUF_NONNULL VoiceAgentComposeConfig::mutable_audio_pipeline_config()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
+  SetHasBit(_impl_._has_bits_[0], 0x00020000U);
   ::runanywhere::v1::AudioPipelineConfig* _msg = _internal_mutable_audio_pipeline_config();
   // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentComposeConfig.audio_pipeline_config)
   return _msg;
@@ -3710,13 +5430,151 @@ inline void VoiceAgentComposeConfig::set_allocated_audio_pipeline_config(::runan
     if (message_arena != submessage_arena) {
       value = ::google::protobuf::internal::GetOwnedMessage(message_arena, value, submessage_arena);
     }
-    SetHasBit(_impl_._has_bits_[0], 0x00008000U);
+    SetHasBit(_impl_._has_bits_[0], 0x00020000U);
   } else {
-    ClearHasBit(_impl_._has_bits_[0], 0x00008000U);
+    ClearHasBit(_impl_._has_bits_[0], 0x00020000U);
   }
 
   _impl_.audio_pipeline_config_ = reinterpret_cast<::runanywhere::v1::AudioPipelineConfig*>(value);
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentComposeConfig.audio_pipeline_config)
+}
+
+// optional string session_id = 22;
+inline bool VoiceAgentComposeConfig::has_session_id() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00004000U);
+  return value;
+}
+inline void VoiceAgentComposeConfig::clear_session_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.session_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00004000U);
+}
+inline const ::std::string& VoiceAgentComposeConfig::session_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComposeConfig.session_id)
+  return _internal_session_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void VoiceAgentComposeConfig::set_session_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
+  _impl_.session_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComposeConfig.session_id)
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentComposeConfig::mutable_session_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00004000U);
+  ::std::string* _s = _internal_mutable_session_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentComposeConfig.session_id)
+  return _s;
+}
+inline const ::std::string& VoiceAgentComposeConfig::_internal_session_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.session_id_.Get();
+}
+inline void VoiceAgentComposeConfig::_internal_set_session_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.session_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentComposeConfig::_internal_mutable_session_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.session_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE VoiceAgentComposeConfig::release_session_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentComposeConfig.session_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00004000U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
+  auto* released = _impl_.session_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.session_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void VoiceAgentComposeConfig::set_allocated_session_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00004000U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00004000U);
+  }
+  _impl_.session_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.session_id_.IsDefault()) {
+    _impl_.session_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentComposeConfig.session_id)
+}
+
+// optional string default_language_code = 23;
+inline bool VoiceAgentComposeConfig::has_default_language_code() const {
+  bool value = CheckHasBit(_impl_._has_bits_[0], 0x00008000U);
+  return value;
+}
+inline void VoiceAgentComposeConfig::clear_default_language_code() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.default_language_code_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00008000U);
+}
+inline const ::std::string& VoiceAgentComposeConfig::default_language_code() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.VoiceAgentComposeConfig.default_language_code)
+  return _internal_default_language_code();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void VoiceAgentComposeConfig::set_default_language_code(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
+  _impl_.default_language_code_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.VoiceAgentComposeConfig.default_language_code)
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentComposeConfig::mutable_default_language_code()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00008000U);
+  ::std::string* _s = _internal_mutable_default_language_code();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.VoiceAgentComposeConfig.default_language_code)
+  return _s;
+}
+inline const ::std::string& VoiceAgentComposeConfig::_internal_default_language_code() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.default_language_code_.Get();
+}
+inline void VoiceAgentComposeConfig::_internal_set_default_language_code(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.default_language_code_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL VoiceAgentComposeConfig::_internal_mutable_default_language_code() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.default_language_code_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE VoiceAgentComposeConfig::release_default_language_code() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.VoiceAgentComposeConfig.default_language_code)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00008000U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00008000U);
+  auto* released = _impl_.default_language_code_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.default_language_code_.Set("", GetArena());
+  }
+  return released;
+}
+inline void VoiceAgentComposeConfig::set_allocated_default_language_code(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00008000U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00008000U);
+  }
+  _impl_.default_language_code_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.default_language_code_.IsDefault()) {
+    _impl_.default_language_code_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceAgentComposeConfig.default_language_code)
 }
 
 #ifdef __GNUC__

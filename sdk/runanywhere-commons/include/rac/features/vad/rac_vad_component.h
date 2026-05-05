@@ -7,6 +7,20 @@
  *
  * Actor-based VAD capability that owns model lifecycle and voice detection.
  * Uses lifecycle manager for unified lifecycle + analytics handling.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Proto-byte APIs (rac_vad_component_configure_proto,
+ *     rac_vad_component_process_proto,
+ *     rac_vad_component_get_statistics_proto,
+ *     rac_vad_component_set_activity_proto_callback):
+ *     `SDK-facing default` over runanywhere.v1.VADConfiguration /
+ *     VADOptions / VADResult / VADStatistics / VADStreamEvent bytes.
+ *   - Struct APIs (rac_vad_component_create, configure, initialize,
+ *     cleanup, set_activity_callback, set_audio_callback, start, stop,
+ *     reset, process, is_speech_active, get/set_energy_threshold,
+ *     load_model, unload, get_state, get_metrics, get_statistics,
+ *     destroy): `delete after SDK migration` for SDK callers — use
+ *     proto-byte APIs.
  */
 
 #ifndef RAC_VAD_COMPONENT_H
@@ -70,7 +84,11 @@ RAC_API rac_result_t rac_vad_component_initialize(rac_handle_t handle);
 RAC_API rac_result_t rac_vad_component_cleanup(rac_handle_t handle);
 
 /**
- * @brief Set speech activity callback
+ * @brief Set the low-level raw speech activity callback.
+ *
+ * This remains the internal/native callback path. SDK-facing generated-proto
+ * callers should use rac_vad_component_set_activity_proto_callback so commons
+ * emits runanywhere.v1.VADStreamEvent envelopes.
  *
  * @param handle Component handle
  * @param callback Activity callback
@@ -239,13 +257,13 @@ RAC_API rac_result_t rac_vad_component_get_statistics(rac_handle_t handle,
 // =============================================================================
 
 /**
- * @brief Callback fired for serialized runanywhere.v1.SpeechActivityEvent bytes.
+ * @brief Callback fired for serialized runanywhere.v1.VADStreamEvent bytes.
  *
  * The byte buffer is valid only for the duration of the callback.
  */
-typedef void (*rac_vad_proto_activity_callback_fn)(const uint8_t* activity_proto_bytes,
-                                                    size_t activity_proto_size,
-                                                    void* user_data);
+typedef void (*rac_vad_proto_stream_event_callback_fn)(const uint8_t* event_proto_bytes,
+                                                       size_t event_proto_size,
+                                                       void* user_data);
 
 /**
  * @brief Configure VAD from serialized runanywhere.v1.VADConfiguration bytes.
@@ -276,11 +294,11 @@ RAC_API rac_result_t rac_vad_component_get_statistics_proto(
     rac_proto_buffer_t* out_result);
 
 /**
- * @brief Register a speech activity callback that receives generated proto bytes.
+ * @brief Register a speech activity callback that receives generated VADStreamEvent bytes.
  */
 RAC_API rac_result_t rac_vad_component_set_activity_proto_callback(
     rac_handle_t handle,
-    rac_vad_proto_activity_callback_fn callback,
+    rac_vad_proto_stream_event_callback_fn callback,
     void* user_data);
 
 #ifdef __cplusplus

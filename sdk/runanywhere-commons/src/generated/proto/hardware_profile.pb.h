@@ -21,6 +21,7 @@
 #include "google/protobuf/io/coded_stream.h"
 #include "google/protobuf/arena.h"
 #include "google/protobuf/arenastring.h"
+#include "google/protobuf/generated_message_bases.h"
 #include "google/protobuf/generated_message_tctable_decl.h"
 #include "google/protobuf/generated_message_util.h"
 #include "google/protobuf/metadata_lite.h"
@@ -62,10 +63,26 @@ class AcceleratorInfo;
 struct AcceleratorInfoDefaultTypeInternal;
 extern AcceleratorInfoDefaultTypeInternal _AcceleratorInfo_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull AcceleratorInfo_class_data_;
+class HardwareAcceleratorPreferenceRequest;
+struct HardwareAcceleratorPreferenceRequestDefaultTypeInternal;
+extern HardwareAcceleratorPreferenceRequestDefaultTypeInternal _HardwareAcceleratorPreferenceRequest_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull HardwareAcceleratorPreferenceRequest_class_data_;
+class HardwareAcceleratorPreferenceResult;
+struct HardwareAcceleratorPreferenceResultDefaultTypeInternal;
+extern HardwareAcceleratorPreferenceResultDefaultTypeInternal _HardwareAcceleratorPreferenceResult_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull HardwareAcceleratorPreferenceResult_class_data_;
+class HardwareAcceleratorsRequest;
+struct HardwareAcceleratorsRequestDefaultTypeInternal;
+extern HardwareAcceleratorsRequestDefaultTypeInternal _HardwareAcceleratorsRequest_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull HardwareAcceleratorsRequest_class_data_;
 class HardwareProfile;
 struct HardwareProfileDefaultTypeInternal;
 extern HardwareProfileDefaultTypeInternal _HardwareProfile_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull HardwareProfile_class_data_;
+class HardwareProfileRequest;
+struct HardwareProfileRequestDefaultTypeInternal;
+extern HardwareProfileRequestDefaultTypeInternal _HardwareProfileRequest_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull HardwareProfileRequest_class_data_;
 class HardwareProfileResult;
 struct HardwareProfileResultDefaultTypeInternal;
 extern HardwareProfileResultDefaultTypeInternal _HardwareProfileResult_default_instance_;
@@ -128,6 +145,143 @@ template <>
 // ===================================================================
 
 
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HardwareProfileRequest final : public ::google::protobuf::internal::ZeroFieldsBase
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.HardwareProfileRequest) */ {
+ public:
+  inline HardwareProfileRequest() : HardwareProfileRequest(nullptr) {}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(HardwareProfileRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(HardwareProfileRequest));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr HardwareProfileRequest(::google::protobuf::internal::ConstantInitialized);
+
+  inline HardwareProfileRequest(const HardwareProfileRequest& from) : HardwareProfileRequest(nullptr, from) {}
+  inline HardwareProfileRequest(HardwareProfileRequest&& from) noexcept
+      : HardwareProfileRequest(nullptr, ::std::move(from)) {}
+  inline HardwareProfileRequest& operator=(const HardwareProfileRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline HardwareProfileRequest& operator=(HardwareProfileRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const HardwareProfileRequest& default_instance() {
+    return *reinterpret_cast<const HardwareProfileRequest*>(
+        &_HardwareProfileRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 3;
+  friend void swap(HardwareProfileRequest& a, HardwareProfileRequest& b) { a.Swap(&b); }
+  inline void Swap(HardwareProfileRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(HardwareProfileRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] HardwareProfileRequest* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::internal::ZeroFieldsBase::DefaultConstruct<HardwareProfileRequest>(arena);
+  }
+  using ::google::protobuf::internal::ZeroFieldsBase::CopyFrom;
+  inline void CopyFrom(const HardwareProfileRequest& from) {
+    ::google::protobuf::internal::ZeroFieldsBase::CopyImpl(*this, from);
+  }
+  using ::google::protobuf::internal::ZeroFieldsBase::MergeFrom;
+  void MergeFrom(const HardwareProfileRequest& from) {
+    ::google::protobuf::internal::ZeroFieldsBase::MergeImpl(*this, from);
+  }
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.HardwareProfileRequest"; }
+
+  explicit HardwareProfileRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  HardwareProfileRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const HardwareProfileRequest& from);
+  HardwareProfileRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, HardwareProfileRequest&& from) noexcept
+      : HardwareProfileRequest(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.HardwareProfileRequest)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<0, 0,
+                                   0, 0,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  friend struct ::TableStruct_hardware_5fprofile_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull HardwareProfileRequest_class_data_;
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HardwareProfile final : public ::google::protobuf::Message
@@ -440,6 +594,552 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HardwareProfile final : public ::go
 };
 
 extern const ::google::protobuf::internal::ClassDataFull HardwareProfile_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HardwareAcceleratorsRequest final : public ::google::protobuf::internal::ZeroFieldsBase
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.HardwareAcceleratorsRequest) */ {
+ public:
+  inline HardwareAcceleratorsRequest() : HardwareAcceleratorsRequest(nullptr) {}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(HardwareAcceleratorsRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(HardwareAcceleratorsRequest));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr HardwareAcceleratorsRequest(::google::protobuf::internal::ConstantInitialized);
+
+  inline HardwareAcceleratorsRequest(const HardwareAcceleratorsRequest& from) : HardwareAcceleratorsRequest(nullptr, from) {}
+  inline HardwareAcceleratorsRequest(HardwareAcceleratorsRequest&& from) noexcept
+      : HardwareAcceleratorsRequest(nullptr, ::std::move(from)) {}
+  inline HardwareAcceleratorsRequest& operator=(const HardwareAcceleratorsRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline HardwareAcceleratorsRequest& operator=(HardwareAcceleratorsRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const HardwareAcceleratorsRequest& default_instance() {
+    return *reinterpret_cast<const HardwareAcceleratorsRequest*>(
+        &_HardwareAcceleratorsRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 4;
+  friend void swap(HardwareAcceleratorsRequest& a, HardwareAcceleratorsRequest& b) { a.Swap(&b); }
+  inline void Swap(HardwareAcceleratorsRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(HardwareAcceleratorsRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] HardwareAcceleratorsRequest* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::internal::ZeroFieldsBase::DefaultConstruct<HardwareAcceleratorsRequest>(arena);
+  }
+  using ::google::protobuf::internal::ZeroFieldsBase::CopyFrom;
+  inline void CopyFrom(const HardwareAcceleratorsRequest& from) {
+    ::google::protobuf::internal::ZeroFieldsBase::CopyImpl(*this, from);
+  }
+  using ::google::protobuf::internal::ZeroFieldsBase::MergeFrom;
+  void MergeFrom(const HardwareAcceleratorsRequest& from) {
+    ::google::protobuf::internal::ZeroFieldsBase::MergeImpl(*this, from);
+  }
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.HardwareAcceleratorsRequest"; }
+
+  explicit HardwareAcceleratorsRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  HardwareAcceleratorsRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const HardwareAcceleratorsRequest& from);
+  HardwareAcceleratorsRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, HardwareAcceleratorsRequest&& from) noexcept
+      : HardwareAcceleratorsRequest(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.HardwareAcceleratorsRequest)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<0, 0,
+                                   0, 0,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  friend struct ::TableStruct_hardware_5fprofile_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull HardwareAcceleratorsRequest_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HardwareAcceleratorPreferenceResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.HardwareAcceleratorPreferenceResult) */ {
+ public:
+  inline HardwareAcceleratorPreferenceResult() : HardwareAcceleratorPreferenceResult(nullptr) {}
+  ~HardwareAcceleratorPreferenceResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(HardwareAcceleratorPreferenceResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(HardwareAcceleratorPreferenceResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr HardwareAcceleratorPreferenceResult(::google::protobuf::internal::ConstantInitialized);
+
+  inline HardwareAcceleratorPreferenceResult(const HardwareAcceleratorPreferenceResult& from) : HardwareAcceleratorPreferenceResult(nullptr, from) {}
+  inline HardwareAcceleratorPreferenceResult(HardwareAcceleratorPreferenceResult&& from) noexcept
+      : HardwareAcceleratorPreferenceResult(nullptr, ::std::move(from)) {}
+  inline HardwareAcceleratorPreferenceResult& operator=(const HardwareAcceleratorPreferenceResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline HardwareAcceleratorPreferenceResult& operator=(HardwareAcceleratorPreferenceResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const HardwareAcceleratorPreferenceResult& default_instance() {
+    return *reinterpret_cast<const HardwareAcceleratorPreferenceResult*>(
+        &_HardwareAcceleratorPreferenceResult_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 6;
+  friend void swap(HardwareAcceleratorPreferenceResult& a, HardwareAcceleratorPreferenceResult& b) { a.Swap(&b); }
+  inline void Swap(HardwareAcceleratorPreferenceResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(HardwareAcceleratorPreferenceResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] HardwareAcceleratorPreferenceResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<HardwareAcceleratorPreferenceResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const HardwareAcceleratorPreferenceResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const HardwareAcceleratorPreferenceResult& from) { HardwareAcceleratorPreferenceResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(HardwareAcceleratorPreferenceResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.HardwareAcceleratorPreferenceResult"; }
+
+  explicit HardwareAcceleratorPreferenceResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  HardwareAcceleratorPreferenceResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const HardwareAcceleratorPreferenceResult& from);
+  HardwareAcceleratorPreferenceResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, HardwareAcceleratorPreferenceResult&& from) noexcept
+      : HardwareAcceleratorPreferenceResult(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kErrorMessageFieldNumber = 2,
+    kSuccessFieldNumber = 1,
+  };
+  // string error_message = 2;
+  void clear_error_message() ;
+  [[nodiscard]] const ::std::string& error_message() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_error_message(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_error_message();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_error_message();
+  void set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_error_message() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_error_message(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_error_message();
+
+  public:
+  // bool success = 1;
+  void clear_success() ;
+  [[nodiscard]] bool success() const;
+  void set_success(bool value);
+
+  private:
+  bool _internal_success() const;
+  void _internal_set_success(bool value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.HardwareAcceleratorPreferenceResult)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<1, 2,
+                                   0, 72,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const HardwareAcceleratorPreferenceResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr error_message_;
+    bool success_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_hardware_5fprofile_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull HardwareAcceleratorPreferenceResult_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED HardwareAcceleratorPreferenceRequest final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.HardwareAcceleratorPreferenceRequest) */ {
+ public:
+  inline HardwareAcceleratorPreferenceRequest() : HardwareAcceleratorPreferenceRequest(nullptr) {}
+  ~HardwareAcceleratorPreferenceRequest() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(HardwareAcceleratorPreferenceRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(HardwareAcceleratorPreferenceRequest));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr HardwareAcceleratorPreferenceRequest(::google::protobuf::internal::ConstantInitialized);
+
+  inline HardwareAcceleratorPreferenceRequest(const HardwareAcceleratorPreferenceRequest& from) : HardwareAcceleratorPreferenceRequest(nullptr, from) {}
+  inline HardwareAcceleratorPreferenceRequest(HardwareAcceleratorPreferenceRequest&& from) noexcept
+      : HardwareAcceleratorPreferenceRequest(nullptr, ::std::move(from)) {}
+  inline HardwareAcceleratorPreferenceRequest& operator=(const HardwareAcceleratorPreferenceRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline HardwareAcceleratorPreferenceRequest& operator=(HardwareAcceleratorPreferenceRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const HardwareAcceleratorPreferenceRequest& default_instance() {
+    return *reinterpret_cast<const HardwareAcceleratorPreferenceRequest*>(
+        &_HardwareAcceleratorPreferenceRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 5;
+  friend void swap(HardwareAcceleratorPreferenceRequest& a, HardwareAcceleratorPreferenceRequest& b) { a.Swap(&b); }
+  inline void Swap(HardwareAcceleratorPreferenceRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(HardwareAcceleratorPreferenceRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] HardwareAcceleratorPreferenceRequest* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<HardwareAcceleratorPreferenceRequest>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const HardwareAcceleratorPreferenceRequest& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const HardwareAcceleratorPreferenceRequest& from) { HardwareAcceleratorPreferenceRequest::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(HardwareAcceleratorPreferenceRequest* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.HardwareAcceleratorPreferenceRequest"; }
+
+  explicit HardwareAcceleratorPreferenceRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  HardwareAcceleratorPreferenceRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const HardwareAcceleratorPreferenceRequest& from);
+  HardwareAcceleratorPreferenceRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, HardwareAcceleratorPreferenceRequest&& from) noexcept
+      : HardwareAcceleratorPreferenceRequest(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kPreferenceFieldNumber = 1,
+  };
+  // .runanywhere.v1.AcceleratorPreference preference = 1;
+  void clear_preference() ;
+  [[nodiscard]] ::runanywhere::v1::AcceleratorPreference preference() const;
+  void set_preference(::runanywhere::v1::AcceleratorPreference value);
+
+  private:
+  ::runanywhere::v1::AcceleratorPreference _internal_preference() const;
+  void _internal_set_preference(::runanywhere::v1::AcceleratorPreference value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.HardwareAcceleratorPreferenceRequest)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<0, 1,
+                                   0, 0,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const HardwareAcceleratorPreferenceRequest& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    int preference_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_hardware_5fprofile_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull HardwareAcceleratorPreferenceRequest_class_data_;
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED AcceleratorInfo final : public ::google::protobuf::Message
@@ -1567,6 +2267,137 @@ inline ::google::protobuf::RepeatedPtrField<::runanywhere::v1::AcceleratorInfo>*
 HardwareProfileResult::_internal_mutable_accelerators() {
   ::google::protobuf::internal::TSanRead(&_impl_);
   return &_impl_.accelerators_;
+}
+
+// -------------------------------------------------------------------
+
+// HardwareProfileRequest
+
+// -------------------------------------------------------------------
+
+// HardwareAcceleratorsRequest
+
+// -------------------------------------------------------------------
+
+// HardwareAcceleratorPreferenceRequest
+
+// .runanywhere.v1.AcceleratorPreference preference = 1;
+inline void HardwareAcceleratorPreferenceRequest::clear_preference() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.preference_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline ::runanywhere::v1::AcceleratorPreference HardwareAcceleratorPreferenceRequest::preference() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareAcceleratorPreferenceRequest.preference)
+  return _internal_preference();
+}
+inline void HardwareAcceleratorPreferenceRequest::set_preference(::runanywhere::v1::AcceleratorPreference value) {
+  _internal_set_preference(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.HardwareAcceleratorPreferenceRequest.preference)
+}
+inline ::runanywhere::v1::AcceleratorPreference HardwareAcceleratorPreferenceRequest::_internal_preference() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::AcceleratorPreference>(_impl_.preference_);
+}
+inline void HardwareAcceleratorPreferenceRequest::_internal_set_preference(::runanywhere::v1::AcceleratorPreference value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.preference_ = value;
+}
+
+// -------------------------------------------------------------------
+
+// HardwareAcceleratorPreferenceResult
+
+// bool success = 1;
+inline void HardwareAcceleratorPreferenceResult::clear_success() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.success_ = false;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline bool HardwareAcceleratorPreferenceResult::success() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareAcceleratorPreferenceResult.success)
+  return _internal_success();
+}
+inline void HardwareAcceleratorPreferenceResult::set_success(bool value) {
+  _internal_set_success(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.HardwareAcceleratorPreferenceResult.success)
+}
+inline bool HardwareAcceleratorPreferenceResult::_internal_success() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.success_;
+}
+inline void HardwareAcceleratorPreferenceResult::_internal_set_success(bool value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.success_ = value;
+}
+
+// string error_message = 2;
+inline void HardwareAcceleratorPreferenceResult::clear_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& HardwareAcceleratorPreferenceResult::error_message() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.HardwareAcceleratorPreferenceResult.error_message)
+  return _internal_error_message();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void HardwareAcceleratorPreferenceResult::set_error_message(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.error_message_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.HardwareAcceleratorPreferenceResult.error_message)
+}
+inline ::std::string* PROTOBUF_NONNULL HardwareAcceleratorPreferenceResult::mutable_error_message()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_error_message();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.HardwareAcceleratorPreferenceResult.error_message)
+  return _s;
+}
+inline const ::std::string& HardwareAcceleratorPreferenceResult::_internal_error_message() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.error_message_.Get();
+}
+inline void HardwareAcceleratorPreferenceResult::_internal_set_error_message(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.error_message_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL HardwareAcceleratorPreferenceResult::_internal_mutable_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.error_message_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE HardwareAcceleratorPreferenceResult::release_error_message() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.HardwareAcceleratorPreferenceResult.error_message)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.error_message_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  return released;
+}
+inline void HardwareAcceleratorPreferenceResult::set_allocated_error_message(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.error_message_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.error_message_.IsDefault()) {
+    _impl_.error_message_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.HardwareAcceleratorPreferenceResult.error_message)
 }
 
 #ifdef __GNUC__

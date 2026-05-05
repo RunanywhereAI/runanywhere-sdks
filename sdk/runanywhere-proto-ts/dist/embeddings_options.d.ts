@@ -129,6 +129,15 @@ export interface EmbeddingVector {
      * inspecting EmbeddingsResult.dimension.
      */
     dimension: number;
+    /** Input index in the original request and optional caller metadata. */
+    inputIndex: number;
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface EmbeddingVector_MetadataEntry {
+    key: string;
+    value: string;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -139,6 +148,15 @@ export interface EmbeddingVector {
 export interface EmbeddingsRequest {
     texts: string[];
     options?: EmbeddingsOptions | undefined;
+    requestId: string;
+    modelId?: string | undefined;
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface EmbeddingsRequest_MetadataEntry {
+    key: string;
+    value: string;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -160,6 +178,18 @@ export interface EmbeddingsResult {
     processingTimeMs: number;
     /** Total tokens consumed across all inputs (post-truncation). */
     tokensUsed: number;
+    modelId?: string | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
+    requestId: string;
+}
+export interface EmbeddingsServiceState {
+    isReady: boolean;
+    currentModel?: string | undefined;
+    dimension: number;
+    maxTokens: number;
+    errorMessage?: string | undefined;
+    errorCode: number;
 }
 export declare const EmbeddingsConfiguration: {
     encode(message: EmbeddingsConfiguration, writer?: _m0.Writer): _m0.Writer;
@@ -185,6 +215,14 @@ export declare const EmbeddingVector: {
     create<I extends Exact<DeepPartial<EmbeddingVector>, I>>(base?: I): EmbeddingVector;
     fromPartial<I extends Exact<DeepPartial<EmbeddingVector>, I>>(object: I): EmbeddingVector;
 };
+export declare const EmbeddingVector_MetadataEntry: {
+    encode(message: EmbeddingVector_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingVector_MetadataEntry;
+    fromJSON(object: any): EmbeddingVector_MetadataEntry;
+    toJSON(message: EmbeddingVector_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<EmbeddingVector_MetadataEntry>, I>>(base?: I): EmbeddingVector_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<EmbeddingVector_MetadataEntry>, I>>(object: I): EmbeddingVector_MetadataEntry;
+};
 export declare const EmbeddingsRequest: {
     encode(message: EmbeddingsRequest, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsRequest;
@@ -193,6 +231,14 @@ export declare const EmbeddingsRequest: {
     create<I extends Exact<DeepPartial<EmbeddingsRequest>, I>>(base?: I): EmbeddingsRequest;
     fromPartial<I extends Exact<DeepPartial<EmbeddingsRequest>, I>>(object: I): EmbeddingsRequest;
 };
+export declare const EmbeddingsRequest_MetadataEntry: {
+    encode(message: EmbeddingsRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsRequest_MetadataEntry;
+    fromJSON(object: any): EmbeddingsRequest_MetadataEntry;
+    toJSON(message: EmbeddingsRequest_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<EmbeddingsRequest_MetadataEntry>, I>>(base?: I): EmbeddingsRequest_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<EmbeddingsRequest_MetadataEntry>, I>>(object: I): EmbeddingsRequest_MetadataEntry;
+};
 export declare const EmbeddingsResult: {
     encode(message: EmbeddingsResult, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsResult;
@@ -200,6 +246,14 @@ export declare const EmbeddingsResult: {
     toJSON(message: EmbeddingsResult): unknown;
     create<I extends Exact<DeepPartial<EmbeddingsResult>, I>>(base?: I): EmbeddingsResult;
     fromPartial<I extends Exact<DeepPartial<EmbeddingsResult>, I>>(object: I): EmbeddingsResult;
+};
+export declare const EmbeddingsServiceState: {
+    encode(message: EmbeddingsServiceState, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsServiceState;
+    fromJSON(object: any): EmbeddingsServiceState;
+    toJSON(message: EmbeddingsServiceState): unknown;
+    create<I extends Exact<DeepPartial<EmbeddingsServiceState>, I>>(base?: I): EmbeddingsServiceState;
+    fromPartial<I extends Exact<DeepPartial<EmbeddingsServiceState>, I>>(object: I): EmbeddingsServiceState;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

@@ -58,6 +58,8 @@ MESSAGE_PROTOS=(
     "${PROTO_DIR}/vlm_options.proto"
     # Wave 3 Step 3.1 (RC-8) — hardware profile types for hardware namespace.
     "${PROTO_DIR}/hardware_profile.proto"
+    # CPP-02 — model lifecycle service stub mirroring rac_model_lifecycle.h.
+    "${PROTO_DIR}/lifecycle_service.proto"
 )
 
 protoc \

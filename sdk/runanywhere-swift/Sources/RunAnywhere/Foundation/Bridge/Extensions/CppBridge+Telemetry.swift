@@ -199,319 +199,51 @@ private func performTelemetryHTTP(path: String, json: String, requiresAuth: Bool
 // MARK: - Event Emission Helpers (for Swift code that needs to emit events to C++)
 
 extension CppBridge.Events {
-
-    // MARK: - Download Events
-
-    /// Emit download started event via C++
-    public static func emitDownloadStarted(modelId: String, totalBytes: Int64 = 0) {
-        modelId.withCString { modelIdPtr in
-            var eventData = rac_analytics_event_data_t()
-            eventData.type = RAC_EVENT_MODEL_DOWNLOAD_STARTED
-            eventData.data.model_download.model_id = modelIdPtr
-            eventData.data.model_download.total_bytes = totalBytes
-            eventData.data.model_download.progress = 0
-            eventData.data.model_download.bytes_downloaded = 0
-            eventData.data.model_download.duration_ms = 0
-            eventData.data.model_download.error_code = RAC_SUCCESS
-            eventData.data.model_download.error_message = nil
-            rac_analytics_event_emit(RAC_EVENT_MODEL_DOWNLOAD_STARTED, &eventData)
-        }
-    }
-
-    /// Emit download progress event via C++
-    public static func emitDownloadProgress(modelId: String, progress: Double, bytesDownloaded: Int64, totalBytes: Int64) {
-        modelId.withCString { modelIdPtr in
-            var eventData = rac_analytics_event_data_t()
-            eventData.type = RAC_EVENT_MODEL_DOWNLOAD_PROGRESS
-            eventData.data.model_download.model_id = modelIdPtr
-            eventData.data.model_download.progress = progress
-            eventData.data.model_download.bytes_downloaded = bytesDownloaded
-            eventData.data.model_download.total_bytes = totalBytes
-            eventData.data.model_download.duration_ms = 0
-            eventData.data.model_download.error_code = RAC_SUCCESS
-            eventData.data.model_download.error_message = nil
-            rac_analytics_event_emit(RAC_EVENT_MODEL_DOWNLOAD_PROGRESS, &eventData)
-        }
-    }
-
-    /// Emit download completed event via C++
-    public static func emitDownloadCompleted(modelId: String, durationMs: Double, sizeBytes: Int64) {
-        modelId.withCString { modelIdPtr in
-            var eventData = rac_analytics_event_data_t()
-            eventData.type = RAC_EVENT_MODEL_DOWNLOAD_COMPLETED
-            eventData.data.model_download.model_id = modelIdPtr
-            eventData.data.model_download.duration_ms = durationMs
-            eventData.data.model_download.size_bytes = sizeBytes
-            eventData.data.model_download.progress = 100
-            eventData.data.model_download.error_code = RAC_SUCCESS
-            eventData.data.model_download.error_message = nil
-            rac_analytics_event_emit(RAC_EVENT_MODEL_DOWNLOAD_COMPLETED, &eventData)
-        }
-    }
-
-    /// Emit download failed event via C++
-    public static func emitDownloadFailed(modelId: String, error: SDKException) {
-        modelId.withCString { modelIdPtr in
-            error.message.withCString { errorMsgPtr in
-                var eventData = rac_analytics_event_data_t()
-                eventData.type = RAC_EVENT_MODEL_DOWNLOAD_FAILED
-                eventData.data.model_download.model_id = modelIdPtr
-                eventData.data.model_download.error_code = RAC_ERROR_UNKNOWN
-                eventData.data.model_download.error_message = errorMsgPtr
-                eventData.data.model_download.progress = 0
-                eventData.data.model_download.duration_ms = 0
-                rac_analytics_event_emit(RAC_EVENT_MODEL_DOWNLOAD_FAILED, &eventData)
-            }
-        }
-    }
-
-    /// Emit download cancelled event via C++
-    public static func emitDownloadCancelled(modelId: String) {
-        modelId.withCString { modelIdPtr in
-            var eventData = rac_analytics_event_data_t()
-            eventData.type = RAC_EVENT_MODEL_DOWNLOAD_CANCELLED
-            eventData.data.model_download.model_id = modelIdPtr
-            eventData.data.model_download.error_code = RAC_SUCCESS
-            eventData.data.model_download.error_message = nil
-            rac_analytics_event_emit(RAC_EVENT_MODEL_DOWNLOAD_CANCELLED, &eventData)
-        }
-    }
-
-    // MARK: - Extraction Events
-
-    /// Emit extraction started event via C++
-    public static func emitExtractionStarted(modelId: String, archiveType: String) {
-        modelId.withCString { modelIdPtr in
-            archiveType.withCString { archiveTypePtr in
-                var eventData = rac_analytics_event_data_t()
-                eventData.type = RAC_EVENT_MODEL_EXTRACTION_STARTED
-                eventData.data.model_download.model_id = modelIdPtr
-                eventData.data.model_download.archive_type = archiveTypePtr
-                eventData.data.model_download.progress = 0
-                eventData.data.model_download.error_code = RAC_SUCCESS
-                eventData.data.model_download.error_message = nil
-                rac_analytics_event_emit(RAC_EVENT_MODEL_EXTRACTION_STARTED, &eventData)
-            }
-        }
-    }
-
-    /// Emit extraction progress event via C++
-    public static func emitExtractionProgress(modelId: String, progress: Double) {
-        modelId.withCString { modelIdPtr in
-            var eventData = rac_analytics_event_data_t()
-            eventData.type = RAC_EVENT_MODEL_EXTRACTION_PROGRESS
-            eventData.data.model_download.model_id = modelIdPtr
-            eventData.data.model_download.progress = progress
-            eventData.data.model_download.error_code = RAC_SUCCESS
-            eventData.data.model_download.error_message = nil
-            rac_analytics_event_emit(RAC_EVENT_MODEL_EXTRACTION_PROGRESS, &eventData)
-        }
-    }
-
-    /// Emit extraction completed event via C++
-    public static func emitExtractionCompleted(modelId: String, durationMs: Double) {
-        modelId.withCString { modelIdPtr in
-            var eventData = rac_analytics_event_data_t()
-            eventData.type = RAC_EVENT_MODEL_EXTRACTION_COMPLETED
-            eventData.data.model_download.model_id = modelIdPtr
-            eventData.data.model_download.duration_ms = durationMs
-            eventData.data.model_download.progress = 100
-            eventData.data.model_download.error_code = RAC_SUCCESS
-            eventData.data.model_download.error_message = nil
-            rac_analytics_event_emit(RAC_EVENT_MODEL_EXTRACTION_COMPLETED, &eventData)
-        }
-    }
-
-    /// Emit extraction failed event via C++
-    public static func emitExtractionFailed(modelId: String, error: SDKException) {
-        modelId.withCString { modelIdPtr in
-            error.message.withCString { errorMsgPtr in
-                var eventData = rac_analytics_event_data_t()
-                eventData.type = RAC_EVENT_MODEL_EXTRACTION_FAILED
-                eventData.data.model_download.model_id = modelIdPtr
-                eventData.data.model_download.error_code = RAC_ERROR_UNKNOWN
-                eventData.data.model_download.error_message = errorMsgPtr
-                rac_analytics_event_emit(RAC_EVENT_MODEL_EXTRACTION_FAILED, &eventData)
-            }
-        }
-    }
-
-    // MARK: - Model Deleted Event
-
-    /// Emit model deleted event via C++
-    public static func emitModelDeleted(modelId: String) {
-        modelId.withCString { modelIdPtr in
-            var eventData = rac_analytics_event_data_t()
-            eventData.type = RAC_EVENT_MODEL_DELETED
-            eventData.data.model_download.model_id = modelIdPtr
-            eventData.data.model_download.error_code = RAC_SUCCESS
-            eventData.data.model_download.error_message = nil
-            rac_analytics_event_emit(RAC_EVENT_MODEL_DELETED, &eventData)
-        }
-    }
-
     // MARK: - SDK Lifecycle Events
 
-    /// Emit SDK init started event via C++
+    /// Emit SDK init started event via the canonical SDK event proto stream.
     public static func emitSDKInitStarted() {
-        var eventData = rac_analytics_event_data_t()
-        eventData.type = RAC_EVENT_SDK_INIT_STARTED
-        eventData.data.sdk_lifecycle.duration_ms = 0
-        eventData.data.sdk_lifecycle.count = 0
-        eventData.data.sdk_lifecycle.error_code = RAC_SUCCESS
-        eventData.data.sdk_lifecycle.error_message = nil
-        rac_analytics_event_emit(RAC_EVENT_SDK_INIT_STARTED, &eventData)
+        publishInitialization(stage: .started)
     }
 
-    /// Emit SDK init completed event via C++
+    /// Emit SDK init completed event via the canonical SDK event proto stream.
     public static func emitSDKInitCompleted(durationMs: Double) {
-        var eventData = rac_analytics_event_data_t()
-        eventData.type = RAC_EVENT_SDK_INIT_COMPLETED
-        eventData.data.sdk_lifecycle.duration_ms = durationMs
-        eventData.data.sdk_lifecycle.count = 0
-        eventData.data.sdk_lifecycle.error_code = RAC_SUCCESS
-        eventData.data.sdk_lifecycle.error_message = nil
-        rac_analytics_event_emit(RAC_EVENT_SDK_INIT_COMPLETED, &eventData)
+        var properties: [String: String] = [:]
+        properties["duration_ms"] = String(durationMs)
+        publishInitialization(stage: .completed, properties: properties)
     }
 
-    /// Emit SDK init failed event via C++
+    /// Emit SDK init failed event via the canonical SDK event proto stream.
     public static func emitSDKInitFailed(error: SDKException) {
-        error.message.withCString { errorMsgPtr in
-            var eventData = rac_analytics_event_data_t()
-            eventData.type = RAC_EVENT_SDK_INIT_FAILED
-            eventData.data.sdk_lifecycle.duration_ms = 0
-            eventData.data.sdk_lifecycle.count = 0
-            eventData.data.sdk_lifecycle.error_code = RAC_ERROR_UNKNOWN
-            eventData.data.sdk_lifecycle.error_message = errorMsgPtr
-            rac_analytics_event_emit(RAC_EVENT_SDK_INIT_FAILED, &eventData)
-        }
+        publishInitialization(stage: .failed, error: error.message)
     }
 
-    /// Emit SDK models loaded event via C++
+    /// Emit SDK models loaded event via the canonical SDK event proto stream.
     public static func emitSDKModelsLoaded(count: Int) {
-        var eventData = rac_analytics_event_data_t()
-        eventData.type = RAC_EVENT_SDK_MODELS_LOADED
-        eventData.data.sdk_lifecycle.duration_ms = 0
-        eventData.data.sdk_lifecycle.count = Int32(count)
-        eventData.data.sdk_lifecycle.error_code = RAC_SUCCESS
-        eventData.data.sdk_lifecycle.error_message = nil
-        rac_analytics_event_emit(RAC_EVENT_SDK_MODELS_LOADED, &eventData)
+        publishInitialization(stage: .servicesBootstrapped, properties: ["model_count": String(count)])
     }
 
-    // MARK: - Storage Events
+    private static func publishInitialization(
+        stage: RAInitializationStage,
+        error: String = "",
+        properties: [String: String] = [:]
+    ) {
+        var initialization = RAInitializationEvent()
+        initialization.stage = stage
+        initialization.error = error
+        initialization.version = SDKConstants.version
 
-    /// Emit storage cache cleared event via C++
-    public static func emitStorageCacheCleared(freedBytes: Int64) {
-        var eventData = rac_analytics_event_data_t()
-        eventData.type = RAC_EVENT_STORAGE_CACHE_CLEARED
-        eventData.data.storage.freed_bytes = freedBytes
-        eventData.data.storage.error_code = RAC_SUCCESS
-        eventData.data.storage.error_message = nil
-        rac_analytics_event_emit(RAC_EVENT_STORAGE_CACHE_CLEARED, &eventData)
-    }
+        var event = RASDKEvent()
+        event.id = UUID().uuidString
+        event.timestampMs = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+        event.severity = stage == .failed ? .error : .info
+        event.category = .initialization
+        event.component = .unspecified
+        event.destination = .all
+        event.source = "swift"
+        event.properties = properties
+        event.initialization = initialization
 
-    /// Emit storage cache clear failed event via C++
-    public static func emitStorageCacheClearFailed(error: SDKException) {
-        error.message.withCString { errorMsgPtr in
-            var eventData = rac_analytics_event_data_t()
-            eventData.type = RAC_EVENT_STORAGE_CACHE_CLEAR_FAILED
-            eventData.data.storage.freed_bytes = 0
-            eventData.data.storage.error_code = RAC_ERROR_UNKNOWN
-            eventData.data.storage.error_message = errorMsgPtr
-            rac_analytics_event_emit(RAC_EVENT_STORAGE_CACHE_CLEAR_FAILED, &eventData)
-        }
-    }
-
-    /// Emit storage temp cleaned event via C++
-    public static func emitStorageTempCleaned(freedBytes: Int64) {
-        var eventData = rac_analytics_event_data_t()
-        eventData.type = RAC_EVENT_STORAGE_TEMP_CLEANED
-        eventData.data.storage.freed_bytes = freedBytes
-        eventData.data.storage.error_code = RAC_SUCCESS
-        eventData.data.storage.error_message = nil
-        rac_analytics_event_emit(RAC_EVENT_STORAGE_TEMP_CLEANED, &eventData)
-    }
-
-    // MARK: - Voice Agent / Pipeline Events
-
-    /// Emit voice agent turn started event via C++
-    public static func emitVoiceAgentTurnStarted() {
-        var eventData = rac_analytics_event_data_t()
-        eventData.type = RAC_EVENT_VOICE_AGENT_TURN_STARTED
-        rac_analytics_event_emit(RAC_EVENT_VOICE_AGENT_TURN_STARTED, &eventData)
-    }
-
-    /// Emit voice agent turn completed event via C++
-    public static func emitVoiceAgentTurnCompleted(durationMs: Double) {
-        var eventData = rac_analytics_event_data_t()
-        eventData.type = RAC_EVENT_VOICE_AGENT_TURN_COMPLETED
-        eventData.data.sdk_lifecycle.duration_ms = durationMs
-        eventData.data.sdk_lifecycle.error_code = RAC_SUCCESS
-        eventData.data.sdk_lifecycle.error_message = nil
-        rac_analytics_event_emit(RAC_EVENT_VOICE_AGENT_TURN_COMPLETED, &eventData)
-    }
-
-    /// Emit voice agent turn failed event via C++
-    public static func emitVoiceAgentTurnFailed(error: SDKException) {
-        error.message.withCString { errorMsgPtr in
-            var eventData = rac_analytics_event_data_t()
-            eventData.type = RAC_EVENT_VOICE_AGENT_TURN_FAILED
-            eventData.data.sdk_lifecycle.duration_ms = 0
-            eventData.data.sdk_lifecycle.count = 0
-            eventData.data.sdk_lifecycle.error_code = RAC_ERROR_UNKNOWN
-            eventData.data.sdk_lifecycle.error_message = errorMsgPtr
-            rac_analytics_event_emit(RAC_EVENT_VOICE_AGENT_TURN_FAILED, &eventData)
-        }
-    }
-
-    // MARK: - Device Events
-
-    /// Emit device registered event via C++
-    public static func emitDeviceRegistered(deviceId: String) {
-        deviceId.withCString { deviceIdPtr in
-            var eventData = rac_analytics_event_data_t()
-            eventData.type = RAC_EVENT_DEVICE_REGISTERED
-            eventData.data.device.device_id = deviceIdPtr
-            eventData.data.device.error_code = RAC_SUCCESS
-            eventData.data.device.error_message = nil
-            rac_analytics_event_emit(RAC_EVENT_DEVICE_REGISTERED, &eventData)
-        }
-    }
-
-    /// Emit device registration failed event via C++
-    public static func emitDeviceRegistrationFailed(error: SDKException) {
-        error.message.withCString { errorMsgPtr in
-            var eventData = rac_analytics_event_data_t()
-            eventData.type = RAC_EVENT_DEVICE_REGISTRATION_FAILED
-            eventData.data.device.device_id = nil
-            eventData.data.device.error_code = RAC_ERROR_UNKNOWN
-            eventData.data.device.error_message = errorMsgPtr
-            rac_analytics_event_emit(RAC_EVENT_DEVICE_REGISTRATION_FAILED, &eventData)
-        }
-    }
-
-    // MARK: - SDK Error Events
-
-    /// Emit SDK error event via C++
-    public static func emitSDKError(error: SDKException, operation: String, context: String? = nil) {
-        error.message.withCString { errorMsgPtr in
-            operation.withCString { operationPtr in
-                var eventData = rac_analytics_event_data_t()
-                eventData.type = RAC_EVENT_SDK_ERROR
-                eventData.data.sdk_error.error_code = RAC_ERROR_UNKNOWN
-                eventData.data.sdk_error.error_message = errorMsgPtr
-                eventData.data.sdk_error.operation = operationPtr
-
-                if let context = context {
-                    context.withCString { contextPtr in
-                        eventData.data.sdk_error.context = contextPtr
-                        rac_analytics_event_emit(RAC_EVENT_SDK_ERROR, &eventData)
-                    }
-                } else {
-                    eventData.data.sdk_error.context = nil
-                    rac_analytics_event_emit(RAC_EVENT_SDK_ERROR, &eventData)
-                }
-            }
-        }
+        _ = publishSDKEvent(event)
     }
 }

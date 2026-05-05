@@ -254,14 +254,14 @@ Generate text with full options and metrics.
 ```typescript
 await RunAnywhere.generate(
   prompt: string,
-  options?: GenerationOptions
+  options?: LLMGenerationOptions
 ): Promise<GenerationResult>
 ```
 
 **Parameters:**
 
 ```typescript
-interface GenerationOptions {
+interface LLMGenerationOptions {
   /** Maximum number of tokens to generate (default: 256) */
   maxTokens?: number;
 
@@ -362,7 +362,7 @@ Generate text with token-by-token streaming.
 ```typescript
 await RunAnywhere.generateStream(
   prompt: string,
-  options?: GenerationOptions
+  options?: LLMGenerationOptions
 ): Promise<LLMStreamingResult>
 ```
 
@@ -478,9 +478,6 @@ interface STTOptions {
 
   /** Enable punctuation */
   punctuation?: boolean;
-
-  /** Enable speaker diarization */
-  diarization?: boolean;
 
   /** Enable word timestamps */
   wordTimestamps?: boolean;
@@ -885,7 +882,7 @@ interface VoiceAgentConfig {
   systemPrompt?: string;
 
   /** Generation options */
-  generationOptions?: GenerationOptions;
+  generationOptions?: LLMGenerationOptions;
 }
 ```
 

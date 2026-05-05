@@ -82,6 +82,12 @@ target_include_directories(runanywhere_commons_jni PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
 )
 
+# JNI bridge is a first-party commons translation unit and can include the
+# legacy internal event headers without tripping the public-API #warning.
+target_compile_definitions(runanywhere_commons_jni PRIVATE
+    RAC_INTERNAL_TRANSLATION_UNIT=1
+)
+
 # Link against runanywhere-commons core ONLY
 # Backend libraries are NOT linked here - they have their own JNI libraries
 target_link_libraries(runanywhere_commons_jni

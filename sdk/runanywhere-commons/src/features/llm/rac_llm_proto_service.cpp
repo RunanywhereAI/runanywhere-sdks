@@ -5,6 +5,7 @@
 
 #include "rac/features/llm/rac_llm_service.h"
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -41,6 +42,8 @@ using runanywhere::v1::GenerationEventKind;
 using runanywhere::v1::LLMGenerateRequest;
 using runanywhere::v1::LLMGenerationResult;
 using runanywhere::v1::LLMStreamEvent;
+using runanywhere::v1::LLMStreamEventKind;
+using runanywhere::v1::LLMStreamFinalResult;
 using runanywhere::v1::LLMTokenKind;
 using runanywhere::v1::SDKComponent;
 using runanywhere::v1::SDKEvent;
@@ -103,6 +106,7 @@ void populate_event_envelope(SDKEvent* event,
     event->set_severity(severity);
     event->set_component(runanywhere::v1::SDK_COMPONENT_LLM);
     event->set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    event->set_source("cpp");
 }
 
 rac_result_t publish_sdk_event(const SDKEvent& event) {
@@ -128,6 +132,7 @@ void publish_generation_event(GenerationEventKind kind,
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_LLM,
                             failed ? runanywhere::v1::EVENT_SEVERITY_ERROR
                                    : runanywhere::v1::EVENT_SEVERITY_INFO);
+    event.set_operation_id("llm.generate");
     auto* generation = event.mutable_generation();
     generation->set_kind(kind);
     if (prompt && prompt[0]) {
@@ -161,6 +166,7 @@ SDKEvent make_cancellation_event(CancellationEventKind kind,
                                  EventSeverity severity) {
     SDKEvent event;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_CANCELLATION, severity);
+    event.set_operation_id("llm.generate");
     auto* cancellation = event.mutable_cancellation();
     cancellation->set_kind(kind);
     cancellation->set_component(runanywhere::v1::SDK_COMPONENT_LLM);
@@ -254,17 +260,73 @@ struct ProtoStreamContext {
     uint64_t seq = 0;
     bool terminal_sent = false;
     bool first_token_sent = false;
+    bool inside_thinking = false;
+    bool emit_thoughts = false;
     int64_t started_ms = 0;
     int32_t token_count = 0;
-    std::string full_text;
+    std::string request_id;
+    std::string conversation_id;
+    std::string raw_text;
+    std::string pending_text;
+    std::string response_text;
+    std::string thinking_text;
 };
+
+size_t matching_tag_suffix_len(const std::string& text,
+                               const char* const* tags,
+                               size_t tags_count) {
+    size_t best = 0;
+    for (size_t i = 0; i < tags_count; ++i) {
+        const char* tag = tags[i];
+        const size_t tag_len = std::strlen(tag);
+        const size_t max_len = std::min(tag_len - 1, text.size());
+        for (size_t len = 1; len <= max_len; ++len) {
+            if (std::memcmp(text.data() + text.size() - len, tag, len) == 0) {
+                best = std::max(best, len);
+            }
+        }
+    }
+    return best;
+}
+
+size_t find_earliest_tag(const std::string& text,
+                         const char* const* tags,
+                         size_t tags_count,
+                         const char** out_tag) {
+    size_t best = std::string::npos;
+    const char* best_tag = nullptr;
+    for (size_t i = 0; i < tags_count; ++i) {
+        const size_t pos = text.find(tags[i]);
+        if (pos != std::string::npos && pos < best) {
+            best = pos;
+            best_tag = tags[i];
+        }
+    }
+    if (out_tag) {
+        *out_tag = best_tag;
+    }
+    return best;
+}
+
+LLMStreamEventKind event_kind_for_token(LLMTokenKind kind, bool is_final,
+                                        const char* error_message) {
+    if (is_final) {
+        return error_message && error_message[0]
+                   ? runanywhere::v1::LLM_STREAM_EVENT_KIND_ERROR
+                   : runanywhere::v1::LLM_STREAM_EVENT_KIND_COMPLETED;
+    }
+    return kind == runanywhere::v1::LLM_TOKEN_KIND_THOUGHT
+               ? runanywhere::v1::LLM_STREAM_EVENT_KIND_THINKING
+               : runanywhere::v1::LLM_STREAM_EVENT_KIND_TOKEN;
+}
 
 void dispatch_stream_event(ProtoStreamContext* ctx,
                            const char* token,
                            bool is_final,
                            LLMTokenKind kind,
                            const char* finish_reason,
-                           const char* error_message) {
+                           const char* error_message,
+                           const LLMStreamFinalResult* result = nullptr) {
     if (!ctx || !ctx->callback) {
         return;
     }
@@ -277,11 +339,23 @@ void dispatch_stream_event(ProtoStreamContext* ctx,
     }
     event.set_is_final(is_final);
     event.set_kind(kind);
+    event.set_event_kind(event_kind_for_token(kind, is_final, error_message));
+    if (!ctx->request_id.empty()) {
+        event.set_request_id(ctx->request_id);
+    }
+    if (!ctx->conversation_id.empty()) {
+        event.set_conversation_id(ctx->conversation_id);
+    }
+    event.set_completion_tokens_generated(ctx->token_count);
+    event.set_elapsed_ms(now_ms() - ctx->started_ms);
     if (finish_reason && finish_reason[0]) {
         event.set_finish_reason(finish_reason);
     }
     if (error_message && error_message[0]) {
         event.set_error_message(error_message);
+    }
+    if (result) {
+        *event.mutable_result() = *result;
     }
 
     const size_t size = event.ByteSizeLong();
@@ -293,15 +367,126 @@ void dispatch_stream_event(ProtoStreamContext* ctx,
     ctx->callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), ctx->user_data);
 }
 
+void emit_stream_segment(ProtoStreamContext* ctx, const std::string& token, LLMTokenKind kind) {
+    if (!ctx || token.empty()) {
+        return;
+    }
+
+    if (kind == runanywhere::v1::LLM_TOKEN_KIND_THOUGHT) {
+        ctx->thinking_text += token;
+        if (!ctx->emit_thoughts) {
+            return;
+        }
+    } else {
+        ctx->response_text += token;
+    }
+
+    ctx->token_count += 1;
+    if (!ctx->first_token_sent) {
+        ctx->first_token_sent = true;
+        publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED,
+                                 nullptr, token.c_str(), nullptr, nullptr,
+                                 ctx->ref->model_id, 1, now_ms() - ctx->started_ms);
+    }
+    publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_TOKEN_GENERATED,
+                             nullptr, token.c_str(), nullptr, nullptr,
+                             ctx->ref->model_id, ctx->token_count, 0);
+    dispatch_stream_event(ctx, token.c_str(), false, kind, nullptr, nullptr);
+}
+
+void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
+    static const char* const kOpenTags[] = {"<think>", "<thinking>"};
+    static const char* const kCloseTags[] = {"</think>", "</thinking>"};
+    if (!ctx || !token || token[0] == '\0') {
+        return;
+    }
+
+    ctx->raw_text += token;
+    ctx->pending_text += token;
+    while (!ctx->pending_text.empty()) {
+        if (ctx->inside_thinking) {
+            const char* close_tag = nullptr;
+            const size_t close_pos = find_earliest_tag(
+                ctx->pending_text, kCloseTags, sizeof(kCloseTags) / sizeof(kCloseTags[0]),
+                &close_tag);
+            if (close_pos != std::string::npos) {
+                emit_stream_segment(ctx, ctx->pending_text.substr(0, close_pos),
+                                    runanywhere::v1::LLM_TOKEN_KIND_THOUGHT);
+                ctx->pending_text.erase(0, close_pos + std::strlen(close_tag));
+                ctx->inside_thinking = false;
+                continue;
+            }
+
+            const size_t keep = matching_tag_suffix_len(
+                ctx->pending_text, kCloseTags, sizeof(kCloseTags) / sizeof(kCloseTags[0]));
+            const size_t emit_len = ctx->pending_text.size() - keep;
+            if (emit_len == 0) {
+                break;
+            }
+            emit_stream_segment(ctx, ctx->pending_text.substr(0, emit_len),
+                                runanywhere::v1::LLM_TOKEN_KIND_THOUGHT);
+            ctx->pending_text.erase(0, emit_len);
+            continue;
+        }
+
+        const char* open_tag = nullptr;
+        const size_t open_pos = find_earliest_tag(
+            ctx->pending_text, kOpenTags, sizeof(kOpenTags) / sizeof(kOpenTags[0]),
+            &open_tag);
+        if (open_pos != std::string::npos) {
+            emit_stream_segment(ctx, ctx->pending_text.substr(0, open_pos),
+                                runanywhere::v1::LLM_TOKEN_KIND_ANSWER);
+            ctx->pending_text.erase(0, open_pos + std::strlen(open_tag));
+            ctx->inside_thinking = true;
+            continue;
+        }
+
+        const size_t keep = matching_tag_suffix_len(
+            ctx->pending_text, kOpenTags, sizeof(kOpenTags) / sizeof(kOpenTags[0]));
+        const size_t emit_len = ctx->pending_text.size() - keep;
+        if (emit_len == 0) {
+            break;
+        }
+        emit_stream_segment(ctx, ctx->pending_text.substr(0, emit_len),
+                            runanywhere::v1::LLM_TOKEN_KIND_ANSWER);
+        ctx->pending_text.erase(0, emit_len);
+    }
+}
+
+void flush_pending_stream_text(ProtoStreamContext* ctx) {
+    if (!ctx || ctx->pending_text.empty()) {
+        return;
+    }
+    emit_stream_segment(ctx, ctx->pending_text,
+                        ctx->inside_thinking ? runanywhere::v1::LLM_TOKEN_KIND_THOUGHT
+                                             : runanywhere::v1::LLM_TOKEN_KIND_ANSWER);
+    ctx->pending_text.clear();
+}
+
 void dispatch_terminal_once(ProtoStreamContext* ctx,
                             const char* finish_reason,
                             const char* error_message) {
     if (!ctx || ctx->terminal_sent) {
         return;
     }
+    flush_pending_stream_text(ctx);
     ctx->terminal_sent = true;
+
+    LLMStreamFinalResult final_result;
+    final_result.set_text(ctx->response_text);
+    if (!ctx->thinking_text.empty()) {
+        final_result.set_thinking_content(ctx->thinking_text);
+    }
+    final_result.set_completion_tokens(ctx->token_count);
+    final_result.set_total_tokens(ctx->token_count);
+    final_result.set_total_time_ms(now_ms() - ctx->started_ms);
+    final_result.set_finish_reason(finish_reason && finish_reason[0] ? finish_reason : "stop");
+    if (error_message && error_message[0]) {
+        final_result.set_error_message(error_message);
+    }
+
     dispatch_stream_event(ctx, "", true, runanywhere::v1::LLM_TOKEN_KIND_ANSWER,
-                          finish_reason, error_message);
+                          finish_reason, error_message, &final_result);
 }
 
 rac_bool_t stream_token_callback(const char* token, void* user_data) {
@@ -314,20 +499,7 @@ rac_bool_t stream_token_callback(const char* token, void* user_data) {
     }
 
     const char* safe_token = token ? token : "";
-    ctx->full_text += safe_token;
-    ctx->token_count += safe_token[0] ? 1 : 0;
-
-    if (!ctx->first_token_sent && safe_token[0]) {
-        ctx->first_token_sent = true;
-        publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED,
-                                 nullptr, safe_token, nullptr, nullptr,
-                                 ctx->ref->model_id, 1, now_ms() - ctx->started_ms);
-    }
-    publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_TOKEN_GENERATED,
-                             nullptr, safe_token, nullptr, nullptr,
-                             ctx->ref->model_id, ctx->token_count, 0);
-    dispatch_stream_event(ctx, safe_token, false, runanywhere::v1::LLM_TOKEN_KIND_ANSWER,
-                          nullptr, nullptr);
+    consume_thinking_aware_text(ctx, safe_token);
     return RAC_TRUE;
 }
 
@@ -471,6 +643,9 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     ctx.user_data = user_data;
     ctx.ref = &ref;
     ctx.started_ms = now_ms();
+    ctx.emit_thoughts = request.emit_thoughts();
+    ctx.request_id = request.request_id();
+    ctx.conversation_id = request.conversation_id();
 
     rc = ref.ops->generate_stream(ref.impl, request.prompt().c_str(), &options,
                                   stream_token_callback, &ctx);
@@ -481,20 +656,20 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     if (cancelled) {
         dispatch_terminal_once(&ctx, "cancelled", nullptr);
         publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_CANCELLED,
-                                 request.prompt().c_str(), nullptr, ctx.full_text.c_str(),
+                                 request.prompt().c_str(), nullptr, ctx.response_text.c_str(),
                                  nullptr, ref.model_id, ctx.token_count,
                                  now_ms() - ctx.started_ms);
         rc = RAC_SUCCESS;
     } else if (rc != RAC_SUCCESS) {
         dispatch_terminal_once(&ctx, "error", rac_error_message(rc));
         publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_FAILED,
-                                 request.prompt().c_str(), nullptr, ctx.full_text.c_str(),
+                                 request.prompt().c_str(), nullptr, ctx.response_text.c_str(),
                                  rac_error_message(rc), ref.model_id, ctx.token_count,
                                  now_ms() - ctx.started_ms);
     } else {
         dispatch_terminal_once(&ctx, "stop", nullptr);
         publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED,
-                                 request.prompt().c_str(), nullptr, ctx.full_text.c_str(),
+                                 request.prompt().c_str(), nullptr, ctx.response_text.c_str(),
                                  nullptr, ref.model_id, ctx.token_count,
                                  now_ms() - ctx.started_ms);
     }

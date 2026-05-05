@@ -7,6 +7,16 @@
  *
  * Actor-based STT capability that owns model lifecycle and transcription.
  * Uses lifecycle manager for unified lifecycle + analytics handling.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Proto-byte APIs (rac_stt_component_transcribe_proto,
+ *     rac_stt_component_transcribe_stream_proto): `SDK-facing default`
+ *     over runanywhere.v1.STTOptions / STTOutput / STTStreamEvent bytes.
+ *   - Struct APIs (rac_stt_component_create, configure, load_model,
+ *     unload, cleanup, transcribe, transcribe_stream, get_*,
+ *     get_supported_languages, detect_language, destroy):
+ *     `delete after SDK migration` for SDK callers — use proto-byte
+ *     APIs and the model lifecycle proto contract.
  */
 
 #ifndef RAC_STT_COMPONENT_H
@@ -115,7 +125,11 @@ RAC_API rac_result_t rac_stt_component_transcribe(rac_handle_t handle, const voi
 RAC_API rac_bool_t rac_stt_component_supports_streaming(rac_handle_t handle);
 
 /**
- * @brief Transcribe audio with streaming
+ * @brief Transcribe audio with the low-level raw partial/final callback.
+ *
+ * This remains the backend-facing C callback path. SDK-facing generated-proto
+ * callers should use rac_stt_component_transcribe_stream_proto so commons emits
+ * runanywhere.v1.STTStreamEvent envelopes.
  *
  * @param handle Component handle
  * @param audio_data Audio chunk data
@@ -190,13 +204,13 @@ RAC_API rac_result_t rac_stt_component_detect_language(rac_handle_t handle, cons
 // =============================================================================
 
 /**
- * @brief Callback fired for serialized runanywhere.v1.STTPartialResult bytes.
+ * @brief Callback fired for serialized runanywhere.v1.STTStreamEvent bytes.
  *
  * The byte buffer is valid only for the duration of the callback.
  */
-typedef void (*rac_stt_proto_partial_callback_fn)(const uint8_t* partial_proto_bytes,
-                                                   size_t partial_proto_size,
-                                                   void* user_data);
+typedef void (*rac_stt_proto_stream_event_callback_fn)(const uint8_t* event_proto_bytes,
+                                                       size_t event_proto_size,
+                                                       void* user_data);
 
 /**
  * @brief Transcribe audio using serialized runanywhere.v1.STTOptions bytes.
@@ -212,7 +226,7 @@ RAC_API rac_result_t rac_stt_component_transcribe_proto(
     rac_proto_buffer_t* out_result);
 
 /**
- * @brief Stream transcription partials as runanywhere.v1.STTPartialResult bytes.
+ * @brief Stream transcription as generated runanywhere.v1.STTStreamEvent bytes.
  */
 RAC_API rac_result_t rac_stt_component_transcribe_stream_proto(
     rac_handle_t handle,
@@ -220,7 +234,7 @@ RAC_API rac_result_t rac_stt_component_transcribe_stream_proto(
     size_t audio_size,
     const uint8_t* options_proto_bytes,
     size_t options_proto_size,
-    rac_stt_proto_partial_callback_fn callback,
+    rac_stt_proto_stream_event_callback_fn callback,
     void* user_data);
 
 #ifdef __cplusplus

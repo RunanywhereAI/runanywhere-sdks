@@ -1236,8 +1236,7 @@ bool rac_lora_entry_to_proto(const rac_lora_entry_t* in,
         }
     }
     out->set_size_bytes(in->file_size);
-    // proto LoraAdapterCatalogEntry has no default_scale field — drop in->default_scale
-    // (drift documented).
+    out->set_default_scale(in->default_scale > 0.0f ? in->default_scale : 1.0f);
     return true;
 }
 
@@ -1251,7 +1250,7 @@ bool rac_lora_entry_from_proto(const ::runanywhere::v1::LoraAdapterCatalogEntry&
     out->download_url = copy_string(in.url());
     out->filename = copy_string(in.filename());
     out->file_size = in.size_bytes();
-    out->default_scale = 1.0f;  // proto has no carrier; use the documented default.
+    out->default_scale = in.default_scale() > 0.0f ? in.default_scale() : 1.0f;
     if (in.compatible_models_size() > 0) {
         out->compatible_model_count = static_cast<size_t>(in.compatible_models_size());
         out->compatible_model_ids = static_cast<char**>(

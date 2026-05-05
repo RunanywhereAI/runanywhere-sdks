@@ -154,6 +154,41 @@ public class STTOptions(
     schemaIndex = 11,
   )
   public val max_alternatives: Int = 0,
+  /**
+   * Streaming/endpointer controls. 0 = backend/default.
+   */
+  @field:WireField(
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "chunkDurationMs",
+    schemaIndex = 12,
+  )
+  public val chunk_duration_ms: Int = 0,
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "endpointSilenceMs",
+    schemaIndex = 13,
+  )
+  public val endpoint_silence_ms: Int = 0,
+  @field:WireField(
+    tag = 15,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "suppressBlank",
+    schemaIndex = 14,
+  )
+  public val suppress_blank: Boolean = false,
+  @field:WireField(
+    tag = 16,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "translateToEnglish",
+    schemaIndex = 15,
+  )
+  public val translate_to_english: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<STTOptions, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -191,6 +226,10 @@ public class STTOptions(
     if (audio_format != other.audio_format) return false
     if (sample_rate != other.sample_rate) return false
     if (max_alternatives != other.max_alternatives) return false
+    if (chunk_duration_ms != other.chunk_duration_ms) return false
+    if (endpoint_silence_ms != other.endpoint_silence_ms) return false
+    if (suppress_blank != other.suppress_blank) return false
+    if (translate_to_english != other.translate_to_english) return false
     return true
   }
 
@@ -210,6 +249,10 @@ public class STTOptions(
       result = result * 37 + audio_format.hashCode()
       result = result * 37 + sample_rate.hashCode()
       result = result * 37 + max_alternatives.hashCode()
+      result = result * 37 + chunk_duration_ms.hashCode()
+      result = result * 37 + endpoint_silence_ms.hashCode()
+      result = result * 37 + suppress_blank.hashCode()
+      result = result * 37 + translate_to_english.hashCode()
       super.hashCode = result
     }
     return result
@@ -229,6 +272,10 @@ public class STTOptions(
     result += """audio_format=$audio_format"""
     result += """sample_rate=$sample_rate"""
     result += """max_alternatives=$max_alternatives"""
+    result += """chunk_duration_ms=$chunk_duration_ms"""
+    result += """endpoint_silence_ms=$endpoint_silence_ms"""
+    result += """suppress_blank=$suppress_blank"""
+    result += """translate_to_english=$translate_to_english"""
     return result.joinToString(prefix = "STTOptions{", separator = ", ", postfix = "}")
   }
 
@@ -245,10 +292,15 @@ public class STTOptions(
     audio_format: AudioFormat = this.audio_format,
     sample_rate: Int = this.sample_rate,
     max_alternatives: Int = this.max_alternatives,
+    chunk_duration_ms: Int = this.chunk_duration_ms,
+    endpoint_silence_ms: Int = this.endpoint_silence_ms,
+    suppress_blank: Boolean = this.suppress_blank,
+    translate_to_english: Boolean = this.translate_to_english,
     unknownFields: ByteString = this.unknownFields,
   ): STTOptions = STTOptions(language, enable_punctuation, enable_diarization, max_speakers,
       vocabulary_list, enable_word_timestamps, beam_size, language_code, detect_language,
-      audio_format, sample_rate, max_alternatives, unknownFields)
+      audio_format, sample_rate, max_alternatives, chunk_duration_ms, endpoint_silence_ms,
+      suppress_blank, translate_to_english, unknownFields)
 
   public companion object {
     @JvmField
@@ -283,6 +335,14 @@ public class STTOptions(
             value.sample_rate)
         if (value.max_alternatives != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(12,
             value.max_alternatives)
+        if (value.chunk_duration_ms != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(13,
+            value.chunk_duration_ms)
+        if (value.endpoint_silence_ms != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(14,
+            value.endpoint_silence_ms)
+        if (value.suppress_blank != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(15,
+            value.suppress_blank)
+        if (value.translate_to_english != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(16,
+            value.translate_to_english)
         return size
       }
 
@@ -306,11 +366,27 @@ public class STTOptions(
         if (value.sample_rate != 0) ProtoAdapter.INT32.encodeWithTag(writer, 11, value.sample_rate)
         if (value.max_alternatives != 0) ProtoAdapter.INT32.encodeWithTag(writer, 12,
             value.max_alternatives)
+        if (value.chunk_duration_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 13,
+            value.chunk_duration_ms)
+        if (value.endpoint_silence_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 14,
+            value.endpoint_silence_ms)
+        if (value.suppress_blank != false) ProtoAdapter.BOOL.encodeWithTag(writer, 15,
+            value.suppress_blank)
+        if (value.translate_to_english != false) ProtoAdapter.BOOL.encodeWithTag(writer, 16,
+            value.translate_to_english)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: STTOptions) {
         writer.writeBytes(value.unknownFields)
+        if (value.translate_to_english != false) ProtoAdapter.BOOL.encodeWithTag(writer, 16,
+            value.translate_to_english)
+        if (value.suppress_blank != false) ProtoAdapter.BOOL.encodeWithTag(writer, 15,
+            value.suppress_blank)
+        if (value.endpoint_silence_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 14,
+            value.endpoint_silence_ms)
+        if (value.chunk_duration_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 13,
+            value.chunk_duration_ms)
         if (value.max_alternatives != 0) ProtoAdapter.INT32.encodeWithTag(writer, 12,
             value.max_alternatives)
         if (value.sample_rate != 0) ProtoAdapter.INT32.encodeWithTag(writer, 11, value.sample_rate)
@@ -345,6 +421,10 @@ public class STTOptions(
         var audio_format: AudioFormat = AudioFormat.AUDIO_FORMAT_UNSPECIFIED
         var sample_rate: Int = 0
         var max_alternatives: Int = 0
+        var chunk_duration_ms: Int = 0
+        var endpoint_silence_ms: Int = 0
+        var suppress_blank: Boolean = false
+        var translate_to_english: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -367,6 +447,10 @@ public class STTOptions(
             }
             11 -> sample_rate = ProtoAdapter.INT32.decode(reader)
             12 -> max_alternatives = ProtoAdapter.INT32.decode(reader)
+            13 -> chunk_duration_ms = ProtoAdapter.INT32.decode(reader)
+            14 -> endpoint_silence_ms = ProtoAdapter.INT32.decode(reader)
+            15 -> suppress_blank = ProtoAdapter.BOOL.decode(reader)
+            16 -> translate_to_english = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -383,6 +467,10 @@ public class STTOptions(
           audio_format = audio_format,
           sample_rate = sample_rate,
           max_alternatives = max_alternatives,
+          chunk_duration_ms = chunk_duration_ms,
+          endpoint_silence_ms = endpoint_silence_ms,
+          suppress_blank = suppress_blank,
+          translate_to_english = translate_to_english,
           unknownFields = unknownFields
         )
       }

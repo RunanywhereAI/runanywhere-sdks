@@ -75,6 +75,14 @@ public class DownloadFilePlan(
     schemaIndex = 5,
   )
   public val checksum_sha256: String = "",
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "isResumeCandidate",
+    schemaIndex = 6,
+  )
+  public val is_resume_candidate: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DownloadFilePlan, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -94,6 +102,7 @@ public class DownloadFilePlan(
     if (expected_bytes != other.expected_bytes) return false
     if (requires_extraction != other.requires_extraction) return false
     if (checksum_sha256 != other.checksum_sha256) return false
+    if (is_resume_candidate != other.is_resume_candidate) return false
     return true
   }
 
@@ -107,6 +116,7 @@ public class DownloadFilePlan(
       result = result * 37 + expected_bytes.hashCode()
       result = result * 37 + requires_extraction.hashCode()
       result = result * 37 + checksum_sha256.hashCode()
+      result = result * 37 + is_resume_candidate.hashCode()
       super.hashCode = result
     }
     return result
@@ -120,6 +130,7 @@ public class DownloadFilePlan(
     result += """expected_bytes=$expected_bytes"""
     result += """requires_extraction=$requires_extraction"""
     result += """checksum_sha256=${sanitize(checksum_sha256)}"""
+    result += """is_resume_candidate=$is_resume_candidate"""
     return result.joinToString(prefix = "DownloadFilePlan{", separator = ", ", postfix = "}")
   }
 
@@ -130,9 +141,10 @@ public class DownloadFilePlan(
     expected_bytes: Long = this.expected_bytes,
     requires_extraction: Boolean = this.requires_extraction,
     checksum_sha256: String = this.checksum_sha256,
+    is_resume_candidate: Boolean = this.is_resume_candidate,
     unknownFields: ByteString = this.unknownFields,
   ): DownloadFilePlan = DownloadFilePlan(file_, storage_key, destination_path, expected_bytes,
-      requires_extraction, checksum_sha256, unknownFields)
+      requires_extraction, checksum_sha256, is_resume_candidate, unknownFields)
 
   public companion object {
     @JvmField
@@ -158,6 +170,8 @@ public class DownloadFilePlan(
             value.requires_extraction)
         if (value.checksum_sha256 != "") size += ProtoAdapter.STRING.encodedSizeWithTag(6,
             value.checksum_sha256)
+        if (value.is_resume_candidate != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(7,
+            value.is_resume_candidate)
         return size
       }
 
@@ -172,11 +186,15 @@ public class DownloadFilePlan(
             value.requires_extraction)
         if (value.checksum_sha256 != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
             value.checksum_sha256)
+        if (value.is_resume_candidate != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.is_resume_candidate)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DownloadFilePlan) {
         writer.writeBytes(value.unknownFields)
+        if (value.is_resume_candidate != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.is_resume_candidate)
         if (value.checksum_sha256 != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
             value.checksum_sha256)
         if (value.requires_extraction != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
@@ -196,6 +214,7 @@ public class DownloadFilePlan(
         var expected_bytes: Long = 0L
         var requires_extraction: Boolean = false
         var checksum_sha256: String = ""
+        var is_resume_candidate: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> file_ = ModelFileDescriptor.ADAPTER.decode(reader)
@@ -204,6 +223,7 @@ public class DownloadFilePlan(
             4 -> expected_bytes = ProtoAdapter.INT64.decode(reader)
             5 -> requires_extraction = ProtoAdapter.BOOL.decode(reader)
             6 -> checksum_sha256 = ProtoAdapter.STRING.decode(reader)
+            7 -> is_resume_candidate = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -214,6 +234,7 @@ public class DownloadFilePlan(
           expected_bytes = expected_bytes,
           requires_extraction = requires_extraction,
           checksum_sha256 = checksum_sha256,
+          is_resume_candidate = is_resume_candidate,
           unknownFields = unknownFields
         )
       }

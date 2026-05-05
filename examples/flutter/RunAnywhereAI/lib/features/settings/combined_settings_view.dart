@@ -79,9 +79,11 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     final prefs = await SharedPreferences.getInstance();
     if (mounted) {
       setState(() {
-        _temperature = prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
+        _temperature =
+            prefs.getDouble(PreferenceKeys.defaultTemperature) ?? 0.7;
         _maxTokens = prefs.getInt(PreferenceKeys.defaultMaxTokens) ?? 1000;
-        _systemPrompt = prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
+        _systemPrompt =
+            prefs.getString(PreferenceKeys.defaultSystemPrompt) ?? '';
         _systemPromptController.text = _systemPrompt;
       });
     }
@@ -312,7 +314,8 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
     });
 
     try {
-      final storageInfo = await sdk.RunAnywhereSDK.instance.downloads.getStorageInfo();
+      final storageInfo =
+          await sdk.RunAnywhereSDK.instance.downloads.getStorageInfo();
 
       final storedModels = await sdk.RunAnywhereSDK.instance.downloads.list();
 
@@ -645,8 +648,8 @@ class _CombinedSettingsViewState extends State<CombinedSettingsView> {
                       ),
                       Text(
                         '${viewModel.registeredTools.length}',
-                        style: AppTypography.subheadlineSemibold(context)
-                            .copyWith(
+                        style:
+                            AppTypography.subheadlineSemibold(context).copyWith(
                           color: AppColors.primaryAccent,
                         ),
                       ),

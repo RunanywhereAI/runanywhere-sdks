@@ -5,6 +5,18 @@
  * Defines the generic VLM service API and vtable for multi-backend dispatch.
  * Backends (LlamaCpp VLM, MLX VLM) implement the vtable and register
  * with the service registry.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - rac_vlm_service_ops_t and rac_vlm_service_t: `internal`.
+ *   - Proto-byte APIs (rac_vlm_process_proto, rac_vlm_process_stream_proto,
+ *     rac_vlm_generate_proto, rac_vlm_stream_proto,
+ *     rac_vlm_cancel_proto, rac_vlm_cancel_lifecycle_proto):
+ *     `SDK-facing default` over runanywhere.v1.VLMImage /
+ *     VLMGenerationOptions / VLMResult / VLMStreamEvent / SDKEvent bytes.
+ *   - Struct APIs (rac_vlm_create, initialize, process, process_stream,
+ *     get_info, cancel, cleanup, destroy, result_free): `delete after
+ *     SDK migration` for SDK callers; keep only as backend smoke-test
+ *     entry points.
  */
 
 #ifndef RAC_VLM_SERVICE_H
@@ -128,6 +140,17 @@ typedef rac_bool_t (*rac_vlm_stream_proto_callback_fn)(const uint8_t* event_prot
                                                        size_t event_proto_size,
                                                        void* user_data);
 
+/**
+ * @brief Callback for generated VLM stream events.
+ *
+ * The callback receives serialized runanywhere.v1.VLMStreamEvent bytes emitted
+ * by lifecycle-owned generated VLM stream processing.
+ */
+typedef rac_bool_t (*rac_vlm_stream_event_proto_callback_fn)(
+    const uint8_t* event_proto_bytes,
+    size_t event_proto_size,
+    void* user_data);
+
 // =============================================================================
 // PUBLIC API - Generic service functions
 // =============================================================================
@@ -231,6 +254,38 @@ RAC_API rac_result_t rac_vlm_cancel(rac_handle_t handle);
  * @brief Cancel VLM generation and emit canonical cancellation events.
  */
 RAC_API rac_result_t rac_vlm_cancel_proto(rac_handle_t handle);
+
+// =============================================================================
+// GENERATED-PROTO VLM ABI - lifecycle-owned model state
+// =============================================================================
+
+/**
+ * @brief Generate text from serialized runanywhere.v1.VLMGenerationRequest bytes.
+ *
+ * Uses the VLM model loaded through rac_model_lifecycle_load_proto() and
+ * returns serialized runanywhere.v1.VLMResult bytes in out_result.
+ */
+RAC_API rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes,
+                                            size_t request_proto_size,
+                                            rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Stream VLM output from serialized runanywhere.v1.VLMGenerationRequest bytes.
+ *
+ * Uses the lifecycle-owned VLM model. The callback receives serialized
+ * runanywhere.v1.VLMStreamEvent bytes including token deltas and exactly one
+ * terminal event.
+ */
+RAC_API rac_result_t rac_vlm_stream_proto(
+    const uint8_t* request_proto_bytes,
+    size_t request_proto_size,
+    rac_vlm_stream_event_proto_callback_fn callback,
+    void* user_data);
+
+/**
+ * @brief Cancel lifecycle-owned VLM generation and return a cancellation event.
+ */
+RAC_API rac_result_t rac_vlm_cancel_lifecycle_proto(rac_proto_buffer_t* out_event);
 
 /**
  * @brief Cleanup and release model resources

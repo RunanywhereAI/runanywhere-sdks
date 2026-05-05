@@ -160,7 +160,7 @@ export class ModelLifecycleAdapter {
   }
 
   currentModel(
-    request: ProtoCurrentModelRequest = {},
+    request: ProtoCurrentModelRequest = { includeModelMetadata: false },
   ): ProtoCurrentModelResult | null {
     if (!this.ensureExports('currentModel', [
       '_rac_model_lifecycle_current_model_proto',

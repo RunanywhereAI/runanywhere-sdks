@@ -1,8 +1,7 @@
 // RunAnywhere Core SDK - Android
 //
 // This plugin bundles RACommons native libraries (.so files) for Android.
-// RACommons provides the core infrastructure for on-device AI capabilities,
-// including the RAG pipeline (compiled directly into librac_commons.so).
+// RACommons provides the core infrastructure for on-device AI capabilities.
 //
 // Binary Configuration:
 //   Edit binary_config.gradle to toggle between local and remote binaries:
@@ -12,7 +11,7 @@
 // Version: Must match Swift SDK's Package.swift and Kotlin SDK's build.gradle.kts
 
 group 'ai.runanywhere.sdk'
-version '0.15.8'
+version '0.19.13'
 
 // Load binary configuration
 apply from: 'binary_config.gradle'
@@ -57,21 +56,6 @@ android {
 
         // Consumer proguard rules
         consumerProguardFiles 'proguard-rules.pro'
-
-        // C++ RAG bridge compilation
-        externalNativeBuild {
-            cmake {
-                cppFlags '-std=c++17'
-                arguments '-DANDROID_STL=c++_shared'
-            }
-        }
-    }
-
-    // CMake build for the C++ RAG bridge
-    externalNativeBuild {
-        cmake {
-            path 'CMakeLists.txt'
-        }
     }
 
     compileOptions {

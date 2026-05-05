@@ -322,6 +322,9 @@ const SDKError$json = {
     {'1': 'timestamp_ms', '3': 7, '4': 1, '5': 3, '10': 'timestampMs'},
     {'1': 'severity', '3': 8, '4': 1, '5': 14, '6': '.runanywhere.v1.ErrorSeverity', '10': 'severity'},
     {'1': 'component', '3': 9, '4': 1, '5': 9, '10': 'component'},
+    {'1': 'retryable', '3': 10, '4': 1, '5': 8, '10': 'retryable'},
+    {'1': 'remediation_hint', '3': 11, '4': 1, '5': 9, '10': 'remediationHint'},
+    {'1': 'correlation_id', '3': 12, '4': 1, '5': 9, '10': 'correlationId'},
   ],
   '8': [
     {'1': '_context'},
@@ -339,6 +342,8 @@ final $typed_data.Uint8List sDKErrorDescriptor = $convert.base64Decode(
     'BUgBUghjQWJpQ29kZYgBARIqCg5uZXN0ZWRfbWVzc2FnZRgGIAEoCUgCUg1uZXN0ZWRNZXNzYW'
     'dliAEBEiEKDHRpbWVzdGFtcF9tcxgHIAEoA1ILdGltZXN0YW1wTXMSOQoIc2V2ZXJpdHkYCCAB'
     'KA4yHS5ydW5hbnl3aGVyZS52MS5FcnJvclNldmVyaXR5UghzZXZlcml0eRIcCgljb21wb25lbn'
-    'QYCSABKAlSCWNvbXBvbmVudEIKCghfY29udGV4dEINCgtfY19hYmlfY29kZUIRCg9fbmVzdGVk'
-    'X21lc3NhZ2U=');
+    'QYCSABKAlSCWNvbXBvbmVudBIcCglyZXRyeWFibGUYCiABKAhSCXJldHJ5YWJsZRIpChByZW1l'
+    'ZGlhdGlvbl9oaW50GAsgASgJUg9yZW1lZGlhdGlvbkhpbnQSJQoOY29ycmVsYXRpb25faWQYDC'
+    'ABKAlSDWNvcnJlbGF0aW9uSWRCCgoIX2NvbnRleHRCDQoLX2NfYWJpX2NvZGVCEQoPX25lc3Rl'
+    'ZF9tZXNzYWdl');
 

@@ -9,10 +9,6 @@ library network;
 export 'package:runanywhere/adapters/http_client_adapter.dart'
     show HTTPClientAdapter, HttpClientResponse, HttpClientException;
 
-// Auth response models
-export 'models/auth/authentication_response.dart'
-    show AuthenticationResponse, RefreshTokenResponse;
-
 // Configuration utilities
 export 'network_configuration.dart'
     show

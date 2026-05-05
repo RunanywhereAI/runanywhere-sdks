@@ -86,15 +86,18 @@ RAC_API bool rac_state_is_initialized(void);
 /**
  * @brief Reset all state (for testing or re-initialization)
  *
- * Clears all state including auth tokens, handles, etc.
- * Does NOT free the singleton - just resets to initial state.
+ * Clears transient device registration state. Environment configuration
+ * survives reset; auth tokens live in rac_auth_manager and must be reset there.
+ * Does NOT free the singleton.
  */
 RAC_API void rac_state_reset(void);
 
 /**
- * @brief Shutdown and free all resources
+ * @brief Shutdown SDK state
  *
- * Called during SDK shutdown. Frees all memory and destroys handles.
+ * Called during SDK shutdown. Clears stored environment/device state in the
+ * singleton and publishes canonical SDKEvent transitions for real state
+ * changes. Auth credentials and OS lifecycle resources are owned elsewhere.
  */
 RAC_API void rac_state_shutdown(void);
 

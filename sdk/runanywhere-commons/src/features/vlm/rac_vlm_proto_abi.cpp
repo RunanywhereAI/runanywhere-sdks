@@ -10,9 +10,11 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <limits>
 #include <string>
 #include <vector>
 
+#include "features/vlm/rac_vlm_lifecycle_bridge.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/foundation/rac_proto_adapters.h"
@@ -32,6 +34,11 @@ int64_t now_ms() {
     return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 }
 
+int64_t now_us() {
+    using namespace std::chrono;
+    return duration_cast<microseconds>(system_clock::now().time_since_epoch()).count();
+}
+
 std::string event_id() {
     static std::atomic<uint64_t> counter{0};
     char buffer[64];
@@ -42,7 +49,8 @@ std::string event_id() {
 }
 
 bool valid_bytes(const uint8_t* bytes, size_t size) {
-    return size == 0 || bytes != nullptr;
+    return (size == 0 || bytes != nullptr) &&
+           size <= static_cast<size_t>(std::numeric_limits<int>::max());
 }
 
 const void* parse_data(const uint8_t* bytes, size_t size) {
@@ -75,6 +83,7 @@ void populate_envelope(runanywhere::v1::SDKEvent* event,
     event->set_severity(severity);
     event->set_component(runanywhere::v1::SDK_COMPONENT_VLM);
     event->set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    event->set_source("cpp");
 }
 
 void publish_event(const runanywhere::v1::SDKEvent& event) {
@@ -95,7 +104,10 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind,
     auto* cap = event.mutable_capability();
     cap->set_kind(kind);
     cap->set_component(runanywhere::v1::SDK_COMPONENT_VLM);
-    if (operation) cap->set_operation(operation);
+    if (operation) {
+        event.set_operation_id(operation);
+        cap->set_operation(operation);
+    }
     cap->set_progress(progress);
     cap->set_input_count(input_count);
     cap->set_output_count(output_count);
@@ -155,12 +167,78 @@ rac_result_t parse_vlm_request(const uint8_t* image_bytes, size_t image_size,
     return RAC_SUCCESS;
 }
 
+rac_result_t parse_vlm_generation_request(const uint8_t* request_bytes,
+                                          size_t request_size,
+                                          runanywhere::v1::VLMGenerationRequest* out_request,
+                                          rac_vlm_image_t* out_image,
+                                          rac_vlm_options_t* out_options,
+                                          const char** out_prompt,
+                                          rac_proto_buffer_t* out_error) {
+    if (!valid_bytes(request_bytes, request_size)) {
+        return parse_error(out_error, "VLMGenerationRequest bytes are invalid");
+    }
+    if (!out_request->ParseFromArray(parse_data(request_bytes, request_size),
+                                     static_cast<int>(request_size))) {
+        return parse_error(out_error, "failed to parse VLMGenerationRequest");
+    }
+    if (out_request->images_size() != 1) {
+        return rac_proto_buffer_set_error(
+            out_error, RAC_ERROR_INVALID_ARGUMENT,
+            "VLMGenerationRequest.images must contain exactly one image");
+    }
+
+    const runanywhere::v1::VLMGenerationOptions& options_proto =
+        out_request->has_options()
+            ? out_request->options()
+            : runanywhere::v1::VLMGenerationOptions::default_instance();
+
+    if (!rac::foundation::rac_vlm_image_from_proto(out_request->images(0), out_image) ||
+        !rac::foundation::rac_vlm_options_from_proto(options_proto, out_options,
+                                                     out_prompt)) {
+        return rac_proto_buffer_set_error(out_error, RAC_ERROR_DECODING_ERROR,
+                                          "failed to convert VLMGenerationRequest");
+    }
+    if (!*out_prompt || (*out_prompt)[0] == '\0') {
+        return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
+                                          "VLMGenerationOptions.prompt is required");
+    }
+    if (!out_image->file_path && !out_image->pixel_data && !out_image->base64_data) {
+        return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
+                                          "VLMImage source is required");
+    }
+    return RAC_SUCCESS;
+}
+
+rac_result_t check_lifecycle_model(const runanywhere::v1::VLMGenerationRequest& request,
+                                   const rac::vlm::LifecycleVlmRef& ref,
+                                   rac_proto_buffer_t* out_error) {
+    if (!request.model_id().empty() && ref.model_id &&
+        request.model_id() != ref.model_id) {
+        return rac_proto_buffer_set_error(out_error, RAC_ERROR_INVALID_ARGUMENT,
+                                          "VLMGenerationRequest.model_id does not match the lifecycle-loaded model");
+    }
+    return RAC_SUCCESS;
+}
+
 struct StreamCtx {
     rac_vlm_stream_proto_callback_fn callback{nullptr};
     void* user_data{nullptr};
     std::string text;
     int32_t token_count{0};
 };
+
+void populate_result_from_stream(const StreamCtx& ctx,
+                                 int64_t elapsed_ms,
+                                 runanywhere::v1::VLMResult* out) {
+    out->set_text(ctx.text);
+    out->set_completion_tokens(ctx.token_count);
+    out->set_total_tokens(ctx.token_count);
+    out->set_processing_time_ms(elapsed_ms);
+    if (elapsed_ms > 0) {
+        out->set_tokens_per_second(
+            static_cast<float>(ctx.token_count) / (static_cast<float>(elapsed_ms) / 1000.0f));
+    }
+}
 
 bool serialize_event(const runanywhere::v1::SDKEvent& event, std::vector<uint8_t>* out) {
     out->resize(event.ByteSizeLong());
@@ -190,6 +268,105 @@ rac_bool_t stream_token_trampoline(const char* token, void* user_data) {
                          ctx->user_data) == RAC_TRUE
                ? RAC_TRUE
                : RAC_FALSE;
+}
+
+struct GeneratedStreamCtx {
+    rac_vlm_stream_event_proto_callback_fn callback{nullptr};
+    void* user_data{nullptr};
+    rac::vlm::LifecycleVlmRef* ref{nullptr};
+    std::string request_id;
+    std::string text;
+    uint64_t seq{0};
+    int32_t token_count{0};
+    int64_t started_ms{0};
+    bool terminal_sent{false};
+};
+
+bool serialize_vlm_stream_event(const runanywhere::v1::VLMStreamEvent& event,
+                                std::vector<uint8_t>* out) {
+    out->resize(event.ByteSizeLong());
+    return out->empty() ||
+           event.SerializeToArray(out->data(), static_cast<int>(out->size()));
+}
+
+rac_bool_t dispatch_vlm_stream_event(GeneratedStreamCtx* ctx,
+                                     runanywhere::v1::VLMStreamEventKind kind,
+                                     const char* token,
+                                     bool is_final,
+                                     const runanywhere::v1::VLMResult* result,
+                                     const char* error_message,
+                                     int32_t error_code) {
+    if (!ctx || !ctx->callback) {
+        return RAC_TRUE;
+    }
+
+    runanywhere::v1::VLMStreamEvent event;
+    event.set_seq(++ctx->seq);
+    event.set_timestamp_us(now_us());
+    event.set_request_id(ctx->request_id);
+    event.set_kind(kind);
+    event.set_is_final(is_final);
+    if (token && token[0]) {
+        event.set_token(token);
+        event.set_token_index(ctx->token_count - 1);
+    }
+    if (result) {
+        event.mutable_result()->CopyFrom(*result);
+        event.set_tokens_per_second(result->tokens_per_second());
+    }
+    if (error_message && error_message[0]) {
+        event.set_error_message(error_message);
+    }
+    if (error_code != 0) {
+        event.set_error_code(error_code);
+    }
+
+    std::vector<uint8_t> bytes;
+    if (!serialize_vlm_stream_event(event, &bytes)) {
+        return RAC_FALSE;
+    }
+    return ctx->callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), ctx->user_data);
+}
+
+rac_bool_t dispatch_vlm_terminal_once(GeneratedStreamCtx* ctx,
+                                      runanywhere::v1::VLMStreamEventKind kind,
+                                      const runanywhere::v1::VLMResult* result,
+                                      const char* error_message,
+                                      int32_t error_code) {
+    if (!ctx || ctx->terminal_sent) {
+        return RAC_TRUE;
+    }
+    ctx->terminal_sent = true;
+    return dispatch_vlm_stream_event(ctx, kind, nullptr, true, result, error_message, error_code);
+}
+
+rac_bool_t generated_stream_token_trampoline(const char* token, void* user_data) {
+    auto* ctx = static_cast<GeneratedStreamCtx*>(user_data);
+    if (!ctx || !ctx->ref) return RAC_FALSE;
+    if (rac::vlm::lifecycle_vlm_cancel_requested(ctx->ref)) {
+        return RAC_FALSE;
+    }
+
+    const char* safe_token = token ? token : "";
+    ctx->text += safe_token;
+    if (safe_token[0]) {
+        ++ctx->token_count;
+    }
+
+    runanywhere::v1::SDKEvent event;
+    populate_envelope(&event, runanywhere::v1::EVENT_SEVERITY_INFO);
+    auto* generation = event.mutable_generation();
+    generation->set_kind(ctx->token_count == 1
+                             ? runanywhere::v1::GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED
+                             : runanywhere::v1::GENERATION_EVENT_KIND_TOKEN_GENERATED);
+    generation->set_token(safe_token);
+    generation->set_streaming_text(ctx->text);
+    generation->set_tokens_count(ctx->token_count);
+    if (ctx->ref->model_id) generation->set_model_id(ctx->ref->model_id);
+    publish_event(event);
+
+    return dispatch_vlm_stream_event(ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_TOKEN,
+                                     safe_token, false, nullptr, nullptr, 0);
 }
 
 #endif  // RAC_HAVE_PROTOBUF
@@ -381,6 +558,218 @@ rac_result_t rac_vlm_cancel_proto(rac_handle_t handle) {
     completed_cancel->set_user_initiated(true);
     publish_event(completed);
     return rc;
+#endif
+}
+
+rac_result_t rac_vlm_generate_proto(const uint8_t* request_proto_bytes,
+                                    size_t request_proto_size,
+                                    rac_proto_buffer_t* out_result) {
+    if (!out_result) return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return feature_unavailable(out_result);
+#else
+    rac::vlm::LifecycleVlmRef ref;
+    rac_result_t rc = rac::vlm::acquire_lifecycle_vlm(&ref);
+    if (rc != RAC_SUCCESS) {
+        publish_failure(rc, "vlm.generate", "no lifecycle VLM model loaded");
+        return rac_proto_buffer_set_error(out_result, rc, "no lifecycle VLM model loaded");
+    }
+
+    runanywhere::v1::VLMGenerationRequest request;
+    rac_vlm_image_t image = {};
+    rac_vlm_options_t options = RAC_VLM_OPTIONS_DEFAULT;
+    const char* prompt = nullptr;
+    rc = parse_vlm_generation_request(request_proto_bytes, request_proto_size,
+                                      &request, &image, &options, &prompt, out_result);
+    if (rc == RAC_SUCCESS) {
+        rc = check_lifecycle_model(request, ref, out_result);
+    }
+    if (rc != RAC_SUCCESS) {
+        publish_failure(rc, "vlm.generate", out_result->error_message);
+        free_vlm_image(&image);
+        rac_free(const_cast<char*>(prompt));
+        rac::vlm::release_lifecycle_vlm(&ref);
+        return rc;
+    }
+
+    rac::vlm::clear_lifecycle_vlm_cancel(&ref);
+    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED,
+                       "vlm.generate", 0.0f, 1, 0, nullptr);
+
+    rac_vlm_result_t raw = {};
+    rc = (ref.ops && ref.ops->process)
+             ? ref.ops->process(ref.impl, &image, prompt, &options, &raw)
+             : RAC_ERROR_NOT_SUPPORTED;
+    if (rc != RAC_SUCCESS) {
+        publish_failure(rc, "vlm.generate", rac_error_message(rc));
+        free_vlm_image(&image);
+        rac_free(const_cast<char*>(prompt));
+        rac::vlm::release_lifecycle_vlm(&ref);
+        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+    }
+
+    runanywhere::v1::VLMResult result;
+    if (!rac::foundation::rac_vlm_result_to_proto(&raw, &result)) {
+        rc = rac_proto_buffer_set_error(out_result, RAC_ERROR_ENCODING_ERROR,
+                                        "failed to encode VLMResult");
+    } else {
+        rc = copy_proto(result, out_result);
+    }
+    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
+                       "vlm.generate", 1.0f, 1, result.completion_tokens(), nullptr);
+    rac_vlm_result_free(&raw);
+    free_vlm_image(&image);
+    rac_free(const_cast<char*>(prompt));
+    rac::vlm::release_lifecycle_vlm(&ref);
+    return rc;
+#endif
+}
+
+rac_result_t rac_vlm_stream_proto(const uint8_t* request_proto_bytes,
+                                  size_t request_proto_size,
+                                  rac_vlm_stream_event_proto_callback_fn callback,
+                                  void* user_data) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    (void)callback;
+    (void)user_data;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    if (!callback) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    rac::vlm::LifecycleVlmRef ref;
+    rac_result_t rc = rac::vlm::acquire_lifecycle_vlm(&ref);
+    if (rc != RAC_SUCCESS) {
+        publish_failure(rc, "vlm.stream", "no lifecycle VLM model loaded");
+        return rc;
+    }
+
+    rac_proto_buffer_t error_buffer;
+    rac_proto_buffer_init(&error_buffer);
+    runanywhere::v1::VLMGenerationRequest request;
+    rac_vlm_image_t image = {};
+    rac_vlm_options_t options = RAC_VLM_OPTIONS_DEFAULT;
+    const char* prompt = nullptr;
+    rc = parse_vlm_generation_request(request_proto_bytes, request_proto_size,
+                                      &request, &image, &options, &prompt, &error_buffer);
+    if (rc == RAC_SUCCESS) {
+        rc = check_lifecycle_model(request, ref, &error_buffer);
+    }
+    if (rc != RAC_SUCCESS) {
+        publish_failure(rc, "vlm.stream", error_buffer.error_message);
+        rac_proto_buffer_free(&error_buffer);
+        free_vlm_image(&image);
+        rac_free(const_cast<char*>(prompt));
+        rac::vlm::release_lifecycle_vlm(&ref);
+        return rc;
+    }
+    rac_proto_buffer_free(&error_buffer);
+    if (!ref.ops || !ref.ops->process_stream) {
+        free_vlm_image(&image);
+        rac_free(const_cast<char*>(prompt));
+        rac::vlm::release_lifecycle_vlm(&ref);
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    rac::vlm::clear_lifecycle_vlm_cancel(&ref);
+    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_STARTED,
+                       "vlm.stream", 0.0f, 1, 0, nullptr);
+
+    GeneratedStreamCtx ctx;
+    ctx.callback = callback;
+    ctx.user_data = user_data;
+    ctx.ref = &ref;
+    ctx.request_id = request.request_id();
+    ctx.started_ms = now_ms();
+
+    dispatch_vlm_stream_event(&ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_STARTED,
+                              nullptr, false, nullptr, nullptr, 0);
+
+    rc = ref.ops->process_stream(ref.impl, &image, prompt, &options,
+                                 generated_stream_token_trampoline, &ctx);
+
+    const int64_t elapsed_ms = now_ms() - ctx.started_ms;
+    const bool cancelled =
+        rac::vlm::lifecycle_vlm_cancel_requested(&ref) ||
+        rc == RAC_ERROR_CANCELLED || rc == RAC_ERROR_STREAM_CANCELLED;
+    if (cancelled) {
+        runanywhere::v1::VLMResult result;
+        populate_result_from_stream(
+            StreamCtx{nullptr, nullptr, ctx.text, ctx.token_count}, elapsed_ms, &result);
+        dispatch_vlm_terminal_once(&ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_COMPLETED,
+                                   &result, nullptr, 0);
+        rc = RAC_SUCCESS;
+    } else if (rc != RAC_SUCCESS) {
+        dispatch_vlm_terminal_once(&ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_ERROR,
+                                   nullptr, rac_error_message(rc), static_cast<int32_t>(rc));
+        publish_failure(rc, "vlm.stream", rac_error_message(rc));
+    } else {
+        runanywhere::v1::VLMResult result;
+        populate_result_from_stream(
+            StreamCtx{nullptr, nullptr, ctx.text, ctx.token_count}, elapsed_ms, &result);
+        dispatch_vlm_terminal_once(&ctx, runanywhere::v1::VLM_STREAM_EVENT_KIND_COMPLETED,
+                                   &result, nullptr, 0);
+        publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
+                           "vlm.stream", 1.0f, 1, ctx.token_count, nullptr);
+    }
+
+    free_vlm_image(&image);
+    rac_free(const_cast<char*>(prompt));
+    rac::vlm::release_lifecycle_vlm(&ref);
+    return rc;
+#endif
+}
+
+rac_result_t rac_vlm_cancel_lifecycle_proto(rac_proto_buffer_t* out_event) {
+    if (!out_event) return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable(out_event);
+#else
+    rac::vlm::LifecycleVlmRef ref;
+    rac_result_t rc = rac::vlm::acquire_lifecycle_vlm(&ref);
+    if (rc != RAC_SUCCESS) {
+        publish_failure(rc, "vlm.cancel", "no lifecycle VLM model loaded");
+        return rac_proto_buffer_set_error(out_event, rc, "no lifecycle VLM model loaded");
+    }
+
+    rac::vlm::request_lifecycle_vlm_cancel(&ref);
+    runanywhere::v1::SDKEvent requested;
+    populate_envelope(&requested, runanywhere::v1::EVENT_SEVERITY_INFO);
+    auto* cancel = requested.mutable_cancellation();
+    cancel->set_kind(runanywhere::v1::CANCELLATION_EVENT_KIND_REQUESTED);
+    cancel->set_component(runanywhere::v1::SDK_COMPONENT_VLM);
+    cancel->set_operation_id("vlm.cancel");
+    cancel->set_reason("requested by caller");
+    cancel->set_user_initiated(true);
+    publish_event(requested);
+
+    if (ref.ops && ref.ops->cancel) {
+        rc = ref.ops->cancel(ref.impl);
+    } else {
+        rc = RAC_SUCCESS;
+    }
+
+    runanywhere::v1::SDKEvent completed;
+    populate_envelope(&completed, rc == RAC_SUCCESS ? runanywhere::v1::EVENT_SEVERITY_INFO
+                                                    : runanywhere::v1::EVENT_SEVERITY_ERROR);
+    auto* completed_cancel = completed.mutable_cancellation();
+    completed_cancel->set_kind(rc == RAC_SUCCESS
+                                   ? runanywhere::v1::CANCELLATION_EVENT_KIND_COMPLETED
+                                   : runanywhere::v1::CANCELLATION_EVENT_KIND_FAILED);
+    completed_cancel->set_component(runanywhere::v1::SDK_COMPONENT_VLM);
+    completed_cancel->set_operation_id("vlm.cancel");
+    completed_cancel->set_reason(rc == RAC_SUCCESS ? "cancelled" : rac_error_message(rc));
+    completed_cancel->set_user_initiated(true);
+    publish_event(completed);
+
+    rac_result_t copy_rc = copy_proto(completed, out_event);
+    rac::vlm::release_lifecycle_vlm(&ref);
+    return rc == RAC_SUCCESS ? copy_rc : rc;
 #endif
 }
 

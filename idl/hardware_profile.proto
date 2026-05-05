@@ -37,3 +37,40 @@ message HardwareProfileResult {
   HardwareProfile profile = 1;
   repeated AcceleratorInfo accelerators = 2;
 }
+
+// Empty request for the cached hardware profile. The native probe is owned by
+// platform adapters; this request carries no portable parameters today.
+message HardwareProfileRequest {
+}
+
+// Empty request for the accelerator list. Mirrors HardwareProfileRequest:
+// platform probes own all OS-level acceleration discovery.
+message HardwareAcceleratorsRequest {
+}
+
+// Result-shaped response for SetAcceleratorPreference so the service contract
+// stays consistent (every rpc returns a non-empty message).
+message HardwareAcceleratorPreferenceRequest {
+  AcceleratorPreference preference = 1;
+}
+
+message HardwareAcceleratorPreferenceResult {
+  bool   success       = 1;
+  string error_message = 2;
+}
+
+// Logical hardware service contract. Mirrors the C ABI in
+// sdk/runanywhere-commons/include/rac/router/rac_hardware_abi.h:
+//   - rac_hardware_profile_get → GetProfile
+//   - rac_hardware_get_accelerators → GetAccelerators
+//   - rac_hardware_set_accelerator_preference → SetAcceleratorPreference
+//
+// Native device probes (chip detection, neural engine queries, GPU
+// discovery, memory/cores) remain platform-adapter owned. C++ caches and
+// serves the normalized HardwareProfile/AcceleratorInfo messages.
+service Hardware {
+  rpc GetProfile(HardwareProfileRequest) returns (HardwareProfileResult);
+  rpc GetAccelerators(HardwareAcceleratorsRequest) returns (HardwareProfileResult);
+  rpc SetAcceleratorPreference(HardwareAcceleratorPreferenceRequest)
+      returns (HardwareAcceleratorPreferenceResult);
+}

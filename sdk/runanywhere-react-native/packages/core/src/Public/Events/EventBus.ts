@@ -9,23 +9,10 @@
 
 import { NativeEventEmitter, NativeModules } from 'react-native';
 import { SDKLogger } from '../../Foundation/Logging';
-import type { SDKComponent } from '../../types/enums';
-import type {
-  AnySDKEvent,
-  ComponentInitializationEvent,
-  SDKConfigurationEvent,
-  SDKDeviceEvent,
-  SDKEventListener,
-  SDKFrameworkEvent,
-  SDKGenerationEvent,
-  SDKInitializationEvent,
-  SDKModelEvent,
-  SDKNetworkEvent,
-  SDKPerformanceEvent,
-  SDKStorageEvent,
-  SDKVoiceEvent,
-  UnsubscribeFunction,
-} from './SDKEventTypes';
+import type { SDKComponent, SDKEvent } from '@runanywhere/proto-ts/sdk_events';
+
+type SDKEventListener<T extends SDKEvent = SDKEvent> = (event: T) => void;
+type UnsubscribeFunction = () => void;
 
 // Native module reference - accessed lazily in setup() to avoid
 // accessing NativeModules before React Native is fully initialized (bridgeless mode)
@@ -69,7 +56,7 @@ type NativeEventName = (typeof NativeEventNames)[keyof typeof NativeEventNames];
  */
 class EventBusImpl {
   private emitter: NativeEventEmitter | null = null;
-  private subscriptions: Map<string, Set<SDKEventListener<AnySDKEvent>>> =
+  private subscriptions: Map<string, Set<SDKEventListener<SDKEvent>>> =
     new Map();
   private nativeSubscriptions: Map<NativeEventName, { remove: () => void }> =
     new Map();
@@ -117,7 +104,7 @@ class EventBusImpl {
 
     const subscription = this.emitter.addListener(
       eventName,
-      (event: AnySDKEvent) => {
+      (event: SDKEvent) => {
         this.handleNativeEvent(eventName, event);
       }
     );
@@ -130,7 +117,7 @@ class EventBusImpl {
    */
   private handleNativeEvent(
     eventName: NativeEventName,
-    event: AnySDKEvent
+    event: SDKEvent
   ): void {
     // Get subscribers for this event type
     const typeSubscribers = this.subscriptions.get(eventName);
@@ -162,7 +149,7 @@ class EventBusImpl {
   /**
    * Subscribe to events of a specific type
    */
-  private subscribe<T extends AnySDKEvent>(
+  private subscribe<T extends SDKEvent>(
     eventName: NativeEventName,
     listener: SDKEventListener<T>
   ): UnsubscribeFunction {
@@ -177,11 +164,11 @@ class EventBusImpl {
       // Should never happen since we just set it above
       return () => {};
     }
-    subscribers.add(listener as SDKEventListener<AnySDKEvent>);
+    subscribers.add(listener as SDKEventListener<SDKEvent>);
 
     // Return unsubscribe function
     return () => {
-      subscribers.delete(listener as SDKEventListener<AnySDKEvent>);
+      subscribers.delete(listener as SDKEventListener<SDKEvent>);
     };
   }
 
@@ -192,7 +179,7 @@ class EventBusImpl {
   /**
    * Subscribe to all SDK events
    */
-  onAllEvents(handler: SDKEventListener<AnySDKEvent>): UnsubscribeFunction {
+  onAllEvents(handler: SDKEventListener<SDKEvent>): UnsubscribeFunction {
     return this.subscribe(NativeEventNames.SDK_ALL_EVENTS, handler);
   }
 
@@ -200,7 +187,7 @@ class EventBusImpl {
    * Subscribe to initialization events
    */
   onInitialization(
-    handler: SDKEventListener<SDKInitializationEvent>
+    handler: SDKEventListener<SDKEvent>
   ): UnsubscribeFunction {
     return this.subscribe(NativeEventNames.SDK_INITIALIZATION, handler);
   }
@@ -209,7 +196,7 @@ class EventBusImpl {
    * Subscribe to configuration events
    */
   onConfiguration(
-    handler: SDKEventListener<SDKConfigurationEvent>
+    handler: SDKEventListener<SDKEvent>
   ): UnsubscribeFunction {
     return this.subscribe(NativeEventNames.SDK_CONFIGURATION, handler);
   }
@@ -218,7 +205,7 @@ class EventBusImpl {
    * Subscribe to generation events
    */
   onGeneration(
-    handler: SDKEventListener<SDKGenerationEvent>
+    handler: SDKEventListener<SDKEvent>
   ): UnsubscribeFunction {
     return this.subscribe(NativeEventNames.SDK_GENERATION, handler);
   }
@@ -226,14 +213,14 @@ class EventBusImpl {
   /**
    * Subscribe to model events
    */
-  onModel(handler: SDKEventListener<SDKModelEvent>): UnsubscribeFunction {
+  onModel(handler: SDKEventListener<SDKEvent>): UnsubscribeFunction {
     return this.subscribe(NativeEventNames.SDK_MODEL, handler);
   }
 
   /**
    * Subscribe to voice events
    */
-  onVoice(handler: SDKEventListener<SDKVoiceEvent>): UnsubscribeFunction {
+  onVoice(handler: SDKEventListener<SDKEvent>): UnsubscribeFunction {
     return this.subscribe(NativeEventNames.SDK_VOICE, handler);
   }
 
@@ -241,7 +228,7 @@ class EventBusImpl {
    * Subscribe to performance events
    */
   onPerformance(
-    handler: SDKEventListener<SDKPerformanceEvent>
+    handler: SDKEventListener<SDKEvent>
   ): UnsubscribeFunction {
     return this.subscribe(NativeEventNames.SDK_PERFORMANCE, handler);
   }
@@ -249,14 +236,14 @@ class EventBusImpl {
   /**
    * Subscribe to network events
    */
-  onNetwork(handler: SDKEventListener<SDKNetworkEvent>): UnsubscribeFunction {
+  onNetwork(handler: SDKEventListener<SDKEvent>): UnsubscribeFunction {
     return this.subscribe(NativeEventNames.SDK_NETWORK, handler);
   }
 
   /**
    * Subscribe to storage events
    */
-  onStorage(handler: SDKEventListener<SDKStorageEvent>): UnsubscribeFunction {
+  onStorage(handler: SDKEventListener<SDKEvent>): UnsubscribeFunction {
     return this.subscribe(NativeEventNames.SDK_STORAGE, handler);
   }
 
@@ -264,7 +251,7 @@ class EventBusImpl {
    * Subscribe to framework events
    */
   onFramework(
-    handler: SDKEventListener<SDKFrameworkEvent>
+    handler: SDKEventListener<SDKEvent>
   ): UnsubscribeFunction {
     return this.subscribe(NativeEventNames.SDK_FRAMEWORK, handler);
   }
@@ -272,7 +259,7 @@ class EventBusImpl {
   /**
    * Subscribe to device events
    */
-  onDevice(handler: SDKEventListener<SDKDeviceEvent>): UnsubscribeFunction {
+  onDevice(handler: SDKEventListener<SDKEvent>): UnsubscribeFunction {
     return this.subscribe(NativeEventNames.SDK_DEVICE, handler);
   }
 
@@ -280,7 +267,7 @@ class EventBusImpl {
    * Subscribe to component initialization events
    */
   onComponentInitialization(
-    handler: SDKEventListener<ComponentInitializationEvent>
+    handler: SDKEventListener<SDKEvent>
   ): UnsubscribeFunction {
     return this.subscribe(NativeEventNames.SDK_COMPONENT, handler);
   }
@@ -290,11 +277,10 @@ class EventBusImpl {
    */
   onComponent(
     component: SDKComponent,
-    handler: SDKEventListener<ComponentInitializationEvent>
+    handler: SDKEventListener<SDKEvent>
   ): UnsubscribeFunction {
     return this.onComponentInitialization((event) => {
-      // Filter by component if event has component property
-      if ('component' in event && event.component === component) {
+      if (event.component === component) {
         handler(event);
       }
     });
@@ -308,7 +294,7 @@ class EventBusImpl {
    * Generic typed event subscription
    * Example: events.on('generation', handler)
    */
-  on<T extends AnySDKEvent>(
+  on<T extends SDKEvent>(
     eventType:
       | 'initialization'
       | 'configuration'
@@ -356,33 +342,33 @@ class EventBusImpl {
    * Publish an event locally (for testing or JS-only events)
    * Note: In production, events come from native modules
    */
-  publish(eventType: string, event: AnySDKEvent): void {
+  publish(eventType: string, event: unknown): void {
     const eventName = `RunAnywhere_SDK${eventType}` as NativeEventName;
-    this.handleNativeEvent(eventName, event);
+    this.handleNativeEvent(eventName, event as SDKEvent);
   }
 
   /**
    * Emit a model event
    * Helper method for components to emit model-related events
    */
-  emitModel(event: SDKModelEvent): void {
-    this.handleNativeEvent(NativeEventNames.SDK_MODEL, event);
+  emitModel(event: unknown): void {
+    this.handleNativeEvent(NativeEventNames.SDK_MODEL, event as SDKEvent);
   }
 
   /**
    * Emit a voice event
    * Helper method for components to emit voice-related events
    */
-  emitVoice(event: SDKVoiceEvent): void {
-    this.handleNativeEvent(NativeEventNames.SDK_VOICE, event);
+  emitVoice(event: unknown): void {
+    this.handleNativeEvent(NativeEventNames.SDK_VOICE, event as SDKEvent);
   }
 
   /**
    * Emit a component initialization event
    * Helper method for components to emit initialization-related events
    */
-  emitComponentInitialization(event: ComponentInitializationEvent): void {
-    this.handleNativeEvent(NativeEventNames.SDK_COMPONENT, event);
+  emitComponentInitialization(event: unknown): void {
+    this.handleNativeEvent(NativeEventNames.SDK_COMPONENT, event as SDKEvent);
   }
 
   // ============================================================================

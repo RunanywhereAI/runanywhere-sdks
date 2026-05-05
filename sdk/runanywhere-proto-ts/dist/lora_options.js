@@ -8,7 +8,7 @@ import Long from "long";
 import _m0 from "protobufjs/minimal";
 export const protobufPackage = "runanywhere.v1";
 function createBaseLoRAAdapterConfig() {
-    return { adapterPath: "", scale: 0, adapterId: undefined };
+    return { adapterPath: "", scale: 0, adapterId: undefined, metadata: {}, targetModules: [] };
 }
 export const LoRAAdapterConfig = {
     encode(message, writer = _m0.Writer.create()) {
@@ -20,6 +20,12 @@ export const LoRAAdapterConfig = {
         }
         if (message.adapterId !== undefined) {
             writer.uint32(26).string(message.adapterId);
+        }
+        Object.entries(message.metadata).forEach(([key, value]) => {
+            LoRAAdapterConfig_MetadataEntry.encode({ key: key, value }, writer.uint32(34).fork()).ldelim();
+        });
+        for (const v of message.targetModules) {
+            writer.uint32(42).string(v);
         }
         return writer;
     },
@@ -48,6 +54,21 @@ export const LoRAAdapterConfig = {
                     }
                     message.adapterId = reader.string();
                     continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    const entry4 = LoRAAdapterConfig_MetadataEntry.decode(reader, reader.uint32());
+                    if (entry4.value !== undefined) {
+                        message.metadata[entry4.key] = entry4.value;
+                    }
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.targetModules.push(reader.string());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -61,6 +82,15 @@ export const LoRAAdapterConfig = {
             adapterPath: isSet(object.adapterPath) ? globalThis.String(object.adapterPath) : "",
             scale: isSet(object.scale) ? globalThis.Number(object.scale) : 0,
             adapterId: isSet(object.adapterId) ? globalThis.String(object.adapterId) : undefined,
+            metadata: isObject(object.metadata)
+                ? Object.entries(object.metadata).reduce((acc, [key, value]) => {
+                    acc[key] = String(value);
+                    return acc;
+                }, {})
+                : {},
+            targetModules: globalThis.Array.isArray(object?.targetModules)
+                ? object.targetModules.map((e) => globalThis.String(e))
+                : [],
         };
     },
     toJSON(message) {
@@ -74,6 +104,18 @@ export const LoRAAdapterConfig = {
         if (message.adapterId !== undefined) {
             obj.adapterId = message.adapterId;
         }
+        if (message.metadata) {
+            const entries = Object.entries(message.metadata);
+            if (entries.length > 0) {
+                obj.metadata = {};
+                entries.forEach(([k, v]) => {
+                    obj.metadata[k] = v;
+                });
+            }
+        }
+        if (message.targetModules?.length) {
+            obj.targetModules = message.targetModules;
+        }
         return obj;
     },
     create(base) {
@@ -84,11 +126,92 @@ export const LoRAAdapterConfig = {
         message.adapterPath = object.adapterPath ?? "";
         message.scale = object.scale ?? 0;
         message.adapterId = object.adapterId ?? undefined;
+        message.metadata = Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
+            if (value !== undefined) {
+                acc[key] = globalThis.String(value);
+            }
+            return acc;
+        }, {});
+        message.targetModules = object.targetModules?.map((e) => e) || [];
+        return message;
+    },
+};
+function createBaseLoRAAdapterConfig_MetadataEntry() {
+    return { key: "", value: "" };
+}
+export const LoRAAdapterConfig_MetadataEntry = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.key !== "") {
+            writer.uint32(10).string(message.key);
+        }
+        if (message.value !== "") {
+            writer.uint32(18).string(message.value);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseLoRAAdapterConfig_MetadataEntry();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.key = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.value = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            key: isSet(object.key) ? globalThis.String(object.key) : "",
+            value: isSet(object.value) ? globalThis.String(object.value) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.key !== "") {
+            obj.key = message.key;
+        }
+        if (message.value !== "") {
+            obj.value = message.value;
+        }
+        return obj;
+    },
+    create(base) {
+        return LoRAAdapterConfig_MetadataEntry.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseLoRAAdapterConfig_MetadataEntry();
+        message.key = object.key ?? "";
+        message.value = object.value ?? "";
         return message;
     },
 };
 function createBaseLoRAAdapterInfo() {
-    return { adapterId: "", adapterPath: "", scale: 0, applied: false, errorMessage: undefined };
+    return {
+        adapterId: "",
+        adapterPath: "",
+        scale: 0,
+        applied: false,
+        errorMessage: undefined,
+        errorCode: 0,
+        loadedAtMs: 0,
+    };
 }
 export const LoRAAdapterInfo = {
     encode(message, writer = _m0.Writer.create()) {
@@ -106,6 +229,12 @@ export const LoRAAdapterInfo = {
         }
         if (message.errorMessage !== undefined) {
             writer.uint32(42).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(48).int32(message.errorCode);
+        }
+        if (message.loadedAtMs !== 0) {
+            writer.uint32(56).int64(message.loadedAtMs);
         }
         return writer;
     },
@@ -146,6 +275,18 @@ export const LoRAAdapterInfo = {
                     }
                     message.errorMessage = reader.string();
                     continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.loadedAtMs = longToNumber(reader.int64());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -161,6 +302,8 @@ export const LoRAAdapterInfo = {
             scale: isSet(object.scale) ? globalThis.Number(object.scale) : 0,
             applied: isSet(object.applied) ? globalThis.Boolean(object.applied) : false,
             errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+            loadedAtMs: isSet(object.loadedAtMs) ? globalThis.Number(object.loadedAtMs) : 0,
         };
     },
     toJSON(message) {
@@ -180,6 +323,12 @@ export const LoRAAdapterInfo = {
         if (message.errorMessage !== undefined) {
             obj.errorMessage = message.errorMessage;
         }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        if (message.loadedAtMs !== 0) {
+            obj.loadedAtMs = Math.round(message.loadedAtMs);
+        }
         return obj;
     },
     create(base) {
@@ -192,6 +341,8 @@ export const LoRAAdapterInfo = {
         message.scale = object.scale ?? 0;
         message.applied = object.applied ?? false;
         message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
+        message.loadedAtMs = object.loadedAtMs ?? 0;
         return message;
     },
 };
@@ -207,6 +358,14 @@ function createBaseLoraAdapterCatalogEntry() {
         author: undefined,
         defaultScale: 0,
         checksumSha256: undefined,
+        license: undefined,
+        tags: [],
+        metadata: {},
+        localPath: undefined,
+        isDownloaded: undefined,
+        downloadedAtUnixMs: undefined,
+        isImported: undefined,
+        statusMessage: undefined,
     };
 }
 export const LoraAdapterCatalogEntry = {
@@ -240,6 +399,30 @@ export const LoraAdapterCatalogEntry = {
         }
         if (message.checksumSha256 !== undefined) {
             writer.uint32(82).string(message.checksumSha256);
+        }
+        if (message.license !== undefined) {
+            writer.uint32(90).string(message.license);
+        }
+        for (const v of message.tags) {
+            writer.uint32(98).string(v);
+        }
+        Object.entries(message.metadata).forEach(([key, value]) => {
+            LoraAdapterCatalogEntry_MetadataEntry.encode({ key: key, value }, writer.uint32(106).fork()).ldelim();
+        });
+        if (message.localPath !== undefined) {
+            writer.uint32(114).string(message.localPath);
+        }
+        if (message.isDownloaded !== undefined) {
+            writer.uint32(120).bool(message.isDownloaded);
+        }
+        if (message.downloadedAtUnixMs !== undefined) {
+            writer.uint32(128).int64(message.downloadedAtUnixMs);
+        }
+        if (message.isImported !== undefined) {
+            writer.uint32(136).bool(message.isImported);
+        }
+        if (message.statusMessage !== undefined) {
+            writer.uint32(146).string(message.statusMessage);
         }
         return writer;
     },
@@ -310,6 +493,57 @@ export const LoraAdapterCatalogEntry = {
                     }
                     message.checksumSha256 = reader.string();
                     continue;
+                case 11:
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.license = reader.string();
+                    continue;
+                case 12:
+                    if (tag !== 98) {
+                        break;
+                    }
+                    message.tags.push(reader.string());
+                    continue;
+                case 13:
+                    if (tag !== 106) {
+                        break;
+                    }
+                    const entry13 = LoraAdapterCatalogEntry_MetadataEntry.decode(reader, reader.uint32());
+                    if (entry13.value !== undefined) {
+                        message.metadata[entry13.key] = entry13.value;
+                    }
+                    continue;
+                case 14:
+                    if (tag !== 114) {
+                        break;
+                    }
+                    message.localPath = reader.string();
+                    continue;
+                case 15:
+                    if (tag !== 120) {
+                        break;
+                    }
+                    message.isDownloaded = reader.bool();
+                    continue;
+                case 16:
+                    if (tag !== 128) {
+                        break;
+                    }
+                    message.downloadedAtUnixMs = longToNumber(reader.int64());
+                    continue;
+                case 17:
+                    if (tag !== 136) {
+                        break;
+                    }
+                    message.isImported = reader.bool();
+                    continue;
+                case 18:
+                    if (tag !== 146) {
+                        break;
+                    }
+                    message.statusMessage = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -332,6 +566,19 @@ export const LoraAdapterCatalogEntry = {
             author: isSet(object.author) ? globalThis.String(object.author) : undefined,
             defaultScale: isSet(object.defaultScale) ? globalThis.Number(object.defaultScale) : 0,
             checksumSha256: isSet(object.checksumSha256) ? globalThis.String(object.checksumSha256) : undefined,
+            license: isSet(object.license) ? globalThis.String(object.license) : undefined,
+            tags: globalThis.Array.isArray(object?.tags) ? object.tags.map((e) => globalThis.String(e)) : [],
+            metadata: isObject(object.metadata)
+                ? Object.entries(object.metadata).reduce((acc, [key, value]) => {
+                    acc[key] = String(value);
+                    return acc;
+                }, {})
+                : {},
+            localPath: isSet(object.localPath) ? globalThis.String(object.localPath) : undefined,
+            isDownloaded: isSet(object.isDownloaded) ? globalThis.Boolean(object.isDownloaded) : undefined,
+            downloadedAtUnixMs: isSet(object.downloadedAtUnixMs) ? globalThis.Number(object.downloadedAtUnixMs) : undefined,
+            isImported: isSet(object.isImported) ? globalThis.Boolean(object.isImported) : undefined,
+            statusMessage: isSet(object.statusMessage) ? globalThis.String(object.statusMessage) : undefined,
         };
     },
     toJSON(message) {
@@ -366,6 +613,36 @@ export const LoraAdapterCatalogEntry = {
         if (message.checksumSha256 !== undefined) {
             obj.checksumSha256 = message.checksumSha256;
         }
+        if (message.license !== undefined) {
+            obj.license = message.license;
+        }
+        if (message.tags?.length) {
+            obj.tags = message.tags;
+        }
+        if (message.metadata) {
+            const entries = Object.entries(message.metadata);
+            if (entries.length > 0) {
+                obj.metadata = {};
+                entries.forEach(([k, v]) => {
+                    obj.metadata[k] = v;
+                });
+            }
+        }
+        if (message.localPath !== undefined) {
+            obj.localPath = message.localPath;
+        }
+        if (message.isDownloaded !== undefined) {
+            obj.isDownloaded = message.isDownloaded;
+        }
+        if (message.downloadedAtUnixMs !== undefined) {
+            obj.downloadedAtUnixMs = Math.round(message.downloadedAtUnixMs);
+        }
+        if (message.isImported !== undefined) {
+            obj.isImported = message.isImported;
+        }
+        if (message.statusMessage !== undefined) {
+            obj.statusMessage = message.statusMessage;
+        }
         return obj;
     },
     create(base) {
@@ -383,11 +660,762 @@ export const LoraAdapterCatalogEntry = {
         message.author = object.author ?? undefined;
         message.defaultScale = object.defaultScale ?? 0;
         message.checksumSha256 = object.checksumSha256 ?? undefined;
+        message.license = object.license ?? undefined;
+        message.tags = object.tags?.map((e) => e) || [];
+        message.metadata = Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
+            if (value !== undefined) {
+                acc[key] = globalThis.String(value);
+            }
+            return acc;
+        }, {});
+        message.localPath = object.localPath ?? undefined;
+        message.isDownloaded = object.isDownloaded ?? undefined;
+        message.downloadedAtUnixMs = object.downloadedAtUnixMs ?? undefined;
+        message.isImported = object.isImported ?? undefined;
+        message.statusMessage = object.statusMessage ?? undefined;
+        return message;
+    },
+};
+function createBaseLoraAdapterCatalogEntry_MetadataEntry() {
+    return { key: "", value: "" };
+}
+export const LoraAdapterCatalogEntry_MetadataEntry = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.key !== "") {
+            writer.uint32(10).string(message.key);
+        }
+        if (message.value !== "") {
+            writer.uint32(18).string(message.value);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseLoraAdapterCatalogEntry_MetadataEntry();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.key = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.value = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            key: isSet(object.key) ? globalThis.String(object.key) : "",
+            value: isSet(object.value) ? globalThis.String(object.value) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.key !== "") {
+            obj.key = message.key;
+        }
+        if (message.value !== "") {
+            obj.value = message.value;
+        }
+        return obj;
+    },
+    create(base) {
+        return LoraAdapterCatalogEntry_MetadataEntry.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseLoraAdapterCatalogEntry_MetadataEntry();
+        message.key = object.key ?? "";
+        message.value = object.value ?? "";
+        return message;
+    },
+};
+function createBaseLoraAdapterCatalogQuery() {
+    return { adapterId: undefined, modelId: undefined, downloadedOnly: undefined, searchQuery: undefined, tags: [] };
+}
+export const LoraAdapterCatalogQuery = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.adapterId !== undefined) {
+            writer.uint32(10).string(message.adapterId);
+        }
+        if (message.modelId !== undefined) {
+            writer.uint32(18).string(message.modelId);
+        }
+        if (message.downloadedOnly !== undefined) {
+            writer.uint32(24).bool(message.downloadedOnly);
+        }
+        if (message.searchQuery !== undefined) {
+            writer.uint32(34).string(message.searchQuery);
+        }
+        for (const v of message.tags) {
+            writer.uint32(42).string(v);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseLoraAdapterCatalogQuery();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.adapterId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.downloadedOnly = reader.bool();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.searchQuery = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.tags.push(reader.string());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            adapterId: isSet(object.adapterId) ? globalThis.String(object.adapterId) : undefined,
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : undefined,
+            downloadedOnly: isSet(object.downloadedOnly) ? globalThis.Boolean(object.downloadedOnly) : undefined,
+            searchQuery: isSet(object.searchQuery) ? globalThis.String(object.searchQuery) : undefined,
+            tags: globalThis.Array.isArray(object?.tags) ? object.tags.map((e) => globalThis.String(e)) : [],
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.adapterId !== undefined) {
+            obj.adapterId = message.adapterId;
+        }
+        if (message.modelId !== undefined) {
+            obj.modelId = message.modelId;
+        }
+        if (message.downloadedOnly !== undefined) {
+            obj.downloadedOnly = message.downloadedOnly;
+        }
+        if (message.searchQuery !== undefined) {
+            obj.searchQuery = message.searchQuery;
+        }
+        if (message.tags?.length) {
+            obj.tags = message.tags;
+        }
+        return obj;
+    },
+    create(base) {
+        return LoraAdapterCatalogQuery.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseLoraAdapterCatalogQuery();
+        message.adapterId = object.adapterId ?? undefined;
+        message.modelId = object.modelId ?? undefined;
+        message.downloadedOnly = object.downloadedOnly ?? undefined;
+        message.searchQuery = object.searchQuery ?? undefined;
+        message.tags = object.tags?.map((e) => e) || [];
+        return message;
+    },
+};
+function createBaseLoraAdapterCatalogListRequest() {
+    return { query: undefined, includeCounts: false };
+}
+export const LoraAdapterCatalogListRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.query !== undefined) {
+            LoraAdapterCatalogQuery.encode(message.query, writer.uint32(10).fork()).ldelim();
+        }
+        if (message.includeCounts !== false) {
+            writer.uint32(16).bool(message.includeCounts);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseLoraAdapterCatalogListRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.query = LoraAdapterCatalogQuery.decode(reader, reader.uint32());
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.includeCounts = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            query: isSet(object.query) ? LoraAdapterCatalogQuery.fromJSON(object.query) : undefined,
+            includeCounts: isSet(object.includeCounts) ? globalThis.Boolean(object.includeCounts) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.query !== undefined) {
+            obj.query = LoraAdapterCatalogQuery.toJSON(message.query);
+        }
+        if (message.includeCounts !== false) {
+            obj.includeCounts = message.includeCounts;
+        }
+        return obj;
+    },
+    create(base) {
+        return LoraAdapterCatalogListRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseLoraAdapterCatalogListRequest();
+        message.query = (object.query !== undefined && object.query !== null)
+            ? LoraAdapterCatalogQuery.fromPartial(object.query)
+            : undefined;
+        message.includeCounts = object.includeCounts ?? false;
+        return message;
+    },
+};
+function createBaseLoraAdapterCatalogListResult() {
+    return { success: false, entries: [], errorMessage: "", totalCount: 0, filteredCount: 0, downloadedCount: 0 };
+}
+export const LoraAdapterCatalogListResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.success !== false) {
+            writer.uint32(8).bool(message.success);
+        }
+        for (const v of message.entries) {
+            LoraAdapterCatalogEntry.encode(v, writer.uint32(18).fork()).ldelim();
+        }
+        if (message.errorMessage !== "") {
+            writer.uint32(26).string(message.errorMessage);
+        }
+        if (message.totalCount !== 0) {
+            writer.uint32(32).int32(message.totalCount);
+        }
+        if (message.filteredCount !== 0) {
+            writer.uint32(40).int32(message.filteredCount);
+        }
+        if (message.downloadedCount !== 0) {
+            writer.uint32(48).int32(message.downloadedCount);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseLoraAdapterCatalogListResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.success = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.entries.push(LoraAdapterCatalogEntry.decode(reader, reader.uint32()));
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.totalCount = reader.int32();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.filteredCount = reader.int32();
+                    continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.downloadedCount = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+            entries: globalThis.Array.isArray(object?.entries)
+                ? object.entries.map((e) => LoraAdapterCatalogEntry.fromJSON(e))
+                : [],
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+            totalCount: isSet(object.totalCount) ? globalThis.Number(object.totalCount) : 0,
+            filteredCount: isSet(object.filteredCount) ? globalThis.Number(object.filteredCount) : 0,
+            downloadedCount: isSet(object.downloadedCount) ? globalThis.Number(object.downloadedCount) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.success !== false) {
+            obj.success = message.success;
+        }
+        if (message.entries?.length) {
+            obj.entries = message.entries.map((e) => LoraAdapterCatalogEntry.toJSON(e));
+        }
+        if (message.errorMessage !== "") {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.totalCount !== 0) {
+            obj.totalCount = Math.round(message.totalCount);
+        }
+        if (message.filteredCount !== 0) {
+            obj.filteredCount = Math.round(message.filteredCount);
+        }
+        if (message.downloadedCount !== 0) {
+            obj.downloadedCount = Math.round(message.downloadedCount);
+        }
+        return obj;
+    },
+    create(base) {
+        return LoraAdapterCatalogListResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseLoraAdapterCatalogListResult();
+        message.success = object.success ?? false;
+        message.entries = object.entries?.map((e) => LoraAdapterCatalogEntry.fromPartial(e)) || [];
+        message.errorMessage = object.errorMessage ?? "";
+        message.totalCount = object.totalCount ?? 0;
+        message.filteredCount = object.filteredCount ?? 0;
+        message.downloadedCount = object.downloadedCount ?? 0;
+        return message;
+    },
+};
+function createBaseLoraAdapterCatalogGetRequest() {
+    return { adapterId: "" };
+}
+export const LoraAdapterCatalogGetRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.adapterId !== "") {
+            writer.uint32(10).string(message.adapterId);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseLoraAdapterCatalogGetRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.adapterId = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return { adapterId: isSet(object.adapterId) ? globalThis.String(object.adapterId) : "" };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.adapterId !== "") {
+            obj.adapterId = message.adapterId;
+        }
+        return obj;
+    },
+    create(base) {
+        return LoraAdapterCatalogGetRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseLoraAdapterCatalogGetRequest();
+        message.adapterId = object.adapterId ?? "";
+        return message;
+    },
+};
+function createBaseLoraAdapterCatalogGetResult() {
+    return { found: false, entry: undefined, errorMessage: "" };
+}
+export const LoraAdapterCatalogGetResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.found !== false) {
+            writer.uint32(8).bool(message.found);
+        }
+        if (message.entry !== undefined) {
+            LoraAdapterCatalogEntry.encode(message.entry, writer.uint32(18).fork()).ldelim();
+        }
+        if (message.errorMessage !== "") {
+            writer.uint32(26).string(message.errorMessage);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseLoraAdapterCatalogGetResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.found = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.entry = LoraAdapterCatalogEntry.decode(reader, reader.uint32());
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            found: isSet(object.found) ? globalThis.Boolean(object.found) : false,
+            entry: isSet(object.entry) ? LoraAdapterCatalogEntry.fromJSON(object.entry) : undefined,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.found !== false) {
+            obj.found = message.found;
+        }
+        if (message.entry !== undefined) {
+            obj.entry = LoraAdapterCatalogEntry.toJSON(message.entry);
+        }
+        if (message.errorMessage !== "") {
+            obj.errorMessage = message.errorMessage;
+        }
+        return obj;
+    },
+    create(base) {
+        return LoraAdapterCatalogGetResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseLoraAdapterCatalogGetResult();
+        message.found = object.found ?? false;
+        message.entry = (object.entry !== undefined && object.entry !== null)
+            ? LoraAdapterCatalogEntry.fromPartial(object.entry)
+            : undefined;
+        message.errorMessage = object.errorMessage ?? "";
+        return message;
+    },
+};
+function createBaseLoraAdapterDownloadCompletedRequest() {
+    return {
+        adapterId: "",
+        localPath: "",
+        sizeBytes: undefined,
+        checksumSha256: undefined,
+        completedAtUnixMs: undefined,
+        imported: false,
+        statusMessage: "",
+    };
+}
+export const LoraAdapterDownloadCompletedRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.adapterId !== "") {
+            writer.uint32(10).string(message.adapterId);
+        }
+        if (message.localPath !== "") {
+            writer.uint32(18).string(message.localPath);
+        }
+        if (message.sizeBytes !== undefined) {
+            writer.uint32(24).int64(message.sizeBytes);
+        }
+        if (message.checksumSha256 !== undefined) {
+            writer.uint32(34).string(message.checksumSha256);
+        }
+        if (message.completedAtUnixMs !== undefined) {
+            writer.uint32(40).int64(message.completedAtUnixMs);
+        }
+        if (message.imported !== false) {
+            writer.uint32(48).bool(message.imported);
+        }
+        if (message.statusMessage !== "") {
+            writer.uint32(58).string(message.statusMessage);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseLoraAdapterDownloadCompletedRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.adapterId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.localPath = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.sizeBytes = longToNumber(reader.int64());
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.checksumSha256 = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.completedAtUnixMs = longToNumber(reader.int64());
+                    continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.imported = reader.bool();
+                    continue;
+                case 7:
+                    if (tag !== 58) {
+                        break;
+                    }
+                    message.statusMessage = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            adapterId: isSet(object.adapterId) ? globalThis.String(object.adapterId) : "",
+            localPath: isSet(object.localPath) ? globalThis.String(object.localPath) : "",
+            sizeBytes: isSet(object.sizeBytes) ? globalThis.Number(object.sizeBytes) : undefined,
+            checksumSha256: isSet(object.checksumSha256) ? globalThis.String(object.checksumSha256) : undefined,
+            completedAtUnixMs: isSet(object.completedAtUnixMs) ? globalThis.Number(object.completedAtUnixMs) : undefined,
+            imported: isSet(object.imported) ? globalThis.Boolean(object.imported) : false,
+            statusMessage: isSet(object.statusMessage) ? globalThis.String(object.statusMessage) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.adapterId !== "") {
+            obj.adapterId = message.adapterId;
+        }
+        if (message.localPath !== "") {
+            obj.localPath = message.localPath;
+        }
+        if (message.sizeBytes !== undefined) {
+            obj.sizeBytes = Math.round(message.sizeBytes);
+        }
+        if (message.checksumSha256 !== undefined) {
+            obj.checksumSha256 = message.checksumSha256;
+        }
+        if (message.completedAtUnixMs !== undefined) {
+            obj.completedAtUnixMs = Math.round(message.completedAtUnixMs);
+        }
+        if (message.imported !== false) {
+            obj.imported = message.imported;
+        }
+        if (message.statusMessage !== "") {
+            obj.statusMessage = message.statusMessage;
+        }
+        return obj;
+    },
+    create(base) {
+        return LoraAdapterDownloadCompletedRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseLoraAdapterDownloadCompletedRequest();
+        message.adapterId = object.adapterId ?? "";
+        message.localPath = object.localPath ?? "";
+        message.sizeBytes = object.sizeBytes ?? undefined;
+        message.checksumSha256 = object.checksumSha256 ?? undefined;
+        message.completedAtUnixMs = object.completedAtUnixMs ?? undefined;
+        message.imported = object.imported ?? false;
+        message.statusMessage = object.statusMessage ?? "";
+        return message;
+    },
+};
+function createBaseLoraAdapterDownloadCompletedResult() {
+    return { success: false, entry: undefined, errorMessage: "", persisted: false };
+}
+export const LoraAdapterDownloadCompletedResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.success !== false) {
+            writer.uint32(8).bool(message.success);
+        }
+        if (message.entry !== undefined) {
+            LoraAdapterCatalogEntry.encode(message.entry, writer.uint32(18).fork()).ldelim();
+        }
+        if (message.errorMessage !== "") {
+            writer.uint32(26).string(message.errorMessage);
+        }
+        if (message.persisted !== false) {
+            writer.uint32(32).bool(message.persisted);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseLoraAdapterDownloadCompletedResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.success = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.entry = LoraAdapterCatalogEntry.decode(reader, reader.uint32());
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.persisted = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+            entry: isSet(object.entry) ? LoraAdapterCatalogEntry.fromJSON(object.entry) : undefined,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+            persisted: isSet(object.persisted) ? globalThis.Boolean(object.persisted) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.success !== false) {
+            obj.success = message.success;
+        }
+        if (message.entry !== undefined) {
+            obj.entry = LoraAdapterCatalogEntry.toJSON(message.entry);
+        }
+        if (message.errorMessage !== "") {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.persisted !== false) {
+            obj.persisted = message.persisted;
+        }
+        return obj;
+    },
+    create(base) {
+        return LoraAdapterDownloadCompletedResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseLoraAdapterDownloadCompletedResult();
+        message.success = object.success ?? false;
+        message.entry = (object.entry !== undefined && object.entry !== null)
+            ? LoraAdapterCatalogEntry.fromPartial(object.entry)
+            : undefined;
+        message.errorMessage = object.errorMessage ?? "";
+        message.persisted = object.persisted ?? false;
         return message;
     },
 };
 function createBaseLoraCompatibilityResult() {
-    return { isCompatible: false, errorMessage: undefined, baseModelRequired: undefined };
+    return { isCompatible: false, errorMessage: undefined, baseModelRequired: undefined, warnings: [], errorCode: 0 };
 }
 export const LoraCompatibilityResult = {
     encode(message, writer = _m0.Writer.create()) {
@@ -399,6 +1427,12 @@ export const LoraCompatibilityResult = {
         }
         if (message.baseModelRequired !== undefined) {
             writer.uint32(26).string(message.baseModelRequired);
+        }
+        for (const v of message.warnings) {
+            writer.uint32(34).string(v);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(40).int32(message.errorCode);
         }
         return writer;
     },
@@ -427,6 +1461,18 @@ export const LoraCompatibilityResult = {
                     }
                     message.baseModelRequired = reader.string();
                     continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.warnings.push(reader.string());
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -440,6 +1486,8 @@ export const LoraCompatibilityResult = {
             isCompatible: isSet(object.isCompatible) ? globalThis.Boolean(object.isCompatible) : false,
             errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
             baseModelRequired: isSet(object.baseModelRequired) ? globalThis.String(object.baseModelRequired) : undefined,
+            warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
         };
     },
     toJSON(message) {
@@ -453,6 +1501,12 @@ export const LoraCompatibilityResult = {
         if (message.baseModelRequired !== undefined) {
             obj.baseModelRequired = message.baseModelRequired;
         }
+        if (message.warnings?.length) {
+            obj.warnings = message.warnings;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
         return obj;
     },
     create(base) {
@@ -463,6 +1517,414 @@ export const LoraCompatibilityResult = {
         message.isCompatible = object.isCompatible ?? false;
         message.errorMessage = object.errorMessage ?? undefined;
         message.baseModelRequired = object.baseModelRequired ?? undefined;
+        message.warnings = object.warnings?.map((e) => e) || [];
+        message.errorCode = object.errorCode ?? 0;
+        return message;
+    },
+};
+function createBaseLoRAApplyRequest() {
+    return { requestId: "", adapters: [], replaceExisting: false };
+}
+export const LoRAApplyRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.requestId !== "") {
+            writer.uint32(10).string(message.requestId);
+        }
+        for (const v of message.adapters) {
+            LoRAAdapterConfig.encode(v, writer.uint32(18).fork()).ldelim();
+        }
+        if (message.replaceExisting !== false) {
+            writer.uint32(24).bool(message.replaceExisting);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseLoRAApplyRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.requestId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.adapters.push(LoRAAdapterConfig.decode(reader, reader.uint32()));
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.replaceExisting = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+            adapters: globalThis.Array.isArray(object?.adapters)
+                ? object.adapters.map((e) => LoRAAdapterConfig.fromJSON(e))
+                : [],
+            replaceExisting: isSet(object.replaceExisting) ? globalThis.Boolean(object.replaceExisting) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.requestId !== "") {
+            obj.requestId = message.requestId;
+        }
+        if (message.adapters?.length) {
+            obj.adapters = message.adapters.map((e) => LoRAAdapterConfig.toJSON(e));
+        }
+        if (message.replaceExisting !== false) {
+            obj.replaceExisting = message.replaceExisting;
+        }
+        return obj;
+    },
+    create(base) {
+        return LoRAApplyRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseLoRAApplyRequest();
+        message.requestId = object.requestId ?? "";
+        message.adapters = object.adapters?.map((e) => LoRAAdapterConfig.fromPartial(e)) || [];
+        message.replaceExisting = object.replaceExisting ?? false;
+        return message;
+    },
+};
+function createBaseLoRAApplyResult() {
+    return { requestId: "", adapters: [], success: false, errorMessage: undefined, errorCode: 0 };
+}
+export const LoRAApplyResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.requestId !== "") {
+            writer.uint32(10).string(message.requestId);
+        }
+        for (const v of message.adapters) {
+            LoRAAdapterInfo.encode(v, writer.uint32(18).fork()).ldelim();
+        }
+        if (message.success !== false) {
+            writer.uint32(24).bool(message.success);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(34).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(40).int32(message.errorCode);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseLoRAApplyResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.requestId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.adapters.push(LoRAAdapterInfo.decode(reader, reader.uint32()));
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.success = reader.bool();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+            adapters: globalThis.Array.isArray(object?.adapters)
+                ? object.adapters.map((e) => LoRAAdapterInfo.fromJSON(e))
+                : [],
+            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.requestId !== "") {
+            obj.requestId = message.requestId;
+        }
+        if (message.adapters?.length) {
+            obj.adapters = message.adapters.map((e) => LoRAAdapterInfo.toJSON(e));
+        }
+        if (message.success !== false) {
+            obj.success = message.success;
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        return obj;
+    },
+    create(base) {
+        return LoRAApplyResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseLoRAApplyResult();
+        message.requestId = object.requestId ?? "";
+        message.adapters = object.adapters?.map((e) => LoRAAdapterInfo.fromPartial(e)) || [];
+        message.success = object.success ?? false;
+        message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
+        return message;
+    },
+};
+function createBaseLoRARemoveRequest() {
+    return { requestId: "", adapterIds: [], adapterPaths: [], clearAll: false };
+}
+export const LoRARemoveRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.requestId !== "") {
+            writer.uint32(10).string(message.requestId);
+        }
+        for (const v of message.adapterIds) {
+            writer.uint32(18).string(v);
+        }
+        for (const v of message.adapterPaths) {
+            writer.uint32(26).string(v);
+        }
+        if (message.clearAll !== false) {
+            writer.uint32(32).bool(message.clearAll);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseLoRARemoveRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.requestId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.adapterIds.push(reader.string());
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.adapterPaths.push(reader.string());
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.clearAll = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+            adapterIds: globalThis.Array.isArray(object?.adapterIds)
+                ? object.adapterIds.map((e) => globalThis.String(e))
+                : [],
+            adapterPaths: globalThis.Array.isArray(object?.adapterPaths)
+                ? object.adapterPaths.map((e) => globalThis.String(e))
+                : [],
+            clearAll: isSet(object.clearAll) ? globalThis.Boolean(object.clearAll) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.requestId !== "") {
+            obj.requestId = message.requestId;
+        }
+        if (message.adapterIds?.length) {
+            obj.adapterIds = message.adapterIds;
+        }
+        if (message.adapterPaths?.length) {
+            obj.adapterPaths = message.adapterPaths;
+        }
+        if (message.clearAll !== false) {
+            obj.clearAll = message.clearAll;
+        }
+        return obj;
+    },
+    create(base) {
+        return LoRARemoveRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseLoRARemoveRequest();
+        message.requestId = object.requestId ?? "";
+        message.adapterIds = object.adapterIds?.map((e) => e) || [];
+        message.adapterPaths = object.adapterPaths?.map((e) => e) || [];
+        message.clearAll = object.clearAll ?? false;
+        return message;
+    },
+};
+function createBaseLoRAState() {
+    return {
+        loadedAdapters: [],
+        hasActiveAdapters: false,
+        baseModelId: undefined,
+        errorMessage: undefined,
+        errorCode: 0,
+    };
+}
+export const LoRAState = {
+    encode(message, writer = _m0.Writer.create()) {
+        for (const v of message.loadedAdapters) {
+            LoRAAdapterInfo.encode(v, writer.uint32(10).fork()).ldelim();
+        }
+        if (message.hasActiveAdapters !== false) {
+            writer.uint32(16).bool(message.hasActiveAdapters);
+        }
+        if (message.baseModelId !== undefined) {
+            writer.uint32(26).string(message.baseModelId);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(34).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(40).int32(message.errorCode);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseLoRAState();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.loadedAdapters.push(LoRAAdapterInfo.decode(reader, reader.uint32()));
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.hasActiveAdapters = reader.bool();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.baseModelId = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            loadedAdapters: globalThis.Array.isArray(object?.loadedAdapters)
+                ? object.loadedAdapters.map((e) => LoRAAdapterInfo.fromJSON(e))
+                : [],
+            hasActiveAdapters: isSet(object.hasActiveAdapters) ? globalThis.Boolean(object.hasActiveAdapters) : false,
+            baseModelId: isSet(object.baseModelId) ? globalThis.String(object.baseModelId) : undefined,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.loadedAdapters?.length) {
+            obj.loadedAdapters = message.loadedAdapters.map((e) => LoRAAdapterInfo.toJSON(e));
+        }
+        if (message.hasActiveAdapters !== false) {
+            obj.hasActiveAdapters = message.hasActiveAdapters;
+        }
+        if (message.baseModelId !== undefined) {
+            obj.baseModelId = message.baseModelId;
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        return obj;
+    },
+    create(base) {
+        return LoRAState.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseLoRAState();
+        message.loadedAdapters = object.loadedAdapters?.map((e) => LoRAAdapterInfo.fromPartial(e)) || [];
+        message.hasActiveAdapters = object.hasActiveAdapters ?? false;
+        message.baseModelId = object.baseModelId ?? undefined;
+        message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
         return message;
     },
 };
@@ -478,6 +1940,9 @@ function longToNumber(long) {
 if (_m0.util.Long !== Long) {
     _m0.util.Long = Long;
     _m0.configure();
+}
+function isObject(value) {
+    return typeof value === "object" && value !== null;
 }
 function isSet(value) {
     return value !== null && value !== undefined;

@@ -10,12 +10,15 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.AudioEncoding
 import ai.runanywhere.proto.v1.STTOutput
 import ai.runanywhere.proto.v1.TTSOutput
 import ai.runanywhere.proto.v1.VoiceAgentComponentStates
 import ai.runanywhere.proto.v1.VoiceAgentConfig
 import ai.runanywhere.proto.v1.VoiceAgentResult
+import ai.runanywhere.proto.v1.VoiceAgentTurnRequest
 import com.runanywhere.sdk.public.RunAnywhere
+import okio.ByteString.Companion.toByteString
 // v3.1: VoiceAgentResult / VoiceSessionEvent imports removed — the
 // expect declarations that used them (processVoice / startVoiceSession /
 // streamVoiceSession) were deleted.
@@ -70,9 +73,9 @@ expect suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels()
 // v3.1: processVoice / startVoiceSession / streamVoiceSession expect
 // declarations DELETED. Replacements:
 //   - Streaming: CppBridgeVoiceAgent.getHandle() + VoiceAgentStreamAdapter(handle)
-//   - One-shot:  compose CppBridgeSTT.transcribe → CppBridgeLLM.generate → CppBridgeTTS.synthesize
-// See the Android sample's processVoiceTurnDirect helper for the canonical
-// one-shot composition pattern.
+//   - One-shot:  process generated VoiceAgentTurnRequest through C++ voice agent
+//                where the native ABI exists; Android currently supports the
+//                audio-only subset.
 
 /**
  * Stop the current voice session.
@@ -117,14 +120,49 @@ expect suspend fun RunAnywhere.setVoiceSystemPrompt(prompt: String)
  * Process a complete voice turn: audio -> transcription -> LLM response ->
  * synthesized speech.
  *
- * Mirrors Swift's `RunAnywhere.processVoiceTurn(_ audioData:)`.
+ * Mirrors Swift's generated voice-turn result surface.
  *
- * @param audioData PCM audio bytes (16 kHz / 16-bit mono recommended).
+ * @param request Generated voice-turn request. Current Android JNI supports
+ *        audio bytes plus the raw PCM format fields only; session metadata and
+ *        generated session_config require the native generated request ABI.
  * @return [VoiceAgentResult] with the transcript, response, and audio.
  */
 expect suspend fun RunAnywhere.processVoiceTurn(
-    audioData: ByteArray,
+    request: VoiceAgentTurnRequest,
 ): VoiceAgentResult
+
+/**
+ * Convenience wrapper for the current audio-only JNI path.
+ */
+suspend fun RunAnywhere.processVoiceTurn(
+    audioData: ByteArray,
+): VoiceAgentResult = processVoiceTurn(audioData.toVoiceAgentTurnRequest())
+
+/**
+ * Build the generated one-shot voice-turn request for raw PCM microphone
+ * buffers. Leave correlation/session fields unset unless the native generated
+ * request ABI is available; Android currently transmits audio bytes only.
+ */
+fun ByteArray.toVoiceAgentTurnRequest(
+    sampleRateHz: Int = 0,
+    channels: Int = 0,
+    encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED,
+): VoiceAgentTurnRequest =
+    VoiceAgentTurnRequest(
+        audio_data = toByteString(),
+        sample_rate_hz = sampleRateHz,
+        channels = channels,
+        encoding = encoding,
+    )
+
+internal fun VoiceAgentTurnRequest.unsupportedAndroidAudioOnlyFields(): List<String> {
+    val unsupported = mutableListOf<String>()
+    if (request_id.isNotBlank()) unsupported += "request_id"
+    if (session_id.isNotBlank()) unsupported += "session_id"
+    if (session_config != null) unsupported += "session_config"
+    if (metadata.isNotEmpty()) unsupported += "metadata"
+    return unsupported
+}
 
 /**
  * Transcribe audio using the voice-agent's STT component.

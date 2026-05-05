@@ -43,5 +43,47 @@ class SpeechActivityKind extends $pb.ProtobufEnum {
   const SpeechActivityKind._($core.int v, $core.String n) : super(v, n);
 }
 
+class VADAudioEncoding extends $pb.ProtobufEnum {
+  static const VADAudioEncoding VAD_AUDIO_ENCODING_UNSPECIFIED = VADAudioEncoding._(0, _omitEnumNames ? '' : 'VAD_AUDIO_ENCODING_UNSPECIFIED');
+  static const VADAudioEncoding VAD_AUDIO_ENCODING_PCM_F32_LE = VADAudioEncoding._(1, _omitEnumNames ? '' : 'VAD_AUDIO_ENCODING_PCM_F32_LE');
+  static const VADAudioEncoding VAD_AUDIO_ENCODING_PCM_S16_LE = VADAudioEncoding._(2, _omitEnumNames ? '' : 'VAD_AUDIO_ENCODING_PCM_S16_LE');
+
+  static const $core.List<VADAudioEncoding> values = <VADAudioEncoding> [
+    VAD_AUDIO_ENCODING_UNSPECIFIED,
+    VAD_AUDIO_ENCODING_PCM_F32_LE,
+    VAD_AUDIO_ENCODING_PCM_S16_LE,
+  ];
+
+  static final $core.Map<$core.int, VADAudioEncoding> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static VADAudioEncoding? valueOf($core.int value) => _byValue[value];
+
+  const VADAudioEncoding._($core.int v, $core.String n) : super(v, n);
+}
+
+class VADStreamEventKind extends $pb.ProtobufEnum {
+  static const VADStreamEventKind VAD_STREAM_EVENT_KIND_UNSPECIFIED = VADStreamEventKind._(0, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_UNSPECIFIED');
+  static const VADStreamEventKind VAD_STREAM_EVENT_KIND_STARTED = VADStreamEventKind._(1, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_STARTED');
+  static const VADStreamEventKind VAD_STREAM_EVENT_KIND_FRAME = VADStreamEventKind._(2, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_FRAME');
+  static const VADStreamEventKind VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY = VADStreamEventKind._(3, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY');
+  static const VADStreamEventKind VAD_STREAM_EVENT_KIND_STATISTICS = VADStreamEventKind._(4, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_STATISTICS');
+  static const VADStreamEventKind VAD_STREAM_EVENT_KIND_STOPPED = VADStreamEventKind._(5, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_STOPPED');
+  static const VADStreamEventKind VAD_STREAM_EVENT_KIND_ERROR = VADStreamEventKind._(6, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_ERROR');
+
+  static const $core.List<VADStreamEventKind> values = <VADStreamEventKind> [
+    VAD_STREAM_EVENT_KIND_UNSPECIFIED,
+    VAD_STREAM_EVENT_KIND_STARTED,
+    VAD_STREAM_EVENT_KIND_FRAME,
+    VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
+    VAD_STREAM_EVENT_KIND_STATISTICS,
+    VAD_STREAM_EVENT_KIND_STOPPED,
+    VAD_STREAM_EVENT_KIND_ERROR,
+  ];
+
+  static final $core.Map<$core.int, VADStreamEventKind> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static VADStreamEventKind? valueOf($core.int value) => _byValue[value];
+
+  const VADStreamEventKind._($core.int v, $core.String n) : super(v, n);
+}
+
 
 const _omitEnumNames = $core.bool.fromEnvironment('protobuf.omit_enum_names');

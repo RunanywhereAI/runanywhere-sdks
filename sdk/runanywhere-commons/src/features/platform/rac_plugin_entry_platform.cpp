@@ -36,14 +36,11 @@ static const rac_runtime_id_t k_platform_runtimes[] = {
     RAC_RUNTIME_CPU,
 };
 
-/* Model formats we serve. COREML = 5 in runanywhere.v1.ModelFormat (see
- * sdk/runanywhere-commons/proto/runanywhere/v1/common.proto); the built-in
- * Foundation Models and System TTS don't have a filesystem format so they
- * won't appear here — the router accepts builtin:// URIs without format
- * gating. */
+/* Built-in Foundation Models and System TTS do not have a filesystem format,
+ * so they do not appear here; the router accepts builtin:// URIs without
+ * format gating. */
 static const uint32_t k_platform_formats[] = {
-    /* MODEL_FORMAT_COREML — Apple CoreML .mlmodelc / .mlpackage */
-    5,
+    RAC_MODEL_FORMAT_ID_COREML,
 };
 
 static const rac_engine_vtable_t g_platform_engine_vtable = {

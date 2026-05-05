@@ -25,7 +25,7 @@ _sym_db = _symbol_database.Default()
 import model_types_pb2 as model__types__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x18\x65mbeddings_options.proto\x12\x0erunanywhere.v1\x1a\x11model_types.proto\"\xa4\x03\n\x17\x45mbeddingsConfiguration\x12\x10\n\x08model_id\x18\x01 \x01(\t\x12\x1b\n\x13\x65mbedding_dimension\x18\x02 \x01(\x05\x12\x1b\n\x13max_sequence_length\x18\x03 \x01(\x05\x12\x16\n\tnormalize\x18\x04 \x01(\x08H\x00\x88\x01\x01\x12\x44\n\x13preferred_framework\x18\x05 \x01(\x0e\x32\".runanywhere.v1.InferenceFrameworkH\x01\x88\x01\x01\x12\x12\n\nmax_tokens\x18\x06 \x01(\x05\x12?\n\x0enormalize_mode\x18\x07 \x01(\x0e\x32\'.runanywhere.v1.EmbeddingsNormalizeMode\x12:\n\x07pooling\x18\x08 \x01(\x0e\x32).runanywhere.v1.EmbeddingsPoolingStrategy\x12\x18\n\x0b\x63onfig_json\x18\t \x01(\tH\x02\x88\x01\x01\x42\x0c\n\n_normalizeB\x16\n\x14_preferred_frameworkB\x0e\n\x0c_config_json\"\x82\x02\n\x11\x45mbeddingsOptions\x12\x11\n\tnormalize\x18\x01 \x01(\x08\x12\x15\n\x08truncate\x18\x02 \x01(\x08H\x00\x88\x01\x01\x12\x17\n\nbatch_size\x18\x03 \x01(\x05H\x01\x88\x01\x01\x12?\n\x0enormalize_mode\x18\x04 \x01(\x0e\x32\'.runanywhere.v1.EmbeddingsNormalizeMode\x12:\n\x07pooling\x18\x05 \x01(\x0e\x32).runanywhere.v1.EmbeddingsPoolingStrategy\x12\x11\n\tn_threads\x18\x06 \x01(\x05\x42\x0b\n\t_truncateB\r\n\x0b_batch_size\"l\n\x0f\x45mbeddingVector\x12\x0e\n\x06values\x18\x01 \x03(\x02\x12\x11\n\x04norm\x18\x02 \x01(\x02H\x00\x88\x01\x01\x12\x11\n\x04text\x18\x03 \x01(\tH\x01\x88\x01\x01\x12\x11\n\tdimension\x18\x04 \x01(\x05\x42\x07\n\x05_normB\x07\n\x05_text\"g\n\x11\x45mbeddingsRequest\x12\r\n\x05texts\x18\x01 \x03(\t\x12\x37\n\x07options\x18\x02 \x01(\x0b\x32!.runanywhere.v1.EmbeddingsOptionsH\x00\x88\x01\x01\x42\n\n\x08_options\"\x88\x01\n\x10\x45mbeddingsResult\x12\x30\n\x07vectors\x18\x01 \x03(\x0b\x32\x1f.runanywhere.v1.EmbeddingVector\x12\x11\n\tdimension\x18\x02 \x01(\x05\x12\x1a\n\x12processing_time_ms\x18\x03 \x01(\x03\x12\x13\n\x0btokens_used\x18\x04 \x01(\x05*\x8a\x01\n\x17\x45mbeddingsNormalizeMode\x12)\n%EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED\x10\x00\x12\"\n\x1e\x45MBEDDINGS_NORMALIZE_MODE_NONE\x10\x01\x12 \n\x1c\x45MBEDDINGS_NORMALIZE_MODE_L2\x10\x02*\xb9\x01\n\x19\x45mbeddingsPoolingStrategy\x12+\n\'EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED\x10\x00\x12$\n EMBEDDINGS_POOLING_STRATEGY_MEAN\x10\x01\x12#\n\x1f\x45MBEDDINGS_POOLING_STRATEGY_CLS\x10\x02\x12$\n EMBEDDINGS_POOLING_STRATEGY_LAST\x10\x03\x42\x91\x01\n\x17\x61i.runanywhere.proto.v1B\x16\x45mbeddingsOptionsProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x18\x65mbeddings_options.proto\x12\x0erunanywhere.v1\x1a\x11model_types.proto\"\xa4\x03\n\x17\x45mbeddingsConfiguration\x12\x10\n\x08model_id\x18\x01 \x01(\t\x12\x1b\n\x13\x65mbedding_dimension\x18\x02 \x01(\x05\x12\x1b\n\x13max_sequence_length\x18\x03 \x01(\x05\x12\x16\n\tnormalize\x18\x04 \x01(\x08H\x00\x88\x01\x01\x12\x44\n\x13preferred_framework\x18\x05 \x01(\x0e\x32\".runanywhere.v1.InferenceFrameworkH\x01\x88\x01\x01\x12\x12\n\nmax_tokens\x18\x06 \x01(\x05\x12?\n\x0enormalize_mode\x18\x07 \x01(\x0e\x32\'.runanywhere.v1.EmbeddingsNormalizeMode\x12:\n\x07pooling\x18\x08 \x01(\x0e\x32).runanywhere.v1.EmbeddingsPoolingStrategy\x12\x18\n\x0b\x63onfig_json\x18\t \x01(\tH\x02\x88\x01\x01\x42\x0c\n\n_normalizeB\x16\n\x14_preferred_frameworkB\x0e\n\x0c_config_json\"\x82\x02\n\x11\x45mbeddingsOptions\x12\x11\n\tnormalize\x18\x01 \x01(\x08\x12\x15\n\x08truncate\x18\x02 \x01(\x08H\x00\x88\x01\x01\x12\x17\n\nbatch_size\x18\x03 \x01(\x05H\x01\x88\x01\x01\x12?\n\x0enormalize_mode\x18\x04 \x01(\x0e\x32\'.runanywhere.v1.EmbeddingsNormalizeMode\x12:\n\x07pooling\x18\x05 \x01(\x0e\x32).runanywhere.v1.EmbeddingsPoolingStrategy\x12\x11\n\tn_threads\x18\x06 \x01(\x05\x42\x0b\n\t_truncateB\r\n\x0b_batch_size\"\xf3\x01\n\x0f\x45mbeddingVector\x12\x0e\n\x06values\x18\x01 \x03(\x02\x12\x11\n\x04norm\x18\x02 \x01(\x02H\x00\x88\x01\x01\x12\x11\n\x04text\x18\x03 \x01(\tH\x01\x88\x01\x01\x12\x11\n\tdimension\x18\x04 \x01(\x05\x12\x13\n\x0binput_index\x18\x05 \x01(\x05\x12?\n\x08metadata\x18\x06 \x03(\x0b\x32-.runanywhere.v1.EmbeddingVector.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\x07\n\x05_normB\x07\n\x05_text\"\x93\x02\n\x11\x45mbeddingsRequest\x12\r\n\x05texts\x18\x01 \x03(\t\x12\x37\n\x07options\x18\x02 \x01(\x0b\x32!.runanywhere.v1.EmbeddingsOptionsH\x00\x88\x01\x01\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x12\x15\n\x08model_id\x18\x04 \x01(\tH\x01\x88\x01\x01\x12\x41\n\x08metadata\x18\x05 \x03(\x0b\x32/.runanywhere.v1.EmbeddingsRequest.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\n\n\x08_optionsB\x0b\n\t_model_id\"\x82\x02\n\x10\x45mbeddingsResult\x12\x30\n\x07vectors\x18\x01 \x03(\x0b\x32\x1f.runanywhere.v1.EmbeddingVector\x12\x11\n\tdimension\x18\x02 \x01(\x05\x12\x1a\n\x12processing_time_ms\x18\x03 \x01(\x03\x12\x13\n\x0btokens_used\x18\x04 \x01(\x05\x12\x15\n\x08model_id\x18\x05 \x01(\tH\x00\x88\x01\x01\x12\x1a\n\rerror_message\x18\x06 \x01(\tH\x01\x88\x01\x01\x12\x12\n\nerror_code\x18\x07 \x01(\x05\x12\x12\n\nrequest_id\x18\x08 \x01(\tB\x0b\n\t_model_idB\x10\n\x0e_error_message\"\xc1\x01\n\x16\x45mbeddingsServiceState\x12\x10\n\x08is_ready\x18\x01 \x01(\x08\x12\x1a\n\rcurrent_model\x18\x02 \x01(\tH\x00\x88\x01\x01\x12\x11\n\tdimension\x18\x03 \x01(\x05\x12\x12\n\nmax_tokens\x18\x04 \x01(\x05\x12\x1a\n\rerror_message\x18\x05 \x01(\tH\x01\x88\x01\x01\x12\x12\n\nerror_code\x18\x06 \x01(\x05\x42\x10\n\x0e_current_modelB\x10\n\x0e_error_message*\x8a\x01\n\x17\x45mbeddingsNormalizeMode\x12)\n%EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED\x10\x00\x12\"\n\x1e\x45MBEDDINGS_NORMALIZE_MODE_NONE\x10\x01\x12 \n\x1c\x45MBEDDINGS_NORMALIZE_MODE_L2\x10\x02*\xb9\x01\n\x19\x45mbeddingsPoolingStrategy\x12+\n\'EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED\x10\x00\x12$\n EMBEDDINGS_POOLING_STRATEGY_MEAN\x10\x01\x12#\n\x1f\x45MBEDDINGS_POOLING_STRATEGY_CLS\x10\x02\x12$\n EMBEDDINGS_POOLING_STRATEGY_LAST\x10\x03\x32\xad\x01\n\nEmbeddings\x12L\n\x05\x45mbed\x12!.runanywhere.v1.EmbeddingsRequest\x1a .runanywhere.v1.EmbeddingsResult\x12Q\n\nEmbedBatch\x12!.runanywhere.v1.EmbeddingsRequest\x1a .runanywhere.v1.EmbeddingsResultB\x91\x01\n\x17\x61i.runanywhere.proto.v1B\x16\x45mbeddingsOptionsProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,18 +33,30 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'embeddings_options_pb2', _g
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\027ai.runanywhere.proto.v1B\026EmbeddingsOptionsProtoP\001Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RA'
-  _globals['_EMBEDDINGSNORMALIZEMODE']._serialized_start=1102
-  _globals['_EMBEDDINGSNORMALIZEMODE']._serialized_end=1240
-  _globals['_EMBEDDINGSPOOLINGSTRATEGY']._serialized_start=1243
-  _globals['_EMBEDDINGSPOOLINGSTRATEGY']._serialized_end=1428
+  _globals['_EMBEDDINGVECTOR_METADATAENTRY']._loaded_options = None
+  _globals['_EMBEDDINGVECTOR_METADATAENTRY']._serialized_options = b'8\001'
+  _globals['_EMBEDDINGSREQUEST_METADATAENTRY']._loaded_options = None
+  _globals['_EMBEDDINGSREQUEST_METADATAENTRY']._serialized_options = b'8\001'
+  _globals['_EMBEDDINGSNORMALIZEMODE']._serialized_start=1729
+  _globals['_EMBEDDINGSNORMALIZEMODE']._serialized_end=1867
+  _globals['_EMBEDDINGSPOOLINGSTRATEGY']._serialized_start=1870
+  _globals['_EMBEDDINGSPOOLINGSTRATEGY']._serialized_end=2055
   _globals['_EMBEDDINGSCONFIGURATION']._serialized_start=64
   _globals['_EMBEDDINGSCONFIGURATION']._serialized_end=484
   _globals['_EMBEDDINGSOPTIONS']._serialized_start=487
   _globals['_EMBEDDINGSOPTIONS']._serialized_end=745
-  _globals['_EMBEDDINGVECTOR']._serialized_start=747
-  _globals['_EMBEDDINGVECTOR']._serialized_end=855
-  _globals['_EMBEDDINGSREQUEST']._serialized_start=857
-  _globals['_EMBEDDINGSREQUEST']._serialized_end=960
-  _globals['_EMBEDDINGSRESULT']._serialized_start=963
-  _globals['_EMBEDDINGSRESULT']._serialized_end=1099
+  _globals['_EMBEDDINGVECTOR']._serialized_start=748
+  _globals['_EMBEDDINGVECTOR']._serialized_end=991
+  _globals['_EMBEDDINGVECTOR_METADATAENTRY']._serialized_start=926
+  _globals['_EMBEDDINGVECTOR_METADATAENTRY']._serialized_end=973
+  _globals['_EMBEDDINGSREQUEST']._serialized_start=994
+  _globals['_EMBEDDINGSREQUEST']._serialized_end=1269
+  _globals['_EMBEDDINGSREQUEST_METADATAENTRY']._serialized_start=926
+  _globals['_EMBEDDINGSREQUEST_METADATAENTRY']._serialized_end=973
+  _globals['_EMBEDDINGSRESULT']._serialized_start=1272
+  _globals['_EMBEDDINGSRESULT']._serialized_end=1530
+  _globals['_EMBEDDINGSSERVICESTATE']._serialized_start=1533
+  _globals['_EMBEDDINGSSERVICESTATE']._serialized_end=1726
+  _globals['_EMBEDDINGS']._serialized_start=2058
+  _globals['_EMBEDDINGS']._serialized_end=2231
 # @@protoc_insertion_point(module_scope)

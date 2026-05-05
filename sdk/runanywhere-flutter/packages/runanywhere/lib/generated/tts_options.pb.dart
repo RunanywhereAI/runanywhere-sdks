@@ -9,6 +9,7 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -263,6 +264,9 @@ class TTSOptions extends $pb.GeneratedMessage {
     $core.bool? enableSsml,
     $0.AudioFormat? audioFormat,
     $core.int? sampleRate,
+    $core.int? speakerId,
+    $core.double? speed,
+    $core.String? style,
   }) {
     final $result = create();
     if (voice != null) {
@@ -289,6 +293,15 @@ class TTSOptions extends $pb.GeneratedMessage {
     if (sampleRate != null) {
       $result.sampleRate = sampleRate;
     }
+    if (speakerId != null) {
+      $result.speakerId = speakerId;
+    }
+    if (speed != null) {
+      $result.speed = speed;
+    }
+    if (style != null) {
+      $result.style = style;
+    }
     return $result;
   }
   TTSOptions._() : super();
@@ -304,6 +317,9 @@ class TTSOptions extends $pb.GeneratedMessage {
     ..aOB(6, _omitFieldNames ? '' : 'enableSsml')
     ..e<$0.AudioFormat>(7, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $0.AudioFormat.valueOf, enumValues: $0.AudioFormat.values)
     ..a<$core.int>(8, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
+    ..a<$core.int>(9, _omitFieldNames ? '' : 'speakerId', $pb.PbFieldType.O3)
+    ..a<$core.double>(10, _omitFieldNames ? '' : 'speed', $pb.PbFieldType.OF)
+    ..aOS(11, _omitFieldNames ? '' : 'style')
     ..hasRequiredFields = false
   ;
 
@@ -413,6 +429,139 @@ class TTSOptions extends $pb.GeneratedMessage {
   $core.bool hasSampleRate() => $_has(7);
   @$pb.TagNumber(8)
   void clearSampleRate() => clearField(8);
+
+  /// Speaker index for multi-speaker voices. -1/0 = backend default
+  /// depending on model convention.
+  @$pb.TagNumber(9)
+  $core.int get speakerId => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set speakerId($core.int v) { $_setSignedInt32(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasSpeakerId() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearSpeakerId() => clearField(9);
+
+  /// Web/ONNX ergonomic alias for speaking_rate. 0.0 = use speaking_rate.
+  @$pb.TagNumber(10)
+  $core.double get speed => $_getN(9);
+  @$pb.TagNumber(10)
+  set speed($core.double v) { $_setFloat(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasSpeed() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearSpeed() => clearField(10);
+
+  /// Optional style/emotion hint for voices that support style transfer.
+  @$pb.TagNumber(11)
+  $core.String get style => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set style($core.String v) { $_setString(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasStyle() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearStyle() => clearField(11);
+}
+
+class TTSSynthesisRequest extends $pb.GeneratedMessage {
+  factory TTSSynthesisRequest({
+    $core.String? requestId,
+    $core.String? text,
+    $core.String? ssml,
+    TTSOptions? options,
+    $core.Map<$core.String, $core.String>? metadata,
+  }) {
+    final $result = create();
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (text != null) {
+      $result.text = text;
+    }
+    if (ssml != null) {
+      $result.ssml = ssml;
+    }
+    if (options != null) {
+      $result.options = options;
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
+    }
+    return $result;
+  }
+  TTSSynthesisRequest._() : super();
+  factory TTSSynthesisRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory TTSSynthesisRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'TTSSynthesisRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aOS(2, _omitFieldNames ? '' : 'text')
+    ..aOS(3, _omitFieldNames ? '' : 'ssml')
+    ..aOM<TTSOptions>(4, _omitFieldNames ? '' : 'options', subBuilder: TTSOptions.create)
+    ..m<$core.String, $core.String>(5, _omitFieldNames ? '' : 'metadata', entryClassName: 'TTSSynthesisRequest.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  TTSSynthesisRequest clone() => TTSSynthesisRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  TTSSynthesisRequest copyWith(void Function(TTSSynthesisRequest) updates) => super.copyWith((message) => updates(message as TTSSynthesisRequest)) as TTSSynthesisRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TTSSynthesisRequest create() => TTSSynthesisRequest._();
+  TTSSynthesisRequest createEmptyInstance() => create();
+  static $pb.PbList<TTSSynthesisRequest> createRepeated() => $pb.PbList<TTSSynthesisRequest>();
+  @$core.pragma('dart2js:noInline')
+  static TTSSynthesisRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<TTSSynthesisRequest>(create);
+  static TTSSynthesisRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get text => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set text($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasText() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearText() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get ssml => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set ssml($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasSsml() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSsml() => clearField(3);
+
+  @$pb.TagNumber(4)
+  TTSOptions get options => $_getN(3);
+  @$pb.TagNumber(4)
+  set options(TTSOptions v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasOptions() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearOptions() => clearField(4);
+  @$pb.TagNumber(4)
+  TTSOptions ensureOptions() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(4);
 }
 
 ///  ---------------------------------------------------------------------------
@@ -657,6 +806,11 @@ class TTSOutput extends $pb.GeneratedMessage {
     $core.Iterable<TTSPhonemeTimestamp>? phonemeTimestamps,
     TTSSynthesisMetadata? metadata,
     $fixnum.Int64? timestampMs,
+    $core.int? chunkIndex,
+    $core.bool? isFinal,
+    $fixnum.Int64? audioSizeBytes,
+    $core.String? errorMessage,
+    $core.int? errorCode,
   }) {
     final $result = create();
     if (audioData != null) {
@@ -680,6 +834,21 @@ class TTSOutput extends $pb.GeneratedMessage {
     if (timestampMs != null) {
       $result.timestampMs = timestampMs;
     }
+    if (chunkIndex != null) {
+      $result.chunkIndex = chunkIndex;
+    }
+    if (isFinal != null) {
+      $result.isFinal = isFinal;
+    }
+    if (audioSizeBytes != null) {
+      $result.audioSizeBytes = audioSizeBytes;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
     return $result;
   }
   TTSOutput._() : super();
@@ -694,6 +863,11 @@ class TTSOutput extends $pb.GeneratedMessage {
     ..pc<TTSPhonemeTimestamp>(5, _omitFieldNames ? '' : 'phonemeTimestamps', $pb.PbFieldType.PM, subBuilder: TTSPhonemeTimestamp.create)
     ..aOM<TTSSynthesisMetadata>(6, _omitFieldNames ? '' : 'metadata', subBuilder: TTSSynthesisMetadata.create)
     ..aInt64(7, _omitFieldNames ? '' : 'timestampMs')
+    ..a<$core.int>(8, _omitFieldNames ? '' : 'chunkIndex', $pb.PbFieldType.O3)
+    ..aOB(9, _omitFieldNames ? '' : 'isFinal')
+    ..aInt64(10, _omitFieldNames ? '' : 'audioSizeBytes')
+    ..aOS(11, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(12, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
@@ -786,6 +960,54 @@ class TTSOutput extends $pb.GeneratedMessage {
   $core.bool hasTimestampMs() => $_has(6);
   @$pb.TagNumber(7)
   void clearTimestampMs() => clearField(7);
+
+  /// Stream chunk metadata. For one-shot synthesis, chunk_index=0 and
+  /// is_final=true when set by the producer.
+  @$pb.TagNumber(8)
+  $core.int get chunkIndex => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set chunkIndex($core.int v) { $_setSignedInt32(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasChunkIndex() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearChunkIndex() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.bool get isFinal => $_getBF(8);
+  @$pb.TagNumber(9)
+  set isFinal($core.bool v) { $_setBool(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasIsFinal() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearIsFinal() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $fixnum.Int64 get audioSizeBytes => $_getI64(9);
+  @$pb.TagNumber(10)
+  set audioSizeBytes($fixnum.Int64 v) { $_setInt64(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasAudioSizeBytes() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearAudioSizeBytes() => clearField(10);
+
+  /// Terminal error details for result-envelope APIs.
+  @$pb.TagNumber(11)
+  $core.String get errorMessage => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set errorMessage($core.String v) { $_setString(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasErrorMessage() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearErrorMessage() => clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.int get errorCode => $_getIZ(11);
+  @$pb.TagNumber(12)
+  set errorCode($core.int v) { $_setSignedInt32(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasErrorCode() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearErrorCode() => clearField(12);
 }
 
 ///  ---------------------------------------------------------------------------
@@ -805,6 +1027,8 @@ class TTSSpeakResult extends $pb.GeneratedMessage {
     $fixnum.Int64? audioSizeBytes,
     TTSSynthesisMetadata? metadata,
     $fixnum.Int64? timestampMs,
+    $core.String? errorMessage,
+    $core.int? errorCode,
   }) {
     final $result = create();
     if (audioFormat != null) {
@@ -825,6 +1049,12 @@ class TTSSpeakResult extends $pb.GeneratedMessage {
     if (timestampMs != null) {
       $result.timestampMs = timestampMs;
     }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
     return $result;
   }
   TTSSpeakResult._() : super();
@@ -838,6 +1068,8 @@ class TTSSpeakResult extends $pb.GeneratedMessage {
     ..aInt64(4, _omitFieldNames ? '' : 'audioSizeBytes')
     ..aOM<TTSSynthesisMetadata>(5, _omitFieldNames ? '' : 'metadata', subBuilder: TTSSynthesisMetadata.create)
     ..aInt64(6, _omitFieldNames ? '' : 'timestampMs')
+    ..aOS(7, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(8, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
@@ -924,6 +1156,24 @@ class TTSSpeakResult extends $pb.GeneratedMessage {
   $core.bool hasTimestampMs() => $_has(5);
   @$pb.TagNumber(6)
   void clearTimestampMs() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get errorMessage => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set errorMessage($core.String v) { $_setString(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasErrorMessage() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearErrorMessage() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get errorCode => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set errorCode($core.int v) { $_setSignedInt32(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasErrorCode() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearErrorCode() => clearField(8);
 }
 
 ///  ---------------------------------------------------------------------------
@@ -940,6 +1190,10 @@ class TTSVoiceInfo extends $pb.GeneratedMessage {
     $core.String? languageCode,
     TTSVoiceGender? gender,
     $core.String? description,
+    $core.bool? isNeural,
+    $core.bool? isSystem,
+    $core.int? sampleRate,
+    $core.Iterable<$core.String>? supportedStyles,
   }) {
     final $result = create();
     if (id != null) {
@@ -957,6 +1211,18 @@ class TTSVoiceInfo extends $pb.GeneratedMessage {
     if (description != null) {
       $result.description = description;
     }
+    if (isNeural != null) {
+      $result.isNeural = isNeural;
+    }
+    if (isSystem != null) {
+      $result.isSystem = isSystem;
+    }
+    if (sampleRate != null) {
+      $result.sampleRate = sampleRate;
+    }
+    if (supportedStyles != null) {
+      $result.supportedStyles.addAll(supportedStyles);
+    }
     return $result;
   }
   TTSVoiceInfo._() : super();
@@ -969,6 +1235,10 @@ class TTSVoiceInfo extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'languageCode')
     ..e<TTSVoiceGender>(4, _omitFieldNames ? '' : 'gender', $pb.PbFieldType.OE, defaultOrMaker: TTSVoiceGender.TTS_VOICE_GENDER_UNSPECIFIED, valueOf: TTSVoiceGender.valueOf, enumValues: TTSVoiceGender.values)
     ..aOS(5, _omitFieldNames ? '' : 'description')
+    ..aOB(6, _omitFieldNames ? '' : 'isNeural')
+    ..aOB(7, _omitFieldNames ? '' : 'isSystem')
+    ..a<$core.int>(8, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
+    ..pPS(9, _omitFieldNames ? '' : 'supportedStyles')
     ..hasRequiredFields = false
   ;
 
@@ -1043,6 +1313,397 @@ class TTSVoiceInfo extends $pb.GeneratedMessage {
   $core.bool hasDescription() => $_has(4);
   @$pb.TagNumber(5)
   void clearDescription() => clearField(5);
+
+  /// Additional discovery fields surfaced by system and ONNX/Piper voices.
+  @$pb.TagNumber(6)
+  $core.bool get isNeural => $_getBF(5);
+  @$pb.TagNumber(6)
+  set isNeural($core.bool v) { $_setBool(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasIsNeural() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearIsNeural() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get isSystem => $_getBF(6);
+  @$pb.TagNumber(7)
+  set isSystem($core.bool v) { $_setBool(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasIsSystem() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearIsSystem() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get sampleRate => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set sampleRate($core.int v) { $_setSignedInt32(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasSampleRate() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearSampleRate() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.List<$core.String> get supportedStyles => $_getList(8);
+}
+
+class TTSStreamEvent extends $pb.GeneratedMessage {
+  factory TTSStreamEvent({
+    $fixnum.Int64? seq,
+    $fixnum.Int64? timestampUs,
+    $core.String? requestId,
+    TTSStreamEventKind? kind,
+    TTSOutput? output,
+    TTSPhonemeTimestamp? phoneme,
+    TTSSpeakResult? speakResult,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+    $core.double? progress,
+    $core.int? chunkIndex,
+    $core.int? totalChunks,
+    $fixnum.Int64? elapsedMs,
+    $core.String? statusMessage,
+  }) {
+    final $result = create();
+    if (seq != null) {
+      $result.seq = seq;
+    }
+    if (timestampUs != null) {
+      $result.timestampUs = timestampUs;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (kind != null) {
+      $result.kind = kind;
+    }
+    if (output != null) {
+      $result.output = output;
+    }
+    if (phoneme != null) {
+      $result.phoneme = phoneme;
+    }
+    if (speakResult != null) {
+      $result.speakResult = speakResult;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    if (progress != null) {
+      $result.progress = progress;
+    }
+    if (chunkIndex != null) {
+      $result.chunkIndex = chunkIndex;
+    }
+    if (totalChunks != null) {
+      $result.totalChunks = totalChunks;
+    }
+    if (elapsedMs != null) {
+      $result.elapsedMs = elapsedMs;
+    }
+    if (statusMessage != null) {
+      $result.statusMessage = statusMessage;
+    }
+    return $result;
+  }
+  TTSStreamEvent._() : super();
+  factory TTSStreamEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory TTSStreamEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'TTSStreamEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
+    ..aOS(3, _omitFieldNames ? '' : 'requestId')
+    ..e<TTSStreamEventKind>(4, _omitFieldNames ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: TTSStreamEventKind.TTS_STREAM_EVENT_KIND_UNSPECIFIED, valueOf: TTSStreamEventKind.valueOf, enumValues: TTSStreamEventKind.values)
+    ..aOM<TTSOutput>(5, _omitFieldNames ? '' : 'output', subBuilder: TTSOutput.create)
+    ..aOM<TTSPhonemeTimestamp>(6, _omitFieldNames ? '' : 'phoneme', subBuilder: TTSPhonemeTimestamp.create)
+    ..aOM<TTSSpeakResult>(7, _omitFieldNames ? '' : 'speakResult', subBuilder: TTSSpeakResult.create)
+    ..aOS(8, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(9, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..a<$core.double>(10, _omitFieldNames ? '' : 'progress', $pb.PbFieldType.OF)
+    ..a<$core.int>(11, _omitFieldNames ? '' : 'chunkIndex', $pb.PbFieldType.O3)
+    ..a<$core.int>(12, _omitFieldNames ? '' : 'totalChunks', $pb.PbFieldType.O3)
+    ..aInt64(13, _omitFieldNames ? '' : 'elapsedMs')
+    ..aOS(14, _omitFieldNames ? '' : 'statusMessage')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  TTSStreamEvent clone() => TTSStreamEvent()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  TTSStreamEvent copyWith(void Function(TTSStreamEvent) updates) => super.copyWith((message) => updates(message as TTSStreamEvent)) as TTSStreamEvent;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TTSStreamEvent create() => TTSStreamEvent._();
+  TTSStreamEvent createEmptyInstance() => create();
+  static $pb.PbList<TTSStreamEvent> createRepeated() => $pb.PbList<TTSStreamEvent>();
+  @$core.pragma('dart2js:noInline')
+  static TTSStreamEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<TTSStreamEvent>(create);
+  static TTSStreamEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get seq => $_getI64(0);
+  @$pb.TagNumber(1)
+  set seq($fixnum.Int64 v) { $_setInt64(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasSeq() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSeq() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get timestampUs => $_getI64(1);
+  @$pb.TagNumber(2)
+  set timestampUs($fixnum.Int64 v) { $_setInt64(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasTimestampUs() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTimestampUs() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get requestId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set requestId($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasRequestId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRequestId() => clearField(3);
+
+  @$pb.TagNumber(4)
+  TTSStreamEventKind get kind => $_getN(3);
+  @$pb.TagNumber(4)
+  set kind(TTSStreamEventKind v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasKind() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearKind() => clearField(4);
+
+  @$pb.TagNumber(5)
+  TTSOutput get output => $_getN(4);
+  @$pb.TagNumber(5)
+  set output(TTSOutput v) { setField(5, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasOutput() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearOutput() => clearField(5);
+  @$pb.TagNumber(5)
+  TTSOutput ensureOutput() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  TTSPhonemeTimestamp get phoneme => $_getN(5);
+  @$pb.TagNumber(6)
+  set phoneme(TTSPhonemeTimestamp v) { setField(6, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasPhoneme() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearPhoneme() => clearField(6);
+  @$pb.TagNumber(6)
+  TTSPhonemeTimestamp ensurePhoneme() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  TTSSpeakResult get speakResult => $_getN(6);
+  @$pb.TagNumber(7)
+  set speakResult(TTSSpeakResult v) { setField(7, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasSpeakResult() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearSpeakResult() => clearField(7);
+  @$pb.TagNumber(7)
+  TTSSpeakResult ensureSpeakResult() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  $core.String get errorMessage => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set errorMessage($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasErrorMessage() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearErrorMessage() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get errorCode => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set errorCode($core.int v) { $_setSignedInt32(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasErrorCode() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearErrorCode() => clearField(9);
+
+  /// Progress metadata for started/progress/audio_chunk/completed events.
+  /// progress is 0.0..1.0 when known; total_chunks=0 means unknown.
+  @$pb.TagNumber(10)
+  $core.double get progress => $_getN(9);
+  @$pb.TagNumber(10)
+  set progress($core.double v) { $_setFloat(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasProgress() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearProgress() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.int get chunkIndex => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set chunkIndex($core.int v) { $_setSignedInt32(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasChunkIndex() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearChunkIndex() => clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.int get totalChunks => $_getIZ(11);
+  @$pb.TagNumber(12)
+  set totalChunks($core.int v) { $_setSignedInt32(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasTotalChunks() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearTotalChunks() => clearField(12);
+
+  @$pb.TagNumber(13)
+  $fixnum.Int64 get elapsedMs => $_getI64(12);
+  @$pb.TagNumber(13)
+  set elapsedMs($fixnum.Int64 v) { $_setInt64(12, v); }
+  @$pb.TagNumber(13)
+  $core.bool hasElapsedMs() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearElapsedMs() => clearField(13);
+
+  @$pb.TagNumber(14)
+  $core.String get statusMessage => $_getSZ(13);
+  @$pb.TagNumber(14)
+  set statusMessage($core.String v) { $_setString(13, v); }
+  @$pb.TagNumber(14)
+  $core.bool hasStatusMessage() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearStatusMessage() => clearField(14);
+}
+
+class TTSServiceState extends $pb.GeneratedMessage {
+  factory TTSServiceState({
+    $core.bool? isReady,
+    $core.String? currentVoice,
+    $core.Iterable<TTSVoiceInfo>? voices,
+    $core.Iterable<$core.String>? supportedLanguageCodes,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (isReady != null) {
+      $result.isReady = isReady;
+    }
+    if (currentVoice != null) {
+      $result.currentVoice = currentVoice;
+    }
+    if (voices != null) {
+      $result.voices.addAll(voices);
+    }
+    if (supportedLanguageCodes != null) {
+      $result.supportedLanguageCodes.addAll(supportedLanguageCodes);
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  TTSServiceState._() : super();
+  factory TTSServiceState.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory TTSServiceState.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'TTSServiceState', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'isReady')
+    ..aOS(2, _omitFieldNames ? '' : 'currentVoice')
+    ..pc<TTSVoiceInfo>(3, _omitFieldNames ? '' : 'voices', $pb.PbFieldType.PM, subBuilder: TTSVoiceInfo.create)
+    ..pPS(4, _omitFieldNames ? '' : 'supportedLanguageCodes')
+    ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(6, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  TTSServiceState clone() => TTSServiceState()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  TTSServiceState copyWith(void Function(TTSServiceState) updates) => super.copyWith((message) => updates(message as TTSServiceState)) as TTSServiceState;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TTSServiceState create() => TTSServiceState._();
+  TTSServiceState createEmptyInstance() => create();
+  static $pb.PbList<TTSServiceState> createRepeated() => $pb.PbList<TTSServiceState>();
+  @$core.pragma('dart2js:noInline')
+  static TTSServiceState getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<TTSServiceState>(create);
+  static TTSServiceState? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get isReady => $_getBF(0);
+  @$pb.TagNumber(1)
+  set isReady($core.bool v) { $_setBool(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasIsReady() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearIsReady() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get currentVoice => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set currentVoice($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasCurrentVoice() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCurrentVoice() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.List<TTSVoiceInfo> get voices => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $core.List<$core.String> get supportedLanguageCodes => $_getList(3);
+
+  @$pb.TagNumber(5)
+  $core.String get errorMessage => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set errorMessage($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasErrorMessage() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearErrorMessage() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get errorCode => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set errorCode($core.int v) { $_setSignedInt32(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasErrorCode() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearErrorCode() => clearField(6);
+}
+
+class TTSApi {
+  $pb.RpcClient _client;
+  TTSApi(this._client);
+
+  $async.Future<TTSOutput> synthesize($pb.ClientContext? ctx, TTSSynthesisRequest request) =>
+    _client.invoke<TTSOutput>(ctx, 'TTS', 'Synthesize', request, TTSOutput())
+  ;
+  $async.Future<TTSStreamEvent> stream($pb.ClientContext? ctx, TTSSynthesisRequest request) =>
+    _client.invoke<TTSStreamEvent>(ctx, 'TTS', 'Stream', request, TTSStreamEvent())
+  ;
 }
 
 

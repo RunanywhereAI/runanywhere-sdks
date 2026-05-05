@@ -5,6 +5,7 @@
 #include "rac/features/llm/rac_llm_service.h"
 #include "rac/plugin/rac_cpu_runtime_provider.h"
 #include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_primitive.h"
 #include "rac/plugin/rac_runtime_registry.h"
@@ -59,7 +60,7 @@ rac_result_t probe_engine_create(const char* model_id,
     }
     rac_runtime_session_desc_t desc = {};
     desc.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
-    desc.model_format = 1;
+    desc.model_format = RAC_MODEL_FORMAT_ID_GGUF;
     desc.model_path = model_id;
     return runtime->create_session(&desc, reinterpret_cast<rac_runtime_session_t**>(out_impl));
 }
@@ -92,7 +93,7 @@ extern "C" const rac_llm_service_ops_t g_probe_llm_ops = {
 };
 
 const rac_runtime_id_t k_probe_runtimes[] = {RAC_RUNTIME_CPU};
-const uint32_t k_probe_formats[] = {1};
+const uint32_t k_probe_formats[] = {RAC_MODEL_FORMAT_ID_GGUF};
 
 const rac_engine_vtable_t k_probe_engine = {
     /* metadata */ {
@@ -127,7 +128,7 @@ int main() {
     rac_plugin_unregister("runtime_probe_engine");
     rac_cpu_runtime_unregister_provider("runtime_probe_provider");
 
-    const uint32_t formats[] = {1};
+    const uint32_t formats[] = {RAC_MODEL_FORMAT_ID_GGUF};
     rac_cpu_runtime_provider_t provider = {};
     provider.name = "runtime_probe_provider";
     provider.primitive = RAC_PRIMITIVE_GENERATE_TEXT;

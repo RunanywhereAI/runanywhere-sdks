@@ -96,6 +96,32 @@ public class RAGQueryOptions(
     schemaIndex = 5,
   )
   public val top_k: Int = 0,
+  /**
+   * Retrieval overrides. 0/unset = use RAGConfiguration defaults.
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "retrievalTopK",
+    schemaIndex = 6,
+  )
+  public val retrieval_top_k: Int = 0,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "similarityThreshold",
+    schemaIndex = 7,
+  )
+  public val similarity_threshold: Float = 0f,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 8,
+  )
+  public val stream: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGQueryOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -115,6 +141,9 @@ public class RAGQueryOptions(
     if (temperature != other.temperature) return false
     if (top_p != other.top_p) return false
     if (top_k != other.top_k) return false
+    if (retrieval_top_k != other.retrieval_top_k) return false
+    if (similarity_threshold != other.similarity_threshold) return false
+    if (stream != other.stream) return false
     return true
   }
 
@@ -128,6 +157,9 @@ public class RAGQueryOptions(
       result = result * 37 + temperature.hashCode()
       result = result * 37 + top_p.hashCode()
       result = result * 37 + top_k.hashCode()
+      result = result * 37 + retrieval_top_k.hashCode()
+      result = result * 37 + similarity_threshold.hashCode()
+      result = result * 37 + stream.hashCode()
       super.hashCode = result
     }
     return result
@@ -141,6 +173,9 @@ public class RAGQueryOptions(
     result += """temperature=$temperature"""
     result += """top_p=$top_p"""
     result += """top_k=$top_k"""
+    result += """retrieval_top_k=$retrieval_top_k"""
+    result += """similarity_threshold=$similarity_threshold"""
+    result += """stream=$stream"""
     return result.joinToString(prefix = "RAGQueryOptions{", separator = ", ", postfix = "}")
   }
 
@@ -151,9 +186,12 @@ public class RAGQueryOptions(
     temperature: Float = this.temperature,
     top_p: Float = this.top_p,
     top_k: Int = this.top_k,
+    retrieval_top_k: Int = this.retrieval_top_k,
+    similarity_threshold: Float = this.similarity_threshold,
+    stream: Boolean = this.stream,
     unknownFields: ByteString = this.unknownFields,
   ): RAGQueryOptions = RAGQueryOptions(question, system_prompt, max_tokens, temperature, top_p,
-      top_k, unknownFields)
+      top_k, retrieval_top_k, similarity_threshold, stream, unknownFields)
 
   public companion object {
     @JvmField
@@ -175,6 +213,11 @@ public class RAGQueryOptions(
             value.temperature)
         if (!value.top_p.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(5, value.top_p)
         if (value.top_k != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(6, value.top_k)
+        if (value.retrieval_top_k != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(7,
+            value.retrieval_top_k)
+        if (!value.similarity_threshold.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(8,
+            value.similarity_threshold)
+        if (value.stream != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(9, value.stream)
         return size
       }
 
@@ -186,11 +229,21 @@ public class RAGQueryOptions(
             value.temperature)
         if (!value.top_p.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.top_p)
         if (value.top_k != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.top_k)
+        if (value.retrieval_top_k != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
+            value.retrieval_top_k)
+        if (!value.similarity_threshold.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 8,
+            value.similarity_threshold)
+        if (value.stream != false) ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.stream)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGQueryOptions) {
         writer.writeBytes(value.unknownFields)
+        if (value.stream != false) ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.stream)
+        if (!value.similarity_threshold.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 8,
+            value.similarity_threshold)
+        if (value.retrieval_top_k != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
+            value.retrieval_top_k)
         if (value.top_k != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.top_k)
         if (!value.top_p.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.top_p)
         if (!value.temperature.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 4,
@@ -207,6 +260,9 @@ public class RAGQueryOptions(
         var temperature: Float = 0f
         var top_p: Float = 0f
         var top_k: Int = 0
+        var retrieval_top_k: Int = 0
+        var similarity_threshold: Float = 0f
+        var stream: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> question = ProtoAdapter.STRING.decode(reader)
@@ -215,6 +271,9 @@ public class RAGQueryOptions(
             4 -> temperature = ProtoAdapter.FLOAT.decode(reader)
             5 -> top_p = ProtoAdapter.FLOAT.decode(reader)
             6 -> top_k = ProtoAdapter.INT32.decode(reader)
+            7 -> retrieval_top_k = ProtoAdapter.INT32.decode(reader)
+            8 -> similarity_threshold = ProtoAdapter.FLOAT.decode(reader)
+            9 -> stream = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -225,6 +284,9 @@ public class RAGQueryOptions(
           temperature = temperature,
           top_p = top_p,
           top_k = top_k,
+          retrieval_top_k = retrieval_top_k,
+          similarity_threshold = similarity_threshold,
+          stream = stream,
           unknownFields = unknownFields
         )
       }

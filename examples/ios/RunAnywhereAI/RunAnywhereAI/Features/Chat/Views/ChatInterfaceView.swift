@@ -111,10 +111,8 @@ struct ChatInterfaceView: View {
                 isLoading: viewModel.isLoadingLoRA
             ) {
                 guard let url = pendingLoRAURL else { return }
-                let accessed = url.startAccessingSecurityScopedResource()
                 Task {
-                    defer { if accessed { url.stopAccessingSecurityScopedResource() } }
-                    await viewModel.loadLoraAdapter(path: url.path, scale: loraScale)
+                    await viewModel.importAndLoadLoraAdapter(url: url, scale: loraScale)
                     showingLoRAScaleSheet = false
                 }
             } onCancel: {
@@ -687,21 +685,19 @@ private struct LoRAManagementSheetView: View {
             } header: {
                 Text("Available for This Model")
             } footer: {
-                Text("These adapters are downloaded from HuggingFace and stored locally.")
+                Text("Downloaded adapters are stored locally.")
             }
         }
     }
 
     // swiftlint:disable:next function_body_length
-    private func availableAdapterRow(_ adapter: LoraAdapterCatalogEntry) -> some View {
+    private func availableAdapterRow(_ adapter: RALoraAdapterCatalogEntry) -> some View {
         let isDownloaded = viewModel.isAdapterDownloaded(adapter)
-        let isDownloading = viewModel.isDownloadingAdapter[adapter.id] == true
-        let progress = viewModel.adapterDownloadProgress[adapter.id] ?? 0.0
         let scale = selectedAdapterScale[adapter.id] ?? adapter.defaultScale
         let isAlreadyApplied = viewModel.loraAdapters.contains {
-            $0.path == viewModel.localPath(for: adapter)
+            $0.adapterPath == viewModel.localPath(for: adapter)
         }
-        let fileSizeText = ByteCountFormatter.string(fromByteCount: adapter.fileSize, countStyle: .file)
+        let fileSizeText = ByteCountFormatter.string(fromByteCount: adapter.sizeBytes, countStyle: .file)
 
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top) {
@@ -709,7 +705,7 @@ private struct LoRAManagementSheetView: View {
                     Text(adapter.name)
                         .font(.subheadline)
                         .fontWeight(.medium)
-                    Text(adapter.adapterDescription)
+                    Text(adapter.description_p)
                         .font(.caption)
                         .foregroundColor(.secondary)
                     Text(fileSizeText)
@@ -730,15 +726,7 @@ private struct LoRAManagementSheetView: View {
                 }
             }
 
-            if isDownloading {
-                VStack(spacing: 4) {
-                    ProgressView(value: progress)
-                        .tint(.purple)
-                    Text("Downloading... \(Int(progress * 100))%")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-            } else if !isAlreadyApplied {
+            if !isAlreadyApplied {
                 HStack(spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Scale: \(String(format: "%.1f", scale))")
@@ -761,7 +749,7 @@ private struct LoRAManagementSheetView: View {
                             await viewModel.downloadAndLoadAdapter(adapter, scale: applyScale)
                         }
                     } label: {
-                        Text(isDownloaded ? "Apply" : "Download & Apply")
+                        Text(isDownloaded ? "Apply" : "Download")
                             .font(.caption)
                             .fontWeight(.semibold)
                             .frame(minWidth: 60)
@@ -780,11 +768,11 @@ private struct LoRAManagementSheetView: View {
     @ViewBuilder private var loadedAdaptersSection: some View {
         if !viewModel.loraAdapters.isEmpty {
             Section("Loaded Adapters") {
-                ForEach(viewModel.loraAdapters, id: \.path) { adapter in
+                ForEach(viewModel.loraAdapters, id: \.adapterPath) { adapter in
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(URL(fileURLWithPath: adapter.path).lastPathComponent)
+                                Text(URL(fileURLWithPath: adapter.adapterPath).lastPathComponent)
                                     .font(.subheadline)
                                     .lineLimit(1)
                                 HStack(spacing: 8) {
@@ -802,7 +790,7 @@ private struct LoRAManagementSheetView: View {
                             Spacer()
 
                             Button {
-                                Task { await viewModel.removeLoraAdapter(path: adapter.path) }
+                                Task { await viewModel.removeLoraAdapter(path: adapter.adapterPath) }
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
                                     .foregroundColor(.secondary)
@@ -810,7 +798,7 @@ private struct LoRAManagementSheetView: View {
                             .buttonStyle(.plain)
                         }
 
-                        let prompts = LoraExamplePrompts.forAdapterPath(adapter.path)
+                        let prompts = LoraExamplePrompts.forAdapterPath(adapter.adapterPath)
                         if !prompts.isEmpty {
                             VStack(alignment: .leading, spacing: 6) {
                                 Text("Try it out:")
@@ -899,7 +887,7 @@ extension ChatInterfaceView {
         }
     }
 
-    func handleModelSelected(_ model: ModelInfo) async {
+    func handleModelSelected(_ model: RAModelInfo) async {
         await MainActor.run {
             ModelListViewModel.shared.setCurrentModel(model)
         }

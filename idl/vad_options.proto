@@ -42,6 +42,12 @@ enum SpeechActivityKind {
     SPEECH_ACTIVITY_KIND_ONGOING        = 3;
 }
 
+enum VADAudioEncoding {
+    VAD_AUDIO_ENCODING_UNSPECIFIED = 0;
+    VAD_AUDIO_ENCODING_PCM_F32_LE  = 1;
+    VAD_AUDIO_ENCODING_PCM_S16_LE  = 2;
+}
+
 // ---------------------------------------------------------------------------
 // Compile-time / load-time configuration for a VAD instance.
 // Sources pre-IDL:
@@ -137,6 +143,28 @@ message VADOptions {
     // Maximum continuous speech duration (ms) before forcing a segment split.
     // 0 = backend/default.
     int32 max_speech_duration_ms    = 4;
+
+    // Whether to include VADStatistics in stream events when available.
+    bool include_statistics          = 5;
+}
+
+message VADAudioSource {
+    oneof source {
+        bytes  audio_data     = 1;
+        string adapter_handle = 2;
+    }
+
+    VADAudioEncoding encoding = 3;
+    int32 sample_rate = 4;
+    int32 channels = 5;
+    int64 frame_offset_ms = 6;
+}
+
+message VADProcessRequest {
+    string request_id = 1;
+    optional VADAudioSource audio = 2;
+    optional VADOptions options = 3;
+    map<string, string> metadata = 4;
 }
 
 // ---------------------------------------------------------------------------
@@ -179,6 +207,11 @@ message VADResult {
     // Optional detected segment start/end times, in milliseconds. 0 = unset.
     int64 start_time_ms = 6;
     int64 end_time_ms   = 7;
+
+    // Optional statistics snapshot and result-envelope error details.
+    optional VADStatistics statistics = 8;
+    optional string error_message = 9;
+    int32 error_code = 10;
 }
 
 // ---------------------------------------------------------------------------
@@ -252,4 +285,54 @@ message SpeechActivityEvent {
     // in milliseconds. Set on SPEECH_ENDED to communicate the just-finished
     // utterance length; left zero on SPEECH_STARTED.
     int32 duration_ms             = 3;
+
+    float confidence              = 4;
+    optional VADResult result     = 5;
+    optional string segment_id    = 6;
+}
+
+enum VADStreamEventKind {
+    VAD_STREAM_EVENT_KIND_UNSPECIFIED = 0;
+    VAD_STREAM_EVENT_KIND_STARTED = 1;
+    VAD_STREAM_EVENT_KIND_FRAME = 2;
+    VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY = 3;
+    VAD_STREAM_EVENT_KIND_STATISTICS = 4;
+    VAD_STREAM_EVENT_KIND_STOPPED = 5;
+    VAD_STREAM_EVENT_KIND_ERROR = 6;
+}
+
+message VADStreamEvent {
+    uint64 seq = 1;
+    int64 timestamp_us = 2;
+    string request_id = 3;
+    VADStreamEventKind kind = 4;
+    optional VADResult result = 5;
+    optional SpeechActivityEvent activity = 6;
+    optional VADStatistics statistics = 7;
+    optional string error_message = 8;
+    int32 error_code = 9;
+}
+
+message VADServiceState {
+    bool is_ready = 1;
+    bool is_speech_active = 2;
+    float energy_threshold = 3;
+    int32 sample_rate = 4;
+    int32 frame_length_ms = 5;
+    optional string current_model = 6;
+    optional string error_message = 7;
+    int32 error_code = 8;
+}
+
+// Logical VAD service contract. Native microphone capture, audio-session
+// ownership, device routing, and platform stream plumbing remain outside C++;
+// C++ consumes only serialized frame requests and emits logical VAD events.
+service VAD {
+    // One-shot frame processing over PCM bytes or an adapter-provided logical
+    // audio handle.
+    rpc ProcessFrame(VADProcessRequest) returns (VADResult);
+
+    // Server-streaming speech-activity events: frame results, transitions,
+    // statistics snapshots, terminal stop, and errors.
+    rpc Stream(VADProcessRequest) returns (stream VADStreamEvent);
 }

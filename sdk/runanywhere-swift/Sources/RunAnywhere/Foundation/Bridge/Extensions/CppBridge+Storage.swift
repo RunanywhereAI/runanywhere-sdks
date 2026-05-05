@@ -82,96 +82,6 @@ extension CppBridge {
 
         // MARK: - Public API
 
-        /// Analyze overall storage
-        /// C++ iterates models, calculates paths, calls Swift for sizes
-        public func analyzeStorage() async -> StorageInfo {
-            guard let handle = handle else {
-                return .empty
-            }
-
-            // Get registry handle from CppBridge.ModelRegistry
-            // Note: We need access to the registry's handle
-            let registryHandle = await getRegistryHandle()
-            guard let regHandle = registryHandle else {
-                return .empty
-            }
-
-            var cInfo = rac_storage_info_t()
-            let result = rac_storage_analyzer_analyze(handle, regHandle, &cInfo)
-
-            guard result == RAC_SUCCESS else {
-                logger.error("Storage analysis failed: \(result)")
-                return .empty
-            }
-
-            defer { rac_storage_info_free(&cInfo) }
-
-            // Convert C++ result to Swift types
-            return StorageInfo(from: cInfo)
-        }
-
-        /// Get storage metrics for a specific model
-        public func getModelStorageMetrics(
-            modelId: String,
-            framework: InferenceFramework
-        ) async -> ModelStorageMetrics? {
-            guard let handle = handle else { return nil }
-
-            let registryHandle = await getRegistryHandle()
-            guard let regHandle = registryHandle else { return nil }
-
-            var cMetrics = rac_model_storage_metrics_t()
-            let result = modelId.withCString { mid in
-                rac_storage_analyzer_get_model_metrics(
-                    handle, regHandle, mid, framework.toCFramework(), &cMetrics
-                )
-            }
-
-            guard result == RAC_SUCCESS else { return nil }
-
-            return ModelStorageMetrics(
-                modelID: cMetrics.model_id.map { String(cString: $0) } ?? modelId,
-                sizeOnDiskBytes: cMetrics.size_on_disk
-            )
-        }
-
-        /// Check if storage is available for a download
-        /// Note: nonisolated because it only calls C functions and doesn't need actor state
-        public nonisolated func checkStorageAvailable(
-            modelSize: Int64,
-            safetyMargin: Double = 0.1
-        ) -> StorageAvailability {
-            // Use C callbacks directly for synchronous check
-            let available = storageGetAvailableSpaceCallback(userData: nil)
-            let required = Int64(Double(modelSize) * (1.0 + safetyMargin))
-
-            let isAvailable = available > required
-            let hasWarning = available < required * 2
-
-            let recommendation: String?
-            if !isAvailable {
-                let shortfall = required - available
-                let formatter = ByteCountFormatter()
-                formatter.countStyle = .memory
-                recommendation = "Need \(formatter.string(fromByteCount: shortfall)) more space."
-            } else if hasWarning {
-                recommendation = "Storage space is getting low."
-            } else {
-                recommendation = nil
-            }
-
-            var availability = StorageAvailability.make(
-                isAvailable: isAvailable,
-                requiredBytes: required,
-                availableBytes: available,
-                recommendation: recommendation
-            )
-            if hasWarning {
-                availability.warningMessage = recommendation ?? "Storage space is getting low."
-            }
-            return availability
-        }
-
         /// Calculate size at a path
         public func calculateSize(at path: URL) throws -> Int64 {
             guard let handle = handle else {
@@ -202,8 +112,8 @@ extension CppBridge {
                 )
             } catch {
                 var result = RAStorageInfoResult()
-                result.success = true
-                result.info = await analyzeStorage()
+                result.success = false
+                result.errorMessage = String(describing: error)
                 return result
             }
         }
@@ -219,12 +129,8 @@ extension CppBridge {
                 )
             } catch {
                 var result = RAStorageAvailabilityResult()
-                result.success = true
-                result.availability = checkStorageAvailable(
-                    modelSize: request.requiredBytes,
-                    safetyMargin: request.safetyMargin == 0 ? 0.1 : request.safetyMargin
-                )
-                result.warnings = [NativeProtoABI.unavailableMessage]
+                result.success = false
+                result.errorMessage = String(describing: error)
                 return result
             }
         }
@@ -239,7 +145,9 @@ extension CppBridge {
                     responseType: RAStorageDeletePlan.self
                 )
             } catch {
-                return await fallbackDeletePlan(request)
+                var plan = RAStorageDeletePlan()
+                plan.errorMessage = String(describing: error)
+                return plan
             }
         }
 
@@ -251,7 +159,10 @@ extension CppBridge {
                     responseType: RAStorageDeleteResult.self
                 )
             } catch {
-                return await fallbackDelete(request)
+                var result = RAStorageDeleteResult()
+                result.success = false
+                result.errorMessage = String(describing: error)
+                return result
             }
         }
 
@@ -287,80 +198,6 @@ extension CppBridge {
             return try NativeProtoABI.decode(responseType, from: outBuffer)
         }
 
-        private func fallbackDeletePlan(_ request: RAStorageDeletePlanRequest) async -> RAStorageDeletePlan {
-            let info = await analyzeStorage()
-            let requestedIds = Set(request.modelIds)
-            var plan = RAStorageDeletePlan()
-            plan.requiredBytes = request.requiredBytes
-            plan.warnings = [NativeProtoABI.unavailableMessage]
-
-            for metrics in info.models where requestedIds.isEmpty || requestedIds.contains(metrics.modelID) {
-                var candidate = RAStorageDeleteCandidate()
-                candidate.modelID = metrics.modelID
-                candidate.reclaimableBytes = metrics.sizeOnDiskBytes
-                candidate.isLoaded = false
-                plan.candidates.append(candidate)
-                plan.reclaimableBytes += metrics.sizeOnDiskBytes
-            }
-
-            plan.canReclaimRequiredBytes = request.requiredBytes == 0 || plan.reclaimableBytes >= request.requiredBytes
-            return plan
-        }
-
-        private func fallbackDelete(_ request: RAStorageDeleteRequest) async -> RAStorageDeleteResult {
-            var result = RAStorageDeleteResult()
-            result.warnings = [NativeProtoABI.unavailableMessage]
-
-            let models = await CppBridge.ModelRegistry.shared.getAll()
-            let requestedIds = Set(request.modelIds)
-            let candidates = models.filter { model in
-                !model.id.isEmpty && (requestedIds.isEmpty || requestedIds.contains(model.id))
-            }
-
-            for model in candidates {
-                var deleted = false
-                if request.deleteFiles, let path = model.localPath {
-                    let size = (try? calculateSize(at: path)) ?? 0
-                    if request.dryRun {
-                        result.deletedBytes += size
-                        result.deletedModelIds.append(model.id)
-                        continue
-                    }
-                    do {
-                        try Foundation.FileManager.default.removeItem(at: path)
-                        result.deletedBytes += size
-                        deleted = true
-                    } catch {
-                        result.failedModelIds.append(model.id)
-                        continue
-                    }
-                }
-
-                if request.clearRegistryPaths_p && !request.dryRun {
-                    do {
-                        try await CppBridge.ModelRegistry.shared.updateDownloadStatus(
-                            modelId: model.id,
-                            localPath: nil
-                        )
-                    } catch {
-                        result.failedModelIds.append(model.id)
-                        continue
-                    }
-                }
-
-                if deleted || request.clearRegistryPaths_p || request.dryRun {
-                    result.deletedModelIds.append(model.id)
-                }
-            }
-
-            let requestedMissing = requestedIds.subtracting(Set(candidates.map(\.id)))
-            result.failedModelIds.append(contentsOf: requestedMissing.sorted())
-            result.success = result.failedModelIds.isEmpty
-            if !result.success {
-                result.errorMessage = "Some models could not be deleted"
-            }
-            return result
-        }
     }
 }
 
@@ -455,40 +292,6 @@ private func storageUnloadModelCallback(
     userData _: UnsafeMutableRawPointer?
 ) -> rac_result_t {
     return RAC_SUCCESS
-}
-
-// MARK: - Swift Type Conversions
-
-extension StorageInfo {
-    /// Initialize from C++ storage info
-    init(from cInfo: rac_storage_info_t) {
-        self.init()
-        self.app = AppStorageInfo(
-            documentsBytes: cInfo.app_storage.documents_size,
-            cacheBytes: cInfo.app_storage.cache_size,
-            appSupportBytes: cInfo.app_storage.app_support_size,
-            totalBytes: cInfo.app_storage.total_size
-        )
-        self.device = DeviceStorageInfo(
-            totalBytes: cInfo.device_storage.total_space,
-            freeBytes: cInfo.device_storage.free_space,
-            usedBytes: cInfo.device_storage.used_space
-        )
-
-        if let cModels = cInfo.models {
-            for i in 0..<cInfo.model_count {
-                let cMetrics = cModels[i]
-                let metrics = ModelStorageMetrics(
-                    modelID: cMetrics.model_id.map { String(cString: $0) } ?? "",
-                    sizeOnDiskBytes: cMetrics.size_on_disk
-                )
-                self.models.append(metrics)
-            }
-        }
-
-        self.totalModels = Int32(self.models.count)
-        self.totalModelsBytes = self.models.reduce(0) { $0 + $1.sizeOnDiskBytes }
-    }
 }
 
 // MARK: - ModelRegistry Handle Access

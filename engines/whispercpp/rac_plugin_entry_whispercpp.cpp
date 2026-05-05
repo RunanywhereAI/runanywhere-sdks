@@ -3,8 +3,12 @@
  * @brief Unified-ABI entry point for whisper.cpp STT backend.
  *
  * GAP 02 Phase 9 — see v2_gap_specs/GAP_02_UNIFIED_ENGINE_PLUGIN_ABI.md.
+ *
+ * CPP-04: declarative manifest publishes package ownership, availability and
+ * the served primitive set alongside the routing metadata.
  */
 
+#include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/features/stt/rac_stt_service.h"
@@ -21,23 +25,35 @@ static const rac_runtime_id_t k_whispercpp_runtimes[] = {
 };
 
 static const uint32_t k_whispercpp_formats[] = {
-    1,  /* MODEL_FORMAT_GGUF */
-    2,  /* MODEL_FORMAT_GGML */
+    RAC_MODEL_FORMAT_ID_GGUF,
+    RAC_MODEL_FORMAT_ID_GGML,
+};
+
+static const rac_primitive_t k_whispercpp_primitives[] = {
+    RAC_PRIMITIVE_TRANSCRIBE,
+};
+
+static const rac_engine_manifest_t k_whispercpp_manifest = {
+    .name             = "whispercpp",
+    .display_name     = "whisper.cpp",
+    .version          = nullptr,
+    .package_owner    = "runanywhere",
+    .package_name     = "runanywhere_whispercpp",
+    .availability     = RAC_ENGINE_AVAILABILITY_PUBLIC,
+    .priority         = 90,
+    .capability_flags = 0,
+    .primitives       = k_whispercpp_primitives,
+    .primitives_count = sizeof(k_whispercpp_primitives) / sizeof(k_whispercpp_primitives[0]),
+    .runtimes         = k_whispercpp_runtimes,
+    .runtimes_count   = sizeof(k_whispercpp_runtimes) / sizeof(k_whispercpp_runtimes[0]),
+    .formats          = k_whispercpp_formats,
+    .formats_count    = sizeof(k_whispercpp_formats) / sizeof(k_whispercpp_formats[0]),
+    .reserved_0       = 0,
+    .reserved_1       = 0,
 };
 
 static const rac_engine_vtable_t g_whispercpp_engine_vtable = {
-    /* metadata */ {
-        .abi_version      = RAC_PLUGIN_API_VERSION,
-        .name             = "whispercpp",
-        .display_name     = "whisper.cpp",
-        .engine_version   = nullptr,
-        .priority         = 90,
-        .capability_flags = 0,
-        .runtimes         = k_whispercpp_runtimes,
-        .runtimes_count   = sizeof(k_whispercpp_runtimes) / sizeof(k_whispercpp_runtimes[0]),
-        .formats          = k_whispercpp_formats,
-        .formats_count    = sizeof(k_whispercpp_formats) / sizeof(k_whispercpp_formats[0]),
-    },
+    /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_whispercpp_manifest),
     /* capability_check */ nullptr,
     /* on_unload        */ nullptr,
 
@@ -55,7 +71,8 @@ static const rac_engine_vtable_t g_whispercpp_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(whispercpp) {
-    return &g_whispercpp_engine_vtable;
+    return rac_engine_entry_with_manifest(&k_whispercpp_manifest,
+                                          &g_whispercpp_engine_vtable);
 }
 
 }  // extern "C"

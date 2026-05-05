@@ -5,6 +5,15 @@
  * Defines the generic STT service API and vtable for multi-backend dispatch.
  * Backends (ONNX, Whisper, etc.) implement the vtable and register
  * with the service registry.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - rac_stt_service_ops_t and rac_stt_service_t: `internal`.
+ *   - rac_stt_transcribe_lifecycle_proto: `SDK-facing default` over
+ *     runanywhere.v1.STTTranscriptionRequest / STTOutput bytes.
+ *   - Struct APIs (rac_stt_create, initialize, transcribe,
+ *     transcribe_stream, get_info, cleanup, destroy, result_free,
+ *     get_languages, detect_language): `delete after SDK migration`
+ *     for SDK callers; keep only as backend smoke-test entry points.
  */
 
 #ifndef RAC_STT_SERVICE_H
@@ -12,6 +21,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/features/stt/rac_stt_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -202,6 +212,18 @@ RAC_API rac_result_t rac_stt_detect_language(rac_handle_t handle, const void* au
                                              size_t audio_size,
                                              const rac_stt_options_t* options,
                                              char** out_language);
+
+/**
+ * @brief Transcribe using the lifecycle-loaded STT model.
+ *
+ * request_proto_bytes encodes runanywhere.v1.STTTranscriptionRequest.
+ * Commons resolves the current STT lifecycle component and out_result receives
+ * serialized runanywhere.v1.STTOutput bytes. Native file/capture adapter
+ * handles are intentionally not dereferenced by this portable ABI.
+ */
+RAC_API rac_result_t rac_stt_transcribe_lifecycle_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
 
 #ifdef __cplusplus
 }

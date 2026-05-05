@@ -4,6 +4,7 @@
 //   protoc               v7.34.1
 // source: tool_calling.proto
 /* eslint-disable */
+import Long from "long";
 import _m0 from "protobufjs/minimal";
 export const protobufPackage = "runanywhere.v1";
 /**
@@ -141,6 +142,116 @@ export function toolCallFormatNameToJSON(object) {
         case ToolCallFormatName.TOOL_CALL_FORMAT_NAME_HERMES:
             return "TOOL_CALL_FORMAT_NAME_HERMES";
         case ToolCallFormatName.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+export var ToolChoiceMode;
+(function (ToolChoiceMode) {
+    ToolChoiceMode[ToolChoiceMode["TOOL_CHOICE_MODE_UNSPECIFIED"] = 0] = "TOOL_CHOICE_MODE_UNSPECIFIED";
+    ToolChoiceMode[ToolChoiceMode["TOOL_CHOICE_MODE_AUTO"] = 1] = "TOOL_CHOICE_MODE_AUTO";
+    ToolChoiceMode[ToolChoiceMode["TOOL_CHOICE_MODE_NONE"] = 2] = "TOOL_CHOICE_MODE_NONE";
+    ToolChoiceMode[ToolChoiceMode["TOOL_CHOICE_MODE_REQUIRED"] = 3] = "TOOL_CHOICE_MODE_REQUIRED";
+    ToolChoiceMode[ToolChoiceMode["TOOL_CHOICE_MODE_SPECIFIC"] = 4] = "TOOL_CHOICE_MODE_SPECIFIC";
+    ToolChoiceMode[ToolChoiceMode["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(ToolChoiceMode || (ToolChoiceMode = {}));
+export function toolChoiceModeFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "TOOL_CHOICE_MODE_UNSPECIFIED":
+            return ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED;
+        case 1:
+        case "TOOL_CHOICE_MODE_AUTO":
+            return ToolChoiceMode.TOOL_CHOICE_MODE_AUTO;
+        case 2:
+        case "TOOL_CHOICE_MODE_NONE":
+            return ToolChoiceMode.TOOL_CHOICE_MODE_NONE;
+        case 3:
+        case "TOOL_CHOICE_MODE_REQUIRED":
+            return ToolChoiceMode.TOOL_CHOICE_MODE_REQUIRED;
+        case 4:
+        case "TOOL_CHOICE_MODE_SPECIFIC":
+            return ToolChoiceMode.TOOL_CHOICE_MODE_SPECIFIC;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return ToolChoiceMode.UNRECOGNIZED;
+    }
+}
+export function toolChoiceModeToJSON(object) {
+    switch (object) {
+        case ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED:
+            return "TOOL_CHOICE_MODE_UNSPECIFIED";
+        case ToolChoiceMode.TOOL_CHOICE_MODE_AUTO:
+            return "TOOL_CHOICE_MODE_AUTO";
+        case ToolChoiceMode.TOOL_CHOICE_MODE_NONE:
+            return "TOOL_CHOICE_MODE_NONE";
+        case ToolChoiceMode.TOOL_CHOICE_MODE_REQUIRED:
+            return "TOOL_CHOICE_MODE_REQUIRED";
+        case ToolChoiceMode.TOOL_CHOICE_MODE_SPECIFIC:
+            return "TOOL_CHOICE_MODE_SPECIFIC";
+        case ToolChoiceMode.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+export var ToolCallingStreamEventKind;
+(function (ToolCallingStreamEventKind) {
+    ToolCallingStreamEventKind[ToolCallingStreamEventKind["TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED"] = 0] = "TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED";
+    ToolCallingStreamEventKind[ToolCallingStreamEventKind["TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN"] = 1] = "TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN";
+    ToolCallingStreamEventKind[ToolCallingStreamEventKind["TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED"] = 2] = "TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED";
+    ToolCallingStreamEventKind[ToolCallingStreamEventKind["TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED"] = 3] = "TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED";
+    ToolCallingStreamEventKind[ToolCallingStreamEventKind["TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED"] = 4] = "TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED";
+    ToolCallingStreamEventKind[ToolCallingStreamEventKind["TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED"] = 5] = "TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED";
+    ToolCallingStreamEventKind[ToolCallingStreamEventKind["TOOL_CALLING_STREAM_EVENT_KIND_ERROR"] = 6] = "TOOL_CALLING_STREAM_EVENT_KIND_ERROR";
+    ToolCallingStreamEventKind[ToolCallingStreamEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(ToolCallingStreamEventKind || (ToolCallingStreamEventKind = {}));
+export function toolCallingStreamEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED":
+            return ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN":
+            return ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN;
+        case 2:
+        case "TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED":
+            return ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED;
+        case 3:
+        case "TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED":
+            return ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED;
+        case 4:
+        case "TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED":
+            return ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED;
+        case 5:
+        case "TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED":
+            return ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED;
+        case 6:
+        case "TOOL_CALLING_STREAM_EVENT_KIND_ERROR":
+            return ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_ERROR;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return ToolCallingStreamEventKind.UNRECOGNIZED;
+    }
+}
+export function toolCallingStreamEventKindToJSON(object) {
+    switch (object) {
+        case ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED:
+            return "TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED";
+        case ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN:
+            return "TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN";
+        case ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED:
+            return "TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED";
+        case ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED:
+            return "TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED";
+        case ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED:
+            return "TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED";
+        case ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED:
+            return "TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED";
+        case ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_ERROR:
+            return "TOOL_CALLING_STREAM_EVENT_KIND_ERROR";
+        case ToolCallingStreamEventKind.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
@@ -470,7 +581,15 @@ export const ToolValueObject_FieldsEntry = {
     },
 };
 function createBaseToolParameter() {
-    return { name: "", type: 0, description: "", required: false, enumValues: [] };
+    return {
+        name: "",
+        type: 0,
+        description: "",
+        required: false,
+        enumValues: [],
+        jsonSchema: undefined,
+        defaultValue: undefined,
+    };
 }
 export const ToolParameter = {
     encode(message, writer = _m0.Writer.create()) {
@@ -488,6 +607,12 @@ export const ToolParameter = {
         }
         for (const v of message.enumValues) {
             writer.uint32(42).string(v);
+        }
+        if (message.jsonSchema !== undefined) {
+            writer.uint32(50).string(message.jsonSchema);
+        }
+        if (message.defaultValue !== undefined) {
+            ToolValue.encode(message.defaultValue, writer.uint32(58).fork()).ldelim();
         }
         return writer;
     },
@@ -528,6 +653,18 @@ export const ToolParameter = {
                     }
                     message.enumValues.push(reader.string());
                     continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.jsonSchema = reader.string();
+                    continue;
+                case 7:
+                    if (tag !== 58) {
+                        break;
+                    }
+                    message.defaultValue = ToolValue.decode(reader, reader.uint32());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -545,6 +682,8 @@ export const ToolParameter = {
             enumValues: globalThis.Array.isArray(object?.enumValues)
                 ? object.enumValues.map((e) => globalThis.String(e))
                 : [],
+            jsonSchema: isSet(object.jsonSchema) ? globalThis.String(object.jsonSchema) : undefined,
+            defaultValue: isSet(object.defaultValue) ? ToolValue.fromJSON(object.defaultValue) : undefined,
         };
     },
     toJSON(message) {
@@ -564,6 +703,12 @@ export const ToolParameter = {
         if (message.enumValues?.length) {
             obj.enumValues = message.enumValues;
         }
+        if (message.jsonSchema !== undefined) {
+            obj.jsonSchema = message.jsonSchema;
+        }
+        if (message.defaultValue !== undefined) {
+            obj.defaultValue = ToolValue.toJSON(message.defaultValue);
+        }
         return obj;
     },
     create(base) {
@@ -576,11 +721,15 @@ export const ToolParameter = {
         message.description = object.description ?? "";
         message.required = object.required ?? false;
         message.enumValues = object.enumValues?.map((e) => e) || [];
+        message.jsonSchema = object.jsonSchema ?? undefined;
+        message.defaultValue = (object.defaultValue !== undefined && object.defaultValue !== null)
+            ? ToolValue.fromPartial(object.defaultValue)
+            : undefined;
         return message;
     },
 };
 function createBaseToolDefinition() {
-    return { name: "", description: "", parameters: [], category: undefined };
+    return { name: "", description: "", parameters: [], category: undefined, jsonSchema: undefined, metadata: {} };
 }
 export const ToolDefinition = {
     encode(message, writer = _m0.Writer.create()) {
@@ -596,6 +745,12 @@ export const ToolDefinition = {
         if (message.category !== undefined) {
             writer.uint32(34).string(message.category);
         }
+        if (message.jsonSchema !== undefined) {
+            writer.uint32(42).string(message.jsonSchema);
+        }
+        Object.entries(message.metadata).forEach(([key, value]) => {
+            ToolDefinition_MetadataEntry.encode({ key: key, value }, writer.uint32(50).fork()).ldelim();
+        });
         return writer;
     },
     decode(input, length) {
@@ -629,6 +784,21 @@ export const ToolDefinition = {
                     }
                     message.category = reader.string();
                     continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.jsonSchema = reader.string();
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    const entry6 = ToolDefinition_MetadataEntry.decode(reader, reader.uint32());
+                    if (entry6.value !== undefined) {
+                        message.metadata[entry6.key] = entry6.value;
+                    }
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -645,6 +815,13 @@ export const ToolDefinition = {
                 ? object.parameters.map((e) => ToolParameter.fromJSON(e))
                 : [],
             category: isSet(object.category) ? globalThis.String(object.category) : undefined,
+            jsonSchema: isSet(object.jsonSchema) ? globalThis.String(object.jsonSchema) : undefined,
+            metadata: isObject(object.metadata)
+                ? Object.entries(object.metadata).reduce((acc, [key, value]) => {
+                    acc[key] = String(value);
+                    return acc;
+                }, {})
+                : {},
         };
     },
     toJSON(message) {
@@ -661,6 +838,18 @@ export const ToolDefinition = {
         if (message.category !== undefined) {
             obj.category = message.category;
         }
+        if (message.jsonSchema !== undefined) {
+            obj.jsonSchema = message.jsonSchema;
+        }
+        if (message.metadata) {
+            const entries = Object.entries(message.metadata);
+            if (entries.length > 0) {
+                obj.metadata = {};
+                entries.forEach(([k, v]) => {
+                    obj.metadata[k] = v;
+                });
+            }
+        }
         return obj;
     },
     create(base) {
@@ -672,11 +861,93 @@ export const ToolDefinition = {
         message.description = object.description ?? "";
         message.parameters = object.parameters?.map((e) => ToolParameter.fromPartial(e)) || [];
         message.category = object.category ?? undefined;
+        message.jsonSchema = object.jsonSchema ?? undefined;
+        message.metadata = Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
+            if (value !== undefined) {
+                acc[key] = globalThis.String(value);
+            }
+            return acc;
+        }, {});
+        return message;
+    },
+};
+function createBaseToolDefinition_MetadataEntry() {
+    return { key: "", value: "" };
+}
+export const ToolDefinition_MetadataEntry = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.key !== "") {
+            writer.uint32(10).string(message.key);
+        }
+        if (message.value !== "") {
+            writer.uint32(18).string(message.value);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseToolDefinition_MetadataEntry();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.key = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.value = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            key: isSet(object.key) ? globalThis.String(object.key) : "",
+            value: isSet(object.value) ? globalThis.String(object.value) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.key !== "") {
+            obj.key = message.key;
+        }
+        if (message.value !== "") {
+            obj.value = message.value;
+        }
+        return obj;
+    },
+    create(base) {
+        return ToolDefinition_MetadataEntry.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseToolDefinition_MetadataEntry();
+        message.key = object.key ?? "";
+        message.value = object.value ?? "";
         return message;
     },
 };
 function createBaseToolCall() {
-    return { id: "", name: "", argumentsJson: "", type: "", arguments: {}, callId: undefined };
+    return {
+        id: "",
+        name: "",
+        argumentsJson: "",
+        type: "",
+        arguments: {},
+        callId: undefined,
+        createdAtMs: 0,
+        rawText: undefined,
+    };
 }
 export const ToolCall = {
     encode(message, writer = _m0.Writer.create()) {
@@ -697,6 +968,12 @@ export const ToolCall = {
         });
         if (message.callId !== undefined) {
             writer.uint32(50).string(message.callId);
+        }
+        if (message.createdAtMs !== 0) {
+            writer.uint32(56).int64(message.createdAtMs);
+        }
+        if (message.rawText !== undefined) {
+            writer.uint32(66).string(message.rawText);
         }
         return writer;
     },
@@ -746,6 +1023,18 @@ export const ToolCall = {
                     }
                     message.callId = reader.string();
                     continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.createdAtMs = longToNumber(reader.int64());
+                    continue;
+                case 8:
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.rawText = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -767,6 +1056,8 @@ export const ToolCall = {
                 }, {})
                 : {},
             callId: isSet(object.callId) ? globalThis.String(object.callId) : undefined,
+            createdAtMs: isSet(object.createdAtMs) ? globalThis.Number(object.createdAtMs) : 0,
+            rawText: isSet(object.rawText) ? globalThis.String(object.rawText) : undefined,
         };
     },
     toJSON(message) {
@@ -795,6 +1086,12 @@ export const ToolCall = {
         if (message.callId !== undefined) {
             obj.callId = message.callId;
         }
+        if (message.createdAtMs !== 0) {
+            obj.createdAtMs = Math.round(message.createdAtMs);
+        }
+        if (message.rawText !== undefined) {
+            obj.rawText = message.rawText;
+        }
         return obj;
     },
     create(base) {
@@ -813,6 +1110,8 @@ export const ToolCall = {
             return acc;
         }, {});
         message.callId = object.callId ?? undefined;
+        message.createdAtMs = object.createdAtMs ?? 0;
+        message.rawText = object.rawText ?? undefined;
         return message;
     },
 };
@@ -885,7 +1184,17 @@ export const ToolCall_ArgumentsEntry = {
     },
 };
 function createBaseToolResult() {
-    return { toolCallId: "", name: "", resultJson: "", error: undefined, success: false, result: {}, callId: undefined };
+    return {
+        toolCallId: "",
+        name: "",
+        resultJson: "",
+        error: undefined,
+        success: false,
+        result: {},
+        callId: undefined,
+        startedAtMs: 0,
+        completedAtMs: 0,
+    };
 }
 export const ToolResult = {
     encode(message, writer = _m0.Writer.create()) {
@@ -909,6 +1218,12 @@ export const ToolResult = {
         });
         if (message.callId !== undefined) {
             writer.uint32(58).string(message.callId);
+        }
+        if (message.startedAtMs !== 0) {
+            writer.uint32(64).int64(message.startedAtMs);
+        }
+        if (message.completedAtMs !== 0) {
+            writer.uint32(72).int64(message.completedAtMs);
         }
         return writer;
     },
@@ -964,6 +1279,18 @@ export const ToolResult = {
                     }
                     message.callId = reader.string();
                     continue;
+                case 8:
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.startedAtMs = longToNumber(reader.int64());
+                    continue;
+                case 9:
+                    if (tag !== 72) {
+                        break;
+                    }
+                    message.completedAtMs = longToNumber(reader.int64());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -986,6 +1313,8 @@ export const ToolResult = {
                 }, {})
                 : {},
             callId: isSet(object.callId) ? globalThis.String(object.callId) : undefined,
+            startedAtMs: isSet(object.startedAtMs) ? globalThis.Number(object.startedAtMs) : 0,
+            completedAtMs: isSet(object.completedAtMs) ? globalThis.Number(object.completedAtMs) : 0,
         };
     },
     toJSON(message) {
@@ -1017,6 +1346,12 @@ export const ToolResult = {
         if (message.callId !== undefined) {
             obj.callId = message.callId;
         }
+        if (message.startedAtMs !== 0) {
+            obj.startedAtMs = Math.round(message.startedAtMs);
+        }
+        if (message.completedAtMs !== 0) {
+            obj.completedAtMs = Math.round(message.completedAtMs);
+        }
         return obj;
     },
     create(base) {
@@ -1036,6 +1371,8 @@ export const ToolResult = {
             return acc;
         }, {});
         message.callId = object.callId ?? undefined;
+        message.startedAtMs = object.startedAtMs ?? 0;
+        message.completedAtMs = object.completedAtMs ?? 0;
         return message;
     },
 };
@@ -1121,6 +1458,10 @@ function createBaseToolCallingOptions() {
         format: undefined,
         customSystemPrompt: undefined,
         maxToolCalls: undefined,
+        toolChoice: 0,
+        forcedToolName: undefined,
+        parallelToolCalls: false,
+        requireJsonArguments: false,
     };
 }
 export const ToolCallingOptions = {
@@ -1160,6 +1501,18 @@ export const ToolCallingOptions = {
         }
         if (message.maxToolCalls !== undefined) {
             writer.uint32(96).int32(message.maxToolCalls);
+        }
+        if (message.toolChoice !== 0) {
+            writer.uint32(104).int32(message.toolChoice);
+        }
+        if (message.forcedToolName !== undefined) {
+            writer.uint32(114).string(message.forcedToolName);
+        }
+        if (message.parallelToolCalls !== false) {
+            writer.uint32(120).bool(message.parallelToolCalls);
+        }
+        if (message.requireJsonArguments !== false) {
+            writer.uint32(128).bool(message.requireJsonArguments);
         }
         return writer;
     },
@@ -1242,6 +1595,30 @@ export const ToolCallingOptions = {
                     }
                     message.maxToolCalls = reader.int32();
                     continue;
+                case 13:
+                    if (tag !== 104) {
+                        break;
+                    }
+                    message.toolChoice = reader.int32();
+                    continue;
+                case 14:
+                    if (tag !== 114) {
+                        break;
+                    }
+                    message.forcedToolName = reader.string();
+                    continue;
+                case 15:
+                    if (tag !== 120) {
+                        break;
+                    }
+                    message.parallelToolCalls = reader.bool();
+                    continue;
+                case 16:
+                    if (tag !== 128) {
+                        break;
+                    }
+                    message.requireJsonArguments = reader.bool();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1264,6 +1641,12 @@ export const ToolCallingOptions = {
             format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : undefined,
             customSystemPrompt: isSet(object.customSystemPrompt) ? globalThis.String(object.customSystemPrompt) : undefined,
             maxToolCalls: isSet(object.maxToolCalls) ? globalThis.Number(object.maxToolCalls) : undefined,
+            toolChoice: isSet(object.toolChoice) ? toolChoiceModeFromJSON(object.toolChoice) : 0,
+            forcedToolName: isSet(object.forcedToolName) ? globalThis.String(object.forcedToolName) : undefined,
+            parallelToolCalls: isSet(object.parallelToolCalls) ? globalThis.Boolean(object.parallelToolCalls) : false,
+            requireJsonArguments: isSet(object.requireJsonArguments)
+                ? globalThis.Boolean(object.requireJsonArguments)
+                : false,
         };
     },
     toJSON(message) {
@@ -1304,6 +1687,18 @@ export const ToolCallingOptions = {
         if (message.maxToolCalls !== undefined) {
             obj.maxToolCalls = Math.round(message.maxToolCalls);
         }
+        if (message.toolChoice !== 0) {
+            obj.toolChoice = toolChoiceModeToJSON(message.toolChoice);
+        }
+        if (message.forcedToolName !== undefined) {
+            obj.forcedToolName = message.forcedToolName;
+        }
+        if (message.parallelToolCalls !== false) {
+            obj.parallelToolCalls = message.parallelToolCalls;
+        }
+        if (message.requireJsonArguments !== false) {
+            obj.requireJsonArguments = message.requireJsonArguments;
+        }
         return obj;
     },
     create(base) {
@@ -1323,11 +1718,25 @@ export const ToolCallingOptions = {
         message.format = object.format ?? undefined;
         message.customSystemPrompt = object.customSystemPrompt ?? undefined;
         message.maxToolCalls = object.maxToolCalls ?? undefined;
+        message.toolChoice = object.toolChoice ?? 0;
+        message.forcedToolName = object.forcedToolName ?? undefined;
+        message.parallelToolCalls = object.parallelToolCalls ?? false;
+        message.requireJsonArguments = object.requireJsonArguments ?? false;
         return message;
     },
 };
 function createBaseToolCallingResult() {
-    return { text: "", toolCalls: [], toolResults: [], isComplete: false, conversationId: undefined, iterationsUsed: 0 };
+    return {
+        text: "",
+        toolCalls: [],
+        toolResults: [],
+        isComplete: false,
+        conversationId: undefined,
+        iterationsUsed: 0,
+        errorMessage: undefined,
+        errorCode: 0,
+        rawText: "",
+    };
 }
 export const ToolCallingResult = {
     encode(message, writer = _m0.Writer.create()) {
@@ -1348,6 +1757,15 @@ export const ToolCallingResult = {
         }
         if (message.iterationsUsed !== 0) {
             writer.uint32(48).int32(message.iterationsUsed);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(58).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(64).int32(message.errorCode);
+        }
+        if (message.rawText !== "") {
+            writer.uint32(74).string(message.rawText);
         }
         return writer;
     },
@@ -1394,6 +1812,24 @@ export const ToolCallingResult = {
                     }
                     message.iterationsUsed = reader.int32();
                     continue;
+                case 7:
+                    if (tag !== 58) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 8:
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+                case 9:
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.rawText = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1414,6 +1850,9 @@ export const ToolCallingResult = {
             isComplete: isSet(object.isComplete) ? globalThis.Boolean(object.isComplete) : false,
             conversationId: isSet(object.conversationId) ? globalThis.String(object.conversationId) : undefined,
             iterationsUsed: isSet(object.iterationsUsed) ? globalThis.Number(object.iterationsUsed) : 0,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+            rawText: isSet(object.rawText) ? globalThis.String(object.rawText) : "",
         };
     },
     toJSON(message) {
@@ -1436,6 +1875,15 @@ export const ToolCallingResult = {
         if (message.iterationsUsed !== 0) {
             obj.iterationsUsed = Math.round(message.iterationsUsed);
         }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        if (message.rawText !== "") {
+            obj.rawText = message.rawText;
+        }
         return obj;
     },
     create(base) {
@@ -1449,9 +1897,875 @@ export const ToolCallingResult = {
         message.isComplete = object.isComplete ?? false;
         message.conversationId = object.conversationId ?? undefined;
         message.iterationsUsed = object.iterationsUsed ?? 0;
+        message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
+        message.rawText = object.rawText ?? "";
         return message;
     },
 };
+function createBaseToolParseRequest() {
+    return { text: "", options: undefined };
+}
+export const ToolParseRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.text !== "") {
+            writer.uint32(10).string(message.text);
+        }
+        if (message.options !== undefined) {
+            ToolCallingOptions.encode(message.options, writer.uint32(18).fork()).ldelim();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseToolParseRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.text = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.options = ToolCallingOptions.decode(reader, reader.uint32());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            text: isSet(object.text) ? globalThis.String(object.text) : "",
+            options: isSet(object.options) ? ToolCallingOptions.fromJSON(object.options) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.text !== "") {
+            obj.text = message.text;
+        }
+        if (message.options !== undefined) {
+            obj.options = ToolCallingOptions.toJSON(message.options);
+        }
+        return obj;
+    },
+    create(base) {
+        return ToolParseRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseToolParseRequest();
+        message.text = object.text ?? "";
+        message.options = (object.options !== undefined && object.options !== null)
+            ? ToolCallingOptions.fromPartial(object.options)
+            : undefined;
+        return message;
+    },
+};
+function createBaseToolParseResult() {
+    return { hasToolCall: false, toolCalls: [], remainingText: "", errorMessage: undefined, errorCode: 0 };
+}
+export const ToolParseResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.hasToolCall !== false) {
+            writer.uint32(8).bool(message.hasToolCall);
+        }
+        for (const v of message.toolCalls) {
+            ToolCall.encode(v, writer.uint32(18).fork()).ldelim();
+        }
+        if (message.remainingText !== "") {
+            writer.uint32(26).string(message.remainingText);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(34).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(40).int32(message.errorCode);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseToolParseResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.hasToolCall = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.toolCalls.push(ToolCall.decode(reader, reader.uint32()));
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.remainingText = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            hasToolCall: isSet(object.hasToolCall) ? globalThis.Boolean(object.hasToolCall) : false,
+            toolCalls: globalThis.Array.isArray(object?.toolCalls)
+                ? object.toolCalls.map((e) => ToolCall.fromJSON(e))
+                : [],
+            remainingText: isSet(object.remainingText) ? globalThis.String(object.remainingText) : "",
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.hasToolCall !== false) {
+            obj.hasToolCall = message.hasToolCall;
+        }
+        if (message.toolCalls?.length) {
+            obj.toolCalls = message.toolCalls.map((e) => ToolCall.toJSON(e));
+        }
+        if (message.remainingText !== "") {
+            obj.remainingText = message.remainingText;
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        return obj;
+    },
+    create(base) {
+        return ToolParseResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseToolParseResult();
+        message.hasToolCall = object.hasToolCall ?? false;
+        message.toolCalls = object.toolCalls?.map((e) => ToolCall.fromPartial(e)) || [];
+        message.remainingText = object.remainingText ?? "";
+        message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
+        return message;
+    },
+};
+function createBaseToolPromptFormatRequest() {
+    return { userPrompt: "", options: undefined, toolResults: [], assistantText: undefined };
+}
+export const ToolPromptFormatRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.userPrompt !== "") {
+            writer.uint32(10).string(message.userPrompt);
+        }
+        if (message.options !== undefined) {
+            ToolCallingOptions.encode(message.options, writer.uint32(18).fork()).ldelim();
+        }
+        for (const v of message.toolResults) {
+            ToolResult.encode(v, writer.uint32(26).fork()).ldelim();
+        }
+        if (message.assistantText !== undefined) {
+            writer.uint32(34).string(message.assistantText);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseToolPromptFormatRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.userPrompt = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.options = ToolCallingOptions.decode(reader, reader.uint32());
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.toolResults.push(ToolResult.decode(reader, reader.uint32()));
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.assistantText = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            userPrompt: isSet(object.userPrompt) ? globalThis.String(object.userPrompt) : "",
+            options: isSet(object.options) ? ToolCallingOptions.fromJSON(object.options) : undefined,
+            toolResults: globalThis.Array.isArray(object?.toolResults)
+                ? object.toolResults.map((e) => ToolResult.fromJSON(e))
+                : [],
+            assistantText: isSet(object.assistantText) ? globalThis.String(object.assistantText) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.userPrompt !== "") {
+            obj.userPrompt = message.userPrompt;
+        }
+        if (message.options !== undefined) {
+            obj.options = ToolCallingOptions.toJSON(message.options);
+        }
+        if (message.toolResults?.length) {
+            obj.toolResults = message.toolResults.map((e) => ToolResult.toJSON(e));
+        }
+        if (message.assistantText !== undefined) {
+            obj.assistantText = message.assistantText;
+        }
+        return obj;
+    },
+    create(base) {
+        return ToolPromptFormatRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseToolPromptFormatRequest();
+        message.userPrompt = object.userPrompt ?? "";
+        message.options = (object.options !== undefined && object.options !== null)
+            ? ToolCallingOptions.fromPartial(object.options)
+            : undefined;
+        message.toolResults = object.toolResults?.map((e) => ToolResult.fromPartial(e)) || [];
+        message.assistantText = object.assistantText ?? undefined;
+        return message;
+    },
+};
+function createBaseToolPromptFormatResult() {
+    return { formattedPrompt: "", format: 0, formatHint: "", errorMessage: undefined, errorCode: 0 };
+}
+export const ToolPromptFormatResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.formattedPrompt !== "") {
+            writer.uint32(10).string(message.formattedPrompt);
+        }
+        if (message.format !== 0) {
+            writer.uint32(16).int32(message.format);
+        }
+        if (message.formatHint !== "") {
+            writer.uint32(26).string(message.formatHint);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(34).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(40).int32(message.errorCode);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseToolPromptFormatResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.formattedPrompt = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.format = reader.int32();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.formatHint = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            formattedPrompt: isSet(object.formattedPrompt) ? globalThis.String(object.formattedPrompt) : "",
+            format: isSet(object.format) ? toolCallFormatNameFromJSON(object.format) : 0,
+            formatHint: isSet(object.formatHint) ? globalThis.String(object.formatHint) : "",
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.formattedPrompt !== "") {
+            obj.formattedPrompt = message.formattedPrompt;
+        }
+        if (message.format !== 0) {
+            obj.format = toolCallFormatNameToJSON(message.format);
+        }
+        if (message.formatHint !== "") {
+            obj.formatHint = message.formatHint;
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        return obj;
+    },
+    create(base) {
+        return ToolPromptFormatResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseToolPromptFormatResult();
+        message.formattedPrompt = object.formattedPrompt ?? "";
+        message.format = object.format ?? 0;
+        message.formatHint = object.formatHint ?? "";
+        message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
+        return message;
+    },
+};
+function createBaseToolCallValidationRequest() {
+    return { toolCall: undefined, options: undefined };
+}
+export const ToolCallValidationRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.toolCall !== undefined) {
+            ToolCall.encode(message.toolCall, writer.uint32(10).fork()).ldelim();
+        }
+        if (message.options !== undefined) {
+            ToolCallingOptions.encode(message.options, writer.uint32(18).fork()).ldelim();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseToolCallValidationRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.toolCall = ToolCall.decode(reader, reader.uint32());
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.options = ToolCallingOptions.decode(reader, reader.uint32());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            toolCall: isSet(object.toolCall) ? ToolCall.fromJSON(object.toolCall) : undefined,
+            options: isSet(object.options) ? ToolCallingOptions.fromJSON(object.options) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.toolCall !== undefined) {
+            obj.toolCall = ToolCall.toJSON(message.toolCall);
+        }
+        if (message.options !== undefined) {
+            obj.options = ToolCallingOptions.toJSON(message.options);
+        }
+        return obj;
+    },
+    create(base) {
+        return ToolCallValidationRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseToolCallValidationRequest();
+        message.toolCall = (object.toolCall !== undefined && object.toolCall !== null)
+            ? ToolCall.fromPartial(object.toolCall)
+            : undefined;
+        message.options = (object.options !== undefined && object.options !== null)
+            ? ToolCallingOptions.fromPartial(object.options)
+            : undefined;
+        return message;
+    },
+};
+function createBaseToolCallValidationResult() {
+    return {
+        isValid: false,
+        validationErrors: [],
+        matchedTool: undefined,
+        normalizedArgumentsJson: "",
+        errorMessage: undefined,
+        errorCode: 0,
+    };
+}
+export const ToolCallValidationResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.isValid !== false) {
+            writer.uint32(8).bool(message.isValid);
+        }
+        for (const v of message.validationErrors) {
+            writer.uint32(18).string(v);
+        }
+        if (message.matchedTool !== undefined) {
+            ToolDefinition.encode(message.matchedTool, writer.uint32(26).fork()).ldelim();
+        }
+        if (message.normalizedArgumentsJson !== "") {
+            writer.uint32(34).string(message.normalizedArgumentsJson);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(42).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(48).int32(message.errorCode);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseToolCallValidationResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.isValid = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.validationErrors.push(reader.string());
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.matchedTool = ToolDefinition.decode(reader, reader.uint32());
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.normalizedArgumentsJson = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            isValid: isSet(object.isValid) ? globalThis.Boolean(object.isValid) : false,
+            validationErrors: globalThis.Array.isArray(object?.validationErrors)
+                ? object.validationErrors.map((e) => globalThis.String(e))
+                : [],
+            matchedTool: isSet(object.matchedTool) ? ToolDefinition.fromJSON(object.matchedTool) : undefined,
+            normalizedArgumentsJson: isSet(object.normalizedArgumentsJson)
+                ? globalThis.String(object.normalizedArgumentsJson)
+                : "",
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.isValid !== false) {
+            obj.isValid = message.isValid;
+        }
+        if (message.validationErrors?.length) {
+            obj.validationErrors = message.validationErrors;
+        }
+        if (message.matchedTool !== undefined) {
+            obj.matchedTool = ToolDefinition.toJSON(message.matchedTool);
+        }
+        if (message.normalizedArgumentsJson !== "") {
+            obj.normalizedArgumentsJson = message.normalizedArgumentsJson;
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        return obj;
+    },
+    create(base) {
+        return ToolCallValidationResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseToolCallValidationResult();
+        message.isValid = object.isValid ?? false;
+        message.validationErrors = object.validationErrors?.map((e) => e) || [];
+        message.matchedTool = (object.matchedTool !== undefined && object.matchedTool !== null)
+            ? ToolDefinition.fromPartial(object.matchedTool)
+            : undefined;
+        message.normalizedArgumentsJson = object.normalizedArgumentsJson ?? "";
+        message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
+        return message;
+    },
+};
+function createBaseToolCallingStreamEvent() {
+    return {
+        seq: 0,
+        timestampUs: 0,
+        conversationId: "",
+        kind: 0,
+        token: "",
+        toolCall: undefined,
+        toolResult: undefined,
+        result: undefined,
+        errorMessage: undefined,
+        errorCode: 0,
+    };
+}
+export const ToolCallingStreamEvent = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.seq !== 0) {
+            writer.uint32(8).uint64(message.seq);
+        }
+        if (message.timestampUs !== 0) {
+            writer.uint32(16).int64(message.timestampUs);
+        }
+        if (message.conversationId !== "") {
+            writer.uint32(26).string(message.conversationId);
+        }
+        if (message.kind !== 0) {
+            writer.uint32(32).int32(message.kind);
+        }
+        if (message.token !== "") {
+            writer.uint32(42).string(message.token);
+        }
+        if (message.toolCall !== undefined) {
+            ToolCall.encode(message.toolCall, writer.uint32(50).fork()).ldelim();
+        }
+        if (message.toolResult !== undefined) {
+            ToolResult.encode(message.toolResult, writer.uint32(58).fork()).ldelim();
+        }
+        if (message.result !== undefined) {
+            ToolCallingResult.encode(message.result, writer.uint32(66).fork()).ldelim();
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(74).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(80).int32(message.errorCode);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseToolCallingStreamEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.seq = longToNumber(reader.uint64());
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.timestampUs = longToNumber(reader.int64());
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.conversationId = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.token = reader.string();
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.toolCall = ToolCall.decode(reader, reader.uint32());
+                    continue;
+                case 7:
+                    if (tag !== 58) {
+                        break;
+                    }
+                    message.toolResult = ToolResult.decode(reader, reader.uint32());
+                    continue;
+                case 8:
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.result = ToolCallingResult.decode(reader, reader.uint32());
+                    continue;
+                case 9:
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 10:
+                    if (tag !== 80) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
+            timestampUs: isSet(object.timestampUs) ? globalThis.Number(object.timestampUs) : 0,
+            conversationId: isSet(object.conversationId) ? globalThis.String(object.conversationId) : "",
+            kind: isSet(object.kind) ? toolCallingStreamEventKindFromJSON(object.kind) : 0,
+            token: isSet(object.token) ? globalThis.String(object.token) : "",
+            toolCall: isSet(object.toolCall) ? ToolCall.fromJSON(object.toolCall) : undefined,
+            toolResult: isSet(object.toolResult) ? ToolResult.fromJSON(object.toolResult) : undefined,
+            result: isSet(object.result) ? ToolCallingResult.fromJSON(object.result) : undefined,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.seq !== 0) {
+            obj.seq = Math.round(message.seq);
+        }
+        if (message.timestampUs !== 0) {
+            obj.timestampUs = Math.round(message.timestampUs);
+        }
+        if (message.conversationId !== "") {
+            obj.conversationId = message.conversationId;
+        }
+        if (message.kind !== 0) {
+            obj.kind = toolCallingStreamEventKindToJSON(message.kind);
+        }
+        if (message.token !== "") {
+            obj.token = message.token;
+        }
+        if (message.toolCall !== undefined) {
+            obj.toolCall = ToolCall.toJSON(message.toolCall);
+        }
+        if (message.toolResult !== undefined) {
+            obj.toolResult = ToolResult.toJSON(message.toolResult);
+        }
+        if (message.result !== undefined) {
+            obj.result = ToolCallingResult.toJSON(message.result);
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        return obj;
+    },
+    create(base) {
+        return ToolCallingStreamEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseToolCallingStreamEvent();
+        message.seq = object.seq ?? 0;
+        message.timestampUs = object.timestampUs ?? 0;
+        message.conversationId = object.conversationId ?? "";
+        message.kind = object.kind ?? 0;
+        message.token = object.token ?? "";
+        message.toolCall = (object.toolCall !== undefined && object.toolCall !== null)
+            ? ToolCall.fromPartial(object.toolCall)
+            : undefined;
+        message.toolResult = (object.toolResult !== undefined && object.toolResult !== null)
+            ? ToolResult.fromPartial(object.toolResult)
+            : undefined;
+        message.result = (object.result !== undefined && object.result !== null)
+            ? ToolCallingResult.fromPartial(object.result)
+            : undefined;
+        message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
+        return message;
+    },
+};
+function createBaseToolRegistrySnapshot() {
+    return { tools: [], updatedAtMs: 0 };
+}
+export const ToolRegistrySnapshot = {
+    encode(message, writer = _m0.Writer.create()) {
+        for (const v of message.tools) {
+            ToolDefinition.encode(v, writer.uint32(10).fork()).ldelim();
+        }
+        if (message.updatedAtMs !== 0) {
+            writer.uint32(16).int64(message.updatedAtMs);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseToolRegistrySnapshot();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.tools.push(ToolDefinition.decode(reader, reader.uint32()));
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.updatedAtMs = longToNumber(reader.int64());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            tools: globalThis.Array.isArray(object?.tools) ? object.tools.map((e) => ToolDefinition.fromJSON(e)) : [],
+            updatedAtMs: isSet(object.updatedAtMs) ? globalThis.Number(object.updatedAtMs) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.tools?.length) {
+            obj.tools = message.tools.map((e) => ToolDefinition.toJSON(e));
+        }
+        if (message.updatedAtMs !== 0) {
+            obj.updatedAtMs = Math.round(message.updatedAtMs);
+        }
+        return obj;
+    },
+    create(base) {
+        return ToolRegistrySnapshot.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseToolRegistrySnapshot();
+        message.tools = object.tools?.map((e) => ToolDefinition.fromPartial(e)) || [];
+        message.updatedAtMs = object.updatedAtMs ?? 0;
+        return message;
+    },
+};
+function longToNumber(long) {
+    if (long.gt(globalThis.Number.MAX_SAFE_INTEGER)) {
+        throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+    }
+    if (long.lt(globalThis.Number.MIN_SAFE_INTEGER)) {
+        throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+    }
+    return long.toNumber();
+}
+if (_m0.util.Long !== Long) {
+    _m0.util.Long = Long;
+    _m0.configure();
+}
 function isObject(value) {
     return typeof value === "object" && value !== null;
 }

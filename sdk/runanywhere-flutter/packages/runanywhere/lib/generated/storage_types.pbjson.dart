@@ -118,6 +118,8 @@ const StorageAvailability$json = {
     {'1': 'available_bytes', '3': 3, '4': 1, '5': 3, '10': 'availableBytes'},
     {'1': 'warning_message', '3': 4, '4': 1, '5': 9, '9': 0, '10': 'warningMessage', '17': true},
     {'1': 'recommendation', '3': 5, '4': 1, '5': 9, '9': 1, '10': 'recommendation', '17': true},
+    {'1': 'shortfall_bytes', '3': 6, '4': 1, '5': 3, '10': 'shortfallBytes'},
+    {'1': 'required_to_available_ratio', '3': 7, '4': 1, '5': 2, '10': 'requiredToAvailableRatio'},
   ],
   '8': [
     {'1': '_warning_message'},
@@ -131,7 +133,9 @@ final $typed_data.Uint8List storageAvailabilityDescriptor = $convert.base64Decod
     'USJQoOcmVxdWlyZWRfYnl0ZXMYAiABKANSDXJlcXVpcmVkQnl0ZXMSJwoPYXZhaWxhYmxlX2J5'
     'dGVzGAMgASgDUg5hdmFpbGFibGVCeXRlcxIsCg93YXJuaW5nX21lc3NhZ2UYBCABKAlIAFIOd2'
     'FybmluZ01lc3NhZ2WIAQESKwoOcmVjb21tZW5kYXRpb24YBSABKAlIAVIOcmVjb21tZW5kYXRp'
-    'b26IAQFCEgoQX3dhcm5pbmdfbWVzc2FnZUIRCg9fcmVjb21tZW5kYXRpb24=');
+    'b26IAQESJwoPc2hvcnRmYWxsX2J5dGVzGAYgASgDUg5zaG9ydGZhbGxCeXRlcxI9ChtyZXF1aX'
+    'JlZF90b19hdmFpbGFibGVfcmF0aW8YByABKAJSGHJlcXVpcmVkVG9BdmFpbGFibGVSYXRpb0IS'
+    'ChBfd2FybmluZ19tZXNzYWdlQhEKD19yZWNvbW1lbmRhdGlvbg==');
 
 @$core.Deprecated('Use storedModelDescriptor instead')
 const StoredModel$json = {
@@ -162,6 +166,7 @@ const StorageInfoRequest$json = {
     {'1': 'include_device', '3': 1, '4': 1, '5': 8, '10': 'includeDevice'},
     {'1': 'include_app', '3': 2, '4': 1, '5': 8, '10': 'includeApp'},
     {'1': 'include_models', '3': 3, '4': 1, '5': 8, '10': 'includeModels'},
+    {'1': 'include_cache', '3': 4, '4': 1, '5': 8, '10': 'includeCache'},
   ],
 };
 
@@ -169,7 +174,8 @@ const StorageInfoRequest$json = {
 final $typed_data.Uint8List storageInfoRequestDescriptor = $convert.base64Decode(
     'ChJTdG9yYWdlSW5mb1JlcXVlc3QSJQoOaW5jbHVkZV9kZXZpY2UYASABKAhSDWluY2x1ZGVEZX'
     'ZpY2USHwoLaW5jbHVkZV9hcHAYAiABKAhSCmluY2x1ZGVBcHASJQoOaW5jbHVkZV9tb2RlbHMY'
-    'AyABKAhSDWluY2x1ZGVNb2RlbHM=');
+    'AyABKAhSDWluY2x1ZGVNb2RlbHMSIwoNaW5jbHVkZV9jYWNoZRgEIAEoCFIMaW5jbHVkZUNhY2'
+    'hl');
 
 @$core.Deprecated('Use storageInfoResultDescriptor instead')
 const StorageInfoResult$json = {
@@ -178,6 +184,7 @@ const StorageInfoResult$json = {
     {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
     {'1': 'info', '3': 2, '4': 1, '5': 11, '6': '.runanywhere.v1.StorageInfo', '10': 'info'},
     {'1': 'error_message', '3': 3, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'warnings', '3': 4, '4': 3, '5': 9, '10': 'warnings'},
   ],
 };
 
@@ -185,7 +192,7 @@ const StorageInfoResult$json = {
 final $typed_data.Uint8List storageInfoResultDescriptor = $convert.base64Decode(
     'ChFTdG9yYWdlSW5mb1Jlc3VsdBIYCgdzdWNjZXNzGAEgASgIUgdzdWNjZXNzEi8KBGluZm8YAi'
     'ABKAsyGy5ydW5hbnl3aGVyZS52MS5TdG9yYWdlSW5mb1IEaW5mbxIjCg1lcnJvcl9tZXNzYWdl'
-    'GAMgASgJUgxlcnJvck1lc3NhZ2U=');
+    'GAMgASgJUgxlcnJvck1lc3NhZ2USGgoId2FybmluZ3MYBCADKAlSCHdhcm5pbmdz');
 
 @$core.Deprecated('Use storageAvailabilityRequestDescriptor instead')
 const StorageAvailabilityRequest$json = {
@@ -195,6 +202,8 @@ const StorageAvailabilityRequest$json = {
     {'1': 'required_bytes', '3': 2, '4': 1, '5': 3, '10': 'requiredBytes'},
     {'1': 'safety_margin', '3': 3, '4': 1, '5': 1, '10': 'safetyMargin'},
     {'1': 'include_existing_model_bytes', '3': 4, '4': 1, '5': 8, '10': 'includeExistingModelBytes'},
+    {'1': 'include_delete_plan', '3': 5, '4': 1, '5': 8, '10': 'includeDeletePlan'},
+    {'1': 'allow_cache_reclamation', '3': 6, '4': 1, '5': 8, '10': 'allowCacheReclamation'},
   ],
 };
 
@@ -203,7 +212,9 @@ final $typed_data.Uint8List storageAvailabilityRequestDescriptor = $convert.base
     'ChpTdG9yYWdlQXZhaWxhYmlsaXR5UmVxdWVzdBIZCghtb2RlbF9pZBgBIAEoCVIHbW9kZWxJZB'
     'IlCg5yZXF1aXJlZF9ieXRlcxgCIAEoA1INcmVxdWlyZWRCeXRlcxIjCg1zYWZldHlfbWFyZ2lu'
     'GAMgASgBUgxzYWZldHlNYXJnaW4SPwocaW5jbHVkZV9leGlzdGluZ19tb2RlbF9ieXRlcxgEIA'
-    'EoCFIZaW5jbHVkZUV4aXN0aW5nTW9kZWxCeXRlcw==');
+    'EoCFIZaW5jbHVkZUV4aXN0aW5nTW9kZWxCeXRlcxIuChNpbmNsdWRlX2RlbGV0ZV9wbGFuGAUg'
+    'ASgIUhFpbmNsdWRlRGVsZXRlUGxhbhI2ChdhbGxvd19jYWNoZV9yZWNsYW1hdGlvbhgGIAEoCF'
+    'IVYWxsb3dDYWNoZVJlY2xhbWF0aW9u');
 
 @$core.Deprecated('Use storageAvailabilityResultDescriptor instead')
 const StorageAvailabilityResult$json = {
@@ -213,6 +224,10 @@ const StorageAvailabilityResult$json = {
     {'1': 'availability', '3': 2, '4': 1, '5': 11, '6': '.runanywhere.v1.StorageAvailability', '10': 'availability'},
     {'1': 'warnings', '3': 3, '4': 3, '5': 9, '10': 'warnings'},
     {'1': 'error_message', '3': 4, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'delete_plan', '3': 5, '4': 1, '5': 11, '6': '.runanywhere.v1.StorageDeletePlan', '9': 0, '10': 'deletePlan', '17': true},
+  ],
+  '8': [
+    {'1': '_delete_plan'},
   ],
 };
 
@@ -221,7 +236,9 @@ final $typed_data.Uint8List storageAvailabilityResultDescriptor = $convert.base6
     'ChlTdG9yYWdlQXZhaWxhYmlsaXR5UmVzdWx0EhgKB3N1Y2Nlc3MYASABKAhSB3N1Y2Nlc3MSRw'
     'oMYXZhaWxhYmlsaXR5GAIgASgLMiMucnVuYW55d2hlcmUudjEuU3RvcmFnZUF2YWlsYWJpbGl0'
     'eVIMYXZhaWxhYmlsaXR5EhoKCHdhcm5pbmdzGAMgAygJUgh3YXJuaW5ncxIjCg1lcnJvcl9tZX'
-    'NzYWdlGAQgASgJUgxlcnJvck1lc3NhZ2U=');
+    'NzYWdlGAQgASgJUgxlcnJvck1lc3NhZ2USRwoLZGVsZXRlX3BsYW4YBSABKAsyIS5ydW5hbnl3'
+    'aGVyZS52MS5TdG9yYWdlRGVsZXRlUGxhbkgAUgpkZWxldGVQbGFuiAEBQg4KDF9kZWxldGVfcG'
+    'xhbg==');
 
 @$core.Deprecated('Use storageDeletePlanRequestDescriptor instead')
 const StorageDeletePlanRequest$json = {
@@ -231,6 +248,8 @@ const StorageDeletePlanRequest$json = {
     {'1': 'required_bytes', '3': 2, '4': 1, '5': 3, '10': 'requiredBytes'},
     {'1': 'include_cache', '3': 3, '4': 1, '5': 8, '10': 'includeCache'},
     {'1': 'oldest_first', '3': 4, '4': 1, '5': 8, '10': 'oldestFirst'},
+    {'1': 'allow_loaded_models', '3': 5, '4': 1, '5': 8, '10': 'allowLoadedModels'},
+    {'1': 'include_download_partials', '3': 6, '4': 1, '5': 8, '10': 'includeDownloadPartials'},
   ],
 };
 
@@ -238,8 +257,9 @@ const StorageDeletePlanRequest$json = {
 final $typed_data.Uint8List storageDeletePlanRequestDescriptor = $convert.base64Decode(
     'ChhTdG9yYWdlRGVsZXRlUGxhblJlcXVlc3QSGwoJbW9kZWxfaWRzGAEgAygJUghtb2RlbElkcx'
     'IlCg5yZXF1aXJlZF9ieXRlcxgCIAEoA1INcmVxdWlyZWRCeXRlcxIjCg1pbmNsdWRlX2NhY2hl'
-    'GAMgASgIUgxpbmNsdWRlQ2FjaGUSIQoMb2xkZXN0X2ZpcnN0GAQgASgIUgtvbGRlc3RGaXJzdA'
-    '==');
+    'GAMgASgIUgxpbmNsdWRlQ2FjaGUSIQoMb2xkZXN0X2ZpcnN0GAQgASgIUgtvbGRlc3RGaXJzdB'
+    'IuChNhbGxvd19sb2FkZWRfbW9kZWxzGAUgASgIUhFhbGxvd0xvYWRlZE1vZGVscxI6ChlpbmNs'
+    'dWRlX2Rvd25sb2FkX3BhcnRpYWxzGAYgASgIUhdpbmNsdWRlRG93bmxvYWRQYXJ0aWFscw==');
 
 @$core.Deprecated('Use storageDeleteCandidateDescriptor instead')
 const StorageDeleteCandidate$json = {
@@ -250,6 +270,9 @@ const StorageDeleteCandidate$json = {
     {'1': 'last_used_ms', '3': 3, '4': 1, '5': 3, '9': 0, '10': 'lastUsedMs', '17': true},
     {'1': 'is_loaded', '3': 4, '4': 1, '5': 8, '10': 'isLoaded'},
     {'1': 'local_path', '3': 5, '4': 1, '5': 9, '10': 'localPath'},
+    {'1': 'requires_unload', '3': 6, '4': 1, '5': 8, '10': 'requiresUnload'},
+    {'1': 'requires_platform_delete', '3': 7, '4': 1, '5': 8, '10': 'requiresPlatformDelete'},
+    {'1': 'storage_key', '3': 8, '4': 1, '5': 9, '10': 'storageKey'},
   ],
   '8': [
     {'1': '_last_used_ms'},
@@ -261,7 +284,10 @@ final $typed_data.Uint8List storageDeleteCandidateDescriptor = $convert.base64De
     'ChZTdG9yYWdlRGVsZXRlQ2FuZGlkYXRlEhkKCG1vZGVsX2lkGAEgASgJUgdtb2RlbElkEisKEX'
     'JlY2xhaW1hYmxlX2J5dGVzGAIgASgDUhByZWNsYWltYWJsZUJ5dGVzEiUKDGxhc3RfdXNlZF9t'
     'cxgDIAEoA0gAUgpsYXN0VXNlZE1ziAEBEhsKCWlzX2xvYWRlZBgEIAEoCFIIaXNMb2FkZWQSHQ'
-    'oKbG9jYWxfcGF0aBgFIAEoCVIJbG9jYWxQYXRoQg8KDV9sYXN0X3VzZWRfbXM=');
+    'oKbG9jYWxfcGF0aBgFIAEoCVIJbG9jYWxQYXRoEicKD3JlcXVpcmVzX3VubG9hZBgGIAEoCFIO'
+    'cmVxdWlyZXNVbmxvYWQSOAoYcmVxdWlyZXNfcGxhdGZvcm1fZGVsZXRlGAcgASgIUhZyZXF1aX'
+    'Jlc1BsYXRmb3JtRGVsZXRlEh8KC3N0b3JhZ2Vfa2V5GAggASgJUgpzdG9yYWdlS2V5Qg8KDV9s'
+    'YXN0X3VzZWRfbXM=');
 
 @$core.Deprecated('Use storageDeletePlanDescriptor instead')
 const StorageDeletePlan$json = {
@@ -273,6 +299,9 @@ const StorageDeletePlan$json = {
     {'1': 'candidates', '3': 4, '4': 3, '5': 11, '6': '.runanywhere.v1.StorageDeleteCandidate', '10': 'candidates'},
     {'1': 'warnings', '3': 5, '4': 3, '5': 9, '10': 'warnings'},
     {'1': 'error_message', '3': 6, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'requires_unload', '3': 7, '4': 1, '5': 8, '10': 'requiresUnload'},
+    {'1': 'requires_platform_delete', '3': 8, '4': 1, '5': 8, '10': 'requiresPlatformDelete'},
+    {'1': 'candidate_count', '3': 9, '4': 1, '5': 5, '10': 'candidateCount'},
   ],
 };
 
@@ -283,7 +312,9 @@ final $typed_data.Uint8List storageDeletePlanDescriptor = $convert.base64Decode(
     'cmVkQnl0ZXMSKwoRcmVjbGFpbWFibGVfYnl0ZXMYAyABKANSEHJlY2xhaW1hYmxlQnl0ZXMSRg'
     'oKY2FuZGlkYXRlcxgEIAMoCzImLnJ1bmFueXdoZXJlLnYxLlN0b3JhZ2VEZWxldGVDYW5kaWRh'
     'dGVSCmNhbmRpZGF0ZXMSGgoId2FybmluZ3MYBSADKAlSCHdhcm5pbmdzEiMKDWVycm9yX21lc3'
-    'NhZ2UYBiABKAlSDGVycm9yTWVzc2FnZQ==');
+    'NhZ2UYBiABKAlSDGVycm9yTWVzc2FnZRInCg9yZXF1aXJlc191bmxvYWQYByABKAhSDnJlcXVp'
+    'cmVzVW5sb2FkEjgKGHJlcXVpcmVzX3BsYXRmb3JtX2RlbGV0ZRgIIAEoCFIWcmVxdWlyZXNQbG'
+    'F0Zm9ybURlbGV0ZRInCg9jYW5kaWRhdGVfY291bnQYCSABKAVSDmNhbmRpZGF0ZUNvdW50');
 
 @$core.Deprecated('Use storageDeleteRequestDescriptor instead')
 const StorageDeleteRequest$json = {
@@ -294,6 +325,12 @@ const StorageDeleteRequest$json = {
     {'1': 'clear_registry_paths', '3': 3, '4': 1, '5': 8, '10': 'clearRegistryPaths'},
     {'1': 'unload_if_loaded', '3': 4, '4': 1, '5': 8, '10': 'unloadIfLoaded'},
     {'1': 'dry_run', '3': 5, '4': 1, '5': 8, '10': 'dryRun'},
+    {'1': 'plan', '3': 6, '4': 1, '5': 11, '6': '.runanywhere.v1.StorageDeletePlan', '9': 0, '10': 'plan', '17': true},
+    {'1': 'require_plan_match', '3': 7, '4': 1, '5': 8, '10': 'requirePlanMatch'},
+    {'1': 'allow_platform_delete', '3': 8, '4': 1, '5': 8, '10': 'allowPlatformDelete'},
+  ],
+  '8': [
+    {'1': '_plan'},
   ],
 };
 
@@ -302,7 +339,10 @@ final $typed_data.Uint8List storageDeleteRequestDescriptor = $convert.base64Deco
     'ChRTdG9yYWdlRGVsZXRlUmVxdWVzdBIbCgltb2RlbF9pZHMYASADKAlSCG1vZGVsSWRzEiEKDG'
     'RlbGV0ZV9maWxlcxgCIAEoCFILZGVsZXRlRmlsZXMSMAoUY2xlYXJfcmVnaXN0cnlfcGF0aHMY'
     'AyABKAhSEmNsZWFyUmVnaXN0cnlQYXRocxIoChB1bmxvYWRfaWZfbG9hZGVkGAQgASgIUg51bm'
-    'xvYWRJZkxvYWRlZBIXCgdkcnlfcnVuGAUgASgIUgZkcnlSdW4=');
+    'xvYWRJZkxvYWRlZBIXCgdkcnlfcnVuGAUgASgIUgZkcnlSdW4SOgoEcGxhbhgGIAEoCzIhLnJ1'
+    'bmFueXdoZXJlLnYxLlN0b3JhZ2VEZWxldGVQbGFuSABSBHBsYW6IAQESLAoScmVxdWlyZV9wbG'
+    'FuX21hdGNoGAcgASgIUhByZXF1aXJlUGxhbk1hdGNoEjIKFWFsbG93X3BsYXRmb3JtX2RlbGV0'
+    'ZRgIIAEoCFITYWxsb3dQbGF0Zm9ybURlbGV0ZUIHCgVfcGxhbg==');
 
 @$core.Deprecated('Use storageDeleteResultDescriptor instead')
 const StorageDeleteResult$json = {
@@ -314,6 +354,10 @@ const StorageDeleteResult$json = {
     {'1': 'failed_model_ids', '3': 4, '4': 3, '5': 9, '10': 'failedModelIds'},
     {'1': 'warnings', '3': 5, '4': 3, '5': 9, '10': 'warnings'},
     {'1': 'error_message', '3': 6, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'skipped_model_ids', '3': 7, '4': 3, '5': 9, '10': 'skippedModelIds'},
+    {'1': 'dry_run', '3': 8, '4': 1, '5': 8, '10': 'dryRun'},
+    {'1': 'registry_updated', '3': 9, '4': 1, '5': 8, '10': 'registryUpdated'},
+    {'1': 'files_deleted', '3': 10, '4': 1, '5': 8, '10': 'filesDeleted'},
   ],
 };
 
@@ -323,5 +367,45 @@ final $typed_data.Uint8List storageDeleteResultDescriptor = $convert.base64Decod
     'RlZF9ieXRlcxgCIAEoA1IMZGVsZXRlZEJ5dGVzEioKEWRlbGV0ZWRfbW9kZWxfaWRzGAMgAygJ'
     'Ug9kZWxldGVkTW9kZWxJZHMSKAoQZmFpbGVkX21vZGVsX2lkcxgEIAMoCVIOZmFpbGVkTW9kZW'
     'xJZHMSGgoId2FybmluZ3MYBSADKAlSCHdhcm5pbmdzEiMKDWVycm9yX21lc3NhZ2UYBiABKAlS'
-    'DGVycm9yTWVzc2FnZQ==');
+    'DGVycm9yTWVzc2FnZRIqChFza2lwcGVkX21vZGVsX2lkcxgHIAMoCVIPc2tpcHBlZE1vZGVsSW'
+    'RzEhcKB2RyeV9ydW4YCCABKAhSBmRyeVJ1bhIpChByZWdpc3RyeV91cGRhdGVkGAkgASgIUg9y'
+    'ZWdpc3RyeVVwZGF0ZWQSIwoNZmlsZXNfZGVsZXRlZBgKIAEoCFIMZmlsZXNEZWxldGVk');
+
+const $core.Map<$core.String, $core.dynamic> StorageServiceBase$json = {
+  '1': 'Storage',
+  '2': [
+    {'1': 'Info', '2': '.runanywhere.v1.StorageInfoRequest', '3': '.runanywhere.v1.StorageInfoResult'},
+    {'1': 'Availability', '2': '.runanywhere.v1.StorageAvailabilityRequest', '3': '.runanywhere.v1.StorageAvailabilityResult'},
+    {'1': 'DeletePlan', '2': '.runanywhere.v1.StorageDeletePlanRequest', '3': '.runanywhere.v1.StorageDeletePlan'},
+    {'1': 'Delete', '2': '.runanywhere.v1.StorageDeleteRequest', '3': '.runanywhere.v1.StorageDeleteResult'},
+  ],
+};
+
+@$core.Deprecated('Use storageServiceDescriptor instead')
+const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> StorageServiceBase$messageJson = {
+  '.runanywhere.v1.StorageInfoRequest': StorageInfoRequest$json,
+  '.runanywhere.v1.StorageInfoResult': StorageInfoResult$json,
+  '.runanywhere.v1.StorageInfo': StorageInfo$json,
+  '.runanywhere.v1.AppStorageInfo': AppStorageInfo$json,
+  '.runanywhere.v1.DeviceStorageInfo': DeviceStorageInfo$json,
+  '.runanywhere.v1.ModelStorageMetrics': ModelStorageMetrics$json,
+  '.runanywhere.v1.StorageAvailabilityRequest': StorageAvailabilityRequest$json,
+  '.runanywhere.v1.StorageAvailabilityResult': StorageAvailabilityResult$json,
+  '.runanywhere.v1.StorageAvailability': StorageAvailability$json,
+  '.runanywhere.v1.StorageDeletePlan': StorageDeletePlan$json,
+  '.runanywhere.v1.StorageDeleteCandidate': StorageDeleteCandidate$json,
+  '.runanywhere.v1.StorageDeletePlanRequest': StorageDeletePlanRequest$json,
+  '.runanywhere.v1.StorageDeleteRequest': StorageDeleteRequest$json,
+  '.runanywhere.v1.StorageDeleteResult': StorageDeleteResult$json,
+};
+
+/// Descriptor for `Storage`. Decode as a `google.protobuf.ServiceDescriptorProto`.
+final $typed_data.Uint8List storageServiceDescriptor = $convert.base64Decode(
+    'CgdTdG9yYWdlEk0KBEluZm8SIi5ydW5hbnl3aGVyZS52MS5TdG9yYWdlSW5mb1JlcXVlc3QaIS'
+    '5ydW5hbnl3aGVyZS52MS5TdG9yYWdlSW5mb1Jlc3VsdBJlCgxBdmFpbGFiaWxpdHkSKi5ydW5h'
+    'bnl3aGVyZS52MS5TdG9yYWdlQXZhaWxhYmlsaXR5UmVxdWVzdBopLnJ1bmFueXdoZXJlLnYxLl'
+    'N0b3JhZ2VBdmFpbGFiaWxpdHlSZXN1bHQSWQoKRGVsZXRlUGxhbhIoLnJ1bmFueXdoZXJlLnYx'
+    'LlN0b3JhZ2VEZWxldGVQbGFuUmVxdWVzdBohLnJ1bmFueXdoZXJlLnYxLlN0b3JhZ2VEZWxldG'
+    'VQbGFuElMKBkRlbGV0ZRIkLnJ1bmFueXdoZXJlLnYxLlN0b3JhZ2VEZWxldGVSZXF1ZXN0GiMu'
+    'cnVuYW55d2hlcmUudjEuU3RvcmFnZURlbGV0ZVJlc3VsdA==');
 

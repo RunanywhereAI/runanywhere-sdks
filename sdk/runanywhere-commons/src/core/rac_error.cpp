@@ -309,6 +309,9 @@ const char* rac_error_message(rac_result_t error_code) {
             return "Backend busy";
         case RAC_ERROR_BACKEND_UNAVAILABLE:
             return "Backend binary not installed (compiled as stub)";
+        case RAC_ERROR_RUNTIME_UNAVAILABLE:
+            return "No registered L1 runtime satisfies the engine's "
+                   "declared runtimes on this host";
         case RAC_ERROR_INVALID_HANDLE:
             return "Invalid handle";
 

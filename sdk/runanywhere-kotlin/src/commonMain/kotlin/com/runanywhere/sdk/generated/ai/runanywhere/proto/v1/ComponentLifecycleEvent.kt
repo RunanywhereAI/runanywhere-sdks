@@ -122,12 +122,36 @@ public class ComponentLifecycleEvent(
     schemaIndex = 10,
   )
   public val storage_delete_result: StorageDeleteResult? = null,
+  @field:WireField(
+    tag = 16,
+    adapter = "ai.runanywhere.proto.v1.ComponentLifecycleSnapshot#ADAPTER",
+    oneofName = "payload",
+    schemaIndex = 11,
+  )
+  public val snapshot: ComponentLifecycleSnapshot? = null,
+  @field:WireField(
+    tag = 17,
+    adapter = "ai.runanywhere.proto.v1.ComponentLifecycleSnapshotResult#ADAPTER",
+    jsonName = "snapshotResult",
+    oneofName = "payload",
+    schemaIndex = 12,
+  )
+  public val snapshot_result: ComponentLifecycleSnapshotResult? = null,
+  @field:WireField(
+    tag = 18,
+    adapter = "ai.runanywhere.proto.v1.StorageDeletePlan#ADAPTER",
+    jsonName = "storageDeletePlan",
+    oneofName = "payload",
+    schemaIndex = 13,
+  )
+  public val storage_delete_plan: StorageDeletePlan? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ComponentLifecycleEvent, Nothing>(ADAPTER, unknownFields) {
   init {
     require(countNonNull(model_load_result, model_unload_result, model_delete_result,
-        download_progress, storage_availability, storage_delete_result) <= 1) {
-      "At most one of model_load_result, model_unload_result, model_delete_result, download_progress, storage_availability, storage_delete_result may be non-null"
+        download_progress, storage_availability, storage_delete_result, snapshot, snapshot_result,
+        storage_delete_plan) <= 1) {
+      "At most one of model_load_result, model_unload_result, model_delete_result, download_progress, storage_availability, storage_delete_result, snapshot, snapshot_result, storage_delete_plan may be non-null"
     }
   }
 
@@ -153,6 +177,9 @@ public class ComponentLifecycleEvent(
     if (download_progress != other.download_progress) return false
     if (storage_availability != other.storage_availability) return false
     if (storage_delete_result != other.storage_delete_result) return false
+    if (snapshot != other.snapshot) return false
+    if (snapshot_result != other.snapshot_result) return false
+    if (storage_delete_plan != other.storage_delete_plan) return false
     return true
   }
 
@@ -171,6 +198,9 @@ public class ComponentLifecycleEvent(
       result = result * 37 + (download_progress?.hashCode() ?: 0)
       result = result * 37 + (storage_availability?.hashCode() ?: 0)
       result = result * 37 + (storage_delete_result?.hashCode() ?: 0)
+      result = result * 37 + (snapshot?.hashCode() ?: 0)
+      result = result * 37 + (snapshot_result?.hashCode() ?: 0)
+      result = result * 37 + (storage_delete_plan?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -189,6 +219,9 @@ public class ComponentLifecycleEvent(
     if (download_progress != null) result += """download_progress=$download_progress"""
     if (storage_availability != null) result += """storage_availability=$storage_availability"""
     if (storage_delete_result != null) result += """storage_delete_result=$storage_delete_result"""
+    if (snapshot != null) result += """snapshot=$snapshot"""
+    if (snapshot_result != null) result += """snapshot_result=$snapshot_result"""
+    if (storage_delete_plan != null) result += """storage_delete_plan=$storage_delete_plan"""
     return result.joinToString(prefix = "ComponentLifecycleEvent{", separator = ", ", postfix = "}")
   }
 
@@ -204,10 +237,14 @@ public class ComponentLifecycleEvent(
     download_progress: DownloadProgress? = this.download_progress,
     storage_availability: StorageAvailabilityResult? = this.storage_availability,
     storage_delete_result: StorageDeleteResult? = this.storage_delete_result,
+    snapshot: ComponentLifecycleSnapshot? = this.snapshot,
+    snapshot_result: ComponentLifecycleSnapshotResult? = this.snapshot_result,
+    storage_delete_plan: StorageDeletePlan? = this.storage_delete_plan,
     unknownFields: ByteString = this.unknownFields,
   ): ComponentLifecycleEvent = ComponentLifecycleEvent(component, previous_state, current_state,
       model_id, timestamp_ms, model_load_result, model_unload_result, model_delete_result,
-      download_progress, storage_availability, storage_delete_result, unknownFields)
+      download_progress, storage_availability, storage_delete_result, snapshot, snapshot_result,
+      storage_delete_plan, unknownFields)
 
   public companion object {
     @JvmField
@@ -237,6 +274,10 @@ public class ComponentLifecycleEvent(
         size += DownloadProgress.ADAPTER.encodedSizeWithTag(13, value.download_progress)
         size += StorageAvailabilityResult.ADAPTER.encodedSizeWithTag(14, value.storage_availability)
         size += StorageDeleteResult.ADAPTER.encodedSizeWithTag(15, value.storage_delete_result)
+        size += ComponentLifecycleSnapshot.ADAPTER.encodedSizeWithTag(16, value.snapshot)
+        size += ComponentLifecycleSnapshotResult.ADAPTER.encodedSizeWithTag(17,
+            value.snapshot_result)
+        size += StorageDeletePlan.ADAPTER.encodedSizeWithTag(18, value.storage_delete_plan)
         return size
       }
 
@@ -256,11 +297,17 @@ public class ComponentLifecycleEvent(
         DownloadProgress.ADAPTER.encodeWithTag(writer, 13, value.download_progress)
         StorageAvailabilityResult.ADAPTER.encodeWithTag(writer, 14, value.storage_availability)
         StorageDeleteResult.ADAPTER.encodeWithTag(writer, 15, value.storage_delete_result)
+        ComponentLifecycleSnapshot.ADAPTER.encodeWithTag(writer, 16, value.snapshot)
+        ComponentLifecycleSnapshotResult.ADAPTER.encodeWithTag(writer, 17, value.snapshot_result)
+        StorageDeletePlan.ADAPTER.encodeWithTag(writer, 18, value.storage_delete_plan)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ComponentLifecycleEvent) {
         writer.writeBytes(value.unknownFields)
+        StorageDeletePlan.ADAPTER.encodeWithTag(writer, 18, value.storage_delete_plan)
+        ComponentLifecycleSnapshotResult.ADAPTER.encodeWithTag(writer, 17, value.snapshot_result)
+        ComponentLifecycleSnapshot.ADAPTER.encodeWithTag(writer, 16, value.snapshot)
         StorageDeleteResult.ADAPTER.encodeWithTag(writer, 15, value.storage_delete_result)
         StorageAvailabilityResult.ADAPTER.encodeWithTag(writer, 14, value.storage_availability)
         DownloadProgress.ADAPTER.encodeWithTag(writer, 13, value.download_progress)
@@ -292,6 +339,9 @@ public class ComponentLifecycleEvent(
         var download_progress: DownloadProgress? = null
         var storage_availability: StorageAvailabilityResult? = null
         var storage_delete_result: StorageDeleteResult? = null
+        var snapshot: ComponentLifecycleSnapshot? = null
+        var snapshot_result: ComponentLifecycleSnapshotResult? = null
+        var storage_delete_plan: StorageDeletePlan? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -317,6 +367,9 @@ public class ComponentLifecycleEvent(
             13 -> download_progress = DownloadProgress.ADAPTER.decode(reader)
             14 -> storage_availability = StorageAvailabilityResult.ADAPTER.decode(reader)
             15 -> storage_delete_result = StorageDeleteResult.ADAPTER.decode(reader)
+            16 -> snapshot = ComponentLifecycleSnapshot.ADAPTER.decode(reader)
+            17 -> snapshot_result = ComponentLifecycleSnapshotResult.ADAPTER.decode(reader)
+            18 -> storage_delete_plan = StorageDeletePlan.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -332,6 +385,9 @@ public class ComponentLifecycleEvent(
           download_progress = download_progress,
           storage_availability = storage_availability,
           storage_delete_result = storage_delete_result,
+          snapshot = snapshot,
+          snapshot_result = snapshot_result,
+          storage_delete_plan = storage_delete_plan,
           unknownFields = unknownFields
         )
       }
@@ -345,6 +401,10 @@ public class ComponentLifecycleEvent(
             value.storage_availability?.let(StorageAvailabilityResult.ADAPTER::redact),
         storage_delete_result =
             value.storage_delete_result?.let(StorageDeleteResult.ADAPTER::redact),
+        snapshot = value.snapshot?.let(ComponentLifecycleSnapshot.ADAPTER::redact),
+        snapshot_result =
+            value.snapshot_result?.let(ComponentLifecycleSnapshotResult.ADAPTER::redact),
+        storage_delete_plan = value.storage_delete_plan?.let(StorageDeletePlan.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

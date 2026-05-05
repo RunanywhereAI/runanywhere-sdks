@@ -13,6 +13,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -25,6 +26,9 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.List
+import kotlin.collections.Map
+import kotlin.lazy
 import okio.ByteString
 
 /**
@@ -70,8 +74,27 @@ public class LoRAAdapterConfig(
     schemaIndex = 2,
   )
   public val adapter_id: String? = null,
+  metadata: Map<String, String> = emptyMap(),
+  target_modules: List<String> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LoRAAdapterConfig, Nothing>(ADAPTER, unknownFields) {
+  @field:WireField(
+    tag = 4,
+    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    schemaIndex = 3,
+  )
+  public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
+
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    jsonName = "targetModules",
+    schemaIndex = 4,
+  )
+  public val target_modules: List<String> = immutableCopyOf("target_modules", target_modules)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -86,6 +109,8 @@ public class LoRAAdapterConfig(
     if (adapter_path != other.adapter_path) return false
     if (scale != other.scale) return false
     if (adapter_id != other.adapter_id) return false
+    if (metadata != other.metadata) return false
+    if (target_modules != other.target_modules) return false
     return true
   }
 
@@ -96,6 +121,8 @@ public class LoRAAdapterConfig(
       result = result * 37 + adapter_path.hashCode()
       result = result * 37 + scale.hashCode()
       result = result * 37 + (adapter_id?.hashCode() ?: 0)
+      result = result * 37 + metadata.hashCode()
+      result = result * 37 + target_modules.hashCode()
       super.hashCode = result
     }
     return result
@@ -106,6 +133,8 @@ public class LoRAAdapterConfig(
     result += """adapter_path=${sanitize(adapter_path)}"""
     result += """scale=$scale"""
     if (adapter_id != null) result += """adapter_id=${sanitize(adapter_id)}"""
+    if (metadata.isNotEmpty()) result += """metadata=$metadata"""
+    if (target_modules.isNotEmpty()) result += """target_modules=${sanitize(target_modules)}"""
     return result.joinToString(prefix = "LoRAAdapterConfig{", separator = ", ", postfix = "}")
   }
 
@@ -113,8 +142,11 @@ public class LoRAAdapterConfig(
     adapter_path: String = this.adapter_path,
     scale: Float = this.scale,
     adapter_id: String? = this.adapter_id,
+    metadata: Map<String, String> = this.metadata,
+    target_modules: List<String> = this.target_modules,
     unknownFields: ByteString = this.unknownFields,
-  ): LoRAAdapterConfig = LoRAAdapterConfig(adapter_path, scale, adapter_id, unknownFields)
+  ): LoRAAdapterConfig = LoRAAdapterConfig(adapter_path, scale, adapter_id, metadata,
+      target_modules, unknownFields)
 
   public companion object {
     @JvmField
@@ -126,12 +158,17 @@ public class LoRAAdapterConfig(
       null, 
       "lora_options.proto"
     ) {
+      private val metadataAdapter: ProtoAdapter<Map<String, String>> by lazy {
+          ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ProtoAdapter.STRING) }
+
       override fun encodedSize(`value`: LoRAAdapterConfig): Int {
         var size = value.unknownFields.size
         if (value.adapter_path != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1,
             value.adapter_path)
         if (!value.scale.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(2, value.scale)
         size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.adapter_id)
+        size += metadataAdapter.encodedSizeWithTag(4, value.metadata)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(5, value.target_modules)
         return size
       }
 
@@ -140,11 +177,15 @@ public class LoRAAdapterConfig(
             value.adapter_path)
         if (!value.scale.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.scale)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.adapter_id)
+        metadataAdapter.encodeWithTag(writer, 4, value.metadata)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.target_modules)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LoRAAdapterConfig) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.target_modules)
+        metadataAdapter.encodeWithTag(writer, 4, value.metadata)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.adapter_id)
         if (!value.scale.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 2, value.scale)
         if (value.adapter_path != "") ProtoAdapter.STRING.encodeWithTag(writer, 1,
@@ -155,11 +196,15 @@ public class LoRAAdapterConfig(
         var adapter_path: String = ""
         var scale: Float = 0f
         var adapter_id: String? = null
+        val metadata = mutableMapOf<String, String>()
+        val target_modules = mutableListOf<String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> adapter_path = ProtoAdapter.STRING.decode(reader)
             2 -> scale = ProtoAdapter.FLOAT.decode(reader)
             3 -> adapter_id = ProtoAdapter.STRING.decode(reader)
+            4 -> metadata.putAll(metadataAdapter.decode(reader))
+            5 -> target_modules.add(ProtoAdapter.STRING.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -167,6 +212,8 @@ public class LoRAAdapterConfig(
           adapter_path = adapter_path,
           scale = scale,
           adapter_id = adapter_id,
+          metadata = metadata,
+          target_modules = target_modules,
           unknownFields = unknownFields
         )
       }

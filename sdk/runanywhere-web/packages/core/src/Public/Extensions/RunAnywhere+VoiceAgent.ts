@@ -1,44 +1,65 @@
 /**
  * RunAnywhere+VoiceAgent.ts
  *
- * Top-level Voice Agent C-ABI parity surface. Mirrors Swift's
- * `RunAnywhere.processVoiceTurn`, `voiceAgentTranscribe`,
- * `voiceAgentGenerateResponse`, `voiceAgentSynthesizeSpeech`,
- * `streamVoiceAgent`, and `cleanupVoiceAgent` static verbs.
- *
- * Single canonical path: backend packages (e.g. `@runanywhere/web-llamacpp`,
- * `@runanywhere/web-onnx`) install a `VoiceAgentProvider` via
- * `setVoiceAgentProvider(...)`. Each verb delegates directly. There is no
- * TS-side compose fallback — that path was deleted in v0.20.0 alongside
- * `RunAnywhere+VoicePipeline.ts` (see CANONICAL_API.md §10 / G-F4).
- *
- * Streaming: `streamVoiceAgent()` returns an `AsyncIterable<VoiceEvent>`
- * built on `VoiceAgentStreamAdapter`. The provider supplies either a raw
- * `rac_voice_agent_handle_t` (proto-byte WASM callback) or a custom
- * `VoiceAgentStreamTransport` for tests.
+ * Public voice-agent facade. Web owns browser audio capture/playback in
+ * adapters; voice-agent request/result/event orchestration is provider- or
+ * native-handle-backed and flows through generated proto models.
  */
 
-import { SDKException } from '../../Foundation/SDKException';
+import { SDKErrorCode, SDKException } from '../../Foundation/SDKException';
 import { SDKLogger } from '../../Foundation/SDKLogger';
+import {
+  VoiceAgentProtoAdapter,
+  type ModalityProtoModule,
+} from '../../Adapters/ModalityProtoAdapter';
 import { VoiceAgentStreamAdapter } from '../../Adapters/VoiceAgentStreamAdapter';
 import type { VoiceAgentStreamTransport } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
-import type { VoiceAgentComposeConfig, VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_service';
-import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 import type {
-  VoiceAgentComponentStates,
+  VoiceAgentComposeConfig,
+  VoiceAgentRequest,
   VoiceAgentResult,
-} from '../../types/index';
+} from '@runanywhere/proto-ts/voice_agent_service';
+import {
+  AudioEncoding,
+  ComponentLoadState,
+  VoiceEventCategory,
+  VoiceEventSeverity,
+  VoicePipelineComponent,
+  type VoiceAgentComponentStates,
+  type VoiceEvent,
+} from '@runanywhere/proto-ts/voice_events';
 import type { EmscriptenRunanywhereModule } from '../../runtime/EmscriptenModule';
 
 const logger = new SDKLogger('VoiceAgent');
 
+export type VoiceAgentAvailabilitySource =
+  | 'provider'
+  | 'wasm-handle'
+  | 'wasm-exports'
+  | 'unavailable';
+
+export interface VoiceAgentAvailability {
+  available: boolean;
+  source: VoiceAgentAvailabilitySource;
+  reason: string;
+  missingExports: string[];
+  hasHandle: boolean;
+}
+
+export type VoiceAgentStreamSource = {
+  handle: number;
+  module: EmscriptenRunanywhereModule;
+} | {
+  transport: VoiceAgentStreamTransport;
+};
+
 /**
- * Backend-supplied voice-agent provider. Installed by `@runanywhere/web-llamacpp`
- * + `@runanywhere/web-onnx` (or a unified backend) once the WASM
- * `rac_voice_agent_*` exports are loaded. Until a provider is registered,
- * every verb on `RunAnywhere.<voice agent>` throws `backendNotAvailable`.
+ * Backend-supplied voice-agent provider. Backends may register a native WASM
+ * handle through `setVoiceAgentHandle(...)` or install a full custom provider
+ * through `setVoiceAgentProvider(...)`.
  */
 export interface VoiceAgentProvider {
+  readonly providerKind?: 'custom' | 'wasm-handle';
   initializeVoiceAgent(config: VoiceAgentComposeConfig): Promise<void>;
   initializeVoiceAgentWithLoadedModels(): Promise<void>;
   isVoiceAgentReady(): Promise<boolean> | boolean;
@@ -48,18 +69,7 @@ export interface VoiceAgentProvider {
   voiceAgentGenerateResponse(prompt: string): Promise<string>;
   voiceAgentSynthesizeSpeech(text: string): Promise<Float32Array>;
   cleanupVoiceAgent(): Promise<void> | void;
-
-  /**
-   * Either a numeric WASM handle (`rac_voice_agent_handle_t`) plus the
-   * Emscripten module that owns it, or a custom transport for tests. When
-   * absent, `streamVoiceAgent()` throws `backendNotAvailable`.
-   */
-  getVoiceAgentStream?(): {
-    handle: number;
-    module: EmscriptenRunanywhereModule;
-  } | {
-    transport: VoiceAgentStreamTransport;
-  } | null;
+  getVoiceAgentStream?(): VoiceAgentStreamSource | null;
 }
 
 let _provider: VoiceAgentProvider | null = null;
@@ -68,20 +78,262 @@ export function setVoiceAgentProvider(provider: VoiceAgentProvider | null): void
   _provider = provider;
 }
 
-function requireProvider(verb: string): VoiceAgentProvider {
-  if (!_provider) {
-    throw SDKException.backendNotAvailable(
-      verb,
-      'No voice-agent provider registered. Install and register a backend ' +
-      '(e.g. `@runanywhere/web-llamacpp` + `@runanywhere/web-onnx`) so the ' +
-      'WASM rac_voice_agent_* exports are reachable.',
-    );
-  }
+export function createVoiceAgentHandleProvider(
+  source: Extract<VoiceAgentStreamSource, { handle: number }>,
+): VoiceAgentProvider {
+  assertNativeHandle(source.handle, 'VoiceAgent.createHandleProvider');
+  return new NativeVoiceAgentHandleProvider(source.handle, source.module);
+}
+
+export function setVoiceAgentHandle(
+  handle: number,
+  module: EmscriptenRunanywhereModule,
+): void {
+  assertNativeHandle(handle, 'VoiceAgent.setHandle');
+  _provider = createVoiceAgentHandleProvider({ handle, module });
+}
+
+function activeProvider(): VoiceAgentProvider | null {
   return _provider;
 }
 
+export function getVoiceAgentAvailability(): VoiceAgentAvailability {
+  if (_provider) {
+    return {
+      available: true,
+      source: _provider.providerKind === 'wasm-handle' ? 'wasm-handle' : 'provider',
+      reason: _provider.providerKind === 'wasm-handle'
+        ? 'Native voice-agent handle registered.'
+        : 'Voice-agent provider registered.',
+      missingExports: [],
+      hasHandle: _provider.providerKind === 'wasm-handle',
+    };
+  }
+
+  const adapter = VoiceAgentProtoAdapter.tryDefault();
+  if (!adapter) {
+    return {
+      available: false,
+      source: 'unavailable',
+      reason: 'No voice-agent provider or native handle is registered.',
+      missingExports: [],
+      hasHandle: false,
+    };
+  }
+
+  const missingExports = adapter.missingVoiceAgentExports();
+  if (missingExports.length > 0) {
+    return {
+      available: false,
+      source: 'unavailable',
+      reason: 'Voice agent is unavailable in this Web WASM build because native voice-agent exports are missing.',
+      missingExports,
+      hasHandle: false,
+    };
+  }
+
+  return {
+    available: false,
+    source: 'wasm-exports',
+    reason: 'Native voice-agent exports are present, but no voice-agent handle/provider is registered.',
+    missingExports: [],
+    hasHandle: false,
+  };
+}
+
+export function isVoiceAgentAvailable(): boolean {
+  return getVoiceAgentAvailability().available;
+}
+
+function requireProvider(feature: string): VoiceAgentProvider {
+  const provider = activeProvider();
+  if (provider) return provider;
+  const availability = getVoiceAgentAvailability();
+  throw SDKException.backendNotAvailable(
+    feature,
+    `${availability.reason}${availability.missingExports.length > 0
+      ? ` Missing exports: ${availability.missingExports.join(', ')}.`
+      : ''}`,
+  );
+}
+
+class NativeVoiceAgentHandleProvider implements VoiceAgentProvider {
+  readonly providerKind = 'wasm-handle' as const;
+  private readonly adapter: VoiceAgentProtoAdapter;
+
+  constructor(
+    private readonly handle: number,
+    private readonly module: EmscriptenRunanywhereModule,
+  ) {
+    assertNativeHandle(handle, 'VoiceAgent.nativeProvider');
+    this.adapter = new VoiceAgentProtoAdapter(module as unknown as ModalityProtoModule);
+  }
+
+  async initializeVoiceAgent(config: VoiceAgentComposeConfig): Promise<void> {
+    const state = this.adapter.initialize(this.handle, config);
+    if (!state) {
+      throw SDKException.backendNotAvailable(
+        'initializeVoiceAgent',
+        'Native voice-agent initialize returned no component state.',
+      );
+    }
+  }
+
+  async initializeVoiceAgentWithLoadedModels(): Promise<void> {
+    await this.initializeVoiceAgent(defaultVoiceAgentComposeConfig());
+  }
+
+  isVoiceAgentReady(): boolean {
+    return this.getVoiceAgentComponentStates().ready;
+  }
+
+  getVoiceAgentComponentStates(): VoiceAgentComponentStates {
+    return this.adapter.componentStates(this.handle)
+      ?? unavailableComponentStates('Native voice-agent component state is unavailable.');
+  }
+
+  async processVoiceTurn(audio: Float32Array | Uint8Array): Promise<VoiceAgentResult> {
+    const result = this.adapter.processVoiceTurn(this.handle, toUint8Audio(audio));
+    return result ?? unavailableVoiceAgentResult(
+      'Native voice-agent processVoiceTurn returned no result.',
+    );
+  }
+
+  async voiceAgentTranscribe(): Promise<string> {
+    throw SDKException.backendNotAvailable(
+      'voiceAgentTranscribe',
+      'The native Web voice-agent handle exposes whole-turn processing, not standalone STT.',
+    );
+  }
+
+  async voiceAgentGenerateResponse(): Promise<string> {
+    throw SDKException.backendNotAvailable(
+      'voiceAgentGenerateResponse',
+      'The native Web voice-agent handle exposes whole-turn processing, not standalone LLM generation.',
+    );
+  }
+
+  async voiceAgentSynthesizeSpeech(): Promise<Float32Array> {
+    throw SDKException.backendNotAvailable(
+      'voiceAgentSynthesizeSpeech',
+      'The native Web voice-agent handle exposes whole-turn processing, not standalone TTS.',
+    );
+  }
+
+  cleanupVoiceAgent(): void {
+    // The current C ABI exposes callback detachment through the stream adapter
+    // but no voice-agent-handle destroy function at this facade layer.
+  }
+
+  getVoiceAgentStream(): VoiceAgentStreamSource {
+    return { handle: this.handle, module: this.module };
+  }
+}
+
+function defaultVoiceAgentComposeConfig(): VoiceAgentComposeConfig {
+  return {
+    vadSampleRate: 16000,
+    vadFrameLength: 0.1,
+    vadEnergyThreshold: 0.005,
+    wakewordEnabled: false,
+    wakewordThreshold: 0.5,
+    sessionId: 'web-voice-agent',
+  };
+}
+
+function assertNativeHandle(handle: number, feature: string): number {
+  if (!Number.isFinite(handle) || handle <= 0) {
+    throw SDKException.backendNotAvailable(
+      feature,
+      'A non-zero native voice-agent handle is required.',
+    );
+  }
+  return handle;
+}
+
+function unavailableComponentStates(reason: string): VoiceAgentComponentStates {
+  return {
+    sttState: ComponentLoadState.COMPONENT_LOAD_STATE_ERROR,
+    llmState: ComponentLoadState.COMPONENT_LOAD_STATE_ERROR,
+    ttsState: ComponentLoadState.COMPONENT_LOAD_STATE_ERROR,
+    vadState: ComponentLoadState.COMPONENT_LOAD_STATE_ERROR,
+    ready: false,
+    anyLoading: false,
+    wakewordState: ComponentLoadState.COMPONENT_LOAD_STATE_NOT_LOADED,
+    errorMessage: reason,
+  };
+}
+
+export function unavailableVoiceAgentResult(reason?: string): VoiceAgentResult {
+  const message = reason ?? getVoiceAgentAvailability().reason;
+  return {
+    speechDetected: false,
+    transcription: undefined,
+    assistantResponse: undefined,
+    thinkingContent: undefined,
+    synthesizedAudio: undefined,
+    finalState: unavailableComponentStates(message),
+    synthesizedAudioSampleRateHz: 0,
+    synthesizedAudioChannels: 0,
+    synthesizedAudioEncoding: AudioEncoding.AUDIO_ENCODING_UNSPECIFIED,
+    sessionId: '',
+    turnId: createId('voice-turn-unavailable'),
+    sttTimeMs: 0,
+    llmTimeMs: 0,
+    ttsTimeMs: 0,
+    totalTimeMs: 0,
+    errorMessage: message,
+    errorCode: SDKErrorCode.BackendNotAvailable,
+  };
+}
+
+function unavailableVoiceEvent(reason?: string): VoiceEvent {
+  const message = reason ?? getVoiceAgentAvailability().reason;
+  return {
+    seq: 0,
+    timestampUs: nowUs(),
+    category: VoiceEventCategory.VOICE_EVENT_CATEGORY_ERROR,
+    severity: VoiceEventSeverity.VOICE_EVENT_SEVERITY_ERROR,
+    component: VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_AGENT,
+    error: {
+      code: SDKErrorCode.BackendNotAvailable,
+      message,
+      component: 'voice-agent',
+      isRecoverable: false,
+      operation: 'streamVoiceAgent',
+      detailsJson: '',
+    },
+    sessionId: '',
+    turnId: '',
+    requestId: '',
+    metadata: {},
+  };
+}
+
+async function* unavailableVoiceEventStream(reason?: string): AsyncIterable<VoiceEvent> {
+  yield unavailableVoiceEvent(reason);
+}
+
+function toUint8Audio(audio: Float32Array | Uint8Array): Uint8Array {
+  if (audio instanceof Uint8Array) return audio;
+  return new Uint8Array(
+    audio.buffer.slice(audio.byteOffset, audio.byteOffset + audio.byteLength),
+  );
+}
+
+function nowUs(): number {
+  return Math.floor(Date.now() * 1000);
+}
+
+function createId(prefix: string): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Math.random().toString(36).slice(2)}`;
+}
+
 // ---------------------------------------------------------------------------
-// Public API — Swift-symmetric verbs.
+// Public API
 // ---------------------------------------------------------------------------
 
 export async function initializeVoiceAgent(config: VoiceAgentComposeConfig): Promise<void> {
@@ -94,22 +346,27 @@ export async function initializeVoiceAgentWithLoadedModels(): Promise<void> {
 }
 
 export async function isVoiceAgentReady(): Promise<boolean> {
-  return Promise.resolve(requireProvider('isVoiceAgentReady').isVoiceAgentReady());
+  const provider = activeProvider();
+  return provider ? Promise.resolve(provider.isVoiceAgentReady()) : false;
 }
 
 export async function getVoiceAgentComponentStates(): Promise<VoiceAgentComponentStates> {
-  return Promise.resolve(requireProvider('getVoiceAgentComponentStates').getVoiceAgentComponentStates());
+  const provider = activeProvider();
+  return provider
+    ? Promise.resolve(provider.getVoiceAgentComponentStates())
+    : unavailableComponentStates(getVoiceAgentAvailability().reason);
 }
 
 export async function areAllVoiceComponentsReady(): Promise<boolean> {
   return (await getVoiceAgentComponentStates()).ready;
 }
 
-/** Mirror Swift `RunAnywhere.processVoiceTurn(audioData) -> VoiceAgentResult`. */
 export async function processVoiceTurn(
   audio: Float32Array | Uint8Array,
 ): Promise<VoiceAgentResult> {
-  return requireProvider('processVoiceTurn').processVoiceTurn(audio);
+  const provider = activeProvider();
+  if (!provider) return unavailableVoiceAgentResult();
+  return provider.processVoiceTurn(audio);
 }
 
 export async function voiceAgentTranscribe(
@@ -131,30 +388,32 @@ export async function cleanupVoiceAgent(): Promise<void> {
   await Promise.resolve(_provider.cleanupVoiceAgent());
 }
 
-/**
- * Mirror Swift `RunAnywhere.streamVoiceAgent() -> AsyncStream<RAVoiceEvent>`.
- *
- * Returns an `AsyncIterable<VoiceEvent>` driven by the backend's
- * `rac_voice_agent_set_proto_callback` (or a custom transport for tests).
- * The provider must implement `getVoiceAgentStream()`; if absent, throws
- * `backendNotAvailable`.
- */
 export function streamVoiceAgent(
-  req: VoiceAgentRequest = { eventFilter: '' },
+  req: VoiceAgentRequest = {
+    eventFilter: '',
+    sessionId: '',
+    categories: [],
+    minSeverity: 0,
+    replayFromSeq: 0,
+    includeAudio: false,
+  },
 ): AsyncIterable<VoiceEvent> {
-  const provider = requireProvider('streamVoiceAgent');
+  const provider = activeProvider();
+  if (!provider) return unavailableVoiceEventStream();
   if (typeof provider.getVoiceAgentStream !== 'function') {
-    throw SDKException.backendNotAvailable(
-      'streamVoiceAgent',
-      'Backend voice-agent provider does not implement getVoiceAgentStream().',
+    return unavailableVoiceEventStream(
+      'Voice-agent provider does not expose a generated proto event stream.',
     );
   }
   const src = provider.getVoiceAgentStream();
   if (src == null) {
-    throw SDKException.backendNotAvailable(
-      'streamVoiceAgent',
-      'Backend has not constructed a voice-agent handle yet — call ' +
-      'initializeVoiceAgent / initializeVoiceAgentWithLoadedModels first.',
+    return unavailableVoiceEventStream(
+      'Voice-agent provider has not constructed a stream source yet.',
+    );
+  }
+  if ('handle' in src && (!Number.isFinite(src.handle) || src.handle <= 0)) {
+    return unavailableVoiceEventStream(
+      'Voice-agent provider returned a missing native handle.',
     );
   }
   const adapter = 'transport' in src
@@ -165,6 +424,11 @@ export function streamVoiceAgent(
 
 export const VoiceAgent = {
   setProvider: setVoiceAgentProvider,
+  setHandle: setVoiceAgentHandle,
+  createHandleProvider: createVoiceAgentHandleProvider,
+  availability: getVoiceAgentAvailability,
+  isAvailable: isVoiceAgentAvailable,
+  unavailableResult: unavailableVoiceAgentResult,
   initialize: initializeVoiceAgent,
   initializeWithLoadedModels: initializeVoiceAgentWithLoadedModels,
   isReady: isVoiceAgentReady,

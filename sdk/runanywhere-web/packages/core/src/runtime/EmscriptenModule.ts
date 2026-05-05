@@ -24,7 +24,9 @@
  */
 
 import { DownloadAdapter } from '../Adapters/DownloadAdapter';
+import { HardwareAdapter } from '../Adapters/HardwareAdapter';
 import { ModelLifecycleAdapter } from '../Adapters/ModelLifecycleAdapter';
+import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter';
 import { ModalityProtoAdapter } from '../Adapters/ModalityProtoAdapter';
 import { SDKEventStreamAdapter } from '../Adapters/SDKEventStreamAdapter';
 
@@ -235,11 +237,36 @@ export interface EmscriptenRunanywhereModule {
   _rac_rag_clear_proto?(session: number, outStats: number): number;
   _rac_rag_stats_proto?(session: number, outStats: number): number;
 
+  _rac_get_lora_registry?(): number;
   _rac_lora_register_proto?(
     registry: number,
     entryBytes: number,
     entrySize: number,
     outEntry: number,
+  ): number;
+  _rac_lora_catalog_list_proto?(
+    registry: number,
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_lora_catalog_query_proto?(
+    registry: number,
+    queryBytes: number,
+    querySize: number,
+    outResult: number,
+  ): number;
+  _rac_lora_catalog_get_proto?(
+    registry: number,
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_lora_catalog_mark_download_completed_proto?(
+    registry: number,
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
   ): number;
   _rac_lora_compatibility_proto?(
     llmComponent: number,
@@ -247,19 +274,61 @@ export interface EmscriptenRunanywhereModule {
     configSize: number,
     outResult: number,
   ): number;
-  _rac_lora_load_proto?(
+  _rac_lora_apply_proto?(
     llmComponent: number,
-    configBytes: number,
-    configSize: number,
-    outInfo: number,
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
   ): number;
   _rac_lora_remove_proto?(
     llmComponent: number,
-    configBytes: number,
-    configSize: number,
-    outInfo: number,
+    requestBytes: number,
+    requestSize: number,
+    outState: number,
   ): number;
-  _rac_lora_clear_proto?(llmComponent: number, outInfo: number): number;
+  _rac_lora_list_proto?(
+    llmComponent: number,
+    requestBytes: number,
+    requestSize: number,
+    outState: number,
+  ): number;
+  _rac_lora_state_proto?(
+    llmComponent: number,
+    requestBytes: number,
+    requestSize: number,
+    outState: number,
+  ): number;
+
+  _rac_structured_output_parse_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_tool_call_parse_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_tool_call_validate_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_tool_call_format_prompt_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_structured_output_prepare_prompt_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
+  _rac_structured_output_validate_proto?(
+    requestBytes: number,
+    requestSize: number,
+    outResult: number,
+  ): number;
 
   // -----------------------------------------------------------------------------
   // LLM Thinking (v3 Phase A11 / GAP 08 #6)
@@ -412,6 +481,14 @@ export interface EmscriptenRunanywhereModule {
     modelId: number,
   ): number;
   _rac_model_registry_proto_free?(protoBytes: number): void;
+
+  // -----------------------------------------------------------------------------
+  // Hardware profile proto-byte ABI
+  // -----------------------------------------------------------------------------
+  _rac_hardware_profile_get?(protoBytesOut: number, protoSizeOut: number): number;
+  _rac_hardware_profile_free?(protoBytes: number): void;
+  _rac_hardware_get_accelerators?(protoBytesOut: number, protoSizeOut: number): number;
+  _rac_hardware_set_accelerator_preference?(preference: number): number;
 
   // -----------------------------------------------------------------------------
   // Model lifecycle proto-byte ABI
@@ -589,7 +666,9 @@ let _module: EmscriptenRunanywhereModule | null = null;
 export function setRunanywhereModule(mod: EmscriptenRunanywhereModule): void {
   _module = mod;
   DownloadAdapter.setDefaultModule(mod);
+  HardwareAdapter.setDefaultModule(mod);
   ModelLifecycleAdapter.setDefaultModule(mod);
+  ModelRegistryAdapter.setDefaultModule(mod);
   ModalityProtoAdapter.setDefaultModule(mod);
   SDKEventStreamAdapter.setDefaultModule(mod);
 }
@@ -597,10 +676,17 @@ export function setRunanywhereModule(mod: EmscriptenRunanywhereModule): void {
 /** Clear the singleton module during backend shutdown. */
 export function clearRunanywhereModule(): void {
   DownloadAdapter.clearDefaultModule();
+  HardwareAdapter.clearDefaultModule();
   ModelLifecycleAdapter.clearDefaultModule();
+  ModelRegistryAdapter.clearDefaultModule();
   ModalityProtoAdapter.clearDefaultModule();
   SDKEventStreamAdapter.clearDefaultModule();
   _module = null;
+}
+
+/** Return the installed WASM module, if one has been registered. */
+export function tryRunanywhereModule(): EmscriptenRunanywhereModule | null {
+  return _module;
 }
 
 /**

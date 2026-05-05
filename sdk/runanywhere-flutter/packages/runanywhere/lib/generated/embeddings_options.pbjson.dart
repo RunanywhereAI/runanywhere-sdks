@@ -115,18 +115,34 @@ const EmbeddingVector$json = {
     {'1': 'norm', '3': 2, '4': 1, '5': 2, '9': 0, '10': 'norm', '17': true},
     {'1': 'text', '3': 3, '4': 1, '5': 9, '9': 1, '10': 'text', '17': true},
     {'1': 'dimension', '3': 4, '4': 1, '5': 5, '10': 'dimension'},
+    {'1': 'input_index', '3': 5, '4': 1, '5': 5, '10': 'inputIndex'},
+    {'1': 'metadata', '3': 6, '4': 3, '5': 11, '6': '.runanywhere.v1.EmbeddingVector.MetadataEntry', '10': 'metadata'},
   ],
+  '3': [EmbeddingVector_MetadataEntry$json],
   '8': [
     {'1': '_norm'},
     {'1': '_text'},
   ],
 };
 
+@$core.Deprecated('Use embeddingVectorDescriptor instead')
+const EmbeddingVector_MetadataEntry$json = {
+  '1': 'MetadataEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'value', '3': 2, '4': 1, '5': 9, '10': 'value'},
+  ],
+  '7': {'7': true},
+};
+
 /// Descriptor for `EmbeddingVector`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List embeddingVectorDescriptor = $convert.base64Decode(
     'Cg9FbWJlZGRpbmdWZWN0b3ISFgoGdmFsdWVzGAEgAygCUgZ2YWx1ZXMSFwoEbm9ybRgCIAEoAk'
     'gAUgRub3JtiAEBEhcKBHRleHQYAyABKAlIAVIEdGV4dIgBARIcCglkaW1lbnNpb24YBCABKAVS'
-    'CWRpbWVuc2lvbkIHCgVfbm9ybUIHCgVfdGV4dA==');
+    'CWRpbWVuc2lvbhIfCgtpbnB1dF9pbmRleBgFIAEoBVIKaW5wdXRJbmRleBJJCghtZXRhZGF0YR'
+    'gGIAMoCzItLnJ1bmFueXdoZXJlLnYxLkVtYmVkZGluZ1ZlY3Rvci5NZXRhZGF0YUVudHJ5Ught'
+    'ZXRhZGF0YRo7Cg1NZXRhZGF0YUVudHJ5EhAKA2tleRgBIAEoCVIDa2V5EhQKBXZhbHVlGAIgAS'
+    'gJUgV2YWx1ZToCOAFCBwoFX25vcm1CBwoFX3RleHQ=');
 
 @$core.Deprecated('Use embeddingsRequestDescriptor instead')
 const EmbeddingsRequest$json = {
@@ -134,17 +150,35 @@ const EmbeddingsRequest$json = {
   '2': [
     {'1': 'texts', '3': 1, '4': 3, '5': 9, '10': 'texts'},
     {'1': 'options', '3': 2, '4': 1, '5': 11, '6': '.runanywhere.v1.EmbeddingsOptions', '9': 0, '10': 'options', '17': true},
+    {'1': 'request_id', '3': 3, '4': 1, '5': 9, '10': 'requestId'},
+    {'1': 'model_id', '3': 4, '4': 1, '5': 9, '9': 1, '10': 'modelId', '17': true},
+    {'1': 'metadata', '3': 5, '4': 3, '5': 11, '6': '.runanywhere.v1.EmbeddingsRequest.MetadataEntry', '10': 'metadata'},
   ],
+  '3': [EmbeddingsRequest_MetadataEntry$json],
   '8': [
     {'1': '_options'},
+    {'1': '_model_id'},
   ],
+};
+
+@$core.Deprecated('Use embeddingsRequestDescriptor instead')
+const EmbeddingsRequest_MetadataEntry$json = {
+  '1': 'MetadataEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'value', '3': 2, '4': 1, '5': 9, '10': 'value'},
+  ],
+  '7': {'7': true},
 };
 
 /// Descriptor for `EmbeddingsRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List embeddingsRequestDescriptor = $convert.base64Decode(
     'ChFFbWJlZGRpbmdzUmVxdWVzdBIUCgV0ZXh0cxgBIAMoCVIFdGV4dHMSQAoHb3B0aW9ucxgCIA'
-    'EoCzIhLnJ1bmFueXdoZXJlLnYxLkVtYmVkZGluZ3NPcHRpb25zSABSB29wdGlvbnOIAQFCCgoI'
-    'X29wdGlvbnM=');
+    'EoCzIhLnJ1bmFueXdoZXJlLnYxLkVtYmVkZGluZ3NPcHRpb25zSABSB29wdGlvbnOIAQESHQoK'
+    'cmVxdWVzdF9pZBgDIAEoCVIJcmVxdWVzdElkEh4KCG1vZGVsX2lkGAQgASgJSAFSB21vZGVsSW'
+    'SIAQESSwoIbWV0YWRhdGEYBSADKAsyLy5ydW5hbnl3aGVyZS52MS5FbWJlZGRpbmdzUmVxdWVz'
+    'dC5NZXRhZGF0YUVudHJ5UghtZXRhZGF0YRo7Cg1NZXRhZGF0YUVudHJ5EhAKA2tleRgBIAEoCV'
+    'IDa2V5EhQKBXZhbHVlGAIgASgJUgV2YWx1ZToCOAFCCgoIX29wdGlvbnNCCwoJX21vZGVsX2lk');
 
 @$core.Deprecated('Use embeddingsResultDescriptor instead')
 const EmbeddingsResult$json = {
@@ -154,6 +188,14 @@ const EmbeddingsResult$json = {
     {'1': 'dimension', '3': 2, '4': 1, '5': 5, '10': 'dimension'},
     {'1': 'processing_time_ms', '3': 3, '4': 1, '5': 3, '10': 'processingTimeMs'},
     {'1': 'tokens_used', '3': 4, '4': 1, '5': 5, '10': 'tokensUsed'},
+    {'1': 'model_id', '3': 5, '4': 1, '5': 9, '9': 0, '10': 'modelId', '17': true},
+    {'1': 'error_message', '3': 6, '4': 1, '5': 9, '9': 1, '10': 'errorMessage', '17': true},
+    {'1': 'error_code', '3': 7, '4': 1, '5': 5, '10': 'errorCode'},
+    {'1': 'request_id', '3': 8, '4': 1, '5': 9, '10': 'requestId'},
+  ],
+  '8': [
+    {'1': '_model_id'},
+    {'1': '_error_message'},
   ],
 };
 
@@ -162,5 +204,58 @@ final $typed_data.Uint8List embeddingsResultDescriptor = $convert.base64Decode(
     'ChBFbWJlZGRpbmdzUmVzdWx0EjkKB3ZlY3RvcnMYASADKAsyHy5ydW5hbnl3aGVyZS52MS5FbW'
     'JlZGRpbmdWZWN0b3JSB3ZlY3RvcnMSHAoJZGltZW5zaW9uGAIgASgFUglkaW1lbnNpb24SLAoS'
     'cHJvY2Vzc2luZ190aW1lX21zGAMgASgDUhBwcm9jZXNzaW5nVGltZU1zEh8KC3Rva2Vuc191c2'
-    'VkGAQgASgFUgp0b2tlbnNVc2Vk');
+    'VkGAQgASgFUgp0b2tlbnNVc2VkEh4KCG1vZGVsX2lkGAUgASgJSABSB21vZGVsSWSIAQESKAoN'
+    'ZXJyb3JfbWVzc2FnZRgGIAEoCUgBUgxlcnJvck1lc3NhZ2WIAQESHQoKZXJyb3JfY29kZRgHIA'
+    'EoBVIJZXJyb3JDb2RlEh0KCnJlcXVlc3RfaWQYCCABKAlSCXJlcXVlc3RJZEILCglfbW9kZWxf'
+    'aWRCEAoOX2Vycm9yX21lc3NhZ2U=');
+
+@$core.Deprecated('Use embeddingsServiceStateDescriptor instead')
+const EmbeddingsServiceState$json = {
+  '1': 'EmbeddingsServiceState',
+  '2': [
+    {'1': 'is_ready', '3': 1, '4': 1, '5': 8, '10': 'isReady'},
+    {'1': 'current_model', '3': 2, '4': 1, '5': 9, '9': 0, '10': 'currentModel', '17': true},
+    {'1': 'dimension', '3': 3, '4': 1, '5': 5, '10': 'dimension'},
+    {'1': 'max_tokens', '3': 4, '4': 1, '5': 5, '10': 'maxTokens'},
+    {'1': 'error_message', '3': 5, '4': 1, '5': 9, '9': 1, '10': 'errorMessage', '17': true},
+    {'1': 'error_code', '3': 6, '4': 1, '5': 5, '10': 'errorCode'},
+  ],
+  '8': [
+    {'1': '_current_model'},
+    {'1': '_error_message'},
+  ],
+};
+
+/// Descriptor for `EmbeddingsServiceState`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List embeddingsServiceStateDescriptor = $convert.base64Decode(
+    'ChZFbWJlZGRpbmdzU2VydmljZVN0YXRlEhkKCGlzX3JlYWR5GAEgASgIUgdpc1JlYWR5EigKDW'
+    'N1cnJlbnRfbW9kZWwYAiABKAlIAFIMY3VycmVudE1vZGVsiAEBEhwKCWRpbWVuc2lvbhgDIAEo'
+    'BVIJZGltZW5zaW9uEh0KCm1heF90b2tlbnMYBCABKAVSCW1heFRva2VucxIoCg1lcnJvcl9tZX'
+    'NzYWdlGAUgASgJSAFSDGVycm9yTWVzc2FnZYgBARIdCgplcnJvcl9jb2RlGAYgASgFUgllcnJv'
+    'ckNvZGVCEAoOX2N1cnJlbnRfbW9kZWxCEAoOX2Vycm9yX21lc3NhZ2U=');
+
+const $core.Map<$core.String, $core.dynamic> EmbeddingsServiceBase$json = {
+  '1': 'Embeddings',
+  '2': [
+    {'1': 'Embed', '2': '.runanywhere.v1.EmbeddingsRequest', '3': '.runanywhere.v1.EmbeddingsResult'},
+    {'1': 'EmbedBatch', '2': '.runanywhere.v1.EmbeddingsRequest', '3': '.runanywhere.v1.EmbeddingsResult'},
+  ],
+};
+
+@$core.Deprecated('Use embeddingsServiceDescriptor instead')
+const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> EmbeddingsServiceBase$messageJson = {
+  '.runanywhere.v1.EmbeddingsRequest': EmbeddingsRequest$json,
+  '.runanywhere.v1.EmbeddingsOptions': EmbeddingsOptions$json,
+  '.runanywhere.v1.EmbeddingsRequest.MetadataEntry': EmbeddingsRequest_MetadataEntry$json,
+  '.runanywhere.v1.EmbeddingsResult': EmbeddingsResult$json,
+  '.runanywhere.v1.EmbeddingVector': EmbeddingVector$json,
+  '.runanywhere.v1.EmbeddingVector.MetadataEntry': EmbeddingVector_MetadataEntry$json,
+};
+
+/// Descriptor for `Embeddings`. Decode as a `google.protobuf.ServiceDescriptorProto`.
+final $typed_data.Uint8List embeddingsServiceDescriptor = $convert.base64Decode(
+    'CgpFbWJlZGRpbmdzEkwKBUVtYmVkEiEucnVuYW55d2hlcmUudjEuRW1iZWRkaW5nc1JlcXVlc3'
+    'QaIC5ydW5hbnl3aGVyZS52MS5FbWJlZGRpbmdzUmVzdWx0ElEKCkVtYmVkQmF0Y2gSIS5ydW5h'
+    'bnl3aGVyZS52MS5FbWJlZGRpbmdzUmVxdWVzdBogLnJ1bmFueXdoZXJlLnYxLkVtYmVkZGluZ3'
+    'NSZXN1bHQ=');
 

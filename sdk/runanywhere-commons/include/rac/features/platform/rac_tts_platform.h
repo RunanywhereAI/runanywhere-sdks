@@ -9,6 +9,11 @@
  * This backend follows the same pattern as ONNX TTS backend, but delegates
  * to Swift via function pointer callbacks since AVSpeechSynthesizer is
  * an Apple-only framework.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal` adapter
+ * contract. AVSpeechSynthesizer bridge — SDKs reach this backend
+ * through standard TTS proto APIs once the platform plugin is
+ * registered.
  */
 
 #ifndef RAC_TTS_PLATFORM_H

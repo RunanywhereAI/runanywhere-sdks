@@ -10,7 +10,15 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@runanywhere/web": ["../../../sdk/runanywhere-web/packages/core/src/index.ts"],
+      "@runanywhere/web-llamacpp": ["../../../sdk/runanywhere-web/packages/llamacpp/src/index.ts"],
+      "@runanywhere/web-onnx": ["../../../sdk/runanywhere-web/packages/onnx/src/index.ts"],
+      "@runanywhere/proto-ts": ["../../../sdk/runanywhere-proto-ts/src/index.ts"],
+      "@runanywhere/proto-ts/*": ["../../../sdk/runanywhere-proto-ts/src/*.ts"]
+    }
   },
   "include": ["src"]
 }

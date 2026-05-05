@@ -1,131 +1,102 @@
 /**
- * RunAnywhere Web SDK - VLM Worker Bridge
+ * RunAnywhere Web SDK - VLM Worker Bridge (V2-canonical)
  *
- * Main-thread proxy for the VLM Web Worker. All VLM inference runs off the
- * main thread so the camera, UI animations, and event loop stay responsive.
+ * Main-thread proxy for the VLM Web Worker. Vision-language inference
+ * runs off the main thread so the camera, UI animations, and event loop
+ * stay responsive during the multi-second `_rac_vlm_process_proto` call.
+ *
+ * The bridge owns:
+ *   - A dedicated `Worker` instance loaded from `vlm-worker.js`
+ *   - Promise correlation by message ID
+ *   - WASM OOM detection + recreate-and-retry recovery
+ *   - Qwen2-VL CPU pinning (Qwen produces NaN logits on WebGPU because
+ *     f16 M-RoPE overflows in the rotary position encoding shader)
+ *   - Last-loaded-model snapshot for transparent recovery after a crash
+ *
+ * The worker side runs `VLMWorkerRuntime` which loads its OWN Emscripten
+ * module — separate from the main-thread bridge — so a VLM crash never
+ * corrupts the main-thread WASM heap.
  *
  * Usage:
  *   ```typescript
- *   import { VLMWorkerBridge } from '@runanywhere/web';
- *
  *   const vlm = VLMWorkerBridge.shared;
  *   await vlm.init();
- *   await vlm.loadModel({ ... });
- *   const result = await vlm.process(rgbPixels, width, height, prompt, { maxTokens: 100 });
+ *   await vlm.loadModel({ modelPath: '/models/llava.gguf', mmprojPath: '...', modelId: '...', modelName: '...' });
+ *   const result = await vlm.process(image, options);
  *   ```
  */
 
-import { SDKLogger } from '@runanywhere/web';
+import {
+  SDKLogger,
+  VLMImage,
+  VLMGenerationOptions,
+  VLMResult,
+  type VLMImage as ProtoVLMImage,
+  type VLMGenerationOptions as ProtoVLMGenerationOptions,
+  type VLMResult as ProtoVLMResult,
+} from '@runanywhere/web';
 import { LlamaCppBridge } from '../Foundation/LlamaCppBridge';
 
 // ---------------------------------------------------------------------------
-// Types
+// RPC protocol — typed messages exchanged between main thread and worker
 // ---------------------------------------------------------------------------
 
-/**
- * RPC commands sent from the main thread to the Worker.
- */
+/** Commands sent from main thread → worker. */
 export type VLMWorkerCommand =
   | {
-      type: 'init'; id: number; payload: {
-        /** URL to the WASM glue JS (racommons.js or racommons-webgpu.js) */
-        wasmJsUrl: string;
-        /** Whether the loaded module is the WebGPU variant */
-        useWebGPU?: boolean;
-      };
+      type: 'init';
+      id: number;
+      payload: { wasmJsUrl: string; useWebGPU: boolean };
     }
   | {
-      type: 'load-model'; id: number; payload: {
-        modelOpfsKey: string; modelFilename: string;
-        mmprojOpfsKey: string; mmprojFilename: string;
-        modelId: string; modelName: string;
-        /** Optional: raw model data when OPFS doesn't have it (memory-cache fallback). */
-        modelData?: ArrayBuffer;
-        /** Optional: raw mmproj data when OPFS doesn't have it. */
-        mmprojData?: ArrayBuffer;
-      };
+      type: 'load-model';
+      id: number;
+      payload: VLMLoadModelParams;
     }
   | {
-      type: 'process'; id: number; payload: {
-        rgbPixels: ArrayBuffer; width: number; height: number;
-        prompt: string; maxTokens: number; temperature: number;
-        topP: number; systemPrompt?: string; modelFamily?: number;
-      };
+      type: 'process';
+      id: number;
+      payload: { imageBytes: Uint8Array; optionsBytes: Uint8Array };
     }
   | { type: 'cancel'; id: number }
   | { type: 'unload'; id: number };
 
-/**
- * Result of a VLM inference operation.
- */
-export interface VLMWorkerResult {
-  text: string;
-  totalTokens: number;
-  promptTokens: number;
-  completionTokens: number;
-  imageTokens: number;
-}
-
-/**
- * RPC responses from the Worker to the main thread.
- */
+/** Responses sent from worker → main thread. */
 export type VLMWorkerResponse =
   | { id: number; type: 'result'; payload: unknown }
   | { id: number; type: 'error'; payload: { message: string } }
   | { id: number; type: 'progress'; payload: { stage: string } };
 
 /**
- * Parameters for loading a VLM model in the Worker.
+ * Parameters required to load a VLM model in the worker.
+ * Either `modelPath` (when a previous bridge already wrote the model into
+ * MEMFS) or raw `modelData` (transferred zero-copy via postMessage).
  */
 export interface VLMLoadModelParams {
-  modelOpfsKey: string;
+  /** Filename written into the worker's MEMFS, e.g. `'llava-7b.gguf'`. */
   modelFilename: string;
-  mmprojOpfsKey: string;
+  /** Filename for the mmproj sidecar, e.g. `'mmproj-llava-7b.gguf'`. */
   mmprojFilename: string;
+  /** Stable identifier (used for model-family detection — Qwen2-VL etc.). */
   modelId: string;
+  /** Human-readable name (also checked for Qwen2-VL detection). */
   modelName: string;
-  /** Optional: raw model data when OPFS doesn't have it (memory-cache fallback). */
-  modelData?: ArrayBuffer;
-  /** Optional: raw mmproj data when OPFS doesn't have it. */
-  mmprojData?: ArrayBuffer;
+  /** Raw model GGUF bytes — transferred zero-copy via postMessage. */
+  modelData: ArrayBuffer;
+  /** Raw mmproj GGUF bytes — transferred zero-copy via postMessage. */
+  mmprojData: ArrayBuffer;
 }
 
-/**
- * Options for VLM image processing via the Worker bridge.
- */
-export interface VLMProcessOptions {
-  maxTokens?: number;
-  temperature?: number;
-  topP?: number;
-  /** System prompt prepended to the user prompt inside the Worker. */
-  systemPrompt?: string;
-  /** Model family enum value (maps to rac_vlm_model_family_t). 0 = auto-detect. */
-  modelFamily?: number;
-}
-
-/**
- * Callback for VLM progress updates (model loading stages, etc.).
- */
+/** Optional callback invoked with progress strings during model load. */
 export type ProgressListener = (stage: string) => void;
-
-// ---------------------------------------------------------------------------
-// Bridge
-// ---------------------------------------------------------------------------
 
 const logger = new SDKLogger('VLMWorkerBridge');
 
-/**
- * VLMWorkerBridge - Main-thread proxy for VLM Web Worker inference.
- *
- * Manages the lifecycle of a dedicated Web Worker that runs VLM inference
- * in its own WASM instance. Provides:
- *   - RPC protocol with message ID tracking and promise correlation
- *   - Auto-recovery from WASM crashes (OOB, stack overflow, etc.)
- *   - Progress listeners for model loading stages
- *   - Transferable pixel data for zero-copy image transfer
- */
+// ---------------------------------------------------------------------------
+// VLMWorkerBridge — singleton main-thread proxy
+// ---------------------------------------------------------------------------
+
 export class VLMWorkerBridge {
-  // ---- Singleton ----
   private static _instance: VLMWorkerBridge | null = null;
 
   static get shared(): VLMWorkerBridge {
@@ -138,43 +109,39 @@ export class VLMWorkerBridge {
   // ---- State ----
   private worker: Worker | null = null;
   private nextId = 0;
-  private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>();
-  private _isInitialized = false;
-  private _isModelLoaded = false;
+  private pending = new Map<
+    number,
+    { resolve: (v: unknown) => void; reject: (e: Error) => void }
+  >();
+  private _initialized = false;
+  private _modelLoaded = false;
   private _progressListeners: ProgressListener[] = [];
-  /** Saved for auto-recovery after WASM crash */
+  /** Saved for OOM-recovery — recreate worker + reload model + retry. */
   private _lastModelParams: VLMLoadModelParams | null = null;
   private _needsRecovery = false;
-
-  /**
-   * Optional: the app can provide a custom Worker URL or factory.
-   * If not set, the bridge uses the bundled SDK worker entry point.
-   */
+  /** Optional override for the worker bundle URL (e.g. tests / custom deploy). */
   private _workerUrl: URL | string | null = null;
 
-  get isInitialized(): boolean { return this._isInitialized; }
-  get isModelLoaded(): boolean { return this._isModelLoaded; }
-
-  // ---- Configuration ----
+  get isInitialized(): boolean {
+    return this._initialized;
+  }
+  get isModelLoaded(): boolean {
+    return this._modelLoaded;
+  }
 
   /**
-   * Set a custom Worker URL.
-   *
-   * By default the bridge creates a Worker using the SDK's bundled entry point
-   * (`workers/vlm-worker.js`). Apps that need to customise the Worker location
-   * (e.g. different deploy path, or a worker that wraps the runtime) can call
-   * this before `init()`.
+   * Set a custom Worker URL. By default the bridge uses the SDK's bundled
+   * entry point (`workers/vlm-worker.js`). Apps that ship the worker from
+   * a different deploy path can call this before `init()`.
    */
   set workerUrl(url: URL | string) {
     this._workerUrl = url;
   }
 
-  // ---- Progress ----
+  // -----------------------------------------------------------------------
+  // Progress
+  // -----------------------------------------------------------------------
 
-  /**
-   * Subscribe to progress updates from the Worker.
-   * Returns an unsubscribe function.
-   */
   onProgress(fn: ProgressListener): () => void {
     this._progressListeners.push(fn);
     return () => {
@@ -186,234 +153,217 @@ export class VLMWorkerBridge {
     for (const fn of this._progressListeners) fn(stage);
   }
 
-  // ---- Lifecycle ----
+  // -----------------------------------------------------------------------
+  // Lifecycle
+  // -----------------------------------------------------------------------
 
   /**
-   * Initialize the Worker and its WASM instance.
-   * Must be called once before loadModel/process.
+   * Initialise the worker and its WASM instance.
    *
-   * Reads the WASM URL and acceleration mode from LlamaCppBridge internally —
-   * the app does not need to pass these.
-   *
-   * @param wasmJsUrl - Optional explicit URL for the WASM glue JS.
-   *                    When omitted, the SDK's LlamaCppBridge.wasmUrl is used
-   *                    so the worker loads the exact same variant (WebGPU or CPU)
-   *                    that the main thread successfully loaded.
+   * Reads the WASM URL and acceleration mode from `LlamaCppBridge` so the
+   * worker loads the same variant (CPU vs WebGPU) the main thread already
+   * picked.
    */
   async init(wasmJsUrl?: string): Promise<void> {
-    if (this._isInitialized) return;
+    if (this._initialized) return;
 
-    // All acceleration logic lives in the SDK's LlamaCppBridge.
-    // We just read the decision it already made.
     const bridge = LlamaCppBridge.shared;
     const useWebGPU = bridge.accelerationMode === 'webgpu';
-    // Pick the URL that matches the active acceleration mode. After the
-    // bridge stopped overwriting `wasmUrl` for the WebGPU path, callers in
-    // WebGPU mode must read `webgpuWasmUrl`.
-    const accelUrl = useWebGPU ? bridge.webgpuWasmUrl : bridge.wasmUrl;
-    const resolvedUrl = wasmJsUrl ?? accelUrl ?? '';
+    const resolvedUrl = wasmJsUrl ?? bridge.wasmUrl ?? null;
 
     if (!resolvedUrl) {
-      throw new Error('[VLMWorkerBridge] SDK not initialized — no WASM URL available');
+      throw new Error(
+        '[VLMWorkerBridge] Main bridge has not loaded WASM yet — call LlamaCPP.register() first',
+      );
     }
 
-    // Create the Worker
-    const workerUrl = this._workerUrl ?? new URL('../workers/vlm-worker.js', import.meta.url);
-    this.worker = new Worker(workerUrl, { type: 'module' });
-
-    this.worker.onmessage = this.handleMessage.bind(this);
-    this.worker.onerror = (e) => {
-      logger.error(`Worker error: ${e.message ?? e}`);
-    };
-
+    this.spawnWorker();
     await this.send('init', { wasmJsUrl: resolvedUrl, useWebGPU });
-    this._isInitialized = true;
-    logger.info(`Worker initialized (${useWebGPU ? 'WebGPU' : 'CPU'})`);
+    this._initialized = true;
+    logger.info(`Worker initialised (${useWebGPU ? 'WebGPU' : 'CPU'})`);
   }
 
   /**
-   * Load a VLM model in the Worker's WASM instance.
+   * Load a VLM model in the worker.
    *
-   * Normally the Worker reads model files directly from OPFS (zero-copy).
-   * When OPFS quota is exceeded and models are only in the main-thread memory
-   * cache, the data is transferred via postMessage (still zero-copy via
-   * Transferable ArrayBuffers).
+   * If the model is Qwen2-VL and the main bridge picked WebGPU, the worker
+   * is restarted on the CPU WASM binary because Qwen2-VL produces NaN
+   * logits on WebGPU due to f16 M-RoPE overflow.
    */
   async loadModel(params: VLMLoadModelParams): Promise<void> {
-    if (!this._isInitialized) {
+    if (!this._initialized) {
       await this.init();
     }
 
-    // M-RoPE models (Qwen2-VL) produce NaN logits on WebGPU due to f16
-    // accumulation overflow in the rotary position encoding shader. If we
-    // detect one, restart the Worker with the CPU WASM binary so the entire
-    // inference runs on the CPU backend.
-    //
-    // PERFORMANCE: The CPU WASM binary is single-threaded (pthreads OFF), so
-    // Qwen2-VL runs at ~1 tok/s vs ~15-20 tok/s for WebGPU models (LFM2-VL).
-    // This is a correctness-over-speed trade-off.
-    // TODO: re-test on WebGPU periodically as llama.cpp's WebGPU backend
-    // matures — the Vulkan fp16 FA fix (b8168) may eventually be ported.
+    // Qwen2-VL CPU pinning — see top-of-file comment.
     const bridge = LlamaCppBridge.shared;
-    const isQwenVL = /qwen.*vl/i.test(params.modelId) || /qwen.*vl/i.test(params.modelName);
+    const isQwenVL =
+      /qwen.*vl/i.test(params.modelId) || /qwen.*vl/i.test(params.modelName);
     if (isQwenVL && bridge.accelerationMode === 'webgpu') {
-      // Derive the CPU URL from the WebGPU URL (which now lives in webgpuWasmUrl).
-      const currentUrl = bridge.webgpuWasmUrl ?? '';
-      const cpuUrl = bridge.wasmUrl ?? currentUrl.replace(/-webgpu\.js$/, '.js');
-      if (cpuUrl && cpuUrl !== currentUrl) {
-        logger.info('Qwen2-VL detected — restarting VLM Worker with CPU WASM (M-RoPE compat)');
+      const currentUrl = bridge.wasmUrl ?? '';
+      const cpuUrl = currentUrl.replace(/-webgpu\.js$/, '.js');
+      if (cpuUrl !== currentUrl) {
+        logger.info(
+          'Qwen2-VL detected — restarting VLM Worker with CPU WASM (M-RoPE compat)',
+        );
         this.terminate();
-        await this.init(cpuUrl);
+        await this.initWithUrl(cpuUrl, false);
       }
     }
 
-    // Transfer data buffers when provided (zero-copy to Worker)
-    const transferables: Transferable[] = [];
-    if (params.modelData) transferables.push(params.modelData);
-    if (params.mmprojData) transferables.push(params.mmprojData);
-
+    const transferables: Transferable[] = [params.modelData, params.mmprojData];
     await this.send('load-model', params, transferables);
-    this._isModelLoaded = true;
+    this._modelLoaded = true;
     this._lastModelParams = params;
     this._needsRecovery = false;
-    logger.info(`Model loaded: ${params.modelId}`);
+    logger.info(`Model loaded in worker: ${params.modelId}`);
   }
 
   /**
-   * Process an image with the VLM.
-   * Returns a promise that resolves when inference is complete.
-   * The main thread stays responsive during processing.
+   * Process an image through the VLM and return a typed `ProtoVLMResult`.
    *
-   * The pixel buffer is transferred (zero-copy) to the Worker.
+   * The image / options are encoded as proto bytes and forwarded to the
+   * worker, which decodes them on its side, calls `_rac_vlm_process_proto`,
+   * and returns the encoded `VLMResult` bytes — the same wire format used by
+   * the main-thread `VLMProtoAdapter` so callers see a uniform surface.
    */
   async process(
-    rgbPixels: Uint8Array,
-    width: number,
-    height: number,
-    prompt: string,
-    options: VLMProcessOptions = {},
-  ): Promise<VLMWorkerResult> {
-    // Auto-recover from previous WASM crash (OOB, etc.)
+    image: ProtoVLMImage,
+    options: ProtoVLMGenerationOptions,
+  ): Promise<ProtoVLMResult> {
     if (this._needsRecovery) {
       await this.recover();
     }
-
-    if (!this._isModelLoaded) {
-      throw new Error('No VLM model loaded in Worker. Call loadModel() first.');
+    if (!this._modelLoaded) {
+      throw new Error(
+        '[VLMWorkerBridge] No VLM model loaded in worker. Call loadModel() first.',
+      );
     }
 
-    // Transfer the pixel buffer (zero-copy to Worker)
-    const buffer = rgbPixels.buffer.slice(
-      rgbPixels.byteOffset,
-      rgbPixels.byteOffset + rgbPixels.byteLength,
-    );
+    const imageBytes = VLMImage.encode(image).finish();
+    const optionsBytes = VLMGenerationOptions.encode(options).finish();
 
     try {
-      return await this.send(
-        'process',
-        {
-          rgbPixels: buffer,
-          width,
-          height,
-          prompt,
-          maxTokens: options.maxTokens ?? 200,
-          temperature: options.temperature ?? 0.7,
-          topP: options.topP ?? 0.9,
-          systemPrompt: options.systemPrompt,
-          modelFamily: options.modelFamily,
-        },
-        [buffer],
-      );
+      const responseBytes = (await this.send('process', {
+        imageBytes,
+        optionsBytes,
+      })) as Uint8Array;
+      return VLMResult.decode(responseBytes);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // WASM runtime errors (OOB, stack overflow) leave the instance corrupted.
-      // Mark for recovery so the next call creates a fresh Worker.
-      if (msg.includes('memory access out of bounds') ||
-          msg.includes('unreachable') ||
-          msg.includes('RuntimeError')) {
-        logger.warning('WASM crash detected, will recover on next call');
+      // WASM runtime crashes (OOB, stack overflow, JSPI corruption) leave the
+      // module unrecoverable — mark for recreate so the next call gets a
+      // fresh worker + WASM instance + reloaded model.
+      if (
+        msg.includes('memory access out of bounds') ||
+        msg.includes('unreachable') ||
+        msg.includes('RuntimeError') ||
+        msg.includes('out of memory')
+      ) {
+        logger.warning(
+          `WASM crash detected (${msg.slice(0, 80)}…) — will recover on next call`,
+        );
         this._needsRecovery = true;
       }
       throw err;
     }
   }
 
-  /**
-   * Recover from a WASM crash by terminating the old Worker,
-   * creating a fresh one, and reloading the model.
-   */
-  private async recover(): Promise<void> {
-    if (!this._lastModelParams) {
-      throw new Error('Cannot recover: no model params saved');
-    }
-
-    logger.info('Recovering from WASM crash...');
-    const params = this._lastModelParams;
-
-    // Destroy old worker completely
-    this.terminate();
-
-    // Reinitialize fresh worker + reload model
-    await this.init();
-    await this.loadModel(params);
-    logger.info('Recovery complete');
-  }
-
-  /** Cancel in-progress VLM generation. */
+  /** Cancel the in-flight VLM generation. Best-effort — no result returned. */
   cancel(): void {
-    if (this.worker) {
-      this.worker.postMessage({ type: 'cancel', id: -2 });
-    }
+    if (!this.worker) return;
+    this.worker.postMessage({ type: 'cancel', id: -2 });
   }
 
-  /** Unload the VLM model. */
+  /** Unload the model in the worker (keeps the WASM instance). */
   async unloadModel(): Promise<void> {
-    if (!this._isModelLoaded) return;
+    if (!this._modelLoaded) return;
     await this.send('unload', {});
-    this._isModelLoaded = false;
+    this._modelLoaded = false;
   }
 
-  /**
-   * Terminate the Worker entirely.
-   *
-   * Rejects any in-flight RPC promises so callers aren't left hanging,
-   * then terminates the underlying Web Worker.
-   */
+  /** Terminate the worker entirely; rejects all in-flight RPC promises. */
   terminate(): void {
-    // Reject all pending RPC calls so callers don't hang forever
     for (const [, { reject }] of this.pending) {
       reject(new Error('VLM Worker terminated'));
     }
     this.pending.clear();
 
-    this.worker?.terminate();
-    this.worker = null;
-    this._isInitialized = false;
-    this._isModelLoaded = false;
+    if (this.worker) {
+      this.worker.terminate();
+      this.worker = null;
+    }
+    this._initialized = false;
+    this._modelLoaded = false;
   }
 
-  // ---- Internal RPC ----
+  // -----------------------------------------------------------------------
+  // Internal: recovery
+  // -----------------------------------------------------------------------
 
-  /* eslint-disable @typescript-eslint/no-explicit-any */
-  private send(type: string, payload: any, transferables?: Transferable[]): Promise<any> {
+  /**
+   * Recover from a WASM crash by terminating the corrupted worker, spinning
+   * up a fresh one, and replaying the last `loadModel` so the next inference
+   * call works transparently.
+   */
+  private async recover(): Promise<void> {
+    if (!this._lastModelParams) {
+      throw new Error(
+        '[VLMWorkerBridge] Cannot recover: no model parameters cached',
+      );
+    }
+
+    logger.info('Recovering from VLM WASM crash…');
+    const params = this._lastModelParams;
+    this.terminate();
+    await this.init();
+    await this.loadModel(params);
+    this._needsRecovery = false;
+    logger.info('VLM Worker recovery complete');
+  }
+
+  // -----------------------------------------------------------------------
+  // Internal: worker spawning + RPC
+  // -----------------------------------------------------------------------
+
+  private spawnWorker(): void {
+    const url =
+      this._workerUrl ?? new URL('../workers/vlm-worker.js', import.meta.url);
+    this.worker = new Worker(url, { type: 'module' });
+    this.worker.onmessage = this.handleMessage.bind(this);
+    this.worker.onerror = (e) => {
+      logger.error(`Worker error: ${e.message ?? e}`);
+    };
+  }
+
+  private async initWithUrl(wasmJsUrl: string, useWebGPU: boolean): Promise<void> {
+    this.spawnWorker();
+    await this.send('init', { wasmJsUrl, useWebGPU });
+    this._initialized = true;
+  }
+
+  private send(
+    type: string,
+    payload: unknown,
+    transferables: Transferable[] = [],
+  ): Promise<unknown> {
     return new Promise((resolve, reject) => {
       if (!this.worker) {
-        reject(new Error('VLM Worker not initialized'));
+        reject(new Error('[VLMWorkerBridge] Worker not initialised'));
         return;
       }
-
       const id = this.nextId++;
       this.pending.set(id, { resolve, reject });
-      this.worker.postMessage({ type, id, payload }, transferables ?? []);
+      this.worker.postMessage({ type, id, payload }, transferables);
     });
   }
 
   private handleMessage(e: MessageEvent<VLMWorkerResponse>): void {
     const { id, type, payload } = e.data;
 
-    // Progress messages (id=-1) are not RPC responses
     if (type === 'progress') {
-      this.emitProgress((payload as any).stage);
+      const stage = (payload as { stage: string }).stage;
+      this.emitProgress(stage);
       return;
     }
 
@@ -422,10 +372,9 @@ export class VLMWorkerBridge {
     this.pending.delete(id);
 
     if (type === 'error') {
-      pending.reject(new Error((payload as any).message));
+      pending.reject(new Error((payload as { message: string }).message));
     } else {
       pending.resolve(payload);
     }
   }
-  /* eslint-enable @typescript-eslint/no-explicit-any */
 }

@@ -29,20 +29,33 @@ import { Typography, FontWeight } from '../../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../../theme/spacing';
 import type { DeviceInfo } from '../../types/model';
 import {
-  ModelCategory,
-  LLMFramework,
-  FrameworkDisplayNames,
-} from '../../types/model';
+  DEFAULT_INFERENCE_FRAMEWORK,
+  getFrameworkColor,
+  getFrameworkDisplayName,
+  getFrameworkIcon,
+  getModelDownloadSizeBytes,
+  getModelFormatLabel,
+  getModelFrameworks,
+  getPrimaryFramework,
+  isModelCompatibleWithFramework,
+  createModelInfoSummary,
+  SYSTEM_TTS_FRAMEWORK,
+} from '../../utils/modelDisplay';
 
 // Import SDK types and values
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import {
+  InferenceFramework,
+  ModelCategory,
   RunAnywhere,
   type ModelInfo as SDKModelInfo,
-  LLMFramework as SDKLLMFramework,
-  ModelCategory as SDKModelCategory,
   requireDeviceInfoModule,
 } from '@runanywhere/core';
+import { ModelFormat } from '@runanywhere/proto-ts/model_types';
+
+// Canonical SDK methods (Swift / Kotlin / Flutter / Web parity).
+const downloadModelHelper = RunAnywhere.downloadModel;
+const getAvailableModels = RunAnywhere.getAvailableModels;
 
 /**
  * Context for filtering frameworks and models based on the current experience/modality
@@ -115,22 +128,22 @@ const _getRelevantCategories = (
  */
 const getCategoryForContext = (
   context: ModelSelectionContext
-): SDKModelCategory | null => {
+): ModelCategory | null => {
   switch (context) {
     case ModelSelectionContext.LLM:
-      return SDKModelCategory.MODEL_CATEGORY_LANGUAGE; // 'language'
+      return ModelCategory.MODEL_CATEGORY_LANGUAGE;
     case ModelSelectionContext.STT:
-      return SDKModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION; // 'speech-recognition'
+      return ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION;
     case ModelSelectionContext.TTS:
-      return SDKModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS; // 'speech-synthesis'
+      return ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS;
     case ModelSelectionContext.Voice:
       return null; // Show all
     case ModelSelectionContext.VLM:
-      return SDKModelCategory.MODEL_CATEGORY_MULTIMODAL; // 'multimodal'
+      return ModelCategory.MODEL_CATEGORY_MULTIMODAL;
     case ModelSelectionContext.RagEmbedding:
-      return SDKModelCategory.MODEL_CATEGORY_EMBEDDING; // 'embedding'
+      return ModelCategory.MODEL_CATEGORY_EMBEDDING;
     case ModelSelectionContext.RagLLM:
-      return SDKModelCategory.MODEL_CATEGORY_LANGUAGE; // 'language'
+      return ModelCategory.MODEL_CATEGORY_LANGUAGE;
   }
 };
 
@@ -140,12 +153,12 @@ const getCategoryForContext = (
  */
 const getAllowedFrameworksForContext = (
   context: ModelSelectionContext
-): Set<string> | null => {
+): Set<InferenceFramework> | null => {
   switch (context) {
     case ModelSelectionContext.RagEmbedding:
-      return new Set([LLMFramework.ONNX]);
+      return new Set([InferenceFramework.INFERENCE_FRAMEWORK_ONNX]);
     case ModelSelectionContext.RagLLM:
-      return new Set([LLMFramework.LlamaCpp]);
+      return new Set([InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP]);
     default:
       return null;
   }
@@ -162,7 +175,7 @@ const isRAGContext = (context: ModelSelectionContext): boolean =>
  * Framework info for display
  */
 interface FrameworkDisplayInfo {
-  framework: LLMFramework;
+  framework: InferenceFramework;
   displayName: string;
   iconName: string;
   color: string;
@@ -173,54 +186,14 @@ interface FrameworkDisplayInfo {
  * Get framework display info
  */
 const getFrameworkInfo = (
-  framework: LLMFramework,
+  framework: InferenceFramework,
   modelCount: number
 ): FrameworkDisplayInfo => {
-  const colorMap: Record<LLMFramework, string> = {
-    [LLMFramework.LlamaCpp]: Colors.frameworkLlamaCpp,
-    [LLMFramework.WhisperKit]: Colors.frameworkWhisperKit,
-    [LLMFramework.ONNX]: Colors.frameworkONNX,
-    [LLMFramework.CoreML]: Colors.frameworkCoreML,
-    [LLMFramework.FoundationModels]: Colors.frameworkFoundationModels,
-    [LLMFramework.TensorFlowLite]: Colors.frameworkTFLite,
-    [LLMFramework.PiperTTS]: Colors.frameworkPiperTTS,
-    [LLMFramework.SystemTTS]: Colors.frameworkSystemTTS,
-    [LLMFramework.MLX]: Colors.primaryPurple,
-    [LLMFramework.SwiftTransformers]: Colors.primaryBlue,
-    [LLMFramework.ExecuTorch]: Colors.primaryOrange,
-    [LLMFramework.PicoLLM]: Colors.primaryGreen,
-    [LLMFramework.MLC]: Colors.primaryBlue,
-    [LLMFramework.MediaPipe]: Colors.primaryOrange,
-    [LLMFramework.OpenAIWhisper]: Colors.primaryGreen,
-    [LLMFramework.Genie]: Colors.primaryPurple,
-    [LLMFramework.Sherpa]: Colors.primaryBlue,
-  };
-
-  const iconMap: Record<LLMFramework, string> = {
-    [LLMFramework.LlamaCpp]: 'terminal-outline',
-    [LLMFramework.WhisperKit]: 'mic-outline',
-    [LLMFramework.ONNX]: 'cube-outline',
-    [LLMFramework.CoreML]: 'hardware-chip-outline',
-    [LLMFramework.FoundationModels]: 'sparkles-outline',
-    [LLMFramework.TensorFlowLite]: 'layers-outline',
-    [LLMFramework.PiperTTS]: 'volume-high-outline',
-    [LLMFramework.SystemTTS]: 'megaphone-outline',
-    [LLMFramework.MLX]: 'flash-outline',
-    [LLMFramework.SwiftTransformers]: 'code-slash-outline',
-    [LLMFramework.ExecuTorch]: 'flame-outline',
-    [LLMFramework.PicoLLM]: 'radio-outline',
-    [LLMFramework.MLC]: 'git-branch-outline',
-    [LLMFramework.MediaPipe]: 'videocam-outline',
-    [LLMFramework.OpenAIWhisper]: 'ear-outline',
-    [LLMFramework.Genie]: 'hardware-chip-outline',
-    [LLMFramework.Sherpa]: 'mic-outline',
-  };
-
   return {
     framework,
-    displayName: FrameworkDisplayNames[framework] || framework,
-    iconName: iconMap[framework] || 'extension-puzzle-outline',
-    color: colorMap[framework] || Colors.primaryBlue,
+    displayName: getFrameworkDisplayName(framework),
+    iconName: getFrameworkIcon(framework),
+    color: getFrameworkColor(framework),
     modelCount,
   };
 };
@@ -252,7 +225,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   // State
   const [availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
   const [expandedFramework, setExpandedFramework] =
-    useState<LLMFramework | null>(null);
+    useState<InferenceFramework | null>(null);
   const [isLoadingModel, setIsLoadingModel] = useState(false);
   const [loadingProgress, _setLoadingProgress] = useState('');
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
@@ -270,7 +243,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     setIsLoading(true);
     try {
       // Load models from SDK
-      const allModels = await RunAnywhere.getAvailableModels();
+      const allModels = await getAvailableModels();
       const categoryFilter = getCategoryForContext(context);
 
       // Filter models based on context (using category field)
@@ -287,8 +260,10 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
 
             // Framework restriction (e.g., ONNX-only for embedding, LlamaCpp-only for RAG LLM)
             if (allowedFrameworks) {
-              const fw = m.preferredFramework || m.compatibleFrameworks?.[0];
-              if (!fw || !allowedFrameworks.has(fw)) return false;
+              const frameworks = getModelFrameworks(m);
+              if (!frameworks.some((fw) => allowedFrameworks.has(fw))) {
+                return false;
+              }
             }
 
             return true;
@@ -304,10 +279,10 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           '[ModelSelectionSheet] No category matches, trying framework fallback'
         );
         filteredModels = allModels.filter((m: SDKModelInfo) => {
-          const hasLlamaFramework =
-            m.preferredFramework === SDKLLMFramework.LlamaCpp ||
-            m.compatibleFrameworks?.includes(SDKLLMFramework.LlamaCpp);
-          return hasLlamaFramework;
+          return isModelCompatibleWithFramework(
+            m,
+            InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
+          );
         });
         console.warn(
           '[ModelSelectionSheet] Framework fallback models:',
@@ -326,7 +301,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
         filteredModels = allModels.filter((m: SDKModelInfo) => {
           const modelCategory = m.category;
           return (
-            modelCategory === SDKModelCategory.MODEL_CATEGORY_VISION ||
+            modelCategory === ModelCategory.MODEL_CATEGORY_VISION ||
             String(modelCategory).toLowerCase() === 'vision'
           );
         });
@@ -431,25 +406,13 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
    * Get frameworks with their model counts
    */
   const getFrameworks = useCallback((): FrameworkDisplayInfo[] => {
-    const frameworkCounts = new Map<LLMFramework, number>();
+    const frameworkCounts = new Map<InferenceFramework, number>();
 
     availableModels.forEach((model: SDKModelInfo, _index: number) => {
-      // Determine framework from model - use preferredFramework or first compatibleFramework
-      const frameworkValue =
-        model.preferredFramework || model.compatibleFrameworks?.[0];
-
-      // Map string to enum if needed
-      let framework: LLMFramework;
-      if (
-        typeof frameworkValue === 'string' &&
-        frameworkValue in LLMFramework
-      ) {
-        framework = LLMFramework[frameworkValue as keyof typeof LLMFramework];
-      } else if (Object.values(LLMFramework).includes(frameworkValue)) {
-        framework = frameworkValue as LLMFramework;
-      } else {
-        framework = LLMFramework.LlamaCpp; // Default
-      }
+      const framework = getPrimaryFramework(
+        model,
+        DEFAULT_INFERENCE_FRAMEWORK
+      );
 
       const count = frameworkCounts.get(framework) || 0;
       frameworkCounts.set(framework, count + 1);
@@ -457,7 +420,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
 
     // Add System TTS for TTS context
     if (context === ModelSelectionContext.TTS) {
-      frameworkCounts.set(LLMFramework.SystemTTS, 1);
+      frameworkCounts.set(SYSTEM_TTS_FRAMEWORK, 1);
     }
 
     return Array.from(frameworkCounts.entries())
@@ -469,18 +432,9 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
    * Get models for a specific framework
    */
   const getModelsForFramework = useCallback(
-    (framework: LLMFramework): SDKModelInfo[] => {
+    (framework: InferenceFramework): SDKModelInfo[] => {
       return availableModels.filter((model: SDKModelInfo) => {
-        // Check preferredFramework first, then compatibleFrameworks
-        const modelFramework =
-          (model.preferredFramework as LLMFramework) ||
-          (model.compatibleFrameworks?.[0] as LLMFramework) ||
-          LLMFramework.LlamaCpp;
-
-        // Also check if this framework is in compatibleFrameworks
-        const isCompatible = model.compatibleFrameworks?.includes(framework);
-
-        return modelFramework === framework || isCompatible;
+        return isModelCompatibleWithFramework(model, framework);
       });
     },
     [availableModels]
@@ -489,7 +443,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   /**
    * Toggle framework expansion
    */
-  const toggleFramework = (framework: LLMFramework) => {
+  const toggleFramework = (framework: InferenceFramework) => {
     setExpandedFramework(expandedFramework === framework ? null : framework);
   };
 
@@ -533,7 +487,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
 
     try {
       // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
-      const dlIter = RunAnywhere.downloadModel(model.id)[Symbol.asyncIterator]();
+      const dlIter = downloadModelHelper(model.id)[Symbol.asyncIterator]();
       let dlResult = await dlIter.next();
       while (!dlResult.done) {
         const progress = dlResult.value;
@@ -567,18 +521,16 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   const handleSelectSystemTTS = async () => {
     try {
       // Create a pseudo model for System TTS
-      const systemTTSModel = {
+      const systemTTSModel = createModelInfoSummary({
         id: 'system-tts',
         name: 'System TTS',
         category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-        preferredFramework: LLMFramework.SystemTTS,
-        compatibleFrameworks: [LLMFramework.SystemTTS],
+        framework: SYSTEM_TTS_FRAMEWORK,
+        format: ModelFormat.MODEL_FORMAT_PROPRIETARY,
+        localPath: 'builtin://system-tts',
         isDownloaded: true,
         isAvailable: true,
-        downloadSize: 0,
-        memoryRequired: 0,
-        format: 'system',
-      } as unknown as SDKModelInfo;
+      });
 
       // Parent is responsible for closing the modal
       await onModelSelected(systemTTSModel);
@@ -737,8 +689,8 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   /**
    * Render expanded models for a framework
    */
-  const renderExpandedModels = (framework: LLMFramework) => {
-    if (framework === LLMFramework.SystemTTS) {
+  const renderExpandedModels = (framework: InferenceFramework) => {
+    if (framework === SYSTEM_TTS_FRAMEWORK) {
       return renderSystemTTSRow();
     }
 
@@ -823,7 +775,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           </Text>
 
           <View style={styles.modelMeta}>
-            {model.downloadSize != null && model.downloadSize > 0 && (
+            {getModelDownloadSizeBytes(model) > 0 && (
               <View style={styles.sizeTag}>
                 <Icon
                   name="server-outline"
@@ -831,14 +783,14 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
                   color={Colors.textSecondary}
                 />
                 <Text style={styles.sizeText}>
-                  {formatBytes(model.downloadSize)}
+                  {formatBytes(getModelDownloadSizeBytes(model))}
                 </Text>
               </View>
             )}
 
             <View style={styles.badge}>
               <Text style={styles.badgeText}>
-                {String(model.format || 'GGUF').toUpperCase()}
+                {getModelFormatLabel(model.format)}
               </Text>
             </View>
           </View>

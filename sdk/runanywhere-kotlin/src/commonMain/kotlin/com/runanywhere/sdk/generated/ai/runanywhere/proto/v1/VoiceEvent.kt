@@ -14,6 +14,8 @@ import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
 import com.squareup.wire.`internal`.countNonNull
+import com.squareup.wire.`internal`.immutableCopyOf
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -24,6 +26,8 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.Map
+import kotlin.lazy
 import okio.ByteString
 
 /**
@@ -215,14 +219,66 @@ public class VoiceEvent(
     schemaIndex = 21,
   )
   public val wakeword_detected: WakeWordDetectedEvent? = null,
+  @field:WireField(
+    tag = 27,
+    adapter = "ai.runanywhere.proto.v1.AudioLevelEvent#ADAPTER",
+    jsonName = "audioLevel",
+    oneofName = "payload",
+    schemaIndex = 22,
+  )
+  public val audio_level: AudioLevelEvent? = null,
+  @field:WireField(
+    tag = 28,
+    adapter = "ai.runanywhere.proto.v1.ComponentProgressEvent#ADAPTER",
+    jsonName = "componentProgress",
+    oneofName = "payload",
+    schemaIndex = 23,
+  )
+  public val component_progress: ComponentProgressEvent? = null,
+  /**
+   * Correlation fields shared by streaming and one-shot voice turns.
+   */
+  @field:WireField(
+    tag = 30,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "sessionId",
+    schemaIndex = 24,
+  )
+  public val session_id: String = "",
+  @field:WireField(
+    tag = 31,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "turnId",
+    schemaIndex = 25,
+  )
+  public val turn_id: String = "",
+  @field:WireField(
+    tag = 32,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "requestId",
+    schemaIndex = 26,
+  )
+  public val request_id: String = "",
+  metadata: Map<String, String> = emptyMap(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceEvent, Nothing>(ADAPTER, unknownFields) {
+  @field:WireField(
+    tag = 33,
+    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    schemaIndex = 27,
+  )
+  public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
+
   init {
     require(countNonNull(user_said, assistant_token, audio, vad, interrupted, state, error, metrics,
         component_state_changed, session_error, session_started, session_stopped,
         agent_response_started, agent_response_completed, speech_turn_detection, turn_lifecycle,
-        wakeword_detected) <= 1) {
-      "At most one of user_said, assistant_token, audio, vad, interrupted, state, error, metrics, component_state_changed, session_error, session_started, session_stopped, agent_response_started, agent_response_completed, speech_turn_detection, turn_lifecycle, wakeword_detected may be non-null"
+        wakeword_detected, audio_level, component_progress) <= 1) {
+      "At most one of user_said, assistant_token, audio, vad, interrupted, state, error, metrics, component_state_changed, session_error, session_started, session_stopped, agent_response_started, agent_response_completed, speech_turn_detection, turn_lifecycle, wakeword_detected, audio_level, component_progress may be non-null"
     }
   }
 
@@ -259,6 +315,12 @@ public class VoiceEvent(
     if (speech_turn_detection != other.speech_turn_detection) return false
     if (turn_lifecycle != other.turn_lifecycle) return false
     if (wakeword_detected != other.wakeword_detected) return false
+    if (audio_level != other.audio_level) return false
+    if (component_progress != other.component_progress) return false
+    if (session_id != other.session_id) return false
+    if (turn_id != other.turn_id) return false
+    if (request_id != other.request_id) return false
+    if (metadata != other.metadata) return false
     return true
   }
 
@@ -288,6 +350,12 @@ public class VoiceEvent(
       result = result * 37 + (speech_turn_detection?.hashCode() ?: 0)
       result = result * 37 + (turn_lifecycle?.hashCode() ?: 0)
       result = result * 37 + (wakeword_detected?.hashCode() ?: 0)
+      result = result * 37 + (audio_level?.hashCode() ?: 0)
+      result = result * 37 + (component_progress?.hashCode() ?: 0)
+      result = result * 37 + session_id.hashCode()
+      result = result * 37 + turn_id.hashCode()
+      result = result * 37 + request_id.hashCode()
+      result = result * 37 + metadata.hashCode()
       super.hashCode = result
     }
     return result
@@ -320,6 +388,12 @@ public class VoiceEvent(
     if (speech_turn_detection != null) result += """speech_turn_detection=$speech_turn_detection"""
     if (turn_lifecycle != null) result += """turn_lifecycle=$turn_lifecycle"""
     if (wakeword_detected != null) result += """wakeword_detected=$wakeword_detected"""
+    if (audio_level != null) result += """audio_level=$audio_level"""
+    if (component_progress != null) result += """component_progress=$component_progress"""
+    result += """session_id=${sanitize(session_id)}"""
+    result += """turn_id=${sanitize(turn_id)}"""
+    result += """request_id=${sanitize(request_id)}"""
+    if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     return result.joinToString(prefix = "VoiceEvent{", separator = ", ", postfix = "}")
   }
 
@@ -346,12 +420,18 @@ public class VoiceEvent(
     speech_turn_detection: SpeechTurnDetectionEvent? = this.speech_turn_detection,
     turn_lifecycle: TurnLifecycleEvent? = this.turn_lifecycle,
     wakeword_detected: WakeWordDetectedEvent? = this.wakeword_detected,
+    audio_level: AudioLevelEvent? = this.audio_level,
+    component_progress: ComponentProgressEvent? = this.component_progress,
+    session_id: String = this.session_id,
+    turn_id: String = this.turn_id,
+    request_id: String = this.request_id,
+    metadata: Map<String, String> = this.metadata,
     unknownFields: ByteString = this.unknownFields,
   ): VoiceEvent = VoiceEvent(seq, timestamp_us, category, severity, component, user_said,
       assistant_token, audio, vad, interrupted, state, error, metrics, component_state_changed,
       session_error, session_started, session_stopped, agent_response_started,
       agent_response_completed, speech_turn_detection, turn_lifecycle, wakeword_detected,
-      unknownFields)
+      audio_level, component_progress, session_id, turn_id, request_id, metadata, unknownFields)
 
   public companion object {
     @JvmField
@@ -363,6 +443,9 @@ public class VoiceEvent(
       null, 
       "voice_events.proto"
     ) {
+      private val metadataAdapter: ProtoAdapter<Map<String, String>> by lazy {
+          ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ProtoAdapter.STRING) }
+
       override fun encodedSize(`value`: VoiceEvent): Int {
         var size = value.unknownFields.size
         if (value.seq != 0L) size += ProtoAdapter.UINT64.encodedSizeWithTag(1, value.seq)
@@ -394,6 +477,14 @@ public class VoiceEvent(
         size += SpeechTurnDetectionEvent.ADAPTER.encodedSizeWithTag(24, value.speech_turn_detection)
         size += TurnLifecycleEvent.ADAPTER.encodedSizeWithTag(25, value.turn_lifecycle)
         size += WakeWordDetectedEvent.ADAPTER.encodedSizeWithTag(26, value.wakeword_detected)
+        size += AudioLevelEvent.ADAPTER.encodedSizeWithTag(27, value.audio_level)
+        size += ComponentProgressEvent.ADAPTER.encodedSizeWithTag(28, value.component_progress)
+        if (value.session_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(30,
+            value.session_id)
+        if (value.turn_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(31, value.turn_id)
+        if (value.request_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(32,
+            value.request_id)
+        size += metadataAdapter.encodedSizeWithTag(33, value.metadata)
         return size
       }
 
@@ -407,6 +498,10 @@ public class VoiceEvent(
             VoiceEventSeverity.ADAPTER.encodeWithTag(writer, 4, value.severity)
         if (value.component != VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED)
             VoicePipelineComponent.ADAPTER.encodeWithTag(writer, 5, value.component)
+        if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 30, value.session_id)
+        if (value.turn_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 31, value.turn_id)
+        if (value.request_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 32, value.request_id)
+        metadataAdapter.encodeWithTag(writer, 33, value.metadata)
         UserSaidEvent.ADAPTER.encodeWithTag(writer, 10, value.user_said)
         AssistantTokenEvent.ADAPTER.encodeWithTag(writer, 11, value.assistant_token)
         AudioFrameEvent.ADAPTER.encodeWithTag(writer, 12, value.audio)
@@ -425,11 +520,15 @@ public class VoiceEvent(
         SpeechTurnDetectionEvent.ADAPTER.encodeWithTag(writer, 24, value.speech_turn_detection)
         TurnLifecycleEvent.ADAPTER.encodeWithTag(writer, 25, value.turn_lifecycle)
         WakeWordDetectedEvent.ADAPTER.encodeWithTag(writer, 26, value.wakeword_detected)
+        AudioLevelEvent.ADAPTER.encodeWithTag(writer, 27, value.audio_level)
+        ComponentProgressEvent.ADAPTER.encodeWithTag(writer, 28, value.component_progress)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceEvent) {
         writer.writeBytes(value.unknownFields)
+        ComponentProgressEvent.ADAPTER.encodeWithTag(writer, 28, value.component_progress)
+        AudioLevelEvent.ADAPTER.encodeWithTag(writer, 27, value.audio_level)
         WakeWordDetectedEvent.ADAPTER.encodeWithTag(writer, 26, value.wakeword_detected)
         TurnLifecycleEvent.ADAPTER.encodeWithTag(writer, 25, value.turn_lifecycle)
         SpeechTurnDetectionEvent.ADAPTER.encodeWithTag(writer, 24, value.speech_turn_detection)
@@ -448,6 +547,10 @@ public class VoiceEvent(
         AudioFrameEvent.ADAPTER.encodeWithTag(writer, 12, value.audio)
         AssistantTokenEvent.ADAPTER.encodeWithTag(writer, 11, value.assistant_token)
         UserSaidEvent.ADAPTER.encodeWithTag(writer, 10, value.user_said)
+        metadataAdapter.encodeWithTag(writer, 33, value.metadata)
+        if (value.request_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 32, value.request_id)
+        if (value.turn_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 31, value.turn_id)
+        if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 30, value.session_id)
         if (value.component != VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED)
             VoicePipelineComponent.ADAPTER.encodeWithTag(writer, 5, value.component)
         if (value.severity != VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG)
@@ -483,6 +586,12 @@ public class VoiceEvent(
         var speech_turn_detection: SpeechTurnDetectionEvent? = null
         var turn_lifecycle: TurnLifecycleEvent? = null
         var wakeword_detected: WakeWordDetectedEvent? = null
+        var audio_level: AudioLevelEvent? = null
+        var component_progress: ComponentProgressEvent? = null
+        var session_id: String = ""
+        var turn_id: String = ""
+        var request_id: String = ""
+        val metadata = mutableMapOf<String, String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> seq = ProtoAdapter.UINT64.decode(reader)
@@ -519,6 +628,12 @@ public class VoiceEvent(
             24 -> speech_turn_detection = SpeechTurnDetectionEvent.ADAPTER.decode(reader)
             25 -> turn_lifecycle = TurnLifecycleEvent.ADAPTER.decode(reader)
             26 -> wakeword_detected = WakeWordDetectedEvent.ADAPTER.decode(reader)
+            27 -> audio_level = AudioLevelEvent.ADAPTER.decode(reader)
+            28 -> component_progress = ComponentProgressEvent.ADAPTER.decode(reader)
+            30 -> session_id = ProtoAdapter.STRING.decode(reader)
+            31 -> turn_id = ProtoAdapter.STRING.decode(reader)
+            32 -> request_id = ProtoAdapter.STRING.decode(reader)
+            33 -> metadata.putAll(metadataAdapter.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -545,6 +660,12 @@ public class VoiceEvent(
           speech_turn_detection = speech_turn_detection,
           turn_lifecycle = turn_lifecycle,
           wakeword_detected = wakeword_detected,
+          audio_level = audio_level,
+          component_progress = component_progress,
+          session_id = session_id,
+          turn_id = turn_id,
+          request_id = request_id,
+          metadata = metadata,
           unknownFields = unknownFields
         )
       }
@@ -571,6 +692,8 @@ public class VoiceEvent(
             value.speech_turn_detection?.let(SpeechTurnDetectionEvent.ADAPTER::redact),
         turn_lifecycle = value.turn_lifecycle?.let(TurnLifecycleEvent.ADAPTER::redact),
         wakeword_detected = value.wakeword_detected?.let(WakeWordDetectedEvent.ADAPTER::redact),
+        audio_level = value.audio_level?.let(AudioLevelEvent.ADAPTER::redact),
+        component_progress = value.component_progress?.let(ComponentProgressEvent.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

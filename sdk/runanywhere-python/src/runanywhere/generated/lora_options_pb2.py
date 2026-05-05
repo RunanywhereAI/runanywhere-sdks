@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12lora_options.proto\x12\x0erunanywhere.v1\"`\n\x11LoRAAdapterConfig\x12\x14\n\x0c\x61\x64\x61pter_path\x18\x01 \x01(\t\x12\r\n\x05scale\x18\x02 \x01(\x02\x12\x17\n\nadapter_id\x18\x03 \x01(\tH\x00\x88\x01\x01\x42\r\n\x0b_adapter_id\"\x89\x01\n\x0fLoRAAdapterInfo\x12\x12\n\nadapter_id\x18\x01 \x01(\t\x12\x14\n\x0c\x61\x64\x61pter_path\x18\x02 \x01(\t\x12\r\n\x05scale\x18\x03 \x01(\x02\x12\x0f\n\x07\x61pplied\x18\x04 \x01(\x08\x12\x1a\n\rerror_message\x18\x05 \x01(\tH\x00\x88\x01\x01\x42\x10\n\x0e_error_message\"\xff\x01\n\x17LoraAdapterCatalogEntry\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12\x0b\n\x03url\x18\x04 \x01(\t\x12\x10\n\x08\x66ilename\x18\x05 \x01(\t\x12\x19\n\x11\x63ompatible_models\x18\x06 \x03(\t\x12\x12\n\nsize_bytes\x18\x07 \x01(\x03\x12\x13\n\x06\x61uthor\x18\x08 \x01(\tH\x00\x88\x01\x01\x12\x15\n\rdefault_scale\x18\t \x01(\x02\x12\x1c\n\x0f\x63hecksum_sha256\x18\n \x01(\tH\x01\x88\x01\x01\x42\t\n\x07_authorB\x12\n\x10_checksum_sha256\"\x98\x01\n\x17LoraCompatibilityResult\x12\x15\n\ris_compatible\x18\x01 \x01(\x08\x12\x1a\n\rerror_message\x18\x02 \x01(\tH\x00\x88\x01\x01\x12 \n\x13\x62\x61se_model_required\x18\x03 \x01(\tH\x01\x88\x01\x01\x42\x10\n\x0e_error_messageB\x16\n\x14_base_model_requiredB\x8b\x01\n\x17\x61i.runanywhere.proto.v1B\x10LoraOptionsProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x12lora_options.proto\x12\x0erunanywhere.v1\"\xec\x01\n\x11LoRAAdapterConfig\x12\x14\n\x0c\x61\x64\x61pter_path\x18\x01 \x01(\t\x12\r\n\x05scale\x18\x02 \x01(\x02\x12\x17\n\nadapter_id\x18\x03 \x01(\tH\x00\x88\x01\x01\x12\x41\n\x08metadata\x18\x04 \x03(\x0b\x32/.runanywhere.v1.LoRAAdapterConfig.MetadataEntry\x12\x16\n\x0etarget_modules\x18\x05 \x03(\t\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\r\n\x0b_adapter_id\"\xb3\x01\n\x0fLoRAAdapterInfo\x12\x12\n\nadapter_id\x18\x01 \x01(\t\x12\x14\n\x0c\x61\x64\x61pter_path\x18\x02 \x01(\t\x12\r\n\x05scale\x18\x03 \x01(\x02\x12\x0f\n\x07\x61pplied\x18\x04 \x01(\x08\x12\x1a\n\rerror_message\x18\x05 \x01(\tH\x00\x88\x01\x01\x12\x12\n\nerror_code\x18\x06 \x01(\x05\x12\x14\n\x0cloaded_at_ms\x18\x07 \x01(\x03\x42\x10\n\x0e_error_message\"\x97\x05\n\x17LoraAdapterCatalogEntry\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12\x0b\n\x03url\x18\x04 \x01(\t\x12\x10\n\x08\x66ilename\x18\x05 \x01(\t\x12\x19\n\x11\x63ompatible_models\x18\x06 \x03(\t\x12\x12\n\nsize_bytes\x18\x07 \x01(\x03\x12\x13\n\x06\x61uthor\x18\x08 \x01(\tH\x00\x88\x01\x01\x12\x15\n\rdefault_scale\x18\t \x01(\x02\x12\x1c\n\x0f\x63hecksum_sha256\x18\n \x01(\tH\x01\x88\x01\x01\x12\x14\n\x07license\x18\x0b \x01(\tH\x02\x88\x01\x01\x12\x0c\n\x04tags\x18\x0c \x03(\t\x12G\n\x08metadata\x18\r \x03(\x0b\x32\x35.runanywhere.v1.LoraAdapterCatalogEntry.MetadataEntry\x12\x17\n\nlocal_path\x18\x0e \x01(\tH\x03\x88\x01\x01\x12\x1a\n\ris_downloaded\x18\x0f \x01(\x08H\x04\x88\x01\x01\x12\"\n\x15\x64ownloaded_at_unix_ms\x18\x10 \x01(\x03H\x05\x88\x01\x01\x12\x18\n\x0bis_imported\x18\x11 \x01(\x08H\x06\x88\x01\x01\x12\x1b\n\x0estatus_message\x18\x12 \x01(\tH\x07\x88\x01\x01\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\t\n\x07_authorB\x12\n\x10_checksum_sha256B\n\n\x08_licenseB\r\n\x0b_local_pathB\x10\n\x0e_is_downloadedB\x18\n\x16_downloaded_at_unix_msB\x0e\n\x0c_is_importedB\x11\n\x0f_status_message\"\xd1\x01\n\x17LoraAdapterCatalogQuery\x12\x17\n\nadapter_id\x18\x01 \x01(\tH\x00\x88\x01\x01\x12\x15\n\x08model_id\x18\x02 \x01(\tH\x01\x88\x01\x01\x12\x1c\n\x0f\x64ownloaded_only\x18\x03 \x01(\x08H\x02\x88\x01\x01\x12\x19\n\x0csearch_query\x18\x04 \x01(\tH\x03\x88\x01\x01\x12\x0c\n\x04tags\x18\x05 \x03(\tB\r\n\x0b_adapter_idB\x0b\n\t_model_idB\x12\n\x10_downloaded_onlyB\x0f\n\r_search_query\"~\n\x1dLoraAdapterCatalogListRequest\x12;\n\x05query\x18\x01 \x01(\x0b\x32\'.runanywhere.v1.LoraAdapterCatalogQueryH\x00\x88\x01\x01\x12\x16\n\x0einclude_counts\x18\x02 \x01(\x08\x42\x08\n\x06_query\"\xc7\x01\n\x1cLoraAdapterCatalogListResult\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x38\n\x07\x65ntries\x18\x02 \x03(\x0b\x32\'.runanywhere.v1.LoraAdapterCatalogEntry\x12\x15\n\rerror_message\x18\x03 \x01(\t\x12\x13\n\x0btotal_count\x18\x04 \x01(\x05\x12\x16\n\x0e\x66iltered_count\x18\x05 \x01(\x05\x12\x18\n\x10\x64ownloaded_count\x18\x06 \x01(\x05\"2\n\x1cLoraAdapterCatalogGetRequest\x12\x12\n\nadapter_id\x18\x01 \x01(\t\"{\n\x1bLoraAdapterCatalogGetResult\x12\r\n\x05\x66ound\x18\x01 \x01(\x08\x12\x36\n\x05\x65ntry\x18\x02 \x01(\x0b\x32\'.runanywhere.v1.LoraAdapterCatalogEntry\x12\x15\n\rerror_message\x18\x03 \x01(\t\"\x8d\x02\n#LoraAdapterDownloadCompletedRequest\x12\x12\n\nadapter_id\x18\x01 \x01(\t\x12\x12\n\nlocal_path\x18\x02 \x01(\t\x12\x17\n\nsize_bytes\x18\x03 \x01(\x03H\x00\x88\x01\x01\x12\x1c\n\x0f\x63hecksum_sha256\x18\x04 \x01(\tH\x01\x88\x01\x01\x12!\n\x14\x63ompleted_at_unix_ms\x18\x05 \x01(\x03H\x02\x88\x01\x01\x12\x10\n\x08imported\x18\x06 \x01(\x08\x12\x16\n\x0estatus_message\x18\x07 \x01(\tB\r\n\x0b_size_bytesB\x12\n\x10_checksum_sha256B\x17\n\x15_completed_at_unix_ms\"\x97\x01\n\"LoraAdapterDownloadCompletedResult\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x36\n\x05\x65ntry\x18\x02 \x01(\x0b\x32\'.runanywhere.v1.LoraAdapterCatalogEntry\x12\x15\n\rerror_message\x18\x03 \x01(\t\x12\x11\n\tpersisted\x18\x04 \x01(\x08\"\xbe\x01\n\x17LoraCompatibilityResult\x12\x15\n\ris_compatible\x18\x01 \x01(\x08\x12\x1a\n\rerror_message\x18\x02 \x01(\tH\x00\x88\x01\x01\x12 \n\x13\x62\x61se_model_required\x18\x03 \x01(\tH\x01\x88\x01\x01\x12\x10\n\x08warnings\x18\x04 \x03(\t\x12\x12\n\nerror_code\x18\x05 \x01(\x05\x42\x10\n\x0e_error_messageB\x16\n\x14_base_model_required\"u\n\x10LoRAApplyRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x33\n\x08\x61\x64\x61pters\x18\x02 \x03(\x0b\x32!.runanywhere.v1.LoRAAdapterConfig\x12\x18\n\x10replace_existing\x18\x03 \x01(\x08\"\xab\x01\n\x0fLoRAApplyResult\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x31\n\x08\x61\x64\x61pters\x18\x02 \x03(\x0b\x32\x1f.runanywhere.v1.LoRAAdapterInfo\x12\x0f\n\x07success\x18\x03 \x01(\x08\x12\x1a\n\rerror_message\x18\x04 \x01(\tH\x00\x88\x01\x01\x12\x12\n\nerror_code\x18\x05 \x01(\x05\x42\x10\n\x0e_error_message\"f\n\x11LoRARemoveRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x13\n\x0b\x61\x64\x61pter_ids\x18\x02 \x03(\t\x12\x15\n\radapter_paths\x18\x03 \x03(\t\x12\x11\n\tclear_all\x18\x04 \x01(\x08\"\xd2\x01\n\tLoRAState\x12\x38\n\x0floaded_adapters\x18\x01 \x03(\x0b\x32\x1f.runanywhere.v1.LoRAAdapterInfo\x12\x1b\n\x13has_active_adapters\x18\x02 \x01(\x08\x12\x1a\n\rbase_model_id\x18\x03 \x01(\tH\x00\x88\x01\x01\x12\x1a\n\rerror_message\x18\x04 \x01(\tH\x01\x88\x01\x01\x12\x12\n\nerror_code\x18\x05 \x01(\x05\x42\x10\n\x0e_base_model_idB\x10\n\x0e_error_message2\xa7\x07\n\x04LoRA\x12h\n\x14RegisterCatalogEntry\x12\'.runanywhere.v1.LoraAdapterCatalogEntry\x1a\'.runanywhere.v1.LoraAdapterCatalogEntry\x12j\n\x0bListCatalog\x12-.runanywhere.v1.LoraAdapterCatalogListRequest\x1a,.runanywhere.v1.LoraAdapterCatalogListResult\x12\x65\n\x0cQueryCatalog\x12\'.runanywhere.v1.LoraAdapterCatalogQuery\x1a,.runanywhere.v1.LoraAdapterCatalogListResult\x12l\n\x0fGetCatalogEntry\x12,.runanywhere.v1.LoraAdapterCatalogGetRequest\x1a+.runanywhere.v1.LoraAdapterCatalogGetResult\x12\x80\x01\n\x15MarkDownloadCompleted\x12\x33.runanywhere.v1.LoraAdapterDownloadCompletedRequest\x1a\x32.runanywhere.v1.LoraAdapterDownloadCompletedResult\x12J\n\x05\x41pply\x12 .runanywhere.v1.LoRAApplyRequest\x1a\x1f.runanywhere.v1.LoRAApplyResult\x12\x46\n\x06Remove\x12!.runanywhere.v1.LoRARemoveRequest\x1a\x19.runanywhere.v1.LoRAState\x12`\n\x12\x43heckCompatibility\x12!.runanywhere.v1.LoRAAdapterConfig\x1a\'.runanywhere.v1.LoraCompatibilityResult\x12<\n\x04List\x12\x19.runanywhere.v1.LoRAState\x1a\x19.runanywhere.v1.LoRAState\x12=\n\x05State\x12\x19.runanywhere.v1.LoRAState\x1a\x19.runanywhere.v1.LoRAStateB\x8b\x01\n\x17\x61i.runanywhere.proto.v1B\x10LoraOptionsProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -32,12 +32,44 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'lora_options_pb2', _globals
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\027ai.runanywhere.proto.v1B\020LoraOptionsProtoP\001Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RA'
-  _globals['_LORAADAPTERCONFIG']._serialized_start=38
-  _globals['_LORAADAPTERCONFIG']._serialized_end=134
-  _globals['_LORAADAPTERINFO']._serialized_start=137
-  _globals['_LORAADAPTERINFO']._serialized_end=274
-  _globals['_LORAADAPTERCATALOGENTRY']._serialized_start=277
-  _globals['_LORAADAPTERCATALOGENTRY']._serialized_end=532
-  _globals['_LORACOMPATIBILITYRESULT']._serialized_start=535
-  _globals['_LORACOMPATIBILITYRESULT']._serialized_end=687
+  _globals['_LORAADAPTERCONFIG_METADATAENTRY']._loaded_options = None
+  _globals['_LORAADAPTERCONFIG_METADATAENTRY']._serialized_options = b'8\001'
+  _globals['_LORAADAPTERCATALOGENTRY_METADATAENTRY']._loaded_options = None
+  _globals['_LORAADAPTERCATALOGENTRY_METADATAENTRY']._serialized_options = b'8\001'
+  _globals['_LORAADAPTERCONFIG']._serialized_start=39
+  _globals['_LORAADAPTERCONFIG']._serialized_end=275
+  _globals['_LORAADAPTERCONFIG_METADATAENTRY']._serialized_start=213
+  _globals['_LORAADAPTERCONFIG_METADATAENTRY']._serialized_end=260
+  _globals['_LORAADAPTERINFO']._serialized_start=278
+  _globals['_LORAADAPTERINFO']._serialized_end=457
+  _globals['_LORAADAPTERCATALOGENTRY']._serialized_start=460
+  _globals['_LORAADAPTERCATALOGENTRY']._serialized_end=1123
+  _globals['_LORAADAPTERCATALOGENTRY_METADATAENTRY']._serialized_start=213
+  _globals['_LORAADAPTERCATALOGENTRY_METADATAENTRY']._serialized_end=260
+  _globals['_LORAADAPTERCATALOGQUERY']._serialized_start=1126
+  _globals['_LORAADAPTERCATALOGQUERY']._serialized_end=1335
+  _globals['_LORAADAPTERCATALOGLISTREQUEST']._serialized_start=1337
+  _globals['_LORAADAPTERCATALOGLISTREQUEST']._serialized_end=1463
+  _globals['_LORAADAPTERCATALOGLISTRESULT']._serialized_start=1466
+  _globals['_LORAADAPTERCATALOGLISTRESULT']._serialized_end=1665
+  _globals['_LORAADAPTERCATALOGGETREQUEST']._serialized_start=1667
+  _globals['_LORAADAPTERCATALOGGETREQUEST']._serialized_end=1717
+  _globals['_LORAADAPTERCATALOGGETRESULT']._serialized_start=1719
+  _globals['_LORAADAPTERCATALOGGETRESULT']._serialized_end=1842
+  _globals['_LORAADAPTERDOWNLOADCOMPLETEDREQUEST']._serialized_start=1845
+  _globals['_LORAADAPTERDOWNLOADCOMPLETEDREQUEST']._serialized_end=2114
+  _globals['_LORAADAPTERDOWNLOADCOMPLETEDRESULT']._serialized_start=2117
+  _globals['_LORAADAPTERDOWNLOADCOMPLETEDRESULT']._serialized_end=2268
+  _globals['_LORACOMPATIBILITYRESULT']._serialized_start=2271
+  _globals['_LORACOMPATIBILITYRESULT']._serialized_end=2461
+  _globals['_LORAAPPLYREQUEST']._serialized_start=2463
+  _globals['_LORAAPPLYREQUEST']._serialized_end=2580
+  _globals['_LORAAPPLYRESULT']._serialized_start=2583
+  _globals['_LORAAPPLYRESULT']._serialized_end=2754
+  _globals['_LORAREMOVEREQUEST']._serialized_start=2756
+  _globals['_LORAREMOVEREQUEST']._serialized_end=2858
+  _globals['_LORASTATE']._serialized_start=2861
+  _globals['_LORASTATE']._serialized_end=3071
+  _globals['_LORA']._serialized_start=3074
+  _globals['_LORA']._serialized_end=4009
 # @@protoc_insertion_point(module_scope)

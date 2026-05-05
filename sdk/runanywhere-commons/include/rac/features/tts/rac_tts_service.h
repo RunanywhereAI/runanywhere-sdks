@@ -5,6 +5,15 @@
  * Defines the generic TTS service API and vtable for multi-backend dispatch.
  * Backends (ONNX, Platform/System TTS, etc.) implement the vtable and register
  * with the service registry.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - rac_tts_service_ops_t and rac_tts_service_t: `internal`.
+ *   - rac_tts_synthesize_lifecycle_proto: `SDK-facing default` over
+ *     runanywhere.v1.TTSSynthesisRequest / TTSOutput bytes.
+ *   - Struct APIs (rac_tts_create, initialize, synthesize,
+ *     synthesize_stream, stop, get_info, cleanup, destroy, result_free,
+ *     get_languages): `delete after SDK migration` for SDK callers;
+ *     keep only as backend smoke-test entry points.
  */
 
 #ifndef RAC_TTS_SERVICE_H
@@ -12,6 +21,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/features/tts/rac_tts_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -183,6 +193,17 @@ RAC_API void rac_tts_result_free(rac_tts_result_t* result);
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_tts_get_languages(rac_handle_t handle, char** out_json);
+
+/**
+ * @brief Synthesize using the lifecycle-loaded TTS voice/model.
+ *
+ * request_proto_bytes encodes runanywhere.v1.TTSSynthesisRequest.
+ * Commons resolves the current TTS lifecycle component and out_result receives
+ * serialized runanywhere.v1.TTSOutput bytes.
+ */
+RAC_API rac_result_t rac_tts_synthesize_lifecycle_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
 
 #ifdef __cplusplus
 }

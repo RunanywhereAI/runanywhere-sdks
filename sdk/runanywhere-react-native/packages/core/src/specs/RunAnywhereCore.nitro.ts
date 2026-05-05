@@ -31,11 +31,10 @@ import type { HybridObject } from 'react-native-nitro-modules';
  * - @runanywhere/llamacpp for text generation (LLM)
  * - @runanywhere/onnx for speech processing (STT, TTS, VAD)
  */
-export interface RunAnywhereCore
-  extends HybridObject<{
-    ios: 'c++';
-    android: 'c++';
-  }> {
+export interface RunAnywhereCore extends HybridObject<{
+  ios: 'c++';
+  android: 'c++';
+}> {
   // ============================================================================
   // SDK Lifecycle
   // Matches Swift: CppBridge+Init.swift
@@ -172,40 +171,6 @@ export interface RunAnywhereCore
   getDownloadedModelsProto(): Promise<ArrayBuffer>;
 
   /**
-   * Get list of available models
-   * @returns JSON array of model info
-   */
-  getAvailableModels(): Promise<string>;
-
-  /**
-   * Get info for a specific model
-   * @param modelId Model identifier
-   * @returns JSON with model info
-   */
-  getModelInfo(modelId: string): Promise<string>;
-
-  /**
-   * Check if a model is downloaded
-   * @param modelId Model identifier
-   * @returns true if model exists locally
-   */
-  isModelDownloaded(modelId: string): Promise<boolean>;
-
-  /**
-   * Get local path for a model
-   * @param modelId Model identifier
-   * @returns Local file path or empty if not downloaded
-   */
-  getModelPath(modelId: string): Promise<string>;
-
-  /**
-   * Register a custom model with the registry
-   * @param modelJson JSON with model definition
-   * @returns true if registered successfully
-   */
-  registerModel(modelJson: string): Promise<boolean>;
-
-  /**
    * Check if a model is compatible with the current device
    * Compares model RAM/storage requirements against device capabilities
    * @param modelId Model identifier
@@ -217,15 +182,11 @@ export interface RunAnywhereCore
    * Refresh the model registry — T4.9 unified cross-SDK surface.
    *
    * Routes to `rac_model_registry_refresh` in commons. Each flag is
-   * independent. The higher-level JS `RunAnywhere+Models.refreshModelRegistry`
-   * wrapper composes this native refresh with RN filesystem reconciliation so
-   * local rescans and orphan pruning behave like the other SDKs.
+   * independent and interpreted by the native registry implementation.
    *
    * @param includeRemoteCatalog Fetch the backend model assignment catalog.
-   * @param rescanLocal Request a local filesystem rescan when routed through
-   *   the public JS wrapper.
-   * @param pruneOrphans Clear `localPath` on models whose file is missing when
-   *   routed through the public JS wrapper.
+   * @param rescanLocal Request a local filesystem rescan in native commons.
+   * @param pruneOrphans Request orphan pruning in native commons.
    * @returns `true` if the refresh returned `RAC_SUCCESS`.
    */
   refreshModelRegistry(
@@ -236,46 +197,11 @@ export interface RunAnywhereCore
 
   // ============================================================================
   // Download Service
-  // Backed by `rac_download_orchestrate` (commons) which routes through the
+  // Backed by `rac_download_*_proto` (commons) which routes through the
   // platform HTTP transport registered by the RN core (OkHttp on Android,
-  // URLSession on iOS). Progress is delivered as a JSON-serialized
-  // `runanywhere.v1.DownloadProgress` message (field names match the proto
-  // camelCase spelling — `DownloadProgress.fromJSON(JSON.parse(json))` from
-  // `@runanywhere/proto-ts/download_service` decodes it in one step).
-  // Cancellation is keyed on `cancelToken`.
+  // URLSession on iOS). Requests, results, progress, cancellation, and resume
+  // state are serialized `runanywhere.v1.*` proto bytes.
   // ============================================================================
-
-  /**
-   * Download a file to `destPath` using the commons download orchestrator.
-   *
-   * @param url Absolute HTTP/HTTPS URL to download
-   * @param destPath Destination file path
-   * @param cancelToken Opaque token the caller uses to cancel via cancelDownload
-   * @param onProgress Progress callback — receives a JSON string encoding a
-   *   `runanywhere.v1.DownloadProgress` message with all 10 fields
-   *   (modelId, stage, bytesDownloaded, totalBytes, stageProgress,
-   *   overallSpeedBps, etaSeconds, state, retryAttempt, errorMessage).
-   *   Parse with `DownloadProgress.fromJSON(JSON.parse(progressJson))`.
-   * @param expectedSha256Hex Optional lowercase hex SHA-256 checksum of
-   *   the downloaded bytes. When provided, the native runner verifies the
-   *   hash inline and rejects the promise with a
-   *   `RAC_HTTP_DL_CHECKSUM_FAILED` error on mismatch.
-   * @returns Resolves when the file is fully written; rejects on error /
-   *   cancellation.
-   */
-  downloadModel(
-    url: string,
-    destPath: string,
-    cancelToken: string,
-    onProgress: (progressJson: string) => void,
-    expectedSha256Hex?: string
-  ): Promise<void>;
-
-  /**
-   * Cancel an ongoing download identified by `cancelToken`.
-   * @returns true if a matching in-flight download was found and cancelled.
-   */
-  cancelDownload(cancelToken: string): Promise<boolean>;
 
   /**
    * Plan a download from serialized runanywhere.v1.DownloadPlanRequest bytes.
@@ -325,23 +251,10 @@ export interface RunAnywhereCore
   // ============================================================================
 
   /**
-   * Get storage info (disk usage, available space)
-   * @returns JSON with storage info
-   */
-  getStorageInfo(): Promise<string>;
-
-  /**
    * Clear model cache
    * @returns true if cleared successfully
    */
   clearCache(): Promise<boolean>;
-
-  /**
-   * Delete a specific model
-   * @param modelId Model identifier
-   * @returns true if deleted successfully
-   */
-  deleteModel(modelId: string): Promise<boolean>;
 
   /**
    * Analyze storage from serialized runanywhere.v1.StorageInfoRequest bytes.
@@ -381,18 +294,6 @@ export interface RunAnywhereCore
   // Events
   // Matches Swift: CppBridge+Events.swift
   // ============================================================================
-
-  /**
-   * Emit an event to the native event system
-   * @param eventJson Event JSON with type, category, data
-   */
-  emitEvent(eventJson: string): Promise<void>;
-
-  /**
-   * Poll for pending events from native
-   * @returns JSON array of events
-   */
-  pollEvents(): Promise<string>;
 
   /**
    * Subscribe to serialized runanywhere.v1.SDKEvent bytes.
@@ -846,6 +747,56 @@ export interface RunAnywhereCore
   ): Promise<boolean>;
 
   // ============================================================================
+  // VLM Capability (Backend-Agnostic)
+  // Uses commons VLM service lifecycle plus rac_vlm_*_proto request/result ABI.
+  // Backend packages register providers only; core owns public VLM calls.
+  // ============================================================================
+
+  /**
+   * Load a VLM model from lifecycle-resolved role artifacts.
+   */
+  loadVLMModelFromArtifacts(
+    primaryModelPath: string,
+    visionProjectorPath: string,
+    modelId: string
+  ): Promise<boolean>;
+
+  /**
+   * Check whether the process-wide VLM service handle is loaded.
+   */
+  isVLMModelLoaded(): Promise<boolean>;
+
+  /**
+   * Unload and destroy the process-wide VLM service handle.
+   */
+  unloadVLMModel(): Promise<boolean>;
+
+  /**
+   * Process one image from serialized runanywhere.v1.VLMImage bytes plus
+   * serialized runanywhere.v1.VLMGenerationOptions bytes. Returns serialized
+   * runanywhere.v1.VLMResult bytes.
+   */
+  vlmProcessProto(
+    imageBytes: ArrayBuffer,
+    optionsBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
+  /**
+   * Stream VLM SDKEvent proto bytes while returning the final serialized
+   * runanywhere.v1.VLMResult bytes.
+   */
+  vlmProcessStreamProto(
+    imageBytes: ArrayBuffer,
+    optionsBytes: ArrayBuffer,
+    onEventBytes: (eventBytes: ArrayBuffer) => void
+  ): Promise<ArrayBuffer>;
+
+  /**
+   * Cancel ongoing VLM generation through commons cancellation ABI.
+   */
+  vlmCancelProto(): Promise<boolean>;
+
+  // ============================================================================
   // Secure Storage
   // Matches Swift: KeychainManager.swift
   // Uses platform secure storage (Keychain on iOS, Keystore on Android)
@@ -1000,73 +951,77 @@ export interface RunAnywhereCore
   // Tool Calling Capability
   //
   // ARCHITECTURE:
-  // - C++ (ToolCallingBridge): Parses <tool_call> tags from LLM output.
-  //   This is the SINGLE SOURCE OF TRUTH for parsing, ensuring consistency.
+  // - C++ commons C ABI: Parses <tool_call> tags from
+  //   LLM output and formats prompts. This is the SINGLE SOURCE OF TRUTH for
+  //   portable parsing and prompt text semantics.
   //
   // - TypeScript (RunAnywhere+ToolCalling.ts): Handles tool registry, executor
-  //   storage, prompt formatting, and orchestration. Executors MUST stay in
+  //   storage and orchestration. Executors MUST stay in
   //   TypeScript because they need JavaScript APIs (fetch, device APIs, etc.).
   //
-  // C++ (ToolCallingBridge) implements: parseToolCallFromOutput, formatToolsPrompt,
-  // buildInitialPrompt, buildFollowupPrompt. TypeScript handles: tool registry,
-  // executor storage (needs JS APIs like fetch), orchestration.
+  // C++ implements: toolParseProto, toolFormatPromptProto, and
+  // toolValidateProto. TypeScript handles: tool registry, executor storage
+  // (needs JS APIs like fetch), orchestration.
   // ============================================================================
 
   /**
-   * Parse LLM output for tool call (IMPLEMENTED in C++ ToolCallingBridge)
+   * Parse LLM output for tool calls from serialized runanywhere.v1.ToolParseRequest bytes.
    *
-   * This is the single source of truth for parsing <tool_call> tags from LLM output.
-   * Ensures consistent parsing behavior across all platforms.
+   * Returns serialized runanywhere.v1.ToolParseResult bytes. JS owns generated
+   * proto-ts encode/decode only; parsing semantics stay in native C++ commons.
    *
-   * @param llmOutput Raw LLM output text that may contain <tool_call> tags
-   * @returns JSON with {hasToolCall, cleanText, toolName, argumentsJson, callId}
-   *          TypeScript layer converts this to {text, toolCall} format
+   * @param requestBytes Serialized ToolParseRequest bytes
+   * @returns Serialized ToolParseResult bytes
    */
-  parseToolCallFromOutput(llmOutput: string): Promise<string>;
+  toolParseProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Format tool definitions for LLM prompt (IMPLEMENTED in C++ ToolCallingBridge)
+   * Format tool prompts from serialized runanywhere.v1.ToolPromptFormatRequest bytes.
    *
-   * Creates a system prompt describing available tools with format-specific instructions.
-   * Uses C++ single source of truth for consistent formatting across all platforms.
+   * Returns serialized runanywhere.v1.ToolPromptFormatResult bytes. JS owns
+   * generated proto-ts encode/decode only; prompt semantics stay in native
+   * C++ commons. Host tool execution remains in JS/app code.
    *
-   * @param toolsJson JSON array of tool definitions
-   * @param format Tool calling format: 'default' or 'lfm2'
-   * @returns Formatted prompt string with tool instructions
+   * @param requestBytes Serialized ToolPromptFormatRequest bytes
+   * @returns Serialized ToolPromptFormatResult bytes
    */
-  formatToolsForPrompt(toolsJson: string, format: string): Promise<string>;
+  toolFormatPromptProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Build initial prompt with tools (IMPLEMENTED in C++ ToolCallingBridge)
+   * Validate a tool call from serialized
+   * runanywhere.v1.ToolCallValidationRequest bytes.
    *
-   * Combines user prompt with tool definitions and system instructions.
-   *
-   * @param userPrompt The user's question/request
-   * @param toolsJson JSON array of tool definitions
-   * @param optionsJson JSON with options (maxToolCalls, temperature, etc.)
-   * @returns Complete formatted prompt ready for LLM
+   * Returns serialized runanywhere.v1.ToolCallValidationResult bytes.
    */
-  buildInitialPrompt(userPrompt: string, toolsJson: string, optionsJson: string): Promise<string>;
+  toolValidateProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
 
   /**
-   * Build follow-up prompt after tool execution (IMPLEMENTED in C++ ToolCallingBridge)
+   * Parse/extract structured output from serialized
+   * runanywhere.v1.StructuredOutputParseRequest bytes.
    *
-   * Creates continuation prompt with tool result for next LLM generation.
-   *
-   * @param originalPrompt The original user prompt
-   * @param toolsPrompt Tool definitions (if keepToolsAvailable) or empty
-   * @param toolName Name of the executed tool
-   * @param resultJson JSON result from tool execution
-   * @param keepToolsAvailable Whether to include tools in follow-up
-   * @returns Follow-up prompt string
+   * Returns serialized runanywhere.v1.StructuredOutputResult bytes.
    */
-  buildFollowupPrompt(
-    originalPrompt: string,
-    toolsPrompt: string,
-    toolName: string,
-    resultJson: string,
-    keepToolsAvailable: boolean
-  ): Promise<string>;
+  structuredOutputParseProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Prepare a structured-output prompt from serialized
+   * runanywhere.v1.StructuredOutputRequest bytes.
+   *
+   * Returns serialized runanywhere.v1.StructuredOutputPromptResult bytes.
+   */
+  structuredOutputPreparePromptProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
+
+  /**
+   * Validate structured output from serialized
+   * runanywhere.v1.StructuredOutputValidationRequest bytes.
+   *
+   * Returns serialized runanywhere.v1.StructuredOutputValidation bytes.
+   */
+  structuredOutputValidateProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
 
   // ===========================================================================
   // RAG Pipeline (Retrieval-Augmented Generation)
@@ -1127,10 +1082,54 @@ export interface RunAnywhereCore
   ): Promise<ArrayBuffer>;
   embeddingsDestroyProto(handle: number): Promise<void>;
 
-  loraLoadProto(configBytes: ArrayBuffer): Promise<ArrayBuffer>;
-  loraRemoveProto(configBytes: ArrayBuffer): Promise<ArrayBuffer>;
-  loraClearProto(): Promise<ArrayBuffer>;
+  loraApplyProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  loraRemoveProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  loraListProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  loraStateProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
   loraCompatibilityProto(configBytes: ArrayBuffer): Promise<ArrayBuffer>;
+  /**
+   * Register a LoRA catalog entry from serialized
+   * runanywhere.v1.LoraAdapterCatalogEntry bytes.
+   *
+   * Returns serialized runanywhere.v1.LoraAdapterCatalogEntry bytes on
+   * success. Catalog metadata/state semantics are owned by commons; native
+   * platform layers still own byte downloads and file permission handling.
+   */
+  loraRegisterCatalogEntryProto(entryBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * List LoRA catalog entries from serialized
+   * runanywhere.v1.LoraAdapterCatalogListRequest bytes.
+   *
+   * Returns serialized runanywhere.v1.LoraAdapterCatalogListResult bytes.
+   */
+  loraCatalogListProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Query LoRA catalog entries from serialized
+   * runanywhere.v1.LoraAdapterCatalogQuery bytes.
+   *
+   * Returns serialized runanywhere.v1.LoraAdapterCatalogListResult bytes.
+   */
+  loraCatalogQueryProto(queryBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Fetch one LoRA catalog entry from serialized
+   * runanywhere.v1.LoraAdapterCatalogGetRequest bytes.
+   *
+   * Returns serialized runanywhere.v1.LoraAdapterCatalogGetResult bytes.
+   */
+  loraCatalogGetProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
+   * Persist platform-reported LoRA artifact completion state from serialized
+   * runanywhere.v1.LoraAdapterDownloadCompletedRequest bytes.
+   *
+   * Returns serialized runanywhere.v1.LoraAdapterDownloadCompletedResult bytes.
+   */
+  loraCatalogMarkDownloadCompletedProto(
+    requestBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
 
   // ===========================================================================
   // Solutions Runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8

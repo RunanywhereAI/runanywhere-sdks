@@ -100,15 +100,23 @@ import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model';
-import type { ModelInfo } from '../types/model';
-import { ModelModality, LLMFramework, ModelCategory } from '../types/model';
+import {
+  createModelInfoSummary,
+  SYSTEM_TTS_FRAMEWORK,
+} from '../utils/modelDisplay';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import {
+  InferenceFramework,
+  ModelCategory,
   RunAnywhere,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/core';
-import { AudioFormat } from '@runanywhere/proto-ts/model_types';
+import { AudioFormat, ModelFormat } from '@runanywhere/proto-ts/model_types';
+
+// Canonical SDK methods (Swift / Kotlin / Flutter / Web parity).
+const getAvailableModels = RunAnywhere.getAvailableModels;
+const loadModelById = RunAnywhere.loadModel;
 
 export const TTSScreen: React.FC = () => {
   // State
@@ -121,7 +129,7 @@ export const TTSScreen: React.FC = () => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioGenerated, setAudioGenerated] = useState(false);
   const [duration, setDuration] = useState(0);
-  const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
+  const [currentModel, setCurrentModel] = useState<SDKModelInfo | null>(null);
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [_availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
   const [_lastGeneratedAudio, setLastGeneratedAudio] = useState<string | null>(
@@ -203,7 +211,7 @@ export const TTSScreen: React.FC = () => {
   const loadModels = useCallback(async () => {
     try {
       // Get available TTS models from catalog
-      const allModels = await RunAnywhere.getAvailableModels();
+      const allModels = await getAvailableModels();
       // Filter by category (speech-synthesis) matching SDK's ModelCategory
       const ttsModels = allModels.filter(
         (m: SDKModelInfo) =>
@@ -233,21 +241,21 @@ export const TTSScreen: React.FC = () => {
           const firstModel = downloadedTts[0];
           if (firstModel) {
             setCurrentModel({
-              id: firstModel.id,
-              name: firstModel.name,
-              preferredFramework: LLMFramework.ONNX,
-            } as ModelInfo);
+              ...firstModel,
+              preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+            });
             console.warn(
               '[TTSScreen] Set currentModel from downloaded:',
               firstModel.name
             );
           }
         } else {
-          setCurrentModel({
+          setCurrentModel(createModelInfoSummary({
             id: 'tts-model',
             name: 'TTS Model (Loaded)',
-            preferredFramework: LLMFramework.ONNX,
-          } as ModelInfo);
+            category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+            framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+          }));
           console.warn('[TTSScreen] Set currentModel as generic TTS Model');
         }
       }
@@ -292,7 +300,7 @@ export const TTSScreen: React.FC = () => {
         // Handle System TTS specially - it's always available, no download needed
         const isSystemTTS =
           model.id === 'system-tts' ||
-          model.preferredFramework === LLMFramework.SystemTTS ||
+          model.preferredFramework === SYSTEM_TTS_FRAMEWORK ||
           model.localPath?.startsWith('builtin://');
 
         if (isSystemTTS) {
@@ -300,18 +308,21 @@ export const TTSScreen: React.FC = () => {
             `[TTSScreen] Using System TTS - no model loading required`
           );
           // System TTS doesn't need to load a model, just mark it as ready
-          setCurrentModel({
+          setCurrentModel(createModelInfoSummary({
             id: 'system-tts',
             name: 'System TTS',
-            preferredFramework: LLMFramework.SystemTTS,
-          } as ModelInfo);
+            category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+            framework: SYSTEM_TTS_FRAMEWORK,
+            format: ModelFormat.MODEL_FORMAT_PROPRIETARY,
+            localPath: 'builtin://system-tts',
+          }));
           return;
         }
 
-        if (!model.localPath) {
+        if (!model.isDownloaded && !model.localPath) {
           Alert.alert(
             'Error',
-            'Model path not found. Please download the model first.'
+            'Model has not been downloaded. Open the model picker to download it first.'
           );
           return;
         }
@@ -330,16 +341,14 @@ export const TTSScreen: React.FC = () => {
           );
         }
 
-        // Pass the path directly - C++ extractArchiveIfNeeded handles archive extraction
-        // and finding the correct nested model folder
-        const modelType = 'piper';
+        // Path-first loading was removed in V2 — model ID is the canonical
+        // handle and the native registry resolves the artifact path.
         console.warn(
-          `[TTSScreen] Calling loadTTSModel with path: ${model.localPath}, type: ${modelType}`
+          `[TTSScreen] Calling loadModelById(${model.id}) for TTS`
         );
-
-        const success = await RunAnywhere.loadTTSModel(
-          model.localPath,
-          modelType
+        const success = await loadModelById(
+          model.id,
+          ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
         );
 
         if (success) {
@@ -348,10 +357,9 @@ export const TTSScreen: React.FC = () => {
             // Set model with framework so ModelStatusBanner shows it properly
             // Use ONNX since TTS uses Sherpa-ONNX (ONNX Runtime)
             setCurrentModel({
-              id: model.id,
-              name: model.name,
-              preferredFramework: LLMFramework.ONNX,
-            } as ModelInfo);
+              ...model,
+              preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+            });
             console.warn(
               `[TTSScreen] Model ${model.name} loaded successfully, currentModel set`
             );
@@ -517,7 +525,7 @@ export const TTSScreen: React.FC = () => {
     // Check if using System TTS
     const isSystemTTS =
       currentModel.id === 'system-tts' ||
-      currentModel.preferredFramework === LLMFramework.SystemTTS;
+      currentModel.preferredFramework === SYSTEM_TTS_FRAMEWORK;
 
     try {
       // For System TTS, use native AVSpeechSynthesizer
@@ -983,7 +991,7 @@ export const TTSScreen: React.FC = () => {
       <SafeAreaView style={styles.container}>
         {renderHeader()}
         <ModelRequiredOverlay
-          modality={ModelModality.TTS}
+          modality="tts"
           onSelectModel={handleSelectModel}
         />
         {/* Model Selection Sheet */}

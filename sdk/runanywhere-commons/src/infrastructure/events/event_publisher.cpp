@@ -184,6 +184,7 @@ void populate_envelope(runanywhere::v1::SDKEvent* event,
     event->set_severity(severity);
     event->set_component(component);
     event->set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    event->set_source("cpp");
 }
 
 void populate_error(runanywhere::v1::SDKError* error,
@@ -191,7 +192,8 @@ void populate_error(runanywhere::v1::SDKError* error,
                     const char* message,
                     runanywhere::v1::SDKComponent component,
                     runanywhere::v1::ErrorSeverity severity =
-                        runanywhere::v1::ERROR_SEVERITY_ERROR) {
+                        runanywhere::v1::ERROR_SEVERITY_ERROR,
+                    bool retryable = false) {
     const int32_t c_code = static_cast<int32_t>(code);
     const int32_t abs_code = c_code < 0 ? -c_code : c_code;
     error->set_code(static_cast<runanywhere::v1::ErrorCode>(abs_code));
@@ -201,6 +203,7 @@ void populate_error(runanywhere::v1::SDKError* error,
     error->set_timestamp_ms(static_cast<int64_t>(current_time_ms()));
     error->set_severity(severity);
     error->set_component(runanywhere::v1::SDKComponent_Name(component));
+    error->set_retryable(retryable);
 }
 
 rac_result_t publish_message(const runanywhere::v1::SDKEvent& event) {
@@ -486,12 +489,17 @@ rac_result_t rac_sdk_event_publish_failure(rac_result_t error_code,
     runanywhere::v1::SDKEvent event;
     populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_FAILURE,
                       runanywhere::v1::EVENT_SEVERITY_ERROR, sdk_component);
-    populate_error(event.mutable_error(), error_code, message, sdk_component);
+    if (operation && operation[0]) {
+        event.set_operation_id(operation);
+    }
+    const bool is_recoverable = recoverable == RAC_TRUE;
+    populate_error(event.mutable_error(), error_code, message, sdk_component,
+                   runanywhere::v1::ERROR_SEVERITY_ERROR, is_recoverable);
 
     auto* failure = event.mutable_failure();
     failure->set_component(sdk_component);
     if (operation) failure->set_operation(operation);
-    failure->set_recoverable(recoverable == RAC_TRUE);
+    failure->set_recoverable(is_recoverable);
     failure->mutable_error()->CopyFrom(event.error());
     return publish_message(event);
 #else
@@ -617,6 +625,98 @@ rac_result_t publish_device_registration_state_changed(bool registered) {
     return publish_message(event);
 #else
     (void)registered;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#endif
+}
+
+rac_result_t publish_auth_succeeded(const char* subject_id,
+                                    const char* provider,
+                                    const char* scope,
+                                    const char* operation,
+                                    const char* device_id) {
+#if defined(RAC_HAVE_PROTOBUF)
+    runanywhere::v1::SDKEvent event;
+    populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_AUTH,
+                      runanywhere::v1::EVENT_SEVERITY_INFO);
+    if (operation && operation[0]) {
+        event.set_operation_id(operation);
+    }
+    auto* auth = event.mutable_auth();
+    auth->set_kind(runanywhere::v1::AUTH_EVENT_KIND_SUCCEEDED);
+    if (provider) auth->set_provider(provider);
+    if (subject_id) auth->set_subject_id(subject_id);
+    if (scope) auth->set_scope(scope);
+    if (device_id && device_id[0]) {
+        (*event.mutable_properties())["device_id"] = device_id;
+    }
+    return publish_message(event);
+#else
+    (void)subject_id;
+    (void)provider;
+    (void)scope;
+    (void)operation;
+    (void)device_id;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#endif
+}
+
+rac_result_t publish_auth_token_refreshed(const char* subject_id,
+                                          const char* provider,
+                                          const char* scope,
+                                          const char* operation,
+                                          const char* device_id) {
+#if defined(RAC_HAVE_PROTOBUF)
+    runanywhere::v1::SDKEvent event;
+    populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_AUTH,
+                      runanywhere::v1::EVENT_SEVERITY_INFO);
+    if (operation && operation[0]) {
+        event.set_operation_id(operation);
+    }
+    auto* auth = event.mutable_auth();
+    auth->set_kind(runanywhere::v1::AUTH_EVENT_KIND_TOKEN_REFRESHED);
+    if (provider) auth->set_provider(provider);
+    if (subject_id) auth->set_subject_id(subject_id);
+    if (scope) auth->set_scope(scope);
+    if (device_id && device_id[0]) {
+        (*event.mutable_properties())["device_id"] = device_id;
+    }
+    return publish_message(event);
+#else
+    (void)subject_id;
+    (void)provider;
+    (void)scope;
+    (void)operation;
+    (void)device_id;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#endif
+}
+
+rac_result_t publish_auth_failed(rac_result_t error_code,
+                                 const char* message,
+                                 const char* provider,
+                                 const char* scope,
+                                 const char* operation) {
+#if defined(RAC_HAVE_PROTOBUF)
+    runanywhere::v1::SDKEvent event;
+    populate_envelope(&event, runanywhere::v1::EVENT_CATEGORY_AUTH,
+                      runanywhere::v1::EVENT_SEVERITY_ERROR);
+    if (operation && operation[0]) {
+        event.set_operation_id(operation);
+    }
+    auto* auth = event.mutable_auth();
+    auth->set_kind(runanywhere::v1::AUTH_EVENT_KIND_FAILED);
+    if (provider) auth->set_provider(provider);
+    if (scope) auth->set_scope(scope);
+    if (message) auth->set_error(message);
+    populate_error(event.mutable_error(), error_code, message,
+                   runanywhere::v1::SDK_COMPONENT_UNSPECIFIED);
+    return publish_message(event);
+#else
+    (void)error_code;
+    (void)message;
+    (void)provider;
+    (void)scope;
+    (void)operation;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #endif
 }

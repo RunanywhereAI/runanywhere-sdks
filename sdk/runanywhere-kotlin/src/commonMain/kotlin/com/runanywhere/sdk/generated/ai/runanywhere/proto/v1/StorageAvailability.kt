@@ -19,6 +19,7 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
+import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -77,6 +78,22 @@ public class StorageAvailability(
     schemaIndex = 4,
   )
   public val recommendation: String? = null,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "shortfallBytes",
+    schemaIndex = 5,
+  )
+  public val shortfall_bytes: Long = 0L,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "requiredToAvailableRatio",
+    schemaIndex = 6,
+  )
+  public val required_to_available_ratio: Float = 0f,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StorageAvailability, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -95,6 +112,8 @@ public class StorageAvailability(
     if (available_bytes != other.available_bytes) return false
     if (warning_message != other.warning_message) return false
     if (recommendation != other.recommendation) return false
+    if (shortfall_bytes != other.shortfall_bytes) return false
+    if (required_to_available_ratio != other.required_to_available_ratio) return false
     return true
   }
 
@@ -107,6 +126,8 @@ public class StorageAvailability(
       result = result * 37 + available_bytes.hashCode()
       result = result * 37 + (warning_message?.hashCode() ?: 0)
       result = result * 37 + (recommendation?.hashCode() ?: 0)
+      result = result * 37 + shortfall_bytes.hashCode()
+      result = result * 37 + required_to_available_ratio.hashCode()
       super.hashCode = result
     }
     return result
@@ -119,6 +140,8 @@ public class StorageAvailability(
     result += """available_bytes=$available_bytes"""
     if (warning_message != null) result += """warning_message=${sanitize(warning_message)}"""
     if (recommendation != null) result += """recommendation=${sanitize(recommendation)}"""
+    result += """shortfall_bytes=$shortfall_bytes"""
+    result += """required_to_available_ratio=$required_to_available_ratio"""
     return result.joinToString(prefix = "StorageAvailability{", separator = ", ", postfix = "}")
   }
 
@@ -128,9 +151,11 @@ public class StorageAvailability(
     available_bytes: Long = this.available_bytes,
     warning_message: String? = this.warning_message,
     recommendation: String? = this.recommendation,
+    shortfall_bytes: Long = this.shortfall_bytes,
+    required_to_available_ratio: Float = this.required_to_available_ratio,
     unknownFields: ByteString = this.unknownFields,
   ): StorageAvailability = StorageAvailability(is_available, required_bytes, available_bytes,
-      warning_message, recommendation, unknownFields)
+      warning_message, recommendation, shortfall_bytes, required_to_available_ratio, unknownFields)
 
   public companion object {
     @JvmField
@@ -153,6 +178,10 @@ public class StorageAvailability(
             value.available_bytes)
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.warning_message)
         size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.recommendation)
+        if (value.shortfall_bytes != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(6,
+            value.shortfall_bytes)
+        if (!value.required_to_available_ratio.equals(0f)) size +=
+            ProtoAdapter.FLOAT.encodedSizeWithTag(7, value.required_to_available_ratio)
         return size
       }
 
@@ -165,11 +194,19 @@ public class StorageAvailability(
             value.available_bytes)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.warning_message)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.recommendation)
+        if (value.shortfall_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 6,
+            value.shortfall_bytes)
+        if (!value.required_to_available_ratio.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer,
+            7, value.required_to_available_ratio)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StorageAvailability) {
         writer.writeBytes(value.unknownFields)
+        if (!value.required_to_available_ratio.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer,
+            7, value.required_to_available_ratio)
+        if (value.shortfall_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 6,
+            value.shortfall_bytes)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.recommendation)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.warning_message)
         if (value.available_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 3,
@@ -186,6 +223,8 @@ public class StorageAvailability(
         var available_bytes: Long = 0L
         var warning_message: String? = null
         var recommendation: String? = null
+        var shortfall_bytes: Long = 0L
+        var required_to_available_ratio: Float = 0f
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_available = ProtoAdapter.BOOL.decode(reader)
@@ -193,6 +232,8 @@ public class StorageAvailability(
             3 -> available_bytes = ProtoAdapter.INT64.decode(reader)
             4 -> warning_message = ProtoAdapter.STRING.decode(reader)
             5 -> recommendation = ProtoAdapter.STRING.decode(reader)
+            6 -> shortfall_bytes = ProtoAdapter.INT64.decode(reader)
+            7 -> required_to_available_ratio = ProtoAdapter.FLOAT.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -202,6 +243,8 @@ public class StorageAvailability(
           available_bytes = available_bytes,
           warning_message = warning_message,
           recommendation = recommendation,
+          shortfall_bytes = shortfall_bytes,
+          required_to_available_ratio = required_to_available_ratio,
           unknownFields = unknownFields
         )
       }

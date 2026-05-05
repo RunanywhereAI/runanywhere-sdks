@@ -251,11 +251,13 @@ class ModelSource extends $pb.ProtobufEnum {
   static const ModelSource MODEL_SOURCE_UNSPECIFIED = ModelSource._(0, _omitEnumNames ? '' : 'MODEL_SOURCE_UNSPECIFIED');
   static const ModelSource MODEL_SOURCE_REMOTE = ModelSource._(1, _omitEnumNames ? '' : 'MODEL_SOURCE_REMOTE');
   static const ModelSource MODEL_SOURCE_LOCAL = ModelSource._(2, _omitEnumNames ? '' : 'MODEL_SOURCE_LOCAL');
+  static const ModelSource MODEL_SOURCE_BUILT_IN = ModelSource._(3, _omitEnumNames ? '' : 'MODEL_SOURCE_BUILT_IN');
 
   static const $core.List<ModelSource> values = <ModelSource> [
     MODEL_SOURCE_UNSPECIFIED,
     MODEL_SOURCE_REMOTE,
     MODEL_SOURCE_LOCAL,
+    MODEL_SOURCE_BUILT_IN,
   ];
 
   static final $core.Map<$core.int, ModelSource> _byValue = $pb.ProtobufEnum.initByValue(values);
@@ -327,6 +329,11 @@ class ModelArtifactType extends $pb.ProtobufEnum {
   static const ModelArtifactType MODEL_ARTIFACT_TYPE_DIRECTORY = ModelArtifactType._(3, _omitEnumNames ? '' : 'MODEL_ARTIFACT_TYPE_DIRECTORY');
   static const ModelArtifactType MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE = ModelArtifactType._(4, _omitEnumNames ? '' : 'MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE');
   static const ModelArtifactType MODEL_ARTIFACT_TYPE_CUSTOM = ModelArtifactType._(5, _omitEnumNames ? '' : 'MODEL_ARTIFACT_TYPE_CUSTOM');
+  static const ModelArtifactType MODEL_ARTIFACT_TYPE_ARCHIVE = ModelArtifactType._(6, _omitEnumNames ? '' : 'MODEL_ARTIFACT_TYPE_ARCHIVE');
+  static const ModelArtifactType MODEL_ARTIFACT_TYPE_MULTI_FILE = ModelArtifactType._(7, _omitEnumNames ? '' : 'MODEL_ARTIFACT_TYPE_MULTI_FILE');
+  static const ModelArtifactType MODEL_ARTIFACT_TYPE_BUILT_IN = ModelArtifactType._(8, _omitEnumNames ? '' : 'MODEL_ARTIFACT_TYPE_BUILT_IN');
+  static const ModelArtifactType MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE = ModelArtifactType._(9, _omitEnumNames ? '' : 'MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE');
+  static const ModelArtifactType MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE = ModelArtifactType._(10, _omitEnumNames ? '' : 'MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE');
 
   static const $core.List<ModelArtifactType> values = <ModelArtifactType> [
     MODEL_ARTIFACT_TYPE_UNSPECIFIED,
@@ -335,6 +342,11 @@ class ModelArtifactType extends $pb.ProtobufEnum {
     MODEL_ARTIFACT_TYPE_DIRECTORY,
     MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE,
     MODEL_ARTIFACT_TYPE_CUSTOM,
+    MODEL_ARTIFACT_TYPE_ARCHIVE,
+    MODEL_ARTIFACT_TYPE_MULTI_FILE,
+    MODEL_ARTIFACT_TYPE_BUILT_IN,
+    MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE,
+    MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE,
   ];
 
   static final $core.Map<$core.int, ModelArtifactType> _byValue = $pb.ProtobufEnum.initByValue(values);

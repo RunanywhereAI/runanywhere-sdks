@@ -206,7 +206,7 @@ fun LoraManagerScreen(
         if (state.registeredAdapters.isEmpty()) {
             item {
                 Text(
-                    "No adapters registered. Adapters are registered at app startup.",
+                    "No LoRA catalog entries are available.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(vertical = Dimensions.large),

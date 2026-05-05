@@ -18,6 +18,16 @@
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/storage/rac_storage_analyzer.h"
 
+#if __has_include("rac/infrastructure/model_management/rac_lora_registry.h")
+#include "rac/infrastructure/model_management/rac_lora_registry.h"
+#elif __has_include("rac_lora_registry.h")
+#include "rac_lora_registry.h"
+#else
+extern "C" {
+typedef struct rac_lora_registry* rac_lora_registry_handle_t;
+}
+#endif
+
 #if __has_include("rac/foundation/rac_proto_buffer.h")
 #include "rac/foundation/rac_proto_buffer.h"
 #else
@@ -160,6 +170,17 @@ using LLMGenerateStreamProtoFn = rac_result_t (*)(
 using LLMCancelProtoFn = rac_result_t (*)(
     rac_proto_buffer_t*);
 
+using LoraRegistryGetFn = rac_lora_registry_handle_t (*)();
+using LoraRegisterProtoFn = rac_result_t (*)(
+    rac_lora_registry_handle_t,
+    const uint8_t*,
+    size_t,
+    rac_proto_buffer_t*);
+using LoraCatalogProtoFn = rac_result_t (*)(
+    rac_lora_registry_handle_t,
+    const uint8_t*,
+    size_t,
+    rac_proto_buffer_t*);
 using STTTranscribeProtoFn = rac_result_t (*)(
     rac_handle_t,
     const void*,
@@ -229,6 +250,40 @@ using VADSetActivityProtoCallbackFn = rac_result_t (*)(
     VADActivityProtoCallbackFn,
     void*);
 
+using VLMCreateFn = rac_result_t (*)(
+    const char*,
+    rac_handle_t*);
+using VLMInitializeFn = rac_result_t (*)(
+    rac_handle_t,
+    const char*,
+    const char*);
+using VLMCleanupFn = rac_result_t (*)(
+    rac_handle_t);
+using VLMDestroyFn = void (*)(
+    rac_handle_t);
+using VLMProcessProtoFn = rac_result_t (*)(
+    rac_handle_t,
+    const uint8_t*,
+    size_t,
+    const uint8_t*,
+    size_t,
+    rac_proto_buffer_t*);
+using VLMStreamProtoCallbackFn = rac_bool_t (*)(
+    const uint8_t*,
+    size_t,
+    void*);
+using VLMProcessStreamProtoFn = rac_result_t (*)(
+    rac_handle_t,
+    const uint8_t*,
+    size_t,
+    const uint8_t*,
+    size_t,
+    VLMStreamProtoCallbackFn,
+    void*,
+    rac_proto_buffer_t*);
+using VLMCancelProtoFn = rac_result_t (*)(
+    rac_handle_t);
+
 using VoiceAgentInitProtoFn = rac_result_t (*)(
     void*,
     const uint8_t*,
@@ -258,6 +313,11 @@ using RAGStatsProtoFn = rac_result_t (*)(
     rac_handle_t,
     rac_proto_buffer_t*);
 
+using StructuredOutputParseProtoFn = rac_result_t (*)(
+    const uint8_t*,
+    size_t,
+    rac_proto_buffer_t*);
+
 using EmbeddingsCreateFn = rac_result_t (*)(
     const char*,
     rac_handle_t*);
@@ -276,13 +336,10 @@ using EmbeddingsEmbedBatchProtoFn = rac_result_t (*)(
 using EmbeddingsDestroyFn = void (*)(
     rac_handle_t);
 
-using LoRAConfigProtoFn = rac_result_t (*)(
+using LoRARequestProtoFn = rac_result_t (*)(
     rac_handle_t,
     const uint8_t*,
     size_t,
-    rac_proto_buffer_t*);
-using LoRAClearProtoFn = rac_result_t (*)(
-    rac_handle_t,
     rac_proto_buffer_t*);
 
 } // namespace margelo::nitro::runanywhere::proto_compat

@@ -5,7 +5,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:runanywhere/runanywhere.dart' as sdk;
-import 'package:runanywhere/runanywhere.dart' show ToolDefinition, ToolParameter, ToolParameterType, ToolCallingOptions;
+import 'package:runanywhere/runanywhere.dart'
+    show ToolDefinition, ToolParameter, ToolParameterType, ToolCallingOptions;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
@@ -152,7 +153,8 @@ class _ToolsViewState extends State<ToolsView> {
         throw Exception('Geocoding failed');
       }
 
-      final geocodeData = jsonDecode(geocodeResponse.body) as Map<String, dynamic>;
+      final geocodeData =
+          jsonDecode(geocodeResponse.body) as Map<String, dynamic>;
       final results = geocodeData['results'] as List?;
       if (results == null || results.isEmpty) {
         return {
@@ -176,7 +178,8 @@ class _ToolsViewState extends State<ToolsView> {
         throw Exception('Weather fetch failed');
       }
 
-      final weatherData = jsonDecode(weatherResponse.body) as Map<String, dynamic>;
+      final weatherData =
+          jsonDecode(weatherResponse.body) as Map<String, dynamic>;
       final current = weatherData['current'] as Map<String, dynamic>;
       final temp = current['temperature_2m'] as num? ?? 0;
       final humidity = current['relative_humidity_2m'] as num? ?? 0;
@@ -285,7 +288,7 @@ class _ToolsViewState extends State<ToolsView> {
     Map<String, dynamic> args,
   ) async {
     final expression = args['expression'] as String?;
-    
+
     // Require expression argument - no hardcoded defaults
     if (expression == null || expression.isEmpty) {
       return {
@@ -354,7 +357,7 @@ class _ToolsViewState extends State<ToolsView> {
 
     return double.parse(expr);
   }
-  
+
   double _pow(double base, double exponent) {
     return math.pow(base, exponent).toDouble();
   }
@@ -366,9 +369,9 @@ class _ToolsViewState extends State<ToolsView> {
     final now = DateTime.now();
     return {
       'date':
-        '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
+          '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}',
       'time':
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}',
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}',
       'timezone': now.timeZoneName,
     };
   }
@@ -595,7 +598,8 @@ class _ToolsViewState extends State<ToolsView> {
           children: [
             Row(
               children: [
-                Icon(Icons.build_outlined, size: 16, color: AppColors.primaryAccent),
+                Icon(Icons.build_outlined,
+                    size: 16, color: AppColors.primaryAccent),
                 const SizedBox(width: 8),
                 Text(
                   tool.name,
@@ -658,9 +662,8 @@ class _ToolsViewState extends State<ToolsView> {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: (_isGenerating || !_toolCallingEnabled)
-            ? null
-            : _runToolCalling,
+        onPressed:
+            (_isGenerating || !_toolCallingEnabled) ? null : _runToolCalling,
         icon: _isGenerating
             ? const SizedBox(
                 width: 16,

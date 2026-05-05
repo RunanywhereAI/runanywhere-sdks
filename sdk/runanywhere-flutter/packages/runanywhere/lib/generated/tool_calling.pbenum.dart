@@ -80,5 +80,51 @@ class ToolCallFormatName extends $pb.ProtobufEnum {
   const ToolCallFormatName._($core.int v, $core.String n) : super(v, n);
 }
 
+class ToolChoiceMode extends $pb.ProtobufEnum {
+  static const ToolChoiceMode TOOL_CHOICE_MODE_UNSPECIFIED = ToolChoiceMode._(0, _omitEnumNames ? '' : 'TOOL_CHOICE_MODE_UNSPECIFIED');
+  static const ToolChoiceMode TOOL_CHOICE_MODE_AUTO = ToolChoiceMode._(1, _omitEnumNames ? '' : 'TOOL_CHOICE_MODE_AUTO');
+  static const ToolChoiceMode TOOL_CHOICE_MODE_NONE = ToolChoiceMode._(2, _omitEnumNames ? '' : 'TOOL_CHOICE_MODE_NONE');
+  static const ToolChoiceMode TOOL_CHOICE_MODE_REQUIRED = ToolChoiceMode._(3, _omitEnumNames ? '' : 'TOOL_CHOICE_MODE_REQUIRED');
+  static const ToolChoiceMode TOOL_CHOICE_MODE_SPECIFIC = ToolChoiceMode._(4, _omitEnumNames ? '' : 'TOOL_CHOICE_MODE_SPECIFIC');
+
+  static const $core.List<ToolChoiceMode> values = <ToolChoiceMode> [
+    TOOL_CHOICE_MODE_UNSPECIFIED,
+    TOOL_CHOICE_MODE_AUTO,
+    TOOL_CHOICE_MODE_NONE,
+    TOOL_CHOICE_MODE_REQUIRED,
+    TOOL_CHOICE_MODE_SPECIFIC,
+  ];
+
+  static final $core.Map<$core.int, ToolChoiceMode> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static ToolChoiceMode? valueOf($core.int value) => _byValue[value];
+
+  const ToolChoiceMode._($core.int v, $core.String n) : super(v, n);
+}
+
+class ToolCallingStreamEventKind extends $pb.ProtobufEnum {
+  static const ToolCallingStreamEventKind TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED = ToolCallingStreamEventKind._(0, _omitEnumNames ? '' : 'TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED');
+  static const ToolCallingStreamEventKind TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN = ToolCallingStreamEventKind._(1, _omitEnumNames ? '' : 'TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN');
+  static const ToolCallingStreamEventKind TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED = ToolCallingStreamEventKind._(2, _omitEnumNames ? '' : 'TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED');
+  static const ToolCallingStreamEventKind TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED = ToolCallingStreamEventKind._(3, _omitEnumNames ? '' : 'TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED');
+  static const ToolCallingStreamEventKind TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED = ToolCallingStreamEventKind._(4, _omitEnumNames ? '' : 'TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED');
+  static const ToolCallingStreamEventKind TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED = ToolCallingStreamEventKind._(5, _omitEnumNames ? '' : 'TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED');
+  static const ToolCallingStreamEventKind TOOL_CALLING_STREAM_EVENT_KIND_ERROR = ToolCallingStreamEventKind._(6, _omitEnumNames ? '' : 'TOOL_CALLING_STREAM_EVENT_KIND_ERROR');
+
+  static const $core.List<ToolCallingStreamEventKind> values = <ToolCallingStreamEventKind> [
+    TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED,
+    TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN,
+    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED,
+    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED,
+    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED,
+    TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED,
+    TOOL_CALLING_STREAM_EVENT_KIND_ERROR,
+  ];
+
+  static final $core.Map<$core.int, ToolCallingStreamEventKind> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static ToolCallingStreamEventKind? valueOf($core.int value) => _byValue[value];
+
+  const ToolCallingStreamEventKind._($core.int v, $core.String n) : super(v, n);
+}
+
 
 const _omitEnumNames = $core.bool.fromEnvironment('protobuf.omit_enum_names');

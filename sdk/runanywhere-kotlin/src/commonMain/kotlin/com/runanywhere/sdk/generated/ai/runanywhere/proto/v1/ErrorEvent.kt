@@ -66,6 +66,21 @@ public class ErrorEvent(
     schemaIndex = 3,
   )
   public val is_recoverable: Boolean = false,
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 4,
+  )
+  public val operation: String = "",
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "detailsJson",
+    schemaIndex = 5,
+  )
+  public val details_json: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ErrorEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -83,6 +98,8 @@ public class ErrorEvent(
     if (message != other.message) return false
     if (component != other.component) return false
     if (is_recoverable != other.is_recoverable) return false
+    if (operation != other.operation) return false
+    if (details_json != other.details_json) return false
     return true
   }
 
@@ -94,6 +111,8 @@ public class ErrorEvent(
       result = result * 37 + message.hashCode()
       result = result * 37 + component.hashCode()
       result = result * 37 + is_recoverable.hashCode()
+      result = result * 37 + operation.hashCode()
+      result = result * 37 + details_json.hashCode()
       super.hashCode = result
     }
     return result
@@ -105,6 +124,8 @@ public class ErrorEvent(
     result += """message=${sanitize(message)}"""
     result += """component=${sanitize(component)}"""
     result += """is_recoverable=$is_recoverable"""
+    result += """operation=${sanitize(operation)}"""
+    result += """details_json=${sanitize(details_json)}"""
     return result.joinToString(prefix = "ErrorEvent{", separator = ", ", postfix = "}")
   }
 
@@ -113,8 +134,11 @@ public class ErrorEvent(
     message: String = this.message,
     component: String = this.component,
     is_recoverable: Boolean = this.is_recoverable,
+    operation: String = this.operation,
+    details_json: String = this.details_json,
     unknownFields: ByteString = this.unknownFields,
-  ): ErrorEvent = ErrorEvent(code, message, component, is_recoverable, unknownFields)
+  ): ErrorEvent = ErrorEvent(code, message, component, is_recoverable, operation, details_json,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -134,6 +158,10 @@ public class ErrorEvent(
             value.component)
         if (value.is_recoverable != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(4,
             value.is_recoverable)
+        if (value.operation != "") size += ProtoAdapter.STRING.encodedSizeWithTag(5,
+            value.operation)
+        if (value.details_json != "") size += ProtoAdapter.STRING.encodedSizeWithTag(6,
+            value.details_json)
         return size
       }
 
@@ -143,11 +171,17 @@ public class ErrorEvent(
         if (value.component != "") ProtoAdapter.STRING.encodeWithTag(writer, 3, value.component)
         if (value.is_recoverable != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
             value.is_recoverable)
+        if (value.operation != "") ProtoAdapter.STRING.encodeWithTag(writer, 5, value.operation)
+        if (value.details_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
+            value.details_json)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ErrorEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.details_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
+            value.details_json)
+        if (value.operation != "") ProtoAdapter.STRING.encodeWithTag(writer, 5, value.operation)
         if (value.is_recoverable != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
             value.is_recoverable)
         if (value.component != "") ProtoAdapter.STRING.encodeWithTag(writer, 3, value.component)
@@ -160,12 +194,16 @@ public class ErrorEvent(
         var message: String = ""
         var component: String = ""
         var is_recoverable: Boolean = false
+        var operation: String = ""
+        var details_json: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> code = ProtoAdapter.INT32.decode(reader)
             2 -> message = ProtoAdapter.STRING.decode(reader)
             3 -> component = ProtoAdapter.STRING.decode(reader)
             4 -> is_recoverable = ProtoAdapter.BOOL.decode(reader)
+            5 -> operation = ProtoAdapter.STRING.decode(reader)
+            6 -> details_json = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -174,6 +212,8 @@ public class ErrorEvent(
           message = message,
           component = component,
           is_recoverable = is_recoverable,
+          operation = operation,
+          details_json = details_json,
           unknownFields = unknownFields
         )
       }

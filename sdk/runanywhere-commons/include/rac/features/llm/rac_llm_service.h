@@ -5,6 +5,20 @@
  * Defines the generic LLM service API and vtable for multi-backend dispatch.
  * Backends (LlamaCpp, Platform, ONNX) implement the vtable and register
  * with the service registry.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - rac_llm_service_ops_t and rac_llm_service_t: `internal`. Engine
+ *     dispatch contract.
+ *   - Proto-byte APIs (rac_llm_generate_proto,
+ *     rac_llm_generate_stream_proto, rac_llm_cancel_proto):
+ *     `SDK-facing default` over runanywhere.v1.LLMGenerateRequest /
+ *     LLMGenerationResult / LLMStreamEvent / SDKEvent bytes.
+ *   - Struct APIs (rac_llm_create, initialize, generate,
+ *     generate_stream, generate_stream_with_timing, get_info, cancel,
+ *     cleanup, destroy, result_free, plus the adaptive-context APIs
+ *     inject_system_prompt/append_context/generate_from_context/
+ *     clear_context): `delete after SDK migration` for SDK callers —
+ *     keep only as backend smoke-test entry points.
  */
 
 #ifndef RAC_LLM_SERVICE_H

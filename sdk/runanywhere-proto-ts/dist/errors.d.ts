@@ -451,6 +451,12 @@ export interface ErrorContext_MetadataEntry {
  *   * `nested_message` — optional. Underlying-error message as captured at
  *     wrap time. Mirrors Swift's RunAnywhereError.underlyingError.localizedDesc
  *     and Kotlin's Throwable.cause.message.
+ *   * `retryable` — canonical retry hint. This is business-policy metadata
+ *     owned by the portable layer; the platform adapter still decides how to
+ *     schedule the retry through native/background APIs when appropriate.
+ *   * `correlation_id` — stable cross-event/request correlation key. SDKEvent
+ *     also carries this field so callers can join success/progress/failure
+ *     events without parsing free-form properties.
  * ---------------------------------------------------------------------------
  */
 export interface SDKError {
@@ -474,6 +480,9 @@ export interface SDKError {
     timestampMs: number;
     severity: ErrorSeverity;
     component: string;
+    retryable: boolean;
+    remediationHint: string;
+    correlationId: string;
 }
 export declare const ErrorContext: {
     encode(message: ErrorContext, writer?: _m0.Writer): _m0.Writer;

@@ -13,6 +13,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -103,6 +104,21 @@ public class TTSSpeakResult(
     schemaIndex = 5,
   )
   public val timestamp_ms: Long = 0L,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "errorMessage",
+    schemaIndex = 6,
+  )
+  public val error_message: String? = null,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "errorCode",
+    schemaIndex = 7,
+  )
+  public val error_code: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TTSSpeakResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -122,6 +138,8 @@ public class TTSSpeakResult(
     if (audio_size_bytes != other.audio_size_bytes) return false
     if (metadata != other.metadata) return false
     if (timestamp_ms != other.timestamp_ms) return false
+    if (error_message != other.error_message) return false
+    if (error_code != other.error_code) return false
     return true
   }
 
@@ -135,6 +153,8 @@ public class TTSSpeakResult(
       result = result * 37 + audio_size_bytes.hashCode()
       result = result * 37 + (metadata?.hashCode() ?: 0)
       result = result * 37 + timestamp_ms.hashCode()
+      result = result * 37 + (error_message?.hashCode() ?: 0)
+      result = result * 37 + error_code.hashCode()
       super.hashCode = result
     }
     return result
@@ -148,6 +168,8 @@ public class TTSSpeakResult(
     result += """audio_size_bytes=$audio_size_bytes"""
     if (metadata != null) result += """metadata=$metadata"""
     result += """timestamp_ms=$timestamp_ms"""
+    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
+    result += """error_code=$error_code"""
     return result.joinToString(prefix = "TTSSpeakResult{", separator = ", ", postfix = "}")
   }
 
@@ -158,9 +180,11 @@ public class TTSSpeakResult(
     audio_size_bytes: Long = this.audio_size_bytes,
     metadata: TTSSynthesisMetadata? = this.metadata,
     timestamp_ms: Long = this.timestamp_ms,
+    error_message: String? = this.error_message,
+    error_code: Int = this.error_code,
     unknownFields: ByteString = this.unknownFields,
   ): TTSSpeakResult = TTSSpeakResult(audio_format, sample_rate, duration_ms, audio_size_bytes,
-      metadata, timestamp_ms, unknownFields)
+      metadata, timestamp_ms, error_message, error_code, unknownFields)
 
   public companion object {
     @JvmField
@@ -186,6 +210,9 @@ public class TTSSpeakResult(
             value.metadata)
         if (value.timestamp_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(6,
             value.timestamp_ms)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.error_message)
+        if (value.error_code != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(8,
+            value.error_code)
         return size
       }
 
@@ -200,11 +227,15 @@ public class TTSSpeakResult(
             value.metadata)
         if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 6,
             value.timestamp_ms)
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8, value.error_code)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TTSSpeakResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8, value.error_code)
+        ProtoAdapter.STRING.encodeWithTag(writer, 7, value.error_message)
         if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 6,
             value.timestamp_ms)
         if (value.metadata != null) TTSSynthesisMetadata.ADAPTER.encodeWithTag(writer, 5,
@@ -224,6 +255,8 @@ public class TTSSpeakResult(
         var audio_size_bytes: Long = 0L
         var metadata: TTSSynthesisMetadata? = null
         var timestamp_ms: Long = 0L
+        var error_message: String? = null
+        var error_code: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -236,6 +269,8 @@ public class TTSSpeakResult(
             4 -> audio_size_bytes = ProtoAdapter.INT64.decode(reader)
             5 -> metadata = TTSSynthesisMetadata.ADAPTER.decode(reader)
             6 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
+            7 -> error_message = ProtoAdapter.STRING.decode(reader)
+            8 -> error_code = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -246,6 +281,8 @@ public class TTSSpeakResult(
           audio_size_bytes = audio_size_bytes,
           metadata = metadata,
           timestamp_ms = timestamp_ms,
+          error_message = error_message,
+          error_code = error_code,
           unknownFields = unknownFields
         )
       }

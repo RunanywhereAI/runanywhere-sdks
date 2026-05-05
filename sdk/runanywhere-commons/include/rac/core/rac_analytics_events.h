@@ -1,19 +1,45 @@
 /**
- * @file rac_events.h
- * @brief RunAnywhere Commons - Cross-Platform Event System
+ * @file rac_analytics_events.h
+ * @brief RunAnywhere Commons - Internal analytics/telemetry event surface.
  *
- * C++ is the canonical source of truth for all analytics events.
- * Platform SDKs (Swift, Kotlin, Flutter) register callbacks to receive
- * these events and forward them to their native event systems.
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal`.
  *
- * Usage:
- * 1. Platform SDK registers callback via rac_events_set_callback()
- * 2. C++ components emit events via rac_event_emit()
- * 3. Platform SDK receives events in callback and converts to native events
+ * This header carries the legacy struct-based analytics callbacks that feed the
+ * commons telemetry pipeline (Sentry/HTTP exporter). It is NOT the SDK-facing
+ * event surface. New SDK consumers MUST subscribe to canonical SDKEvent bytes
+ * via `rac/infrastructure/events/rac_sdk_event_stream.h` (`rac_sdk_event_*`).
+ *
+ * The five public SDKs (Swift, Kotlin, Flutter, React Native, Web) MUST NOT
+ * include this header from public APIs — only from internal telemetry-bridge
+ * shims that explicitly opt in by defining `RAC_ALLOW_INTERNAL_EVENTS` before
+ * including it.
+ *
+ * Internal pipeline:
+ *   1. C++ component emits a struct event via `rac_analytics_event_emit()`.
+ *   2. The analytics manager forwards to the telemetry HTTP exporter and any
+ *      registered analytics-only callback for backward compatibility.
+ *   3. The same component publishes the canonical proto SDKEvent through
+ *      `rac_sdk_event_publish_proto`. SDK subscribers see only the proto
+ *      stream — they do not see the legacy struct callbacks.
+ *
+ * Migration trigger: when SWF-04, KOT-11, FLT-04, RN-04, WEB-04 land, the
+ * remaining SDK-side telemetry shims migrate off this header. Once every SDK
+ * is on the proto stream, this header may be moved to `src/internal/`.
  */
 
 #ifndef RAC_ANALYTICS_EVENTS_H
 #define RAC_ANALYTICS_EVENTS_H
+
+// ---------------------------------------------------------------------------
+// Internal-use guard. Defined automatically when commons builds itself
+// (RAC_BUILDING_COMMONS / RAC_INTERNAL_TRANSLATION_UNIT) and may be opted into
+// by SDK-side telemetry shims that have not yet migrated to the canonical
+// SDKEvent proto stream. Public SDK code MUST not opt in.
+// ---------------------------------------------------------------------------
+#if !defined(RAC_ALLOW_INTERNAL_EVENTS) && !defined(RAC_BUILDING_COMMONS) &&    \
+    !defined(RAC_INTERNAL_TRANSLATION_UNIT)
+#warning "rac_analytics_events.h is an internal commons header. Public SDK code must subscribe to canonical SDKEvent bytes via rac_sdk_event_stream.h. Define RAC_ALLOW_INTERNAL_EVENTS only if you are an internal telemetry-bridge shim."
+#endif
 
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"

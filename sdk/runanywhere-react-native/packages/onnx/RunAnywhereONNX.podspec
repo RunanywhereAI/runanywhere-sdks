@@ -27,14 +27,12 @@ Pod::Spec.new do |s|
   s.source_files = [
     "cpp/HybridRunAnywhereONNX.cpp",
     "cpp/HybridRunAnywhereONNX.hpp",
-    "cpp/bridges/**/*.{cpp,hpp}",
   ]
 
   s.pod_target_xcconfig = {
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++17",
     "HEADER_SEARCH_PATHS" => [
       "$(PODS_TARGET_SRCROOT)/cpp",
-      "$(PODS_TARGET_SRCROOT)/cpp/bridges",
       "$(PODS_TARGET_SRCROOT)/ios/Frameworks/RABackendONNX.xcframework/ios-arm64/Headers",
       "$(PODS_TARGET_SRCROOT)/ios/Frameworks/RABackendONNX.xcframework/ios-arm64-simulator/Headers",
       "$(PODS_TARGET_SRCROOT)/ios/Frameworks/RABackendONNX.xcframework/ios-arm64_x86_64-simulator/Headers",

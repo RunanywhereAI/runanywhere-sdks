@@ -8,6 +8,17 @@
  * whose `embedding_ops` slot points at the ops struct defined by the
  * backend (e.g. `g_onnx_embeddings_ops` in
  * `sdk/runanywhere-commons/src/features/rag/rac_onnx_embeddings_register.cpp`).
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - rac_embeddings_service_ops_t and rac_embeddings_service_t:
+ *     `internal`.
+ *   - Proto-byte APIs (rac_embeddings_embed_batch_proto,
+ *     rac_embeddings_embed_batch_lifecycle_proto): `SDK-facing default`
+ *     over runanywhere.v1.EmbeddingsRequest / EmbeddingsResult bytes.
+ *   - Struct APIs (rac_embeddings_create, create_with_config,
+ *     initialize, embed, embed_batch, get_info, cleanup, destroy):
+ *     `delete after SDK migration` for SDK callers; keep only as
+ *     backend smoke-test entry points.
  */
 
 #ifndef RAC_EMBEDDINGS_SERVICE_H
@@ -144,6 +155,17 @@ RAC_API rac_result_t rac_embeddings_embed_batch(rac_handle_t handle, const char*
  */
 RAC_API rac_result_t rac_embeddings_embed_batch_proto(
     rac_handle_t handle, const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Generate embeddings using the lifecycle-loaded embeddings model.
+ *
+ * request_proto_bytes encodes runanywhere.v1.EmbeddingsRequest. Commons
+ * resolves the current embeddings lifecycle component and out_result receives
+ * serialized runanywhere.v1.EmbeddingsResult bytes.
+ */
+RAC_API rac_result_t rac_embeddings_embed_batch_lifecycle_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
     rac_proto_buffer_t* out_result);
 
 /**

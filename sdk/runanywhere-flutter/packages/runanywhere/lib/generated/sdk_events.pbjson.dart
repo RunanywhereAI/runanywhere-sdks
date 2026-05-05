@@ -13,6 +13,13 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
+import 'download_service.pbjson.dart' as $6;
+import 'errors.pbjson.dart' as $8;
+import 'hardware_profile.pbjson.dart' as $7;
+import 'model_types.pbjson.dart' as $0;
+import 'storage_types.pbjson.dart' as $5;
+import 'voice_events.pbjson.dart' as $9;
+
 @$core.Deprecated('Use sDKComponentDescriptor instead')
 const SDKComponent$json = {
   '1': 'SDKComponent',
@@ -153,6 +160,10 @@ const ComponentLifecycleState$json = {
     {'1': 'COMPONENT_LIFECYCLE_STATE_UNLOADING', '2': 4},
     {'1': 'COMPONENT_LIFECYCLE_STATE_ERROR', '2': 5},
     {'1': 'COMPONENT_LIFECYCLE_STATE_SHUTDOWN', '2': 6},
+    {'1': 'COMPONENT_LIFECYCLE_STATE_DOWNLOADING', '2': 7},
+    {'1': 'COMPONENT_LIFECYCLE_STATE_DELETING', '2': 8},
+    {'1': 'COMPONENT_LIFECYCLE_STATE_PAUSED', '2': 9},
+    {'1': 'COMPONENT_LIFECYCLE_STATE_UPDATING', '2': 10},
   ],
 };
 
@@ -163,7 +174,10 @@ final $typed_data.Uint8List componentLifecycleStateDescriptor = $convert.base64D
     'JQohQ09NUE9ORU5UX0xJRkVDWUNMRV9TVEFURV9MT0FESU5HEAISIwofQ09NUE9ORU5UX0xJRk'
     'VDWUNMRV9TVEFURV9SRUFEWRADEicKI0NPTVBPTkVOVF9MSUZFQ1lDTEVfU1RBVEVfVU5MT0FE'
     'SU5HEAQSIwofQ09NUE9ORU5UX0xJRkVDWUNMRV9TVEFURV9FUlJPUhAFEiYKIkNPTVBPTkVOVF'
-    '9MSUZFQ1lDTEVfU1RBVEVfU0hVVERPV04QBg==');
+    '9MSUZFQ1lDTEVfU1RBVEVfU0hVVERPV04QBhIpCiVDT01QT05FTlRfTElGRUNZQ0xFX1NUQVRF'
+    'X0RPV05MT0FESU5HEAcSJgoiQ09NUE9ORU5UX0xJRkVDWUNMRV9TVEFURV9ERUxFVElORxAIEi'
+    'QKIENPTVBPTkVOVF9MSUZFQ1lDTEVfU1RBVEVfUEFVU0VEEAkSJgoiQ09NUE9ORU5UX0xJRkVD'
+    'WUNMRV9TVEFURV9VUERBVElORxAK');
 
 @$core.Deprecated('Use initializationStageDescriptor instead')
 const InitializationStage$json = {
@@ -693,6 +707,12 @@ const ModelRegistryEventKind$json = {
     {'1': 'MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED', '2': 11},
     {'1': 'MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED', '2': 12},
     {'1': 'MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED', '2': 13},
+    {'1': 'MODEL_REGISTRY_EVENT_KIND_LIST_STARTED', '2': 14},
+    {'1': 'MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED', '2': 15},
+    {'1': 'MODEL_REGISTRY_EVENT_KIND_LIST_FAILED', '2': 16},
+    {'1': 'MODEL_REGISTRY_EVENT_KIND_GET_STARTED', '2': 17},
+    {'1': 'MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED', '2': 18},
+    {'1': 'MODEL_REGISTRY_EVENT_KIND_GET_FAILED', '2': 19},
   ],
 };
 
@@ -710,7 +730,12 @@ final $typed_data.Uint8List modelRegistryEventKindDescriptor = $convert.base64De
     'IvCitNT0RFTF9SRUdJU1RSWV9FVkVOVF9LSU5EX0RJU0NPVkVSWV9TVEFSVEVEEAoSMQotTU9E'
     'RUxfUkVHSVNUUllfRVZFTlRfS0lORF9ESVNDT1ZFUllfQ09NUExFVEVEEAsSLgoqTU9ERUxfUk'
     'VHSVNUUllfRVZFTlRfS0lORF9ESVNDT1ZFUllfRkFJTEVEEAwSMwovTU9ERUxfUkVHSVNUUllf'
-    'RVZFTlRfS0lORF9DVVJSRU5UX01PREVMX0NIQU5HRUQQDQ==');
+    'RVZFTlRfS0lORF9DVVJSRU5UX01PREVMX0NIQU5HRUQQDRIqCiZNT0RFTF9SRUdJU1RSWV9FVk'
+    'VOVF9LSU5EX0xJU1RfU1RBUlRFRBAOEiwKKE1PREVMX1JFR0lTVFJZX0VWRU5UX0tJTkRfTElT'
+    'VF9DT01QTEVURUQQDxIpCiVNT0RFTF9SRUdJU1RSWV9FVkVOVF9LSU5EX0xJU1RfRkFJTEVEEB'
+    'ASKQolTU9ERUxfUkVHSVNUUllfRVZFTlRfS0lORF9HRVRfU1RBUlRFRBAREisKJ01PREVMX1JF'
+    'R0lTVFJZX0VWRU5UX0tJTkRfR0VUX0NPTVBMRVRFRBASEigKJE1PREVMX1JFR0lTVFJZX0VWRU'
+    '5UX0tJTkRfR0VUX0ZBSUxFRBAT');
 
 @$core.Deprecated('Use downloadEventKindDescriptor instead')
 const DownloadEventKind$json = {
@@ -728,6 +753,8 @@ const DownloadEventKind$json = {
     {'1': 'DOWNLOAD_EVENT_KIND_RESUMED', '2': 9},
     {'1': 'DOWNLOAD_EVENT_KIND_COMPLETED', '2': 10},
     {'1': 'DOWNLOAD_EVENT_KIND_FAILED', '2': 11},
+    {'1': 'DOWNLOAD_EVENT_KIND_PAUSED', '2': 12},
+    {'1': 'DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED', '2': 13},
   ],
 };
 
@@ -741,7 +768,8 @@ final $typed_data.Uint8List downloadEventKindDescriptor = $convert.base64Decode(
     'QQBhIhCh1ET1dOTE9BRF9FVkVOVF9LSU5EX0NBTkNFTExFRBAHEigKJERPV05MT0FEX0VWRU5U'
     'X0tJTkRfUkVTVU1FX1JFUVVFU1RFRBAIEh8KG0RPV05MT0FEX0VWRU5UX0tJTkRfUkVTVU1FRB'
     'AJEiEKHURPV05MT0FEX0VWRU5UX0tJTkRfQ09NUExFVEVEEAoSHgoaRE9XTkxPQURfRVZFTlRf'
-    'S0lORF9GQUlMRUQQCw==');
+    'S0lORF9GQUlMRUQQCxIeChpET1dOTE9BRF9FVkVOVF9LSU5EX1BBVVNFRBAMEi0KKURPV05MT0'
+    'FEX0VWRU5UX0tJTkRfUEFSVElBTF9CWVRFU19ERUxFVEVEEA0=');
 
 @$core.Deprecated('Use storageLifecycleEventKindDescriptor instead')
 const StorageLifecycleEventKind$json = {
@@ -758,6 +786,9 @@ const StorageLifecycleEventKind$json = {
     {'1': 'STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED', '2': 8},
     {'1': 'STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED', '2': 9},
     {'1': 'STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED', '2': 10},
+    {'1': 'STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED', '2': 11},
+    {'1': 'STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED', '2': 12},
+    {'1': 'STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED', '2': 13},
   ],
 };
 
@@ -773,7 +804,10 @@ final $typed_data.Uint8List storageLifecycleEventKindDescriptor = $convert.base6
     'VfTElGRUNZQ0xFX0VWRU5UX0tJTkRfREVMRVRFX0ZBSUxFRBAHEjYKMlNUT1JBR0VfTElGRUNZ'
     'Q0xFX0VWRU5UX0tJTkRfQ0FDSEVfQ0xFQU5VUF9TVEFSVEVEEAgSOAo0U1RPUkFHRV9MSUZFQ1'
     'lDTEVfRVZFTlRfS0lORF9DQUNIRV9DTEVBTlVQX0NPTVBMRVRFRBAJEjUKMVNUT1JBR0VfTElG'
-    'RUNZQ0xFX0VWRU5UX0tJTkRfQ0FDSEVfQ0xFQU5VUF9GQUlMRUQQCg==');
+    'RUNZQ0xFX0VWRU5UX0tJTkRfQ0FDSEVfQ0xFQU5VUF9GQUlMRUQQChI0CjBTVE9SQUdFX0xJRk'
+    'VDWUNMRV9FVkVOVF9LSU5EX0FWQUlMQUJJTElUWV9GQUlMRUQQCxIzCi9TVE9SQUdFX0xJRkVD'
+    'WUNMRV9FVkVOVF9LSU5EX0RFTEVURV9QTEFOX0ZBSUxFRBAMEjkKNVNUT1JBR0VfTElGRUNZQ0'
+    'xFX0VWRU5UX0tJTkRfREVMRVRFX0RSWV9SVU5fQ09NUExFVEVEEA0=');
 
 @$core.Deprecated('Use hardwareRoutingEventKindDescriptor instead')
 const HardwareRoutingEventKind$json = {
@@ -1216,6 +1250,11 @@ const ComponentLifecycleSnapshot$json = {
     {'1': 'model_id', '3': 3, '4': 1, '5': 9, '10': 'modelId'},
     {'1': 'updated_at_ms', '3': 4, '4': 1, '5': 3, '10': 'updatedAtMs'},
     {'1': 'error_message', '3': 5, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'category', '3': 6, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelCategory', '10': 'category'},
+    {'1': 'framework', '3': 7, '4': 1, '5': 14, '6': '.runanywhere.v1.InferenceFramework', '10': 'framework'},
+    {'1': 'resolved_path', '3': 8, '4': 1, '5': 9, '10': 'resolvedPath'},
+    {'1': 'loaded_at_unix_ms', '3': 9, '4': 1, '5': 3, '10': 'loadedAtUnixMs'},
+    {'1': 'model', '3': 10, '4': 1, '5': 11, '6': '.runanywhere.v1.ModelInfo', '10': 'model'},
   ],
 };
 
@@ -1225,7 +1264,44 @@ final $typed_data.Uint8List componentLifecycleSnapshotDescriptor = $convert.base
     'l3aGVyZS52MS5TREtDb21wb25lbnRSCWNvbXBvbmVudBI9CgVzdGF0ZRgCIAEoDjInLnJ1bmFu'
     'eXdoZXJlLnYxLkNvbXBvbmVudExpZmVjeWNsZVN0YXRlUgVzdGF0ZRIZCghtb2RlbF9pZBgDIA'
     'EoCVIHbW9kZWxJZBIiCg11cGRhdGVkX2F0X21zGAQgASgDUgt1cGRhdGVkQXRNcxIjCg1lcnJv'
-    'cl9tZXNzYWdlGAUgASgJUgxlcnJvck1lc3NhZ2U=');
+    'cl9tZXNzYWdlGAUgASgJUgxlcnJvck1lc3NhZ2USOQoIY2F0ZWdvcnkYBiABKA4yHS5ydW5hbn'
+    'l3aGVyZS52MS5Nb2RlbENhdGVnb3J5UghjYXRlZ29yeRJACglmcmFtZXdvcmsYByABKA4yIi5y'
+    'dW5hbnl3aGVyZS52MS5JbmZlcmVuY2VGcmFtZXdvcmtSCWZyYW1ld29yaxIjCg1yZXNvbHZlZF'
+    '9wYXRoGAggASgJUgxyZXNvbHZlZFBhdGgSKQoRbG9hZGVkX2F0X3VuaXhfbXMYCSABKANSDmxv'
+    'YWRlZEF0VW5peE1zEi8KBW1vZGVsGAogASgLMhkucnVuYW55d2hlcmUudjEuTW9kZWxJbmZvUg'
+    'Vtb2RlbA==');
+
+@$core.Deprecated('Use componentLifecycleSnapshotRequestDescriptor instead')
+const ComponentLifecycleSnapshotRequest$json = {
+  '1': 'ComponentLifecycleSnapshotRequest',
+  '2': [
+    {'1': 'component', '3': 1, '4': 1, '5': 14, '6': '.runanywhere.v1.SDKComponent', '10': 'component'},
+    {'1': 'include_model', '3': 2, '4': 1, '5': 8, '10': 'includeModel'},
+  ],
+};
+
+/// Descriptor for `ComponentLifecycleSnapshotRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List componentLifecycleSnapshotRequestDescriptor = $convert.base64Decode(
+    'CiFDb21wb25lbnRMaWZlY3ljbGVTbmFwc2hvdFJlcXVlc3QSOgoJY29tcG9uZW50GAEgASgOMh'
+    'wucnVuYW55d2hlcmUudjEuU0RLQ29tcG9uZW50Ugljb21wb25lbnQSIwoNaW5jbHVkZV9tb2Rl'
+    'bBgCIAEoCFIMaW5jbHVkZU1vZGVs');
+
+@$core.Deprecated('Use componentLifecycleSnapshotResultDescriptor instead')
+const ComponentLifecycleSnapshotResult$json = {
+  '1': 'ComponentLifecycleSnapshotResult',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+    {'1': 'snapshots', '3': 2, '4': 3, '5': 11, '6': '.runanywhere.v1.ComponentLifecycleSnapshot', '10': 'snapshots'},
+    {'1': 'error_message', '3': 3, '4': 1, '5': 9, '10': 'errorMessage'},
+  ],
+};
+
+/// Descriptor for `ComponentLifecycleSnapshotResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List componentLifecycleSnapshotResultDescriptor = $convert.base64Decode(
+    'CiBDb21wb25lbnRMaWZlY3ljbGVTbmFwc2hvdFJlc3VsdBIYCgdzdWNjZXNzGAEgASgIUgdzdW'
+    'NjZXNzEkgKCXNuYXBzaG90cxgCIAMoCzIqLnJ1bmFueXdoZXJlLnYxLkNvbXBvbmVudExpZmVj'
+    'eWNsZVNuYXBzaG90UglzbmFwc2hvdHMSIwoNZXJyb3JfbWVzc2FnZRgDIAEoCVIMZXJyb3JNZX'
+    'NzYWdl');
 
 @$core.Deprecated('Use componentLifecycleEventDescriptor instead')
 const ComponentLifecycleEvent$json = {
@@ -1242,6 +1318,9 @@ const ComponentLifecycleEvent$json = {
     {'1': 'download_progress', '3': 13, '4': 1, '5': 11, '6': '.runanywhere.v1.DownloadProgress', '9': 0, '10': 'downloadProgress'},
     {'1': 'storage_availability', '3': 14, '4': 1, '5': 11, '6': '.runanywhere.v1.StorageAvailabilityResult', '9': 0, '10': 'storageAvailability'},
     {'1': 'storage_delete_result', '3': 15, '4': 1, '5': 11, '6': '.runanywhere.v1.StorageDeleteResult', '9': 0, '10': 'storageDeleteResult'},
+    {'1': 'snapshot', '3': 16, '4': 1, '5': 11, '6': '.runanywhere.v1.ComponentLifecycleSnapshot', '9': 0, '10': 'snapshot'},
+    {'1': 'snapshot_result', '3': 17, '4': 1, '5': 11, '6': '.runanywhere.v1.ComponentLifecycleSnapshotResult', '9': 0, '10': 'snapshotResult'},
+    {'1': 'storage_delete_plan', '3': 18, '4': 1, '5': 11, '6': '.runanywhere.v1.StorageDeletePlan', '9': 0, '10': 'storageDeletePlan'},
   ],
   '8': [
     {'1': 'payload'},
@@ -1264,8 +1343,12 @@ final $typed_data.Uint8List componentLifecycleEventDescriptor = $convert.base64D
     'dyZXNzSABSEGRvd25sb2FkUHJvZ3Jlc3MSXgoUc3RvcmFnZV9hdmFpbGFiaWxpdHkYDiABKAsy'
     'KS5ydW5hbnl3aGVyZS52MS5TdG9yYWdlQXZhaWxhYmlsaXR5UmVzdWx0SABSE3N0b3JhZ2VBdm'
     'FpbGFiaWxpdHkSWQoVc3RvcmFnZV9kZWxldGVfcmVzdWx0GA8gASgLMiMucnVuYW55d2hlcmUu'
-    'djEuU3RvcmFnZURlbGV0ZVJlc3VsdEgAUhNzdG9yYWdlRGVsZXRlUmVzdWx0QgkKB3BheWxvYW'
-    'Q=');
+    'djEuU3RvcmFnZURlbGV0ZVJlc3VsdEgAUhNzdG9yYWdlRGVsZXRlUmVzdWx0EkgKCHNuYXBzaG'
+    '90GBAgASgLMioucnVuYW55d2hlcmUudjEuQ29tcG9uZW50TGlmZWN5Y2xlU25hcHNob3RIAFII'
+    'c25hcHNob3QSWwoPc25hcHNob3RfcmVzdWx0GBEgASgLMjAucnVuYW55d2hlcmUudjEuQ29tcG'
+    '9uZW50TGlmZWN5Y2xlU25hcHNob3RSZXN1bHRIAFIOc25hcHNob3RSZXN1bHQSUwoTc3RvcmFn'
+    'ZV9kZWxldGVfcGxhbhgSIAEoCzIhLnJ1bmFueXdoZXJlLnYxLlN0b3JhZ2VEZWxldGVQbGFuSA'
+    'BSEXN0b3JhZ2VEZWxldGVQbGFuQgkKB3BheWxvYWQ=');
 
 @$core.Deprecated('Use sessionEventDescriptor instead')
 const SessionEvent$json = {
@@ -1552,6 +1635,10 @@ const SDKEvent$json = {
     {'1': 'session_id', '3': 14, '4': 1, '5': 9, '10': 'sessionId'},
     {'1': 'destination', '3': 15, '4': 1, '5': 14, '6': '.runanywhere.v1.EventDestination', '10': 'destination'},
     {'1': 'properties', '3': 16, '4': 3, '5': 11, '6': '.runanywhere.v1.SDKEvent.PropertiesEntry', '10': 'properties'},
+    {'1': 'operation_id', '3': 33, '4': 1, '5': 9, '10': 'operationId'},
+    {'1': 'correlation_id', '3': 34, '4': 1, '5': 9, '10': 'correlationId'},
+    {'1': 'source', '3': 35, '4': 1, '5': 9, '10': 'source'},
+    {'1': 'trace_id', '3': 36, '4': 1, '5': 9, '10': 'traceId'},
     {'1': 'initialization', '3': 3, '4': 1, '5': 11, '6': '.runanywhere.v1.InitializationEvent', '9': 0, '10': 'initialization'},
     {'1': 'configuration', '3': 4, '4': 1, '5': 11, '6': '.runanywhere.v1.ConfigurationEvent', '9': 0, '10': 'configuration'},
     {'1': 'generation', '3': 5, '4': 1, '5': 11, '6': '.runanywhere.v1.GenerationEvent', '9': 0, '10': 'generation'},
@@ -1603,35 +1690,232 @@ final $typed_data.Uint8List sDKEventDescriptor = $convert.base64Decode(
     '4KAmlkGA0gASgJUgJpZBIdCgpzZXNzaW9uX2lkGA4gASgJUglzZXNzaW9uSWQSQgoLZGVzdGlu'
     'YXRpb24YDyABKA4yIC5ydW5hbnl3aGVyZS52MS5FdmVudERlc3RpbmF0aW9uUgtkZXN0aW5hdG'
     'lvbhJICgpwcm9wZXJ0aWVzGBAgAygLMigucnVuYW55d2hlcmUudjEuU0RLRXZlbnQuUHJvcGVy'
-    'dGllc0VudHJ5Ugpwcm9wZXJ0aWVzEk0KDmluaXRpYWxpemF0aW9uGAMgASgLMiMucnVuYW55d2'
-    'hlcmUudjEuSW5pdGlhbGl6YXRpb25FdmVudEgAUg5pbml0aWFsaXphdGlvbhJKCg1jb25maWd1'
-    'cmF0aW9uGAQgASgLMiIucnVuYW55d2hlcmUudjEuQ29uZmlndXJhdGlvbkV2ZW50SABSDWNvbm'
-    'ZpZ3VyYXRpb24SQQoKZ2VuZXJhdGlvbhgFIAEoCzIfLnJ1bmFueXdoZXJlLnYxLkdlbmVyYXRp'
-    'b25FdmVudEgAUgpnZW5lcmF0aW9uEjIKBW1vZGVsGAYgASgLMhoucnVuYW55d2hlcmUudjEuTW'
-    '9kZWxFdmVudEgAUgVtb2RlbBJECgtwZXJmb3JtYW5jZRgHIAEoCzIgLnJ1bmFueXdoZXJlLnYx'
-    'LlBlcmZvcm1hbmNlRXZlbnRIAFILcGVyZm9ybWFuY2USOAoHbmV0d29yaxgIIAEoCzIcLnJ1bm'
-    'FueXdoZXJlLnYxLk5ldHdvcmtFdmVudEgAUgduZXR3b3JrEjgKB3N0b3JhZ2UYCSABKAsyHC5y'
-    'dW5hbnl3aGVyZS52MS5TdG9yYWdlRXZlbnRIAFIHc3RvcmFnZRI+CglmcmFtZXdvcmsYCiABKA'
-    'syHi5ydW5hbnl3aGVyZS52MS5GcmFtZXdvcmtFdmVudEgAUglmcmFtZXdvcmsSNQoGZGV2aWNl'
-    'GAsgASgLMhsucnVuYW55d2hlcmUudjEuRGV2aWNlRXZlbnRIAFIGZGV2aWNlElUKDmNvbXBvbm'
-    'VudF9pbml0GAwgASgLMiwucnVuYW55d2hlcmUudjEuQ29tcG9uZW50SW5pdGlhbGl6YXRpb25F'
-    'dmVudEgAUg1jb21wb25lbnRJbml0EjsKBXZvaWNlGBEgASgLMiMucnVuYW55d2hlcmUudjEuVm'
-    '9pY2VMaWZlY3ljbGVFdmVudEgAUgV2b2ljZRJDCg52b2ljZV9waXBlbGluZRgSIAEoCzIaLnJ1'
-    'bmFueXdoZXJlLnYxLlZvaWNlRXZlbnRIAFINdm9pY2VQaXBlbGluZRJaChNjb21wb25lbnRfbG'
-    'lmZWN5Y2xlGBMgASgLMicucnVuYW55d2hlcmUudjEuQ29tcG9uZW50TGlmZWN5Y2xlRXZlbnRI'
-    'AFISY29tcG9uZW50TGlmZWN5Y2xlEjgKB3Nlc3Npb24YFyABKAsyHC5ydW5hbnl3aGVyZS52MS'
-    '5TZXNzaW9uRXZlbnRIAFIHc2Vzc2lvbhIvCgRhdXRoGBggASgLMhkucnVuYW55d2hlcmUudjEu'
-    'QXV0aEV2ZW50SABSBGF1dGgSSwoObW9kZWxfcmVnaXN0cnkYGSABKAsyIi5ydW5hbnl3aGVyZS'
-    '52MS5Nb2RlbFJlZ2lzdHJ5RXZlbnRIAFINbW9kZWxSZWdpc3RyeRI7Cghkb3dubG9hZBgaIAEo'
-    'CzIdLnJ1bmFueXdoZXJlLnYxLkRvd25sb2FkRXZlbnRIAFIIZG93bmxvYWQSVAoRc3RvcmFnZV'
-    '9saWZlY3ljbGUYGyABKAsyJS5ydW5hbnl3aGVyZS52MS5TdG9yYWdlTGlmZWN5Y2xlRXZlbnRI'
-    'AFIQc3RvcmFnZUxpZmVjeWNsZRJRChBoYXJkd2FyZV9yb3V0aW5nGBwgASgLMiQucnVuYW55d2'
-    'hlcmUudjEuSGFyZHdhcmVSb3V0aW5nRXZlbnRIAFIPaGFyZHdhcmVSb3V0aW5nEkoKCmNhcGFi'
-    'aWxpdHkYHSABKAsyKC5ydW5hbnl3aGVyZS52MS5DYXBhYmlsaXR5T3BlcmF0aW9uRXZlbnRIAF'
-    'IKY2FwYWJpbGl0eRI+Cgl0ZWxlbWV0cnkYHiABKAsyHi5ydW5hbnl3aGVyZS52MS5UZWxlbWV0'
-    'cnlFdmVudEgAUgl0ZWxlbWV0cnkSRwoMY2FuY2VsbGF0aW9uGB8gASgLMiEucnVuYW55d2hlcm'
-    'UudjEuQ2FuY2VsbGF0aW9uRXZlbnRIAFIMY2FuY2VsbGF0aW9uEjgKB2ZhaWx1cmUYICABKAsy'
-    'HC5ydW5hbnl3aGVyZS52MS5GYWlsdXJlRXZlbnRIAFIHZmFpbHVyZRo9Cg9Qcm9wZXJ0aWVzRW'
-    '50cnkSEAoDa2V5GAEgASgJUgNrZXkSFAoFdmFsdWUYAiABKAlSBXZhbHVlOgI4AUIHCgVldmVu'
-    'dEIICgZfZXJyb3I=');
+    'dGllc0VudHJ5Ugpwcm9wZXJ0aWVzEiEKDG9wZXJhdGlvbl9pZBghIAEoCVILb3BlcmF0aW9uSW'
+    'QSJQoOY29ycmVsYXRpb25faWQYIiABKAlSDWNvcnJlbGF0aW9uSWQSFgoGc291cmNlGCMgASgJ'
+    'UgZzb3VyY2USGQoIdHJhY2VfaWQYJCABKAlSB3RyYWNlSWQSTQoOaW5pdGlhbGl6YXRpb24YAy'
+    'ABKAsyIy5ydW5hbnl3aGVyZS52MS5Jbml0aWFsaXphdGlvbkV2ZW50SABSDmluaXRpYWxpemF0'
+    'aW9uEkoKDWNvbmZpZ3VyYXRpb24YBCABKAsyIi5ydW5hbnl3aGVyZS52MS5Db25maWd1cmF0aW'
+    '9uRXZlbnRIAFINY29uZmlndXJhdGlvbhJBCgpnZW5lcmF0aW9uGAUgASgLMh8ucnVuYW55d2hl'
+    'cmUudjEuR2VuZXJhdGlvbkV2ZW50SABSCmdlbmVyYXRpb24SMgoFbW9kZWwYBiABKAsyGi5ydW'
+    '5hbnl3aGVyZS52MS5Nb2RlbEV2ZW50SABSBW1vZGVsEkQKC3BlcmZvcm1hbmNlGAcgASgLMiAu'
+    'cnVuYW55d2hlcmUudjEuUGVyZm9ybWFuY2VFdmVudEgAUgtwZXJmb3JtYW5jZRI4CgduZXR3b3'
+    'JrGAggASgLMhwucnVuYW55d2hlcmUudjEuTmV0d29ya0V2ZW50SABSB25ldHdvcmsSOAoHc3Rv'
+    'cmFnZRgJIAEoCzIcLnJ1bmFueXdoZXJlLnYxLlN0b3JhZ2VFdmVudEgAUgdzdG9yYWdlEj4KCW'
+    'ZyYW1ld29yaxgKIAEoCzIeLnJ1bmFueXdoZXJlLnYxLkZyYW1ld29ya0V2ZW50SABSCWZyYW1l'
+    'd29yaxI1CgZkZXZpY2UYCyABKAsyGy5ydW5hbnl3aGVyZS52MS5EZXZpY2VFdmVudEgAUgZkZX'
+    'ZpY2USVQoOY29tcG9uZW50X2luaXQYDCABKAsyLC5ydW5hbnl3aGVyZS52MS5Db21wb25lbnRJ'
+    'bml0aWFsaXphdGlvbkV2ZW50SABSDWNvbXBvbmVudEluaXQSOwoFdm9pY2UYESABKAsyIy5ydW'
+    '5hbnl3aGVyZS52MS5Wb2ljZUxpZmVjeWNsZUV2ZW50SABSBXZvaWNlEkMKDnZvaWNlX3BpcGVs'
+    'aW5lGBIgASgLMhoucnVuYW55d2hlcmUudjEuVm9pY2VFdmVudEgAUg12b2ljZVBpcGVsaW5lEl'
+    'oKE2NvbXBvbmVudF9saWZlY3ljbGUYEyABKAsyJy5ydW5hbnl3aGVyZS52MS5Db21wb25lbnRM'
+    'aWZlY3ljbGVFdmVudEgAUhJjb21wb25lbnRMaWZlY3ljbGUSOAoHc2Vzc2lvbhgXIAEoCzIcLn'
+    'J1bmFueXdoZXJlLnYxLlNlc3Npb25FdmVudEgAUgdzZXNzaW9uEi8KBGF1dGgYGCABKAsyGS5y'
+    'dW5hbnl3aGVyZS52MS5BdXRoRXZlbnRIAFIEYXV0aBJLCg5tb2RlbF9yZWdpc3RyeRgZIAEoCz'
+    'IiLnJ1bmFueXdoZXJlLnYxLk1vZGVsUmVnaXN0cnlFdmVudEgAUg1tb2RlbFJlZ2lzdHJ5EjsK'
+    'CGRvd25sb2FkGBogASgLMh0ucnVuYW55d2hlcmUudjEuRG93bmxvYWRFdmVudEgAUghkb3dubG'
+    '9hZBJUChFzdG9yYWdlX2xpZmVjeWNsZRgbIAEoCzIlLnJ1bmFueXdoZXJlLnYxLlN0b3JhZ2VM'
+    'aWZlY3ljbGVFdmVudEgAUhBzdG9yYWdlTGlmZWN5Y2xlElEKEGhhcmR3YXJlX3JvdXRpbmcYHC'
+    'ABKAsyJC5ydW5hbnl3aGVyZS52MS5IYXJkd2FyZVJvdXRpbmdFdmVudEgAUg9oYXJkd2FyZVJv'
+    'dXRpbmcSSgoKY2FwYWJpbGl0eRgdIAEoCzIoLnJ1bmFueXdoZXJlLnYxLkNhcGFiaWxpdHlPcG'
+    'VyYXRpb25FdmVudEgAUgpjYXBhYmlsaXR5Ej4KCXRlbGVtZXRyeRgeIAEoCzIeLnJ1bmFueXdo'
+    'ZXJlLnYxLlRlbGVtZXRyeUV2ZW50SABSCXRlbGVtZXRyeRJHCgxjYW5jZWxsYXRpb24YHyABKA'
+    'syIS5ydW5hbnl3aGVyZS52MS5DYW5jZWxsYXRpb25FdmVudEgAUgxjYW5jZWxsYXRpb24SOAoH'
+    'ZmFpbHVyZRggIAEoCzIcLnJ1bmFueXdoZXJlLnYxLkZhaWx1cmVFdmVudEgAUgdmYWlsdXJlGj'
+    '0KD1Byb3BlcnRpZXNFbnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCVIFdmFs'
+    'dWU6AjgBQgcKBWV2ZW50QggKBl9lcnJvcg==');
+
+@$core.Deprecated('Use sDKEventFilterDescriptor instead')
+const SDKEventFilter$json = {
+  '1': 'SDKEventFilter',
+  '2': [
+    {'1': 'categories', '3': 1, '4': 3, '5': 14, '6': '.runanywhere.v1.EventCategory', '10': 'categories'},
+    {'1': 'components', '3': 2, '4': 3, '5': 14, '6': '.runanywhere.v1.SDKComponent', '10': 'components'},
+    {'1': 'destinations', '3': 3, '4': 3, '5': 14, '6': '.runanywhere.v1.EventDestination', '10': 'destinations'},
+    {'1': 'minimum_severity', '3': 4, '4': 1, '5': 14, '6': '.runanywhere.v1.EventSeverity', '10': 'minimumSeverity'},
+    {'1': 'session_id', '3': 5, '4': 1, '5': 9, '10': 'sessionId'},
+    {'1': 'operation_id', '3': 6, '4': 1, '5': 9, '10': 'operationId'},
+    {'1': 'correlation_id', '3': 7, '4': 1, '5': 9, '10': 'correlationId'},
+    {'1': 'source', '3': 8, '4': 1, '5': 9, '10': 'source'},
+    {'1': 'trace_id', '3': 9, '4': 1, '5': 9, '10': 'traceId'},
+  ],
+};
+
+/// Descriptor for `SDKEventFilter`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sDKEventFilterDescriptor = $convert.base64Decode(
+    'Cg5TREtFdmVudEZpbHRlchI9CgpjYXRlZ29yaWVzGAEgAygOMh0ucnVuYW55d2hlcmUudjEuRX'
+    'ZlbnRDYXRlZ29yeVIKY2F0ZWdvcmllcxI8Cgpjb21wb25lbnRzGAIgAygOMhwucnVuYW55d2hl'
+    'cmUudjEuU0RLQ29tcG9uZW50Ugpjb21wb25lbnRzEkQKDGRlc3RpbmF0aW9ucxgDIAMoDjIgLn'
+    'J1bmFueXdoZXJlLnYxLkV2ZW50RGVzdGluYXRpb25SDGRlc3RpbmF0aW9ucxJIChBtaW5pbXVt'
+    'X3NldmVyaXR5GAQgASgOMh0ucnVuYW55d2hlcmUudjEuRXZlbnRTZXZlcml0eVIPbWluaW11bV'
+    'NldmVyaXR5Eh0KCnNlc3Npb25faWQYBSABKAlSCXNlc3Npb25JZBIhCgxvcGVyYXRpb25faWQY'
+    'BiABKAlSC29wZXJhdGlvbklkEiUKDmNvcnJlbGF0aW9uX2lkGAcgASgJUg1jb3JyZWxhdGlvbk'
+    'lkEhYKBnNvdXJjZRgIIAEoCVIGc291cmNlEhkKCHRyYWNlX2lkGAkgASgJUgd0cmFjZUlk');
+
+@$core.Deprecated('Use sDKEventPublishRequestDescriptor instead')
+const SDKEventPublishRequest$json = {
+  '1': 'SDKEventPublishRequest',
+  '2': [
+    {'1': 'event', '3': 1, '4': 1, '5': 11, '6': '.runanywhere.v1.SDKEvent', '10': 'event'},
+    {'1': 'normalize_envelope', '3': 2, '4': 1, '5': 8, '10': 'normalizeEnvelope'},
+  ],
+};
+
+/// Descriptor for `SDKEventPublishRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sDKEventPublishRequestDescriptor = $convert.base64Decode(
+    'ChZTREtFdmVudFB1Ymxpc2hSZXF1ZXN0Ei4KBWV2ZW50GAEgASgLMhgucnVuYW55d2hlcmUudj'
+    'EuU0RLRXZlbnRSBWV2ZW50Ei0KEm5vcm1hbGl6ZV9lbnZlbG9wZRgCIAEoCFIRbm9ybWFsaXpl'
+    'RW52ZWxvcGU=');
+
+@$core.Deprecated('Use sDKEventPublishResultDescriptor instead')
+const SDKEventPublishResult$json = {
+  '1': 'SDKEventPublishResult',
+  '2': [
+    {'1': 'accepted', '3': 1, '4': 1, '5': 8, '10': 'accepted'},
+    {'1': 'event_id', '3': 2, '4': 1, '5': 9, '10': 'eventId'},
+    {'1': 'normalized_event', '3': 3, '4': 1, '5': 11, '6': '.runanywhere.v1.SDKEvent', '9': 0, '10': 'normalizedEvent', '17': true},
+    {'1': 'error_message', '3': 4, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'error', '3': 5, '4': 1, '5': 11, '6': '.runanywhere.v1.SDKError', '9': 1, '10': 'error', '17': true},
+  ],
+  '8': [
+    {'1': '_normalized_event'},
+    {'1': '_error'},
+  ],
+};
+
+/// Descriptor for `SDKEventPublishResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sDKEventPublishResultDescriptor = $convert.base64Decode(
+    'ChVTREtFdmVudFB1Ymxpc2hSZXN1bHQSGgoIYWNjZXB0ZWQYASABKAhSCGFjY2VwdGVkEhkKCG'
+    'V2ZW50X2lkGAIgASgJUgdldmVudElkEkgKEG5vcm1hbGl6ZWRfZXZlbnQYAyABKAsyGC5ydW5h'
+    'bnl3aGVyZS52MS5TREtFdmVudEgAUg9ub3JtYWxpemVkRXZlbnSIAQESIwoNZXJyb3JfbWVzc2'
+    'FnZRgEIAEoCVIMZXJyb3JNZXNzYWdlEjMKBWVycm9yGAUgASgLMhgucnVuYW55d2hlcmUudjEu'
+    'U0RLRXJyb3JIAVIFZXJyb3KIAQFCEwoRX25vcm1hbGl6ZWRfZXZlbnRCCAoGX2Vycm9y');
+
+@$core.Deprecated('Use sDKEventSubscribeRequestDescriptor instead')
+const SDKEventSubscribeRequest$json = {
+  '1': 'SDKEventSubscribeRequest',
+  '2': [
+    {'1': 'filter', '3': 1, '4': 1, '5': 11, '6': '.runanywhere.v1.SDKEventFilter', '10': 'filter'},
+    {'1': 'replay_queued_events', '3': 2, '4': 1, '5': 8, '10': 'replayQueuedEvents'},
+  ],
+};
+
+/// Descriptor for `SDKEventSubscribeRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List sDKEventSubscribeRequestDescriptor = $convert.base64Decode(
+    'ChhTREtFdmVudFN1YnNjcmliZVJlcXVlc3QSNgoGZmlsdGVyGAEgASgLMh4ucnVuYW55d2hlcm'
+    'UudjEuU0RLRXZlbnRGaWx0ZXJSBmZpbHRlchIwChRyZXBsYXlfcXVldWVkX2V2ZW50cxgCIAEo'
+    'CFIScmVwbGF5UXVldWVkRXZlbnRz');
+
+const $core.Map<$core.String, $core.dynamic> SDKEventsServiceBase$json = {
+  '1': 'SDKEvents',
+  '2': [
+    {'1': 'Publish', '2': '.runanywhere.v1.SDKEventPublishRequest', '3': '.runanywhere.v1.SDKEventPublishResult'},
+    {'1': 'Subscribe', '2': '.runanywhere.v1.SDKEventSubscribeRequest', '3': '.runanywhere.v1.SDKEvent', '6': true},
+  ],
+};
+
+@$core.Deprecated('Use sDKEventsServiceDescriptor instead')
+const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> SDKEventsServiceBase$messageJson = {
+  '.runanywhere.v1.SDKEventPublishRequest': SDKEventPublishRequest$json,
+  '.runanywhere.v1.SDKEvent': SDKEvent$json,
+  '.runanywhere.v1.InitializationEvent': InitializationEvent$json,
+  '.runanywhere.v1.ConfigurationEvent': ConfigurationEvent$json,
+  '.runanywhere.v1.GenerationEvent': GenerationEvent$json,
+  '.runanywhere.v1.ModelEvent': ModelEvent$json,
+  '.runanywhere.v1.PerformanceEvent': PerformanceEvent$json,
+  '.runanywhere.v1.NetworkEvent': NetworkEvent$json,
+  '.runanywhere.v1.StorageEvent': StorageEvent$json,
+  '.runanywhere.v1.FrameworkEvent': FrameworkEvent$json,
+  '.runanywhere.v1.DeviceEvent': DeviceEvent$json,
+  '.runanywhere.v1.ComponentInitializationEvent': ComponentInitializationEvent$json,
+  '.runanywhere.v1.SDKEvent.PropertiesEntry': SDKEvent_PropertiesEntry$json,
+  '.runanywhere.v1.VoiceLifecycleEvent': VoiceLifecycleEvent$json,
+  '.runanywhere.v1.VoiceEvent': $9.VoiceEvent$json,
+  '.runanywhere.v1.UserSaidEvent': $9.UserSaidEvent$json,
+  '.runanywhere.v1.AssistantTokenEvent': $9.AssistantTokenEvent$json,
+  '.runanywhere.v1.AudioFrameEvent': $9.AudioFrameEvent$json,
+  '.runanywhere.v1.VADEvent': $9.VADEvent$json,
+  '.runanywhere.v1.InterruptedEvent': $9.InterruptedEvent$json,
+  '.runanywhere.v1.StateChangeEvent': $9.StateChangeEvent$json,
+  '.runanywhere.v1.ErrorEvent': $9.ErrorEvent$json,
+  '.runanywhere.v1.MetricsEvent': $9.MetricsEvent$json,
+  '.runanywhere.v1.VoiceAgentComponentStates': $9.VoiceAgentComponentStates$json,
+  '.runanywhere.v1.VoiceSessionError': $9.VoiceSessionError$json,
+  '.runanywhere.v1.SessionStartedEvent': $9.SessionStartedEvent$json,
+  '.runanywhere.v1.SessionStoppedEvent': $9.SessionStoppedEvent$json,
+  '.runanywhere.v1.AgentResponseStartedEvent': $9.AgentResponseStartedEvent$json,
+  '.runanywhere.v1.AgentResponseCompletedEvent': $9.AgentResponseCompletedEvent$json,
+  '.runanywhere.v1.SpeechTurnDetectionEvent': $9.SpeechTurnDetectionEvent$json,
+  '.runanywhere.v1.TurnLifecycleEvent': $9.TurnLifecycleEvent$json,
+  '.runanywhere.v1.WakeWordDetectedEvent': $9.WakeWordDetectedEvent$json,
+  '.runanywhere.v1.AudioLevelEvent': $9.AudioLevelEvent$json,
+  '.runanywhere.v1.ComponentProgressEvent': $9.ComponentProgressEvent$json,
+  '.runanywhere.v1.VoiceEvent.MetadataEntry': $9.VoiceEvent_MetadataEntry$json,
+  '.runanywhere.v1.ComponentLifecycleEvent': ComponentLifecycleEvent$json,
+  '.runanywhere.v1.ModelLoadResult': $0.ModelLoadResult$json,
+  '.runanywhere.v1.ModelFileDescriptor': $0.ModelFileDescriptor$json,
+  '.runanywhere.v1.ModelUnloadResult': $0.ModelUnloadResult$json,
+  '.runanywhere.v1.ModelDeleteResult': $0.ModelDeleteResult$json,
+  '.runanywhere.v1.DownloadProgress': $6.DownloadProgress$json,
+  '.runanywhere.v1.StorageAvailabilityResult': $5.StorageAvailabilityResult$json,
+  '.runanywhere.v1.StorageAvailability': $5.StorageAvailability$json,
+  '.runanywhere.v1.StorageDeletePlan': $5.StorageDeletePlan$json,
+  '.runanywhere.v1.StorageDeleteCandidate': $5.StorageDeleteCandidate$json,
+  '.runanywhere.v1.StorageDeleteResult': $5.StorageDeleteResult$json,
+  '.runanywhere.v1.ComponentLifecycleSnapshot': ComponentLifecycleSnapshot$json,
+  '.runanywhere.v1.ModelInfo': $0.ModelInfo$json,
+  '.runanywhere.v1.ModelThinkingTagPattern': $0.ModelThinkingTagPattern$json,
+  '.runanywhere.v1.ModelInfoMetadata': $0.ModelInfoMetadata$json,
+  '.runanywhere.v1.SingleFileArtifact': $0.SingleFileArtifact$json,
+  '.runanywhere.v1.ExpectedModelFiles': $0.ExpectedModelFiles$json,
+  '.runanywhere.v1.ArchiveArtifact': $0.ArchiveArtifact$json,
+  '.runanywhere.v1.MultiFileArtifact': $0.MultiFileArtifact$json,
+  '.runanywhere.v1.ModelRuntimeCompatibility': $0.ModelRuntimeCompatibility$json,
+  '.runanywhere.v1.ComponentLifecycleSnapshotResult': ComponentLifecycleSnapshotResult$json,
+  '.runanywhere.v1.SDKError': $8.SDKError$json,
+  '.runanywhere.v1.ErrorContext': $8.ErrorContext$json,
+  '.runanywhere.v1.ErrorContext.MetadataEntry': $8.ErrorContext_MetadataEntry$json,
+  '.runanywhere.v1.SessionEvent': SessionEvent$json,
+  '.runanywhere.v1.AuthEvent': AuthEvent$json,
+  '.runanywhere.v1.ModelRegistryEvent': ModelRegistryEvent$json,
+  '.runanywhere.v1.ModelRegistryRefreshResult': $0.ModelRegistryRefreshResult$json,
+  '.runanywhere.v1.ModelInfoList': $0.ModelInfoList$json,
+  '.runanywhere.v1.ModelListResult': $0.ModelListResult$json,
+  '.runanywhere.v1.ModelGetResult': $0.ModelGetResult$json,
+  '.runanywhere.v1.ModelImportResult': $0.ModelImportResult$json,
+  '.runanywhere.v1.ModelDiscoveryResult': $0.ModelDiscoveryResult$json,
+  '.runanywhere.v1.DiscoveredModel': $0.DiscoveredModel$json,
+  '.runanywhere.v1.ModelCompatibilityResult': $0.ModelCompatibilityResult$json,
+  '.runanywhere.v1.CurrentModelResult': $0.CurrentModelResult$json,
+  '.runanywhere.v1.DownloadEvent': DownloadEvent$json,
+  '.runanywhere.v1.DownloadPlanResult': $6.DownloadPlanResult$json,
+  '.runanywhere.v1.DownloadFilePlan': $6.DownloadFilePlan$json,
+  '.runanywhere.v1.DownloadStartResult': $6.DownloadStartResult$json,
+  '.runanywhere.v1.DownloadCancelResult': $6.DownloadCancelResult$json,
+  '.runanywhere.v1.DownloadResumeResult': $6.DownloadResumeResult$json,
+  '.runanywhere.v1.StorageLifecycleEvent': StorageLifecycleEvent$json,
+  '.runanywhere.v1.StorageInfoResult': $5.StorageInfoResult$json,
+  '.runanywhere.v1.StorageInfo': $5.StorageInfo$json,
+  '.runanywhere.v1.AppStorageInfo': $5.AppStorageInfo$json,
+  '.runanywhere.v1.DeviceStorageInfo': $5.DeviceStorageInfo$json,
+  '.runanywhere.v1.ModelStorageMetrics': $5.ModelStorageMetrics$json,
+  '.runanywhere.v1.HardwareRoutingEvent': HardwareRoutingEvent$json,
+  '.runanywhere.v1.HardwareProfileResult': $7.HardwareProfileResult$json,
+  '.runanywhere.v1.HardwareProfile': $7.HardwareProfile$json,
+  '.runanywhere.v1.AcceleratorInfo': $7.AcceleratorInfo$json,
+  '.runanywhere.v1.CapabilityOperationEvent': CapabilityOperationEvent$json,
+  '.runanywhere.v1.TelemetryEvent': TelemetryEvent$json,
+  '.runanywhere.v1.TelemetryEvent.AttributesEntry': TelemetryEvent_AttributesEntry$json,
+  '.runanywhere.v1.CancellationEvent': CancellationEvent$json,
+  '.runanywhere.v1.FailureEvent': FailureEvent$json,
+  '.runanywhere.v1.SDKEventPublishResult': SDKEventPublishResult$json,
+  '.runanywhere.v1.SDKEventSubscribeRequest': SDKEventSubscribeRequest$json,
+  '.runanywhere.v1.SDKEventFilter': SDKEventFilter$json,
+};
+
+/// Descriptor for `SDKEvents`. Decode as a `google.protobuf.ServiceDescriptorProto`.
+final $typed_data.Uint8List sDKEventsServiceDescriptor = $convert.base64Decode(
+    'CglTREtFdmVudHMSWAoHUHVibGlzaBImLnJ1bmFueXdoZXJlLnYxLlNES0V2ZW50UHVibGlzaF'
+    'JlcXVlc3QaJS5ydW5hbnl3aGVyZS52MS5TREtFdmVudFB1Ymxpc2hSZXN1bHQSUQoJU3Vic2Ny'
+    'aWJlEigucnVuYW55d2hlcmUudjEuU0RLRXZlbnRTdWJzY3JpYmVSZXF1ZXN0GhgucnVuYW55d2'
+    'hlcmUudjEuU0RLRXZlbnQwAQ==');
 

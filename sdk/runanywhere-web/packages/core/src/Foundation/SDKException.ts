@@ -155,6 +155,9 @@ export class SDKException extends Error {
         timestampMs: Date.now(),
         severity: severityForCode(code),
         component: componentForCode(code),
+        retryable: false,
+        remediationHint: '',
+        correlationId: '',
       };
     } else {
       super(codeOrProto.message);

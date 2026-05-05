@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Wave 2 STT capability — aligned to Swift + proto. Returns proto STTOutput.
+// STT capability backed by commons model lifecycle and lifecycle-owned
+// generated-proto transcription.
 
 import 'dart:async';
 import 'dart:typed_data';
@@ -11,21 +12,23 @@ import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
+import 'package:runanywhere/generated/sdk_events.pb.dart'
+    show ComponentLifecycleSnapshot;
+import 'package:runanywhere/generated/sdk_events.pbenum.dart'
+    show ComponentLifecycleState, SDKComponent;
 import 'package:runanywhere/generated/stt_options.pb.dart';
 import 'package:runanywhere/generated/stt_options_helpers.dart';
+import 'package:runanywhere/internal/sdk_event_factories.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
-import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/native/dart_bridge_model_registry.dart'
-    hide ModelInfo;
-import 'package:runanywhere/native/dart_bridge_stt_streaming.dart';
-import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
+import 'package:runanywhere/native/dart_bridge_stt.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
-import 'package:runanywhere/public/events/sdk_event.dart';
 
 /// STT (speech-to-text) capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.stt`. Mirrors Swift's
-/// `RunAnywhere+STT.swift`. Returns proto [STTOutput].
+/// Access via `RunAnywhereSDK.instance.stt`. Load/current/unload state is owned
+/// by commons lifecycle; one-shot transcription uses the lifecycle-owned
+/// generated-proto commons ABI.
 class RunAnywhereSTT {
   RunAnywhereSTT._();
   static final RunAnywhereSTT _instance = RunAnywhereSTT._();
@@ -33,34 +36,50 @@ class RunAnywhereSTT {
 
   bool _isStreaming = false;
 
-  /// True when an STT model is currently loaded.
-  bool get isLoaded => DartBridge.stt.isLoaded;
-
-  /// True when a streaming transcription session is active (canonical §4).
-  bool get isStreaming => _isStreaming;
-
-  /// Stop any active streaming transcription session (canonical §4).
-  Future<void> stopStreamingTranscription() async {
-    _isStreaming = false;
-    // The native streaming path self-terminates when the stream consumer
-    // cancels; this flag is the public-facing gate for the canonical property.
+  /// True when commons lifecycle has a ready STT model.
+  bool get isLoaded {
+    final snapshot = _lifecycleSnapshot;
+    return snapshot != null &&
+        snapshot.state ==
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+        snapshot.modelId.isNotEmpty;
   }
 
-  /// Currently-loaded STT model ID, or null.
-  String? get currentModelId => DartBridge.stt.currentModelId;
+  /// True when a streaming transcription session is active.
+  bool get isStreaming => _isStreaming;
+
+  /// Stop any active streaming transcription session.
+  Future<void> stopStreamingTranscription() async {
+    _isStreaming = false;
+  }
+
+  /// Currently-loaded STT model ID from commons lifecycle, or null.
+  String? get currentModelId {
+    final snapshot = _lifecycleSnapshot;
+    if (snapshot == null ||
+        snapshot.state !=
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY ||
+        snapshot.modelId.isEmpty) {
+      return null;
+    }
+    return snapshot.modelId;
+  }
 
   /// Currently-loaded STT model as `ModelInfo`, or null.
   Future<ModelInfo?> currentModel() async {
-    final modelId = currentModelId;
-    if (modelId == null) return null;
-    final models = await RunAnywhereModels.shared.available();
-    return models.cast<ModelInfo?>().firstWhere(
-          (m) => m?.id == modelId,
-          orElse: () => null,
-        );
+    final current = await RunAnywhereModelLifecycle.shared.current(
+      model_pb.CurrentModelRequest(
+        category: _sttCategory,
+        includeModelMetadata: true,
+      ),
+    );
+    if (!current.found || current.modelId.isEmpty || !current.hasModel()) {
+      return null;
+    }
+    return current.model;
   }
 
-  /// Load an STT model by ID.
+  /// Load an STT model by ID through commons lifecycle routing.
   Future<void> load(String modelId) async {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
@@ -70,44 +89,27 @@ class RunAnywhereSTT {
     logger.info('Loading STT model: $modelId');
     final startTime = DateTime.now().millisecondsSinceEpoch;
 
-    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
+    EventBus.shared.publish(SdkEventFactory.modelLoadStarted(modelId));
 
     try {
-      final models = await RunAnywhereModels.shared.available();
-      final model = models.where((m) => m.id == modelId).firstOrNull;
-
-      if (model == null) {
-        throw SDKException.modelNotFound('STT model not found: $modelId');
-      }
-
-      if (model.localPath.isEmpty) {
-        throw SDKException.modelNotDownloaded(
-          'STT model is not downloaded. Call downloadModel() first.',
-        );
-      }
-
-      final resolvedPath =
-          await DartBridge.modelPaths.resolveModelFilePath(model);
-      if (resolvedPath == null) {
-        throw SDKException.modelNotFound(
-            'Could not resolve STT model file path for: $modelId');
-      }
-
-      if (DartBridge.stt.isLoaded) {
-        DartBridge.stt.unload();
-      }
-
-      logger.debug('Loading STT model via C++ bridge: $resolvedPath');
-      await DartBridge.stt.loadModel(resolvedPath, modelId, model.name);
-
-      if (!DartBridge.stt.isLoaded) {
-        throw SDKException.sttNotAvailable(
-          'STT model failed to load - model may not be compatible',
+      final result = await RunAnywhereModelLifecycle.shared.load(
+        model_pb.ModelLoadRequest(
+          modelId: modelId,
+          category: _sttCategory,
+          forceReload: true,
+          validateAvailability: true,
+        ),
+      );
+      if (!result.success) {
+        throw SDKException.modelLoadFailed(
+          modelId,
+          result.errorMessage.isNotEmpty
+              ? result.errorMessage
+              : 'STT lifecycle load failed',
         );
       }
 
       final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-
       TelemetryService.shared.trackModelLoad(
         modelId: modelId,
         modelType: 'stt',
@@ -115,8 +117,8 @@ class RunAnywhereSTT {
         loadTimeMs: loadTimeMs,
       );
 
-      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
-      logger.info('STT model loaded: ${model.name}');
+      EventBus.shared.publish(SdkEventFactory.modelLoadCompleted(modelId));
+      logger.info('STT model loaded: $modelId');
     } catch (e) {
       logger.error('Failed to load STT model: $e');
       TelemetryService.shared.trackModelLoad(
@@ -129,24 +131,43 @@ class RunAnywhereSTT {
         errorMessage: e.toString(),
         context: {'model_id': modelId},
       );
-      EventBus.shared.publish(SDKModelEvent.loadFailed(
-        modelId: modelId,
-        error: e.toString(),
-      ));
+      EventBus.shared.publish(SdkEventFactory.modelLoadFailed(modelId, e));
       rethrow;
     }
   }
 
-  /// Unload the currently-loaded STT model.
+  /// Unload the currently-loaded STT model through commons lifecycle routing.
   Future<void> unload() async {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    DartBridge.stt.unload();
+
+    final modelId = currentModelId ??
+        (await RunAnywhereModelLifecycle.shared.current(
+          model_pb.CurrentModelRequest(category: _sttCategory),
+        ))
+            .modelId;
+    if (modelId.isEmpty) return;
+
+    EventBus.shared.publish(SdkEventFactory.modelUnloadStarted(modelId));
+    final result = await RunAnywhereModelLifecycle.shared.unload(
+      model_pb.ModelUnloadRequest(
+        modelId: modelId,
+        category: _sttCategory,
+      ),
+    );
+    if (!result.success) {
+      throw SDKException.invalidState(
+        result.errorMessage.isNotEmpty
+            ? result.errorMessage
+            : 'STT lifecycle unload failed',
+      );
+    }
+    _isStreaming = false;
+    EventBus.shared.publish(SdkEventFactory.modelUnloadCompleted(modelId));
   }
 
-  /// Transcribe audio data to a proto [STTOutput]. Mirrors Swift's
-  /// `transcribe(_ audio:options:)` (the rich variant).
+  /// Transcribe audio data to a proto [STTOutput].
   Future<STTOutput> transcribe(
     Uint8List audio, [
     STTOptions? options,
@@ -154,148 +175,39 @@ class RunAnywhereSTT {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    if (!DartBridge.stt.isLoaded) {
-      throw SDKException.sttNotAvailable(
-        'No STT model loaded. Call loadSTTModel() first.',
-      );
-    }
-
-    final logger = SDKLogger('RunAnywhere.Transcribe');
-    final opts = _effectiveOptions(options ?? STTOptions());
-    final modelId = currentModelId ?? 'unknown';
-    final modelInfo =
-        await DartBridgeModelRegistry.instance.getProtoModel(modelId);
-    final modelName = modelInfo?.name;
-
-    // Audio length estimate: PCM16 at 16kHz mono → bytes / 2 / sampleRate * 1000.
-    const sampleRate = 16000;
-    final estimatedDurationMs = (audio.length / 2 / sampleRate * 1000).round();
-
-    final startTime = DateTime.now().millisecondsSinceEpoch;
-    try {
-      final result = await DartBridge.stt.transcribeProto(audio, opts);
-      final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      final resultDurationMs =
-          result.hasDurationMs() ? result.durationMs.toInt() : 0;
-      final audioDurationMs =
-          resultDurationMs > 0 ? resultDurationMs : estimatedDurationMs;
-
-      final wordCount = result.text.trim().isEmpty
-          ? 0
-          : result.text.trim().split(RegExp(r'\s+')).length;
-      final language = result.languageCode.isNotEmpty
-          ? result.languageCode
-          : result.language.name;
-
-      TelemetryService.shared.trackTranscription(
-        modelId: modelId,
-        modelName: modelName,
-        audioDurationMs: audioDurationMs,
-        latencyMs: latencyMs,
-        wordCount: wordCount,
-        confidence: result.confidence,
-        language: language,
-        isStreaming: false,
-      );
-
-      logger.info('Transcription complete: ${result.text.length} chars, '
-          'confidence: ${result.confidence}');
-
-      return result;
-    } catch (e) {
-      TelemetryService.shared.trackError(
-        errorCode: 'transcription_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
-      logger.error('Transcription failed: $e');
-      rethrow;
-    }
+    return _transcribeAudioData(
+      audio,
+      options ?? STTOptions(),
+    );
   }
 
-  /// Streaming transcription. Yields a real partial event for every
-  /// callback fired by `rac_stt_component_transcribe_stream` and
-  /// completes when the C bridge signals `is_final = true`.
-  ///
-  /// Cancellation: drop the [StreamSubscription] you obtained via
-  /// `.listen(...)`. The native callback is automatically detached
-  /// once the consumer cancels.
+  /// Streaming transcription.
   Stream<STTPartialResult> transcribeStream(
     Uint8List audio, {
     STTOptions? options,
-  }) {
+  }) async* {
     if (!SdkState.shared.isInitialized) {
-      return Stream<STTPartialResult>.error(SDKException.notInitialized());
+      throw SDKException.notInitialized();
     }
-    if (!DartBridge.stt.isLoaded) {
-      return Stream<STTPartialResult>.error(SDKException.sttNotAvailable(
-        'No STT model loaded. Call loadSTTModel() first.',
-      ));
-    }
-
-    final opts = _effectiveOptions(options ?? STTOptions());
-    final streaming = DartBridgeSttStreaming.transcribeStream(
-      audio: audio,
-      options: opts,
+    await _requireLoadedModelId();
+    _effectiveOptions(options ?? STTOptions());
+    throw SDKException.featureNotAvailable(
+      'Lifecycle-owned STT streaming is unavailable in Flutter. '
+      'Use transcribe() for one-shot STT until commons exposes '
+      'rac_stt_transcribe_stream_lifecycle_proto.',
     );
-
-    _isStreaming = true;
-
-    final controller = StreamController<STTPartialResult>(sync: false);
-    final sub = streaming.stream.listen(
-      (event) {
-        if (controller.isClosed) return;
-        controller.add(event);
-        if (event.isFinal) {
-          unawaited(controller.close());
-          _isStreaming = false;
-        }
-      },
-      onError: (Object err, StackTrace stack) {
-        if (!controller.isClosed) {
-          controller.addError(err, stack);
-          unawaited(controller.close());
-        }
-        _isStreaming = false;
-      },
-      onDone: () {
-        if (!controller.isClosed) {
-          unawaited(controller.close());
-        }
-        _isStreaming = false;
-      },
-    );
-
-    controller.onCancel = () {
-      _isStreaming = false;
-      streaming.onCancel();
-      unawaited(sub.cancel());
-    };
-
-    return controller.stream;
   }
 
   /// Symmetric with Swift's `processStreamingAudio`. Float32 PCM samples
-  /// at 16kHz are forwarded to the synchronous transcribe path.
+  /// at 16kHz are forwarded to the lifecycle-owned one-shot transcribe path.
   Future<void> processStreamingAudio(
     Float32List samples, {
     STTOptions? options,
   }) async {
-    if (!SdkState.shared.isInitialized) {
-      throw SDKException.notInitialized();
-    }
-    if (!DartBridge.stt.isLoaded) {
-      throw SDKException.sttNotAvailable('No STT model loaded.');
-    }
-    final byteData = ByteData(samples.lengthInBytes);
-    for (var i = 0; i < samples.length; i++) {
-      byteData.setFloat32(i * 4, samples[i], Endian.little);
-    }
-    await transcribe(byteData.buffer.asUint8List(), options);
+    await transcribeBuffer(samples, options: options);
   }
 
-  /// Transcribe a Float32 PCM buffer directly. Mirrors Swift's
-  /// `transcribeBuffer`.
+  /// Transcribe a Float32 PCM buffer directly.
   Future<STTOutput> transcribeBuffer(
     Float32List samples, {
     STTOptions? options,
@@ -304,7 +216,56 @@ class RunAnywhereSTT {
     for (var i = 0; i < samples.length; i++) {
       byteData.setFloat32(i * 4, samples[i], Endian.little);
     }
-    return transcribe(byteData.buffer.asUint8List(), options);
+    final opts = _effectiveOptions(options ?? STTOptions());
+    opts.audioFormat = model_pb.AudioFormat.AUDIO_FORMAT_PCM;
+    return _transcribeAudioData(
+      byteData.buffer.asUint8List(),
+      opts,
+      encoding: STTAudioEncoding.STT_AUDIO_ENCODING_PCM_F32_LE,
+      bitsPerSample: 32,
+    );
+  }
+
+  Future<STTOutput> _transcribeAudioData(
+    Uint8List audio,
+    STTOptions options, {
+    STTAudioEncoding? encoding,
+    int? bitsPerSample,
+  }) async {
+    final modelId = await _requireLoadedModelId();
+    final opts = _effectiveOptions(options);
+    final sourceEncoding = encoding ?? _encodingForOptions(opts);
+
+    final request = STTTranscriptionRequest(
+      audio: STTAudioSource(
+        audioData: audio,
+        encoding: sourceEncoding,
+        audioFormat: opts.audioFormat,
+        sampleRate: opts.sampleRate,
+        channels: 1,
+        bitsPerSample: bitsPerSample ?? _bitsPerSample(sourceEncoding),
+      ),
+      options: opts,
+      metadata: {'model_id': modelId},
+    );
+
+    return DartBridgeSTT.shared.transcribeLifecycleProto(request);
+  }
+
+  Future<String> _requireLoadedModelId() async {
+    final snapshotModelId = currentModelId;
+    if (snapshotModelId != null) {
+      return snapshotModelId;
+    }
+    final current = await RunAnywhereModelLifecycle.shared.current(
+      model_pb.CurrentModelRequest(category: _sttCategory),
+    );
+    if (current.found && current.modelId.isNotEmpty) {
+      return current.modelId;
+    }
+    throw SDKException.sttNotAvailable(
+      'No STT model loaded through commons lifecycle. Call loadSTTModel() first.',
+    );
   }
 
   STTOptions _effectiveOptions(STTOptions options) {
@@ -330,4 +291,45 @@ class RunAnywhereSTT {
     }
     return opts;
   }
+
+  STTAudioEncoding _encodingForOptions(STTOptions options) {
+    switch (options.audioFormat) {
+      case model_pb.AudioFormat.AUDIO_FORMAT_PCM:
+      case model_pb.AudioFormat.AUDIO_FORMAT_PCM_S16LE:
+        return STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE;
+      case model_pb.AudioFormat.AUDIO_FORMAT_UNSPECIFIED:
+      case model_pb.AudioFormat.AUDIO_FORMAT_WAV:
+      case model_pb.AudioFormat.AUDIO_FORMAT_MP3:
+      case model_pb.AudioFormat.AUDIO_FORMAT_OPUS:
+      case model_pb.AudioFormat.AUDIO_FORMAT_AAC:
+      case model_pb.AudioFormat.AUDIO_FORMAT_FLAC:
+      case model_pb.AudioFormat.AUDIO_FORMAT_M4A:
+      case model_pb.AudioFormat.AUDIO_FORMAT_OGG:
+        return STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER;
+      default:
+        return STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER;
+    }
+  }
+
+  int _bitsPerSample(STTAudioEncoding encoding) {
+    switch (encoding) {
+      case STTAudioEncoding.STT_AUDIO_ENCODING_PCM_F32_LE:
+        return 32;
+      case STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE:
+        return 16;
+      case STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED:
+      case STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER:
+        return 0;
+      default:
+        return 0;
+    }
+  }
+
+  ComponentLifecycleSnapshot? get _lifecycleSnapshot =>
+      RunAnywhereModelLifecycle.shared.componentSnapshot(
+        SDKComponent.SDK_COMPONENT_STT,
+      );
+
+  static const _sttCategory =
+      model_pb.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION;
 }

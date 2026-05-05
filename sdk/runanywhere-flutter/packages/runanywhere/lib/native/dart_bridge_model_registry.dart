@@ -7,7 +7,6 @@ import 'dart:io';
 import 'package:ffi/ffi.dart';
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/core/native/rac_native.dart';
-import 'package:runanywhere/core/types/model_types.dart' as public_types;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/native/ffi_types.dart';
@@ -100,177 +99,6 @@ class DartBridgeModelRegistry {
   // Model CRUD Operations
   // ============================================================================
 
-  /// Save model info to registry using C allocation for safety.
-  ///
-  /// Uses rac_model_info_alloc() to allocate a properly sized struct in C++,
-  /// then fills in the fields using strdup for strings (allocated by C).
-  /// This avoids struct layout mismatches and memory allocation issues.
-  ///
-  /// Pattern matches Kotlin JNI: allocate in C++, fill fields, call save.
-  Future<bool> saveModel(ModelInfo model) async {
-    if (_registryHandle == null) return false;
-
-    try {
-      final lib = PlatformLoader.loadCommons();
-
-      // Allocate struct in C++ with correct size (zeroed by calloc)
-      final allocFn = lib.lookupFunction<
-          Pointer<RacModelInfoCStruct> Function(),
-          Pointer<RacModelInfoCStruct> Function()>('rac_model_info_alloc');
-
-      // Use C's free function for the struct (rac_model_info_free frees strings
-      // but we're using rac_strdup which uses C's malloc)
-      final freeFn = lib.lookupFunction<
-          Void Function(Pointer<RacModelInfoCStruct>),
-          void Function(Pointer<RacModelInfoCStruct>)>('rac_model_info_free');
-
-      // Use C's strdup to allocate strings - this matches what Kotlin JNI does
-      final strdupFn = lib.lookupFunction<Pointer<Utf8> Function(Pointer<Utf8>),
-          Pointer<Utf8> Function(Pointer<Utf8>)>('rac_strdup');
-
-      final saveFn = lib.lookupFunction<
-          Int32 Function(Pointer<Void>, Pointer<RacModelInfoCStruct>),
-          int Function(Pointer<Void>,
-              Pointer<RacModelInfoCStruct>)>('rac_model_registry_save');
-
-      final modelPtr = allocFn();
-      if (modelPtr == nullptr) {
-        _logger.debug('rac_model_info_alloc returned null');
-        return false;
-      }
-      // Temporary Dart strings for conversion
-      final idDart = model.id.toNativeUtf8();
-      final nameDart = model.name.toNativeUtf8();
-      final urlDart = model.downloadURL?.toNativeUtf8();
-      final pathDart = model.localPath?.toNativeUtf8();
-      final descriptionDart = model.description?.toNativeUtf8();
-
-      try {
-        // Use strdup to allocate strings in C heap (matches Kotlin JNI pattern)
-        // This is critical - C's rac_model_info_free will call free() on these
-        modelPtr.ref.id = strdupFn(idDart);
-        modelPtr.ref.name = strdupFn(nameDart);
-        modelPtr.ref.category = model.category;
-        modelPtr.ref.format = model.format;
-        modelPtr.ref.framework = model.framework;
-        modelPtr.ref.downloadUrl =
-            urlDart != null ? strdupFn(urlDart) : nullptr;
-        modelPtr.ref.localPath =
-            pathDart != null ? strdupFn(pathDart) : nullptr;
-        modelPtr.ref.downloadSize = model.sizeBytes;
-        modelPtr.ref.contextLength = model.contextLength;
-        modelPtr.ref.supportsThinking = model.supportsThinking ? 1 : 0;
-        modelPtr.ref.supportsLora = model.supportsLora ? 1 : 0;
-        modelPtr.ref.description =
-            descriptionDart != null ? strdupFn(descriptionDart) : nullptr;
-        modelPtr.ref.source = model.source;
-
-        final result = saveFn(_registryHandle!, modelPtr);
-        if (result != RacResultCode.success) {
-          _logger.error('Failed to save model ${model.id}: result=$result');
-        }
-        return result == RacResultCode.success;
-      } finally {
-        // Free Dart-allocated temporary strings
-        calloc.free(idDart);
-        calloc.free(nameDart);
-        if (urlDart != null) calloc.free(urlDart);
-        if (pathDart != null) calloc.free(pathDart);
-        if (descriptionDart != null) calloc.free(descriptionDart);
-
-        // Free C-allocated struct and its strings
-        freeFn(modelPtr);
-      }
-    } catch (e) {
-      _logger.debug('rac_model_registry_save error: $e');
-      return false;
-    }
-  }
-
-  /// Save a public ModelInfo to the C++ registry.
-  ///
-  /// Converts the public ModelInfo (from model_types.dart) to the FFI format
-  /// and saves it to the C++ registry for model discovery and loading.
-  ///
-  /// Matches Swift: `CppBridge.ModelRegistry.shared.save(modelInfo)`
-  Future<bool> savePublicModel(public_types.ModelInfo model) async {
-    if (_registryHandle == null) {
-      _logger.debug('Registry not initialized, cannot save model');
-      return false;
-    }
-
-    try {
-      // Convert public ModelInfo to FFI ModelInfo.
-      //
-      // Nullable -> non-nullable at the adapter boundary:
-      //   public_types.ModelInfo.downloadSize and .contextLength are `int?`
-      //   (null means "unknown"), while the internal FFI ModelInfo uses
-      //   non-nullable `int` to mirror the C struct (which uses 0 as the
-      //   sentinel for "unset"). The `?? 0` here encodes that null -> 0
-      //   convention used by the registry ABI.
-      final ffiModel = ModelInfo(
-        id: model.id,
-        name: model.name,
-        category: _categoryToFfi(model.category),
-        format: _formatToFfi(model.format),
-        framework: _frameworkToFfi(model.framework),
-        source: _sourceToFfi(model.source),
-        sizeBytes: model.downloadSize ?? 0,
-        contextLength: model.contextLength ?? 0,
-        downloadURL: model.downloadURL?.toString(),
-        localPath: model.localPath?.toFilePath(),
-        version: null,
-        supportsThinking: model.supportsThinking,
-        supportsLora: false,
-        description: model.description,
-      );
-
-      final result = await saveModel(ffiModel);
-      if (result) {
-        _logger.debug('Saved public model to C++ registry: ${model.id}');
-      }
-      return result;
-    } catch (e) {
-      _logger.debug('savePublicModel error: $e');
-      return false;
-    }
-  }
-
-  // ===========================================================================
-  // FFI Type Conversion Helpers
-  // ===========================================================================
-
-  /// Convert public ModelCategory to C++ RAC_MODEL_CATEGORY int
-  static int _categoryToFfi(public_types.ModelCategory category) =>
-      category.toC();
-
-  /// Convert public ModelFormat to C++ RAC_MODEL_FORMAT int
-  static int _formatToFfi(public_types.ModelFormat format) => format.toC();
-
-  /// Convert public InferenceFramework to C++ RAC_FRAMEWORK int
-  static int _frameworkToFfi(public_types.InferenceFramework framework) =>
-      framework.toC();
-
-  /// Convert public ModelSource to C++ RAC_MODEL_SOURCE int
-  static int _sourceToFfi(public_types.ModelSource source) => source.toC();
-
-  /// Get the FFI framework value (for external use)
-  static int getFrameworkFfiValue(public_types.InferenceFramework framework) {
-    return _frameworkToFfi(framework);
-  }
-
-  // ===========================================================================
-  // Public Model Query Methods (returns public_types.ModelInfo)
-  // ===========================================================================
-
-  /// Get all models from C++ registry as public ModelInfo objects.
-  ///
-  /// Matches Swift: `CppBridge.ModelRegistry.shared.getAll()`
-  Future<List<public_types.ModelInfo>> getAllPublicModels() async {
-    final protoModels = await getAllProtoModels();
-    return protoModels.map(_protoModelToPublic).toList();
-  }
-
   /// Save a generated proto ModelInfo to the C++ registry.
   Future<bool> saveProtoModel(model_pb.ModelInfo model) async {
     if (_registryHandle == null) {
@@ -287,39 +115,8 @@ class DartBridgeModelRegistry {
       return protoResult;
     }
 
-    try {
-      final ffiModel = ModelInfo(
-        id: model.id,
-        name: model.name,
-        category: model.category.toC(),
-        format: model.format.toC(),
-        framework: model.framework.toC(),
-        source: model.source.toC(),
-        sizeBytes: model.downloadSizeBytes.toInt(),
-        contextLength: model.contextLength,
-        downloadURL: model.hasDownloadUrl() && model.downloadUrl.isNotEmpty
-            ? model.downloadUrl
-            : null,
-        localPath: model.hasLocalPath() && model.localPath.isNotEmpty
-            ? model.localPath
-            : null,
-        version: null,
-        supportsThinking: model.supportsThinking,
-        supportsLora: model.supportsLora,
-        description: model.hasDescription() && model.description.isNotEmpty
-            ? model.description
-            : null,
-      );
-
-      final result = await saveModel(ffiModel);
-      if (result) {
-        _logger.debug('Saved proto model to C++ registry: ${model.id}');
-      }
-      return result;
-    } catch (e) {
-      _logger.debug('saveProtoModel error: $e');
-      return false;
-    }
+    _logger.debug('rac_model_registry_register_proto unavailable');
+    return false;
   }
 
   /// Update an existing generated proto ModelInfo in the C++ registry.
@@ -344,20 +141,12 @@ class DartBridgeModelRegistry {
   /// Get all models from C++ registry as generated ModelInfo protos.
   Future<List<model_pb.ModelInfo>> getAllProtoModels() async {
     final protoModels = _listProtoModels();
-    if (protoModels != null) return protoModels;
-
-    final ffiModels = await getAllModels();
-    return ffiModels.map(_ffiModelToProto).toList();
+    return protoModels ?? const [];
   }
 
   /// Get a single model from C++ registry as a generated ModelInfo proto.
   Future<model_pb.ModelInfo?> getProtoModel(String modelId) async {
-    final protoModel = _getProtoModel(modelId);
-    if (protoModel != null) return protoModel;
-
-    final ffiModel = await getModel(modelId);
-    if (ffiModel == null) return null;
-    return _ffiModelToProto(ffiModel);
+    return _getProtoModel(modelId);
   }
 
   /// Query the C++ registry with a generated ModelQuery proto.
@@ -367,33 +156,8 @@ class DartBridgeModelRegistry {
     final protoModels = _queryProtoModels(query);
     if (protoModels != null) return protoModels;
 
-    final allModels = await getAllProtoModels();
-    return allModels.where((model) {
-      if (query.downloadedOnly && model.localPath.isEmpty) return false;
-      if (query.hasFramework() && model.framework != query.framework) {
-        return false;
-      }
-      if (query.hasCategory() && model.category != query.category) {
-        return false;
-      }
-      if (query.hasFormat() && model.format != query.format) {
-        return false;
-      }
-      if (query.hasSource() && model.source != query.source) {
-        return false;
-      }
-      if (query.searchQuery.isNotEmpty) {
-        final needle = query.searchQuery.toLowerCase();
-        final haystack =
-            '${model.id} ${model.name} ${model.description}'.toLowerCase();
-        if (!haystack.contains(needle)) return false;
-      }
-      if (query.maxSizeBytes.toInt() > 0 &&
-          model.downloadSizeBytes > query.maxSizeBytes) {
-        return false;
-      }
-      return true;
-    }).toList(growable: false);
+    _logger.debug('rac_model_registry_query_proto unavailable');
+    return const [];
   }
 
   /// List downloaded models via the registry proto-byte ABI.
@@ -401,83 +165,8 @@ class DartBridgeModelRegistry {
     final protoModels = _listDownloadedProtoModels();
     if (protoModels != null) return protoModels;
 
-    return queryProtoModels(model_pb.ModelQuery(downloadedOnly: true));
-  }
-
-  /// Get a single model from C++ registry as public ModelInfo.
-  Future<public_types.ModelInfo?> getPublicModel(String modelId) async {
-    final protoModel = await getProtoModel(modelId);
-    if (protoModel == null) return null;
-    return _protoModelToPublic(protoModel);
-  }
-
-  static model_pb.ModelInfo _ffiModelToProto(ModelInfo ffiModel) {
-    return withInferredArtifact(protoModelInfoFromCFields(
-      id: ffiModel.id,
-      name: ffiModel.name,
-      category: ffiModel.category,
-      format: ffiModel.format,
-      framework: ffiModel.framework,
-      source: ffiModel.source,
-      downloadSizeBytes: ffiModel.sizeBytes,
-      contextLength: ffiModel.contextLength,
-      downloadUrl: ffiModel.downloadURL,
-      localPath: ffiModel.localPath,
-      supportsThinking: ffiModel.supportsThinking ? 1 : 0,
-      supportsLora: ffiModel.supportsLora ? 1 : 0,
-      description: ffiModel.description,
-      createdAtUnixMs: ffiModel.createdAt,
-      updatedAtUnixMs: ffiModel.updatedAt,
-    ));
-  }
-
-  static public_types.ModelInfo _protoModelToPublic(model_pb.ModelInfo model) {
-    final downloadSize = model.downloadSize;
-    return public_types.ModelInfo(
-      id: model.id,
-      name: model.name,
-      category: public_types.ModelCategory.fromProto(model.category),
-      format: public_types.ModelFormat.fromProto(model.format),
-      framework: _publicFrameworkFromProto(model.framework),
-      downloadURL: model.downloadUri,
-      localPath: _localPathUri(model.localFilePath),
-      downloadSize:
-          downloadSize != null && downloadSize > 0 ? downloadSize : null,
-      contextLength: model.nullableContextLength,
-      supportsThinking: model.supportsThinking,
-      description: model.hasDescription() && model.description.isNotEmpty
-          ? model.description
-          : null,
-      source: public_types.ModelSource.fromProto(model.source),
-      createdAt: _dateTimeFromUnixMs(model.createdAtUnixMs.toInt()),
-      updatedAt: _dateTimeFromUnixMs(model.updatedAtUnixMs.toInt()),
-    );
-  }
-
-  static public_types.InferenceFramework _publicFrameworkFromProto(
-      model_pb.InferenceFramework framework) {
-    switch (framework) {
-      case model_pb.InferenceFramework.INFERENCE_FRAMEWORK_COREML:
-      case model_pb.InferenceFramework.INFERENCE_FRAMEWORK_MLX:
-      case model_pb.InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML:
-      case model_pb.InferenceFramework.INFERENCE_FRAMEWORK_METALRT:
-        return public_types.InferenceFramework.onnx;
-      default:
-        return public_types.InferenceFramework.fromProto(framework);
-    }
-  }
-
-  static Uri? _localPathUri(String? path) {
-    if (path == null || path.isEmpty) return null;
-    if (path.startsWith('builtin:') || path.contains('://')) {
-      return Uri.tryParse(path);
-    }
-    return Uri.file(path);
-  }
-
-  static DateTime? _dateTimeFromUnixMs(int unixMs) {
-    if (unixMs <= 0) return null;
-    return DateTime.fromMillisecondsSinceEpoch(unixMs);
+    _logger.debug('rac_model_registry_list_downloaded_proto unavailable');
+    return const [];
   }
 
   bool? _writeProtoModel(
@@ -668,206 +357,6 @@ class DartBridgeModelRegistry {
     }
   }
 
-  /// Get model by ID
-  Future<ModelInfo?> getModel(String modelId) async {
-    if (_registryHandle == null) return null;
-
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final getFn = lib.lookupFunction<
-          Int32 Function(Pointer<Void>, Pointer<Utf8>,
-              Pointer<Pointer<RacModelInfoCStruct>>),
-          int Function(Pointer<Void>, Pointer<Utf8>,
-              Pointer<Pointer<RacModelInfoCStruct>>)>('rac_model_registry_get');
-
-      final modelIdPtr = modelId.toNativeUtf8();
-      final outModelPtr = calloc<Pointer<RacModelInfoCStruct>>();
-
-      try {
-        final result = getFn(_registryHandle!, modelIdPtr, outModelPtr);
-        if (result == RacResultCode.success && outModelPtr.value != nullptr) {
-          final model = _cStructToModelInfo(outModelPtr.value);
-
-          // Free the model struct
-          final freeFn = lib.lookupFunction<
-              Void Function(Pointer<RacModelInfoCStruct>),
-              void Function(
-                  Pointer<RacModelInfoCStruct>)>('rac_model_info_free');
-          freeFn(outModelPtr.value);
-
-          return model;
-        }
-        return null;
-      } finally {
-        calloc.free(modelIdPtr);
-        calloc.free(outModelPtr);
-      }
-    } catch (e) {
-      _logger.debug('rac_model_registry_get error: $e');
-      return null;
-    }
-  }
-
-  /// Get all models
-  Future<List<ModelInfo>> getAllModels() async {
-    if (_registryHandle == null) return [];
-
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final getAllFn = lib.lookupFunction<
-          Int32 Function(Pointer<Void>,
-              Pointer<Pointer<Pointer<RacModelInfoCStruct>>>, Pointer<IntPtr>),
-          int Function(
-              Pointer<Void>,
-              Pointer<Pointer<Pointer<RacModelInfoCStruct>>>,
-              Pointer<IntPtr>)>('rac_model_registry_get_all');
-
-      final outModelsPtr = calloc<Pointer<Pointer<RacModelInfoCStruct>>>();
-      final outCountPtr = calloc<IntPtr>();
-
-      try {
-        final result = getAllFn(_registryHandle!, outModelsPtr, outCountPtr);
-        if (result != RacResultCode.success) return [];
-
-        final count = outCountPtr.value;
-        if (count == 0) return [];
-
-        final models = <ModelInfo>[];
-        final modelsArray = outModelsPtr.value;
-
-        for (var i = 0; i < count; i++) {
-          final modelPtr = modelsArray[i];
-          if (modelPtr != nullptr) {
-            models.add(_cStructToModelInfo(modelPtr));
-          }
-        }
-
-        // Free the array
-        final freeFn = lib.lookupFunction<
-            Void Function(Pointer<Pointer<RacModelInfoCStruct>>, IntPtr),
-            void Function(Pointer<Pointer<RacModelInfoCStruct>>,
-                int)>('rac_model_info_array_free');
-        freeFn(modelsArray, count);
-
-        return models;
-      } finally {
-        calloc.free(outModelsPtr);
-        calloc.free(outCountPtr);
-      }
-    } catch (e) {
-      _logger.debug('rac_model_registry_get_all error: $e');
-      return [];
-    }
-  }
-
-  /// Get downloaded models only
-  Future<List<ModelInfo>> getDownloadedModels() async {
-    if (_registryHandle == null) return [];
-
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final getDownloadedFn = lib.lookupFunction<
-          Int32 Function(Pointer<Void>,
-              Pointer<Pointer<Pointer<RacModelInfoCStruct>>>, Pointer<IntPtr>),
-          int Function(
-              Pointer<Void>,
-              Pointer<Pointer<Pointer<RacModelInfoCStruct>>>,
-              Pointer<IntPtr>)>('rac_model_registry_get_downloaded');
-
-      final outModelsPtr = calloc<Pointer<Pointer<RacModelInfoCStruct>>>();
-      final outCountPtr = calloc<IntPtr>();
-
-      try {
-        final result =
-            getDownloadedFn(_registryHandle!, outModelsPtr, outCountPtr);
-        if (result != RacResultCode.success) return [];
-
-        final count = outCountPtr.value;
-        if (count == 0) return [];
-
-        final models = <ModelInfo>[];
-        final modelsArray = outModelsPtr.value;
-
-        for (var i = 0; i < count; i++) {
-          final modelPtr = modelsArray[i];
-          if (modelPtr != nullptr) {
-            models.add(_cStructToModelInfo(modelPtr));
-          }
-        }
-
-        // Free the array
-        final freeFn = lib.lookupFunction<
-            Void Function(Pointer<Pointer<RacModelInfoCStruct>>, IntPtr),
-            void Function(Pointer<Pointer<RacModelInfoCStruct>>,
-                int)>('rac_model_info_array_free');
-        freeFn(modelsArray, count);
-
-        return models;
-      } finally {
-        calloc.free(outModelsPtr);
-        calloc.free(outCountPtr);
-      }
-    } catch (e) {
-      _logger.debug('rac_model_registry_get_downloaded error: $e');
-      return [];
-    }
-  }
-
-  /// Get models by frameworks
-  Future<List<ModelInfo>> getModelsByFrameworks(List<int> frameworks) async {
-    if (_registryHandle == null || frameworks.isEmpty) return [];
-
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final getByFrameworksFn = lib.lookupFunction<
-          Int32 Function(Pointer<Void>, Pointer<Int32>, IntPtr,
-              Pointer<Pointer<Pointer<RacModelInfoCStruct>>>, Pointer<IntPtr>),
-          int Function(
-              Pointer<Void>,
-              Pointer<Int32>,
-              int,
-              Pointer<Pointer<Pointer<RacModelInfoCStruct>>>,
-              Pointer<IntPtr>)>('rac_model_registry_get_by_frameworks');
-
-      final frameworksPtr = calloc<Int32>(frameworks.length);
-      for (var i = 0; i < frameworks.length; i++) {
-        frameworksPtr[i] = frameworks[i];
-      }
-
-      final outModelsPtr = calloc<Pointer<Pointer<RacModelInfoCStruct>>>();
-      final outCountPtr = calloc<IntPtr>();
-
-      try {
-        final result = getByFrameworksFn(_registryHandle!, frameworksPtr,
-            frameworks.length, outModelsPtr, outCountPtr);
-
-        if (result != RacResultCode.success) return [];
-
-        final count = outCountPtr.value;
-        if (count == 0) return [];
-
-        final models = <ModelInfo>[];
-        final modelsArray = outModelsPtr.value;
-
-        for (var i = 0; i < count; i++) {
-          final modelPtr = modelsArray[i];
-          if (modelPtr != nullptr) {
-            models.add(_cStructToModelInfo(modelPtr));
-          }
-        }
-
-        return models;
-      } finally {
-        calloc.free(frameworksPtr);
-        calloc.free(outModelsPtr);
-        calloc.free(outCountPtr);
-      }
-    } catch (e) {
-      _logger.debug('rac_model_registry_get_by_frameworks error: $e');
-      return [];
-    }
-  }
-
   /// Update download status for a model
   Future<bool> updateDownloadStatus(String modelId, String? localPath) async {
     if (_registryHandle == null) {
@@ -899,32 +388,8 @@ class DartBridgeModelRegistry {
       }
     }
 
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final updateFn = lib.lookupFunction<
-          Int32 Function(Pointer<Void>, Pointer<Utf8>, Pointer<Utf8>),
-          int Function(Pointer<Void>, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_model_registry_update_download_status');
-
-      final modelIdPtr = modelId.toNativeUtf8();
-      final localPathPtr = localPath?.toNativeUtf8() ?? nullptr;
-
-      try {
-        final result =
-            updateFn(_registryHandle!, modelIdPtr, localPathPtr.cast<Utf8>());
-        if (result != RacResultCode.success) {
-          _logger.warning(
-              'updateDownloadStatus failed for $modelId: result=$result');
-        }
-        return result == RacResultCode.success;
-      } finally {
-        calloc.free(modelIdPtr);
-        if (localPathPtr != nullptr) calloc.free(localPathPtr);
-      }
-    } catch (e) {
-      _logger.debug('rac_model_registry_update_download_status error: $e');
-      return false;
-    }
+    _logger.debug('registry download-status proto update unavailable');
+    return false;
   }
 
   /// Remove a model from registry
@@ -952,24 +417,8 @@ class DartBridgeModelRegistry {
       }
     }
 
-    try {
-      final lib = PlatformLoader.loadCommons();
-      final removeFn = lib.lookupFunction<
-          Int32 Function(Pointer<Void>, Pointer<Utf8>),
-          int Function(
-              Pointer<Void>, Pointer<Utf8>)>('rac_model_registry_remove');
-
-      final modelIdPtr = modelId.toNativeUtf8();
-      try {
-        final result = removeFn(_registryHandle!, modelIdPtr);
-        return result == RacResultCode.success;
-      } finally {
-        calloc.free(modelIdPtr);
-      }
-    } catch (e) {
-      _logger.debug('rac_model_registry_remove error: $e');
-      return false;
-    }
+    _logger.debug('rac_model_registry_remove_proto unavailable');
+    return false;
   }
 
   /// Update last used timestamp
@@ -1040,9 +489,9 @@ class DartBridgeModelRegistry {
   // ============================================================================
 
   /// Discover downloaded models by scanning filesystem
-  Future<DiscoveryResult> discoverDownloadedModels() async {
+  Future<model_pb.ModelDiscoveryResult> discoverDownloadedModels() async {
     if (_registryHandle == null) {
-      return const DiscoveryResult(discoveredModels: [], unregisteredCount: 0);
+      return model_pb.ModelDiscoveryResult(success: false);
     }
 
     try {
@@ -1085,20 +534,21 @@ class DartBridgeModelRegistry {
             discoverFn(_registryHandle!, _discoveryCallbacksPtr!, resultStruct);
 
         if (result != RacResultCode.success) {
-          return const DiscoveryResult(
-              discoveredModels: [], unregisteredCount: 0);
+          return model_pb.ModelDiscoveryResult(
+            success: false,
+            errorMessage: RacResultCode.getMessage(result),
+          );
         }
 
         // Parse result
-        final discoveredModels = <DiscoveredModel>[];
+        final discoveredModels = <model_pb.DiscoveredModel>[];
         final discoveredCount = resultStruct.ref.discoveredCount;
 
         for (var i = 0; i < discoveredCount; i++) {
           final modelPtr = resultStruct.ref.discoveredModels + i;
-          discoveredModels.add(DiscoveredModel(
+          discoveredModels.add(model_pb.DiscoveredModel(
             modelId: modelPtr.ref.modelId.toDartString(),
             localPath: modelPtr.ref.localPath.toDartString(),
-            framework: modelPtr.ref.framework,
           ));
         }
 
@@ -1111,9 +561,11 @@ class DartBridgeModelRegistry {
             'rac_discovery_result_free');
         freeResultFn(resultStruct);
 
-        return DiscoveryResult(
+        return model_pb.ModelDiscoveryResult(
+          success: true,
           discoveredModels: discoveredModels,
-          unregisteredCount: unregisteredCount,
+          scannedCount: discoveredCount,
+          purgedCount: unregisteredCount,
         );
       } finally {
         calloc.free(_discoveryCallbacksPtr!);
@@ -1122,45 +574,11 @@ class DartBridgeModelRegistry {
       }
     } catch (e) {
       _logger.debug('rac_model_registry_discover_downloaded error: $e');
-      return const DiscoveryResult(discoveredModels: [], unregisteredCount: 0);
+      return model_pb.ModelDiscoveryResult(
+        success: false,
+        errorMessage: e.toString(),
+      );
     }
-  }
-
-  // ============================================================================
-  // Struct Conversion Helpers
-  // ============================================================================
-
-  /// Convert C struct to Dart ModelInfo using correct struct layout.
-  /// Uses RacModelInfoCStruct which matches the actual C rac_model_info_t.
-  ModelInfo _cStructToModelInfo(Pointer<RacModelInfoCStruct> struct) {
-    final id = struct.ref.id.toDartString();
-    final name = struct.ref.name.toDartString();
-    final downloadURL = struct.ref.downloadUrl != nullptr
-        ? struct.ref.downloadUrl.toDartString()
-        : null;
-    final localPath = struct.ref.localPath != nullptr
-        ? struct.ref.localPath.toDartString()
-        : null;
-    return ModelInfo(
-      id: id,
-      name: name,
-      category: struct.ref.category,
-      format: struct.ref.format,
-      framework: struct.ref.framework,
-      source: struct.ref.source,
-      sizeBytes: struct.ref.downloadSize,
-      contextLength: struct.ref.contextLength,
-      downloadURL: downloadURL,
-      localPath: localPath,
-      version: null,
-      supportsThinking: struct.ref.supportsThinking != 0,
-      supportsLora: struct.ref.supportsLora != 0,
-      description: struct.ref.description != nullptr
-          ? struct.ref.description.toDartString()
-          : null,
-      createdAt: struct.ref.createdAt,
-      updatedAt: struct.ref.updatedAt,
-    );
   }
 }
 
@@ -1433,92 +851,4 @@ base class RacDiscoveryResultStruct extends Struct {
 
   @IntPtr()
   external int unregisteredCount;
-}
-
-// =============================================================================
-// Data Classes
-// =============================================================================
-
-/// Model info data class
-class ModelInfo {
-  final String id;
-  final String name;
-  final int category;
-  final int format;
-  final int framework;
-  final int source;
-  final int sizeBytes;
-  final int contextLength;
-  final String? downloadURL;
-  final String? localPath;
-  final String? version;
-  final bool supportsThinking;
-  final bool supportsLora;
-  final String? description;
-  final int createdAt;
-  final int updatedAt;
-
-  const ModelInfo({
-    required this.id,
-    required this.name,
-    required this.category,
-    required this.format,
-    required this.framework,
-    required this.source,
-    required this.sizeBytes,
-    required this.contextLength,
-    this.downloadURL,
-    this.localPath,
-    this.version,
-    this.supportsThinking = false,
-    this.supportsLora = false,
-    this.description,
-    this.createdAt = 0,
-    this.updatedAt = 0,
-  });
-
-  bool get isDownloaded => localPath != null && localPath!.isNotEmpty;
-
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'category': category,
-        'format': format,
-        'framework': framework,
-        'source': source,
-        'sizeBytes': sizeBytes,
-        'contextLength': contextLength,
-        if (downloadURL != null) 'downloadURL': downloadURL,
-        if (localPath != null) 'localPath': localPath,
-        if (version != null) 'version': version,
-        'supportsThinking': supportsThinking,
-        'supportsLora': supportsLora,
-        if (description != null) 'description': description,
-        if (createdAt > 0) 'createdAt': createdAt,
-        if (updatedAt > 0) 'updatedAt': updatedAt,
-      };
-}
-
-/// Discovered model
-class DiscoveredModel {
-  final String modelId;
-  final String localPath;
-  final int framework;
-
-  const DiscoveredModel({
-    required this.modelId,
-    required this.localPath,
-    required this.framework,
-  });
-}
-
-/// Discovery result
-class DiscoveryResult {
-  final List<DiscoveredModel> discoveredModels;
-  final int unregisteredCount;
-
-  const DiscoveryResult({
-    required this.discoveredModels,
-    required this.unregisteredCount,
-  });
 }

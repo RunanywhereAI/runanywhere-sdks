@@ -8,9 +8,9 @@
  *
  * Mirrors Swift RunAnywhere+TTS.swift exactly.
  *
- * Round 2 KOTLIN: Added loadTTSModel/unloadTTSModel public surface,
- * changed synthesizeStream to return Flow<ByteArray>, changed
+ * Round 2 KOTLIN: Added loadTTSModel/unloadTTSModel public surface and
  * availableTTSVoices to return List<TTSVoiceInfo>.
+ * KOT-STREAM-04: synthesizeStream returns generated TTSOutput chunks.
  */
 
 package com.runanywhere.sdk.public.extensions
@@ -68,14 +68,6 @@ expect val RunAnywhere.isTTSVoiceLoaded: Boolean
 expect val RunAnywhere.currentTTSVoiceId: String?
 
 /**
- * Check if a TTS voice is loaded (non-suspend version for quick checks).
- *
- * This accesses cached state and doesn't require suspension.
- * @deprecated Use isTTSVoiceLoaded directly.
- */
-expect val RunAnywhere.isTTSVoiceLoadedSync: Boolean
-
-/**
  * Get available TTS voices.
  *
  * @return List of [TTSVoiceInfo] proto objects describing each available voice
@@ -99,16 +91,16 @@ expect suspend fun RunAnywhere.synthesize(
 /**
  * Stream audio chunks for long text synthesis.
  *
- * Returns a [Flow] that emits raw audio [ByteArray] chunks as they are synthesized.
+ * Returns a [Flow] that emits generated [TTSOutput] chunks as they are synthesized.
  *
  * @param text Text to synthesize
  * @param options Synthesis options
- * @return Flow of audio chunks
+ * @return Flow of generated TTS output chunks
  */
 expect fun RunAnywhere.synthesizeStream(
     text: String,
     options: TTSOptions = TTSOptions(),
-): Flow<ByteArray>
+): Flow<TTSOutput>
 
 /**
  * Stop current TTS synthesis.

@@ -3,31 +3,11 @@
 /// Privacy-first, on-device AI SDK for Flutter.
 library runanywhere;
 
-// Wave 2: Legacy hand-rolled types DELETED. The proto bindings are the
-// canonical shape; throwables flow through SDKException directly.
+// Generated proto bindings are the canonical public data-contract surface;
+// throwables flow through SDKException directly.
 export 'adapters/model_download_adapter.dart' show ModelDownloadService;
 export 'adapters/voice_agent_stream_adapter.dart' show VoiceAgentStreamAdapter;
 export 'core/module/runanywhere_module.dart';
-export 'core/types/model_types.dart'
-    hide
-        ArchiveArtifact,
-        ArchiveStructure,
-        ArchiveType,
-        BuiltInArtifact,
-        CustomArtifact,
-        ExpectedModelFiles,
-        InferenceFramework,
-        ModelArtifactType,
-        ModelCategory,
-        ModelFileDescriptor,
-        ModelFormat,
-        ModelInfo,
-        ModelSource,
-        MultiFileArtifact,
-        SingleFileArtifact,
-        ThinkingTagPattern;
-export 'core/types/npu_chip.dart';
-export 'core/types/sdk_component.dart' hide SDKComponent;
 export 'data/network/network.dart';
 export 'foundation/configuration/sdk_constants.dart';
 export 'foundation/error_types/sdk_exception.dart';
@@ -75,7 +55,11 @@ export 'generated/hardware_profile.pb.dart'
     show AcceleratorInfo, HardwareProfile, HardwareProfileResult;
 export 'generated/hardware_profile.pbenum.dart' show AcceleratorPreference;
 export 'generated/llm_options.pb.dart'
-    show LLMConfiguration, LLMGenerationOptions, LLMGenerationResult;
+    show
+        LLMConfiguration,
+        LLMGenerationOptions,
+        LLMGenerationResult,
+        ThinkingTagPattern;
 export 'generated/llm_options.pbenum.dart' show ExecutionTarget;
 export 'generated/llm_service.pb.dart'
     show LLMGenerateRequest, LLMStreamEvent, LLMStreamFinalResult;
@@ -83,15 +67,29 @@ export 'generated/lora_options.pb.dart'
     show
         LoRAAdapterConfig,
         LoRAAdapterInfo,
+        LoRAApplyRequest,
+        LoRAApplyResult,
+        LoRARemoveRequest,
+        LoRAState,
         LoraAdapterCatalogEntry,
+        LoraAdapterCatalogGetRequest,
+        LoraAdapterCatalogGetResult,
+        LoraAdapterCatalogListRequest,
+        LoraAdapterCatalogListResult,
+        LoraAdapterCatalogQuery,
+        LoraAdapterDownloadCompletedRequest,
+        LoraAdapterDownloadCompletedResult,
         LoraCompatibilityResult;
 export 'generated/model_types.pb.dart'
     show
         ArchiveArtifact,
         CurrentModelRequest,
         CurrentModelResult,
+        DiscoveredModel,
         ExpectedModelFiles,
+        ModelThinkingTagPattern,
         ModelFileDescriptor,
+        ModelDiscoveryResult,
         ModelInfo,
         MultiFileArtifact,
         ModelInfoList,
@@ -146,6 +144,7 @@ export 'generated/sdk_events.pbenum.dart'
         ComponentInitializationEventKind,
         ConfigurationEventKind,
         DeviceEventKind,
+        EventCategory,
         EventDestination,
         EventSeverity,
         FrameworkEventKind,
@@ -173,6 +172,7 @@ export 'generated/storage_types.pb.dart'
         StorageInfoRequest,
         StorageInfoResult,
         StoredModel;
+export 'generated/storage_types.pbenum.dart' show NPUChip;
 export 'generated/structured_output.pb.dart'
     show
         JSONSchema,
@@ -255,30 +255,22 @@ export 'public/capabilities/runanywhere_plugin_loader.dart'
 export 'public/capabilities/runanywhere_rag.dart' show RunAnywhereRAG;
 export 'public/capabilities/runanywhere_stt.dart' show RunAnywhereSTT;
 export 'public/capabilities/runanywhere_tools.dart'
-    show RunAnywhereTools, ToolCallFormatNames, ToolExecutor;
+    show RunAnywhereTools, ToolExecutor;
 export 'public/capabilities/runanywhere_tts.dart' show RunAnywhereTTS;
 export 'public/capabilities/runanywhere_vad.dart' show RunAnywhereVAD;
 export 'public/capabilities/runanywhere_vlm.dart' show RunAnywhereVLM;
 export 'public/capabilities/runanywhere_vlm_models.dart'
     show RunAnywhereVLMModels;
-export 'public/capabilities/runanywhere_voice.dart'
-    show RunAnywhereVoice, VoiceAgentConfiguration;
+export 'public/capabilities/runanywhere_voice.dart' show RunAnywhereVoice;
 export 'public/capabilities/runanywhere_voice_agent.dart'
     show RunAnywhereVoiceAgent;
 export 'public/configuration/sdk_environment.dart';
+export 'public/events/event_bus.dart' show EventBus;
 export 'public/extensions/rag_module.dart';
-export 'public/extensions/runanywhere_flat_aliases.dart';
-export 'public/extensions/runanywhere_frameworks.dart';
 export 'public/extensions/runanywhere_logging.dart';
-export 'public/extensions/runanywhere_lora.dart';
-export 'public/extensions/runanywhere_model_assignments.dart'
-    show RunAnywhereModelAssignments;
-export 'public/extensions/runanywhere_model_management.dart'
-    show RunAnywhereModelManagement;
 export 'public/extensions/runanywhere_storage.dart';
 export 'public/extensions/runanywhere_structured_output.dart'
     show RunAnywhereStructuredOutput;
 export 'public/extensions/runanywhere_thinking_utils.dart'
     show RunAnywhereThinkingUtils, ThinkingExtractionResult;
 export 'public/runanywhere_v4.dart' show RunAnywhereSDK;
-export 'public/types/types.dart';

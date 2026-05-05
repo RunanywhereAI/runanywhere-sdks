@@ -10,7 +10,7 @@
  *   1. register + get_by_id round-trip.
  *   2. unregister removes + subsequent get_by_id returns NULL.
  *   3. NULL vtable / NULL metadata.name / missing init or destroy → rejected.
- *   4. ABI version mismatch → RAC_ERROR_ABI_VERSION_MISMATCH.
+ *   4. ABI version mismatch / v1 runtime → RAC_ERROR_ABI_VERSION_MISMATCH.
  *   5. init() returning non-zero → runtime silently rejected, not in registry.
  *   6. duplicate id with lower priority → RAC_ERROR_PLUGIN_DUPLICATE, existing
  *      entry keeps its slot.
@@ -55,6 +55,26 @@ struct VtState {
 
 VtState g_states[8] = {};
 
+const rac_runtime_vtable_v2_t k_noop_v2 = {
+    /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION_V2,
+    /* .struct_size    = */ sizeof(rac_runtime_vtable_v2_t),
+    /* .run_session_v2 = */ nullptr,
+    /* .alloc_buffer   = */ nullptr,
+    /* .buffer_info    = */ nullptr,
+    /* .map_buffer     = */ nullptr,
+    /* .unmap_buffer   = */ nullptr,
+    /* .copy_buffer    = */ nullptr,
+    /* .release_tensor = */ nullptr,
+    /* .reserved_0     = */ nullptr,
+    /* .reserved_1     = */ nullptr,
+    /* .reserved_2     = */ nullptr,
+    /* .reserved_3     = */ nullptr,
+    /* .reserved_4     = */ nullptr,
+    /* .reserved_5     = */ nullptr,
+    /* .reserved_6     = */ nullptr,
+    /* .reserved_7     = */ nullptr,
+};
+
 /* Each vtable references its own VtState index via metadata.reserved_0. */
 #define MAKE_OPS(slot)                                              \
     rac_result_t init_##slot(void) {                                \
@@ -84,6 +104,7 @@ rac_runtime_vtable_t make_vt(int slot, rac_runtime_id_t id, const char* name,
     v.metadata.reserved_0  = static_cast<uint64_t>(slot);
     v.init    = init;
     v.destroy = destroy;
+    v.reserved_slot_0 = &k_noop_v2;
     return v;
 }
 
@@ -115,6 +136,8 @@ int main() {
               "(1) register invokes init exactly once");
         CHECK(rac_runtime_get_by_id(RAC_RUNTIME_METAL) == &vt,
               "(1) get_by_id returns the registered vtable");
+        CHECK(rac_runtime_vtable_get_v2(&vt) == &k_noop_v2,
+              "(1) v2 extension accessor returns the extension");
         CHECK(rac_runtime_count() == 1,
               "(1) rac_runtime_count reflects one entry");
         rac_runtime_unregister(RAC_RUNTIME_METAL);
@@ -155,9 +178,15 @@ int main() {
                                init_0, nullptr);
         CHECK(rac_runtime_register(&no_dtor) == RAC_ERROR_INVALID_PARAMETER,
               "(3) NULL destroy op → RAC_ERROR_INVALID_PARAMETER");
+
+        auto no_v2 = make_vt(0, RAC_RUNTIME_VULKAN, "vulkan_no_v2", 0,
+                             init_0, destroy_0);
+        no_v2.reserved_slot_0 = nullptr;
+        CHECK(rac_runtime_register(&no_v2) == RAC_ERROR_INVALID_PARAMETER,
+              "(3) missing v2 extension → RAC_ERROR_INVALID_PARAMETER");
     }
 
-    /* --- (4) ABI version mismatch --------------------------------------- */
+    /* --- (4) ABI version mismatch / v1 rejected ------------------------- */
     {
         for (auto& s : g_states) s = {};
         auto vt = make_vt(0, RAC_RUNTIME_VULKAN, "vulkan_bad_abi", 0,
@@ -169,6 +198,12 @@ int main() {
               "(4) init() not called when ABI check fails");
         CHECK(rac_runtime_get_by_id(RAC_RUNTIME_VULKAN) == nullptr,
               "(4) rejected runtime absent from registry");
+
+        auto v1 = make_vt(0, RAC_RUNTIME_VULKAN, "vulkan_v1", 0,
+                          init_0, destroy_0);
+        v1.metadata.abi_version = RAC_RUNTIME_ABI_VERSION_V1;
+        CHECK(rac_runtime_register(&v1) == RAC_ERROR_ABI_VERSION_MISMATCH,
+              "(4) ABI v1 runtime → RAC_ERROR_ABI_VERSION_MISMATCH");
     }
 
     /* --- (5) init returning non-zero → silent reject -------------------- */

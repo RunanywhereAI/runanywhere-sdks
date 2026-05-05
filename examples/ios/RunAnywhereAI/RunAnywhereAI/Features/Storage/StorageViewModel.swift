@@ -15,7 +15,7 @@ class StorageViewModel: ObservableObject {
     @Published var totalStorageSize: Int64 = 0
     @Published var availableSpace: Int64 = 0
     @Published var modelStorageSize: Int64 = 0
-    @Published var storedModels: [StoredModel] = []
+    @Published var storedModels: [RAStoredModel] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
 
@@ -26,14 +26,29 @@ class StorageViewModel: ObservableObject {
         errorMessage = nil
 
         // Use public API to get storage info
-        let storageInfo = await RunAnywhere.getStorageInfo()
+        var request = RAStorageInfoRequest()
+        request.includeDevice = true
+        request.includeApp = true
+        request.includeModels = true
+        request.includeCache = true
+
+        let storageResult = await RunAnywhere.getStorageInfo(request)
+        guard storageResult.success else {
+            errorMessage = storageResult.errorMessage.isEmpty
+                ? "Failed to load storage data"
+                : storageResult.errorMessage
+            isLoading = false
+            return
+        }
+
+        let storageInfo = storageResult.info
 
         // Update storage sizes from the public API
         totalStorageSize = storageInfo.appStorage.totalSize
         availableSpace = storageInfo.deviceStorage.freeSpace
         modelStorageSize = storageInfo.totalModelsSize
 
-        // Use StoredModel directly from SDK
+        // Use RAStoredModel directly from SDK
         storedModels = storageInfo.storedModels
 
         isLoading = false
@@ -45,7 +60,7 @@ class StorageViewModel: ObservableObject {
 
     func clearCache() async {
         do {
-            try await RunAnywhere.clearCache()
+            try SimplifiedFileManager.shared.clearCache()
             await refreshData()
         } catch {
             errorMessage = "Failed to clear cache: \(error.localizedDescription)"
@@ -54,19 +69,29 @@ class StorageViewModel: ObservableObject {
 
     func cleanTempFiles() async {
         do {
-            try await RunAnywhere.cleanTempFiles()
+            try SimplifiedFileManager.shared.cleanTempFiles()
             await refreshData()
         } catch {
             errorMessage = "Failed to clean temporary files: \(error.localizedDescription)"
         }
     }
 
-    func deleteModel(_ model: StoredModel) async {
-        do {
-            try await RunAnywhere.deleteModel(model.id)
-            await refreshData()
-        } catch {
-            errorMessage = "Failed to delete model: \(error.localizedDescription)"
+    func deleteModel(_ model: RAStoredModel) async {
+        var request = RAStorageDeleteRequest()
+        request.modelIds = [model.id]
+        request.deleteFiles = true
+        request.clearRegistryPaths_p = true
+        request.unloadIfLoaded = true
+        request.allowPlatformDelete = true
+
+        let result = await RunAnywhere.deleteStorage(request)
+        guard result.success else {
+            errorMessage = result.errorMessage.isEmpty
+                ? "Failed to delete model"
+                : result.errorMessage
+            return
         }
+
+        await refreshData()
     }
 }

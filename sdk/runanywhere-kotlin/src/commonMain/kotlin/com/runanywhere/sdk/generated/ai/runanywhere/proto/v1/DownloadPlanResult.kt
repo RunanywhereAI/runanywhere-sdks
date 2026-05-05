@@ -88,6 +88,30 @@ public class DownloadPlanResult(
     schemaIndex = 8,
   )
   public val error_message: String = "",
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "storageNamespace",
+    schemaIndex = 9,
+  )
+  public val storage_namespace: String = "",
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "resumeToken",
+    schemaIndex = 10,
+  )
+  public val resume_token: String = "",
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "requiredFreeBytesAfterDownload",
+    schemaIndex = 11,
+  )
+  public val required_free_bytes_after_download: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DownloadPlanResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -126,6 +150,9 @@ public class DownloadPlanResult(
     if (resume_from_bytes != other.resume_from_bytes) return false
     if (warnings != other.warnings) return false
     if (error_message != other.error_message) return false
+    if (storage_namespace != other.storage_namespace) return false
+    if (resume_token != other.resume_token) return false
+    if (required_free_bytes_after_download != other.required_free_bytes_after_download) return false
     return true
   }
 
@@ -142,6 +169,9 @@ public class DownloadPlanResult(
       result = result * 37 + resume_from_bytes.hashCode()
       result = result * 37 + warnings.hashCode()
       result = result * 37 + error_message.hashCode()
+      result = result * 37 + storage_namespace.hashCode()
+      result = result * 37 + resume_token.hashCode()
+      result = result * 37 + required_free_bytes_after_download.hashCode()
       super.hashCode = result
     }
     return result
@@ -158,6 +188,9 @@ public class DownloadPlanResult(
     result += """resume_from_bytes=$resume_from_bytes"""
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
     result += """error_message=${sanitize(error_message)}"""
+    result += """storage_namespace=${sanitize(storage_namespace)}"""
+    result += """resume_token=${sanitize(resume_token)}"""
+    result += """required_free_bytes_after_download=$required_free_bytes_after_download"""
     return result.joinToString(prefix = "DownloadPlanResult{", separator = ", ", postfix = "}")
   }
 
@@ -171,9 +204,13 @@ public class DownloadPlanResult(
     resume_from_bytes: Long = this.resume_from_bytes,
     warnings: List<String> = this.warnings,
     error_message: String = this.error_message,
+    storage_namespace: String = this.storage_namespace,
+    resume_token: String = this.resume_token,
+    required_free_bytes_after_download: Long = this.required_free_bytes_after_download,
     unknownFields: ByteString = this.unknownFields,
   ): DownloadPlanResult = DownloadPlanResult(can_start, model_id, files, total_bytes,
-      requires_extraction, can_resume, resume_from_bytes, warnings, error_message, unknownFields)
+      requires_extraction, can_resume, resume_from_bytes, warnings, error_message,
+      storage_namespace, resume_token, required_free_bytes_after_download, unknownFields)
 
   public companion object {
     @JvmField
@@ -203,6 +240,12 @@ public class DownloadPlanResult(
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(8, value.warnings)
         if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(9,
             value.error_message)
+        if (value.storage_namespace != "") size += ProtoAdapter.STRING.encodedSizeWithTag(10,
+            value.storage_namespace)
+        if (value.resume_token != "") size += ProtoAdapter.STRING.encodedSizeWithTag(11,
+            value.resume_token)
+        if (value.required_free_bytes_after_download != 0L) size +=
+            ProtoAdapter.INT64.encodedSizeWithTag(12, value.required_free_bytes_after_download)
         return size
       }
 
@@ -219,11 +262,23 @@ public class DownloadPlanResult(
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 9,
             value.error_message)
+        if (value.storage_namespace != "") ProtoAdapter.STRING.encodeWithTag(writer, 10,
+            value.storage_namespace)
+        if (value.resume_token != "") ProtoAdapter.STRING.encodeWithTag(writer, 11,
+            value.resume_token)
+        if (value.required_free_bytes_after_download != 0L) ProtoAdapter.INT64.encodeWithTag(writer,
+            12, value.required_free_bytes_after_download)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DownloadPlanResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.required_free_bytes_after_download != 0L) ProtoAdapter.INT64.encodeWithTag(writer,
+            12, value.required_free_bytes_after_download)
+        if (value.resume_token != "") ProtoAdapter.STRING.encodeWithTag(writer, 11,
+            value.resume_token)
+        if (value.storage_namespace != "") ProtoAdapter.STRING.encodeWithTag(writer, 10,
+            value.storage_namespace)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 9,
             value.error_message)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
@@ -248,6 +303,9 @@ public class DownloadPlanResult(
         var resume_from_bytes: Long = 0L
         val warnings = mutableListOf<String>()
         var error_message: String = ""
+        var storage_namespace: String = ""
+        var resume_token: String = ""
+        var required_free_bytes_after_download: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> can_start = ProtoAdapter.BOOL.decode(reader)
@@ -259,6 +317,9 @@ public class DownloadPlanResult(
             7 -> resume_from_bytes = ProtoAdapter.INT64.decode(reader)
             8 -> warnings.add(ProtoAdapter.STRING.decode(reader))
             9 -> error_message = ProtoAdapter.STRING.decode(reader)
+            10 -> storage_namespace = ProtoAdapter.STRING.decode(reader)
+            11 -> resume_token = ProtoAdapter.STRING.decode(reader)
+            12 -> required_free_bytes_after_download = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -272,6 +333,9 @@ public class DownloadPlanResult(
           resume_from_bytes = resume_from_bytes,
           warnings = warnings,
           error_message = error_message,
+          storage_namespace = storage_namespace,
+          resume_token = resume_token,
+          required_free_bytes_after_download = required_free_bytes_after_download,
           unknownFields = unknownFields
         )
       }

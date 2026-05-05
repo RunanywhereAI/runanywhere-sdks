@@ -16,6 +16,7 @@ import ai.runanywhere.proto.v1.VADEventType
 import ai.runanywhere.proto.v1.VADOptions
 import ai.runanywhere.proto.v1.VADResult
 import ai.runanywhere.proto.v1.VADStatistics
+import ai.runanywhere.proto.v1.VADStreamEvent
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.Flow
 
@@ -29,12 +30,11 @@ import kotlinx.coroutines.flow.Flow
  */
 expect suspend fun RunAnywhere.detectVoiceActivity(audioData: ByteArray): VADResult
 
-/** Canonical cross-SDK signature: detectVoiceActivity(audio, options) → VADResult */
-@Suppress("UnusedParameter")
-suspend fun RunAnywhere.detectVoiceActivity(
-    audio: ByteArray,
+/** Canonical cross-SDK signature: detectVoiceActivity(audio, options) returns VADResult. */
+expect suspend fun RunAnywhere.detectVoiceActivity(
+    audioData: ByteArray,
     options: VADOptions,
-): VADResult = detectVoiceActivity(audio)
+): VADResult
 
 /**
  * Get current VAD statistics for debugging.
@@ -44,12 +44,24 @@ suspend fun RunAnywhere.detectVoiceActivity(
 expect suspend fun RunAnywhere.getVADStatistics(): VADStatistics
 
 /**
- * Process audio samples and stream VAD results.
+ * Process audio samples and stream generated VAD event envelopes.
  *
  * @param audioSamples Flow of audio samples
- * @return Flow of VAD results
+ * @return Flow of generated VAD stream events
  */
-expect fun RunAnywhere.streamVAD(audioSamples: Flow<FloatArray>): Flow<VADResult>
+fun RunAnywhere.streamVAD(audioSamples: Flow<FloatArray>): Flow<VADStreamEvent> =
+    streamVAD(audioSamples, VADOptions())
+
+/**
+ * Process audio samples and stream generated VAD event envelopes using options.
+ *
+ * Native audio capture and session ownership remain app/platform-owned; this
+ * stream consumes already-captured PCM frames and emits generated proto events.
+ */
+expect fun RunAnywhere.streamVAD(
+    audioSamples: Flow<FloatArray>,
+    options: VADOptions,
+): Flow<VADStreamEvent>
 
 /**
  * Calibrate VAD with ambient noise.

@@ -10,5 +10,37 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
+import 'dart:core' as $core;
+
+import 'package:protobuf/protobuf.dart' as $pb;
+
+import 'stt_options.pb.dart' as $12;
+import 'stt_options.pbjson.dart';
+
 export 'stt_options.pb.dart';
+
+abstract class STTServiceBase extends $pb.GeneratedService {
+  $async.Future<$12.STTOutput> transcribe($pb.ServerContext ctx, $12.STTTranscriptionRequest request);
+  $async.Future<$12.STTStreamEvent> stream($pb.ServerContext ctx, $12.STTTranscriptionRequest request);
+
+  $pb.GeneratedMessage createRequest($core.String methodName) {
+    switch (methodName) {
+      case 'Transcribe': return $12.STTTranscriptionRequest();
+      case 'Stream': return $12.STTTranscriptionRequest();
+      default: throw $core.ArgumentError('Unknown method: $methodName');
+    }
+  }
+
+  $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx, $core.String methodName, $pb.GeneratedMessage request) {
+    switch (methodName) {
+      case 'Transcribe': return this.transcribe(ctx, request as $12.STTTranscriptionRequest);
+      case 'Stream': return this.stream(ctx, request as $12.STTTranscriptionRequest);
+      default: throw $core.ArgumentError('Unknown method: $methodName');
+    }
+  }
+
+  $core.Map<$core.String, $core.dynamic> get $json => STTServiceBase$json;
+  $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> get $messageJson => STTServiceBase$messageJson;
+}
 

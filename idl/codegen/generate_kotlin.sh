@@ -39,7 +39,8 @@ if command -v wire-compiler >/dev/null 2>&1; then
         lora_options.proto rag.proto sdk_events.proto storage_types.proto \
         structured_output.proto stt_options.proto tts_options.proto \
         vad_options.proto vlm_options.proto \
-        hardware_profile.proto
+        hardware_profile.proto \
+        lifecycle_service.proto
 
     # v2 close-out: Wire 4.x emits gRPC service interfaces (`<Service>Client.kt`)
     # AND their Grpc client implementations (`Grpc<Service>Client.kt`). Both
@@ -48,7 +49,7 @@ if command -v wire-compiler >/dev/null 2>&1; then
     # VoiceAgentStreamAdapter / DownloadStreamAdapter under jvmAndroidMain
     # consume the message types directly via rac_*_set_proto_callback, so the
     # generated client stubs are dead weight. Strip them so regen stays green.
-    for svc in Download LLM VoiceAgent; do
+    for svc in Download LLM VoiceAgent STT TTS VAD VLM Diffusion Embeddings RAG LoRA Storage SDKEvents ToolCalling StructuredOutput ModelRegistry Lifecycle Hardware; do
         rm -f "${OUT_DIR}/ai/runanywhere/proto/v1/${svc}Client.kt"
         rm -f "${OUT_DIR}/ai/runanywhere/proto/v1/Grpc${svc}Client.kt"
     done

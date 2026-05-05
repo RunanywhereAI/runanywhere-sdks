@@ -2,7 +2,7 @@
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
- * Public API for tool calling (function calling) with LLMs.
+ * JVM/Android implementation for tool calling (function calling) with LLMs.
  * Allows LLMs to request external actions (API calls, device functions, etc.)
  *
  * ARCHITECTURE:
@@ -21,11 +21,9 @@ import ai.runanywhere.proto.v1.LLMGenerationOptions
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeToolCalling
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.generateStream
-import kotlinx.coroutines.flow.takeWhile
+import com.runanywhere.sdk.public.extensions.generate
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Thread-safe tool registry for tool registration and lookup.
@@ -61,9 +59,9 @@ private object ToolRegistry {
 }
 
 /**
- * Tool calling extension for RunAnywhere.
+ * Tool calling implementation behind the public RunAnywhere extension surface.
  */
-object RunAnywhereToolCalling {
+internal object RunAnywhereToolCalling {
     private const val TAG = "ToolCalling"
     private val logger = SDKLogger(TAG)
 
@@ -130,29 +128,43 @@ object RunAnywhereToolCalling {
      */
     suspend fun executeTool(toolCall: ToolCall): ToolResult {
         val tool = ToolRegistry.get(toolCall.name)
+        val startedAtMs = System.currentTimeMillis()
+        val callId = toolCall.call_id ?: toolCall.id
 
         if (tool == null) {
             return ToolResult(
-                tool_call_id = toolCall.id,
+                tool_call_id = callId,
                 name = toolCall.name,
                 error = "Unknown tool: ${toolCall.name}",
+                success = false,
+                call_id = callId,
+                started_at_ms = startedAtMs,
+                completed_at_ms = System.currentTimeMillis(),
             )
         }
 
         return try {
-            val arguments = CppBridgeToolCalling.parseArgumentsJson(toolCall.arguments_json.ifBlank { "{}" })
-            val result = tool.executor(arguments)
-            ToolResult(
-                tool_call_id = toolCall.id,
-                name = toolCall.name,
-                result_json = CppBridgeToolCalling.toolValueToJsonString(result),
+            val result = tool.executor(toolCall)
+            result.copy(
+                tool_call_id = result.tool_call_id.ifBlank { callId },
+                name = result.name.ifBlank { toolCall.name },
+                success = result.error.isNullOrBlank(),
+                call_id = result.call_id ?: callId,
+                started_at_ms = result.started_at_ms.takeIf { it > 0 } ?: startedAtMs,
+                completed_at_ms =
+                    result.completed_at_ms.takeIf { it > 0 }
+                        ?: System.currentTimeMillis(),
             )
         } catch (e: Exception) {
             logger.error("Tool execution failed: ${e.message}")
             ToolResult(
-                tool_call_id = toolCall.id,
+                tool_call_id = callId,
                 name = toolCall.name,
                 error = e.message ?: "Unknown error",
+                success = false,
+                call_id = callId,
+                started_at_ms = startedAtMs,
+                completed_at_ms = System.currentTimeMillis(),
             )
         }
     }
@@ -190,24 +202,35 @@ object RunAnywhereToolCalling {
             )
         val registeredTools = ToolRegistry.getAll()
         val tools = opts.tools.ifEmpty { registeredTools }
+        val executionOptions = opts.copy(tools = tools)
 
-        // Build system prompt using C++ (SINGLE SOURCE OF TRUTH)
-        val systemPrompt = buildToolSystemPrompt(tools, opts)
-        var fullPrompt = if (systemPrompt.isEmpty()) prompt else "$systemPrompt\n\nUser: $prompt"
+        var fullPrompt =
+            CppBridgeToolCalling.buildInitialPrompt(
+                userPrompt = prompt,
+                tools = tools,
+                options = executionOptions,
+            )
 
         val allToolCalls = mutableListOf<ToolCall>()
         val allToolResults = mutableListOf<ToolResult>()
         var finalText = ""
 
-        val maxIterations = opts.max_iterations.takeIf { it > 0 } ?: 5
+        val maxIterations = executionOptions.effectiveMaxIterations()
         repeat(maxIterations) { iteration ->
             logger.debug("Tool calling iteration $iteration")
 
             // Generate response
-            val responseText = generateAndCollect(fullPrompt, opts.temperature, opts.max_tokens)
+            val responseText =
+                generateAndCollect(
+                    fullPrompt,
+                    executionOptions.temperature,
+                    executionOptions.max_tokens,
+                    executionOptions,
+                )
 
             // Parse for tool calls using C++ (SINGLE SOURCE OF TRUTH - NO FALLBACK)
-            val (cleanText, toolCall) = CppBridgeToolCalling.parseToolCallToObject(responseText)
+            val (cleanText, toolCall) =
+                CppBridgeToolCalling.parseToolCallToObject(responseText, executionOptions)
             finalText = cleanText
 
             if (toolCall == null) {
@@ -224,7 +247,7 @@ object RunAnywhereToolCalling {
             allToolCalls.add(toolCall)
             logger.info("Found tool call: ${toolCall.name}")
 
-            if (!opts.auto_execute) {
+            if (!executionOptions.auto_execute) {
                 return ToolCallingResult(
                     text = finalText,
                     tool_calls = allToolCalls,
@@ -234,26 +257,57 @@ object RunAnywhereToolCalling {
                 )
             }
 
+            val validation =
+                CppBridgeToolCalling.validateToolCall(
+                    toolCall = toolCall,
+                    tools = tools,
+                    options = executionOptions,
+                )
+            if (!validation.is_valid) {
+                val validationError =
+                    validation.error_message
+                        ?: validation.validation_errors
+                            .joinToString("; ")
+                            .ifBlank { "Tool call validation failed" }
+                val failedResult =
+                    ToolResult(
+                        tool_call_id = toolCall.call_id ?: toolCall.id,
+                        name = toolCall.name,
+                        error = validationError,
+                        success = false,
+                        call_id = toolCall.call_id ?: toolCall.id,
+                    )
+                allToolResults.add(failedResult)
+                return ToolCallingResult(
+                    text = finalText,
+                    tool_calls = allToolCalls,
+                    tool_results = allToolResults,
+                    is_complete = false,
+                    iterations_used = iteration + 1,
+                    error_message = validationError,
+                    error_code = validation.error_code,
+                )
+            }
+
             // Execute tool
-            val result = executeTool(toolCall)
+            val executableToolCall =
+                if (validation.normalized_arguments_json.isNotBlank()) {
+                    toolCall.copy(arguments_json = validation.normalized_arguments_json)
+                } else {
+                    toolCall
+                }
+            val result = executeTool(executableToolCall)
             allToolResults.add(result)
-            logger.info("Tool ${toolCall.name} executed: ${if (result.error.isNullOrBlank()) "success" else "failed"}")
+            val status = if (result.error.isNullOrBlank()) "success" else "failed"
+            logger.info("Tool ${toolCall.name} executed: $status")
 
             // Build follow-up prompt using C++ (SINGLE SOURCE OF TRUTH)
-            val toolResultJson =
-                result.result_json.ifBlank {
-                    CppBridgeToolCalling.toolValueToJsonString(
-                        mapOf("error" to ToolValue(string_value = result.error ?: "Unknown error")),
-                    )
-                }
-
             fullPrompt =
                 CppBridgeToolCalling.buildFollowupPrompt(
                     originalPrompt = prompt,
-                    toolsPrompt = if (opts.keep_tools_available) CppBridgeToolCalling.formatToolsForPrompt(tools, opts.format_hint) else null,
-                    toolName = toolCall.name,
-                    toolResultJson = toolResultJson,
-                    keepToolsAvailable = opts.keep_tools_available,
+                    tools = tools,
+                    toolResult = result,
+                    options = executionOptions,
                 )
         }
 
@@ -284,109 +338,59 @@ object RunAnywhereToolCalling {
         toolResult: ToolResult,
         options: ToolCallingOptions? = null,
     ): ToolCallingResult {
-        val resultJson =
-            toolResult.result_json.ifBlank {
-                CppBridgeToolCalling.toolValueToJsonString(
-                    mapOf("error" to ToolValue(string_value = toolResult.error ?: "Unknown error")),
-                )
-            }
-
         // Build follow-up prompt using C++ (SINGLE SOURCE OF TRUTH)
         val tools = options?.tools?.ifEmpty { ToolRegistry.getAll() } ?: ToolRegistry.getAll()
-        val toolsPrompt =
-            if (options?.keep_tools_available == true) {
-                CppBridgeToolCalling.formatToolsForPrompt(tools, options.format_hint)
-            } else {
-                null
-            }
+        val effectiveOptions = options ?: ToolCallingOptions()
 
         val continuedPrompt =
             CppBridgeToolCalling.buildFollowupPrompt(
                 originalPrompt = previousPrompt,
-                toolsPrompt = toolsPrompt,
-                toolName = toolCall.name,
-                toolResultJson = resultJson,
-                keepToolsAvailable = options?.keep_tools_available ?: false,
+                tools = tools,
+                toolResult =
+                    toolResult.copy(
+                        tool_call_id = toolResult.tool_call_id.ifBlank { toolCall.call_id ?: toolCall.id },
+                        name = toolResult.name.ifBlank { toolCall.name },
+                        call_id = toolResult.call_id ?: toolCall.call_id ?: toolCall.id,
+                    ),
+                options = effectiveOptions.copy(tools = tools),
             )
 
         val continuationOptions =
             ToolCallingOptions(
                 tools = options?.tools ?: emptyList(),
-                max_iterations = maxOf(0, (options?.max_iterations ?: 5) - 1),
+                max_iterations =
+                    maxOf(
+                        0,
+                        (options?.effectiveMaxIterations() ?: DEFAULT_TOOL_CALL_MAX_ITERATIONS) - 1,
+                    ),
                 auto_execute = options?.auto_execute ?: true,
                 temperature = options?.temperature,
                 max_tokens = options?.max_tokens,
                 system_prompt = options?.system_prompt,
                 replace_system_prompt = options?.replace_system_prompt ?: false,
                 keep_tools_available = options?.keep_tools_available ?: false,
-                format_hint = options?.format_hint ?: "default",
+                format_hint = options?.effectiveToolFormatHint() ?: "default",
             )
 
         return generateWithTools(continuedPrompt, continuationOptions)
     }
 
-    // ========================================================================
-    // PRIVATE HELPERS
-    // ========================================================================
-
     /**
-     * Builds the system prompt with tool definitions using C++ implementation.
-     */
-    private fun buildToolSystemPrompt(
-        tools: List<ToolDefinition>,
-        options: ToolCallingOptions,
-    ): String {
-        // Use C++ implementation for prompt formatting (SINGLE SOURCE OF TRUTH)
-        // Pass the format from options to generate model-specific instructions
-        val toolsPrompt = CppBridgeToolCalling.formatToolsForPrompt(tools, options.format_hint)
-
-        return when {
-            options.replace_system_prompt && options.system_prompt != null -> {
-                options.system_prompt
-            }
-            options.system_prompt != null -> {
-                "${options.system_prompt}\n\n$toolsPrompt"
-            }
-            else -> {
-                toolsPrompt
-            }
-        }
-    }
-
-    /**
-     * Generate text using streaming and collect all tokens into a single string.
+     * Generate text through the generated proto LLM path.
      */
     private suspend fun generateAndCollect(
         prompt: String,
         temperature: Float?,
         maxTokens: Int?,
+        toolOptions: ToolCallingOptions,
     ): String {
         val genOptions =
             LLMGenerationOptions(
                 max_tokens = maxTokens ?: 1024,
                 temperature = temperature ?: 0.7f,
+                tool_calling = toolOptions,
             )
 
-        // v2 close-out Phase G-2: generateStream now emits LLMStreamEvent;
-        // collect token text off each non-terminal event.
-        val eventFlow = RunAnywhere.generateStream(prompt, genOptions)
-
-        val responseText = StringBuilder()
-        // B-AK-7-002: bound the collect with a timeout so a missing is_final never hangs the UI.
-        withTimeoutOrNull(60_000L) {
-            eventFlow
-                .takeWhile { !it.is_final }
-                .collect { event ->
-                    if (event.token.isNotEmpty()) {
-                        responseText.append(event.token)
-                    }
-                    if (event.is_final && event.error_message.isNotEmpty()) {
-                        throw com.runanywhere.sdk.foundation.errors.SDKException
-                            .llm(event.error_message)
-                    }
-                }
-        }
-
-        return responseText.toString()
+        return RunAnywhere.generate(prompt, genOptions).text
     }
 }

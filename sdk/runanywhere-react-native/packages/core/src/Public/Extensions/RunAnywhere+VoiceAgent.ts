@@ -12,8 +12,8 @@
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import type {
-  VoiceSessionConfig as VoiceAgentConfig,
   VoiceAgentResult,
+  VoiceSessionConfig,
 } from '@runanywhere/proto-ts/voice_agent_service';
 import {
   VoiceAgentComposeConfig,
@@ -26,9 +26,10 @@ import {
 import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 import {
   STTLanguage,
+  STTOutput as STTOutputMessage,
   type STTOutput as STTOutputType,
 } from '@runanywhere/proto-ts/stt_options';
-import type { TTSOutput } from '@runanywhere/proto-ts/tts_options';
+import { TTSOutput } from '@runanywhere/proto-ts/tts_options';
 import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 import { VoiceAgentStreamAdapter } from '../../Adapters/VoiceAgentStreamAdapter';
 import {
@@ -55,7 +56,7 @@ function audioToArrayBuffer(audioData: ArrayBuffer | string): ArrayBuffer {
 }
 
 function buildVoiceAgentComposeConfig(
-  config: VoiceAgentConfig
+  config: VoiceSessionConfig
 ): ReturnType<typeof VoiceAgentComposeConfig.create> {
   return VoiceAgentComposeConfig.create({
     vadSampleRate: 16000,
@@ -95,7 +96,7 @@ export async function areAllVoiceComponentsReady(): Promise<boolean> {
 
 /** Initialize voice agent with configuration. */
 export async function initializeVoiceAgent(
-  config: VoiceAgentConfig
+  config: VoiceSessionConfig
 ): Promise<boolean> {
   if (!isNativeModuleAvailable()) {
     throw new Error('Native module not available');
@@ -203,7 +204,7 @@ export async function voiceAgentTranscribe(
   // JSON-encoded STTOutput. Normalise to STTOutput shape.
   try {
     const parsed = JSON.parse(raw) as Partial<STTOutputType>;
-    return {
+    return STTOutputMessage.fromPartial({
       text: parsed.text ?? raw,
       language: parsed.language ?? STTLanguage.STT_LANGUAGE_UNSPECIFIED,
       confidence: parsed.confidence ?? 1.0,
@@ -212,10 +213,10 @@ export async function voiceAgentTranscribe(
       metadata: parsed.metadata,
       timestampMs: parsed.timestampMs ?? Date.now(),
       durationMs: parsed.durationMs ?? 0,
-    };
+    });
   } catch {
     // Native returned a plain text string — wrap it.
-    return {
+    return STTOutputMessage.fromPartial({
       text: raw,
       language: STTLanguage.STT_LANGUAGE_UNSPECIFIED,
       confidence: 1.0,
@@ -223,7 +224,7 @@ export async function voiceAgentTranscribe(
       alternatives: [],
       timestampMs: Date.now(),
       durationMs: 0,
-    };
+    });
   }
 }
 
@@ -277,25 +278,25 @@ export async function voiceAgentSynthesizeSpeech(
     } else {
       audioData = new Uint8Array(0);
     }
-    return {
+    return TTSOutput.fromPartial({
       audioData,
       audioFormat: (parsed.audioFormat ?? parsed.audio_format ?? AudioFormat.AUDIO_FORMAT_PCM) as AudioFormat,
       sampleRate: parsed.sampleRate ?? parsed.sample_rate ?? 22050,
       durationMs: parsed.durationMs ?? parsed.duration_ms ?? 0,
       phonemeTimestamps: [],
       timestampMs: parsed.timestampMs ?? Date.now(),
-    };
+    });
   } catch {
     // Native returned a base64 audio string directly.
     const audioData = raw ? base64ToBytes(raw) : new Uint8Array(0);
-    return {
+    return TTSOutput.fromPartial({
       audioData,
       audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
       sampleRate: 22050,
       durationMs: 0,
       phonemeTimestamps: [],
       timestampMs: Date.now(),
-    };
+    });
   }
 }
 

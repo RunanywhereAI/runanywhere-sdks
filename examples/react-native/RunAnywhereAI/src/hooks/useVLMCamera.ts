@@ -33,11 +33,7 @@ export interface VLMCameraState {
 export interface VLMCameraActions {
   requestCameraPermission: () => Promise<void>;
   checkModelStatus: () => Promise<void>;
-  loadModel: (
-    modelPath: string,
-    modelName: string,
-    mmprojPath?: string
-  ) => Promise<void>;
+  loadModel: (modelId: string, modelName: string) => Promise<void>;
   captureAndDescribe: () => Promise<void>;
   selectPhotoAndDescribe: () => Promise<void>;
   toggleAutoStreaming: () => void;
@@ -128,11 +124,11 @@ export function useVLMCamera(
   }, [vlmService]);
 
   const loadModel = useCallback(
-    async (modelPath: string, modelName: string, mmprojPath?: string) => {
+    async (modelId: string, modelName: string) => {
       try {
         setIsProcessing(true);
         // Load into the persistent service instance
-        await vlmService.loadModel(modelPath, mmprojPath, modelName);
+        await vlmService.loadModel(modelId, modelName);
         setIsModelLoaded(true);
         setLoadedModelName(modelName);
         setError(null);

@@ -9,14 +9,14 @@
  *   - `hardware.hasNeuralEngine: boolean`
  *   - `hardware.accelerationMode: string`
  *
- * Hardware data is currently scraped from `navigator.*` and the active
- * runtime acceleration mode (`Runtime.preferred`) — there is no dedicated
- * `rac_hardware_profile_*` C ABI yet (G-C6 / G-B1 [CPP-BLOCKED]). When that
- * lands the implementation here can drop the `navigator` paths and route
- * through the new C ABI without changing the public shape.
+ * Hardware data is decoded from the commons serialized-proto ABI when the
+ * active WASM module exports it. Browser-owned facts (`navigator.*`, WebGPU,
+ * and the active Runtime acceleration mode) stay in the Web adapter and are
+ * merged into missing proto fields.
  */
 
 import { Runtime, type RuntimeAccelerationMode } from '../../Foundation/RuntimeConfig';
+import { HardwareAdapter } from '../../Adapters/HardwareAdapter';
 import {
   AcceleratorPreference,
   type HardwareProfileResult,
@@ -67,48 +67,87 @@ function detectWebGPU(): boolean {
   return nav?.gpu != null;
 }
 
+function browserHardwareProfileResult(): HardwareProfileResult {
+  const nav = getNavigator();
+  const chip = detectChip();
+  const accelerationMode = detectAccelerationMode();
+  const webgpuAvailable = detectWebGPU();
+  return {
+    profile: {
+      chip,
+      hasNeuralEngine: chip === 'apple-silicon',
+      accelerationMode,
+      totalMemoryBytes: Math.round((nav?.deviceMemory ?? 0) * 1024 * 1024 * 1024),
+      coreCount: nav?.hardwareConcurrency ?? 0,
+      performanceCores: 0,
+      efficiencyCores: 0,
+      architecture: chip,
+      platform: 'web',
+    },
+    accelerators: [
+      {
+        name: webgpuAvailable ? 'webgpu' : accelerationMode,
+        type: webgpuAvailable
+          ? AcceleratorPreference.ACCELERATOR_PREFERENCE_GPU
+          : AcceleratorPreference.ACCELERATOR_PREFERENCE_CPU,
+        available: true,
+      },
+    ],
+  };
+}
+
+function mergeBrowserFacts(
+  protoResult: HardwareProfileResult,
+  browserResult: HardwareProfileResult,
+): HardwareProfileResult {
+  const protoProfile = protoResult.profile;
+  const browserProfile = browserResult.profile;
+  const acceleratorsByName = new Map(
+    protoResult.accelerators.map((accelerator) => [accelerator.name, accelerator]),
+  );
+  for (const accelerator of browserResult.accelerators) {
+    if (!acceleratorsByName.has(accelerator.name)) {
+      acceleratorsByName.set(accelerator.name, accelerator);
+    }
+  }
+
+  return {
+    profile: protoProfile && browserProfile
+      ? {
+          chip: protoProfile.chip || browserProfile.chip,
+          hasNeuralEngine: protoProfile.hasNeuralEngine || browserProfile.hasNeuralEngine,
+          accelerationMode: protoProfile.accelerationMode || browserProfile.accelerationMode,
+          totalMemoryBytes: protoProfile.totalMemoryBytes || browserProfile.totalMemoryBytes,
+          coreCount: protoProfile.coreCount || browserProfile.coreCount,
+          performanceCores: protoProfile.performanceCores || browserProfile.performanceCores,
+          efficiencyCores: protoProfile.efficiencyCores || browserProfile.efficiencyCores,
+          architecture: protoProfile.architecture || browserProfile.architecture,
+          platform: protoProfile.platform || browserProfile.platform,
+        }
+      : protoProfile ?? browserProfile,
+    accelerators: Array.from(acceleratorsByName.values()),
+  };
+}
+
 export const Hardware = {
   /** Snapshot the current hardware profile. */
   getProfile(): HardwareProfileResult {
-    const nav = getNavigator();
-    const accelerationMode = detectAccelerationMode();
-    const webgpuAvailable = detectWebGPU();
-    return {
-      profile: {
-        chip: detectChip(),
-        hasNeuralEngine: detectChip() === 'apple-silicon',
-        accelerationMode,
-        totalMemoryBytes: Math.round((nav?.deviceMemory ?? 0) * 1024 * 1024 * 1024),
-        coreCount: nav?.hardwareConcurrency ?? 0,
-        performanceCores: 0,
-        efficiencyCores: 0,
-        architecture: detectChip(),
-        platform: 'web',
-      },
-      accelerators: [
-        {
-          name: webgpuAvailable ? 'webgpu' : accelerationMode,
-          type: webgpuAvailable
-            ? AcceleratorPreference.ACCELERATOR_PREFERENCE_GPU
-            : AcceleratorPreference.ACCELERATOR_PREFERENCE_CPU,
-          available: true,
-        },
-      ],
-    };
+    const browserResult = browserHardwareProfileResult();
+    const protoResult = HardwareAdapter.tryDefault()?.getProfile();
+    return protoResult ? mergeBrowserFacts(protoResult, browserResult) : browserResult;
   },
 
   /** Best-effort chip name (e.g., "apple-silicon", "x86_64"). */
   getChip(): string {
-    return detectChip();
+    return Hardware.getProfile().profile?.chip || detectChip();
   },
 
   /**
-   * Whether the device has a Neural Engine. Today this is approximated by
-   * `chip === 'apple-silicon'`; a real check needs the `rac_hardware_profile_*`
-   * C ABI (G-C6 [CPP-BLOCKED]).
+   * Whether the device has a Neural Engine. The proto bridge is authoritative
+   * when present; browser detection fills the gap for older or partial modules.
    */
   get hasNeuralEngine(): boolean {
-    return detectChip() === 'apple-silicon';
+    return Hardware.getProfile().profile?.hasNeuralEngine ?? detectChip() === 'apple-silicon';
   },
 
   /**
@@ -117,6 +156,16 @@ export const Hardware = {
    * `preferred === 'auto'`).
    */
   get accelerationMode(): string {
-    return detectAccelerationMode();
+    return Hardware.getProfile().profile?.accelerationMode || detectAccelerationMode();
+  },
+
+  getAccelerators(): HardwareProfileResult {
+    return HardwareAdapter.tryDefault()?.getAccelerators() ?? {
+      accelerators: Hardware.getProfile().accelerators,
+    };
+  },
+
+  setAcceleratorPreference(preference: AcceleratorPreference): boolean {
+    return HardwareAdapter.tryDefault()?.setAcceleratorPreference(preference) ?? false;
   },
 };

@@ -62,6 +62,28 @@ public class StorageDeleteRequest(
     schemaIndex = 4,
   )
   public val dry_run: Boolean = false,
+  @field:WireField(
+    tag = 6,
+    adapter = "ai.runanywhere.proto.v1.StorageDeletePlan#ADAPTER",
+    schemaIndex = 5,
+  )
+  public val plan: StorageDeletePlan? = null,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "requirePlanMatch",
+    schemaIndex = 6,
+  )
+  public val require_plan_match: Boolean = false,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "allowPlatformDelete",
+    schemaIndex = 7,
+  )
+  public val allow_platform_delete: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StorageDeleteRequest, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -89,6 +111,9 @@ public class StorageDeleteRequest(
     if (clear_registry_paths != other.clear_registry_paths) return false
     if (unload_if_loaded != other.unload_if_loaded) return false
     if (dry_run != other.dry_run) return false
+    if (plan != other.plan) return false
+    if (require_plan_match != other.require_plan_match) return false
+    if (allow_platform_delete != other.allow_platform_delete) return false
     return true
   }
 
@@ -101,6 +126,9 @@ public class StorageDeleteRequest(
       result = result * 37 + clear_registry_paths.hashCode()
       result = result * 37 + unload_if_loaded.hashCode()
       result = result * 37 + dry_run.hashCode()
+      result = result * 37 + (plan?.hashCode() ?: 0)
+      result = result * 37 + require_plan_match.hashCode()
+      result = result * 37 + allow_platform_delete.hashCode()
       super.hashCode = result
     }
     return result
@@ -113,6 +141,9 @@ public class StorageDeleteRequest(
     result += """clear_registry_paths=$clear_registry_paths"""
     result += """unload_if_loaded=$unload_if_loaded"""
     result += """dry_run=$dry_run"""
+    if (plan != null) result += """plan=$plan"""
+    result += """require_plan_match=$require_plan_match"""
+    result += """allow_platform_delete=$allow_platform_delete"""
     return result.joinToString(prefix = "StorageDeleteRequest{", separator = ", ", postfix = "}")
   }
 
@@ -122,9 +153,12 @@ public class StorageDeleteRequest(
     clear_registry_paths: Boolean = this.clear_registry_paths,
     unload_if_loaded: Boolean = this.unload_if_loaded,
     dry_run: Boolean = this.dry_run,
+    plan: StorageDeletePlan? = this.plan,
+    require_plan_match: Boolean = this.require_plan_match,
+    allow_platform_delete: Boolean = this.allow_platform_delete,
     unknownFields: ByteString = this.unknownFields,
   ): StorageDeleteRequest = StorageDeleteRequest(model_ids, delete_files, clear_registry_paths,
-      unload_if_loaded, dry_run, unknownFields)
+      unload_if_loaded, dry_run, plan, require_plan_match, allow_platform_delete, unknownFields)
 
   public companion object {
     @JvmField
@@ -147,6 +181,11 @@ public class StorageDeleteRequest(
         if (value.unload_if_loaded != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(4,
             value.unload_if_loaded)
         if (value.dry_run != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.dry_run)
+        size += StorageDeletePlan.ADAPTER.encodedSizeWithTag(6, value.plan)
+        if (value.require_plan_match != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(7,
+            value.require_plan_match)
+        if (value.allow_platform_delete != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(8,
+            value.allow_platform_delete)
         return size
       }
 
@@ -159,11 +198,21 @@ public class StorageDeleteRequest(
         if (value.unload_if_loaded != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
             value.unload_if_loaded)
         if (value.dry_run != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.dry_run)
+        StorageDeletePlan.ADAPTER.encodeWithTag(writer, 6, value.plan)
+        if (value.require_plan_match != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.require_plan_match)
+        if (value.allow_platform_delete != false) ProtoAdapter.BOOL.encodeWithTag(writer, 8,
+            value.allow_platform_delete)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StorageDeleteRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.allow_platform_delete != false) ProtoAdapter.BOOL.encodeWithTag(writer, 8,
+            value.allow_platform_delete)
+        if (value.require_plan_match != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.require_plan_match)
+        StorageDeletePlan.ADAPTER.encodeWithTag(writer, 6, value.plan)
         if (value.dry_run != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.dry_run)
         if (value.unload_if_loaded != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
             value.unload_if_loaded)
@@ -180,6 +229,9 @@ public class StorageDeleteRequest(
         var clear_registry_paths: Boolean = false
         var unload_if_loaded: Boolean = false
         var dry_run: Boolean = false
+        var plan: StorageDeletePlan? = null
+        var require_plan_match: Boolean = false
+        var allow_platform_delete: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_ids.add(ProtoAdapter.STRING.decode(reader))
@@ -187,6 +239,9 @@ public class StorageDeleteRequest(
             3 -> clear_registry_paths = ProtoAdapter.BOOL.decode(reader)
             4 -> unload_if_loaded = ProtoAdapter.BOOL.decode(reader)
             5 -> dry_run = ProtoAdapter.BOOL.decode(reader)
+            6 -> plan = StorageDeletePlan.ADAPTER.decode(reader)
+            7 -> require_plan_match = ProtoAdapter.BOOL.decode(reader)
+            8 -> allow_platform_delete = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -196,11 +251,15 @@ public class StorageDeleteRequest(
           clear_registry_paths = clear_registry_paths,
           unload_if_loaded = unload_if_loaded,
           dry_run = dry_run,
+          plan = plan,
+          require_plan_match = require_plan_match,
+          allow_platform_delete = allow_platform_delete,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: StorageDeleteRequest): StorageDeleteRequest = value.copy(
+        plan = value.plan?.let(StorageDeletePlan.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

@@ -165,11 +165,10 @@ android {
         }
 
         jniLibs {
-            // Use legacy packaging to extract libraries to filesystem
-            // This helps with symbol resolution for transitive dependencies
-            // CRITICAL: useLegacyPackaging = true is REQUIRED for 16KB page size support
-            // when using AGP < 8.5.1. With AGP 8.5.1+, this ensures proper extraction
-            // and 16KB alignment during packaging.
+            // Keep extracted native libraries for the example's transitive
+            // backend loading path. The 16 KB launch dialog is handled by
+            // packaging only 16 KB ELF-aligned .so files; legacy packaging is
+            // not a substitute for ELF alignment.
             useLegacyPackaging = true
 
             // Handle duplicate native libraries from multiple SDK modules.

@@ -11,7 +11,9 @@ import com.squareup.wire.ProtoReader
 import com.squareup.wire.ProtoWriter
 import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
+import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -35,6 +37,14 @@ import okio.ByteString
  * ---------------------------------------------------------------------------
  */
 public class SessionStartedEvent(
+  @field:WireField(
+    tag = 1,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "sessionId",
+    schemaIndex = 0,
+  )
+  public val session_id: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SessionStartedEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -48,15 +58,28 @@ public class SessionStartedEvent(
     if (other === this) return true
     if (other !is SessionStartedEvent) return false
     if (unknownFields != other.unknownFields) return false
+    if (session_id != other.session_id) return false
     return true
   }
 
-  override fun hashCode(): Int = unknownFields.hashCode()
+  override fun hashCode(): Int {
+    var result = super.hashCode
+    if (result == 0) {
+      result = unknownFields.hashCode()
+      result = result * 37 + session_id.hashCode()
+      super.hashCode = result
+    }
+    return result
+  }
 
-  override fun toString(): String = "SessionStartedEvent{}"
+  override fun toString(): String {
+    val result = mutableListOf<String>()
+    result += """session_id=${sanitize(session_id)}"""
+    return result.joinToString(prefix = "SessionStartedEvent{", separator = ", ", postfix = "}")
+  }
 
-  public fun copy(unknownFields: ByteString = this.unknownFields): SessionStartedEvent =
-      SessionStartedEvent(unknownFields)
+  public fun copy(session_id: String = this.session_id, unknownFields: ByteString =
+      this.unknownFields): SessionStartedEvent = SessionStartedEvent(session_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -71,20 +94,31 @@ public class SessionStartedEvent(
     ) {
       override fun encodedSize(`value`: SessionStartedEvent): Int {
         var size = value.unknownFields.size
+        if (value.session_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1,
+            value.session_id)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: SessionStartedEvent) {
+        if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.session_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SessionStartedEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.session_id)
       }
 
       override fun decode(reader: ProtoReader): SessionStartedEvent {
-        val unknownFields = reader.forEachTag(reader::readUnknownField)
+        var session_id: String = ""
+        val unknownFields = reader.forEachTag { tag ->
+          when (tag) {
+            1 -> session_id = ProtoAdapter.STRING.decode(reader)
+            else -> reader.readUnknownField(tag)
+          }
+        }
         return SessionStartedEvent(
+          session_id = session_id,
           unknownFields = unknownFields
         )
       }

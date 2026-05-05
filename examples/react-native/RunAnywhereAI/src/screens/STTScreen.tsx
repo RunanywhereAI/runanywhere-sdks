@@ -47,16 +47,21 @@ import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model';
-import type { ModelInfo } from '../types/model';
-import { ModelModality, LLMFramework, ModelCategory } from '../types/model';
 import { STTMode } from '../types/voice';
+import { createModelInfoSummary } from '../utils/modelDisplay';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import {
+  InferenceFramework,
+  ModelCategory,
   RunAnywhere,
   STTLanguage,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/core';
+
+// Canonical SDK methods (Swift / Kotlin / Flutter / Web parity).
+const getAvailableModels = RunAnywhere.getAvailableModels;
+const loadModelById = RunAnywhere.loadModel;
 
 // STT Model IDs (kept for reference, uses SDK model registry)
 const _STT_MODEL_IDS = ['whisper-tiny-en', 'whisper-base-en'];
@@ -69,7 +74,7 @@ export const STTScreen: React.FC = () => {
   const [transcript, setTranscript] = useState('');
   const [partialTranscript, setPartialTranscript] = useState(''); // For live mode - current chunk
   const [confidence, setConfidence] = useState<number | null>(null);
-  const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
+  const [currentModel, setCurrentModel] = useState<SDKModelInfo | null>(null);
   const [isModelLoading, setIsModelLoading] = useState(false);
   const [_availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -147,7 +152,7 @@ export const STTScreen: React.FC = () => {
   const loadModels = useCallback(async () => {
     try {
       // Get available STT models from catalog
-      const allModels = await RunAnywhere.getAvailableModels();
+      const allModels = await getAvailableModels();
       // Filter by category (speech-recognition) matching SDK's ModelCategory
       const sttModels = allModels.filter(
         (m: SDKModelInfo) =>
@@ -176,21 +181,21 @@ export const STTScreen: React.FC = () => {
           const firstModel = downloadedStt[0];
           if (firstModel) {
             setCurrentModel({
-              id: firstModel.id,
-              name: firstModel.name,
-              preferredFramework: LLMFramework.ONNX,
-            } as ModelInfo);
+              ...firstModel,
+              preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+            });
             console.warn(
               '[STTScreen] Set currentModel from downloaded:',
               firstModel.name
             );
           }
         } else {
-          setCurrentModel({
+          setCurrentModel(createModelInfoSummary({
             id: 'stt-model',
             name: 'STT Model (Loaded)',
-            preferredFramework: LLMFramework.ONNX,
-          } as ModelInfo);
+            category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+            framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+          }));
           console.warn('[STTScreen] Set currentModel as generic STT Model');
         }
       }
@@ -226,28 +231,29 @@ export const STTScreen: React.FC = () => {
   }, []);
 
   /**
-   * Load a model from its info
+   * Load a model from its info via the canonical lifecycle ABI.
+   *
+   * Path-first loading was removed in V2 — model ID is the canonical handle
+   * and the native registry resolves the artifact path internally.
    */
   const loadModel = async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
       console.warn(
-        `[STTScreen] Loading model: ${model.id} from ${model.localPath}`
+        `[STTScreen] Loading model: ${model.id} (registry will resolve path)`
       );
 
-      if (!model.localPath) {
+      if (!model.isDownloaded && !model.localPath) {
         Alert.alert(
           'Error',
-          'Model path not found. Please re-download the model.'
+          'Model has not been downloaded. Open the model picker to download it first.'
         );
         return;
       }
 
-      // Pass the path directly - C++ extractArchiveIfNeeded handles archive extraction
-      // and finding the correct nested model folder
-      const success = await RunAnywhere.loadSTTModel(
-        model.localPath,
-        'whisper'
+      const success = await loadModelById(
+        model.id,
+        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
       );
 
       if (success) {
@@ -256,10 +262,9 @@ export const STTScreen: React.FC = () => {
           // Set model with framework so ModelStatusBanner shows it properly
           // Use ONNX since STT uses Sherpa-ONNX (ONNX Runtime)
           setCurrentModel({
-            id: model.id,
-            name: model.name,
-            preferredFramework: LLMFramework.ONNX,
-          } as ModelInfo);
+            ...model,
+            preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+          });
           console.warn(
             `[STTScreen] Model ${model.name} loaded successfully, currentModel set`
           );
@@ -854,7 +859,7 @@ export const STTScreen: React.FC = () => {
       <SafeAreaView style={styles.container}>
         {renderHeader()}
         <ModelRequiredOverlay
-          modality={ModelModality.STT}
+          modality="stt"
           onSelectModel={handleSelectModel}
         />
         {/* Model Selection Sheet */}

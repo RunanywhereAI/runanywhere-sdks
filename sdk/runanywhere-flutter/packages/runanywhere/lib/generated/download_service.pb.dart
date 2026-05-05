@@ -101,6 +101,11 @@ class DownloadProgress extends $pb.GeneratedMessage {
     $core.int? totalFiles,
     $core.String? storageKey,
     $core.String? localPath,
+    $core.double? overallProgress,
+    $fixnum.Int64? startedAtUnixMs,
+    $fixnum.Int64? updatedAtUnixMs,
+    $core.String? currentFileName,
+    $core.String? resumeToken,
   }) {
     final $result = create();
     if (modelId != null) {
@@ -148,6 +153,21 @@ class DownloadProgress extends $pb.GeneratedMessage {
     if (localPath != null) {
       $result.localPath = localPath;
     }
+    if (overallProgress != null) {
+      $result.overallProgress = overallProgress;
+    }
+    if (startedAtUnixMs != null) {
+      $result.startedAtUnixMs = startedAtUnixMs;
+    }
+    if (updatedAtUnixMs != null) {
+      $result.updatedAtUnixMs = updatedAtUnixMs;
+    }
+    if (currentFileName != null) {
+      $result.currentFileName = currentFileName;
+    }
+    if (resumeToken != null) {
+      $result.resumeToken = resumeToken;
+    }
     return $result;
   }
   DownloadProgress._() : super();
@@ -170,6 +190,11 @@ class DownloadProgress extends $pb.GeneratedMessage {
     ..a<$core.int>(13, _omitFieldNames ? '' : 'totalFiles', $pb.PbFieldType.O3)
     ..aOS(14, _omitFieldNames ? '' : 'storageKey')
     ..aOS(15, _omitFieldNames ? '' : 'localPath')
+    ..a<$core.double>(16, _omitFieldNames ? '' : 'overallProgress', $pb.PbFieldType.OF)
+    ..aInt64(17, _omitFieldNames ? '' : 'startedAtUnixMs')
+    ..aInt64(18, _omitFieldNames ? '' : 'updatedAtUnixMs')
+    ..aOS(19, _omitFieldNames ? '' : 'currentFileName')
+    ..aOS(20, _omitFieldNames ? '' : 'resumeToken')
     ..hasRequiredFields = false
   ;
 
@@ -328,6 +353,51 @@ class DownloadProgress extends $pb.GeneratedMessage {
   $core.bool hasLocalPath() => $_has(14);
   @$pb.TagNumber(15)
   void clearLocalPath() => clearField(15);
+
+  @$pb.TagNumber(16)
+  $core.double get overallProgress => $_getN(15);
+  @$pb.TagNumber(16)
+  set overallProgress($core.double v) { $_setFloat(15, v); }
+  @$pb.TagNumber(16)
+  $core.bool hasOverallProgress() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearOverallProgress() => clearField(16);
+
+  @$pb.TagNumber(17)
+  $fixnum.Int64 get startedAtUnixMs => $_getI64(16);
+  @$pb.TagNumber(17)
+  set startedAtUnixMs($fixnum.Int64 v) { $_setInt64(16, v); }
+  @$pb.TagNumber(17)
+  $core.bool hasStartedAtUnixMs() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearStartedAtUnixMs() => clearField(17);
+
+  @$pb.TagNumber(18)
+  $fixnum.Int64 get updatedAtUnixMs => $_getI64(17);
+  @$pb.TagNumber(18)
+  set updatedAtUnixMs($fixnum.Int64 v) { $_setInt64(17, v); }
+  @$pb.TagNumber(18)
+  $core.bool hasUpdatedAtUnixMs() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearUpdatedAtUnixMs() => clearField(18);
+
+  @$pb.TagNumber(19)
+  $core.String get currentFileName => $_getSZ(18);
+  @$pb.TagNumber(19)
+  set currentFileName($core.String v) { $_setString(18, v); }
+  @$pb.TagNumber(19)
+  $core.bool hasCurrentFileName() => $_has(18);
+  @$pb.TagNumber(19)
+  void clearCurrentFileName() => clearField(19);
+
+  @$pb.TagNumber(20)
+  $core.String get resumeToken => $_getSZ(19);
+  @$pb.TagNumber(20)
+  set resumeToken($core.String v) { $_setString(19, v); }
+  @$pb.TagNumber(20)
+  $core.bool hasResumeToken() => $_has(19);
+  @$pb.TagNumber(20)
+  void clearResumeToken() => clearField(20);
 }
 
 class DownloadPlanRequest extends $pb.GeneratedMessage {
@@ -337,6 +407,10 @@ class DownloadPlanRequest extends $pb.GeneratedMessage {
     $core.bool? resumeExisting,
     $fixnum.Int64? availableStorageBytes,
     $core.bool? allowMeteredNetwork,
+    $core.String? storageNamespace,
+    $core.bool? validateExistingBytes,
+    $core.bool? verifyChecksums,
+    $fixnum.Int64? requiredFreeBytesAfterDownload,
   }) {
     final $result = create();
     if (modelId != null) {
@@ -354,6 +428,18 @@ class DownloadPlanRequest extends $pb.GeneratedMessage {
     if (allowMeteredNetwork != null) {
       $result.allowMeteredNetwork = allowMeteredNetwork;
     }
+    if (storageNamespace != null) {
+      $result.storageNamespace = storageNamespace;
+    }
+    if (validateExistingBytes != null) {
+      $result.validateExistingBytes = validateExistingBytes;
+    }
+    if (verifyChecksums != null) {
+      $result.verifyChecksums = verifyChecksums;
+    }
+    if (requiredFreeBytesAfterDownload != null) {
+      $result.requiredFreeBytesAfterDownload = requiredFreeBytesAfterDownload;
+    }
     return $result;
   }
   DownloadPlanRequest._() : super();
@@ -366,6 +452,10 @@ class DownloadPlanRequest extends $pb.GeneratedMessage {
     ..aOB(3, _omitFieldNames ? '' : 'resumeExisting')
     ..aInt64(4, _omitFieldNames ? '' : 'availableStorageBytes')
     ..aOB(5, _omitFieldNames ? '' : 'allowMeteredNetwork')
+    ..aOS(6, _omitFieldNames ? '' : 'storageNamespace')
+    ..aOB(7, _omitFieldNames ? '' : 'validateExistingBytes')
+    ..aOB(8, _omitFieldNames ? '' : 'verifyChecksums')
+    ..aInt64(9, _omitFieldNames ? '' : 'requiredFreeBytesAfterDownload')
     ..hasRequiredFields = false
   ;
 
@@ -436,6 +526,42 @@ class DownloadPlanRequest extends $pb.GeneratedMessage {
   $core.bool hasAllowMeteredNetwork() => $_has(4);
   @$pb.TagNumber(5)
   void clearAllowMeteredNetwork() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get storageNamespace => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set storageNamespace($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasStorageNamespace() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearStorageNamespace() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get validateExistingBytes => $_getBF(6);
+  @$pb.TagNumber(7)
+  set validateExistingBytes($core.bool v) { $_setBool(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasValidateExistingBytes() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearValidateExistingBytes() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get verifyChecksums => $_getBF(7);
+  @$pb.TagNumber(8)
+  set verifyChecksums($core.bool v) { $_setBool(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasVerifyChecksums() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearVerifyChecksums() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $fixnum.Int64 get requiredFreeBytesAfterDownload => $_getI64(8);
+  @$pb.TagNumber(9)
+  set requiredFreeBytesAfterDownload($fixnum.Int64 v) { $_setInt64(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasRequiredFreeBytesAfterDownload() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearRequiredFreeBytesAfterDownload() => clearField(9);
 }
 
 class DownloadFilePlan extends $pb.GeneratedMessage {
@@ -446,6 +572,7 @@ class DownloadFilePlan extends $pb.GeneratedMessage {
     $fixnum.Int64? expectedBytes,
     $core.bool? requiresExtraction,
     $core.String? checksumSha256,
+    $core.bool? isResumeCandidate,
   }) {
     final $result = create();
     if (file != null) {
@@ -466,6 +593,9 @@ class DownloadFilePlan extends $pb.GeneratedMessage {
     if (checksumSha256 != null) {
       $result.checksumSha256 = checksumSha256;
     }
+    if (isResumeCandidate != null) {
+      $result.isResumeCandidate = isResumeCandidate;
+    }
     return $result;
   }
   DownloadFilePlan._() : super();
@@ -479,6 +609,7 @@ class DownloadFilePlan extends $pb.GeneratedMessage {
     ..aInt64(4, _omitFieldNames ? '' : 'expectedBytes')
     ..aOB(5, _omitFieldNames ? '' : 'requiresExtraction')
     ..aOS(6, _omitFieldNames ? '' : 'checksumSha256')
+    ..aOB(7, _omitFieldNames ? '' : 'isResumeCandidate')
     ..hasRequiredFields = false
   ;
 
@@ -558,6 +689,15 @@ class DownloadFilePlan extends $pb.GeneratedMessage {
   $core.bool hasChecksumSha256() => $_has(5);
   @$pb.TagNumber(6)
   void clearChecksumSha256() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get isResumeCandidate => $_getBF(6);
+  @$pb.TagNumber(7)
+  set isResumeCandidate($core.bool v) { $_setBool(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasIsResumeCandidate() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearIsResumeCandidate() => clearField(7);
 }
 
 class DownloadPlanResult extends $pb.GeneratedMessage {
@@ -571,6 +711,9 @@ class DownloadPlanResult extends $pb.GeneratedMessage {
     $fixnum.Int64? resumeFromBytes,
     $core.Iterable<$core.String>? warnings,
     $core.String? errorMessage,
+    $core.String? storageNamespace,
+    $core.String? resumeToken,
+    $fixnum.Int64? requiredFreeBytesAfterDownload,
   }) {
     final $result = create();
     if (canStart != null) {
@@ -600,6 +743,15 @@ class DownloadPlanResult extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (storageNamespace != null) {
+      $result.storageNamespace = storageNamespace;
+    }
+    if (resumeToken != null) {
+      $result.resumeToken = resumeToken;
+    }
+    if (requiredFreeBytesAfterDownload != null) {
+      $result.requiredFreeBytesAfterDownload = requiredFreeBytesAfterDownload;
+    }
     return $result;
   }
   DownloadPlanResult._() : super();
@@ -616,6 +768,9 @@ class DownloadPlanResult extends $pb.GeneratedMessage {
     ..aInt64(7, _omitFieldNames ? '' : 'resumeFromBytes')
     ..pPS(8, _omitFieldNames ? '' : 'warnings')
     ..aOS(9, _omitFieldNames ? '' : 'errorMessage')
+    ..aOS(10, _omitFieldNames ? '' : 'storageNamespace')
+    ..aOS(11, _omitFieldNames ? '' : 'resumeToken')
+    ..aInt64(12, _omitFieldNames ? '' : 'requiredFreeBytesAfterDownload')
     ..hasRequiredFields = false
   ;
 
@@ -708,6 +863,33 @@ class DownloadPlanResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(8);
   @$pb.TagNumber(9)
   void clearErrorMessage() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.String get storageNamespace => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set storageNamespace($core.String v) { $_setString(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasStorageNamespace() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearStorageNamespace() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.String get resumeToken => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set resumeToken($core.String v) { $_setString(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasResumeToken() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearResumeToken() => clearField(11);
+
+  @$pb.TagNumber(12)
+  $fixnum.Int64 get requiredFreeBytesAfterDownload => $_getI64(11);
+  @$pb.TagNumber(12)
+  set requiredFreeBytesAfterDownload($fixnum.Int64 v) { $_setInt64(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasRequiredFreeBytesAfterDownload() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearRequiredFreeBytesAfterDownload() => clearField(12);
 }
 
 class DownloadStartRequest extends $pb.GeneratedMessage {
@@ -715,6 +897,8 @@ class DownloadStartRequest extends $pb.GeneratedMessage {
     $core.String? modelId,
     DownloadPlanResult? plan,
     $core.bool? resume,
+    $core.String? resumeToken,
+    $core.bool? updateRegistryOnCompletion,
   }) {
     final $result = create();
     if (modelId != null) {
@@ -726,6 +910,12 @@ class DownloadStartRequest extends $pb.GeneratedMessage {
     if (resume != null) {
       $result.resume = resume;
     }
+    if (resumeToken != null) {
+      $result.resumeToken = resumeToken;
+    }
+    if (updateRegistryOnCompletion != null) {
+      $result.updateRegistryOnCompletion = updateRegistryOnCompletion;
+    }
     return $result;
   }
   DownloadStartRequest._() : super();
@@ -736,6 +926,8 @@ class DownloadStartRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
     ..aOM<DownloadPlanResult>(2, _omitFieldNames ? '' : 'plan', subBuilder: DownloadPlanResult.create)
     ..aOB(3, _omitFieldNames ? '' : 'resume')
+    ..aOS(4, _omitFieldNames ? '' : 'resumeToken')
+    ..aOB(5, _omitFieldNames ? '' : 'updateRegistryOnCompletion')
     ..hasRequiredFields = false
   ;
 
@@ -788,6 +980,24 @@ class DownloadStartRequest extends $pb.GeneratedMessage {
   $core.bool hasResume() => $_has(2);
   @$pb.TagNumber(3)
   void clearResume() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get resumeToken => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set resumeToken($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasResumeToken() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearResumeToken() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get updateRegistryOnCompletion => $_getBF(4);
+  @$pb.TagNumber(5)
+  set updateRegistryOnCompletion($core.bool v) { $_setBool(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasUpdateRegistryOnCompletion() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearUpdateRegistryOnCompletion() => clearField(5);
 }
 
 class DownloadStartResult extends $pb.GeneratedMessage {
@@ -797,6 +1007,7 @@ class DownloadStartResult extends $pb.GeneratedMessage {
     $core.String? modelId,
     DownloadProgress? initialProgress,
     $core.String? errorMessage,
+    $core.String? resumeToken,
   }) {
     final $result = create();
     if (accepted != null) {
@@ -814,6 +1025,9 @@ class DownloadStartResult extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (resumeToken != null) {
+      $result.resumeToken = resumeToken;
+    }
     return $result;
   }
   DownloadStartResult._() : super();
@@ -826,6 +1040,7 @@ class DownloadStartResult extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'modelId')
     ..aOM<DownloadProgress>(4, _omitFieldNames ? '' : 'initialProgress', subBuilder: DownloadProgress.create)
     ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
+    ..aOS(6, _omitFieldNames ? '' : 'resumeToken')
     ..hasRequiredFields = false
   ;
 
@@ -896,6 +1111,15 @@ class DownloadStartResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(4);
   @$pb.TagNumber(5)
   void clearErrorMessage() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get resumeToken => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set resumeToken($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasResumeToken() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearResumeToken() => clearField(6);
 }
 
 class DownloadCancelRequest extends $pb.GeneratedMessage {
@@ -983,6 +1207,9 @@ class DownloadCancelResult extends $pb.GeneratedMessage {
     $core.String? modelId,
     $fixnum.Int64? partialBytesDeleted,
     $core.String? errorMessage,
+    $core.bool? wasRunning,
+    $core.bool? partialBytesPreserved,
+    $core.String? resumeToken,
   }) {
     final $result = create();
     if (success != null) {
@@ -1000,6 +1227,15 @@ class DownloadCancelResult extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (wasRunning != null) {
+      $result.wasRunning = wasRunning;
+    }
+    if (partialBytesPreserved != null) {
+      $result.partialBytesPreserved = partialBytesPreserved;
+    }
+    if (resumeToken != null) {
+      $result.resumeToken = resumeToken;
+    }
     return $result;
   }
   DownloadCancelResult._() : super();
@@ -1012,6 +1248,9 @@ class DownloadCancelResult extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'modelId')
     ..aInt64(4, _omitFieldNames ? '' : 'partialBytesDeleted')
     ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
+    ..aOB(6, _omitFieldNames ? '' : 'wasRunning')
+    ..aOB(7, _omitFieldNames ? '' : 'partialBytesPreserved')
+    ..aOS(8, _omitFieldNames ? '' : 'resumeToken')
     ..hasRequiredFields = false
   ;
 
@@ -1080,6 +1319,33 @@ class DownloadCancelResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(4);
   @$pb.TagNumber(5)
   void clearErrorMessage() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get wasRunning => $_getBF(5);
+  @$pb.TagNumber(6)
+  set wasRunning($core.bool v) { $_setBool(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasWasRunning() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearWasRunning() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get partialBytesPreserved => $_getBF(6);
+  @$pb.TagNumber(7)
+  set partialBytesPreserved($core.bool v) { $_setBool(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasPartialBytesPreserved() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearPartialBytesPreserved() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get resumeToken => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set resumeToken($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasResumeToken() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearResumeToken() => clearField(8);
 }
 
 class DownloadResumeRequest extends $pb.GeneratedMessage {
@@ -1087,6 +1353,8 @@ class DownloadResumeRequest extends $pb.GeneratedMessage {
     $core.String? taskId,
     $core.String? modelId,
     $fixnum.Int64? resumeFromBytes,
+    $core.String? resumeToken,
+    $core.bool? validatePartialBytes,
   }) {
     final $result = create();
     if (taskId != null) {
@@ -1098,6 +1366,12 @@ class DownloadResumeRequest extends $pb.GeneratedMessage {
     if (resumeFromBytes != null) {
       $result.resumeFromBytes = resumeFromBytes;
     }
+    if (resumeToken != null) {
+      $result.resumeToken = resumeToken;
+    }
+    if (validatePartialBytes != null) {
+      $result.validatePartialBytes = validatePartialBytes;
+    }
     return $result;
   }
   DownloadResumeRequest._() : super();
@@ -1108,6 +1382,8 @@ class DownloadResumeRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'taskId')
     ..aOS(2, _omitFieldNames ? '' : 'modelId')
     ..aInt64(3, _omitFieldNames ? '' : 'resumeFromBytes')
+    ..aOS(4, _omitFieldNames ? '' : 'resumeToken')
+    ..aOB(5, _omitFieldNames ? '' : 'validatePartialBytes')
     ..hasRequiredFields = false
   ;
 
@@ -1158,6 +1434,24 @@ class DownloadResumeRequest extends $pb.GeneratedMessage {
   $core.bool hasResumeFromBytes() => $_has(2);
   @$pb.TagNumber(3)
   void clearResumeFromBytes() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get resumeToken => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set resumeToken($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasResumeToken() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearResumeToken() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get validatePartialBytes => $_getBF(4);
+  @$pb.TagNumber(5)
+  set validatePartialBytes($core.bool v) { $_setBool(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasValidatePartialBytes() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearValidatePartialBytes() => clearField(5);
 }
 
 class DownloadResumeResult extends $pb.GeneratedMessage {
@@ -1167,6 +1461,7 @@ class DownloadResumeResult extends $pb.GeneratedMessage {
     $core.String? modelId,
     DownloadProgress? initialProgress,
     $core.String? errorMessage,
+    $core.String? resumeToken,
   }) {
     final $result = create();
     if (accepted != null) {
@@ -1184,6 +1479,9 @@ class DownloadResumeResult extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (resumeToken != null) {
+      $result.resumeToken = resumeToken;
+    }
     return $result;
   }
   DownloadResumeResult._() : super();
@@ -1196,6 +1494,7 @@ class DownloadResumeResult extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'modelId')
     ..aOM<DownloadProgress>(4, _omitFieldNames ? '' : 'initialProgress', subBuilder: DownloadProgress.create)
     ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
+    ..aOS(6, _omitFieldNames ? '' : 'resumeToken')
     ..hasRequiredFields = false
   ;
 
@@ -1266,6 +1565,15 @@ class DownloadResumeResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(4);
   @$pb.TagNumber(5)
   void clearErrorMessage() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get resumeToken => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set resumeToken($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasResumeToken() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearResumeToken() => clearField(6);
 }
 
 class DownloadApi {

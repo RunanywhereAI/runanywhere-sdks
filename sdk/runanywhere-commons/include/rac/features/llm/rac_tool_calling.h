@@ -18,6 +18,19 @@
  * Ported from:
  * - Swift: ToolCallParser.swift
  * - React Native: ToolCallingBridge.cpp
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Proto-byte APIs (rac_tool_call_parse_proto,
+ *     rac_tool_call_validate_proto, rac_tool_call_format_prompt_proto):
+ *     `SDK-facing default` over runanywhere.v1.ToolParseRequest /
+ *     ToolParseResult / ToolCallValidationRequest /
+ *     ToolCallValidationResult / ToolPromptFormatRequest /
+ *     ToolPromptFormatResult bytes.
+ *   - Struct/JSON helpers (rac_tool_call_t, rac_tool_definition_t,
+ *     rac_tool_call_validation_t, rac_tool_calling_options_t, parse,
+ *     validate, format, normalize, definitions_to_json, etc.):
+ *     `delete after SDK migration` for SDK-facing helpers; `internal`
+ *     for parser primitives once SDKs are on the proto path.
  */
 
 #ifndef RAC_TOOL_CALLING_H
@@ -25,6 +38,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -112,6 +126,21 @@ typedef struct rac_tool_call {
 } rac_tool_call_t;
 
 /**
+ * @brief Tool call validation result
+ *
+ * Mirrors the portable parts of the generated ToolCallValidationResult
+ * contract without depending on generated headers in the C ABI.
+ */
+typedef struct rac_tool_call_validation {
+    rac_bool_t is_valid;              /**< Whether the call matches a known tool definition */
+    char* validation_errors_json;     /**< JSON array of validation error strings (owned) */
+    char* matched_tool_json;          /**< Matched tool definition as JSON object (owned) */
+    char* normalized_arguments_json;  /**< Canonical arguments JSON object (owned) */
+    char* error_message;              /**< First validation error, if any (owned) */
+    rac_result_t error_code;          /**< RAC_SUCCESS or a validation error code */
+} rac_tool_call_validation_t;
+
+/**
  * @brief Tool calling options
  */
 typedef struct rac_tool_calling_options {
@@ -175,6 +204,81 @@ RAC_API rac_result_t rac_tool_call_parse(const char* llm_output, rac_tool_call_t
 RAC_API rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
                                                      rac_tool_call_format_t format,
                                                      rac_tool_call_t* out_result);
+
+/**
+ * @brief Parse tool calls from serialized generated proto bytes.
+ *
+ * Accepts a runanywhere.v1.ToolParseRequest and returns a serialized
+ * runanywhere.v1.ToolParseResult in out_result. This keeps SDK bridges from
+ * hand-parsing protobuf wire bytes while preserving C++ as the portable parser.
+ *
+ * @param request_proto_bytes Borrowed ToolParseRequest bytes.
+ * @param request_proto_size Size of request_proto_bytes.
+ * @param out_result Owned ToolParseResult bytes or typed error.
+ * @return RAC_SUCCESS when out_result carries a serialized result.
+ */
+RAC_API rac_result_t rac_tool_call_parse_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Validate a parsed tool call against local tool definitions
+ *
+ * Checks that the parsed call names a known tool, has valid JSON object
+ * arguments, includes all required parameters, uses the expected parameter
+ * types, and respects enum constraints when provided.
+ *
+ * This does not execute tools or perform permission checks. Host adapters own
+ * execution and side effects.
+ *
+ * @param call Parsed tool call
+ * @param definitions Array of allowed tool definitions
+ * @param num_definitions Number of definitions
+ * @param out_validation Output validation result (free with rac_tool_call_validation_free)
+ * @return RAC_SUCCESS on successful validation processing
+ */
+RAC_API rac_result_t rac_tool_call_validate(const rac_tool_call_t* call,
+                                            const rac_tool_definition_t* definitions,
+                                            size_t num_definitions,
+                                            rac_tool_call_validation_t* out_validation);
+
+/**
+ * @brief Validate a parsed tool call against JSON tool definitions
+ *
+ * Convenience API for adapters that already hold tools as JSON. Supports the
+ * same shape produced by rac_tool_call_definitions_to_json and generated-style
+ * ToolDefinition JSON objects.
+ *
+ * @param call Parsed tool call
+ * @param tools_json JSON array of tool definitions
+ * @param out_validation Output validation result (free with rac_tool_call_validation_free)
+ * @return RAC_SUCCESS on successful validation processing
+ */
+RAC_API rac_result_t rac_tool_call_validate_json(const rac_tool_call_t* call,
+                                                const char* tools_json,
+                                                rac_tool_call_validation_t* out_validation);
+
+/**
+ * @brief Validate a tool call from serialized generated proto bytes.
+ *
+ * Accepts a runanywhere.v1.ToolCallValidationRequest and returns a serialized
+ * runanywhere.v1.ToolCallValidationResult in out_result. This keeps SDK
+ * bridges on generated protobuf contracts while C++ owns portable validation.
+ *
+ * @param request_proto_bytes Borrowed ToolCallValidationRequest bytes.
+ * @param request_proto_size Size of request_proto_bytes.
+ * @param out_result Owned ToolCallValidationResult bytes or typed error.
+ * @return RAC_SUCCESS when out_result carries a serialized result.
+ */
+RAC_API rac_result_t rac_tool_call_validate_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Free tool call validation result
+ * @param validation Validation result to free
+ */
+RAC_API void rac_tool_call_validation_free(rac_tool_call_validation_t* validation);
 
 /**
  * @brief Free tool call result
@@ -321,6 +425,23 @@ RAC_API rac_result_t rac_tool_call_build_initial_prompt(const char* user_prompt,
 RAC_API rac_result_t rac_tool_call_build_followup_prompt(
     const char* original_user_prompt, const char* tools_prompt, const char* tool_name,
     const char* tool_result_json, rac_bool_t keep_tools_available, char** out_prompt);
+
+/**
+ * @brief Format tool prompts from serialized generated proto bytes.
+ *
+ * Accepts a runanywhere.v1.ToolPromptFormatRequest and returns a serialized
+ * runanywhere.v1.ToolPromptFormatResult in out_result. Native/Web SDKs should
+ * pass generated request bytes through to this API instead of duplicating
+ * protobuf parsing, tool-definition JSON conversion, or prompt-building logic.
+ *
+ * @param request_proto_bytes Borrowed ToolPromptFormatRequest bytes.
+ * @param request_proto_size Size of request_proto_bytes.
+ * @param out_result Owned ToolPromptFormatResult bytes or typed error.
+ * @return RAC_SUCCESS when out_result carries a serialized result.
+ */
+RAC_API rac_result_t rac_tool_call_format_prompt_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
 
 // =============================================================================
 // JSON UTILITY API - All JSON handling happens here

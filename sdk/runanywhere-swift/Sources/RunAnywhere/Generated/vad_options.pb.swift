@@ -19,6 +19,11 @@
 // Note: this file does NOT redefine VADEventType / VADEvent — those already
 // live in voice_events.proto and are imported here when needed.
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 import SwiftProtobuf
 
 // If the compiler emits an error on this type, it is because this file
@@ -82,6 +87,98 @@ public enum RASpeechActivityKind: SwiftProtobuf.Enum, Swift.CaseIterable {
     .speechStarted,
     .speechEnded,
     .ongoing,
+  ]
+
+}
+
+public enum RAVADAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case pcmF32Le // = 1
+  case pcmS16Le // = 2
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .pcmF32Le
+    case 2: self = .pcmS16Le
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .pcmF32Le: return 1
+    case .pcmS16Le: return 2
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAVADAudioEncoding] = [
+    .unspecified,
+    .pcmF32Le,
+    .pcmS16Le,
+  ]
+
+}
+
+public enum RAVADStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case started // = 1
+  case frame // = 2
+  case speechActivity // = 3
+  case statistics // = 4
+  case stopped // = 5
+  case error // = 6
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .started
+    case 2: self = .frame
+    case 3: self = .speechActivity
+    case 4: self = .statistics
+    case 5: self = .stopped
+    case 6: self = .error
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .started: return 1
+    case .frame: return 2
+    case .speechActivity: return 3
+    case .statistics: return 4
+    case .stopped: return 5
+    case .error: return 6
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RAVADStreamEventKind] = [
+    .unspecified,
+    .started,
+    .frame,
+    .speechActivity,
+    .statistics,
+    .stopped,
+    .error,
   ]
 
 }
@@ -211,9 +308,89 @@ public struct RAVADOptions: Sendable {
   /// 0 = backend/default.
   public var maxSpeechDurationMs: Int32 = 0
 
+  /// Whether to include VADStatistics in stream events when available.
+  public var includeStatistics: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+}
+
+public struct RAVADAudioSource: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var source: RAVADAudioSource.OneOf_Source? = nil
+
+  public var audioData: Data {
+    get {
+      if case .audioData(let v)? = source {return v}
+      return Data()
+    }
+    set {source = .audioData(newValue)}
+  }
+
+  public var adapterHandle: String {
+    get {
+      if case .adapterHandle(let v)? = source {return v}
+      return String()
+    }
+    set {source = .adapterHandle(newValue)}
+  }
+
+  public var encoding: RAVADAudioEncoding = .unspecified
+
+  public var sampleRate: Int32 = 0
+
+  public var channels: Int32 = 0
+
+  public var frameOffsetMs: Int64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public enum OneOf_Source: Equatable, Sendable {
+    case audioData(Data)
+    case adapterHandle(String)
+
+  }
+
+  public init() {}
+}
+
+public struct RAVADProcessRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var requestID: String = String()
+
+  public var audio: RAVADAudioSource {
+    get {_audio ?? RAVADAudioSource()}
+    set {_audio = newValue}
+  }
+  /// Returns true if `audio` has been explicitly set.
+  public var hasAudio: Bool {self._audio != nil}
+  /// Clears the value of `audio`. Subsequent reads from it will return its default value.
+  public mutating func clearAudio() {self._audio = nil}
+
+  public var options: RAVADOptions {
+    get {_options ?? RAVADOptions()}
+    set {_options = newValue}
+  }
+  /// Returns true if `options` has been explicitly set.
+  public var hasOptions: Bool {self._options != nil}
+  /// Clears the value of `options`. Subsequent reads from it will return its default value.
+  public mutating func clearOptions() {self._options = nil}
+
+  public var metadata: Dictionary<String,String> = [:]
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _audio: RAVADAudioSource? = nil
+  fileprivate var _options: RAVADOptions? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -235,36 +412,83 @@ public struct RAVADOptions: Sendable {
 ///     analyzed frame). Wall-clock timestamps belong on the carrying envelope
 ///     (e.g. VoiceEvent.timestamp_us in voice_events.proto).
 /// ---------------------------------------------------------------------------
-public struct RAVADResult: Sendable {
+public struct RAVADResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Whether speech was detected in this frame.
   /// Mirrors rac_vad_output_t::is_speech_detected.
-  public var isSpeech: Bool = false
+  public var isSpeech: Bool {
+    get {_storage._isSpeech}
+    set {_uniqueStorage()._isSpeech = newValue}
+  }
 
   /// Confidence / probability in [0.0, 1.0]. Backend-dependent.
-  public var confidence: Float = 0
+  public var confidence: Float {
+    get {_storage._confidence}
+    set {_uniqueStorage()._confidence = newValue}
+  }
 
   /// RMS energy level of the analyzed frame.
   /// Mirrors rac_vad_output_t::energy_level.
-  public var energy: Float = 0
+  public var energy: Float {
+    get {_storage._energy}
+    set {_uniqueStorage()._energy = newValue}
+  }
 
   /// Length of the analyzed frame in milliseconds.
-  public var durationMs: Int32 = 0
+  public var durationMs: Int32 {
+    get {_storage._durationMs}
+    set {_uniqueStorage()._durationMs = newValue}
+  }
 
   /// Wall-clock timestamp for this frame/result, in milliseconds since epoch.
-  public var timestampMs: Int64 = 0
+  public var timestampMs: Int64 {
+    get {_storage._timestampMs}
+    set {_uniqueStorage()._timestampMs = newValue}
+  }
 
   /// Optional detected segment start/end times, in milliseconds. 0 = unset.
-  public var startTimeMs: Int64 = 0
+  public var startTimeMs: Int64 {
+    get {_storage._startTimeMs}
+    set {_uniqueStorage()._startTimeMs = newValue}
+  }
 
-  public var endTimeMs: Int64 = 0
+  public var endTimeMs: Int64 {
+    get {_storage._endTimeMs}
+    set {_uniqueStorage()._endTimeMs = newValue}
+  }
+
+  /// Optional statistics snapshot and result-envelope error details.
+  public var statistics: RAVADStatistics {
+    get {_storage._statistics ?? RAVADStatistics()}
+    set {_uniqueStorage()._statistics = newValue}
+  }
+  /// Returns true if `statistics` has been explicitly set.
+  public var hasStatistics: Bool {_storage._statistics != nil}
+  /// Clears the value of `statistics`. Subsequent reads from it will return its default value.
+  public mutating func clearStatistics() {_uniqueStorage()._statistics = nil}
+
+  public var errorMessage: String {
+    get {_storage._errorMessage ?? String()}
+    set {_uniqueStorage()._errorMessage = newValue}
+  }
+  /// Returns true if `errorMessage` has been explicitly set.
+  public var hasErrorMessage: Bool {_storage._errorMessage != nil}
+  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
+  public mutating func clearErrorMessage() {_uniqueStorage()._errorMessage = nil}
+
+  public var errorCode: Int32 {
+    get {_storage._errorCode}
+    set {_uniqueStorage()._errorCode = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// ---------------------------------------------------------------------------
@@ -354,9 +578,148 @@ public struct RASpeechActivityEvent: Sendable {
   /// utterance length; left zero on SPEECH_STARTED.
   public var durationMs: Int32 = 0
 
+  public var confidence: Float = 0
+
+  public var result: RAVADResult {
+    get {_result ?? RAVADResult()}
+    set {_result = newValue}
+  }
+  /// Returns true if `result` has been explicitly set.
+  public var hasResult: Bool {self._result != nil}
+  /// Clears the value of `result`. Subsequent reads from it will return its default value.
+  public mutating func clearResult() {self._result = nil}
+
+  public var segmentID: String {
+    get {_segmentID ?? String()}
+    set {_segmentID = newValue}
+  }
+  /// Returns true if `segmentID` has been explicitly set.
+  public var hasSegmentID: Bool {self._segmentID != nil}
+  /// Clears the value of `segmentID`. Subsequent reads from it will return its default value.
+  public mutating func clearSegmentID() {self._segmentID = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _result: RAVADResult? = nil
+  fileprivate var _segmentID: String? = nil
+}
+
+public struct RAVADStreamEvent: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var seq: UInt64 {
+    get {_storage._seq}
+    set {_uniqueStorage()._seq = newValue}
+  }
+
+  public var timestampUs: Int64 {
+    get {_storage._timestampUs}
+    set {_uniqueStorage()._timestampUs = newValue}
+  }
+
+  public var requestID: String {
+    get {_storage._requestID}
+    set {_uniqueStorage()._requestID = newValue}
+  }
+
+  public var kind: RAVADStreamEventKind {
+    get {_storage._kind}
+    set {_uniqueStorage()._kind = newValue}
+  }
+
+  public var result: RAVADResult {
+    get {_storage._result ?? RAVADResult()}
+    set {_uniqueStorage()._result = newValue}
+  }
+  /// Returns true if `result` has been explicitly set.
+  public var hasResult: Bool {_storage._result != nil}
+  /// Clears the value of `result`. Subsequent reads from it will return its default value.
+  public mutating func clearResult() {_uniqueStorage()._result = nil}
+
+  public var activity: RASpeechActivityEvent {
+    get {_storage._activity ?? RASpeechActivityEvent()}
+    set {_uniqueStorage()._activity = newValue}
+  }
+  /// Returns true if `activity` has been explicitly set.
+  public var hasActivity: Bool {_storage._activity != nil}
+  /// Clears the value of `activity`. Subsequent reads from it will return its default value.
+  public mutating func clearActivity() {_uniqueStorage()._activity = nil}
+
+  public var statistics: RAVADStatistics {
+    get {_storage._statistics ?? RAVADStatistics()}
+    set {_uniqueStorage()._statistics = newValue}
+  }
+  /// Returns true if `statistics` has been explicitly set.
+  public var hasStatistics: Bool {_storage._statistics != nil}
+  /// Clears the value of `statistics`. Subsequent reads from it will return its default value.
+  public mutating func clearStatistics() {_uniqueStorage()._statistics = nil}
+
+  public var errorMessage: String {
+    get {_storage._errorMessage ?? String()}
+    set {_uniqueStorage()._errorMessage = newValue}
+  }
+  /// Returns true if `errorMessage` has been explicitly set.
+  public var hasErrorMessage: Bool {_storage._errorMessage != nil}
+  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
+  public mutating func clearErrorMessage() {_uniqueStorage()._errorMessage = nil}
+
+  public var errorCode: Int32 {
+    get {_storage._errorCode}
+    set {_uniqueStorage()._errorCode = newValue}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public struct RAVADServiceState: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var isReady: Bool = false
+
+  public var isSpeechActive: Bool = false
+
+  public var energyThreshold: Float = 0
+
+  public var sampleRate: Int32 = 0
+
+  public var frameLengthMs: Int32 = 0
+
+  public var currentModel: String {
+    get {_currentModel ?? String()}
+    set {_currentModel = newValue}
+  }
+  /// Returns true if `currentModel` has been explicitly set.
+  public var hasCurrentModel: Bool {self._currentModel != nil}
+  /// Clears the value of `currentModel`. Subsequent reads from it will return its default value.
+  public mutating func clearCurrentModel() {self._currentModel = nil}
+
+  public var errorMessage: String {
+    get {_errorMessage ?? String()}
+    set {_errorMessage = newValue}
+  }
+  /// Returns true if `errorMessage` has been explicitly set.
+  public var hasErrorMessage: Bool {self._errorMessage != nil}
+  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
+  public mutating func clearErrorMessage() {self._errorMessage = nil}
+
+  public var errorCode: Int32 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _currentModel: String? = nil
+  fileprivate var _errorMessage: String? = nil
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -365,6 +728,14 @@ fileprivate let _protobuf_package = "runanywhere.v1"
 
 extension RASpeechActivityKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0SPEECH_ACTIVITY_KIND_UNSPECIFIED\0\u{1}SPEECH_ACTIVITY_KIND_SPEECH_STARTED\0\u{1}SPEECH_ACTIVITY_KIND_SPEECH_ENDED\0\u{1}SPEECH_ACTIVITY_KIND_ONGOING\0")
+}
+
+extension RAVADAudioEncoding: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VAD_AUDIO_ENCODING_UNSPECIFIED\0\u{1}VAD_AUDIO_ENCODING_PCM_F32_LE\0\u{1}VAD_AUDIO_ENCODING_PCM_S16_LE\0")
+}
+
+extension RAVADStreamEventKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VAD_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}VAD_STREAM_EVENT_KIND_STARTED\0\u{1}VAD_STREAM_EVENT_KIND_FRAME\0\u{1}VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY\0\u{1}VAD_STREAM_EVENT_KIND_STATISTICS\0\u{1}VAD_STREAM_EVENT_KIND_STOPPED\0\u{1}VAD_STREAM_EVENT_KIND_ERROR\0")
 }
 
 extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -448,7 +819,7 @@ extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
 
 extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".VADOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}threshold\0\u{3}min_speech_duration_ms\0\u{3}min_silence_duration_ms\0\u{3}max_speech_duration_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}threshold\0\u{3}min_speech_duration_ms\0\u{3}min_silence_duration_ms\0\u{3}max_speech_duration_ms\0\u{3}include_statistics\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -460,6 +831,7 @@ extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
       case 2: try { try decoder.decodeSingularInt32Field(value: &self.minSpeechDurationMs) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.minSilenceDurationMs) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.maxSpeechDurationMs) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.includeStatistics) }()
       default: break
       }
     }
@@ -478,6 +850,9 @@ extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     if self.maxSpeechDurationMs != 0 {
       try visitor.visitSingularInt32Field(value: self.maxSpeechDurationMs, fieldNumber: 4)
     }
+    if self.includeStatistics != false {
+      try visitor.visitSingularBoolField(value: self.includeStatistics, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -486,14 +861,15 @@ extension RAVADOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     if lhs.minSpeechDurationMs != rhs.minSpeechDurationMs {return false}
     if lhs.minSilenceDurationMs != rhs.minSilenceDurationMs {return false}
     if lhs.maxSpeechDurationMs != rhs.maxSpeechDurationMs {return false}
+    if lhs.includeStatistics != rhs.includeStatistics {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".VADResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_speech\0\u{1}confidence\0\u{1}energy\0\u{3}duration_ms\0\u{3}timestamp_ms\0\u{3}start_time_ms\0\u{3}end_time_ms\0")
+extension RAVADAudioSource: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VADAudioSource"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_data\0\u{3}adapter_handle\0\u{1}encoding\0\u{3}sample_rate\0\u{1}channels\0\u{3}frame_offset_ms\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -501,51 +877,250 @@ extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBoolField(value: &self.isSpeech) }()
-      case 2: try { try decoder.decodeSingularFloatField(value: &self.confidence) }()
-      case 3: try { try decoder.decodeSingularFloatField(value: &self.energy) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.durationMs) }()
-      case 5: try { try decoder.decodeSingularInt64Field(value: &self.timestampMs) }()
-      case 6: try { try decoder.decodeSingularInt64Field(value: &self.startTimeMs) }()
-      case 7: try { try decoder.decodeSingularInt64Field(value: &self.endTimeMs) }()
+      case 1: try {
+        var v: Data?
+        try decoder.decodeSingularBytesField(value: &v)
+        if let v = v {
+          if self.source != nil {try decoder.handleConflictingOneOf()}
+          self.source = .audioData(v)
+        }
+      }()
+      case 2: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.source != nil {try decoder.handleConflictingOneOf()}
+          self.source = .adapterHandle(v)
+        }
+      }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.encoding) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
+      case 5: try { try decoder.decodeSingularInt32Field(value: &self.channels) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self.frameOffsetMs) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.isSpeech != false {
-      try visitor.visitSingularBoolField(value: self.isSpeech, fieldNumber: 1)
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    switch self.source {
+    case .audioData?: try {
+      guard case .audioData(let v)? = self.source else { preconditionFailure() }
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
+    }()
+    case .adapterHandle?: try {
+      guard case .adapterHandle(let v)? = self.source else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    }()
+    case nil: break
     }
-    if self.confidence.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.confidence, fieldNumber: 2)
+    if self.encoding != .unspecified {
+      try visitor.visitSingularEnumField(value: self.encoding, fieldNumber: 3)
     }
-    if self.energy.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.energy, fieldNumber: 3)
+    if self.sampleRate != 0 {
+      try visitor.visitSingularInt32Field(value: self.sampleRate, fieldNumber: 4)
     }
-    if self.durationMs != 0 {
-      try visitor.visitSingularInt32Field(value: self.durationMs, fieldNumber: 4)
+    if self.channels != 0 {
+      try visitor.visitSingularInt32Field(value: self.channels, fieldNumber: 5)
     }
-    if self.timestampMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.timestampMs, fieldNumber: 5)
+    if self.frameOffsetMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.frameOffsetMs, fieldNumber: 6)
     }
-    if self.startTimeMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.startTimeMs, fieldNumber: 6)
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAVADAudioSource, rhs: RAVADAudioSource) -> Bool {
+    if lhs.source != rhs.source {return false}
+    if lhs.encoding != rhs.encoding {return false}
+    if lhs.sampleRate != rhs.sampleRate {return false}
+    if lhs.channels != rhs.channels {return false}
+    if lhs.frameOffsetMs != rhs.frameOffsetMs {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAVADProcessRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VADProcessRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}audio\0\u{1}options\0\u{1}metadata\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._audio) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._options) }()
+      case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
+      default: break
+      }
     }
-    if self.endTimeMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.endTimeMs, fieldNumber: 7)
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.requestID.isEmpty {
+      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 1)
+    }
+    try { if let v = self._audio {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._options {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    if !self.metadata.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAVADProcessRequest, rhs: RAVADProcessRequest) -> Bool {
+    if lhs.requestID != rhs.requestID {return false}
+    if lhs._audio != rhs._audio {return false}
+    if lhs._options != rhs._options {return false}
+    if lhs.metadata != rhs.metadata {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAVADResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VADResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_speech\0\u{1}confidence\0\u{1}energy\0\u{3}duration_ms\0\u{3}timestamp_ms\0\u{3}start_time_ms\0\u{3}end_time_ms\0\u{1}statistics\0\u{3}error_message\0\u{3}error_code\0")
+
+  fileprivate class _StorageClass {
+    var _isSpeech: Bool = false
+    var _confidence: Float = 0
+    var _energy: Float = 0
+    var _durationMs: Int32 = 0
+    var _timestampMs: Int64 = 0
+    var _startTimeMs: Int64 = 0
+    var _endTimeMs: Int64 = 0
+    var _statistics: RAVADStatistics? = nil
+    var _errorMessage: String? = nil
+    var _errorCode: Int32 = 0
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _isSpeech = source._isSpeech
+      _confidence = source._confidence
+      _energy = source._energy
+      _durationMs = source._durationMs
+      _timestampMs = source._timestampMs
+      _startTimeMs = source._startTimeMs
+      _endTimeMs = source._endTimeMs
+      _statistics = source._statistics
+      _errorMessage = source._errorMessage
+      _errorCode = source._errorCode
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularBoolField(value: &_storage._isSpeech) }()
+        case 2: try { try decoder.decodeSingularFloatField(value: &_storage._confidence) }()
+        case 3: try { try decoder.decodeSingularFloatField(value: &_storage._energy) }()
+        case 4: try { try decoder.decodeSingularInt32Field(value: &_storage._durationMs) }()
+        case 5: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampMs) }()
+        case 6: try { try decoder.decodeSingularInt64Field(value: &_storage._startTimeMs) }()
+        case 7: try { try decoder.decodeSingularInt64Field(value: &_storage._endTimeMs) }()
+        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._statistics) }()
+        case 9: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
+        case 10: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCode) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._isSpeech != false {
+        try visitor.visitSingularBoolField(value: _storage._isSpeech, fieldNumber: 1)
+      }
+      if _storage._confidence.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._confidence, fieldNumber: 2)
+      }
+      if _storage._energy.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._energy, fieldNumber: 3)
+      }
+      if _storage._durationMs != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._durationMs, fieldNumber: 4)
+      }
+      if _storage._timestampMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._timestampMs, fieldNumber: 5)
+      }
+      if _storage._startTimeMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._startTimeMs, fieldNumber: 6)
+      }
+      if _storage._endTimeMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._endTimeMs, fieldNumber: 7)
+      }
+      try { if let v = _storage._statistics {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
+      try { if let v = _storage._errorMessage {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 9)
+      } }()
+      if _storage._errorCode != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._errorCode, fieldNumber: 10)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAVADResult, rhs: RAVADResult) -> Bool {
-    if lhs.isSpeech != rhs.isSpeech {return false}
-    if lhs.confidence != rhs.confidence {return false}
-    if lhs.energy != rhs.energy {return false}
-    if lhs.durationMs != rhs.durationMs {return false}
-    if lhs.timestampMs != rhs.timestampMs {return false}
-    if lhs.startTimeMs != rhs.startTimeMs {return false}
-    if lhs.endTimeMs != rhs.endTimeMs {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._isSpeech != rhs_storage._isSpeech {return false}
+        if _storage._confidence != rhs_storage._confidence {return false}
+        if _storage._energy != rhs_storage._energy {return false}
+        if _storage._durationMs != rhs_storage._durationMs {return false}
+        if _storage._timestampMs != rhs_storage._timestampMs {return false}
+        if _storage._startTimeMs != rhs_storage._startTimeMs {return false}
+        if _storage._endTimeMs != rhs_storage._endTimeMs {return false}
+        if _storage._statistics != rhs_storage._statistics {return false}
+        if _storage._errorMessage != rhs_storage._errorMessage {return false}
+        if _storage._errorCode != rhs_storage._errorCode {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -623,7 +1198,7 @@ extension RAVADStatistics: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
 
 extension RASpeechActivityEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".SpeechActivityEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}event_type\0\u{3}timestamp_ms\0\u{3}duration_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}event_type\0\u{3}timestamp_ms\0\u{3}duration_ms\0\u{1}confidence\0\u{1}result\0\u{3}segment_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -634,12 +1209,19 @@ extension RASpeechActivityEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
       case 1: try { try decoder.decodeSingularEnumField(value: &self.eventType) }()
       case 2: try { try decoder.decodeSingularInt64Field(value: &self.timestampMs) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.durationMs) }()
+      case 4: try { try decoder.decodeSingularFloatField(value: &self.confidence) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._result) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._segmentID) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if self.eventType != .unspecified {
       try visitor.visitSingularEnumField(value: self.eventType, fieldNumber: 1)
     }
@@ -649,6 +1231,15 @@ extension RASpeechActivityEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     if self.durationMs != 0 {
       try visitor.visitSingularInt32Field(value: self.durationMs, fieldNumber: 3)
     }
+    if self.confidence.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.confidence, fieldNumber: 4)
+    }
+    try { if let v = self._result {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._segmentID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -656,6 +1247,204 @@ extension RASpeechActivityEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     if lhs.eventType != rhs.eventType {return false}
     if lhs.timestampMs != rhs.timestampMs {return false}
     if lhs.durationMs != rhs.durationMs {return false}
+    if lhs.confidence != rhs.confidence {return false}
+    if lhs._result != rhs._result {return false}
+    if lhs._segmentID != rhs._segmentID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAVADStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VADStreamEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}result\0\u{1}activity\0\u{1}statistics\0\u{3}error_message\0\u{3}error_code\0")
+
+  fileprivate class _StorageClass {
+    var _seq: UInt64 = 0
+    var _timestampUs: Int64 = 0
+    var _requestID: String = String()
+    var _kind: RAVADStreamEventKind = .unspecified
+    var _result: RAVADResult? = nil
+    var _activity: RASpeechActivityEvent? = nil
+    var _statistics: RAVADStatistics? = nil
+    var _errorMessage: String? = nil
+    var _errorCode: Int32 = 0
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _seq = source._seq
+      _timestampUs = source._timestampUs
+      _requestID = source._requestID
+      _kind = source._kind
+      _result = source._result
+      _activity = source._activity
+      _statistics = source._statistics
+      _errorMessage = source._errorMessage
+      _errorCode = source._errorCode
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularUInt64Field(value: &_storage._seq) }()
+        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
+        case 4: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
+        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._result) }()
+        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._activity) }()
+        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._statistics) }()
+        case 8: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
+        case 9: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCode) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._seq != 0 {
+        try visitor.visitSingularUInt64Field(value: _storage._seq, fieldNumber: 1)
+      }
+      if _storage._timestampUs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._timestampUs, fieldNumber: 2)
+      }
+      if !_storage._requestID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._requestID, fieldNumber: 3)
+      }
+      if _storage._kind != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._kind, fieldNumber: 4)
+      }
+      try { if let v = _storage._result {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+      } }()
+      try { if let v = _storage._activity {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._statistics {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+      } }()
+      try { if let v = _storage._errorMessage {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+      } }()
+      if _storage._errorCode != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._errorCode, fieldNumber: 9)
+      }
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAVADStreamEvent, rhs: RAVADStreamEvent) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._seq != rhs_storage._seq {return false}
+        if _storage._timestampUs != rhs_storage._timestampUs {return false}
+        if _storage._requestID != rhs_storage._requestID {return false}
+        if _storage._kind != rhs_storage._kind {return false}
+        if _storage._result != rhs_storage._result {return false}
+        if _storage._activity != rhs_storage._activity {return false}
+        if _storage._statistics != rhs_storage._statistics {return false}
+        if _storage._errorMessage != rhs_storage._errorMessage {return false}
+        if _storage._errorCode != rhs_storage._errorCode {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAVADServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VADServiceState"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{3}is_speech_active\0\u{3}energy_threshold\0\u{3}sample_rate\0\u{3}frame_length_ms\0\u{3}current_model\0\u{3}error_message\0\u{3}error_code\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.isReady) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.isSpeechActive) }()
+      case 3: try { try decoder.decodeSingularFloatField(value: &self.energyThreshold) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
+      case 5: try { try decoder.decodeSingularInt32Field(value: &self.frameLengthMs) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self._currentModel) }()
+      case 7: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
+      case 8: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.isReady != false {
+      try visitor.visitSingularBoolField(value: self.isReady, fieldNumber: 1)
+    }
+    if self.isSpeechActive != false {
+      try visitor.visitSingularBoolField(value: self.isSpeechActive, fieldNumber: 2)
+    }
+    if self.energyThreshold.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.energyThreshold, fieldNumber: 3)
+    }
+    if self.sampleRate != 0 {
+      try visitor.visitSingularInt32Field(value: self.sampleRate, fieldNumber: 4)
+    }
+    if self.frameLengthMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.frameLengthMs, fieldNumber: 5)
+    }
+    try { if let v = self._currentModel {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+    } }()
+    try { if let v = self._errorMessage {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+    } }()
+    if self.errorCode != 0 {
+      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 8)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAVADServiceState, rhs: RAVADServiceState) -> Bool {
+    if lhs.isReady != rhs.isReady {return false}
+    if lhs.isSpeechActive != rhs.isSpeechActive {return false}
+    if lhs.energyThreshold != rhs.energyThreshold {return false}
+    if lhs.sampleRate != rhs.sampleRate {return false}
+    if lhs.frameLengthMs != rhs.frameLengthMs {return false}
+    if lhs._currentModel != rhs._currentModel {return false}
+    if lhs._errorMessage != rhs._errorMessage {return false}
+    if lhs.errorCode != rhs.errorCode {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -390,8 +390,13 @@ sdk/runanywhere-kotlin/src/androidMain/jniLibs/
 
 # Commons - Build artifacts and third-party dependencies
 sdk/runanywhere-commons/build/
+sdk/runanywhere-commons/build_audit/
 sdk/runanywhere-commons/dist/
 sdk/runanywhere-commons/third_party/
+
+# clangd index/cache
+.cache/clangd/
+**/.cache/clangd/
 
 # React Native - Local builds
 sdk/runanywhere-react-native/packages/*/prebuilt/

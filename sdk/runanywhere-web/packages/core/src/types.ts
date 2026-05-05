@@ -6,7 +6,7 @@
  * truth for cross-SDK shapes is `@runanywhere/proto-ts/*`.
  */
 
-import type { DownloadProgress } from './Infrastructure/ModelRegistry';
+import type { DownloadProgress } from '@runanywhere/proto-ts/download_service';
 
 export type { DownloadProgress };
 
@@ -15,7 +15,6 @@ export type { DownloadProgress };
 export * from './types/index';
 
 import type { SDKInitOptions } from './types/models';
-import type { CompactModelDef, ManagedModel } from './Infrastructure/ModelManager';
 import type {
   STTTranscribeOptions,
   STTTranscriptionResult,
@@ -36,7 +35,7 @@ export type SynthesisOptions = TTSSynthesizeOptions;
 
 
 export type { ChatMessage } from '@runanywhere/proto-ts/chat';
-export { MessageRole } from '@runanywhere/proto-ts/chat';
+export { ChatMessageStatus, MessageRole } from '@runanywhere/proto-ts/chat';
 export { ModelArtifactType } from '@runanywhere/proto-ts/model_types';
 
 
@@ -47,20 +46,5 @@ export { ModelArtifactType } from '@runanywhere/proto-ts/model_types';
 export interface IRunAnywhere {
   initialize(options: SDKInitOptions): Promise<void>;
   readonly isInitialized: boolean;
-  registerModel(model: CompactModelDef): void;
-  unregisterModel(modelId: string): void;
-  availableModels(): ManagedModel[];
-  getModel(modelId: string): ManagedModel | undefined;
-  downloadModel(modelId: string, onProgress?: (p: DownloadProgress) => void): Promise<void>;
-  cancelDownload(modelId: string): boolean;
-  deleteModel(modelId: string): Promise<void>;
-  deleteAllModels(): Promise<void>;
-  refreshModelRegistry(options?: {
-    includeRemoteCatalog?: boolean;
-    rescanLocal?: boolean;
-    pruneOrphans?: boolean;
-  }): boolean;
-  loadModel(modelId: string): Promise<boolean>;
-  unloadAll(): Promise<void>;
   shutdown(): void;
 }

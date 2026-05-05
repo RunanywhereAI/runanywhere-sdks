@@ -763,6 +763,117 @@ static TestResult test_proto_plan_invalid_url() {
     return r;
 }
 
+static TestResult test_proto_plan_resume_metadata() {
+    TestResult r;
+    r.test_name = "proto_plan_resume_metadata";
+
+    std::string base_dir = create_temp_dir("proto_resume_meta");
+    ASSERT_TRUE(!base_dir.empty(), "Failed to create temp dir");
+    rac_model_paths_set_base_dir(base_dir.c_str());
+
+    const std::string model_id = "proto-model-resume-meta";
+    const std::string model_url = "http://fake/success/model.gguf";
+    char destination[4096];
+    rac_bool_t needs_extraction = RAC_FALSE;
+    ASSERT_TRUE(rac_download_compute_destination(model_id.c_str(), model_url.c_str(),
+                                                  RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF,
+                                                  destination, sizeof(destination),
+                                                  &needs_extraction) == RAC_SUCCESS,
+                "Destination should compute");
+    std::string dest_path(destination);
+    auto slash = dest_path.rfind('/');
+    if (slash != std::string::npos) {
+        mkdir_p(dest_path.substr(0, slash));
+    }
+    write_dummy_file(dest_path, std::string(128, 'p'));
+
+    rav1::DownloadPlanRequest request;
+    request.set_model_id(model_id);
+    *request.mutable_model() = make_download_model(model_id, model_url, 1024);
+    request.mutable_model()->set_checksum_sha256(std::string(64, 'a'));
+    request.set_resume_existing(true);
+    request.set_validate_existing_bytes(true);
+    request.set_verify_checksums(true);
+    request.set_storage_namespace("cpp04");
+    request.set_required_free_bytes_after_download(256);
+    request.set_available_storage_bytes(2048);
+    std::string bytes = serialize_msg(request);
+
+    rac_proto_buffer_t buffer;
+    rac_proto_buffer_init(&buffer);
+    ASSERT_TRUE(rac_download_plan_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
+                                        bytes.size(), &buffer) == RAC_SUCCESS,
+                "Plan call should succeed");
+    rav1::DownloadPlanResult plan;
+    ASSERT_TRUE(parse_plan(buffer, &plan), "Plan should parse");
+    rac_proto_buffer_free(&buffer);
+
+    ASSERT_TRUE(plan.can_start(), "Validated partial bytes should be startable");
+    ASSERT_TRUE(plan.can_resume(), "Plan should be resumable");
+    ASSERT_TRUE(plan.resume_from_bytes() == 128, "Resume offset should match partial bytes");
+    ASSERT_TRUE(!plan.resume_token().empty(), "Plan should include a logical resume token");
+    ASSERT_TRUE(plan.storage_namespace() == "cpp04", "Plan should preserve namespace");
+    ASSERT_TRUE(plan.required_free_bytes_after_download() == 256,
+                "Plan should preserve post-download free-space requirement");
+    ASSERT_TRUE(plan.files_size() == 1, "Plan should include one file");
+    ASSERT_TRUE(plan.files(0).is_resume_candidate(), "File should be marked resumable");
+    ASSERT_TRUE(plan.files(0).checksum_sha256() == std::string(64, 'a'),
+                "Plan should carry checksum validation metadata");
+
+    remove_dir(base_dir);
+    r.passed = true;
+    return r;
+}
+
+static TestResult test_proto_plan_rejects_invalid_existing_bytes() {
+    TestResult r;
+    r.test_name = "proto_plan_rejects_invalid_existing_bytes";
+
+    std::string base_dir = create_temp_dir("proto_bad_existing");
+    ASSERT_TRUE(!base_dir.empty(), "Failed to create temp dir");
+    rac_model_paths_set_base_dir(base_dir.c_str());
+
+    const std::string model_id = "proto-model-bad-existing";
+    const std::string model_url = "http://fake/success/model.gguf";
+    char destination[4096];
+    rac_bool_t needs_extraction = RAC_FALSE;
+    ASSERT_TRUE(rac_download_compute_destination(model_id.c_str(), model_url.c_str(),
+                                                  RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF,
+                                                  destination, sizeof(destination),
+                                                  &needs_extraction) == RAC_SUCCESS,
+                "Destination should compute");
+    std::string dest_path(destination);
+    auto slash = dest_path.rfind('/');
+    if (slash != std::string::npos) {
+        mkdir_p(dest_path.substr(0, slash));
+    }
+    write_dummy_file(dest_path, std::string(256, 'p'));
+
+    rav1::DownloadPlanRequest request;
+    request.set_model_id(model_id);
+    *request.mutable_model() = make_download_model(model_id, model_url, 128);
+    request.set_resume_existing(true);
+    request.set_validate_existing_bytes(true);
+    std::string bytes = serialize_msg(request);
+
+    rac_proto_buffer_t buffer;
+    rac_proto_buffer_init(&buffer);
+    ASSERT_TRUE(rac_download_plan_proto(reinterpret_cast<const uint8_t*>(bytes.data()),
+                                        bytes.size(), &buffer) == RAC_SUCCESS,
+                "Plan call should return a result proto");
+    rav1::DownloadPlanResult plan;
+    ASSERT_TRUE(parse_plan(buffer, &plan), "Plan should parse");
+    rac_proto_buffer_free(&buffer);
+
+    ASSERT_TRUE(!plan.can_start(), "Oversized partial bytes should be rejected");
+    ASSERT_TRUE(plan.error_message().find("existing") != std::string::npos,
+                "Error should describe existing-byte validation");
+
+    remove_dir(base_dir);
+    r.passed = true;
+    return r;
+}
+
 static TestResult test_proto_start_no_adapter() {
     TestResult r;
     r.test_name = "proto_start_no_adapter";
@@ -809,6 +920,9 @@ static TestResult test_proto_start_progress_callback_complete() {
     rav1::DownloadStartResult start;
     ASSERT_TRUE(start_from_plan(plan, false, &start), "Start should serialize and parse");
     ASSERT_TRUE(start.accepted(), "Start should be accepted");
+    ASSERT_TRUE(!start.resume_token().empty(), "Start should return a logical resume token");
+    ASSERT_TRUE(start.initial_progress().resume_token() == start.resume_token(),
+                "Initial progress should carry the same resume token");
     ASSERT_TRUE(wait_for_any_progress(&capture), "Progress callback should fire");
 
     rav1::DownloadProgress terminal;
@@ -816,6 +930,11 @@ static TestResult test_proto_start_progress_callback_complete() {
     ASSERT_TRUE(terminal.state() == rav1::DOWNLOAD_STATE_COMPLETED,
                 "Download should complete successfully");
     ASSERT_TRUE(!terminal.local_path().empty(), "Completed progress should include local_path");
+    ASSERT_TRUE(terminal.overall_progress() == 1.0f,
+                "Completed progress should report overall progress");
+    ASSERT_TRUE(!terminal.resume_token().empty(), "Completed progress should preserve resume token");
+    ASSERT_TRUE(terminal.updated_at_unix_ms() >= terminal.started_at_unix_ms(),
+                "Progress timestamps should be populated");
 
     std::ifstream in(terminal.local_path(), std::ios::binary);
     std::vector<uint8_t> downloaded((std::istreambuf_iterator<char>(in)),
@@ -864,12 +983,21 @@ static TestResult test_proto_cancel_resume() {
     rav1::DownloadCancelResult cancel_result;
     ASSERT_TRUE(parse_cancel(cancel_buffer, &cancel_result), "Cancel result should parse");
     ASSERT_TRUE(cancel_result.success(), "Cancel result should report success");
+    ASSERT_TRUE(cancel_result.was_running(), "Cancel should observe a running task");
+    ASSERT_TRUE(cancel_result.partial_bytes_preserved(),
+                "Cancel without deletion should preserve partial bytes");
+    ASSERT_TRUE(!cancel_result.resume_token().empty(),
+                "Cancel result should preserve the resume token");
     rac_proto_buffer_free(&cancel_buffer);
 
     rav1::DownloadProgress cancelled;
     ASSERT_TRUE(wait_for_terminal(start.task_id(), &cancelled), "Cancelled task should terminal");
     ASSERT_TRUE(cancelled.state() == rav1::DOWNLOAD_STATE_CANCELLED,
                 "Task should be cancelled, not completed");
+    ASSERT_TRUE(cancelled.bytes_downloaded() > 0,
+                "Cancelled progress should preserve partial byte count");
+    ASSERT_TRUE(cancelled.resume_token() == cancel_result.resume_token(),
+                "Cancelled progress should carry the resume token");
 
     int64_t partial_size = 0;
     if (plan.files_size() > 0) {
@@ -879,9 +1007,30 @@ static TestResult test_proto_cancel_resume() {
     ASSERT_TRUE(partial_size > 0 && partial_size < static_cast<int64_t>(fake.payload.size()),
                 "Cancel should leave partial bytes for resume");
 
+    rav1::DownloadResumeRequest stale_resume;
+    stale_resume.set_task_id(start.task_id());
+    stale_resume.set_resume_token(cancel_result.resume_token());
+    stale_resume.set_resume_from_bytes(partial_size + 8192);
+    stale_resume.set_validate_partial_bytes(true);
+    std::string stale_resume_bytes = serialize_msg(stale_resume);
+    rac_proto_buffer_t stale_resume_buffer;
+    rac_proto_buffer_init(&stale_resume_buffer);
+    ASSERT_TRUE(rac_download_resume_proto(
+                    reinterpret_cast<const uint8_t*>(stale_resume_bytes.data()),
+                    stale_resume_bytes.size(), &stale_resume_buffer) == RAC_SUCCESS,
+                "Stale resume call should return a result proto");
+    rav1::DownloadResumeResult stale_resume_result;
+    ASSERT_TRUE(parse_resume(stale_resume_buffer, &stale_resume_result),
+                "Stale resume result should parse");
+    ASSERT_TRUE(!stale_resume_result.accepted(),
+                "Stale resume offset should be rejected when validation is requested");
+    rac_proto_buffer_free(&stale_resume_buffer);
+
     rav1::DownloadResumeRequest resume;
     resume.set_task_id(start.task_id());
+    resume.set_resume_token(cancel_result.resume_token());
     resume.set_resume_from_bytes(partial_size);
+    resume.set_validate_partial_bytes(true);
     std::string resume_bytes = serialize_msg(resume);
     rac_proto_buffer_t resume_buffer;
     rac_proto_buffer_init(&resume_buffer);
@@ -891,6 +1040,10 @@ static TestResult test_proto_cancel_resume() {
     rav1::DownloadResumeResult resume_result;
     ASSERT_TRUE(parse_resume(resume_buffer, &resume_result), "Resume result should parse");
     ASSERT_TRUE(resume_result.accepted(), "Resume should be accepted");
+    ASSERT_TRUE(resume_result.resume_token() == cancel_result.resume_token(),
+                "Resume should preserve the logical resume token");
+    ASSERT_TRUE(resume_result.initial_progress().bytes_downloaded() == partial_size,
+                "Resume initial progress should preserve partial byte count");
     rac_proto_buffer_free(&resume_buffer);
 
     rav1::DownloadProgress completed;
@@ -929,6 +1082,7 @@ static TestResult test_proto_failed_transfer_no_stale_completion() {
     ASSERT_TRUE(terminal.state() == rav1::DOWNLOAD_STATE_FAILED,
                 "Failed transfer must not be marked completed");
     ASSERT_TRUE(terminal.local_path().empty(), "Failed transfer should not publish final path");
+    ASSERT_TRUE(!terminal.resume_token().empty(), "Failed progress should preserve resume token");
 
     remove_dir(base_dir);
     r.passed = true;
@@ -969,6 +1123,9 @@ int main(int argc, char** argv) {
     // proto-byte workflow ABI
     suite.add("proto_plan_single_file", test_proto_plan_single_file);
     suite.add("proto_plan_invalid_url", test_proto_plan_invalid_url);
+    suite.add("proto_plan_resume_metadata", test_proto_plan_resume_metadata);
+    suite.add("proto_plan_rejects_invalid_existing_bytes",
+              test_proto_plan_rejects_invalid_existing_bytes);
     suite.add("proto_start_no_adapter", test_proto_start_no_adapter);
     suite.add("proto_start_progress_callback_complete",
               test_proto_start_progress_callback_complete);

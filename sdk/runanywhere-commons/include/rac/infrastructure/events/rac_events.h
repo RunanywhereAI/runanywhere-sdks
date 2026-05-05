@@ -1,17 +1,38 @@
 /**
  * @file rac_events.h
- * @brief RunAnywhere Commons - Event Publishing and Subscription
+ * @brief RunAnywhere Commons - Internal lower-level category event publisher.
  *
- * C port of Swift's SDKEvent protocol and EventPublisher from:
- * Sources/RunAnywhere/Infrastructure/Events/SDKEvent.swift
- * Sources/RunAnywhere/Infrastructure/Events/EventPublisher.swift
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal`.
  *
- * Events are categorized and can be routed to different destinations
- * (public EventBus or analytics).
+ * Lock-copy-dispatch category-keyed pub/sub used inside commons by lifecycle
+ * manager, storage analyzer, device manager, and engine plugins for
+ * fine-grained backend telemetry breadcrumbs. It is NOT the SDK-facing event
+ * surface. SDK consumers MUST use the canonical SDKEvent proto-byte stream in
+ * `rac/infrastructure/events/rac_sdk_event_stream.h`.
+ *
+ * Coexistence:
+ *   - `rac_event_publish` / `rac_event_subscribe` carry the older
+ *     `rac_event_t` struct (string `type`, JSON `properties_json`).
+ *   - `rac_sdk_event_publish_proto` carries serialized `runanywhere.v1.SDKEvent`
+ *     bytes. This is the canonical SDK surface.
+ *
+ * Bridge: components that already emit through this channel ALSO emit a
+ * canonical SDKEvent through `rac_sdk_event_publish_proto`. The legacy struct
+ * stream stays alive only for engine-internal breadcrumbs that are still being
+ * migrated to typed proto fields under `SDKEvent.telemetry`.
  */
 
 #ifndef RAC_EVENTS_H
 #define RAC_EVENTS_H
+
+// ---------------------------------------------------------------------------
+// Internal-use guard. Defined automatically when commons or engines build
+// against the C++ source tree. Public SDK headers MUST NOT include this file.
+// ---------------------------------------------------------------------------
+#if !defined(RAC_ALLOW_INTERNAL_EVENTS) && !defined(RAC_BUILDING_COMMONS) &&    \
+    !defined(RAC_INTERNAL_TRANSLATION_UNIT)
+#warning "rac_events.h is an internal commons header. Public SDK code must subscribe to canonical SDKEvent bytes via rac_sdk_event_stream.h. Define RAC_ALLOW_INTERNAL_EVENTS only inside engine plugins or commons internals."
+#endif
 
 #include "rac/core/rac_types.h"
 

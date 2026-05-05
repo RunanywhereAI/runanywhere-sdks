@@ -27,6 +27,64 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
+public enum RALLMStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case started // = 1
+  case token // = 2
+  case thinking // = 3
+  case toolCall // = 4
+  case progress // = 5
+  case completed // = 6
+  case error // = 7
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .started
+    case 2: self = .token
+    case 3: self = .thinking
+    case 4: self = .toolCall
+    case 5: self = .progress
+    case 6: self = .completed
+    case 7: self = .error
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .started: return 1
+    case .token: return 2
+    case .thinking: return 3
+    case .toolCall: return 4
+    case .progress: return 5
+    case .completed: return 6
+    case .error: return 7
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RALLMStreamEventKind] = [
+    .unspecified,
+    .started,
+    .token,
+    .thinking,
+    .toolCall,
+    .progress,
+    .completed,
+    .error,
+  ]
+
+}
+
 public enum RALLMTokenKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -69,43 +127,144 @@ public enum RALLMTokenKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public struct RALLMGenerateRequest: Sendable {
+public struct RALLMGenerateRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var prompt: String = String()
+  public var prompt: String {
+    get {_storage._prompt}
+    set {_uniqueStorage()._prompt = newValue}
+  }
 
-  public var maxTokens: Int32 = 0
+  public var maxTokens: Int32 {
+    get {_storage._maxTokens}
+    set {_uniqueStorage()._maxTokens = newValue}
+  }
 
-  public var temperature: Float = 0
+  public var temperature: Float {
+    get {_storage._temperature}
+    set {_uniqueStorage()._temperature = newValue}
+  }
 
-  public var topP: Float = 0
+  public var topP: Float {
+    get {_storage._topP}
+    set {_uniqueStorage()._topP = newValue}
+  }
 
-  public var topK: Int32 = 0
+  public var topK: Int32 {
+    get {_storage._topK}
+    set {_uniqueStorage()._topK = newValue}
+  }
 
-  public var systemPrompt: String = String()
+  public var systemPrompt: String {
+    get {_storage._systemPrompt}
+    set {_uniqueStorage()._systemPrompt = newValue}
+  }
 
   /// chain-of-thought tokens emit as TokenKind.THOUGHT
-  public var emitThoughts: Bool = false
+  public var emitThoughts: Bool {
+    get {_storage._emitThoughts}
+    set {_uniqueStorage()._emitThoughts = newValue}
+  }
 
   /// Additional LLMGenerationOptions fields kept inline to avoid a codegen
   /// package cycle between service stubs and option messages.
-  public var repetitionPenalty: Float = 0
+  public var repetitionPenalty: Float {
+    get {_storage._repetitionPenalty}
+    set {_uniqueStorage()._repetitionPenalty = newValue}
+  }
 
-  public var stopSequences: [String] = []
+  public var stopSequences: [String] {
+    get {_storage._stopSequences}
+    set {_uniqueStorage()._stopSequences = newValue}
+  }
 
-  public var streamingEnabled: Bool = false
+  public var streamingEnabled: Bool {
+    get {_storage._streamingEnabled}
+    set {_uniqueStorage()._streamingEnabled = newValue}
+  }
 
-  public var preferredFramework: String = String()
+  public var preferredFramework: String {
+    get {_storage._preferredFramework}
+    set {_uniqueStorage()._preferredFramework = newValue}
+  }
 
-  public var jsonSchema: String = String()
+  public var jsonSchema: String {
+    get {_storage._jsonSchema}
+    set {_uniqueStorage()._jsonSchema = newValue}
+  }
 
-  public var executionTarget: String = String()
+  public var executionTarget: String {
+    get {_storage._executionTarget}
+    set {_uniqueStorage()._executionTarget = newValue}
+  }
+
+  public var requestID: String {
+    get {_storage._requestID}
+    set {_uniqueStorage()._requestID = newValue}
+  }
+
+  public var modelID: String {
+    get {_storage._modelID}
+    set {_uniqueStorage()._modelID = newValue}
+  }
+
+  public var conversationID: String {
+    get {_storage._conversationID}
+    set {_uniqueStorage()._conversationID = newValue}
+  }
+
+  public var seed: Int64 {
+    get {_storage._seed}
+    set {_uniqueStorage()._seed = newValue}
+  }
+
+  public var frequencyPenalty: Float {
+    get {_storage._frequencyPenalty}
+    set {_uniqueStorage()._frequencyPenalty = newValue}
+  }
+
+  public var presencePenalty: Float {
+    get {_storage._presencePenalty}
+    set {_uniqueStorage()._presencePenalty = newValue}
+  }
+
+  public var minP: Float {
+    get {_storage._minP}
+    set {_uniqueStorage()._minP = newValue}
+  }
+
+  public var grammar: String {
+    get {_storage._grammar}
+    set {_uniqueStorage()._grammar = newValue}
+  }
+
+  public var responseFormat: String {
+    get {_storage._responseFormat}
+    set {_uniqueStorage()._responseFormat = newValue}
+  }
+
+  public var echoPrompt: Bool {
+    get {_storage._echoPrompt}
+    set {_uniqueStorage()._echoPrompt = newValue}
+  }
+
+  public var nThreads: Int32 {
+    get {_storage._nThreads}
+    set {_uniqueStorage()._nThreads = newValue}
+  }
+
+  public var metadata: Dictionary<String,String> {
+    get {_storage._metadata}
+    set {_uniqueStorage()._metadata = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// Aggregate result carried on the terminal LLMStreamEvent. This intentionally
@@ -141,6 +300,14 @@ public struct RALLMStreamFinalResult: Sendable {
   public var tokensPerSecond: Float = 0
 
   public var finishReason: String = String()
+
+  public var errorCode: Int32 = 0
+
+  public var errorMessage: String = String()
+
+  public var promptEvalTimeMs: Int64 = 0
+
+  public var decodeTimeMs: Int64 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -237,6 +404,39 @@ public struct RALLMStreamEvent: @unchecked Sendable {
     set {_uniqueStorage()._errorCode = newValue}
   }
 
+  /// Event classification distinct from token semantic kind.
+  public var eventKind: RALLMStreamEventKind {
+    get {_storage._eventKind}
+    set {_uniqueStorage()._eventKind = newValue}
+  }
+
+  /// Request/session correlation fields.
+  public var requestID: String {
+    get {_storage._requestID}
+    set {_uniqueStorage()._requestID = newValue}
+  }
+
+  public var conversationID: String {
+    get {_storage._conversationID}
+    set {_uniqueStorage()._conversationID = newValue}
+  }
+
+  /// Running counters for progress UIs.
+  public var promptTokensProcessed: Int32 {
+    get {_storage._promptTokensProcessed}
+    set {_uniqueStorage()._promptTokensProcessed = newValue}
+  }
+
+  public var completionTokensGenerated: Int32 {
+    get {_storage._completionTokensGenerated}
+    set {_uniqueStorage()._completionTokensGenerated = newValue}
+  }
+
+  public var elapsedMs: Int64 {
+    get {_storage._elapsedMs}
+    set {_uniqueStorage()._elapsedMs = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -248,95 +448,243 @@ public struct RALLMStreamEvent: @unchecked Sendable {
 
 fileprivate let _protobuf_package = "runanywhere.v1"
 
+extension RALLMStreamEventKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0LLM_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}LLM_STREAM_EVENT_KIND_STARTED\0\u{1}LLM_STREAM_EVENT_KIND_TOKEN\0\u{1}LLM_STREAM_EVENT_KIND_THINKING\0\u{1}LLM_STREAM_EVENT_KIND_TOOL_CALL\0\u{1}LLM_STREAM_EVENT_KIND_PROGRESS\0\u{1}LLM_STREAM_EVENT_KIND_COMPLETED\0\u{1}LLM_STREAM_EVENT_KIND_ERROR\0")
+}
+
 extension RALLMTokenKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0LLM_TOKEN_KIND_UNSPECIFIED\0\u{1}LLM_TOKEN_KIND_ANSWER\0\u{1}LLM_TOKEN_KIND_THOUGHT\0\u{1}LLM_TOKEN_KIND_TOOL_CALL\0")
 }
 
 extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMGenerateRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}system_prompt\0\u{3}emit_thoughts\0\u{3}repetition_penalty\0\u{3}stop_sequences\0\u{3}streaming_enabled\0\u{3}preferred_framework\0\u{3}json_schema\0\u{3}execution_target\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}top_k\0\u{3}system_prompt\0\u{3}emit_thoughts\0\u{3}repetition_penalty\0\u{3}stop_sequences\0\u{3}streaming_enabled\0\u{3}preferred_framework\0\u{3}json_schema\0\u{3}execution_target\0\u{3}request_id\0\u{3}model_id\0\u{3}conversation_id\0\u{1}seed\0\u{3}frequency_penalty\0\u{3}presence_penalty\0\u{3}min_p\0\u{1}grammar\0\u{3}response_format\0\u{3}echo_prompt\0\u{3}n_threads\0\u{1}metadata\0")
+
+  fileprivate class _StorageClass {
+    var _prompt: String = String()
+    var _maxTokens: Int32 = 0
+    var _temperature: Float = 0
+    var _topP: Float = 0
+    var _topK: Int32 = 0
+    var _systemPrompt: String = String()
+    var _emitThoughts: Bool = false
+    var _repetitionPenalty: Float = 0
+    var _stopSequences: [String] = []
+    var _streamingEnabled: Bool = false
+    var _preferredFramework: String = String()
+    var _jsonSchema: String = String()
+    var _executionTarget: String = String()
+    var _requestID: String = String()
+    var _modelID: String = String()
+    var _conversationID: String = String()
+    var _seed: Int64 = 0
+    var _frequencyPenalty: Float = 0
+    var _presencePenalty: Float = 0
+    var _minP: Float = 0
+    var _grammar: String = String()
+    var _responseFormat: String = String()
+    var _echoPrompt: Bool = false
+    var _nThreads: Int32 = 0
+    var _metadata: Dictionary<String,String> = [:]
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _prompt = source._prompt
+      _maxTokens = source._maxTokens
+      _temperature = source._temperature
+      _topP = source._topP
+      _topK = source._topK
+      _systemPrompt = source._systemPrompt
+      _emitThoughts = source._emitThoughts
+      _repetitionPenalty = source._repetitionPenalty
+      _stopSequences = source._stopSequences
+      _streamingEnabled = source._streamingEnabled
+      _preferredFramework = source._preferredFramework
+      _jsonSchema = source._jsonSchema
+      _executionTarget = source._executionTarget
+      _requestID = source._requestID
+      _modelID = source._modelID
+      _conversationID = source._conversationID
+      _seed = source._seed
+      _frequencyPenalty = source._frequencyPenalty
+      _presencePenalty = source._presencePenalty
+      _minP = source._minP
+      _grammar = source._grammar
+      _responseFormat = source._responseFormat
+      _echoPrompt = source._echoPrompt
+      _nThreads = source._nThreads
+      _metadata = source._metadata
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.prompt) }()
-      case 2: try { try decoder.decodeSingularInt32Field(value: &self.maxTokens) }()
-      case 3: try { try decoder.decodeSingularFloatField(value: &self.temperature) }()
-      case 4: try { try decoder.decodeSingularFloatField(value: &self.topP) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self.topK) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self.systemPrompt) }()
-      case 7: try { try decoder.decodeSingularBoolField(value: &self.emitThoughts) }()
-      case 8: try { try decoder.decodeSingularFloatField(value: &self.repetitionPenalty) }()
-      case 9: try { try decoder.decodeRepeatedStringField(value: &self.stopSequences) }()
-      case 10: try { try decoder.decodeSingularBoolField(value: &self.streamingEnabled) }()
-      case 11: try { try decoder.decodeSingularStringField(value: &self.preferredFramework) }()
-      case 12: try { try decoder.decodeSingularStringField(value: &self.jsonSchema) }()
-      case 13: try { try decoder.decodeSingularStringField(value: &self.executionTarget) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._prompt) }()
+        case 2: try { try decoder.decodeSingularInt32Field(value: &_storage._maxTokens) }()
+        case 3: try { try decoder.decodeSingularFloatField(value: &_storage._temperature) }()
+        case 4: try { try decoder.decodeSingularFloatField(value: &_storage._topP) }()
+        case 5: try { try decoder.decodeSingularInt32Field(value: &_storage._topK) }()
+        case 6: try { try decoder.decodeSingularStringField(value: &_storage._systemPrompt) }()
+        case 7: try { try decoder.decodeSingularBoolField(value: &_storage._emitThoughts) }()
+        case 8: try { try decoder.decodeSingularFloatField(value: &_storage._repetitionPenalty) }()
+        case 9: try { try decoder.decodeRepeatedStringField(value: &_storage._stopSequences) }()
+        case 10: try { try decoder.decodeSingularBoolField(value: &_storage._streamingEnabled) }()
+        case 11: try { try decoder.decodeSingularStringField(value: &_storage._preferredFramework) }()
+        case 12: try { try decoder.decodeSingularStringField(value: &_storage._jsonSchema) }()
+        case 13: try { try decoder.decodeSingularStringField(value: &_storage._executionTarget) }()
+        case 14: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
+        case 15: try { try decoder.decodeSingularStringField(value: &_storage._modelID) }()
+        case 16: try { try decoder.decodeSingularStringField(value: &_storage._conversationID) }()
+        case 17: try { try decoder.decodeSingularInt64Field(value: &_storage._seed) }()
+        case 18: try { try decoder.decodeSingularFloatField(value: &_storage._frequencyPenalty) }()
+        case 19: try { try decoder.decodeSingularFloatField(value: &_storage._presencePenalty) }()
+        case 20: try { try decoder.decodeSingularFloatField(value: &_storage._minP) }()
+        case 21: try { try decoder.decodeSingularStringField(value: &_storage._grammar) }()
+        case 22: try { try decoder.decodeSingularStringField(value: &_storage._responseFormat) }()
+        case 23: try { try decoder.decodeSingularBoolField(value: &_storage._echoPrompt) }()
+        case 24: try { try decoder.decodeSingularInt32Field(value: &_storage._nThreads) }()
+        case 25: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._metadata) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.prompt.isEmpty {
-      try visitor.visitSingularStringField(value: self.prompt, fieldNumber: 1)
-    }
-    if self.maxTokens != 0 {
-      try visitor.visitSingularInt32Field(value: self.maxTokens, fieldNumber: 2)
-    }
-    if self.temperature.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.temperature, fieldNumber: 3)
-    }
-    if self.topP.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.topP, fieldNumber: 4)
-    }
-    if self.topK != 0 {
-      try visitor.visitSingularInt32Field(value: self.topK, fieldNumber: 5)
-    }
-    if !self.systemPrompt.isEmpty {
-      try visitor.visitSingularStringField(value: self.systemPrompt, fieldNumber: 6)
-    }
-    if self.emitThoughts != false {
-      try visitor.visitSingularBoolField(value: self.emitThoughts, fieldNumber: 7)
-    }
-    if self.repetitionPenalty.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.repetitionPenalty, fieldNumber: 8)
-    }
-    if !self.stopSequences.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.stopSequences, fieldNumber: 9)
-    }
-    if self.streamingEnabled != false {
-      try visitor.visitSingularBoolField(value: self.streamingEnabled, fieldNumber: 10)
-    }
-    if !self.preferredFramework.isEmpty {
-      try visitor.visitSingularStringField(value: self.preferredFramework, fieldNumber: 11)
-    }
-    if !self.jsonSchema.isEmpty {
-      try visitor.visitSingularStringField(value: self.jsonSchema, fieldNumber: 12)
-    }
-    if !self.executionTarget.isEmpty {
-      try visitor.visitSingularStringField(value: self.executionTarget, fieldNumber: 13)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      if !_storage._prompt.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._prompt, fieldNumber: 1)
+      }
+      if _storage._maxTokens != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._maxTokens, fieldNumber: 2)
+      }
+      if _storage._temperature.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._temperature, fieldNumber: 3)
+      }
+      if _storage._topP.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._topP, fieldNumber: 4)
+      }
+      if _storage._topK != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._topK, fieldNumber: 5)
+      }
+      if !_storage._systemPrompt.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._systemPrompt, fieldNumber: 6)
+      }
+      if _storage._emitThoughts != false {
+        try visitor.visitSingularBoolField(value: _storage._emitThoughts, fieldNumber: 7)
+      }
+      if _storage._repetitionPenalty.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._repetitionPenalty, fieldNumber: 8)
+      }
+      if !_storage._stopSequences.isEmpty {
+        try visitor.visitRepeatedStringField(value: _storage._stopSequences, fieldNumber: 9)
+      }
+      if _storage._streamingEnabled != false {
+        try visitor.visitSingularBoolField(value: _storage._streamingEnabled, fieldNumber: 10)
+      }
+      if !_storage._preferredFramework.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._preferredFramework, fieldNumber: 11)
+      }
+      if !_storage._jsonSchema.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._jsonSchema, fieldNumber: 12)
+      }
+      if !_storage._executionTarget.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._executionTarget, fieldNumber: 13)
+      }
+      if !_storage._requestID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._requestID, fieldNumber: 14)
+      }
+      if !_storage._modelID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._modelID, fieldNumber: 15)
+      }
+      if !_storage._conversationID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._conversationID, fieldNumber: 16)
+      }
+      if _storage._seed != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._seed, fieldNumber: 17)
+      }
+      if _storage._frequencyPenalty.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._frequencyPenalty, fieldNumber: 18)
+      }
+      if _storage._presencePenalty.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._presencePenalty, fieldNumber: 19)
+      }
+      if _storage._minP.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._minP, fieldNumber: 20)
+      }
+      if !_storage._grammar.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._grammar, fieldNumber: 21)
+      }
+      if !_storage._responseFormat.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._responseFormat, fieldNumber: 22)
+      }
+      if _storage._echoPrompt != false {
+        try visitor.visitSingularBoolField(value: _storage._echoPrompt, fieldNumber: 23)
+      }
+      if _storage._nThreads != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._nThreads, fieldNumber: 24)
+      }
+      if !_storage._metadata.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: _storage._metadata, fieldNumber: 25)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RALLMGenerateRequest, rhs: RALLMGenerateRequest) -> Bool {
-    if lhs.prompt != rhs.prompt {return false}
-    if lhs.maxTokens != rhs.maxTokens {return false}
-    if lhs.temperature != rhs.temperature {return false}
-    if lhs.topP != rhs.topP {return false}
-    if lhs.topK != rhs.topK {return false}
-    if lhs.systemPrompt != rhs.systemPrompt {return false}
-    if lhs.emitThoughts != rhs.emitThoughts {return false}
-    if lhs.repetitionPenalty != rhs.repetitionPenalty {return false}
-    if lhs.stopSequences != rhs.stopSequences {return false}
-    if lhs.streamingEnabled != rhs.streamingEnabled {return false}
-    if lhs.preferredFramework != rhs.preferredFramework {return false}
-    if lhs.jsonSchema != rhs.jsonSchema {return false}
-    if lhs.executionTarget != rhs.executionTarget {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._prompt != rhs_storage._prompt {return false}
+        if _storage._maxTokens != rhs_storage._maxTokens {return false}
+        if _storage._temperature != rhs_storage._temperature {return false}
+        if _storage._topP != rhs_storage._topP {return false}
+        if _storage._topK != rhs_storage._topK {return false}
+        if _storage._systemPrompt != rhs_storage._systemPrompt {return false}
+        if _storage._emitThoughts != rhs_storage._emitThoughts {return false}
+        if _storage._repetitionPenalty != rhs_storage._repetitionPenalty {return false}
+        if _storage._stopSequences != rhs_storage._stopSequences {return false}
+        if _storage._streamingEnabled != rhs_storage._streamingEnabled {return false}
+        if _storage._preferredFramework != rhs_storage._preferredFramework {return false}
+        if _storage._jsonSchema != rhs_storage._jsonSchema {return false}
+        if _storage._executionTarget != rhs_storage._executionTarget {return false}
+        if _storage._requestID != rhs_storage._requestID {return false}
+        if _storage._modelID != rhs_storage._modelID {return false}
+        if _storage._conversationID != rhs_storage._conversationID {return false}
+        if _storage._seed != rhs_storage._seed {return false}
+        if _storage._frequencyPenalty != rhs_storage._frequencyPenalty {return false}
+        if _storage._presencePenalty != rhs_storage._presencePenalty {return false}
+        if _storage._minP != rhs_storage._minP {return false}
+        if _storage._grammar != rhs_storage._grammar {return false}
+        if _storage._responseFormat != rhs_storage._responseFormat {return false}
+        if _storage._echoPrompt != rhs_storage._echoPrompt {return false}
+        if _storage._nThreads != rhs_storage._nThreads {return false}
+        if _storage._metadata != rhs_storage._metadata {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -344,7 +692,7 @@ extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
 
 extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMStreamFinalResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{3}prompt_tokens\0\u{3}completion_tokens\0\u{3}total_tokens\0\u{3}total_time_ms\0\u{3}time_to_first_token_ms\0\u{3}tokens_per_second\0\u{3}finish_reason\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}thinking_content\0\u{3}prompt_tokens\0\u{3}completion_tokens\0\u{3}total_tokens\0\u{3}total_time_ms\0\u{3}time_to_first_token_ms\0\u{3}tokens_per_second\0\u{3}finish_reason\0\u{3}error_code\0\u{3}error_message\0\u{3}prompt_eval_time_ms\0\u{3}decode_time_ms\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -361,6 +709,10 @@ extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       case 7: try { try decoder.decodeSingularInt64Field(value: &self.timeToFirstTokenMs) }()
       case 8: try { try decoder.decodeSingularFloatField(value: &self.tokensPerSecond) }()
       case 9: try { try decoder.decodeSingularStringField(value: &self.finishReason) }()
+      case 10: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
+      case 11: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
+      case 12: try { try decoder.decodeSingularInt64Field(value: &self.promptEvalTimeMs) }()
+      case 13: try { try decoder.decodeSingularInt64Field(value: &self.decodeTimeMs) }()
       default: break
       }
     }
@@ -398,6 +750,18 @@ extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if !self.finishReason.isEmpty {
       try visitor.visitSingularStringField(value: self.finishReason, fieldNumber: 9)
     }
+    if self.errorCode != 0 {
+      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 10)
+    }
+    if !self.errorMessage.isEmpty {
+      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 11)
+    }
+    if self.promptEvalTimeMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.promptEvalTimeMs, fieldNumber: 12)
+    }
+    if self.decodeTimeMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.decodeTimeMs, fieldNumber: 13)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -411,6 +775,10 @@ extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if lhs.timeToFirstTokenMs != rhs.timeToFirstTokenMs {return false}
     if lhs.tokensPerSecond != rhs.tokensPerSecond {return false}
     if lhs.finishReason != rhs.finishReason {return false}
+    if lhs.errorCode != rhs.errorCode {return false}
+    if lhs.errorMessage != rhs.errorMessage {return false}
+    if lhs.promptEvalTimeMs != rhs.promptEvalTimeMs {return false}
+    if lhs.decodeTimeMs != rhs.decodeTimeMs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -418,7 +786,7 @@ extension RALLMStreamFinalResult: SwiftProtobuf.Message, SwiftProtobuf._MessageI
 
 extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".LLMStreamEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{1}token\0\u{3}is_final\0\u{1}kind\0\u{3}token_id\0\u{1}logprob\0\u{3}finish_reason\0\u{3}error_message\0\u{1}result\0\u{3}error_code\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{1}token\0\u{3}is_final\0\u{1}kind\0\u{3}token_id\0\u{1}logprob\0\u{3}finish_reason\0\u{3}error_message\0\u{1}result\0\u{3}error_code\0\u{3}event_kind\0\u{3}request_id\0\u{3}conversation_id\0\u{3}prompt_tokens_processed\0\u{3}completion_tokens_generated\0\u{3}elapsed_ms\0")
 
   fileprivate class _StorageClass {
     var _seq: UInt64 = 0
@@ -432,6 +800,12 @@ extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     var _errorMessage: String = String()
     var _result: RALLMStreamFinalResult? = nil
     var _errorCode: Int32 = 0
+    var _eventKind: RALLMStreamEventKind = .unspecified
+    var _requestID: String = String()
+    var _conversationID: String = String()
+    var _promptTokensProcessed: Int32 = 0
+    var _completionTokensGenerated: Int32 = 0
+    var _elapsedMs: Int64 = 0
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -453,6 +827,12 @@ extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
       _errorMessage = source._errorMessage
       _result = source._result
       _errorCode = source._errorCode
+      _eventKind = source._eventKind
+      _requestID = source._requestID
+      _conversationID = source._conversationID
+      _promptTokensProcessed = source._promptTokensProcessed
+      _completionTokensGenerated = source._completionTokensGenerated
+      _elapsedMs = source._elapsedMs
     }
   }
 
@@ -482,6 +862,12 @@ extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
         case 9: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
         case 10: try { try decoder.decodeSingularMessageField(value: &_storage._result) }()
         case 11: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCode) }()
+        case 12: try { try decoder.decodeSingularEnumField(value: &_storage._eventKind) }()
+        case 13: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
+        case 14: try { try decoder.decodeSingularStringField(value: &_storage._conversationID) }()
+        case 15: try { try decoder.decodeSingularInt32Field(value: &_storage._promptTokensProcessed) }()
+        case 16: try { try decoder.decodeSingularInt32Field(value: &_storage._completionTokensGenerated) }()
+        case 17: try { try decoder.decodeSingularInt64Field(value: &_storage._elapsedMs) }()
         default: break
         }
       }
@@ -527,6 +913,24 @@ extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
       if _storage._errorCode != 0 {
         try visitor.visitSingularInt32Field(value: _storage._errorCode, fieldNumber: 11)
       }
+      if _storage._eventKind != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._eventKind, fieldNumber: 12)
+      }
+      if !_storage._requestID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._requestID, fieldNumber: 13)
+      }
+      if !_storage._conversationID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._conversationID, fieldNumber: 14)
+      }
+      if _storage._promptTokensProcessed != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._promptTokensProcessed, fieldNumber: 15)
+      }
+      if _storage._completionTokensGenerated != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._completionTokensGenerated, fieldNumber: 16)
+      }
+      if _storage._elapsedMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._elapsedMs, fieldNumber: 17)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -547,6 +951,12 @@ extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
         if _storage._errorMessage != rhs_storage._errorMessage {return false}
         if _storage._result != rhs_storage._result {return false}
         if _storage._errorCode != rhs_storage._errorCode {return false}
+        if _storage._eventKind != rhs_storage._eventKind {return false}
+        if _storage._requestID != rhs_storage._requestID {return false}
+        if _storage._conversationID != rhs_storage._conversationID {return false}
+        if _storage._promptTokensProcessed != rhs_storage._promptTokensProcessed {return false}
+        if _storage._completionTokensGenerated != rhs_storage._completionTokensGenerated {return false}
+        if _storage._elapsedMs != rhs_storage._elapsedMs {return false}
         return true
       }
       if !storagesAreEqual {return false}

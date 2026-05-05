@@ -590,19 +590,18 @@ fun RunAnywhere.cancelGeneration()
 
 ### LLM Types
 
-#### LLMGenerationOptions
+#### LLMGenerationOptions (proto-generated)
+
+`LLMGenerationOptions` is a Wire-generated protobuf type from `idl/llm_options.proto`. Key fields:
 
 ```kotlin
-data class LLMGenerationOptions(
-    val maxTokens: Int = 100,
-    val temperature: Float = 0.8f,
-    val topP: Float = 1.0f,
-    val stopSequences: List<String> = emptyList(),
-    val streamingEnabled: Boolean = false,
-    val preferredFramework: InferenceFramework? = null,
-    val structuredOutput: StructuredOutputConfig? = null,
-    val systemPrompt: String? = null
-)
+// Proto-generated — do not hand-edit. See idl/llm_options.proto for the full schema.
+// Commonly used fields:
+val maxTokens: Int?
+val temperature: Float?
+val topP: Float?
+val stopSequences: List<String>
+val systemPrompt: String?
 ```
 
 #### LLMGenerationResult
@@ -689,10 +688,6 @@ suspend fun RunAnywhere.isSTTModelLoaded(): Boolean
  */
 val RunAnywhere.currentSTTModelId: String?
 
-/**
- * Check if STT model is loaded (non-suspend version).
- */
-val RunAnywhere.isSTTModelLoadedSync: Boolean
 ```
 
 ### Advanced Transcription
@@ -711,28 +706,16 @@ suspend fun RunAnywhere.transcribeWithOptions(
 ): STTOutput
 
 /**
- * Streaming transcription with callbacks.
+ * Streaming transcription as generated proto events.
  *
  * @param audioData Audio data to transcribe
  * @param options Transcription options
- * @param onPartialResult Callback for partial results
- * @return Final transcription output
+ * @return Flow of STTStreamEvent envelopes
  */
-suspend fun RunAnywhere.transcribeStream(
+fun RunAnywhere.transcribeStream(
     audioData: ByteArray,
     options: STTOptions = STTOptions(),
-    onPartialResult: (STTTranscriptionResult) -> Unit
-): STTOutput
-
-/**
- * Process audio samples for streaming transcription.
- */
-suspend fun RunAnywhere.processStreamingAudio(samples: FloatArray)
-
-/**
- * Stop streaming transcription.
- */
-suspend fun RunAnywhere.stopStreamingTranscription()
+): Flow<STTStreamEvent>
 ```
 
 ### STT Types
@@ -821,11 +804,6 @@ suspend fun RunAnywhere.isTTSVoiceLoaded(): Boolean
  * Get the currently loaded TTS voice ID (synchronous).
  */
 val RunAnywhere.currentTTSVoiceId: String?
-
-/**
- * Check if TTS voice is loaded (non-suspend version).
- */
-val RunAnywhere.isTTSVoiceLoadedSync: Boolean
 
 /**
  * Get available TTS voices.
@@ -1420,84 +1398,26 @@ object EventBus {
 
 ### Event Types
 
-#### SDKEvent (Interface)
+All event types are proto-generated via Wire. The SDK re-exports them as typealiases:
 
 ```kotlin
-interface SDKEvent {
-    val id: String
-    val type: String
-    val category: EventCategory
-    val timestamp: Long
-    val sessionId: String?
-    val destination: EventDestination
-    val properties: Map<String, String>
-}
-```
+// All events use the proto-generated SDKEvent envelope
+typealias SDKEvent = ai.runanywhere.proto.v1.SDKEvent
+typealias EventCategory = ai.runanywhere.proto.v1.EventCategory
+typealias EventDestination = ai.runanywhere.proto.v1.EventDestination
 
-#### LLMEvent
-
-```kotlin
-data class LLMEvent(
-    val eventType: LLMEventType,
-    val modelId: String?,
-    val tokensGenerated: Int?,
-    val latencyMs: Double?,
-    val error: String?
-) : SDKEvent
-
-enum class LLMEventType {
-    GENERATION_STARTED, GENERATION_COMPLETED, GENERATION_FAILED,
-    STREAM_TOKEN, STREAM_COMPLETED
-}
-```
-
-#### STTEvent
-
-```kotlin
-data class STTEvent(
-    val eventType: STTEventType,
-    val modelId: String?,
-    val transcript: String?,
-    val confidence: Float?,
-    val error: String?
-) : SDKEvent
-
-enum class STTEventType {
-    TRANSCRIPTION_STARTED, TRANSCRIPTION_COMPLETED, TRANSCRIPTION_FAILED,
-    PARTIAL_RESULT
-}
-```
-
-#### TTSEvent
-
-```kotlin
-data class TTSEvent(
-    val eventType: TTSEventType,
-    val voice: String?,
-    val durationMs: Double?,
-    val error: String?
-) : SDKEvent
-
-enum class TTSEventType {
-    SYNTHESIS_STARTED, SYNTHESIS_COMPLETED, SYNTHESIS_FAILED,
-    PLAYBACK_STARTED, PLAYBACK_COMPLETED
-}
-```
-
-#### ModelEvent
-
-```kotlin
-data class ModelEvent(
-    val eventType: ModelEventType,
-    val modelId: String,
-    val progress: Float?,
-    val error: String?
-) : SDKEvent
-
-enum class ModelEventType {
-    DOWNLOAD_STARTED, DOWNLOAD_PROGRESS, DOWNLOAD_COMPLETED, DOWNLOAD_FAILED,
-    LOADED, UNLOADED, DELETED
-}
+// Typed event payloads (proto-generated)
+typealias GenerationEvent = ai.runanywhere.proto.v1.GenerationEvent
+typealias ModelEvent = ai.runanywhere.proto.v1.ModelEvent
+typealias DownloadEvent = ai.runanywhere.proto.v1.DownloadEvent
+typealias VoiceEvent = ai.runanywhere.proto.v1.VoiceEvent
+typealias PerformanceEvent = ai.runanywhere.proto.v1.PerformanceEvent
+typealias FailureEvent = ai.runanywhere.proto.v1.FailureEvent
+typealias NetworkEvent = ai.runanywhere.proto.v1.NetworkEvent
+typealias StorageLifecycleEvent = ai.runanywhere.proto.v1.StorageLifecycleEvent
+typealias ComponentInitializationEvent = ai.runanywhere.proto.v1.ComponentInitializationEvent
+typealias ComponentLifecycleEvent = ai.runanywhere.proto.v1.ComponentLifecycleEvent
+typealias ModelRegistryEvent = ai.runanywhere.proto.v1.ModelRegistryEvent
 ```
 
 ---

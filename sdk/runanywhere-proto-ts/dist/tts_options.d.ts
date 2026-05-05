@@ -18,6 +18,18 @@ export declare enum TTSVoiceGender {
 }
 export declare function tTSVoiceGenderFromJSON(object: any): TTSVoiceGender;
 export declare function tTSVoiceGenderToJSON(object: TTSVoiceGender): string;
+export declare enum TTSStreamEventKind {
+    TTS_STREAM_EVENT_KIND_UNSPECIFIED = 0,
+    TTS_STREAM_EVENT_KIND_STARTED = 1,
+    TTS_STREAM_EVENT_KIND_AUDIO_CHUNK = 2,
+    TTS_STREAM_EVENT_KIND_PHONEME = 3,
+    TTS_STREAM_EVENT_KIND_COMPLETED = 4,
+    TTS_STREAM_EVENT_KIND_ERROR = 5,
+    TTS_STREAM_EVENT_KIND_PROGRESS = 6,
+    UNRECOGNIZED = -1
+}
+export declare function tTSStreamEventKindFromJSON(object: any): TTSStreamEventKind;
+export declare function tTSStreamEventKindToJSON(object: TTSStreamEventKind): string;
 /**
  * ---------------------------------------------------------------------------
  * Component-level TTS configuration.
@@ -116,6 +128,28 @@ export interface TTSOptions {
      * Present in rac_tts_options_t and several SDK option structs.
      */
     sampleRate: number;
+    /**
+     * Speaker index for multi-speaker voices. -1/0 = backend default
+     * depending on model convention.
+     */
+    speakerId: number;
+    /** Web/ONNX ergonomic alias for speaking_rate. 0.0 = use speaking_rate. */
+    speed: number;
+    /** Optional style/emotion hint for voices that support style transfer. */
+    style?: string | undefined;
+}
+export interface TTSSynthesisRequest {
+    requestId: string;
+    text: string;
+    ssml?: string | undefined;
+    options?: TTSOptions | undefined;
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface TTSSynthesisRequest_MetadataEntry {
+    key: string;
+    value: string;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -199,6 +233,16 @@ export interface TTSOutput {
      * (milliseconds since UNIX epoch). Mirrors C ABI `timestamp_ms`.
      */
     timestampMs: number;
+    /**
+     * Stream chunk metadata. For one-shot synthesis, chunk_index=0 and
+     * is_final=true when set by the producer.
+     */
+    chunkIndex: number;
+    isFinal: boolean;
+    audioSizeBytes: number;
+    /** Terminal error details for result-envelope APIs. */
+    errorMessage?: string | undefined;
+    errorCode: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -227,6 +271,8 @@ export interface TTSSpeakResult {
     metadata?: TTSSynthesisMetadata | undefined;
     /** Wall-clock timestamp when speech completed (ms since UNIX epoch). */
     timestampMs: number;
+    errorMessage?: string | undefined;
+    errorCode: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -251,6 +297,39 @@ export interface TTSVoiceInfo {
     gender: TTSVoiceGender;
     /** Optional descriptive text (locale, age, style notes). */
     description: string;
+    /** Additional discovery fields surfaced by system and ONNX/Piper voices. */
+    isNeural: boolean;
+    isSystem: boolean;
+    sampleRate: number;
+    supportedStyles: string[];
+}
+export interface TTSStreamEvent {
+    seq: number;
+    timestampUs: number;
+    requestId: string;
+    kind: TTSStreamEventKind;
+    output?: TTSOutput | undefined;
+    phoneme?: TTSPhonemeTimestamp | undefined;
+    speakResult?: TTSSpeakResult | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
+    /**
+     * Progress metadata for started/progress/audio_chunk/completed events.
+     * progress is 0.0..1.0 when known; total_chunks=0 means unknown.
+     */
+    progress: number;
+    chunkIndex: number;
+    totalChunks: number;
+    elapsedMs: number;
+    statusMessage: string;
+}
+export interface TTSServiceState {
+    isReady: boolean;
+    currentVoice?: string | undefined;
+    voices: TTSVoiceInfo[];
+    supportedLanguageCodes: string[];
+    errorMessage?: string | undefined;
+    errorCode: number;
 }
 export declare const TTSConfiguration: {
     encode(message: TTSConfiguration, writer?: _m0.Writer): _m0.Writer;
@@ -267,6 +346,22 @@ export declare const TTSOptions: {
     toJSON(message: TTSOptions): unknown;
     create<I extends Exact<DeepPartial<TTSOptions>, I>>(base?: I): TTSOptions;
     fromPartial<I extends Exact<DeepPartial<TTSOptions>, I>>(object: I): TTSOptions;
+};
+export declare const TTSSynthesisRequest: {
+    encode(message: TTSSynthesisRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): TTSSynthesisRequest;
+    fromJSON(object: any): TTSSynthesisRequest;
+    toJSON(message: TTSSynthesisRequest): unknown;
+    create<I extends Exact<DeepPartial<TTSSynthesisRequest>, I>>(base?: I): TTSSynthesisRequest;
+    fromPartial<I extends Exact<DeepPartial<TTSSynthesisRequest>, I>>(object: I): TTSSynthesisRequest;
+};
+export declare const TTSSynthesisRequest_MetadataEntry: {
+    encode(message: TTSSynthesisRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): TTSSynthesisRequest_MetadataEntry;
+    fromJSON(object: any): TTSSynthesisRequest_MetadataEntry;
+    toJSON(message: TTSSynthesisRequest_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<TTSSynthesisRequest_MetadataEntry>, I>>(base?: I): TTSSynthesisRequest_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<TTSSynthesisRequest_MetadataEntry>, I>>(object: I): TTSSynthesisRequest_MetadataEntry;
 };
 export declare const TTSPhonemeTimestamp: {
     encode(message: TTSPhonemeTimestamp, writer?: _m0.Writer): _m0.Writer;
@@ -307,6 +402,22 @@ export declare const TTSVoiceInfo: {
     toJSON(message: TTSVoiceInfo): unknown;
     create<I extends Exact<DeepPartial<TTSVoiceInfo>, I>>(base?: I): TTSVoiceInfo;
     fromPartial<I extends Exact<DeepPartial<TTSVoiceInfo>, I>>(object: I): TTSVoiceInfo;
+};
+export declare const TTSStreamEvent: {
+    encode(message: TTSStreamEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): TTSStreamEvent;
+    fromJSON(object: any): TTSStreamEvent;
+    toJSON(message: TTSStreamEvent): unknown;
+    create<I extends Exact<DeepPartial<TTSStreamEvent>, I>>(base?: I): TTSStreamEvent;
+    fromPartial<I extends Exact<DeepPartial<TTSStreamEvent>, I>>(object: I): TTSStreamEvent;
+};
+export declare const TTSServiceState: {
+    encode(message: TTSServiceState, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): TTSServiceState;
+    fromJSON(object: any): TTSServiceState;
+    toJSON(message: TTSServiceState): unknown;
+    create<I extends Exact<DeepPartial<TTSServiceState>, I>>(base?: I): TTSServiceState;
+    fromPartial<I extends Exact<DeepPartial<TTSServiceState>, I>>(object: I): TTSServiceState;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

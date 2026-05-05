@@ -9,8 +9,10 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
+import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'structured_output.pbenum.dart';
@@ -40,6 +42,14 @@ class JSONSchemaProperty extends $pb.GeneratedMessage {
     $core.String? format,
     JSONSchema? itemsSchema,
     JSONSchema? objectSchema,
+    $core.double? minimum,
+    $core.double? maximum,
+    $core.int? minLength,
+    $core.int? maxLength,
+    $core.String? pattern,
+    $core.int? minItems,
+    $core.int? maxItems,
+    $core.String? defaultJson,
   }) {
     final $result = create();
     if (type != null) {
@@ -60,6 +70,30 @@ class JSONSchemaProperty extends $pb.GeneratedMessage {
     if (objectSchema != null) {
       $result.objectSchema = objectSchema;
     }
+    if (minimum != null) {
+      $result.minimum = minimum;
+    }
+    if (maximum != null) {
+      $result.maximum = maximum;
+    }
+    if (minLength != null) {
+      $result.minLength = minLength;
+    }
+    if (maxLength != null) {
+      $result.maxLength = maxLength;
+    }
+    if (pattern != null) {
+      $result.pattern = pattern;
+    }
+    if (minItems != null) {
+      $result.minItems = minItems;
+    }
+    if (maxItems != null) {
+      $result.maxItems = maxItems;
+    }
+    if (defaultJson != null) {
+      $result.defaultJson = defaultJson;
+    }
     return $result;
   }
   JSONSchemaProperty._() : super();
@@ -73,6 +107,14 @@ class JSONSchemaProperty extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'format')
     ..aOM<JSONSchema>(5, _omitFieldNames ? '' : 'itemsSchema', subBuilder: JSONSchema.create)
     ..aOM<JSONSchema>(6, _omitFieldNames ? '' : 'objectSchema', subBuilder: JSONSchema.create)
+    ..a<$core.double>(7, _omitFieldNames ? '' : 'minimum', $pb.PbFieldType.OD)
+    ..a<$core.double>(8, _omitFieldNames ? '' : 'maximum', $pb.PbFieldType.OD)
+    ..a<$core.int>(9, _omitFieldNames ? '' : 'minLength', $pb.PbFieldType.O3)
+    ..a<$core.int>(10, _omitFieldNames ? '' : 'maxLength', $pb.PbFieldType.O3)
+    ..aOS(11, _omitFieldNames ? '' : 'pattern')
+    ..a<$core.int>(12, _omitFieldNames ? '' : 'minItems', $pb.PbFieldType.O3)
+    ..a<$core.int>(13, _omitFieldNames ? '' : 'maxItems', $pb.PbFieldType.O3)
+    ..aOS(14, _omitFieldNames ? '' : 'defaultJson')
     ..hasRequiredFields = false
   ;
 
@@ -156,6 +198,79 @@ class JSONSchemaProperty extends $pb.GeneratedMessage {
   void clearObjectSchema() => clearField(6);
   @$pb.TagNumber(6)
   JSONSchema ensureObjectSchema() => $_ensure(5);
+
+  /// Common validation constraints carried by RN/Web schema builders.
+  @$pb.TagNumber(7)
+  $core.double get minimum => $_getN(6);
+  @$pb.TagNumber(7)
+  set minimum($core.double v) { $_setDouble(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasMinimum() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearMinimum() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.double get maximum => $_getN(7);
+  @$pb.TagNumber(8)
+  set maximum($core.double v) { $_setDouble(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasMaximum() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearMaximum() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get minLength => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set minLength($core.int v) { $_setSignedInt32(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasMinLength() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearMinLength() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get maxLength => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set maxLength($core.int v) { $_setSignedInt32(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasMaxLength() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearMaxLength() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.String get pattern => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set pattern($core.String v) { $_setString(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasPattern() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearPattern() => clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.int get minItems => $_getIZ(11);
+  @$pb.TagNumber(12)
+  set minItems($core.int v) { $_setSignedInt32(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasMinItems() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearMinItems() => clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.int get maxItems => $_getIZ(12);
+  @$pb.TagNumber(13)
+  set maxItems($core.int v) { $_setSignedInt32(12, v); }
+  @$pb.TagNumber(13)
+  $core.bool hasMaxItems() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearMaxItems() => clearField(13);
+
+  @$pb.TagNumber(14)
+  $core.String get defaultJson => $_getSZ(13);
+  @$pb.TagNumber(14)
+  set defaultJson($core.String v) { $_setString(13, v); }
+  @$pb.TagNumber(14)
+  $core.bool hasDefaultJson() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearDefaultJson() => clearField(14);
 }
 
 /// ---------------------------------------------------------------------------
@@ -182,6 +297,7 @@ class JSONSchema extends $pb.GeneratedMessage {
     $core.Iterable<JSONSchema>? anyOf,
     $core.Iterable<JSONSchema>? oneOf,
     JSONSchema? notSchema,
+    $core.String? rawJson,
   }) {
     final $result = create();
     if (type != null) {
@@ -229,6 +345,9 @@ class JSONSchema extends $pb.GeneratedMessage {
     if (notSchema != null) {
       $result.notSchema = notSchema;
     }
+    if (rawJson != null) {
+      $result.rawJson = rawJson;
+    }
     return $result;
   }
   JSONSchema._() : super();
@@ -251,6 +370,7 @@ class JSONSchema extends $pb.GeneratedMessage {
     ..pc<JSONSchema>(13, _omitFieldNames ? '' : 'anyOf', $pb.PbFieldType.PM, subBuilder: JSONSchema.create)
     ..pc<JSONSchema>(14, _omitFieldNames ? '' : 'oneOf', $pb.PbFieldType.PM, subBuilder: JSONSchema.create)
     ..aOM<JSONSchema>(15, _omitFieldNames ? '' : 'notSchema', subBuilder: JSONSchema.create)
+    ..aOS(16, _omitFieldNames ? '' : 'rawJson')
     ..hasRequiredFields = false
   ;
 
@@ -384,6 +504,15 @@ class JSONSchema extends $pb.GeneratedMessage {
   void clearNotSchema() => clearField(15);
   @$pb.TagNumber(15)
   JSONSchema ensureNotSchema() => $_ensure(14);
+
+  @$pb.TagNumber(16)
+  $core.String get rawJson => $_getSZ(15);
+  @$pb.TagNumber(16)
+  set rawJson($core.String v) { $_setString(15, v); }
+  @$pb.TagNumber(16)
+  $core.bool hasRawJson() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearRawJson() => clearField(16);
 }
 
 /// ---------------------------------------------------------------------------
@@ -403,6 +532,11 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
     $core.String? jsonSchema,
     $core.String? typeName,
     $core.String? name,
+    StructuredOutputMode? mode,
+    $core.String? regexPattern,
+    $core.String? grammar,
+    $core.bool? repairJson,
+    $core.int? maxRetries,
   }) {
     final $result = create();
     if (schema != null) {
@@ -423,6 +557,21 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
     if (name != null) {
       $result.name = name;
     }
+    if (mode != null) {
+      $result.mode = mode;
+    }
+    if (regexPattern != null) {
+      $result.regexPattern = regexPattern;
+    }
+    if (grammar != null) {
+      $result.grammar = grammar;
+    }
+    if (repairJson != null) {
+      $result.repairJson = repairJson;
+    }
+    if (maxRetries != null) {
+      $result.maxRetries = maxRetries;
+    }
     return $result;
   }
   StructuredOutputOptions._() : super();
@@ -436,6 +585,11 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'jsonSchema')
     ..aOS(5, _omitFieldNames ? '' : 'typeName')
     ..aOS(6, _omitFieldNames ? '' : 'name')
+    ..e<StructuredOutputMode>(7, _omitFieldNames ? '' : 'mode', $pb.PbFieldType.OE, defaultOrMaker: StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED, valueOf: StructuredOutputMode.valueOf, enumValues: StructuredOutputMode.values)
+    ..aOS(8, _omitFieldNames ? '' : 'regexPattern')
+    ..aOS(9, _omitFieldNames ? '' : 'grammar')
+    ..aOB(10, _omitFieldNames ? '' : 'repairJson')
+    ..a<$core.int>(11, _omitFieldNames ? '' : 'maxRetries', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
@@ -521,6 +675,51 @@ class StructuredOutputOptions extends $pb.GeneratedMessage {
   $core.bool hasName() => $_has(5);
   @$pb.TagNumber(6)
   void clearName() => clearField(6);
+
+  @$pb.TagNumber(7)
+  StructuredOutputMode get mode => $_getN(6);
+  @$pb.TagNumber(7)
+  set mode(StructuredOutputMode v) { setField(7, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasMode() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearMode() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get regexPattern => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set regexPattern($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasRegexPattern() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearRegexPattern() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get grammar => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set grammar($core.String v) { $_setString(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasGrammar() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearGrammar() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.bool get repairJson => $_getBF(9);
+  @$pb.TagNumber(10)
+  set repairJson($core.bool v) { $_setBool(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasRepairJson() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearRepairJson() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.int get maxRetries => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set maxRetries($core.int v) { $_setSignedInt32(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasMaxRetries() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearMaxRetries() => clearField(11);
 }
 
 /// ---------------------------------------------------------------------------
@@ -537,6 +736,8 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
     $core.String? errorMessage,
     $core.String? rawOutput,
     $core.String? extractedJson,
+    $core.Iterable<$core.String>? validationErrors,
+    $fixnum.Int64? validationTimeMs,
   }) {
     final $result = create();
     if (isValid != null) {
@@ -554,6 +755,12 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
     if (extractedJson != null) {
       $result.extractedJson = extractedJson;
     }
+    if (validationErrors != null) {
+      $result.validationErrors.addAll(validationErrors);
+    }
+    if (validationTimeMs != null) {
+      $result.validationTimeMs = validationTimeMs;
+    }
     return $result;
   }
   StructuredOutputValidation._() : super();
@@ -566,6 +773,8 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'errorMessage')
     ..aOS(4, _omitFieldNames ? '' : 'rawOutput')
     ..aOS(5, _omitFieldNames ? '' : 'extractedJson')
+    ..pPS(6, _omitFieldNames ? '' : 'validationErrors')
+    ..aInt64(7, _omitFieldNames ? '' : 'validationTimeMs')
     ..hasRequiredFields = false
   ;
 
@@ -640,6 +849,18 @@ class StructuredOutputValidation extends $pb.GeneratedMessage {
   $core.bool hasExtractedJson() => $_has(4);
   @$pb.TagNumber(5)
   void clearExtractedJson() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.List<$core.String> get validationErrors => $_getList(5);
+
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get validationTimeMs => $_getI64(6);
+  @$pb.TagNumber(7)
+  set validationTimeMs($fixnum.Int64 v) { $_setInt64(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasValidationTimeMs() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearValidationTimeMs() => clearField(7);
 }
 
 /// ---------------------------------------------------------------------------
@@ -657,6 +878,8 @@ class StructuredOutputResult extends $pb.GeneratedMessage {
     $core.List<$core.int>? parsedJson,
     StructuredOutputValidation? validation,
     $core.String? rawText,
+    $core.String? errorMessage,
+    $core.int? errorCode,
   }) {
     final $result = create();
     if (parsedJson != null) {
@@ -668,6 +891,12 @@ class StructuredOutputResult extends $pb.GeneratedMessage {
     if (rawText != null) {
       $result.rawText = rawText;
     }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
     return $result;
   }
   StructuredOutputResult._() : super();
@@ -678,6 +907,8 @@ class StructuredOutputResult extends $pb.GeneratedMessage {
     ..a<$core.List<$core.int>>(1, _omitFieldNames ? '' : 'parsedJson', $pb.PbFieldType.OY)
     ..aOM<StructuredOutputValidation>(2, _omitFieldNames ? '' : 'validation', subBuilder: StructuredOutputValidation.create)
     ..aOS(3, _omitFieldNames ? '' : 'rawText')
+    ..aOS(4, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(5, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
@@ -733,6 +964,580 @@ class StructuredOutputResult extends $pb.GeneratedMessage {
   $core.bool hasRawText() => $_has(2);
   @$pb.TagNumber(3)
   void clearRawText() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get errorMessage => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set errorMessage($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasErrorMessage() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearErrorMessage() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get errorCode => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set errorCode($core.int v) { $_setSignedInt32(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasErrorCode() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearErrorCode() => clearField(5);
+}
+
+class StructuredOutputParseRequest extends $pb.GeneratedMessage {
+  factory StructuredOutputParseRequest({
+    $core.String? requestId,
+    $core.String? text,
+    StructuredOutputOptions? options,
+    $core.Map<$core.String, $core.String>? metadata,
+  }) {
+    final $result = create();
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (text != null) {
+      $result.text = text;
+    }
+    if (options != null) {
+      $result.options = options;
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
+    }
+    return $result;
+  }
+  StructuredOutputParseRequest._() : super();
+  factory StructuredOutputParseRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory StructuredOutputParseRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'StructuredOutputParseRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aOS(2, _omitFieldNames ? '' : 'text')
+    ..aOM<StructuredOutputOptions>(3, _omitFieldNames ? '' : 'options', subBuilder: StructuredOutputOptions.create)
+    ..m<$core.String, $core.String>(4, _omitFieldNames ? '' : 'metadata', entryClassName: 'StructuredOutputParseRequest.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  StructuredOutputParseRequest clone() => StructuredOutputParseRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  StructuredOutputParseRequest copyWith(void Function(StructuredOutputParseRequest) updates) => super.copyWith((message) => updates(message as StructuredOutputParseRequest)) as StructuredOutputParseRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static StructuredOutputParseRequest create() => StructuredOutputParseRequest._();
+  StructuredOutputParseRequest createEmptyInstance() => create();
+  static $pb.PbList<StructuredOutputParseRequest> createRepeated() => $pb.PbList<StructuredOutputParseRequest>();
+  @$core.pragma('dart2js:noInline')
+  static StructuredOutputParseRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<StructuredOutputParseRequest>(create);
+  static StructuredOutputParseRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get text => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set text($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasText() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearText() => clearField(2);
+
+  @$pb.TagNumber(3)
+  StructuredOutputOptions get options => $_getN(2);
+  @$pb.TagNumber(3)
+  set options(StructuredOutputOptions v) { setField(3, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasOptions() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOptions() => clearField(3);
+  @$pb.TagNumber(3)
+  StructuredOutputOptions ensureOptions() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(3);
+}
+
+class StructuredOutputValidationRequest extends $pb.GeneratedMessage {
+  factory StructuredOutputValidationRequest({
+    $core.String? text,
+    StructuredOutputOptions? options,
+  }) {
+    final $result = create();
+    if (text != null) {
+      $result.text = text;
+    }
+    if (options != null) {
+      $result.options = options;
+    }
+    return $result;
+  }
+  StructuredOutputValidationRequest._() : super();
+  factory StructuredOutputValidationRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory StructuredOutputValidationRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'StructuredOutputValidationRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'text')
+    ..aOM<StructuredOutputOptions>(2, _omitFieldNames ? '' : 'options', subBuilder: StructuredOutputOptions.create)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  StructuredOutputValidationRequest clone() => StructuredOutputValidationRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  StructuredOutputValidationRequest copyWith(void Function(StructuredOutputValidationRequest) updates) => super.copyWith((message) => updates(message as StructuredOutputValidationRequest)) as StructuredOutputValidationRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static StructuredOutputValidationRequest create() => StructuredOutputValidationRequest._();
+  StructuredOutputValidationRequest createEmptyInstance() => create();
+  static $pb.PbList<StructuredOutputValidationRequest> createRepeated() => $pb.PbList<StructuredOutputValidationRequest>();
+  @$core.pragma('dart2js:noInline')
+  static StructuredOutputValidationRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<StructuredOutputValidationRequest>(create);
+  static StructuredOutputValidationRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get text => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set text($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasText() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearText() => clearField(1);
+
+  @$pb.TagNumber(2)
+  StructuredOutputOptions get options => $_getN(1);
+  @$pb.TagNumber(2)
+  set options(StructuredOutputOptions v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasOptions() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOptions() => clearField(2);
+  @$pb.TagNumber(2)
+  StructuredOutputOptions ensureOptions() => $_ensure(1);
+}
+
+class StructuredOutputPromptResult extends $pb.GeneratedMessage {
+  factory StructuredOutputPromptResult({
+    $core.String? preparedPrompt,
+    $core.String? systemPrompt,
+    $core.String? jsonSchema,
+    $core.String? regexPattern,
+    $core.String? grammar,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (preparedPrompt != null) {
+      $result.preparedPrompt = preparedPrompt;
+    }
+    if (systemPrompt != null) {
+      $result.systemPrompt = systemPrompt;
+    }
+    if (jsonSchema != null) {
+      $result.jsonSchema = jsonSchema;
+    }
+    if (regexPattern != null) {
+      $result.regexPattern = regexPattern;
+    }
+    if (grammar != null) {
+      $result.grammar = grammar;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  StructuredOutputPromptResult._() : super();
+  factory StructuredOutputPromptResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory StructuredOutputPromptResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'StructuredOutputPromptResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'preparedPrompt')
+    ..aOS(2, _omitFieldNames ? '' : 'systemPrompt')
+    ..aOS(3, _omitFieldNames ? '' : 'jsonSchema')
+    ..aOS(4, _omitFieldNames ? '' : 'regexPattern')
+    ..aOS(5, _omitFieldNames ? '' : 'grammar')
+    ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(7, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  StructuredOutputPromptResult clone() => StructuredOutputPromptResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  StructuredOutputPromptResult copyWith(void Function(StructuredOutputPromptResult) updates) => super.copyWith((message) => updates(message as StructuredOutputPromptResult)) as StructuredOutputPromptResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static StructuredOutputPromptResult create() => StructuredOutputPromptResult._();
+  StructuredOutputPromptResult createEmptyInstance() => create();
+  static $pb.PbList<StructuredOutputPromptResult> createRepeated() => $pb.PbList<StructuredOutputPromptResult>();
+  @$core.pragma('dart2js:noInline')
+  static StructuredOutputPromptResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<StructuredOutputPromptResult>(create);
+  static StructuredOutputPromptResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get preparedPrompt => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set preparedPrompt($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasPreparedPrompt() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPreparedPrompt() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get systemPrompt => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set systemPrompt($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasSystemPrompt() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSystemPrompt() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get jsonSchema => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set jsonSchema($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasJsonSchema() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearJsonSchema() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get regexPattern => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set regexPattern($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasRegexPattern() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRegexPattern() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get grammar => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set grammar($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasGrammar() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearGrammar() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get errorMessage => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set errorMessage($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasErrorMessage() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearErrorMessage() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get errorCode => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set errorCode($core.int v) { $_setSignedInt32(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasErrorCode() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearErrorCode() => clearField(7);
+}
+
+class StructuredOutputRequest extends $pb.GeneratedMessage {
+  factory StructuredOutputRequest({
+    $core.String? requestId,
+    $core.String? prompt,
+    StructuredOutputOptions? options,
+    $core.Map<$core.String, $core.String>? metadata,
+  }) {
+    final $result = create();
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (prompt != null) {
+      $result.prompt = prompt;
+    }
+    if (options != null) {
+      $result.options = options;
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
+    }
+    return $result;
+  }
+  StructuredOutputRequest._() : super();
+  factory StructuredOutputRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory StructuredOutputRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'StructuredOutputRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aOS(2, _omitFieldNames ? '' : 'prompt')
+    ..aOM<StructuredOutputOptions>(3, _omitFieldNames ? '' : 'options', subBuilder: StructuredOutputOptions.create)
+    ..m<$core.String, $core.String>(4, _omitFieldNames ? '' : 'metadata', entryClassName: 'StructuredOutputRequest.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  StructuredOutputRequest clone() => StructuredOutputRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  StructuredOutputRequest copyWith(void Function(StructuredOutputRequest) updates) => super.copyWith((message) => updates(message as StructuredOutputRequest)) as StructuredOutputRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static StructuredOutputRequest create() => StructuredOutputRequest._();
+  StructuredOutputRequest createEmptyInstance() => create();
+  static $pb.PbList<StructuredOutputRequest> createRepeated() => $pb.PbList<StructuredOutputRequest>();
+  @$core.pragma('dart2js:noInline')
+  static StructuredOutputRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<StructuredOutputRequest>(create);
+  static StructuredOutputRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get prompt => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set prompt($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasPrompt() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPrompt() => clearField(2);
+
+  @$pb.TagNumber(3)
+  StructuredOutputOptions get options => $_getN(2);
+  @$pb.TagNumber(3)
+  set options(StructuredOutputOptions v) { setField(3, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasOptions() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOptions() => clearField(3);
+  @$pb.TagNumber(3)
+  StructuredOutputOptions ensureOptions() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(3);
+}
+
+class StructuredOutputStreamEvent extends $pb.GeneratedMessage {
+  factory StructuredOutputStreamEvent({
+    $fixnum.Int64? seq,
+    $fixnum.Int64? timestampUs,
+    $core.String? requestId,
+    StructuredOutputStreamEventKind? kind,
+    $core.String? token,
+    $core.String? partialJson,
+    StructuredOutputValidation? validation,
+    StructuredOutputResult? result,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (seq != null) {
+      $result.seq = seq;
+    }
+    if (timestampUs != null) {
+      $result.timestampUs = timestampUs;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (kind != null) {
+      $result.kind = kind;
+    }
+    if (token != null) {
+      $result.token = token;
+    }
+    if (partialJson != null) {
+      $result.partialJson = partialJson;
+    }
+    if (validation != null) {
+      $result.validation = validation;
+    }
+    if (result != null) {
+      $result.result = result;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  StructuredOutputStreamEvent._() : super();
+  factory StructuredOutputStreamEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory StructuredOutputStreamEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'StructuredOutputStreamEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
+    ..aOS(3, _omitFieldNames ? '' : 'requestId')
+    ..e<StructuredOutputStreamEventKind>(4, _omitFieldNames ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED, valueOf: StructuredOutputStreamEventKind.valueOf, enumValues: StructuredOutputStreamEventKind.values)
+    ..aOS(5, _omitFieldNames ? '' : 'token')
+    ..aOS(6, _omitFieldNames ? '' : 'partialJson')
+    ..aOM<StructuredOutputValidation>(7, _omitFieldNames ? '' : 'validation', subBuilder: StructuredOutputValidation.create)
+    ..aOM<StructuredOutputResult>(8, _omitFieldNames ? '' : 'result', subBuilder: StructuredOutputResult.create)
+    ..aOS(9, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(10, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  StructuredOutputStreamEvent clone() => StructuredOutputStreamEvent()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  StructuredOutputStreamEvent copyWith(void Function(StructuredOutputStreamEvent) updates) => super.copyWith((message) => updates(message as StructuredOutputStreamEvent)) as StructuredOutputStreamEvent;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static StructuredOutputStreamEvent create() => StructuredOutputStreamEvent._();
+  StructuredOutputStreamEvent createEmptyInstance() => create();
+  static $pb.PbList<StructuredOutputStreamEvent> createRepeated() => $pb.PbList<StructuredOutputStreamEvent>();
+  @$core.pragma('dart2js:noInline')
+  static StructuredOutputStreamEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<StructuredOutputStreamEvent>(create);
+  static StructuredOutputStreamEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get seq => $_getI64(0);
+  @$pb.TagNumber(1)
+  set seq($fixnum.Int64 v) { $_setInt64(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasSeq() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSeq() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get timestampUs => $_getI64(1);
+  @$pb.TagNumber(2)
+  set timestampUs($fixnum.Int64 v) { $_setInt64(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasTimestampUs() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTimestampUs() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get requestId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set requestId($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasRequestId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRequestId() => clearField(3);
+
+  @$pb.TagNumber(4)
+  StructuredOutputStreamEventKind get kind => $_getN(3);
+  @$pb.TagNumber(4)
+  set kind(StructuredOutputStreamEventKind v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasKind() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearKind() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get token => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set token($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasToken() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearToken() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get partialJson => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set partialJson($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasPartialJson() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearPartialJson() => clearField(6);
+
+  @$pb.TagNumber(7)
+  StructuredOutputValidation get validation => $_getN(6);
+  @$pb.TagNumber(7)
+  set validation(StructuredOutputValidation v) { setField(7, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasValidation() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearValidation() => clearField(7);
+  @$pb.TagNumber(7)
+  StructuredOutputValidation ensureValidation() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  StructuredOutputResult get result => $_getN(7);
+  @$pb.TagNumber(8)
+  set result(StructuredOutputResult v) { setField(8, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasResult() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearResult() => clearField(8);
+  @$pb.TagNumber(8)
+  StructuredOutputResult ensureResult() => $_ensure(7);
+
+  @$pb.TagNumber(9)
+  $core.String get errorMessage => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set errorMessage($core.String v) { $_setString(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasErrorMessage() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearErrorMessage() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get errorCode => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set errorCode($core.int v) { $_setSignedInt32(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasErrorCode() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearErrorCode() => clearField(10);
 }
 
 /// ---------------------------------------------------------------------------
@@ -1217,6 +2022,21 @@ class NERResult extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(1)
   $core.List<NamedEntity> get entities => $_getList(0);
+}
+
+class StructuredOutputApi {
+  $pb.RpcClient _client;
+  StructuredOutputApi(this._client);
+
+  $async.Future<StructuredOutputPromptResult> preparePrompt($pb.ClientContext? ctx, StructuredOutputRequest request) =>
+    _client.invoke<StructuredOutputPromptResult>(ctx, 'StructuredOutput', 'PreparePrompt', request, StructuredOutputPromptResult())
+  ;
+  $async.Future<StructuredOutputValidation> validate($pb.ClientContext? ctx, StructuredOutputValidationRequest request) =>
+    _client.invoke<StructuredOutputValidation>(ctx, 'StructuredOutput', 'Validate', request, StructuredOutputValidation())
+  ;
+  $async.Future<StructuredOutputResult> parse($pb.ClientContext? ctx, StructuredOutputParseRequest request) =>
+    _client.invoke<StructuredOutputResult>(ctx, 'StructuredOutput', 'Parse', request, StructuredOutputResult())
+  ;
 }
 
 

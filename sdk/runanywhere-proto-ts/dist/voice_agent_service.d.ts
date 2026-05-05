@@ -1,5 +1,5 @@
 import _m0 from "protobufjs/minimal";
-import { AudioEncoding, VoiceAgentComponentStates } from "./voice_events";
+import { AudioEncoding, VoiceAgentComponentStates, VoiceEventCategory, VoiceEventSeverity } from "./voice_events";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * Empty request type — the voice agent already has its config set via
@@ -12,6 +12,11 @@ export interface VoiceAgentRequest {
      * (e.g. "user_said,assistant_token"). Empty = all events.
      */
     eventFilter: string;
+    sessionId: string;
+    categories: VoiceEventCategory[];
+    minSeverity: VoiceEventSeverity;
+    replayFromSeq: number;
+    includeAudio: boolean;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -60,6 +65,30 @@ export interface VoiceAgentResult {
     synthesizedAudioSampleRateHz: number;
     synthesizedAudioChannels: number;
     synthesizedAudioEncoding: AudioEncoding;
+    sessionId: string;
+    turnId: string;
+    sttTimeMs: number;
+    llmTimeMs: number;
+    ttsTimeMs: number;
+    totalTimeMs: number;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+export interface VoiceAgentTurnRequest {
+    requestId: string;
+    sessionId: string;
+    audioData: Uint8Array;
+    sampleRateHz: number;
+    channels: number;
+    encoding: AudioEncoding;
+    sessionConfig?: VoiceSessionConfig | undefined;
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface VoiceAgentTurnRequest_MetadataEntry {
+    key: string;
+    value: string;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -93,6 +122,11 @@ export interface VoiceSessionConfig {
     thinkingModeEnabled: boolean;
     /** Optional per-turn LLM max token limit. 0 = LLM/default. */
     maxTokens: number;
+    /** Maximum recording duration before forcing an end-of-turn. 0 = default. */
+    maxRecordingDurationMs: number;
+    /** Optional language/voice hints passed to STT/TTS adapters. */
+    languageCode?: string | undefined;
+    voiceId?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -183,6 +217,9 @@ export interface VoiceAgentComposeConfig {
      * the native voice-agent implementation.
      */
     audioPipelineConfig?: AudioPipelineConfig | undefined;
+    /** Correlation and defaults for event streams and one-shot turn APIs. */
+    sessionId?: string | undefined;
+    defaultLanguageCode?: string | undefined;
 }
 export declare const VoiceAgentRequest: {
     encode(message: VoiceAgentRequest, writer?: _m0.Writer): _m0.Writer;
@@ -199,6 +236,22 @@ export declare const VoiceAgentResult: {
     toJSON(message: VoiceAgentResult): unknown;
     create<I extends Exact<DeepPartial<VoiceAgentResult>, I>>(base?: I): VoiceAgentResult;
     fromPartial<I extends Exact<DeepPartial<VoiceAgentResult>, I>>(object: I): VoiceAgentResult;
+};
+export declare const VoiceAgentTurnRequest: {
+    encode(message: VoiceAgentTurnRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentTurnRequest;
+    fromJSON(object: any): VoiceAgentTurnRequest;
+    toJSON(message: VoiceAgentTurnRequest): unknown;
+    create<I extends Exact<DeepPartial<VoiceAgentTurnRequest>, I>>(base?: I): VoiceAgentTurnRequest;
+    fromPartial<I extends Exact<DeepPartial<VoiceAgentTurnRequest>, I>>(object: I): VoiceAgentTurnRequest;
+};
+export declare const VoiceAgentTurnRequest_MetadataEntry: {
+    encode(message: VoiceAgentTurnRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentTurnRequest_MetadataEntry;
+    fromJSON(object: any): VoiceAgentTurnRequest_MetadataEntry;
+    toJSON(message: VoiceAgentTurnRequest_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<VoiceAgentTurnRequest_MetadataEntry>, I>>(base?: I): VoiceAgentTurnRequest_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<VoiceAgentTurnRequest_MetadataEntry>, I>>(object: I): VoiceAgentTurnRequest_MetadataEntry;
 };
 export declare const VoiceSessionConfig: {
     encode(message: VoiceSessionConfig, writer?: _m0.Writer): _m0.Writer;

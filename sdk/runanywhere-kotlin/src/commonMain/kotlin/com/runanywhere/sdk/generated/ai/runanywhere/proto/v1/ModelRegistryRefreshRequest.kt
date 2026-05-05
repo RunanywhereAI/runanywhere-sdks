@@ -13,6 +13,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -80,6 +81,40 @@ public class ModelRegistryRefreshRequest(
     schemaIndex = 3,
   )
   public val query: ModelQuery? = null,
+  /**
+   * Portable catalog selector. Auth state, cookies, native HTTP clients, and
+   * background transfer handles are supplied by platform adapters.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "catalogUri",
+    schemaIndex = 4,
+  )
+  public val catalog_uri: String = "",
+  /**
+   * Ignore cached catalog metadata and force a fresh adapter-backed refresh.
+   */
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "forceRefresh",
+    schemaIndex = 5,
+  )
+  public val force_refresh: Boolean = false,
+  /**
+   * Include local downloaded/available state reconciliation in the refresh.
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "includeDownloadedState",
+    schemaIndex = 6,
+  )
+  public val include_downloaded_state: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelRegistryRefreshRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -97,6 +132,9 @@ public class ModelRegistryRefreshRequest(
     if (rescan_local != other.rescan_local) return false
     if (prune_orphans != other.prune_orphans) return false
     if (query != other.query) return false
+    if (catalog_uri != other.catalog_uri) return false
+    if (force_refresh != other.force_refresh) return false
+    if (include_downloaded_state != other.include_downloaded_state) return false
     return true
   }
 
@@ -108,6 +146,9 @@ public class ModelRegistryRefreshRequest(
       result = result * 37 + rescan_local.hashCode()
       result = result * 37 + prune_orphans.hashCode()
       result = result * 37 + (query?.hashCode() ?: 0)
+      result = result * 37 + catalog_uri.hashCode()
+      result = result * 37 + force_refresh.hashCode()
+      result = result * 37 + include_downloaded_state.hashCode()
       super.hashCode = result
     }
     return result
@@ -119,6 +160,9 @@ public class ModelRegistryRefreshRequest(
     result += """rescan_local=$rescan_local"""
     result += """prune_orphans=$prune_orphans"""
     if (query != null) result += """query=$query"""
+    result += """catalog_uri=${sanitize(catalog_uri)}"""
+    result += """force_refresh=$force_refresh"""
+    result += """include_downloaded_state=$include_downloaded_state"""
     return result.joinToString(prefix = "ModelRegistryRefreshRequest{", separator = ", ", postfix =
         "}")
   }
@@ -128,9 +172,12 @@ public class ModelRegistryRefreshRequest(
     rescan_local: Boolean = this.rescan_local,
     prune_orphans: Boolean = this.prune_orphans,
     query: ModelQuery? = this.query,
+    catalog_uri: String = this.catalog_uri,
+    force_refresh: Boolean = this.force_refresh,
+    include_downloaded_state: Boolean = this.include_downloaded_state,
     unknownFields: ByteString = this.unknownFields,
   ): ModelRegistryRefreshRequest = ModelRegistryRefreshRequest(include_remote_catalog, rescan_local,
-      prune_orphans, query, unknownFields)
+      prune_orphans, query, catalog_uri, force_refresh, include_downloaded_state, unknownFields)
 
   public companion object {
     @JvmField
@@ -152,6 +199,12 @@ public class ModelRegistryRefreshRequest(
         if (value.prune_orphans != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(3,
             value.prune_orphans)
         size += ModelQuery.ADAPTER.encodedSizeWithTag(4, value.query)
+        if (value.catalog_uri != "") size += ProtoAdapter.STRING.encodedSizeWithTag(5,
+            value.catalog_uri)
+        if (value.force_refresh != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(6,
+            value.force_refresh)
+        if (value.include_downloaded_state != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(7,
+            value.include_downloaded_state)
         return size
       }
 
@@ -163,11 +216,21 @@ public class ModelRegistryRefreshRequest(
         if (value.prune_orphans != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3,
             value.prune_orphans)
         ModelQuery.ADAPTER.encodeWithTag(writer, 4, value.query)
+        if (value.catalog_uri != "") ProtoAdapter.STRING.encodeWithTag(writer, 5, value.catalog_uri)
+        if (value.force_refresh != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.force_refresh)
+        if (value.include_downloaded_state != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.include_downloaded_state)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelRegistryRefreshRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.include_downloaded_state != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.include_downloaded_state)
+        if (value.force_refresh != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.force_refresh)
+        if (value.catalog_uri != "") ProtoAdapter.STRING.encodeWithTag(writer, 5, value.catalog_uri)
         ModelQuery.ADAPTER.encodeWithTag(writer, 4, value.query)
         if (value.prune_orphans != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3,
             value.prune_orphans)
@@ -182,12 +245,18 @@ public class ModelRegistryRefreshRequest(
         var rescan_local: Boolean = false
         var prune_orphans: Boolean = false
         var query: ModelQuery? = null
+        var catalog_uri: String = ""
+        var force_refresh: Boolean = false
+        var include_downloaded_state: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> include_remote_catalog = ProtoAdapter.BOOL.decode(reader)
             2 -> rescan_local = ProtoAdapter.BOOL.decode(reader)
             3 -> prune_orphans = ProtoAdapter.BOOL.decode(reader)
             4 -> query = ModelQuery.ADAPTER.decode(reader)
+            5 -> catalog_uri = ProtoAdapter.STRING.decode(reader)
+            6 -> force_refresh = ProtoAdapter.BOOL.decode(reader)
+            7 -> include_downloaded_state = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -196,6 +265,9 @@ public class ModelRegistryRefreshRequest(
           rescan_local = rescan_local,
           prune_orphans = prune_orphans,
           query = query,
+          catalog_uri = catalog_uri,
+          force_refresh = force_refresh,
+          include_downloaded_state = include_downloaded_state,
           unknownFields = unknownFields
         )
       }

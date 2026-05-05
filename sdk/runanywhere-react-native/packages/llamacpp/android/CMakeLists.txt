@@ -30,15 +30,9 @@ set_target_properties(rac_backend_llamacpp PROPERTIES
 )
 message(STATUS "[RunAnywhereLlama] Found RABackendLlamaCPP at ${JNILIB_DIR}/librac_backend_llamacpp.so")
 
-# =============================================================================
-# Source files - Llama bridges
-# =============================================================================
-file(GLOB BRIDGE_SOURCES "../cpp/bridges/*.cpp")
-
 add_library(${PACKAGE_NAME} SHARED
     src/main/cpp/cpp-adapter.cpp
     ../cpp/HybridRunAnywhereLlama.cpp
-    ${BRIDGE_SOURCES}
 )
 
 # =============================================================================
@@ -72,7 +66,6 @@ set(CORE_JNILIB_DIR "${RN_NODE_MODULES}/@runanywhere/core/android/src/main/jniLi
 include_directories(
     "src/main/cpp"
     "../cpp"
-    "../cpp/bridges"
     # nlohmann/json (header-only, vendored by sibling @runanywhere/core package).
     # Sharing avoids re-fetching the dependency and keeps both packages on the
     # same JSON version.

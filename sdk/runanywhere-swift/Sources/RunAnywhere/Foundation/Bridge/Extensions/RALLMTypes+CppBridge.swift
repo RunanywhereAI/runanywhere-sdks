@@ -18,6 +18,16 @@ extension RALLMConfiguration: ComponentConfiguration {
 // MARK: - RALLMGenerationOptions: C-bridge + convenience
 
 public extension RALLMGenerationOptions {
+    static func defaults() -> RALLMGenerationOptions {
+        RALLMGenerationOptions(
+            maxTokens: 100,
+            temperature: 0.8,
+            topP: 1.0,
+            topK: 0,
+            repetitionPenalty: 1.0
+        )
+    }
+
     init(
         maxTokens: Int = 512,
         temperature: Float = 0.7,
@@ -61,6 +71,38 @@ public extension RALLMGenerationOptions {
             cOptions.system_prompt = nil
             return try body(&cOptions)
         }
+    }
+
+    func toRALLMGenerateRequest(prompt: String) -> RALLMGenerateRequest {
+        var request = RALLMGenerateRequest()
+        request.prompt = prompt
+        request.maxTokens = maxTokens
+        request.temperature = temperature
+        request.topP = topP
+        request.topK = topK
+        request.repetitionPenalty = repetitionPenalty
+        request.stopSequences = stopSequences
+        request.streamingEnabled = streamingEnabled
+        request.preferredFramework = preferredFramework.wireString
+        if hasSystemPrompt {
+            request.systemPrompt = systemPrompt
+        }
+        if hasJsonSchema {
+            request.jsonSchema = jsonSchema
+        }
+        if hasStructuredOutput {
+            request.jsonSchema = structuredOutput.hasJsonSchema
+                ? structuredOutput.jsonSchema
+                : structuredOutput.schema.jsonSchemaString
+            request.responseFormat = structuredOutput.mode == .jsonObject ? "json_object" : "json_schema"
+            if !structuredOutput.grammar.isEmpty {
+                request.grammar = structuredOutput.grammar
+            }
+        }
+        if hasExecutionTarget {
+            request.executionTarget = executionTarget.wireString
+        }
+        return request
     }
 }
 
@@ -120,20 +162,13 @@ public extension RAThinkingTagPattern {
     }
 }
 
-// MARK: - RALoraAdapterCatalogEntry: C-bridge
-
-public extension RALoraAdapterCatalogEntry {
-    init(from cEntry: rac_lora_entry_t) {
-        var e = RALoraAdapterCatalogEntry()
-        if let id = cEntry.id { e.id = String(cString: id) }
-        if let n = cEntry.name { e.name = String(cString: n) }
-        if let u = cEntry.download_url { e.url = String(cString: u) }
-        if let f = cEntry.filename { e.filename = String(cString: f) }
-        if cEntry.compatible_model_count > 0, let ids = cEntry.compatible_model_ids {
-            e.compatibleModels = (0..<cEntry.compatible_model_count).compactMap { i in
-                ids[i].map { String(cString: $0) }
-            }
+public extension RAExecutionTarget {
+    var wireString: String {
+        switch self {
+        case .onDevice: return "on-device"
+        case .cloud: return "cloud"
+        case .auto: return "auto"
+        default: return ""
         }
-        self = e
     }
 }

@@ -55,6 +55,14 @@ public class ModelLoadRequest(
     schemaIndex = 3,
   )
   public val force_reload: Boolean = false,
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "validateAvailability",
+    schemaIndex = 4,
+  )
+  public val validate_availability: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelLoadRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -72,6 +80,7 @@ public class ModelLoadRequest(
     if (category != other.category) return false
     if (framework != other.framework) return false
     if (force_reload != other.force_reload) return false
+    if (validate_availability != other.validate_availability) return false
     return true
   }
 
@@ -83,6 +92,7 @@ public class ModelLoadRequest(
       result = result * 37 + (category?.hashCode() ?: 0)
       result = result * 37 + (framework?.hashCode() ?: 0)
       result = result * 37 + force_reload.hashCode()
+      result = result * 37 + validate_availability.hashCode()
       super.hashCode = result
     }
     return result
@@ -94,6 +104,7 @@ public class ModelLoadRequest(
     if (category != null) result += """category=$category"""
     if (framework != null) result += """framework=$framework"""
     result += """force_reload=$force_reload"""
+    result += """validate_availability=$validate_availability"""
     return result.joinToString(prefix = "ModelLoadRequest{", separator = ", ", postfix = "}")
   }
 
@@ -102,8 +113,10 @@ public class ModelLoadRequest(
     category: ModelCategory? = this.category,
     framework: InferenceFramework? = this.framework,
     force_reload: Boolean = this.force_reload,
+    validate_availability: Boolean = this.validate_availability,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelLoadRequest = ModelLoadRequest(model_id, category, framework, force_reload, unknownFields)
+  ): ModelLoadRequest = ModelLoadRequest(model_id, category, framework, force_reload,
+      validate_availability, unknownFields)
 
   public companion object {
     @JvmField
@@ -122,6 +135,8 @@ public class ModelLoadRequest(
         size += InferenceFramework.ADAPTER.encodedSizeWithTag(3, value.framework)
         if (value.force_reload != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(4,
             value.force_reload)
+        if (value.validate_availability != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5,
+            value.validate_availability)
         return size
       }
 
@@ -131,11 +146,15 @@ public class ModelLoadRequest(
         InferenceFramework.ADAPTER.encodeWithTag(writer, 3, value.framework)
         if (value.force_reload != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
             value.force_reload)
+        if (value.validate_availability != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
+            value.validate_availability)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelLoadRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.validate_availability != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
+            value.validate_availability)
         if (value.force_reload != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
             value.force_reload)
         InferenceFramework.ADAPTER.encodeWithTag(writer, 3, value.framework)
@@ -148,6 +167,7 @@ public class ModelLoadRequest(
         var category: ModelCategory? = null
         var framework: InferenceFramework? = null
         var force_reload: Boolean = false
+        var validate_availability: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
@@ -162,6 +182,7 @@ public class ModelLoadRequest(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             4 -> force_reload = ProtoAdapter.BOOL.decode(reader)
+            5 -> validate_availability = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -170,6 +191,7 @@ public class ModelLoadRequest(
           category = category,
           framework = framework,
           force_reload = force_reload,
+          validate_availability = validate_availability,
           unknownFields = unknownFields
         )
       }

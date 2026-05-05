@@ -1,84 +1,52 @@
 import 'dart:async';
 
-import 'package:runanywhere/public/events/sdk_event.dart';
+import 'package:runanywhere/generated/sdk_events.pb.dart';
 
-/// Central event bus for SDK-wide event distribution
-/// Thread-safe event bus using Dart Streams
+/// Central event bus for generated SDKEvent proto distribution.
 class EventBus {
   /// Shared instance - thread-safe singleton
   static final EventBus shared = EventBus._();
 
   EventBus._();
 
-  // Event controllers for each event type
-  final _initializationController =
-      StreamController<SDKInitializationEvent>.broadcast();
-  final _configurationController =
-      StreamController<SDKConfigurationEvent>.broadcast();
-  final _generationController =
-      StreamController<SDKGenerationEvent>.broadcast();
-  final _modelController = StreamController<SDKModelEvent>.broadcast();
-  final _voiceController = StreamController<SDKVoiceEvent>.broadcast();
-  final _storageController = StreamController<SDKStorageEvent>.broadcast();
-  final _deviceController = StreamController<SDKDeviceEvent>.broadcast();
-  final _ragController = StreamController<SDKRAGEvent>.broadcast();
   final _allEventsController = StreamController<SDKEvent>.broadcast();
 
-  /// Public streams for subscribing to events
-  Stream<SDKInitializationEvent> get initializationEvents =>
-      _initializationController.stream;
+  /// Public streams for subscribing to generated proto events.
+  Stream<SDKEvent> get initializationEvents =>
+      _where(EventCategory.EVENT_CATEGORY_INITIALIZATION);
 
-  Stream<SDKConfigurationEvent> get configurationEvents =>
-      _configurationController.stream;
+  Stream<SDKEvent> get configurationEvents =>
+      _where(EventCategory.EVENT_CATEGORY_SDK);
 
-  Stream<SDKGenerationEvent> get generationEvents =>
-      _generationController.stream;
+  Stream<SDKEvent> get generationEvents =>
+      _where(EventCategory.EVENT_CATEGORY_LLM);
 
-  Stream<SDKModelEvent> get modelEvents => _modelController.stream;
+  Stream<SDKEvent> get modelEvents =>
+      _where(EventCategory.EVENT_CATEGORY_MODEL);
 
-  Stream<SDKVoiceEvent> get voiceEvents => _voiceController.stream;
+  Stream<SDKEvent> get voiceEvents =>
+      _where(EventCategory.EVENT_CATEGORY_VOICE_AGENT);
 
-  Stream<SDKStorageEvent> get storageEvents => _storageController.stream;
+  Stream<SDKEvent> get storageEvents =>
+      _where(EventCategory.EVENT_CATEGORY_STORAGE);
 
-  Stream<SDKDeviceEvent> get deviceEvents => _deviceController.stream;
+  Stream<SDKEvent> get deviceEvents =>
+      _where(EventCategory.EVENT_CATEGORY_DEVICE);
 
-  Stream<SDKRAGEvent> get ragEvents => _ragController.stream;
+  Stream<SDKEvent> get ragEvents => _where(EventCategory.EVENT_CATEGORY_RAG);
 
   Stream<SDKEvent> get allEvents => _allEventsController.stream;
 
   /// Generic event publisher - dispatches to appropriate stream
   void publish(SDKEvent event) {
     _allEventsController.add(event);
-
-    if (event is SDKInitializationEvent) {
-      _initializationController.add(event);
-    } else if (event is SDKConfigurationEvent) {
-      _configurationController.add(event);
-    } else if (event is SDKGenerationEvent) {
-      _generationController.add(event);
-    } else if (event is SDKModelEvent) {
-      _modelController.add(event);
-    } else if (event is SDKVoiceEvent) {
-      _voiceController.add(event);
-    } else if (event is SDKStorageEvent) {
-      _storageController.add(event);
-    } else if (event is SDKDeviceEvent) {
-      _deviceController.add(event);
-    } else if (event is SDKRAGEvent) {
-      _ragController.add(event);
-    }
   }
 
   /// Dispose all controllers
   Future<void> dispose() async {
-    await _initializationController.close();
-    await _configurationController.close();
-    await _generationController.close();
-    await _modelController.close();
-    await _voiceController.close();
-    await _storageController.close();
-    await _deviceController.close();
-    await _ragController.close();
     await _allEventsController.close();
   }
+
+  Stream<SDKEvent> _where(EventCategory category) =>
+      _allEventsController.stream.where((event) => event.category == category);
 }

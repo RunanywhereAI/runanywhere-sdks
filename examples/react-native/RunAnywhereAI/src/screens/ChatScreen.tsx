@@ -49,26 +49,42 @@ import { ChatAnalyticsScreen } from './ChatAnalyticsScreen';
 import { ConversationListScreen } from './ConversationListScreen';
 import type { Message, Conversation, ToolCallInfo } from '../types/chat';
 import { MessageRole } from '../types/chat';
-import type { ModelInfo } from '../types/model';
-import { ModelModality, LLMFramework, ModelCategory } from '../types/model';
 import { useConversationStore } from '../stores/conversationStore';
 import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model';
 import { GENERATION_SETTINGS_KEYS } from '../types/settings';
+import {
+  getFrameworkDisplayName,
+  getPrimaryFramework,
+} from '../utils/modelDisplay';
 
 // Import RunAnywhere SDK (Multi-Package Architecture)
 import {
   RunAnywhere,
+  InferenceFramework,
+  ModelCategory,
   ToolParameterType,
   type ModelInfo as SDKModelInfo,
-  type GenerationOptions,
 } from '@runanywhere/core';
+import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
+import { ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
 import { safeEvaluateExpression } from '../utils/mathParser';
+import { logDiagnostic } from '../utils/diagnostics';
+
+// Canonical SDK methods (Swift / Kotlin / Flutter / Web parity).
+const getAvailableModels = RunAnywhere.getAvailableModels;
+const loadModelById = RunAnywhere.loadModel;
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
+
+interface GenerationSettings {
+  temperature: number;
+  maxTokens: number;
+  systemPrompt?: string;
+}
 
 // =============================================================================
 // TOOL CALLING SETUP - Weather API Example
@@ -84,7 +100,7 @@ const registerChatTools = () => {
 
   // Weather tool - Real API (wttr.in - no key needed)
   RunAnywhere.registerTool(
-    {
+    ToolDefinition.fromPartial({
       name: 'get_weather',
       description: 'Gets the current weather for a city or location',
       parameters: [
@@ -97,7 +113,7 @@ const registerChatTools = () => {
           enumValues: [],
         },
       ],
-    },
+    }),
     async (args) => {
       // Handle both 'location' and 'city' parameter names (models vary)
       const location = (args.location || args.city) as string;
@@ -137,11 +153,11 @@ const registerChatTools = () => {
 
   // Current time tool
   RunAnywhere.registerTool(
-    {
+    ToolDefinition.fromPartial({
       name: 'get_current_time',
       description: 'Gets the current date and time',
       parameters: [],
-    },
+    }),
     async () => {
       // eslint-disable-next-line no-console -- demo tool call diagnostic
       console.log('[Tool] get_current_time called');
@@ -156,7 +172,7 @@ const registerChatTools = () => {
 
   // Calculator tool - Math evaluation
   RunAnywhere.registerTool(
-    {
+    ToolDefinition.fromPartial({
       name: 'calculate',
       description:
         'Performs math calculations. Supports +, -, *, /, and parentheses',
@@ -169,7 +185,7 @@ const registerChatTools = () => {
           enumValues: [],
         },
       ],
-    },
+    }),
     async (args) => {
       const expression = (args.expression || args.input) as string;
       // eslint-disable-next-line no-console -- demo tool call diagnostic
@@ -239,7 +255,7 @@ export const ChatScreen: React.FC = () => {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isModelLoading, setIsModelLoading] = useState(false);
-  const [currentModel, setCurrentModel] = useState<ModelInfo | null>(null);
+  const [currentModel, setCurrentModel] = useState<SDKModelInfo | null>(null);
   const [_availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showConversationList, setShowConversationList] = useState(false);
@@ -295,7 +311,7 @@ export const ChatScreen: React.FC = () => {
    * Get generation options from AsyncStorage
    * Reads user-configured temperature, maxTokens, and systemPrompt
    */
-  const getGenerationOptions = async (): Promise<GenerationOptions> => {
+  const getGenerationOptions = async (): Promise<GenerationSettings> => {
     const tempStr = await AsyncStorage.getItem(
       GENERATION_SETTINGS_KEYS.TEMPERATURE
     );
@@ -326,12 +342,12 @@ export const ChatScreen: React.FC = () => {
    */
   const loadAvailableModels = async () => {
     try {
-      const allModels = await RunAnywhere.getAvailableModels();
+      const allModels = await getAvailableModels();
       const llmModels = allModels.filter(
         (m: SDKModelInfo) => m.category === ModelCategory.MODEL_CATEGORY_LANGUAGE
       );
       setAvailableModels(llmModels);
-      console.warn(
+      logDiagnostic(
         '[ChatScreen] Available LLM models:',
         llmModels.map(
           (m: SDKModelInfo) =>
@@ -354,7 +370,7 @@ export const ChatScreen: React.FC = () => {
   const checkModelStatus = async () => {
     try {
       const isLoaded = await RunAnywhere.isModelLoaded();
-      console.warn('[ChatScreen] Text model loaded:', isLoaded);
+      logDiagnostic('[ChatScreen] Text model loaded:', isLoaded);
     } catch (error) {
       console.warn('[ChatScreen] Error checking model status:', error);
     }
@@ -379,34 +395,40 @@ export const ChatScreen: React.FC = () => {
 
   /**
    * Load a model using the SDK
+   *
+   * Path-first loading was removed in V2 — model ID is the canonical handle
+   * and the native registry resolves the artifact path internally.
    */
   const loadModel = async (model: SDKModelInfo) => {
     try {
       setIsModelLoading(true);
-      console.warn(
-        `[ChatScreen] Loading model: ${model.id} from ${model.localPath}`
+      logDiagnostic(
+        `[ChatScreen] Loading model: ${model.id} (registry will resolve path)`
       );
 
-      if (!model.localPath) {
+      if (!model.isDownloaded && !model.localPath) {
         Alert.alert(
           'Error',
-          'Model path not found. Please re-download the model.'
+          'Model has not been downloaded. Open the model picker to download it first.'
         );
         return;
       }
 
-      const success = await RunAnywhere.loadModel(model.localPath);
+      const success = await loadModelById(
+        model.id,
+        ModelCategory.MODEL_CATEGORY_LANGUAGE,
+      );
 
       if (success) {
         // Set the model info preserving the actual framework from the SDK model
-        const fw =
-          (model.preferredFramework as unknown as LLMFramework) ??
-          LLMFramework.LlamaCpp;
-        const modelInfo: ModelInfo = {
+        const fw = getPrimaryFramework(
+          model,
+          InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
+        );
+        const modelInfo: SDKModelInfo = {
           ...model,
           category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-          compatibleFrameworks:
-            (model.compatibleFrameworks as unknown as LLMFramework[]) ?? [fw],
+          framework: model.framework || fw,
           preferredFramework: fw,
           isDownloaded: true,
           isAvailable: true,
@@ -416,7 +438,7 @@ export const ChatScreen: React.FC = () => {
 
         // Log model info for format detection debugging
         const format = detectToolCallFormat(model.id, model.name);
-        console.warn(
+        logDiagnostic(
           `[ChatScreen] Model loaded: id="${model.id}", name="${model.name}", detected format="${format}"`
         );
 
@@ -424,7 +446,7 @@ export const ChatScreen: React.FC = () => {
         registerChatTools();
         const tools = RunAnywhere.getRegisteredTools();
         setRegisteredToolCount(tools.length);
-        console.warn('[ChatScreen] Tools registered:', tools.length, 'tools');
+        logDiagnostic('[ChatScreen] Tools registered:', tools.length, 'tools');
       } else {
         const lastError = await RunAnywhere.getLastError();
         Alert.alert(
@@ -483,7 +505,7 @@ export const ChatScreen: React.FC = () => {
 
       let accumulatedText = '';
 
-      const genOptions = {
+      const genOptions = LLMGenerationOptions.fromPartial({
         maxTokens: options.maxTokens ?? 512,
         temperature: options.temperature ?? 0.7,
         topP: 1.0,
@@ -491,10 +513,20 @@ export const ChatScreen: React.FC = () => {
         repetitionPenalty: 1.0,
         stopSequences: [],
         streamingEnabled: true,
-        preferredFramework: 0,
+        preferredFramework:
+          currentModel?.preferredFramework ??
+          currentModel?.framework ??
+          InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
         systemPrompt: options.systemPrompt,
         enableRealTimeTracking: false,
-      };
+        seed: 0,
+        frequencyPenalty: 0,
+        presencePenalty: 0,
+        repeatLastN: 0,
+        minP: 0,
+        echoPrompt: false,
+        nThreads: 0,
+      });
 
       if (Platform.OS === 'android') {
         // NitroModules async iterator bridge doesn't deliver token
@@ -514,6 +546,9 @@ export const ChatScreen: React.FC = () => {
           const event = iterResult.value;
           if (event.token) {
             accumulatedText += event.token;
+            const frameworkName = getFrameworkDisplayName(
+              currentModel?.preferredFramework ?? currentModel?.framework
+            );
             const partialMessage: Message = {
               id: assistantMessageId,
               role: MessageRole.Assistant,
@@ -522,8 +557,8 @@ export const ChatScreen: React.FC = () => {
               modelInfo: {
                 modelId: currentModel?.id || 'unknown',
                 modelName: currentModel?.name || 'Unknown Model',
-                framework: currentModel?.preferredFramework || 'unknown',
-                frameworkDisplayName: currentModel?.preferredFramework || 'unknown',
+                framework: frameworkName,
+                frameworkDisplayName: frameworkName,
               },
             };
             await addMessage(partialMessage, currentConversation.id);
@@ -537,6 +572,9 @@ export const ChatScreen: React.FC = () => {
       const finalContent = accumulatedText || '(No response generated)';
 
       // Persist the final message with analytics
+      const frameworkName = getFrameworkDisplayName(
+        currentModel?.preferredFramework ?? currentModel?.framework
+      );
       const finalMessage: Message = {
         id: assistantMessageId,
         role: MessageRole.Assistant,
@@ -545,8 +583,8 @@ export const ChatScreen: React.FC = () => {
         modelInfo: {
           modelId: currentModel?.id || 'unknown',
           modelName: currentModel?.name || 'Unknown Model',
-          framework: currentModel?.preferredFramework || 'unknown',
-          frameworkDisplayName: currentModel?.preferredFramework || 'unknown',
+          framework: frameworkName,
+          frameworkDisplayName: frameworkName,
         },
         analytics: {
           totalGenerationTime: 0,
@@ -698,7 +736,7 @@ export const ChatScreen: React.FC = () => {
       <SafeAreaView style={styles.container}>
         {renderHeader()}
         <ModelRequiredOverlay
-          modality={ModelModality.LLM}
+          modality="llm"
           onSelectModel={handleSelectModel}
         />
 

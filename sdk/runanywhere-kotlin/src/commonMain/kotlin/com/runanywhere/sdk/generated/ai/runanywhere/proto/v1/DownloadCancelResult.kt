@@ -66,6 +66,30 @@ public class DownloadCancelResult(
     schemaIndex = 4,
   )
   public val error_message: String = "",
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "wasRunning",
+    schemaIndex = 5,
+  )
+  public val was_running: Boolean = false,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "partialBytesPreserved",
+    schemaIndex = 6,
+  )
+  public val partial_bytes_preserved: Boolean = false,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "resumeToken",
+    schemaIndex = 7,
+  )
+  public val resume_token: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DownloadCancelResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -84,6 +108,9 @@ public class DownloadCancelResult(
     if (model_id != other.model_id) return false
     if (partial_bytes_deleted != other.partial_bytes_deleted) return false
     if (error_message != other.error_message) return false
+    if (was_running != other.was_running) return false
+    if (partial_bytes_preserved != other.partial_bytes_preserved) return false
+    if (resume_token != other.resume_token) return false
     return true
   }
 
@@ -96,6 +123,9 @@ public class DownloadCancelResult(
       result = result * 37 + model_id.hashCode()
       result = result * 37 + partial_bytes_deleted.hashCode()
       result = result * 37 + error_message.hashCode()
+      result = result * 37 + was_running.hashCode()
+      result = result * 37 + partial_bytes_preserved.hashCode()
+      result = result * 37 + resume_token.hashCode()
       super.hashCode = result
     }
     return result
@@ -108,6 +138,9 @@ public class DownloadCancelResult(
     result += """model_id=${sanitize(model_id)}"""
     result += """partial_bytes_deleted=$partial_bytes_deleted"""
     result += """error_message=${sanitize(error_message)}"""
+    result += """was_running=$was_running"""
+    result += """partial_bytes_preserved=$partial_bytes_preserved"""
+    result += """resume_token=${sanitize(resume_token)}"""
     return result.joinToString(prefix = "DownloadCancelResult{", separator = ", ", postfix = "}")
   }
 
@@ -117,9 +150,12 @@ public class DownloadCancelResult(
     model_id: String = this.model_id,
     partial_bytes_deleted: Long = this.partial_bytes_deleted,
     error_message: String = this.error_message,
+    was_running: Boolean = this.was_running,
+    partial_bytes_preserved: Boolean = this.partial_bytes_preserved,
+    resume_token: String = this.resume_token,
     unknownFields: ByteString = this.unknownFields,
   ): DownloadCancelResult = DownloadCancelResult(success, task_id, model_id, partial_bytes_deleted,
-      error_message, unknownFields)
+      error_message, was_running, partial_bytes_preserved, resume_token, unknownFields)
 
   public companion object {
     @JvmField
@@ -141,6 +177,12 @@ public class DownloadCancelResult(
             value.partial_bytes_deleted)
         if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(5,
             value.error_message)
+        if (value.was_running != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(6,
+            value.was_running)
+        if (value.partial_bytes_preserved != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(7,
+            value.partial_bytes_preserved)
+        if (value.resume_token != "") size += ProtoAdapter.STRING.encodedSizeWithTag(8,
+            value.resume_token)
         return size
       }
 
@@ -152,11 +194,23 @@ public class DownloadCancelResult(
             value.partial_bytes_deleted)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 5,
             value.error_message)
+        if (value.was_running != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.was_running)
+        if (value.partial_bytes_preserved != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.partial_bytes_preserved)
+        if (value.resume_token != "") ProtoAdapter.STRING.encodeWithTag(writer, 8,
+            value.resume_token)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DownloadCancelResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.resume_token != "") ProtoAdapter.STRING.encodeWithTag(writer, 8,
+            value.resume_token)
+        if (value.partial_bytes_preserved != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.partial_bytes_preserved)
+        if (value.was_running != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.was_running)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 5,
             value.error_message)
         if (value.partial_bytes_deleted != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 4,
@@ -172,6 +226,9 @@ public class DownloadCancelResult(
         var model_id: String = ""
         var partial_bytes_deleted: Long = 0L
         var error_message: String = ""
+        var was_running: Boolean = false
+        var partial_bytes_preserved: Boolean = false
+        var resume_token: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> success = ProtoAdapter.BOOL.decode(reader)
@@ -179,6 +236,9 @@ public class DownloadCancelResult(
             3 -> model_id = ProtoAdapter.STRING.decode(reader)
             4 -> partial_bytes_deleted = ProtoAdapter.INT64.decode(reader)
             5 -> error_message = ProtoAdapter.STRING.decode(reader)
+            6 -> was_running = ProtoAdapter.BOOL.decode(reader)
+            7 -> partial_bytes_preserved = ProtoAdapter.BOOL.decode(reader)
+            8 -> resume_token = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -188,6 +248,9 @@ public class DownloadCancelResult(
           model_id = model_id,
           partial_bytes_deleted = partial_bytes_deleted,
           error_message = error_message,
+          was_running = was_running,
+          partial_bytes_preserved = partial_bytes_preserved,
+          resume_token = resume_token,
           unknownFields = unknownFields
         )
       }

@@ -18,6 +18,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
 #ifdef __cplusplus
@@ -310,6 +311,132 @@ RAC_API rac_result_t rac_model_registry_remove_proto(rac_model_registry_handle_t
  * @param proto_bytes Buffer to free (may be NULL)
  */
 RAC_API void rac_model_registry_proto_free(uint8_t* proto_bytes);
+
+// =============================================================================
+// CANONICAL PROTO-BUFFER MODEL REGISTRY API
+// =============================================================================
+
+/**
+ * @brief Save serialized runanywhere.v1.ModelInfo and return the saved ModelInfo.
+ *
+ * Output uses the canonical rac_proto_buffer_t ownership/error convention.
+ */
+RAC_API rac_result_t rac_model_registry_register_proto_buffer(
+    rac_model_registry_handle_t handle,
+    const uint8_t* proto_bytes,
+    size_t proto_size,
+    rac_proto_buffer_t* out_model);
+
+/**
+ * @brief Update an existing runanywhere.v1.ModelInfo and return the saved ModelInfo.
+ *
+ * Missing model ids return RAC_ERROR_NOT_FOUND in out_model->status.
+ */
+RAC_API rac_result_t rac_model_registry_update_proto_buffer(
+    rac_model_registry_handle_t handle,
+    const uint8_t* proto_bytes,
+    size_t proto_size,
+    rac_proto_buffer_t* out_model);
+
+/**
+ * @brief Get a model as serialized runanywhere.v1.ModelInfo bytes.
+ */
+RAC_API rac_result_t rac_model_registry_get_proto_buffer(
+    rac_model_registry_handle_t handle,
+    const char* model_id,
+    rac_proto_buffer_t* out_model);
+
+/**
+ * @brief List models as serialized runanywhere.v1.ModelInfoList bytes.
+ */
+RAC_API rac_result_t rac_model_registry_list_proto_buffer(
+    rac_model_registry_handle_t handle,
+    rac_proto_buffer_t* out_models);
+
+/**
+ * @brief Query models using serialized runanywhere.v1.ModelQuery bytes.
+ */
+RAC_API rac_result_t rac_model_registry_query_proto_buffer(
+    rac_model_registry_handle_t handle,
+    const uint8_t* query_proto_bytes,
+    size_t query_proto_size,
+    rac_proto_buffer_t* out_models);
+
+/**
+ * @brief List downloaded models as serialized runanywhere.v1.ModelInfoList bytes.
+ */
+RAC_API rac_result_t rac_model_registry_list_downloaded_proto_buffer(
+    rac_model_registry_handle_t handle,
+    rac_proto_buffer_t* out_models);
+
+/**
+ * @brief Remove model metadata and return serialized runanywhere.v1.ModelDeleteResult bytes.
+ *
+ * File deletion remains platform-owned; this function only unregisters the
+ * portable registry row.
+ */
+RAC_API rac_result_t rac_model_registry_remove_proto_buffer(
+    rac_model_registry_handle_t handle,
+    const char* model_id,
+    rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Handle serialized runanywhere.v1.ModelGetRequest bytes.
+ *
+ * Returns serialized runanywhere.v1.ModelGetResult bytes in out_result.
+ */
+RAC_API rac_result_t rac_model_registry_get_model_proto(
+    rac_model_registry_handle_t handle,
+    const uint8_t* request_proto_bytes,
+    size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Handle serialized runanywhere.v1.ModelListRequest bytes.
+ *
+ * Returns serialized runanywhere.v1.ModelListResult bytes in out_result.
+ */
+RAC_API rac_result_t rac_model_registry_list_models_proto(
+    rac_model_registry_handle_t handle,
+    const uint8_t* request_proto_bytes,
+    size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Handle serialized runanywhere.v1.ModelImportRequest bytes.
+ *
+ * The input source_path must already be a stable platform-normalized path.
+ * Commons records registry metadata only; it does not copy files or acquire OS
+ * handles.
+ */
+RAC_API rac_result_t rac_model_registry_import_proto(
+    rac_model_registry_handle_t handle,
+    const uint8_t* request_proto_bytes,
+    size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Handle serialized runanywhere.v1.ModelDiscoveryRequest bytes.
+ *
+ * Platform adapters own filesystem traversal. This portable entry point shapes
+ * discovery results from registry state and normalized local_path values.
+ */
+RAC_API rac_result_t rac_model_registry_discover_proto(
+    rac_model_registry_handle_t handle,
+    const uint8_t* request_proto_bytes,
+    size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Handle serialized runanywhere.v1.ModelRegistryRefreshRequest bytes.
+ *
+ * Returns serialized runanywhere.v1.ModelRegistryRefreshResult bytes.
+ */
+RAC_API rac_result_t rac_model_registry_refresh_proto(
+    rac_model_registry_handle_t handle,
+    const uint8_t* request_proto_bytes,
+    size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
 
 // =============================================================================
 // QUERY HELPERS

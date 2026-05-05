@@ -17,26 +17,35 @@ import ai.runanywhere.proto.v1.VADEventType
 import ai.runanywhere.proto.v1.VADOptions
 import ai.runanywhere.proto.v1.VADResult
 import ai.runanywhere.proto.v1.VADStatistics
+import ai.runanywhere.proto.v1.VADStreamEvent
+import ai.runanywhere.proto.v1.VADStreamEventKind
 import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVAD
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVADProto
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.flow
 
 private val vadLogger = SDKLogger.vad
 
-actual suspend fun RunAnywhere.detectVoiceActivity(audioData: ByteArray): VADResult {
+actual suspend fun RunAnywhere.detectVoiceActivity(audioData: ByteArray): VADResult =
+    detectVoiceActivity(audioData, VADOptions())
+
+actual suspend fun RunAnywhere.detectVoiceActivity(
+    audioData: ByteArray,
+    options: VADOptions,
+): VADResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
 
     vadLogger.debug("Processing VAD frame: ${audioData.size} bytes")
 
-    val result = CppBridgeVADProto.process(audioData.toFloatArray(), VADOptions())
+    val result = CppBridgeVADProto.process(audioData.toFloatArray(), options)
 
     if (result.is_speech) {
         vadLogger.debug("Speech detected (confidence: ${String.format("%.2f", result.confidence)})")
@@ -53,11 +62,78 @@ actual suspend fun RunAnywhere.getVADStatistics(): VADStatistics {
     return CppBridgeVADProto.statistics()
 }
 
-actual fun RunAnywhere.streamVAD(audioSamples: Flow<FloatArray>): Flow<VADResult> {
-    return audioSamples.map { samples ->
-        CppBridgeVADProto.process(samples, VADOptions())
+actual fun RunAnywhere.streamVAD(
+    audioSamples: Flow<FloatArray>,
+    options: VADOptions,
+): Flow<VADStreamEvent> =
+    flow {
+        if (!isInitialized) {
+            throw SDKException.notInitialized("SDK not initialized")
+        }
+
+        var sequence = 0L
+        fun nextSequence(): Long = ++sequence
+        fun nowUs(): Long = System.currentTimeMillis() * 1000L
+        val requestId = "vad-stream-${nowUs()}"
+
+        emit(
+            VADStreamEvent(
+                seq = nextSequence(),
+                timestamp_us = nowUs(),
+                request_id = requestId,
+                kind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_STARTED,
+            ),
+        )
+
+        try {
+            audioSamples.collect { samples ->
+                vadAudioBufferCallback?.invoke(samples)
+
+                val result = CppBridgeVADProto.process(samples, options)
+                val statistics =
+                    result.statistics ?: if (options.include_statistics) {
+                        CppBridgeVADProto.statistics()
+                    } else {
+                        null
+                    }
+                val callbackStatistics = statistics ?: VADStatistics(current_energy = result.energy)
+                vadStatisticsCallback?.invoke(callbackStatistics)
+
+                emit(
+                    VADStreamEvent(
+                        seq = nextSequence(),
+                        timestamp_us = nowUs(),
+                        request_id = requestId,
+                        kind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_FRAME,
+                        result = result,
+                        statistics = statistics,
+                    ),
+                )
+            }
+
+            emit(
+                VADStreamEvent(
+                    seq = nextSequence(),
+                    timestamp_us = nowUs(),
+                    request_id = requestId,
+                    kind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_STOPPED,
+                ),
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            emit(
+                VADStreamEvent(
+                    seq = nextSequence(),
+                    timestamp_us = nowUs(),
+                    request_id = requestId,
+                    kind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_ERROR,
+                    error_message = e.message ?: "VAD stream failed",
+                ),
+            )
+            throw e
+        }
     }
-}
 
 actual suspend fun RunAnywhere.calibrateVAD(ambientAudioData: ByteArray) {
     if (!isInitialized) {
@@ -70,7 +146,7 @@ actual suspend fun RunAnywhere.resetVAD() {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
-    CppBridgeVAD.reset()
+    CppBridgeVADProto.reset()
 }
 
 private fun ByteArray.toFloatArray(): FloatArray {
@@ -88,7 +164,7 @@ private fun ByteArray.toFloatArray(): FloatArray {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase 4a — VAD lifecycle parity with Swift's RunAnywhere+VAD.swift
-// Backed by CppBridgeVAD (which owns the native handle + state).
+// Backed by CppBridgeVADProto (which owns the native handle + state).
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Volatile private var vadAudioBufferCallback: ((FloatArray) -> Unit)? = null
@@ -97,41 +173,41 @@ private fun ByteArray.toFloatArray(): FloatArray {
 
 actual suspend fun RunAnywhere.initializeVAD() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    // Ensure native VAD component exists. CppBridgeVAD.create is idempotent.
-    CppBridgeVAD.create()
+    // Ensure native VAD component exists. CppBridgeVADProto.create is idempotent.
+    CppBridgeVADProto.create()
 }
 
 actual suspend fun RunAnywhere.initializeVAD(configuration: VADConfiguration) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    CppBridgeVAD.create()
+    CppBridgeVADProto.create()
     CppBridgeVADProto.configure(configuration)
 }
 
 actual suspend fun RunAnywhere.isVADReady(): Boolean {
     if (!isInitialized) return false
-    return CppBridgeVAD.isReady
+    return CppBridgeVADProto.isReady
 }
 
 actual suspend fun RunAnywhere.startVAD() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    // No explicit start verb in CppBridgeVAD — readiness is "loaded model";
+    // No explicit start verb in CppBridgeVADProto — readiness is "loaded model";
     // mirror Swift behaviour (start() forwards to C++ which is a no-op when
     // already ready).
-    CppBridgeVAD.create()
+    CppBridgeVADProto.create()
 }
 
 actual suspend fun RunAnywhere.stopVAD() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    CppBridgeVAD.cancel()
+    CppBridgeVADProto.cancel()
 }
 
 actual suspend fun RunAnywhere.setVADSpeechActivityCallback(
     callback: (VADEventType) -> Unit,
 ) {
     vadSpeechActivityCallback = callback
-    // The Kotlin SDK's recommended path is `streamVAD(samples)`; this
-    // setter records the callback for parity with Swift's API. The C
-    // bridge wires its own activity-callback when a stream is collected.
+    // Keep the Swift-parity setter until commons exposes a native
+    // VADStreamEvent stream ABI; the current JNI activity callback emits only
+    // SpeechActivityEvent bytes, not the public stream envelope.
 }
 
 actual suspend fun RunAnywhere.setVADAudioBufferCallback(callback: (FloatArray) -> Unit) {
@@ -148,13 +224,13 @@ actual suspend fun RunAnywhere.cleanupVAD() {
 actual suspend fun RunAnywhere.loadVADModel(modelId: String) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     val model = model(modelId) ?: throw SDKException.modelNotFound(modelId)
-    val localPath = model.localPath ?: throw SDKException.modelNotLoaded(modelId)
+    val localPath = model.local_path.takeIf { it.isNotEmpty() } ?: throw SDKException.modelNotLoaded(modelId)
     val result =
         loadModel(
             ModelLoadRequest(
                 model_id = modelId,
                 category = ProtoModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
-                framework = model.framework.toProto(),
+                framework = model.framework,
             ),
         )
     if (!result.success) {

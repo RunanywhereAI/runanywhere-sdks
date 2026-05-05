@@ -89,8 +89,13 @@ final class RAGViewModel {
     ///
     /// - Parameters:
     ///   - url: Security-scoped URL of the document (PDF or JSON).
-    ///   - config: RAG pipeline configuration with model paths and tuning parameters.
-    func loadDocument(url: URL, config: RAGConfiguration) async {
+    ///   - embeddingModel: Registry model selected for embeddings.
+    ///   - llmModel: Registry model selected for answer generation.
+    func loadDocument(
+        url: URL,
+        embeddingModel: RAModelInfo,
+        llmModel: RAModelInfo
+    ) async {
         isLoadingDocument = true
         error = nil
 
@@ -103,7 +108,18 @@ final class RAGViewModel {
             let extractedText = try DocumentService.extractText(from: url)
 
             logger.info("Creating RAG pipeline")
-            try await RunAnywhere.ragCreatePipeline(config: config)
+            var baseConfig = RARAGConfiguration.defaults()
+            baseConfig.embeddingDimension = 384
+            baseConfig.topK = 3
+            baseConfig.similarityThreshold = 0.12
+            baseConfig.maxContextTokens = 2048
+            baseConfig.chunkSize = 180
+            baseConfig.chunkOverlap = 30
+            try await RunAnywhere.ragCreatePipeline(
+                embeddingModel: embeddingModel,
+                llmModel: llmModel,
+                baseConfiguration: baseConfig
+            )
 
             logger.info("Ingesting document text (\(extractedText.count) chars)")
             try await RunAnywhere.ragIngest(text: extractedText)
@@ -149,7 +165,7 @@ final class RAGViewModel {
             let thinkingContent = RAGMessage.extractThinkingContent(from: result.answer)
             let displayText = RAGMessage.stripThinkTags(from: result.answer)
             messages.append(RAGMessage(role: .assistant, text: displayText, thinkingContent: thinkingContent))
-            logger.info("Query complete (\(result.totalTimeMs, format: .fixed(precision: 0))ms)")
+            logger.info("Query complete (\(Double(result.totalTimeMs), format: .fixed(precision: 0))ms)")
         } catch {
             self.error = error
             messages.append(RAGMessage(role: .assistant, text: "Error: \(error.localizedDescription)"))

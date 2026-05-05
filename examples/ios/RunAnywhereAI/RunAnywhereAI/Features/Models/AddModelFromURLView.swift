@@ -24,7 +24,7 @@ struct AddModelFromURLView: View {
     @State private var errorMessage: String?
     @State private var availableFrameworks: [InferenceFramework] = []
 
-    let onModelAdded: (ModelInfo) -> Void
+    let onModelAdded: (RAModelInfo) -> Void
 
     var body: some View {
         NavigationStack {
@@ -180,16 +180,13 @@ struct AddModelFromURLView: View {
         errorMessage = nil
 
         // Use the new registerModel API
-        let modelInfo = await MainActor.run {
-            RunAnywhere.registerModel(
-                name: modelName,
-                url: url,
-                framework: selectedFramework,
-                memoryRequirement: Int64(estimatedSize),
-                supportsThinking: supportsThinking
-            )
-        }
-        await RunAnywhere.flushPendingRegistrations()
+        let modelInfo = await RunAnywhere.registerModel(
+            name: modelName,
+            url: url,
+            framework: selectedFramework,
+            memoryRequirement: Int64(estimatedSize),
+            supportsThinking: supportsThinking
+        )
 
         await MainActor.run {
             onModelAdded(modelInfo)

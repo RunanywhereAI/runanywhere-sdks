@@ -122,7 +122,7 @@ fun LoraAdapterPickerSheet(
                 if (state.compatibleAdapters.isEmpty()) {
                     item {
                         Text(
-                            "No compatible adapters found for this model.",
+                            "No compatible LoRA catalog entries are available for this model.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(vertical = Dimensions.mediumLarge),

@@ -51,6 +51,22 @@ public class DownloadResumeRequest(
     schemaIndex = 2,
   )
   public val resume_from_bytes: Long = 0L,
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "resumeToken",
+    schemaIndex = 3,
+  )
+  public val resume_token: String = "",
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "validatePartialBytes",
+    schemaIndex = 4,
+  )
+  public val validate_partial_bytes: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DownloadResumeRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -67,6 +83,8 @@ public class DownloadResumeRequest(
     if (task_id != other.task_id) return false
     if (model_id != other.model_id) return false
     if (resume_from_bytes != other.resume_from_bytes) return false
+    if (resume_token != other.resume_token) return false
+    if (validate_partial_bytes != other.validate_partial_bytes) return false
     return true
   }
 
@@ -77,6 +95,8 @@ public class DownloadResumeRequest(
       result = result * 37 + task_id.hashCode()
       result = result * 37 + model_id.hashCode()
       result = result * 37 + resume_from_bytes.hashCode()
+      result = result * 37 + resume_token.hashCode()
+      result = result * 37 + validate_partial_bytes.hashCode()
       super.hashCode = result
     }
     return result
@@ -87,6 +107,8 @@ public class DownloadResumeRequest(
     result += """task_id=${sanitize(task_id)}"""
     result += """model_id=${sanitize(model_id)}"""
     result += """resume_from_bytes=$resume_from_bytes"""
+    result += """resume_token=${sanitize(resume_token)}"""
+    result += """validate_partial_bytes=$validate_partial_bytes"""
     return result.joinToString(prefix = "DownloadResumeRequest{", separator = ", ", postfix = "}")
   }
 
@@ -94,9 +116,11 @@ public class DownloadResumeRequest(
     task_id: String = this.task_id,
     model_id: String = this.model_id,
     resume_from_bytes: Long = this.resume_from_bytes,
+    resume_token: String = this.resume_token,
+    validate_partial_bytes: Boolean = this.validate_partial_bytes,
     unknownFields: ByteString = this.unknownFields,
   ): DownloadResumeRequest = DownloadResumeRequest(task_id, model_id, resume_from_bytes,
-      unknownFields)
+      resume_token, validate_partial_bytes, unknownFields)
 
   public companion object {
     @JvmField
@@ -115,6 +139,10 @@ public class DownloadResumeRequest(
         if (value.model_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.model_id)
         if (value.resume_from_bytes != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(3,
             value.resume_from_bytes)
+        if (value.resume_token != "") size += ProtoAdapter.STRING.encodedSizeWithTag(4,
+            value.resume_token)
+        if (value.validate_partial_bytes != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5,
+            value.validate_partial_bytes)
         return size
       }
 
@@ -123,11 +151,19 @@ public class DownloadResumeRequest(
         if (value.model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.model_id)
         if (value.resume_from_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 3,
             value.resume_from_bytes)
+        if (value.resume_token != "") ProtoAdapter.STRING.encodeWithTag(writer, 4,
+            value.resume_token)
+        if (value.validate_partial_bytes != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
+            value.validate_partial_bytes)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DownloadResumeRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.validate_partial_bytes != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
+            value.validate_partial_bytes)
+        if (value.resume_token != "") ProtoAdapter.STRING.encodeWithTag(writer, 4,
+            value.resume_token)
         if (value.resume_from_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 3,
             value.resume_from_bytes)
         if (value.model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.model_id)
@@ -138,11 +174,15 @@ public class DownloadResumeRequest(
         var task_id: String = ""
         var model_id: String = ""
         var resume_from_bytes: Long = 0L
+        var resume_token: String = ""
+        var validate_partial_bytes: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> task_id = ProtoAdapter.STRING.decode(reader)
             2 -> model_id = ProtoAdapter.STRING.decode(reader)
             3 -> resume_from_bytes = ProtoAdapter.INT64.decode(reader)
+            4 -> resume_token = ProtoAdapter.STRING.decode(reader)
+            5 -> validate_partial_bytes = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -150,6 +190,8 @@ public class DownloadResumeRequest(
           task_id = task_id,
           model_id = model_id,
           resume_from_bytes = resume_from_bytes,
+          resume_token = resume_token,
+          validate_partial_bytes = validate_partial_bytes,
           unknownFields = unknownFields
         )
       }

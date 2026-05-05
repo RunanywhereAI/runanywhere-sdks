@@ -114,6 +114,9 @@ RAC_PROTO_STATIC_DEPS=()
 collect_protobuf_static_deps() {
     local build_root="$1"
     local dep
+    local absl_count=0
+    local protobuf_has_absl_refs=0
+    local protobuf_archives=()
     RAC_PROTO_STATIC_DEPS=()
 
     if [ "${DRY_RUN}" = "1" ] || [ ! -d "${build_root}/_deps" ]; then
@@ -122,6 +125,14 @@ collect_protobuf_static_deps() {
 
     while IFS= read -r dep; do
         RAC_PROTO_STATIC_DEPS+=("${dep}")
+        case "$(basename "${dep}")" in
+            libabsl*.a)
+                absl_count=$((absl_count + 1))
+                ;;
+            libprotobuf*.a)
+                protobuf_archives+=("${dep}")
+                ;;
+        esac
     done < <(find "${build_root}/_deps" -type f \( \
         -name "libprotobuf.a" -o \
         -name "libprotobuf-lite.a" -o \
@@ -133,6 +144,20 @@ collect_protobuf_static_deps() {
         echo "error: no vendored protobuf/abseil static archives found under ${build_root}/_deps" >&2
         echo "       RACommons.xcframework must bundle protobuf runtime objects." >&2
         exit 1
+    fi
+
+    if [ "${#protobuf_archives[@]}" -gt 0 ] && [ "${absl_count}" -eq 0 ]; then
+        for dep in "${protobuf_archives[@]}"; do
+            if nm -u "${dep}" 2>/dev/null | grep -q "absl"; then
+                protobuf_has_absl_refs=1
+                break
+            fi
+        done
+        if [ "${protobuf_has_absl_refs}" = "1" ]; then
+            echo "error: vendored protobuf archive references absl, but no static libabsl*.a archives were found under ${build_root}/_deps" >&2
+            echo "       Reconfigure with RAC_VENDOR_PROTOBUF=ON and protobuf_FORCE_FETCH_DEPENDENCIES=ON before packaging RACommons.xcframework." >&2
+            exit 1
+        fi
     fi
 }
 
@@ -364,6 +389,8 @@ cmake_extra=(
     "-DRAC_ENABLE_SOLUTIONS=${RAC_ENABLE_SOLUTIONS:-ON}"
     "-DRAC_VENDOR_PROTOBUF=ON"
     "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"
+    "-DCMAKE_DISABLE_FIND_PACKAGE_absl=TRUE"
+    "-Dprotobuf_FORCE_FETCH_DEPENDENCIES=ON"
 )
 if [ "${RAC_BACKEND_ONNX}" = "OFF" ]; then
     cmake_extra+=("-DRAC_BACKEND_ONNX=OFF")
@@ -394,10 +421,13 @@ macos_cmake_args=(
     "-DRAC_BACKEND_DIFFUSION_COREML=OFF"
     "-DRAC_BACKEND_METALRT=OFF"
     "-DCMAKE_DISABLE_FIND_PACKAGE_Protobuf=TRUE"
+    "-DCMAKE_DISABLE_FIND_PACKAGE_absl=TRUE"
     "-DCMAKE_DISABLE_FIND_PACKAGE_CURL=TRUE"
+    "-DCMAKE_OSX_DEPLOYMENT_TARGET=14.0"
     "-DRAC_ENABLE_PROTOBUF=ON"
     "-DRAC_ENABLE_SOLUTIONS=${RAC_ENABLE_SOLUTIONS:-ON}"
     "-DRAC_VENDOR_PROTOBUF=ON"
+    "-Dprotobuf_FORCE_FETCH_DEPENDENCIES=ON"
 )
 run cmake --preset macos-release "${macos_cmake_args[@]}"
 echo "▶ Build macos-release"

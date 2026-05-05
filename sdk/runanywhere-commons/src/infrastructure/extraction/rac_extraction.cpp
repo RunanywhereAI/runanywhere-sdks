@@ -30,6 +30,128 @@ static const char* kLogTag = "Extraction";
 // INTERNAL HELPERS
 // =============================================================================
 
+enum class archive_kind {
+    unknown,
+    zip,
+    tar,
+    tar_gz,
+    tar_bz2,
+    tar_xz,
+};
+
+static archive_kind kind_from_archive_type(rac_archive_type_t type) {
+    switch (type) {
+        case RAC_ARCHIVE_TYPE_ZIP:
+            return archive_kind::zip;
+        case RAC_ARCHIVE_TYPE_TAR_BZ2:
+            return archive_kind::tar_bz2;
+        case RAC_ARCHIVE_TYPE_TAR_GZ:
+            return archive_kind::tar_gz;
+        case RAC_ARCHIVE_TYPE_TAR_XZ:
+            return archive_kind::tar_xz;
+        case RAC_ARCHIVE_TYPE_NONE:
+        default:
+            return archive_kind::unknown;
+    }
+}
+
+static bool archive_kind_to_archive_type(archive_kind kind, rac_archive_type_t* out_type) {
+    if (!out_type) {
+        return false;
+    }
+    switch (kind) {
+        case archive_kind::zip:
+            *out_type = RAC_ARCHIVE_TYPE_ZIP;
+            return true;
+        case archive_kind::tar_bz2:
+            *out_type = RAC_ARCHIVE_TYPE_TAR_BZ2;
+            return true;
+        case archive_kind::tar_gz:
+            *out_type = RAC_ARCHIVE_TYPE_TAR_GZ;
+            return true;
+        case archive_kind::tar_xz:
+            *out_type = RAC_ARCHIVE_TYPE_TAR_XZ;
+            return true;
+        case archive_kind::tar:
+        case archive_kind::unknown:
+        default:
+            return false;
+    }
+}
+
+static const char* archive_kind_name(archive_kind kind) {
+    switch (kind) {
+        case archive_kind::zip:
+            return "zip";
+        case archive_kind::tar:
+            return "tar";
+        case archive_kind::tar_gz:
+            return "tar.gz";
+        case archive_kind::tar_bz2:
+            return "tar.bz2";
+        case archive_kind::tar_xz:
+            return "tar.xz";
+        case archive_kind::unknown:
+        default:
+            return "unknown";
+    }
+}
+
+static archive_kind detect_archive_kind_from_bytes(const unsigned char* bytes, size_t size) {
+    if (!bytes || size < 2) {
+        return archive_kind::unknown;
+    }
+
+    // ZIP: local file header, empty archive end-of-central-directory, or
+    // spanned/split archive marker.
+    if (size >= 4 && bytes[0] == 0x50 && bytes[1] == 0x4B &&
+        ((bytes[2] == 0x03 && bytes[3] == 0x04) ||
+         (bytes[2] == 0x05 && bytes[3] == 0x06) ||
+         (bytes[2] == 0x07 && bytes[3] == 0x08))) {
+        return archive_kind::zip;
+    }
+
+    // GZIP (tar.gz): \x1f\x8b
+    if (bytes[0] == 0x1F && bytes[1] == 0x8B) {
+        return archive_kind::tar_gz;
+    }
+
+    // BZIP2 (tar.bz2): BZh
+    if (size >= 3 && bytes[0] == 0x42 && bytes[1] == 0x5A && bytes[2] == 0x68) {
+        return archive_kind::tar_bz2;
+    }
+
+    // XZ (tar.xz): \xFD7zXZ\x00
+    if (size >= 6 && bytes[0] == 0xFD && bytes[1] == 0x37 && bytes[2] == 0x7A &&
+        bytes[3] == 0x58 && bytes[4] == 0x5A && bytes[5] == 0x00) {
+        return archive_kind::tar_xz;
+    }
+
+    // POSIX tar: "ustar" at offset 257.
+    if (size >= 262 && memcmp(bytes + 257, "ustar", 5) == 0) {
+        return archive_kind::tar;
+    }
+
+    return archive_kind::unknown;
+}
+
+static archive_kind detect_archive_kind_from_file(const char* file_path) {
+    if (!file_path) {
+        return archive_kind::unknown;
+    }
+
+    FILE* f = fopen(file_path, "rb");
+    if (!f) {
+        return archive_kind::unknown;
+    }
+
+    unsigned char bytes[512] = {0};
+    size_t bytes_read = fread(bytes, 1, sizeof(bytes), f);
+    fclose(f);
+
+    return detect_archive_kind_from_bytes(bytes, bytes_read);
+}
+
 /**
  * Security: Check for path traversal (zip-slip attack).
  * Rejects absolute paths and paths containing ".." components.
@@ -150,6 +272,16 @@ rac_result_t rac_extract_archive_native(const char* archive_path, const char* de
 
     // Use defaults if no options provided
     rac_extraction_options_t opts = options ? *options : RAC_EXTRACTION_OPTIONS_DEFAULT;
+
+    archive_kind detected_kind = detect_archive_kind_from_file(archive_path);
+    archive_kind explicit_hint_kind = kind_from_archive_type(opts.archive_type_hint);
+    if (detected_kind != archive_kind::unknown &&
+        explicit_hint_kind != archive_kind::unknown && detected_kind != explicit_hint_kind) {
+        RAC_LOG_ERROR(kLogTag, "Archive type mismatch for %s: detected %s, expected %s",
+                      archive_path, archive_kind_name(detected_kind),
+                      archive_kind_name(explicit_hint_kind));
+        return RAC_ERROR_UNSUPPORTED_ARCHIVE;
+    }
 
     // Create destination directory
     rac_result_t dir_result = create_directories(destination_dir);
@@ -361,9 +493,10 @@ rac_result_t rac_extract_model_archive_native(
 
     memset(out_result, 0, sizeof(*out_result));
     out_result->archive_type = RAC_ARCHIVE_TYPE_NONE;
-    rac_archive_type_t detected = RAC_ARCHIVE_TYPE_NONE;
-    if (rac_detect_archive_type(archive_path, &detected) == RAC_TRUE) {
-        out_result->archive_type = detected;
+    rac_archive_type_t detected_type = RAC_ARCHIVE_TYPE_NONE;
+    archive_kind detected_kind = detect_archive_kind_from_file(archive_path);
+    if (archive_kind_to_archive_type(detected_kind, &detected_type)) {
+        out_result->archive_type = detected_type;
     } else if (options && options->archive_type_hint != RAC_ARCHIVE_TYPE_NONE) {
         out_result->archive_type = options->archive_type_hint;
     } else if (model_info->artifact_info.kind == RAC_ARTIFACT_KIND_ARCHIVE) {
@@ -397,42 +530,7 @@ rac_bool_t rac_detect_archive_type(const char* file_path, rac_archive_type_t* ou
     if (!file_path || !out_type)
         return RAC_FALSE;
 
-    FILE* f = fopen(file_path, "rb");
-    if (!f)
-        return RAC_FALSE;
-
-    unsigned char magic[6] = {0};
-    size_t bytes_read = fread(magic, 1, sizeof(magic), f);
-    fclose(f);
-
-    if (bytes_read < 2)
-        return RAC_FALSE;
-
-    // ZIP: PK\x03\x04
-    if (bytes_read >= 4 && magic[0] == 0x50 && magic[1] == 0x4B && magic[2] == 0x03 &&
-        magic[3] == 0x04) {
-        *out_type = RAC_ARCHIVE_TYPE_ZIP;
-        return RAC_TRUE;
-    }
-
-    // GZIP (tar.gz): \x1f\x8b
-    if (magic[0] == 0x1F && magic[1] == 0x8B) {
-        *out_type = RAC_ARCHIVE_TYPE_TAR_GZ;
-        return RAC_TRUE;
-    }
-
-    // BZIP2 (tar.bz2): BZh
-    if (bytes_read >= 3 && magic[0] == 0x42 && magic[1] == 0x5A && magic[2] == 0x68) {
-        *out_type = RAC_ARCHIVE_TYPE_TAR_BZ2;
-        return RAC_TRUE;
-    }
-
-    // XZ (tar.xz): \xFD7zXZ\x00
-    if (bytes_read >= 6 && magic[0] == 0xFD && magic[1] == 0x37 && magic[2] == 0x7A &&
-        magic[3] == 0x58 && magic[4] == 0x5A && magic[5] == 0x00) {
-        *out_type = RAC_ARCHIVE_TYPE_TAR_XZ;
-        return RAC_TRUE;
-    }
-
-    return RAC_FALSE;
+    return archive_kind_to_archive_type(detect_archive_kind_from_file(file_path), out_type)
+               ? RAC_TRUE
+               : RAC_FALSE;
 }

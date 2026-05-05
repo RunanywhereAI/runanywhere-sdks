@@ -16,6 +16,12 @@
  *
  * The strings are NOT retained — callers copy the output before the next call
  * (the implementation uses a thread_local arena that's reused).
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal`.
+ * SDK-facing thinking/response splits arrive inside
+ * runanywhere.v1.LLMGenerationResult / LLMStreamEvent bytes; this header
+ * is the portable parser used by commons to compute those splits. Do not
+ * expose it as a new public SDK surface.
  */
 
 #ifndef RAC_FEATURES_LLM_RAC_LLM_THINKING_H

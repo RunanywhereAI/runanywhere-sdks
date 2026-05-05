@@ -104,6 +104,38 @@ public class LLMStreamFinalResult(
     schemaIndex = 8,
   )
   public val finish_reason: String = "",
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "errorCode",
+    schemaIndex = 9,
+  )
+  public val error_code: Int = 0,
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "errorMessage",
+    schemaIndex = 10,
+  )
+  public val error_message: String = "",
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "promptEvalTimeMs",
+    schemaIndex = 11,
+  )
+  public val prompt_eval_time_ms: Long = 0L,
+  @field:WireField(
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "decodeTimeMs",
+    schemaIndex = 12,
+  )
+  public val decode_time_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMStreamFinalResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -126,6 +158,10 @@ public class LLMStreamFinalResult(
     if (time_to_first_token_ms != other.time_to_first_token_ms) return false
     if (tokens_per_second != other.tokens_per_second) return false
     if (finish_reason != other.finish_reason) return false
+    if (error_code != other.error_code) return false
+    if (error_message != other.error_message) return false
+    if (prompt_eval_time_ms != other.prompt_eval_time_ms) return false
+    if (decode_time_ms != other.decode_time_ms) return false
     return true
   }
 
@@ -142,6 +178,10 @@ public class LLMStreamFinalResult(
       result = result * 37 + time_to_first_token_ms.hashCode()
       result = result * 37 + tokens_per_second.hashCode()
       result = result * 37 + finish_reason.hashCode()
+      result = result * 37 + error_code.hashCode()
+      result = result * 37 + error_message.hashCode()
+      result = result * 37 + prompt_eval_time_ms.hashCode()
+      result = result * 37 + decode_time_ms.hashCode()
       super.hashCode = result
     }
     return result
@@ -158,6 +198,10 @@ public class LLMStreamFinalResult(
     result += """time_to_first_token_ms=$time_to_first_token_ms"""
     result += """tokens_per_second=$tokens_per_second"""
     result += """finish_reason=${sanitize(finish_reason)}"""
+    result += """error_code=$error_code"""
+    result += """error_message=${sanitize(error_message)}"""
+    result += """prompt_eval_time_ms=$prompt_eval_time_ms"""
+    result += """decode_time_ms=$decode_time_ms"""
     return result.joinToString(prefix = "LLMStreamFinalResult{", separator = ", ", postfix = "}")
   }
 
@@ -171,10 +215,14 @@ public class LLMStreamFinalResult(
     time_to_first_token_ms: Long = this.time_to_first_token_ms,
     tokens_per_second: Float = this.tokens_per_second,
     finish_reason: String = this.finish_reason,
+    error_code: Int = this.error_code,
+    error_message: String = this.error_message,
+    prompt_eval_time_ms: Long = this.prompt_eval_time_ms,
+    decode_time_ms: Long = this.decode_time_ms,
     unknownFields: ByteString = this.unknownFields,
   ): LLMStreamFinalResult = LLMStreamFinalResult(text, thinking_content, prompt_tokens,
       completion_tokens, total_tokens, total_time_ms, time_to_first_token_ms, tokens_per_second,
-      finish_reason, unknownFields)
+      finish_reason, error_code, error_message, prompt_eval_time_ms, decode_time_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -205,6 +253,14 @@ public class LLMStreamFinalResult(
             value.tokens_per_second)
         if (value.finish_reason != "") size += ProtoAdapter.STRING.encodedSizeWithTag(9,
             value.finish_reason)
+        if (value.error_code != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(10,
+            value.error_code)
+        if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(11,
+            value.error_message)
+        if (value.prompt_eval_time_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(12,
+            value.prompt_eval_time_ms)
+        if (value.decode_time_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(13,
+            value.decode_time_ms)
         return size
       }
 
@@ -224,11 +280,25 @@ public class LLMStreamFinalResult(
             value.tokens_per_second)
         if (value.finish_reason != "") ProtoAdapter.STRING.encodeWithTag(writer, 9,
             value.finish_reason)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 10, value.error_code)
+        if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 11,
+            value.error_message)
+        if (value.prompt_eval_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 12,
+            value.prompt_eval_time_ms)
+        if (value.decode_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 13,
+            value.decode_time_ms)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMStreamFinalResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.decode_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 13,
+            value.decode_time_ms)
+        if (value.prompt_eval_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 12,
+            value.prompt_eval_time_ms)
+        if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 11,
+            value.error_message)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 10, value.error_code)
         if (value.finish_reason != "") ProtoAdapter.STRING.encodeWithTag(writer, 9,
             value.finish_reason)
         if (!value.tokens_per_second.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 8,
@@ -256,6 +326,10 @@ public class LLMStreamFinalResult(
         var time_to_first_token_ms: Long = 0L
         var tokens_per_second: Float = 0f
         var finish_reason: String = ""
+        var error_code: Int = 0
+        var error_message: String = ""
+        var prompt_eval_time_ms: Long = 0L
+        var decode_time_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
@@ -267,6 +341,10 @@ public class LLMStreamFinalResult(
             7 -> time_to_first_token_ms = ProtoAdapter.INT64.decode(reader)
             8 -> tokens_per_second = ProtoAdapter.FLOAT.decode(reader)
             9 -> finish_reason = ProtoAdapter.STRING.decode(reader)
+            10 -> error_code = ProtoAdapter.INT32.decode(reader)
+            11 -> error_message = ProtoAdapter.STRING.decode(reader)
+            12 -> prompt_eval_time_ms = ProtoAdapter.INT64.decode(reader)
+            13 -> decode_time_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -280,6 +358,10 @@ public class LLMStreamFinalResult(
           time_to_first_token_ms = time_to_first_token_ms,
           tokens_per_second = tokens_per_second,
           finish_reason = finish_reason,
+          error_code = error_code,
+          error_message = error_message,
+          prompt_eval_time_ms = prompt_eval_time_ms,
+          decode_time_ms = decode_time_ms,
           unknownFields = unknownFields
         )
       }

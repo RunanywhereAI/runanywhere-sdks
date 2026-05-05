@@ -68,6 +68,21 @@ public class ModelImportResult(
     schemaIndex = 5,
   )
   public val error_message: String = "",
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 6,
+  )
+  public val registered: Boolean = false,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "copiedIntoManagedStorage",
+    schemaIndex = 7,
+  )
+  public val copied_into_managed_storage: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelImportResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -95,6 +110,8 @@ public class ModelImportResult(
     if (imported_bytes != other.imported_bytes) return false
     if (warnings != other.warnings) return false
     if (error_message != other.error_message) return false
+    if (registered != other.registered) return false
+    if (copied_into_managed_storage != other.copied_into_managed_storage) return false
     return true
   }
 
@@ -108,6 +125,8 @@ public class ModelImportResult(
       result = result * 37 + imported_bytes.hashCode()
       result = result * 37 + warnings.hashCode()
       result = result * 37 + error_message.hashCode()
+      result = result * 37 + registered.hashCode()
+      result = result * 37 + copied_into_managed_storage.hashCode()
       super.hashCode = result
     }
     return result
@@ -121,6 +140,8 @@ public class ModelImportResult(
     result += """imported_bytes=$imported_bytes"""
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
     result += """error_message=${sanitize(error_message)}"""
+    result += """registered=$registered"""
+    result += """copied_into_managed_storage=$copied_into_managed_storage"""
     return result.joinToString(prefix = "ModelImportResult{", separator = ", ", postfix = "}")
   }
 
@@ -131,9 +152,11 @@ public class ModelImportResult(
     imported_bytes: Long = this.imported_bytes,
     warnings: List<String> = this.warnings,
     error_message: String = this.error_message,
+    registered: Boolean = this.registered,
+    copied_into_managed_storage: Boolean = this.copied_into_managed_storage,
     unknownFields: ByteString = this.unknownFields,
   ): ModelImportResult = ModelImportResult(success, model, local_path, imported_bytes, warnings,
-      error_message, unknownFields)
+      error_message, registered, copied_into_managed_storage, unknownFields)
 
   public companion object {
     @JvmField
@@ -156,6 +179,10 @@ public class ModelImportResult(
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(5, value.warnings)
         if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(6,
             value.error_message)
+        if (value.registered != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(7,
+            value.registered)
+        if (value.copied_into_managed_storage != false) size +=
+            ProtoAdapter.BOOL.encodedSizeWithTag(8, value.copied_into_managed_storage)
         return size
       }
 
@@ -168,11 +195,17 @@ public class ModelImportResult(
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.warnings)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
             value.error_message)
+        if (value.registered != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.registered)
+        if (value.copied_into_managed_storage != false) ProtoAdapter.BOOL.encodeWithTag(writer, 8,
+            value.copied_into_managed_storage)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelImportResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.copied_into_managed_storage != false) ProtoAdapter.BOOL.encodeWithTag(writer, 8,
+            value.copied_into_managed_storage)
+        if (value.registered != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7, value.registered)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
             value.error_message)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.warnings)
@@ -190,6 +223,8 @@ public class ModelImportResult(
         var imported_bytes: Long = 0L
         val warnings = mutableListOf<String>()
         var error_message: String = ""
+        var registered: Boolean = false
+        var copied_into_managed_storage: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> success = ProtoAdapter.BOOL.decode(reader)
@@ -198,6 +233,8 @@ public class ModelImportResult(
             4 -> imported_bytes = ProtoAdapter.INT64.decode(reader)
             5 -> warnings.add(ProtoAdapter.STRING.decode(reader))
             6 -> error_message = ProtoAdapter.STRING.decode(reader)
+            7 -> registered = ProtoAdapter.BOOL.decode(reader)
+            8 -> copied_into_managed_storage = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -208,6 +245,8 @@ public class ModelImportResult(
           imported_bytes = imported_bytes,
           warnings = warnings,
           error_message = error_message,
+          registered = registered,
+          copied_into_managed_storage = copied_into_managed_storage,
           unknownFields = unknownFields
         )
       }

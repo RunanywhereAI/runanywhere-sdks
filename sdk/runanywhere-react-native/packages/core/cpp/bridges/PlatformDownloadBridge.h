@@ -9,9 +9,9 @@
  *
  * NOTE: The `SyncHttpDownload` C++ wrapper that previously lived here was
  * the B-RN-3-001 / G-A6 workaround around libcurl HTTPS on Android. It was
- * removed in Task M5 — `HybridRunAnywhereCore::downloadModel` now goes
- * straight through `rac_http_download_execute`, which uses the registered
- * platform HTTP transport (OkHttp / URLSession) wired by Task M1.2.
+ * removed in Task M5. RN downloads now enter commons through the
+ * `rac_download_*_proto` ABI, which uses the registered platform HTTP
+ * transport (OkHttp / URLSession).
  */
 
 #ifndef RUNANYWHERE_PLATFORM_DOWNLOAD_BRIDGE_H

@@ -13,6 +13,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -24,6 +25,7 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.List
 import okio.ByteString
 
 /**
@@ -143,8 +145,36 @@ public class DiffusionResult(
     schemaIndex = 8,
   )
   public val error_code: Int = 0,
+  /**
+   * Output image media type, e.g. "image/png" or "image/raw-rgba".
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "imageMediaType",
+    schemaIndex = 9,
+  )
+  public val image_media_type: String? = null,
+  batch_images: List<ByteString> = emptyList(),
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "imagesGenerated",
+    schemaIndex = 11,
+  )
+  public val images_generated: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DiffusionResult, Nothing>(ADAPTER, unknownFields) {
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#BYTES",
+    label = WireField.Label.REPEATED,
+    jsonName = "batchImages",
+    schemaIndex = 10,
+  )
+  public val batch_images: List<ByteString> = immutableCopyOf("batch_images", batch_images)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -165,6 +195,9 @@ public class DiffusionResult(
     if (used_scheduler != other.used_scheduler) return false
     if (error_message != other.error_message) return false
     if (error_code != other.error_code) return false
+    if (image_media_type != other.image_media_type) return false
+    if (batch_images != other.batch_images) return false
+    if (images_generated != other.images_generated) return false
     return true
   }
 
@@ -181,6 +214,9 @@ public class DiffusionResult(
       result = result * 37 + used_scheduler.hashCode()
       result = result * 37 + (error_message?.hashCode() ?: 0)
       result = result * 37 + error_code.hashCode()
+      result = result * 37 + (image_media_type?.hashCode() ?: 0)
+      result = result * 37 + batch_images.hashCode()
+      result = result * 37 + images_generated.hashCode()
       super.hashCode = result
     }
     return result
@@ -197,6 +233,9 @@ public class DiffusionResult(
     result += """used_scheduler=$used_scheduler"""
     if (error_message != null) result += """error_message=${sanitize(error_message)}"""
     result += """error_code=$error_code"""
+    if (image_media_type != null) result += """image_media_type=${sanitize(image_media_type)}"""
+    if (batch_images.isNotEmpty()) result += """batch_images=$batch_images"""
+    result += """images_generated=$images_generated"""
     return result.joinToString(prefix = "DiffusionResult{", separator = ", ", postfix = "}")
   }
 
@@ -210,9 +249,13 @@ public class DiffusionResult(
     used_scheduler: DiffusionScheduler = this.used_scheduler,
     error_message: String? = this.error_message,
     error_code: Int = this.error_code,
+    image_media_type: String? = this.image_media_type,
+    batch_images: List<ByteString> = this.batch_images,
+    images_generated: Int = this.images_generated,
     unknownFields: ByteString = this.unknownFields,
   ): DiffusionResult = DiffusionResult(image_data, width, height, seed_used, total_time_ms,
-      safety_flag, used_scheduler, error_message, error_code, unknownFields)
+      safety_flag, used_scheduler, error_message, error_code, image_media_type, batch_images,
+      images_generated, unknownFields)
 
   public companion object {
     @JvmField
@@ -240,6 +283,10 @@ public class DiffusionResult(
         size += ProtoAdapter.STRING.encodedSizeWithTag(8, value.error_message)
         if (value.error_code != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(9,
             value.error_code)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.image_media_type)
+        size += ProtoAdapter.BYTES.asRepeated().encodedSizeWithTag(11, value.batch_images)
+        if (value.images_generated != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(12,
+            value.images_generated)
         return size
       }
 
@@ -257,11 +304,19 @@ public class DiffusionResult(
             DiffusionScheduler.ADAPTER.encodeWithTag(writer, 7, value.used_scheduler)
         ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error_message)
         if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 9, value.error_code)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.image_media_type)
+        ProtoAdapter.BYTES.asRepeated().encodeWithTag(writer, 11, value.batch_images)
+        if (value.images_generated != 0) ProtoAdapter.INT32.encodeWithTag(writer, 12,
+            value.images_generated)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DiffusionResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.images_generated != 0) ProtoAdapter.INT32.encodeWithTag(writer, 12,
+            value.images_generated)
+        ProtoAdapter.BYTES.asRepeated().encodeWithTag(writer, 11, value.batch_images)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.image_media_type)
         if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 9, value.error_code)
         ProtoAdapter.STRING.encodeWithTag(writer, 8, value.error_message)
         if (value.used_scheduler != DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED)
@@ -287,6 +342,9 @@ public class DiffusionResult(
         var used_scheduler: DiffusionScheduler = DiffusionScheduler.DIFFUSION_SCHEDULER_UNSPECIFIED
         var error_message: String? = null
         var error_code: Int = 0
+        var image_media_type: String? = null
+        val batch_images = mutableListOf<ByteString>()
+        var images_generated: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> image_data = ProtoAdapter.BYTES.decode(reader)
@@ -302,6 +360,9 @@ public class DiffusionResult(
             }
             8 -> error_message = ProtoAdapter.STRING.decode(reader)
             9 -> error_code = ProtoAdapter.INT32.decode(reader)
+            10 -> image_media_type = ProtoAdapter.STRING.decode(reader)
+            11 -> batch_images.add(ProtoAdapter.BYTES.decode(reader))
+            12 -> images_generated = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -315,6 +376,9 @@ public class DiffusionResult(
           used_scheduler = used_scheduler,
           error_message = error_message,
           error_code = error_code,
+          image_media_type = image_media_type,
+          batch_images = batch_images,
+          images_generated = images_generated,
           unknownFields = unknownFields
         )
       }

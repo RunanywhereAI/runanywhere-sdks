@@ -2,121 +2,307 @@
  * RunAnywhere+TTS.ts
  *
  * Text-to-speech namespace — mirrors Swift's `RunAnywhere+TTS.swift`.
- * Provides `RunAnywhere.tts.*` capability surface around synthesize/speak.
+ * Provides `RunAnywhere.tts.*` capability surface for owning TTS component
+ * handles plus a top-level `RunAnywhere.synthesize(text, options)` shortcut.
+ *
+ * The proto-byte adapters (`TTSProtoAdapter`) take a numeric `handle` argument
+ * — it comes from `_rac_tts_component_create()` followed by
+ * `_rac_tts_component_load_voice()`. This facade owns those calls so the
+ * example app and external consumers never have to touch raw exports.
  */
 
-import type { TTSOptions, TTSOutput, TTSVoiceInfo } from '@runanywhere/proto-ts/tts_options';
-import type { TTSSynthesisResult, TTSSynthesizeOptions } from '../../types/index';
-import { synthesize, speak, isSpeaking, stopSpeaking } from './RunAnywhere+Convenience';
+import { AudioFormat } from '@runanywhere/proto-ts/model_types';
+import {
+  type TTSOptions,
+  type TTSOutput,
+  type TTSVoiceInfo,
+} from '@runanywhere/proto-ts/tts_options';
 import { SDKException } from '../../Foundation/SDKException';
-import { ExtensionPoint } from '../../Infrastructure/ExtensionPoint';
+import { SDKLogger } from '../../Foundation/SDKLogger';
+import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
+import {
+  tryRunanywhereModule,
+  type EmscriptenRunanywhereModule,
+} from '../../runtime/EmscriptenModule';
+import { TTSProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
+import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
 
 export type { TTSOptions, TTSOutput, TTSVoiceInfo };
 
-/** TTS provider interface extensions for model/voice management. */
-interface TTSModelProvider {
-  loadTTSVoice?(voiceId: string): Promise<void>;
-  unloadTTSVoice?(): Promise<void>;
-  isTTSVoiceLoaded?: boolean;
-  availableTTSVoices?(): Promise<TTSVoiceInfo[]>;
-  loadTTSModel?(modelId: string): Promise<void>;
-  unloadTTSModel?(): Promise<void>;
-  synthesizeStream?(text: string, options?: TTSSynthesizeOptions): AsyncIterable<Uint8Array>;
+const logger = new SDKLogger('TTS');
+
+/**
+ * Extra Emscripten exports the TTS facade reaches into directly. The proto
+ * `synthesize`/`synthesizeStream`/`listVoices` calls go through
+ * `TTSProtoAdapter`; what this facade adds is the component lifecycle.
+ */
+interface TTSComponentModule extends EmscriptenRunanywhereModule {
+  _rac_tts_component_create?(outHandlePtr: number): number;
+  _rac_tts_component_load_voice?(
+    handle: number,
+    voicePathPtr: number,
+    voiceIdPtr: number,
+    voiceNamePtr: number,
+  ): number;
+  _rac_tts_component_unload?(handle: number): number;
+  _rac_tts_component_destroy?(handle: number): void;
+  _rac_tts_component_is_loaded?(handle: number): number;
+  _rac_tts_component_stop?(handle: number): number;
 }
 
-function getTTSProvider(): TTSModelProvider | null {
-  return ExtensionPoint.getProvider('tts') as TTSModelProvider | null;
+function requireTTSModule(feature: string): TTSComponentModule {
+  const module = tryRunanywhereModule() as TTSComponentModule | null;
+  if (!module) {
+    throw SDKException.backendNotAvailable(
+      feature,
+      'RunAnywhere WASM module is not initialized. Call a backend.register() first.',
+    );
+  }
+  return module;
+}
+
+function defaultTTSOptions(overrides?: Partial<TTSOptions>): TTSOptions {
+  return {
+    voice: '',
+    languageCode: '',
+    speakingRate: 1.0,
+    pitch: 1.0,
+    volume: 1.0,
+    enableSsml: false,
+    audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
+    sampleRate: 0,
+    ...(overrides ?? {}),
+  } as TTSOptions;
+}
+
+function callCreate(module: TTSComponentModule): number {
+  if (typeof module._rac_tts_component_create !== 'function') {
+    throw SDKException.backendNotAvailable(
+      'TTS.create',
+      'Loaded WASM module does not export _rac_tts_component_create.',
+    );
+  }
+  const bridge = new ProtoWasmBridge(module, logger);
+  const outPtr = bridge.allocOutPtr();
+  if (!outPtr) {
+    throw SDKException.fromCode(-180, 'TTS.create: failed to allocate output handle slot');
+  }
+  try {
+    const rc = module._rac_tts_component_create(outPtr);
+    if (rc !== 0) {
+      throw SDKException.fromRACResult(
+        rc,
+        `rac_tts_component_create failed with code ${rc}`,
+      );
+    }
+    const handle = bridge.readU32(outPtr);
+    if (!handle) {
+      throw SDKException.componentNotReady(
+        'tts',
+        'rac_tts_component_create returned null handle',
+      );
+    }
+    return handle;
+  } finally {
+    bridge.free(outPtr);
+  }
+}
+
+function callLoadVoice(
+  module: TTSComponentModule,
+  handle: number,
+  voicePath: string,
+  voiceId?: string,
+  voiceName?: string,
+): void {
+  if (typeof module._rac_tts_component_load_voice !== 'function') {
+    throw SDKException.backendNotAvailable(
+      'TTS.loadVoice',
+      'Loaded WASM module does not export _rac_tts_component_load_voice.',
+    );
+  }
+  const bridge = new ProtoWasmBridge(module, logger);
+  const pathPtr = bridge.allocUtf8(voicePath);
+  if (!pathPtr) {
+    throw SDKException.fromCode(-180, 'TTS.loadVoice: failed to allocate voice path');
+  }
+  const idPtr = voiceId ? bridge.allocUtf8(voiceId) : 0;
+  const namePtr = voiceName ? bridge.allocUtf8(voiceName) : 0;
+  try {
+    const rc = module._rac_tts_component_load_voice(handle, pathPtr, idPtr, namePtr);
+    if (rc !== 0) {
+      throw SDKException.fromRACResult(
+        rc,
+        `rac_tts_component_load_voice failed with code ${rc}`,
+      );
+    }
+  } finally {
+    bridge.free(pathPtr);
+    if (idPtr) bridge.free(idPtr);
+    if (namePtr) bridge.free(namePtr);
+  }
+}
+
+/** Top-level synthesize options for the ergonomic shortcut. */
+export interface SynthesizeOptions extends Partial<TTSOptions> {
+  /** Optional explicit voice id. */
+  voiceId?: string;
+  /** Optional explicit voice file path. Required when no voice has been loaded yet. */
+  voicePath?: string;
 }
 
 export const TTS = {
-  async synthesize(text: string, options?: TTSSynthesizeOptions): Promise<TTSSynthesisResult> {
-    return synthesize(text, options);
+  /**
+   * Returns true when the WASM module is loaded with both the proto-byte
+   * TTS exports AND the component lifecycle exports (create / load_voice /
+   * destroy).
+   */
+  supportsProtoTTS(): boolean {
+    const module = tryRunanywhereModule() as TTSComponentModule | null;
+    if (!module) return false;
+    if (typeof module._rac_tts_component_create !== 'function') return false;
+    if (typeof module._rac_tts_component_load_voice !== 'function') return false;
+    if (typeof module._rac_tts_component_destroy !== 'function') return false;
+    return TTSProtoAdapter.tryDefault()?.supportsProtoTTS() ?? false;
   },
 
   /**
-   * Streaming TTS synthesis (§5). Returns an AsyncIterable of PCM audio chunks.
-   * Delegates to the TTS provider if available.
+   * Create a fresh TTS component handle. Caller owns lifecycle and MUST call
+   * `TTS.destroy(handle)` when finished.
    */
-  synthesizeStream(text: string, options?: TTSSynthesizeOptions): AsyncIterable<Uint8Array> {
-    const provider = getTTSProvider();
-    if (typeof provider?.synthesizeStream === 'function') {
-      return provider.synthesizeStream(text, options);
+  create(): number {
+    const module = requireTTSModule('TTS.create');
+    return callCreate(module);
+  },
+
+  /**
+   * Load a voice into the component handle. `voicePath` is the on-device file
+   * path resolved by the C++ model lifecycle. `voiceId` and `voiceName` are
+   * optional telemetry hints.
+   */
+  loadVoice(handle: number, voicePath: string, voiceId?: string, voiceName?: string): void {
+    const module = requireTTSModule('TTS.loadVoice');
+    callLoadVoice(module, handle, voicePath, voiceId, voiceName);
+  },
+
+  /** Whether the component handle has a voice loaded. */
+  isLoaded(handle: number): boolean {
+    const module = tryRunanywhereModule() as TTSComponentModule | null;
+    if (!module || typeof module._rac_tts_component_is_loaded !== 'function') return false;
+    return Boolean(module._rac_tts_component_is_loaded(handle));
+  },
+
+  /** Enumerate the voices the loaded TTS engine can render. */
+  listVoices(handle: number): TTSVoiceInfo[] {
+    const adapter = TTSProtoAdapter.tryDefault();
+    if (!adapter || !adapter.supportsProtoTTS()) {
+      throw SDKException.backendNotAvailable(
+        'TTS.listVoices',
+        'No Web WASM backend with rac_tts_*_proto exports is registered.',
+      );
     }
-    throw SDKException.backendNotAvailable(
-      'synthesizeStream',
-      'The active TTS provider does not implement streaming synthesis.',
-    );
+    return adapter.listVoices(handle) ?? [];
   },
 
-  async speak(text: string, options?: TTSSynthesizeOptions): Promise<void> {
-    return speak(text, options);
-  },
-
-  isSpeaking(): boolean {
-    return isSpeaking();
-  },
-
-  /** Stop current TTS playback (§5). */
-  stop(): void {
-    stopSpeaking();
-  },
-
-  /** Stop current TTS synthesis — alias for `stop()` per §5 `stopSynthesis`. */
-  stopSynthesis(): void {
-    stopSpeaking();
-  },
-
-  /** Load a TTS voice by ID (§5). */
-  async loadTTSVoice(voiceId: string): Promise<void> {
-    const provider = getTTSProvider();
-    if (typeof provider?.loadTTSVoice === 'function') {
-      return provider.loadTTSVoice(voiceId);
+  /** Synthesize a chunk of text — returns an audio buffer. */
+  synthesize(
+    handle: number,
+    text: string,
+    options?: Partial<TTSOptions>,
+  ): TTSOutput {
+    const adapter = TTSProtoAdapter.tryDefault();
+    if (!adapter || !adapter.supportsProtoTTS()) {
+      throw SDKException.backendNotAvailable(
+        'TTS.synthesize',
+        'No Web WASM backend with rac_tts_*_proto exports is registered.',
+      );
     }
-    throw SDKException.backendNotAvailable(
-      'loadTTSVoice',
-      'No TTS provider registered. Install and register @runanywhere/web-onnx.',
-    );
-  },
-
-  /** Unload the active TTS voice (§5). */
-  async unloadTTSVoice(): Promise<void> {
-    const provider = getTTSProvider();
-    if (typeof provider?.unloadTTSVoice === 'function') {
-      return provider.unloadTTSVoice();
+    const result = adapter.synthesize(handle, text, defaultTTSOptions(options));
+    if (!result) {
+      throw SDKException.backendNotAvailable(
+        'TTS.synthesize',
+        'rac_tts_component_synthesize_proto returned no TTSOutput bytes.',
+      );
     }
+    return result;
   },
 
-  /** Whether a TTS voice is currently loaded (§5). */
-  get isTTSVoiceLoaded(): boolean {
-    return getTTSProvider()?.isTTSVoiceLoaded ?? false;
-  },
-
-  /** List available TTS voices (§5). */
-  async availableTTSVoices(): Promise<TTSVoiceInfo[]> {
-    const provider = getTTSProvider();
-    if (typeof provider?.availableTTSVoices === 'function') {
-      return provider.availableTTSVoices();
+  /** Streaming synthesis — yields TTSOutput chunks. */
+  synthesizeStream(
+    handle: number,
+    text: string,
+    options?: Partial<TTSOptions>,
+  ): AsyncIterable<TTSOutput> {
+    const adapter = TTSProtoAdapter.tryDefault();
+    if (!adapter || !adapter.supportsProtoTTS()) {
+      throw SDKException.backendNotAvailable(
+        'TTS.synthesizeStream',
+        'No Web WASM backend with rac_tts_*_proto exports is registered.',
+      );
     }
-    return [];
+    return adapter.synthesizeStream(handle, text, defaultTTSOptions(options));
   },
 
-  /** Load a TTS model by ID (§5). */
-  async loadTTSModel(modelId: string): Promise<void> {
-    const provider = getTTSProvider();
-    if (typeof provider?.loadTTSModel === 'function') {
-      return provider.loadTTSModel(modelId);
-    }
-    throw SDKException.backendNotAvailable(
-      'loadTTSModel',
-      'No TTS provider registered. Install and register @runanywhere/web-onnx.',
-    );
+  /** Stop in-flight synthesis (best-effort). */
+  stop(handle: number): boolean {
+    const module = tryRunanywhereModule() as TTSComponentModule | null;
+    if (!module || typeof module._rac_tts_component_stop !== 'function') return false;
+    const rc = module._rac_tts_component_stop(handle);
+    return rc === 0;
   },
 
-  /** Unload the active TTS model (§5). */
-  async unloadTTSModel(): Promise<void> {
-    const provider = getTTSProvider();
-    if (typeof provider?.unloadTTSModel === 'function') {
-      return provider.unloadTTSModel();
-    }
+  /** Unload the voice but keep the component handle alive. */
+  unload(handle: number): boolean {
+    const module = tryRunanywhereModule() as TTSComponentModule | null;
+    if (!module || typeof module._rac_tts_component_unload !== 'function') return false;
+    const rc = module._rac_tts_component_unload(handle);
+    return rc === 0;
+  },
+
+  /** Destroy the component handle. Idempotent. */
+  destroy(handle: number): void {
+    const module = tryRunanywhereModule() as TTSComponentModule | null;
+    if (!module || typeof module._rac_tts_component_destroy !== 'function') return;
+    module._rac_tts_component_destroy(handle);
   },
 };
+
+/**
+ * Top-level ergonomic shortcut: auto-creates a handle, loads the current TTS
+ * voice from lifecycle (if any), synthesizes, destroys the handle.
+ */
+export async function synthesize(
+  text: string,
+  options?: SynthesizeOptions,
+): Promise<TTSOutput> {
+  const module = requireTTSModule('RunAnywhere.synthesize');
+  let voicePath = options?.voicePath;
+  let voiceId = options?.voiceId;
+  let voiceName: string | undefined;
+
+  if (!voicePath) {
+    if (!ModelLifecycle.supportsNativeLifecycle()) {
+      throw SDKException.backendNotAvailable(
+        'RunAnywhere.synthesize',
+        'No voicePath provided and the model lifecycle proto adapter is not installed.',
+      );
+    }
+    const current = ModelLifecycle.currentModel({ includeModelMetadata: true });
+    if (!current?.modelId) {
+      throw SDKException.componentNotReady(
+        'tts',
+        'No TTS voice is loaded. Call ModelLifecycle.load(...) before RunAnywhere.synthesize().',
+      );
+    }
+    voicePath = current.resolvedPath || current.modelId;
+    voiceId = current.modelId;
+  }
+
+  const handle = callCreate(module);
+  try {
+    callLoadVoice(module, handle, voicePath, voiceId, voiceName);
+    return TTS.synthesize(handle, text, options);
+  } finally {
+    TTS.destroy(handle);
+  }
+}

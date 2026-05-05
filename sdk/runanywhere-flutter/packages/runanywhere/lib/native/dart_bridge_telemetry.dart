@@ -578,12 +578,14 @@ class DartBridgeTelemetry {
 
   static int _environmentToInt(SDKEnvironment env) {
     switch (env) {
-      case SDKEnvironment.development:
+      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 0;
-      case SDKEnvironment.staging:
+      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
         return 1;
-      case SDKEnvironment.production:
+      case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 2;
+      default:
+        return 0;
     }
   }
 

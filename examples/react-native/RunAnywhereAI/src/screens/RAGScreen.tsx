@@ -45,6 +45,7 @@ import {
   ragIngest,
   ragQuery,
 } from '@runanywhere/core';
+import { RAGConfiguration, RAGQueryOptions } from '@runanywhere/proto-ts/rag';
 
 // MARK: - Types
 
@@ -193,7 +194,7 @@ export const RAGScreen: React.FC = () => {
       const embeddingPath = resolveEmbeddingFilePath(embeddingLocalPath);
       const llmPath = resolveLLMFilePath(llmLocalPath);
 
-      const config = {
+      const config = RAGConfiguration.fromPartial({
         embeddingModelPath: embeddingPath,
         llmModelPath: llmPath,
         embeddingDimension: 384,
@@ -202,7 +203,9 @@ export const RAGScreen: React.FC = () => {
         chunkSize: 180,
         chunkOverlap: 30,
         maxContextTokens: 2048,
-      };
+        persistIndex: false,
+        rerankResults: false,
+      });
 
       // Create pipeline and ingest document (same as iOS loadDocument)
       await ragCreatePipeline(config);
@@ -253,12 +256,15 @@ export const RAGScreen: React.FC = () => {
     setError(null);
 
     try {
-      const result = await ragQuery(question, {
+      const result = await ragQuery(question, RAGQueryOptions.fromPartial({
         maxTokens: 256,
         temperature: 0.7,
         topP: 0.9,
         topK: 40,
-      });
+        retrievalTopK: 3,
+        similarityThreshold: 0.12,
+        stream: false,
+      }));
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', text: result.answer },

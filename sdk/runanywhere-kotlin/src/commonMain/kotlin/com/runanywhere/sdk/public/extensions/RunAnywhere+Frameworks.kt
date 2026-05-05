@@ -9,8 +9,8 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import com.runanywhere.sdk.core.types.InferenceFramework
-import com.runanywhere.sdk.core.types.SDKComponent
+import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.public.RunAnywhere
 
 /**

@@ -13,11 +13,13 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
+import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -79,6 +81,26 @@ public class SpeechActivityEvent(
     schemaIndex = 2,
   )
   public val duration_ms: Int = 0,
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 3,
+  )
+  public val confidence: Float = 0f,
+  @field:WireField(
+    tag = 5,
+    adapter = "ai.runanywhere.proto.v1.VADResult#ADAPTER",
+    schemaIndex = 4,
+  )
+  public val result: VADResult? = null,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "segmentId",
+    schemaIndex = 5,
+  )
+  public val segment_id: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SpeechActivityEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -95,35 +117,48 @@ public class SpeechActivityEvent(
     if (event_type != other.event_type) return false
     if (timestamp_ms != other.timestamp_ms) return false
     if (duration_ms != other.duration_ms) return false
+    if (confidence != other.confidence) return false
+    if (result != other.result) return false
+    if (segment_id != other.segment_id) return false
     return true
   }
 
   override fun hashCode(): Int {
-    var result = super.hashCode
-    if (result == 0) {
-      result = unknownFields.hashCode()
-      result = result * 37 + event_type.hashCode()
-      result = result * 37 + timestamp_ms.hashCode()
-      result = result * 37 + duration_ms.hashCode()
-      super.hashCode = result
+    var result_ = super.hashCode
+    if (result_ == 0) {
+      result_ = unknownFields.hashCode()
+      result_ = result_ * 37 + event_type.hashCode()
+      result_ = result_ * 37 + timestamp_ms.hashCode()
+      result_ = result_ * 37 + duration_ms.hashCode()
+      result_ = result_ * 37 + confidence.hashCode()
+      result_ = result_ * 37 + (result?.hashCode() ?: 0)
+      result_ = result_ * 37 + (segment_id?.hashCode() ?: 0)
+      super.hashCode = result_
     }
-    return result
+    return result_
   }
 
   override fun toString(): String {
-    val result = mutableListOf<String>()
-    result += """event_type=$event_type"""
-    result += """timestamp_ms=$timestamp_ms"""
-    result += """duration_ms=$duration_ms"""
-    return result.joinToString(prefix = "SpeechActivityEvent{", separator = ", ", postfix = "}")
+    val result_ = mutableListOf<String>()
+    result_ += """event_type=$event_type"""
+    result_ += """timestamp_ms=$timestamp_ms"""
+    result_ += """duration_ms=$duration_ms"""
+    result_ += """confidence=$confidence"""
+    if (result != null) result_ += """result=$result"""
+    if (segment_id != null) result_ += """segment_id=${sanitize(segment_id)}"""
+    return result_.joinToString(prefix = "SpeechActivityEvent{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     event_type: SpeechActivityKind = this.event_type,
     timestamp_ms: Long = this.timestamp_ms,
     duration_ms: Int = this.duration_ms,
+    confidence: Float = this.confidence,
+    result: VADResult? = this.result,
+    segment_id: String? = this.segment_id,
     unknownFields: ByteString = this.unknownFields,
-  ): SpeechActivityEvent = SpeechActivityEvent(event_type, timestamp_ms, duration_ms, unknownFields)
+  ): SpeechActivityEvent = SpeechActivityEvent(event_type, timestamp_ms, duration_ms, confidence,
+      result, segment_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -144,6 +179,10 @@ public class SpeechActivityEvent(
             value.timestamp_ms)
         if (value.duration_ms != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(3,
             value.duration_ms)
+        if (!value.confidence.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(4,
+            value.confidence)
+        size += VADResult.ADAPTER.encodedSizeWithTag(5, value.result)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.segment_id)
         return size
       }
 
@@ -153,11 +192,19 @@ public class SpeechActivityEvent(
         if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 2,
             value.timestamp_ms)
         if (value.duration_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 3, value.duration_ms)
+        if (!value.confidence.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 4,
+            value.confidence)
+        VADResult.ADAPTER.encodeWithTag(writer, 5, value.result)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.segment_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SpeechActivityEvent) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.segment_id)
+        VADResult.ADAPTER.encodeWithTag(writer, 5, value.result)
+        if (!value.confidence.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 4,
+            value.confidence)
         if (value.duration_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 3, value.duration_ms)
         if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 2,
             value.timestamp_ms)
@@ -169,6 +216,9 @@ public class SpeechActivityEvent(
         var event_type: SpeechActivityKind = SpeechActivityKind.SPEECH_ACTIVITY_KIND_UNSPECIFIED
         var timestamp_ms: Long = 0L
         var duration_ms: Int = 0
+        var confidence: Float = 0f
+        var result: VADResult? = null
+        var segment_id: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -178,6 +228,9 @@ public class SpeechActivityEvent(
             }
             2 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
             3 -> duration_ms = ProtoAdapter.INT32.decode(reader)
+            4 -> confidence = ProtoAdapter.FLOAT.decode(reader)
+            5 -> result = VADResult.ADAPTER.decode(reader)
+            6 -> segment_id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -185,11 +238,15 @@ public class SpeechActivityEvent(
           event_type = event_type,
           timestamp_ms = timestamp_ms,
           duration_ms = duration_ms,
+          confidence = confidence,
+          result = result,
+          segment_id = segment_id,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: SpeechActivityEvent): SpeechActivityEvent = value.copy(
+        result = value.result?.let(VADResult.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

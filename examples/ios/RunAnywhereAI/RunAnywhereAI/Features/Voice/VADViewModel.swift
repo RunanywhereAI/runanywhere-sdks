@@ -70,7 +70,7 @@ class VADViewModel: ObservableObject {
     // MARK: - Model Management
 
     /// Load model from ModelSelectionSheet selection
-    func loadModelFromSelection(_ model: ModelInfo) async {
+    func loadModelFromSelection(_ model: RAModelInfo) async {
         logger.info("Loading VAD model from selection: \(model.name)")
         isProcessing = true
         errorMessage = nil
@@ -147,12 +147,13 @@ class VADViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    private func handleSDKEvent(_ event: any SDKEvent) {
-        // VAD events may arrive as "voice" or "model" category
-        // Filter by event type prefix instead
-        switch event.type {
-        case "vad_model_load_completed":
-            let modelId = event.properties["model_id"] ?? ""
+    private func handleSDKEvent(_ event: RASDKEvent) {
+        guard event.category == .vad || event.component == .vad else { return }
+
+        let modelId = event.model.modelID
+
+        switch event.model.kind {
+        case .loadCompleted:
             selectedModelId = modelId
             if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
                 selectedModelName = matchingModel.name
@@ -161,7 +162,7 @@ class VADViewModel: ObservableObject {
                 selectedModelName = modelId.modelNameFromID()
             }
             logger.info("VAD model loaded: \(modelId)")
-        case "vad_model_unloaded":
+        case .unloadCompleted:
             selectedModelId = nil
             selectedModelName = nil
             selectedFramework = nil

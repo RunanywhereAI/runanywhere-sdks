@@ -10,6 +10,16 @@
  *
  * This header defines data structures only. For the service interface,
  * see rac_vad_service.h.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Public structs/enums/callbacks (rac_vad_config_t, rac_vad_input_t,
+ *     rac_vad_output_t, rac_vad_info_t, rac_vad_statistics_t,
+ *     rac_speech_activity_t, rac_vad_activity_callback_fn,
+ *     rac_vad_audio_callback_fn): `delete after SDK migration`.
+ *     Replaced by serialized runanywhere.v1.VADConfiguration / VADOptions /
+ *     VADResult / VADStatistics / VADStreamEvent bytes via
+ *     rac_vad_component_*_proto APIs.
+ *   - RAC_VAD_* numeric constants are `internal` shared audio plumbing.
  */
 
 #ifndef RAC_VAD_TYPES_H

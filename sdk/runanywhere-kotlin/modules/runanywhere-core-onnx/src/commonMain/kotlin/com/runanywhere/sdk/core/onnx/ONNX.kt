@@ -1,8 +1,8 @@
 package com.runanywhere.sdk.core.onnx
 
+import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.core.module.RunAnywhereModule
-import com.runanywhere.sdk.core.types.InferenceFramework
-import com.runanywhere.sdk.core.types.SDKComponent
 import com.runanywhere.sdk.foundation.SDKLogger
 
 /**
@@ -57,15 +57,15 @@ object ONNX : RunAnywhereModule {
 
     override val capabilities: Set<SDKComponent> =
         setOf(
-            SDKComponent.STT,
-            SDKComponent.TTS,
-            SDKComponent.VAD,
+            SDKComponent.SDK_COMPONENT_STT,
+            SDKComponent.SDK_COMPONENT_TTS,
+            SDKComponent.SDK_COMPONENT_VAD,
         )
 
     override val defaultPriority: Int = 100
 
     /** ONNX uses the ONNX Runtime inference framework */
-    override val inferenceFramework: InferenceFramework = InferenceFramework.ONNX
+    override val inferenceFramework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_ONNX
 
     // MARK: - Registration State
 

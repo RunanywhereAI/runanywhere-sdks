@@ -9,6 +9,11 @@
  * This backend follows the same pattern as LlamaCPP and ONNX backends,
  * but delegates to Swift via function pointer callbacks since Foundation
  * Models is a Swift-only framework.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal` adapter
+ * contract. Swift Foundation Models bridge — SDKs reach this backend
+ * through standard LLM proto APIs after the platform plugin is
+ * registered.
  */
 
 #ifndef RAC_LLM_PLATFORM_H

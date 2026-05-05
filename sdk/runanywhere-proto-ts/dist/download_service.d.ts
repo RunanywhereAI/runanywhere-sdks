@@ -54,6 +54,13 @@ export interface DownloadProgress {
     storageKey: string;
     /** final path once known */
     localPath: string;
+    /** 0.0..1.0 across all planned files/stages */
+    overallProgress: number;
+    startedAtUnixMs: number;
+    updatedAtUnixMs: number;
+    currentFileName: string;
+    /** logical resume marker, not a native handle */
+    resumeToken: string;
 }
 export interface DownloadPlanRequest {
     modelId: string;
@@ -61,6 +68,10 @@ export interface DownloadPlanRequest {
     resumeExisting: boolean;
     availableStorageBytes: number;
     allowMeteredNetwork: boolean;
+    storageNamespace: string;
+    validateExistingBytes: boolean;
+    verifyChecksums: boolean;
+    requiredFreeBytesAfterDownload: number;
 }
 export interface DownloadFilePlan {
     file?: ModelFileDescriptor | undefined;
@@ -69,6 +80,7 @@ export interface DownloadFilePlan {
     expectedBytes: number;
     requiresExtraction: boolean;
     checksumSha256: string;
+    isResumeCandidate: boolean;
 }
 export interface DownloadPlanResult {
     canStart: boolean;
@@ -80,11 +92,16 @@ export interface DownloadPlanResult {
     resumeFromBytes: number;
     warnings: string[];
     errorMessage: string;
+    storageNamespace: string;
+    resumeToken: string;
+    requiredFreeBytesAfterDownload: number;
 }
 export interface DownloadStartRequest {
     modelId: string;
     plan?: DownloadPlanResult | undefined;
     resume: boolean;
+    resumeToken: string;
+    updateRegistryOnCompletion: boolean;
 }
 export interface DownloadStartResult {
     accepted: boolean;
@@ -92,6 +109,7 @@ export interface DownloadStartResult {
     modelId: string;
     initialProgress?: DownloadProgress | undefined;
     errorMessage: string;
+    resumeToken: string;
 }
 export interface DownloadCancelRequest {
     taskId: string;
@@ -104,11 +122,16 @@ export interface DownloadCancelResult {
     modelId: string;
     partialBytesDeleted: number;
     errorMessage: string;
+    wasRunning: boolean;
+    partialBytesPreserved: boolean;
+    resumeToken: string;
 }
 export interface DownloadResumeRequest {
     taskId: string;
     modelId: string;
     resumeFromBytes: number;
+    resumeToken: string;
+    validatePartialBytes: boolean;
 }
 export interface DownloadResumeResult {
     accepted: boolean;
@@ -116,6 +139,7 @@ export interface DownloadResumeResult {
     modelId: string;
     initialProgress?: DownloadProgress | undefined;
     errorMessage: string;
+    resumeToken: string;
 }
 export declare const DownloadSubscribeRequest: {
     encode(message: DownloadSubscribeRequest, writer?: _m0.Writer): _m0.Writer;

@@ -3,21 +3,21 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * VLM model loading helpers — Kotlin equivalent of Swift's RunAnywhere+VLMModels.swift.
- * Model file resolution (main model + mmproj) is handled in C++ commons.
+ * Model file resolution is handled by C++ commons lifecycle artifacts.
  *
  * Wave 2 KOTLIN: Added missing namespace extension to align with Swift.
  */
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.ModelInfo
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.Models.ModelInfo
 
 /**
  * Load a VLM model from a [ModelInfo] using the C++ model registry.
  *
- * The C++ layer handles resolving the model folder, finding the main
- * .gguf and mmproj .gguf files automatically.
+ * The C++ lifecycle resolves primary and vision-projector artifacts and
+ * returns them as generated `ModelFileDescriptor` values.
  *
  * @param model The model to load (must be registered in the global registry).
  */

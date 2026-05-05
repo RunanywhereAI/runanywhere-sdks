@@ -79,7 +79,7 @@ The entire UI is blocked behind `isSDKInitialized` in `RunAnywhereAIApp.swift`. 
 1. **Backend registration (synchronous, before any `await`)**: `LlamaCPP.register(priority:100)`, `ONNX.register(priority:100)`, `WhisperKitSTT.register(priority:200)`
 2. `RunAnywhere.initialize()` — core C++ bridge init
 3. `registerModulesAndModels()` — registers ~30 models (LLMs, VLMs, STT, TTS, VAD, embeddings, diffusion, LoRA)
-4. `RunAnywhere.flushPendingRegistrations()` + `RunAnywhere.discoverDownloadedModels()`
+4. `RunAnywhere.discoverDownloadedModels()` then `RunAnywhere.listModels()` (refresh registry)
 
 Backends MUST be registered before any `await` to prevent a race where `loadModel()` fires with an empty provider registry.
 
@@ -173,7 +173,7 @@ The primary feature. `LLMViewModel` is split across 7 files via extensions:
 
 **Tool calling**: Activated via `ToolSettingsViewModel.shared.toolCallingEnabled`. Three demo tools registered in `ToolSettingsView.swift`: `get_weather` (Open-Meteo API), `get_current_time`, `calculate` (recursive-descent `SafeMathEvaluator`). Format auto-detected per model name.
 
-**LoRA adapters**: 5 catalog entries registered at startup via `LoRAAdapterCatalog.registerAll()`. Downloaded via `URLSession` to `~/Documents/LoRA/`, validated by GGUF magic bytes (`0x47475546`). Loaded via `RunAnywhere.lora.load(config)` with user-adjustable scale (0.0–2.0).
+**LoRA adapters**: 5 catalog entries registered at startup via `LoRAAdapterCatalog.registerAll()`. Downloaded via `URLSession` to `~/Documents/LoRA/`, validated by GGUF magic bytes (`0x47475546`). Applied via `RunAnywhere.lora.apply(RALoRAApplyRequest)` and removed via `RunAnywhere.lora.remove(RALoRARemoveRequest)` with user-adjustable scale (0.0-2.0).
 
 **Conversation persistence**: `ConversationStore` saves per-conversation JSON to `Documents/Conversations/`. Smart titles generated via Apple `FoundationModels` framework (iOS 26+). Search across title and message content.
 
@@ -282,84 +282,112 @@ Three-layer delegation chain for AI response text:
 
 ---
 
-## SDK Public API Surface (as consumed by this app)
+## SDK API Surface (as consumed by this app)
 
-All calls go through the `RunAnywhere` enum namespace (no instances).
+All calls go through the `RunAnywhere` enum namespace (no instances). The app
+uses a mix of canonical proto-backed SDK APIs and **app-local convenience
+shims** defined in `Extensions/RunAnywhere+ExampleShims.swift`. The shims
+compose canonical proto requests (`RAModelLoadRequest`, `RALLMGenerateRequest`,
+etc.) into ergonomic helpers; they are NOT part of the SDK public surface.
 
-### Initialization
+### Canonical SDK API (`sdk/runanywhere-swift`)
+
 ```swift
+// Initialization
 RunAnywhere.initialize(apiKey:baseURL:environment:)  // throws
-RunAnywhere.registerModel(id:name:url:framework:memoryRequirement:supportsThinking:)
-RunAnywhere.registerMultiFileModel(id:name:files:framework:modality:memoryRequirement:)
-RunAnywhere.flushPendingRegistrations()
 RunAnywhere.discoverDownloadedModels()
-```
 
-### Model Management
-```swift
-RunAnywhere.availableModels() -> [ModelInfo]
-RunAnywhere.loadModel(modelId)          // LLM
-RunAnywhere.loadSTTModel(modelId)
-RunAnywhere.loadTTSModel(voiceId)
-RunAnywhere.loadVADModel(modelId)
-RunAnywhere.loadVLMModel(modelInfo)     // takes ModelInfo, not just ID
-RunAnywhere.unloadModel()               // LLM
-RunAnywhere.getCurrentModelId() -> String?
-RunAnywhere.currentSTTModel / currentTTSVoiceId / currentVADModel
-RunAnywhere.downloadModel(modelId) -> AsyncStream<DownloadProgress>
-RunAnywhere.deleteStoredModel(id, framework:)
-```
+// Model lifecycle (canonical proto-request entry points)
+RunAnywhere.loadModel(_ request: RAModelLoadRequest) -> RAModelLoadResult
+RunAnywhere.unloadModel(_ request: RAModelUnloadRequest) -> RAModelUnloadResult
+RunAnywhere.currentModel(_ request: RACurrentModelRequest) -> RACurrentModelSnapshot
+RunAnywhere.listModels() -> RAListModelsResult
+RunAnywhere.queryModels(_:) / getModel(_:) / downloadedModels()
+RunAnywhere.importModel(_ request: RAModelImportRequest)
+RunAnywhere.downloadModel(_ model: RAModelInfo, onProgress:) async throws
 
-### LLM Generation
-```swift
-RunAnywhere.generate(prompt, options:) -> LLMGenerationResult
-RunAnywhere.generateStream(prompt, options:) -> AsyncStream<RALLMStreamEvent>
-RunAnywhere.generateWithTools(prompt, options:) -> LLMGenerationResult
+// LLM
+RunAnywhere.generate(_ request: RALLMGenerateRequest) -> RALLMGenerationResult
+RunAnywhere.generateStream(_:) -> AsyncStream<RALLMStreamEvent>
+RunAnywhere.generateWithTools(prompt:options:toolOptions:) -> RAToolCallingResult
 RunAnywhere.cancelGeneration()
-RunAnywhere.supportsLLMStreaming -> Bool
-RunAnywhere.getRegisteredTools() -> [ToolDefinition]
-RunAnywhere.registerTool(definition:executor:)
-RunAnywhere.clearTools()
-```
+RunAnywhere.registerTool(_:executor:) / unregisterTool(_:) / getRegisteredTools() / clearTools()
 
-### STT / TTS / VAD
-```swift
-RunAnywhere.transcribe(audioData) -> String
-RunAnywhere.speak(text, options: TTSOptions) -> TTSSpeakResult
-RunAnywhere.stopSpeaking()
-RunAnywhere.initializeVAD()
-RunAnywhere.detectSpeech(in: [Float]) -> Bool
-RunAnywhere.isVADReady -> Bool
-```
+// STT / TTS / VAD / VLM
+RunAnywhere.transcribe(audio:options:) -> RATranscriptionResult
+RunAnywhere.speak(text:options:) -> RATTSSpeakResult
+RunAnywhere.detectVoiceActivity(_ audioData: Data) -> RAVADResult
+RunAnywhere.processImage(_ image: RAVLMImage, options:) -> RAVLMResult
+RunAnywhere.processImageStream(_ image: RAVLMImage, options:) -> AsyncStream<RAVLMStreamEvent>
 
-### Voice Agent
-```swift
-RunAnywhere.initializeVoiceAgentWithLoadedModels()
+// Voice agent
+RunAnywhere.initializeVoiceAgent(_ config: RAVoiceAgentComposeConfig)
 RunAnywhere.streamVoiceAgent() -> AsyncStream<RAVoiceEvent>
-RunAnywhere.getVoiceAgentComponentStates() -> ComponentStates
-```
+RunAnywhere.processVoiceTurn / cleanupVoiceAgent
 
-### VLM / Diffusion / RAG
-```swift
-RunAnywhere.processImageStream(VLMImage, prompt:, maxTokens:) -> stream result
-RunAnywhere.generateImage(prompt:options:) -> image result with progress callback
-RunAnywhere.ragCreatePipeline(config:) / ragIngest(text:) / ragQuery(question:)
-```
-
-### Events
-```swift
-RunAnywhere.events.events  // Combine Publisher<any SDKEvent, Never>
-// Event types: llm_model_load_completed, llm_model_unloaded, stt_model_load_completed, etc.
-// Properties: model_id, error_message, time_to_first_token_ms, tokens_per_second, etc.
-```
-
-### Storage / LoRA / Solutions
-```swift
-RunAnywhere.getStorageInfo() -> StorageInfo
-RunAnywhere.clearCache() / cleanTempFiles()
-RunAnywhere.lora.register(entry) / load(config) / remove(id) / clear() / getLoaded()
+// Diffusion / RAG / Storage / LoRA / Solutions
+RunAnywhere.generateImage(options:) / generateImage(options:onProgress:) / cancelImageGeneration()
+RunAnywhere.ragCreatePipeline(config:) / ragIngest(_:) / ragQuery(_:)
+RunAnywhere.getStorageInfo() / clearCache() / cleanTempFiles() / planStorageDelete / deleteStorage
+RunAnywhere.lora.{apply,remove,list,state,register,listCatalog,allRegistered,...}
 RunAnywhere.solutions.run(yaml:) -> handle
+
+// Events (canonical typed payloads)
+RunAnywhere.events.events  // Combine Publisher<any SDKEvent, Never>
+// Read typed payloads on RASDKEvent: event.model.kind/.modelID, event.generation.kind/.tokensUsed/...,
+// event.capability, event.componentLifecycle, event.operationID. Do NOT read event.properties[String].
 ```
+
+### App-Local Convenience Shims (`RunAnywhere+ExampleShims.swift`)
+
+The following are **example-app-local convenience helpers**, not canonical SDK
+API. Each composes the canonical proto-backed entry points above.
+
+```swift
+// Modality-shorthand model lifecycle (wrap RAModelLoadRequest with category:)
+RunAnywhere.loadModel(_ modelId: String, category: RAModelCategory)
+RunAnywhere.loadSTTModel(_:) / loadTTSModel(_:) / loadVADModel(_:) / loadVLMModel(_:) / loadDiffusionModel(_:)
+RunAnywhere.unloadModel() / unloadSTTModel() / unloadTTSVoice() / unloadVLMModel() / unloadDiffusionModel()
+
+// Current-model accessors (wrap RACurrentModelRequest)
+RunAnywhere.getCurrentModelId() -> String?
+RunAnywhere.isModelLoaded -> Bool
+RunAnywhere.currentSTTModel / currentTTSVoiceId / currentVADModel / currentDiffusionModelId
+RunAnywhere.isVLMModelLoaded / isDiffusionModelLoaded / supportsLLMStreaming
+
+// Prompt-form generation (wrap RALLMGenerateRequest)
+RunAnywhere.generate(_ prompt: String, options:) -> RALLMGenerationResult
+RunAnywhere.generateStream(_ prompt: String, options:) -> AsyncStream<RALLMStreamEvent>
+RunAnywhere.generateWithTools(_ prompt: String, options:, toolOptions:) -> RAToolCallingResult
+
+// VAD ergonomics
+RunAnywhere.detectSpeech(in samples: [Float]) -> Bool
+RunAnywhere.isVADReady / initializeVAD()  // initializeVAD is a no-op stub
+
+// VLM token-stream flattening
+RunAnywhere.processImageStream(_ image: RAVLMImage, prompt:, options:) -> AsyncStream<String>
+RunAnywhere.processImage(_ image:, prompt:, maxTokens:, temperature:) -> RAVLMResult
+
+// STT positional shim
+RunAnywhere.transcribe(_ audioData: Data) -> String
+
+// Diffusion prompt-form
+RunAnywhere.generateImage(prompt:, options:) / generateImage(prompt:, options:, onProgress:)
+
+// Voice agent (compose-from-currently-loaded)
+RunAnywhere.initializeVoiceAgentWithLoadedModels()
+RunAnywhere.getVoiceAgentComponentStates() -> RAVoiceAgentComponentStates
+
+// Framework discovery via listModels()
+RunAnywhere.getRegisteredFrameworks() -> [RAInferenceFramework]
+
+// URL-form custom-model registration (wraps RAModelImportRequest)
+RunAnywhere.registerModel(id:name:url:framework:memoryRequirement:supportsThinking:) -> RAModelInfo
+```
+
+When deciding whether to add a new feature: if it composes existing canonical
+proto APIs into an app-friendly shape, put it in `RunAnywhere+ExampleShims.swift`.
+If it requires net-new C bridge code, it belongs in the SDK.
 
 ---
 

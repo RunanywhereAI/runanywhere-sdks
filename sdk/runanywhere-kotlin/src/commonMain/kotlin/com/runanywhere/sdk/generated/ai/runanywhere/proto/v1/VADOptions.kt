@@ -96,6 +96,17 @@ public class VADOptions(
     schemaIndex = 3,
   )
   public val max_speech_duration_ms: Int = 0,
+  /**
+   * Whether to include VADStatistics in stream events when available.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "includeStatistics",
+    schemaIndex = 4,
+  )
+  public val include_statistics: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VADOptions, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -113,6 +124,7 @@ public class VADOptions(
     if (min_speech_duration_ms != other.min_speech_duration_ms) return false
     if (min_silence_duration_ms != other.min_silence_duration_ms) return false
     if (max_speech_duration_ms != other.max_speech_duration_ms) return false
+    if (include_statistics != other.include_statistics) return false
     return true
   }
 
@@ -124,6 +136,7 @@ public class VADOptions(
       result = result * 37 + min_speech_duration_ms.hashCode()
       result = result * 37 + min_silence_duration_ms.hashCode()
       result = result * 37 + max_speech_duration_ms.hashCode()
+      result = result * 37 + include_statistics.hashCode()
       super.hashCode = result
     }
     return result
@@ -135,6 +148,7 @@ public class VADOptions(
     result += """min_speech_duration_ms=$min_speech_duration_ms"""
     result += """min_silence_duration_ms=$min_silence_duration_ms"""
     result += """max_speech_duration_ms=$max_speech_duration_ms"""
+    result += """include_statistics=$include_statistics"""
     return result.joinToString(prefix = "VADOptions{", separator = ", ", postfix = "}")
   }
 
@@ -143,9 +157,10 @@ public class VADOptions(
     min_speech_duration_ms: Int = this.min_speech_duration_ms,
     min_silence_duration_ms: Int = this.min_silence_duration_ms,
     max_speech_duration_ms: Int = this.max_speech_duration_ms,
+    include_statistics: Boolean = this.include_statistics,
     unknownFields: ByteString = this.unknownFields,
   ): VADOptions = VADOptions(threshold, min_speech_duration_ms, min_silence_duration_ms,
-      max_speech_duration_ms, unknownFields)
+      max_speech_duration_ms, include_statistics, unknownFields)
 
   public companion object {
     @JvmField
@@ -167,6 +182,8 @@ public class VADOptions(
             value.min_silence_duration_ms)
         if (value.max_speech_duration_ms != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(4,
             value.max_speech_duration_ms)
+        if (value.include_statistics != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5,
+            value.include_statistics)
         return size
       }
 
@@ -179,11 +196,15 @@ public class VADOptions(
             value.min_silence_duration_ms)
         if (value.max_speech_duration_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4,
             value.max_speech_duration_ms)
+        if (value.include_statistics != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
+            value.include_statistics)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VADOptions) {
         writer.writeBytes(value.unknownFields)
+        if (value.include_statistics != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
+            value.include_statistics)
         if (value.max_speech_duration_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4,
             value.max_speech_duration_ms)
         if (value.min_silence_duration_ms != 0) ProtoAdapter.INT32.encodeWithTag(writer, 3,
@@ -199,12 +220,14 @@ public class VADOptions(
         var min_speech_duration_ms: Int = 0
         var min_silence_duration_ms: Int = 0
         var max_speech_duration_ms: Int = 0
+        var include_statistics: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> threshold = ProtoAdapter.FLOAT.decode(reader)
             2 -> min_speech_duration_ms = ProtoAdapter.INT32.decode(reader)
             3 -> min_silence_duration_ms = ProtoAdapter.INT32.decode(reader)
             4 -> max_speech_duration_ms = ProtoAdapter.INT32.decode(reader)
+            5 -> include_statistics = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -213,6 +236,7 @@ public class VADOptions(
           min_speech_duration_ms = min_speech_duration_ms,
           min_silence_duration_ms = min_silence_duration_ms,
           max_speech_duration_ms = max_speech_duration_ms,
+          include_statistics = include_statistics,
           unknownFields = unknownFields
         )
       }

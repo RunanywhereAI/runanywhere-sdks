@@ -115,6 +115,13 @@ enum STTLanguage {
     STT_LANGUAGE_HI          = 13;
 }
 
+enum STTAudioEncoding {
+    STT_AUDIO_ENCODING_UNSPECIFIED = 0;
+    STT_AUDIO_ENCODING_PCM_S16_LE  = 1;
+    STT_AUDIO_ENCODING_PCM_F32_LE  = 2;
+    STT_AUDIO_ENCODING_CONTAINER   = 3;  // WAV/MP3/FLAC/etc.; see AudioFormat.
+}
+
 // ---------------------------------------------------------------------------
 // STT component configuration (init-time settings).
 // Sources pre-IDL:
@@ -192,6 +199,34 @@ message STTOptions {
 
     // Maximum number of alternatives to return. 0 = backend/default.
     int32           max_alternatives       = 12;
+
+    // Streaming/endpointer controls. 0 = backend/default.
+    int32           chunk_duration_ms      = 13;
+    int32           endpoint_silence_ms    = 14;
+    bool            suppress_blank         = 15;
+    bool            translate_to_english   = 16;
+}
+
+message STTAudioSource {
+    oneof source {
+        bytes  audio_data      = 1;
+        string file_uri        = 2;
+        string adapter_handle  = 3;
+    }
+
+    STTAudioEncoding encoding = 4;
+    AudioFormat audio_format = 5;
+    int32 sample_rate = 6;
+    int32 channels = 7;
+    int32 bits_per_sample = 8;
+    int64 duration_ms = 9;
+}
+
+message STTTranscriptionRequest {
+    string request_id = 1;
+    optional STTAudioSource audio = 2;
+    optional STTOptions options = 3;
+    map<string, string> metadata = 4;
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +246,7 @@ message WordTimestamp {
     int64  start_ms   = 2;
     int64  end_ms     = 3;
     float  confidence = 4;
+    optional string speaker_id = 5;
 }
 
 // ---------------------------------------------------------------------------
@@ -282,6 +318,16 @@ message STTOutput {
     // Audio duration in milliseconds for SDKs that expose duration directly.
     // Often duplicates metadata.audio_length_ms.
     int64                             duration_ms   = 9;
+
+    // Diarization summary when available.
+    repeated string                   speaker_ids   = 10;
+
+    // Terminal error details for result-envelope APIs.
+    optional string                   error_message = 11;
+    int32                             error_code    = 12;
+
+    // Segment index for long-running/streaming transcription.
+    int32                             segment_index = 13;
 }
 
 // ---------------------------------------------------------------------------
@@ -308,4 +354,60 @@ message STTPartialResult {
     int64  timestamp_ms = 6;
     repeated TranscriptionAlternative alternatives = 7;
     optional string language_code = 8;
+
+    // Streaming correlation and endpointing metadata.
+    string request_id = 9;
+    int32 segment_index = 10;
+    int64 audio_start_ms = 11;
+    int64 audio_end_ms = 12;
+    optional STTOutput final_output = 13;
+}
+
+enum STTStreamEventKind {
+    STT_STREAM_EVENT_KIND_UNSPECIFIED = 0;
+    STT_STREAM_EVENT_KIND_STARTED = 1;
+    STT_STREAM_EVENT_KIND_PARTIAL = 2;
+    STT_STREAM_EVENT_KIND_FINAL = 3;
+    STT_STREAM_EVENT_KIND_ENDPOINT = 4;
+    STT_STREAM_EVENT_KIND_ERROR = 5;
+}
+
+message STTStreamEvent {
+    uint64 seq = 1;
+    int64 timestamp_us = 2;
+    string request_id = 3;
+    STTStreamEventKind kind = 4;
+    optional STTPartialResult partial = 5;
+    optional STTOutput final_output = 6;
+    optional string error_message = 7;
+    int32 error_code = 8;
+}
+
+message STTServiceState {
+    bool is_ready = 1;
+    optional string current_model = 2;
+    bool supports_streaming = 3;
+    repeated string supported_language_codes = 4;
+    optional string error_message = 5;
+    int32 error_code = 6;
+}
+
+message STTLanguageDetectionResult {
+    STTLanguage language = 1;
+    optional string language_code = 2;
+    float confidence = 3;
+    repeated string alternatives = 4;
+}
+
+// Logical STT service contract. Platform adapters remain responsible for
+// native capture, file access, and stream plumbing; C++ consumes only the
+// serialized request/event messages defined above.
+service STT {
+    // One-shot transcription. The request may carry audio bytes or a logical
+    // adapter-provided handle; native file/capture I/O stays outside this IDL.
+    rpc Transcribe(STTTranscriptionRequest) returns (STTOutput);
+
+    // Server-streaming transcription events: started, partial hypotheses,
+    // terminal final output, endpoint notifications, and errors.
+    rpc Stream(STTTranscriptionRequest) returns (stream STTStreamEvent);
 }

@@ -314,7 +314,7 @@ private struct CategoryChip: View {
 // MARK: - Model Selection Row
 
 private struct ModelSelectionRow: View {
-    let model: ModelInfo
+    let model: RAModelInfo
     let isSelected: Bool
     let onTap: () -> Void
 

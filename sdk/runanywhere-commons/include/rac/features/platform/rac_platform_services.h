@@ -4,6 +4,12 @@
  *
  * Platform SDKs can register a lightweight availability callback for services
  * that are supplied by the host OS rather than by a native ML backend.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal` adapter
+ * contract. Used by Apple platform plugins to advertise built-in
+ * services (Foundation Models, system TTS/STT). Public SDK callers
+ * should query plugin/router state and generated capability descriptors
+ * rather than this enum/callback directly.
  */
 
 #ifndef RAC_PLATFORM_SERVICES_H

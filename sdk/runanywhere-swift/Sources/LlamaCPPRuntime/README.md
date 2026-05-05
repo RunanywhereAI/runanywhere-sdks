@@ -259,7 +259,7 @@ Performance varies based on model size, quantization, context length, and device
 
 ### Model Load Fails
 
-1. Ensure the model is downloaded: check `ModelInfo.isDownloaded`
+1. Ensure the model is downloaded: check `RAModelInfo.isDownloaded`
 2. Verify the model format is GGUF
 3. Check available memory (large models require significant RAM)
 

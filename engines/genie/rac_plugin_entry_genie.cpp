@@ -12,10 +12,16 @@
  * downstream SDKs (runanywhere_genie Flutter plugin, Kotlin Genie
  * module) can load the shell without platform-specific branches while the
  * router only sees Genie when the Qualcomm SDK-backed ops are real.
+ *
+ * CPP-04: declarative manifest publishes package ownership, Qualcomm-only
+ * (private) availability and the served primitive set alongside the routing
+ * metadata. The manifest mirrors the conditional ops slots so registry
+ * validation accepts both routable and shell builds.
  */
 
 #include "genie_backend.h"
 
+#include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -122,54 +128,76 @@ static const rac_runtime_id_t k_genie_runtimes[] = {
 };
 
 static const uint32_t k_genie_formats[] = {
-    3,  /* MODEL_FORMAT_ONNX — Genie ingests QNN-compiled ONNX bundles */
+    RAC_MODEL_FORMAT_ID_ONNX,  /* Genie ingests QNN-compiled ONNX bundles */
+};
+
+static const rac_primitive_t k_genie_primitives[] = {
+    RAC_PRIMITIVE_GENERATE_TEXT,
 };
 #endif
 
+static const rac_engine_manifest_t k_genie_manifest = {
+    .name             = "genie",
+    .display_name     =
+#if RAC_GENIE_ROUTABLE
+        "Qualcomm Genie (NPU)",
+#else
+        "Qualcomm Genie (NPU) [ops unavailable]",
+#endif
+    .version          = nullptr,
+    .package_owner    = "runanywhere",
+    .package_name     = "runanywhere_genie",
+    .availability     = RAC_ENGINE_AVAILABILITY_PRIVATE,  /* Qualcomm-only. */
+    /* High priority only when the SDK-backed Android engine is eligible. */
+    .priority         =
+#if RAC_GENIE_ROUTABLE
+        200,
+#else
+        0,
+#endif
+    .capability_flags = 0,
+    .primitives       =
+#if RAC_GENIE_ROUTABLE
+        k_genie_primitives,
+#else
+        nullptr,
+#endif
+    .primitives_count =
+#if RAC_GENIE_ROUTABLE
+        sizeof(k_genie_primitives) / sizeof(k_genie_primitives[0]),
+#else
+        0,
+#endif
+    .runtimes         =
+#if RAC_GENIE_ROUTABLE
+        k_genie_runtimes,
+#else
+        nullptr,
+#endif
+    .runtimes_count   =
+#if RAC_GENIE_ROUTABLE
+        sizeof(k_genie_runtimes) / sizeof(k_genie_runtimes[0]),
+#else
+        0,
+#endif
+    .formats          =
+#if RAC_GENIE_ROUTABLE
+        k_genie_formats,
+#else
+        nullptr,
+#endif
+    .formats_count    =
+#if RAC_GENIE_ROUTABLE
+        sizeof(k_genie_formats) / sizeof(k_genie_formats[0]),
+#else
+        0,
+#endif
+    .reserved_0       = 0,
+    .reserved_1       = 0,
+};
+
 static const rac_engine_vtable_t g_genie_engine_vtable = {
-    /* metadata */ {
-        .abi_version      = RAC_PLUGIN_API_VERSION,
-        .name             = "genie",
-        .display_name     =
-#if RAC_GENIE_ROUTABLE
-            "Qualcomm Genie (NPU)",
-#else
-            "Qualcomm Genie (NPU) [ops unavailable]",
-#endif
-        .engine_version   = nullptr,
-        /* High priority only when the SDK-backed Android engine is eligible. */
-        .priority         =
-#if RAC_GENIE_ROUTABLE
-            200,
-#else
-            0,
-#endif
-        .capability_flags = 0,
-        .runtimes         =
-#if RAC_GENIE_ROUTABLE
-            k_genie_runtimes,
-#else
-            nullptr,
-#endif
-        .runtimes_count   =
-#if RAC_GENIE_ROUTABLE
-            sizeof(k_genie_runtimes) / sizeof(k_genie_runtimes[0]),
-#else
-            0,
-#endif
-        .formats          =
-#if RAC_GENIE_ROUTABLE
-            k_genie_formats,
-#else
-            nullptr,
-#endif
-        .formats_count    =
-#if RAC_GENIE_ROUTABLE
-            sizeof(k_genie_formats) / sizeof(k_genie_formats[0]),
-#else
-            0,
-#endif
-    },
+    /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_genie_manifest),
     /* capability_check */ genie_capability_check,
     /* on_unload        */ nullptr,
 
@@ -192,7 +220,8 @@ static const rac_engine_vtable_t g_genie_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(genie) {
-    return &g_genie_engine_vtable;
+    return rac_engine_entry_with_manifest(&k_genie_manifest,
+                                          &g_genie_engine_vtable);
 }
 
 }  // extern "C"

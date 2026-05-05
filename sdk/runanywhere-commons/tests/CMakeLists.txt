@@ -191,6 +191,7 @@ target_include_directories(test_tool_calling PRIVATE
 target_link_libraries(test_tool_calling PRIVATE rac_commons)
 rac_link_archive_deps(test_tool_calling)
 target_compile_features(test_tool_calling PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_tool_calling)
 add_test(NAME tool_calling_tests COMMAND test_tool_calling)
 
 # --- CPP-09A: structured-output helper tests --------------------------------
@@ -202,6 +203,7 @@ target_include_directories(test_structured_output PRIVATE
 target_link_libraries(test_structured_output PRIVATE rac_commons)
 rac_link_archive_deps(test_structured_output)
 target_compile_features(test_structured_output PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_structured_output)
 add_test(NAME structured_output_tests COMMAND test_structured_output)
 
 # --- v2 close-out Phase 2: proto-byte event dispatch test --------------------
@@ -340,6 +342,54 @@ target_compile_features(test_sdk_event_stream PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_sdk_event_stream)
 add_test(NAME sdk_event_stream_tests COMMAND test_sdk_event_stream)
 
+# --- Auth manager canonical SDKEvent tests ----------------------------------
+add_executable(test_auth_sdk_events test_auth_sdk_events.cpp)
+target_include_directories(test_auth_sdk_events PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_auth_sdk_events PRIVATE rac_commons)
+rac_link_archive_deps(test_auth_sdk_events)
+target_compile_features(test_auth_sdk_events PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_auth_sdk_events)
+add_test(NAME auth_sdk_event_tests COMMAND test_auth_sdk_events)
+
+# --- SDKEvents generated service descriptor test ----------------------------
+add_executable(test_sdk_events_service_proto_abi test_sdk_events_service_proto_abi.cpp)
+target_include_directories(test_sdk_events_service_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_sdk_events_service_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_sdk_events_service_proto_abi)
+target_compile_features(test_sdk_events_service_proto_abi PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_sdk_events_service_proto_abi)
+add_test(NAME sdk_events_service_proto_abi_tests COMMAND test_sdk_events_service_proto_abi)
+
+# --- ToolCalling generated service descriptor test --------------------------
+add_executable(test_tool_calling_service_proto_abi test_tool_calling_service_proto_abi.cpp)
+target_include_directories(test_tool_calling_service_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_tool_calling_service_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_tool_calling_service_proto_abi)
+target_compile_features(test_tool_calling_service_proto_abi PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_tool_calling_service_proto_abi)
+add_test(NAME tool_calling_service_proto_abi_tests COMMAND test_tool_calling_service_proto_abi)
+
+# --- StructuredOutput generated service descriptor test ---------------------
+add_executable(test_structured_output_service_proto_abi test_structured_output_service_proto_abi.cpp)
+target_include_directories(test_structured_output_service_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_structured_output_service_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_structured_output_service_proto_abi)
+target_compile_features(test_structured_output_service_proto_abi PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_structured_output_service_proto_abi)
+add_test(NAME structured_output_service_proto_abi_tests COMMAND test_structured_output_service_proto_abi)
+
 # --- Model registry proto-byte ABI tests -------------------------------------
 # Exercises register/update/get/list/remove using serialized ModelInfo and
 # ModelInfoList bytes. SKIP-style fallback when Protobuf is unavailable.
@@ -353,6 +403,32 @@ rac_link_archive_deps(test_model_registry_proto)
 target_compile_features(test_model_registry_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_model_registry_proto)
 add_test(NAME model_registry_proto_tests COMMAND test_model_registry_proto)
+
+# --- ModelRegistry generated service descriptor test -------------------------
+add_executable(test_model_registry_service_proto_abi test_model_registry_service_proto_abi.cpp)
+target_include_directories(test_model_registry_service_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_model_registry_service_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_model_registry_service_proto_abi)
+target_compile_features(test_model_registry_service_proto_abi PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_model_registry_service_proto_abi)
+add_test(NAME model_registry_service_proto_abi_tests COMMAND test_model_registry_service_proto_abi)
+
+# --- Model assignment proto-byte refresh/cache tests -------------------------
+# Exercises ModelRegistryRefreshRequest/Result over the assignment transport
+# callback boundary. SKIP-style fallback when Protobuf is unavailable.
+add_executable(test_model_assignment_proto test_model_assignment_proto.cpp)
+target_include_directories(test_model_assignment_proto PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_model_assignment_proto PRIVATE rac_commons)
+rac_link_archive_deps(test_model_assignment_proto)
+target_compile_features(test_model_assignment_proto PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_model_assignment_proto)
+add_test(NAME model_assignment_proto_tests COMMAND test_model_assignment_proto)
 
 # --- Model lifecycle proto-byte ABI tests ------------------------------------
 # Exercises ModelLoad/Unload/CurrentModel and ComponentLifecycleSnapshot over
@@ -368,6 +444,18 @@ rac_link_archive_deps(test_model_lifecycle_proto)
 target_compile_features(test_model_lifecycle_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_model_lifecycle_proto)
 add_test(NAME model_lifecycle_proto_tests COMMAND test_model_lifecycle_proto)
+
+# --- Non-LLM lifecycle-owned generated-proto operation ABI tests -------------
+add_executable(test_nonllm_lifecycle_proto_abi test_nonllm_lifecycle_proto_abi.cpp)
+target_include_directories(test_nonllm_lifecycle_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_nonllm_lifecycle_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_nonllm_lifecycle_proto_abi)
+target_compile_features(test_nonllm_lifecycle_proto_abi PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_nonllm_lifecycle_proto_abi)
+add_test(NAME nonllm_lifecycle_proto_abi_tests COMMAND test_nonllm_lifecycle_proto_abi)
 
 # --- Advanced modality proto-byte ABI tests ---------------------------------
 # Exercises VLM, embeddings, RAG, LoRA, and diffusion service boundaries over
@@ -386,6 +474,78 @@ if(TARGET rac_backend_rag)
     add_test(NAME advanced_modality_proto_abi_tests COMMAND test_advanced_modality_proto_abi)
 endif()
 
+# --- Diffusion generated service descriptor test ----------------------------
+add_executable(test_diffusion_service_proto_abi test_diffusion_service_proto_abi.cpp)
+target_include_directories(test_diffusion_service_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_diffusion_service_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_diffusion_service_proto_abi)
+target_compile_features(test_diffusion_service_proto_abi PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_diffusion_service_proto_abi)
+add_test(NAME diffusion_service_proto_abi_tests COMMAND test_diffusion_service_proto_abi)
+
+# --- Embeddings generated service descriptor test ---------------------------
+add_executable(test_embeddings_service_proto_abi test_embeddings_service_proto_abi.cpp)
+target_include_directories(test_embeddings_service_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_embeddings_service_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_embeddings_service_proto_abi)
+target_compile_features(test_embeddings_service_proto_abi PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_embeddings_service_proto_abi)
+add_test(NAME embeddings_service_proto_abi_tests COMMAND test_embeddings_service_proto_abi)
+
+# --- VLM generated service descriptor test ----------------------------------
+add_executable(test_vlm_service_proto_abi test_vlm_service_proto_abi.cpp)
+target_include_directories(test_vlm_service_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_vlm_service_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_vlm_service_proto_abi)
+target_compile_features(test_vlm_service_proto_abi PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_vlm_service_proto_abi)
+add_test(NAME vlm_service_proto_abi_tests COMMAND test_vlm_service_proto_abi)
+
+# --- RAG generated service descriptor test ----------------------------------
+add_executable(test_rag_service_proto_abi test_rag_service_proto_abi.cpp)
+target_include_directories(test_rag_service_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_rag_service_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_rag_service_proto_abi)
+target_compile_features(test_rag_service_proto_abi PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_rag_service_proto_abi)
+add_test(NAME rag_service_proto_abi_tests COMMAND test_rag_service_proto_abi)
+
+# --- LoRA generated service descriptor test ---------------------------------
+add_executable(test_lora_service_proto_abi test_lora_service_proto_abi.cpp)
+target_include_directories(test_lora_service_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_lora_service_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_lora_service_proto_abi)
+target_compile_features(test_lora_service_proto_abi PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_lora_service_proto_abi)
+add_test(NAME lora_service_proto_abi_tests COMMAND test_lora_service_proto_abi)
+
+# --- Storage generated service descriptor test ------------------------------
+add_executable(test_storage_service_proto_abi test_storage_service_proto_abi.cpp)
+target_include_directories(test_storage_service_proto_abi PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_storage_service_proto_abi PRIVATE rac_commons)
+rac_link_archive_deps(test_storage_service_proto_abi)
+target_compile_features(test_storage_service_proto_abi PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_storage_service_proto_abi)
+add_test(NAME storage_service_proto_abi_tests COMMAND test_storage_service_proto_abi)
+
 # --- Speech/VAD/voice-agent proto-byte ABI tests -----------------------------
 # Exercises STT transcribe/partials, TTS voices/synthesize/stream, VAD
 # process/statistics/activity, and voice-agent turn events over serialized
@@ -400,6 +560,18 @@ rac_link_archive_deps(test_speech_proto_abi)
 target_compile_features(test_speech_proto_abi PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_speech_proto_abi)
 add_test(NAME speech_proto_abi_tests COMMAND test_speech_proto_abi)
+
+# --- CPP-STREAM-EVENT-01: generated STT/VAD stream-event payload tests -------
+add_executable(test_stt_vad_stream_events test_stt_vad_stream_events.cpp)
+target_include_directories(test_stt_vad_stream_events PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_stt_vad_stream_events PRIVATE rac_commons)
+rac_link_archive_deps(test_stt_vad_stream_events)
+target_compile_features(test_stt_vad_stream_events PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_stt_vad_stream_events)
+add_test(NAME stt_vad_stream_event_tests COMMAND test_stt_vad_stream_events)
 
 # --- Storage analyzer proto-byte ABI tests -----------------------------------
 # Exercises StorageInfoResult, StorageAvailabilityResult, StorageDeletePlan, and

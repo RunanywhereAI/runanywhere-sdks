@@ -22,7 +22,6 @@
 #include "bridges/HTTPBridge.hpp"
 #include "bridges/DownloadBridge.hpp"
 #include "bridges/TelemetryBridge.hpp"
-#include "bridges/ToolCallingBridge.hpp"
 #include "bridges/RAGBridge.hpp"
 #include "bridges/FileManagerBridge.hpp"
 
@@ -46,14 +45,12 @@
 #include "rac_model_assignment.h"
 #include "rac_extraction.h"
 #include "rac/infrastructure/http/rac_http_client.h"
-#include "rac/infrastructure/http/rac_http_download.h"
+#include "rac/infrastructure/model_management/rac_model_paths.h"
 
 #include <chrono>
 #include <vector>
 #include <mutex>
-#include <atomic>
 #include <memory>
-#include <unordered_map>
 #include <thread>
 #include <sys/stat.h>
 #include <dirent.h>
@@ -505,41 +502,6 @@ std::string headersToJson(const std::vector<std::pair<std::string, std::string>>
     }
     out += "}";
     return out;
-}
-
-// -----------------------------------------------------------------------------
-// Download cancel registry — maps cancel tokens to atomic cancel flags. The
-// progress callback reads the flag and returns RAC_FALSE to abort the
-// download. The registry is thread-safe.
-// -----------------------------------------------------------------------------
-struct DownloadCancelRegistry {
-    std::mutex mutex;
-    std::unordered_map<std::string, std::shared_ptr<std::atomic<bool>>> flags;
-
-    std::shared_ptr<std::atomic<bool>> registerToken(const std::string& token) {
-        auto flag = std::make_shared<std::atomic<bool>>(false);
-        std::lock_guard<std::mutex> lk(mutex);
-        flags[token] = flag;
-        return flag;
-    }
-
-    bool cancel(const std::string& token) {
-        std::lock_guard<std::mutex> lk(mutex);
-        auto it = flags.find(token);
-        if (it == flags.end()) return false;
-        it->second->store(true);
-        return true;
-    }
-
-    void release(const std::string& token) {
-        std::lock_guard<std::mutex> lk(mutex);
-        flags.erase(token);
-    }
-};
-
-DownloadCancelRegistry& downloadCancelRegistry() {
-    static DownloadCancelRegistry instance;
-    return instance;
 }
 
 } // anonymous namespace

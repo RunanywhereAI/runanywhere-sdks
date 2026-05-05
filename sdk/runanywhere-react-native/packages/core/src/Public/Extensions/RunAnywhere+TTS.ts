@@ -1,9 +1,10 @@
 /**
  * RunAnywhere+TTS.ts
  *
- * Text-to-Speech extension for RunAnywhere SDK. Wave 2: aligned to
- * proto-canonical TTS shapes (`@runanywhere/proto-ts/tts_options`). All
- * legacy ad-hoc shapes have been deleted.
+ * Text-to-Speech extension for RunAnywhere SDK. Aligned to proto-canonical
+ * TTS shapes (`@runanywhere/proto-ts/tts_options`). Path-first loading and
+ * registry path probing have been removed — voice loading goes through
+ * `loadModelLifecycle` in `RunAnywhere+Lifecycle.ts`.
  *
  * Matches Swift: `Public/Extensions/TTS/RunAnywhere+TTS.swift`.
  */
@@ -11,7 +12,6 @@
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import { AudioPlaybackManager } from '../../Features/VoiceSession/AudioPlaybackManager';
-import { ModelRegistry } from '../../services/ModelRegistry';
 import {
   type TTSOptions,
   type TTSOutput,
@@ -21,6 +21,7 @@ import {
 import {
   TTSOptions as TTSOptionsMessage,
   TTSOutput as TTSOutputMessage,
+  TTSSpeakResult as TTSSpeakResultMessage,
   TTSVoiceInfo as TTSVoiceInfoMessage,
 } from '@runanywhere/proto-ts/tts_options';
 import { AudioFormat } from '@runanywhere/proto-ts/model_types';
@@ -79,50 +80,6 @@ function decodeTTSOutput(buffer: ArrayBuffer): TTSOutput {
 // ============================================================================
 // Voice / Model Loading
 // ============================================================================
-
-/** Load a TTS model. */
-export async function loadTTSModel(
-  modelPath: string,
-  modelType: string = 'piper',
-  config?: Record<string, unknown>
-): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    logger.warning('Native module not available for loadTTSModel');
-    return false;
-  }
-  const native = requireNativeModule();
-  return native.loadTTSModel(
-    modelPath,
-    modelType,
-    config ? JSON.stringify(config) : undefined
-  );
-}
-
-/** Load a TTS voice by ID. */
-export async function loadTTSVoice(voiceId: string): Promise<void> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
-  }
-  logger.info(`Loading TTS voice: ${voiceId}`);
-  const native = requireNativeModule();
-  const modelInfo = await ModelRegistry.getModel(voiceId);
-  if (!modelInfo?.localPath) {
-    throw new Error(`Voice '${voiceId}' is not downloaded`);
-  }
-  const loaded = await native.loadTTSModel(modelInfo.localPath, 'piper');
-  if (!loaded) {
-    throw new Error(`Failed to load voice '${voiceId}'`);
-  }
-  logger.info(`TTS voice loaded: ${voiceId}`);
-}
-
-/** Unload the current TTS voice. */
-export async function unloadTTSVoice(): Promise<void> {
-  if (!isNativeModuleAvailable()) return;
-  const native = requireNativeModule();
-  await native.unloadTTSModel();
-  logger.info('TTS voice unloaded');
-}
 
 /** Check if a TTS model is loaded. */
 export async function isTTSModelLoaded(): Promise<boolean> {
@@ -340,14 +297,14 @@ export async function speak(
     await playback.play(bytesToBase64(output.audioData));
   }
 
-  return {
+  return TTSSpeakResultMessage.fromPartial({
     audioFormat: output.audioFormat,
     sampleRate: output.sampleRate,
     durationMs: output.durationMs,
     audioSizeBytes: output.audioData.byteLength,
     metadata: output.metadata,
     timestampMs: output.timestampMs,
-  };
+  });
 }
 
 /** Whether speech is currently playing. */

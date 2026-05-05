@@ -21,8 +21,12 @@
 #           rac_plugin_entry_llamacpp.cpp
 #           rac_static_register_llamacpp.cpp
 #       LINK_LIBRARIES llama common
+#       PRIMITIVES GENERATE_TEXT
 #       RUNTIMES CPU METAL CUDA
 #       FORMATS GGUF GGML BIN
+#       AVAILABILITY PUBLIC
+#       PACKAGE_OWNER runanywhere
+#       PACKAGE_NAME runanywhere_llamacpp
 #   )
 #
 # Then in the consuming app's CMakeLists.txt:
@@ -62,8 +66,12 @@ include_guard(GLOBAL)
 #                       [COMPILE_DEFINITIONS <def1> ...]
 #                       [COMPILE_OPTIONS <opt1> ...]   # v3.1.2: e.g. -O3 -fvisibility=hidden
 #                       [LINK_OPTIONS <opt1> ...]      # v3.1.2: e.g. -Wl,--gc-sections
+#                       [PRIMITIVES <GENERATE_TEXT|EMBED|...>]
 #                       [RUNTIMES <CPU|METAL|...>]
-#                       [FORMATS <GGUF|ONNX|...>])
+#                       [FORMATS <GGUF|ONNX|...>]
+#                       [AVAILABILITY <PUBLIC|PRIVATE>]
+#                       [PACKAGE_OWNER <owner>]
+#                       [PACKAGE_NAME <package>])
 #
 # Branches:
 #   - RAC_STATIC_PLUGINS=ON AND NOT SHARED_ONLY → SOURCES become rac_commons
@@ -81,7 +89,7 @@ include_guard(GLOBAL)
 # CMake target names — the macro now supports TARGET_NAME override + non-17
 # C++ standards + SHARED_ONLY (skip the static-fold-into-rac_commons path).
 #
-# RUNTIMES + FORMATS are recorded as GLOBAL properties for tooling
+# PRIMITIVES + RUNTIMES + FORMATS + ownership are recorded as GLOBAL properties for tooling
 # (cmake -t graphviz / json), independent of build mode.
 # -----------------------------------------------------------------------------
 function(rac_add_engine_plugin name)
@@ -93,9 +101,9 @@ function(rac_add_engine_plugin name)
     # CXX_STANDARD lets engines override the default 17 (e.g. ONNX needs 20).
     # SHARED_ONLY skips the static-build short-circuit when the engine MUST
     # produce a separate library (e.g. tests link directly against it).
-    set(_oneval  TARGET_NAME CXX_STANDARD)
+    set(_oneval  TARGET_NAME CXX_STANDARD AVAILABILITY PACKAGE_OWNER PACKAGE_NAME VERSION)
     set(_multival SOURCES LINK_LIBRARIES INCLUDE_DIRECTORIES COMPILE_DEFINITIONS
-                  RUNTIMES FORMATS COMPILE_OPTIONS LINK_OPTIONS)
+                  PRIMITIVES RUNTIMES FORMATS COMPILE_OPTIONS LINK_OPTIONS)
     cmake_parse_arguments(P "SHARED_ONLY" "${_oneval}" "${_multival}" ${ARGN})
 
     if(NOT P_SOURCES)
@@ -167,6 +175,11 @@ function(rac_add_engine_plugin name)
         if(P_INCLUDE_DIRECTORIES)
             target_include_directories(${P_TARGET_NAME} PUBLIC ${P_INCLUDE_DIRECTORIES})
         endif()
+        # Mark every engine plugin as an "internal translation unit" so legacy
+        # event headers (rac_analytics_events.h, rac_events.h, rac_*_events.h)
+        # compile without their public-API #warning. Engines are first-party
+        # commons consumers; only out-of-tree SDK code should trip the warning.
+        target_compile_definitions(${P_TARGET_NAME} PRIVATE RAC_INTERNAL_TRANSLATION_UNIT=1)
         if(P_COMPILE_DEFINITIONS)
             target_compile_definitions(${P_TARGET_NAME} PRIVATE ${P_COMPILE_DEFINITIONS})
         endif()
@@ -187,11 +200,26 @@ function(rac_add_engine_plugin name)
     endif()
 
     # Tooling-only metadata — never read by code, only by cmake -t graphviz/json.
+    if(P_PRIMITIVES)
+        set_property(GLOBAL APPEND PROPERTY RAC_ENGINE_${name}_PRIMITIVES ${P_PRIMITIVES})
+    endif()
     if(P_RUNTIMES)
         set_property(GLOBAL APPEND PROPERTY RAC_ENGINE_${name}_RUNTIMES ${P_RUNTIMES})
     endif()
     if(P_FORMATS)
         set_property(GLOBAL APPEND PROPERTY RAC_ENGINE_${name}_FORMATS ${P_FORMATS})
+    endif()
+    if(P_AVAILABILITY)
+        set_property(GLOBAL PROPERTY RAC_ENGINE_${name}_AVAILABILITY ${P_AVAILABILITY})
+    endif()
+    if(P_PACKAGE_OWNER)
+        set_property(GLOBAL PROPERTY RAC_ENGINE_${name}_PACKAGE_OWNER ${P_PACKAGE_OWNER})
+    endif()
+    if(P_PACKAGE_NAME)
+        set_property(GLOBAL PROPERTY RAC_ENGINE_${name}_PACKAGE_NAME ${P_PACKAGE_NAME})
+    endif()
+    if(P_VERSION)
+        set_property(GLOBAL PROPERTY RAC_ENGINE_${name}_VERSION ${P_VERSION})
     endif()
     set_property(GLOBAL APPEND PROPERTY RAC_REGISTERED_ENGINES ${name})
 endfunction()

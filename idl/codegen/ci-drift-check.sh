@@ -20,8 +20,23 @@ cd "${REPO_ROOT}"
 # Regenerate every language.
 "${SCRIPT_DIR}/generate_all.sh"
 
-# Fail loud on any drift.
+# Fail loud on any drift (modified tracked files).
+DRIFT=0
 if ! git diff --exit-code --stat; then
+    DRIFT=1
+fi
+
+# Also catch newly created files that codegen may produce (e.g., a new .proto
+# added without committing the generated output).
+UNTRACKED="$(git ls-files --others --exclude-standard -- .)"
+if [[ -n "${UNTRACKED}" ]]; then
+    echo "" >&2
+    echo "New untracked files after codegen:" >&2
+    echo "${UNTRACKED}" | sed 's/^/  ?? /' >&2
+    DRIFT=1
+fi
+
+if [[ "${DRIFT}" -ne 0 ]]; then
     echo "" >&2
     echo "::error::IDL-generated code is out of sync with .proto sources." >&2
     echo "" >&2

@@ -8,6 +8,11 @@
  *
  * IMPORTANT: This is a direct translation of the Swift implementation.
  * Do NOT add features not present in the Swift code.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal`.
+ * Diagnostic plumbing used inside commons. SDK-facing TTFT/throughput
+ * metrics surface through runanywhere.v1.LLMStreamEvent / SDKEvent
+ * proto bytes. Do not expose these handles or structs from public APIs.
  */
 
 #ifndef RAC_LLM_METRICS_H

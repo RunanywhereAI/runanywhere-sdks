@@ -7,6 +7,16 @@
  *
  * Actor-based TTS capability that owns voice lifecycle and synthesis.
  * Uses lifecycle manager for unified lifecycle + analytics handling.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Proto-byte APIs (rac_tts_component_list_voices_proto,
+ *     rac_tts_component_synthesize_proto,
+ *     rac_tts_component_synthesize_stream_proto): `SDK-facing default`
+ *     over runanywhere.v1.TTSVoiceInfo / TTSOptions / TTSOutput bytes.
+ *   - Struct APIs (rac_tts_component_create, configure, load_voice,
+ *     unload, cleanup, stop, synthesize, synthesize_stream, get_*,
+ *     get_supported_languages, destroy): `delete after SDK migration`
+ *     for SDK callers — use proto-byte APIs.
  */
 
 #ifndef RAC_TTS_COMPONENT_H

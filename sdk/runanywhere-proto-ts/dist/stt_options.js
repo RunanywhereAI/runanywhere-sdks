@@ -126,6 +126,105 @@ export function sTTLanguageToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
+export var STTAudioEncoding;
+(function (STTAudioEncoding) {
+    STTAudioEncoding[STTAudioEncoding["STT_AUDIO_ENCODING_UNSPECIFIED"] = 0] = "STT_AUDIO_ENCODING_UNSPECIFIED";
+    STTAudioEncoding[STTAudioEncoding["STT_AUDIO_ENCODING_PCM_S16_LE"] = 1] = "STT_AUDIO_ENCODING_PCM_S16_LE";
+    STTAudioEncoding[STTAudioEncoding["STT_AUDIO_ENCODING_PCM_F32_LE"] = 2] = "STT_AUDIO_ENCODING_PCM_F32_LE";
+    /** STT_AUDIO_ENCODING_CONTAINER - WAV/MP3/FLAC/etc.; see AudioFormat. */
+    STTAudioEncoding[STTAudioEncoding["STT_AUDIO_ENCODING_CONTAINER"] = 3] = "STT_AUDIO_ENCODING_CONTAINER";
+    STTAudioEncoding[STTAudioEncoding["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(STTAudioEncoding || (STTAudioEncoding = {}));
+export function sTTAudioEncodingFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "STT_AUDIO_ENCODING_UNSPECIFIED":
+            return STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED;
+        case 1:
+        case "STT_AUDIO_ENCODING_PCM_S16_LE":
+            return STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE;
+        case 2:
+        case "STT_AUDIO_ENCODING_PCM_F32_LE":
+            return STTAudioEncoding.STT_AUDIO_ENCODING_PCM_F32_LE;
+        case 3:
+        case "STT_AUDIO_ENCODING_CONTAINER":
+            return STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return STTAudioEncoding.UNRECOGNIZED;
+    }
+}
+export function sTTAudioEncodingToJSON(object) {
+    switch (object) {
+        case STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED:
+            return "STT_AUDIO_ENCODING_UNSPECIFIED";
+        case STTAudioEncoding.STT_AUDIO_ENCODING_PCM_S16_LE:
+            return "STT_AUDIO_ENCODING_PCM_S16_LE";
+        case STTAudioEncoding.STT_AUDIO_ENCODING_PCM_F32_LE:
+            return "STT_AUDIO_ENCODING_PCM_F32_LE";
+        case STTAudioEncoding.STT_AUDIO_ENCODING_CONTAINER:
+            return "STT_AUDIO_ENCODING_CONTAINER";
+        case STTAudioEncoding.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
+export var STTStreamEventKind;
+(function (STTStreamEventKind) {
+    STTStreamEventKind[STTStreamEventKind["STT_STREAM_EVENT_KIND_UNSPECIFIED"] = 0] = "STT_STREAM_EVENT_KIND_UNSPECIFIED";
+    STTStreamEventKind[STTStreamEventKind["STT_STREAM_EVENT_KIND_STARTED"] = 1] = "STT_STREAM_EVENT_KIND_STARTED";
+    STTStreamEventKind[STTStreamEventKind["STT_STREAM_EVENT_KIND_PARTIAL"] = 2] = "STT_STREAM_EVENT_KIND_PARTIAL";
+    STTStreamEventKind[STTStreamEventKind["STT_STREAM_EVENT_KIND_FINAL"] = 3] = "STT_STREAM_EVENT_KIND_FINAL";
+    STTStreamEventKind[STTStreamEventKind["STT_STREAM_EVENT_KIND_ENDPOINT"] = 4] = "STT_STREAM_EVENT_KIND_ENDPOINT";
+    STTStreamEventKind[STTStreamEventKind["STT_STREAM_EVENT_KIND_ERROR"] = 5] = "STT_STREAM_EVENT_KIND_ERROR";
+    STTStreamEventKind[STTStreamEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(STTStreamEventKind || (STTStreamEventKind = {}));
+export function sTTStreamEventKindFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "STT_STREAM_EVENT_KIND_UNSPECIFIED":
+            return STTStreamEventKind.STT_STREAM_EVENT_KIND_UNSPECIFIED;
+        case 1:
+        case "STT_STREAM_EVENT_KIND_STARTED":
+            return STTStreamEventKind.STT_STREAM_EVENT_KIND_STARTED;
+        case 2:
+        case "STT_STREAM_EVENT_KIND_PARTIAL":
+            return STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL;
+        case 3:
+        case "STT_STREAM_EVENT_KIND_FINAL":
+            return STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL;
+        case 4:
+        case "STT_STREAM_EVENT_KIND_ENDPOINT":
+            return STTStreamEventKind.STT_STREAM_EVENT_KIND_ENDPOINT;
+        case 5:
+        case "STT_STREAM_EVENT_KIND_ERROR":
+            return STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return STTStreamEventKind.UNRECOGNIZED;
+    }
+}
+export function sTTStreamEventKindToJSON(object) {
+    switch (object) {
+        case STTStreamEventKind.STT_STREAM_EVENT_KIND_UNSPECIFIED:
+            return "STT_STREAM_EVENT_KIND_UNSPECIFIED";
+        case STTStreamEventKind.STT_STREAM_EVENT_KIND_STARTED:
+            return "STT_STREAM_EVENT_KIND_STARTED";
+        case STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL:
+            return "STT_STREAM_EVENT_KIND_PARTIAL";
+        case STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL:
+            return "STT_STREAM_EVENT_KIND_FINAL";
+        case STTStreamEventKind.STT_STREAM_EVENT_KIND_ENDPOINT:
+            return "STT_STREAM_EVENT_KIND_ENDPOINT";
+        case STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR:
+            return "STT_STREAM_EVENT_KIND_ERROR";
+        case STTStreamEventKind.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
 function createBaseSTTConfiguration() {
     return {
         modelId: "",
@@ -365,6 +464,10 @@ function createBaseSTTOptions() {
         audioFormat: 0,
         sampleRate: 0,
         maxAlternatives: 0,
+        chunkDurationMs: 0,
+        endpointSilenceMs: 0,
+        suppressBlank: false,
+        translateToEnglish: false,
     };
 }
 export const STTOptions = {
@@ -404,6 +507,18 @@ export const STTOptions = {
         }
         if (message.maxAlternatives !== 0) {
             writer.uint32(96).int32(message.maxAlternatives);
+        }
+        if (message.chunkDurationMs !== 0) {
+            writer.uint32(104).int32(message.chunkDurationMs);
+        }
+        if (message.endpointSilenceMs !== 0) {
+            writer.uint32(112).int32(message.endpointSilenceMs);
+        }
+        if (message.suppressBlank !== false) {
+            writer.uint32(120).bool(message.suppressBlank);
+        }
+        if (message.translateToEnglish !== false) {
+            writer.uint32(128).bool(message.translateToEnglish);
         }
         return writer;
     },
@@ -486,6 +601,30 @@ export const STTOptions = {
                     }
                     message.maxAlternatives = reader.int32();
                     continue;
+                case 13:
+                    if (tag !== 104) {
+                        break;
+                    }
+                    message.chunkDurationMs = reader.int32();
+                    continue;
+                case 14:
+                    if (tag !== 112) {
+                        break;
+                    }
+                    message.endpointSilenceMs = reader.int32();
+                    continue;
+                case 15:
+                    if (tag !== 120) {
+                        break;
+                    }
+                    message.suppressBlank = reader.bool();
+                    continue;
+                case 16:
+                    if (tag !== 128) {
+                        break;
+                    }
+                    message.translateToEnglish = reader.bool();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -512,6 +651,10 @@ export const STTOptions = {
             audioFormat: isSet(object.audioFormat) ? audioFormatFromJSON(object.audioFormat) : 0,
             sampleRate: isSet(object.sampleRate) ? globalThis.Number(object.sampleRate) : 0,
             maxAlternatives: isSet(object.maxAlternatives) ? globalThis.Number(object.maxAlternatives) : 0,
+            chunkDurationMs: isSet(object.chunkDurationMs) ? globalThis.Number(object.chunkDurationMs) : 0,
+            endpointSilenceMs: isSet(object.endpointSilenceMs) ? globalThis.Number(object.endpointSilenceMs) : 0,
+            suppressBlank: isSet(object.suppressBlank) ? globalThis.Boolean(object.suppressBlank) : false,
+            translateToEnglish: isSet(object.translateToEnglish) ? globalThis.Boolean(object.translateToEnglish) : false,
         };
     },
     toJSON(message) {
@@ -552,6 +695,18 @@ export const STTOptions = {
         if (message.maxAlternatives !== 0) {
             obj.maxAlternatives = Math.round(message.maxAlternatives);
         }
+        if (message.chunkDurationMs !== 0) {
+            obj.chunkDurationMs = Math.round(message.chunkDurationMs);
+        }
+        if (message.endpointSilenceMs !== 0) {
+            obj.endpointSilenceMs = Math.round(message.endpointSilenceMs);
+        }
+        if (message.suppressBlank !== false) {
+            obj.suppressBlank = message.suppressBlank;
+        }
+        if (message.translateToEnglish !== false) {
+            obj.translateToEnglish = message.translateToEnglish;
+        }
         return obj;
     },
     create(base) {
@@ -571,11 +726,372 @@ export const STTOptions = {
         message.audioFormat = object.audioFormat ?? 0;
         message.sampleRate = object.sampleRate ?? 0;
         message.maxAlternatives = object.maxAlternatives ?? 0;
+        message.chunkDurationMs = object.chunkDurationMs ?? 0;
+        message.endpointSilenceMs = object.endpointSilenceMs ?? 0;
+        message.suppressBlank = object.suppressBlank ?? false;
+        message.translateToEnglish = object.translateToEnglish ?? false;
+        return message;
+    },
+};
+function createBaseSTTAudioSource() {
+    return {
+        audioData: undefined,
+        fileUri: undefined,
+        adapterHandle: undefined,
+        encoding: 0,
+        audioFormat: 0,
+        sampleRate: 0,
+        channels: 0,
+        bitsPerSample: 0,
+        durationMs: 0,
+    };
+}
+export const STTAudioSource = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.audioData !== undefined) {
+            writer.uint32(10).bytes(message.audioData);
+        }
+        if (message.fileUri !== undefined) {
+            writer.uint32(18).string(message.fileUri);
+        }
+        if (message.adapterHandle !== undefined) {
+            writer.uint32(26).string(message.adapterHandle);
+        }
+        if (message.encoding !== 0) {
+            writer.uint32(32).int32(message.encoding);
+        }
+        if (message.audioFormat !== 0) {
+            writer.uint32(40).int32(message.audioFormat);
+        }
+        if (message.sampleRate !== 0) {
+            writer.uint32(48).int32(message.sampleRate);
+        }
+        if (message.channels !== 0) {
+            writer.uint32(56).int32(message.channels);
+        }
+        if (message.bitsPerSample !== 0) {
+            writer.uint32(64).int32(message.bitsPerSample);
+        }
+        if (message.durationMs !== 0) {
+            writer.uint32(72).int64(message.durationMs);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseSTTAudioSource();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.audioData = reader.bytes();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.fileUri = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.adapterHandle = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.encoding = reader.int32();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.audioFormat = reader.int32();
+                    continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.sampleRate = reader.int32();
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.channels = reader.int32();
+                    continue;
+                case 8:
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.bitsPerSample = reader.int32();
+                    continue;
+                case 9:
+                    if (tag !== 72) {
+                        break;
+                    }
+                    message.durationMs = longToNumber(reader.int64());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            audioData: isSet(object.audioData) ? bytesFromBase64(object.audioData) : undefined,
+            fileUri: isSet(object.fileUri) ? globalThis.String(object.fileUri) : undefined,
+            adapterHandle: isSet(object.adapterHandle) ? globalThis.String(object.adapterHandle) : undefined,
+            encoding: isSet(object.encoding) ? sTTAudioEncodingFromJSON(object.encoding) : 0,
+            audioFormat: isSet(object.audioFormat) ? audioFormatFromJSON(object.audioFormat) : 0,
+            sampleRate: isSet(object.sampleRate) ? globalThis.Number(object.sampleRate) : 0,
+            channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
+            bitsPerSample: isSet(object.bitsPerSample) ? globalThis.Number(object.bitsPerSample) : 0,
+            durationMs: isSet(object.durationMs) ? globalThis.Number(object.durationMs) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.audioData !== undefined) {
+            obj.audioData = base64FromBytes(message.audioData);
+        }
+        if (message.fileUri !== undefined) {
+            obj.fileUri = message.fileUri;
+        }
+        if (message.adapterHandle !== undefined) {
+            obj.adapterHandle = message.adapterHandle;
+        }
+        if (message.encoding !== 0) {
+            obj.encoding = sTTAudioEncodingToJSON(message.encoding);
+        }
+        if (message.audioFormat !== 0) {
+            obj.audioFormat = audioFormatToJSON(message.audioFormat);
+        }
+        if (message.sampleRate !== 0) {
+            obj.sampleRate = Math.round(message.sampleRate);
+        }
+        if (message.channels !== 0) {
+            obj.channels = Math.round(message.channels);
+        }
+        if (message.bitsPerSample !== 0) {
+            obj.bitsPerSample = Math.round(message.bitsPerSample);
+        }
+        if (message.durationMs !== 0) {
+            obj.durationMs = Math.round(message.durationMs);
+        }
+        return obj;
+    },
+    create(base) {
+        return STTAudioSource.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseSTTAudioSource();
+        message.audioData = object.audioData ?? undefined;
+        message.fileUri = object.fileUri ?? undefined;
+        message.adapterHandle = object.adapterHandle ?? undefined;
+        message.encoding = object.encoding ?? 0;
+        message.audioFormat = object.audioFormat ?? 0;
+        message.sampleRate = object.sampleRate ?? 0;
+        message.channels = object.channels ?? 0;
+        message.bitsPerSample = object.bitsPerSample ?? 0;
+        message.durationMs = object.durationMs ?? 0;
+        return message;
+    },
+};
+function createBaseSTTTranscriptionRequest() {
+    return { requestId: "", audio: undefined, options: undefined, metadata: {} };
+}
+export const STTTranscriptionRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.requestId !== "") {
+            writer.uint32(10).string(message.requestId);
+        }
+        if (message.audio !== undefined) {
+            STTAudioSource.encode(message.audio, writer.uint32(18).fork()).ldelim();
+        }
+        if (message.options !== undefined) {
+            STTOptions.encode(message.options, writer.uint32(26).fork()).ldelim();
+        }
+        Object.entries(message.metadata).forEach(([key, value]) => {
+            STTTranscriptionRequest_MetadataEntry.encode({ key: key, value }, writer.uint32(34).fork()).ldelim();
+        });
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseSTTTranscriptionRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.requestId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.audio = STTAudioSource.decode(reader, reader.uint32());
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.options = STTOptions.decode(reader, reader.uint32());
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    const entry4 = STTTranscriptionRequest_MetadataEntry.decode(reader, reader.uint32());
+                    if (entry4.value !== undefined) {
+                        message.metadata[entry4.key] = entry4.value;
+                    }
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+            audio: isSet(object.audio) ? STTAudioSource.fromJSON(object.audio) : undefined,
+            options: isSet(object.options) ? STTOptions.fromJSON(object.options) : undefined,
+            metadata: isObject(object.metadata)
+                ? Object.entries(object.metadata).reduce((acc, [key, value]) => {
+                    acc[key] = String(value);
+                    return acc;
+                }, {})
+                : {},
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.requestId !== "") {
+            obj.requestId = message.requestId;
+        }
+        if (message.audio !== undefined) {
+            obj.audio = STTAudioSource.toJSON(message.audio);
+        }
+        if (message.options !== undefined) {
+            obj.options = STTOptions.toJSON(message.options);
+        }
+        if (message.metadata) {
+            const entries = Object.entries(message.metadata);
+            if (entries.length > 0) {
+                obj.metadata = {};
+                entries.forEach(([k, v]) => {
+                    obj.metadata[k] = v;
+                });
+            }
+        }
+        return obj;
+    },
+    create(base) {
+        return STTTranscriptionRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseSTTTranscriptionRequest();
+        message.requestId = object.requestId ?? "";
+        message.audio = (object.audio !== undefined && object.audio !== null)
+            ? STTAudioSource.fromPartial(object.audio)
+            : undefined;
+        message.options = (object.options !== undefined && object.options !== null)
+            ? STTOptions.fromPartial(object.options)
+            : undefined;
+        message.metadata = Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
+            if (value !== undefined) {
+                acc[key] = globalThis.String(value);
+            }
+            return acc;
+        }, {});
+        return message;
+    },
+};
+function createBaseSTTTranscriptionRequest_MetadataEntry() {
+    return { key: "", value: "" };
+}
+export const STTTranscriptionRequest_MetadataEntry = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.key !== "") {
+            writer.uint32(10).string(message.key);
+        }
+        if (message.value !== "") {
+            writer.uint32(18).string(message.value);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseSTTTranscriptionRequest_MetadataEntry();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.key = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.value = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            key: isSet(object.key) ? globalThis.String(object.key) : "",
+            value: isSet(object.value) ? globalThis.String(object.value) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.key !== "") {
+            obj.key = message.key;
+        }
+        if (message.value !== "") {
+            obj.value = message.value;
+        }
+        return obj;
+    },
+    create(base) {
+        return STTTranscriptionRequest_MetadataEntry.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseSTTTranscriptionRequest_MetadataEntry();
+        message.key = object.key ?? "";
+        message.value = object.value ?? "";
         return message;
     },
 };
 function createBaseWordTimestamp() {
-    return { word: "", startMs: 0, endMs: 0, confidence: 0 };
+    return { word: "", startMs: 0, endMs: 0, confidence: 0, speakerId: undefined };
 }
 export const WordTimestamp = {
     encode(message, writer = _m0.Writer.create()) {
@@ -590,6 +1106,9 @@ export const WordTimestamp = {
         }
         if (message.confidence !== 0) {
             writer.uint32(37).float(message.confidence);
+        }
+        if (message.speakerId !== undefined) {
+            writer.uint32(42).string(message.speakerId);
         }
         return writer;
     },
@@ -624,6 +1143,12 @@ export const WordTimestamp = {
                     }
                     message.confidence = reader.float();
                     continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.speakerId = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -638,6 +1163,7 @@ export const WordTimestamp = {
             startMs: isSet(object.startMs) ? globalThis.Number(object.startMs) : 0,
             endMs: isSet(object.endMs) ? globalThis.Number(object.endMs) : 0,
             confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
+            speakerId: isSet(object.speakerId) ? globalThis.String(object.speakerId) : undefined,
         };
     },
     toJSON(message) {
@@ -654,6 +1180,9 @@ export const WordTimestamp = {
         if (message.confidence !== 0) {
             obj.confidence = message.confidence;
         }
+        if (message.speakerId !== undefined) {
+            obj.speakerId = message.speakerId;
+        }
         return obj;
     },
     create(base) {
@@ -665,6 +1194,7 @@ export const WordTimestamp = {
         message.startMs = object.startMs ?? 0;
         message.endMs = object.endMs ?? 0;
         message.confidence = object.confidence ?? 0;
+        message.speakerId = object.speakerId ?? undefined;
         return message;
     },
 };
@@ -853,6 +1383,10 @@ function createBaseSTTOutput() {
         languageCode: undefined,
         timestampMs: 0,
         durationMs: 0,
+        speakerIds: [],
+        errorMessage: undefined,
+        errorCode: 0,
+        segmentIndex: 0,
     };
 }
 export const STTOutput = {
@@ -883,6 +1417,18 @@ export const STTOutput = {
         }
         if (message.durationMs !== 0) {
             writer.uint32(72).int64(message.durationMs);
+        }
+        for (const v of message.speakerIds) {
+            writer.uint32(82).string(v);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(90).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(96).int32(message.errorCode);
+        }
+        if (message.segmentIndex !== 0) {
+            writer.uint32(104).int32(message.segmentIndex);
         }
         return writer;
     },
@@ -947,6 +1493,30 @@ export const STTOutput = {
                     }
                     message.durationMs = longToNumber(reader.int64());
                     continue;
+                case 10:
+                    if (tag !== 82) {
+                        break;
+                    }
+                    message.speakerIds.push(reader.string());
+                    continue;
+                case 11:
+                    if (tag !== 90) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 12:
+                    if (tag !== 96) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+                case 13:
+                    if (tag !== 104) {
+                        break;
+                    }
+                    message.segmentIndex = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -968,6 +1538,12 @@ export const STTOutput = {
             languageCode: isSet(object.languageCode) ? globalThis.String(object.languageCode) : undefined,
             timestampMs: isSet(object.timestampMs) ? globalThis.Number(object.timestampMs) : 0,
             durationMs: isSet(object.durationMs) ? globalThis.Number(object.durationMs) : 0,
+            speakerIds: globalThis.Array.isArray(object?.speakerIds)
+                ? object.speakerIds.map((e) => globalThis.String(e))
+                : [],
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+            segmentIndex: isSet(object.segmentIndex) ? globalThis.Number(object.segmentIndex) : 0,
         };
     },
     toJSON(message) {
@@ -999,6 +1575,18 @@ export const STTOutput = {
         if (message.durationMs !== 0) {
             obj.durationMs = Math.round(message.durationMs);
         }
+        if (message.speakerIds?.length) {
+            obj.speakerIds = message.speakerIds;
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        if (message.segmentIndex !== 0) {
+            obj.segmentIndex = Math.round(message.segmentIndex);
+        }
         return obj;
     },
     create(base) {
@@ -1017,6 +1605,10 @@ export const STTOutput = {
         message.languageCode = object.languageCode ?? undefined;
         message.timestampMs = object.timestampMs ?? 0;
         message.durationMs = object.durationMs ?? 0;
+        message.speakerIds = object.speakerIds?.map((e) => e) || [];
+        message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
+        message.segmentIndex = object.segmentIndex ?? 0;
         return message;
     },
 };
@@ -1030,6 +1622,11 @@ function createBaseSTTPartialResult() {
         timestampMs: 0,
         alternatives: [],
         languageCode: undefined,
+        requestId: "",
+        segmentIndex: 0,
+        audioStartMs: 0,
+        audioEndMs: 0,
+        finalOutput: undefined,
     };
 }
 export const STTPartialResult = {
@@ -1057,6 +1654,21 @@ export const STTPartialResult = {
         }
         if (message.languageCode !== undefined) {
             writer.uint32(66).string(message.languageCode);
+        }
+        if (message.requestId !== "") {
+            writer.uint32(74).string(message.requestId);
+        }
+        if (message.segmentIndex !== 0) {
+            writer.uint32(80).int32(message.segmentIndex);
+        }
+        if (message.audioStartMs !== 0) {
+            writer.uint32(88).int64(message.audioStartMs);
+        }
+        if (message.audioEndMs !== 0) {
+            writer.uint32(96).int64(message.audioEndMs);
+        }
+        if (message.finalOutput !== undefined) {
+            STTOutput.encode(message.finalOutput, writer.uint32(106).fork()).ldelim();
         }
         return writer;
     },
@@ -1115,6 +1727,36 @@ export const STTPartialResult = {
                     }
                     message.languageCode = reader.string();
                     continue;
+                case 9:
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.requestId = reader.string();
+                    continue;
+                case 10:
+                    if (tag !== 80) {
+                        break;
+                    }
+                    message.segmentIndex = reader.int32();
+                    continue;
+                case 11:
+                    if (tag !== 88) {
+                        break;
+                    }
+                    message.audioStartMs = longToNumber(reader.int64());
+                    continue;
+                case 12:
+                    if (tag !== 96) {
+                        break;
+                    }
+                    message.audioEndMs = longToNumber(reader.int64());
+                    continue;
+                case 13:
+                    if (tag !== 106) {
+                        break;
+                    }
+                    message.finalOutput = STTOutput.decode(reader, reader.uint32());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -1135,6 +1777,11 @@ export const STTPartialResult = {
                 ? object.alternatives.map((e) => TranscriptionAlternative.fromJSON(e))
                 : [],
             languageCode: isSet(object.languageCode) ? globalThis.String(object.languageCode) : undefined,
+            requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+            segmentIndex: isSet(object.segmentIndex) ? globalThis.Number(object.segmentIndex) : 0,
+            audioStartMs: isSet(object.audioStartMs) ? globalThis.Number(object.audioStartMs) : 0,
+            audioEndMs: isSet(object.audioEndMs) ? globalThis.Number(object.audioEndMs) : 0,
+            finalOutput: isSet(object.finalOutput) ? STTOutput.fromJSON(object.finalOutput) : undefined,
         };
     },
     toJSON(message) {
@@ -1163,6 +1810,21 @@ export const STTPartialResult = {
         if (message.languageCode !== undefined) {
             obj.languageCode = message.languageCode;
         }
+        if (message.requestId !== "") {
+            obj.requestId = message.requestId;
+        }
+        if (message.segmentIndex !== 0) {
+            obj.segmentIndex = Math.round(message.segmentIndex);
+        }
+        if (message.audioStartMs !== 0) {
+            obj.audioStartMs = Math.round(message.audioStartMs);
+        }
+        if (message.audioEndMs !== 0) {
+            obj.audioEndMs = Math.round(message.audioEndMs);
+        }
+        if (message.finalOutput !== undefined) {
+            obj.finalOutput = STTOutput.toJSON(message.finalOutput);
+        }
         return obj;
     },
     create(base) {
@@ -1178,9 +1840,421 @@ export const STTPartialResult = {
         message.timestampMs = object.timestampMs ?? 0;
         message.alternatives = object.alternatives?.map((e) => TranscriptionAlternative.fromPartial(e)) || [];
         message.languageCode = object.languageCode ?? undefined;
+        message.requestId = object.requestId ?? "";
+        message.segmentIndex = object.segmentIndex ?? 0;
+        message.audioStartMs = object.audioStartMs ?? 0;
+        message.audioEndMs = object.audioEndMs ?? 0;
+        message.finalOutput = (object.finalOutput !== undefined && object.finalOutput !== null)
+            ? STTOutput.fromPartial(object.finalOutput)
+            : undefined;
         return message;
     },
 };
+function createBaseSTTStreamEvent() {
+    return {
+        seq: 0,
+        timestampUs: 0,
+        requestId: "",
+        kind: 0,
+        partial: undefined,
+        finalOutput: undefined,
+        errorMessage: undefined,
+        errorCode: 0,
+    };
+}
+export const STTStreamEvent = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.seq !== 0) {
+            writer.uint32(8).uint64(message.seq);
+        }
+        if (message.timestampUs !== 0) {
+            writer.uint32(16).int64(message.timestampUs);
+        }
+        if (message.requestId !== "") {
+            writer.uint32(26).string(message.requestId);
+        }
+        if (message.kind !== 0) {
+            writer.uint32(32).int32(message.kind);
+        }
+        if (message.partial !== undefined) {
+            STTPartialResult.encode(message.partial, writer.uint32(42).fork()).ldelim();
+        }
+        if (message.finalOutput !== undefined) {
+            STTOutput.encode(message.finalOutput, writer.uint32(50).fork()).ldelim();
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(58).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(64).int32(message.errorCode);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseSTTStreamEvent();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.seq = longToNumber(reader.uint64());
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.timestampUs = longToNumber(reader.int64());
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.requestId = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.kind = reader.int32();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.partial = STTPartialResult.decode(reader, reader.uint32());
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.finalOutput = STTOutput.decode(reader, reader.uint32());
+                    continue;
+                case 7:
+                    if (tag !== 58) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 8:
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
+            timestampUs: isSet(object.timestampUs) ? globalThis.Number(object.timestampUs) : 0,
+            requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+            kind: isSet(object.kind) ? sTTStreamEventKindFromJSON(object.kind) : 0,
+            partial: isSet(object.partial) ? STTPartialResult.fromJSON(object.partial) : undefined,
+            finalOutput: isSet(object.finalOutput) ? STTOutput.fromJSON(object.finalOutput) : undefined,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.seq !== 0) {
+            obj.seq = Math.round(message.seq);
+        }
+        if (message.timestampUs !== 0) {
+            obj.timestampUs = Math.round(message.timestampUs);
+        }
+        if (message.requestId !== "") {
+            obj.requestId = message.requestId;
+        }
+        if (message.kind !== 0) {
+            obj.kind = sTTStreamEventKindToJSON(message.kind);
+        }
+        if (message.partial !== undefined) {
+            obj.partial = STTPartialResult.toJSON(message.partial);
+        }
+        if (message.finalOutput !== undefined) {
+            obj.finalOutput = STTOutput.toJSON(message.finalOutput);
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        return obj;
+    },
+    create(base) {
+        return STTStreamEvent.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseSTTStreamEvent();
+        message.seq = object.seq ?? 0;
+        message.timestampUs = object.timestampUs ?? 0;
+        message.requestId = object.requestId ?? "";
+        message.kind = object.kind ?? 0;
+        message.partial = (object.partial !== undefined && object.partial !== null)
+            ? STTPartialResult.fromPartial(object.partial)
+            : undefined;
+        message.finalOutput = (object.finalOutput !== undefined && object.finalOutput !== null)
+            ? STTOutput.fromPartial(object.finalOutput)
+            : undefined;
+        message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
+        return message;
+    },
+};
+function createBaseSTTServiceState() {
+    return {
+        isReady: false,
+        currentModel: undefined,
+        supportsStreaming: false,
+        supportedLanguageCodes: [],
+        errorMessage: undefined,
+        errorCode: 0,
+    };
+}
+export const STTServiceState = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.isReady !== false) {
+            writer.uint32(8).bool(message.isReady);
+        }
+        if (message.currentModel !== undefined) {
+            writer.uint32(18).string(message.currentModel);
+        }
+        if (message.supportsStreaming !== false) {
+            writer.uint32(24).bool(message.supportsStreaming);
+        }
+        for (const v of message.supportedLanguageCodes) {
+            writer.uint32(34).string(v);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(42).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(48).int32(message.errorCode);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseSTTServiceState();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.isReady = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.currentModel = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.supportsStreaming = reader.bool();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.supportedLanguageCodes.push(reader.string());
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            isReady: isSet(object.isReady) ? globalThis.Boolean(object.isReady) : false,
+            currentModel: isSet(object.currentModel) ? globalThis.String(object.currentModel) : undefined,
+            supportsStreaming: isSet(object.supportsStreaming) ? globalThis.Boolean(object.supportsStreaming) : false,
+            supportedLanguageCodes: globalThis.Array.isArray(object?.supportedLanguageCodes)
+                ? object.supportedLanguageCodes.map((e) => globalThis.String(e))
+                : [],
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.isReady !== false) {
+            obj.isReady = message.isReady;
+        }
+        if (message.currentModel !== undefined) {
+            obj.currentModel = message.currentModel;
+        }
+        if (message.supportsStreaming !== false) {
+            obj.supportsStreaming = message.supportsStreaming;
+        }
+        if (message.supportedLanguageCodes?.length) {
+            obj.supportedLanguageCodes = message.supportedLanguageCodes;
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        return obj;
+    },
+    create(base) {
+        return STTServiceState.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseSTTServiceState();
+        message.isReady = object.isReady ?? false;
+        message.currentModel = object.currentModel ?? undefined;
+        message.supportsStreaming = object.supportsStreaming ?? false;
+        message.supportedLanguageCodes = object.supportedLanguageCodes?.map((e) => e) || [];
+        message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
+        return message;
+    },
+};
+function createBaseSTTLanguageDetectionResult() {
+    return { language: 0, languageCode: undefined, confidence: 0, alternatives: [] };
+}
+export const STTLanguageDetectionResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.language !== 0) {
+            writer.uint32(8).int32(message.language);
+        }
+        if (message.languageCode !== undefined) {
+            writer.uint32(18).string(message.languageCode);
+        }
+        if (message.confidence !== 0) {
+            writer.uint32(29).float(message.confidence);
+        }
+        for (const v of message.alternatives) {
+            writer.uint32(34).string(v);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseSTTLanguageDetectionResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.language = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.languageCode = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 29) {
+                        break;
+                    }
+                    message.confidence = reader.float();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.alternatives.push(reader.string());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            language: isSet(object.language) ? sTTLanguageFromJSON(object.language) : 0,
+            languageCode: isSet(object.languageCode) ? globalThis.String(object.languageCode) : undefined,
+            confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
+            alternatives: globalThis.Array.isArray(object?.alternatives)
+                ? object.alternatives.map((e) => globalThis.String(e))
+                : [],
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.language !== 0) {
+            obj.language = sTTLanguageToJSON(message.language);
+        }
+        if (message.languageCode !== undefined) {
+            obj.languageCode = message.languageCode;
+        }
+        if (message.confidence !== 0) {
+            obj.confidence = message.confidence;
+        }
+        if (message.alternatives?.length) {
+            obj.alternatives = message.alternatives;
+        }
+        return obj;
+    },
+    create(base) {
+        return STTLanguageDetectionResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseSTTLanguageDetectionResult();
+        message.language = object.language ?? 0;
+        message.languageCode = object.languageCode ?? undefined;
+        message.confidence = object.confidence ?? 0;
+        message.alternatives = object.alternatives?.map((e) => e) || [];
+        return message;
+    },
+};
+function bytesFromBase64(b64) {
+    const bin = globalThis.atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; ++i) {
+        arr[i] = bin.charCodeAt(i);
+    }
+    return arr;
+}
+function base64FromBytes(arr) {
+    const bin = [];
+    arr.forEach((byte) => {
+        bin.push(globalThis.String.fromCharCode(byte));
+    });
+    return globalThis.btoa(bin.join(""));
+}
 function longToNumber(long) {
     if (long.gt(globalThis.Number.MAX_SAFE_INTEGER)) {
         throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
@@ -1193,6 +2267,9 @@ function longToNumber(long) {
 if (_m0.util.Long !== Long) {
     _m0.util.Long = Long;
     _m0.configure();
+}
+function isObject(value) {
+    return typeof value === "object" && value !== null;
 }
 function isSet(value) {
     return value !== null && value !== undefined;

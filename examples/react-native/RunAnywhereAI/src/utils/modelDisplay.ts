@@ -1,0 +1,241 @@
+import { Colors } from '../theme/colors';
+import {
+  InferenceFramework,
+  ModelCategory,
+  ModelFormat,
+  ModelInfo as ModelInfoMessage,
+  ModelSource,
+  type ModelInfo,
+} from '@runanywhere/proto-ts/model_types';
+
+export const DEFAULT_INFERENCE_FRAMEWORK =
+  InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
+export const SYSTEM_TTS_FRAMEWORK =
+  InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
+
+export const INFERENCE_FRAMEWORK_DISPLAY_NAMES: Partial<
+  Record<InferenceFramework, string>
+> = {
+  [InferenceFramework.INFERENCE_FRAMEWORK_ONNX]: 'ONNX',
+  [InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP]: 'Llama.cpp',
+  [InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS]:
+    'Foundation Models',
+  [InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS]: 'System TTS',
+  [InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO]: 'Fluid Audio',
+  [InferenceFramework.INFERENCE_FRAMEWORK_COREML]: 'Core ML',
+  [InferenceFramework.INFERENCE_FRAMEWORK_MLX]: 'MLX',
+  [InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML]:
+    'WhisperKit Core ML',
+  [InferenceFramework.INFERENCE_FRAMEWORK_METALRT]: 'MetalRT',
+  [InferenceFramework.INFERENCE_FRAMEWORK_GENIE]: 'Genie',
+  [InferenceFramework.INFERENCE_FRAMEWORK_TFLITE]: 'TensorFlow Lite',
+  [InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH]: 'ExecuTorch',
+  [InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE]: 'MediaPipe',
+  [InferenceFramework.INFERENCE_FRAMEWORK_MLC]: 'MLC',
+  [InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM]: 'PicoLLM',
+  [InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS]: 'Piper TTS',
+  [InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT]: 'WhisperKit',
+  [InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER]: 'OpenAI Whisper',
+  [InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS]:
+    'Swift Transformers',
+  [InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN]: 'Built In',
+  [InferenceFramework.INFERENCE_FRAMEWORK_SHERPA]: 'Sherpa',
+};
+
+export const getFrameworkDisplayName = (
+  framework?: InferenceFramework | null
+): string => {
+  if (
+    framework == null ||
+    framework === InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED ||
+    framework === InferenceFramework.UNRECOGNIZED
+  ) {
+    return 'Unknown';
+  }
+  return (
+    INFERENCE_FRAMEWORK_DISPLAY_NAMES[framework] ??
+    InferenceFramework[framework] ??
+    String(framework)
+  );
+};
+
+export const getFrameworkColor = (
+  framework?: InferenceFramework | null
+): string => {
+  switch (framework) {
+    case InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
+      return Colors.frameworkLlamaCpp;
+    case InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT:
+    case InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML:
+      return Colors.frameworkWhisperKit;
+    case InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS:
+      return Colors.frameworkPiperTTS;
+    case InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
+      return Colors.frameworkFoundationModels;
+    case InferenceFramework.INFERENCE_FRAMEWORK_COREML:
+      return Colors.frameworkCoreML;
+    case InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
+      return Colors.frameworkONNX;
+    case InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
+      return Colors.frameworkSystemTTS;
+    case InferenceFramework.INFERENCE_FRAMEWORK_TFLITE:
+      return Colors.frameworkTFLite;
+    case InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
+    case InferenceFramework.INFERENCE_FRAMEWORK_MLX:
+      return Colors.primaryPurple;
+    case InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH:
+    case InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE:
+      return Colors.primaryOrange;
+    case InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM:
+    case InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER:
+      return Colors.primaryGreen;
+    case InferenceFramework.INFERENCE_FRAMEWORK_MLC:
+    case InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
+    case InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS:
+      return Colors.primaryBlue;
+    default:
+      return Colors.primaryBlue;
+  }
+};
+
+export const getFrameworkIcon = (
+  framework?: InferenceFramework | null
+): string => {
+  switch (framework) {
+    case InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
+      return 'terminal-outline';
+    case InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT:
+    case InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML:
+    case InferenceFramework.INFERENCE_FRAMEWORK_OPENAI_WHISPER:
+    case InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
+      return 'mic-outline';
+    case InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS:
+      return 'volume-high-outline';
+    case InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
+      return 'sparkles-outline';
+    case InferenceFramework.INFERENCE_FRAMEWORK_COREML:
+    case InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
+      return 'hardware-chip-outline';
+    case InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
+      return 'cube-outline';
+    case InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
+      return 'megaphone-outline';
+    case InferenceFramework.INFERENCE_FRAMEWORK_TFLITE:
+      return 'layers-outline';
+    case InferenceFramework.INFERENCE_FRAMEWORK_MLX:
+      return 'flash-outline';
+    case InferenceFramework.INFERENCE_FRAMEWORK_SWIFT_TRANSFORMERS:
+      return 'code-slash-outline';
+    case InferenceFramework.INFERENCE_FRAMEWORK_EXECUTORCH:
+      return 'flame-outline';
+    case InferenceFramework.INFERENCE_FRAMEWORK_PICO_LLM:
+      return 'radio-outline';
+    case InferenceFramework.INFERENCE_FRAMEWORK_MLC:
+      return 'git-branch-outline';
+    case InferenceFramework.INFERENCE_FRAMEWORK_MEDIAPIPE:
+      return 'videocam-outline';
+    default:
+      return 'extension-puzzle-outline';
+  }
+};
+
+const isUsableFramework = (
+  framework: InferenceFramework | undefined
+): framework is InferenceFramework =>
+  framework !== undefined &&
+  framework !== InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED &&
+  framework !== InferenceFramework.UNRECOGNIZED;
+
+export const getModelFrameworks = (model: ModelInfo): InferenceFramework[] => {
+  const seen = new Set<InferenceFramework>();
+  const candidates = [
+    model.preferredFramework,
+    ...(model.compatibility?.compatibleFrameworks ?? []),
+    model.framework,
+  ];
+  for (const framework of candidates) {
+    if (isUsableFramework(framework)) {
+      seen.add(framework);
+    }
+  }
+  return Array.from(seen);
+};
+
+export const getPrimaryFramework = (
+  model: ModelInfo,
+  fallback: InferenceFramework = DEFAULT_INFERENCE_FRAMEWORK
+): InferenceFramework => getModelFrameworks(model)[0] ?? fallback;
+
+export const isModelCompatibleWithFramework = (
+  model: ModelInfo,
+  framework: InferenceFramework
+): boolean => getModelFrameworks(model).includes(framework);
+
+export const getModelDownloadSizeBytes = (model: ModelInfo): number =>
+  model.downloadSizeBytes || 0;
+
+export const getModelFormatLabel = (
+  format?: ModelFormat | null
+): string => {
+  switch (format) {
+    case ModelFormat.MODEL_FORMAT_GGUF:
+      return 'GGUF';
+    case ModelFormat.MODEL_FORMAT_ONNX:
+      return 'ONNX';
+    case ModelFormat.MODEL_FORMAT_ORT:
+      return 'ORT';
+    case ModelFormat.MODEL_FORMAT_QNN_CONTEXT:
+      return 'QNN';
+    case ModelFormat.MODEL_FORMAT_TFLITE:
+      return 'TFLite';
+    case ModelFormat.MODEL_FORMAT_COREML:
+      return 'Core ML';
+    case ModelFormat.MODEL_FORMAT_ZIP:
+      return 'ZIP';
+    case ModelFormat.MODEL_FORMAT_FOLDER:
+      return 'Folder';
+    case ModelFormat.MODEL_FORMAT_PROPRIETARY:
+      return 'Built in';
+    default:
+      return 'Model';
+  }
+};
+
+export const createModelInfoSummary = (options: {
+  id: string;
+  name: string;
+  category: ModelCategory;
+  framework: InferenceFramework;
+  format?: ModelFormat;
+  localPath?: string;
+  isDownloaded?: boolean;
+  isAvailable?: boolean;
+}): ModelInfo => {
+  const now = Date.now();
+  const format = options.format ?? ModelFormat.MODEL_FORMAT_UNKNOWN;
+  return ModelInfoMessage.fromPartial({
+    id: options.id,
+    name: options.name,
+    category: options.category,
+    format,
+    framework: options.framework,
+    preferredFramework: options.framework,
+    downloadUrl: '',
+    localPath: options.localPath ?? '',
+    downloadSizeBytes: 0,
+    contextLength: 0,
+    supportsThinking: false,
+    supportsLora: false,
+    description: '',
+    source: ModelSource.MODEL_SOURCE_LOCAL,
+    createdAtUnixMs: now,
+    updatedAtUnixMs: now,
+    memoryRequiredBytes: 0,
+    isDownloaded: options.isDownloaded ?? true,
+    isAvailable: options.isAvailable ?? true,
+    compatibility: {
+      compatibleFrameworks: [options.framework],
+      compatibleFormats: [format],
+    },
+  });
+};

@@ -367,6 +367,12 @@ extern "C" {
 #define RAC_ERROR_BACKEND_BUSY ((rac_result_t) - 603)
 /** Backend unavailable: backend compiled as stub, engine binary not installed */
 #define RAC_ERROR_BACKEND_UNAVAILABLE ((rac_result_t) - 604)
+/** Routing rejected: engine declares one or more L1 runtimes (Metal / CoreML /
+ *  CUDA / QNN / WebGPU / …) but none of them are registered on this host.
+ *  Returned by `rac_plugin_route` when no candidate plugin survives the
+ *  runtime-availability filter. Engines with `runtimes == NULL` bypass the
+ *  filter and never produce this error. */
+#define RAC_ERROR_RUNTIME_UNAVAILABLE ((rac_result_t) - 605)
 /** Invalid handle */
 #define RAC_ERROR_INVALID_HANDLE ((rac_result_t) - 610)
 

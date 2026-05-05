@@ -50,7 +50,7 @@ namespace margelo::nitro::runanywhere {
 
     public:
       // Properties
-      
+
 
     public:
       // Methods
@@ -74,15 +74,8 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> removeModelProto(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> queryModelsProto(const std::shared_ptr<ArrayBuffer>& queryBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getDownloadedModelsProto() = 0;
-      virtual std::shared_ptr<Promise<std::string>> getAvailableModels() = 0;
-      virtual std::shared_ptr<Promise<std::string>> getModelInfo(const std::string& modelId) = 0;
-      virtual std::shared_ptr<Promise<bool>> isModelDownloaded(const std::string& modelId) = 0;
-      virtual std::shared_ptr<Promise<std::string>> getModelPath(const std::string& modelId) = 0;
-      virtual std::shared_ptr<Promise<bool>> registerModel(const std::string& modelJson) = 0;
       virtual std::shared_ptr<Promise<std::string>> checkCompatibility(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<bool>> refreshModelRegistry(bool includeRemoteCatalog, bool rescanLocal, bool pruneOrphans) = 0;
-      virtual std::shared_ptr<Promise<void>> downloadModel(const std::string& url, const std::string& destPath, const std::string& cancelToken, const std::function<void(const std::string& /* progressJson */)>& onProgress, const std::optional<std::string>& expectedSha256Hex) = 0;
-      virtual std::shared_ptr<Promise<bool>> cancelDownload(const std::string& cancelToken) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadPlanProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadStartProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadCancelProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
@@ -90,16 +83,12 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadProgressPollProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> setDownloadProgressCallbackProto(const std::function<void(const std::shared_ptr<ArrayBuffer>& /* progressBytes */)>& onProgressBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> clearDownloadProgressCallbackProto() = 0;
-      virtual std::shared_ptr<Promise<std::string>> getStorageInfo() = 0;
       virtual std::shared_ptr<Promise<bool>> clearCache() = 0;
-      virtual std::shared_ptr<Promise<bool>> deleteModel(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageInfoProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageAvailabilityProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageDeletePlanProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageDeleteProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> hardwareProfileProto() = 0;
-      virtual std::shared_ptr<Promise<void>> emitEvent(const std::string& eventJson) = 0;
-      virtual std::shared_ptr<Promise<std::string>> pollEvents() = 0;
       virtual std::shared_ptr<Promise<double>> subscribeSDKEventsProto(const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
       virtual std::shared_ptr<Promise<void>> unsubscribeSDKEventsProto(double subscriptionId) = 0;
       virtual std::shared_ptr<Promise<bool>> publishSDKEventProto(const std::shared_ptr<ArrayBuffer>& eventBytes) = 0;
@@ -156,6 +145,12 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vadProcessProto(const std::shared_ptr<ArrayBuffer>& samplesBytes, const std::shared_ptr<ArrayBuffer>& optionsBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vadGetStatisticsProto() = 0;
       virtual std::shared_ptr<Promise<bool>> vadSetActivityCallbackProto(const std::function<void(const std::shared_ptr<ArrayBuffer>& /* activityBytes */)>& onActivityBytes) = 0;
+      virtual std::shared_ptr<Promise<bool>> loadVLMModelFromArtifacts(const std::string& primaryModelPath, const std::string& visionProjectorPath, const std::string& modelId) = 0;
+      virtual std::shared_ptr<Promise<bool>> isVLMModelLoaded() = 0;
+      virtual std::shared_ptr<Promise<bool>> unloadVLMModel() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vlmProcessProto(const std::shared_ptr<ArrayBuffer>& imageBytes, const std::shared_ptr<ArrayBuffer>& optionsBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vlmProcessStreamProto(const std::shared_ptr<ArrayBuffer>& imageBytes, const std::shared_ptr<ArrayBuffer>& optionsBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
+      virtual std::shared_ptr<Promise<bool>> vlmCancelProto() = 0;
       virtual std::shared_ptr<Promise<bool>> secureStorageSet(const std::string& key, const std::string& value) = 0;
       virtual std::shared_ptr<Promise<std::variant<nitro::NullType, std::string>>> secureStorageGet(const std::string& key) = 0;
       virtual std::shared_ptr<Promise<bool>> secureStorageDelete(const std::string& key) = 0;
@@ -178,10 +173,12 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentInitializeProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentComponentStatesProto() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentProcessTurnProto(const std::shared_ptr<ArrayBuffer>& audioBytes) = 0;
-      virtual std::shared_ptr<Promise<std::string>> parseToolCallFromOutput(const std::string& llmOutput) = 0;
-      virtual std::shared_ptr<Promise<std::string>> formatToolsForPrompt(const std::string& toolsJson, const std::string& format) = 0;
-      virtual std::shared_ptr<Promise<std::string>> buildInitialPrompt(const std::string& userPrompt, const std::string& toolsJson, const std::string& optionsJson) = 0;
-      virtual std::shared_ptr<Promise<std::string>> buildFollowupPrompt(const std::string& originalPrompt, const std::string& toolsPrompt, const std::string& toolName, const std::string& resultJson, bool keepToolsAvailable) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolParseProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolFormatPromptProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolValidateProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputParseProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputPreparePromptProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputValidateProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> ragCreatePipeline(const std::string& configJson) = 0;
       virtual std::shared_ptr<Promise<bool>> ragDestroyPipeline() = 0;
       virtual std::shared_ptr<Promise<bool>> ragAddDocument(const std::string& text, const std::string& metadataJson) = 0;
@@ -199,10 +196,16 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<double>> embeddingsCreateProto(const std::string& modelId, const std::optional<std::string>& configJson) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> embeddingsEmbedBatchProto(double handle, const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<void>> embeddingsDestroyProto(double handle) = 0;
-      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraLoadProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
-      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraRemoveProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
-      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraClearProto() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraApplyProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraRemoveProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraListProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraStateProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCompatibilityProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraRegisterCatalogEntryProto(const std::shared_ptr<ArrayBuffer>& entryBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogListProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogQueryProto(const std::shared_ptr<ArrayBuffer>& queryBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogGetProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogMarkDownloadCompletedProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<double>> solutionCreateFromProto(const std::string& configBytesBase64) = 0;
       virtual std::shared_ptr<Promise<double>> solutionCreateFromYaml(const std::string& yamlText) = 0;
       virtual std::shared_ptr<Promise<bool>> solutionStart(double handle) = 0;

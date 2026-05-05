@@ -13,6 +13,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -24,6 +25,7 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.List
 import okio.ByteString
 
 public class ModelDeleteResult(
@@ -82,8 +84,17 @@ public class ModelDeleteResult(
     schemaIndex = 6,
   )
   public val error_message: String = "",
+  warnings: List<String> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelDeleteResult, Nothing>(ADAPTER, unknownFields) {
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    schemaIndex = 7,
+  )
+  public val warnings: List<String> = immutableCopyOf("warnings", warnings)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -102,6 +113,7 @@ public class ModelDeleteResult(
     if (registry_updated != other.registry_updated) return false
     if (was_loaded != other.was_loaded) return false
     if (error_message != other.error_message) return false
+    if (warnings != other.warnings) return false
     return true
   }
 
@@ -116,6 +128,7 @@ public class ModelDeleteResult(
       result = result * 37 + registry_updated.hashCode()
       result = result * 37 + was_loaded.hashCode()
       result = result * 37 + error_message.hashCode()
+      result = result * 37 + warnings.hashCode()
       super.hashCode = result
     }
     return result
@@ -130,6 +143,7 @@ public class ModelDeleteResult(
     result += """registry_updated=$registry_updated"""
     result += """was_loaded=$was_loaded"""
     result += """error_message=${sanitize(error_message)}"""
+    if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
     return result.joinToString(prefix = "ModelDeleteResult{", separator = ", ", postfix = "}")
   }
 
@@ -141,9 +155,10 @@ public class ModelDeleteResult(
     registry_updated: Boolean = this.registry_updated,
     was_loaded: Boolean = this.was_loaded,
     error_message: String = this.error_message,
+    warnings: List<String> = this.warnings,
     unknownFields: ByteString = this.unknownFields,
   ): ModelDeleteResult = ModelDeleteResult(success, model_id, deleted_bytes, files_deleted,
-      registry_updated, was_loaded, error_message, unknownFields)
+      registry_updated, was_loaded, error_message, warnings, unknownFields)
 
   public companion object {
     @JvmField
@@ -169,6 +184,7 @@ public class ModelDeleteResult(
             value.was_loaded)
         if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(7,
             value.error_message)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(8, value.warnings)
         return size
       }
 
@@ -184,11 +200,13 @@ public class ModelDeleteResult(
         if (value.was_loaded != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.was_loaded)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 7,
             value.error_message)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelDeleteResult) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 7,
             value.error_message)
         if (value.was_loaded != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6, value.was_loaded)
@@ -210,6 +228,7 @@ public class ModelDeleteResult(
         var registry_updated: Boolean = false
         var was_loaded: Boolean = false
         var error_message: String = ""
+        val warnings = mutableListOf<String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> success = ProtoAdapter.BOOL.decode(reader)
@@ -219,6 +238,7 @@ public class ModelDeleteResult(
             5 -> registry_updated = ProtoAdapter.BOOL.decode(reader)
             6 -> was_loaded = ProtoAdapter.BOOL.decode(reader)
             7 -> error_message = ProtoAdapter.STRING.decode(reader)
+            8 -> warnings.add(ProtoAdapter.STRING.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -230,6 +250,7 @@ public class ModelDeleteResult(
           registry_updated = registry_updated,
           was_loaded = was_loaded,
           error_message = error_message,
+          warnings = warnings,
           unknownFields = unknownFields
         )
       }

@@ -2,46 +2,44 @@
  * RunAnywhere Web SDK - Main Entry Point
  *
  * The public API for the RunAnywhere Web SDK.
- * Core is pure TypeScript — no WASM. Each backend package ships its own WASM:
- *   - @runanywhere/web-llamacpp (racommons-llamacpp.wasm)
- *   - @runanywhere/web-onnx (sherpa-onnx.wasm)
+ * Core is pure TypeScript — no WASM. Backend packages ship their own WASM
+ * and install proto-byte adapters via `setRunanywhereModule(...)`.
+ *
+ * After the V2 cleanup, model lifecycle, registry, downloads, and provider
+ * routing are all owned by the commons C ABI through the proto-byte adapters.
+ * This file no longer dispatches through ExtensionPoint or ModelManager.
  *
  * Usage:
  *   import { RunAnywhere } from '@runanywhere/web';
- *   import { LlamaCPP } from '@runanywhere/web-llamacpp';
- *   import { ONNX } from '@runanywhere/web-onnx';
  *
  *   await RunAnywhere.initialize({ environment: 'development' });
- *   await LlamaCPP.register();
- *   await ONNX.register();
+ *   // Backend packages register their WASM module via setRunanywhereModule();
+ *   // typed adapters (ModelLifecycleAdapter, DownloadAdapter, ...) become live.
  */
 
-import type { ModelCategory } from '../types/enums';
-import { SDKEnvironment, SDKEventType } from '../types/enums';
+import { SDKEnvironment } from '@runanywhere/proto-ts/model_types';
+import type { LLMGenerationOptions, LLMGenerationResult } from '@runanywhere/proto-ts/llm_options';
+import type { STTOutput } from '@runanywhere/proto-ts/stt_options';
+import type { TTSOutput } from '@runanywhere/proto-ts/tts_options';
+import type { VADResult } from '@runanywhere/proto-ts/vad_options';
+import { SDKEventType } from '../types/enums';
 import type { SDKInitOptions } from '../types/models';
+import type { LLMStreamingResult } from '../types/index';
 import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger, LogLevel } from '../Foundation/SDKLogger';
-import { ModelManager } from '../Infrastructure/ModelManager';
-import type { CompactModelDef, ManagedModel, VLMLoader } from '../Infrastructure/ModelManager';
-import { ExtensionRegistry } from '../Infrastructure/ExtensionRegistry';
-import { ExtensionPoint } from '../Infrastructure/ExtensionPoint';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
 import { OPFSStorage } from '../Infrastructure/OPFSStorage';
 import { SDKErrorCode, SDKException } from '../Foundation/SDKException';
 import { Runtime } from '../Foundation/RuntimeConfig';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
-import * as Convenience from './Extensions/RunAnywhere+Convenience';
 import { LoRA as LoRACapability } from './Extensions/RunAnywhere+LoRA';
 import * as RAGExt from './Extensions/RunAnywhere+RAG';
 import * as VoiceAgentExt from './Extensions/RunAnywhere+VoiceAgent';
-import { Storage as StorageCapability } from './Extensions/RunAnywhere+Storage';
 import { Downloads as DownloadsCapability } from './Extensions/RunAnywhere+Downloads';
 import { SDKEvents as SDKEventsCapability } from './Extensions/RunAnywhere+SDKEvents';
 import { ModelRegistry as ModelRegistryCapability } from './Extensions/RunAnywhere+ModelRegistry';
 import { ModelLifecycle as ModelLifecycleCapability } from './Extensions/RunAnywhere+ModelLifecycle';
-import { PluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
 import { Hardware as HardwareCapability } from './Extensions/RunAnywhere+Hardware';
-import { VAD as VADCapability } from './Extensions/RunAnywhere+VAD';
 import {
   TextGeneration as TextGenerationCapability,
   generateStructuredStream,
@@ -49,24 +47,22 @@ import {
 } from './Extensions/RunAnywhere+TextGeneration';
 import { StructuredOutput as StructuredOutputCapability } from './Extensions/RunAnywhere+StructuredOutput';
 import { ToolCalling as ToolCallingCapability } from './Extensions/RunAnywhere+ToolCalling';
-import { STT as STTCapability } from './Extensions/RunAnywhere+STT';
-import { TTS as TTSCapability } from './Extensions/RunAnywhere+TTS';
-import { VisionLanguage as VisionLanguageCapability } from './Extensions/RunAnywhere+VisionLanguage';
-import { VLMModels as VLMModelsCapability } from './Extensions/RunAnywhere+VLMModels';
-import {
-  Diffusion as DiffusionCapability,
-  generateImage,
-  generateImageStream,
-  loadDiffusionModel,
-  unloadDiffusionModel,
-  getIsDiffusionModelLoaded,
-  cancelImageGeneration,
-  getDiffusionCapabilities,
-} from './Extensions/RunAnywhere+Diffusion';
-import { ModelManagement as ModelManagementCapability } from './Extensions/RunAnywhere+ModelManagement';
-import { ModelAssignments as ModelAssignmentsCapability } from './Extensions/RunAnywhere+ModelAssignments';
-import { Frameworks as FrameworksCapability } from './Extensions/RunAnywhere+Frameworks';
 import { Logging as LoggingCapability } from './Extensions/RunAnywhere+Logging';
+import {
+  STT as STTCapability,
+  transcribe as transcribeImpl,
+  type TranscribeOptions,
+} from './Extensions/RunAnywhere+STT';
+import {
+  TTS as TTSCapability,
+  synthesize as synthesizeImpl,
+  type SynthesizeOptions,
+} from './Extensions/RunAnywhere+TTS';
+import {
+  VAD as VADCapability,
+  detectVoice as detectVoiceImpl,
+  type DetectVoiceOptions,
+} from './Extensions/RunAnywhere+VAD';
 import { ModelRegistryAdapter } from '../Adapters/ModelRegistryAdapter';
 import { ModelLifecycleAdapter } from '../Adapters/ModelLifecycleAdapter';
 import { DownloadAdapter } from '../Adapters/DownloadAdapter';
@@ -83,16 +79,6 @@ import { LlmThinking } from '../Features/LLM/LlmThinking';
  */
 export type StorageBackend = 'fsAccess' | 'opfs' | 'memory';
 
-/** Options for showOpenFilePicker. */
-interface OpenFilePickerOptions {
-  types?: Array<{ description?: string; accept?: { [k: string]: string[] } }>;
-  multiple?: boolean;
-}
-/** Window with File System Access API (showOpenFilePicker). */
-interface WindowWithFilePicker extends Window {
-  showOpenFilePicker?(options?: OpenFilePickerOptions): Promise<FileSystemFileHandle[]>;
-}
-
 const logger = new SDKLogger('RunAnywhere');
 
 // ---------------------------------------------------------------------------
@@ -106,17 +92,12 @@ let _localFileStorage: LocalFileStorage | null = null;
 let _deviceId: string | null = null;
 
 // Phase 2 (services) init state — mirrors Swift's
-// `hasCompletedServicesInit` + `hasCompletedHTTPSetup` split. On Web today
-// there is no backend authentication or device registration step, so Phase 2
-// mostly just marks "ready to issue API calls". Wired so `ensureServicesReady()`
-// is symmetric with the other SDKs and apps can opt into a future-real Phase 2
-// without code changes.
+// `hasCompletedServicesInit` + `hasCompletedHTTPSetup` split.
 let _hasCompletedServicesInit = false;
 let _servicesInitPromise: Promise<void> | null = null;
 
 /** Generate (and cache) a stable device ID, matching Swift's UUID-style. */
 function generateDeviceId(): string {
-  // Try Web Crypto first; fall back to a Math-based UUID v4 if unavailable.
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
   }
@@ -190,8 +171,8 @@ export const RunAnywhere = {
   },
 
   /**
-   * Stable device identifier (Swift `RunAnywhere.deviceId`).
-   * On the Web SDK this is persisted in `localStorage` so it survives reloads.
+   * Stable device identifier. On the Web SDK this is persisted in
+   * `localStorage` so it survives reloads.
    */
   get deviceId(): string {
     return ensureDeviceId();
@@ -202,10 +183,7 @@ export const RunAnywhere = {
     return false;
   },
 
-  /**
-   * Runtime configuration surface (acceleration mode etc.).
-   * Mirror of the unified `RunAnywhere.runtime` accessor.
-   */
+  /** Runtime configuration surface (acceleration mode etc.). */
   get runtime(): typeof Runtime {
     return Runtime;
   },
@@ -228,12 +206,10 @@ export const RunAnywhere = {
    *
    * This only initializes the TypeScript infrastructure:
    *   1. Configure logging
-   *   2. Initialize storage (OPFS)
-   *   3. Restore local file storage (if previously configured)
+   *   2. Restore local file storage (if previously configured)
    *
-   * WASM is loaded lazily by each backend package when you call:
-   *   await LlamaCPP.register();  // loads racommons-llamacpp.wasm
-   *   await ONNX.register();      // loads sherpa-onnx.wasm (on first use)
+   * WASM and proto-byte adapters are installed by backend packages once
+   * their module loads.
    */
   async initialize(options: SDKInitOptions = {}): Promise<void> {
     if (_isInitialized) {
@@ -248,7 +224,7 @@ export const RunAnywhere = {
 
     _initializingPromise = (async () => {
       try {
-        const env = options.environment ?? SDKEnvironment.Development;
+        const env = options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
         _initOptions = { ...options, environment: env };
 
         if (options.debug) {
@@ -257,12 +233,7 @@ export const RunAnywhere = {
 
         logger.info(`Initializing RunAnywhere Web SDK (${env})...`);
 
-        // Streaming downloads and WASM progress reporting require the
-        // Fetch Streams API. Fail fast with a clear message in environments
-        // where it's missing (very old browsers, some SSR contexts) instead
-        // of surfacing a confusing error deep inside a model download.
         if (typeof ReadableStream === 'undefined') {
-          // Phase C-prime: throw SDKException — wraps proto-typed wire envelope.
           throw SDKException.fromCode(
             SDKErrorCode.InitializationFailed,
             'ReadableStream is not available in this environment. ' +
@@ -271,7 +242,6 @@ export const RunAnywhere = {
           );
         }
 
-        // Restore local file storage from previous session (non-blocking)
         try {
           await RunAnywhere.restoreLocalStorage();
         } catch (err) {
@@ -280,8 +250,6 @@ export const RunAnywhere = {
 
         _isInitialized = true;
 
-        // Eagerly resolve the device ID so `RunAnywhere.deviceId` is non-empty
-        // before the first call.
         ensureDeviceId();
 
         logger.info('RunAnywhere Web SDK initialized successfully');
@@ -289,8 +257,6 @@ export const RunAnywhere = {
           environment: env,
         });
 
-        // Kick off Phase 2 in the background so `ensureServicesReady()` is
-        // a fast-path on the next API call. Failures are non-fatal.
         void RunAnywhere.completeServicesInitialization().catch((err) => {
           logger.warning(
             `Phase 2 init failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
@@ -308,11 +274,6 @@ export const RunAnywhere = {
    * Complete the Phase 2 (services) initialization. Mirror of Swift's
    * `RunAnywhere.completeServicesInitialization()`. Idempotent — concurrent
    * callers share a single in-flight promise.
-   *
-   * On Web this is currently a near-no-op (no auth, no device registration),
-   * but the function is exposed so applications can `await` services-ready
-   * before issuing time-sensitive calls. Future versions may perform real
-   * backend work here.
    */
   async completeServicesInitialization(): Promise<void> {
     if (_hasCompletedServicesInit) return;
@@ -320,7 +281,6 @@ export const RunAnywhere = {
 
     _servicesInitPromise = (async () => {
       try {
-        // Future: HTTP/auth/device registration goes here.
         _hasCompletedServicesInit = true;
         logger.debug('Services initialization complete (Phase 2)');
       } finally {
@@ -331,209 +291,11 @@ export const RunAnywhere = {
   },
 
   /**
-   * Internal-style guard used by extensions that need a fully-initialized
-   * SDK. Mirror of Swift's `RunAnywhere.ensureServicesReady()`. Awaits Phase
-   * 2 completion if it isn't already done.
+   * Internal-style guard used by extensions that need a fully-initialized SDK.
    */
   async ensureServicesReady(): Promise<void> {
     if (_hasCompletedServicesInit) return;
     return RunAnywhere.completeServicesInitialization();
-  },
-
-  // =========================================================================
-  // Model Management
-  // =========================================================================
-
-  /** Canonical single-model registration (CANONICAL_API.md §13). */
-  registerModel(model: CompactModelDef): void {
-    ModelManager.registerModel(model);
-  },
-
-  /**
-   * Register a multi-file model (mmproj sidecars, sherpa-onnx archive bundles, etc.).
-   * Per canonical §13. Internally identical to `registerModel` today; reserved
-   * for future schema enforcement of multi-file-only fields.
-   */
-  registerMultiFileModel(model: CompactModelDef): void {
-    ModelManager.registerMultiFileModel(model);
-  },
-
-  /**
-   * Internal batch helper used by example apps that ship a predefined catalog.
-   * Public callers should use `registerModel` / `registerMultiFileModel`.
-   */
-  registerCatalog(models: CompactModelDef[]): void {
-    ModelManager.registerCatalog(models);
-  },
-
-  unregisterModel(modelId: string): void {
-    ModelManager.unregisterModel(modelId);
-  },
-
-  setVLMLoader(loader: VLMLoader): void {
-    ModelManager.setVLMLoader(loader);
-  },
-
-  async downloadModel(modelId: string): Promise<void> {
-    return ModelManager.downloadModel(modelId);
-  },
-
-  cancelDownload(modelId: string): boolean {
-    return ModelManager.cancelDownload(modelId);
-  },
-
-  async loadModel(modelId: string): Promise<boolean> {
-    return ModelManager.loadModel(modelId);
-  },
-
-  availableModels(): ManagedModel[] {
-    return ModelManager.getModels();
-  },
-
-  getModel(modelId: string): ManagedModel | undefined {
-    return ModelManager.getModel(modelId);
-  },
-
-  getLoadedModel(category?: ModelCategory): ManagedModel | null {
-    return ModelManager.getLoadedModel(category);
-  },
-
-  async unloadAll(): Promise<void> {
-    return ModelManager.unloadAll();
-  },
-
-  async deleteModel(modelId: string): Promise<void> {
-    return ModelManager.deleteModel(modelId);
-  },
-
-  async deleteAllModels(): Promise<void> {
-    return ModelManager.deleteAllModels();
-  },
-
-  /**
-   * Canonical 0-arg refresh per CANONICAL_API.md §13. Refreshes remote
-   * catalog + local rescan. Apps that need finer control can call
-   * `ModelRegistryAdapter.tryDefault()?.refresh(options)` directly.
-   */
-  refreshModelRegistry(): boolean {
-    return ModelRegistryAdapter.tryDefault()?.refresh({
-      includeRemoteCatalog: true,
-      rescanLocal: true,
-      pruneOrphans: false,
-    }) ?? false;
-  },
-
-  /**
-   * Fetch server-assigned model assignments (§13). Returns the locally
-   * cached assignment list, refreshed through the proto-byte registry C ABI
-   * when a Web WASM backend with those exports is loaded.
-   */
-  fetchModelAssignments(): ManagedModel[] {
-    return ModelManager.getModels();
-  },
-
-  /**
-   * Return the list of registered inference frameworks (§13). Web surfaces
-   * registered backends via ExtensionRegistry — there is no `InferenceFramework`
-   * proto enum wiring yet (CPP-BLOCKED: G-B1 hardware_profile.proto), so this
-   * returns string names of registered backends as a best-effort.
-   */
-  getRegisteredFrameworks(): string[] {
-    return ExtensionRegistry.getAll().map((ext) => ext.extensionName);
-  },
-
-  /**
-   * Return frameworks capable of a given SDK component (§13). Delegates to
-   * `getRegisteredFrameworks()` for now; real capability filtering requires
-   * `rac_hardware_profile_*` C ABI (CPP-BLOCKED: G-C6).
-   */
-  getFrameworksForCapability(_capability: string): string[] {
-    return RunAnywhere.getRegisteredFrameworks();
-  },
-
-  // =========================================================================
-  // Model Import (file picker / drag-and-drop)
-  // =========================================================================
-
-  async importModelFromPicker(options?: { modelId?: string; accept?: string[] }): Promise<string | null> {
-    const acceptExts = options?.accept ?? ['.gguf', '.onnx', '.bin'];
-
-    if ('showOpenFilePicker' in window) {
-      try {
-        const [handle] = await (window as WindowWithFilePicker).showOpenFilePicker!({
-          types: [{
-            description: 'AI Model Files',
-            accept: { 'application/octet-stream': acceptExts },
-          }],
-          multiple: false,
-        });
-        const file: File = await handle.getFile();
-        return this.importModelFromFile(file, options);
-      } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') return null;
-        logger.debug('showOpenFilePicker failed, using input fallback');
-      }
-    }
-
-    return new Promise<string | null>((resolve) => {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = acceptExts.join(',');
-      input.style.display = 'none';
-      let settled = false;
-
-      const cleanup = () => {
-        if (input.parentNode) {
-          document.body.removeChild(input);
-        }
-      };
-
-      const settle = (value: string | null) => {
-        if (settled) return;
-        settled = true;
-        cleanup();
-        resolve(value);
-      };
-
-      input.onchange = async () => {
-        const file = input.files?.[0];
-        if (!file) { settle(null); return; }
-        try {
-          const id = await this.importModelFromFile(file, options);
-          settle(id);
-        } catch (err) {
-          logger.error(`Import failed: ${err instanceof Error ? err.message : String(err)}`);
-          settle(null);
-        }
-      };
-
-      input.addEventListener('cancel', () => settle(null));
-
-      // Safety net: on older browsers the `cancel` event may not fire when
-      // the user dismisses the picker. Use a focus/visibilitychange listener
-      // to detect that the picker was closed without selection.
-      const fallbackCleanup = () => {
-        // Wait a tick — onchange fires after focus returns
-        setTimeout(() => {
-          if (!settled) {
-            settle(null);
-          }
-        }, 300);
-        window.removeEventListener('focus', fallbackCleanup);
-        document.removeEventListener('visibilitychange', fallbackCleanup);
-      };
-
-      window.addEventListener('focus', fallbackCleanup);
-      document.addEventListener('visibilitychange', fallbackCleanup);
-
-      document.body.appendChild(input);
-      input.click();
-    });
-  },
-
-  async importModelFromFile(file: File, options?: { modelId?: string }): Promise<string> {
-    logger.info(`Importing model from file: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`);
-    return ModelManager.importModel(file, options?.modelId);
   },
 
   // =========================================================================
@@ -560,14 +322,9 @@ export const RunAnywhere = {
    * Which persistent storage backend is currently active.
    *
    * Resolution order:
-   *   1. `fsAccess` — File System Access API with an active directory handle
-   *      (user picked a folder via `chooseLocalStorageDirectory()` or a handle
-   *      was restored from a previous session).
+   *   1. `fsAccess` — File System Access API with an active directory handle.
    *   2. `opfs` — Origin Private File System (default persistent fallback).
    *   3. `memory` — Neither backend is available; models live only in MEMFS.
-   *
-   * Apps can surface this to users (e.g. "Stored on disk" vs. "Stored in
-   * browser storage") or gate features that assume real-filesystem semantics.
    */
   get storageBackend(): StorageBackend {
     if (LocalFileStorage.isSupported && _localFileStorage?.isReady) {
@@ -591,7 +348,6 @@ export const RunAnywhere = {
 
     const success = await _localFileStorage.chooseDirectory();
     if (success) {
-      ModelManager.setLocalFileStorage(_localFileStorage);
       EventBus.shared.emit('storage.localDirectorySelected', SDKEventType.Storage, {
         directoryName: _localFileStorage.directoryName,
       });
@@ -608,7 +364,6 @@ export const RunAnywhere = {
 
     const success = await _localFileStorage.restoreDirectory();
     if (success) {
-      ModelManager.setLocalFileStorage(_localFileStorage);
       logger.info(`Local storage restored: ${_localFileStorage.directoryName}`);
     }
     return success;
@@ -616,90 +371,75 @@ export const RunAnywhere = {
 
   async requestLocalStorageAccess(): Promise<boolean> {
     if (!_localFileStorage) return false;
-
-    const success = await _localFileStorage.requestAccess();
-    if (success) {
-      ModelManager.setLocalFileStorage(_localFileStorage);
-    }
-    return success;
+    return _localFileStorage.requestAccess();
   },
 
   // =========================================================================
-  // Top-level convenience verbs — mirror Swift's `RunAnywhere.chat / generate /
-  // transcribe / synthesize / speak / detectSpeech / setVADCallback / etc.`
-  // Each delegates through ExtensionPoint to the appropriate backend.
+  // Top-level convenience verbs that delegate to the proto-byte adapters.
   // =========================================================================
 
-  // LLM
-  chat: Convenience.chat,
-  generate: Convenience.generate,
-  generateStream: Convenience.generateStream,
-  generateStructured: Convenience.generateStructured,
-
-  // STT — flat canonical verbs (§4)
-  transcribe: Convenience.transcribe,
-
-  // TTS — flat canonical verbs (§5)
-  synthesize: Convenience.synthesize,
-  speak: Convenience.speak,
-  isSpeaking: Convenience.isSpeaking,
-  stopSpeaking: Convenience.stopSpeaking,
-
-  // VAD — flat canonical verbs (§6)
-  detectSpeech: Convenience.detectSpeech,
-  /** Canonical §6 name for the speech-activity callback setter. */
-  setVADSpeechActivityCallback: Convenience.setVADCallback,
-  /** Set a callback for raw audio buffers (§6 `setVADAudioBufferCallback`). */
-  setVADAudioBufferCallback(cb: (buffer: Uint8Array) => void): void {
-    VADCapability.setVADAudioBufferCallback(cb);
-  },
-  /** Set a callback for VAD statistics (§6 `setVADStatisticsCallback`). */
-  setVADStatisticsCallback(cb: (stats: unknown) => void): void {
-    VADCapability.setVADStatisticsCallback(cb);
-  },
-  startVAD: Convenience.startVAD,
-  stopVAD: Convenience.stopVAD,
-  cleanupVAD: Convenience.cleanupVAD,
-  isVADReady: Convenience.isVADReady,
-
-  // LLM model management — canonical flat verbs (§3)
-  async loadLLMModel(modelId: string): Promise<void> {
-    await ModelManager.loadModel(modelId);
-  },
-
-  async unloadLLMModel(): Promise<void> {
-    await ModelManager.unloadAll();
-  },
-
-  get isLLMModelLoaded(): boolean {
-    return ModelManager.getLoadedModel(undefined as unknown as import('../types/enums').ModelCategory) != null;
-  },
-
-  currentLLMModel(): import('../Infrastructure/ModelManager').ManagedModel | null {
-    return ModelManager.getLoadedModel(undefined as unknown as import('../types/enums').ModelCategory);
-  },
-
-  /**
-   * Generate with tool calling — canonical §3 `generateWithTools`.
-   * Delegates to the LLM provider's tool calling capability.
-   */
-  async generateWithTools(
+  /** Generate text via the LLM proto adapter. */
+  async generate(
     prompt: string,
-    options?: Partial<import('@runanywhere/proto-ts/llm_options').LLMGenerationOptions>,
-  ): Promise<import('@runanywhere/proto-ts/llm_options').LLMGenerationResult> {
-    return Convenience.generate(prompt, options);
+    options?: Partial<LLMGenerationOptions>,
+  ): Promise<LLMGenerationResult> {
+    return TextGenerationCapability.generate({
+      ...(options ?? {}),
+      prompt,
+    } as Partial<LLMGenerationOptions>);
+  },
+
+  async generateStream(
+    prompt: string,
+    options?: Partial<LLMGenerationOptions>,
+  ): Promise<LLMStreamingResult> {
+    return TextGenerationCapability.generateStream({
+      ...(options ?? {}),
+      prompt,
+    } as Partial<LLMGenerationOptions>);
+  },
+
+  async chat(
+    prompt: string,
+    options?: Partial<LLMGenerationOptions>,
+  ): Promise<string> {
+    return TextGenerationCapability.chat(prompt, options);
   },
 
   /**
-   * Continue a conversation after a tool call result (§3 `continueWithToolResult`).
-   * Appends the tool result to the context and generates the next response.
+   * Transcribe audio. Auto-creates an STT component handle, loads the current
+   * STT model from lifecycle (if no `modelPath` is supplied), runs transcription,
+   * and tears the handle down. Use `RunAnywhere.stt.*` directly when you want
+   * to reuse a handle across multiple calls.
    */
-  async continueWithToolResult(
-    toolCallId: string,
-    result: string,
-    options?: Partial<import('@runanywhere/proto-ts/llm_options').LLMGenerationOptions>,
-  ): Promise<import('@runanywhere/proto-ts/llm_options').LLMGenerationResult> {
-    return Convenience.generate(`[Tool ${toolCallId} result]: ${result}`, options);
+  async transcribe(
+    audio: Uint8Array | Float32Array,
+    options?: TranscribeOptions,
+  ): Promise<STTOutput> {
+    return transcribeImpl(audio, options);
+  },
+
+  /**
+   * Synthesize speech. Auto-creates a TTS component handle, loads the current
+   * TTS voice from lifecycle (if no `voicePath` is supplied), synthesizes, and
+   * tears the handle down.
+   */
+  async synthesize(
+    text: string,
+    options?: SynthesizeOptions,
+  ): Promise<TTSOutput> {
+    return synthesizeImpl(text, options);
+  },
+
+  /**
+   * Detect speech activity in an audio buffer. Auto-creates a VAD handle,
+   * configures + initializes it, runs one process pass, and destroys the handle.
+   */
+  async detectVoice(
+    audio: Float32Array,
+    options?: DetectVoiceOptions,
+  ): Promise<VADResult> {
+    return detectVoiceImpl(audio, options);
   },
 
   // Thinking token utilities — canonical §3 helpers.
@@ -713,15 +453,13 @@ export const RunAnywhere = {
     return LlmThinking.strip(text);
   },
 
-  /** Split thinking and response sections (§3). Returns `[thinking, response]`. */
+  /** Split thinking and response sections (§3). */
   splitThinkingAndResponse(text: string): { thinking: string; response: string } {
     const { thinking, response } = LlmThinking.extract(text);
     return { thinking: thinking ?? '', response };
   },
 
-  // RAG — flat (RAG is stateless from public-API view; the pipeline is a
-  // managed handle, not a stateful object on RunAnywhere). Mirrors Swift
-  // `RunAnywhere+RAG.swift`.
+  // RAG — flat (RAG is stateless from public-API view).
   ragCreatePipeline: RAGExt.ragCreatePipeline,
   ragDestroyPipeline: RAGExt.ragDestroyPipeline,
   ragIngest: RAGExt.ragIngest,
@@ -730,59 +468,18 @@ export const RunAnywhere = {
   ragClearDocuments: RAGExt.ragClearDocuments,
   ragGetDocumentCount: RAGExt.ragGetDocumentCount,
   ragGetStatistics: RAGExt.ragGetStatistics,
+  ragListDocuments: RAGExt.ragListDocuments,
+  ragRemoveDocument: RAGExt.ragRemoveDocument,
+  ragGetCapabilities: RAGExt.ragGetCapabilities,
+  createDefaultRAGConfiguration: RAGExt.createDefaultRAGConfiguration,
   getRAGAvailability: RAGExt.getRAGAvailability,
   isRAGAvailable: RAGExt.isRAGAvailable,
 
-  // STT model management — canonical flat verbs (§4)
-  loadSTTModel: STTCapability.loadSTTModel.bind(STTCapability),
-  unloadSTTModel: STTCapability.unloadSTTModel.bind(STTCapability),
-
-  get isSTTModelLoaded(): boolean {
-    return STTCapability.isSTTModelLoaded;
-  },
-
-  // TTS model management — canonical flat verbs (§5)
-  loadTTSVoice: TTSCapability.loadTTSVoice.bind(TTSCapability),
-  unloadTTSVoice: TTSCapability.unloadTTSVoice.bind(TTSCapability),
-  loadTTSModel: TTSCapability.loadTTSModel.bind(TTSCapability),
-  unloadTTSModel: TTSCapability.unloadTTSModel.bind(TTSCapability),
-  availableTTSVoices: TTSCapability.availableTTSVoices.bind(TTSCapability),
-
-  get isTTSVoiceLoaded(): boolean {
-    return TTSCapability.isTTSVoiceLoaded;
-  },
-
-  // VLM — canonical flat verbs (§7)
-  describeImage: VisionLanguageCapability.describeImage.bind(VisionLanguageCapability),
-  askAboutImage: VisionLanguageCapability.askAboutImage.bind(VisionLanguageCapability),
-  processImage: VisionLanguageCapability.generate.bind(VisionLanguageCapability),
-  processImageStream: VisionLanguageCapability.processImageStream.bind(VisionLanguageCapability),
-  cancelVLMGeneration: VisionLanguageCapability.cancelVLMGeneration.bind(VisionLanguageCapability),
-  loadVLMModel: VisionLanguageCapability.loadVLMModel.bind(VisionLanguageCapability),
-  unloadVLMModel: VisionLanguageCapability.unloadVLMModel.bind(VisionLanguageCapability),
-
-  get isVLMModelLoaded(): boolean {
-    return VisionLanguageCapability.isVLMModelLoaded;
-  },
-
-  // Diffusion — canonical §8 flat verbs
-  generateImage,
-  generateImageStream,
-  loadDiffusionModel,
-  unloadDiffusionModel,
-  cancelImageGeneration,
-  getDiffusionCapabilities,
-
-  get isDiffusionModelLoaded(): boolean {
-    return getIsDiffusionModelLoaded();
-  },
-
-  // LLM structured stream + extraction — canonical §3 flat verbs
+  // LLM structured stream + extraction — canonical §3 flat verbs.
   generateStructuredStream,
   extractStructuredOutput,
 
-  // VoiceAgent C-ABI parity — mirrors Swift `RunAnywhere+VoiceAgent.swift`.
-  // Includes the canonical streamVoiceAgent verb (CANONICAL_API.md §10).
+  // VoiceAgent C-ABI parity.
   initializeVoiceAgent: VoiceAgentExt.initializeVoiceAgent,
   initializeVoiceAgentWithLoadedModels: VoiceAgentExt.initializeVoiceAgentWithLoadedModels,
   isVoiceAgentReady: VoiceAgentExt.isVoiceAgentReady,
@@ -794,22 +491,18 @@ export const RunAnywhere = {
   voiceAgentSynthesizeSpeech: VoiceAgentExt.voiceAgentSynthesizeSpeech,
   streamVoiceAgent: VoiceAgentExt.streamVoiceAgent,
   cleanupVoiceAgent: VoiceAgentExt.cleanupVoiceAgent,
+  getVoiceAgentAvailability: VoiceAgentExt.getVoiceAgentAvailability,
+  isVoiceAgentAvailable: VoiceAgentExt.isVoiceAgentAvailable,
 
   // =========================================================================
-  // Solutions (T4.7 / T4.8) — proto/YAML-driven L5 pipeline runtime.
-  // Capability shape: `RunAnywhere.solutions.run({ config | configBytes | yaml })`
-  // returns a `SolutionHandle` with start / stop / cancel / feed / closeInput /
-  // destroy verbs. Mirrors the namespace exposed by every other RunAnywhere SDK.
+  // Solutions namespace
   // =========================================================================
 
   solutions: SolutionsCapability,
 
   // =========================================================================
-  // Phase C-prime namespace extensions — symmetric with Swift / Kotlin / RN.
+  // Namespace extensions — proto-byte adapter facades.
   // =========================================================================
-
-  /** Storage info / persistence — `RunAnywhere.storage.info()` etc. */
-  storage: StorageCapability,
 
   /** C++-owned download workflow — plan/start/cancel/resume/progress. */
   downloads: DownloadsCapability,
@@ -823,12 +516,6 @@ export const RunAnywhere = {
   /** C++ model lifecycle proto bridge — load/unload/current/snapshot. */
   modelLifecycle: ModelLifecycleCapability,
 
-  /** Plugin/extension management — `RunAnywhere.pluginLoader.register(ext)` etc. */
-  pluginLoader: PluginLoaderCapability,
-
-  /** VAD namespace — `RunAnywhere.vad.detect(audio)` etc. */
-  vad: VADCapability,
-
   /** Text generation — `RunAnywhere.textGeneration.generate(options)` etc. */
   textGeneration: TextGenerationCapability,
 
@@ -838,34 +525,19 @@ export const RunAnywhere = {
   /** Tool calling — `RunAnywhere.toolCalling.generate(prompt, tools)` */
   toolCalling: ToolCallingCapability,
 
-  /** Speech-to-text — `RunAnywhere.stt.transcribe(audio)` */
+  /** Speech-to-text — `RunAnywhere.stt.create()` / `transcribe(handle, audio)` etc. */
   stt: STTCapability,
 
-  /** Text-to-speech — `RunAnywhere.tts.synthesize(text)` */
+  /** Text-to-speech — `RunAnywhere.tts.create()` / `synthesize(handle, text)` etc. */
   tts: TTSCapability,
 
-  /** Vision-language models — `RunAnywhere.visionLanguage.generate(options)` */
-  visionLanguage: VisionLanguageCapability,
-
-  /** VLM model catalog — `RunAnywhere.vlmModels.list()` */
-  vlmModels: VLMModelsCapability,
-
-  /** Image diffusion — `RunAnywhere.diffusion.generate(options)` */
-  diffusion: DiffusionCapability,
-
-  /** Model lifecycle — `RunAnywhere.modelManagement.list()` / `.download()` etc. */
-  modelManagement: ModelManagementCapability,
-
-  /** Role→model mappings — `RunAnywhere.modelAssignments.set(role, modelId)` */
-  modelAssignments: ModelAssignmentsCapability,
-
-  /** Registered backend frameworks — `RunAnywhere.frameworks.list()` */
-  frameworks: FrameworksCapability,
+  /** Voice activity detection — `RunAnywhere.vad.create()` / `process(handle, samples)` etc. */
+  vad: VADCapability,
 
   /** Logging control — `RunAnywhere.logging.setLevel(LogLevel.Debug)` */
   logging: LoggingCapability,
 
-  /** LoRA adapter management — `RunAnywhere.lora.load(config)` etc. */
+  /** LoRA adapter management — `RunAnywhere.lora.apply(handle, request)` etc. */
   lora: LoRACapability,
 
   /** RAG retrieval pipeline — `RunAnywhere.rag.query(...)` etc. */
@@ -875,44 +547,11 @@ export const RunAnywhere = {
   hardware: HardwareCapability,
 
   // =========================================================================
-  // Canonical flat verbs (§1 / §3 / §5 / §6 of CANONICAL_API.md)
-  // =========================================================================
-
-  /**
-   * Cancel any in-flight LLM generation (§1 / §3). Calls `iterator.return()`
-   * on the active stream if one exists; otherwise a no-op. Symmetric with
-   * Swift / Kotlin / RN / Flutter `RunAnywhere.cancelGeneration()`.
-   */
-  cancelGeneration(): void {
-    const llm = ExtensionPoint.getProvider('llm') as {
-      cancelGeneration?: () => void;
-    } | undefined;
-    if (typeof llm?.cancelGeneration === 'function') {
-      llm.cancelGeneration();
-    }
-  },
-
-  /**
-   * Stop any in-progress TTS synthesis (§5). Symmetric with
-   * Swift `RunAnywhere.stopSynthesis()`.
-   */
-  stopSynthesis(): void {
-    Convenience.stopSpeaking();
-  },
-
-  // =========================================================================
   // Shutdown
   // =========================================================================
 
   shutdown(): void {
     logger.info('Shutting down RunAnywhere Web SDK...');
-
-    // Unload all models before tearing down extensions
-    ModelManager.unloadAll().catch(() => { /* ignore during shutdown */ });
-
-    // Clean up all registered extensions and backends
-    ExtensionRegistry.cleanupAll();
-    ExtensionPoint.cleanupAll();
 
     // Clear WASM adapter singletons so stale module refs don't linger.
     HTTPAdapter.clearDefaultModule();
@@ -922,10 +561,7 @@ export const RunAnywhere = {
     SDKEventStreamAdapter.clearDefaultModule();
     StorageAdapter.clearDefaultHandles();
 
-    // Reset state
     EventBus.reset();
-    ExtensionRegistry.reset();
-    ExtensionPoint.reset();
 
     _isInitialized = false;
     _initOptions = null;

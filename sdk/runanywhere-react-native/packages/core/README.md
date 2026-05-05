@@ -516,9 +516,9 @@ import type {
   ModelInfo,
   StorageInfo,
 
-  // Generation
-  GenerationOptions,
-  GenerationResult,
+  // Generation (proto-generated)
+  LLMGenerationOptions,
+  LLMGenerationResult,
   PerformanceMetrics,
 
   // Tool Calling
@@ -553,7 +553,6 @@ import type {
 
   // Download
   DownloadProgress,
-  DownloadConfiguration,
 } from '@runanywhere/core';
 ```
 
@@ -602,7 +601,7 @@ packages/core/
 │   └── native/                     # Native module access
 ├── cpp/                            # C++ HybridObject bridges
 │   ├── HybridRunAnywhereCore.cpp   # Core native bridge
-│   └── ToolCallingBridge.cpp       # Tool calling C++ bridge
+│   └── bridges/                    # Platform adapters and legacy JSON RAG bridge
 ├── ios/                            # iOS native module
 ├── android/                        # Android native module
 └── nitrogen/                       # Generated Nitro specs

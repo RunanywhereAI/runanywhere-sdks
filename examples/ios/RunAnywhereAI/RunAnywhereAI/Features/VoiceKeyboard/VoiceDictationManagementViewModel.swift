@@ -87,7 +87,7 @@ final class VoiceDictationManagementViewModel: ObservableObject {
         }
     }
 
-    func loadModel(_ model: ModelInfo) async {
+    func loadModel(_ model: RAModelInfo) async {
         logger.info("Loading STT model: \(model.name)")
         isLoadingModel = true
         errorMessage = nil

@@ -6,6 +6,7 @@
 #include "rac/foundation/rac_proto_buffer.h"
 
 #include <cstring>
+#include <limits>
 
 namespace {
 
@@ -26,6 +27,22 @@ void release_fields(rac_proto_buffer_t* buffer) {
 
 extern "C" {
 
+rac_result_t rac_proto_bytes_validate(const uint8_t* data, size_t size) {
+    if (!data && size != 0) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    if (size > static_cast<size_t>(std::numeric_limits<int>::max())) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    return RAC_SUCCESS;
+}
+
+const void* rac_proto_bytes_data_or_empty(const uint8_t* data, size_t size) {
+    static const uint8_t kEmptyProtoSentinel = 0;
+    return size == 0 ? static_cast<const void*>(&kEmptyProtoSentinel)
+                     : static_cast<const void*>(data);
+}
+
 void rac_proto_buffer_init(rac_proto_buffer_t* buffer) {
     if (!buffer) {
         return;
@@ -42,8 +59,9 @@ rac_result_t rac_proto_buffer_copy(const uint8_t* data,
 
     release_fields(out_buffer);
 
-    if (!data && size != 0) {
-        out_buffer->status = RAC_ERROR_INVALID_ARGUMENT;
+    rac_result_t validation = rac_proto_bytes_validate(data, size);
+    if (validation != RAC_SUCCESS) {
+        out_buffer->status = validation;
         return out_buffer->status;
     }
 
@@ -66,10 +84,34 @@ rac_result_t rac_proto_buffer_copy(const uint8_t* data,
     return RAC_SUCCESS;
 }
 
+rac_result_t rac_proto_buffer_take_data(rac_proto_buffer_t* buffer,
+                                        uint8_t** data_out,
+                                        size_t* size_out) {
+    if (!buffer || !data_out || !size_out) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    *data_out = nullptr;
+    *size_out = 0;
+
+    if (buffer->status != RAC_SUCCESS) {
+        return buffer->status;
+    }
+
+    *data_out = buffer->data;
+    *size_out = buffer->size;
+    buffer->data = nullptr;
+    buffer->size = 0;
+    rac_free(buffer->error_message);
+    buffer->error_message = nullptr;
+    buffer->status = RAC_SUCCESS;
+    return RAC_SUCCESS;
+}
+
 rac_result_t rac_proto_buffer_set_error(rac_proto_buffer_t* buffer,
                                         rac_result_t status,
                                         const char* error_message) {
-    if (!buffer || status == RAC_SUCCESS) {
+    if (!buffer || RAC_SUCCEEDED(status)) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
@@ -110,12 +152,9 @@ rac_result_t rac_proto_buffer_copy_to_raw(const uint8_t* data,
         return rc;
     }
 
-    *data_out = buffer.data;
-    *size_out = buffer.size;
-    buffer.data = nullptr;
-    buffer.size = 0;
+    rc = rac_proto_buffer_take_data(&buffer, data_out, size_out);
     rac_proto_buffer_free(&buffer);
-    return RAC_SUCCESS;
+    return rc;
 }
 
 void rac_proto_buffer_free_data(uint8_t* data) {

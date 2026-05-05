@@ -15,6 +15,7 @@
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_model_lifecycle.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/llm/rac_llm_structured_output.h"
 #include "rac/foundation/rac_proto_buffer.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
@@ -25,6 +26,7 @@
 #include "llm_service.pb.h"
 #include "model_types.pb.h"
 #include "sdk_events.pb.h"
+#include "structured_output.pb.h"
 #endif
 
 namespace {
@@ -107,6 +109,21 @@ rac_result_t mock_generate_stream(void* impl,
                                   void* user_data) {
     if (!impl || !prompt || !callback) return RAC_ERROR_NULL_POINTER;
     auto* mock = static_cast<MockLlm*>(impl);
+    if (std::strstr(prompt, "thinking-stream") != nullptr) {
+        if (callback("<think>plan</think>done", user_data) != RAC_TRUE) {
+            return RAC_ERROR_STREAM_CANCELLED;
+        }
+        return RAC_SUCCESS;
+    }
+    if (std::strstr(prompt, "structured-stream-json") != nullptr) {
+        if (callback("{\"ok\"", user_data) != RAC_TRUE) {
+            return RAC_ERROR_STREAM_CANCELLED;
+        }
+        if (callback(":true}", user_data) != RAC_TRUE) {
+            return RAC_ERROR_STREAM_CANCELLED;
+        }
+        return RAC_SUCCESS;
+    }
     if (callback("alpha", user_data) != RAC_TRUE) {
         return RAC_ERROR_STREAM_CANCELLED;
     }
@@ -348,6 +365,138 @@ int test_stream_terminal_once(rac_model_registry_handle_t registry) {
     return 0;
 }
 
+int test_stream_thinking_envelope(rac_model_registry_handle_t registry) {
+    CHECK(load_mock_model(registry), "mock lifecycle LLM loads for thinking stream");
+
+    runanywhere::v1::LLMGenerateRequest request;
+    request.set_prompt("thinking-stream");
+    request.set_emit_thoughts(true);
+    request.set_request_id("think-req");
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "thinking stream request serializes");
+
+    CapturedStream capture;
+    const rac_result_t rc =
+        rac_llm_generate_stream_proto(bytes.data(), bytes.size(), stream_callback, &capture);
+    CHECK(rc == RAC_SUCCESS, "thinking stream generation succeeds");
+
+    bool saw_thinking = false;
+    bool saw_answer = false;
+    bool saw_terminal_result = false;
+    for (const auto& event_bytes : capture.events) {
+        runanywhere::v1::LLMStreamEvent event;
+        CHECK(event.ParseFromArray(event_bytes.data(), static_cast<int>(event_bytes.size())),
+              "thinking stream event parses");
+        if (event.kind() == runanywhere::v1::LLM_TOKEN_KIND_THOUGHT) {
+            saw_thinking = true;
+            CHECK(event.event_kind() == runanywhere::v1::LLM_STREAM_EVENT_KIND_THINKING,
+                  "thinking event kind is classified");
+            CHECK(event.token() == "plan", "thinking token strips tags");
+            CHECK(event.request_id() == "think-req", "thinking event carries request id");
+        }
+        if (!event.is_final() && event.kind() == runanywhere::v1::LLM_TOKEN_KIND_ANSWER) {
+            saw_answer = true;
+            CHECK(event.token() == "done", "answer token strips thinking block");
+        }
+        if (event.is_final()) {
+            saw_terminal_result = event.has_result();
+            CHECK(event.result().text() == "done", "terminal result carries answer text");
+            CHECK(event.result().thinking_content() == "plan",
+                  "terminal result carries thinking content");
+            CHECK(event.event_kind() == runanywhere::v1::LLM_STREAM_EVENT_KIND_COMPLETED,
+                  "terminal event kind is completed");
+        }
+    }
+
+    CHECK(saw_thinking, "stream emits generated thinking envelope");
+    CHECK(saw_answer, "stream emits answer envelope after thinking");
+    CHECK(saw_terminal_result, "stream emits terminal result envelope");
+    cleanup_environment();
+    return 0;
+}
+
+int test_structured_generate_proto(rac_model_registry_handle_t registry) {
+    CHECK(load_mock_model(registry), "mock lifecycle LLM loads for structured generate");
+
+    runanywhere::v1::StructuredOutputRequest request;
+    request.set_prompt("answer as json");
+    request.mutable_options()->set_json_schema(
+        "{\"type\":\"object\",\"required\":[\"ok\"],\"properties\":{"
+        "\"ok\":{\"type\":\"boolean\"}},\"additionalProperties\":false}");
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "structured generate request serializes");
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    const rac_result_t rc =
+        rac_structured_output_generate_proto(bytes.data(), bytes.size(), &out);
+    runanywhere::v1::StructuredOutputResult result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
+          "structured generate returns parsable StructuredOutputResult");
+    CHECK(result.validation().is_valid(), "structured generate validates JSON");
+    CHECK(result.parsed_json() == "{\"ok\":true}",
+          "structured generate returns parsed JSON bytes");
+    CHECK(result.error_code() == RAC_SUCCESS, "structured generate reports success code");
+    rac_proto_buffer_free(&out);
+    cleanup_environment();
+    return 0;
+}
+
+int test_structured_stream_proto(rac_model_registry_handle_t registry) {
+    CHECK(load_mock_model(registry), "mock lifecycle LLM loads for structured stream");
+
+    runanywhere::v1::StructuredOutputRequest request;
+    request.set_request_id("structured-req");
+    request.set_prompt("structured-stream-json");
+    auto* options = request.mutable_options();
+    options->set_include_schema_in_prompt(true);
+    options->set_json_schema(
+        "{\"type\":\"object\",\"required\":[\"ok\"],\"properties\":{"
+        "\"ok\":{\"type\":\"boolean\"}},\"additionalProperties\":false}");
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes), "structured stream request serializes");
+
+    CapturedStream capture;
+    const rac_result_t rc = rac_structured_output_generate_stream_proto(
+        bytes.data(), bytes.size(), stream_callback, &capture);
+    CHECK(rc == RAC_SUCCESS, "structured stream generation succeeds");
+
+    bool saw_token = false;
+    bool saw_partial = false;
+    bool saw_terminal = false;
+    for (const auto& event_bytes : capture.events) {
+        runanywhere::v1::StructuredOutputStreamEvent event;
+        CHECK(event.ParseFromArray(event_bytes.data(), static_cast<int>(event_bytes.size())),
+              "structured stream event parses");
+        CHECK(event.request_id() == "structured-req",
+              "structured stream event carries request id");
+        if (event.kind() == runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN) {
+            saw_token = true;
+        }
+        if (event.kind() ==
+            runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON) {
+            saw_partial = true;
+            CHECK(event.partial_json() == "{\"ok\":true}",
+                  "structured stream emits partial JSON envelope");
+        }
+        if (event.kind() ==
+            runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED) {
+            saw_terminal = true;
+            CHECK(event.has_result(), "structured terminal carries result");
+            CHECK(event.result().parsed_json() == "{\"ok\":true}",
+                  "structured terminal result carries parsed JSON");
+            CHECK(event.result().validation().is_valid(),
+                  "structured terminal result validates");
+        }
+    }
+
+    CHECK(saw_token, "structured stream emits token envelope");
+    CHECK(saw_partial, "structured stream emits partial JSON envelope");
+    CHECK(saw_terminal, "structured stream emits completed envelope");
+    cleanup_environment();
+    return 0;
+}
+
 int test_cancel_stream(rac_model_registry_handle_t registry) {
     CHECK(load_mock_model(registry), "mock lifecycle LLM loads for cancel");
     {
@@ -412,6 +561,9 @@ int main() {
     test_missing_lifecycle_model();
     test_mocked_generation(registry);
     test_stream_terminal_once(registry);
+    test_stream_thinking_envelope(registry);
+    test_structured_generate_proto(registry);
+    test_structured_stream_proto(registry);
     test_cancel_stream(registry);
 
     cleanup_environment();

@@ -11,11 +11,9 @@ export {
   requireNativeModule,
   isNativeModuleAvailable,
   requireDeviceInfoModule,
-  requireFileSystemModule,
   hasNativeMethod,
 } from './NativeRunAnywhereCore';
 export type {
   NativeRunAnywhereCoreModule,
   NativeRunAnywhereModule,
-  FileSystemModule,
 } from './NativeRunAnywhereCore';

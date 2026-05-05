@@ -2,17 +2,15 @@
  * @file rac_http_client_emscripten.cpp
  * @brief Emscripten Fetch-backed HTTP transport adapter.
  *
- * v2 close-out Phase H7 refactor — instead of replacing the libcurl
- * client wholesale (B03 did this as a "WASM is special" fork) this
- * file now registers itself through the platform HTTP transport vtable
- * declared in `include/rac/infrastructure/http/rac_http_transport.h`.
+ * v2 close-out Phase H7 refactor: the Web implementation registers
+ * itself through the platform HTTP transport vtable declared in
+ * `include/rac/infrastructure/http/rac_http_transport.h`.
  *
- * The libcurl-backed `rac_http_request_*` entry points in
- * `rac_http_client_curl.cpp` consult the transport registry first and
- * short-circuit to us when we're installed. Doing it that way means
- * the WASM build goes through the same one-pattern routing used by
- * the Swift URLSession / Kotlin OkHttp / Flutter dart:io / RN fetch
- * adapters instead of compiling a second, parallel C ABI shim.
+ * The public `rac_http_request_*` entry points consult the transport
+ * registry and dispatch to whichever Web adapter is installed. Doing
+ * it that way means the WASM build goes through the same routing
+ * pattern used by the Swift URLSession / Kotlin OkHttp / Flutter
+ * dart:io / RN fetch adapters.
  *
  * The actual emscripten_fetch() logic below is unchanged from B03 —
  * only the wiring is different. See `rac_http_transport.h` for the
@@ -21,9 +19,9 @@
  *     EMSCRIPTEN_FETCH_SYNCHRONOUS so "any thread" means the worker
  *     pthread that issued the request),
  *   - strings/bytes handed to us are caller-owned,
- *   - out_resp fields must be heap-allocated with the same
- *     malloc/strdup contract as the libcurl default (so the shared
- *     `rac_http_response_free` frees them correctly).
+ *   - out_resp fields must be heap-allocated with malloc/strdup-
+ *     compatible allocators so the shared `rac_http_response_free`
+ *     frees them correctly.
  *
  * See `include/rac/infrastructure/http/rac_http_client.h` for the
  * original C ABI contract. This file is compiled into `rac_commons`
@@ -41,17 +39,18 @@
  *     and Asyncify (implicit via JSPI when WebGPU is on, explicit via
  *     `-sASYNCIFY=1` otherwise — see the emscripten branch there).
  *
- * Limitations vs. the libcurl backend:
+ * Emscripten Fetch adapter limitations:
  *   - No cookie jar (the browser's own cookies are used per CORS
  *     rules; the SDK never sees them).
- *   - No CURLOPT_FOLLOWLOCATION toggle: `fetch()` always follows
+ *   - No per-request redirect toggle: `fetch()` always follows
  *     redirects per `redirect: "follow"` (the default).
  *   - `total_time` is derived from a wall-clock measurement around the
  *     blocking `emscripten_fetch` call.
  *   - Streaming body callbacks are fired once with the whole buffer
  *     (the Fetch API's `ReadableStream` requires async JS glue that's
  *     out of scope for the MVP). Download byte counts remain correct;
- *     only the progress granularity is coarser than libcurl.
+ *     only the progress granularity is coarser than chunked native
+ *     adapters.
  *   - Response headers are parsed from
  *     `emscripten_fetch_get_response_headers_length` /
  *     `..._get_response_headers`.
@@ -285,8 +284,8 @@ rac_result_t do_fetch(const rac_http_request_t* req, rac_http_response_t* out,
 // Transport vtable ops (v2 close-out Phase H7)
 //
 // These are the thin shims the transport router in
-// `rac_http_transport.cpp` calls into after short-circuiting around
-// libcurl. Signature matches `rac_http_transport_ops_t` — the leading
+// `rac_http_transport.cpp` calls into. Signature matches
+// `rac_http_transport_ops_t` — the leading
 // `void* user_data` slot is unused here (the adapter has no state;
 // emscripten_fetch is stateless at the handle level).
 // =============================================================================
@@ -420,15 +419,10 @@ const rac_http_transport_ops_t kJsOps = {
 
 // =============================================================================
 // Public registration API — JS calls this once after the WASM module
-// loads so the libcurl router in `rac_http_client_curl.cpp` starts
-// short-circuiting here for every HTTP request. (Note: on WASM the
-// libcurl `.cpp` itself isn't compiled in — the router lookup lives
-// in `rac_http_transport.cpp` which IS compiled unconditionally, and
-// the `rac_http_request_*` symbols we used to export directly from
-// this file are now provided by whichever TU wires the transport in.
-// Since this is still the only HTTP implementation in the WASM build,
-// we continue to export those symbols as well for back-compat with
-// anything that linked against the B03 shim.)
+// loads so every HTTP request routes through the Emscripten Fetch
+// adapter. Since this is still the only HTTP implementation in the
+// WASM build, this file also exports the public `rac_http_request_*`
+// symbols.
 // =============================================================================
 
 extern "C" RAC_API rac_result_t rac_http_transport_register_emscripten(void) {
@@ -440,18 +434,19 @@ extern "C" RAC_API rac_result_t rac_http_transport_register_emscripten(void) {
 // JS-side registration (Stage 3d). Takes three function-table indices
 // (obtained from `Module.addFunction(fn, sig)` on the JS side) that match
 // `rac_http_transport_ops_t.request_send` / `_stream` / `_resume`. Any of
-// them may be null — the corresponding op falls back to emscripten_fetch.
+// them may be null — the corresponding op uses the Emscripten Fetch
+// adapter.
 //
 // The JS side should call this AFTER WASM module load. Registration
-// installs the JS-fanout vtable into the transport registry, so the
-// libcurl router (or direct rac_http_request_* calls) dispatches to JS
-// for every subsequent HTTP request. This avoids the emscripten_fetch
+// installs the JS-fanout vtable into the transport registry, so public
+// HTTP calls dispatch to JS for every subsequent HTTP request. This
+// avoids the emscripten_fetch
 // ASYNCIFY requirement and lets the JS side plug in retry / caching /
 // service-worker routing.
 //
-// Pass all three pointers as 0 to unregister and fall back to pure
-// emscripten_fetch. The JS function-table indices remain owned by the JS
-// side (i.e. JS is responsible for the matching `removeFunction`).
+// Pass all three pointers as 0 to unregister the JS adapter. The JS
+// function-table indices remain owned by the JS side (i.e. JS is
+// responsible for the matching `removeFunction`).
 // =============================================================================
 
 extern "C" RAC_API rac_result_t rac_http_transport_register_from_js(
@@ -468,8 +463,9 @@ extern "C" RAC_API rac_result_t rac_http_transport_register_from_js(
     s.request_stream = request_stream_fp;
     s.request_resume = request_resume_fp;
 
-    // If all three were cleared, unregister (emscripten_fetch fallback
-    // remains reachable via rac_http_transport_register_emscripten()).
+    // If all three were cleared, unregister the JS adapter. The
+    // emscripten_fetch adapter remains reachable via
+    // rac_http_transport_register_emscripten().
     if (request_send_fp == nullptr && request_stream_fp == nullptr &&
         request_resume_fp == nullptr) {
         RAC_LOG_INFO(kTag, "JS HTTP transport unregistered");
@@ -485,8 +481,8 @@ extern "C" RAC_API rac_result_t rac_http_transport_register_from_js(
 }
 
 // =============================================================================
-// Opaque handle — keep the shape identical to the curl backend so
-// downstream code (`rac_http_download.cpp`) treats both the same.
+// Opaque handle: downstream code (`rac_http_download.cpp`) treats the
+// WASM and native handles the same.
 // =============================================================================
 
 struct rac_http_client {
@@ -498,7 +494,7 @@ struct rac_http_client {
 // =============================================================================
 // Public API — routes through the platform transport registry so the
 // JS-side trampolines installed via `rac_http_transport_register_from_js`
-// take precedence over the built-in emscripten_fetch fallback.
+// take precedence over the built-in emscripten_fetch adapter.
 //
 // Parity with `rac_http_client_default.cpp` (non-WASM targets): the
 // public entry points consult `rac_internal::get_http_transport()`. On

@@ -9,6 +9,7 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -439,6 +440,8 @@ class StorageAvailability extends $pb.GeneratedMessage {
     $fixnum.Int64? availableBytes,
     $core.String? warningMessage,
     $core.String? recommendation,
+    $fixnum.Int64? shortfallBytes,
+    $core.double? requiredToAvailableRatio,
   }) {
     final $result = create();
     if (isAvailable != null) {
@@ -456,6 +459,12 @@ class StorageAvailability extends $pb.GeneratedMessage {
     if (recommendation != null) {
       $result.recommendation = recommendation;
     }
+    if (shortfallBytes != null) {
+      $result.shortfallBytes = shortfallBytes;
+    }
+    if (requiredToAvailableRatio != null) {
+      $result.requiredToAvailableRatio = requiredToAvailableRatio;
+    }
     return $result;
   }
   StorageAvailability._() : super();
@@ -468,6 +477,8 @@ class StorageAvailability extends $pb.GeneratedMessage {
     ..aInt64(3, _omitFieldNames ? '' : 'availableBytes')
     ..aOS(4, _omitFieldNames ? '' : 'warningMessage')
     ..aOS(5, _omitFieldNames ? '' : 'recommendation')
+    ..aInt64(6, _omitFieldNames ? '' : 'shortfallBytes')
+    ..a<$core.double>(7, _omitFieldNames ? '' : 'requiredToAvailableRatio', $pb.PbFieldType.OF)
     ..hasRequiredFields = false
   ;
 
@@ -536,6 +547,24 @@ class StorageAvailability extends $pb.GeneratedMessage {
   $core.bool hasRecommendation() => $_has(4);
   @$pb.TagNumber(5)
   void clearRecommendation() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get shortfallBytes => $_getI64(5);
+  @$pb.TagNumber(6)
+  set shortfallBytes($fixnum.Int64 v) { $_setInt64(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasShortfallBytes() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearShortfallBytes() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.double get requiredToAvailableRatio => $_getN(6);
+  @$pb.TagNumber(7)
+  set requiredToAvailableRatio($core.double v) { $_setFloat(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasRequiredToAvailableRatio() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearRequiredToAvailableRatio() => clearField(7);
 }
 
 ///  ---------------------------------------------------------------------------
@@ -658,6 +687,7 @@ class StorageInfoRequest extends $pb.GeneratedMessage {
     $core.bool? includeDevice,
     $core.bool? includeApp,
     $core.bool? includeModels,
+    $core.bool? includeCache,
   }) {
     final $result = create();
     if (includeDevice != null) {
@@ -669,6 +699,9 @@ class StorageInfoRequest extends $pb.GeneratedMessage {
     if (includeModels != null) {
       $result.includeModels = includeModels;
     }
+    if (includeCache != null) {
+      $result.includeCache = includeCache;
+    }
     return $result;
   }
   StorageInfoRequest._() : super();
@@ -679,6 +712,7 @@ class StorageInfoRequest extends $pb.GeneratedMessage {
     ..aOB(1, _omitFieldNames ? '' : 'includeDevice')
     ..aOB(2, _omitFieldNames ? '' : 'includeApp')
     ..aOB(3, _omitFieldNames ? '' : 'includeModels')
+    ..aOB(4, _omitFieldNames ? '' : 'includeCache')
     ..hasRequiredFields = false
   ;
 
@@ -729,6 +763,15 @@ class StorageInfoRequest extends $pb.GeneratedMessage {
   $core.bool hasIncludeModels() => $_has(2);
   @$pb.TagNumber(3)
   void clearIncludeModels() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get includeCache => $_getBF(3);
+  @$pb.TagNumber(4)
+  set includeCache($core.bool v) { $_setBool(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasIncludeCache() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearIncludeCache() => clearField(4);
 }
 
 class StorageInfoResult extends $pb.GeneratedMessage {
@@ -736,6 +779,7 @@ class StorageInfoResult extends $pb.GeneratedMessage {
     $core.bool? success,
     StorageInfo? info,
     $core.String? errorMessage,
+    $core.Iterable<$core.String>? warnings,
   }) {
     final $result = create();
     if (success != null) {
@@ -747,6 +791,9 @@ class StorageInfoResult extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (warnings != null) {
+      $result.warnings.addAll(warnings);
+    }
     return $result;
   }
   StorageInfoResult._() : super();
@@ -757,6 +804,7 @@ class StorageInfoResult extends $pb.GeneratedMessage {
     ..aOB(1, _omitFieldNames ? '' : 'success')
     ..aOM<StorageInfo>(2, _omitFieldNames ? '' : 'info', subBuilder: StorageInfo.create)
     ..aOS(3, _omitFieldNames ? '' : 'errorMessage')
+    ..pPS(4, _omitFieldNames ? '' : 'warnings')
     ..hasRequiredFields = false
   ;
 
@@ -809,6 +857,9 @@ class StorageInfoResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(2);
   @$pb.TagNumber(3)
   void clearErrorMessage() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.List<$core.String> get warnings => $_getList(3);
 }
 
 class StorageAvailabilityRequest extends $pb.GeneratedMessage {
@@ -817,6 +868,8 @@ class StorageAvailabilityRequest extends $pb.GeneratedMessage {
     $fixnum.Int64? requiredBytes,
     $core.double? safetyMargin,
     $core.bool? includeExistingModelBytes,
+    $core.bool? includeDeletePlan,
+    $core.bool? allowCacheReclamation,
   }) {
     final $result = create();
     if (modelId != null) {
@@ -831,6 +884,12 @@ class StorageAvailabilityRequest extends $pb.GeneratedMessage {
     if (includeExistingModelBytes != null) {
       $result.includeExistingModelBytes = includeExistingModelBytes;
     }
+    if (includeDeletePlan != null) {
+      $result.includeDeletePlan = includeDeletePlan;
+    }
+    if (allowCacheReclamation != null) {
+      $result.allowCacheReclamation = allowCacheReclamation;
+    }
     return $result;
   }
   StorageAvailabilityRequest._() : super();
@@ -842,6 +901,8 @@ class StorageAvailabilityRequest extends $pb.GeneratedMessage {
     ..aInt64(2, _omitFieldNames ? '' : 'requiredBytes')
     ..a<$core.double>(3, _omitFieldNames ? '' : 'safetyMargin', $pb.PbFieldType.OD)
     ..aOB(4, _omitFieldNames ? '' : 'includeExistingModelBytes')
+    ..aOB(5, _omitFieldNames ? '' : 'includeDeletePlan')
+    ..aOB(6, _omitFieldNames ? '' : 'allowCacheReclamation')
     ..hasRequiredFields = false
   ;
 
@@ -901,6 +962,24 @@ class StorageAvailabilityRequest extends $pb.GeneratedMessage {
   $core.bool hasIncludeExistingModelBytes() => $_has(3);
   @$pb.TagNumber(4)
   void clearIncludeExistingModelBytes() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get includeDeletePlan => $_getBF(4);
+  @$pb.TagNumber(5)
+  set includeDeletePlan($core.bool v) { $_setBool(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasIncludeDeletePlan() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearIncludeDeletePlan() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get allowCacheReclamation => $_getBF(5);
+  @$pb.TagNumber(6)
+  set allowCacheReclamation($core.bool v) { $_setBool(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasAllowCacheReclamation() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAllowCacheReclamation() => clearField(6);
 }
 
 class StorageAvailabilityResult extends $pb.GeneratedMessage {
@@ -909,6 +988,7 @@ class StorageAvailabilityResult extends $pb.GeneratedMessage {
     StorageAvailability? availability,
     $core.Iterable<$core.String>? warnings,
     $core.String? errorMessage,
+    StorageDeletePlan? deletePlan,
   }) {
     final $result = create();
     if (success != null) {
@@ -923,6 +1003,9 @@ class StorageAvailabilityResult extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (deletePlan != null) {
+      $result.deletePlan = deletePlan;
+    }
     return $result;
   }
   StorageAvailabilityResult._() : super();
@@ -934,6 +1017,7 @@ class StorageAvailabilityResult extends $pb.GeneratedMessage {
     ..aOM<StorageAvailability>(2, _omitFieldNames ? '' : 'availability', subBuilder: StorageAvailability.create)
     ..pPS(3, _omitFieldNames ? '' : 'warnings')
     ..aOS(4, _omitFieldNames ? '' : 'errorMessage')
+    ..aOM<StorageDeletePlan>(5, _omitFieldNames ? '' : 'deletePlan', subBuilder: StorageDeletePlan.create)
     ..hasRequiredFields = false
   ;
 
@@ -989,6 +1073,17 @@ class StorageAvailabilityResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(3);
   @$pb.TagNumber(4)
   void clearErrorMessage() => clearField(4);
+
+  @$pb.TagNumber(5)
+  StorageDeletePlan get deletePlan => $_getN(4);
+  @$pb.TagNumber(5)
+  set deletePlan(StorageDeletePlan v) { setField(5, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasDeletePlan() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearDeletePlan() => clearField(5);
+  @$pb.TagNumber(5)
+  StorageDeletePlan ensureDeletePlan() => $_ensure(4);
 }
 
 class StorageDeletePlanRequest extends $pb.GeneratedMessage {
@@ -997,6 +1092,8 @@ class StorageDeletePlanRequest extends $pb.GeneratedMessage {
     $fixnum.Int64? requiredBytes,
     $core.bool? includeCache,
     $core.bool? oldestFirst,
+    $core.bool? allowLoadedModels,
+    $core.bool? includeDownloadPartials,
   }) {
     final $result = create();
     if (modelIds != null) {
@@ -1011,6 +1108,12 @@ class StorageDeletePlanRequest extends $pb.GeneratedMessage {
     if (oldestFirst != null) {
       $result.oldestFirst = oldestFirst;
     }
+    if (allowLoadedModels != null) {
+      $result.allowLoadedModels = allowLoadedModels;
+    }
+    if (includeDownloadPartials != null) {
+      $result.includeDownloadPartials = includeDownloadPartials;
+    }
     return $result;
   }
   StorageDeletePlanRequest._() : super();
@@ -1022,6 +1125,8 @@ class StorageDeletePlanRequest extends $pb.GeneratedMessage {
     ..aInt64(2, _omitFieldNames ? '' : 'requiredBytes')
     ..aOB(3, _omitFieldNames ? '' : 'includeCache')
     ..aOB(4, _omitFieldNames ? '' : 'oldestFirst')
+    ..aOB(5, _omitFieldNames ? '' : 'allowLoadedModels')
+    ..aOB(6, _omitFieldNames ? '' : 'includeDownloadPartials')
     ..hasRequiredFields = false
   ;
 
@@ -1075,6 +1180,24 @@ class StorageDeletePlanRequest extends $pb.GeneratedMessage {
   $core.bool hasOldestFirst() => $_has(3);
   @$pb.TagNumber(4)
   void clearOldestFirst() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get allowLoadedModels => $_getBF(4);
+  @$pb.TagNumber(5)
+  set allowLoadedModels($core.bool v) { $_setBool(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasAllowLoadedModels() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearAllowLoadedModels() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get includeDownloadPartials => $_getBF(5);
+  @$pb.TagNumber(6)
+  set includeDownloadPartials($core.bool v) { $_setBool(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasIncludeDownloadPartials() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearIncludeDownloadPartials() => clearField(6);
 }
 
 class StorageDeleteCandidate extends $pb.GeneratedMessage {
@@ -1084,6 +1207,9 @@ class StorageDeleteCandidate extends $pb.GeneratedMessage {
     $fixnum.Int64? lastUsedMs,
     $core.bool? isLoaded,
     $core.String? localPath,
+    $core.bool? requiresUnload,
+    $core.bool? requiresPlatformDelete,
+    $core.String? storageKey,
   }) {
     final $result = create();
     if (modelId != null) {
@@ -1101,6 +1227,15 @@ class StorageDeleteCandidate extends $pb.GeneratedMessage {
     if (localPath != null) {
       $result.localPath = localPath;
     }
+    if (requiresUnload != null) {
+      $result.requiresUnload = requiresUnload;
+    }
+    if (requiresPlatformDelete != null) {
+      $result.requiresPlatformDelete = requiresPlatformDelete;
+    }
+    if (storageKey != null) {
+      $result.storageKey = storageKey;
+    }
     return $result;
   }
   StorageDeleteCandidate._() : super();
@@ -1113,6 +1248,9 @@ class StorageDeleteCandidate extends $pb.GeneratedMessage {
     ..aInt64(3, _omitFieldNames ? '' : 'lastUsedMs')
     ..aOB(4, _omitFieldNames ? '' : 'isLoaded')
     ..aOS(5, _omitFieldNames ? '' : 'localPath')
+    ..aOB(6, _omitFieldNames ? '' : 'requiresUnload')
+    ..aOB(7, _omitFieldNames ? '' : 'requiresPlatformDelete')
+    ..aOS(8, _omitFieldNames ? '' : 'storageKey')
     ..hasRequiredFields = false
   ;
 
@@ -1181,6 +1319,33 @@ class StorageDeleteCandidate extends $pb.GeneratedMessage {
   $core.bool hasLocalPath() => $_has(4);
   @$pb.TagNumber(5)
   void clearLocalPath() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get requiresUnload => $_getBF(5);
+  @$pb.TagNumber(6)
+  set requiresUnload($core.bool v) { $_setBool(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasRequiresUnload() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearRequiresUnload() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get requiresPlatformDelete => $_getBF(6);
+  @$pb.TagNumber(7)
+  set requiresPlatformDelete($core.bool v) { $_setBool(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasRequiresPlatformDelete() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearRequiresPlatformDelete() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get storageKey => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set storageKey($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasStorageKey() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearStorageKey() => clearField(8);
 }
 
 class StorageDeletePlan extends $pb.GeneratedMessage {
@@ -1191,6 +1356,9 @@ class StorageDeletePlan extends $pb.GeneratedMessage {
     $core.Iterable<StorageDeleteCandidate>? candidates,
     $core.Iterable<$core.String>? warnings,
     $core.String? errorMessage,
+    $core.bool? requiresUnload,
+    $core.bool? requiresPlatformDelete,
+    $core.int? candidateCount,
   }) {
     final $result = create();
     if (canReclaimRequiredBytes != null) {
@@ -1211,6 +1379,15 @@ class StorageDeletePlan extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (requiresUnload != null) {
+      $result.requiresUnload = requiresUnload;
+    }
+    if (requiresPlatformDelete != null) {
+      $result.requiresPlatformDelete = requiresPlatformDelete;
+    }
+    if (candidateCount != null) {
+      $result.candidateCount = candidateCount;
+    }
     return $result;
   }
   StorageDeletePlan._() : super();
@@ -1224,6 +1401,9 @@ class StorageDeletePlan extends $pb.GeneratedMessage {
     ..pc<StorageDeleteCandidate>(4, _omitFieldNames ? '' : 'candidates', $pb.PbFieldType.PM, subBuilder: StorageDeleteCandidate.create)
     ..pPS(5, _omitFieldNames ? '' : 'warnings')
     ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
+    ..aOB(7, _omitFieldNames ? '' : 'requiresUnload')
+    ..aOB(8, _omitFieldNames ? '' : 'requiresPlatformDelete')
+    ..a<$core.int>(9, _omitFieldNames ? '' : 'candidateCount', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
@@ -1289,6 +1469,33 @@ class StorageDeletePlan extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(5);
   @$pb.TagNumber(6)
   void clearErrorMessage() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get requiresUnload => $_getBF(6);
+  @$pb.TagNumber(7)
+  set requiresUnload($core.bool v) { $_setBool(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasRequiresUnload() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearRequiresUnload() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get requiresPlatformDelete => $_getBF(7);
+  @$pb.TagNumber(8)
+  set requiresPlatformDelete($core.bool v) { $_setBool(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasRequiresPlatformDelete() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearRequiresPlatformDelete() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get candidateCount => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set candidateCount($core.int v) { $_setSignedInt32(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasCandidateCount() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearCandidateCount() => clearField(9);
 }
 
 class StorageDeleteRequest extends $pb.GeneratedMessage {
@@ -1298,6 +1505,9 @@ class StorageDeleteRequest extends $pb.GeneratedMessage {
     $core.bool? clearRegistryPaths,
     $core.bool? unloadIfLoaded,
     $core.bool? dryRun,
+    StorageDeletePlan? plan,
+    $core.bool? requirePlanMatch,
+    $core.bool? allowPlatformDelete,
   }) {
     final $result = create();
     if (modelIds != null) {
@@ -1315,6 +1525,15 @@ class StorageDeleteRequest extends $pb.GeneratedMessage {
     if (dryRun != null) {
       $result.dryRun = dryRun;
     }
+    if (plan != null) {
+      $result.plan = plan;
+    }
+    if (requirePlanMatch != null) {
+      $result.requirePlanMatch = requirePlanMatch;
+    }
+    if (allowPlatformDelete != null) {
+      $result.allowPlatformDelete = allowPlatformDelete;
+    }
     return $result;
   }
   StorageDeleteRequest._() : super();
@@ -1327,6 +1546,9 @@ class StorageDeleteRequest extends $pb.GeneratedMessage {
     ..aOB(3, _omitFieldNames ? '' : 'clearRegistryPaths')
     ..aOB(4, _omitFieldNames ? '' : 'unloadIfLoaded')
     ..aOB(5, _omitFieldNames ? '' : 'dryRun')
+    ..aOM<StorageDeletePlan>(6, _omitFieldNames ? '' : 'plan', subBuilder: StorageDeletePlan.create)
+    ..aOB(7, _omitFieldNames ? '' : 'requirePlanMatch')
+    ..aOB(8, _omitFieldNames ? '' : 'allowPlatformDelete')
     ..hasRequiredFields = false
   ;
 
@@ -1389,6 +1611,35 @@ class StorageDeleteRequest extends $pb.GeneratedMessage {
   $core.bool hasDryRun() => $_has(4);
   @$pb.TagNumber(5)
   void clearDryRun() => clearField(5);
+
+  @$pb.TagNumber(6)
+  StorageDeletePlan get plan => $_getN(5);
+  @$pb.TagNumber(6)
+  set plan(StorageDeletePlan v) { setField(6, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasPlan() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearPlan() => clearField(6);
+  @$pb.TagNumber(6)
+  StorageDeletePlan ensurePlan() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  $core.bool get requirePlanMatch => $_getBF(6);
+  @$pb.TagNumber(7)
+  set requirePlanMatch($core.bool v) { $_setBool(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasRequirePlanMatch() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearRequirePlanMatch() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get allowPlatformDelete => $_getBF(7);
+  @$pb.TagNumber(8)
+  set allowPlatformDelete($core.bool v) { $_setBool(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasAllowPlatformDelete() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearAllowPlatformDelete() => clearField(8);
 }
 
 class StorageDeleteResult extends $pb.GeneratedMessage {
@@ -1399,6 +1650,10 @@ class StorageDeleteResult extends $pb.GeneratedMessage {
     $core.Iterable<$core.String>? failedModelIds,
     $core.Iterable<$core.String>? warnings,
     $core.String? errorMessage,
+    $core.Iterable<$core.String>? skippedModelIds,
+    $core.bool? dryRun,
+    $core.bool? registryUpdated,
+    $core.bool? filesDeleted,
   }) {
     final $result = create();
     if (success != null) {
@@ -1419,6 +1674,18 @@ class StorageDeleteResult extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (skippedModelIds != null) {
+      $result.skippedModelIds.addAll(skippedModelIds);
+    }
+    if (dryRun != null) {
+      $result.dryRun = dryRun;
+    }
+    if (registryUpdated != null) {
+      $result.registryUpdated = registryUpdated;
+    }
+    if (filesDeleted != null) {
+      $result.filesDeleted = filesDeleted;
+    }
     return $result;
   }
   StorageDeleteResult._() : super();
@@ -1432,6 +1699,10 @@ class StorageDeleteResult extends $pb.GeneratedMessage {
     ..pPS(4, _omitFieldNames ? '' : 'failedModelIds')
     ..pPS(5, _omitFieldNames ? '' : 'warnings')
     ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
+    ..pPS(7, _omitFieldNames ? '' : 'skippedModelIds')
+    ..aOB(8, _omitFieldNames ? '' : 'dryRun')
+    ..aOB(9, _omitFieldNames ? '' : 'registryUpdated')
+    ..aOB(10, _omitFieldNames ? '' : 'filesDeleted')
     ..hasRequiredFields = false
   ;
 
@@ -1491,6 +1762,54 @@ class StorageDeleteResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(5);
   @$pb.TagNumber(6)
   void clearErrorMessage() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.List<$core.String> get skippedModelIds => $_getList(6);
+
+  @$pb.TagNumber(8)
+  $core.bool get dryRun => $_getBF(7);
+  @$pb.TagNumber(8)
+  set dryRun($core.bool v) { $_setBool(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasDryRun() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearDryRun() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.bool get registryUpdated => $_getBF(8);
+  @$pb.TagNumber(9)
+  set registryUpdated($core.bool v) { $_setBool(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasRegistryUpdated() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearRegistryUpdated() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.bool get filesDeleted => $_getBF(9);
+  @$pb.TagNumber(10)
+  set filesDeleted($core.bool v) { $_setBool(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasFilesDeleted() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearFilesDeleted() => clearField(10);
+}
+
+class StorageApi {
+  $pb.RpcClient _client;
+  StorageApi(this._client);
+
+  $async.Future<StorageInfoResult> info($pb.ClientContext? ctx, StorageInfoRequest request) =>
+    _client.invoke<StorageInfoResult>(ctx, 'Storage', 'Info', request, StorageInfoResult())
+  ;
+  $async.Future<StorageAvailabilityResult> availability($pb.ClientContext? ctx, StorageAvailabilityRequest request) =>
+    _client.invoke<StorageAvailabilityResult>(ctx, 'Storage', 'Availability', request, StorageAvailabilityResult())
+  ;
+  $async.Future<StorageDeletePlan> deletePlan($pb.ClientContext? ctx, StorageDeletePlanRequest request) =>
+    _client.invoke<StorageDeletePlan>(ctx, 'Storage', 'DeletePlan', request, StorageDeletePlan())
+  ;
+  $async.Future<StorageDeleteResult> delete($pb.ClientContext? ctx, StorageDeleteRequest request) =>
+    _client.invoke<StorageDeleteResult>(ctx, 'Storage', 'Delete', request, StorageDeleteResult())
+  ;
 }
 
 

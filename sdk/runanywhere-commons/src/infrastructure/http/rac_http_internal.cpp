@@ -7,12 +7,10 @@
  * points inherit platform-transport routing for free because their
  * underlying C functions (`rac_http_request_send`,
  * `rac_http_request_stream`, `rac_http_request_resume`) already
- * consult the `rac_http_transport_ops_t` registry before dispatching
- * to libcurl.
+ * consult the `rac_http_transport_ops_t` registry.
  *
- * The facade is deliberately thin — Stage 2 is about funnelling every
- * internal caller through a single entry point so Stage 5 can delete
- * libcurl with one atomic change. No new logic lives here.
+ * The facade is deliberately thin: no portable C++ HTTP fallback lives
+ * here, and no new HTTP execution logic is introduced here.
  */
 
 #include "rac_http_internal.h"
@@ -31,9 +29,8 @@ namespace rac {
 namespace http {
 
 rac_result_t execute(const rac_http_request_t& req, rac_http_response_t& out_resp) {
-    // The curl-backed send path in rac_http_client_curl.cpp already
-    // calls rac_internal::get_http_transport() and routes through the
-    // adapter's request_send op when one is installed — the facade
+    // The default send path already calls rac_internal::get_http_transport()
+    // and routes through the adapter's request_send op. The facade
     // doesn't need to duplicate that branch.
     rac_http_client_t* client = nullptr;
     rac_result_t rc = rac_http_client_create(&client);

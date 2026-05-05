@@ -171,6 +171,12 @@ typedef int64_t (*rac_get_total_space_fn)(void* user_data);
 
 /**
  * @brief Callback to delete a file or directory.
+ *
+ * This is a platform-adapter boundary. C++ storage planning decides what is
+ * safe to delete, but OS-governed deletion is executed only by the adapter.
+ * Proto delete requests must opt in with allow_platform_delete before this
+ * callback is invoked.
+ *
  * @param path Path to delete
  * @param recursive Non-zero to delete directory contents recursively
  * @param user_data User context
@@ -316,6 +322,11 @@ RAC_API rac_result_t rac_storage_analyzer_delete_plan_proto(
 
 /**
  * @brief Execute or dry-run a storage delete request and return StorageDeleteResult bytes.
+ *
+ * Model/file/cache safety decisions are represented in generated protos. When
+ * deleting files would require OS/sandbox participation, C++ returns skipped
+ * ids or a typed plan/result unless the request explicitly allows the platform
+ * delete adapter to run.
  */
 RAC_API rac_result_t rac_storage_analyzer_delete_proto(
     rac_storage_analyzer_handle_t handle, rac_model_registry_handle_t registry_handle,

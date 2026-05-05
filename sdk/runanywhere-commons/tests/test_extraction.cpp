@@ -12,6 +12,7 @@
 #include "test_config.h"
 
 #include "rac/infrastructure/extraction/rac_extraction.h"
+#include "rac/infrastructure/model_management/rac_model_strategy.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 
 #include <cstdio>
@@ -153,6 +154,23 @@ static std::string create_test_tar_gz(const std::string& base_dir) {
 }
 
 /**
+ * Create an uncompressed TAR archive containing test files.
+ * Returns path to the created archive, or empty string on failure.
+ */
+static std::string create_test_tar(const std::string& base_dir) {
+    std::string content_dir = base_dir + "/tarcontent";
+    compat_mkdir(content_dir.c_str());
+
+    write_file(content_dir + "/plain.txt", "Plain tar content\n");
+    write_file(content_dir + "/weights.gguf", "weights");
+
+    std::string archive_path = base_dir + "/test.tar";
+    std::string cmd = "tar cf \"" + archive_path + "\" -C \"" + base_dir + "\" tarcontent";
+    if (system(cmd.c_str()) != 0) return "";
+    return archive_path;
+}
+
+/**
  * Create a ZIP archive containing test files.
  * Returns path to the created archive, or empty string on failure.
  */
@@ -170,6 +188,17 @@ static std::string create_test_zip(const std::string& base_dir) {
     std::string cmd = "cd \"" + base_dir + "\" && zip -r \"" + archive_path + "\" zipcontent > /dev/null 2>&1";
     if (system(cmd.c_str()) != 0) return "";
     return archive_path;
+}
+
+static const rac_resolved_model_file_t* find_resolution_file(
+    const rac_model_path_resolution_t& resolution, const char* relative_path) {
+    for (size_t i = 0; i < resolution.file_count; ++i) {
+        if (resolution.files[i].relative_path &&
+            std::strcmp(resolution.files[i].relative_path, relative_path) == 0) {
+            return &resolution.files[i];
+        }
+    }
+    return nullptr;
 }
 
 // =============================================================================
@@ -241,6 +270,23 @@ static TestResult test_detect_zip() {
     rac_archive_type_t type;
     ASSERT_EQ(rac_detect_archive_type(path.c_str(), &type), RAC_TRUE,
               "ZIP magic bytes should be detected");
+    ASSERT_EQ(type, RAC_ARCHIVE_TYPE_ZIP, "Type should be RAC_ARCHIVE_TYPE_ZIP");
+
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: detect empty ZIP magic bytes
+// =============================================================================
+
+static TestResult test_detect_empty_zip() {
+    std::string path = g_test_dir + "/magic_empty_zip.bin";
+    unsigned char zip_magic[] = {0x50, 0x4B, 0x05, 0x06, 0x00, 0x00};
+    write_file(path, zip_magic, sizeof(zip_magic));
+
+    rac_archive_type_t type;
+    ASSERT_EQ(rac_detect_archive_type(path.c_str(), &type), RAC_TRUE,
+              "Empty ZIP magic bytes should be detected");
     ASSERT_EQ(type, RAC_ARCHIVE_TYPE_ZIP, "Type should be RAC_ARCHIVE_TYPE_ZIP");
 
     return TEST_PASS();
@@ -381,6 +427,43 @@ static TestResult test_extract_tar_gz() {
     ASSERT_TRUE(data_content[0] == '\x42', "data.bin content should be 0x42");
 
     // Cleanup
+    remove_dir(archive_dir);
+    remove_dir(dest_dir);
+
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: extract uncompressed TAR archive
+// =============================================================================
+
+static TestResult test_extract_plain_tar() {
+    if (!has_tar()) {
+        TestResult r;
+        r.passed = true;
+        r.details = "SKIPPED (tar not available)";
+        return r;
+    }
+
+    std::string archive_dir = create_temp_dir("tar_src");
+    std::string dest_dir = create_temp_dir("tar_dest");
+    ASSERT_TRUE(!archive_dir.empty(), "Should create archive source dir");
+    ASSERT_TRUE(!dest_dir.empty(), "Should create dest dir");
+
+    std::string archive_path = create_test_tar(archive_dir);
+    ASSERT_TRUE(!archive_path.empty(), "Should create tar archive");
+    ASSERT_TRUE(file_exists(archive_path), "Archive file should exist");
+
+    rac_extraction_result_t result = {};
+    rac_result_t rc = rac_extract_archive_native(
+        archive_path.c_str(), dest_dir.c_str(), nullptr, nullptr, nullptr, &result);
+    ASSERT_EQ(rc, RAC_SUCCESS, "Plain TAR extraction should succeed");
+    ASSERT_TRUE(result.files_extracted >= 2, "Should extract tar files");
+    ASSERT_TRUE(file_exists(dest_dir + "/tarcontent/plain.txt"),
+                "Plain TAR text file should be extracted");
+    ASSERT_TRUE(file_exists(dest_dir + "/tarcontent/weights.gguf"),
+                "Plain TAR model file should be extracted");
+
     remove_dir(archive_dir);
     remove_dir(dest_dir);
 
@@ -561,6 +644,39 @@ static TestResult test_unsupported_format() {
 }
 
 // =============================================================================
+// Test: archive type hint mismatch is rejected
+// =============================================================================
+
+static TestResult test_archive_hint_mismatch_rejected() {
+    if (!has_tar()) {
+        TestResult r;
+        r.passed = true;
+        r.details = "SKIPPED (tar not available)";
+        return r;
+    }
+
+    std::string archive_dir = create_temp_dir("hint_src");
+    std::string dest_dir = create_temp_dir("hint_dest");
+    ASSERT_TRUE(!archive_dir.empty(), "Should create archive source dir");
+    ASSERT_TRUE(!dest_dir.empty(), "Should create dest dir");
+
+    std::string archive_path = create_test_tar_gz(archive_dir);
+    ASSERT_TRUE(!archive_path.empty(), "Should create tar.gz archive");
+
+    rac_extraction_options_t opts = RAC_EXTRACTION_OPTIONS_DEFAULT;
+    opts.archive_type_hint = RAC_ARCHIVE_TYPE_ZIP;
+    rac_result_t rc = rac_extract_archive_native(
+        archive_path.c_str(), dest_dir.c_str(), &opts, nullptr, nullptr, nullptr);
+    ASSERT_EQ(rc, RAC_ERROR_UNSUPPORTED_ARCHIVE,
+              "Mismatched archive type hint should be rejected");
+
+    remove_dir(archive_dir);
+    remove_dir(dest_dir);
+
+    return TEST_PASS();
+}
+
+// =============================================================================
 // Test: resolve single-file artifact and checksum
 // =============================================================================
 
@@ -582,6 +698,25 @@ static TestResult test_resolve_single_file_with_checksum() {
                 "Primary path should point to the GGUF file");
     ASSERT_EQ(resolution.checksum_validated, RAC_TRUE, "Checksum should be validated");
     ASSERT_EQ(resolution.checksum_matched, RAC_TRUE, "Checksum should match");
+    rac_model_path_resolution_free(&resolution);
+
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: single-file artifact rejects wrong model extension
+// =============================================================================
+
+static TestResult test_resolve_single_file_wrong_format_rejected() {
+    std::string model_path = g_test_dir + "/not-a-gguf.txt";
+    ASSERT_TRUE(write_file(model_path, "abc"), "Should write non-model file");
+
+    rac_model_info_t model =
+        make_test_model("not-a-gguf", RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF);
+    rac_model_path_resolution_t resolution = {};
+    rac_result_t rc =
+        rac_model_paths_resolve_artifact(&model, model_path.c_str(), nullptr, &resolution);
+    ASSERT_EQ(rc, RAC_ERROR_NOT_FOUND, "Wrong single-file format should not resolve");
     rac_model_path_resolution_free(&resolution);
 
     return TEST_PASS();
@@ -628,6 +763,46 @@ static TestResult test_resolve_companion_files() {
 }
 
 // =============================================================================
+// Test: expected patterns mark existing files and prefer tokenizer primary companion
+// =============================================================================
+
+static TestResult test_resolve_expected_marks_required_and_prefers_tokenizer() {
+    std::string dir = create_temp_dir("resolve_required_flags");
+    ASSERT_TRUE(!dir.empty(), "Should create temp dir");
+    ASSERT_TRUE(write_file(dir + "/model.gguf", "model"), "Should write model");
+    ASSERT_TRUE(write_file(dir + "/added_tokens.json", "{}"), "Should write added tokens");
+    ASSERT_TRUE(write_file(dir + "/merges.txt", "merge"), "Should write merges");
+    ASSERT_TRUE(write_file(dir + "/tokenizer.json", "{}"), "Should write tokenizer");
+
+    const char* required[] = {"model.gguf", "tokenizer.json"};
+    rac_expected_model_files_t expected = {};
+    expected.required_patterns = required;
+    expected.required_pattern_count = 2;
+
+    rac_model_info_t model =
+        make_test_model("model", RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF);
+    model.artifact_info.kind = RAC_ARTIFACT_KIND_MULTI_FILE;
+    model.artifact_info.expected_files = &expected;
+
+    rac_model_path_resolution_t resolution = {};
+    rac_result_t rc = rac_model_paths_resolve_artifact(&model, dir.c_str(), nullptr, &resolution);
+    ASSERT_EQ(rc, RAC_SUCCESS, "Expected files should resolve");
+    ASSERT_TRUE(resolution.tokenizer_path != nullptr, "Tokenizer path should be set");
+    ASSERT_TRUE(std::string(resolution.tokenizer_path).find("tokenizer.json") !=
+                    std::string::npos,
+                "Tokenizer path should prefer tokenizer.json over sidecar token files");
+    const rac_resolved_model_file_t* tokenizer_file =
+        find_resolution_file(resolution, "tokenizer.json");
+    ASSERT_TRUE(tokenizer_file != nullptr, "Tokenizer should be in resolved file list");
+    ASSERT_EQ(tokenizer_file->is_required, RAC_TRUE,
+              "Required expected pattern should mark existing tokenizer required");
+    rac_model_path_resolution_free(&resolution);
+    remove_dir(dir);
+
+    return TEST_PASS();
+}
+
+// =============================================================================
 // Test: missing required file fails while optional file is allowed
 // =============================================================================
 
@@ -656,6 +831,92 @@ static TestResult test_resolve_missing_required_optional_allowed() {
               "Exactly one required file should be missing");
     ASSERT_TRUE(std::string(resolution.missing_required_files[0]) == "tokenizer.json",
                 "Missing required file should be tokenizer.json");
+    rac_model_path_resolution_free(&resolution);
+    remove_dir(dir);
+
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: present file descriptor marks existing companion required
+// =============================================================================
+
+static TestResult test_resolve_file_descriptor_marks_existing_required() {
+    std::string dir = create_temp_dir("resolve_descriptor_flags");
+    ASSERT_TRUE(!dir.empty(), "Should create temp dir");
+    ASSERT_TRUE(write_file(dir + "/model.gguf", "model"), "Should write model");
+    ASSERT_TRUE(write_file(dir + "/tokenizer.model", "tok"), "Should write tokenizer");
+
+    rac_model_file_descriptor_t descriptors[2] = {};
+    descriptors[0].relative_path = "model.gguf";
+    descriptors[0].destination_path = "model.gguf";
+    descriptors[0].is_required = RAC_TRUE;
+    descriptors[1].relative_path = "tokenizer.model";
+    descriptors[1].destination_path = "tokenizer.model";
+    descriptors[1].is_required = RAC_TRUE;
+
+    rac_model_info_t model =
+        make_test_model("model", RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF);
+    model.artifact_info.kind = RAC_ARTIFACT_KIND_MULTI_FILE;
+    model.artifact_info.file_descriptors = descriptors;
+    model.artifact_info.file_descriptor_count = 2;
+
+    rac_model_path_resolution_t resolution = {};
+    rac_result_t rc = rac_model_paths_resolve_artifact(&model, dir.c_str(), nullptr, &resolution);
+    ASSERT_EQ(rc, RAC_SUCCESS, "Present required descriptors should resolve");
+    const rac_resolved_model_file_t* tokenizer_file =
+        find_resolution_file(resolution, "tokenizer.model");
+    ASSERT_TRUE(tokenizer_file != nullptr, "Tokenizer descriptor should be in resolved file list");
+    ASSERT_EQ(tokenizer_file->is_required, RAC_TRUE,
+              "Descriptor should mark existing tokenizer required");
+    rac_model_path_resolution_free(&resolution);
+    remove_dir(dir);
+
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: explicit descriptor roles override filename inference
+// =============================================================================
+
+static TestResult test_resolve_file_descriptor_roles() {
+    std::string dir = create_temp_dir("resolve_descriptor_roles");
+    ASSERT_TRUE(!dir.empty(), "Should create temp dir");
+    ASSERT_TRUE(write_file(dir + "/vision.gguf", "model"), "Should write primary model");
+    ASSERT_TRUE(write_file(dir + "/projector.gguf", "projector"), "Should write projector");
+
+    rac_model_file_descriptor_t descriptors[2] = {};
+    descriptors[0].relative_path = "vision.gguf";
+    descriptors[0].destination_path = "vision.gguf";
+    descriptors[0].is_required = RAC_TRUE;
+    descriptors[0].role = RAC_MODEL_FILE_ROLE_PRIMARY_MODEL;
+    descriptors[1].relative_path = "projector.gguf";
+    descriptors[1].destination_path = "projector.gguf";
+    descriptors[1].is_required = RAC_TRUE;
+    descriptors[1].role = RAC_MODEL_FILE_ROLE_VISION_PROJECTOR;
+
+    rac_model_info_t model =
+        make_test_model("explicit-roles", RAC_FRAMEWORK_LLAMACPP, RAC_MODEL_FORMAT_GGUF);
+    model.artifact_info.kind = RAC_ARTIFACT_KIND_MULTI_FILE;
+    model.artifact_info.file_descriptors = descriptors;
+    model.artifact_info.file_descriptor_count = 2;
+
+    rac_model_path_resolution_t resolution = {};
+    rac_result_t rc = rac_model_paths_resolve_artifact(&model, dir.c_str(), nullptr, &resolution);
+    ASSERT_EQ(rc, RAC_SUCCESS, "Descriptor roles should resolve");
+    ASSERT_TRUE(resolution.primary_model_path != nullptr, "Primary path should be populated");
+    ASSERT_TRUE(std::string(resolution.primary_model_path).find("vision.gguf") !=
+                    std::string::npos,
+                "Primary role should select vision.gguf");
+    ASSERT_TRUE(resolution.mmproj_path != nullptr, "Projector path should be populated");
+    ASSERT_TRUE(std::string(resolution.mmproj_path).find("projector.gguf") !=
+                    std::string::npos,
+                "Vision projector role should select projector.gguf");
+    const rac_resolved_model_file_t* projector_file =
+        find_resolution_file(resolution, "projector.gguf");
+    ASSERT_TRUE(projector_file != nullptr, "Projector file should be in resolved file list");
+    ASSERT_EQ(projector_file->role, RAC_RESOLVED_MODEL_FILE_ROLE_VISION_PROJECTOR,
+              "Projector file should keep vision projector role");
     rac_model_path_resolution_free(&resolution);
     remove_dir(dir);
 
@@ -776,6 +1037,79 @@ static TestResult test_extract_and_resolve_archive() {
     rac_model_extraction_result_free(&result);
     remove_dir(archive_dir);
     remove_dir(dest_dir);
+
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: default model strategy post-process extracts and resolves archive
+// =============================================================================
+
+static TestResult test_model_strategy_default_post_process_archive() {
+    if (!has_tar()) {
+        TestResult r;
+        r.passed = true;
+        r.details = "SKIPPED (tar not available)";
+        return r;
+    }
+
+    std::string archive_dir = create_temp_dir("strategy_archive_src");
+    std::string content_dir = archive_dir + "/strategy-bundle";
+    compat_mkdir(content_dir.c_str());
+    ASSERT_TRUE(write_file(content_dir + "/strategy.gguf", "model"),
+                "Should write archive model");
+    ASSERT_TRUE(write_file(content_dir + "/tokenizer.json", "{}"),
+                "Should write tokenizer");
+
+    std::string archive_path = archive_dir + "/strategy.tar.gz";
+    std::string cmd =
+        "tar czf \"" + archive_path + "\" -C \"" + archive_dir + "\" strategy-bundle";
+    ASSERT_TRUE(system(cmd.c_str()) == 0, "Should create strategy model archive");
+
+    std::string dest_dir = create_temp_dir("strategy_archive_dest");
+    ASSERT_TRUE(!dest_dir.empty(), "Should create destination dir");
+
+    rac_model_download_config_t config = {};
+    config.model_id = "strategy";
+    config.source_url = "https://example.com/strategy.tar.gz";
+    config.destination_folder = dest_dir.c_str();
+    config.archive_type = RAC_ARCHIVE_TYPE_TAR_GZ;
+    config.expected_size = 123;
+
+    rac_download_result_t result = {};
+    rac_result_t rc = rac_model_strategy_post_process(
+        RAC_FRAMEWORK_LLAMACPP, &config, archive_path.c_str(), &result);
+    ASSERT_EQ(rc, RAC_SUCCESS, "Default strategy should extract and resolve archive");
+    ASSERT_EQ(result.was_extracted, RAC_TRUE, "Default strategy should report extraction");
+    ASSERT_EQ(result.downloaded_size, static_cast<int64_t>(123),
+              "Downloaded size should propagate from config");
+    ASSERT_TRUE(result.final_path != nullptr, "Final path should be set");
+    ASSERT_TRUE(std::string(result.final_path).find("strategy.gguf") != std::string::npos,
+                "Final path should point to resolved GGUF");
+    rac_download_result_free(&result);
+    remove_dir(archive_dir);
+    remove_dir(dest_dir);
+
+    return TEST_PASS();
+}
+
+// =============================================================================
+// Test: default model strategy find_path uses canonical resolver
+// =============================================================================
+
+static TestResult test_model_strategy_default_find_path() {
+    std::string dir = create_temp_dir("strategy_find");
+    ASSERT_TRUE(!dir.empty(), "Should create temp dir");
+    ASSERT_TRUE(write_file(dir + "/other.gguf", "other"), "Should write fallback model");
+    ASSERT_TRUE(write_file(dir + "/strategy.gguf", "model"), "Should write preferred model");
+
+    char out_path[1024];
+    rac_result_t rc = rac_model_strategy_find_path(
+        RAC_FRAMEWORK_LLAMACPP, "strategy", dir.c_str(), out_path, sizeof(out_path));
+    ASSERT_EQ(rc, RAC_SUCCESS, "Default strategy should resolve model path");
+    ASSERT_TRUE(std::string(out_path).find("strategy.gguf") != std::string::npos,
+                "Default strategy should prefer model_id filename");
+    remove_dir(dir);
 
     return TEST_PASS();
 }
@@ -1042,6 +1376,7 @@ int main(int argc, char** argv) {
     suite.add("detect_null", test_detect_null);
     suite.add("detect_nonexistent", test_detect_nonexistent);
     suite.add("detect_zip", test_detect_zip);
+    suite.add("detect_empty_zip", test_detect_empty_zip);
     suite.add("detect_gzip", test_detect_gzip);
     suite.add("detect_bzip2", test_detect_bzip2);
     suite.add("detect_xz", test_detect_xz);
@@ -1056,14 +1391,26 @@ int main(int argc, char** argv) {
 
     // Extraction
     suite.add("extract_tar_gz", test_extract_tar_gz);
+    suite.add("extract_plain_tar", test_extract_plain_tar);
     suite.add("extract_zip", test_extract_zip);
+    suite.add("archive_hint_mismatch_rejected", test_archive_hint_mismatch_rejected);
     suite.add("resolve_single_file_with_checksum", test_resolve_single_file_with_checksum);
+    suite.add("resolve_single_file_wrong_format_rejected",
+              test_resolve_single_file_wrong_format_rejected);
     suite.add("resolve_companion_files", test_resolve_companion_files);
+    suite.add("resolve_expected_marks_required_and_prefers_tokenizer",
+              test_resolve_expected_marks_required_and_prefers_tokenizer);
     suite.add("resolve_missing_required_optional_allowed",
               test_resolve_missing_required_optional_allowed);
+    suite.add("resolve_file_descriptor_marks_existing_required",
+              test_resolve_file_descriptor_marks_existing_required);
+    suite.add("resolve_file_descriptor_roles", test_resolve_file_descriptor_roles);
     suite.add("resolve_file_descriptor_required", test_resolve_file_descriptor_required);
     suite.add("resolve_checksum_mismatch", test_resolve_checksum_mismatch);
     suite.add("extract_and_resolve_archive", test_extract_and_resolve_archive);
+    suite.add("model_strategy_default_post_process_archive",
+              test_model_strategy_default_post_process_archive);
+    suite.add("model_strategy_default_find_path", test_model_strategy_default_find_path);
     suite.add("progress_callback", test_progress_callback_invoked);
     suite.add("extraction_result_stats", test_extraction_result_stats);
     suite.add("creates_dest_dir", test_creates_dest_dir);

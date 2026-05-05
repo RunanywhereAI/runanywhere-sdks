@@ -127,7 +127,7 @@ public class SystemFoundationModelsService {
     }
     #endif
 
-    public func generate(prompt: String, options: LLMGenerationOptions) async throws -> String {
+    public func generate(prompt: String, options: RALLMGenerationOptions) async throws -> String {
         guard isReady else {
             throw SDKException.llm(.notInitialized, "Foundation Models service not initialized")
         }
@@ -172,7 +172,7 @@ public class SystemFoundationModelsService {
 
     public func streamGenerate(
         prompt: String,
-        options: LLMGenerationOptions,
+        options: RALLMGenerationOptions,
         onToken: @escaping (String) -> Void
     ) async throws {
         guard isReady else {

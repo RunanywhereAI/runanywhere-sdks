@@ -73,7 +73,9 @@ inline constexpr VoiceSessionError::Impl_::Impl_(
         failed_component_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
-        code_{static_cast< ::runanywhere::v1::VoiceSessionErrorCode >(0)} {}
+        code_{static_cast< ::runanywhere::v1::VoiceSessionErrorCode >(0)},
+        c_abi_code_{0},
+        recoverable_{false} {}
 
 template <typename>
 constexpr VoiceSessionError::VoiceSessionError(::_pbi::ConstantInitialized)
@@ -94,17 +96,39 @@ struct VoiceSessionErrorDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 VoiceSessionErrorDefaultTypeInternal _VoiceSessionError_default_instance_;
+template <typename>
+constexpr VoiceEvent_MetadataEntry_DoNotUse::VoiceEvent_MetadataEntry_DoNotUse(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : VoiceEvent_MetadataEntry_DoNotUse::MapEntry(VoiceEvent_MetadataEntry_DoNotUse_class_data_.base()){}
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : VoiceEvent_MetadataEntry_DoNotUse::MapEntry() {
+}
+#endif  // PROTOBUF_CUSTOM_VTABLE
+struct VoiceEvent_MetadataEntry_DoNotUseDefaultTypeInternal {
+  constexpr VoiceEvent_MetadataEntry_DoNotUseDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~VoiceEvent_MetadataEntry_DoNotUseDefaultTypeInternal() {}
+  union {
+    VoiceEvent_MetadataEntry_DoNotUse _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 VoiceEvent_MetadataEntry_DoNotUseDefaultTypeInternal _VoiceEvent_MetadataEntry_DoNotUse_default_instance_;
 
 inline constexpr VoiceAgentComponentStates::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
+        error_message_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
         stt_state_{static_cast< ::runanywhere::v1::ComponentLoadState >(0)},
         llm_state_{static_cast< ::runanywhere::v1::ComponentLoadState >(0)},
         tts_state_{static_cast< ::runanywhere::v1::ComponentLoadState >(0)},
         vad_state_{static_cast< ::runanywhere::v1::ComponentLoadState >(0)},
         ready_{false},
-        any_loading_{false} {}
+        any_loading_{false},
+        wakeword_state_{static_cast< ::runanywhere::v1::ComponentLoadState >(0)} {}
 
 template <typename>
 constexpr VoiceAgentComponentStates::VoiceAgentComponentStates(::_pbi::ConstantInitialized)
@@ -165,10 +189,14 @@ inline constexpr UserSaidEvent::Impl_::Impl_(
         text_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
+        language_code_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
         is_final_{false},
         confidence_{0},
         audio_start_us_{::int64_t{0}},
-        audio_end_us_{::int64_t{0}} {}
+        audio_end_us_{::int64_t{0}},
+        segment_index_{0} {}
 
 template <typename>
 constexpr UserSaidEvent::UserSaidEvent(::_pbi::ConstantInitialized)
@@ -209,6 +237,8 @@ inline constexpr TurnLifecycleEvent::Impl_::Impl_(
         error_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
+        started_at_ms_{::int64_t{0}},
+        completed_at_ms_{::int64_t{0}},
         kind_{static_cast< ::runanywhere::v1::TurnLifecycleEventKind >(0)} {}
 
 template <typename>
@@ -291,14 +321,27 @@ struct SpeechTurnDetectionEventDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 SpeechTurnDetectionEventDefaultTypeInternal _SpeechTurnDetectionEvent_default_instance_;
+
+inline constexpr SessionStoppedEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        session_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        reason_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()) {}
+
 template <typename>
 constexpr SessionStoppedEvent::SessionStoppedEvent(::_pbi::ConstantInitialized)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(SessionStoppedEvent_class_data_.base()){}
+    : ::google::protobuf::Message(SessionStoppedEvent_class_data_.base()),
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase() {
-}
+    : ::google::protobuf::Message(),
 #endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
 struct SessionStoppedEventDefaultTypeInternal {
   constexpr SessionStoppedEventDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
   ~SessionStoppedEventDefaultTypeInternal() {}
@@ -309,14 +352,24 @@ struct SessionStoppedEventDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 SessionStoppedEventDefaultTypeInternal _SessionStoppedEvent_default_instance_;
+
+inline constexpr SessionStartedEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        session_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()) {}
+
 template <typename>
 constexpr SessionStartedEvent::SessionStartedEvent(::_pbi::ConstantInitialized)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(SessionStartedEvent_class_data_.base()){}
+    : ::google::protobuf::Message(SessionStartedEvent_class_data_.base()),
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase() {
-}
+    : ::google::protobuf::Message(),
 #endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
 struct SessionStartedEventDefaultTypeInternal {
   constexpr SessionStartedEventDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
   ~SessionStartedEventDefaultTypeInternal() {}
@@ -339,6 +392,10 @@ inline constexpr MetricsEvent::Impl_::Impl_(
         tokens_generated_{::int64_t{0}},
         audio_samples_played_{::int64_t{0}},
         created_at_ns_{::int64_t{0}},
+        vad_first_speech_ms_{0},
+        stt_first_partial_ms_{0},
+        llm_total_ms_{0},
+        tts_total_ms_{0},
         is_over_budget_{false} {}
 
 template <typename>
@@ -400,6 +457,12 @@ inline constexpr ErrorEvent::Impl_::Impl_(
         component_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
+        operation_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        details_json_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
         code_{0},
         is_recoverable_{false} {}
 
@@ -423,6 +486,68 @@ struct ErrorEventDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ErrorEventDefaultTypeInternal _ErrorEvent_default_instance_;
 
+inline constexpr ComponentProgressEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        operation_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        message_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        component_{static_cast< ::runanywhere::v1::VoicePipelineComponent >(0)},
+        progress_{0} {}
+
+template <typename>
+constexpr ComponentProgressEvent::ComponentProgressEvent(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(ComponentProgressEvent_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct ComponentProgressEventDefaultTypeInternal {
+  constexpr ComponentProgressEventDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~ComponentProgressEventDefaultTypeInternal() {}
+  union {
+    ComponentProgressEvent _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ComponentProgressEventDefaultTypeInternal _ComponentProgressEvent_default_instance_;
+
+inline constexpr AudioLevelEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        rms_{0},
+        peak_{0},
+        noise_floor_db_{0},
+        is_speech_{false} {}
+
+template <typename>
+constexpr AudioLevelEvent::AudioLevelEvent(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(AudioLevelEvent_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct AudioLevelEventDefaultTypeInternal {
+  constexpr AudioLevelEventDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~AudioLevelEventDefaultTypeInternal() {}
+  union {
+    AudioLevelEvent _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 AudioLevelEventDefaultTypeInternal _AudioLevelEvent_default_instance_;
+
 inline constexpr AudioFrameEvent::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
@@ -433,7 +558,9 @@ inline constexpr AudioFrameEvent::Impl_::Impl_(
         sample_rate_hz_{0},
         channels_{0},
         encoding_{static_cast< ::runanywhere::v1::AudioEncoding >(0)},
-        is_final_{false} {}
+        is_final_{false},
+        duration_ms_{::int64_t{0}},
+        chunk_index_{0} {}
 
 template <typename>
 constexpr AudioFrameEvent::AudioFrameEvent(::_pbi::ConstantInitialized)
@@ -462,8 +589,13 @@ inline constexpr AssistantTokenEvent::Impl_::Impl_(
         text_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
+        finish_reason_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
         is_final_{false},
-        kind_{static_cast< ::runanywhere::v1::TokenKind >(0)} {}
+        kind_{static_cast< ::runanywhere::v1::TokenKind >(0)},
+        token_id_{0u},
+        logprob_{0} {}
 
 template <typename>
 constexpr AssistantTokenEvent::AssistantTokenEvent(::_pbi::ConstantInitialized)
@@ -484,14 +616,24 @@ struct AssistantTokenEventDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 AssistantTokenEventDefaultTypeInternal _AssistantTokenEvent_default_instance_;
+
+inline constexpr AgentResponseStartedEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        turn_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()) {}
+
 template <typename>
 constexpr AgentResponseStartedEvent::AgentResponseStartedEvent(::_pbi::ConstantInitialized)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(AgentResponseStartedEvent_class_data_.base()){}
+    : ::google::protobuf::Message(AgentResponseStartedEvent_class_data_.base()),
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase() {
-}
+    : ::google::protobuf::Message(),
 #endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
 struct AgentResponseStartedEventDefaultTypeInternal {
   constexpr AgentResponseStartedEventDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
   ~AgentResponseStartedEventDefaultTypeInternal() {}
@@ -502,14 +644,25 @@ struct AgentResponseStartedEventDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 AgentResponseStartedEventDefaultTypeInternal _AgentResponseStartedEvent_default_instance_;
+
+inline constexpr AgentResponseCompletedEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        turn_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        response_duration_ms_{::int64_t{0}} {}
+
 template <typename>
 constexpr AgentResponseCompletedEvent::AgentResponseCompletedEvent(::_pbi::ConstantInitialized)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(AgentResponseCompletedEvent_class_data_.base()){}
+    : ::google::protobuf::Message(AgentResponseCompletedEvent_class_data_.base()),
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase() {
-}
+    : ::google::protobuf::Message(),
 #endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
 struct AgentResponseCompletedEventDefaultTypeInternal {
   constexpr AgentResponseCompletedEventDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
   ~AgentResponseCompletedEventDefaultTypeInternal() {}
@@ -525,11 +678,29 @@ inline constexpr VoiceEvent::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
       : _cached_size_{0},
+        session_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        turn_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        request_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
         seq_{::uint64_t{0u}},
         timestamp_us_{::int64_t{0}},
         category_{static_cast< ::runanywhere::v1::VoiceEventCategory >(0)},
         severity_{static_cast< ::runanywhere::v1::VoiceEventSeverity >(0)},
         component_{static_cast< ::runanywhere::v1::VoicePipelineComponent >(0)},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
+        metadata_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::VoiceEvent,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_.metadata_)>()
+        }
+        #else
+        metadata_ {}
+        #endif
+        ,
         payload_{},
         _oneof_case_{} {}
 
@@ -561,10 +732,17 @@ static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULL
 const ::uint32_t
     TableStruct_voice_5fevents_2eproto::offsets[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
         protodesc_cold) = {
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent_MetadataEntry_DoNotUse, _impl_._has_bits_),
+        5, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent_MetadataEntry_DoNotUse, _impl_.key_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent_MetadataEntry_DoNotUse, _impl_.value_),
+        0,
+        1,
         0x085, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_._has_bits_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_._oneof_case_[0]),
-        27, // hasbit index offset
+        33, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_.seq_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_.timestamp_us_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_.category_),
@@ -588,63 +766,89 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_.payload_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_.payload_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_.payload_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_.payload_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_.session_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_.turn_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_.request_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_.metadata_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_.payload_),
+        3,
+        4,
+        5,
+        6,
+        7,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
+        ~0u,
         0,
         1,
         2,
-        3,
-        4,
-        ~0u,
-        ~0u,
-        ~0u,
-        ~0u,
-        ~0u,
-        ~0u,
-        ~0u,
-        ~0u,
-        ~0u,
-        ~0u,
-        ~0u,
-        ~0u,
-        ~0u,
-        ~0u,
-        ~0u,
-        ~0u,
-        ~0u,
+        8,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::UserSaidEvent, _impl_._has_bits_),
-        8, // hasbit index offset
+        10, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::UserSaidEvent, _impl_.text_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::UserSaidEvent, _impl_.is_final_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::UserSaidEvent, _impl_.confidence_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::UserSaidEvent, _impl_.audio_start_us_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::UserSaidEvent, _impl_.audio_end_us_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::UserSaidEvent, _impl_.language_code_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::UserSaidEvent, _impl_.segment_index_),
         0,
-        1,
         2,
         3,
         4,
+        5,
+        1,
+        6,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AssistantTokenEvent, _impl_._has_bits_),
-        6, // hasbit index offset
+        9, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AssistantTokenEvent, _impl_.text_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AssistantTokenEvent, _impl_.is_final_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AssistantTokenEvent, _impl_.kind_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AssistantTokenEvent, _impl_.token_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AssistantTokenEvent, _impl_.logprob_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AssistantTokenEvent, _impl_.finish_reason_),
         0,
-        1,
         2,
+        3,
+        4,
+        5,
+        1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AudioFrameEvent, _impl_._has_bits_),
-        8, // hasbit index offset
+        10, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AudioFrameEvent, _impl_.pcm_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AudioFrameEvent, _impl_.sample_rate_hz_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AudioFrameEvent, _impl_.channels_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AudioFrameEvent, _impl_.encoding_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AudioFrameEvent, _impl_.is_final_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AudioFrameEvent, _impl_.chunk_index_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AudioFrameEvent, _impl_.duration_ms_),
         0,
         1,
         2,
         3,
         4,
+        6,
+        5,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VADEvent, _impl_._has_bits_),
         10, // hasbit index offset
@@ -678,18 +882,22 @@ const ::uint32_t
         1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ErrorEvent, _impl_._has_bits_),
-        7, // hasbit index offset
+        9, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ErrorEvent, _impl_.code_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ErrorEvent, _impl_.message_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ErrorEvent, _impl_.component_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ErrorEvent, _impl_.is_recoverable_),
-        2,
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ErrorEvent, _impl_.operation_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ErrorEvent, _impl_.details_json_),
+        4,
         0,
         1,
+        5,
+        2,
         3,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_._has_bits_),
-        11, // hasbit index offset
+        15, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.stt_final_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.llm_first_token_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.tts_first_audio_ms_),
@@ -698,42 +906,100 @@ const ::uint32_t
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.audio_samples_played_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.is_over_budget_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.created_at_ns_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.vad_first_speech_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.stt_first_partial_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.llm_total_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::MetricsEvent, _impl_.tts_total_ms_),
         0,
         1,
         2,
         3,
         4,
         5,
-        7,
+        11,
         6,
+        7,
+        8,
+        9,
+        10,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AudioLevelEvent, _impl_._has_bits_),
+        7, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AudioLevelEvent, _impl_.rms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AudioLevelEvent, _impl_.peak_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AudioLevelEvent, _impl_.noise_floor_db_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AudioLevelEvent, _impl_.is_speech_),
+        0,
+        1,
+        2,
+        3,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentProgressEvent, _impl_._has_bits_),
+        7, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentProgressEvent, _impl_.component_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentProgressEvent, _impl_.operation_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentProgressEvent, _impl_.progress_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ComponentProgressEvent, _impl_.message_),
+        2,
+        0,
+        3,
+        1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceAgentComponentStates, _impl_._has_bits_),
-        9, // hasbit index offset
+        11, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceAgentComponentStates, _impl_.stt_state_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceAgentComponentStates, _impl_.llm_state_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceAgentComponentStates, _impl_.tts_state_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceAgentComponentStates, _impl_.vad_state_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceAgentComponentStates, _impl_.ready_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceAgentComponentStates, _impl_.any_loading_),
-        0,
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceAgentComponentStates, _impl_.wakeword_state_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceAgentComponentStates, _impl_.error_message_),
         1,
         2,
         3,
         4,
         5,
+        6,
+        7,
+        0,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceSessionError, _impl_._has_bits_),
-        6, // hasbit index offset
+        8, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceSessionError, _impl_.code_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceSessionError, _impl_.message_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceSessionError, _impl_.failed_component_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceSessionError, _impl_.c_abi_code_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceSessionError, _impl_.recoverable_),
         2,
         0,
         1,
-        0x000, // bitmap
-        0x000, // bitmap
-        0x000, // bitmap
-        0x000, // bitmap
+        3,
+        4,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SessionStartedEvent, _impl_._has_bits_),
+        4, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SessionStartedEvent, _impl_.session_id_),
+        0,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SessionStoppedEvent, _impl_._has_bits_),
+        5, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SessionStoppedEvent, _impl_.session_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SessionStoppedEvent, _impl_.reason_),
+        0,
+        1,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AgentResponseStartedEvent, _impl_._has_bits_),
+        4, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AgentResponseStartedEvent, _impl_.turn_id_),
+        0,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AgentResponseCompletedEvent, _impl_._has_bits_),
+        5, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AgentResponseCompletedEvent, _impl_.turn_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::AgentResponseCompletedEvent, _impl_.response_duration_ms_),
+        0,
+        1,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::SpeechTurnDetectionEvent, _impl_._has_bits_),
         10, // hasbit index offset
@@ -753,19 +1019,23 @@ const ::uint32_t
         6,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TurnLifecycleEvent, _impl_._has_bits_),
-        9, // hasbit index offset
+        11, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TurnLifecycleEvent, _impl_.kind_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TurnLifecycleEvent, _impl_.turn_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TurnLifecycleEvent, _impl_.session_id_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TurnLifecycleEvent, _impl_.transcript_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TurnLifecycleEvent, _impl_.response_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TurnLifecycleEvent, _impl_.error_),
-        5,
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TurnLifecycleEvent, _impl_.started_at_ms_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::TurnLifecycleEvent, _impl_.completed_at_ms_),
+        7,
         0,
         1,
         2,
         3,
         4,
+        5,
+        6,
         0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::WakeWordDetectedEvent, _impl_._has_bits_),
         9, // hasbit index offset
@@ -785,26 +1055,30 @@ const ::uint32_t
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
-        {0, sizeof(::runanywhere::v1::VoiceEvent)},
-        {49, sizeof(::runanywhere::v1::UserSaidEvent)},
-        {62, sizeof(::runanywhere::v1::AssistantTokenEvent)},
-        {71, sizeof(::runanywhere::v1::AudioFrameEvent)},
-        {84, sizeof(::runanywhere::v1::VADEvent)},
-        {101, sizeof(::runanywhere::v1::InterruptedEvent)},
-        {108, sizeof(::runanywhere::v1::StateChangeEvent)},
-        {115, sizeof(::runanywhere::v1::ErrorEvent)},
-        {126, sizeof(::runanywhere::v1::MetricsEvent)},
-        {145, sizeof(::runanywhere::v1::VoiceAgentComponentStates)},
-        {160, sizeof(::runanywhere::v1::VoiceSessionError)},
-        {169, sizeof(::runanywhere::v1::SessionStartedEvent)},
-        {170, sizeof(::runanywhere::v1::SessionStoppedEvent)},
-        {171, sizeof(::runanywhere::v1::AgentResponseStartedEvent)},
-        {172, sizeof(::runanywhere::v1::AgentResponseCompletedEvent)},
-        {173, sizeof(::runanywhere::v1::SpeechTurnDetectionEvent)},
-        {190, sizeof(::runanywhere::v1::TurnLifecycleEvent)},
-        {205, sizeof(::runanywhere::v1::WakeWordDetectedEvent)},
+        {0, sizeof(::runanywhere::v1::VoiceEvent_MetadataEntry_DoNotUse)},
+        {7, sizeof(::runanywhere::v1::VoiceEvent)},
+        {68, sizeof(::runanywhere::v1::UserSaidEvent)},
+        {85, sizeof(::runanywhere::v1::AssistantTokenEvent)},
+        {100, sizeof(::runanywhere::v1::AudioFrameEvent)},
+        {117, sizeof(::runanywhere::v1::VADEvent)},
+        {134, sizeof(::runanywhere::v1::InterruptedEvent)},
+        {141, sizeof(::runanywhere::v1::StateChangeEvent)},
+        {148, sizeof(::runanywhere::v1::ErrorEvent)},
+        {163, sizeof(::runanywhere::v1::MetricsEvent)},
+        {190, sizeof(::runanywhere::v1::AudioLevelEvent)},
+        {201, sizeof(::runanywhere::v1::ComponentProgressEvent)},
+        {212, sizeof(::runanywhere::v1::VoiceAgentComponentStates)},
+        {231, sizeof(::runanywhere::v1::VoiceSessionError)},
+        {244, sizeof(::runanywhere::v1::SessionStartedEvent)},
+        {249, sizeof(::runanywhere::v1::SessionStoppedEvent)},
+        {256, sizeof(::runanywhere::v1::AgentResponseStartedEvent)},
+        {261, sizeof(::runanywhere::v1::AgentResponseCompletedEvent)},
+        {268, sizeof(::runanywhere::v1::SpeechTurnDetectionEvent)},
+        {285, sizeof(::runanywhere::v1::TurnLifecycleEvent)},
+        {304, sizeof(::runanywhere::v1::WakeWordDetectedEvent)},
 };
 static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
+    &::runanywhere::v1::_VoiceEvent_MetadataEntry_DoNotUse_default_instance_._instance,
     &::runanywhere::v1::_VoiceEvent_default_instance_._instance,
     &::runanywhere::v1::_UserSaidEvent_default_instance_._instance,
     &::runanywhere::v1::_AssistantTokenEvent_default_instance_._instance,
@@ -814,6 +1088,8 @@ static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::runanywhere::v1::_StateChangeEvent_default_instance_._instance,
     &::runanywhere::v1::_ErrorEvent_default_instance_._instance,
     &::runanywhere::v1::_MetricsEvent_default_instance_._instance,
+    &::runanywhere::v1::_AudioLevelEvent_default_instance_._instance,
+    &::runanywhere::v1::_ComponentProgressEvent_default_instance_._instance,
     &::runanywhere::v1::_VoiceAgentComponentStates_default_instance_._instance,
     &::runanywhere::v1::_VoiceSessionError_default_instance_._instance,
     &::runanywhere::v1::_SessionStartedEvent_default_instance_._instance,
@@ -826,7 +1102,7 @@ static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
 };
 const char descriptor_table_protodef_voice_5fevents_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\022voice_events.proto\022\016runanywhere.v1\"\357\t\n"
+    "\n\022voice_events.proto\022\016runanywhere.v1\"\223\014\n"
     "\nVoiceEvent\022\013\n\003seq\030\001 \001(\004\022\024\n\014timestamp_us"
     "\030\002 \001(\003\0224\n\010category\030\003 \001(\0162\".runanywhere.v"
     "1.VoiceEventCategory\0224\n\010severity\030\004 \001(\0162\""
@@ -858,16 +1134,27 @@ const char descriptor_table_protodef_voice_5fevents_2eproto[] ABSL_ATTRIBUTE_SEC
     "\000\022<\n\016turn_lifecycle\030\031 \001(\0132\".runanywhere."
     "v1.TurnLifecycleEventH\000\022B\n\021wakeword_dete"
     "cted\030\032 \001(\0132%.runanywhere.v1.WakeWordDete"
-    "ctedEventH\000B\t\n\007payload\"q\n\rUserSaidEvent\022"
-    "\014\n\004text\030\001 \001(\t\022\020\n\010is_final\030\002 \001(\010\022\022\n\nconfi"
-    "dence\030\003 \001(\002\022\026\n\016audio_start_us\030\004 \001(\003\022\024\n\014a"
-    "udio_end_us\030\005 \001(\003\"^\n\023AssistantTokenEvent"
-    "\022\014\n\004text\030\001 \001(\t\022\020\n\010is_final\030\002 \001(\010\022\'\n\004kind"
-    "\030\003 \001(\0162\031.runanywhere.v1.TokenKind\"\213\001\n\017Au"
-    "dioFrameEvent\022\013\n\003pcm\030\001 \001(\014\022\026\n\016sample_rat"
-    "e_hz\030\002 \001(\005\022\020\n\010channels\030\003 \001(\005\022/\n\010encoding"
-    "\030\004 \001(\0162\035.runanywhere.v1.AudioEncoding\022\020\n"
-    "\010is_final\030\005 \001(\010\"\307\001\n\010VADEvent\022*\n\004type\030\001 \001"
+    "ctedEventH\000\0226\n\013audio_level\030\033 \001(\0132\037.runan"
+    "ywhere.v1.AudioLevelEventH\000\022D\n\022component"
+    "_progress\030\034 \001(\0132&.runanywhere.v1.Compone"
+    "ntProgressEventH\000\022\022\n\nsession_id\030\036 \001(\t\022\017\n"
+    "\007turn_id\030\037 \001(\t\022\022\n\nrequest_id\030  \001(\t\022:\n\010me"
+    "tadata\030! \003(\0132(.runanywhere.v1.VoiceEvent"
+    ".MetadataEntry\032/\n\rMetadataEntry\022\013\n\003key\030\001"
+    " \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001B\t\n\007payload\"\237\001\n\rU"
+    "serSaidEvent\022\014\n\004text\030\001 \001(\t\022\020\n\010is_final\030\002"
+    " \001(\010\022\022\n\nconfidence\030\003 \001(\002\022\026\n\016audio_start_"
+    "us\030\004 \001(\003\022\024\n\014audio_end_us\030\005 \001(\003\022\025\n\rlangua"
+    "ge_code\030\006 \001(\t\022\025\n\rsegment_index\030\007 \001(\005\"\230\001\n"
+    "\023AssistantTokenEvent\022\014\n\004text\030\001 \001(\t\022\020\n\010is"
+    "_final\030\002 \001(\010\022\'\n\004kind\030\003 \001(\0162\031.runanywhere"
+    ".v1.TokenKind\022\020\n\010token_id\030\004 \001(\r\022\017\n\007logpr"
+    "ob\030\005 \001(\002\022\025\n\rfinish_reason\030\006 \001(\t\"\265\001\n\017Audi"
+    "oFrameEvent\022\013\n\003pcm\030\001 \001(\014\022\026\n\016sample_rate_"
+    "hz\030\002 \001(\005\022\020\n\010channels\030\003 \001(\005\022/\n\010encoding\030\004"
+    " \001(\0162\035.runanywhere.v1.AudioEncoding\022\020\n\010i"
+    "s_final\030\005 \001(\010\022\023\n\013chunk_index\030\006 \001(\005\022\023\n\013du"
+    "ration_ms\030\007 \001(\003\"\307\001\n\010VADEvent\022*\n\004type\030\001 \001"
     "(\0162\034.runanywhere.v1.VADEventType\022\027\n\017fram"
     "e_offset_us\030\002 \001(\003\022\022\n\nconfidence\030\003 \001(\002\022\021\n"
     "\tis_speech\030\004 \001(\010\022\032\n\022speech_duration_ms\030\005"
@@ -877,137 +1164,154 @@ const char descriptor_table_protodef_voice_5fevents_2eproto[] ABSL_ATTRIBUTE_SEC
     "Reason\022\016\n\006detail\030\002 \001(\t\"s\n\020StateChangeEve"
     "nt\022/\n\010previous\030\001 \001(\0162\035.runanywhere.v1.Pi"
     "pelineState\022.\n\007current\030\002 \001(\0162\035.runanywhe"
-    "re.v1.PipelineState\"V\n\nErrorEvent\022\014\n\004cod"
+    "re.v1.PipelineState\"\177\n\nErrorEvent\022\014\n\004cod"
     "e\030\001 \001(\005\022\017\n\007message\030\002 \001(\t\022\021\n\tcomponent\030\003 "
-    "\001(\t\022\026\n\016is_recoverable\030\004 \001(\010\"\332\001\n\014MetricsE"
-    "vent\022\024\n\014stt_final_ms\030\001 \001(\001\022\032\n\022llm_first_"
-    "token_ms\030\002 \001(\001\022\032\n\022tts_first_audio_ms\030\003 \001"
-    "(\001\022\025\n\rend_to_end_ms\030\004 \001(\001\022\030\n\020tokens_gene"
-    "rated\030\005 \001(\003\022\034\n\024audio_samples_played\030\006 \001("
-    "\003\022\026\n\016is_over_budget\030\007 \001(\010\022\025\n\rcreated_at_"
-    "ns\030\010 \001(\003\"\233\002\n\031VoiceAgentComponentStates\0225"
-    "\n\tstt_state\030\001 \001(\0162\".runanywhere.v1.Compo"
-    "nentLoadState\0225\n\tllm_state\030\002 \001(\0162\".runan"
-    "ywhere.v1.ComponentLoadState\0225\n\ttts_stat"
-    "e\030\003 \001(\0162\".runanywhere.v1.ComponentLoadSt"
-    "ate\0225\n\tvad_state\030\004 \001(\0162\".runanywhere.v1."
-    "ComponentLoadState\022\r\n\005ready\030\005 \001(\010\022\023\n\013any"
-    "_loading\030\006 \001(\010\"\215\001\n\021VoiceSessionError\0223\n\004"
-    "code\030\001 \001(\0162%.runanywhere.v1.VoiceSession"
-    "ErrorCode\022\017\n\007message\030\002 \001(\t\022\035\n\020failed_com"
-    "ponent\030\003 \001(\tH\000\210\001\001B\023\n\021_failed_component\"\025"
-    "\n\023SessionStartedEvent\"\025\n\023SessionStoppedE"
-    "vent\"\033\n\031AgentResponseStartedEvent\"\035\n\033Age"
-    "ntResponseCompletedEvent\"\343\001\n\030SpeechTurnD"
+    "\001(\t\022\026\n\016is_recoverable\030\004 \001(\010\022\021\n\toperation"
+    "\030\005 \001(\t\022\024\n\014details_json\030\006 \001(\t\"\301\002\n\014Metrics"
+    "Event\022\024\n\014stt_final_ms\030\001 \001(\001\022\032\n\022llm_first"
+    "_token_ms\030\002 \001(\001\022\032\n\022tts_first_audio_ms\030\003 "
+    "\001(\001\022\025\n\rend_to_end_ms\030\004 \001(\001\022\030\n\020tokens_gen"
+    "erated\030\005 \001(\003\022\034\n\024audio_samples_played\030\006 \001"
+    "(\003\022\026\n\016is_over_budget\030\007 \001(\010\022\025\n\rcreated_at"
+    "_ns\030\010 \001(\003\022\033\n\023vad_first_speech_ms\030\t \001(\001\022\034"
+    "\n\024stt_first_partial_ms\030\n \001(\001\022\024\n\014llm_tota"
+    "l_ms\030\013 \001(\001\022\024\n\014tts_total_ms\030\014 \001(\001\"W\n\017Audi"
+    "oLevelEvent\022\013\n\003rms\030\001 \001(\002\022\014\n\004peak\030\002 \001(\002\022\026"
+    "\n\016noise_floor_db\030\003 \001(\002\022\021\n\tis_speech\030\004 \001("
+    "\010\"\211\001\n\026ComponentProgressEvent\0229\n\tcomponen"
+    "t\030\001 \001(\0162&.runanywhere.v1.VoicePipelineCo"
+    "mponent\022\021\n\toperation\030\002 \001(\t\022\020\n\010progress\030\003"
+    " \001(\002\022\017\n\007message\030\004 \001(\t\"\205\003\n\031VoiceAgentComp"
+    "onentStates\0225\n\tstt_state\030\001 \001(\0162\".runanyw"
+    "here.v1.ComponentLoadState\0225\n\tllm_state\030"
+    "\002 \001(\0162\".runanywhere.v1.ComponentLoadStat"
+    "e\0225\n\ttts_state\030\003 \001(\0162\".runanywhere.v1.Co"
+    "mponentLoadState\0225\n\tvad_state\030\004 \001(\0162\".ru"
+    "nanywhere.v1.ComponentLoadState\022\r\n\005ready"
+    "\030\005 \001(\010\022\023\n\013any_loading\030\006 \001(\010\022:\n\016wakeword_"
+    "state\030\007 \001(\0162\".runanywhere.v1.ComponentLo"
+    "adState\022\032\n\rerror_message\030\010 \001(\tH\000\210\001\001B\020\n\016_"
+    "error_message\"\266\001\n\021VoiceSessionError\0223\n\004c"
+    "ode\030\001 \001(\0162%.runanywhere.v1.VoiceSessionE"
+    "rrorCode\022\017\n\007message\030\002 \001(\t\022\035\n\020failed_comp"
+    "onent\030\003 \001(\tH\000\210\001\001\022\022\n\nc_abi_code\030\004 \001(\005\022\023\n\013"
+    "recoverable\030\005 \001(\010B\023\n\021_failed_component\")"
+    "\n\023SessionStartedEvent\022\022\n\nsession_id\030\001 \001("
+    "\t\"9\n\023SessionStoppedEvent\022\022\n\nsession_id\030\001"
+    " \001(\t\022\016\n\006reason\030\002 \001(\t\",\n\031AgentResponseSta"
+    "rtedEvent\022\017\n\007turn_id\030\001 \001(\t\"L\n\033AgentRespo"
+    "nseCompletedEvent\022\017\n\007turn_id\030\001 \001(\t\022\034\n\024re"
+    "sponse_duration_ms\030\002 \001(\003\"\343\001\n\030SpeechTurnD"
     "etectionEvent\022:\n\004kind\030\001 \001(\0162,.runanywher"
     "e.v1.SpeechTurnDetectionEventKind\022\022\n\nspe"
     "aker_id\030\002 \001(\t\022\025\n\rturn_start_us\030\003 \001(\003\022\023\n\013"
     "turn_end_us\030\004 \001(\003\022\022\n\nconfidence\030\005 \001(\002\022\032\n"
     "\022speech_duration_ms\030\006 \001(\001\022\033\n\023silence_dur"
-    "ation_ms\030\007 \001(\001\"\244\001\n\022TurnLifecycleEvent\0224\n"
+    "ation_ms\030\007 \001(\001\"\324\001\n\022TurnLifecycleEvent\0224\n"
     "\004kind\030\001 \001(\0162&.runanywhere.v1.TurnLifecyc"
     "leEventKind\022\017\n\007turn_id\030\002 \001(\t\022\022\n\nsession_"
     "id\030\003 \001(\t\022\022\n\ntranscript\030\004 \001(\t\022\020\n\010response"
-    "\030\005 \001(\t\022\r\n\005error\030\006 \001(\t\"\220\001\n\025WakeWordDetect"
-    "edEvent\022\021\n\twake_word\030\001 \001(\t\022\022\n\nconfidence"
-    "\030\002 \001(\002\022\024\n\014timestamp_ms\030\003 \001(\003\022\020\n\010model_id"
-    "\030\004 \001(\t\022\023\n\013model_index\030\005 \001(\005\022\023\n\013duration_"
-    "ms\030\006 \001(\003*\231\003\n\022VoiceEventCategory\022$\n VOICE"
-    "_EVENT_CATEGORY_UNSPECIFIED\020\000\022$\n VOICE_E"
-    "VENT_CATEGORY_VOICE_AGENT\020\001\022\034\n\030VOICE_EVE"
-    "NT_CATEGORY_STT\020\002\022\034\n\030VOICE_EVENT_CATEGOR"
-    "Y_ASR\020\003\022\034\n\030VOICE_EVENT_CATEGORY_TTS\020\004\022\034\n"
-    "\030VOICE_EVENT_CATEGORY_VAD\020\005\022\034\n\030VOICE_EVE"
-    "NT_CATEGORY_STD\020\006\022\034\n\030VOICE_EVENT_CATEGOR"
-    "Y_LLM\020\007\022\036\n\032VOICE_EVENT_CATEGORY_AUDIO\020\010\022"
-    " \n\034VOICE_EVENT_CATEGORY_METRICS\020\t\022\036\n\032VOI"
-    "CE_EVENT_CATEGORY_ERROR\020\n\022!\n\035VOICE_EVENT"
-    "_CATEGORY_WAKEWORD\020\013*\270\001\n\022VoiceEventSever"
-    "ity\022\036\n\032VOICE_EVENT_SEVERITY_DEBUG\020\000\022\035\n\031V"
-    "OICE_EVENT_SEVERITY_INFO\020\001\022 \n\034VOICE_EVEN"
-    "T_SEVERITY_WARNING\020\002\022\036\n\032VOICE_EVENT_SEVE"
-    "RITY_ERROR\020\003\022!\n\035VOICE_EVENT_SEVERITY_CRI"
-    "TICAL\020\004*\375\002\n\026VoicePipelineComponent\022(\n$VO"
-    "ICE_PIPELINE_COMPONENT_UNSPECIFIED\020\000\022\"\n\036"
-    "VOICE_PIPELINE_COMPONENT_AGENT\020\001\022 \n\034VOIC"
-    "E_PIPELINE_COMPONENT_STT\020\002\022 \n\034VOICE_PIPE"
-    "LINE_COMPONENT_ASR\020\003\022 \n\034VOICE_PIPELINE_C"
-    "OMPONENT_TTS\020\004\022 \n\034VOICE_PIPELINE_COMPONE"
-    "NT_VAD\020\005\022 \n\034VOICE_PIPELINE_COMPONENT_STD"
-    "\020\006\022 \n\034VOICE_PIPELINE_COMPONENT_LLM\020\007\022\"\n\036"
-    "VOICE_PIPELINE_COMPONENT_AUDIO\020\010\022%\n!VOIC"
-    "E_PIPELINE_COMPONENT_WAKEWORD\020\t*p\n\tToken"
-    "Kind\022\032\n\026TOKEN_KIND_UNSPECIFIED\020\000\022\025\n\021TOKE"
-    "N_KIND_ANSWER\020\001\022\026\n\022TOKEN_KIND_THOUGHT\020\002\022"
-    "\030\n\024TOKEN_KIND_TOOL_CALL\020\003*m\n\rAudioEncodi"
-    "ng\022\036\n\032AUDIO_ENCODING_UNSPECIFIED\020\000\022\035\n\031AU"
-    "DIO_ENCODING_PCM_F32_LE\020\001\022\035\n\031AUDIO_ENCOD"
-    "ING_PCM_S16_LE\020\002*\320\001\n\014VADEventType\022\031\n\025VAD"
-    "_EVENT_UNSPECIFIED\020\000\022\031\n\025VAD_EVENT_VOICE_"
-    "START\020\001\022$\n VAD_EVENT_VOICE_END_OF_UTTERA"
-    "NCE\020\002\022\026\n\022VAD_EVENT_BARGE_IN\020\003\022\025\n\021VAD_EVE"
-    "NT_SILENCE\020\004\022\030\n\024VAD_EVENT_STATISTICS\020\005\022\033"
-    "\n\027VAD_EVENT_STATE_CHANGED\020\006*\275\001\n\017Interrup"
-    "tReason\022 \n\034INTERRUPT_REASON_UNSPECIFIED\020"
-    "\000\022\"\n\036INTERRUPT_REASON_USER_BARGE_IN\020\001\022\035\n"
-    "\031INTERRUPT_REASON_APP_STOP\020\002\022\'\n#INTERRUP"
-    "T_REASON_AUDIO_ROUTE_CHANGE\020\003\022\034\n\030INTERRU"
-    "PT_REASON_TIMEOUT\020\004*\206\003\n\rPipelineState\022\036\n"
-    "\032PIPELINE_STATE_UNSPECIFIED\020\000\022\027\n\023PIPELIN"
-    "E_STATE_IDLE\020\001\022\034\n\030PIPELINE_STATE_LISTENI"
-    "NG\020\002\022\033\n\027PIPELINE_STATE_THINKING\020\003\022\033\n\027PIP"
-    "ELINE_STATE_SPEAKING\020\004\022\032\n\026PIPELINE_STATE"
-    "_STOPPED\020\005\022#\n\037PIPELINE_STATE_WAITING_WAK"
-    "EWORD\020\006\022$\n PIPELINE_STATE_PROCESSING_SPE"
-    "ECH\020\007\022&\n\"PIPELINE_STATE_GENERATING_RESPO"
-    "NSE\020\010\022\036\n\032PIPELINE_STATE_PLAYING_TTS\020\t\022\033\n"
-    "\027PIPELINE_STATE_COOLDOWN\020\n\022\030\n\024PIPELINE_S"
-    "TATE_ERROR\020\013*\302\001\n\022ComponentLoadState\022$\n C"
-    "OMPONENT_LOAD_STATE_UNSPECIFIED\020\000\022#\n\037COM"
-    "PONENT_LOAD_STATE_NOT_LOADED\020\001\022 \n\034COMPON"
-    "ENT_LOAD_STATE_LOADING\020\002\022\037\n\033COMPONENT_LO"
-    "AD_STATE_LOADED\020\003\022\036\n\032COMPONENT_LOAD_STAT"
-    "E_ERROR\020\004*\202\002\n\025VoiceSessionErrorCode\022(\n$V"
-    "OICE_SESSION_ERROR_CODE_UNSPECIFIED\020\000\0229\n"
-    "5VOICE_SESSION_ERROR_CODE_MICROPHONE_PER"
-    "MISSION_DENIED\020\001\022&\n\"VOICE_SESSION_ERROR_"
-    "CODE_NOT_READY\020\002\022,\n(VOICE_SESSION_ERROR_"
-    "CODE_ALREADY_RUNNING\020\003\022.\n*VOICE_SESSION_"
-    "ERROR_CODE_COMPONENT_FAILURE\020\004*\233\002\n\034Speec"
-    "hTurnDetectionEventKind\0220\n,SPEECH_TURN_D"
-    "ETECTION_EVENT_KIND_UNSPECIFIED\020\000\0221\n-SPE"
-    "ECH_TURN_DETECTION_EVENT_KIND_TURN_START"
-    "ED\020\001\022/\n+SPEECH_TURN_DETECTION_EVENT_KIND"
-    "_TURN_ENDED\020\002\0224\n0SPEECH_TURN_DETECTION_E"
-    "VENT_KIND_SPEAKER_CHANGED\020\003\022/\n+SPEECH_TU"
-    "RN_DETECTION_EVENT_KIND_STATISTICS\020\004*\347\003\n"
-    "\026TurnLifecycleEventKind\022)\n%TURN_LIFECYCL"
-    "E_EVENT_KIND_UNSPECIFIED\020\000\022%\n!TURN_LIFEC"
-    "YCLE_EVENT_KIND_STARTED\020\001\0221\n-TURN_LIFECY"
-    "CLE_EVENT_KIND_USER_SPEECH_STARTED\020\002\022/\n+"
-    "TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_EN"
-    "DED\020\003\0221\n-TURN_LIFECYCLE_EVENT_KIND_TRANS"
-    "CRIPTION_FINAL\020\004\0224\n0TURN_LIFECYCLE_EVENT"
-    "_KIND_AGENT_RESPONSE_STARTED\020\005\0226\n2TURN_L"
-    "IFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPL"
-    "ETED\020\006\022\'\n#TURN_LIFECYCLE_EVENT_KIND_COMP"
-    "LETED\020\007\022\'\n#TURN_LIFECYCLE_EVENT_KIND_CAN"
-    "CELLED\020\010\022$\n TURN_LIFECYCLE_EVENT_KIND_FA"
-    "ILED\020\tBM\n\027ai.runanywhere.proto.v1B\020Voice"
-    "EventsProtoP\001\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1"
-    "\272\002\002RAb\006proto3"
+    "\030\005 \001(\t\022\r\n\005error\030\006 \001(\t\022\025\n\rstarted_at_ms\030\007"
+    " \001(\003\022\027\n\017completed_at_ms\030\010 \001(\003\"\220\001\n\025WakeWo"
+    "rdDetectedEvent\022\021\n\twake_word\030\001 \001(\t\022\022\n\nco"
+    "nfidence\030\002 \001(\002\022\024\n\014timestamp_ms\030\003 \001(\003\022\020\n\010"
+    "model_id\030\004 \001(\t\022\023\n\013model_index\030\005 \001(\005\022\023\n\013d"
+    "uration_ms\030\006 \001(\003*\231\003\n\022VoiceEventCategory\022"
+    "$\n VOICE_EVENT_CATEGORY_UNSPECIFIED\020\000\022$\n"
+    " VOICE_EVENT_CATEGORY_VOICE_AGENT\020\001\022\034\n\030V"
+    "OICE_EVENT_CATEGORY_STT\020\002\022\034\n\030VOICE_EVENT"
+    "_CATEGORY_ASR\020\003\022\034\n\030VOICE_EVENT_CATEGORY_"
+    "TTS\020\004\022\034\n\030VOICE_EVENT_CATEGORY_VAD\020\005\022\034\n\030V"
+    "OICE_EVENT_CATEGORY_STD\020\006\022\034\n\030VOICE_EVENT"
+    "_CATEGORY_LLM\020\007\022\036\n\032VOICE_EVENT_CATEGORY_"
+    "AUDIO\020\010\022 \n\034VOICE_EVENT_CATEGORY_METRICS\020"
+    "\t\022\036\n\032VOICE_EVENT_CATEGORY_ERROR\020\n\022!\n\035VOI"
+    "CE_EVENT_CATEGORY_WAKEWORD\020\013*\270\001\n\022VoiceEv"
+    "entSeverity\022\036\n\032VOICE_EVENT_SEVERITY_DEBU"
+    "G\020\000\022\035\n\031VOICE_EVENT_SEVERITY_INFO\020\001\022 \n\034VO"
+    "ICE_EVENT_SEVERITY_WARNING\020\002\022\036\n\032VOICE_EV"
+    "ENT_SEVERITY_ERROR\020\003\022!\n\035VOICE_EVENT_SEVE"
+    "RITY_CRITICAL\020\004*\375\002\n\026VoicePipelineCompone"
+    "nt\022(\n$VOICE_PIPELINE_COMPONENT_UNSPECIFI"
+    "ED\020\000\022\"\n\036VOICE_PIPELINE_COMPONENT_AGENT\020\001"
+    "\022 \n\034VOICE_PIPELINE_COMPONENT_STT\020\002\022 \n\034VO"
+    "ICE_PIPELINE_COMPONENT_ASR\020\003\022 \n\034VOICE_PI"
+    "PELINE_COMPONENT_TTS\020\004\022 \n\034VOICE_PIPELINE"
+    "_COMPONENT_VAD\020\005\022 \n\034VOICE_PIPELINE_COMPO"
+    "NENT_STD\020\006\022 \n\034VOICE_PIPELINE_COMPONENT_L"
+    "LM\020\007\022\"\n\036VOICE_PIPELINE_COMPONENT_AUDIO\020\010"
+    "\022%\n!VOICE_PIPELINE_COMPONENT_WAKEWORD\020\t*"
+    "p\n\tTokenKind\022\032\n\026TOKEN_KIND_UNSPECIFIED\020\000"
+    "\022\025\n\021TOKEN_KIND_ANSWER\020\001\022\026\n\022TOKEN_KIND_TH"
+    "OUGHT\020\002\022\030\n\024TOKEN_KIND_TOOL_CALL\020\003*m\n\rAud"
+    "ioEncoding\022\036\n\032AUDIO_ENCODING_UNSPECIFIED"
+    "\020\000\022\035\n\031AUDIO_ENCODING_PCM_F32_LE\020\001\022\035\n\031AUD"
+    "IO_ENCODING_PCM_S16_LE\020\002*\320\001\n\014VADEventTyp"
+    "e\022\031\n\025VAD_EVENT_UNSPECIFIED\020\000\022\031\n\025VAD_EVEN"
+    "T_VOICE_START\020\001\022$\n VAD_EVENT_VOICE_END_O"
+    "F_UTTERANCE\020\002\022\026\n\022VAD_EVENT_BARGE_IN\020\003\022\025\n"
+    "\021VAD_EVENT_SILENCE\020\004\022\030\n\024VAD_EVENT_STATIS"
+    "TICS\020\005\022\033\n\027VAD_EVENT_STATE_CHANGED\020\006*\275\001\n\017"
+    "InterruptReason\022 \n\034INTERRUPT_REASON_UNSP"
+    "ECIFIED\020\000\022\"\n\036INTERRUPT_REASON_USER_BARGE"
+    "_IN\020\001\022\035\n\031INTERRUPT_REASON_APP_STOP\020\002\022\'\n#"
+    "INTERRUPT_REASON_AUDIO_ROUTE_CHANGE\020\003\022\034\n"
+    "\030INTERRUPT_REASON_TIMEOUT\020\004*\206\003\n\rPipeline"
+    "State\022\036\n\032PIPELINE_STATE_UNSPECIFIED\020\000\022\027\n"
+    "\023PIPELINE_STATE_IDLE\020\001\022\034\n\030PIPELINE_STATE"
+    "_LISTENING\020\002\022\033\n\027PIPELINE_STATE_THINKING\020"
+    "\003\022\033\n\027PIPELINE_STATE_SPEAKING\020\004\022\032\n\026PIPELI"
+    "NE_STATE_STOPPED\020\005\022#\n\037PIPELINE_STATE_WAI"
+    "TING_WAKEWORD\020\006\022$\n PIPELINE_STATE_PROCES"
+    "SING_SPEECH\020\007\022&\n\"PIPELINE_STATE_GENERATI"
+    "NG_RESPONSE\020\010\022\036\n\032PIPELINE_STATE_PLAYING_"
+    "TTS\020\t\022\033\n\027PIPELINE_STATE_COOLDOWN\020\n\022\030\n\024PI"
+    "PELINE_STATE_ERROR\020\013*\302\001\n\022ComponentLoadSt"
+    "ate\022$\n COMPONENT_LOAD_STATE_UNSPECIFIED\020"
+    "\000\022#\n\037COMPONENT_LOAD_STATE_NOT_LOADED\020\001\022 "
+    "\n\034COMPONENT_LOAD_STATE_LOADING\020\002\022\037\n\033COMP"
+    "ONENT_LOAD_STATE_LOADED\020\003\022\036\n\032COMPONENT_L"
+    "OAD_STATE_ERROR\020\004*\202\002\n\025VoiceSessionErrorC"
+    "ode\022(\n$VOICE_SESSION_ERROR_CODE_UNSPECIF"
+    "IED\020\000\0229\n5VOICE_SESSION_ERROR_CODE_MICROP"
+    "HONE_PERMISSION_DENIED\020\001\022&\n\"VOICE_SESSIO"
+    "N_ERROR_CODE_NOT_READY\020\002\022,\n(VOICE_SESSIO"
+    "N_ERROR_CODE_ALREADY_RUNNING\020\003\022.\n*VOICE_"
+    "SESSION_ERROR_CODE_COMPONENT_FAILURE\020\004*\233"
+    "\002\n\034SpeechTurnDetectionEventKind\0220\n,SPEEC"
+    "H_TURN_DETECTION_EVENT_KIND_UNSPECIFIED\020"
+    "\000\0221\n-SPEECH_TURN_DETECTION_EVENT_KIND_TU"
+    "RN_STARTED\020\001\022/\n+SPEECH_TURN_DETECTION_EV"
+    "ENT_KIND_TURN_ENDED\020\002\0224\n0SPEECH_TURN_DET"
+    "ECTION_EVENT_KIND_SPEAKER_CHANGED\020\003\022/\n+S"
+    "PEECH_TURN_DETECTION_EVENT_KIND_STATISTI"
+    "CS\020\004*\347\003\n\026TurnLifecycleEventKind\022)\n%TURN_"
+    "LIFECYCLE_EVENT_KIND_UNSPECIFIED\020\000\022%\n!TU"
+    "RN_LIFECYCLE_EVENT_KIND_STARTED\020\001\0221\n-TUR"
+    "N_LIFECYCLE_EVENT_KIND_USER_SPEECH_START"
+    "ED\020\002\022/\n+TURN_LIFECYCLE_EVENT_KIND_USER_S"
+    "PEECH_ENDED\020\003\0221\n-TURN_LIFECYCLE_EVENT_KI"
+    "ND_TRANSCRIPTION_FINAL\020\004\0224\n0TURN_LIFECYC"
+    "LE_EVENT_KIND_AGENT_RESPONSE_STARTED\020\005\0226"
+    "\n2TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPON"
+    "SE_COMPLETED\020\006\022\'\n#TURN_LIFECYCLE_EVENT_K"
+    "IND_COMPLETED\020\007\022\'\n#TURN_LIFECYCLE_EVENT_"
+    "KIND_CANCELLED\020\010\022$\n TURN_LIFECYCLE_EVENT"
+    "_KIND_FAILED\020\tBM\n\027ai.runanywhere.proto.v"
+    "1B\020VoiceEventsProtoP\001\370\001\001\242\002\004RAV1\252\002\016Runany"
+    "where.V1\272\002\002RAb\006proto3"
 };
 static ::absl::once_flag descriptor_table_voice_5fevents_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_voice_5fevents_2eproto = {
     false,
     false,
-    6773,
+    7901,
     descriptor_table_protodef_voice_5fevents_2eproto,
     "voice_events.proto",
     &descriptor_table_voice_5fevents_2eproto_once,
     nullptr,
     0,
-    18,
+    21,
     schemas,
     file_default_instances,
     TableStruct_voice_5fevents_2eproto::offsets,
@@ -1100,6 +1404,103 @@ TurnLifecycleEventKind_descriptor() {
 }
 PROTOBUF_CONSTINIT const uint32_t TurnLifecycleEventKind_internal_data_[] = {
     655360u, 0u, };
+// ===================================================================
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+VoiceEvent_MetadataEntry_DoNotUse::VoiceEvent_MetadataEntry_DoNotUse()
+    : SuperType(VoiceEvent_MetadataEntry_DoNotUse_class_data_.base()) {}
+VoiceEvent_MetadataEntry_DoNotUse::VoiceEvent_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+    : SuperType(arena, VoiceEvent_MetadataEntry_DoNotUse_class_data_.base()) {}
+#else   // PROTOBUF_CUSTOM_VTABLE
+VoiceEvent_MetadataEntry_DoNotUse::VoiceEvent_MetadataEntry_DoNotUse() : SuperType() {}
+VoiceEvent_MetadataEntry_DoNotUse::VoiceEvent_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena) : SuperType(arena) {}
+#endif  // PROTOBUF_CUSTOM_VTABLE
+inline void* PROTOBUF_NONNULL VoiceEvent_MetadataEntry_DoNotUse::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) VoiceEvent_MetadataEntry_DoNotUse(arena);
+}
+constexpr auto VoiceEvent_MetadataEntry_DoNotUse::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(VoiceEvent_MetadataEntry_DoNotUse),
+                                            alignof(VoiceEvent_MetadataEntry_DoNotUse));
+}
+constexpr auto VoiceEvent_MetadataEntry_DoNotUse::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_VoiceEvent_MetadataEntry_DoNotUse_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &VoiceEvent_MetadataEntry_DoNotUse::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<VoiceEvent_MetadataEntry_DoNotUse>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &VoiceEvent_MetadataEntry_DoNotUse::SharedDtor,
+          static_cast<void (::google::protobuf::MessageLite::*)()>(&VoiceEvent_MetadataEntry_DoNotUse::ClearImpl),
+              ::google::protobuf::Message::ByteSizeLongImpl, ::google::protobuf::Message::_InternalSerializeImpl
+              ,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(VoiceEvent_MetadataEntry_DoNotUse, _impl_._cached_size_),
+          false,
+      },
+      &VoiceEvent_MetadataEntry_DoNotUse::kDescriptorMethods,
+      &descriptor_table_voice_5fevents_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull VoiceEvent_MetadataEntry_DoNotUse_class_data_ =
+        VoiceEvent_MetadataEntry_DoNotUse::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+VoiceEvent_MetadataEntry_DoNotUse::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&VoiceEvent_MetadataEntry_DoNotUse_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(VoiceEvent_MetadataEntry_DoNotUse_class_data_.tc_table);
+  return VoiceEvent_MetadataEntry_DoNotUse_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<1, 2, 0, 56, 2>
+VoiceEvent_MetadataEntry_DoNotUse::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(VoiceEvent_MetadataEntry_DoNotUse, _impl_._has_bits_),
+    0, // no _extensions_
+    2, 8,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967292,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    2,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    VoiceEvent_MetadataEntry_DoNotUse_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::DiscardEverythingFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::VoiceEvent_MetadataEntry_DoNotUse>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // string value = 2;
+    {::_pbi::TcParser::FastUS1,
+     {18, 1, 0,
+      PROTOBUF_FIELD_OFFSET(VoiceEvent_MetadataEntry_DoNotUse, _impl_.value_)}},
+    // string key = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(VoiceEvent_MetadataEntry_DoNotUse, _impl_.key_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // string key = 1;
+    {PROTOBUF_FIELD_OFFSET(VoiceEvent_MetadataEntry_DoNotUse, _impl_.key_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // string value = 2;
+    {PROTOBUF_FIELD_OFFSET(VoiceEvent_MetadataEntry_DoNotUse, _impl_.value_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  // no aux_entries
+  {{
+    "\47\3\5\0\0\0\0\0"
+    "runanywhere.v1.VoiceEvent.MetadataEntry"
+    "key"
+    "value"
+  }},
+};
 // ===================================================================
 
 class VoiceEvent::_Internal {
@@ -1333,6 +1734,32 @@ void VoiceEvent::set_allocated_wakeword_detected(::runanywhere::v1::WakeWordDete
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceEvent.wakeword_detected)
 }
+void VoiceEvent::set_allocated_audio_level(::runanywhere::v1::AudioLevelEvent* PROTOBUF_NULLABLE audio_level) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  clear_payload();
+  if (audio_level) {
+    ::google::protobuf::Arena* submessage_arena = audio_level->GetArena();
+    if (message_arena != submessage_arena) {
+      audio_level = ::google::protobuf::internal::GetOwnedMessage(message_arena, audio_level, submessage_arena);
+    }
+    set_has_audio_level();
+    _impl_.payload_.audio_level_ = audio_level;
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceEvent.audio_level)
+}
+void VoiceEvent::set_allocated_component_progress(::runanywhere::v1::ComponentProgressEvent* PROTOBUF_NULLABLE component_progress) {
+  ::google::protobuf::Arena* message_arena = GetArena();
+  clear_payload();
+  if (component_progress) {
+    ::google::protobuf::Arena* submessage_arena = component_progress->GetArena();
+    if (message_arena != submessage_arena) {
+      component_progress = ::google::protobuf::internal::GetOwnedMessage(message_arena, component_progress, submessage_arena);
+    }
+    set_has_component_progress();
+    _impl_.payload_.component_progress_ = component_progress;
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VoiceEvent.component_progress)
+}
 VoiceEvent::VoiceEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
     : ::google::protobuf::Message(arena, VoiceEvent_class_data_.base()) {
@@ -1348,6 +1775,18 @@ PROTOBUF_NDEBUG_INLINE VoiceEvent::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::VoiceEvent& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
+        session_id_(arena, from.session_id_),
+        turn_id_(arena, from.turn_id_),
+        request_id_(arena, from.request_id_),
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
+        metadata_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::VoiceEvent,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_.metadata_)>()
+        , from.metadata_}
+        #else
+        metadata_ { visibility, arena, from.metadata_ }
+        #endif
+        ,
         payload_{},
         _oneof_case_{from._oneof_case_[0]} {}
 
@@ -1425,6 +1864,12 @@ VoiceEvent::VoiceEvent(
       case kWakewordDetected:
         _impl_.payload_.wakeword_detected_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.payload_.wakeword_detected_);
         break;
+      case kAudioLevel:
+        _impl_.payload_.audio_level_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.payload_.audio_level_);
+        break;
+      case kComponentProgress:
+        _impl_.payload_.component_progress_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.payload_.component_progress_);
+        break;
   }
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.VoiceEvent)
@@ -1433,6 +1878,18 @@ PROTOBUF_NDEBUG_INLINE VoiceEvent::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
+        session_id_(arena),
+        turn_id_(arena),
+        request_id_(arena),
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
+        metadata_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::VoiceEvent,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::VoiceEvent, _impl_.metadata_)>()
+        }
+        #else
+        metadata_ { visibility, arena }
+        #endif
+        ,
         payload_{},
         _oneof_case_{} {}
 
@@ -1456,6 +1913,9 @@ inline void VoiceEvent::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.session_id_.Destroy();
+  this_._impl_.turn_id_.Destroy();
+  this_._impl_.request_id_.Destroy();
   if (this_.has_payload()) {
     this_.clear_payload();
   }
@@ -1602,6 +2062,22 @@ void VoiceEvent::clear_payload() {
       }
       break;
     }
+    case kAudioLevel: {
+      if (GetArena() == nullptr) {
+        delete _impl_.payload_.audio_level_;
+      } else if (::google::protobuf::internal::DebugHardenClearOneofMessageOnArena()) {
+        ::google::protobuf::internal::MaybePoisonAfterClear(_impl_.payload_.audio_level_);
+      }
+      break;
+    }
+    case kComponentProgress: {
+      if (GetArena() == nullptr) {
+        delete _impl_.payload_.component_progress_;
+      } else if (::google::protobuf::internal::DebugHardenClearOneofMessageOnArena()) {
+        ::google::protobuf::internal::MaybePoisonAfterClear(_impl_.payload_.component_progress_);
+      }
+      break;
+    }
     case PAYLOAD_NOT_SET: {
       break;
     }
@@ -1615,10 +2091,29 @@ inline void* PROTOBUF_NONNULL VoiceEvent::PlacementNew_(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
   return ::new (mem) VoiceEvent(arena);
 }
+#ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
 constexpr auto VoiceEvent::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(VoiceEvent),
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(VoiceEvent),
                                             alignof(VoiceEvent));
 }
+#else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+constexpr auto VoiceEvent::InternalNewImpl_() {
+  constexpr auto arena_bits = ::google::protobuf::internal::EncodePlacementArenaOffsets({
+      PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.metadata_) +
+          decltype(VoiceEvent::_impl_.metadata_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+  });
+  if (arena_bits.has_value()) {
+    return ::google::protobuf::internal::MessageCreator::CopyInit(
+        sizeof(VoiceEvent), alignof(VoiceEvent), *arena_bits);
+  } else {
+    return ::google::protobuf::internal::MessageCreator(&VoiceEvent::PlacementNew_,
+                                 sizeof(VoiceEvent),
+                                 alignof(VoiceEvent));
+  }
+}
+#endif
 constexpr auto VoiceEvent::InternalGenerateClassData_() {
   return ::google::protobuf::internal::ClassDataFull{
       ::google::protobuf::internal::ClassData{
@@ -1652,17 +2147,17 @@ VoiceEvent::GetClassData() const {
   return VoiceEvent_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 22, 17, 0, 2>
+const ::_pbi::TcParseTable<3, 28, 20, 93, 7>
 VoiceEvent::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_._has_bits_),
     0, // no _extensions_
-    26, 56,  // max_field_number, fast_idx_mask
+    33, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4227858912,  // skipmap
+    268435936,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    22,  // num_field_entries
-    17,  // num_aux_entries
+    28,  // num_field_entries
+    20,  // num_aux_entries
     offsetof(decltype(_table_), aux_entries),
     VoiceEvent_class_data_.base(),
     nullptr,  // post_loop_handler
@@ -1671,42 +2166,53 @@ VoiceEvent::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::VoiceEvent>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    {::_pbi::TcParser::MiniParse, {}},
+    // string request_id = 32;
+    {::_pbi::TcParser::FastUS2,
+     {642, 2, 0,
+      PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.request_id_)}},
     // uint64 seq = 1;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VoiceEvent, _impl_.seq_), 0>(),
-     {8, 0, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VoiceEvent, _impl_.seq_), 3>(),
+     {8, 3, 0,
       PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.seq_)}},
     // int64 timestamp_us = 2;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VoiceEvent, _impl_.timestamp_us_), 1>(),
-     {16, 1, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(VoiceEvent, _impl_.timestamp_us_), 4>(),
+     {16, 4, 0,
       PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.timestamp_us_)}},
     // .runanywhere.v1.VoiceEventCategory category = 3;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceEvent, _impl_.category_), 2>(),
-     {24, 2, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceEvent, _impl_.category_), 5>(),
+     {24, 5, 0,
       PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.category_)}},
     // .runanywhere.v1.VoiceEventSeverity severity = 4;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceEvent, _impl_.severity_), 3>(),
-     {32, 3, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceEvent, _impl_.severity_), 6>(),
+     {32, 6, 0,
       PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.severity_)}},
     // .runanywhere.v1.VoicePipelineComponent component = 5;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceEvent, _impl_.component_), 4>(),
-     {40, 4, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceEvent, _impl_.component_), 7>(),
+     {40, 7, 0,
       PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.component_)}},
-    {::_pbi::TcParser::MiniParse, {}},
-    {::_pbi::TcParser::MiniParse, {}},
+    // string session_id = 30;
+    {::_pbi::TcParser::FastUS2,
+     {498, 0, 0,
+      PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.session_id_)}},
+    // string turn_id = 31;
+    {::_pbi::TcParser::FastUS2,
+     {506, 1, 0,
+      PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.turn_id_)}},
   }}, {{
+    33, 0, 1,
+    65534, 27,
     65535, 65535
   }}, {{
     // uint64 seq = 1;
-    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.seq_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt64)},
+    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.seq_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt64)},
     // int64 timestamp_us = 2;
-    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.timestamp_us_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
     // .runanywhere.v1.VoiceEventCategory category = 3;
-    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.category_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.category_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // .runanywhere.v1.VoiceEventSeverity severity = 4;
-    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.severity_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.severity_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // .runanywhere.v1.VoicePipelineComponent component = 5;
-    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.component_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.component_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // .runanywhere.v1.UserSaidEvent user_said = 10;
     {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.payload_.user_said_), _Internal::kOneofCaseOffset + 0, 0, (0 | ::_fl::kFcOneof | ::_fl::kMessage | ::_fl::kTvTable)},
     // .runanywhere.v1.AssistantTokenEvent assistant_token = 11;
@@ -1741,6 +2247,18 @@ VoiceEvent::_table_ = {
     {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.payload_.turn_lifecycle_), _Internal::kOneofCaseOffset + 0, 15, (0 | ::_fl::kFcOneof | ::_fl::kMessage | ::_fl::kTvTable)},
     // .runanywhere.v1.WakeWordDetectedEvent wakeword_detected = 26;
     {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.payload_.wakeword_detected_), _Internal::kOneofCaseOffset + 0, 16, (0 | ::_fl::kFcOneof | ::_fl::kMessage | ::_fl::kTvTable)},
+    // .runanywhere.v1.AudioLevelEvent audio_level = 27;
+    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.payload_.audio_level_), _Internal::kOneofCaseOffset + 0, 17, (0 | ::_fl::kFcOneof | ::_fl::kMessage | ::_fl::kTvTable)},
+    // .runanywhere.v1.ComponentProgressEvent component_progress = 28;
+    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.payload_.component_progress_), _Internal::kOneofCaseOffset + 0, 18, (0 | ::_fl::kFcOneof | ::_fl::kMessage | ::_fl::kTvTable)},
+    // string session_id = 30;
+    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.session_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // string turn_id = 31;
+    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.turn_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // string request_id = 32;
+    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.request_id_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // map<string, string> metadata = 33;
+    {PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.metadata_), _Internal::kHasBitsOffset + 8, 19, (0 | ::_fl::kFcRepeated | ::_fl::kMap)},
   }},
   {{
       {::_pbi::TcParser::GetTable<::runanywhere::v1::UserSaidEvent>()},
@@ -1760,8 +2278,18 @@ VoiceEvent::_table_ = {
       {::_pbi::TcParser::GetTable<::runanywhere::v1::SpeechTurnDetectionEvent>()},
       {::_pbi::TcParser::GetTable<::runanywhere::v1::TurnLifecycleEvent>()},
       {::_pbi::TcParser::GetTable<::runanywhere::v1::WakeWordDetectedEvent>()},
+      {::_pbi::TcParser::GetTable<::runanywhere::v1::AudioLevelEvent>()},
+      {::_pbi::TcParser::GetTable<::runanywhere::v1::ComponentProgressEvent>()},
+      {::_pbi::TcParser::GetMapAuxInfo(
+          1, 0, 9, 9, 0)},
   }},
   {{
+    "\31\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\12\7\12\10\0\0\0"
+    "runanywhere.v1.VoiceEvent"
+    "session_id"
+    "turn_id"
+    "request_id"
+    "metadata"
   }},
 };
 PROTOBUF_NOINLINE void VoiceEvent::Clear() {
@@ -1772,10 +2300,24 @@ PROTOBUF_NOINLINE void VoiceEvent::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.session_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.turn_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _impl_.request_id_.ClearNonDefaultToEmpty();
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x000000f8U)) {
     ::memset(&_impl_.seq_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.component_) -
         reinterpret_cast<char*>(&_impl_.seq_)) + sizeof(_impl_.component_));
+  }
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000100U)) {
+    _impl_.metadata_.Clear();
   }
   clear_payload();
   _impl_._has_bits_.Clear();
@@ -1802,7 +2344,7 @@ PROTOBUF_NOINLINE void VoiceEvent::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // uint64 seq = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_seq() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteUInt64ToArray(
@@ -1811,7 +2353,7 @@ PROTOBUF_NOINLINE void VoiceEvent::Clear() {
   }
 
   // int64 timestamp_us = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_timestamp_us() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
@@ -1820,7 +2362,7 @@ PROTOBUF_NOINLINE void VoiceEvent::Clear() {
   }
 
   // .runanywhere.v1.VoiceEventCategory category = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_category() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -1829,7 +2371,7 @@ PROTOBUF_NOINLINE void VoiceEvent::Clear() {
   }
 
   // .runanywhere.v1.VoiceEventSeverity severity = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_severity() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -1838,7 +2380,7 @@ PROTOBUF_NOINLINE void VoiceEvent::Clear() {
   }
 
   // .runanywhere.v1.VoicePipelineComponent component = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_component() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -1949,9 +2491,86 @@ PROTOBUF_NOINLINE void VoiceEvent::Clear() {
           stream);
       break;
     }
+    case kAudioLevel: {
+      target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+          27, *this_._impl_.payload_.audio_level_, this_._impl_.payload_.audio_level_->GetCachedSize(), target,
+          stream);
+      break;
+    }
+    case kComponentProgress: {
+      target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
+          28, *this_._impl_.payload_.component_progress_, this_._impl_.payload_.component_progress_->GetCachedSize(), target,
+          stream);
+      break;
+    }
     default:
       break;
   }
+  // string session_id = 30;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_session_id().empty()) {
+      const ::std::string& _s = this_._internal_session_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VoiceEvent.session_id");
+      target = stream->WriteStringMaybeAliased(30, _s, target);
+    }
+  }
+
+  // string turn_id = 31;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_turn_id().empty()) {
+      const ::std::string& _s = this_._internal_turn_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VoiceEvent.turn_id");
+      target = stream->WriteStringMaybeAliased(31, _s, target);
+    }
+  }
+
+  // string request_id = 32;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (!this_._internal_request_id().empty()) {
+      const ::std::string& _s = this_._internal_request_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VoiceEvent.request_id");
+      target = stream->WriteStringMaybeAliased(32, _s, target);
+    }
+  }
+
+  // map<string, string> metadata = 33;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000100U)) {
+    if (!this_._internal_metadata().empty()) {
+      using MapType = ::google::protobuf::Map<::std::string, ::std::string>;
+      using WireHelper = _pbi::MapEntryFuncs<::std::string, ::std::string,
+                                     _pbi::WireFormatLite::TYPE_STRING,
+                                     _pbi::WireFormatLite::TYPE_STRING>;
+      const auto& field = this_._internal_metadata();
+
+      if (stream->IsSerializationDeterministic() && field.size() > 1) {
+        for (const auto& entry : ::google::protobuf::internal::MapSorterPtr<MapType>(field)) {
+          target = WireHelper::InternalSerialize(
+              33, entry.first, entry.second, target, stream);
+          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+              entry.first.data(), static_cast<int>(entry.first.length()),
+ ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VoiceEvent.metadata");
+          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+              entry.second.data(), static_cast<int>(entry.second.length()),
+ ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VoiceEvent.metadata");
+        }
+      } else {
+        for (const auto& entry : field) {
+          target = WireHelper::InternalSerialize(
+              33, entry.first, entry.second, target, stream);
+          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+              entry.first.data(), static_cast<int>(entry.first.length()),
+ ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VoiceEvent.metadata");
+          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+              entry.second.data(), static_cast<int>(entry.second.length()),
+ ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VoiceEvent.metadata");
+        }
+      }
+    }
+  }
+
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -1977,40 +2596,73 @@ PROTOBUF_NOINLINE void VoiceEvent::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
-    // uint64 seq = 1;
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+    // string session_id = 30;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_session_id().empty()) {
+        total_size += 2 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_session_id());
+      }
+    }
+    // string turn_id = 31;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_turn_id().empty()) {
+        total_size += 2 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_turn_id());
+      }
+    }
+    // string request_id = 32;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (!this_._internal_request_id().empty()) {
+        total_size += 2 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_request_id());
+      }
+    }
+    // uint64 seq = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_seq() != 0) {
         total_size += ::_pbi::WireFormatLite::UInt64SizePlusOne(
             this_._internal_seq());
       }
     }
     // int64 timestamp_us = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_timestamp_us() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_timestamp_us());
       }
     }
     // .runanywhere.v1.VoiceEventCategory category = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_category() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_category());
       }
     }
     // .runanywhere.v1.VoiceEventSeverity severity = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_severity() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_severity());
       }
     }
     // .runanywhere.v1.VoicePipelineComponent component = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_component() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_component());
+      }
+    }
+  }
+   {
+    // map<string, string> metadata = 33;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000100U)) {
+      total_size +=
+          2 * ::google::protobuf::internal::FromIntSize(this_._internal_metadata_size());
+      for (const auto& entry : this_._internal_metadata()) {
+        total_size += _pbi::MapEntryFuncs<::std::string, ::std::string,
+                                       _pbi::WireFormatLite::TYPE_STRING,
+                                       _pbi::WireFormatLite::TYPE_STRING>::ByteSizeLong(entry.first, entry.second);
       }
     }
   }
@@ -2117,6 +2769,18 @@ PROTOBUF_NOINLINE void VoiceEvent::Clear() {
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.payload_.wakeword_detected_);
       break;
     }
+    // .runanywhere.v1.AudioLevelEvent audio_level = 27;
+    case kAudioLevel: {
+      total_size += 2 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.payload_.audio_level_);
+      break;
+    }
+    // .runanywhere.v1.ComponentProgressEvent component_progress = 28;
+    case kComponentProgress: {
+      total_size += 2 +
+                    ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.payload_.component_progress_);
+      break;
+    }
     case PAYLOAD_NOT_SET: {
       break;
     }
@@ -2140,32 +2804,62 @@ void VoiceEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_session_id().empty()) {
+        _this->_internal_set_session_id(from._internal_session_id());
+      } else {
+        if (_this->_impl_.session_id_.IsDefault()) {
+          _this->_internal_set_session_id("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_turn_id().empty()) {
+        _this->_internal_set_turn_id(from._internal_turn_id());
+      } else {
+        if (_this->_impl_.turn_id_.IsDefault()) {
+          _this->_internal_set_turn_id("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (!from._internal_request_id().empty()) {
+        _this->_internal_set_request_id(from._internal_request_id());
+      } else {
+        if (_this->_impl_.request_id_.IsDefault()) {
+          _this->_internal_set_request_id("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_seq() != 0) {
         _this->_impl_.seq_ = from._impl_.seq_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_timestamp_us() != 0) {
         _this->_impl_.timestamp_us_ = from._impl_.timestamp_us_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_category() != 0) {
         _this->_impl_.category_ = from._impl_.category_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_severity() != 0) {
         _this->_impl_.severity_ = from._impl_.severity_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (from._internal_component() != 0) {
         _this->_impl_.component_ = from._impl_.component_;
       }
     }
+  }
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000100U)) {
+    _this->_impl_.metadata_.MergeFrom(from._impl_.metadata_);
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
   if (const uint32_t oneof_from_case =
@@ -2316,6 +3010,22 @@ void VoiceEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
         }
         break;
       }
+      case kAudioLevel: {
+        if (oneof_needs_init) {
+          _this->_impl_.payload_.audio_level_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.payload_.audio_level_);
+        } else {
+          _this->_impl_.payload_.audio_level_->MergeFrom(*from._impl_.payload_.audio_level_);
+        }
+        break;
+      }
+      case kComponentProgress: {
+        if (oneof_needs_init) {
+          _this->_impl_.payload_.component_progress_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.payload_.component_progress_);
+        } else {
+          _this->_impl_.payload_.component_progress_->MergeFrom(*from._impl_.payload_.component_progress_);
+        }
+        break;
+      }
       case PAYLOAD_NOT_SET:
         break;
     }
@@ -2334,14 +3044,20 @@ void VoiceEvent::CopyFrom(const VoiceEvent& from) {
 
 void VoiceEvent::InternalSwap(VoiceEvent* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
   using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.session_id_, &other->_impl_.session_id_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.turn_id_, &other->_impl_.turn_id_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.request_id_, &other->_impl_.request_id_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.component_)
       + sizeof(VoiceEvent::_impl_.component_)
       - PROTOBUF_FIELD_OFFSET(VoiceEvent, _impl_.seq_)>(
           reinterpret_cast<char*>(&_impl_.seq_),
           reinterpret_cast<char*>(&other->_impl_.seq_));
+  _impl_.metadata_.InternalSwap(&other->_impl_.metadata_);
   swap(_impl_.payload_, other->_impl_.payload_);
   swap(_impl_._oneof_case_[0], other->_impl_._oneof_case_[0]);
 }
@@ -2374,7 +3090,8 @@ PROTOBUF_NDEBUG_INLINE UserSaidEvent::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::UserSaidEvent& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        text_(arena, from.text_) {}
+        text_(arena, from.text_),
+        language_code_(arena, from.language_code_) {}
 
 UserSaidEvent::UserSaidEvent(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -2393,9 +3110,9 @@ UserSaidEvent::UserSaidEvent(
                offsetof(Impl_, is_final_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, is_final_),
-           offsetof(Impl_, audio_end_us_) -
+           offsetof(Impl_, segment_index_) -
                offsetof(Impl_, is_final_) +
-               sizeof(Impl_::audio_end_us_));
+               sizeof(Impl_::segment_index_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.UserSaidEvent)
 }
@@ -2403,16 +3120,17 @@ PROTOBUF_NDEBUG_INLINE UserSaidEvent::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        text_(arena) {}
+        text_(arena),
+        language_code_(arena) {}
 
 inline void UserSaidEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, is_final_),
            0,
-           offsetof(Impl_, audio_end_us_) -
+           offsetof(Impl_, segment_index_) -
                offsetof(Impl_, is_final_) +
-               sizeof(Impl_::audio_end_us_));
+               sizeof(Impl_::segment_index_));
 }
 UserSaidEvent::~UserSaidEvent() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.UserSaidEvent)
@@ -2426,6 +3144,7 @@ inline void UserSaidEvent::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.text_.Destroy();
+  this_._impl_.language_code_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -2471,16 +3190,16 @@ UserSaidEvent::GetClassData() const {
   return UserSaidEvent_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 5, 0, 41, 2>
+const ::_pbi::TcParseTable<3, 7, 0, 54, 2>
 UserSaidEvent::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_._has_bits_),
     0, // no _extensions_
-    5, 56,  // max_field_number, fast_idx_mask
+    7, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967264,  // skipmap
+    4294967168,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    5,  // num_field_entries
+    7,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     UserSaidEvent_class_data_.base(),
@@ -2496,42 +3215,53 @@ UserSaidEvent::_table_ = {
      {10, 0, 0,
       PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.text_)}},
     // bool is_final = 2;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(UserSaidEvent, _impl_.is_final_), 1>(),
-     {16, 1, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(UserSaidEvent, _impl_.is_final_), 2>(),
+     {16, 2, 0,
       PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.is_final_)}},
     // float confidence = 3;
     {::_pbi::TcParser::FastF32S1,
-     {29, 2, 0,
+     {29, 3, 0,
       PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.confidence_)}},
     // int64 audio_start_us = 4;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(UserSaidEvent, _impl_.audio_start_us_), 3>(),
-     {32, 3, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(UserSaidEvent, _impl_.audio_start_us_), 4>(),
+     {32, 4, 0,
       PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.audio_start_us_)}},
     // int64 audio_end_us = 5;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(UserSaidEvent, _impl_.audio_end_us_), 4>(),
-     {40, 4, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(UserSaidEvent, _impl_.audio_end_us_), 5>(),
+     {40, 5, 0,
       PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.audio_end_us_)}},
-    {::_pbi::TcParser::MiniParse, {}},
-    {::_pbi::TcParser::MiniParse, {}},
+    // string language_code = 6;
+    {::_pbi::TcParser::FastUS1,
+     {50, 1, 0,
+      PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.language_code_)}},
+    // int32 segment_index = 7;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(UserSaidEvent, _impl_.segment_index_), 6>(),
+     {56, 6, 0,
+      PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.segment_index_)}},
   }}, {{
     65535, 65535
   }}, {{
     // string text = 1;
     {PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.text_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // bool is_final = 2;
-    {PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.is_final_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.is_final_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // float confidence = 3;
-    {PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.confidence_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+    {PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.confidence_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
     // int64 audio_start_us = 4;
-    {PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.audio_start_us_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    {PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.audio_start_us_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
     // int64 audio_end_us = 5;
-    {PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.audio_end_us_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    {PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.audio_end_us_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    // string language_code = 6;
+    {PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.language_code_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // int32 segment_index = 7;
+    {PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.segment_index_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
   }},
   // no aux_entries
   {{
-    "\34\4\0\0\0\0\0\0"
+    "\34\4\0\0\0\0\15\0"
     "runanywhere.v1.UserSaidEvent"
     "text"
+    "language_code"
   }},
 };
 PROTOBUF_NOINLINE void UserSaidEvent::Clear() {
@@ -2542,13 +3272,18 @@ PROTOBUF_NOINLINE void UserSaidEvent::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    _impl_.text_.ClearNonDefaultToEmpty();
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.text_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.language_code_.ClearNonDefaultToEmpty();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001eU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007cU)) {
     ::memset(&_impl_.is_final_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.audio_end_us_) -
-        reinterpret_cast<char*>(&_impl_.is_final_)) + sizeof(_impl_.audio_end_us_));
+        reinterpret_cast<char*>(&_impl_.segment_index_) -
+        reinterpret_cast<char*>(&_impl_.is_final_)) + sizeof(_impl_.segment_index_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -2584,7 +3319,7 @@ PROTOBUF_NOINLINE void UserSaidEvent::Clear() {
   }
 
   // bool is_final = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_is_final() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -2593,7 +3328,7 @@ PROTOBUF_NOINLINE void UserSaidEvent::Clear() {
   }
 
   // float confidence = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (::absl::bit_cast<::uint32_t>(this_._internal_confidence()) != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteFloatToArray(
@@ -2602,7 +3337,7 @@ PROTOBUF_NOINLINE void UserSaidEvent::Clear() {
   }
 
   // int64 audio_start_us = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_audio_start_us() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<4>(
@@ -2611,11 +3346,30 @@ PROTOBUF_NOINLINE void UserSaidEvent::Clear() {
   }
 
   // int64 audio_end_us = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_audio_end_us() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<5>(
               stream, this_._internal_audio_end_us(), target);
+    }
+  }
+
+  // string language_code = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_language_code().empty()) {
+      const ::std::string& _s = this_._internal_language_code();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.UserSaidEvent.language_code");
+      target = stream->WriteStringMaybeAliased(6, _s, target);
+    }
+  }
+
+  // int32 segment_index = 7;
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (this_._internal_segment_index() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<7>(
+              stream, this_._internal_segment_index(), target);
     }
   }
 
@@ -2644,7 +3398,7 @@ PROTOBUF_NOINLINE void UserSaidEvent::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     // string text = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_text().empty()) {
@@ -2652,30 +3406,44 @@ PROTOBUF_NOINLINE void UserSaidEvent::Clear() {
                                         this_._internal_text());
       }
     }
-    // bool is_final = 2;
+    // string language_code = 6;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_language_code().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_language_code());
+      }
+    }
+    // bool is_final = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_is_final() != 0) {
         total_size += 2;
       }
     }
     // float confidence = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (::absl::bit_cast<::uint32_t>(this_._internal_confidence()) != 0) {
         total_size += 5;
       }
     }
     // int64 audio_start_us = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_audio_start_us() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_audio_start_us());
       }
     }
     // int64 audio_end_us = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_audio_end_us() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_audio_end_us());
+      }
+    }
+    // int32 segment_index = 7;
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (this_._internal_segment_index() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_segment_index());
       }
     }
   }
@@ -2697,7 +3465,7 @@ void UserSaidEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_text().empty()) {
         _this->_internal_set_text(from._internal_text());
@@ -2708,23 +3476,37 @@ void UserSaidEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_language_code().empty()) {
+        _this->_internal_set_language_code(from._internal_language_code());
+      } else {
+        if (_this->_impl_.language_code_.IsDefault()) {
+          _this->_internal_set_language_code("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_is_final() != 0) {
         _this->_impl_.is_final_ = from._impl_.is_final_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (::absl::bit_cast<::uint32_t>(from._internal_confidence()) != 0) {
         _this->_impl_.confidence_ = from._impl_.confidence_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_audio_start_us() != 0) {
         _this->_impl_.audio_start_us_ = from._impl_.audio_start_us_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_audio_end_us() != 0) {
         _this->_impl_.audio_end_us_ = from._impl_.audio_end_us_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (from._internal_segment_index() != 0) {
+        _this->_impl_.segment_index_ = from._impl_.segment_index_;
       }
     }
   }
@@ -2748,9 +3530,10 @@ void UserSaidEvent::InternalSwap(UserSaidEvent* PROTOBUF_RESTRICT PROTOBUF_NONNU
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.text_, &other->_impl_.text_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.language_code_, &other->_impl_.language_code_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.audio_end_us_)
-      + sizeof(UserSaidEvent::_impl_.audio_end_us_)
+      PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.segment_index_)
+      + sizeof(UserSaidEvent::_impl_.segment_index_)
       - PROTOBUF_FIELD_OFFSET(UserSaidEvent, _impl_.is_final_)>(
           reinterpret_cast<char*>(&_impl_.is_final_),
           reinterpret_cast<char*>(&other->_impl_.is_final_));
@@ -2784,7 +3567,8 @@ PROTOBUF_NDEBUG_INLINE AssistantTokenEvent::Impl_::Impl_(
     [[maybe_unused]] const ::runanywhere::v1::AssistantTokenEvent& from_msg)
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
-        text_(arena, from.text_) {}
+        text_(arena, from.text_),
+        finish_reason_(arena, from.finish_reason_) {}
 
 AssistantTokenEvent::AssistantTokenEvent(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -2803,9 +3587,9 @@ AssistantTokenEvent::AssistantTokenEvent(
                offsetof(Impl_, is_final_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, is_final_),
-           offsetof(Impl_, kind_) -
+           offsetof(Impl_, logprob_) -
                offsetof(Impl_, is_final_) +
-               sizeof(Impl_::kind_));
+               sizeof(Impl_::logprob_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.AssistantTokenEvent)
 }
@@ -2813,16 +3597,17 @@ PROTOBUF_NDEBUG_INLINE AssistantTokenEvent::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
-        text_(arena) {}
+        text_(arena),
+        finish_reason_(arena) {}
 
 inline void AssistantTokenEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, is_final_),
            0,
-           offsetof(Impl_, kind_) -
+           offsetof(Impl_, logprob_) -
                offsetof(Impl_, is_final_) +
-               sizeof(Impl_::kind_));
+               sizeof(Impl_::logprob_));
 }
 AssistantTokenEvent::~AssistantTokenEvent() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.AssistantTokenEvent)
@@ -2836,6 +3621,7 @@ inline void AssistantTokenEvent::SharedDtor(MessageLite& self) {
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.text_.Destroy();
+  this_._impl_.finish_reason_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -2881,16 +3667,16 @@ AssistantTokenEvent::GetClassData() const {
   return AssistantTokenEvent_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<2, 3, 0, 47, 2>
+const ::_pbi::TcParseTable<3, 6, 0, 60, 2>
 AssistantTokenEvent::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_._has_bits_),
     0, // no _extensions_
-    3, 24,  // max_field_number, fast_idx_mask
+    6, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967288,  // skipmap
+    4294967232,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    3,  // num_field_entries
+    6,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     AssistantTokenEvent_class_data_.base(),
@@ -2906,28 +3692,48 @@ AssistantTokenEvent::_table_ = {
      {10, 0, 0,
       PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.text_)}},
     // bool is_final = 2;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(AssistantTokenEvent, _impl_.is_final_), 1>(),
-     {16, 1, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(AssistantTokenEvent, _impl_.is_final_), 2>(),
+     {16, 2, 0,
       PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.is_final_)}},
     // .runanywhere.v1.TokenKind kind = 3;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(AssistantTokenEvent, _impl_.kind_), 2>(),
-     {24, 2, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(AssistantTokenEvent, _impl_.kind_), 3>(),
+     {24, 3, 0,
       PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.kind_)}},
+    // uint32 token_id = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(AssistantTokenEvent, _impl_.token_id_), 4>(),
+     {32, 4, 0,
+      PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.token_id_)}},
+    // float logprob = 5;
+    {::_pbi::TcParser::FastF32S1,
+     {45, 5, 0,
+      PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.logprob_)}},
+    // string finish_reason = 6;
+    {::_pbi::TcParser::FastUS1,
+     {50, 1, 0,
+      PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.finish_reason_)}},
+    {::_pbi::TcParser::MiniParse, {}},
   }}, {{
     65535, 65535
   }}, {{
     // string text = 1;
     {PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.text_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // bool is_final = 2;
-    {PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.is_final_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.is_final_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // .runanywhere.v1.TokenKind kind = 3;
-    {PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.kind_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.kind_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    // uint32 token_id = 4;
+    {PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.token_id_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
+    // float logprob = 5;
+    {PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.logprob_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+    // string finish_reason = 6;
+    {PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.finish_reason_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
   }},
   // no aux_entries
   {{
-    "\42\4\0\0\0\0\0\0"
+    "\42\4\0\0\0\0\15\0"
     "runanywhere.v1.AssistantTokenEvent"
     "text"
+    "finish_reason"
   }},
 };
 PROTOBUF_NOINLINE void AssistantTokenEvent::Clear() {
@@ -2938,13 +3744,18 @@ PROTOBUF_NOINLINE void AssistantTokenEvent::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
-    _impl_.text_.ClearNonDefaultToEmpty();
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.text_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.finish_reason_.ClearNonDefaultToEmpty();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x00000006U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003cU)) {
     ::memset(&_impl_.is_final_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.kind_) -
-        reinterpret_cast<char*>(&_impl_.is_final_)) + sizeof(_impl_.kind_));
+        reinterpret_cast<char*>(&_impl_.logprob_) -
+        reinterpret_cast<char*>(&_impl_.is_final_)) + sizeof(_impl_.logprob_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -2980,7 +3791,7 @@ PROTOBUF_NOINLINE void AssistantTokenEvent::Clear() {
   }
 
   // bool is_final = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_is_final() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -2989,11 +3800,39 @@ PROTOBUF_NOINLINE void AssistantTokenEvent::Clear() {
   }
 
   // .runanywhere.v1.TokenKind kind = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_kind() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
           3, this_._internal_kind(), target);
+    }
+  }
+
+  // uint32 token_id = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (this_._internal_token_id() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteUInt32ToArray(
+          4, this_._internal_token_id(), target);
+    }
+  }
+
+  // float logprob = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_logprob()) != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteFloatToArray(
+          5, this_._internal_logprob(), target);
+    }
+  }
+
+  // string finish_reason = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_finish_reason().empty()) {
+      const ::std::string& _s = this_._internal_finish_reason();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.AssistantTokenEvent.finish_reason");
+      target = stream->WriteStringMaybeAliased(6, _s, target);
     }
   }
 
@@ -3022,7 +3861,7 @@ PROTOBUF_NOINLINE void AssistantTokenEvent::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     // string text = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_text().empty()) {
@@ -3030,17 +3869,37 @@ PROTOBUF_NOINLINE void AssistantTokenEvent::Clear() {
                                         this_._internal_text());
       }
     }
-    // bool is_final = 2;
+    // string finish_reason = 6;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_finish_reason().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_finish_reason());
+      }
+    }
+    // bool is_final = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_is_final() != 0) {
         total_size += 2;
       }
     }
     // .runanywhere.v1.TokenKind kind = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_kind() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_kind());
+      }
+    }
+    // uint32 token_id = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_token_id() != 0) {
+        total_size += ::_pbi::WireFormatLite::UInt32SizePlusOne(
+            this_._internal_token_id());
+      }
+    }
+    // float logprob = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_logprob()) != 0) {
+        total_size += 5;
       }
     }
   }
@@ -3062,7 +3921,7 @@ void AssistantTokenEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_text().empty()) {
         _this->_internal_set_text(from._internal_text());
@@ -3073,13 +3932,32 @@ void AssistantTokenEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_finish_reason().empty()) {
+        _this->_internal_set_finish_reason(from._internal_finish_reason());
+      } else {
+        if (_this->_impl_.finish_reason_.IsDefault()) {
+          _this->_internal_set_finish_reason("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_is_final() != 0) {
         _this->_impl_.is_final_ = from._impl_.is_final_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_kind() != 0) {
         _this->_impl_.kind_ = from._impl_.kind_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_token_id() != 0) {
+        _this->_impl_.token_id_ = from._impl_.token_id_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (::absl::bit_cast<::uint32_t>(from._internal_logprob()) != 0) {
+        _this->_impl_.logprob_ = from._impl_.logprob_;
       }
     }
   }
@@ -3103,9 +3981,10 @@ void AssistantTokenEvent::InternalSwap(AssistantTokenEvent* PROTOBUF_RESTRICT PR
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.text_, &other->_impl_.text_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.finish_reason_, &other->_impl_.finish_reason_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.kind_)
-      + sizeof(AssistantTokenEvent::_impl_.kind_)
+      PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.logprob_)
+      + sizeof(AssistantTokenEvent::_impl_.logprob_)
       - PROTOBUF_FIELD_OFFSET(AssistantTokenEvent, _impl_.is_final_)>(
           reinterpret_cast<char*>(&_impl_.is_final_),
           reinterpret_cast<char*>(&other->_impl_.is_final_));
@@ -3158,9 +4037,9 @@ AudioFrameEvent::AudioFrameEvent(
                offsetof(Impl_, sample_rate_hz_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, sample_rate_hz_),
-           offsetof(Impl_, is_final_) -
+           offsetof(Impl_, chunk_index_) -
                offsetof(Impl_, sample_rate_hz_) +
-               sizeof(Impl_::is_final_));
+               sizeof(Impl_::chunk_index_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.AudioFrameEvent)
 }
@@ -3175,9 +4054,9 @@ inline void AudioFrameEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, sample_rate_hz_),
            0,
-           offsetof(Impl_, is_final_) -
+           offsetof(Impl_, chunk_index_) -
                offsetof(Impl_, sample_rate_hz_) +
-               sizeof(Impl_::is_final_));
+               sizeof(Impl_::chunk_index_));
 }
 AudioFrameEvent::~AudioFrameEvent() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.AudioFrameEvent)
@@ -3236,16 +4115,16 @@ AudioFrameEvent::GetClassData() const {
   return AudioFrameEvent_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 5, 0, 0, 2>
+const ::_pbi::TcParseTable<3, 7, 0, 0, 2>
 AudioFrameEvent::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(AudioFrameEvent, _impl_._has_bits_),
     0, // no _extensions_
-    5, 56,  // max_field_number, fast_idx_mask
+    7, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967264,  // skipmap
+    4294967168,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    5,  // num_field_entries
+    7,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     AudioFrameEvent_class_data_.base(),
@@ -3276,8 +4155,14 @@ AudioFrameEvent::_table_ = {
     {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(AudioFrameEvent, _impl_.is_final_), 4>(),
      {40, 4, 0,
       PROTOBUF_FIELD_OFFSET(AudioFrameEvent, _impl_.is_final_)}},
-    {::_pbi::TcParser::MiniParse, {}},
-    {::_pbi::TcParser::MiniParse, {}},
+    // int32 chunk_index = 6;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(AudioFrameEvent, _impl_.chunk_index_), 6>(),
+     {48, 6, 0,
+      PROTOBUF_FIELD_OFFSET(AudioFrameEvent, _impl_.chunk_index_)}},
+    // int64 duration_ms = 7;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(AudioFrameEvent, _impl_.duration_ms_), 5>(),
+     {56, 5, 0,
+      PROTOBUF_FIELD_OFFSET(AudioFrameEvent, _impl_.duration_ms_)}},
   }}, {{
     65535, 65535
   }}, {{
@@ -3291,6 +4176,10 @@ AudioFrameEvent::_table_ = {
     {PROTOBUF_FIELD_OFFSET(AudioFrameEvent, _impl_.encoding_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // bool is_final = 5;
     {PROTOBUF_FIELD_OFFSET(AudioFrameEvent, _impl_.is_final_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // int32 chunk_index = 6;
+    {PROTOBUF_FIELD_OFFSET(AudioFrameEvent, _impl_.chunk_index_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    // int64 duration_ms = 7;
+    {PROTOBUF_FIELD_OFFSET(AudioFrameEvent, _impl_.duration_ms_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
   }},
   // no aux_entries
   {{
@@ -3307,10 +4196,10 @@ PROTOBUF_NOINLINE void AudioFrameEvent::Clear() {
   if (CheckHasBit(cached_has_bits, 0x00000001U)) {
     _impl_.pcm_.ClearNonDefaultToEmpty();
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001eU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007eU)) {
     ::memset(&_impl_.sample_rate_hz_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.is_final_) -
-        reinterpret_cast<char*>(&_impl_.sample_rate_hz_)) + sizeof(_impl_.is_final_));
+        reinterpret_cast<char*>(&_impl_.chunk_index_) -
+        reinterpret_cast<char*>(&_impl_.sample_rate_hz_)) + sizeof(_impl_.chunk_index_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -3379,6 +4268,24 @@ PROTOBUF_NOINLINE void AudioFrameEvent::Clear() {
     }
   }
 
+  // int32 chunk_index = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (this_._internal_chunk_index() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<6>(
+              stream, this_._internal_chunk_index(), target);
+    }
+  }
+
+  // int64 duration_ms = 7;
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (this_._internal_duration_ms() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<7>(
+              stream, this_._internal_duration_ms(), target);
+    }
+  }
+
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -3404,7 +4311,7 @@ PROTOBUF_NOINLINE void AudioFrameEvent::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     // bytes pcm = 1;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_pcm().empty()) {
@@ -3439,6 +4346,20 @@ PROTOBUF_NOINLINE void AudioFrameEvent::Clear() {
         total_size += 2;
       }
     }
+    // int64 duration_ms = 7;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (this_._internal_duration_ms() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_duration_ms());
+      }
+    }
+    // int32 chunk_index = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (this_._internal_chunk_index() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_chunk_index());
+      }
+    }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
                                              &this_._impl_._cached_size_);
@@ -3458,7 +4379,7 @@ void AudioFrameEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000007fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_pcm().empty()) {
         _this->_internal_set_pcm(from._internal_pcm());
@@ -3488,6 +4409,16 @@ void AudioFrameEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
         _this->_impl_.is_final_ = from._impl_.is_final_;
       }
     }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (from._internal_duration_ms() != 0) {
+        _this->_impl_.duration_ms_ = from._impl_.duration_ms_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (from._internal_chunk_index() != 0) {
+        _this->_impl_.chunk_index_ = from._impl_.chunk_index_;
+      }
+    }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
   _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
@@ -3510,8 +4441,8 @@ void AudioFrameEvent::InternalSwap(AudioFrameEvent* PROTOBUF_RESTRICT PROTOBUF_N
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.pcm_, &other->_impl_.pcm_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(AudioFrameEvent, _impl_.is_final_)
-      + sizeof(AudioFrameEvent::_impl_.is_final_)
+      PROTOBUF_FIELD_OFFSET(AudioFrameEvent, _impl_.chunk_index_)
+      + sizeof(AudioFrameEvent::_impl_.chunk_index_)
       - PROTOBUF_FIELD_OFFSET(AudioFrameEvent, _impl_.sample_rate_hz_)>(
           reinterpret_cast<char*>(&_impl_.sample_rate_hz_),
           reinterpret_cast<char*>(&other->_impl_.sample_rate_hz_));
@@ -4569,7 +5500,9 @@ PROTOBUF_NDEBUG_INLINE ErrorEvent::Impl_::Impl_(
       : _has_bits_{from._has_bits_},
         _cached_size_{0},
         message_(arena, from.message_),
-        component_(arena, from.component_) {}
+        component_(arena, from.component_),
+        operation_(arena, from.operation_),
+        details_json_(arena, from.details_json_) {}
 
 ErrorEvent::ErrorEvent(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -4599,7 +5532,9 @@ PROTOBUF_NDEBUG_INLINE ErrorEvent::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
       : _cached_size_{0},
         message_(arena),
-        component_(arena) {}
+        component_(arena),
+        operation_(arena),
+        details_json_(arena) {}
 
 inline void ErrorEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
@@ -4623,6 +5558,8 @@ inline void ErrorEvent::SharedDtor(MessageLite& self) {
   ABSL_DCHECK(this_.GetArena() == nullptr);
   this_._impl_.message_.Destroy();
   this_._impl_.component_.Destroy();
+  this_._impl_.operation_.Destroy();
+  this_._impl_.details_json_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -4668,16 +5605,16 @@ ErrorEvent::GetClassData() const {
   return ErrorEvent_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<2, 4, 0, 50, 2>
+const ::_pbi::TcParseTable<3, 6, 0, 71, 2>
 ErrorEvent::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_._has_bits_),
     0, // no _extensions_
-    4, 24,  // max_field_number, fast_idx_mask
+    6, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967280,  // skipmap
+    4294967232,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    4,  // num_field_entries
+    6,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     ErrorEvent_class_data_.base(),
@@ -4687,13 +5624,10 @@ ErrorEvent::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::ErrorEvent>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    // bool is_recoverable = 4;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ErrorEvent, _impl_.is_recoverable_), 3>(),
-     {32, 3, 0,
-      PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_.is_recoverable_)}},
+    {::_pbi::TcParser::MiniParse, {}},
     // int32 code = 1;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ErrorEvent, _impl_.code_), 2>(),
-     {8, 2, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ErrorEvent, _impl_.code_), 4>(),
+     {8, 4, 0,
       PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_.code_)}},
     // string message = 2;
     {::_pbi::TcParser::FastUS1,
@@ -4703,24 +5637,43 @@ ErrorEvent::_table_ = {
     {::_pbi::TcParser::FastUS1,
      {26, 1, 0,
       PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_.component_)}},
+    // bool is_recoverable = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(ErrorEvent, _impl_.is_recoverable_), 5>(),
+     {32, 5, 0,
+      PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_.is_recoverable_)}},
+    // string operation = 5;
+    {::_pbi::TcParser::FastUS1,
+     {42, 2, 0,
+      PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_.operation_)}},
+    // string details_json = 6;
+    {::_pbi::TcParser::FastUS1,
+     {50, 3, 0,
+      PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_.details_json_)}},
+    {::_pbi::TcParser::MiniParse, {}},
   }}, {{
     65535, 65535
   }}, {{
     // int32 code = 1;
-    {PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_.code_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    {PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_.code_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
     // string message = 2;
     {PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_.message_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // string component = 3;
     {PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_.component_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // bool is_recoverable = 4;
-    {PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_.is_recoverable_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_.is_recoverable_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // string operation = 5;
+    {PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_.operation_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // string details_json = 6;
+    {PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_.details_json_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
   }},
   // no aux_entries
   {{
-    "\31\0\7\11\0\0\0\0"
+    "\31\0\7\11\0\11\14\0"
     "runanywhere.v1.ErrorEvent"
     "message"
     "component"
+    "operation"
+    "details_json"
   }},
 };
 PROTOBUF_NOINLINE void ErrorEvent::Clear() {
@@ -4731,15 +5684,21 @@ PROTOBUF_NOINLINE void ErrorEvent::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       _impl_.message_.ClearNonDefaultToEmpty();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       _impl_.component_.ClearNonDefaultToEmpty();
     }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _impl_.operation_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      _impl_.details_json_.ClearNonDefaultToEmpty();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000cU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x00000030U)) {
     ::memset(&_impl_.code_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.is_recoverable_) -
         reinterpret_cast<char*>(&_impl_.code_)) + sizeof(_impl_.is_recoverable_));
@@ -4768,7 +5727,7 @@ PROTOBUF_NOINLINE void ErrorEvent::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // int32 code = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_code() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<1>(
@@ -4797,11 +5756,31 @@ PROTOBUF_NOINLINE void ErrorEvent::Clear() {
   }
 
   // bool is_recoverable = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_is_recoverable() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
           4, this_._internal_is_recoverable(), target);
+    }
+  }
+
+  // string operation = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (!this_._internal_operation().empty()) {
+      const ::std::string& _s = this_._internal_operation();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ErrorEvent.operation");
+      target = stream->WriteStringMaybeAliased(5, _s, target);
+    }
+  }
+
+  // string details_json = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (!this_._internal_details_json().empty()) {
+      const ::std::string& _s = this_._internal_details_json();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ErrorEvent.details_json");
+      target = stream->WriteStringMaybeAliased(6, _s, target);
     }
   }
 
@@ -4830,7 +5809,7 @@ PROTOBUF_NOINLINE void ErrorEvent::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     // string message = 2;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_message().empty()) {
@@ -4845,15 +5824,29 @@ PROTOBUF_NOINLINE void ErrorEvent::Clear() {
                                         this_._internal_component());
       }
     }
-    // int32 code = 1;
+    // string operation = 5;
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (!this_._internal_operation().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_operation());
+      }
+    }
+    // string details_json = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (!this_._internal_details_json().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_details_json());
+      }
+    }
+    // int32 code = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_code() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_code());
       }
     }
     // bool is_recoverable = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_is_recoverable() != 0) {
         total_size += 2;
       }
@@ -4877,7 +5870,7 @@ void ErrorEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_message().empty()) {
         _this->_internal_set_message(from._internal_message());
@@ -4897,11 +5890,29 @@ void ErrorEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (!from._internal_operation().empty()) {
+        _this->_internal_set_operation(from._internal_operation());
+      } else {
+        if (_this->_impl_.operation_.IsDefault()) {
+          _this->_internal_set_operation("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (!from._internal_details_json().empty()) {
+        _this->_internal_set_details_json(from._internal_details_json());
+      } else {
+        if (_this->_impl_.details_json_.IsDefault()) {
+          _this->_internal_set_details_json("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_code() != 0) {
         _this->_impl_.code_ = from._impl_.code_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_is_recoverable() != 0) {
         _this->_impl_.is_recoverable_ = from._impl_.is_recoverable_;
       }
@@ -4928,6 +5939,8 @@ void ErrorEvent::InternalSwap(ErrorEvent* PROTOBUF_RESTRICT PROTOBUF_NONNULL oth
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.message_, &other->_impl_.message_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.component_, &other->_impl_.component_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.operation_, &other->_impl_.operation_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.details_json_, &other->_impl_.details_json_, arena);
   ::google::protobuf::internal::memswap<
       PROTOBUF_FIELD_OFFSET(ErrorEvent, _impl_.is_recoverable_)
       + sizeof(ErrorEvent::_impl_.is_recoverable_)
@@ -5039,16 +6052,16 @@ MetricsEvent::GetClassData() const {
   return MetricsEvent_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 8, 0, 0, 2>
+const ::_pbi::TcParseTable<4, 12, 0, 0, 2>
 MetricsEvent::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_._has_bits_),
     0, // no _extensions_
-    8, 56,  // max_field_number, fast_idx_mask
+    12, 120,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967040,  // skipmap
+    4294963200,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    8,  // num_field_entries
+    12,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     MetricsEvent_class_data_.base(),
@@ -5058,10 +6071,7 @@ MetricsEvent::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::MetricsEvent>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    // int64 created_at_ns = 8;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(MetricsEvent, _impl_.created_at_ns_), 6>(),
-     {64, 6, 0,
-      PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.created_at_ns_)}},
+    {::_pbi::TcParser::MiniParse, {}},
     // double stt_final_ms = 1;
     {::_pbi::TcParser::FastF64S1,
      {9, 0, 0,
@@ -5087,9 +6097,32 @@ MetricsEvent::_table_ = {
      {48, 5, 0,
       PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.audio_samples_played_)}},
     // bool is_over_budget = 7;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(MetricsEvent, _impl_.is_over_budget_), 7>(),
-     {56, 7, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(MetricsEvent, _impl_.is_over_budget_), 11>(),
+     {56, 11, 0,
       PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.is_over_budget_)}},
+    // int64 created_at_ns = 8;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(MetricsEvent, _impl_.created_at_ns_), 6>(),
+     {64, 6, 0,
+      PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.created_at_ns_)}},
+    // double vad_first_speech_ms = 9;
+    {::_pbi::TcParser::FastF64S1,
+     {73, 7, 0,
+      PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.vad_first_speech_ms_)}},
+    // double stt_first_partial_ms = 10;
+    {::_pbi::TcParser::FastF64S1,
+     {81, 8, 0,
+      PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.stt_first_partial_ms_)}},
+    // double llm_total_ms = 11;
+    {::_pbi::TcParser::FastF64S1,
+     {89, 9, 0,
+      PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.llm_total_ms_)}},
+    // double tts_total_ms = 12;
+    {::_pbi::TcParser::FastF64S1,
+     {97, 10, 0,
+      PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.tts_total_ms_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
   }}, {{
     65535, 65535
   }}, {{
@@ -5106,9 +6139,17 @@ MetricsEvent::_table_ = {
     // int64 audio_samples_played = 6;
     {PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.audio_samples_played_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
     // bool is_over_budget = 7;
-    {PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.is_over_budget_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.is_over_budget_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // int64 created_at_ns = 8;
     {PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.created_at_ns_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    // double vad_first_speech_ms = 9;
+    {PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.vad_first_speech_ms_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
+    // double stt_first_partial_ms = 10;
+    {PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.stt_first_partial_ms_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
+    // double llm_total_ms = 11;
+    {PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.llm_total_ms_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
+    // double tts_total_ms = 12;
+    {PROTOBUF_FIELD_OFFSET(MetricsEvent, _impl_.tts_total_ms_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kDouble)},
   }},
   // no aux_entries
   {{
@@ -5124,8 +6165,13 @@ PROTOBUF_NOINLINE void MetricsEvent::Clear() {
   cached_has_bits = _impl_._has_bits_[0];
   if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     ::memset(&_impl_.stt_final_ms_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.vad_first_speech_ms_) -
+        reinterpret_cast<char*>(&_impl_.stt_final_ms_)) + sizeof(_impl_.vad_first_speech_ms_));
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
+    ::memset(&_impl_.stt_first_partial_ms_, 0, static_cast<::size_t>(
         reinterpret_cast<char*>(&_impl_.is_over_budget_) -
-        reinterpret_cast<char*>(&_impl_.stt_final_ms_)) + sizeof(_impl_.is_over_budget_));
+        reinterpret_cast<char*>(&_impl_.stt_first_partial_ms_)) + sizeof(_impl_.is_over_budget_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -5205,7 +6251,7 @@ PROTOBUF_NOINLINE void MetricsEvent::Clear() {
   }
 
   // bool is_over_budget = 7;
-  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000800U)) {
     if (this_._internal_is_over_budget() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -5219,6 +6265,42 @@ PROTOBUF_NOINLINE void MetricsEvent::Clear() {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<8>(
               stream, this_._internal_created_at_ns(), target);
+    }
+  }
+
+  // double vad_first_speech_ms = 9;
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (::absl::bit_cast<::uint64_t>(this_._internal_vad_first_speech_ms()) != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteDoubleToArray(
+          9, this_._internal_vad_first_speech_ms(), target);
+    }
+  }
+
+  // double stt_first_partial_ms = 10;
+  if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+    if (::absl::bit_cast<::uint64_t>(this_._internal_stt_first_partial_ms()) != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteDoubleToArray(
+          10, this_._internal_stt_first_partial_ms(), target);
+    }
+  }
+
+  // double llm_total_ms = 11;
+  if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+    if (::absl::bit_cast<::uint64_t>(this_._internal_llm_total_ms()) != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteDoubleToArray(
+          11, this_._internal_llm_total_ms(), target);
+    }
+  }
+
+  // double tts_total_ms = 12;
+  if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+    if (::absl::bit_cast<::uint64_t>(this_._internal_tts_total_ms()) != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteDoubleToArray(
+          12, this_._internal_tts_total_ms(), target);
     }
   }
 
@@ -5293,8 +6375,34 @@ PROTOBUF_NOINLINE void MetricsEvent::Clear() {
             this_._internal_created_at_ns());
       }
     }
-    // bool is_over_budget = 7;
+    // double vad_first_speech_ms = 9;
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (::absl::bit_cast<::uint64_t>(this_._internal_vad_first_speech_ms()) != 0) {
+        total_size += 9;
+      }
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
+    // double stt_first_partial_ms = 10;
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      if (::absl::bit_cast<::uint64_t>(this_._internal_stt_first_partial_ms()) != 0) {
+        total_size += 9;
+      }
+    }
+    // double llm_total_ms = 11;
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (::absl::bit_cast<::uint64_t>(this_._internal_llm_total_ms()) != 0) {
+        total_size += 9;
+      }
+    }
+    // double tts_total_ms = 12;
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+      if (::absl::bit_cast<::uint64_t>(this_._internal_tts_total_ms()) != 0) {
+        total_size += 9;
+      }
+    }
+    // bool is_over_budget = 7;
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (this_._internal_is_over_budget() != 0) {
         total_size += 2;
       }
@@ -5355,6 +6463,28 @@ void MetricsEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (::absl::bit_cast<::uint64_t>(from._internal_vad_first_speech_ms()) != 0) {
+        _this->_impl_.vad_first_speech_ms_ = from._impl_.vad_first_speech_ms_;
+      }
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x00000f00U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000100U)) {
+      if (::absl::bit_cast<::uint64_t>(from._internal_stt_first_partial_ms()) != 0) {
+        _this->_impl_.stt_first_partial_ms_ = from._impl_.stt_first_partial_ms_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000200U)) {
+      if (::absl::bit_cast<::uint64_t>(from._internal_llm_total_ms()) != 0) {
+        _this->_impl_.llm_total_ms_ = from._impl_.llm_total_ms_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000400U)) {
+      if (::absl::bit_cast<::uint64_t>(from._internal_tts_total_ms()) != 0) {
+        _this->_impl_.tts_total_ms_ = from._impl_.tts_total_ms_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000800U)) {
       if (from._internal_is_over_budget() != 0) {
         _this->_impl_.is_over_budget_ = from._impl_.is_over_budget_;
       }
@@ -5390,6 +6520,744 @@ void MetricsEvent::InternalSwap(MetricsEvent* PROTOBUF_RESTRICT PROTOBUF_NONNULL
 }
 // ===================================================================
 
+class AudioLevelEvent::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<AudioLevelEvent>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(AudioLevelEvent, _impl_._has_bits_);
+};
+
+AudioLevelEvent::AudioLevelEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, AudioLevelEvent_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.AudioLevelEvent)
+}
+AudioLevelEvent::AudioLevelEvent(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const AudioLevelEvent& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, AudioLevelEvent_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(from._impl_) {
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+PROTOBUF_NDEBUG_INLINE AudioLevelEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0} {}
+
+inline void AudioLevelEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, rms_),
+           0,
+           offsetof(Impl_, is_speech_) -
+               offsetof(Impl_, rms_) +
+               sizeof(Impl_::is_speech_));
+}
+AudioLevelEvent::~AudioLevelEvent() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.AudioLevelEvent)
+  SharedDtor(*this);
+}
+inline void AudioLevelEvent::SharedDtor(MessageLite& self) {
+  AudioLevelEvent& this_ = static_cast<AudioLevelEvent&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL AudioLevelEvent::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) AudioLevelEvent(arena);
+}
+constexpr auto AudioLevelEvent::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(AudioLevelEvent),
+                                            alignof(AudioLevelEvent));
+}
+constexpr auto AudioLevelEvent::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_AudioLevelEvent_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &AudioLevelEvent::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<AudioLevelEvent>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &AudioLevelEvent::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<AudioLevelEvent>(), &AudioLevelEvent::ByteSizeLong,
+              &AudioLevelEvent::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(AudioLevelEvent, _impl_._cached_size_),
+          false,
+      },
+      &AudioLevelEvent::kDescriptorMethods,
+      &descriptor_table_voice_5fevents_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull AudioLevelEvent_class_data_ =
+        AudioLevelEvent::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+AudioLevelEvent::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&AudioLevelEvent_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(AudioLevelEvent_class_data_.tc_table);
+  return AudioLevelEvent_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<2, 4, 0, 0, 2>
+AudioLevelEvent::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(AudioLevelEvent, _impl_._has_bits_),
+    0, // no _extensions_
+    4, 24,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967280,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    4,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    AudioLevelEvent_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::AudioLevelEvent>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // bool is_speech = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(AudioLevelEvent, _impl_.is_speech_), 3>(),
+     {32, 3, 0,
+      PROTOBUF_FIELD_OFFSET(AudioLevelEvent, _impl_.is_speech_)}},
+    // float rms = 1;
+    {::_pbi::TcParser::FastF32S1,
+     {13, 0, 0,
+      PROTOBUF_FIELD_OFFSET(AudioLevelEvent, _impl_.rms_)}},
+    // float peak = 2;
+    {::_pbi::TcParser::FastF32S1,
+     {21, 1, 0,
+      PROTOBUF_FIELD_OFFSET(AudioLevelEvent, _impl_.peak_)}},
+    // float noise_floor_db = 3;
+    {::_pbi::TcParser::FastF32S1,
+     {29, 2, 0,
+      PROTOBUF_FIELD_OFFSET(AudioLevelEvent, _impl_.noise_floor_db_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // float rms = 1;
+    {PROTOBUF_FIELD_OFFSET(AudioLevelEvent, _impl_.rms_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+    // float peak = 2;
+    {PROTOBUF_FIELD_OFFSET(AudioLevelEvent, _impl_.peak_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+    // float noise_floor_db = 3;
+    {PROTOBUF_FIELD_OFFSET(AudioLevelEvent, _impl_.noise_floor_db_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+    // bool is_speech = 4;
+    {PROTOBUF_FIELD_OFFSET(AudioLevelEvent, _impl_.is_speech_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+  }},
+  // no aux_entries
+  {{
+  }},
+};
+PROTOBUF_NOINLINE void AudioLevelEvent::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.AudioLevelEvent)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    ::memset(&_impl_.rms_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.is_speech_) -
+        reinterpret_cast<char*>(&_impl_.rms_)) + sizeof(_impl_.is_speech_));
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL AudioLevelEvent::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const AudioLevelEvent& this_ = static_cast<const AudioLevelEvent&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL AudioLevelEvent::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const AudioLevelEvent& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.AudioLevelEvent)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // float rms = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_rms()) != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteFloatToArray(
+          1, this_._internal_rms(), target);
+    }
+  }
+
+  // float peak = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_peak()) != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteFloatToArray(
+          2, this_._internal_peak(), target);
+    }
+  }
+
+  // float noise_floor_db = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_noise_floor_db()) != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteFloatToArray(
+          3, this_._internal_noise_floor_db(), target);
+    }
+  }
+
+  // bool is_speech = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_is_speech() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          4, this_._internal_is_speech(), target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.AudioLevelEvent)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t AudioLevelEvent::ByteSizeLong(const MessageLite& base) {
+  const AudioLevelEvent& this_ = static_cast<const AudioLevelEvent&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t AudioLevelEvent::ByteSizeLong() const {
+  const AudioLevelEvent& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.AudioLevelEvent)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    // float rms = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_rms()) != 0) {
+        total_size += 5;
+      }
+    }
+    // float peak = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_peak()) != 0) {
+        total_size += 5;
+      }
+    }
+    // float noise_floor_db = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_noise_floor_db()) != 0) {
+        total_size += 5;
+      }
+    }
+    // bool is_speech = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_is_speech() != 0) {
+        total_size += 2;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void AudioLevelEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<AudioLevelEvent*>(&to_msg);
+  auto& from = static_cast<const AudioLevelEvent&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.AudioLevelEvent)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (::absl::bit_cast<::uint32_t>(from._internal_rms()) != 0) {
+        _this->_impl_.rms_ = from._impl_.rms_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (::absl::bit_cast<::uint32_t>(from._internal_peak()) != 0) {
+        _this->_impl_.peak_ = from._impl_.peak_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (::absl::bit_cast<::uint32_t>(from._internal_noise_floor_db()) != 0) {
+        _this->_impl_.noise_floor_db_ = from._impl_.noise_floor_db_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_is_speech() != 0) {
+        _this->_impl_.is_speech_ = from._impl_.is_speech_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void AudioLevelEvent::CopyFrom(const AudioLevelEvent& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.AudioLevelEvent)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void AudioLevelEvent::InternalSwap(AudioLevelEvent* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(AudioLevelEvent, _impl_.is_speech_)
+      + sizeof(AudioLevelEvent::_impl_.is_speech_)
+      - PROTOBUF_FIELD_OFFSET(AudioLevelEvent, _impl_.rms_)>(
+          reinterpret_cast<char*>(&_impl_.rms_),
+          reinterpret_cast<char*>(&other->_impl_.rms_));
+}
+
+::google::protobuf::Metadata AudioLevelEvent::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class ComponentProgressEvent::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<ComponentProgressEvent>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(ComponentProgressEvent, _impl_._has_bits_);
+};
+
+ComponentProgressEvent::ComponentProgressEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, ComponentProgressEvent_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.ComponentProgressEvent)
+}
+PROTOBUF_NDEBUG_INLINE ComponentProgressEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::ComponentProgressEvent& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        operation_(arena, from.operation_),
+        message_(arena, from.message_) {}
+
+ComponentProgressEvent::ComponentProgressEvent(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const ComponentProgressEvent& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, ComponentProgressEvent_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  ComponentProgressEvent* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, component_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, component_),
+           offsetof(Impl_, progress_) -
+               offsetof(Impl_, component_) +
+               sizeof(Impl_::progress_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.ComponentProgressEvent)
+}
+PROTOBUF_NDEBUG_INLINE ComponentProgressEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        operation_(arena),
+        message_(arena) {}
+
+inline void ComponentProgressEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, component_),
+           0,
+           offsetof(Impl_, progress_) -
+               offsetof(Impl_, component_) +
+               sizeof(Impl_::progress_));
+}
+ComponentProgressEvent::~ComponentProgressEvent() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.ComponentProgressEvent)
+  SharedDtor(*this);
+}
+inline void ComponentProgressEvent::SharedDtor(MessageLite& self) {
+  ComponentProgressEvent& this_ = static_cast<ComponentProgressEvent&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.operation_.Destroy();
+  this_._impl_.message_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL ComponentProgressEvent::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) ComponentProgressEvent(arena);
+}
+constexpr auto ComponentProgressEvent::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ComponentProgressEvent),
+                                            alignof(ComponentProgressEvent));
+}
+constexpr auto ComponentProgressEvent::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_ComponentProgressEvent_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &ComponentProgressEvent::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<ComponentProgressEvent>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &ComponentProgressEvent::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<ComponentProgressEvent>(), &ComponentProgressEvent::ByteSizeLong,
+              &ComponentProgressEvent::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(ComponentProgressEvent, _impl_._cached_size_),
+          false,
+      },
+      &ComponentProgressEvent::kDescriptorMethods,
+      &descriptor_table_voice_5fevents_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull ComponentProgressEvent_class_data_ =
+        ComponentProgressEvent::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+ComponentProgressEvent::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&ComponentProgressEvent_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(ComponentProgressEvent_class_data_.tc_table);
+  return ComponentProgressEvent_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<2, 4, 0, 62, 2>
+ComponentProgressEvent::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(ComponentProgressEvent, _impl_._has_bits_),
+    0, // no _extensions_
+    4, 24,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967280,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    4,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    ComponentProgressEvent_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::ComponentProgressEvent>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // string message = 4;
+    {::_pbi::TcParser::FastUS1,
+     {34, 1, 0,
+      PROTOBUF_FIELD_OFFSET(ComponentProgressEvent, _impl_.message_)}},
+    // .runanywhere.v1.VoicePipelineComponent component = 1;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ComponentProgressEvent, _impl_.component_), 2>(),
+     {8, 2, 0,
+      PROTOBUF_FIELD_OFFSET(ComponentProgressEvent, _impl_.component_)}},
+    // string operation = 2;
+    {::_pbi::TcParser::FastUS1,
+     {18, 0, 0,
+      PROTOBUF_FIELD_OFFSET(ComponentProgressEvent, _impl_.operation_)}},
+    // float progress = 3;
+    {::_pbi::TcParser::FastF32S1,
+     {29, 3, 0,
+      PROTOBUF_FIELD_OFFSET(ComponentProgressEvent, _impl_.progress_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // .runanywhere.v1.VoicePipelineComponent component = 1;
+    {PROTOBUF_FIELD_OFFSET(ComponentProgressEvent, _impl_.component_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    // string operation = 2;
+    {PROTOBUF_FIELD_OFFSET(ComponentProgressEvent, _impl_.operation_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // float progress = 3;
+    {PROTOBUF_FIELD_OFFSET(ComponentProgressEvent, _impl_.progress_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kFloat)},
+    // string message = 4;
+    {PROTOBUF_FIELD_OFFSET(ComponentProgressEvent, _impl_.message_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  // no aux_entries
+  {{
+    "\45\0\11\0\7\0\0\0"
+    "runanywhere.v1.ComponentProgressEvent"
+    "operation"
+    "message"
+  }},
+};
+PROTOBUF_NOINLINE void ComponentProgressEvent::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.ComponentProgressEvent)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.operation_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.message_.ClearNonDefaultToEmpty();
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000cU)) {
+    ::memset(&_impl_.component_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.progress_) -
+        reinterpret_cast<char*>(&_impl_.component_)) + sizeof(_impl_.progress_));
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL ComponentProgressEvent::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const ComponentProgressEvent& this_ = static_cast<const ComponentProgressEvent&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL ComponentProgressEvent::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const ComponentProgressEvent& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.ComponentProgressEvent)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // .runanywhere.v1.VoicePipelineComponent component = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_component() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          1, this_._internal_component(), target);
+    }
+  }
+
+  // string operation = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_operation().empty()) {
+      const ::std::string& _s = this_._internal_operation();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ComponentProgressEvent.operation");
+      target = stream->WriteStringMaybeAliased(2, _s, target);
+    }
+  }
+
+  // float progress = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (::absl::bit_cast<::uint32_t>(this_._internal_progress()) != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteFloatToArray(
+          3, this_._internal_progress(), target);
+    }
+  }
+
+  // string message = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_message().empty()) {
+      const ::std::string& _s = this_._internal_message();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ComponentProgressEvent.message");
+      target = stream->WriteStringMaybeAliased(4, _s, target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.ComponentProgressEvent)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t ComponentProgressEvent::ByteSizeLong(const MessageLite& base) {
+  const ComponentProgressEvent& this_ = static_cast<const ComponentProgressEvent&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t ComponentProgressEvent::ByteSizeLong() const {
+  const ComponentProgressEvent& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.ComponentProgressEvent)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    // string operation = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_operation().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_operation());
+      }
+    }
+    // string message = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_message().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_message());
+      }
+    }
+    // .runanywhere.v1.VoicePipelineComponent component = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_component() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_component());
+      }
+    }
+    // float progress = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (::absl::bit_cast<::uint32_t>(this_._internal_progress()) != 0) {
+        total_size += 5;
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void ComponentProgressEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<ComponentProgressEvent*>(&to_msg);
+  auto& from = static_cast<const ComponentProgressEvent&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.ComponentProgressEvent)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_operation().empty()) {
+        _this->_internal_set_operation(from._internal_operation());
+      } else {
+        if (_this->_impl_.operation_.IsDefault()) {
+          _this->_internal_set_operation("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_message().empty()) {
+        _this->_internal_set_message(from._internal_message());
+      } else {
+        if (_this->_impl_.message_.IsDefault()) {
+          _this->_internal_set_message("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_component() != 0) {
+        _this->_impl_.component_ = from._impl_.component_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (::absl::bit_cast<::uint32_t>(from._internal_progress()) != 0) {
+        _this->_impl_.progress_ = from._impl_.progress_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void ComponentProgressEvent::CopyFrom(const ComponentProgressEvent& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.ComponentProgressEvent)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void ComponentProgressEvent::InternalSwap(ComponentProgressEvent* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.operation_, &other->_impl_.operation_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.message_, &other->_impl_.message_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(ComponentProgressEvent, _impl_.progress_)
+      + sizeof(ComponentProgressEvent::_impl_.progress_)
+      - PROTOBUF_FIELD_OFFSET(ComponentProgressEvent, _impl_.component_)>(
+          reinterpret_cast<char*>(&_impl_.component_),
+          reinterpret_cast<char*>(&other->_impl_.component_));
+}
+
+::google::protobuf::Metadata ComponentProgressEvent::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
 class VoiceAgentComponentStates::_Internal {
  public:
   using HasBits =
@@ -5407,30 +7275,51 @@ VoiceAgentComponentStates::VoiceAgentComponentStates(::google::protobuf::Arena* 
   SharedCtor(arena);
   // @@protoc_insertion_point(arena_constructor:runanywhere.v1.VoiceAgentComponentStates)
 }
+PROTOBUF_NDEBUG_INLINE VoiceAgentComponentStates::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::VoiceAgentComponentStates& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        error_message_(arena, from.error_message_) {}
+
 VoiceAgentComponentStates::VoiceAgentComponentStates(
-    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const VoiceAgentComponentStates& from)
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const VoiceAgentComponentStates& from)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(arena, VoiceAgentComponentStates_class_data_.base()),
+    : ::google::protobuf::Message(arena, VoiceAgentComponentStates_class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(arena),
+    : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
-      _impl_(from._impl_) {
+  VoiceAgentComponentStates* const _this = this;
+  (void)_this;
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, stt_state_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, stt_state_),
+           offsetof(Impl_, wakeword_state_) -
+               offsetof(Impl_, stt_state_) +
+               sizeof(Impl_::wakeword_state_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.VoiceAgentComponentStates)
 }
 PROTOBUF_NDEBUG_INLINE VoiceAgentComponentStates::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
-      : _cached_size_{0} {}
+      : _cached_size_{0},
+        error_message_(arena) {}
 
 inline void VoiceAgentComponentStates::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, stt_state_),
            0,
-           offsetof(Impl_, any_loading_) -
+           offsetof(Impl_, wakeword_state_) -
                offsetof(Impl_, stt_state_) +
-               sizeof(Impl_::any_loading_));
+               sizeof(Impl_::wakeword_state_));
 }
 VoiceAgentComponentStates::~VoiceAgentComponentStates() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.VoiceAgentComponentStates)
@@ -5443,6 +7332,7 @@ inline void VoiceAgentComponentStates::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.error_message_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -5452,7 +7342,7 @@ inline void* PROTOBUF_NONNULL VoiceAgentComponentStates::PlacementNew_(
   return ::new (mem) VoiceAgentComponentStates(arena);
 }
 constexpr auto VoiceAgentComponentStates::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(VoiceAgentComponentStates),
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(VoiceAgentComponentStates),
                                             alignof(VoiceAgentComponentStates));
 }
 constexpr auto VoiceAgentComponentStates::InternalGenerateClassData_() {
@@ -5488,16 +7378,16 @@ VoiceAgentComponentStates::GetClassData() const {
   return VoiceAgentComponentStates_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 6, 0, 0, 2>
+const ::_pbi::TcParseTable<3, 8, 0, 70, 2>
 VoiceAgentComponentStates::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_._has_bits_),
     0, // no _extensions_
-    6, 56,  // max_field_number, fast_idx_mask
+    8, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967232,  // skipmap
+    4294967040,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    6,  // num_field_entries
+    8,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     VoiceAgentComponentStates_class_data_.base(),
@@ -5507,50 +7397,63 @@ VoiceAgentComponentStates::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::VoiceAgentComponentStates>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    {::_pbi::TcParser::MiniParse, {}},
+    // optional string error_message = 8;
+    {::_pbi::TcParser::FastUS1,
+     {66, 0, 0,
+      PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.error_message_)}},
     // .runanywhere.v1.ComponentLoadState stt_state = 1;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceAgentComponentStates, _impl_.stt_state_), 0>(),
-     {8, 0, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceAgentComponentStates, _impl_.stt_state_), 1>(),
+     {8, 1, 0,
       PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.stt_state_)}},
     // .runanywhere.v1.ComponentLoadState llm_state = 2;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceAgentComponentStates, _impl_.llm_state_), 1>(),
-     {16, 1, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceAgentComponentStates, _impl_.llm_state_), 2>(),
+     {16, 2, 0,
       PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.llm_state_)}},
     // .runanywhere.v1.ComponentLoadState tts_state = 3;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceAgentComponentStates, _impl_.tts_state_), 2>(),
-     {24, 2, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceAgentComponentStates, _impl_.tts_state_), 3>(),
+     {24, 3, 0,
       PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.tts_state_)}},
     // .runanywhere.v1.ComponentLoadState vad_state = 4;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceAgentComponentStates, _impl_.vad_state_), 3>(),
-     {32, 3, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceAgentComponentStates, _impl_.vad_state_), 4>(),
+     {32, 4, 0,
       PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.vad_state_)}},
     // bool ready = 5;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VoiceAgentComponentStates, _impl_.ready_), 4>(),
-     {40, 4, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VoiceAgentComponentStates, _impl_.ready_), 5>(),
+     {40, 5, 0,
       PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.ready_)}},
     // bool any_loading = 6;
-    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VoiceAgentComponentStates, _impl_.any_loading_), 5>(),
-     {48, 5, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VoiceAgentComponentStates, _impl_.any_loading_), 6>(),
+     {48, 6, 0,
       PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.any_loading_)}},
-    {::_pbi::TcParser::MiniParse, {}},
+    // .runanywhere.v1.ComponentLoadState wakeword_state = 7;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceAgentComponentStates, _impl_.wakeword_state_), 7>(),
+     {56, 7, 0,
+      PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.wakeword_state_)}},
   }}, {{
     65535, 65535
   }}, {{
     // .runanywhere.v1.ComponentLoadState stt_state = 1;
-    {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.stt_state_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.stt_state_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // .runanywhere.v1.ComponentLoadState llm_state = 2;
-    {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.llm_state_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.llm_state_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // .runanywhere.v1.ComponentLoadState tts_state = 3;
-    {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.tts_state_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.tts_state_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // .runanywhere.v1.ComponentLoadState vad_state = 4;
-    {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.vad_state_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.vad_state_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // bool ready = 5;
-    {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.ready_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.ready_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // bool any_loading = 6;
-    {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.any_loading_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.any_loading_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // .runanywhere.v1.ComponentLoadState wakeword_state = 7;
+    {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.wakeword_state_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    // optional string error_message = 8;
+    {PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.error_message_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
   }},
   // no aux_entries
   {{
+    "\50\0\0\0\0\0\0\0\15\0\0\0\0\0\0\0"
+    "runanywhere.v1.VoiceAgentComponentStates"
+    "error_message"
   }},
 };
 PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
@@ -5561,10 +7464,13 @@ PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    _impl_.error_message_.ClearNonDefaultToEmpty();
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x000000feU)) {
     ::memset(&_impl_.stt_state_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.any_loading_) -
-        reinterpret_cast<char*>(&_impl_.stt_state_)) + sizeof(_impl_.any_loading_));
+        reinterpret_cast<char*>(&_impl_.wakeword_state_) -
+        reinterpret_cast<char*>(&_impl_.stt_state_)) + sizeof(_impl_.wakeword_state_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -5590,7 +7496,7 @@ PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // .runanywhere.v1.ComponentLoadState stt_state = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
     if (this_._internal_stt_state() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -5599,7 +7505,7 @@ PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
   }
 
   // .runanywhere.v1.ComponentLoadState llm_state = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_llm_state() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -5608,7 +7514,7 @@ PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
   }
 
   // .runanywhere.v1.ComponentLoadState tts_state = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_tts_state() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -5617,7 +7523,7 @@ PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
   }
 
   // .runanywhere.v1.ComponentLoadState vad_state = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_vad_state() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -5626,7 +7532,7 @@ PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
   }
 
   // bool ready = 5;
-  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_ready() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
@@ -5635,12 +7541,29 @@ PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
   }
 
   // bool any_loading = 6;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_any_loading() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteBoolToArray(
           6, this_._internal_any_loading(), target);
     }
+  }
+
+  // .runanywhere.v1.ComponentLoadState wakeword_state = 7;
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (this_._internal_wakeword_state() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteEnumToArray(
+          7, this_._internal_wakeword_state(), target);
+    }
+  }
+
+  // optional string error_message = 8;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    const ::std::string& _s = this_._internal_error_message();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.VoiceAgentComponentStates.error_message");
+    target = stream->WriteStringMaybeAliased(8, _s, target);
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -5668,45 +7591,57 @@ PROTOBUF_NOINLINE void VoiceAgentComponentStates::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
-    // .runanywhere.v1.ComponentLoadState stt_state = 1;
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
+    // optional string error_message = 8;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_error_message());
+    }
+    // .runanywhere.v1.ComponentLoadState stt_state = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (this_._internal_stt_state() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_stt_state());
       }
     }
     // .runanywhere.v1.ComponentLoadState llm_state = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_llm_state() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_llm_state());
       }
     }
     // .runanywhere.v1.ComponentLoadState tts_state = 3;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_tts_state() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_tts_state());
       }
     }
     // .runanywhere.v1.ComponentLoadState vad_state = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_vad_state() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_vad_state());
       }
     }
     // bool ready = 5;
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_ready() != 0) {
         total_size += 2;
       }
     }
     // bool any_loading = 6;
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_any_loading() != 0) {
         total_size += 2;
+      }
+    }
+    // .runanywhere.v1.ComponentLoadState wakeword_state = 7;
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (this_._internal_wakeword_state() != 0) {
+        total_size += 1 +
+                      ::_pbi::WireFormatLite::EnumSize(this_._internal_wakeword_state());
       }
     }
   }
@@ -5728,35 +7663,43 @@ void VoiceAgentComponentStates::MergeImpl(::google::protobuf::MessageLite& to_ms
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _this->_internal_set_error_message(from._internal_error_message());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
       if (from._internal_stt_state() != 0) {
         _this->_impl_.stt_state_ = from._impl_.stt_state_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_llm_state() != 0) {
         _this->_impl_.llm_state_ = from._impl_.llm_state_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (from._internal_tts_state() != 0) {
         _this->_impl_.tts_state_ = from._impl_.tts_state_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_vad_state() != 0) {
         _this->_impl_.vad_state_ = from._impl_.vad_state_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_ready() != 0) {
         _this->_impl_.ready_ = from._impl_.ready_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_any_loading() != 0) {
         _this->_impl_.any_loading_ = from._impl_.any_loading_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (from._internal_wakeword_state() != 0) {
+        _this->_impl_.wakeword_state_ = from._impl_.wakeword_state_;
       }
     }
   }
@@ -5775,11 +7718,14 @@ void VoiceAgentComponentStates::CopyFrom(const VoiceAgentComponentStates& from) 
 
 void VoiceAgentComponentStates::InternalSwap(VoiceAgentComponentStates* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
   using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.any_loading_)
-      + sizeof(VoiceAgentComponentStates::_impl_.any_loading_)
+      PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.wakeword_state_)
+      + sizeof(VoiceAgentComponentStates::_impl_.wakeword_state_)
       - PROTOBUF_FIELD_OFFSET(VoiceAgentComponentStates, _impl_.stt_state_)>(
           reinterpret_cast<char*>(&_impl_.stt_state_),
           reinterpret_cast<char*>(&other->_impl_.stt_state_));
@@ -5829,7 +7775,13 @@ VoiceSessionError::VoiceSessionError(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  _impl_.code_ = from._impl_.code_;
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, code_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, code_),
+           offsetof(Impl_, recoverable_) -
+               offsetof(Impl_, code_) +
+               sizeof(Impl_::recoverable_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.VoiceSessionError)
 }
@@ -5842,7 +7794,12 @@ PROTOBUF_NDEBUG_INLINE VoiceSessionError::Impl_::Impl_(
 
 inline void VoiceSessionError::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
-  _impl_.code_ = {};
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, code_),
+           0,
+           offsetof(Impl_, recoverable_) -
+               offsetof(Impl_, code_) +
+               sizeof(Impl_::recoverable_));
 }
 VoiceSessionError::~VoiceSessionError() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.VoiceSessionError)
@@ -5902,16 +7859,16 @@ VoiceSessionError::GetClassData() const {
   return VoiceSessionError_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<2, 3, 0, 64, 2>
+const ::_pbi::TcParseTable<3, 5, 0, 64, 2>
 VoiceSessionError::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(VoiceSessionError, _impl_._has_bits_),
     0, // no _extensions_
-    3, 24,  // max_field_number, fast_idx_mask
+    5, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967288,  // skipmap
+    4294967264,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    3,  // num_field_entries
+    5,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     VoiceSessionError_class_data_.base(),
@@ -5934,6 +7891,16 @@ VoiceSessionError::_table_ = {
     {::_pbi::TcParser::FastUS1,
      {26, 1, 0,
       PROTOBUF_FIELD_OFFSET(VoiceSessionError, _impl_.failed_component_)}},
+    // int32 c_abi_code = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(VoiceSessionError, _impl_.c_abi_code_), 3>(),
+     {32, 3, 0,
+      PROTOBUF_FIELD_OFFSET(VoiceSessionError, _impl_.c_abi_code_)}},
+    // bool recoverable = 5;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(VoiceSessionError, _impl_.recoverable_), 4>(),
+     {40, 4, 0,
+      PROTOBUF_FIELD_OFFSET(VoiceSessionError, _impl_.recoverable_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
   }}, {{
     65535, 65535
   }}, {{
@@ -5943,6 +7910,10 @@ VoiceSessionError::_table_ = {
     {PROTOBUF_FIELD_OFFSET(VoiceSessionError, _impl_.message_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // optional string failed_component = 3;
     {PROTOBUF_FIELD_OFFSET(VoiceSessionError, _impl_.failed_component_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // int32 c_abi_code = 4;
+    {PROTOBUF_FIELD_OFFSET(VoiceSessionError, _impl_.c_abi_code_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    // bool recoverable = 5;
+    {PROTOBUF_FIELD_OFFSET(VoiceSessionError, _impl_.recoverable_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
   }},
   // no aux_entries
   {{
@@ -5968,7 +7939,11 @@ PROTOBUF_NOINLINE void VoiceSessionError::Clear() {
       _impl_.failed_component_.ClearNonDefaultToEmpty();
     }
   }
-  _impl_.code_ = 0;
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001cU)) {
+    ::memset(&_impl_.code_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.recoverable_) -
+        reinterpret_cast<char*>(&_impl_.code_)) + sizeof(_impl_.recoverable_));
+  }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -6019,6 +7994,24 @@ PROTOBUF_NOINLINE void VoiceSessionError::Clear() {
     target = stream->WriteStringMaybeAliased(3, _s, target);
   }
 
+  // int32 c_abi_code = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_c_abi_code() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
+              stream, this_._internal_c_abi_code(), target);
+    }
+  }
+
+  // bool recoverable = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (this_._internal_recoverable() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          5, this_._internal_recoverable(), target);
+    }
+  }
+
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -6044,7 +8037,7 @@ PROTOBUF_NOINLINE void VoiceSessionError::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     // string message = 2;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_message().empty()) {
@@ -6062,6 +8055,19 @@ PROTOBUF_NOINLINE void VoiceSessionError::Clear() {
       if (this_._internal_code() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_code());
+      }
+    }
+    // int32 c_abi_code = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_c_abi_code() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_c_abi_code());
+      }
+    }
+    // bool recoverable = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_recoverable() != 0) {
+        total_size += 2;
       }
     }
   }
@@ -6083,7 +8089,7 @@ void VoiceSessionError::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000007U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_message().empty()) {
         _this->_internal_set_message(from._internal_message());
@@ -6099,6 +8105,16 @@ void VoiceSessionError::MergeImpl(::google::protobuf::MessageLite& to_msg,
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (from._internal_code() != 0) {
         _this->_impl_.code_ = from._impl_.code_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_c_abi_code() != 0) {
+        _this->_impl_.c_abi_code_ = from._impl_.c_abi_code_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_recoverable() != 0) {
+        _this->_impl_.recoverable_ = from._impl_.recoverable_;
       }
     }
   }
@@ -6123,7 +8139,12 @@ void VoiceSessionError::InternalSwap(VoiceSessionError* PROTOBUF_RESTRICT PROTOB
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.message_, &other->_impl_.message_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.failed_component_, &other->_impl_.failed_component_, arena);
-  swap(_impl_.code_, other->_impl_.code_);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(VoiceSessionError, _impl_.recoverable_)
+      + sizeof(VoiceSessionError::_impl_.recoverable_)
+      - PROTOBUF_FIELD_OFFSET(VoiceSessionError, _impl_.code_)>(
+          reinterpret_cast<char*>(&_impl_.code_),
+          reinterpret_cast<char*>(&other->_impl_.code_));
 }
 
 ::google::protobuf::Metadata VoiceSessionError::GetMetadata() const {
@@ -6133,30 +8154,67 @@ void VoiceSessionError::InternalSwap(VoiceSessionError* PROTOBUF_RESTRICT PROTOB
 
 class SessionStartedEvent::_Internal {
  public:
+  using HasBits =
+      decltype(::std::declval<SessionStartedEvent>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(SessionStartedEvent, _impl_._has_bits_);
 };
 
 SessionStartedEvent::SessionStartedEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(arena, SessionStartedEvent_class_data_.base()) {
+    : ::google::protobuf::Message(arena, SessionStartedEvent_class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
+    : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
   // @@protoc_insertion_point(arena_constructor:runanywhere.v1.SessionStartedEvent)
 }
+PROTOBUF_NDEBUG_INLINE SessionStartedEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::SessionStartedEvent& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        session_id_(arena, from.session_id_) {}
+
 SessionStartedEvent::SessionStartedEvent(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
     const SessionStartedEvent& from)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(arena, SessionStartedEvent_class_data_.base()) {
+    : ::google::protobuf::Message(arena, SessionStartedEvent_class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
+    : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
   SessionStartedEvent* const _this = this;
   (void)_this;
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.SessionStartedEvent)
+}
+PROTOBUF_NDEBUG_INLINE SessionStartedEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        session_id_(arena) {}
+
+inline void SessionStartedEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+}
+SessionStartedEvent::~SessionStartedEvent() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.SessionStartedEvent)
+  SharedDtor(*this);
+}
+inline void SessionStartedEvent::SharedDtor(MessageLite& self) {
+  SessionStartedEvent& this_ = static_cast<SessionStartedEvent&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.session_id_.Destroy();
+  this_._impl_.~Impl_();
 }
 
 inline void* PROTOBUF_NONNULL SessionStartedEvent::PlacementNew_(
@@ -6165,7 +8223,7 @@ inline void* PROTOBUF_NONNULL SessionStartedEvent::PlacementNew_(
   return ::new (mem) SessionStartedEvent(arena);
 }
 constexpr auto SessionStartedEvent::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(SessionStartedEvent),
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(SessionStartedEvent),
                                             alignof(SessionStartedEvent));
 }
 constexpr auto SessionStartedEvent::InternalGenerateClassData_() {
@@ -6175,10 +8233,10 @@ constexpr auto SessionStartedEvent::InternalGenerateClassData_() {
           &_table_.header,
           nullptr,  // IsInitialized
           &SessionStartedEvent::MergeImpl,
-          ::google::protobuf::internal::ZeroFieldsBase::GetNewImpl<SessionStartedEvent>(),
+          ::google::protobuf::Message::GetNewImpl<SessionStartedEvent>(),
 #if defined(PROTOBUF_CUSTOM_VTABLE)
           &SessionStartedEvent::SharedDtor,
-          ::google::protobuf::internal::ZeroFieldsBase::GetClearImpl<SessionStartedEvent>(), &SessionStartedEvent::ByteSizeLong,
+          ::google::protobuf::Message::GetClearImpl<SessionStartedEvent>(), &SessionStartedEvent::ByteSizeLong,
               &SessionStartedEvent::_InternalSerialize,
 #endif  // PROTOBUF_CUSTOM_VTABLE
           PROTOBUF_FIELD_OFFSET(SessionStartedEvent, _impl_._cached_size_),
@@ -6201,17 +8259,16 @@ SessionStartedEvent::GetClassData() const {
   return SessionStartedEvent_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<0, 0, 0, 0, 2>
+const ::_pbi::TcParseTable<0, 1, 0, 53, 2>
 SessionStartedEvent::_table_ = {
   {
-    PROTOBUF_FIELD_OFFSET(SessionStartedEvent,
-                          _impl_._cached_size_),  // no hasbits
+    PROTOBUF_FIELD_OFFSET(SessionStartedEvent, _impl_._has_bits_),
     0, // no _extensions_
-    0, 0,  // max_field_number, fast_idx_mask
+    1, 0,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967295,  // skipmap
-    offsetof(decltype(_table_), field_names),  // no field_entries
-    0,  // num_field_entries
+    4294967294,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    1,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     SessionStartedEvent_class_data_.base(),
@@ -6221,51 +8278,220 @@ SessionStartedEvent::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::SessionStartedEvent>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    {::_pbi::TcParser::MiniParse, {}},
+    // string session_id = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(SessionStartedEvent, _impl_.session_id_)}},
   }}, {{
     65535, 65535
-  }}, // no field_entries, or aux_entries
+  }}, {{
+    // string session_id = 1;
+    {PROTOBUF_FIELD_OFFSET(SessionStartedEvent, _impl_.session_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  // no aux_entries
   {{
+    "\42\12\0\0\0\0\0\0"
+    "runanywhere.v1.SessionStartedEvent"
+    "session_id"
   }},
 };
+PROTOBUF_NOINLINE void SessionStartedEvent::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.SessionStartedEvent)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    _impl_.session_id_.ClearNonDefaultToEmpty();
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL SessionStartedEvent::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const SessionStartedEvent& this_ = static_cast<const SessionStartedEvent&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL SessionStartedEvent::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const SessionStartedEvent& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.SessionStartedEvent)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string session_id = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_session_id().empty()) {
+      const ::std::string& _s = this_._internal_session_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SessionStartedEvent.session_id");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.SessionStartedEvent)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t SessionStartedEvent::ByteSizeLong(const MessageLite& base) {
+  const SessionStartedEvent& this_ = static_cast<const SessionStartedEvent&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t SessionStartedEvent::ByteSizeLong() const {
+  const SessionStartedEvent& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.SessionStartedEvent)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+   {
+    // string session_id = 1;
+    cached_has_bits = this_._impl_._has_bits_[0];
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_session_id().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_session_id());
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void SessionStartedEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<SessionStartedEvent*>(&to_msg);
+  auto& from = static_cast<const SessionStartedEvent&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.SessionStartedEvent)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!from._internal_session_id().empty()) {
+      _this->_internal_set_session_id(from._internal_session_id());
+    } else {
+      if (_this->_impl_.session_id_.IsDefault()) {
+        _this->_internal_set_session_id("");
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void SessionStartedEvent::CopyFrom(const SessionStartedEvent& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.SessionStartedEvent)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
 
 
-
-
-
-
+void SessionStartedEvent::InternalSwap(SessionStartedEvent* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.session_id_, &other->_impl_.session_id_, arena);
+}
 
 ::google::protobuf::Metadata SessionStartedEvent::GetMetadata() const {
-  return ::google::protobuf::internal::ZeroFieldsBase::GetMetadataImpl(GetClassData()->full());
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================
 
 class SessionStoppedEvent::_Internal {
  public:
+  using HasBits =
+      decltype(::std::declval<SessionStoppedEvent>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(SessionStoppedEvent, _impl_._has_bits_);
 };
 
 SessionStoppedEvent::SessionStoppedEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(arena, SessionStoppedEvent_class_data_.base()) {
+    : ::google::protobuf::Message(arena, SessionStoppedEvent_class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
+    : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
   // @@protoc_insertion_point(arena_constructor:runanywhere.v1.SessionStoppedEvent)
 }
+PROTOBUF_NDEBUG_INLINE SessionStoppedEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::SessionStoppedEvent& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        session_id_(arena, from.session_id_),
+        reason_(arena, from.reason_) {}
+
 SessionStoppedEvent::SessionStoppedEvent(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
     const SessionStoppedEvent& from)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(arena, SessionStoppedEvent_class_data_.base()) {
+    : ::google::protobuf::Message(arena, SessionStoppedEvent_class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
+    : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
   SessionStoppedEvent* const _this = this;
   (void)_this;
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.SessionStoppedEvent)
+}
+PROTOBUF_NDEBUG_INLINE SessionStoppedEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        session_id_(arena),
+        reason_(arena) {}
+
+inline void SessionStoppedEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+}
+SessionStoppedEvent::~SessionStoppedEvent() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.SessionStoppedEvent)
+  SharedDtor(*this);
+}
+inline void SessionStoppedEvent::SharedDtor(MessageLite& self) {
+  SessionStoppedEvent& this_ = static_cast<SessionStoppedEvent&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.session_id_.Destroy();
+  this_._impl_.reason_.Destroy();
+  this_._impl_.~Impl_();
 }
 
 inline void* PROTOBUF_NONNULL SessionStoppedEvent::PlacementNew_(
@@ -6274,7 +8500,7 @@ inline void* PROTOBUF_NONNULL SessionStoppedEvent::PlacementNew_(
   return ::new (mem) SessionStoppedEvent(arena);
 }
 constexpr auto SessionStoppedEvent::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(SessionStoppedEvent),
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(SessionStoppedEvent),
                                             alignof(SessionStoppedEvent));
 }
 constexpr auto SessionStoppedEvent::InternalGenerateClassData_() {
@@ -6284,10 +8510,10 @@ constexpr auto SessionStoppedEvent::InternalGenerateClassData_() {
           &_table_.header,
           nullptr,  // IsInitialized
           &SessionStoppedEvent::MergeImpl,
-          ::google::protobuf::internal::ZeroFieldsBase::GetNewImpl<SessionStoppedEvent>(),
+          ::google::protobuf::Message::GetNewImpl<SessionStoppedEvent>(),
 #if defined(PROTOBUF_CUSTOM_VTABLE)
           &SessionStoppedEvent::SharedDtor,
-          ::google::protobuf::internal::ZeroFieldsBase::GetClearImpl<SessionStoppedEvent>(), &SessionStoppedEvent::ByteSizeLong,
+          ::google::protobuf::Message::GetClearImpl<SessionStoppedEvent>(), &SessionStoppedEvent::ByteSizeLong,
               &SessionStoppedEvent::_InternalSerialize,
 #endif  // PROTOBUF_CUSTOM_VTABLE
           PROTOBUF_FIELD_OFFSET(SessionStoppedEvent, _impl_._cached_size_),
@@ -6310,17 +8536,16 @@ SessionStoppedEvent::GetClassData() const {
   return SessionStoppedEvent_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<0, 0, 0, 0, 2>
+const ::_pbi::TcParseTable<1, 2, 0, 59, 2>
 SessionStoppedEvent::_table_ = {
   {
-    PROTOBUF_FIELD_OFFSET(SessionStoppedEvent,
-                          _impl_._cached_size_),  // no hasbits
+    PROTOBUF_FIELD_OFFSET(SessionStoppedEvent, _impl_._has_bits_),
     0, // no _extensions_
-    0, 0,  // max_field_number, fast_idx_mask
+    2, 8,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967295,  // skipmap
-    offsetof(decltype(_table_), field_names),  // no field_entries
-    0,  // num_field_entries
+    4294967292,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    2,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     SessionStoppedEvent_class_data_.base(),
@@ -6330,51 +8555,259 @@ SessionStoppedEvent::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::SessionStoppedEvent>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    {::_pbi::TcParser::MiniParse, {}},
+    // string reason = 2;
+    {::_pbi::TcParser::FastUS1,
+     {18, 1, 0,
+      PROTOBUF_FIELD_OFFSET(SessionStoppedEvent, _impl_.reason_)}},
+    // string session_id = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(SessionStoppedEvent, _impl_.session_id_)}},
   }}, {{
     65535, 65535
-  }}, // no field_entries, or aux_entries
+  }}, {{
+    // string session_id = 1;
+    {PROTOBUF_FIELD_OFFSET(SessionStoppedEvent, _impl_.session_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // string reason = 2;
+    {PROTOBUF_FIELD_OFFSET(SessionStoppedEvent, _impl_.reason_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  // no aux_entries
   {{
+    "\42\12\6\0\0\0\0\0"
+    "runanywhere.v1.SessionStoppedEvent"
+    "session_id"
+    "reason"
   }},
 };
+PROTOBUF_NOINLINE void SessionStoppedEvent::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.SessionStoppedEvent)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.session_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.reason_.ClearNonDefaultToEmpty();
+    }
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL SessionStoppedEvent::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const SessionStoppedEvent& this_ = static_cast<const SessionStoppedEvent&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL SessionStoppedEvent::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const SessionStoppedEvent& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.SessionStoppedEvent)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string session_id = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_session_id().empty()) {
+      const ::std::string& _s = this_._internal_session_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SessionStoppedEvent.session_id");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  // string reason = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_reason().empty()) {
+      const ::std::string& _s = this_._internal_reason();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.SessionStoppedEvent.reason");
+      target = stream->WriteStringMaybeAliased(2, _s, target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.SessionStoppedEvent)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t SessionStoppedEvent::ByteSizeLong(const MessageLite& base) {
+  const SessionStoppedEvent& this_ = static_cast<const SessionStoppedEvent&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t SessionStoppedEvent::ByteSizeLong() const {
+  const SessionStoppedEvent& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.SessionStoppedEvent)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    // string session_id = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_session_id().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_session_id());
+      }
+    }
+    // string reason = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_reason().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_reason());
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void SessionStoppedEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<SessionStoppedEvent*>(&to_msg);
+  auto& from = static_cast<const SessionStoppedEvent&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.SessionStoppedEvent)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_session_id().empty()) {
+        _this->_internal_set_session_id(from._internal_session_id());
+      } else {
+        if (_this->_impl_.session_id_.IsDefault()) {
+          _this->_internal_set_session_id("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_reason().empty()) {
+        _this->_internal_set_reason(from._internal_reason());
+      } else {
+        if (_this->_impl_.reason_.IsDefault()) {
+          _this->_internal_set_reason("");
+        }
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void SessionStoppedEvent::CopyFrom(const SessionStoppedEvent& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.SessionStoppedEvent)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
 
 
-
-
-
-
+void SessionStoppedEvent::InternalSwap(SessionStoppedEvent* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.session_id_, &other->_impl_.session_id_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.reason_, &other->_impl_.reason_, arena);
+}
 
 ::google::protobuf::Metadata SessionStoppedEvent::GetMetadata() const {
-  return ::google::protobuf::internal::ZeroFieldsBase::GetMetadataImpl(GetClassData()->full());
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================
 
 class AgentResponseStartedEvent::_Internal {
  public:
+  using HasBits =
+      decltype(::std::declval<AgentResponseStartedEvent>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(AgentResponseStartedEvent, _impl_._has_bits_);
 };
 
 AgentResponseStartedEvent::AgentResponseStartedEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(arena, AgentResponseStartedEvent_class_data_.base()) {
+    : ::google::protobuf::Message(arena, AgentResponseStartedEvent_class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
+    : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
   // @@protoc_insertion_point(arena_constructor:runanywhere.v1.AgentResponseStartedEvent)
 }
+PROTOBUF_NDEBUG_INLINE AgentResponseStartedEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::AgentResponseStartedEvent& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        turn_id_(arena, from.turn_id_) {}
+
 AgentResponseStartedEvent::AgentResponseStartedEvent(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
     const AgentResponseStartedEvent& from)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(arena, AgentResponseStartedEvent_class_data_.base()) {
+    : ::google::protobuf::Message(arena, AgentResponseStartedEvent_class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
+    : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
   AgentResponseStartedEvent* const _this = this;
   (void)_this;
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.AgentResponseStartedEvent)
+}
+PROTOBUF_NDEBUG_INLINE AgentResponseStartedEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        turn_id_(arena) {}
+
+inline void AgentResponseStartedEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+}
+AgentResponseStartedEvent::~AgentResponseStartedEvent() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.AgentResponseStartedEvent)
+  SharedDtor(*this);
+}
+inline void AgentResponseStartedEvent::SharedDtor(MessageLite& self) {
+  AgentResponseStartedEvent& this_ = static_cast<AgentResponseStartedEvent&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.turn_id_.Destroy();
+  this_._impl_.~Impl_();
 }
 
 inline void* PROTOBUF_NONNULL AgentResponseStartedEvent::PlacementNew_(
@@ -6383,7 +8816,7 @@ inline void* PROTOBUF_NONNULL AgentResponseStartedEvent::PlacementNew_(
   return ::new (mem) AgentResponseStartedEvent(arena);
 }
 constexpr auto AgentResponseStartedEvent::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(AgentResponseStartedEvent),
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(AgentResponseStartedEvent),
                                             alignof(AgentResponseStartedEvent));
 }
 constexpr auto AgentResponseStartedEvent::InternalGenerateClassData_() {
@@ -6393,10 +8826,10 @@ constexpr auto AgentResponseStartedEvent::InternalGenerateClassData_() {
           &_table_.header,
           nullptr,  // IsInitialized
           &AgentResponseStartedEvent::MergeImpl,
-          ::google::protobuf::internal::ZeroFieldsBase::GetNewImpl<AgentResponseStartedEvent>(),
+          ::google::protobuf::Message::GetNewImpl<AgentResponseStartedEvent>(),
 #if defined(PROTOBUF_CUSTOM_VTABLE)
           &AgentResponseStartedEvent::SharedDtor,
-          ::google::protobuf::internal::ZeroFieldsBase::GetClearImpl<AgentResponseStartedEvent>(), &AgentResponseStartedEvent::ByteSizeLong,
+          ::google::protobuf::Message::GetClearImpl<AgentResponseStartedEvent>(), &AgentResponseStartedEvent::ByteSizeLong,
               &AgentResponseStartedEvent::_InternalSerialize,
 #endif  // PROTOBUF_CUSTOM_VTABLE
           PROTOBUF_FIELD_OFFSET(AgentResponseStartedEvent, _impl_._cached_size_),
@@ -6419,17 +8852,16 @@ AgentResponseStartedEvent::GetClassData() const {
   return AgentResponseStartedEvent_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<0, 0, 0, 0, 2>
+const ::_pbi::TcParseTable<0, 1, 0, 56, 2>
 AgentResponseStartedEvent::_table_ = {
   {
-    PROTOBUF_FIELD_OFFSET(AgentResponseStartedEvent,
-                          _impl_._cached_size_),  // no hasbits
+    PROTOBUF_FIELD_OFFSET(AgentResponseStartedEvent, _impl_._has_bits_),
     0, // no _extensions_
-    0, 0,  // max_field_number, fast_idx_mask
+    1, 0,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967295,  // skipmap
-    offsetof(decltype(_table_), field_names),  // no field_entries
-    0,  // num_field_entries
+    4294967294,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    1,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     AgentResponseStartedEvent_class_data_.base(),
@@ -6439,51 +8871,219 @@ AgentResponseStartedEvent::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::AgentResponseStartedEvent>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    {::_pbi::TcParser::MiniParse, {}},
+    // string turn_id = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(AgentResponseStartedEvent, _impl_.turn_id_)}},
   }}, {{
     65535, 65535
-  }}, // no field_entries, or aux_entries
+  }}, {{
+    // string turn_id = 1;
+    {PROTOBUF_FIELD_OFFSET(AgentResponseStartedEvent, _impl_.turn_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  // no aux_entries
   {{
+    "\50\7\0\0\0\0\0\0"
+    "runanywhere.v1.AgentResponseStartedEvent"
+    "turn_id"
   }},
 };
+PROTOBUF_NOINLINE void AgentResponseStartedEvent::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.AgentResponseStartedEvent)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    _impl_.turn_id_.ClearNonDefaultToEmpty();
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL AgentResponseStartedEvent::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const AgentResponseStartedEvent& this_ = static_cast<const AgentResponseStartedEvent&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL AgentResponseStartedEvent::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const AgentResponseStartedEvent& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.AgentResponseStartedEvent)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string turn_id = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_turn_id().empty()) {
+      const ::std::string& _s = this_._internal_turn_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.AgentResponseStartedEvent.turn_id");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.AgentResponseStartedEvent)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t AgentResponseStartedEvent::ByteSizeLong(const MessageLite& base) {
+  const AgentResponseStartedEvent& this_ = static_cast<const AgentResponseStartedEvent&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t AgentResponseStartedEvent::ByteSizeLong() const {
+  const AgentResponseStartedEvent& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.AgentResponseStartedEvent)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+   {
+    // string turn_id = 1;
+    cached_has_bits = this_._impl_._has_bits_[0];
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_turn_id().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_turn_id());
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void AgentResponseStartedEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<AgentResponseStartedEvent*>(&to_msg);
+  auto& from = static_cast<const AgentResponseStartedEvent&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.AgentResponseStartedEvent)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!from._internal_turn_id().empty()) {
+      _this->_internal_set_turn_id(from._internal_turn_id());
+    } else {
+      if (_this->_impl_.turn_id_.IsDefault()) {
+        _this->_internal_set_turn_id("");
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void AgentResponseStartedEvent::CopyFrom(const AgentResponseStartedEvent& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.AgentResponseStartedEvent)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
 
 
-
-
-
-
+void AgentResponseStartedEvent::InternalSwap(AgentResponseStartedEvent* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.turn_id_, &other->_impl_.turn_id_, arena);
+}
 
 ::google::protobuf::Metadata AgentResponseStartedEvent::GetMetadata() const {
-  return ::google::protobuf::internal::ZeroFieldsBase::GetMetadataImpl(GetClassData()->full());
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================
 
 class AgentResponseCompletedEvent::_Internal {
  public:
+  using HasBits =
+      decltype(::std::declval<AgentResponseCompletedEvent>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(AgentResponseCompletedEvent, _impl_._has_bits_);
 };
 
 AgentResponseCompletedEvent::AgentResponseCompletedEvent(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(arena, AgentResponseCompletedEvent_class_data_.base()) {
+    : ::google::protobuf::Message(arena, AgentResponseCompletedEvent_class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
+    : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
   // @@protoc_insertion_point(arena_constructor:runanywhere.v1.AgentResponseCompletedEvent)
 }
+PROTOBUF_NDEBUG_INLINE AgentResponseCompletedEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::AgentResponseCompletedEvent& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        turn_id_(arena, from.turn_id_) {}
+
 AgentResponseCompletedEvent::AgentResponseCompletedEvent(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
     const AgentResponseCompletedEvent& from)
 #if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::internal::ZeroFieldsBase(arena, AgentResponseCompletedEvent_class_data_.base()) {
+    : ::google::protobuf::Message(arena, AgentResponseCompletedEvent_class_data_.base()) {
 #else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
+    : ::google::protobuf::Message(arena) {
 #endif  // PROTOBUF_CUSTOM_VTABLE
   AgentResponseCompletedEvent* const _this = this;
   (void)_this;
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  _impl_.response_duration_ms_ = from._impl_.response_duration_ms_;
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.AgentResponseCompletedEvent)
+}
+PROTOBUF_NDEBUG_INLINE AgentResponseCompletedEvent::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        turn_id_(arena) {}
+
+inline void AgentResponseCompletedEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  _impl_.response_duration_ms_ = {};
+}
+AgentResponseCompletedEvent::~AgentResponseCompletedEvent() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.AgentResponseCompletedEvent)
+  SharedDtor(*this);
+}
+inline void AgentResponseCompletedEvent::SharedDtor(MessageLite& self) {
+  AgentResponseCompletedEvent& this_ = static_cast<AgentResponseCompletedEvent&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.turn_id_.Destroy();
+  this_._impl_.~Impl_();
 }
 
 inline void* PROTOBUF_NONNULL AgentResponseCompletedEvent::PlacementNew_(
@@ -6492,7 +9092,7 @@ inline void* PROTOBUF_NONNULL AgentResponseCompletedEvent::PlacementNew_(
   return ::new (mem) AgentResponseCompletedEvent(arena);
 }
 constexpr auto AgentResponseCompletedEvent::InternalNewImpl_() {
-  return ::google::protobuf::internal::MessageCreator::ZeroInit(sizeof(AgentResponseCompletedEvent),
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(AgentResponseCompletedEvent),
                                             alignof(AgentResponseCompletedEvent));
 }
 constexpr auto AgentResponseCompletedEvent::InternalGenerateClassData_() {
@@ -6502,10 +9102,10 @@ constexpr auto AgentResponseCompletedEvent::InternalGenerateClassData_() {
           &_table_.header,
           nullptr,  // IsInitialized
           &AgentResponseCompletedEvent::MergeImpl,
-          ::google::protobuf::internal::ZeroFieldsBase::GetNewImpl<AgentResponseCompletedEvent>(),
+          ::google::protobuf::Message::GetNewImpl<AgentResponseCompletedEvent>(),
 #if defined(PROTOBUF_CUSTOM_VTABLE)
           &AgentResponseCompletedEvent::SharedDtor,
-          ::google::protobuf::internal::ZeroFieldsBase::GetClearImpl<AgentResponseCompletedEvent>(), &AgentResponseCompletedEvent::ByteSizeLong,
+          ::google::protobuf::Message::GetClearImpl<AgentResponseCompletedEvent>(), &AgentResponseCompletedEvent::ByteSizeLong,
               &AgentResponseCompletedEvent::_InternalSerialize,
 #endif  // PROTOBUF_CUSTOM_VTABLE
           PROTOBUF_FIELD_OFFSET(AgentResponseCompletedEvent, _impl_._cached_size_),
@@ -6528,17 +9128,16 @@ AgentResponseCompletedEvent::GetClassData() const {
   return AgentResponseCompletedEvent_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<0, 0, 0, 0, 2>
+const ::_pbi::TcParseTable<1, 2, 0, 58, 2>
 AgentResponseCompletedEvent::_table_ = {
   {
-    PROTOBUF_FIELD_OFFSET(AgentResponseCompletedEvent,
-                          _impl_._cached_size_),  // no hasbits
+    PROTOBUF_FIELD_OFFSET(AgentResponseCompletedEvent, _impl_._has_bits_),
     0, // no _extensions_
-    0, 0,  // max_field_number, fast_idx_mask
+    2, 8,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967295,  // skipmap
-    offsetof(decltype(_table_), field_names),  // no field_entries
-    0,  // num_field_entries
+    4294967292,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    2,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     AgentResponseCompletedEvent_class_data_.base(),
@@ -6548,22 +9147,183 @@ AgentResponseCompletedEvent::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::AgentResponseCompletedEvent>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    {::_pbi::TcParser::MiniParse, {}},
+    // int64 response_duration_ms = 2;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(AgentResponseCompletedEvent, _impl_.response_duration_ms_), 1>(),
+     {16, 1, 0,
+      PROTOBUF_FIELD_OFFSET(AgentResponseCompletedEvent, _impl_.response_duration_ms_)}},
+    // string turn_id = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(AgentResponseCompletedEvent, _impl_.turn_id_)}},
   }}, {{
     65535, 65535
-  }}, // no field_entries, or aux_entries
+  }}, {{
+    // string turn_id = 1;
+    {PROTOBUF_FIELD_OFFSET(AgentResponseCompletedEvent, _impl_.turn_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // int64 response_duration_ms = 2;
+    {PROTOBUF_FIELD_OFFSET(AgentResponseCompletedEvent, _impl_.response_duration_ms_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+  }},
+  // no aux_entries
   {{
+    "\52\7\0\0\0\0\0\0"
+    "runanywhere.v1.AgentResponseCompletedEvent"
+    "turn_id"
   }},
 };
+PROTOBUF_NOINLINE void AgentResponseCompletedEvent::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.AgentResponseCompletedEvent)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    _impl_.turn_id_.ClearNonDefaultToEmpty();
+  }
+  _impl_.response_duration_ms_ = ::int64_t{0};
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL AgentResponseCompletedEvent::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const AgentResponseCompletedEvent& this_ = static_cast<const AgentResponseCompletedEvent&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL AgentResponseCompletedEvent::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const AgentResponseCompletedEvent& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.AgentResponseCompletedEvent)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string turn_id = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_turn_id().empty()) {
+      const ::std::string& _s = this_._internal_turn_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.AgentResponseCompletedEvent.turn_id");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  // int64 response_duration_ms = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (this_._internal_response_duration_ms() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<2>(
+              stream, this_._internal_response_duration_ms(), target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.AgentResponseCompletedEvent)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t AgentResponseCompletedEvent::ByteSizeLong(const MessageLite& base) {
+  const AgentResponseCompletedEvent& this_ = static_cast<const AgentResponseCompletedEvent&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t AgentResponseCompletedEvent::ByteSizeLong() const {
+  const AgentResponseCompletedEvent& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.AgentResponseCompletedEvent)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    // string turn_id = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_turn_id().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_turn_id());
+      }
+    }
+    // int64 response_duration_ms = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (this_._internal_response_duration_ms() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_response_duration_ms());
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void AgentResponseCompletedEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<AgentResponseCompletedEvent*>(&to_msg);
+  auto& from = static_cast<const AgentResponseCompletedEvent&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.AgentResponseCompletedEvent)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_turn_id().empty()) {
+        _this->_internal_set_turn_id(from._internal_turn_id());
+      } else {
+        if (_this->_impl_.turn_id_.IsDefault()) {
+          _this->_internal_set_turn_id("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (from._internal_response_duration_ms() != 0) {
+        _this->_impl_.response_duration_ms_ = from._impl_.response_duration_ms_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void AgentResponseCompletedEvent::CopyFrom(const AgentResponseCompletedEvent& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.AgentResponseCompletedEvent)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
 
 
-
-
-
-
+void AgentResponseCompletedEvent::InternalSwap(AgentResponseCompletedEvent* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.turn_id_, &other->_impl_.turn_id_, arena);
+  swap(_impl_.response_duration_ms_, other->_impl_.response_duration_ms_);
+}
 
 ::google::protobuf::Metadata AgentResponseCompletedEvent::GetMetadata() const {
-  return ::google::protobuf::internal::ZeroFieldsBase::GetMetadataImpl(GetClassData()->full());
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // ===================================================================
 
@@ -7070,7 +9830,13 @@ TurnLifecycleEvent::TurnLifecycleEvent(
   _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
-  _impl_.kind_ = from._impl_.kind_;
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, started_at_ms_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, started_at_ms_),
+           offsetof(Impl_, kind_) -
+               offsetof(Impl_, started_at_ms_) +
+               sizeof(Impl_::kind_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.TurnLifecycleEvent)
 }
@@ -7086,7 +9852,12 @@ PROTOBUF_NDEBUG_INLINE TurnLifecycleEvent::Impl_::Impl_(
 
 inline void TurnLifecycleEvent::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
-  _impl_.kind_ = {};
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, started_at_ms_),
+           0,
+           offsetof(Impl_, kind_) -
+               offsetof(Impl_, started_at_ms_) +
+               sizeof(Impl_::kind_));
 }
 TurnLifecycleEvent::~TurnLifecycleEvent() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.TurnLifecycleEvent)
@@ -7149,16 +9920,16 @@ TurnLifecycleEvent::GetClassData() const {
   return TurnLifecycleEvent_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<3, 6, 0, 82, 2>
+const ::_pbi::TcParseTable<3, 8, 0, 90, 2>
 TurnLifecycleEvent::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(TurnLifecycleEvent, _impl_._has_bits_),
     0, // no _extensions_
-    6, 56,  // max_field_number, fast_idx_mask
+    8, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967232,  // skipmap
+    4294967040,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    6,  // num_field_entries
+    8,  // num_field_entries
     0,  // num_aux_entries
     offsetof(decltype(_table_), field_names),  // no aux_entries
     TurnLifecycleEvent_class_data_.base(),
@@ -7168,10 +9939,13 @@ TurnLifecycleEvent::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::TurnLifecycleEvent>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    {::_pbi::TcParser::MiniParse, {}},
+    // int64 completed_at_ms = 8;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(TurnLifecycleEvent, _impl_.completed_at_ms_), 6>(),
+     {64, 6, 0,
+      PROTOBUF_FIELD_OFFSET(TurnLifecycleEvent, _impl_.completed_at_ms_)}},
     // .runanywhere.v1.TurnLifecycleEventKind kind = 1;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(TurnLifecycleEvent, _impl_.kind_), 5>(),
-     {8, 5, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(TurnLifecycleEvent, _impl_.kind_), 7>(),
+     {8, 7, 0,
       PROTOBUF_FIELD_OFFSET(TurnLifecycleEvent, _impl_.kind_)}},
     // string turn_id = 2;
     {::_pbi::TcParser::FastUS1,
@@ -7193,12 +9967,15 @@ TurnLifecycleEvent::_table_ = {
     {::_pbi::TcParser::FastUS1,
      {50, 4, 0,
       PROTOBUF_FIELD_OFFSET(TurnLifecycleEvent, _impl_.error_)}},
-    {::_pbi::TcParser::MiniParse, {}},
+    // int64 started_at_ms = 7;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(TurnLifecycleEvent, _impl_.started_at_ms_), 5>(),
+     {56, 5, 0,
+      PROTOBUF_FIELD_OFFSET(TurnLifecycleEvent, _impl_.started_at_ms_)}},
   }}, {{
     65535, 65535
   }}, {{
     // .runanywhere.v1.TurnLifecycleEventKind kind = 1;
-    {PROTOBUF_FIELD_OFFSET(TurnLifecycleEvent, _impl_.kind_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    {PROTOBUF_FIELD_OFFSET(TurnLifecycleEvent, _impl_.kind_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // string turn_id = 2;
     {PROTOBUF_FIELD_OFFSET(TurnLifecycleEvent, _impl_.turn_id_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // string session_id = 3;
@@ -7209,10 +9986,14 @@ TurnLifecycleEvent::_table_ = {
     {PROTOBUF_FIELD_OFFSET(TurnLifecycleEvent, _impl_.response_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // string error = 6;
     {PROTOBUF_FIELD_OFFSET(TurnLifecycleEvent, _impl_.error_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // int64 started_at_ms = 7;
+    {PROTOBUF_FIELD_OFFSET(TurnLifecycleEvent, _impl_.started_at_ms_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    // int64 completed_at_ms = 8;
+    {PROTOBUF_FIELD_OFFSET(TurnLifecycleEvent, _impl_.completed_at_ms_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
   }},
   // no aux_entries
   {{
-    "\41\0\7\12\12\10\5\0"
+    "\41\0\7\12\12\10\5\0\0\0\0\0\0\0\0\0"
     "runanywhere.v1.TurnLifecycleEvent"
     "turn_id"
     "session_id"
@@ -7246,7 +10027,11 @@ PROTOBUF_NOINLINE void TurnLifecycleEvent::Clear() {
       _impl_.error_.ClearNonDefaultToEmpty();
     }
   }
-  _impl_.kind_ = 0;
+  if (BatchCheckHasBit(cached_has_bits, 0x000000e0U)) {
+    ::memset(&_impl_.started_at_ms_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.kind_) -
+        reinterpret_cast<char*>(&_impl_.started_at_ms_)) + sizeof(_impl_.kind_));
+  }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
 }
@@ -7271,7 +10056,7 @@ PROTOBUF_NOINLINE void TurnLifecycleEvent::Clear() {
 
   cached_has_bits = this_._impl_._has_bits_[0];
   // .runanywhere.v1.TurnLifecycleEventKind kind = 1;
-  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_kind() != 0) {
       target = stream->EnsureSpace(target);
       target = ::_pbi::WireFormatLite::WriteEnumToArray(
@@ -7329,6 +10114,24 @@ PROTOBUF_NOINLINE void TurnLifecycleEvent::Clear() {
     }
   }
 
+  // int64 started_at_ms = 7;
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (this_._internal_started_at_ms() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<7>(
+              stream, this_._internal_started_at_ms(), target);
+    }
+  }
+
+  // int64 completed_at_ms = 8;
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+    if (this_._internal_completed_at_ms() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<8>(
+              stream, this_._internal_completed_at_ms(), target);
+    }
+  }
+
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -7354,7 +10157,7 @@ PROTOBUF_NOINLINE void TurnLifecycleEvent::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     // string turn_id = 2;
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!this_._internal_turn_id().empty()) {
@@ -7390,8 +10193,22 @@ PROTOBUF_NOINLINE void TurnLifecycleEvent::Clear() {
                                         this_._internal_error());
       }
     }
-    // .runanywhere.v1.TurnLifecycleEventKind kind = 1;
+    // int64 started_at_ms = 7;
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (this_._internal_started_at_ms() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_started_at_ms());
+      }
+    }
+    // int64 completed_at_ms = 8;
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (this_._internal_completed_at_ms() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
+            this_._internal_completed_at_ms());
+      }
+    }
+    // .runanywhere.v1.TurnLifecycleEventKind kind = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_kind() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_kind());
@@ -7416,7 +10233,7 @@ void TurnLifecycleEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBit(cached_has_bits, 0x00000001U)) {
       if (!from._internal_turn_id().empty()) {
         _this->_internal_set_turn_id(from._internal_turn_id());
@@ -7463,6 +10280,16 @@ void TurnLifecycleEvent::MergeImpl(::google::protobuf::MessageLite& to_msg,
       }
     }
     if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (from._internal_started_at_ms() != 0) {
+        _this->_impl_.started_at_ms_ = from._impl_.started_at_ms_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
+      if (from._internal_completed_at_ms() != 0) {
+        _this->_impl_.completed_at_ms_ = from._impl_.completed_at_ms_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (from._internal_kind() != 0) {
         _this->_impl_.kind_ = from._impl_.kind_;
       }
@@ -7492,7 +10319,12 @@ void TurnLifecycleEvent::InternalSwap(TurnLifecycleEvent* PROTOBUF_RESTRICT PROT
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.transcript_, &other->_impl_.transcript_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.response_, &other->_impl_.response_, arena);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_, &other->_impl_.error_, arena);
-  swap(_impl_.kind_, other->_impl_.kind_);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(TurnLifecycleEvent, _impl_.kind_)
+      + sizeof(TurnLifecycleEvent::_impl_.kind_)
+      - PROTOBUF_FIELD_OFFSET(TurnLifecycleEvent, _impl_.started_at_ms_)>(
+          reinterpret_cast<char*>(&_impl_.started_at_ms_),
+          reinterpret_cast<char*>(&other->_impl_.started_at_ms_));
 }
 
 ::google::protobuf::Metadata TurnLifecycleEvent::GetMetadata() const {

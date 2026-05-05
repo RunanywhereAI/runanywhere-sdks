@@ -9,9 +9,8 @@
  * C++ core compiles into a GraphScheduler DAG and executes through the
  * `rac_solution_*` C ABI. Mirrors Swift RunAnywhere+Solutions.swift.
  *
- * Round 1 KOTLIN (G-A1): Migrated from bare `RunAnywhere.runSolution(...)`
- * top-level methods to the canonical `RunAnywhere.solutions.run(...)`
- * namespace. Bare names DELETED — no aliases, no @Deprecated.
+ * Bare `RunAnywhere.runSolution(...)` top-level methods were deleted; the
+ * canonical surface is `RunAnywhere.solutions.run(...)`.
  */
 
 package com.runanywhere.sdk.public.extensions

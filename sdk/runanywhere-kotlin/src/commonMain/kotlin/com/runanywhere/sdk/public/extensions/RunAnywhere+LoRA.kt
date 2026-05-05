@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * Public API for LoRA adapter management.
- * Delegates to C++ via CppBridgeLLM for all operations.
+ * Delegates to the generated LoRA proto-byte ABI in C++.
  *
  * LoRA (Low-Rank Adaptation) adapters allow fine-tuning behavior
  * of a loaded base model without replacing it.
@@ -11,157 +11,170 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.DownloadProgress
+import ai.runanywhere.proto.v1.ExpectedModelFiles
+import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LoRAAdapterConfig
-import ai.runanywhere.proto.v1.LoRAAdapterInfo
+import ai.runanywhere.proto.v1.LoRAApplyRequest
+import ai.runanywhere.proto.v1.LoRAApplyResult
+import ai.runanywhere.proto.v1.LoRARemoveRequest
+import ai.runanywhere.proto.v1.LoRAState
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
+import ai.runanywhere.proto.v1.LoraAdapterCatalogGetRequest
+import ai.runanywhere.proto.v1.LoraAdapterCatalogGetResult
+import ai.runanywhere.proto.v1.LoraAdapterCatalogListRequest
+import ai.runanywhere.proto.v1.LoraAdapterCatalogListResult
+import ai.runanywhere.proto.v1.LoraAdapterCatalogQuery
+import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedRequest
+import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedResult
 import ai.runanywhere.proto.v1.LoraCompatibilityResult
+import ai.runanywhere.proto.v1.ModelArtifactType
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelFileDescriptor
+import ai.runanywhere.proto.v1.ModelFileRole
+import ai.runanywhere.proto.v1.ModelFormat
+import ai.runanywhere.proto.v1.ModelInfo
+import ai.runanywhere.proto.v1.ModelInfoMetadata
+import ai.runanywhere.proto.v1.ModelSource
+import ai.runanywhere.proto.v1.SingleFileArtifact
 import com.runanywhere.sdk.public.RunAnywhere
-import kotlinx.coroutines.flow.Flow
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Round 1 KOTLIN (G-A7): canonical `RunAnywhere.lora.*` namespace.
-//
-// Per canonical §3 LoRA section: 8 methods exposed under a `LoRA` capability
-// object. The pre-existing flat extensions (loadLoraAdapter, etc.) remain so
-// existing call sites compile, but the namespaced form is the canonical
-// surface that mirrors Swift / RN / Web / Flutter.
-// ─────────────────────────────────────────────────────────────────────────────
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
 /**
  * Capability namespace for LoRA adapter management.
  *
- * Per canonical §3 — 8 method surface:
- * `lora.load`, `lora.remove`, `lora.clear`, `lora.getLoaded`,
- * `lora.checkCompatibility`, `lora.register`, `lora.adaptersForModel`,
- * `lora.allRegistered`.
+ * This surface intentionally follows the generated LoRA service messages:
+ * runtime apply/remove/list/state, catalog list/query/get, and download
+ * completion all use request/result/state types generated from
+ * `lora_options.proto`. Legacy `load`/`clear` compatibility helpers were
+ * removed with the corresponding C ABI symbols.
  */
 expect class LoRA internal constructor() {
-    /** Load and apply a LoRA adapter, returning the loaded info snapshot. */
-    suspend fun load(config: LoRAAdapterConfig): LoRAAdapterInfo
+    /** Apply one or more LoRA adapters to the current LLM session. */
+    suspend fun apply(request: LoRAApplyRequest): LoRAApplyResult
 
-    /** Remove a previously-loaded adapter by id. */
-    suspend fun remove(adapterId: String)
+    /** Remove adapters by generated request semantics, including `clear_all`. */
+    suspend fun remove(request: LoRARemoveRequest): LoRAState
 
-    /** Clear all currently-loaded adapters. */
-    suspend fun clear()
+    /** Return the current loaded-adapter snapshot from native state. */
+    suspend fun list(request: LoRAState): LoRAState
 
-    /** Snapshot of all currently-loaded adapters. */
-    suspend fun getLoaded(): List<LoRAAdapterInfo>
+    /** Return the logical LoRA service state from native state. */
+    suspend fun state(request: LoRAState): LoRAState
 
-    /** Pre-flight compatibility check between an adapter id and base model id. */
-    suspend fun checkCompatibility(adapterId: String, modelId: String): LoraCompatibilityResult
+    /** Pre-flight compatibility check for an adapter config and current base model. */
+    suspend fun checkCompatibility(config: LoRAAdapterConfig): LoraCompatibilityResult
 
-    /** Register an adapter in the catalog so [adaptersForModel] / [allRegistered] can find it. */
-    suspend fun register(config: LoRAAdapterConfig)
+    /** Register an adapter catalog entry. */
+    suspend fun register(entry: LoraAdapterCatalogEntry): LoraAdapterCatalogEntry
 
-    /** Adapters in the catalog compatible with the supplied base model id. */
-    suspend fun adaptersForModel(modelId: String): List<LoRAAdapterInfo>
+    /** List catalog entries using the generated catalog request/result ABI. */
+    suspend fun listCatalog(
+        request: LoraAdapterCatalogListRequest = LoraAdapterCatalogListRequest(),
+    ): LoraAdapterCatalogListResult
 
-    /** Snapshot of every adapter currently registered in the catalog. */
-    suspend fun allRegistered(): List<LoRAAdapterInfo>
+    /** Query catalog entries using generated filter semantics owned by commons. */
+    suspend fun queryCatalog(query: LoraAdapterCatalogQuery): LoraAdapterCatalogListResult
+
+    /** Fetch one catalog entry by generated request semantics. */
+    suspend fun getCatalogEntry(request: LoraAdapterCatalogGetRequest): LoraAdapterCatalogGetResult
+
+    /** Persist native-reported completion state after Android has fetched bytes. */
+    suspend fun markDownloadCompleted(
+        request: LoraAdapterDownloadCompletedRequest,
+    ): LoraAdapterDownloadCompletedResult
 }
 
-/** Public capability accessor — `RunAnywhere.lora.load(config)`. */
+/** Public capability accessor: `RunAnywhere.lora.apply(request)`. */
 expect val RunAnywhere.lora: LoRA
 
-// MARK: - LoRA Adapter Management
+private const val LORA_ARTIFACT_MODEL_ID_PREFIX = "lora-adapter:"
+private const val LORA_ARTIFACT_TAG = "lora-adapter"
 
 /**
- * Load and apply a LoRA adapter to the currently loaded model.
+ * Stable model-registry id used for a LoRA adapter artifact.
  *
- * The adapter is loaded from a GGUF file and applied with the given scale.
- * Multiple adapters can be stacked. Context is recreated internally.
- *
- * @param config LoRA adapter configuration (path and scale)
- * @throws SDKException if no model is loaded or loading fails
+ * The adapter remains a LoRA catalog entry for apply/remove semantics, while
+ * its bytes are represented as a generated model artifact so download/storage
+ * policy stays on the generated registry/download path.
  */
-expect suspend fun RunAnywhere.loadLoraAdapter(config: LoRAAdapterConfig)
+val LoraAdapterCatalogEntry.loraArtifactModelId: String
+    get() =
+        if (id.startsWith(LORA_ARTIFACT_MODEL_ID_PREFIX)) {
+            id
+        } else {
+            "$LORA_ARTIFACT_MODEL_ID_PREFIX$id"
+        }
 
 /**
- * Remove a specific LoRA adapter by path.
- *
- * @param path Path that was used when loading the adapter
- * @throws SDKException if adapter not found or removal fails
+ * Convert a generated LoRA catalog entry into generated model-registry
+ * metadata used by the generic generated download path. Catalog filtering and
+ * completion state remain owned by the generated LoRA catalog ABI.
  */
-expect suspend fun RunAnywhere.removeLoraAdapter(path: String)
+fun LoraAdapterCatalogEntry.toLoraArtifactModelInfo(
+    timestampUnixMs: Long = getCurrentTimeMillis(),
+): ModelInfo {
+    val artifactFilename = filename.ifBlank { url.substringAfterLast('/').substringBefore('?') }
+    val descriptor =
+        ModelFileDescriptor(
+            url = url,
+            filename = artifactFilename,
+            is_required = true,
+            size_bytes = size_bytes.takeIf { it > 0 },
+            role = ModelFileRole.MODEL_FILE_ROLE_COMPANION,
+            checksum_sha256 = checksum_sha256,
+        )
+    val expectedFiles =
+        ExpectedModelFiles(
+            files = listOf(descriptor),
+            required_patterns = listOf(artifactFilename),
+            description = "LoRA adapter artifact",
+        )
+    val metadataTags =
+        buildList {
+            add(LORA_ARTIFACT_TAG)
+            compatible_models.forEach { add("base-model:$it") }
+            addAll(tags)
+        }.distinct()
+
+    return ModelInfo(
+        id = loraArtifactModelId,
+        name = name,
+        category = ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
+        format = ModelFormat.MODEL_FORMAT_GGUF,
+        framework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
+        download_url = url,
+        download_size_bytes = size_bytes,
+        supports_lora = false,
+        description = description,
+        source = ModelSource.MODEL_SOURCE_REMOTE,
+        created_at_unix_ms = timestampUnixMs,
+        updated_at_unix_ms = timestampUnixMs,
+        checksum_sha256 = checksum_sha256,
+        metadata =
+            ModelInfoMetadata(
+                description = description,
+                author = author.orEmpty(),
+                license = license.orEmpty(),
+                tags = metadataTags,
+            ),
+        single_file =
+            SingleFileArtifact(
+                required_patterns = listOf(artifactFilename),
+                expected_files = expectedFiles,
+            ),
+        artifact_type = ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
+        expected_files = expectedFiles,
+        is_available = true,
+    )
+}
 
 /**
- * Remove all loaded LoRA adapters.
+ * Register both the generated LoRA catalog entry and its generated download
+ * artifact record. This does not fetch bytes.
  */
-expect suspend fun RunAnywhere.clearLoraAdapters()
-
-/**
- * Get info about all currently loaded LoRA adapters.
- *
- * @return List of loaded adapter info (path, scale, applied status)
- */
-expect suspend fun RunAnywhere.getLoadedLoraAdapters(): List<LoRAAdapterInfo>
-
-// MARK: - LoRA Compatibility Check
-//
-// Round 1 KOTLIN (G-B2 / Task 5): hand-rolled `LoraCompatibilityResult` DELETED.
-// The proto-generated `ai.runanywhere.proto.v1.LoraCompatibilityResult` is the
-// canonical type. `checkLoraCompatibility` now returns the proto type directly.
-
-/**
- * Check if a LoRA adapter file is compatible with the currently loaded model.
- *
- * @param loraPath Path to the LoRA adapter GGUF file
- * @return [ai.runanywhere.proto.v1.LoraCompatibilityResult] with [is_compatible]
- *         and optional [error_message].
- */
-expect fun RunAnywhere.checkLoraCompatibility(loraPath: String): ai.runanywhere.proto.v1.LoraCompatibilityResult
-
-// MARK: - LoRA Adapter Catalog (Registry)
-
-/**
- * Register a LoRA adapter in the catalog.
- * The adapter metadata is stored in the C++ LoRA registry.
- *
- * @param entry The adapter catalog entry with metadata
- */
-expect fun RunAnywhere.registerLoraAdapter(entry: LoraAdapterCatalogEntry)
-
-/**
- * Get LoRA adapters compatible with a specific model.
- *
- * @param modelId The base model ID to find adapters for
- * @return List of compatible adapter catalog entries
- */
-expect fun RunAnywhere.loraAdaptersForModel(modelId: String): List<LoraAdapterCatalogEntry>
-
-/**
- * Get all registered LoRA adapters.
- *
- * @return List of all adapter catalog entries
- */
-expect fun RunAnywhere.allRegisteredLoraAdapters(): List<LoraAdapterCatalogEntry>
-
-// MARK: - LoRA Adapter Downloads
-
-/**
- * Download a LoRA adapter GGUF file by its registered catalog ID.
- * Returns a Flow of download progress matching the model download pattern.
- *
- * @param adapterId Adapter ID from the catalog registry
- * @return Flow of download progress events
- * @throws SDKException if adapter not found or download fails
- */
-expect fun RunAnywhere.downloadLoraAdapter(adapterId: String): Flow<DownloadProgress>
-
-/**
- * Get the local file path for a downloaded LoRA adapter.
- *
- * @param adapterId Adapter ID from the catalog registry
- * @return Absolute file path if downloaded, null otherwise
- */
-expect fun RunAnywhere.loraAdapterLocalPath(adapterId: String): String?
-
-/**
- * Delete a downloaded LoRA adapter file from disk.
- *
- * @param adapterId Adapter ID from the catalog registry
- * @return true if file was deleted, false if not found
- */
-expect fun RunAnywhere.deleteDownloadedLoraAdapter(adapterId: String): Boolean
+suspend fun RunAnywhere.registerLoraArtifact(entry: LoraAdapterCatalogEntry): ModelInfo {
+    val registeredEntry = lora.register(entry)
+    val artifact = registeredEntry.toLoraArtifactModelInfo()
+    registerModelInternal(artifact)
+    return artifact
+}

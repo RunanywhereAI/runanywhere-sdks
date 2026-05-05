@@ -6,16 +6,6 @@
 //
 
 import CRACommons
-import Foundation
-
-// MARK: - Decodable JSON Entries
-
-/// Decoded entry from `rac_llm_component_get_lora_info` JSON payload.
-private struct LoRAInfoJSONEntry: Decodable {
-    let path: String
-    let scale: Double
-    let applied: Bool
-}
 
 // MARK: - LLM Component Bridge
 
@@ -95,30 +85,6 @@ extension CppBridge {
         public func cancel() {
             guard let handle = handle else { return }
             rac_llm_component_cancel(handle)
-        }
-
-        // MARK: - LoRA Adapter Management
-
-        /// Get info about all loaded LoRA adapters
-        public func getLoadedLoraAdapters() throws -> [LoRAAdapterInfo] {
-            guard let handle = handle else { return [] }
-            var jsonPtr: UnsafeMutablePointer<CChar>?
-            let result = rac_llm_component_get_lora_info(handle, &jsonPtr)
-            guard result == RAC_SUCCESS, let ptr = jsonPtr else {
-                return []
-            }
-            defer { rac_free(ptr) }
-
-            let jsonString = String(cString: ptr)
-            guard let data = jsonString.data(using: .utf8),
-                  let entries = try? JSONDecoder().decode([LoRAInfoJSONEntry].self, from: data) else {
-                logger.error("Failed to parse LoRA info JSON")
-                return []
-            }
-
-            return entries.map { entry in
-                LoRAAdapterInfo(path: entry.path, scale: Float(entry.scale), applied: entry.applied)
-            }
         }
 
         // MARK: - Cleanup

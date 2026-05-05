@@ -18,6 +18,7 @@
  */
 
 #include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/features/llm/rac_llm_service.h"
 
@@ -44,12 +45,35 @@ static const rac_runtime_id_t k_llamacpp_runtimes[] = {
 #endif
 };
 
-/* Model formats — proto enum values (runanywhere.v1.ModelFormat) cast to uint32_t.
- * Reusing the GAP 01 IDL avoids a duplicate enum definition. */
+/* Model formats use RAC_MODEL_FORMAT_ID_* values mirrored from
+ * runanywhere.v1.ModelFormat. */
 static const uint32_t k_llamacpp_formats[] = {
-    1,  /* MODEL_FORMAT_GGUF */
-    2,  /* MODEL_FORMAT_GGML */
-    5,  /* MODEL_FORMAT_BIN  */
+    RAC_MODEL_FORMAT_ID_GGUF,
+    RAC_MODEL_FORMAT_ID_GGML,
+    RAC_MODEL_FORMAT_ID_BIN,
+};
+
+static const rac_primitive_t k_llamacpp_primitives[] = {
+    RAC_PRIMITIVE_GENERATE_TEXT,
+};
+
+static const rac_engine_manifest_t k_llamacpp_manifest = {
+    .name             = "llamacpp",
+    .display_name     = "llama.cpp",
+    .version          = nullptr,
+    .package_owner    = "runanywhere",
+    .package_name     = "runanywhere_llamacpp",
+    .availability     = RAC_ENGINE_AVAILABILITY_PUBLIC,
+    .priority         = 100,
+    .capability_flags = 0,
+    .primitives       = k_llamacpp_primitives,
+    .primitives_count = sizeof(k_llamacpp_primitives) / sizeof(k_llamacpp_primitives[0]),
+    .runtimes         = k_llamacpp_runtimes,
+    .runtimes_count   = sizeof(k_llamacpp_runtimes) / sizeof(k_llamacpp_runtimes[0]),
+    .formats          = k_llamacpp_formats,
+    .formats_count    = sizeof(k_llamacpp_formats) / sizeof(k_llamacpp_formats[0]),
+    .reserved_0       = 0,
+    .reserved_1       = 0,
 };
 
 /* Static vtable in .rodata — registry records the pointer, does not copy. */
@@ -58,18 +82,7 @@ static void llamacpp_on_unload(void) {
 }
 
 static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
-    /* metadata */ {
-        .abi_version      = RAC_PLUGIN_API_VERSION,
-        .name             = "llamacpp",
-        .display_name     = "llama.cpp",
-        .engine_version   = nullptr,   /* filled by llama_cpp's own header */
-        .priority         = 100,
-        .capability_flags = 0,
-        .runtimes         = k_llamacpp_runtimes,
-        .runtimes_count   = sizeof(k_llamacpp_runtimes) / sizeof(k_llamacpp_runtimes[0]),
-        .formats          = k_llamacpp_formats,
-        .formats_count    = sizeof(k_llamacpp_formats) / sizeof(k_llamacpp_formats[0]),
-    },
+    /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_llamacpp_manifest),
     /* capability_check */ nullptr,
     /* on_unload        */ llamacpp_on_unload,
 
@@ -88,8 +101,13 @@ static const rac_engine_vtable_t g_llamacpp_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(llamacpp) {
-    (void)rac_llamacpp_cpu_runtime_register();
-    return &g_llamacpp_engine_vtable;
+    const rac_engine_vtable_t* vt =
+        rac_engine_entry_with_manifest(&k_llamacpp_manifest,
+                                       &g_llamacpp_engine_vtable);
+    if (vt != nullptr) {
+        (void)rac_llamacpp_cpu_runtime_register();
+    }
+    return vt;
 }
 
 }  // extern "C"

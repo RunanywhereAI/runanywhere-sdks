@@ -55,7 +55,7 @@ public final class SystemTTSService: NSObject {
     /// Speak `text` through the system audio output and return when playback
     /// finishes. Throws `CancellationError` if playback is cancelled via
     /// `stop()`.
-    public nonisolated func speak(text: String, options: TTSOptions) async throws {
+    public nonisolated func speak(text: String, options: RATTSOptions) async throws {
         // Use Task.detached to completely break out of any async context
         // This prevents AVFoundation's internal sync operations from conflicting with Swift concurrency
         try await Task.detached { @MainActor [self] in
@@ -105,31 +105,34 @@ public final class SystemTTSService: NSObject {
 
     // MARK: - Private Helpers
 
-    private func createUtterance(text: String, options: TTSOptions) -> AVSpeechUtterance {
+    private func createUtterance(text: String, options: RATTSOptions) -> AVSpeechUtterance {
         let utterance = AVSpeechUtterance(string: text)
 
         // Configure voice
         utterance.voice = resolveVoice(options: options)
 
         // Configure speech parameters
-        utterance.rate = options.rate * AVSpeechUtteranceDefaultSpeechRate
-        utterance.pitchMultiplier = options.pitch
-        utterance.volume = options.volume
+        let speakingRate = options.speakingRate > 0 ? options.speakingRate : 1.0
+        utterance.rate = speakingRate * AVSpeechUtteranceDefaultSpeechRate
+        utterance.pitchMultiplier = options.pitch > 0 ? options.pitch : 1.0
+        utterance.volume = options.volume > 0 ? options.volume : 1.0
         utterance.preUtteranceDelay = 0.0
         utterance.postUtteranceDelay = 0.0
 
         return utterance
     }
 
-    private func resolveVoice(options: TTSOptions) -> AVSpeechSynthesisVoice? {
-        guard let voiceId = options.voice,
-              voiceId != "system" && voiceId != "system-tts" else {
-            return AVSpeechSynthesisVoice(language: options.language)
+    private func resolveVoice(options: RATTSOptions) -> AVSpeechSynthesisVoice? {
+        guard !options.voice.isEmpty,
+              options.voice != "system",
+              options.voice != "system-tts" else {
+            return AVSpeechSynthesisVoice(language: options.languageCode.isEmpty ? "en-US" : options.languageCode)
         }
 
+        let voiceId = options.voice
         return AVSpeechSynthesisVoice(identifier: voiceId)
             ?? AVSpeechSynthesisVoice(language: voiceId)
-            ?? AVSpeechSynthesisVoice(language: options.language)
+            ?? AVSpeechSynthesisVoice(language: options.languageCode.isEmpty ? "en-US" : options.languageCode)
     }
 }
 

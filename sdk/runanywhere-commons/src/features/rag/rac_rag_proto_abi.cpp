@@ -85,10 +85,14 @@ void publish_capability(runanywhere::v1::CapabilityOperationEventKind kind,
                                          : runanywhere::v1::EVENT_SEVERITY_INFO);
     event.set_component(runanywhere::v1::SDK_COMPONENT_RAG);
     event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    event.set_source("cpp");
     auto* cap = event.mutable_capability();
     cap->set_kind(kind);
     cap->set_component(runanywhere::v1::SDK_COMPONENT_RAG);
-    if (operation) cap->set_operation(operation);
+    if (operation) {
+        event.set_operation_id(operation);
+        cap->set_operation(operation);
+    }
     cap->set_progress(progress);
     cap->set_input_count(input_count);
     cap->set_output_count(output_count);

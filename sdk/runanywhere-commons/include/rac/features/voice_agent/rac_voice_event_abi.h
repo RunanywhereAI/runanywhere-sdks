@@ -24,6 +24,11 @@
  *     contention with the GAP 02 plugin ABI version.
  *   - RAC_ABI_VERSION (declared below) bumped to 2 by this header so
  *     consumers can detect runtime support.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `SDK-facing default`.
+ * rac_voice_agent_set_proto_callback and the
+ * rac_voice_agent_proto_event_callback_fn typedef carry serialized
+ * runanywhere.v1.VoiceEvent bytes.
  */
 
 #ifndef RAC_FEATURES_VOICE_AGENT_RAC_VOICE_EVENT_ABI_H

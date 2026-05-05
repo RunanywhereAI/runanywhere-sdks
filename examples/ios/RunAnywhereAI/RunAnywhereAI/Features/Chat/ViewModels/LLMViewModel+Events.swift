@@ -44,36 +44,36 @@ extension LLMViewModel {
 
     // MARK: - SDK Event Handling
 
-    func handleSDKEvent(_ event: any SDKEvent) {
-        // Events now come from C++ via generic BridgedEvent
-        guard event.category == .llm else { return }
+    func handleSDKEvent(_ event: RASDKEvent) {
+        guard event.category == .llm || event.component == .llm else { return }
 
-        let modelId = event.properties["model_id"] ?? ""
-        let generationId = event.properties["generation_id"] ?? ""
+        let modelId = event.model.modelID.isEmpty ? event.generation.modelID : event.model.modelID
+        let generationId = event.generation.sessionID.isEmpty ? event.operationID : event.generation.sessionID
 
-        switch event.type {
-        case "llm_model_load_completed":
+        switch (event.model.kind, event.generation.kind) {
+        case (.loadCompleted, _), (_, .modelLoaded):
             handleModelLoadCompleted(modelId: modelId)
 
-        case "llm_model_unloaded":
+        case (.unloadCompleted, _), (_, .modelUnloaded):
             handleModelUnloaded(modelId: modelId)
 
-        case "llm_model_load_started":
+        case (.loadStarted, _):
             break
 
-        case "llm_first_token":
-            let ttft = Double(event.properties["time_to_first_token_ms"] ?? "0") ?? 0
+        case (_, .firstTokenGenerated):
+            let ttft = Double(event.generation.firstTokenLatencyMs)
             handleFirstToken(generationId: generationId, timeToFirstTokenMs: ttft)
 
-        case "llm_generation_completed":
-            let inputTokens = Int(event.properties["input_tokens"] ?? "0") ?? 0
-            let outputTokens = Int(event.properties["output_tokens"] ?? "0") ?? 0
-            let durationMs = Double(event.properties["processing_time_ms"] ?? "0") ?? 0
-            let tps = Double(event.properties["tokens_per_second"] ?? "0") ?? 0
+        case (_, .completed), (_, .streamCompleted):
+            let outputTokens = Int(event.generation.tokensUsed)
+            let durationMs = Double(event.generation.latencyMs)
+            let tps = durationMs > 0 && outputTokens > 0
+                ? Double(outputTokens) / (durationMs / 1000.0)
+                : 0
             handleGenerationCompleted(
                 generationId: generationId,
                 modelId: modelId,
-                inputTokens: inputTokens,
+                inputTokens: 0,
                 outputTokens: outputTokens,
                 durationMs: durationMs,
                 tokensPerSecond: tps

@@ -10,14 +10,9 @@
  * synchronous turn) have been deleted. The public API remains source-
  * compatible:
  *
- *   - startVoiceSession() / streamVoiceSession() are now thin shells that
- *     emit a deprecation hint + Started. New callers MUST use
- *     [VoiceAgentStreamAdapter] from
- *     com.runanywhere.sdk.adapters.VoiceAgentStreamAdapter (Wave C).
- *
- *   - processVoice() is now a thin one-shot through CppBridgeSTT/LLM/TTS;
- *     the duplicated retry/error/logging branches were removed (the
- *     component bridges already log every step).
+ *   - startVoiceSession(), streamVoiceSession(), and processVoice() were
+ *     deleted. Streaming callers use [VoiceAgentStreamAdapter]; one-shot
+ *     callers use processVoiceTurn(VoiceAgentTurnRequest).
  *
  *   - configureVoiceAgent / voiceAgentComponentStates / isVoiceAgentReady /
  *     initializeVoiceAgentWithLoadedModels / setVoiceSystemPrompt /
@@ -27,8 +22,10 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.ComponentLifecycleState
 import ai.runanywhere.proto.v1.ComponentLoadState
 import ai.runanywhere.proto.v1.LLMGenerationOptions
+import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.STTOptions
 import ai.runanywhere.proto.v1.STTOutput
 import ai.runanywhere.proto.v1.TTSOptions
@@ -37,16 +34,17 @@ import ai.runanywhere.proto.v1.VoiceAgentComponentStates
 import ai.runanywhere.proto.v1.VoiceAgentComposeConfig
 import ai.runanywhere.proto.v1.VoiceAgentConfig
 import ai.runanywhere.proto.v1.VoiceAgentResult
+import ai.runanywhere.proto.v1.VoiceAgentTurnRequest
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLMProto
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTTProto
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTSProto
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgentProto
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
-// v3.1: VoiceAgentResult / VoiceSessionConfig / VoiceSessionEvent /
-// Flow / flow imports removed — the actual declarations using them
+// v3.1: VoiceSessionEvent / Flow / flow imports removed — the actual declarations using them
 // (processVoice / startVoiceSession / streamVoiceSession) were deleted.
 
 private val voiceAgentLogger = SDKLogger.voiceAgent
@@ -57,14 +55,22 @@ private val voiceAgentLogger = SDKLogger.voiceAgent
 
 @Volatile private var voiceAgentInitialized: Boolean = false
 
+private fun isComponentReady(component: SDKComponent): Boolean =
+    CppBridgeModelLifecycleProto.snapshot(component)?.let {
+        it.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+            it.model_id.isNotEmpty()
+    } ?: false
+
 private fun areAllComponentsLoaded(): Boolean =
-    CppBridgeSTT.isLoaded && CppBridgeLLM.isLoaded && CppBridgeTTS.isLoaded
+    isComponentReady(SDKComponent.SDK_COMPONENT_STT) &&
+        isComponentReady(SDKComponent.SDK_COMPONENT_LLM) &&
+        isComponentReady(SDKComponent.SDK_COMPONENT_TTS)
 
 private fun getMissingComponents(): List<String> {
     val missing = mutableListOf<String>()
-    if (!CppBridgeSTT.isLoaded) missing.add("STT")
-    if (!CppBridgeLLM.isLoaded) missing.add("LLM")
-    if (!CppBridgeTTS.isLoaded) missing.add("TTS")
+    if (!isComponentReady(SDKComponent.SDK_COMPONENT_STT)) missing.add("STT")
+    if (!isComponentReady(SDKComponent.SDK_COMPONENT_LLM)) missing.add("LLM")
+    if (!isComponentReady(SDKComponent.SDK_COMPONENT_TTS)) missing.add("TTS")
     return missing
 }
 
@@ -109,15 +115,22 @@ actual suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels() {
 
 // v3.1: processVoice / startVoiceSession / streamVoiceSession DELETED.
 // Use CppBridgeVoiceAgent.getHandle() + VoiceAgentStreamAdapter(handle)
-// for streaming, or compose CppBridgeSTT/LLM/TTS directly for one-shot
-// turns (see Android sample's processVoiceTurnDirect helper).
+// for streaming, or call processVoiceTurn(VoiceAgentTurnRequest) for the
+// current native audio-only one-shot path.
 
 actual suspend fun RunAnywhere.stopVoiceSession() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     voiceSessionActive = false
-    CppBridgeSTT.cancel()
-    CppBridgeLLM.cancel()
-    CppBridgeTTS.cancel()
+    // Cancel each component via the native cancel ABI — C++ owns the
+    // cancellation flag. The legacy CppBridge{LLM,STT,TTS}.cancel
+    // shims (which managed per-component Kotlin state) were deleted.
+    CppBridgeLLMProto.cancel()
+    com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racSttComponentCancel(
+        CppBridgeSTTProto.getHandle(),
+    )
+    com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racTtsComponentCancel(
+        CppBridgeTTSProto.getHandle(),
+    )
 }
 
 actual suspend fun RunAnywhere.isVoiceSessionActive(): Boolean = voiceSessionActive
@@ -134,16 +147,31 @@ actual suspend fun RunAnywhere.setVoiceSystemPrompt(prompt: String) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase 4a — VoiceAgent processing parity actuals.
 //
-// One-shot composition of CppBridgeSTT/LLM/TTS, mirroring Swift's
+// One-shot composition of CppBridgeSTTProto/LLMProto/TTSProto, mirroring Swift's
 // `RunAnywhere+VoiceAgent.swift`. The streaming path remains via
 // `VoiceAgentStreamAdapter`.
 // ─────────────────────────────────────────────────────────────────────────────
 
 actual suspend fun RunAnywhere.processVoiceTurn(
-    audioData: ByteArray,
+    request: VoiceAgentTurnRequest,
 ): VoiceAgentResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    return CppBridgeVoiceAgentProto.processVoiceTurn(CppBridgeVoiceAgent.getRawHandle(), audioData)
+    if (request.audio_data.size == 0) {
+        throw SDKException.invalidArgument("VoiceAgentTurnRequest.audio_data is required")
+    }
+
+    val unsupportedFields = request.unsupportedAndroidAudioOnlyFields()
+    if (unsupportedFields.isNotEmpty()) {
+        throw SDKException.notImplemented(
+            "Native generated VoiceAgentTurnRequest ABI unavailable for fields: " +
+                unsupportedFields.joinToString(", "),
+        )
+    }
+
+    return CppBridgeVoiceAgentProto.processVoiceTurn(
+        CppBridgeVoiceAgent.getRawHandle(),
+        request.audio_data.toByteArray(),
+    )
 }
 
 actual suspend fun RunAnywhere.voiceAgentTranscribe(audioData: ByteArray): STTOutput {

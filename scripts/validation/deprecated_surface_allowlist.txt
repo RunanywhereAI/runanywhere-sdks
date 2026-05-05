@@ -1,0 +1,123 @@
+# Deprecated / Legacy Surface Allowlist
+#
+# Files listed here are known legacy surfaces that have not yet been migrated
+# to proto-generated types. The deprecated_surface_check.sh script will PASS
+# when only these files trigger violations, and FAIL when new ones appear.
+#
+# Format: one relative path per line (from repo root). Blank lines and lines
+# starting with '#' are ignored.
+#
+# When you migrate a file away from deprecated patterns, REMOVE it from this
+# list so it stays clean.
+
+# ============================================================================
+# Kotlin SDK — CppBridge JSON serialisation (will be replaced by proto bytes)
+# ============================================================================
+sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/foundation/bridge/extensions/CppBridgeLLM.kt
+sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/foundation/bridge/extensions/CppBridgePlatform.kt
+sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/foundation/bridge/extensions/CppBridgeSTT.kt
+sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/foundation/bridge/extensions/CppBridgeTTS.kt
+sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/foundation/bridge/extensions/CppBridgeVAD.kt
+sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/public/extensions/RunAnywhere+RAG.kt
+
+# ============================================================================
+# Swift SDK — hand-written *Types.swift DTO files
+# ============================================================================
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Diffusion/DiffusionTypes.swift
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/LLMTypes.swift
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/ToolCallingTypes.swift
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/ModelTypes.swift
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/VoiceAgentTypes.swift
+
+# Swift SDK — files using JSONDecoder/JSONEncoder in bridge code
+sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/HTTPClientAdapter.swift
+sdk/runanywhere-swift/Sources/RunAnywhere/Data/Network/Protocols/NetworkService.swift
+sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+PlatformAdapter.swift
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/LLM/StructuredOutputProto+Helpers.swift
+sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RAG/RAGProto+Helpers.swift
+
+# ============================================================================
+# Flutter SDK — vendored nlohmann JSON and RAG bridge C++ files
+# ============================================================================
+sdk/runanywhere-flutter/packages/runanywhere/src/third_party/nlohmann/json.hpp
+sdk/runanywhere-flutter/packages/runanywhere/src/flutter_rag_bridge.cpp
+sdk/runanywhere-flutter/packages/runanywhere/src/flutter_rag_bridge.h
+sdk/runanywhere-flutter/packages/runanywhere/ios/Classes/flutter_rag_bridge.cpp
+sdk/runanywhere-flutter/packages/runanywhere/ios/Classes/flutter_rag_bridge.h
+
+# ============================================================================
+# React Native SDK — vendored nlohmann JSON, RAG bridge, and NativeLogBridge
+# ============================================================================
+sdk/runanywhere-react-native/packages/core/cpp/third_party/nlohmann/json.hpp
+sdk/runanywhere-react-native/packages/core/cpp/bridges/RAGBridge.cpp
+sdk/runanywhere-react-native/packages/core/cpp/HybridRunAnywhereCore+Voice.cpp
+sdk/runanywhere-react-native/packages/core/cpp/HybridRunAnywhereCore+Http.cpp
+sdk/runanywhere-react-native/packages/core/cpp/HybridRunAnywhereCore.cpp
+sdk/runanywhere-react-native/packages/core/src/Foundation/Logging/Destinations/NativeLogBridge.ts
+sdk/runanywhere-react-native/packages/core/src/Features/LLM/LlmThinking.ts
+sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RunAnywhere+Diffusion.ts
+sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RunAnywhere+PluginLoader.ts
+sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RunAnywhere+StructuredOutput.ts
+sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RunAnywhere+STT.ts
+sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RunAnywhere+TextGeneration.ts
+sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RunAnywhere+ToolCalling.ts
+sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RunAnywhere+TTS.ts
+sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RunAnywhere+VAD.ts
+sdk/runanywhere-react-native/packages/core/src/Public/Extensions/RunAnywhere+VoiceAgent.ts
+sdk/runanywhere-react-native/packages/core/src/Public/RunAnywhere.ts
+sdk/runanywhere-react-native/packages/core/src/services/ModelRegistry.ts
+
+# ============================================================================
+# Web SDK — files with JSON.parse/JSON.stringify in bridge code
+# ============================================================================
+sdk/runanywhere-web/packages/core/src/Infrastructure/ModelManager.ts
+sdk/runanywhere-web/packages/core/src/Infrastructure/OPFSStorage.ts
+sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+Convenience.ts
+sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+RAG.ts
+sdk/runanywhere-web/packages/core/src/Public/Extensions/RunAnywhere+StructuredOutput.ts
+sdk/runanywhere-web/packages/llamacpp/src/Extensions/RunAnywhere+StructuredOutput.ts
+sdk/runanywhere-web/packages/llamacpp/src/Extensions/RunAnywhere+ToolCalling.ts
+sdk/runanywhere-web/packages/llamacpp/src/Foundation/TelemetryService.ts
+sdk/runanywhere-web/packages/onnx/src/Extensions/RunAnywhere+STT.ts
+sdk/runanywhere-web/packages/onnx/src/Extensions/RunAnywhere+TTS.ts
+
+# Web SDK — hand-written TypeScript type files
+sdk/runanywhere-web/packages/core/src/Infrastructure/ModelLoaderTypes.ts
+sdk/runanywhere-web/packages/core/src/Infrastructure/ProviderTypes.ts
+sdk/runanywhere-web/packages/core/src/types.ts
+sdk/runanywhere-web/packages/llamacpp/src/Extensions/DiffusionTypes.ts
+sdk/runanywhere-web/packages/llamacpp/src/Extensions/EmbeddingsTypes.ts
+sdk/runanywhere-web/packages/onnx/src/Extensions/STTTypes.ts
+sdk/runanywhere-web/packages/onnx/src/Extensions/TTSTypes.ts
+sdk/runanywhere-web/packages/onnx/src/Extensions/VADTypes.ts
+
+# ============================================================================
+# C++ Public API — rac_*_json functions in public headers
+# These are part of the stable C ABI and will be migrated to proto-bytes API.
+# ============================================================================
+sdk/runanywhere-commons/include/rac/core/rac_benchmark_log.h
+sdk/runanywhere-commons/include/rac/core/rac_benchmark_stats.h
+sdk/runanywhere-commons/include/rac/core/rac_structured_error.h
+sdk/runanywhere-commons/include/rac/backends/rac_llm_llamacpp.h
+sdk/runanywhere-commons/include/rac/backends/rac_stt_onnx.h
+sdk/runanywhere-commons/include/rac/backends/rac_tts_onnx.h
+sdk/runanywhere-commons/include/rac/features/diffusion/rac_diffusion_component.h
+sdk/runanywhere-commons/include/rac/features/llm/rac_llm_component.h
+sdk/runanywhere-commons/include/rac/features/llm/rac_llm_structured_output.h
+sdk/runanywhere-commons/include/rac/features/llm/rac_tool_calling.h
+sdk/runanywhere-commons/include/rac/features/rag/rac_rag_pipeline.h
+sdk/runanywhere-commons/include/rac/features/stt/rac_stt_service.h
+sdk/runanywhere-commons/include/rac/features/tts/rac_tts_service.h
+sdk/runanywhere-commons/include/rac/features/vlm/rac_vlm_service.h
+sdk/runanywhere-commons/include/rac/infrastructure/telemetry/rac_telemetry_manager.h
+sdk/runanywhere-commons/include/rac/features/llm/rac_llm_service.h
+sdk/runanywhere-commons/include/rac/features/diffusion/rac_diffusion_service.h
+sdk/runanywhere-commons/include/rac/features/vad/rac_vad_service.h
+sdk/runanywhere-commons/include/rac/features/embeddings/rac_embeddings_service.h
+sdk/runanywhere-commons/include/rac/infrastructure/network/rac_api_types.h
+sdk/runanywhere-commons/include/rac/backends/rac_stt_whispercpp.h
+sdk/runanywhere-commons/include/rac/backends/rac_vlm_llamacpp.h
+sdk/runanywhere-commons/include/rac/features/tts/rac_tts_component.h
+sdk/runanywhere-commons/include/rac/features/stt/rac_stt_component.h
+sdk/runanywhere-commons/include/rac/plugin/rac_plugin_entry.h
+sdk/runanywhere-commons/include/rac/router/rac_route.h

@@ -5,8 +5,20 @@
 // source: voice_agent_service.proto
 
 /* eslint-disable */
+import Long from "long";
 import _m0 from "protobufjs/minimal";
-import { AudioEncoding, audioEncodingFromJSON, audioEncodingToJSON, VoiceAgentComponentStates } from "./voice_events";
+import {
+  AudioEncoding,
+  audioEncodingFromJSON,
+  audioEncodingToJSON,
+  VoiceAgentComponentStates,
+  VoiceEventCategory,
+  voiceEventCategoryFromJSON,
+  voiceEventCategoryToJSON,
+  VoiceEventSeverity,
+  voiceEventSeverityFromJSON,
+  voiceEventSeverityToJSON,
+} from "./voice_events";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -21,6 +33,11 @@ export interface VoiceAgentRequest {
    * (e.g. "user_said,assistant_token"). Empty = all events.
    */
   eventFilter: string;
+  sessionId: string;
+  categories: VoiceEventCategory[];
+  minSeverity: VoiceEventSeverity;
+  replayFromSeq: number;
+  includeAudio: boolean;
 }
 
 /**
@@ -80,6 +97,30 @@ export interface VoiceAgentResult {
   synthesizedAudioSampleRateHz: number;
   synthesizedAudioChannels: number;
   synthesizedAudioEncoding: AudioEncoding;
+  sessionId: string;
+  turnId: string;
+  sttTimeMs: number;
+  llmTimeMs: number;
+  ttsTimeMs: number;
+  totalTimeMs: number;
+  errorMessage?: string | undefined;
+  errorCode: number;
+}
+
+export interface VoiceAgentTurnRequest {
+  requestId: string;
+  sessionId: string;
+  audioData: Uint8Array;
+  sampleRateHz: number;
+  channels: number;
+  encoding: AudioEncoding;
+  sessionConfig?: VoiceSessionConfig | undefined;
+  metadata: { [key: string]: string };
+}
+
+export interface VoiceAgentTurnRequest_MetadataEntry {
+  key: string;
+  value: string;
 }
 
 /**
@@ -114,6 +155,11 @@ export interface VoiceSessionConfig {
   thinkingModeEnabled: boolean;
   /** Optional per-turn LLM max token limit. 0 = LLM/default. */
   maxTokens: number;
+  /** Maximum recording duration before forcing an end-of-turn. 0 = default. */
+  maxRecordingDurationMs: number;
+  /** Optional language/voice hints passed to STT/TTS adapters. */
+  languageCode?: string | undefined;
+  voiceId?: string | undefined;
 }
 
 /**
@@ -217,17 +263,39 @@ export interface VoiceAgentComposeConfig {
    * Audio state-machine behavior. Optional so defaults can be applied by
    * the native voice-agent implementation.
    */
-  audioPipelineConfig?: AudioPipelineConfig | undefined;
+  audioPipelineConfig?:
+    | AudioPipelineConfig
+    | undefined;
+  /** Correlation and defaults for event streams and one-shot turn APIs. */
+  sessionId?: string | undefined;
+  defaultLanguageCode?: string | undefined;
 }
 
 function createBaseVoiceAgentRequest(): VoiceAgentRequest {
-  return { eventFilter: "" };
+  return { eventFilter: "", sessionId: "", categories: [], minSeverity: 0, replayFromSeq: 0, includeAudio: false };
 }
 
 export const VoiceAgentRequest = {
   encode(message: VoiceAgentRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.eventFilter !== "") {
       writer.uint32(10).string(message.eventFilter);
+    }
+    if (message.sessionId !== "") {
+      writer.uint32(18).string(message.sessionId);
+    }
+    writer.uint32(26).fork();
+    for (const v of message.categories) {
+      writer.int32(v);
+    }
+    writer.ldelim();
+    if (message.minSeverity !== 0) {
+      writer.uint32(32).int32(message.minSeverity);
+    }
+    if (message.replayFromSeq !== 0) {
+      writer.uint32(40).uint64(message.replayFromSeq);
+    }
+    if (message.includeAudio !== false) {
+      writer.uint32(48).bool(message.includeAudio);
     }
     return writer;
   },
@@ -246,6 +314,51 @@ export const VoiceAgentRequest = {
 
           message.eventFilter = reader.string();
           continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.sessionId = reader.string();
+          continue;
+        case 3:
+          if (tag === 24) {
+            message.categories.push(reader.int32() as any);
+
+            continue;
+          }
+
+          if (tag === 26) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.categories.push(reader.int32() as any);
+            }
+
+            continue;
+          }
+
+          break;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.minSeverity = reader.int32() as any;
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.replayFromSeq = longToNumber(reader.uint64() as Long);
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.includeAudio = reader.bool();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -256,13 +369,37 @@ export const VoiceAgentRequest = {
   },
 
   fromJSON(object: any): VoiceAgentRequest {
-    return { eventFilter: isSet(object.eventFilter) ? globalThis.String(object.eventFilter) : "" };
+    return {
+      eventFilter: isSet(object.eventFilter) ? globalThis.String(object.eventFilter) : "",
+      sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
+      categories: globalThis.Array.isArray(object?.categories)
+        ? object.categories.map((e: any) => voiceEventCategoryFromJSON(e))
+        : [],
+      minSeverity: isSet(object.minSeverity) ? voiceEventSeverityFromJSON(object.minSeverity) : 0,
+      replayFromSeq: isSet(object.replayFromSeq) ? globalThis.Number(object.replayFromSeq) : 0,
+      includeAudio: isSet(object.includeAudio) ? globalThis.Boolean(object.includeAudio) : false,
+    };
   },
 
   toJSON(message: VoiceAgentRequest): unknown {
     const obj: any = {};
     if (message.eventFilter !== "") {
       obj.eventFilter = message.eventFilter;
+    }
+    if (message.sessionId !== "") {
+      obj.sessionId = message.sessionId;
+    }
+    if (message.categories?.length) {
+      obj.categories = message.categories.map((e) => voiceEventCategoryToJSON(e));
+    }
+    if (message.minSeverity !== 0) {
+      obj.minSeverity = voiceEventSeverityToJSON(message.minSeverity);
+    }
+    if (message.replayFromSeq !== 0) {
+      obj.replayFromSeq = Math.round(message.replayFromSeq);
+    }
+    if (message.includeAudio !== false) {
+      obj.includeAudio = message.includeAudio;
     }
     return obj;
   },
@@ -273,6 +410,11 @@ export const VoiceAgentRequest = {
   fromPartial<I extends Exact<DeepPartial<VoiceAgentRequest>, I>>(object: I): VoiceAgentRequest {
     const message = createBaseVoiceAgentRequest();
     message.eventFilter = object.eventFilter ?? "";
+    message.sessionId = object.sessionId ?? "";
+    message.categories = object.categories?.map((e) => e) || [];
+    message.minSeverity = object.minSeverity ?? 0;
+    message.replayFromSeq = object.replayFromSeq ?? 0;
+    message.includeAudio = object.includeAudio ?? false;
     return message;
   },
 };
@@ -288,6 +430,14 @@ function createBaseVoiceAgentResult(): VoiceAgentResult {
     synthesizedAudioSampleRateHz: 0,
     synthesizedAudioChannels: 0,
     synthesizedAudioEncoding: 0,
+    sessionId: "",
+    turnId: "",
+    sttTimeMs: 0,
+    llmTimeMs: 0,
+    ttsTimeMs: 0,
+    totalTimeMs: 0,
+    errorMessage: undefined,
+    errorCode: 0,
   };
 }
 
@@ -319,6 +469,30 @@ export const VoiceAgentResult = {
     }
     if (message.synthesizedAudioEncoding !== 0) {
       writer.uint32(72).int32(message.synthesizedAudioEncoding);
+    }
+    if (message.sessionId !== "") {
+      writer.uint32(82).string(message.sessionId);
+    }
+    if (message.turnId !== "") {
+      writer.uint32(90).string(message.turnId);
+    }
+    if (message.sttTimeMs !== 0) {
+      writer.uint32(96).int64(message.sttTimeMs);
+    }
+    if (message.llmTimeMs !== 0) {
+      writer.uint32(104).int64(message.llmTimeMs);
+    }
+    if (message.ttsTimeMs !== 0) {
+      writer.uint32(112).int64(message.ttsTimeMs);
+    }
+    if (message.totalTimeMs !== 0) {
+      writer.uint32(120).int64(message.totalTimeMs);
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(130).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(136).int32(message.errorCode);
     }
     return writer;
   },
@@ -393,6 +567,62 @@ export const VoiceAgentResult = {
 
           message.synthesizedAudioEncoding = reader.int32() as any;
           continue;
+        case 10:
+          if (tag !== 82) {
+            break;
+          }
+
+          message.sessionId = reader.string();
+          continue;
+        case 11:
+          if (tag !== 90) {
+            break;
+          }
+
+          message.turnId = reader.string();
+          continue;
+        case 12:
+          if (tag !== 96) {
+            break;
+          }
+
+          message.sttTimeMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 13:
+          if (tag !== 104) {
+            break;
+          }
+
+          message.llmTimeMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 14:
+          if (tag !== 112) {
+            break;
+          }
+
+          message.ttsTimeMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 15:
+          if (tag !== 120) {
+            break;
+          }
+
+          message.totalTimeMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 16:
+          if (tag !== 130) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 17:
+          if (tag !== 136) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -419,6 +649,14 @@ export const VoiceAgentResult = {
       synthesizedAudioEncoding: isSet(object.synthesizedAudioEncoding)
         ? audioEncodingFromJSON(object.synthesizedAudioEncoding)
         : 0,
+      sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
+      turnId: isSet(object.turnId) ? globalThis.String(object.turnId) : "",
+      sttTimeMs: isSet(object.sttTimeMs) ? globalThis.Number(object.sttTimeMs) : 0,
+      llmTimeMs: isSet(object.llmTimeMs) ? globalThis.Number(object.llmTimeMs) : 0,
+      ttsTimeMs: isSet(object.ttsTimeMs) ? globalThis.Number(object.ttsTimeMs) : 0,
+      totalTimeMs: isSet(object.totalTimeMs) ? globalThis.Number(object.totalTimeMs) : 0,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
     };
   },
 
@@ -451,6 +689,30 @@ export const VoiceAgentResult = {
     if (message.synthesizedAudioEncoding !== 0) {
       obj.synthesizedAudioEncoding = audioEncodingToJSON(message.synthesizedAudioEncoding);
     }
+    if (message.sessionId !== "") {
+      obj.sessionId = message.sessionId;
+    }
+    if (message.turnId !== "") {
+      obj.turnId = message.turnId;
+    }
+    if (message.sttTimeMs !== 0) {
+      obj.sttTimeMs = Math.round(message.sttTimeMs);
+    }
+    if (message.llmTimeMs !== 0) {
+      obj.llmTimeMs = Math.round(message.llmTimeMs);
+    }
+    if (message.ttsTimeMs !== 0) {
+      obj.ttsTimeMs = Math.round(message.ttsTimeMs);
+    }
+    if (message.totalTimeMs !== 0) {
+      obj.totalTimeMs = Math.round(message.totalTimeMs);
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
     return obj;
   },
 
@@ -470,6 +732,286 @@ export const VoiceAgentResult = {
     message.synthesizedAudioSampleRateHz = object.synthesizedAudioSampleRateHz ?? 0;
     message.synthesizedAudioChannels = object.synthesizedAudioChannels ?? 0;
     message.synthesizedAudioEncoding = object.synthesizedAudioEncoding ?? 0;
+    message.sessionId = object.sessionId ?? "";
+    message.turnId = object.turnId ?? "";
+    message.sttTimeMs = object.sttTimeMs ?? 0;
+    message.llmTimeMs = object.llmTimeMs ?? 0;
+    message.ttsTimeMs = object.ttsTimeMs ?? 0;
+    message.totalTimeMs = object.totalTimeMs ?? 0;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
+    return message;
+  },
+};
+
+function createBaseVoiceAgentTurnRequest(): VoiceAgentTurnRequest {
+  return {
+    requestId: "",
+    sessionId: "",
+    audioData: new Uint8Array(0),
+    sampleRateHz: 0,
+    channels: 0,
+    encoding: 0,
+    sessionConfig: undefined,
+    metadata: {},
+  };
+}
+
+export const VoiceAgentTurnRequest = {
+  encode(message: VoiceAgentTurnRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    if (message.sessionId !== "") {
+      writer.uint32(18).string(message.sessionId);
+    }
+    if (message.audioData.length !== 0) {
+      writer.uint32(26).bytes(message.audioData);
+    }
+    if (message.sampleRateHz !== 0) {
+      writer.uint32(32).int32(message.sampleRateHz);
+    }
+    if (message.channels !== 0) {
+      writer.uint32(40).int32(message.channels);
+    }
+    if (message.encoding !== 0) {
+      writer.uint32(48).int32(message.encoding);
+    }
+    if (message.sessionConfig !== undefined) {
+      VoiceSessionConfig.encode(message.sessionConfig, writer.uint32(58).fork()).ldelim();
+    }
+    Object.entries(message.metadata).forEach(([key, value]) => {
+      VoiceAgentTurnRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(66).fork()).ldelim();
+    });
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentTurnRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseVoiceAgentTurnRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.sessionId = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.audioData = reader.bytes();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.sampleRateHz = reader.int32();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.channels = reader.int32();
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.encoding = reader.int32() as any;
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.sessionConfig = VoiceSessionConfig.decode(reader, reader.uint32());
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          const entry8 = VoiceAgentTurnRequest_MetadataEntry.decode(reader, reader.uint32());
+          if (entry8.value !== undefined) {
+            message.metadata[entry8.key] = entry8.value;
+          }
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): VoiceAgentTurnRequest {
+    return {
+      requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+      sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
+      audioData: isSet(object.audioData) ? bytesFromBase64(object.audioData) : new Uint8Array(0),
+      sampleRateHz: isSet(object.sampleRateHz) ? globalThis.Number(object.sampleRateHz) : 0,
+      channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
+      encoding: isSet(object.encoding) ? audioEncodingFromJSON(object.encoding) : 0,
+      sessionConfig: isSet(object.sessionConfig) ? VoiceSessionConfig.fromJSON(object.sessionConfig) : undefined,
+      metadata: isObject(object.metadata)
+        ? Object.entries(object.metadata).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+        : {},
+    };
+  },
+
+  toJSON(message: VoiceAgentTurnRequest): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.sessionId !== "") {
+      obj.sessionId = message.sessionId;
+    }
+    if (message.audioData.length !== 0) {
+      obj.audioData = base64FromBytes(message.audioData);
+    }
+    if (message.sampleRateHz !== 0) {
+      obj.sampleRateHz = Math.round(message.sampleRateHz);
+    }
+    if (message.channels !== 0) {
+      obj.channels = Math.round(message.channels);
+    }
+    if (message.encoding !== 0) {
+      obj.encoding = audioEncodingToJSON(message.encoding);
+    }
+    if (message.sessionConfig !== undefined) {
+      obj.sessionConfig = VoiceSessionConfig.toJSON(message.sessionConfig);
+    }
+    if (message.metadata) {
+      const entries = Object.entries(message.metadata);
+      if (entries.length > 0) {
+        obj.metadata = {};
+        entries.forEach(([k, v]) => {
+          obj.metadata[k] = v;
+        });
+      }
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<VoiceAgentTurnRequest>, I>>(base?: I): VoiceAgentTurnRequest {
+    return VoiceAgentTurnRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<VoiceAgentTurnRequest>, I>>(object: I): VoiceAgentTurnRequest {
+    const message = createBaseVoiceAgentTurnRequest();
+    message.requestId = object.requestId ?? "";
+    message.sessionId = object.sessionId ?? "";
+    message.audioData = object.audioData ?? new Uint8Array(0);
+    message.sampleRateHz = object.sampleRateHz ?? 0;
+    message.channels = object.channels ?? 0;
+    message.encoding = object.encoding ?? 0;
+    message.sessionConfig = (object.sessionConfig !== undefined && object.sessionConfig !== null)
+      ? VoiceSessionConfig.fromPartial(object.sessionConfig)
+      : undefined;
+    message.metadata = Object.entries(object.metadata ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = globalThis.String(value);
+      }
+      return acc;
+    }, {});
+    return message;
+  },
+};
+
+function createBaseVoiceAgentTurnRequest_MetadataEntry(): VoiceAgentTurnRequest_MetadataEntry {
+  return { key: "", value: "" };
+}
+
+export const VoiceAgentTurnRequest_MetadataEntry = {
+  encode(message: VoiceAgentTurnRequest_MetadataEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentTurnRequest_MetadataEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseVoiceAgentTurnRequest_MetadataEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): VoiceAgentTurnRequest_MetadataEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: VoiceAgentTurnRequest_MetadataEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<VoiceAgentTurnRequest_MetadataEntry>, I>>(
+    base?: I,
+  ): VoiceAgentTurnRequest_MetadataEntry {
+    return VoiceAgentTurnRequest_MetadataEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<VoiceAgentTurnRequest_MetadataEntry>, I>>(
+    object: I,
+  ): VoiceAgentTurnRequest_MetadataEntry {
+    const message = createBaseVoiceAgentTurnRequest_MetadataEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
     return message;
   },
 };
@@ -482,6 +1024,9 @@ function createBaseVoiceSessionConfig(): VoiceSessionConfig {
     continuousMode: false,
     thinkingModeEnabled: false,
     maxTokens: 0,
+    maxRecordingDurationMs: 0,
+    languageCode: undefined,
+    voiceId: undefined,
   };
 }
 
@@ -504,6 +1049,15 @@ export const VoiceSessionConfig = {
     }
     if (message.maxTokens !== 0) {
       writer.uint32(48).int32(message.maxTokens);
+    }
+    if (message.maxRecordingDurationMs !== 0) {
+      writer.uint32(56).int32(message.maxRecordingDurationMs);
+    }
+    if (message.languageCode !== undefined) {
+      writer.uint32(66).string(message.languageCode);
+    }
+    if (message.voiceId !== undefined) {
+      writer.uint32(74).string(message.voiceId);
     }
     return writer;
   },
@@ -557,6 +1111,27 @@ export const VoiceSessionConfig = {
 
           message.maxTokens = reader.int32();
           continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.maxRecordingDurationMs = reader.int32();
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.languageCode = reader.string();
+          continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.voiceId = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -574,6 +1149,11 @@ export const VoiceSessionConfig = {
       continuousMode: isSet(object.continuousMode) ? globalThis.Boolean(object.continuousMode) : false,
       thinkingModeEnabled: isSet(object.thinkingModeEnabled) ? globalThis.Boolean(object.thinkingModeEnabled) : false,
       maxTokens: isSet(object.maxTokens) ? globalThis.Number(object.maxTokens) : 0,
+      maxRecordingDurationMs: isSet(object.maxRecordingDurationMs)
+        ? globalThis.Number(object.maxRecordingDurationMs)
+        : 0,
+      languageCode: isSet(object.languageCode) ? globalThis.String(object.languageCode) : undefined,
+      voiceId: isSet(object.voiceId) ? globalThis.String(object.voiceId) : undefined,
     };
   },
 
@@ -597,6 +1177,15 @@ export const VoiceSessionConfig = {
     if (message.maxTokens !== 0) {
       obj.maxTokens = Math.round(message.maxTokens);
     }
+    if (message.maxRecordingDurationMs !== 0) {
+      obj.maxRecordingDurationMs = Math.round(message.maxRecordingDurationMs);
+    }
+    if (message.languageCode !== undefined) {
+      obj.languageCode = message.languageCode;
+    }
+    if (message.voiceId !== undefined) {
+      obj.voiceId = message.voiceId;
+    }
     return obj;
   },
 
@@ -611,6 +1200,9 @@ export const VoiceSessionConfig = {
     message.continuousMode = object.continuousMode ?? false;
     message.thinkingModeEnabled = object.thinkingModeEnabled ?? false;
     message.maxTokens = object.maxTokens ?? 0;
+    message.maxRecordingDurationMs = object.maxRecordingDurationMs ?? 0;
+    message.languageCode = object.languageCode ?? undefined;
+    message.voiceId = object.voiceId ?? undefined;
     return message;
   },
 };
@@ -727,6 +1319,8 @@ function createBaseVoiceAgentComposeConfig(): VoiceAgentComposeConfig {
     wakewordVadModelPath: undefined,
     sessionConfig: undefined,
     audioPipelineConfig: undefined,
+    sessionId: undefined,
+    defaultLanguageCode: undefined,
   };
 }
 
@@ -794,6 +1388,12 @@ export const VoiceAgentComposeConfig = {
     }
     if (message.audioPipelineConfig !== undefined) {
       AudioPipelineConfig.encode(message.audioPipelineConfig, writer.uint32(170).fork()).ldelim();
+    }
+    if (message.sessionId !== undefined) {
+      writer.uint32(178).string(message.sessionId);
+    }
+    if (message.defaultLanguageCode !== undefined) {
+      writer.uint32(186).string(message.defaultLanguageCode);
     }
     return writer;
   },
@@ -952,6 +1552,20 @@ export const VoiceAgentComposeConfig = {
 
           message.audioPipelineConfig = AudioPipelineConfig.decode(reader, reader.uint32());
           continue;
+        case 22:
+          if (tag !== 178) {
+            break;
+          }
+
+          message.sessionId = reader.string();
+          continue;
+        case 23:
+          if (tag !== 186) {
+            break;
+          }
+
+          message.defaultLanguageCode = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -989,6 +1603,10 @@ export const VoiceAgentComposeConfig = {
       sessionConfig: isSet(object.sessionConfig) ? VoiceSessionConfig.fromJSON(object.sessionConfig) : undefined,
       audioPipelineConfig: isSet(object.audioPipelineConfig)
         ? AudioPipelineConfig.fromJSON(object.audioPipelineConfig)
+        : undefined,
+      sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : undefined,
+      defaultLanguageCode: isSet(object.defaultLanguageCode)
+        ? globalThis.String(object.defaultLanguageCode)
         : undefined,
     };
   },
@@ -1058,6 +1676,12 @@ export const VoiceAgentComposeConfig = {
     if (message.audioPipelineConfig !== undefined) {
       obj.audioPipelineConfig = AudioPipelineConfig.toJSON(message.audioPipelineConfig);
     }
+    if (message.sessionId !== undefined) {
+      obj.sessionId = message.sessionId;
+    }
+    if (message.defaultLanguageCode !== undefined) {
+      obj.defaultLanguageCode = message.defaultLanguageCode;
+    }
     return obj;
   },
 
@@ -1091,6 +1715,8 @@ export const VoiceAgentComposeConfig = {
     message.audioPipelineConfig = (object.audioPipelineConfig !== undefined && object.audioPipelineConfig !== null)
       ? AudioPipelineConfig.fromPartial(object.audioPipelineConfig)
       : undefined;
+    message.sessionId = object.sessionId ?? undefined;
+    message.defaultLanguageCode = object.defaultLanguageCode ?? undefined;
     return message;
   },
 };
@@ -1123,6 +1749,25 @@ export type DeepPartial<T> = T extends Builtin ? T
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 export type Exact<P, I extends P> = P extends Builtin ? P
   : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+
+function longToNumber(long: Long): number {
+  if (long.gt(globalThis.Number.MAX_SAFE_INTEGER)) {
+    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+  }
+  if (long.lt(globalThis.Number.MIN_SAFE_INTEGER)) {
+    throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+  }
+  return long.toNumber();
+}
+
+if (_m0.util.Long !== Long) {
+  _m0.util.Long = Long as any;
+  _m0.configure();
+}
+
+function isObject(value: any): boolean {
+  return typeof value === "object" && value !== null;
+}
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

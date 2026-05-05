@@ -43,6 +43,27 @@ export declare enum Sentiment {
 }
 export declare function sentimentFromJSON(object: any): Sentiment;
 export declare function sentimentToJSON(object: Sentiment): string;
+export declare enum StructuredOutputMode {
+    STRUCTURED_OUTPUT_MODE_UNSPECIFIED = 0,
+    STRUCTURED_OUTPUT_MODE_JSON_SCHEMA = 1,
+    STRUCTURED_OUTPUT_MODE_JSON_OBJECT = 2,
+    STRUCTURED_OUTPUT_MODE_REGEX = 3,
+    STRUCTURED_OUTPUT_MODE_GRAMMAR = 4,
+    UNRECOGNIZED = -1
+}
+export declare function structuredOutputModeFromJSON(object: any): StructuredOutputMode;
+export declare function structuredOutputModeToJSON(object: StructuredOutputMode): string;
+export declare enum StructuredOutputStreamEventKind {
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED = 0,
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN = 1,
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON = 2,
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION = 3,
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED = 4,
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR = 5,
+    UNRECOGNIZED = -1
+}
+export declare function structuredOutputStreamEventKindFromJSON(object: any): StructuredOutputStreamEventKind;
+export declare function structuredOutputStreamEventKindToJSON(object: StructuredOutputStreamEventKind): string;
 /**
  * ---------------------------------------------------------------------------
  * JSON Schema property — describes a single property within a schema.
@@ -79,6 +100,15 @@ export interface JSONSchemaProperty {
     itemsSchema?: JSONSchema | undefined;
     /** Nested object schema when `type == JSON_SCHEMA_TYPE_OBJECT`. */
     objectSchema?: JSONSchema | undefined;
+    /** Common validation constraints carried by RN/Web schema builders. */
+    minimum?: number | undefined;
+    maximum?: number | undefined;
+    minLength?: number | undefined;
+    maxLength?: number | undefined;
+    pattern?: string | undefined;
+    minItems?: number | undefined;
+    maxItems?: number | undefined;
+    defaultJson?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -118,6 +148,7 @@ export interface JSONSchema {
     anyOf: JSONSchema[];
     oneOf: JSONSchema[];
     notSchema?: JSONSchema | undefined;
+    rawJson?: string | undefined;
 }
 export interface JSONSchema_PropertiesEntry {
     key: string;
@@ -153,6 +184,11 @@ export interface StructuredOutputOptions {
     /** Optional generated type/name hints used by Swift/Kotlin/Dart wrappers. */
     typeName?: string | undefined;
     name?: string | undefined;
+    mode: StructuredOutputMode;
+    regexPattern?: string | undefined;
+    grammar?: string | undefined;
+    repairJson: boolean;
+    maxRetries: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -177,6 +213,8 @@ export interface StructuredOutputValidation {
      * extractor found one.
      */
     extractedJson?: string | undefined;
+    validationErrors: string[];
+    validationTimeMs: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -197,6 +235,57 @@ export interface StructuredOutputResult {
     validation?: StructuredOutputValidation | undefined;
     /** Raw model text prior to parsing (optional, useful for retries). */
     rawText?: string | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+export interface StructuredOutputParseRequest {
+    requestId: string;
+    text: string;
+    options?: StructuredOutputOptions | undefined;
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface StructuredOutputParseRequest_MetadataEntry {
+    key: string;
+    value: string;
+}
+export interface StructuredOutputValidationRequest {
+    text: string;
+    options?: StructuredOutputOptions | undefined;
+}
+export interface StructuredOutputPromptResult {
+    preparedPrompt: string;
+    systemPrompt?: string | undefined;
+    jsonSchema?: string | undefined;
+    regexPattern?: string | undefined;
+    grammar?: string | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+export interface StructuredOutputRequest {
+    requestId: string;
+    prompt: string;
+    options?: StructuredOutputOptions | undefined;
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface StructuredOutputRequest_MetadataEntry {
+    key: string;
+    value: string;
+}
+export interface StructuredOutputStreamEvent {
+    seq: number;
+    timestampUs: number;
+    requestId: string;
+    kind: StructuredOutputStreamEventKind;
+    token: string;
+    partialJson?: string | undefined;
+    validation?: StructuredOutputValidation | undefined;
+    result?: StructuredOutputResult | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -342,6 +431,62 @@ export declare const StructuredOutputResult: {
     toJSON(message: StructuredOutputResult): unknown;
     create<I extends Exact<DeepPartial<StructuredOutputResult>, I>>(base?: I): StructuredOutputResult;
     fromPartial<I extends Exact<DeepPartial<StructuredOutputResult>, I>>(object: I): StructuredOutputResult;
+};
+export declare const StructuredOutputParseRequest: {
+    encode(message: StructuredOutputParseRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputParseRequest;
+    fromJSON(object: any): StructuredOutputParseRequest;
+    toJSON(message: StructuredOutputParseRequest): unknown;
+    create<I extends Exact<DeepPartial<StructuredOutputParseRequest>, I>>(base?: I): StructuredOutputParseRequest;
+    fromPartial<I extends Exact<DeepPartial<StructuredOutputParseRequest>, I>>(object: I): StructuredOutputParseRequest;
+};
+export declare const StructuredOutputParseRequest_MetadataEntry: {
+    encode(message: StructuredOutputParseRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputParseRequest_MetadataEntry;
+    fromJSON(object: any): StructuredOutputParseRequest_MetadataEntry;
+    toJSON(message: StructuredOutputParseRequest_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<StructuredOutputParseRequest_MetadataEntry>, I>>(base?: I): StructuredOutputParseRequest_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<StructuredOutputParseRequest_MetadataEntry>, I>>(object: I): StructuredOutputParseRequest_MetadataEntry;
+};
+export declare const StructuredOutputValidationRequest: {
+    encode(message: StructuredOutputValidationRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputValidationRequest;
+    fromJSON(object: any): StructuredOutputValidationRequest;
+    toJSON(message: StructuredOutputValidationRequest): unknown;
+    create<I extends Exact<DeepPartial<StructuredOutputValidationRequest>, I>>(base?: I): StructuredOutputValidationRequest;
+    fromPartial<I extends Exact<DeepPartial<StructuredOutputValidationRequest>, I>>(object: I): StructuredOutputValidationRequest;
+};
+export declare const StructuredOutputPromptResult: {
+    encode(message: StructuredOutputPromptResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputPromptResult;
+    fromJSON(object: any): StructuredOutputPromptResult;
+    toJSON(message: StructuredOutputPromptResult): unknown;
+    create<I extends Exact<DeepPartial<StructuredOutputPromptResult>, I>>(base?: I): StructuredOutputPromptResult;
+    fromPartial<I extends Exact<DeepPartial<StructuredOutputPromptResult>, I>>(object: I): StructuredOutputPromptResult;
+};
+export declare const StructuredOutputRequest: {
+    encode(message: StructuredOutputRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputRequest;
+    fromJSON(object: any): StructuredOutputRequest;
+    toJSON(message: StructuredOutputRequest): unknown;
+    create<I extends Exact<DeepPartial<StructuredOutputRequest>, I>>(base?: I): StructuredOutputRequest;
+    fromPartial<I extends Exact<DeepPartial<StructuredOutputRequest>, I>>(object: I): StructuredOutputRequest;
+};
+export declare const StructuredOutputRequest_MetadataEntry: {
+    encode(message: StructuredOutputRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputRequest_MetadataEntry;
+    fromJSON(object: any): StructuredOutputRequest_MetadataEntry;
+    toJSON(message: StructuredOutputRequest_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<StructuredOutputRequest_MetadataEntry>, I>>(base?: I): StructuredOutputRequest_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<StructuredOutputRequest_MetadataEntry>, I>>(object: I): StructuredOutputRequest_MetadataEntry;
+};
+export declare const StructuredOutputStreamEvent: {
+    encode(message: StructuredOutputStreamEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputStreamEvent;
+    fromJSON(object: any): StructuredOutputStreamEvent;
+    toJSON(message: StructuredOutputStreamEvent): unknown;
+    create<I extends Exact<DeepPartial<StructuredOutputStreamEvent>, I>>(base?: I): StructuredOutputStreamEvent;
+    fromPartial<I extends Exact<DeepPartial<StructuredOutputStreamEvent>, I>>(object: I): StructuredOutputStreamEvent;
 };
 export declare const NamedEntity: {
     encode(message: NamedEntity, writer?: _m0.Writer): _m0.Writer;

@@ -211,6 +211,10 @@ class ComponentLifecycleState extends $pb.ProtobufEnum {
   static const ComponentLifecycleState COMPONENT_LIFECYCLE_STATE_UNLOADING = ComponentLifecycleState._(4, _omitEnumNames ? '' : 'COMPONENT_LIFECYCLE_STATE_UNLOADING');
   static const ComponentLifecycleState COMPONENT_LIFECYCLE_STATE_ERROR = ComponentLifecycleState._(5, _omitEnumNames ? '' : 'COMPONENT_LIFECYCLE_STATE_ERROR');
   static const ComponentLifecycleState COMPONENT_LIFECYCLE_STATE_SHUTDOWN = ComponentLifecycleState._(6, _omitEnumNames ? '' : 'COMPONENT_LIFECYCLE_STATE_SHUTDOWN');
+  static const ComponentLifecycleState COMPONENT_LIFECYCLE_STATE_DOWNLOADING = ComponentLifecycleState._(7, _omitEnumNames ? '' : 'COMPONENT_LIFECYCLE_STATE_DOWNLOADING');
+  static const ComponentLifecycleState COMPONENT_LIFECYCLE_STATE_DELETING = ComponentLifecycleState._(8, _omitEnumNames ? '' : 'COMPONENT_LIFECYCLE_STATE_DELETING');
+  static const ComponentLifecycleState COMPONENT_LIFECYCLE_STATE_PAUSED = ComponentLifecycleState._(9, _omitEnumNames ? '' : 'COMPONENT_LIFECYCLE_STATE_PAUSED');
+  static const ComponentLifecycleState COMPONENT_LIFECYCLE_STATE_UPDATING = ComponentLifecycleState._(10, _omitEnumNames ? '' : 'COMPONENT_LIFECYCLE_STATE_UPDATING');
 
   static const $core.List<ComponentLifecycleState> values = <ComponentLifecycleState> [
     COMPONENT_LIFECYCLE_STATE_UNSPECIFIED,
@@ -220,6 +224,10 @@ class ComponentLifecycleState extends $pb.ProtobufEnum {
     COMPONENT_LIFECYCLE_STATE_UNLOADING,
     COMPONENT_LIFECYCLE_STATE_ERROR,
     COMPONENT_LIFECYCLE_STATE_SHUTDOWN,
+    COMPONENT_LIFECYCLE_STATE_DOWNLOADING,
+    COMPONENT_LIFECYCLE_STATE_DELETING,
+    COMPONENT_LIFECYCLE_STATE_PAUSED,
+    COMPONENT_LIFECYCLE_STATE_UPDATING,
   ];
 
   static final $core.Map<$core.int, ComponentLifecycleState> _byValue = $pb.ProtobufEnum.initByValue(values);
@@ -804,6 +812,12 @@ class ModelRegistryEventKind extends $pb.ProtobufEnum {
   static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED = ModelRegistryEventKind._(11, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED');
   static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED = ModelRegistryEventKind._(12, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED');
   static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED = ModelRegistryEventKind._(13, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED');
+  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_LIST_STARTED = ModelRegistryEventKind._(14, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_LIST_STARTED');
+  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED = ModelRegistryEventKind._(15, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED');
+  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_LIST_FAILED = ModelRegistryEventKind._(16, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_LIST_FAILED');
+  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_GET_STARTED = ModelRegistryEventKind._(17, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_GET_STARTED');
+  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED = ModelRegistryEventKind._(18, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED');
+  static const ModelRegistryEventKind MODEL_REGISTRY_EVENT_KIND_GET_FAILED = ModelRegistryEventKind._(19, _omitEnumNames ? '' : 'MODEL_REGISTRY_EVENT_KIND_GET_FAILED');
 
   static const $core.List<ModelRegistryEventKind> values = <ModelRegistryEventKind> [
     MODEL_REGISTRY_EVENT_KIND_UNSPECIFIED,
@@ -820,6 +834,12 @@ class ModelRegistryEventKind extends $pb.ProtobufEnum {
     MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED,
     MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED,
     MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED,
+    MODEL_REGISTRY_EVENT_KIND_LIST_STARTED,
+    MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED,
+    MODEL_REGISTRY_EVENT_KIND_LIST_FAILED,
+    MODEL_REGISTRY_EVENT_KIND_GET_STARTED,
+    MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED,
+    MODEL_REGISTRY_EVENT_KIND_GET_FAILED,
   ];
 
   static final $core.Map<$core.int, ModelRegistryEventKind> _byValue = $pb.ProtobufEnum.initByValue(values);
@@ -841,6 +861,8 @@ class DownloadEventKind extends $pb.ProtobufEnum {
   static const DownloadEventKind DOWNLOAD_EVENT_KIND_RESUMED = DownloadEventKind._(9, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_RESUMED');
   static const DownloadEventKind DOWNLOAD_EVENT_KIND_COMPLETED = DownloadEventKind._(10, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_COMPLETED');
   static const DownloadEventKind DOWNLOAD_EVENT_KIND_FAILED = DownloadEventKind._(11, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_FAILED');
+  static const DownloadEventKind DOWNLOAD_EVENT_KIND_PAUSED = DownloadEventKind._(12, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_PAUSED');
+  static const DownloadEventKind DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED = DownloadEventKind._(13, _omitEnumNames ? '' : 'DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED');
 
   static const $core.List<DownloadEventKind> values = <DownloadEventKind> [
     DOWNLOAD_EVENT_KIND_UNSPECIFIED,
@@ -855,6 +877,8 @@ class DownloadEventKind extends $pb.ProtobufEnum {
     DOWNLOAD_EVENT_KIND_RESUMED,
     DOWNLOAD_EVENT_KIND_COMPLETED,
     DOWNLOAD_EVENT_KIND_FAILED,
+    DOWNLOAD_EVENT_KIND_PAUSED,
+    DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED,
   ];
 
   static final $core.Map<$core.int, DownloadEventKind> _byValue = $pb.ProtobufEnum.initByValue(values);
@@ -875,6 +899,9 @@ class StorageLifecycleEventKind extends $pb.ProtobufEnum {
   static const StorageLifecycleEventKind STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED = StorageLifecycleEventKind._(8, _omitEnumNames ? '' : 'STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED');
   static const StorageLifecycleEventKind STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED = StorageLifecycleEventKind._(9, _omitEnumNames ? '' : 'STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED');
   static const StorageLifecycleEventKind STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED = StorageLifecycleEventKind._(10, _omitEnumNames ? '' : 'STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED');
+  static const StorageLifecycleEventKind STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED = StorageLifecycleEventKind._(11, _omitEnumNames ? '' : 'STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED');
+  static const StorageLifecycleEventKind STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED = StorageLifecycleEventKind._(12, _omitEnumNames ? '' : 'STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED');
+  static const StorageLifecycleEventKind STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED = StorageLifecycleEventKind._(13, _omitEnumNames ? '' : 'STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED');
 
   static const $core.List<StorageLifecycleEventKind> values = <StorageLifecycleEventKind> [
     STORAGE_LIFECYCLE_EVENT_KIND_UNSPECIFIED,
@@ -888,6 +915,9 @@ class StorageLifecycleEventKind extends $pb.ProtobufEnum {
     STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED,
     STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED,
     STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED,
+    STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED,
+    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED,
+    STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED,
   ];
 
   static final $core.Map<$core.int, StorageLifecycleEventKind> _byValue = $pb.ProtobufEnum.initByValue(values);

@@ -2,21 +2,21 @@
  * RunAnywhere Web SDK - Core Package (Pure TypeScript)
  *
  * Backend-agnostic infrastructure for on-device AI in the browser.
- * This package has ZERO WASM — all inference binaries live in backend packages:
- *   - @runanywhere/web-llamacpp — LLM, VLM, embeddings, diffusion (ships racommons-llamacpp.wasm)
- *   - @runanywhere/web-onnx — STT, TTS, VAD (ships sherpa-onnx.wasm)
+ * This package has ZERO WASM — all inference binaries live in backend packages.
+ *
+ * After the V2 cleanup, the public surface is built entirely on the proto-byte
+ * adapters that wrap the commons C ABI. JS-side model lifecycle policy
+ * (ModelManager / ModelRegistry / ModelDownloader / ExtensionPoint /
+ * ExtensionRegistry / archive helpers / provider routing) has been deleted.
  *
  * @packageDocumentation
  *
  * @example
  * ```typescript
  * import { RunAnywhere } from '@runanywhere/web';
- * import { LlamaCPP } from '@runanywhere/web-llamacpp';
- * import { ONNX } from '@runanywhere/web-onnx';
  *
  * await RunAnywhere.initialize({ environment: 'development' });
- * await LlamaCPP.register();
- * await ONNX.register();
+ * // Backend packages register their proto-byte handles via setRunanywhereModule().
  * ```
  */
 
@@ -24,8 +24,7 @@
 export { RunAnywhere } from './Public/RunAnywhere';
 export type { StorageBackend } from './Public/RunAnywhere';
 
-// Namespace extensions — symmetric with Swift's 19-extension pattern.
-export { Storage } from './Public/Extensions/RunAnywhere+Storage';
+// Namespace extensions — symmetric with Swift's namespace pattern.
 export type {
   StorageAvailabilityRequest,
   StorageAvailabilityResult,
@@ -51,88 +50,75 @@ export type {
   ModelUnloadResult,
 } from './Public/Extensions/RunAnywhere+ModelLifecycle';
 export { ComponentLifecycleState } from './Public/Extensions/RunAnywhere+ModelLifecycle';
-export { PluginLoader } from './Public/Extensions/RunAnywhere+PluginLoader';
 export { TextGeneration, generateStructuredStream, extractStructuredOutput } from './Public/Extensions/RunAnywhere+TextGeneration';
 export type { StructuredOutputResult, JSONSchemaDescriptor } from './Public/Extensions/RunAnywhere+TextGeneration';
 export { StructuredOutput } from './Public/Extensions/RunAnywhere+StructuredOutput';
 export { ToolCalling } from './Public/Extensions/RunAnywhere+ToolCalling';
-export { LoRA } from './Public/Extensions/RunAnywhere+LoRA';
-export { STT } from './Public/Extensions/RunAnywhere+STT';
-export { TTS } from './Public/Extensions/RunAnywhere+TTS';
-export { VAD } from './Public/Extensions/RunAnywhere+VAD';
-export { VoiceAgent } from './Public/Extensions/RunAnywhere+VoiceAgent';
-export { VisionLanguage } from './Public/Extensions/RunAnywhere+VisionLanguage';
-export type { VLMImage, VLMGenerationOptions, VLMResult } from './Public/Extensions/RunAnywhere+VisionLanguage';
-export { VLMImageFormat, VLMErrorCode } from './Public/Extensions/RunAnywhere+VisionLanguage';
-export { VLMModels } from './Public/Extensions/RunAnywhere+VLMModels';
-export { Diffusion } from './Public/Extensions/RunAnywhere+Diffusion';
+export type { ToolCallingGenerationOptions } from './Public/Extensions/RunAnywhere+ToolCalling';
+export { STT, transcribe } from './Public/Extensions/RunAnywhere+STT';
 export type {
-  DiffusionGenerationOptions,
-  DiffusionResult,
-  DiffusionConfiguration,
-  DiffusionCapabilities,
-  DiffusionProgress,
-} from './Public/Extensions/RunAnywhere+Diffusion';
-export {
-  DiffusionMode,
-  DiffusionScheduler,
-  DiffusionModelVariant,
-  DiffusionTokenizerSourceKind,
-} from './Public/Extensions/RunAnywhere+Diffusion';
-export {
-  generateImage,
-  generateImageStream,
-  loadDiffusionModel,
-  unloadDiffusionModel,
-  getIsDiffusionModelLoaded,
-  cancelImageGeneration,
-  getDiffusionCapabilities,
-} from './Public/Extensions/RunAnywhere+Diffusion';
+  STTOptions,
+  STTOutput,
+  STTPartialResult,
+  TranscribeOptions,
+} from './Public/Extensions/RunAnywhere+STT';
+export { TTS, synthesize } from './Public/Extensions/RunAnywhere+TTS';
+export type {
+  TTSOptions,
+  TTSOutput,
+  TTSVoiceInfo,
+  SynthesizeOptions,
+} from './Public/Extensions/RunAnywhere+TTS';
+export { VAD, detectVoice } from './Public/Extensions/RunAnywhere+VAD';
+export type {
+  VADConfiguration,
+  VADOptions,
+  VADResult,
+  VADStatistics,
+  SpeechActivityEvent,
+  DetectVoiceOptions,
+} from './Public/Extensions/RunAnywhere+VAD';
+export { LoRA } from './Public/Extensions/RunAnywhere+LoRA';
 export { RAG } from './Public/Extensions/RunAnywhere+RAG';
-export { ModelManagement } from './Public/Extensions/RunAnywhere+ModelManagement';
-export { ModelAssignments } from './Public/Extensions/RunAnywhere+ModelAssignments';
-export type { ModelAssignment } from './Public/Extensions/RunAnywhere+ModelAssignments';
-export { Frameworks } from './Public/Extensions/RunAnywhere+Frameworks';
 export { solutions as Solutions } from './Public/Extensions/RunAnywhere+Solutions';
 export { Logging } from './Public/Extensions/RunAnywhere+Logging';
 export { Hardware } from './Public/Extensions/RunAnywhere+Hardware';
 export type { HardwareProfile, HardwareProfileResult } from './Public/Extensions/RunAnywhere+Hardware';
 
-// Phase 4d: top-level convenience verbs (chat / generate / transcribe /
-// synthesize / speak / detectSpeech / setVADCallback / etc.) — also reachable
-// as static methods on `RunAnywhere`. Re-exported for tree-shakability.
+// LoRA / RAG / VoiceAgent C-ABI extensions.
 export {
-  chat,
-  generate,
-  generateStream,
-  generateStructured,
-  transcribe,
-  synthesize,
-  speak,
-  isSpeaking,
-  stopSpeaking,
-  detectSpeech,
-  setVADCallback,
-  startVAD,
-  stopVAD,
-  cleanupVAD,
-  isVADReady,
-} from './Public/Extensions/RunAnywhere+Convenience';
-
-// LoRA / RAG / VoiceAgent C-ABI extensions (Phase 4d).
-// Today these dispatch through provider hooks installed by backend packages.
-export {
-  loadLoraAdapter,
-  removeLoraAdapter,
-  clearLoraAdapters,
-  getLoadedLoraAdapters,
+  applyLoraAdapters,
   checkLoraCompatibility,
+  getLoraCatalogEntry,
+  getLoraState,
+  listLoraCatalog,
+  listLoraAdapters,
+  markLoraAdapterDownloadCompleted,
+  missingLoRACatalogExports,
+  missingLoRAExports,
+  queryLoraCatalog,
   registerLoraAdapter,
-  loraAdaptersForModel,
-  allRegisteredLoraAdapters,
-  setLoRAProvider,
+  removeLoraAdapters,
+  supportsNativeLoRACatalog,
+  supportsNativeLoRA,
 } from './Public/Extensions/RunAnywhere+LoRA';
-export type { LoRAProvider } from './Public/Extensions/RunAnywhere+LoRA';
+export type {
+  LoRAAdapterConfig,
+  LoRAAdapterInfo,
+  LoRAApplyRequest,
+  LoRAApplyResult,
+  LoRARemoveRequest,
+  LoRAState,
+  LoraAdapterCatalogEntry,
+  LoraAdapterCatalogGetRequest,
+  LoraAdapterCatalogGetResult,
+  LoraAdapterCatalogListRequest,
+  LoraAdapterCatalogListResult,
+  LoraAdapterCatalogQuery,
+  LoraAdapterDownloadCompletedRequest,
+  LoraAdapterDownloadCompletedResult,
+  LoraCompatibilityResult,
+} from './Public/Extensions/RunAnywhere+LoRA';
 
 export {
   ragCreatePipeline,
@@ -143,11 +129,27 @@ export {
   ragClearDocuments,
   ragGetDocumentCount,
   ragGetStatistics,
+  ragListDocuments,
+  ragRemoveDocument,
+  ragGetCapabilities,
+  createDefaultRAGConfiguration,
+  createRAGNativeProvider,
+  setRAGSessionHandle,
+  unavailableRAGResult,
+  unavailableRAGStatistics,
   getRAGAvailability,
   isRAGAvailable,
   setRAGProvider,
 } from './Public/Extensions/RunAnywhere+RAG';
-export type { RAGAvailability, RAGAvailabilitySource, RAGProvider } from './Public/Extensions/RunAnywhere+RAG';
+export type {
+  RAGAvailability,
+  RAGAvailabilitySource,
+  RAGDocumentSummary,
+  RAGNativeProviderOptions,
+  RAGProvider,
+  RAGProviderCapabilities,
+  RAGQueryOverrides,
+} from './Public/Extensions/RunAnywhere+RAG';
 
 export {
   initializeVoiceAgent,
@@ -161,9 +163,19 @@ export {
   voiceAgentSynthesizeSpeech,
   streamVoiceAgent,
   cleanupVoiceAgent,
+  createVoiceAgentHandleProvider,
+  getVoiceAgentAvailability,
+  isVoiceAgentAvailable,
   setVoiceAgentProvider,
+  setVoiceAgentHandle,
+  unavailableVoiceAgentResult,
 } from './Public/Extensions/RunAnywhere+VoiceAgent';
-export type { VoiceAgentProvider } from './Public/Extensions/RunAnywhere+VoiceAgent';
+export type {
+  VoiceAgentAvailability,
+  VoiceAgentAvailabilitySource,
+  VoiceAgentProvider,
+  VoiceAgentStreamSource,
+} from './Public/Extensions/RunAnywhere+VoiceAgent';
 
 // Runtime config (acceleration). Backend hooks for the llamacpp pkg.
 export {
@@ -176,8 +188,7 @@ export type {
   RuntimeAccelerationSwitcher,
 } from './Foundation/RuntimeConfig';
 
-// Storage provider interface (Phase 4d P1) — uniform contract for OPFS /
-// File System Access / memory backends.
+// Storage provider interface — uniform contract for OPFS / FSA / memory.
 export type {
   StorageProvider,
   StorageProviderId,
@@ -188,17 +199,15 @@ export type {
 //   `VoiceAgentStreamAdapter` wraps the WASM proto-stream
 //   (`rac_voice_agent_set_proto_callback`) and yields an
 //   `AsyncIterable<VoiceEvent>` symmetric with iOS / Android / Flutter / RN.
-//   The legacy TS-side compose orchestrator (`VoicePipeline`) was removed
-//   per CANONICAL_API.md §15; example apps inline their own STT→LLM→TTS
-//   composition directly via `ExtensionPoint.requireProvider(...)` until
-//   the Web WASM voice-agent bindings land.
+//   Backends must register a native handle/provider; the core facade reports
+//   typed unavailable results/events when no handle is present.
 export { VoiceAgentStreamAdapter } from './Adapters/VoiceAgentStreamAdapter';
 export type { VoiceAgentStreamTransport } from '@runanywhere/proto-ts/streams/voice_agent_service_stream';
 export type { VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_service';
 
-// LLM proto-byte streaming (GAP 09 — symmetric to VoiceAgentStreamAdapter).
-// Used by backend packages (e.g. @runanywhere/web-llamacpp) to expose a
-// platform-agnostic AsyncIterable<LLMStreamEvent> over the C++ proto callback.
+// LLM proto-byte streaming (symmetric to VoiceAgentStreamAdapter).
+// Used by backend packages to expose a platform-agnostic
+// AsyncIterable<LLMStreamEvent> over the C++ proto callback.
 export { LLMStreamAdapter } from './Adapters/LLMStreamAdapter';
 export type { LLMStreamTransport } from '@runanywhere/proto-ts/streams/llm_service_stream';
 export type { LLMGenerateRequest, LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
@@ -221,10 +230,9 @@ export type {
   ProtoEventHandler,
 } from './Adapters/ModalityProtoAdapter';
 
-// Solutions runtime (T4.7 / T4.8) — proto/YAML-driven L5 pipeline runtime.
+// Solutions runtime — proto/YAML-driven L5 pipeline runtime.
 // Construct via `RunAnywhere.solutions.run(...)` (preferred) or directly via
-// `SolutionAdapter.run(...)`. Returns a `SolutionHandle` whose verbs map 1:1
-// to `rac_solution_*` in the C ABI.
+// `SolutionAdapter.run(...)`.
 export {
   SolutionAdapter,
   SolutionHandle,
@@ -246,13 +254,16 @@ export {
   InterruptReason,
   PipelineState as VoiceEventPipelineState,
 } from '@runanywhere/proto-ts/voice_events';
-export { clearRunanywhereModule, setRunanywhereModule } from './runtime/EmscriptenModule';
+export {
+  clearRunanywhereModule,
+  setRunanywhereModule,
+  tryRunanywhereModule,
+} from './runtime/EmscriptenModule';
 export type { EmscriptenRunanywhereModule } from './runtime/EmscriptenModule';
 
-// HTTP adapter (T3.13) — wraps the commons libcurl-backed C ABI so every
-// Web site goes through the same HTTP transport as Swift/Kotlin/RN/Flutter.
-// Backend packages install their Emscripten module via
-// HTTPAdapter.setDefaultModule(module) after WASM load.
+// HTTP adapter — wraps the commons HTTP transport so every Web site goes
+// through the same path as Swift/Kotlin/RN/Flutter. Backend packages install
+// their Emscripten module via HTTPAdapter.setDefaultModule(module) after WASM load.
 export { HTTPAdapter, DownloadStatus, HTTP_FETCH_CARVE_OUTS } from './Adapters/HTTPAdapter';
 export type {
   HTTPRequest,
@@ -264,18 +275,13 @@ export type {
   DownloadProgressHandler,
 } from './Adapters/HTTPAdapter';
 
-// Stage 3d — JS-side HTTP transport. Provides the scaffolding for
-// `fetch()`-backed routing registered via the commons transport vtable.
-// HTTPAdapter.setDefaultModule auto-installs this when the module exposes
-// `_rac_http_transport_register_from_js`; export is available for tests
-// and for callers that want direct lifecycle control.
+// JS-side HTTP transport. Provides the scaffolding for `fetch()`-backed
+// routing registered via the commons transport vtable.
 export { FetchHttpTransport } from './Adapters/FetchHttpTransport';
 export type { FetchHttpTransportModule } from './Adapters/FetchHttpTransport';
 
-// Model registry bridge — wraps the commons `rac_model_registry_refresh`
-// and proto-byte model-info C ABI so the web surface is symmetric with
-// Swift / Kotlin / RN / Flutter. Backend packages install their Emscripten
-// module via `ModelRegistryAdapter.setDefaultModule(module)` after load.
+// Model registry / lifecycle / download / hardware / SDK-event / storage
+// proto-byte bridges. Symmetric with Swift / Kotlin / RN / Flutter.
 export { ModelRegistryAdapter } from './Adapters/ModelRegistryAdapter';
 export type {
   ModelRegistryModule,
@@ -287,6 +293,8 @@ export { ModelLifecycleAdapter } from './Adapters/ModelLifecycleAdapter';
 export type { ModelLifecycleModule } from './Adapters/ModelLifecycleAdapter';
 export { DownloadAdapter } from './Adapters/DownloadAdapter';
 export type { DownloadModule, ProtoDownloadProgressHandler } from './Adapters/DownloadAdapter';
+export { HardwareAdapter } from './Adapters/HardwareAdapter';
+export type { HardwareModule } from './Adapters/HardwareAdapter';
 export { StorageAdapter } from './Adapters/StorageAdapter';
 export type { StorageModule } from './Adapters/StorageAdapter';
 export { SDKEventStreamAdapter } from './Adapters/SDKEventStreamAdapter';
@@ -310,24 +318,9 @@ export { EventBus } from './Foundation/EventBus';
 export type { EventListener, Unsubscribe, SDKEventEnvelope } from './Foundation/EventBus';
 export { AsyncQueue } from './Foundation/AsyncQueue';
 export type { AccelerationMode } from './Foundation/WASMBridge';
-export type {
-  AllOffsets,
-  ConfigOffsets,
-  LLMOptionsOffsets,
-  LLMResultOffsets,
-  VLMImageOffsets,
-  VLMOptionsOffsets,
-  VLMResultOffsets,
-  StructuredOutputConfigOffsets,
-  StructuredOutputValidationOffsets,
-  EmbeddingsOptionsOffsets,
-  EmbeddingsResultOffsets,
-  EmbeddingVectorOffsets,
-  DiffusionOptionsOffsets,
-  DiffusionResultOffsets,
-} from './Foundation/StructOffsets';
 
-// I/O Infrastructure (backend-agnostic capture/playback)
+// I/O Infrastructure (backend-agnostic capture/playback). Browser-specific
+// platform adapters that the C++ core cannot do directly.
 export { AudioCapture } from './Infrastructure/AudioCapture';
 export type { AudioChunkCallback, AudioLevelCallback, AudioCaptureConfig } from './Infrastructure/AudioCapture';
 export { AudioPlayback } from './Infrastructure/AudioPlayback';
@@ -337,34 +330,13 @@ export type { AudioFileLoaderResult } from './Infrastructure/AudioFileLoader';
 export { VideoCapture } from './Infrastructure/VideoCapture';
 export type { VideoCaptureConfig, CapturedFrame } from './Infrastructure/VideoCapture';
 
-// Infrastructure
+// Browser-specific persistent storage adapters (OPFS / File System Access).
+// These are platform helpers the C++ commons layer cannot speak directly.
 export { detectCapabilities, getDeviceInfo } from './Infrastructure/DeviceCapabilities';
 export type { WebCapabilities } from './Infrastructure/DeviceCapabilities';
-export { ModelManager } from './Infrastructure/ModelManager';
-export type {
-  ManagedModel, CompactModelDef, DownloadProgress,
-  ModelFileDescriptor, ArtifactType, VLMLoader, VLMLoadParams,
-} from './Infrastructure/ModelManager';
-export type { QuotaCheckResult, EvictionCandidateInfo } from './Infrastructure/ModelDownloader';
 export { OPFSStorage } from './Infrastructure/OPFSStorage';
 export type { StoredModelInfo, MetadataMap, ModelMetadata } from './Infrastructure/OPFSStorage';
-export { ExtensionRegistry } from './Infrastructure/ExtensionRegistry';
-export type { SDKExtension } from './Infrastructure/ExtensionRegistry';
-export { ExtensionPoint, BackendCapability, ServiceKey } from './Infrastructure/ExtensionPoint';
-export type { BackendExtension } from './Infrastructure/ExtensionPoint';
-export type {
-  ProviderCapability,
-  ProviderMap,
-  LLMProvider,
-  STTProvider,
-  TTSProvider,
-  VADProvider,
-} from './Infrastructure/ProviderTypes';
-export type { ModelLoadContext, LLMModelLoader, STTModelLoader, TTSModelLoader, VADModelLoader } from './Infrastructure/ModelLoaderTypes';
-export { extractTarGz } from './Infrastructure/ArchiveUtility';
 export { LocalFileStorage } from './Infrastructure/LocalFileStorage';
-export { inferModelFromFilename, sanitizeId } from './Infrastructure/ModelFileInference';
-export type { InferredModelMeta } from './Infrastructure/ModelFileInference';
 
 // Services
 export { AnalyticsEmitter } from './services/AnalyticsEmitter';

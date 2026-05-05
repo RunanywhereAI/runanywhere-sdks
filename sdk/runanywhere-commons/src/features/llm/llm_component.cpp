@@ -46,6 +46,8 @@ void dispatch_llm_stream_event(rac_handle_t handle,
                                const char*  error_message);
 }  // namespace rac::llm
 
+extern "C" void rac_lora_forget_component_state(rac_handle_t handle);
+
 // =============================================================================
 // INTERNAL STRUCTURES
 // =============================================================================
@@ -266,6 +268,7 @@ extern "C" void rac_llm_component_destroy(rac_handle_t handle) {
     // protobuf decoder to throw "end-group tag did not match" on the first
     // generate after a model switch.
     rac_llm_unset_stream_proto_callback(handle);
+    rac_lora_forget_component_state(handle);
 
     log_info("LLM.Component", "LLM component destroyed");
 
@@ -334,6 +337,7 @@ extern "C" rac_result_t rac_llm_component_load_model(rac_handle_t handle, const 
         event.data.llm_model.duration_ms = load_duration_ms;
         event.data.llm_model.error_code = RAC_SUCCESS;
         rac_analytics_event_emit(RAC_EVENT_LLM_MODEL_LOAD_COMPLETED, &event);
+        rac_lora_forget_component_state(handle);
     }
 
     return result;
@@ -346,7 +350,11 @@ extern "C" rac_result_t rac_llm_component_unload(rac_handle_t handle) {
     auto* component = reinterpret_cast<rac_llm_component*>(handle);
     std::lock_guard<std::mutex> lock(component->mtx);
 
-    return rac_lifecycle_unload(component->lifecycle);
+    rac_result_t result = rac_lifecycle_unload(component->lifecycle);
+    if (result == RAC_SUCCESS) {
+        rac_lora_forget_component_state(handle);
+    }
+    return result;
 }
 
 extern "C" rac_result_t rac_llm_component_cleanup(rac_handle_t handle) {
@@ -357,7 +365,11 @@ extern "C" rac_result_t rac_llm_component_cleanup(rac_handle_t handle) {
     std::lock_guard<std::mutex> lock(component->mtx);
 
     // Mirrors Swift's: await managedLifecycle.reset()
-    return rac_lifecycle_reset(component->lifecycle);
+    rac_result_t result = rac_lifecycle_reset(component->lifecycle);
+    if (result == RAC_SUCCESS) {
+        rac_lora_forget_component_state(handle);
+    }
+    return result;
 }
 
 // =============================================================================

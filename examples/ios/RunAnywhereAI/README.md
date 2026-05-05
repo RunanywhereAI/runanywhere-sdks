@@ -77,21 +77,19 @@ This Sample App → Local Swift SDK (sdk/runanywhere-swift/)
                           ↓
               Local XCFrameworks (sdk/runanywhere-swift/Binaries/)
                           ↑
-           Built by: ./scripts/build-swift.sh --setup
+           Built by: ./scripts/build-core-xcframework.sh
 ```
 
-The `build-swift.sh --setup` script:
+The `build-core-xcframework.sh` script:
 1. Builds the native C++ frameworks from `runanywhere-commons`
 2. Copies them to `sdk/runanywhere-swift/Binaries/`
-3. Sets `testLocal = true` in the SDK's `Package.swift`
 
 ### After Modifying the SDK
 
 - **Swift SDK code changes**: Xcode picks them up automatically
 - **C++ code changes** (in `runanywhere-commons`):
   ```bash
-  cd sdk/runanywhere-swift
-  ./scripts/build-swift.sh --local --build-commons
+  ./scripts/build-core-xcframework.sh
   ```
 
 ---

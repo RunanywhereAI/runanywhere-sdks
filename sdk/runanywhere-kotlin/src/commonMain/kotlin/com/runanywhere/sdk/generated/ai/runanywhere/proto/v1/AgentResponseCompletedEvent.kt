@@ -11,7 +11,9 @@ import com.squareup.wire.ProtoReader
 import com.squareup.wire.ProtoWriter
 import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
+import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -25,6 +27,22 @@ import kotlin.Suppress
 import okio.ByteString
 
 public class AgentResponseCompletedEvent(
+  @field:WireField(
+    tag = 1,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "turnId",
+    schemaIndex = 0,
+  )
+  public val turn_id: String = "",
+  @field:WireField(
+    tag = 2,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "responseDurationMs",
+    schemaIndex = 1,
+  )
+  public val response_duration_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<AgentResponseCompletedEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -38,15 +56,36 @@ public class AgentResponseCompletedEvent(
     if (other === this) return true
     if (other !is AgentResponseCompletedEvent) return false
     if (unknownFields != other.unknownFields) return false
+    if (turn_id != other.turn_id) return false
+    if (response_duration_ms != other.response_duration_ms) return false
     return true
   }
 
-  override fun hashCode(): Int = unknownFields.hashCode()
+  override fun hashCode(): Int {
+    var result = super.hashCode
+    if (result == 0) {
+      result = unknownFields.hashCode()
+      result = result * 37 + turn_id.hashCode()
+      result = result * 37 + response_duration_ms.hashCode()
+      super.hashCode = result
+    }
+    return result
+  }
 
-  override fun toString(): String = "AgentResponseCompletedEvent{}"
+  override fun toString(): String {
+    val result = mutableListOf<String>()
+    result += """turn_id=${sanitize(turn_id)}"""
+    result += """response_duration_ms=$response_duration_ms"""
+    return result.joinToString(prefix = "AgentResponseCompletedEvent{", separator = ", ", postfix =
+        "}")
+  }
 
-  public fun copy(unknownFields: ByteString = this.unknownFields): AgentResponseCompletedEvent =
-      AgentResponseCompletedEvent(unknownFields)
+  public fun copy(
+    turn_id: String = this.turn_id,
+    response_duration_ms: Long = this.response_duration_ms,
+    unknownFields: ByteString = this.unknownFields,
+  ): AgentResponseCompletedEvent = AgentResponseCompletedEvent(turn_id, response_duration_ms,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -61,20 +100,39 @@ public class AgentResponseCompletedEvent(
     ) {
       override fun encodedSize(`value`: AgentResponseCompletedEvent): Int {
         var size = value.unknownFields.size
+        if (value.turn_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.turn_id)
+        if (value.response_duration_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(2,
+            value.response_duration_ms)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: AgentResponseCompletedEvent) {
+        if (value.turn_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.turn_id)
+        if (value.response_duration_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 2,
+            value.response_duration_ms)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: AgentResponseCompletedEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.response_duration_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 2,
+            value.response_duration_ms)
+        if (value.turn_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.turn_id)
       }
 
       override fun decode(reader: ProtoReader): AgentResponseCompletedEvent {
-        val unknownFields = reader.forEachTag(reader::readUnknownField)
+        var turn_id: String = ""
+        var response_duration_ms: Long = 0L
+        val unknownFields = reader.forEachTag { tag ->
+          when (tag) {
+            1 -> turn_id = ProtoAdapter.STRING.decode(reader)
+            2 -> response_duration_ms = ProtoAdapter.INT64.decode(reader)
+            else -> reader.readUnknownField(tag)
+          }
+        }
         return AgentResponseCompletedEvent(
+          turn_id = turn_id,
+          response_duration_ms = response_duration_ms,
           unknownFields = unknownFields
         )
       }

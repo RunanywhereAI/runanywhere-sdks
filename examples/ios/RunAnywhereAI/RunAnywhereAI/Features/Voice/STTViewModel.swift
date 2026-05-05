@@ -105,7 +105,7 @@ class STTViewModel: ObservableObject {
     }
 
     /// Load model from ModelSelectionSheet selection
-    func loadModelFromSelection(_ model: ModelInfo) async {
+    func loadModelFromSelection(_ model: RAModelInfo) async {
         logger.info("Loading STT model from selection: \(model.name)")
         isProcessing = true
         errorMessage = nil
@@ -177,13 +177,13 @@ class STTViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    private func handleSDKEvent(_ event: any SDKEvent) {
-        // Events now come from C++ via generic BridgedEvent
-        guard event.category == .stt else { return }
+    private func handleSDKEvent(_ event: RASDKEvent) {
+        guard event.category == .stt || event.component == .stt else { return }
 
-        switch event.type {
-        case "stt_model_load_completed":
-            let modelId = event.properties["model_id"] ?? ""
+        let modelId = event.model.modelID
+
+        switch event.model.kind {
+        case .loadCompleted:
             selectedModelId = modelId
             // Look up the model name from available models
             if let matchingModel = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
@@ -193,7 +193,7 @@ class STTViewModel: ObservableObject {
                 selectedModelName = modelId.modelNameFromID() // Look up proper name
             }
             logger.info("STT model loaded: \(modelId)")
-        case "stt_model_unloaded":
+        case .unloadCompleted:
             selectedModelId = nil
             selectedModelName = nil
             selectedFramework = nil

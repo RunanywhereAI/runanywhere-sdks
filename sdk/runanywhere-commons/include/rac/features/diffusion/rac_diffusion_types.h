@@ -7,6 +7,19 @@
  *
  * This header defines data structures only. For the service interface,
  * see rac_diffusion_service.h.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Public structs/callbacks (rac_diffusion_config_t,
+ *     rac_diffusion_options_t, rac_diffusion_progress_t,
+ *     rac_diffusion_result_t, rac_diffusion_info_t,
+ *     rac_diffusion_progress_callback_fn,
+ *     rac_diffusion_complete_callback_fn,
+ *     rac_diffusion_error_callback_fn): `delete after SDK migration`.
+ *     Replaced by serialized runanywhere.v1.DiffusionConfiguration /
+ *     DiffusionGenerationOptions / DiffusionProgress / DiffusionResult
+ *     bytes (see proto adapters in foundation/rac_proto_adapters.h).
+ *   - Scheduler / variant / mode / tokenizer enums and the
+ *     RAC_DIFFUSION_CAP_* flags are `internal` shared identifiers.
  */
 
 #ifndef RAC_DIFFUSION_TYPES_H

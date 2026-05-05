@@ -1,128 +1,125 @@
 /**
- * RunAnywhere React Native SDK - Types
+ * RunAnywhere React Native SDK public types.
  *
- * Re-exports the canonical proto-generated types from
- * `@runanywhere/proto-ts/*` plus a small set of RN-only structural types
- * that have no proto counterpart (LLM streaming, ToolCalling, NPU,
- * generic enums, model registry shapes).
- *
- * Wave 2 cleanup: all per-modality legacy interfaces (STT/TTS/VAD/VLM/
- * Diffusion/LoRA/RAG/StructuredOutput/VoiceAgent) have been deleted.
- * Consumers MUST import the proto-canonical shapes directly.
+ * Structures, model metadata, event envelopes, storage, download, tool, and
+ * voice contracts are generated from proto IDL. RN-only survivors here are
+ * limited to JS call-site helpers that cannot round-trip over proto, such as
+ * callback/function-reference types.
  */
 
 // =========================================================================
-// Enums (RN-local, no proto equivalent)
+// Proto enums plus RN-only helper enums
 // =========================================================================
 
 export {
   AccelerationPreference,
   AudioFormat,
-  ComponentState,
-  ConfigurationSource,
+  ComponentLifecycleState,
+  EventCategory,
+  EventDestination,
+  EventSeverity,
   ExecutionTarget,
   FrameworkModality,
-  HardwareAcceleration,
   InferenceFramework,
-  LLMFramework,
-  LLMFrameworkDisplayNames,
+  ModelArtifactType,
   ModelCategory,
   ModelCategoryDisplayNames,
   ModelFormat,
+  ModelSource,
   PrivacyMode,
   RoutingPolicy,
   SDKComponent,
   SDKEnvironment,
-  SDKEventType,
-  ModelArtifactType,
 } from './enums';
 
+export type { SDKInitOptions } from './models';
+
 // =========================================================================
-// Model registry — proto-canonical types plus legacy RN bridge DTOs.
+// Model registry / lifecycle — proto-canonical
 // =========================================================================
 
 export type {
-  ModelInfo as ProtoModelInfo,
-  ModelFileDescriptor as ProtoModelFileDescriptor,
-  SingleFileArtifact as ProtoSingleFileArtifact,
-  ArchiveArtifact as ProtoArchiveArtifact,
-  MultiFileArtifact as ProtoMultiFileArtifact,
-  ExpectedModelFiles as ProtoExpectedModelFiles,
+  ArchiveArtifact,
+  CurrentModelRequest,
+  CurrentModelResult,
+  DiscoveredModel,
+  ExpectedModelFiles,
+  ModelCompatibilityResult,
+  ModelDeleteRequest,
+  ModelDeleteResult,
+  ModelDiscoveryRequest,
+  ModelDiscoveryResult,
+  ModelFileDescriptor,
+  ModelGetRequest,
+  ModelGetResult,
+  ModelImportRequest,
+  ModelImportResult,
+  ModelInfo,
+  ModelInfoList,
+  ModelInfoMetadata,
+  ModelListRequest,
+  ModelListResult,
+  ModelLoadRequest,
+  ModelLoadResult,
+  ModelQuery,
+  ModelRegistryRefreshRequest,
+  ModelRegistryRefreshResult,
+  ModelRuntimeCompatibility,
+  ModelThinkingTagPattern,
+  ModelUnloadRequest,
+  ModelUnloadResult,
+  MultiFileArtifact,
+  SingleFileArtifact,
+} from '@runanywhere/proto-ts/model_types';
+export {
+  ArchiveStructure,
+  ArchiveType,
+  ModelFileRole,
+  ModelQuerySortField,
+  ModelQuerySortOrder,
+  ModelRegistryStatus,
 } from '@runanywhere/proto-ts/model_types';
 
-export type {
-  ComponentHealth,
-  ConfigurationData,
-  DefaultGenerationSettings,
-  DeviceInfoData,
-  FrameworkAvailability,
-  GenerationOptions,
-  InitializationResult,
-  ModelInfo,
-  ModelCompatibilityResult,
-  ModelInfoMetadata,
-  SDKInitOptions,
-  StorageInfo,
-  StoredModel,
-  ThinkingTagPattern,
-  VoiceAudioChunk,
-} from './models';
-
 // =========================================================================
-// Events — RN runtime payload shapes (native-bridge JSON envelopes)
+// Events / components — proto-canonical
 // =========================================================================
 
 export type {
-  AnySDKEvent,
   ComponentInitializationEvent,
-  SDKConfigurationEvent,
-  SDKDeviceEvent,
-  SDKRuntimeEvent as SDKEvent,
-  SDKEventListener,
-  SDKFrameworkEvent,
-  SDKGenerationEvent,
-  SDKInitializationEvent,
-  SDKModelEvent,
-  SDKNetworkEvent,
-  SDKPerformanceEvent,
-  SDKStorageEvent,
-  SDKVoiceEvent,
-  UnsubscribeFunction,
-} from '../Public/Events/SDKEventTypes';
-
-// Canonical proto-encoded event envelope (analytics / cross-SDK transport)
-export type {
-  SDKEvent as ProtoSDKEvent,
-  InitializationEvent as ProtoInitializationEvent,
-  ConfigurationEvent as ProtoConfigurationEvent,
-  GenerationEvent as ProtoGenerationEvent,
-  ModelEvent as ProtoModelEvent,
-  VoiceLifecycleEvent as ProtoVoiceLifecycleEvent,
-  PerformanceEvent as ProtoPerformanceEvent,
-  NetworkEvent as ProtoNetworkEvent,
-  StorageEvent as ProtoStorageEvent,
-  FrameworkEvent as ProtoFrameworkEvent,
-  DeviceEvent as ProtoDeviceEvent,
-  ComponentInitializationEvent as ProtoComponentInitializationEvent,
+  ComponentLifecycleEvent,
+  ComponentLifecycleSnapshot,
+  ComponentLifecycleSnapshotRequest,
+  ComponentLifecycleSnapshotResult,
+  ConfigurationEvent,
+  DeviceEvent,
+  FrameworkEvent,
+  GenerationEvent,
+  InitializationEvent,
+  ModelEvent,
+  NetworkEvent,
+  PerformanceEvent,
+  SDKEvent,
+  SessionEvent,
+  StorageEvent,
+  VoiceLifecycleEvent,
 } from '@runanywhere/proto-ts/sdk_events';
 export {
-  EventSeverity as ProtoEventSeverity,
-  EventDestination as ProtoEventDestination,
-  InitializationStage as ProtoInitializationStage,
-  ConfigurationEventKind as ProtoConfigurationEventKind,
-  GenerationEventKind as ProtoGenerationEventKind,
-  ModelEventKind as ProtoModelEventKind,
-  VoiceEventKind as ProtoVoiceEventKind,
-  PerformanceEventKind as ProtoPerformanceEventKind,
-  NetworkEventKind as ProtoNetworkEventKind,
-  StorageEventKind as ProtoStorageEventKind,
-  FrameworkEventKind as ProtoFrameworkEventKind,
-  DeviceEventKind as ProtoDeviceEventKind,
-  ComponentInitializationEventKind as ProtoComponentInitializationEventKind,
+  ComponentInitializationEventKind,
+  ConfigurationEventKind,
+  DeviceEventKind,
+  FrameworkEventKind,
+  GenerationEventKind,
+  InitializationStage,
+  ModelEventKind,
+  NetworkEventKind,
+  PerformanceEventKind,
+  SessionEventKind,
+  StorageEventKind,
+  VoiceEventKind,
 } from '@runanywhere/proto-ts/sdk_events';
 
 // =========================================================================
-// Download — proto-canonical
+// Download / storage — proto-canonical
 // =========================================================================
 
 export type {
@@ -143,11 +140,10 @@ export {
   DownloadState,
 } from '@runanywhere/proto-ts/download_service';
 
-// =========================================================================
-// Storage — proto-canonical
-// =========================================================================
-
 export type {
+  AppStorageInfo,
+  DeviceStorageInfo,
+  ModelStorageMetrics,
   StorageAvailability,
   StorageAvailabilityRequest,
   StorageAvailabilityResult,
@@ -156,191 +152,273 @@ export type {
   StorageDeletePlanRequest,
   StorageDeleteRequest,
   StorageDeleteResult,
+  StorageInfo,
+  StorageInfoRequest,
   StorageInfoResult,
+  StoredModel,
 } from '@runanywhere/proto-ts/storage_types';
+export { NPUChip } from '@runanywhere/proto-ts/storage_types';
 
 // =========================================================================
-// STT — proto-canonical
+// Hardware — proto-canonical
 // =========================================================================
 
 export type {
+  AcceleratorInfo,
+  HardwareProfile,
+  HardwareProfileResult,
+} from '@runanywhere/proto-ts/hardware_profile';
+export { AcceleratorPreference } from '@runanywhere/proto-ts/hardware_profile';
+
+// =========================================================================
+// STT / TTS / VAD / VLM / Diffusion — proto-canonical
+// =========================================================================
+
+export type {
+  STTAudioSource,
   STTConfiguration,
+  STTLanguageDetectionResult,
   STTOptions,
   STTOutput,
   STTPartialResult,
-  WordTimestamp,
+  STTServiceState,
+  STTStreamEvent,
+  STTTranscriptionRequest,
   TranscriptionAlternative,
   TranscriptionMetadata,
+  WordTimestamp,
 } from '@runanywhere/proto-ts/stt_options';
-export { STTLanguage } from '@runanywhere/proto-ts/stt_options';
-
-// =========================================================================
-// TTS — proto-canonical
-// =========================================================================
+export {
+  STTAudioEncoding,
+  STTLanguage,
+  STTStreamEventKind,
+} from '@runanywhere/proto-ts/stt_options';
 
 export type {
   TTSConfiguration,
   TTSOptions,
   TTSOutput,
   TTSPhonemeTimestamp,
-  TTSSynthesisMetadata,
+  TTSServiceState,
   TTSSpeakResult,
+  TTSSynthesisMetadata,
+  TTSSynthesisRequest,
+  TTSStreamEvent,
   TTSVoiceInfo,
 } from '@runanywhere/proto-ts/tts_options';
-export { TTSVoiceGender } from '@runanywhere/proto-ts/tts_options';
-
-// =========================================================================
-// VAD — proto-canonical
-// =========================================================================
+export {
+  TTSStreamEventKind,
+  TTSVoiceGender,
+} from '@runanywhere/proto-ts/tts_options';
 
 export type {
+  SpeechActivityEvent,
+  VADAudioSource,
   VADConfiguration,
   VADOptions,
+  VADProcessRequest,
   VADResult,
+  VADServiceState,
   VADStatistics,
-  SpeechActivityEvent,
+  VADStreamEvent,
 } from '@runanywhere/proto-ts/vad_options';
-export { SpeechActivityKind } from '@runanywhere/proto-ts/vad_options';
-
-// =========================================================================
-// VLM — proto-canonical
-// =========================================================================
+export {
+  SpeechActivityKind,
+  VADAudioEncoding,
+  VADStreamEventKind,
+} from '@runanywhere/proto-ts/vad_options';
 
 export type {
-  VLMImage,
   VLMConfiguration,
   VLMGenerationOptions,
+  VLMGenerationRequest,
+  VLMImage,
   VLMResult,
+  VLMServiceState,
+  VLMStreamEvent,
 } from '@runanywhere/proto-ts/vlm_options';
 export {
-  VLMImageFormat,
   VLMErrorCode,
+  VLMImageFormat,
+  VLMModelFamily,
+  VLMStreamEventKind,
 } from '@runanywhere/proto-ts/vlm_options';
 
-// =========================================================================
-// Diffusion — proto-canonical
-// =========================================================================
-
 export type {
-  DiffusionTokenizerSource,
+  DiffusionCapabilities,
+  DiffusionConfig,
   DiffusionConfiguration,
   DiffusionGenerationOptions,
+  DiffusionGenerationRequest,
   DiffusionProgress,
   DiffusionResult,
-  DiffusionCapabilities,
+  DiffusionServiceState,
+  DiffusionStreamEvent,
+  DiffusionTokenizerSource,
 } from '@runanywhere/proto-ts/diffusion_options';
 export {
   DiffusionMode,
-  DiffusionScheduler,
   DiffusionModelVariant,
+  DiffusionScheduler,
+  DiffusionStreamEventKind,
   DiffusionTokenizerSourceKind,
 } from '@runanywhere/proto-ts/diffusion_options';
 
 // =========================================================================
-// LoRA — proto-canonical
+// LLM / chat / embeddings — proto-canonical plus RN-only stream wrappers
+// =========================================================================
+
+export type {
+  LLMConfiguration,
+  LLMGenerationOptions,
+  LLMGenerationRequest,
+  LLMGenerationResult,
+  LLMGenerationStatus,
+  PerformanceMetrics,
+  StreamToken,
+  ThinkingTagPattern,
+} from '@runanywhere/proto-ts/llm_options';
+export { LLMGenerationState } from '@runanywhere/proto-ts/llm_options';
+
+export type {
+  ChatAttachment,
+  ChatConversationState,
+  ChatGenerationRequest,
+  ChatGenerationResult,
+  ChatMessage,
+  ChatStreamEvent,
+} from '@runanywhere/proto-ts/chat';
+export {
+  ChatMessageStatus,
+  ChatStreamEventKind,
+  MessageRole,
+} from '@runanywhere/proto-ts/chat';
+
+export type {
+  EmbeddingVector,
+  EmbeddingsConfiguration,
+  EmbeddingsOptions,
+  EmbeddingsRequest,
+  EmbeddingsResult,
+  EmbeddingsServiceState,
+} from '@runanywhere/proto-ts/embeddings_options';
+export {
+  EmbeddingsNormalizeMode,
+  EmbeddingsPoolingStrategy,
+} from '@runanywhere/proto-ts/embeddings_options';
+
+// =========================================================================
+// LoRA / RAG / structured output — proto-canonical
 // =========================================================================
 
 export type {
   LoRAAdapterConfig,
   LoRAAdapterInfo,
+  LoRAApplyRequest,
+  LoRAApplyResult,
+  LoRARemoveRequest,
+  LoRAState,
   LoraAdapterCatalogEntry,
+  LoraAdapterCatalogGetRequest,
+  LoraAdapterCatalogGetResult,
+  LoraAdapterCatalogListRequest,
+  LoraAdapterCatalogListResult,
+  LoraAdapterCatalogQuery,
+  LoraAdapterDownloadCompletedRequest,
+  LoraAdapterDownloadCompletedResult,
   LoraCompatibilityResult,
 } from '@runanywhere/proto-ts/lora_options';
 
-// =========================================================================
-// RAG — proto-canonical
-// =========================================================================
-
 export type {
   RAGConfiguration,
+  RAGDocument,
+  RAGIngestRequest,
+  RAGIngestResult,
   RAGQueryOptions,
-  RAGSearchResult,
+  RAGQueryRequest,
   RAGResult,
+  RAGSearchResult,
+  RAGServiceState,
   RAGStatistics,
+  RAGStreamEvent,
 } from '@runanywhere/proto-ts/rag';
-
-// =========================================================================
-// Structured Output — proto-canonical
-// =========================================================================
+export { RAGStreamEventKind } from '@runanywhere/proto-ts/rag';
 
 export type {
-  JSONSchemaProperty,
-  JSONSchema,
-  StructuredOutputOptions,
-  StructuredOutputResult,
-  EntityExtractionResult,
   ClassificationCandidate,
   ClassificationResult,
-  SentimentResult,
+  EntityExtractionResult,
+  JSONSchema,
+  JSONSchemaProperty,
   NamedEntity,
   NERResult,
+  SentimentResult,
+  StructuredOutputOptions,
+  StructuredOutputResult,
+  StructuredOutputStreamEvent,
 } from '@runanywhere/proto-ts/structured_output';
 export {
   JSONSchemaType,
   Sentiment,
+  StructuredOutputStreamEventKind,
 } from '@runanywhere/proto-ts/structured_output';
 
 // =========================================================================
-// Voice Agent — proto-canonical (control RPCs + streaming events)
+// Voice agent / voice events — proto-canonical
 // =========================================================================
 
 export type {
-  VoiceEvent,
+  AgentResponseCompletedEvent,
+  AgentResponseStartedEvent,
+  AssistantTokenEvent,
+  AudioFrameEvent,
+  AudioLevelEvent,
+  SessionStartedEvent,
+  SessionStoppedEvent,
+  UserSaidEvent,
   VoiceAgentComponentStates,
+  VoiceEvent,
+  VoiceSessionError,
 } from '@runanywhere/proto-ts/voice_events';
 export {
   ComponentLoadState,
+  VoiceEventCategory,
+  VoiceEventSeverity,
+  VoiceSessionErrorCode,
 } from '@runanywhere/proto-ts/voice_events';
 export type {
-  VoiceSessionConfig as VoiceAgentConfig,
+  VoiceAgentComposeConfig,
+  VoiceAgentRequest,
+  VoiceAgentResult,
+  VoiceAgentTurnRequest,
+  VoiceSessionConfig,
 } from '@runanywhere/proto-ts/voice_agent_service';
 
 // =========================================================================
-// LLM types — proto-canonical (LLMGenerationOptions, LLMGenerationResult,
-// LLMConfiguration, StreamToken) plus RN-local streaming primitives.
+// Tool Calling — proto-canonical plus RN-only function-reference helpers
 // =========================================================================
 
 export type {
-  LLMGenerationOptions,
-  LLMGenerationResult,
-  LLMConfiguration,
-  StreamToken,
-  LLMStreamingResult,
-  LLMStreamingMetrics,
-  LLMTokenCallback,
-  LLMStreamCompleteCallback,
-  LLMStreamErrorCallback,
-} from './LLMTypes';
-
-// =========================================================================
-// Tool Calling — proto-canonical (definition / call / result / options)
-// plus RN-only `ToolExecutor` and `RegisteredTool` (function references
-// can't round-trip through proto wire format).
-// =========================================================================
-
-export type {
-  ToolParameter,
-  ToolDefinition,
   ToolCall,
-  ToolResult,
   ToolCallingOptions,
   ToolCallingResult,
+  ToolCallingStreamEvent,
+  ToolDefinition,
+  ToolParameter,
+  ToolParseRequest,
+  ToolParseResult,
+  ToolRegistrySnapshot,
+  ToolResult,
+  ToolValue,
 } from '@runanywhere/proto-ts/tool_calling';
-export { ToolParameterType } from '@runanywhere/proto-ts/tool_calling';
+export {
+  ToolCallFormatName,
+  ToolCallingStreamEventKind,
+  ToolChoiceMode,
+  ToolParameterType,
+} from '@runanywhere/proto-ts/tool_calling';
 
 export type {
-  ToolExecutor,
   RegisteredTool,
+  ToolExecutor,
 } from '../Public/Extensions/RunAnywhere+ToolCalling';
-
-// =========================================================================
-// NPU Chip Types (RN-local — device dispatch only)
-// =========================================================================
-
-export type { NPUChip } from './NPUChip';
-export {
-  NPU_CHIPS,
-  NPU_BASE_URL,
-  getNPUDownloadUrl,
-  npuChipFromSocModel,
-} from './NPUChip';

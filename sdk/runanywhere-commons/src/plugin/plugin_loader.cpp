@@ -29,6 +29,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_plugin_loader.h"
 
@@ -154,6 +155,7 @@ rac_result_t rac_registry_load_plugin(const char* path) {
                       path,
                       vt->metadata.name,
                       static_cast<int>(rc));
+        (void)rac_engine_manifest_detach_vtable(vt);
         rac_dl_close(handle);
         return rc;
     }

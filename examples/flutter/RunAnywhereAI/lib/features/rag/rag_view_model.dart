@@ -87,9 +87,7 @@ class RAGViewModel extends ChangeNotifier {
   // MARK: - Computed Properties
 
   bool get canAskQuestion =>
-      _isDocumentLoaded &&
-      !_isQuerying &&
-      _currentQuestion.trim().isNotEmpty;
+      _isDocumentLoaded && !_isQuerying && _currentQuestion.trim().isNotEmpty;
 
   // MARK: - Public Methods
 
@@ -127,7 +125,10 @@ class RAGViewModel extends ChangeNotifier {
     if (question.isEmpty) return;
     if (!_isDocumentLoaded) return;
 
-    _messages = [..._messages, RAGMessage(role: RAGMessageRole.user, text: question)];
+    _messages = [
+      ..._messages,
+      RAGMessage(role: RAGMessageRole.user, text: question)
+    ];
     _currentQuestion = '';
     _isQuerying = true;
     _error = null;
@@ -138,7 +139,10 @@ class RAGViewModel extends ChangeNotifier {
 
       _messages = [
         ..._messages,
-        RAGMessage(role: RAGMessageRole.assistant, text: result.answer, result: result),
+        RAGMessage(
+            role: RAGMessageRole.assistant,
+            text: result.answer,
+            result: result),
       ];
       _lastResult = result;
     } catch (e) {

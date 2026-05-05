@@ -30,6 +30,10 @@ public enum class ModelSource(
    * Bundled or user-imported
    */
   MODEL_SOURCE_LOCAL(2),
+  /**
+   * Platform/system model with no portable download artifact
+   */
+  MODEL_SOURCE_BUILT_IN(3),
   ;
 
   public companion object {
@@ -47,6 +51,7 @@ public enum class ModelSource(
       0 -> MODEL_SOURCE_UNSPECIFIED
       1 -> MODEL_SOURCE_REMOTE
       2 -> MODEL_SOURCE_LOCAL
+      3 -> MODEL_SOURCE_BUILT_IN
       else -> null
     }
   }

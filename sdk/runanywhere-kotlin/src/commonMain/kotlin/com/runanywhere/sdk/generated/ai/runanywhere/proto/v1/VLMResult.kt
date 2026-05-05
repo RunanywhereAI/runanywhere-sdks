@@ -51,10 +51,9 @@ import okio.ByteString
  *                                  image_encode_time_ms, total_time_ms,
  *                                  tokens_per_second)
  *
- * Streaming note: streaming results reuse this VLMResult message; per-token
- * text deltas are emitted on the existing LLM stream channel
- * (llm_service.proto streaming surface). No VLM-specific stream-event message
- * is introduced here.
+ * Streaming note: the VLM service emits VLMStreamEvent messages for
+ * per-token deltas and terminal results; this aggregate result is carried on
+ * the unary Generate RPC and on terminal stream events.
  * ---------------------------------------------------------------------------
  */
 public class VLMResult(
@@ -145,6 +144,37 @@ public class VLMResult(
     schemaIndex = 9,
   )
   public val hardware_used: String? = null,
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "errorMessage",
+    schemaIndex = 10,
+  )
+  public val error_message: String? = null,
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "errorCode",
+    schemaIndex = 11,
+  )
+  public val error_code: Int = 0,
+  @field:WireField(
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "finishReason",
+    schemaIndex = 12,
+  )
+  public val finish_reason: String = "",
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "imagesProcessed",
+    schemaIndex = 13,
+  )
+  public val images_processed: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VLMResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -168,6 +198,10 @@ public class VLMResult(
     if (time_to_first_token_ms != other.time_to_first_token_ms) return false
     if (image_encode_time_ms != other.image_encode_time_ms) return false
     if (hardware_used != other.hardware_used) return false
+    if (error_message != other.error_message) return false
+    if (error_code != other.error_code) return false
+    if (finish_reason != other.finish_reason) return false
+    if (images_processed != other.images_processed) return false
     return true
   }
 
@@ -185,6 +219,10 @@ public class VLMResult(
       result = result * 37 + time_to_first_token_ms.hashCode()
       result = result * 37 + image_encode_time_ms.hashCode()
       result = result * 37 + (hardware_used?.hashCode() ?: 0)
+      result = result * 37 + (error_message?.hashCode() ?: 0)
+      result = result * 37 + error_code.hashCode()
+      result = result * 37 + finish_reason.hashCode()
+      result = result * 37 + images_processed.hashCode()
       super.hashCode = result
     }
     return result
@@ -202,6 +240,10 @@ public class VLMResult(
     result += """time_to_first_token_ms=$time_to_first_token_ms"""
     result += """image_encode_time_ms=$image_encode_time_ms"""
     if (hardware_used != null) result += """hardware_used=${sanitize(hardware_used)}"""
+    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
+    result += """error_code=$error_code"""
+    result += """finish_reason=${sanitize(finish_reason)}"""
+    result += """images_processed=$images_processed"""
     return result.joinToString(prefix = "VLMResult{", separator = ", ", postfix = "}")
   }
 
@@ -216,10 +258,14 @@ public class VLMResult(
     time_to_first_token_ms: Long = this.time_to_first_token_ms,
     image_encode_time_ms: Long = this.image_encode_time_ms,
     hardware_used: String? = this.hardware_used,
+    error_message: String? = this.error_message,
+    error_code: Int = this.error_code,
+    finish_reason: String = this.finish_reason,
+    images_processed: Int = this.images_processed,
     unknownFields: ByteString = this.unknownFields,
   ): VLMResult = VLMResult(text, prompt_tokens, completion_tokens, total_tokens, processing_time_ms,
       tokens_per_second, image_tokens, time_to_first_token_ms, image_encode_time_ms, hardware_used,
-      unknownFields)
+      error_message, error_code, finish_reason, images_processed, unknownFields)
 
   public companion object {
     @JvmField
@@ -251,6 +297,13 @@ public class VLMResult(
         if (value.image_encode_time_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(9,
             value.image_encode_time_ms)
         size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.hardware_used)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.error_message)
+        if (value.error_code != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(12,
+            value.error_code)
+        if (value.finish_reason != "") size += ProtoAdapter.STRING.encodedSizeWithTag(13,
+            value.finish_reason)
+        if (value.images_processed != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(14,
+            value.images_processed)
         return size
       }
 
@@ -272,11 +325,23 @@ public class VLMResult(
         if (value.image_encode_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 9,
             value.image_encode_time_ms)
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.hardware_used)
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.error_message)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 12, value.error_code)
+        if (value.finish_reason != "") ProtoAdapter.STRING.encodeWithTag(writer, 13,
+            value.finish_reason)
+        if (value.images_processed != 0) ProtoAdapter.INT32.encodeWithTag(writer, 14,
+            value.images_processed)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VLMResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.images_processed != 0) ProtoAdapter.INT32.encodeWithTag(writer, 14,
+            value.images_processed)
+        if (value.finish_reason != "") ProtoAdapter.STRING.encodeWithTag(writer, 13,
+            value.finish_reason)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 12, value.error_code)
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.error_message)
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.hardware_used)
         if (value.image_encode_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 9,
             value.image_encode_time_ms)
@@ -307,6 +372,10 @@ public class VLMResult(
         var time_to_first_token_ms: Long = 0L
         var image_encode_time_ms: Long = 0L
         var hardware_used: String? = null
+        var error_message: String? = null
+        var error_code: Int = 0
+        var finish_reason: String = ""
+        var images_processed: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
@@ -319,6 +388,10 @@ public class VLMResult(
             8 -> time_to_first_token_ms = ProtoAdapter.INT64.decode(reader)
             9 -> image_encode_time_ms = ProtoAdapter.INT64.decode(reader)
             10 -> hardware_used = ProtoAdapter.STRING.decode(reader)
+            11 -> error_message = ProtoAdapter.STRING.decode(reader)
+            12 -> error_code = ProtoAdapter.INT32.decode(reader)
+            13 -> finish_reason = ProtoAdapter.STRING.decode(reader)
+            14 -> images_processed = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -333,6 +406,10 @@ public class VLMResult(
           time_to_first_token_ms = time_to_first_token_ms,
           image_encode_time_ms = image_encode_time_ms,
           hardware_used = hardware_used,
+          error_message = error_message,
+          error_code = error_code,
+          finish_reason = finish_reason,
+          images_processed = images_processed,
           unknownFields = unknownFields
         )
       }

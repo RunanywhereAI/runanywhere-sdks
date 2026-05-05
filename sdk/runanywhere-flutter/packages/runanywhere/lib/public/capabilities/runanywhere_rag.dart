@@ -6,10 +6,10 @@
 
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/generated/rag.pb.dart';
+import 'package:runanywhere/internal/sdk_event_factories.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge_rag.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
-import 'package:runanywhere/public/events/sdk_event.dart';
 
 /// RAG (Retrieval-Augmented Generation) capability surface.
 ///
@@ -22,7 +22,7 @@ class RunAnywhereRAG {
   // -- pipeline lifecycle ---------------------------------------------------
 
   /// Create the RAG pipeline. Throws `SDKError.invalidState` if
-  /// creation fails. Publishes [SDKRAGEvent.pipelineCreated] on success.
+  /// creation fails. Publishes a generated RAG SDKEvent on success.
   Future<void> createPipeline(RAGConfiguration config) async {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
@@ -30,9 +30,9 @@ class RunAnywhereRAG {
 
     try {
       await DartBridgeRAG.shared.createPipelineAsync(config);
-      EventBus.shared.publish(SDKRAGEvent.pipelineCreated());
+      EventBus.shared.publish(SdkEventFactory.ragPipelineCreated());
     } catch (e) {
-      EventBus.shared.publish(SDKRAGEvent.error(message: e.toString()));
+      EventBus.shared.publish(SdkEventFactory.ragFailed(e));
       throw SDKException.invalidState('RAG pipeline creation failed: $e');
     }
   }
@@ -43,7 +43,7 @@ class RunAnywhereRAG {
       throw SDKException.notInitialized();
     }
     DartBridgeRAG.shared.destroyPipeline();
-    EventBus.shared.publish(SDKRAGEvent.pipelineDestroyed());
+    EventBus.shared.publish(SdkEventFactory.ragPipelineDestroyed());
   }
 
   // -- document management --------------------------------------------------
@@ -55,7 +55,7 @@ class RunAnywhereRAG {
     }
 
     EventBus.shared.publish(
-      SDKRAGEvent.ingestionStarted(documentLength: text.length),
+      SdkEventFactory.ragIngestionStarted(text.length),
     );
 
     final stopwatch = Stopwatch()..start();
@@ -67,14 +67,14 @@ class RunAnywhereRAG {
 
       final chunkCount = DartBridgeRAG.shared.documentCount;
       EventBus.shared.publish(
-        SDKRAGEvent.ingestionComplete(
+        SdkEventFactory.ragIngestionCompleted(
           chunkCount: chunkCount,
           durationMs: stopwatch.elapsedMilliseconds.toDouble(),
         ),
       );
     } catch (e) {
       stopwatch.stop();
-      EventBus.shared.publish(SDKRAGEvent.error(message: e.toString()));
+      EventBus.shared.publish(SdkEventFactory.ragFailed(e));
       throw SDKException.invalidState('RAG ingestion failed: $e');
     }
   }
@@ -90,7 +90,7 @@ class RunAnywhereRAG {
         documents.fold<int>(0, (sum, d) => sum + (d['text']?.length ?? 0));
 
     EventBus.shared.publish(
-      SDKRAGEvent.ingestionStarted(documentLength: totalLength),
+      SdkEventFactory.ragIngestionStarted(totalLength),
     );
 
     final stopwatch = Stopwatch()..start();
@@ -101,14 +101,14 @@ class RunAnywhereRAG {
 
       final chunkCount = DartBridgeRAG.shared.documentCount;
       EventBus.shared.publish(
-        SDKRAGEvent.ingestionComplete(
+        SdkEventFactory.ragIngestionCompleted(
           chunkCount: chunkCount,
           durationMs: stopwatch.elapsedMilliseconds.toDouble(),
         ),
       );
     } catch (e) {
       stopwatch.stop();
-      EventBus.shared.publish(SDKRAGEvent.error(message: e.toString()));
+      EventBus.shared.publish(SdkEventFactory.ragFailed(e));
       throw SDKException.invalidState('RAG batch ingestion failed: $e');
     }
   }
@@ -160,7 +160,7 @@ class RunAnywhereRAG {
     }
 
     EventBus.shared.publish(
-      SDKRAGEvent.queryStarted(questionLength: question.length),
+      SdkEventFactory.ragQueryStarted(question.length),
     );
 
     try {
@@ -180,7 +180,7 @@ class RunAnywhereRAG {
       final result = await DartBridgeRAG.shared.queryAsync(effectiveOptions);
 
       EventBus.shared.publish(
-        SDKRAGEvent.queryComplete(
+        SdkEventFactory.ragQueryCompleted(
           answerLength: result.answer.length,
           chunksRetrieved: result.retrievedChunks.length,
           retrievalTimeMs: result.retrievalTimeMs.toDouble(),
@@ -191,7 +191,7 @@ class RunAnywhereRAG {
 
       return result;
     } catch (e) {
-      EventBus.shared.publish(SDKRAGEvent.error(message: e.toString()));
+      EventBus.shared.publish(SdkEventFactory.ragFailed(e));
       throw SDKException.generationFailed('RAG query failed: $e');
     }
   }

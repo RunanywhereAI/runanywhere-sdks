@@ -1,7 +1,21 @@
 import _m0 from "protobufjs/minimal";
 import { InferenceFramework } from "./model_types";
 import { StructuredOutputOptions, StructuredOutputValidation } from "./structured_output";
+import { ToolCall, ToolCallingOptions, ToolResult } from "./tool_calling";
 export declare const protobufPackage = "runanywhere.v1";
+export declare enum LLMGenerationState {
+    LLM_GENERATION_STATE_UNSPECIFIED = 0,
+    LLM_GENERATION_STATE_QUEUED = 1,
+    LLM_GENERATION_STATE_PREFILLING = 2,
+    LLM_GENERATION_STATE_DECODING = 3,
+    LLM_GENERATION_STATE_TOOL_CALLING = 4,
+    LLM_GENERATION_STATE_COMPLETED = 5,
+    LLM_GENERATION_STATE_CANCELLED = 6,
+    LLM_GENERATION_STATE_FAILED = 7,
+    UNRECOGNIZED = -1
+}
+export declare function lLMGenerationStateFromJSON(object: any): LLMGenerationState;
+export declare function lLMGenerationStateToJSON(object: LLMGenerationState): string;
 /**
  * ---------------------------------------------------------------------------
  * Routing destination for a generation (Web SDK ExecutionTarget in
@@ -79,6 +93,28 @@ export interface LLMGenerationOptions {
      * generation telemetry. No-op for backends without a telemetry sink.
      */
     enableRealTimeTracking: boolean;
+    /** Deterministic sampling seed. 0 = backend/default random seed. */
+    seed: number;
+    /** OpenAI-compatible sampling penalties. 0.0 = disabled. */
+    frequencyPenalty: number;
+    presencePenalty: number;
+    /** Repeat-penalty lookback window. 0 = backend default. */
+    repeatLastN: number;
+    /** Minimum probability sampling. 0.0 = disabled. */
+    minP: number;
+    /** Grammar or constrained-decoding rule text (GBNF/regex/backend-specific). */
+    grammar?: string | undefined;
+    /** Caller-visible format hint: "text", "json_object", "json_schema", etc. */
+    responseFormat?: string | undefined;
+    /** Include prompt text in the result/stream when the backend supports echo. */
+    echoPrompt: boolean;
+    /** Per-request backend thread hint. 0 = backend/runtime default. */
+    nThreads: number;
+    /**
+     * Tool-calling contract for this generation. The SDK owns executor
+     * functions; proto carries only definitions and parser options.
+     */
+    toolCalling?: ToolCallingOptions | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -149,6 +185,46 @@ export interface LLMGenerationResult {
      * result envelope instead of throwing through the host language.
      */
     errorMessage?: string | undefined;
+    /** Numeric backend status code when a result envelope carries an error. */
+    errorCode: number;
+    /** Prompt/cache accounting surfaced by llama.cpp/CoreML-style backends. */
+    cachedPromptTokens: number;
+    promptEvalTimeMs: number;
+    decodeTimeMs: number;
+    /** Tool calls parsed from the final assistant response, if any. */
+    toolCalls: ToolCall[];
+    /** Tool results incorporated during auto-execute loops. */
+    toolResults: ToolResult[];
+}
+/**
+ * Request envelope for one non-streaming LLM generation call. This is the
+ * proto-owned DTO SDKs can use instead of parallel prompt/options tuples.
+ */
+export interface LLMGenerationRequest {
+    requestId: string;
+    modelId: string;
+    prompt: string;
+    options?: LLMGenerationOptions | undefined;
+    contextChunks: string[];
+    metadata: {
+        [key: string]: string;
+    };
+    conversationId?: string | undefined;
+}
+export interface LLMGenerationRequest_MetadataEntry {
+    key: string;
+    value: string;
+}
+export interface LLMGenerationStatus {
+    requestId: string;
+    state: LLMGenerationState;
+    promptTokensProcessed: number;
+    completionTokensGenerated: number;
+    progress: number;
+    elapsedMs: number;
+    message?: string | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -258,6 +334,30 @@ export declare const LLMGenerationResult: {
     toJSON(message: LLMGenerationResult): unknown;
     create<I extends Exact<DeepPartial<LLMGenerationResult>, I>>(base?: I): LLMGenerationResult;
     fromPartial<I extends Exact<DeepPartial<LLMGenerationResult>, I>>(object: I): LLMGenerationResult;
+};
+export declare const LLMGenerationRequest: {
+    encode(message: LLMGenerationRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): LLMGenerationRequest;
+    fromJSON(object: any): LLMGenerationRequest;
+    toJSON(message: LLMGenerationRequest): unknown;
+    create<I extends Exact<DeepPartial<LLMGenerationRequest>, I>>(base?: I): LLMGenerationRequest;
+    fromPartial<I extends Exact<DeepPartial<LLMGenerationRequest>, I>>(object: I): LLMGenerationRequest;
+};
+export declare const LLMGenerationRequest_MetadataEntry: {
+    encode(message: LLMGenerationRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): LLMGenerationRequest_MetadataEntry;
+    fromJSON(object: any): LLMGenerationRequest_MetadataEntry;
+    toJSON(message: LLMGenerationRequest_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<LLMGenerationRequest_MetadataEntry>, I>>(base?: I): LLMGenerationRequest_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<LLMGenerationRequest_MetadataEntry>, I>>(object: I): LLMGenerationRequest_MetadataEntry;
+};
+export declare const LLMGenerationStatus: {
+    encode(message: LLMGenerationStatus, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): LLMGenerationStatus;
+    fromJSON(object: any): LLMGenerationStatus;
+    toJSON(message: LLMGenerationStatus): unknown;
+    create<I extends Exact<DeepPartial<LLMGenerationStatus>, I>>(base?: I): LLMGenerationStatus;
+    fromPartial<I extends Exact<DeepPartial<LLMGenerationStatus>, I>>(object: I): LLMGenerationStatus;
 };
 export declare const LLMConfiguration: {
     encode(message: LLMConfiguration, writer?: _m0.Writer): _m0.Writer;

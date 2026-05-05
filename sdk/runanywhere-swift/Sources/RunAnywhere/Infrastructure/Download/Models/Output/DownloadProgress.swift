@@ -10,17 +10,9 @@
 
 import Foundation
 
-// MARK: - Canonical proto types
-//
-// The proto-gen prefix is `RA` (from `option swift_prefix = "RA"`).
-
-public typealias DownloadProgress = RADownloadProgress
-public typealias DownloadStage = RADownloadStage
-public typealias DownloadState = RADownloadState
-
 // MARK: - Stage Helpers
 
-public extension DownloadStage {
+public extension RADownloadStage {
     /// Display name for UI.
     var displayName: String {
         switch self {
@@ -48,13 +40,7 @@ public extension DownloadStage {
 
 // MARK: - Progress Helpers
 
-public extension DownloadProgress {
-    /// Overall progress across all stages (0.0 to 1.0).
-    var overallProgress: Double {
-        let range = stage.progressRange
-        return range.start + (Double(stageProgress) * (range.end - range.start))
-    }
-
+public extension RADownloadProgress {
     /// Legacy percentage convenience: returns stage progress for the
     /// download stage, and the overall progress everywhere else.
     var percentage: Double {
@@ -62,7 +48,7 @@ public extension DownloadProgress {
         case .downloading:
             return Double(stageProgress)
         default:
-            return overallProgress
+            return Double(overallProgress)
         }
     }
 
@@ -83,8 +69,8 @@ public extension DownloadProgress {
         modelId: String,
         progress: Double,
         totalBytes: Int64 = 0
-    ) -> DownloadProgress {
-        var msg = DownloadProgress()
+    ) -> RADownloadProgress {
+        var msg = RADownloadProgress()
         msg.modelID = modelId
         msg.stage = .extracting
         msg.state = .extracting
@@ -96,8 +82,8 @@ public extension DownloadProgress {
     }
 
     /// Completed progress.
-    static func completed(modelId: String = "", totalBytes: Int64) -> DownloadProgress {
-        var msg = DownloadProgress()
+    static func completed(modelId: String = "", totalBytes: Int64) -> RADownloadProgress {
+        var msg = RADownloadProgress()
         msg.modelID = modelId
         msg.stage = .completed
         msg.state = .completed
@@ -115,8 +101,8 @@ public extension DownloadProgress {
         modelId: String = "",
         bytesDownloaded: Int64 = 0,
         totalBytes: Int64 = 0
-    ) -> DownloadProgress {
-        var msg = DownloadProgress()
+    ) -> RADownloadProgress {
+        var msg = RADownloadProgress()
         msg.modelID = modelId
         msg.stage = .downloading
         msg.state = .failed
@@ -133,13 +119,13 @@ public extension DownloadProgress {
     /// Common-case init for the download stage.
     init(
         modelId: String = "",
-        stage: DownloadStage,
+        stage: RADownloadStage,
         bytesDownloaded: Int64,
         totalBytes: Int64,
         stageProgress: Double,
         speed: Double? = nil,
         estimatedTimeRemaining: TimeInterval? = nil,
-        state: DownloadState,
+        state: RADownloadState,
         retryAttempt: Int32 = 0,
         errorMessage: String = ""
     ) {
@@ -159,7 +145,7 @@ public extension DownloadProgress {
 
 // MARK: - State Helpers
 
-public extension DownloadState {
+public extension RADownloadState {
     /// Human-readable error text for the `.failed` state (mirrors the
     /// previous hand-rolled enum case's associated `Error`).
     var errorDescription: String? { nil }

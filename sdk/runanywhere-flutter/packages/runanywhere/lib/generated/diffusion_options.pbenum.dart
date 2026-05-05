@@ -168,5 +168,28 @@ class DiffusionTokenizerSourceKind extends $pb.ProtobufEnum {
   const DiffusionTokenizerSourceKind._($core.int v, $core.String n) : super(v, n);
 }
 
+class DiffusionStreamEventKind extends $pb.ProtobufEnum {
+  static const DiffusionStreamEventKind DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED = DiffusionStreamEventKind._(0, _omitEnumNames ? '' : 'DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED');
+  static const DiffusionStreamEventKind DIFFUSION_STREAM_EVENT_KIND_STARTED = DiffusionStreamEventKind._(1, _omitEnumNames ? '' : 'DIFFUSION_STREAM_EVENT_KIND_STARTED');
+  static const DiffusionStreamEventKind DIFFUSION_STREAM_EVENT_KIND_PROGRESS = DiffusionStreamEventKind._(2, _omitEnumNames ? '' : 'DIFFUSION_STREAM_EVENT_KIND_PROGRESS');
+  static const DiffusionStreamEventKind DIFFUSION_STREAM_EVENT_KIND_INTERMEDIATE_IMAGE = DiffusionStreamEventKind._(3, _omitEnumNames ? '' : 'DIFFUSION_STREAM_EVENT_KIND_INTERMEDIATE_IMAGE');
+  static const DiffusionStreamEventKind DIFFUSION_STREAM_EVENT_KIND_COMPLETED = DiffusionStreamEventKind._(4, _omitEnumNames ? '' : 'DIFFUSION_STREAM_EVENT_KIND_COMPLETED');
+  static const DiffusionStreamEventKind DIFFUSION_STREAM_EVENT_KIND_ERROR = DiffusionStreamEventKind._(5, _omitEnumNames ? '' : 'DIFFUSION_STREAM_EVENT_KIND_ERROR');
+
+  static const $core.List<DiffusionStreamEventKind> values = <DiffusionStreamEventKind> [
+    DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED,
+    DIFFUSION_STREAM_EVENT_KIND_STARTED,
+    DIFFUSION_STREAM_EVENT_KIND_PROGRESS,
+    DIFFUSION_STREAM_EVENT_KIND_INTERMEDIATE_IMAGE,
+    DIFFUSION_STREAM_EVENT_KIND_COMPLETED,
+    DIFFUSION_STREAM_EVENT_KIND_ERROR,
+  ];
+
+  static final $core.Map<$core.int, DiffusionStreamEventKind> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static DiffusionStreamEventKind? valueOf($core.int value) => _byValue[value];
+
+  const DiffusionStreamEventKind._($core.int v, $core.String n) : super(v, n);
+}
+
 
 const _omitEnumNames = $core.bool.fromEnvironment('protobuf.omit_enum_names');

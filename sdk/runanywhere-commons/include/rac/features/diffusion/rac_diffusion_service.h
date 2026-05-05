@@ -5,6 +5,16 @@
  * Defines the generic diffusion service API and vtable for multi-backend dispatch.
  * Backends (CoreML, ONNX, Platform) implement the vtable and register
  * with the service registry.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - rac_diffusion_service_ops_t and rac_diffusion_service_t: `internal`.
+ *   - Struct APIs (rac_diffusion_create, generate, generate_with_progress,
+ *     get_info, get_capabilities, cancel, cleanup, destroy): `delete
+ *     after SDK migration` for SDK callers; keep only as backend
+ *     smoke-test entry points.
+ *   - rac_diffusion_progress_proto_callback_fn typedef is the
+ *     `SDK-facing default` callback shape for streaming progress over
+ *     runanywhere.v1.DiffusionProgress bytes.
  */
 
 #ifndef RAC_DIFFUSION_SERVICE_H
@@ -146,6 +156,17 @@ RAC_API rac_result_t rac_diffusion_generate(rac_handle_t handle,
  */
 RAC_API rac_result_t rac_diffusion_generate_proto(
     rac_handle_t handle, const uint8_t* options_proto_bytes, size_t options_proto_size,
+    rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Generate an image using the lifecycle-loaded diffusion model.
+ *
+ * request_proto_bytes encodes runanywhere.v1.DiffusionGenerationRequest.
+ * Commons resolves the current diffusion lifecycle component and out_result
+ * receives serialized runanywhere.v1.DiffusionResult bytes.
+ */
+RAC_API rac_result_t rac_diffusion_generate_lifecycle_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
     rac_proto_buffer_t* out_result);
 
 /**

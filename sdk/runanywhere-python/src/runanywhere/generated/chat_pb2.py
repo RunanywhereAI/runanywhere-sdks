@@ -23,9 +23,10 @@ _sym_db = _symbol_database.Default()
 
 
 import tool_calling_pb2 as tool__calling__pb2
+import llm_options_pb2 as llm__options__pb2
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nchat.proto\x12\x0erunanywhere.v1\x1a\x12tool_calling.proto\"\xc0\x02\n\x0b\x43hatMessage\x12\n\n\x02id\x18\x01 \x01(\t\x12)\n\x04role\x18\x02 \x01(\x0e\x32\x1b.runanywhere.v1.MessageRole\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\x12\x14\n\x0ctimestamp_us\x18\x04 \x01(\x03\x12\x11\n\x04name\x18\x05 \x01(\tH\x00\x88\x01\x01\x12\x17\n\x0ftool_calls_json\x18\x06 \x03(\t\x12\x19\n\x0ctool_call_id\x18\x07 \x01(\tH\x01\x88\x01\x01\x12,\n\ntool_calls\x18\x08 \x03(\x0b\x32\x18.runanywhere.v1.ToolCall\x12\x34\n\x0btool_result\x18\t \x01(\x0b\x32\x1a.runanywhere.v1.ToolResultH\x02\x88\x01\x01\x42\x07\n\x05_nameB\x0f\n\r_tool_call_idB\x0e\n\x0c_tool_result*\x8e\x01\n\x0bMessageRole\x12\x1c\n\x18MESSAGE_ROLE_UNSPECIFIED\x10\x00\x12\x15\n\x11MESSAGE_ROLE_USER\x10\x01\x12\x1a\n\x16MESSAGE_ROLE_ASSISTANT\x10\x02\x12\x17\n\x13MESSAGE_ROLE_SYSTEM\x10\x03\x12\x15\n\x11MESSAGE_ROLE_TOOL\x10\x04\x42\x84\x01\n\x17\x61i.runanywhere.proto.v1B\tChatProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nchat.proto\x12\x0erunanywhere.v1\x1a\x12tool_calling.proto\x1a\x11llm_options.proto\"\x94\x02\n\x0e\x43hatAttachment\x12\n\n\x02id\x18\x01 \x01(\t\x12\x12\n\nmedia_type\x18\x02 \x01(\t\x12\x0e\n\x04\x64\x61ta\x18\x03 \x01(\x0cH\x00\x12\r\n\x03uri\x18\x04 \x01(\tH\x00\x12\x18\n\x0e\x61\x64\x61pter_handle\x18\x05 \x01(\tH\x00\x12\x11\n\x04name\x18\x06 \x01(\tH\x01\x88\x01\x01\x12\x12\n\nsize_bytes\x18\x07 \x01(\x03\x12>\n\x08metadata\x18\x08 \x03(\x0b\x32,.runanywhere.v1.ChatAttachment.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\x08\n\x06sourceB\x07\n\x05_name\"\xea\x04\n\x0b\x43hatMessage\x12\n\n\x02id\x18\x01 \x01(\t\x12)\n\x04role\x18\x02 \x01(\x0e\x32\x1b.runanywhere.v1.MessageRole\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\x12\x14\n\x0ctimestamp_us\x18\x04 \x01(\x03\x12\x11\n\x04name\x18\x05 \x01(\tH\x00\x88\x01\x01\x12\x17\n\x0ftool_calls_json\x18\x06 \x03(\t\x12\x19\n\x0ctool_call_id\x18\x07 \x01(\tH\x01\x88\x01\x01\x12,\n\ntool_calls\x18\x08 \x03(\x0b\x32\x18.runanywhere.v1.ToolCall\x12\x34\n\x0btool_result\x18\t \x01(\x0b\x32\x1a.runanywhere.v1.ToolResultH\x02\x88\x01\x01\x12\x16\n\tparent_id\x18\n \x01(\tH\x03\x88\x01\x01\x12\x31\n\x06status\x18\x0b \x01(\x0e\x32!.runanywhere.v1.ChatMessageStatus\x12\x1a\n\rerror_message\x18\x0c \x01(\tH\x04\x88\x01\x01\x12;\n\x08metadata\x18\r \x03(\x0b\x32).runanywhere.v1.ChatMessage.MetadataEntry\x12\x33\n\x0b\x61ttachments\x18\x0e \x03(\x0b\x32\x1e.runanywhere.v1.ChatAttachment\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\x07\n\x05_nameB\x0f\n\r_tool_call_idB\x0e\n\x0c_tool_resultB\x0c\n\n_parent_idB\x10\n\x0e_error_message\"\x83\x03\n\x15\x43hatGenerationRequest\x12\x12\n\nrequest_id\x18\x01 \x01(\t\x12\x17\n\x0f\x63onversation_id\x18\x02 \x01(\t\x12-\n\x08messages\x18\x03 \x03(\x0b\x32\x1b.runanywhere.v1.ChatMessage\x12:\n\x07options\x18\x04 \x01(\x0b\x32$.runanywhere.v1.LLMGenerationOptionsH\x00\x88\x01\x01\x12=\n\x0ctool_calling\x18\x05 \x01(\x0b\x32\".runanywhere.v1.ToolCallingOptionsH\x01\x88\x01\x01\x12\x45\n\x08metadata\x18\x06 \x03(\x0b\x32\x33.runanywhere.v1.ChatGenerationRequest.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x42\n\n\x08_optionsB\x0f\n\r_tool_calling\"\xcc\x02\n\x14\x43hatGenerationResult\x12\x17\n\x0f\x63onversation_id\x18\x01 \x01(\t\x12,\n\x07message\x18\x02 \x01(\x0b\x32\x1b.runanywhere.v1.ChatMessage\x12<\n\ngeneration\x18\x03 \x01(\x0b\x32#.runanywhere.v1.LLMGenerationResultH\x00\x88\x01\x01\x12,\n\ntool_calls\x18\x04 \x03(\x0b\x32\x18.runanywhere.v1.ToolCall\x12\x30\n\x0ctool_results\x18\x05 \x03(\x0b\x32\x1a.runanywhere.v1.ToolResult\x12\x1a\n\rerror_message\x18\x06 \x01(\tH\x01\x88\x01\x01\x12\x12\n\nerror_code\x18\x07 \x01(\x05\x42\r\n\x0b_generationB\x10\n\x0e_error_message\"\x8a\x04\n\x0f\x43hatStreamEvent\x12\x0b\n\x03seq\x18\x01 \x01(\x04\x12\x14\n\x0ctimestamp_us\x18\x02 \x01(\x03\x12\x12\n\nrequest_id\x18\x03 \x01(\t\x12\x17\n\x0f\x63onversation_id\x18\x04 \x01(\t\x12\x31\n\x04kind\x18\x05 \x01(\x0e\x32#.runanywhere.v1.ChatStreamEventKind\x12\x12\n\x05token\x18\x06 \x01(\tH\x00\x88\x01\x01\x12\x31\n\x07message\x18\x07 \x01(\x0b\x32\x1b.runanywhere.v1.ChatMessageH\x01\x88\x01\x01\x12\x30\n\ttool_call\x18\x08 \x01(\x0b\x32\x18.runanywhere.v1.ToolCallH\x02\x88\x01\x01\x12\x34\n\x0btool_result\x18\t \x01(\x0b\x32\x1a.runanywhere.v1.ToolResultH\x03\x88\x01\x01\x12>\n\x0c\x66inal_result\x18\n \x01(\x0b\x32#.runanywhere.v1.LLMGenerationResultH\x04\x88\x01\x01\x12\x1a\n\rerror_message\x18\x0b \x01(\tH\x05\x88\x01\x01\x12\x12\n\nerror_code\x18\x0c \x01(\x05\x42\x08\n\x06_tokenB\n\n\x08_messageB\x0c\n\n_tool_callB\x0e\n\x0c_tool_resultB\x0f\n\r_final_resultB\x10\n\x0e_error_message\"\x85\x02\n\x15\x43hatConversationState\x12\x17\n\x0f\x63onversation_id\x18\x01 \x01(\t\x12-\n\x08messages\x18\x02 \x03(\x0b\x32\x1b.runanywhere.v1.ChatMessage\x12\x15\n\rcreated_at_ms\x18\x03 \x01(\x03\x12\x15\n\rupdated_at_ms\x18\x04 \x01(\x03\x12\x45\n\x08metadata\x18\x05 \x03(\x0b\x32\x33.runanywhere.v1.ChatConversationState.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01*\xaa\x01\n\x0bMessageRole\x12\x1c\n\x18MESSAGE_ROLE_UNSPECIFIED\x10\x00\x12\x15\n\x11MESSAGE_ROLE_USER\x10\x01\x12\x1a\n\x16MESSAGE_ROLE_ASSISTANT\x10\x02\x12\x17\n\x13MESSAGE_ROLE_SYSTEM\x10\x03\x12\x15\n\x11MESSAGE_ROLE_TOOL\x10\x04\x12\x1a\n\x16MESSAGE_ROLE_DEVELOPER\x10\x05*\xe1\x01\n\x11\x43hatMessageStatus\x12#\n\x1f\x43HAT_MESSAGE_STATUS_UNSPECIFIED\x10\x00\x12\x1f\n\x1b\x43HAT_MESSAGE_STATUS_PENDING\x10\x01\x12!\n\x1d\x43HAT_MESSAGE_STATUS_STREAMING\x10\x02\x12 \n\x1c\x43HAT_MESSAGE_STATUS_COMPLETE\x10\x03\x12\x1e\n\x1a\x43HAT_MESSAGE_STATUS_FAILED\x10\x04\x12!\n\x1d\x43HAT_MESSAGE_STATUS_CANCELLED\x10\x05*\xa9\x02\n\x13\x43hatStreamEventKind\x12&\n\"CHAT_STREAM_EVENT_KIND_UNSPECIFIED\x10\x00\x12*\n&CHAT_STREAM_EVENT_KIND_MESSAGE_STARTED\x10\x01\x12 \n\x1c\x43HAT_STREAM_EVENT_KIND_TOKEN\x10\x02\x12$\n CHAT_STREAM_EVENT_KIND_TOOL_CALL\x10\x03\x12&\n\"CHAT_STREAM_EVENT_KIND_TOOL_RESULT\x10\x04\x12,\n(CHAT_STREAM_EVENT_KIND_MESSAGE_COMPLETED\x10\x05\x12 \n\x1c\x43HAT_STREAM_EVENT_KIND_ERROR\x10\x06\x42\x84\x01\n\x17\x61i.runanywhere.proto.v1B\tChatProtoP\x01Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\xf8\x01\x01\xa2\x02\x04RAV1\xaa\x02\x0eRunanywhere.V1\xba\x02\x02RAb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,8 +34,38 @@ _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'chat_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._loaded_options = None
   _globals['DESCRIPTOR']._serialized_options = b'\n\027ai.runanywhere.proto.v1B\tChatProtoP\001Z<github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RA'
-  _globals['_MESSAGEROLE']._serialized_start=374
-  _globals['_MESSAGEROLE']._serialized_end=516
-  _globals['_CHATMESSAGE']._serialized_start=51
-  _globals['_CHATMESSAGE']._serialized_end=371
+  _globals['_CHATATTACHMENT_METADATAENTRY']._loaded_options = None
+  _globals['_CHATATTACHMENT_METADATAENTRY']._serialized_options = b'8\001'
+  _globals['_CHATMESSAGE_METADATAENTRY']._loaded_options = None
+  _globals['_CHATMESSAGE_METADATAENTRY']._serialized_options = b'8\001'
+  _globals['_CHATGENERATIONREQUEST_METADATAENTRY']._loaded_options = None
+  _globals['_CHATGENERATIONREQUEST_METADATAENTRY']._serialized_options = b'8\001'
+  _globals['_CHATCONVERSATIONSTATE_METADATAENTRY']._loaded_options = None
+  _globals['_CHATCONVERSATIONSTATE_METADATAENTRY']._serialized_options = b'8\001'
+  _globals['_MESSAGEROLE']._serialized_start=2484
+  _globals['_MESSAGEROLE']._serialized_end=2654
+  _globals['_CHATMESSAGESTATUS']._serialized_start=2657
+  _globals['_CHATMESSAGESTATUS']._serialized_end=2882
+  _globals['_CHATSTREAMEVENTKIND']._serialized_start=2885
+  _globals['_CHATSTREAMEVENTKIND']._serialized_end=3182
+  _globals['_CHATATTACHMENT']._serialized_start=70
+  _globals['_CHATATTACHMENT']._serialized_end=346
+  _globals['_CHATATTACHMENT_METADATAENTRY']._serialized_start=280
+  _globals['_CHATATTACHMENT_METADATAENTRY']._serialized_end=327
+  _globals['_CHATMESSAGE']._serialized_start=349
+  _globals['_CHATMESSAGE']._serialized_end=967
+  _globals['_CHATMESSAGE_METADATAENTRY']._serialized_start=280
+  _globals['_CHATMESSAGE_METADATAENTRY']._serialized_end=327
+  _globals['_CHATGENERATIONREQUEST']._serialized_start=970
+  _globals['_CHATGENERATIONREQUEST']._serialized_end=1357
+  _globals['_CHATGENERATIONREQUEST_METADATAENTRY']._serialized_start=280
+  _globals['_CHATGENERATIONREQUEST_METADATAENTRY']._serialized_end=327
+  _globals['_CHATGENERATIONRESULT']._serialized_start=1360
+  _globals['_CHATGENERATIONRESULT']._serialized_end=1692
+  _globals['_CHATSTREAMEVENT']._serialized_start=1695
+  _globals['_CHATSTREAMEVENT']._serialized_end=2217
+  _globals['_CHATCONVERSATIONSTATE']._serialized_start=2220
+  _globals['_CHATCONVERSATIONSTATE']._serialized_end=2481
+  _globals['_CHATCONVERSATIONSTATE_METADATAENTRY']._serialized_start=280
+  _globals['_CHATCONVERSATIONSTATE_METADATAENTRY']._serialized_end=327
 # @@protoc_insertion_point(module_scope)

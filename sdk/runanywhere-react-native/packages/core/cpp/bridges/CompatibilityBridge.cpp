@@ -4,6 +4,16 @@
  *
  * Uses DeviceBridge for RAM and POSIX statvfs for disk space,
  * then calls rac_model_check_compatibility() from runanywhere-commons.
+ *
+ * V2 bridge classification (CPP-09 — see docs/CPP_PROTO_OWNERSHIP.md
+ * "Bridge Layer Audit"):
+ *   - `delete after SDK migration`. Today this bridge synthesizes a
+ *     compatibility decision from `rac_model_check_compatibility` (struct
+ *     ABI) plus DeviceBridge / statvfs and returns it via a hand-built
+ *     JSON object in the Nitro `checkCompatibility` method. Migration
+ *     blocker: commons does not yet expose a
+ *     `rac_model_compatibility_*_proto` ABI. Once it does, replace this
+ *     bridge with a thin proto-byte pass-through.
  */
 
 #include "CompatibilityBridge.hpp"

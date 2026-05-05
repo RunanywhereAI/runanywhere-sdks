@@ -80,18 +80,18 @@ typedef struct {
 // =============================================================================
 
 /**
- * @brief Progress callback. Fires on every chunk libcurl delivers
- * (typically ~16 KiB each), plus a final call with `bytes_written ==
- * total_bytes` on clean completion. No time-based throttling is
- * applied inside the runner — callers that want UI-update frequency
- * throttling should do it in their callback.
+ * @brief Progress callback. Fires on every chunk delivered by the
+ * registered transport adapter, plus a final call with
+ * `bytes_written == total_bytes` on clean completion. No time-based
+ * throttling is applied inside the runner; callers that want
+ * UI-update frequency throttling should do it in their callback.
  *
  * @param bytes_written Total bytes written to disk (including the
  *        resume-from prefix).
  * @param total_bytes   Total download size including resume prefix,
  *        or 0 when the server did not send Content-Length.
  * @param user_data     Opaque.
- * @return RAC_FALSE to cancel (the runner aborts libcurl and returns
+ * @return RAC_FALSE to cancel (the runner returns
  *         `RAC_HTTP_DL_CANCELLED`), RAC_TRUE to continue.
  */
 typedef rac_bool_t (*rac_http_download_progress_fn)(uint64_t bytes_written, uint64_t total_bytes,

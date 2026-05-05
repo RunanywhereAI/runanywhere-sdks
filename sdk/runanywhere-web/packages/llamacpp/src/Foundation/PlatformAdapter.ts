@@ -1,27 +1,35 @@
 /**
- * RunAnywhere Web SDK - Platform Adapter
+ * PlatformAdapter — registers `rac_platform_adapter_t` callbacks with the
+ * loaded WASM module.
  *
- * Implements rac_platform_adapter_t callbacks using browser Web APIs.
- * This is the web equivalent of:
- *   - SwiftPlatformAdapter (iOS)
- *   - KotlinPlatformAdapter (Android/JVM)
- *   - DartPlatformAdapter (Flutter)
+ * The C struct is a flat list of function pointers. JavaScript provides
+ * implementations via Emscripten's `addFunction()`, then writes the resulting
+ * function-table indices into the struct in WASM memory.
  *
- * Each callback is registered as a C function pointer via Emscripten's
- * Module.addFunction(), then written into the rac_platform_adapter_t
- * struct in WASM memory.
+ * Field order is the same as the deleted V1 PlatformAdapter and matches
+ * `rac_platform_adapter.h`:
+ *
+ *   file_exists, file_read, file_write, file_delete,
+ *   secure_get, secure_set, secure_delete,
+ *   log, track_error, now_ms, get_memory_info,
+ *   http_download, http_download_cancel, extract_archive,
+ *   user_data
+ *
+ * Pointer width on wasm32 is 4 bytes.
  */
 
+import { SDKLogger } from '@runanywhere/web';
 import type { LlamaCppModule } from './LlamaCppBridge';
-import { LlamaCppBridge } from './LlamaCppBridge';
-import { SDKLogger, HTTPAdapter, DownloadStatus } from '@runanywhere/web';
 
 const logger = new SDKLogger('PlatformAdapter');
 
-/**
- * Registered callback function pointers (for cleanup).
- */
-interface RegisteredCallbacks {
+// rac_error.h ranges
+const RAC_OK = 0;
+const RAC_ERROR_FILE_NOT_FOUND = -182;
+const RAC_ERROR_FILE_WRITE_FAILED = -183;
+const RAC_ERROR_PLATFORM = -180;
+
+interface CallbackPtrs {
   fileExists: number;
   fileRead: number;
   fileWrite: number;
@@ -32,60 +40,52 @@ interface RegisteredCallbacks {
   log: number;
   nowMs: number;
   getMemoryInfo: number;
-  httpDownload: number;
 }
 
-/**
- * PlatformAdapter - Bridges browser Web APIs to RACommons C callbacks.
- *
- * The rac_platform_adapter_t struct is a collection of C function pointers.
- * JavaScript provides implementations via Emscripten's addFunction(),
- * which creates callable C function pointers from JS closures.
- */
 export class PlatformAdapter {
-  private callbacks: RegisteredCallbacks | null = null;
+  private callbacks: CallbackPtrs | null = null;
   private adapterPtr = 0;
 
+  constructor(private readonly m: LlamaCppModule) {}
+
   /**
-   * Create and register the platform adapter with RACommons.
-   * Must be called after WASM module is loaded but before rac_init().
+   * Allocate the rac_platform_adapter_t struct, install JS callbacks via
+   * `addFunction()`, write the resulting indices into the struct in WASM
+   * memory, then call `_rac_set_platform_adapter()`.
    */
   register(): void {
-    const bridge = LlamaCppBridge.shared;
-    const m = bridge.module;
+    const m = this.m;
+    const sizeofPlatformAdapter = m._rac_wasm_sizeof_platform_adapter;
+    const setPlatformAdapter = m._rac_set_platform_adapter;
+    if (typeof sizeofPlatformAdapter !== 'function' || typeof setPlatformAdapter !== 'function') {
+      throw new Error(
+        'WASM module missing _rac_wasm_sizeof_platform_adapter or _rac_set_platform_adapter exports',
+      );
+    }
 
     logger.info('Registering platform adapter callbacks...');
 
-    // Allocate the rac_platform_adapter_t struct
-    const adapterSize = m._rac_wasm_sizeof_platform_adapter();
+    const adapterSize = sizeofPlatformAdapter();
     this.adapterPtr = m._malloc(adapterSize);
-
-    // Zero-initialize
     for (let i = 0; i < adapterSize; i++) {
       m.setValue(this.adapterPtr + i, 0, 'i8');
     }
 
-    // Register each callback as a C function pointer
     this.callbacks = {
-      fileExists: this.registerFileExists(m),
-      fileRead: this.registerFileRead(m),
-      fileWrite: this.registerFileWrite(m),
-      fileDelete: this.registerFileDelete(m),
-      secureGet: this.registerSecureGet(m),
-      secureSet: this.registerSecureSet(m),
-      secureDelete: this.registerSecureDelete(m),
-      log: this.registerLog(m),
-      nowMs: this.registerNowMs(m),
-      getMemoryInfo: this.registerGetMemoryInfo(m),
-      httpDownload: this.registerHttpDownload(m),
+      fileExists: this.registerFileExists(),
+      fileRead: this.registerFileRead(),
+      fileWrite: this.registerFileWrite(),
+      fileDelete: this.registerFileDelete(),
+      secureGet: this.registerSecureGet(),
+      secureSet: this.registerSecureSet(),
+      secureDelete: this.registerSecureDelete(),
+      log: this.registerLog(),
+      nowMs: this.registerNowMs(),
+      getMemoryInfo: this.registerGetMemoryInfo(),
     };
 
-    // Write function pointers into the struct.
-    // The struct layout matches rac_platform_adapter.h field order.
-    // Each field is a function pointer (4 bytes on wasm32).
     const PTR_SIZE = 4;
     let offset = 0;
-
     m.setValue(this.adapterPtr + offset, this.callbacks.fileExists, '*'); offset += PTR_SIZE;
     m.setValue(this.adapterPtr + offset, this.callbacks.fileRead, '*'); offset += PTR_SIZE;
     m.setValue(this.adapterPtr + offset, this.callbacks.fileWrite, '*'); offset += PTR_SIZE;
@@ -94,43 +94,36 @@ export class PlatformAdapter {
     m.setValue(this.adapterPtr + offset, this.callbacks.secureSet, '*'); offset += PTR_SIZE;
     m.setValue(this.adapterPtr + offset, this.callbacks.secureDelete, '*'); offset += PTR_SIZE;
     m.setValue(this.adapterPtr + offset, this.callbacks.log, '*'); offset += PTR_SIZE;
-    // track_error: optional, set to 0 (null)
+    // track_error (optional) → null
     m.setValue(this.adapterPtr + offset, 0, '*'); offset += PTR_SIZE;
     m.setValue(this.adapterPtr + offset, this.callbacks.nowMs, '*'); offset += PTR_SIZE;
     m.setValue(this.adapterPtr + offset, this.callbacks.getMemoryInfo, '*'); offset += PTR_SIZE;
-    m.setValue(this.adapterPtr + offset, this.callbacks.httpDownload, '*'); offset += PTR_SIZE;
-    // http_download_cancel: optional, set to 0 (null)
+    // http_download (optional) → null. The HTTPAdapter / FetchHttpTransport
+    // path takes over once setRunanywhereModule installs the module.
     m.setValue(this.adapterPtr + offset, 0, '*'); offset += PTR_SIZE;
-    // extract_archive: no-op (native libarchive compiled into WASM, bypasses platform adapter)
+    // http_download_cancel
     m.setValue(this.adapterPtr + offset, 0, '*'); offset += PTR_SIZE;
-    // user_data: set to 0 (null)
+    // extract_archive — native libarchive is compiled into WASM
+    m.setValue(this.adapterPtr + offset, 0, '*'); offset += PTR_SIZE;
+    // user_data
     m.setValue(this.adapterPtr + offset, 0, '*');
 
-    // Register with RACommons
-    const result = m._rac_set_platform_adapter(this.adapterPtr);
+    const result = setPlatformAdapter(this.adapterPtr);
     if (result !== 0) {
       logger.error(`Failed to set platform adapter: ${result}`);
       this.cleanup();
-      return;
+      throw new Error(`rac_set_platform_adapter returned ${result}`);
     }
-
     logger.info('Platform adapter registered successfully');
   }
 
-  /**
-   * Get the WASM pointer to the adapter struct.
-   * Used by RunAnywhere.initialize() to populate rac_config_t.
-   */
+  /** Pointer to the rac_platform_adapter_t struct in WASM memory. */
   getAdapterPtr(): number {
     return this.adapterPtr;
   }
 
-  /**
-   * Clean up allocated callbacks and memory.
-   */
   cleanup(): void {
-    const m = LlamaCppBridge.shared.module;
-
+    const m = this.m;
     if (this.callbacks) {
       for (const ptr of Object.values(this.callbacks)) {
         if (ptr !== 0) {
@@ -139,7 +132,6 @@ export class PlatformAdapter {
       }
       this.callbacks = null;
     }
-
     if (this.adapterPtr !== 0) {
       m._free(this.adapterPtr);
       this.adapterPtr = 0;
@@ -150,314 +142,197 @@ export class PlatformAdapter {
   // Callback Implementations
   // -----------------------------------------------------------------------
 
-  /** file_exists: rac_bool_t (*)(const char* path, void* user_data) */
-  private registerFileExists(m: LlamaCppModule): number {
-    return m.addFunction((pathPtr: number, _userData: number): number => {
+  /** rac_bool_t (*)(const char* path, void* user_data) */
+  private registerFileExists(): number {
+    const m = this.m;
+    return m.addFunction((pathPtr: number, _userData: number) => {
       try {
         const path = m.UTF8ToString(pathPtr);
-        const result = m.FS.analyzePath(path);
-        return result.exists ? 1 : 0;
+        const exists = m.FS?.analyzePath(path).exists ?? false;
+        return exists ? 1 : 0;
       } catch {
         return 0;
       }
     }, 'iii');
   }
 
-  /** file_read: rac_result_t (*)(const char* path, void** out_data, size_t* out_size, void* user_data) */
-  private registerFileRead(m: LlamaCppModule): number {
-    return m.addFunction((pathPtr: number, outDataPtr: number, outSizePtr: number, _userData: number): number => {
+  /** rac_result_t (*)(const char* path, void** out_data, size_t* out_size, void* user_data) */
+  private registerFileRead(): number {
+    const m = this.m;
+    return m.addFunction((pathPtr: number, outDataPtr: number, outSizePtr: number, _userData: number) => {
       try {
         const path = m.UTF8ToString(pathPtr);
+        if (!m.FS) return RAC_ERROR_FILE_NOT_FOUND;
         const data = m.FS.readFile(path);
         const wasmPtr = m._malloc(data.length);
-        LlamaCppBridge.shared.writeBytes(data, wasmPtr);
+        writeBytes(m, data, wasmPtr);
         m.setValue(outDataPtr, wasmPtr, '*');
         m.setValue(outSizePtr, data.length, 'i32');
-        return 0; // RAC_OK
+        return RAC_OK;
       } catch {
-        return -182; // RAC_ERROR_FILE_NOT_FOUND
+        return RAC_ERROR_FILE_NOT_FOUND;
       }
     }, 'iiiii');
   }
 
-  /** file_write: rac_result_t (*)(const char* path, const void* data, size_t size, void* user_data) */
-  private registerFileWrite(m: LlamaCppModule): number {
-    return m.addFunction((pathPtr: number, dataPtr: number, size: number, _userData: number): number => {
+  /** rac_result_t (*)(const char* path, const void* data, size_t size, void* user_data) */
+  private registerFileWrite(): number {
+    const m = this.m;
+    return m.addFunction((pathPtr: number, dataPtr: number, size: number, _userData: number) => {
       try {
         const path = m.UTF8ToString(pathPtr);
-        const data = LlamaCppBridge.shared.readBytes(dataPtr, size);
+        if (!m.FS) return RAC_ERROR_FILE_WRITE_FAILED;
+        const data = readBytes(m, dataPtr, size);
         m.FS.writeFile(path, data);
-        return 0;
+        return RAC_OK;
       } catch {
-        return -183; // RAC_ERROR_FILE_WRITE_FAILED
+        return RAC_ERROR_FILE_WRITE_FAILED;
       }
     }, 'iiiii');
   }
 
-  /** file_delete: rac_result_t (*)(const char* path, void* user_data) */
-  private registerFileDelete(m: LlamaCppModule): number {
-    return m.addFunction((pathPtr: number, _userData: number): number => {
+  /** rac_result_t (*)(const char* path, void* user_data) */
+  private registerFileDelete(): number {
+    const m = this.m;
+    return m.addFunction((pathPtr: number, _userData: number) => {
       try {
         const path = m.UTF8ToString(pathPtr);
-        m.FS.unlink(path);
-        return 0;
+        m.FS?.unlink(path);
+        return RAC_OK;
       } catch {
-        return -182;
+        return RAC_ERROR_FILE_NOT_FOUND;
       }
     }, 'iii');
   }
 
   /**
-   * secure_get: rac_result_t (*)(const char* key, char** out_value, void* user_data)
-   *
-   * SECURITY NOTE: On web, "secure" storage uses localStorage which is NOT
-   * truly secure. Data is accessible to any script running on the same origin
-   * (including XSS attacks). Do NOT store sensitive secrets (API keys, tokens,
-   * PII) here. On native platforms (iOS/Android) the equivalent callback uses
-   * Keychain / KeyStore which are hardware-backed and encrypted.
-   *
-   * For the web platform this is intentionally best-effort: the RACommons C
-   * layer only uses it for non-sensitive SDK state (e.g. cached environment).
+   * SECURITY NOTE: localStorage is **not** secure. Used only for the small
+   * SDK metadata C-side reads/writes (e.g. cached environment). Do not
+   * store API keys or PII here. Native platforms back this with Keychain /
+   * KeyStore which is hardware-encrypted; the browser has no equivalent.
    */
-  private registerSecureGet(m: LlamaCppModule): number {
-    return m.addFunction((keyPtr: number, outValuePtr: number, _userData: number): number => {
+  private registerSecureGet(): number {
+    const m = this.m;
+    return m.addFunction((keyPtr: number, outValuePtr: number, _userData: number) => {
       try {
         const key = m.UTF8ToString(keyPtr);
         const value = localStorage.getItem(`rac_sdk_${key}`);
         if (value === null) {
           m.setValue(outValuePtr, 0, '*');
-          return -182;
+          return RAC_ERROR_FILE_NOT_FOUND;
         }
-        const strPtr = LlamaCppBridge.shared.allocString(value);
+        const len = m.lengthBytesUTF8(value) + 1;
+        const strPtr = m._malloc(len);
+        m.stringToUTF8(value, strPtr, len);
         m.setValue(outValuePtr, strPtr, '*');
-        return 0;
+        return RAC_OK;
       } catch {
-        return -180;
+        return RAC_ERROR_PLATFORM;
       }
     }, 'iiii');
   }
 
-  /**
-   * secure_set: rac_result_t (*)(const char* key, const char* value, void* user_data)
-   *
-   * SECURITY NOTE: See registerSecureGet — localStorage is NOT secure on web.
-   * Do not use for sensitive data.
-   */
-  private registerSecureSet(m: LlamaCppModule): number {
-    return m.addFunction((keyPtr: number, valuePtr: number, _userData: number): number => {
+  private registerSecureSet(): number {
+    const m = this.m;
+    return m.addFunction((keyPtr: number, valuePtr: number, _userData: number) => {
       try {
         const key = m.UTF8ToString(keyPtr);
         const value = m.UTF8ToString(valuePtr);
         localStorage.setItem(`rac_sdk_${key}`, value);
-        return 0;
+        return RAC_OK;
       } catch {
-        return -180;
+        return RAC_ERROR_PLATFORM;
       }
     }, 'iiii');
   }
 
-  /**
-   * secure_delete: rac_result_t (*)(const char* key, void* user_data)
-   *
-   * SECURITY NOTE: See registerSecureGet — localStorage is NOT secure on web.
-   */
-  private registerSecureDelete(m: LlamaCppModule): number {
-    return m.addFunction((keyPtr: number, _userData: number): number => {
+  private registerSecureDelete(): number {
+    const m = this.m;
+    return m.addFunction((keyPtr: number, _userData: number) => {
       try {
         const key = m.UTF8ToString(keyPtr);
         localStorage.removeItem(`rac_sdk_${key}`);
-        return 0;
+        return RAC_OK;
       } catch {
-        return -180;
+        return RAC_ERROR_PLATFORM;
       }
     }, 'iii');
   }
 
-  /** log: void (*)(rac_log_level_t level, const char* category, const char* message, void* user_data) */
-  private registerLog(m: LlamaCppModule): number {
-    return m.addFunction((level: number, categoryPtr: number, messagePtr: number, _userData: number): void => {
+  /** void (*)(rac_log_level_t level, const char* category, const char* message, void* user_data) */
+  private registerLog(): number {
+    const m = this.m;
+    return m.addFunction((level: number, categoryPtr: number, messagePtr: number, _userData: number) => {
       const category = m.UTF8ToString(categoryPtr);
       const message = m.UTF8ToString(messagePtr);
       const prefix = `[RAC:${category}]`;
-
       switch (level) {
-        case 0: // TRACE
-        case 1: // DEBUG
-          console.debug(prefix, message);
-          break;
-        case 2: // INFO
-          console.info(prefix, message);
-          break;
-        case 3: // WARNING
-          console.warn(prefix, message);
-          break;
-        case 4: // ERROR
-        case 5: // FATAL
-          console.error(prefix, message);
-          break;
-        default:
-          console.log(prefix, message);
+        case 0: case 1: console.debug(prefix, message); break;
+        case 2: console.info(prefix, message); break;
+        case 3: console.warn(prefix, message); break;
+        case 4: case 5: console.error(prefix, message); break;
+        default: console.log(prefix, message);
       }
     }, 'viiii');
   }
 
-  /** now_ms: int64_t (*)(void* user_data) */
-  private registerNowMs(m: LlamaCppModule): number {
-    // Note: Emscripten represents int64_t as two i32 values (lo, hi) in some cases.
-    // For simplicity, we use 'ii' return (returns i32 which truncates but is fine for ms).
-    return m.addFunction((_userData: number): number => {
-      return Date.now();
+  /** int64_t (*)(void* user_data) — clang lowers as i32-pair on wasm32. */
+  private registerNowMs(): number {
+    const m = this.m;
+    // Emscripten's int64 ABI is sometimes split into two i32 result values.
+    // Returning a JS number from `'ii'` truncates to 32 bits, which is fine
+    // for monotonic millisecond timestamps used by the C side as a delta clock.
+    return m.addFunction((_userData: number) => {
+      return Date.now() | 0;
     }, 'ii');
   }
 
-  /** get_memory_info: rac_result_t (*)(rac_memory_info_t* out_info, void* user_data) */
-  private registerGetMemoryInfo(m: LlamaCppModule): number {
-    return m.addFunction((outInfoPtr: number, _userData: number): number => {
+  /** rac_result_t (*)(rac_memory_info_t* out_info, void* user_data) */
+  private registerGetMemoryInfo(): number {
+    const m = this.m;
+    return m.addFunction((outInfoPtr: number, _userData: number) => {
       try {
-        // rac_memory_info_t: { uint64_t total, available, used }
-        // Estimate browser memory
-        const nav = navigator as NavigatorWithMemory;
-        const totalMB = nav.deviceMemory ?? 4; // deviceMemory API (GB)
+        const nav = navigator as Navigator & { deviceMemory?: number };
+        const totalMB = nav.deviceMemory ?? 4;
         const totalBytes = totalMB * 1024 * 1024 * 1024;
 
-        // performance.memory is Chrome-only (non-standard)
-        const perf = performance as PerformanceWithMemory;
+        const perf = performance as Performance & {
+          memory?: { usedJSHeapSize?: number; jsHeapSizeLimit?: number };
+        };
         const jsHeapUsed = perf.memory?.usedJSHeapSize ?? 0;
         const jsHeapTotal = perf.memory?.jsHeapSizeLimit ?? totalBytes;
 
-        // Write as uint64 (two i32 values each for wasm32)
-        // Simplified: write lower 32 bits only
-        m.setValue(outInfoPtr, jsHeapTotal & 0xFFFFFFFF, 'i32');      // total low
-        m.setValue(outInfoPtr + 4, 0, 'i32');                          // total high
-        m.setValue(outInfoPtr + 8, (jsHeapTotal - jsHeapUsed) & 0xFFFFFFFF, 'i32'); // available low
-        m.setValue(outInfoPtr + 12, 0, 'i32');                         // available high
-        m.setValue(outInfoPtr + 16, jsHeapUsed & 0xFFFFFFFF, 'i32');  // used low
-        m.setValue(outInfoPtr + 20, 0, 'i32');                         // used high
-
-        return 0;
+        // rac_memory_info_t: { uint64_t total, available, used } — write low/high pairs
+        m.setValue(outInfoPtr, jsHeapTotal & 0xFFFFFFFF, 'i32');
+        m.setValue(outInfoPtr + 4, 0, 'i32');
+        m.setValue(outInfoPtr + 8, (jsHeapTotal - jsHeapUsed) & 0xFFFFFFFF, 'i32');
+        m.setValue(outInfoPtr + 12, 0, 'i32');
+        m.setValue(outInfoPtr + 16, jsHeapUsed & 0xFFFFFFFF, 'i32');
+        m.setValue(outInfoPtr + 20, 0, 'i32');
+        return RAC_OK;
       } catch {
-        return -180;
+        return RAC_ERROR_PLATFORM;
       }
     }, 'iii');
   }
-
-  /**
-   * http_download: rac_result_t (*)(const char* url, const char* dest_path,
-   *   progress_cb, complete_cb, void* cb_user_data, char** out_task_id, void* user_data)
-   * Note: 7 params in C
-   */
-  private registerHttpDownload(m: LlamaCppModule): number {
-    return m.addFunction(
-      (urlPtr: number, destPathPtr: number, progressCbPtr: number, completeCbPtr: number, cbUserData: number, outTaskIdPtr: number, _userData: number): number => {
-        const url = m.UTF8ToString(urlPtr);
-        const destPath = m.UTF8ToString(destPathPtr);
-
-        // Generate task ID string
-        const taskId = `dl_${Date.now()}`;
-        if (outTaskIdPtr !== 0) {
-          const strPtr = LlamaCppBridge.shared.allocString(taskId);
-          m.setValue(outTaskIdPtr, strPtr, '*');
-        }
-
-        // Async download via fetch
-        this.performDownload(m, url, destPath, progressCbPtr, completeCbPtr, cbUserData)
-          .catch((err) => {
-            logger.error(`Download failed: ${err}`);
-          });
-
-        return 0;
-      },
-      'iiiiiiii',
-    );
-  }
-
-  // -----------------------------------------------------------------------
-  // Helpers
-  // -----------------------------------------------------------------------
-
-  /**
-   * Perform an HTTP download through the commons libcurl-backed HTTP
-   * client (T3.13). Routes bytes directly into the Emscripten FS via
-   * `rac_http_download_execute`, firing the C progress/complete
-   * callbacks on the JS task queue so the C caller (e.g. the diffusion
-   * tokenizer vocab fetch, or the model download orchestrator) keeps
-   * its existing task-id-returning contract.
-   */
-  private async performDownload(
-    m: LlamaCppModule,
-    url: string,
-    destPath: string,
-    progressCbPtr: number,
-    completeCbPtr: number,
-    cbUserData: number,
-  ): Promise<void> {
-    // Ensure parent directory exists on the Emscripten FS before the
-    // C client starts writing — rac_http_download_execute opens the
-    // file via fopen() which would otherwise fail with ENOENT.
-    const parentDir = destPath.substring(0, destPath.lastIndexOf('/'));
-    if (parentDir) {
-      try { m.FS.mkdir(parentDir); } catch { /* exists */ }
-    }
-
-    const http = new HTTPAdapter(m as unknown as Parameters<typeof HTTPAdapter.setDefaultModule>[0]);
-    let lastReported = 0;
-    let lastTotal = 0;
-
-    try {
-      const status = await http.download(
-        { url, destinationPath: destPath, followRedirects: true },
-        (bytesWritten, totalBytes) => {
-          lastReported = bytesWritten;
-          lastTotal = totalBytes;
-          if (progressCbPtr !== 0) {
-            m.dynCall('viii', progressCbPtr, [bytesWritten, totalBytes, cbUserData]);
-          }
-        },
-      );
-
-      if (status !== DownloadStatus.OK) {
-        throw new Error(`rac_http_download_execute status=${status} for ${url}`);
-      }
-
-      if (completeCbPtr !== 0) {
-        const pathPtr = LlamaCppBridge.shared.allocString(destPath);
-        m.dynCall('viii', completeCbPtr, [0, pathPtr, cbUserData]); // 0 = RAC_OK
-        m._free(pathPtr);
-      }
-    } catch (error) {
-      logger.error(`Download failed for ${url} (after ${lastReported}/${lastTotal} bytes): ${error}`);
-      if (completeCbPtr !== 0) {
-        const pathPtr = LlamaCppBridge.shared.allocString('');
-        m.dynCall('viii', completeCbPtr, [-160, pathPtr, cbUserData]); // RAC_ERROR_DOWNLOAD_FAILED
-        m._free(pathPtr);
-      }
-    }
-  }
 }
 
-// Browser API type extensions
-interface NavigatorWithMemory extends Navigator {
-  deviceMemory?: number;
-}
+// ---------------------------------------------------------------------------
+// HEAP helpers — `addFunction` callbacks run before any `_malloc`, so the
+// HEAP views can be stale; always re-read off the module.
+// ---------------------------------------------------------------------------
 
-interface PerformanceWithMemory extends Performance {
-  memory?: {
-    usedJSHeapSize: number;
-    totalJSHeapSize: number;
-    jsHeapSizeLimit: number;
-  };
-}
-
-// Extend LlamaCppModule with dynCall and FS
-declare module './LlamaCppBridge' {
-  interface LlamaCppModule {
-    dynCall: (sig: string, ptr: number, args: number[]) => unknown;
-    FS: {
-      analyzePath: (path: string) => { exists: boolean };
-      readFile: (path: string) => Uint8Array;
-      writeFile: (path: string, data: Uint8Array) => void;
-      unlink: (path: string) => void;
-      mkdir: (path: string) => void;
-    };
+function writeBytes(m: LlamaCppModule, src: Uint8Array, destPtr: number): void {
+  if (m.HEAPU8) {
+    m.HEAPU8.set(src, destPtr);
+    return;
   }
+  for (let i = 0; i < src.length; i++) m.setValue(destPtr + i, src[i], 'i8');
+}
+
+function readBytes(m: LlamaCppModule, srcPtr: number, length: number): Uint8Array {
+  if (m.HEAPU8) return m.HEAPU8.slice(srcPtr, srcPtr + length);
+  const out = new Uint8Array(length);
+  for (let i = 0; i < length; i++) out[i] = m.getValue(srcPtr + i, 'i8') & 0xff;
+  return out;
 }

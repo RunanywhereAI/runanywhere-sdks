@@ -20,7 +20,7 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
 
     func execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo
+        model: RAModelInfo
     ) async throws -> BenchmarkMetrics {
         var metrics = BenchmarkMetrics()
 
@@ -46,13 +46,13 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
 
             // Transcribe
             let benchStart = Date()
-            let options = STTOptions()
+            let options = RASTTOptions.defaults()
             let result = try await RunAnywhere.transcribe(audio: audioData, options: options)
             metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
 
             // processingTime is in seconds
             metrics.audioLengthSeconds = audioDuration
-            metrics.realTimeFactor = result.metadata.realTimeFactor
+            metrics.realTimeFactor = Double(result.metadata.realTimeFactor)
 
             let memAfter = SyntheticInputGenerator.availableMemoryBytes()
             metrics.memoryDeltaBytes = memBefore - memAfter

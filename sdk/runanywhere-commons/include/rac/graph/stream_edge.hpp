@@ -57,6 +57,7 @@ public:
     /// space is available OR cancel is observed.
     bool push(T item, CancelToken* cancel = nullptr) {
         std::unique_lock<std::mutex> lock(mu_);
+        if (closed_) return false;
 
         switch (policy_) {
         case OverflowPolicy::DropNewest:
@@ -69,6 +70,7 @@ public:
             break;
         case OverflowPolicy::BlockProducer:
             while (queue_.size() >= capacity_) {
+                if (closed_) return false;
                 if (cancel && cancel->is_cancelled()) return false;
                 // Waiting: release the lock, re-acquire when woken.
                 // Timed wait so a cancel that arrives AFTER we start
@@ -78,6 +80,7 @@ public:
             break;
         }
 
+        if (closed_) return false;
         if (cancel && cancel->is_cancelled()) return false;
 
         queue_.emplace_back(std::move(item));

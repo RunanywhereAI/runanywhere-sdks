@@ -2,31 +2,54 @@
  * RunAnywhere+VisionLanguage.ts
  *
  * Vision Language Model (VLM) extension for the RunAnywhere core SDK.
- * Renamed from RunAnywhere+VLM.ts (Wave 3) to match Swift canonical name.
- * Aligned to proto-canonical VLM shapes (`@runanywhere/proto-ts/vlm_options`).
+ * Uses proto-canonical VLM shapes and the RN core Nitro bridge over commons
+ * `rac_vlm_process_proto`, `rac_vlm_process_stream_proto`, and
+ * `rac_vlm_cancel_proto`.
  *
- * The actual backend dispatch lives in `@runanywhere/llamacpp` (optional
- * peer dep); this file forwards to it dynamically so core remains
- * backend-agnostic.
- *
- * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VLM/RunAnywhere+VisionLanguage.swift
+ * Backend packages register providers only; core owns the public VLM
+ * lifecycle/process surface.
  */
 
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { ModelRegistry } from '../../services/ModelRegistry';
-import { FileSystem } from '../../services/FileSystem';
+import {
+  requireNativeModule,
+  isNativeModuleAvailable,
+} from '../../native';
+import {
+  arrayBufferToBytes,
+  bytesToArrayBuffer,
+} from '../../services/ProtoBytes';
+import {
+  VLMGenerationOptions as VLMGenerationOptionsMessage,
+  VLMImage as VLMImageMessage,
+  VLMResult as VLMResultMessage,
+} from '@runanywhere/proto-ts/vlm_options';
 import type {
+  VLMGenerationOptions,
   VLMImage,
   VLMResult,
-  VLMGenerationOptions,
 } from '@runanywhere/proto-ts/vlm_options';
+import {
+  GenerationEventKind,
+  SDKEvent as SDKEventMessage,
+} from '@runanywhere/proto-ts/sdk_events';
+import {
+  CurrentModelRequest,
+  ModelCategory,
+  ModelLoadRequest,
+} from '@runanywhere/proto-ts/model_types';
+import {
+  getCurrentModel,
+  loadModelLifecycle,
+  resolveVLMArtifactsFromLifecycleResult,
+  type VLMResolvedLifecycleArtifacts,
+} from './RunAnywhere+Lifecycle';
 
-const logger = new SDKLogger('RunAnywhere.VLM');
+const logger = new SDKLogger('RunAnywhere.VisionLanguage');
 
 /**
- * RN-local streaming wrapper. The proto `VLMResult` carries final
- * metrics; the streaming surface adds `stream` (token AsyncIterable) and
- * `cancel`. Same shape as `LLMStreamingResult`.
+ * RN-local streaming wrapper. The proto `VLMResult` carries final metrics; the
+ * streaming surface adds `stream` (token AsyncIterable) and `cancel`.
  */
 export interface VLMStreamingResult {
   stream: AsyncIterable<string>;
@@ -35,117 +58,177 @@ export interface VLMStreamingResult {
 }
 
 /**
- * Minimal structural interface for the `@runanywhere/llamacpp` module surface
- * used by this VLM extension. Keeps the dynamic-require typed without pulling
- * the full backend package into the core type graph (it is an optional dep).
+ * Optional backend provider-registration hook. It is intentionally limited to
+ * registration; load/process/cancel always route through RN core.
  */
-interface VLMModule {
-  registerVLMBackend(): boolean | Promise<boolean>;
-  loadVLMModel(
-    modelPath: string,
-    mmprojPath?: string,
-    modelId?: string,
-    modelName?: string
-  ): boolean | Promise<boolean>;
-  isVLMModelLoaded(): boolean | Promise<boolean>;
-  unloadVLMModel(): boolean | Promise<boolean>;
-  describeImage(image: VLMImage, prompt?: string): string | Promise<string>;
-  askAboutImage(question: string, image: VLMImage): string | Promise<string>;
-  processImage(
-    image: VLMImage,
-    prompt: string,
-    options?: Partial<VLMGenerationOptions>
-  ): VLMResult | Promise<VLMResult>;
-  processImageStream(
-    image: VLMImage,
-    prompt: string,
-    options?: Partial<VLMGenerationOptions>
-  ): VLMStreamingResult | Promise<VLMStreamingResult>;
-  cancelVLMGeneration(): void;
+export interface VLMBackendProvider {
+  registerVLMBackend: () => boolean | Promise<boolean>;
 }
 
-let _vlmModule: VLMModule | null = null;
-
-async function getVLMModule(): Promise<VLMModule> {
-  if (_vlmModule) return _vlmModule;
-  try {
-    // Optional peer dep: loaded dynamically so core doesn't require it.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    _vlmModule = require('@runanywhere/llamacpp') as VLMModule;
-    return _vlmModule;
-  } catch {
-    throw new Error(
-      'VLM requires @runanywhere/llamacpp package. Install it to use VLM features.'
-    );
+function ensureNative() {
+  if (!isNativeModuleAvailable()) {
+    throw new Error('Native module not available');
   }
+  return requireNativeModule();
+}
+
+function encodeVLMImage(image: VLMImage): ArrayBuffer {
+  return bytesToArrayBuffer(VLMImageMessage.encode(image).finish());
+}
+
+function buildVLMOptions(
+  prompt: string,
+  options: Partial<VLMGenerationOptions> | undefined,
+  streamingEnabled: boolean
+): VLMGenerationOptions {
+  const requestedPrompt =
+    options?.prompt && options.prompt.length > 0 ? options.prompt : prompt;
+  return VLMGenerationOptionsMessage.fromPartial({
+    ...options,
+    prompt: requestedPrompt,
+    maxTokens: options?.maxTokens ?? 2048,
+    temperature: options?.temperature ?? 0.7,
+    topP: options?.topP ?? 0.9,
+    topK: options?.topK ?? 0,
+    stopSequences: options?.stopSequences ?? [],
+    streamingEnabled,
+    systemPrompt: options?.systemPrompt,
+    maxImageSize: options?.maxImageSize ?? 0,
+    nThreads: options?.nThreads ?? 0,
+    useGpu: options?.useGpu ?? true,
+    modelFamily: options?.modelFamily ?? 0,
+    customChatTemplate: options?.customChatTemplate,
+    imageMarkerOverride: options?.imageMarkerOverride,
+    seed: options?.seed ?? 0,
+    repetitionPenalty: options?.repetitionPenalty ?? 0,
+    minP: options?.minP ?? 0,
+    emitImageEmbeddings: options?.emitImageEmbeddings ?? false,
+  });
+}
+
+function encodeVLMOptions(
+  prompt: string,
+  options: Partial<VLMGenerationOptions> | undefined,
+  streamingEnabled: boolean
+): ArrayBuffer {
+  return bytesToArrayBuffer(
+    VLMGenerationOptionsMessage.encode(
+      buildVLMOptions(prompt, options, streamingEnabled)
+    ).finish()
+  );
+}
+
+function decodeVLMResult(buffer: ArrayBuffer, operation: string): VLMResult {
+  const bytes = arrayBufferToBytes(buffer);
+  if (bytes.byteLength === 0) {
+    throw new Error(`${operation} returned an empty proto result`);
+  }
+  return VLMResultMessage.decode(bytes);
+}
+
+async function resolveVLMArtifacts(
+  modelId: string
+): Promise<VLMResolvedLifecycleArtifacts | null> {
+  const loadResult = await loadModelLifecycle(
+    ModelLoadRequest.fromPartial({
+      modelId,
+      validateAvailability: true,
+    })
+  );
+
+  if (!loadResult.success) {
+    logger.warning('VLM lifecycle load failed', {
+      modelId,
+      error: loadResult.errorMessage,
+      warnings: loadResult.warnings,
+    });
+    return null;
+  }
+
+  const loadArtifacts = resolveVLMArtifactsFromLifecycleResult(loadResult);
+  if (loadArtifacts) {
+    return loadArtifacts;
+  }
+
+  const currentRequest = CurrentModelRequest.fromPartial({
+    includeModelMetadata: true,
+    ...(loadResult.category !== ModelCategory.MODEL_CATEGORY_UNSPECIFIED
+      ? { category: loadResult.category }
+      : {}),
+  });
+  const currentModel = await getCurrentModel(currentRequest);
+  if (currentModel?.found && currentModel.modelId === modelId) {
+    const currentArtifacts = resolveVLMArtifactsFromLifecycleResult(currentModel);
+    if (currentArtifacts) {
+      return currentArtifacts;
+    }
+  }
+
+  logger.warning('VLM lifecycle did not resolve required artifacts', {
+    modelId,
+    resolvedArtifactCount: loadResult.resolvedArtifacts.length,
+  });
+  return null;
 }
 
 /**
- * Register VLM backend.
- *
- * Matches iOS: auto-registered, but explicit in RN.
+ * Register a VLM backend provider. Calling without a provider is a no-op for
+ * apps that already registered backends through package-level `register()`.
  */
-export async function registerVLMBackend(): Promise<boolean> {
-  const vlm = await getVLMModule();
-  return vlm.registerVLMBackend();
-}
-
-/**
- * Load a VLM model by providing paths directly.
- *
- * Matches iOS: `RunAnywhere.loadVLMModel(_:mmprojPath:modelId:modelName:)`.
- */
-export async function loadVLMModel(
-  modelPath: string,
-  mmprojPath?: string,
-  modelId?: string,
-  modelName?: string
+export async function registerVLMBackend(
+  provider?: VLMBackendProvider
 ): Promise<boolean> {
-  const vlm = await getVLMModule();
-  return vlm.loadVLMModel(modelPath, mmprojPath, modelId, modelName);
+  if (!provider) {
+    return true;
+  }
+  return !!(await provider.registerVLMBackend());
+}
+
+/**
+ * Load a VLM model by registry ID. Model paths are resolved by commons
+ * lifecycle and consumed through role-tagged resolved artifacts.
+ */
+export async function loadVLMModel(modelId: string): Promise<boolean> {
+  if (!isNativeModuleAvailable()) {
+    logger.warning('Native module not available for loadVLMModel');
+    return false;
+  }
+
+  const artifacts = await resolveVLMArtifacts(modelId);
+  if (!artifacts) {
+    return false;
+  }
+
+  return requireNativeModule().loadVLMModelFromArtifacts(
+    artifacts.primaryModelPath,
+    artifacts.visionProjectorPath,
+    modelId
+  );
 }
 
 /**
  * Load a VLM model by its registered model ID.
- * Automatically resolves the model path and mmproj path from the registry.
  *
  * Matches iOS: `RunAnywhere.loadVLMModelById(_:)`.
  */
 export async function loadVLMModelById(modelId: string): Promise<boolean> {
-  const modelInfo = await ModelRegistry.getModel(modelId);
-  if (!modelInfo) {
-    throw new Error(`VLM model not found in registry: ${modelId}`);
-  }
-  if (!modelInfo.localPath) {
-    throw new Error(`VLM model not downloaded: ${modelId}`);
-  }
-  let mmprojPath: string | undefined;
-  try {
-    mmprojPath = await FileSystem.findMmprojForModel(modelInfo.localPath);
-  } catch {
-    logger.debug(`No mmproj found for ${modelId}, backend will auto-detect`);
-  }
-  return loadVLMModel(modelInfo.localPath, mmprojPath, modelId, modelInfo.name);
+  return loadVLMModel(modelId);
 }
 
 /** Whether a VLM model is loaded. */
 export async function isVLMModelLoaded(): Promise<boolean> {
-  try {
-    const vlm = await getVLMModule();
-    return vlm.isVLMModelLoaded();
-  } catch {
+  if (!isNativeModuleAvailable()) {
     return false;
   }
+  return requireNativeModule().isVLMModelLoaded();
 }
 
 /** Unload the currently loaded VLM model. */
 export async function unloadVLMModel(): Promise<boolean> {
-  try {
-    const vlm = await getVLMModule();
-    return vlm.unloadVLMModel();
-  } catch {
+  if (!isNativeModuleAvailable()) {
     return false;
   }
+  return requireNativeModule().unloadVLMModel();
 }
 
 /**
@@ -157,8 +240,8 @@ export async function describeImage(
   image: VLMImage,
   prompt?: string
 ): Promise<string> {
-  const vlm = await getVLMModule();
-  return vlm.describeImage(image, prompt);
+  const result = await processImage(image, prompt ?? "What's in this image?");
+  return result.text;
 }
 
 /**
@@ -170,8 +253,8 @@ export async function askAboutImage(
   question: string,
   image: VLMImage
 ): Promise<string> {
-  const vlm = await getVLMModule();
-  return vlm.askAboutImage(question, image);
+  const result = await processImage(image, question);
+  return result.text;
 }
 
 /**
@@ -184,22 +267,123 @@ export async function processImage(
   prompt: string,
   options?: Partial<VLMGenerationOptions>
 ): Promise<VLMResult> {
-  const vlm = await getVLMModule();
-  return vlm.processImage(image, prompt, options);
+  const native = ensureNative();
+  const resultBytes = await native.vlmProcessProto(
+    encodeVLMImage(image),
+    encodeVLMOptions(prompt, options, false)
+  );
+  return decodeVLMResult(resultBytes, 'vlmProcessProto');
 }
 
 /**
- * Stream image processing with real-time tokens.
+ * Stream image processing with real-time token text.
  *
- * Matches iOS: `RunAnywhere.processImageStream(_:prompt:maxTokens:temperature:topP:)`.
+ * Commons emits canonical `SDKEvent` proto bytes for token deltas and returns
+ * a final `VLMResult` proto at stream completion.
  */
 export async function processImageStream(
   image: VLMImage,
   prompt: string,
   options?: Partial<VLMGenerationOptions>
 ): Promise<VLMStreamingResult> {
-  const vlm = await getVLMModule();
-  return vlm.processImageStream(image, prompt, options);
+  const native = ensureNative();
+  const imageBytes = encodeVLMImage(image);
+  const optionsBytes = encodeVLMOptions(prompt, options, true);
+  const queue: string[] = [];
+  let done = false;
+  let streamError: Error | null = null;
+  let resolver: ((value: IteratorResult<string>) => void) | null = null;
+
+  const finish = (): void => {
+    done = true;
+    if (resolver) {
+      resolver({ value: undefined as unknown as string, done: true });
+      resolver = null;
+    }
+  };
+
+  const push = (token: string): void => {
+    if (!token) {
+      return;
+    }
+    if (resolver) {
+      resolver({ value: token, done: false });
+      resolver = null;
+    } else {
+      queue.push(token);
+    }
+  };
+
+  const resultPromise = native
+    .vlmProcessStreamProto(
+      imageBytes,
+      optionsBytes,
+      (eventBytes: ArrayBuffer) => {
+        try {
+          const event = SDKEventMessage.decode(arrayBufferToBytes(eventBytes));
+          if (event.generation?.error) {
+            streamError = new Error(event.generation.error);
+          }
+          if (
+            event.generation?.kind ===
+            GenerationEventKind.GENERATION_EVENT_KIND_TOKEN_GENERATED
+          ) {
+            push(event.generation.token);
+          }
+        } catch (error) {
+          streamError =
+            error instanceof Error ? error : new Error(String(error));
+          finish();
+        }
+      }
+    )
+    .then((resultBytes) => decodeVLMResult(resultBytes, 'vlmProcessStreamProto'))
+    .catch((error: Error) => {
+      streamError = error;
+      throw error;
+    })
+    .finally(finish);
+
+  const cancel = (): void => {
+    native.vlmCancelProto().catch((error: Error) => {
+      logger.warning(`vlmCancelProto failed: ${error.message}`);
+    });
+    finish();
+  };
+
+  return {
+    stream: {
+      [Symbol.asyncIterator](): AsyncIterator<string> {
+        return {
+          async next(): Promise<IteratorResult<string>> {
+            if (queue.length > 0) {
+              return { value: queue.shift()!, done: false };
+            }
+            if (streamError) {
+              throw streamError;
+            }
+            if (done) {
+              return { value: undefined as unknown as string, done: true };
+            }
+            return new Promise<IteratorResult<string>>((resolve) => {
+              resolver = resolve;
+            }).then((result) => {
+              if (streamError) {
+                throw streamError;
+              }
+              return result;
+            });
+          },
+          async return(): Promise<IteratorResult<string>> {
+            cancel();
+            return { value: undefined as unknown as string, done: true };
+          },
+        };
+      },
+    },
+    result: resultPromise,
+    cancel,
+  };
 }
 
 /**
@@ -208,11 +392,10 @@ export async function processImageStream(
  * Matches iOS: `RunAnywhere.cancelVLMGeneration()`.
  */
 export function cancelVLMGeneration(): void {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const vlm = require('@runanywhere/llamacpp') as VLMModule;
-    vlm.cancelVLMGeneration();
-  } catch {
-    // Silently ignore if llamacpp not available.
+  if (!isNativeModuleAvailable()) {
+    return;
   }
+  requireNativeModule().vlmCancelProto().catch((error: Error) => {
+    logger.warning(`vlmCancelProto failed: ${error.message}`);
+  });
 }

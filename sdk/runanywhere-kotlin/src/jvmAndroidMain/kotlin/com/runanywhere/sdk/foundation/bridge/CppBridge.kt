@@ -14,7 +14,6 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeAuth
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelAssignment
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatform
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
@@ -431,9 +430,8 @@ object CppBridge {
      *
      * Initializes the service components:
      * 1. Authentication with backend (production/staging only, makes HTTP calls)
-     * 2. Model Assignment registration
-     * 3. Platform services registration
-     * 4. Device registration (triggers backend call)
+     * 2. Platform services registration
+     * 3. Device registration (triggers backend call)
      *
      * Must be called after [initialize] completes.
      * Must be called from a background thread (e.g., Dispatchers.IO) as it makes network calls.
@@ -480,44 +478,9 @@ object CppBridge {
                 }
             }
 
-            // Step 2: Register model assignment callbacks
-            // IMPORTANT: Register WITHOUT auto-fetch first to avoid threading issues
-            // The C++ auto-fetch mechanism can cause state issues when called during JNI registration
-            // This mirrors Swift SDK which always registers with autoFetch: false
-            logger.info("========== STEP 2: MODEL ASSIGNMENT REGISTRATION ==========")
-            val shouldFetchModels = _environment != Environment.DEVELOPMENT
-            logger.info("📦 Environment: ${_environment.name}, shouldFetchModels: $shouldFetchModels")
-            logger.info("📦 Registering model assignment callbacks (autoFetch: false)")
-            val registrationSucceeded = CppBridgeModelAssignment.register(autoFetch = false) // Always false!
-            logger.info("📦 Registration result: $registrationSucceeded")
-
-            // If auto-fetch is needed, trigger it asynchronously off the synchronized block
-            // This mirrors Swift SDK's Task.detached pattern:
-            //   Task.detached {
-            //       _ = try await ModelAssignment.fetch(forceRefresh: true)
-            //   }
-            // By fetching asynchronously, we:
-            // 1. Avoid blocking the initialization thread
-            // 2. Ensure callbacks are fully registered before HTTP fetch begins
-            if (shouldFetchModels && registrationSucceeded) {
-                logger.info("📦 Will fetch model assignments asynchronously...")
-                sdkScope.launch {
-                    try {
-                        logger.info("📦 [Async] Fetching model assignments from backend (forceRefresh=true)...")
-                        val assignmentsJson = CppBridgeModelAssignment.fetchModelAssignments(forceRefresh = true)
-                        logger.info("📦 [Async] Model assignments fetched successfully (${assignmentsJson.length} chars)")
-                        logger.info("📦 [Async] Response: ${assignmentsJson.take(500)}...")
-                    } catch (e: Exception) {
-                        logger.warn("📦 [Async] Model assignment fetch failed (non-critical): ${e.message}")
-                    }
-                }
-            } else if (!registrationSucceeded) {
-                logger.error("📦 Skipping model assignment fetch - callback registration failed")
-                logger.error("📦 This may indicate a JNI method signature mismatch or native library issue")
-            } else {
-                logger.info("📦 Skipping model fetch (development mode)")
-            }
-            logger.info("========== STEP 2 COMPLETE ==========")
+            // Step 2: Model assignment registration removed.
+            // Native commons owns assignment fetch; legacy CppBridgeModelAssignment
+            // JSON adapter was deleted in the dead-code wave.
 
             // Register platform services callbacks
             CppBridgePlatform.register()
@@ -615,7 +578,6 @@ object CppBridge {
             // Unregister Phase 2 services (reverse order)
             if (_servicesInitialized) {
                 CppBridgePlatform.unregister()
-                CppBridgeModelAssignment.unregister()
             }
 
             // Unregister Phase 1 core extensions (reverse order)

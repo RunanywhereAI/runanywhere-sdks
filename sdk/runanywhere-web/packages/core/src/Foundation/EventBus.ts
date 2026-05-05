@@ -16,7 +16,8 @@
  * adapted to the Web SDK's no-bridge environment.
  */
 
-import type { ModelCategory, SDKEnvironment, SDKEventType } from '../types/enums';
+import type { ModelCategory, SDKEnvironment } from '@runanywhere/proto-ts/model_types';
+import type { SDKEventType } from '../types/enums';
 import type { SpeechActivityKind } from '@runanywhere/proto-ts/vad_options';
 import { SDKLogger } from './SDKLogger';
 

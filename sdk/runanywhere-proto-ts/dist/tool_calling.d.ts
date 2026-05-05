@@ -46,6 +46,28 @@ export declare enum ToolCallFormatName {
 }
 export declare function toolCallFormatNameFromJSON(object: any): ToolCallFormatName;
 export declare function toolCallFormatNameToJSON(object: ToolCallFormatName): string;
+export declare enum ToolChoiceMode {
+    TOOL_CHOICE_MODE_UNSPECIFIED = 0,
+    TOOL_CHOICE_MODE_AUTO = 1,
+    TOOL_CHOICE_MODE_NONE = 2,
+    TOOL_CHOICE_MODE_REQUIRED = 3,
+    TOOL_CHOICE_MODE_SPECIFIC = 4,
+    UNRECOGNIZED = -1
+}
+export declare function toolChoiceModeFromJSON(object: any): ToolChoiceMode;
+export declare function toolChoiceModeToJSON(object: ToolChoiceMode): string;
+export declare enum ToolCallingStreamEventKind {
+    TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED = 0,
+    TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN = 1,
+    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED = 2,
+    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED = 3,
+    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED = 4,
+    TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED = 5,
+    TOOL_CALLING_STREAM_EVENT_KIND_ERROR = 6,
+    UNRECOGNIZED = -1
+}
+export declare function toolCallingStreamEventKindFromJSON(object: any): ToolCallingStreamEventKind;
+export declare function toolCallingStreamEventKindToJSON(object: ToolCallingStreamEventKind): string;
 /**
  * ---------------------------------------------------------------------------
  * JSON-typed scalar / composite carrier for tool arguments and results.
@@ -88,6 +110,8 @@ export interface ToolParameter {
     required: boolean;
     /** Allowed values for enum-like parameters. Empty = unconstrained. */
     enumValues: string[];
+    jsonSchema?: string | undefined;
+    defaultValue?: ToolValue | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -100,6 +124,14 @@ export interface ToolDefinition {
     parameters: ToolParameter[];
     /** Optional category for grouping tools in catalogs / UIs. */
     category?: string | undefined;
+    jsonSchema?: string | undefined;
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface ToolDefinition_MetadataEntry {
+    key: string;
+    value: string;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -129,6 +161,8 @@ export interface ToolCall {
     };
     /** Alias for id used by pre-proto SDK surfaces. */
     callId?: string | undefined;
+    createdAtMs: number;
+    rawText?: string | undefined;
 }
 export interface ToolCall_ArgumentsEntry {
     key: string;
@@ -160,6 +194,8 @@ export interface ToolResult {
     };
     /** Alias for tool_call_id used by pre-proto SDK surfaces. */
     callId?: string | undefined;
+    startedAtMs: number;
+    completedAtMs: number;
 }
 export interface ToolResult_ResultEntry {
     key: string;
@@ -222,6 +258,10 @@ export interface ToolCallingOptions {
      * SDK default.
      */
     maxToolCalls?: number | undefined;
+    toolChoice: ToolChoiceMode;
+    forcedToolName?: string | undefined;
+    parallelToolCalls: boolean;
+    requireJsonArguments: boolean;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -241,6 +281,75 @@ export interface ToolCallingResult {
     conversationId?: string | undefined;
     /** Number of tool-call iterations actually used. */
     iterationsUsed: number;
+    errorMessage?: string | undefined;
+    errorCode: number;
+    rawText: string;
+}
+export interface ToolParseRequest {
+    text: string;
+    options?: ToolCallingOptions | undefined;
+}
+export interface ToolParseResult {
+    hasToolCall: boolean;
+    toolCalls: ToolCall[];
+    remainingText: string;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+export interface ToolPromptFormatRequest {
+    /**
+     * User prompt to merge with tool instructions. Empty means return only
+     * the tool-instruction block for the selected format.
+     */
+    userPrompt: string;
+    /** Carries available tools plus format/choice/iteration constraints. */
+    options?: ToolCallingOptions | undefined;
+    /**
+     * Tool results to include when formatting a follow-up prompt after host
+     * execution. Empty means an initial tool-enabled prompt.
+     */
+    toolResults: ToolResult[];
+    /** Assistant text emitted before tool execution, when available. */
+    assistantText?: string | undefined;
+}
+export interface ToolPromptFormatResult {
+    formattedPrompt: string;
+    format: ToolCallFormatName;
+    formatHint: string;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+export interface ToolCallValidationRequest {
+    toolCall?: ToolCall | undefined;
+    /**
+     * Validation uses options.tools as the registry snapshot and honors
+     * portable flags such as require_json_arguments and forced_tool_name.
+     */
+    options?: ToolCallingOptions | undefined;
+}
+export interface ToolCallValidationResult {
+    isValid: boolean;
+    validationErrors: string[];
+    matchedTool?: ToolDefinition | undefined;
+    normalizedArgumentsJson: string;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+export interface ToolCallingStreamEvent {
+    seq: number;
+    timestampUs: number;
+    conversationId: string;
+    kind: ToolCallingStreamEventKind;
+    token: string;
+    toolCall?: ToolCall | undefined;
+    toolResult?: ToolResult | undefined;
+    result?: ToolCallingResult | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+export interface ToolRegistrySnapshot {
+    tools: ToolDefinition[];
+    updatedAtMs: number;
 }
 export declare const ToolValue: {
     encode(message: ToolValue, writer?: _m0.Writer): _m0.Writer;
@@ -290,6 +399,14 @@ export declare const ToolDefinition: {
     create<I extends Exact<DeepPartial<ToolDefinition>, I>>(base?: I): ToolDefinition;
     fromPartial<I extends Exact<DeepPartial<ToolDefinition>, I>>(object: I): ToolDefinition;
 };
+export declare const ToolDefinition_MetadataEntry: {
+    encode(message: ToolDefinition_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolDefinition_MetadataEntry;
+    fromJSON(object: any): ToolDefinition_MetadataEntry;
+    toJSON(message: ToolDefinition_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<ToolDefinition_MetadataEntry>, I>>(base?: I): ToolDefinition_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<ToolDefinition_MetadataEntry>, I>>(object: I): ToolDefinition_MetadataEntry;
+};
 export declare const ToolCall: {
     encode(message: ToolCall, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): ToolCall;
@@ -337,6 +454,70 @@ export declare const ToolCallingResult: {
     toJSON(message: ToolCallingResult): unknown;
     create<I extends Exact<DeepPartial<ToolCallingResult>, I>>(base?: I): ToolCallingResult;
     fromPartial<I extends Exact<DeepPartial<ToolCallingResult>, I>>(object: I): ToolCallingResult;
+};
+export declare const ToolParseRequest: {
+    encode(message: ToolParseRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolParseRequest;
+    fromJSON(object: any): ToolParseRequest;
+    toJSON(message: ToolParseRequest): unknown;
+    create<I extends Exact<DeepPartial<ToolParseRequest>, I>>(base?: I): ToolParseRequest;
+    fromPartial<I extends Exact<DeepPartial<ToolParseRequest>, I>>(object: I): ToolParseRequest;
+};
+export declare const ToolParseResult: {
+    encode(message: ToolParseResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolParseResult;
+    fromJSON(object: any): ToolParseResult;
+    toJSON(message: ToolParseResult): unknown;
+    create<I extends Exact<DeepPartial<ToolParseResult>, I>>(base?: I): ToolParseResult;
+    fromPartial<I extends Exact<DeepPartial<ToolParseResult>, I>>(object: I): ToolParseResult;
+};
+export declare const ToolPromptFormatRequest: {
+    encode(message: ToolPromptFormatRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolPromptFormatRequest;
+    fromJSON(object: any): ToolPromptFormatRequest;
+    toJSON(message: ToolPromptFormatRequest): unknown;
+    create<I extends Exact<DeepPartial<ToolPromptFormatRequest>, I>>(base?: I): ToolPromptFormatRequest;
+    fromPartial<I extends Exact<DeepPartial<ToolPromptFormatRequest>, I>>(object: I): ToolPromptFormatRequest;
+};
+export declare const ToolPromptFormatResult: {
+    encode(message: ToolPromptFormatResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolPromptFormatResult;
+    fromJSON(object: any): ToolPromptFormatResult;
+    toJSON(message: ToolPromptFormatResult): unknown;
+    create<I extends Exact<DeepPartial<ToolPromptFormatResult>, I>>(base?: I): ToolPromptFormatResult;
+    fromPartial<I extends Exact<DeepPartial<ToolPromptFormatResult>, I>>(object: I): ToolPromptFormatResult;
+};
+export declare const ToolCallValidationRequest: {
+    encode(message: ToolCallValidationRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallValidationRequest;
+    fromJSON(object: any): ToolCallValidationRequest;
+    toJSON(message: ToolCallValidationRequest): unknown;
+    create<I extends Exact<DeepPartial<ToolCallValidationRequest>, I>>(base?: I): ToolCallValidationRequest;
+    fromPartial<I extends Exact<DeepPartial<ToolCallValidationRequest>, I>>(object: I): ToolCallValidationRequest;
+};
+export declare const ToolCallValidationResult: {
+    encode(message: ToolCallValidationResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallValidationResult;
+    fromJSON(object: any): ToolCallValidationResult;
+    toJSON(message: ToolCallValidationResult): unknown;
+    create<I extends Exact<DeepPartial<ToolCallValidationResult>, I>>(base?: I): ToolCallValidationResult;
+    fromPartial<I extends Exact<DeepPartial<ToolCallValidationResult>, I>>(object: I): ToolCallValidationResult;
+};
+export declare const ToolCallingStreamEvent: {
+    encode(message: ToolCallingStreamEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingStreamEvent;
+    fromJSON(object: any): ToolCallingStreamEvent;
+    toJSON(message: ToolCallingStreamEvent): unknown;
+    create<I extends Exact<DeepPartial<ToolCallingStreamEvent>, I>>(base?: I): ToolCallingStreamEvent;
+    fromPartial<I extends Exact<DeepPartial<ToolCallingStreamEvent>, I>>(object: I): ToolCallingStreamEvent;
+};
+export declare const ToolRegistrySnapshot: {
+    encode(message: ToolRegistrySnapshot, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolRegistrySnapshot;
+    fromJSON(object: any): ToolRegistrySnapshot;
+    toJSON(message: ToolRegistrySnapshot): unknown;
+    create<I extends Exact<DeepPartial<ToolRegistrySnapshot>, I>>(base?: I): ToolRegistrySnapshot;
+    fromPartial<I extends Exact<DeepPartial<ToolRegistrySnapshot>, I>>(object: I): ToolRegistrySnapshot;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

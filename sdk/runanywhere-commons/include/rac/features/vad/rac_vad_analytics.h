@@ -5,6 +5,10 @@
  * Tracks VAD operations and metrics.
  *
  * Swift Source: Sources/RunAnywhere/Features/VAD/Analytics/VADAnalyticsService.swift
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal`.
+ * Telemetry/analytics implementation owned by commons; SDK-facing VAD
+ * progress crosses via runanywhere.v1.SDKEvent / VADStreamEvent bytes.
  */
 
 #ifndef RAC_VAD_ANALYTICS_H

@@ -7,12 +7,18 @@
  * The sherpa engine owns Sherpa-ONNX-backed STT / TTS / VAD primitives.
  * It only advertises those primitives when both the Sherpa-ONNX prebuilt and
  * the real RAC speech ops are compiled into this target.
+ *
+ * CPP-04: declarative manifest publishes package ownership, availability and
+ * the served primitive set alongside the routing metadata. The manifest mirrors
+ * the conditional ops slots so registry validation accepts both routable and
+ * stub builds.
  */
 
 #include "rac/core/rac_error.h"
 #include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vad/rac_vad_service.h"
+#include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
@@ -45,48 +51,72 @@ static const rac_runtime_id_t k_sherpa_runtimes[] = {
 };
 
 static const uint32_t k_sherpa_formats[] = {
-    3,  /* MODEL_FORMAT_ONNX */
+    RAC_MODEL_FORMAT_ID_ONNX,
+};
+
+static const rac_primitive_t k_sherpa_primitives[] = {
+    RAC_PRIMITIVE_TRANSCRIBE,
+    RAC_PRIMITIVE_SYNTHESIZE,
+    RAC_PRIMITIVE_DETECT_VOICE,
 };
 #endif
 
+static const rac_engine_manifest_t k_sherpa_manifest = {
+    .name             = "sherpa",
+    .display_name     = "Sherpa-ONNX",
+    .version          = nullptr,
+    .package_owner    = "runanywhere",
+    .package_name     = "runanywhere_sherpa",
+    .availability     = RAC_ENGINE_AVAILABILITY_PUBLIC,
+    .priority         =
+#if RAC_SHERPA_ROUTABLE
+        90,
+#else
+        0,
+#endif
+    .capability_flags = 0,
+    .primitives       =
+#if RAC_SHERPA_ROUTABLE
+        k_sherpa_primitives,
+#else
+        nullptr,
+#endif
+    .primitives_count =
+#if RAC_SHERPA_ROUTABLE
+        sizeof(k_sherpa_primitives) / sizeof(k_sherpa_primitives[0]),
+#else
+        0,
+#endif
+    .runtimes         =
+#if RAC_SHERPA_ROUTABLE
+        k_sherpa_runtimes,
+#else
+        nullptr,
+#endif
+    .runtimes_count   =
+#if RAC_SHERPA_ROUTABLE
+        sizeof(k_sherpa_runtimes) / sizeof(k_sherpa_runtimes[0]),
+#else
+        0,
+#endif
+    .formats          =
+#if RAC_SHERPA_ROUTABLE
+        k_sherpa_formats,
+#else
+        nullptr,
+#endif
+    .formats_count    =
+#if RAC_SHERPA_ROUTABLE
+        sizeof(k_sherpa_formats) / sizeof(k_sherpa_formats[0]),
+#else
+        0,
+#endif
+    .reserved_0       = 0,
+    .reserved_1       = 0,
+};
+
 static const rac_engine_vtable_t g_sherpa_engine_vtable = {
-    /* metadata */ {
-        .abi_version      = RAC_PLUGIN_API_VERSION,
-        .name             = "sherpa",
-        .display_name     = "Sherpa-ONNX",
-        .engine_version   = nullptr,
-        .priority         =
-#if RAC_SHERPA_ROUTABLE
-            90,
-#else
-            0,
-#endif
-        .capability_flags = 0,
-        .runtimes         =
-#if RAC_SHERPA_ROUTABLE
-            k_sherpa_runtimes,
-#else
-            nullptr,
-#endif
-        .runtimes_count   =
-#if RAC_SHERPA_ROUTABLE
-            sizeof(k_sherpa_runtimes) / sizeof(k_sherpa_runtimes[0]),
-#else
-            0,
-#endif
-        .formats          =
-#if RAC_SHERPA_ROUTABLE
-            k_sherpa_formats,
-#else
-            nullptr,
-#endif
-        .formats_count    =
-#if RAC_SHERPA_ROUTABLE
-            sizeof(k_sherpa_formats) / sizeof(k_sherpa_formats[0]),
-#else
-            0,
-#endif
-    },
+    /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_sherpa_manifest),
     /* capability_check */ sherpa_capability_check,
     /* on_unload        */ nullptr,
 
@@ -119,7 +149,8 @@ static const rac_engine_vtable_t g_sherpa_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(sherpa) {
-    return &g_sherpa_engine_vtable;
+    return rac_engine_entry_with_manifest(&k_sherpa_manifest,
+                                          &g_sherpa_engine_vtable);
 }
 
 }  // extern "C"

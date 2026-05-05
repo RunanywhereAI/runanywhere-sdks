@@ -15,8 +15,9 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'llm_options.pbenum.dart';
-import 'model_types.pbenum.dart' as $1;
-import 'structured_output.pb.dart' as $0;
+import 'model_types.pbenum.dart' as $2;
+import 'structured_output.pb.dart' as $1;
+import 'tool_calling.pb.dart' as $0;
 
 export 'llm_options.pbenum.dart';
 
@@ -36,13 +37,23 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     $core.double? repetitionPenalty,
     $core.Iterable<$core.String>? stopSequences,
     $core.bool? streamingEnabled,
-    $1.InferenceFramework? preferredFramework,
+    $2.InferenceFramework? preferredFramework,
     $core.String? systemPrompt,
     $core.String? jsonSchema,
     ThinkingTagPattern? thinkingPattern,
     ExecutionTarget? executionTarget,
-    $0.StructuredOutputOptions? structuredOutput,
+    $1.StructuredOutputOptions? structuredOutput,
     $core.bool? enableRealTimeTracking,
+    $fixnum.Int64? seed,
+    $core.double? frequencyPenalty,
+    $core.double? presencePenalty,
+    $core.int? repeatLastN,
+    $core.double? minP,
+    $core.String? grammar,
+    $core.String? responseFormat,
+    $core.bool? echoPrompt,
+    $core.int? nThreads,
+    $0.ToolCallingOptions? toolCalling,
   }) {
     final $result = create();
     if (maxTokens != null) {
@@ -87,6 +98,36 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     if (enableRealTimeTracking != null) {
       $result.enableRealTimeTracking = enableRealTimeTracking;
     }
+    if (seed != null) {
+      $result.seed = seed;
+    }
+    if (frequencyPenalty != null) {
+      $result.frequencyPenalty = frequencyPenalty;
+    }
+    if (presencePenalty != null) {
+      $result.presencePenalty = presencePenalty;
+    }
+    if (repeatLastN != null) {
+      $result.repeatLastN = repeatLastN;
+    }
+    if (minP != null) {
+      $result.minP = minP;
+    }
+    if (grammar != null) {
+      $result.grammar = grammar;
+    }
+    if (responseFormat != null) {
+      $result.responseFormat = responseFormat;
+    }
+    if (echoPrompt != null) {
+      $result.echoPrompt = echoPrompt;
+    }
+    if (nThreads != null) {
+      $result.nThreads = nThreads;
+    }
+    if (toolCalling != null) {
+      $result.toolCalling = toolCalling;
+    }
     return $result;
   }
   LLMGenerationOptions._() : super();
@@ -101,13 +142,23 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     ..a<$core.double>(5, _omitFieldNames ? '' : 'repetitionPenalty', $pb.PbFieldType.OF)
     ..pPS(6, _omitFieldNames ? '' : 'stopSequences')
     ..aOB(7, _omitFieldNames ? '' : 'streamingEnabled')
-    ..e<$1.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $1.InferenceFramework.valueOf, enumValues: $1.InferenceFramework.values)
+    ..e<$2.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $2.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $2.InferenceFramework.valueOf, enumValues: $2.InferenceFramework.values)
     ..aOS(9, _omitFieldNames ? '' : 'systemPrompt')
     ..aOS(10, _omitFieldNames ? '' : 'jsonSchema')
     ..aOM<ThinkingTagPattern>(11, _omitFieldNames ? '' : 'thinkingPattern', subBuilder: ThinkingTagPattern.create)
     ..e<ExecutionTarget>(12, _omitFieldNames ? '' : 'executionTarget', $pb.PbFieldType.OE, defaultOrMaker: ExecutionTarget.EXECUTION_TARGET_UNSPECIFIED, valueOf: ExecutionTarget.valueOf, enumValues: ExecutionTarget.values)
-    ..aOM<$0.StructuredOutputOptions>(13, _omitFieldNames ? '' : 'structuredOutput', subBuilder: $0.StructuredOutputOptions.create)
+    ..aOM<$1.StructuredOutputOptions>(13, _omitFieldNames ? '' : 'structuredOutput', subBuilder: $1.StructuredOutputOptions.create)
     ..aOB(14, _omitFieldNames ? '' : 'enableRealTimeTracking')
+    ..aInt64(15, _omitFieldNames ? '' : 'seed')
+    ..a<$core.double>(16, _omitFieldNames ? '' : 'frequencyPenalty', $pb.PbFieldType.OF)
+    ..a<$core.double>(17, _omitFieldNames ? '' : 'presencePenalty', $pb.PbFieldType.OF)
+    ..a<$core.int>(18, _omitFieldNames ? '' : 'repeatLastN', $pb.PbFieldType.O3)
+    ..a<$core.double>(19, _omitFieldNames ? '' : 'minP', $pb.PbFieldType.OF)
+    ..aOS(20, _omitFieldNames ? '' : 'grammar')
+    ..aOS(21, _omitFieldNames ? '' : 'responseFormat')
+    ..aOB(22, _omitFieldNames ? '' : 'echoPrompt')
+    ..a<$core.int>(23, _omitFieldNames ? '' : 'nThreads', $pb.PbFieldType.O3)
+    ..aOM<$0.ToolCallingOptions>(24, _omitFieldNames ? '' : 'toolCalling', subBuilder: $0.ToolCallingOptions.create)
     ..hasRequiredFields = false
   ;
 
@@ -200,9 +251,9 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
 
   /// Preferred inference framework. UNSPECIFIED = pick automatically.
   @$pb.TagNumber(8)
-  $1.InferenceFramework get preferredFramework => $_getN(7);
+  $2.InferenceFramework get preferredFramework => $_getN(7);
   @$pb.TagNumber(8)
-  set preferredFramework($1.InferenceFramework v) { setField(8, v); }
+  set preferredFramework($2.InferenceFramework v) { setField(8, v); }
   @$pb.TagNumber(8)
   $core.bool hasPreferredFramework() => $_has(7);
   @$pb.TagNumber(8)
@@ -258,15 +309,15 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   /// structured_output.proto so the schema/format details aren't duplicated
   /// here. When set, supersedes the simpler `json_schema` string above.
   @$pb.TagNumber(13)
-  $0.StructuredOutputOptions get structuredOutput => $_getN(12);
+  $1.StructuredOutputOptions get structuredOutput => $_getN(12);
   @$pb.TagNumber(13)
-  set structuredOutput($0.StructuredOutputOptions v) { setField(13, v); }
+  set structuredOutput($1.StructuredOutputOptions v) { setField(13, v); }
   @$pb.TagNumber(13)
   $core.bool hasStructuredOutput() => $_has(12);
   @$pb.TagNumber(13)
   void clearStructuredOutput() => clearField(13);
   @$pb.TagNumber(13)
-  $0.StructuredOutputOptions ensureStructuredOutput() => $_ensure(12);
+  $1.StructuredOutputOptions ensureStructuredOutput() => $_ensure(12);
 
   /// Enable per-token/cost dashboard tracking for SDKs that surface live
   /// generation telemetry. No-op for backends without a telemetry sink.
@@ -278,6 +329,108 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   $core.bool hasEnableRealTimeTracking() => $_has(13);
   @$pb.TagNumber(14)
   void clearEnableRealTimeTracking() => clearField(14);
+
+  /// Deterministic sampling seed. 0 = backend/default random seed.
+  @$pb.TagNumber(15)
+  $fixnum.Int64 get seed => $_getI64(14);
+  @$pb.TagNumber(15)
+  set seed($fixnum.Int64 v) { $_setInt64(14, v); }
+  @$pb.TagNumber(15)
+  $core.bool hasSeed() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearSeed() => clearField(15);
+
+  /// OpenAI-compatible sampling penalties. 0.0 = disabled.
+  @$pb.TagNumber(16)
+  $core.double get frequencyPenalty => $_getN(15);
+  @$pb.TagNumber(16)
+  set frequencyPenalty($core.double v) { $_setFloat(15, v); }
+  @$pb.TagNumber(16)
+  $core.bool hasFrequencyPenalty() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearFrequencyPenalty() => clearField(16);
+
+  @$pb.TagNumber(17)
+  $core.double get presencePenalty => $_getN(16);
+  @$pb.TagNumber(17)
+  set presencePenalty($core.double v) { $_setFloat(16, v); }
+  @$pb.TagNumber(17)
+  $core.bool hasPresencePenalty() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearPresencePenalty() => clearField(17);
+
+  /// Repeat-penalty lookback window. 0 = backend default.
+  @$pb.TagNumber(18)
+  $core.int get repeatLastN => $_getIZ(17);
+  @$pb.TagNumber(18)
+  set repeatLastN($core.int v) { $_setSignedInt32(17, v); }
+  @$pb.TagNumber(18)
+  $core.bool hasRepeatLastN() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearRepeatLastN() => clearField(18);
+
+  /// Minimum probability sampling. 0.0 = disabled.
+  @$pb.TagNumber(19)
+  $core.double get minP => $_getN(18);
+  @$pb.TagNumber(19)
+  set minP($core.double v) { $_setFloat(18, v); }
+  @$pb.TagNumber(19)
+  $core.bool hasMinP() => $_has(18);
+  @$pb.TagNumber(19)
+  void clearMinP() => clearField(19);
+
+  /// Grammar or constrained-decoding rule text (GBNF/regex/backend-specific).
+  @$pb.TagNumber(20)
+  $core.String get grammar => $_getSZ(19);
+  @$pb.TagNumber(20)
+  set grammar($core.String v) { $_setString(19, v); }
+  @$pb.TagNumber(20)
+  $core.bool hasGrammar() => $_has(19);
+  @$pb.TagNumber(20)
+  void clearGrammar() => clearField(20);
+
+  /// Caller-visible format hint: "text", "json_object", "json_schema", etc.
+  @$pb.TagNumber(21)
+  $core.String get responseFormat => $_getSZ(20);
+  @$pb.TagNumber(21)
+  set responseFormat($core.String v) { $_setString(20, v); }
+  @$pb.TagNumber(21)
+  $core.bool hasResponseFormat() => $_has(20);
+  @$pb.TagNumber(21)
+  void clearResponseFormat() => clearField(21);
+
+  /// Include prompt text in the result/stream when the backend supports echo.
+  @$pb.TagNumber(22)
+  $core.bool get echoPrompt => $_getBF(21);
+  @$pb.TagNumber(22)
+  set echoPrompt($core.bool v) { $_setBool(21, v); }
+  @$pb.TagNumber(22)
+  $core.bool hasEchoPrompt() => $_has(21);
+  @$pb.TagNumber(22)
+  void clearEchoPrompt() => clearField(22);
+
+  /// Per-request backend thread hint. 0 = backend/runtime default.
+  @$pb.TagNumber(23)
+  $core.int get nThreads => $_getIZ(22);
+  @$pb.TagNumber(23)
+  set nThreads($core.int v) { $_setSignedInt32(22, v); }
+  @$pb.TagNumber(23)
+  $core.bool hasNThreads() => $_has(22);
+  @$pb.TagNumber(23)
+  void clearNThreads() => clearField(23);
+
+  /// Tool-calling contract for this generation. The SDK owns executor
+  /// functions; proto carries only definitions and parser options.
+  @$pb.TagNumber(24)
+  $0.ToolCallingOptions get toolCalling => $_getN(23);
+  @$pb.TagNumber(24)
+  set toolCalling($0.ToolCallingOptions v) { setField(24, v); }
+  @$pb.TagNumber(24)
+  $core.bool hasToolCalling() => $_has(23);
+  @$pb.TagNumber(24)
+  void clearToolCalling() => clearField(24);
+  @$pb.TagNumber(24)
+  $0.ToolCallingOptions ensureToolCalling() => $_ensure(23);
 }
 
 /// ---------------------------------------------------------------------------
@@ -302,9 +455,15 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     $core.String? jsonOutput,
     PerformanceMetrics? performance,
     ExecutionTarget? executedOn,
-    $0.StructuredOutputValidation? structuredOutputValidation,
+    $1.StructuredOutputValidation? structuredOutputValidation,
     $core.int? totalTokens,
     $core.String? errorMessage,
+    $core.int? errorCode,
+    $core.int? cachedPromptTokens,
+    $fixnum.Int64? promptEvalTimeMs,
+    $fixnum.Int64? decodeTimeMs,
+    $core.Iterable<$0.ToolCall>? toolCalls,
+    $core.Iterable<$0.ToolResult>? toolResults,
   }) {
     final $result = create();
     if (text != null) {
@@ -361,6 +520,24 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    if (cachedPromptTokens != null) {
+      $result.cachedPromptTokens = cachedPromptTokens;
+    }
+    if (promptEvalTimeMs != null) {
+      $result.promptEvalTimeMs = promptEvalTimeMs;
+    }
+    if (decodeTimeMs != null) {
+      $result.decodeTimeMs = decodeTimeMs;
+    }
+    if (toolCalls != null) {
+      $result.toolCalls.addAll(toolCalls);
+    }
+    if (toolResults != null) {
+      $result.toolResults.addAll(toolResults);
+    }
     return $result;
   }
   LLMGenerationResult._() : super();
@@ -383,9 +560,15 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     ..aOS(13, _omitFieldNames ? '' : 'jsonOutput')
     ..aOM<PerformanceMetrics>(14, _omitFieldNames ? '' : 'performance', subBuilder: PerformanceMetrics.create)
     ..e<ExecutionTarget>(15, _omitFieldNames ? '' : 'executedOn', $pb.PbFieldType.OE, defaultOrMaker: ExecutionTarget.EXECUTION_TARGET_UNSPECIFIED, valueOf: ExecutionTarget.valueOf, enumValues: ExecutionTarget.values)
-    ..aOM<$0.StructuredOutputValidation>(16, _omitFieldNames ? '' : 'structuredOutputValidation', subBuilder: $0.StructuredOutputValidation.create)
+    ..aOM<$1.StructuredOutputValidation>(16, _omitFieldNames ? '' : 'structuredOutputValidation', subBuilder: $1.StructuredOutputValidation.create)
     ..a<$core.int>(17, _omitFieldNames ? '' : 'totalTokens', $pb.PbFieldType.O3)
     ..aOS(18, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(19, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..a<$core.int>(20, _omitFieldNames ? '' : 'cachedPromptTokens', $pb.PbFieldType.O3)
+    ..aInt64(21, _omitFieldNames ? '' : 'promptEvalTimeMs')
+    ..aInt64(22, _omitFieldNames ? '' : 'decodeTimeMs')
+    ..pc<$0.ToolCall>(23, _omitFieldNames ? '' : 'toolCalls', $pb.PbFieldType.PM, subBuilder: $0.ToolCall.create)
+    ..pc<$0.ToolResult>(24, _omitFieldNames ? '' : 'toolResults', $pb.PbFieldType.PM, subBuilder: $0.ToolResult.create)
     ..hasRequiredFields = false
   ;
 
@@ -571,15 +754,15 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   /// Structured-output validation details, when a structured-output request
   /// was used. Mirrors the Swift/RN validation payload.
   @$pb.TagNumber(16)
-  $0.StructuredOutputValidation get structuredOutputValidation => $_getN(15);
+  $1.StructuredOutputValidation get structuredOutputValidation => $_getN(15);
   @$pb.TagNumber(16)
-  set structuredOutputValidation($0.StructuredOutputValidation v) { setField(16, v); }
+  set structuredOutputValidation($1.StructuredOutputValidation v) { setField(16, v); }
   @$pb.TagNumber(16)
   $core.bool hasStructuredOutputValidation() => $_has(15);
   @$pb.TagNumber(16)
   void clearStructuredOutputValidation() => clearField(16);
   @$pb.TagNumber(16)
-  $0.StructuredOutputValidation ensureStructuredOutputValidation() => $_ensure(15);
+  $1.StructuredOutputValidation ensureStructuredOutputValidation() => $_ensure(15);
 
   /// Total tokens consumed (prompt + completion). Some C ABI paths expose
   /// this directly; consumers may also compute it from the per-field counts.
@@ -602,6 +785,340 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(17);
   @$pb.TagNumber(18)
   void clearErrorMessage() => clearField(18);
+
+  /// Numeric backend status code when a result envelope carries an error.
+  @$pb.TagNumber(19)
+  $core.int get errorCode => $_getIZ(18);
+  @$pb.TagNumber(19)
+  set errorCode($core.int v) { $_setSignedInt32(18, v); }
+  @$pb.TagNumber(19)
+  $core.bool hasErrorCode() => $_has(18);
+  @$pb.TagNumber(19)
+  void clearErrorCode() => clearField(19);
+
+  /// Prompt/cache accounting surfaced by llama.cpp/CoreML-style backends.
+  @$pb.TagNumber(20)
+  $core.int get cachedPromptTokens => $_getIZ(19);
+  @$pb.TagNumber(20)
+  set cachedPromptTokens($core.int v) { $_setSignedInt32(19, v); }
+  @$pb.TagNumber(20)
+  $core.bool hasCachedPromptTokens() => $_has(19);
+  @$pb.TagNumber(20)
+  void clearCachedPromptTokens() => clearField(20);
+
+  @$pb.TagNumber(21)
+  $fixnum.Int64 get promptEvalTimeMs => $_getI64(20);
+  @$pb.TagNumber(21)
+  set promptEvalTimeMs($fixnum.Int64 v) { $_setInt64(20, v); }
+  @$pb.TagNumber(21)
+  $core.bool hasPromptEvalTimeMs() => $_has(20);
+  @$pb.TagNumber(21)
+  void clearPromptEvalTimeMs() => clearField(21);
+
+  @$pb.TagNumber(22)
+  $fixnum.Int64 get decodeTimeMs => $_getI64(21);
+  @$pb.TagNumber(22)
+  set decodeTimeMs($fixnum.Int64 v) { $_setInt64(21, v); }
+  @$pb.TagNumber(22)
+  $core.bool hasDecodeTimeMs() => $_has(21);
+  @$pb.TagNumber(22)
+  void clearDecodeTimeMs() => clearField(22);
+
+  /// Tool calls parsed from the final assistant response, if any.
+  @$pb.TagNumber(23)
+  $core.List<$0.ToolCall> get toolCalls => $_getList(22);
+
+  /// Tool results incorporated during auto-execute loops.
+  @$pb.TagNumber(24)
+  $core.List<$0.ToolResult> get toolResults => $_getList(23);
+}
+
+/// Request envelope for one non-streaming LLM generation call. This is the
+/// proto-owned DTO SDKs can use instead of parallel prompt/options tuples.
+class LLMGenerationRequest extends $pb.GeneratedMessage {
+  factory LLMGenerationRequest({
+    $core.String? requestId,
+    $core.String? modelId,
+    $core.String? prompt,
+    LLMGenerationOptions? options,
+    $core.Iterable<$core.String>? contextChunks,
+    $core.Map<$core.String, $core.String>? metadata,
+    $core.String? conversationId,
+  }) {
+    final $result = create();
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (modelId != null) {
+      $result.modelId = modelId;
+    }
+    if (prompt != null) {
+      $result.prompt = prompt;
+    }
+    if (options != null) {
+      $result.options = options;
+    }
+    if (contextChunks != null) {
+      $result.contextChunks.addAll(contextChunks);
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
+    }
+    if (conversationId != null) {
+      $result.conversationId = conversationId;
+    }
+    return $result;
+  }
+  LLMGenerationRequest._() : super();
+  factory LLMGenerationRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory LLMGenerationRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'LLMGenerationRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aOS(2, _omitFieldNames ? '' : 'modelId')
+    ..aOS(3, _omitFieldNames ? '' : 'prompt')
+    ..aOM<LLMGenerationOptions>(4, _omitFieldNames ? '' : 'options', subBuilder: LLMGenerationOptions.create)
+    ..pPS(5, _omitFieldNames ? '' : 'contextChunks')
+    ..m<$core.String, $core.String>(6, _omitFieldNames ? '' : 'metadata', entryClassName: 'LLMGenerationRequest.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
+    ..aOS(7, _omitFieldNames ? '' : 'conversationId')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  LLMGenerationRequest clone() => LLMGenerationRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  LLMGenerationRequest copyWith(void Function(LLMGenerationRequest) updates) => super.copyWith((message) => updates(message as LLMGenerationRequest)) as LLMGenerationRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LLMGenerationRequest create() => LLMGenerationRequest._();
+  LLMGenerationRequest createEmptyInstance() => create();
+  static $pb.PbList<LLMGenerationRequest> createRepeated() => $pb.PbList<LLMGenerationRequest>();
+  @$core.pragma('dart2js:noInline')
+  static LLMGenerationRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<LLMGenerationRequest>(create);
+  static LLMGenerationRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get modelId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set modelId($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasModelId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearModelId() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get prompt => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set prompt($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasPrompt() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPrompt() => clearField(3);
+
+  @$pb.TagNumber(4)
+  LLMGenerationOptions get options => $_getN(3);
+  @$pb.TagNumber(4)
+  set options(LLMGenerationOptions v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasOptions() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearOptions() => clearField(4);
+  @$pb.TagNumber(4)
+  LLMGenerationOptions ensureOptions() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  $core.List<$core.String> get contextChunks => $_getList(4);
+
+  @$pb.TagNumber(6)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(5);
+
+  @$pb.TagNumber(7)
+  $core.String get conversationId => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set conversationId($core.String v) { $_setString(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasConversationId() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearConversationId() => clearField(7);
+}
+
+class LLMGenerationStatus extends $pb.GeneratedMessage {
+  factory LLMGenerationStatus({
+    $core.String? requestId,
+    LLMGenerationState? state,
+    $core.int? promptTokensProcessed,
+    $core.int? completionTokensGenerated,
+    $core.double? progress,
+    $fixnum.Int64? elapsedMs,
+    $core.String? message,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (state != null) {
+      $result.state = state;
+    }
+    if (promptTokensProcessed != null) {
+      $result.promptTokensProcessed = promptTokensProcessed;
+    }
+    if (completionTokensGenerated != null) {
+      $result.completionTokensGenerated = completionTokensGenerated;
+    }
+    if (progress != null) {
+      $result.progress = progress;
+    }
+    if (elapsedMs != null) {
+      $result.elapsedMs = elapsedMs;
+    }
+    if (message != null) {
+      $result.message = message;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  LLMGenerationStatus._() : super();
+  factory LLMGenerationStatus.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory LLMGenerationStatus.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'LLMGenerationStatus', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..e<LLMGenerationState>(2, _omitFieldNames ? '' : 'state', $pb.PbFieldType.OE, defaultOrMaker: LLMGenerationState.LLM_GENERATION_STATE_UNSPECIFIED, valueOf: LLMGenerationState.valueOf, enumValues: LLMGenerationState.values)
+    ..a<$core.int>(3, _omitFieldNames ? '' : 'promptTokensProcessed', $pb.PbFieldType.O3)
+    ..a<$core.int>(4, _omitFieldNames ? '' : 'completionTokensGenerated', $pb.PbFieldType.O3)
+    ..a<$core.double>(5, _omitFieldNames ? '' : 'progress', $pb.PbFieldType.OF)
+    ..aInt64(6, _omitFieldNames ? '' : 'elapsedMs')
+    ..aOS(7, _omitFieldNames ? '' : 'message')
+    ..aOS(8, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(9, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  LLMGenerationStatus clone() => LLMGenerationStatus()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  LLMGenerationStatus copyWith(void Function(LLMGenerationStatus) updates) => super.copyWith((message) => updates(message as LLMGenerationStatus)) as LLMGenerationStatus;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static LLMGenerationStatus create() => LLMGenerationStatus._();
+  LLMGenerationStatus createEmptyInstance() => create();
+  static $pb.PbList<LLMGenerationStatus> createRepeated() => $pb.PbList<LLMGenerationStatus>();
+  @$core.pragma('dart2js:noInline')
+  static LLMGenerationStatus getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<LLMGenerationStatus>(create);
+  static LLMGenerationStatus? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  LLMGenerationState get state => $_getN(1);
+  @$pb.TagNumber(2)
+  set state(LLMGenerationState v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasState() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearState() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get promptTokensProcessed => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set promptTokensProcessed($core.int v) { $_setSignedInt32(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasPromptTokensProcessed() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearPromptTokensProcessed() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get completionTokensGenerated => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set completionTokensGenerated($core.int v) { $_setSignedInt32(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasCompletionTokensGenerated() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCompletionTokensGenerated() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.double get progress => $_getN(4);
+  @$pb.TagNumber(5)
+  set progress($core.double v) { $_setFloat(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasProgress() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearProgress() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get elapsedMs => $_getI64(5);
+  @$pb.TagNumber(6)
+  set elapsedMs($fixnum.Int64 v) { $_setInt64(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasElapsedMs() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearElapsedMs() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get message => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set message($core.String v) { $_setString(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasMessage() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearMessage() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get errorMessage => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set errorMessage($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasErrorMessage() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearErrorMessage() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get errorCode => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set errorCode($core.int v) { $_setSignedInt32(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasErrorCode() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearErrorCode() => clearField(9);
 }
 
 /// ---------------------------------------------------------------------------
@@ -617,7 +1134,7 @@ class LLMConfiguration extends $pb.GeneratedMessage {
     $core.String? systemPrompt,
     $core.bool? streaming,
     $core.String? modelId,
-    $1.InferenceFramework? preferredFramework,
+    $2.InferenceFramework? preferredFramework,
   }) {
     final $result = create();
     if (contextLength != null) {
@@ -654,7 +1171,7 @@ class LLMConfiguration extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'systemPrompt')
     ..aOB(5, _omitFieldNames ? '' : 'streaming')
     ..aOS(6, _omitFieldNames ? '' : 'modelId')
-    ..e<$1.InferenceFramework>(7, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $1.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $1.InferenceFramework.valueOf, enumValues: $1.InferenceFramework.values)
+    ..e<$2.InferenceFramework>(7, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $2.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $2.InferenceFramework.valueOf, enumValues: $2.InferenceFramework.values)
     ..hasRequiredFields = false
   ;
 
@@ -743,9 +1260,9 @@ class LLMConfiguration extends $pb.GeneratedMessage {
   /// Preferred inference framework for this component. UNSPECIFIED / absent
   /// means "auto".
   @$pb.TagNumber(7)
-  $1.InferenceFramework get preferredFramework => $_getN(6);
+  $2.InferenceFramework get preferredFramework => $_getN(6);
   @$pb.TagNumber(7)
-  set preferredFramework($1.InferenceFramework v) { setField(7, v); }
+  set preferredFramework($2.InferenceFramework v) { setField(7, v); }
   @$pb.TagNumber(7)
   $core.bool hasPreferredFramework() => $_has(6);
   @$pb.TagNumber(7)

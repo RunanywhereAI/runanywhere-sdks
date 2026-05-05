@@ -2,9 +2,30 @@
  * HybridRunAnywhereCore+Tools.cpp
  *
  * Domain implementation for HybridRunAnywhereCore.
+ *
+ * V2 bridge classification (CPP-09 — see docs/CPP_PROTO_OWNERSHIP.md
+ * "Bridge Layer Audit"):
+ *   - SDK-facing pass-through: toolParseProto, toolFormatPromptProto,
+ *     toolValidateProto, structuredOutputParseProto,
+ *     structuredOutputPreparePromptProto, structuredOutputValidateProto,
+ *     ragCreatePipelineProto, ragDestroyPipelineProto, ragIngestProto,
+ *     ragQueryProto, ragClearProto, ragStatsProto,
+ *     embeddingsEmbedBatchProto.
+ *   - Needs migration (delete after RN TS migration to *Proto siblings):
+ *     ragCreatePipeline, ragDestroyPipeline, ragAddDocument,
+ *     ragAddDocumentsBatch, ragQuery, ragClearDocuments,
+ *     ragGetDocumentCount, ragGetStatistics — these wrap the non-proto
+ *     `rac_rag_pipeline_*` struct ABI through RAGBridge. The proto
+ *     siblings already exist on the Nitro spec; remove these once TS
+ *     callers move.
+ *   - Bridge limitation tracked on commons backlog: embeddingsCreateProto
+ *     still calls `rac_embeddings_create` / `rac_embeddings_initialize`
+ *     because no `rac_embeddings_create_proto` lifecycle ABI exists yet.
  */
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "HybridRunAnywhereCore+ProtoCompat.hpp"
+
+#include <stdexcept>
 
 namespace margelo::nitro::runanywhere {
 
@@ -49,6 +70,47 @@ std::shared_ptr<ArrayBuffer> copyToolsProtoBuffer(rac_proto_buffer_t& protoBuffe
     auto buffer = ArrayBuffer::copy(protoBuffer.data, protoBuffer.size);
     proto_compat::freeBuffer(&protoBuffer);
     return buffer;
+}
+
+std::shared_ptr<ArrayBuffer> copyRequiredToolsProtoBuffer(rac_proto_buffer_t& protoBuffer,
+                                                          const char* operation) {
+    if (protoBuffer.status != RAC_SUCCESS) {
+        std::string error = protoBuffer.error_message
+            ? protoBuffer.error_message
+            : "unknown proto error";
+        LOGE("%s proto error: %s", operation, error.c_str());
+        proto_compat::freeBuffer(&protoBuffer);
+        throw std::runtime_error(std::string(operation) + ": " + error);
+    }
+    if (!protoBuffer.data || protoBuffer.size == 0) {
+        proto_compat::freeBuffer(&protoBuffer);
+        throw std::runtime_error(std::string(operation) + ": empty proto result");
+    }
+    auto buffer = ArrayBuffer::copy(protoBuffer.data, protoBuffer.size);
+    proto_compat::freeBuffer(&protoBuffer);
+    return buffer;
+}
+
+std::shared_ptr<ArrayBuffer> callCommonsBufferProto(const std::vector<uint8_t>& bytes,
+                                                    const char* symbolName,
+                                                    const char* operation) {
+    auto fn = proto_compat::symbol<proto_compat::ProtoBufferCallFn>(symbolName);
+    if (!fn) {
+        LOGE("%s: %s unavailable", operation, symbolName);
+        throw std::runtime_error(
+            std::string(operation) + ": commons export " + symbolName + " unavailable");
+    }
+    rac_proto_buffer_t out;
+    proto_compat::initBuffer(&out);
+    const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
+    rac_result_t rc = fn(data, bytes.size(), &out);
+    if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+        LOGE("%s: rc=%d", operation, rc);
+        proto_compat::freeBuffer(&out);
+        throw std::runtime_error(
+            std::string(operation) + ": commons call failed rc=" + std::to_string(rc));
+    }
+    return copyRequiredToolsProtoBuffer(out, operation);
 }
 
 std::shared_ptr<ArrayBuffer> callRagBufferProto(const std::vector<uint8_t>& bytes,
@@ -123,54 +185,68 @@ double doubleFromHandle(rac_handle_t handle) {
 // Tool Calling
 //
 // ARCHITECTURE:
-// - Commons C ABI (rac_tool_call_*): SINGLE SOURCE OF TRUTH for parsing and
-//   prompt formatting. Shared by all SDK frontends (Swift/Kotlin/Flutter/Web/RN).
-// - ToolCallingBridge: Thin C++ wrapper that marshals std::string <-> C ABI.
+// - Commons C ABI (rac_tool_call_*): SINGLE SOURCE OF TRUTH for parsing,
+//   prompt formatting, and validation. Shared by all SDK frontends.
+// - Nitro proto-byte methods expose generated request/result envelopes to TS.
 // - TypeScript (RunAnywhere+ToolCalling.ts): Registry, executor storage,
 //   orchestration. Executors stay in TS because they need JS APIs (fetch, etc.).
 // ============================================================================
 
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::parseToolCallFromOutput(const std::string& llmOutput) {
-    return Promise<std::string>::async([llmOutput]() -> std::string {
-        LOGD("parseToolCallFromOutput: input length=%zu", llmOutput.length());
-        return ::runanywhere::bridges::ToolCallingBridge::shared().parseToolCall(llmOutput);
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::toolParseProto(const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyToolsArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callCommonsBufferProto(bytes, "rac_tool_call_parse_proto", "toolParseProto");
     });
 }
 
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::formatToolsForPrompt(
-    const std::string& toolsJson,
-    const std::string& format
-) {
-    return Promise<std::string>::async([toolsJson, format]() -> std::string {
-        LOGD("formatToolsForPrompt: tools length=%zu, format=%s", toolsJson.length(), format.c_str());
-        return ::runanywhere::bridges::ToolCallingBridge::shared().formatToolsPrompt(toolsJson, format);
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::toolFormatPromptProto(const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyToolsArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callCommonsBufferProto(
+            bytes, "rac_tool_call_format_prompt_proto", "toolFormatPromptProto");
     });
 }
 
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::buildInitialPrompt(
-    const std::string& userPrompt,
-    const std::string& toolsJson,
-    const std::string& optionsJson
-) {
-    return Promise<std::string>::async([userPrompt, toolsJson, optionsJson]() -> std::string {
-        LOGD("buildInitialPrompt: prompt length=%zu, tools length=%zu",
-             userPrompt.length(), toolsJson.length());
-        return ::runanywhere::bridges::ToolCallingBridge::shared().buildInitialPrompt(
-            userPrompt, toolsJson, optionsJson);
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::toolValidateProto(const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyToolsArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callCommonsBufferProto(
+            bytes, "rac_tool_call_validate_proto", "toolValidateProto");
     });
 }
 
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::buildFollowupPrompt(
-    const std::string& originalPrompt,
-    const std::string& toolsPrompt,
-    const std::string& toolName,
-    const std::string& resultJson,
-    bool keepToolsAvailable
-) {
-    return Promise<std::string>::async([originalPrompt, toolsPrompt, toolName, resultJson, keepToolsAvailable]() -> std::string {
-        LOGD("buildFollowupPrompt: tool=%s, keepTools=%d", toolName.c_str(), keepToolsAvailable);
-        return ::runanywhere::bridges::ToolCallingBridge::shared().buildFollowupPrompt(
-            originalPrompt, toolsPrompt, toolName, resultJson, keepToolsAvailable);
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::structuredOutputParseProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyToolsArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callCommonsBufferProto(
+            bytes, "rac_structured_output_parse_proto", "structuredOutputParseProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::structuredOutputPreparePromptProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyToolsArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callCommonsBufferProto(
+            bytes,
+            "rac_structured_output_prepare_prompt_proto",
+            "structuredOutputPreparePromptProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::structuredOutputValidateProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyToolsArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callCommonsBufferProto(
+            bytes, "rac_structured_output_validate_proto", "structuredOutputValidateProto");
     });
 }
 

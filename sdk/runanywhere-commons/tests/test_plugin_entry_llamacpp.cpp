@@ -14,6 +14,7 @@
 #include <cstdio>
 
 #include "rac/core/rac_error.h"
+#include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry_llamacpp.h"
 #include "rac/features/llm/rac_llm_service.h"
@@ -50,6 +51,14 @@ int main() {
     }
     if (rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT) != vt) {
         std::fprintf(stderr, "rac_plugin_find did not return llama.cpp vtable\n");
+        return 1;
+    }
+    const rac_engine_manifest_t* manifest = rac_engine_manifest_find("llamacpp");
+    if (manifest == nullptr ||
+        manifest->availability != RAC_ENGINE_AVAILABILITY_PUBLIC ||
+        manifest->primitives_count != 1 ||
+        manifest->primitives[0] != RAC_PRIMITIVE_GENERATE_TEXT) {
+        std::fprintf(stderr, "llama.cpp manifest was not published correctly\n");
         return 1;
     }
     rac_plugin_unregister("llamacpp");

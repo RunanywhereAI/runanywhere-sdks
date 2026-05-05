@@ -4,7 +4,10 @@
  *
  * Simple pub/sub for SDK events.
  *
- * Mirrors Swift EventBus.swift exactly.
+ * Mirrors Swift EventBus.swift exactly: subscribes to the canonical native
+ * SDKEvent stream via rac_sdk_event_subscribe, decodes the proto bytes, and
+ * fans them into a Kotlin MutableSharedFlow so consumers see lifecycle,
+ * model, error, and other events emitted by C++ commons.
  */
 
 package com.runanywhere.sdk.public.events
@@ -39,7 +42,10 @@ import kotlinx.coroutines.flow.filter
  * }
  * ```
  *
- * Mirrors Swift EventBus exactly.
+ * Mirrors Swift EventBus exactly. Native SDK events emitted by C++ commons
+ * (model lifecycle, errors, init, device, etc.) flow into this bus through
+ * the [start] / [stop] lifecycle hooks called by the platform bridge during
+ * SDK init/shutdown.
  */
 object EventBus {
     // MARK: - Publishers
@@ -55,14 +61,50 @@ object EventBus {
     /** All events flow */
     val events: Flow<SDKEvent> = _events.asSharedFlow()
 
+    // MARK: - Native subscription lifecycle
+
+    /**
+     * Start the native SDK event subscription. Idempotent: calling twice
+     * is a no-op. Invoked by the platform bridge after C++ commons is
+     * initialized so native events are delivered into [events].
+     */
+    fun start() {
+        startNativeSubscription()
+    }
+
+    /**
+     * Stop the native SDK event subscription. Idempotent: calling twice
+     * is a no-op. Invoked by the platform bridge during shutdown so the
+     * native side releases the subscription slot.
+     */
+    fun stop() {
+        stopNativeSubscription()
+    }
+
+    /**
+     * Internal entry point used by the platform bridge to push a native
+     * SDKEvent into the bus. Non-suspending; safe to call from any
+     * thread (including the JNI callback thread).
+     */
+    internal fun emitFromNative(event: SDKEvent) {
+        _events.tryEmit(event)
+    }
+
     // MARK: - Publishing
 
     /**
      * Publish an event to all subscribers.
+     *
+     * Mirrors Swift: tries the native publish path first so the canonical
+     * stream sees the event (and re-delivers it back through the
+     * subscription); falls back to a direct local emit if native is not
+     * available (e.g. native lib not loaded).
      */
     fun publish(event: SDKEvent) {
         logger.debug("Publishing event: ${event.id} (category: ${event.category})")
-        _events.tryEmit(event)
+        if (!publishToNative(event)) {
+            _events.tryEmit(event)
+        }
     }
 
     // MARK: - Filtered Subscriptions
@@ -125,3 +167,32 @@ object EventBus {
     val ragEvents: Flow<SDKEvent>
         get() = events(EVENT_CATEGORY_RAG)
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Platform-specific native bridge hooks (expect/actual pattern)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Subscribe to the native canonical SDKEvent stream and forward decoded
+ * events into [EventBus.emitFromNative]. JVM/Android implementation calls
+ * `CppBridgeSDKEventStream.subscribe` (rac_sdk_event_subscribe).
+ *
+ * Idempotent: implementations must guard against double-subscribe.
+ */
+internal expect fun startNativeSubscription()
+
+/**
+ * Tear down any active native SDKEvent subscription created by
+ * [startNativeSubscription]. Idempotent.
+ */
+internal expect fun stopNativeSubscription()
+
+/**
+ * Publish a Kotlin-side event to the native event stream so it is fanned
+ * out through the canonical pipeline (telemetry + native subscribers).
+ *
+ * @return true when the native publish succeeded; false when the native
+ * library is unavailable or the publish failed and the caller should
+ * fall back to a direct local emit.
+ */
+internal expect fun publishToNative(event: SDKEvent): Boolean

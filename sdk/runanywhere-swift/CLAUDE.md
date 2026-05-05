@@ -130,7 +130,7 @@ Proto-generated types (`RA*` prefix from `.pb.swift` files in `Generated/`) are 
 
 Models stored at `Documents/RunAnywhere/Models/{framework}/{modelId}/`. Path computation delegated to C++ via `rac_model_paths_*`. Model registry is a Swift actor wrapping the C++ global registry. Model file type detection: `.gguf`/`.bin` → LlamaCPP, `.onnx`/`.ort` → ONNX, `.mlmodelc`/`.mlpackage` → CoreML, `.safetensors`/`.json` → MetalRT.
 
-Download orchestration in `DownloadAdapter` runs `rac_http_download_execute` on a concurrent `DispatchQueue`. Cancellation via `OSAllocatedUnfairLock<Bool>` polled by the C++ progress callback.
+Download orchestration runs `rac_http_download_execute` on a concurrent `DispatchQueue`. Cancellation via `OSAllocatedUnfairLock<Bool>` polled by the C++ progress callback.
 
 ### Security
 
@@ -188,7 +188,7 @@ Configured in `.periphery.yml`. Scans `RunAnywhere`, `ONNXRuntime`, `LlamaCPPRun
 | `Sources/RunAnywhere/Public/RunAnywhere.swift` | SDK entry point, two-phase init |
 | `Sources/RunAnywhere/Foundation/Bridge/CppBridge.swift` | Bridge coordinator, init sequence, shutdown |
 | `Sources/RunAnywhere/Foundation/Bridge/Extensions/` | ~26 CppBridge domain extensions |
-| `Sources/RunAnywhere/Adapters/` | LLMStreamAdapter, VoiceAgentStreamAdapter, HTTPClientAdapter, DownloadAdapter |
+| `Sources/RunAnywhere/Adapters/` | LLMStreamAdapter, VoiceAgentStreamAdapter, HTTPClientAdapter |
 | `Sources/RunAnywhere/HttpTransport/URLSessionHttpTransport.swift` | HTTP vtable (Apple URLSession) |
 | `Sources/RunAnywhere/Public/Extensions/` | All RunAnywhere+{Feature}.swift public API extensions |
 | `Sources/RunAnywhere/Generated/` | Proto-generated .pb.swift files (do not edit) |
@@ -212,6 +212,6 @@ Configured in `.periphery.yml`. Scans `RunAnywhere`, `ONNXRuntime`, `LlamaCPPRun
 | WhisperKit | CoreML speech recognition |
 | swift-protobuf | Proto-generated type support |
 
-## Stub Features
+## Unsupported Features
 
-`SpeakerDiarization` and `WakeWord` are stub facades — all methods throw `.featureNotAvailable`. The C ABI exists in commons but is not yet wired through `CRACommons`.
+Speaker diarization and wake-word detection are not yet available as SDK facades. The C ABI stubs exist in commons but are not exposed through the Swift SDK.

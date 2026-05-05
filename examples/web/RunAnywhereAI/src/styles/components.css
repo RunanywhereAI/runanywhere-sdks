@@ -2294,3 +2294,56 @@ input[type="range"]::-webkit-slider-thumb {
   line-height: 1.4;
   white-space: pre-wrap;
 }
+
+/* Feature unavailable placeholder — used by views whose canonical SDK
+   surface was deleted in the V2 cleanup and is pending the proto-byte
+   bridge re-land. */
+.feature-unavailable {
+  padding: 32px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  max-width: 720px;
+  margin: 0 auto;
+  color: var(--text-primary, #e2e8f0);
+}
+
+.feature-unavailable__icon {
+  color: var(--color-primary, #ff6b35);
+  opacity: 0.7;
+}
+
+.feature-unavailable h2 {
+  margin: 4px 0 0 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.feature-unavailable__description,
+.feature-unavailable__hint {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-secondary, #94a3b8);
+  margin: 0;
+}
+
+.feature-unavailable__list {
+  list-style: disc;
+  text-align: left;
+  margin: 4px 0 0 0;
+  padding-left: 24px;
+  color: var(--text-secondary, #94a3b8);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.feature-unavailable code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 107, 53, 0.08);
+  color: var(--color-primary, #ff6b35);
+}

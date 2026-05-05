@@ -81,6 +81,11 @@
 //   - model_id: optional `string` in Swift/Kotlin/Dart, nullable C string
 //     in C ABI. Canonicalize on `string` (empty = unset, proto3 default).
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 import SwiftProtobuf
 
 // If the compiler emits an error on this type, it is because this file
@@ -185,6 +190,100 @@ public enum RASTTLanguage: SwiftProtobuf.Enum, Swift.CaseIterable {
     .ar,
     .ru,
     .hi,
+  ]
+
+}
+
+public enum RASTTAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case pcmS16Le // = 1
+  case pcmF32Le // = 2
+
+  /// WAV/MP3/FLAC/etc.; see AudioFormat.
+  case container // = 3
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .pcmS16Le
+    case 2: self = .pcmF32Le
+    case 3: self = .container
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .pcmS16Le: return 1
+    case .pcmF32Le: return 2
+    case .container: return 3
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RASTTAudioEncoding] = [
+    .unspecified,
+    .pcmS16Le,
+    .pcmF32Le,
+    .container,
+  ]
+
+}
+
+public enum RASTTStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case started // = 1
+  case partial // = 2
+  case final // = 3
+  case endpoint // = 4
+  case error // = 5
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .started
+    case 2: self = .partial
+    case 3: self = .final
+    case 4: self = .endpoint
+    case 5: self = .error
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .started: return 1
+    case .partial: return 2
+    case .final: return 3
+    case .endpoint: return 4
+    case .error: return 5
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RASTTStreamEventKind] = [
+    .unspecified,
+    .started,
+    .partial,
+    .final,
+    .endpoint,
+    .error,
   ]
 
 }
@@ -323,11 +422,115 @@ public struct RASTTOptions: Sendable {
   /// Maximum number of alternatives to return. 0 = backend/default.
   public var maxAlternatives: Int32 = 0
 
+  /// Streaming/endpointer controls. 0 = backend/default.
+  public var chunkDurationMs: Int32 = 0
+
+  public var endpointSilenceMs: Int32 = 0
+
+  public var suppressBlank: Bool = false
+
+  public var translateToEnglish: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _languageCode: String? = nil
+}
+
+public struct RASTTAudioSource: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var source: RASTTAudioSource.OneOf_Source? = nil
+
+  public var audioData: Data {
+    get {
+      if case .audioData(let v)? = source {return v}
+      return Data()
+    }
+    set {source = .audioData(newValue)}
+  }
+
+  public var fileUri: String {
+    get {
+      if case .fileUri(let v)? = source {return v}
+      return String()
+    }
+    set {source = .fileUri(newValue)}
+  }
+
+  public var adapterHandle: String {
+    get {
+      if case .adapterHandle(let v)? = source {return v}
+      return String()
+    }
+    set {source = .adapterHandle(newValue)}
+  }
+
+  public var encoding: RASTTAudioEncoding = .unspecified
+
+  public var audioFormat: RAAudioFormat = .unspecified
+
+  public var sampleRate: Int32 = 0
+
+  public var channels: Int32 = 0
+
+  public var bitsPerSample: Int32 = 0
+
+  public var durationMs: Int64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public enum OneOf_Source: Equatable, Sendable {
+    case audioData(Data)
+    case fileUri(String)
+    case adapterHandle(String)
+
+  }
+
+  public init() {}
+}
+
+public struct RASTTTranscriptionRequest: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var requestID: String {
+    get {_storage._requestID}
+    set {_uniqueStorage()._requestID = newValue}
+  }
+
+  public var audio: RASTTAudioSource {
+    get {_storage._audio ?? RASTTAudioSource()}
+    set {_uniqueStorage()._audio = newValue}
+  }
+  /// Returns true if `audio` has been explicitly set.
+  public var hasAudio: Bool {_storage._audio != nil}
+  /// Clears the value of `audio`. Subsequent reads from it will return its default value.
+  public mutating func clearAudio() {_uniqueStorage()._audio = nil}
+
+  public var options: RASTTOptions {
+    get {_storage._options ?? RASTTOptions()}
+    set {_uniqueStorage()._options = newValue}
+  }
+  /// Returns true if `options` has been explicitly set.
+  public var hasOptions: Bool {_storage._options != nil}
+  /// Clears the value of `options`. Subsequent reads from it will return its default value.
+  public mutating func clearOptions() {_uniqueStorage()._options = nil}
+
+  public var metadata: Dictionary<String,String> {
+    get {_storage._metadata}
+    set {_uniqueStorage()._metadata = newValue}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 /// ---------------------------------------------------------------------------
@@ -355,9 +558,20 @@ public struct RAWordTimestamp: Sendable {
 
   public var confidence: Float = 0
 
+  public var speakerID: String {
+    get {_speakerID ?? String()}
+    set {_speakerID = newValue}
+  }
+  /// Returns true if `speakerID` has been explicitly set.
+  public var hasSpeakerID: Bool {self._speakerID != nil}
+  /// Clears the value of `speakerID`. Subsequent reads from it will return its default value.
+  public mutating func clearSpeakerID() {self._speakerID = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _speakerID: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -474,12 +688,31 @@ public struct RASTTOutput: Sendable {
   /// Often duplicates metadata.audio_length_ms.
   public var durationMs: Int64 = 0
 
+  /// Diarization summary when available.
+  public var speakerIds: [String] = []
+
+  /// Terminal error details for result-envelope APIs.
+  public var errorMessage: String {
+    get {_errorMessage ?? String()}
+    set {_errorMessage = newValue}
+  }
+  /// Returns true if `errorMessage` has been explicitly set.
+  public var hasErrorMessage: Bool {self._errorMessage != nil}
+  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
+  public mutating func clearErrorMessage() {self._errorMessage = nil}
+
+  public var errorCode: Int32 = 0
+
+  /// Segment index for long-running/streaming transcription.
+  public var segmentIndex: Int32 = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _metadata: RATranscriptionMetadata? = nil
   fileprivate var _languageCode: String? = nil
+  fileprivate var _errorMessage: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -495,25 +728,202 @@ public struct RASTTOutput: Sendable {
 /// `stability` is the Whisper-style hypothesis stability score (0.0-1.0);
 /// 0.0 when backend does not provide one.
 /// ---------------------------------------------------------------------------
-public struct RASTTPartialResult: Sendable {
+public struct RASTTPartialResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var text: String = String()
+  public var text: String {
+    get {_storage._text}
+    set {_uniqueStorage()._text = newValue}
+  }
 
-  public var isFinal: Bool = false
+  public var isFinal: Bool {
+    get {_storage._isFinal}
+    set {_uniqueStorage()._isFinal = newValue}
+  }
 
-  public var stability: Float = 0
+  public var stability: Float {
+    get {_storage._stability}
+    set {_uniqueStorage()._stability = newValue}
+  }
 
   /// Additional partial-hypothesis fields carried by Dart/RN live streams.
-  public var confidence: Float = 0
+  public var confidence: Float {
+    get {_storage._confidence}
+    set {_uniqueStorage()._confidence = newValue}
+  }
+
+  public var language: RASTTLanguage {
+    get {_storage._language}
+    set {_uniqueStorage()._language = newValue}
+  }
+
+  public var timestampMs: Int64 {
+    get {_storage._timestampMs}
+    set {_uniqueStorage()._timestampMs = newValue}
+  }
+
+  public var alternatives: [RATranscriptionAlternative] {
+    get {_storage._alternatives}
+    set {_uniqueStorage()._alternatives = newValue}
+  }
+
+  public var languageCode: String {
+    get {_storage._languageCode ?? String()}
+    set {_uniqueStorage()._languageCode = newValue}
+  }
+  /// Returns true if `languageCode` has been explicitly set.
+  public var hasLanguageCode: Bool {_storage._languageCode != nil}
+  /// Clears the value of `languageCode`. Subsequent reads from it will return its default value.
+  public mutating func clearLanguageCode() {_uniqueStorage()._languageCode = nil}
+
+  /// Streaming correlation and endpointing metadata.
+  public var requestID: String {
+    get {_storage._requestID}
+    set {_uniqueStorage()._requestID = newValue}
+  }
+
+  public var segmentIndex: Int32 {
+    get {_storage._segmentIndex}
+    set {_uniqueStorage()._segmentIndex = newValue}
+  }
+
+  public var audioStartMs: Int64 {
+    get {_storage._audioStartMs}
+    set {_uniqueStorage()._audioStartMs = newValue}
+  }
+
+  public var audioEndMs: Int64 {
+    get {_storage._audioEndMs}
+    set {_uniqueStorage()._audioEndMs = newValue}
+  }
+
+  public var finalOutput: RASTTOutput {
+    get {_storage._finalOutput ?? RASTTOutput()}
+    set {_uniqueStorage()._finalOutput = newValue}
+  }
+  /// Returns true if `finalOutput` has been explicitly set.
+  public var hasFinalOutput: Bool {_storage._finalOutput != nil}
+  /// Clears the value of `finalOutput`. Subsequent reads from it will return its default value.
+  public mutating func clearFinalOutput() {_uniqueStorage()._finalOutput = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public struct RASTTStreamEvent: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var seq: UInt64 {
+    get {_storage._seq}
+    set {_uniqueStorage()._seq = newValue}
+  }
+
+  public var timestampUs: Int64 {
+    get {_storage._timestampUs}
+    set {_uniqueStorage()._timestampUs = newValue}
+  }
+
+  public var requestID: String {
+    get {_storage._requestID}
+    set {_uniqueStorage()._requestID = newValue}
+  }
+
+  public var kind: RASTTStreamEventKind {
+    get {_storage._kind}
+    set {_uniqueStorage()._kind = newValue}
+  }
+
+  public var partial: RASTTPartialResult {
+    get {_storage._partial ?? RASTTPartialResult()}
+    set {_uniqueStorage()._partial = newValue}
+  }
+  /// Returns true if `partial` has been explicitly set.
+  public var hasPartial: Bool {_storage._partial != nil}
+  /// Clears the value of `partial`. Subsequent reads from it will return its default value.
+  public mutating func clearPartial() {_uniqueStorage()._partial = nil}
+
+  public var finalOutput: RASTTOutput {
+    get {_storage._finalOutput ?? RASTTOutput()}
+    set {_uniqueStorage()._finalOutput = newValue}
+  }
+  /// Returns true if `finalOutput` has been explicitly set.
+  public var hasFinalOutput: Bool {_storage._finalOutput != nil}
+  /// Clears the value of `finalOutput`. Subsequent reads from it will return its default value.
+  public mutating func clearFinalOutput() {_uniqueStorage()._finalOutput = nil}
+
+  public var errorMessage: String {
+    get {_storage._errorMessage ?? String()}
+    set {_uniqueStorage()._errorMessage = newValue}
+  }
+  /// Returns true if `errorMessage` has been explicitly set.
+  public var hasErrorMessage: Bool {_storage._errorMessage != nil}
+  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
+  public mutating func clearErrorMessage() {_uniqueStorage()._errorMessage = nil}
+
+  public var errorCode: Int32 {
+    get {_storage._errorCode}
+    set {_uniqueStorage()._errorCode = newValue}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public struct RASTTServiceState: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var isReady: Bool = false
+
+  public var currentModel: String {
+    get {_currentModel ?? String()}
+    set {_currentModel = newValue}
+  }
+  /// Returns true if `currentModel` has been explicitly set.
+  public var hasCurrentModel: Bool {self._currentModel != nil}
+  /// Clears the value of `currentModel`. Subsequent reads from it will return its default value.
+  public mutating func clearCurrentModel() {self._currentModel = nil}
+
+  public var supportsStreaming: Bool = false
+
+  public var supportedLanguageCodes: [String] = []
+
+  public var errorMessage: String {
+    get {_errorMessage ?? String()}
+    set {_errorMessage = newValue}
+  }
+  /// Returns true if `errorMessage` has been explicitly set.
+  public var hasErrorMessage: Bool {self._errorMessage != nil}
+  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
+  public mutating func clearErrorMessage() {self._errorMessage = nil}
+
+  public var errorCode: Int32 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _currentModel: String? = nil
+  fileprivate var _errorMessage: String? = nil
+}
+
+public struct RASTTLanguageDetectionResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
 
   public var language: RASTTLanguage = .unspecified
-
-  public var timestampMs: Int64 = 0
-
-  public var alternatives: [RATranscriptionAlternative] = []
 
   public var languageCode: String {
     get {_languageCode ?? String()}
@@ -523,6 +933,10 @@ public struct RASTTPartialResult: Sendable {
   public var hasLanguageCode: Bool {self._languageCode != nil}
   /// Clears the value of `languageCode`. Subsequent reads from it will return its default value.
   public mutating func clearLanguageCode() {self._languageCode = nil}
+
+  public var confidence: Float = 0
+
+  public var alternatives: [String] = []
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -537,6 +951,14 @@ fileprivate let _protobuf_package = "runanywhere.v1"
 
 extension RASTTLanguage: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STT_LANGUAGE_UNSPECIFIED\0\u{1}STT_LANGUAGE_AUTO\0\u{1}STT_LANGUAGE_EN\0\u{1}STT_LANGUAGE_ES\0\u{1}STT_LANGUAGE_FR\0\u{1}STT_LANGUAGE_DE\0\u{1}STT_LANGUAGE_ZH\0\u{1}STT_LANGUAGE_JA\0\u{1}STT_LANGUAGE_KO\0\u{1}STT_LANGUAGE_IT\0\u{1}STT_LANGUAGE_PT\0\u{1}STT_LANGUAGE_AR\0\u{1}STT_LANGUAGE_RU\0\u{1}STT_LANGUAGE_HI\0")
+}
+
+extension RASTTAudioEncoding: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STT_AUDIO_ENCODING_UNSPECIFIED\0\u{1}STT_AUDIO_ENCODING_PCM_S16_LE\0\u{1}STT_AUDIO_ENCODING_PCM_F32_LE\0\u{1}STT_AUDIO_ENCODING_CONTAINER\0")
+}
+
+extension RASTTStreamEventKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0STT_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}STT_STREAM_EVENT_KIND_STARTED\0\u{1}STT_STREAM_EVENT_KIND_PARTIAL\0\u{1}STT_STREAM_EVENT_KIND_FINAL\0\u{1}STT_STREAM_EVENT_KIND_ENDPOINT\0\u{1}STT_STREAM_EVENT_KIND_ERROR\0")
 }
 
 extension RASTTConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -630,7 +1052,7 @@ extension RASTTConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
 
 extension RASTTOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}language\0\u{3}enable_punctuation\0\u{3}enable_diarization\0\u{3}max_speakers\0\u{3}vocabulary_list\0\u{3}enable_word_timestamps\0\u{3}beam_size\0\u{3}language_code\0\u{3}detect_language\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}max_alternatives\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}language\0\u{3}enable_punctuation\0\u{3}enable_diarization\0\u{3}max_speakers\0\u{3}vocabulary_list\0\u{3}enable_word_timestamps\0\u{3}beam_size\0\u{3}language_code\0\u{3}detect_language\0\u{3}audio_format\0\u{3}sample_rate\0\u{3}max_alternatives\0\u{3}chunk_duration_ms\0\u{3}endpoint_silence_ms\0\u{3}suppress_blank\0\u{3}translate_to_english\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -650,6 +1072,10 @@ extension RASTTOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
       case 10: try { try decoder.decodeSingularEnumField(value: &self.audioFormat) }()
       case 11: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
       case 12: try { try decoder.decodeSingularInt32Field(value: &self.maxAlternatives) }()
+      case 13: try { try decoder.decodeSingularInt32Field(value: &self.chunkDurationMs) }()
+      case 14: try { try decoder.decodeSingularInt32Field(value: &self.endpointSilenceMs) }()
+      case 15: try { try decoder.decodeSingularBoolField(value: &self.suppressBlank) }()
+      case 16: try { try decoder.decodeSingularBoolField(value: &self.translateToEnglish) }()
       default: break
       }
     }
@@ -696,6 +1122,18 @@ extension RASTTOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     if self.maxAlternatives != 0 {
       try visitor.visitSingularInt32Field(value: self.maxAlternatives, fieldNumber: 12)
     }
+    if self.chunkDurationMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.chunkDurationMs, fieldNumber: 13)
+    }
+    if self.endpointSilenceMs != 0 {
+      try visitor.visitSingularInt32Field(value: self.endpointSilenceMs, fieldNumber: 14)
+    }
+    if self.suppressBlank != false {
+      try visitor.visitSingularBoolField(value: self.suppressBlank, fieldNumber: 15)
+    }
+    if self.translateToEnglish != false {
+      try visitor.visitSingularBoolField(value: self.translateToEnglish, fieldNumber: 16)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -712,6 +1150,200 @@ extension RASTTOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     if lhs.audioFormat != rhs.audioFormat {return false}
     if lhs.sampleRate != rhs.sampleRate {return false}
     if lhs.maxAlternatives != rhs.maxAlternatives {return false}
+    if lhs.chunkDurationMs != rhs.chunkDurationMs {return false}
+    if lhs.endpointSilenceMs != rhs.endpointSilenceMs {return false}
+    if lhs.suppressBlank != rhs.suppressBlank {return false}
+    if lhs.translateToEnglish != rhs.translateToEnglish {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RASTTAudioSource: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".STTAudioSource"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_data\0\u{3}file_uri\0\u{3}adapter_handle\0\u{1}encoding\0\u{3}audio_format\0\u{3}sample_rate\0\u{1}channels\0\u{3}bits_per_sample\0\u{3}duration_ms\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try {
+        var v: Data?
+        try decoder.decodeSingularBytesField(value: &v)
+        if let v = v {
+          if self.source != nil {try decoder.handleConflictingOneOf()}
+          self.source = .audioData(v)
+        }
+      }()
+      case 2: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.source != nil {try decoder.handleConflictingOneOf()}
+          self.source = .fileUri(v)
+        }
+      }()
+      case 3: try {
+        var v: String?
+        try decoder.decodeSingularStringField(value: &v)
+        if let v = v {
+          if self.source != nil {try decoder.handleConflictingOneOf()}
+          self.source = .adapterHandle(v)
+        }
+      }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self.encoding) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self.audioFormat) }()
+      case 6: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
+      case 7: try { try decoder.decodeSingularInt32Field(value: &self.channels) }()
+      case 8: try { try decoder.decodeSingularInt32Field(value: &self.bitsPerSample) }()
+      case 9: try { try decoder.decodeSingularInt64Field(value: &self.durationMs) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    switch self.source {
+    case .audioData?: try {
+      guard case .audioData(let v)? = self.source else { preconditionFailure() }
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
+    }()
+    case .fileUri?: try {
+      guard case .fileUri(let v)? = self.source else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    }()
+    case .adapterHandle?: try {
+      guard case .adapterHandle(let v)? = self.source else { preconditionFailure() }
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    }()
+    case nil: break
+    }
+    if self.encoding != .unspecified {
+      try visitor.visitSingularEnumField(value: self.encoding, fieldNumber: 4)
+    }
+    if self.audioFormat != .unspecified {
+      try visitor.visitSingularEnumField(value: self.audioFormat, fieldNumber: 5)
+    }
+    if self.sampleRate != 0 {
+      try visitor.visitSingularInt32Field(value: self.sampleRate, fieldNumber: 6)
+    }
+    if self.channels != 0 {
+      try visitor.visitSingularInt32Field(value: self.channels, fieldNumber: 7)
+    }
+    if self.bitsPerSample != 0 {
+      try visitor.visitSingularInt32Field(value: self.bitsPerSample, fieldNumber: 8)
+    }
+    if self.durationMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.durationMs, fieldNumber: 9)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RASTTAudioSource, rhs: RASTTAudioSource) -> Bool {
+    if lhs.source != rhs.source {return false}
+    if lhs.encoding != rhs.encoding {return false}
+    if lhs.audioFormat != rhs.audioFormat {return false}
+    if lhs.sampleRate != rhs.sampleRate {return false}
+    if lhs.channels != rhs.channels {return false}
+    if lhs.bitsPerSample != rhs.bitsPerSample {return false}
+    if lhs.durationMs != rhs.durationMs {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RASTTTranscriptionRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".STTTranscriptionRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}audio\0\u{1}options\0\u{1}metadata\0")
+
+  fileprivate class _StorageClass {
+    var _requestID: String = String()
+    var _audio: RASTTAudioSource? = nil
+    var _options: RASTTOptions? = nil
+    var _metadata: Dictionary<String,String> = [:]
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _requestID = source._requestID
+      _audio = source._audio
+      _options = source._options
+      _metadata = source._metadata
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
+        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._audio) }()
+        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._options) }()
+        case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &_storage._metadata) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._requestID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._requestID, fieldNumber: 1)
+      }
+      try { if let v = _storage._audio {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      } }()
+      try { if let v = _storage._options {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      } }()
+      if !_storage._metadata.isEmpty {
+        try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: _storage._metadata, fieldNumber: 4)
+      }
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RASTTTranscriptionRequest, rhs: RASTTTranscriptionRequest) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._requestID != rhs_storage._requestID {return false}
+        if _storage._audio != rhs_storage._audio {return false}
+        if _storage._options != rhs_storage._options {return false}
+        if _storage._metadata != rhs_storage._metadata {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -719,7 +1351,7 @@ extension RASTTOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
 
 extension RAWordTimestamp: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".WordTimestamp"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}word\0\u{3}start_ms\0\u{3}end_ms\0\u{1}confidence\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}word\0\u{3}start_ms\0\u{3}end_ms\0\u{1}confidence\0\u{3}speaker_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -731,12 +1363,17 @@ extension RAWordTimestamp: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
       case 2: try { try decoder.decodeSingularInt64Field(value: &self.startMs) }()
       case 3: try { try decoder.decodeSingularInt64Field(value: &self.endMs) }()
       case 4: try { try decoder.decodeSingularFloatField(value: &self.confidence) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._speakerID) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.word.isEmpty {
       try visitor.visitSingularStringField(value: self.word, fieldNumber: 1)
     }
@@ -749,6 +1386,9 @@ extension RAWordTimestamp: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
     if self.confidence.bitPattern != 0 {
       try visitor.visitSingularFloatField(value: self.confidence, fieldNumber: 4)
     }
+    try { if let v = self._speakerID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -757,6 +1397,7 @@ extension RAWordTimestamp: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
     if lhs.startMs != rhs.startMs {return false}
     if lhs.endMs != rhs.endMs {return false}
     if lhs.confidence != rhs.confidence {return false}
+    if lhs._speakerID != rhs._speakerID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -849,7 +1490,7 @@ extension RATranscriptionMetadata: SwiftProtobuf.Message, SwiftProtobuf._Message
 
 extension RASTTOutput: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTOutput"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{1}language\0\u{1}confidence\0\u{1}words\0\u{1}alternatives\0\u{1}metadata\0\u{3}language_code\0\u{3}timestamp_ms\0\u{3}duration_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{1}language\0\u{1}confidence\0\u{1}words\0\u{1}alternatives\0\u{1}metadata\0\u{3}language_code\0\u{3}timestamp_ms\0\u{3}duration_ms\0\u{3}speaker_ids\0\u{3}error_message\0\u{3}error_code\0\u{3}segment_index\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -866,6 +1507,10 @@ extension RASTTOutput: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
       case 7: try { try decoder.decodeSingularStringField(value: &self._languageCode) }()
       case 8: try { try decoder.decodeSingularInt64Field(value: &self.timestampMs) }()
       case 9: try { try decoder.decodeSingularInt64Field(value: &self.durationMs) }()
+      case 10: try { try decoder.decodeRepeatedStringField(value: &self.speakerIds) }()
+      case 11: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
+      case 12: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
+      case 13: try { try decoder.decodeSingularInt32Field(value: &self.segmentIndex) }()
       default: break
       }
     }
@@ -903,6 +1548,18 @@ extension RASTTOutput: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     if self.durationMs != 0 {
       try visitor.visitSingularInt64Field(value: self.durationMs, fieldNumber: 9)
     }
+    if !self.speakerIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.speakerIds, fieldNumber: 10)
+    }
+    try { if let v = self._errorMessage {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 11)
+    } }()
+    if self.errorCode != 0 {
+      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 12)
+    }
+    if self.segmentIndex != 0 {
+      try visitor.visitSingularInt32Field(value: self.segmentIndex, fieldNumber: 13)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -916,6 +1573,10 @@ extension RASTTOutput: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     if lhs._languageCode != rhs._languageCode {return false}
     if lhs.timestampMs != rhs.timestampMs {return false}
     if lhs.durationMs != rhs.durationMs {return false}
+    if lhs.speakerIds != rhs.speakerIds {return false}
+    if lhs._errorMessage != rhs._errorMessage {return false}
+    if lhs.errorCode != rhs.errorCode {return false}
+    if lhs.segmentIndex != rhs.segmentIndex {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -923,7 +1584,280 @@ extension RASTTOutput: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
 
 extension RASTTPartialResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".STTPartialResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}is_final\0\u{1}stability\0\u{1}confidence\0\u{1}language\0\u{3}timestamp_ms\0\u{1}alternatives\0\u{3}language_code\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}is_final\0\u{1}stability\0\u{1}confidence\0\u{1}language\0\u{3}timestamp_ms\0\u{1}alternatives\0\u{3}language_code\0\u{3}request_id\0\u{3}segment_index\0\u{3}audio_start_ms\0\u{3}audio_end_ms\0\u{3}final_output\0")
+
+  fileprivate class _StorageClass {
+    var _text: String = String()
+    var _isFinal: Bool = false
+    var _stability: Float = 0
+    var _confidence: Float = 0
+    var _language: RASTTLanguage = .unspecified
+    var _timestampMs: Int64 = 0
+    var _alternatives: [RATranscriptionAlternative] = []
+    var _languageCode: String? = nil
+    var _requestID: String = String()
+    var _segmentIndex: Int32 = 0
+    var _audioStartMs: Int64 = 0
+    var _audioEndMs: Int64 = 0
+    var _finalOutput: RASTTOutput? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _text = source._text
+      _isFinal = source._isFinal
+      _stability = source._stability
+      _confidence = source._confidence
+      _language = source._language
+      _timestampMs = source._timestampMs
+      _alternatives = source._alternatives
+      _languageCode = source._languageCode
+      _requestID = source._requestID
+      _segmentIndex = source._segmentIndex
+      _audioStartMs = source._audioStartMs
+      _audioEndMs = source._audioEndMs
+      _finalOutput = source._finalOutput
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._text) }()
+        case 2: try { try decoder.decodeSingularBoolField(value: &_storage._isFinal) }()
+        case 3: try { try decoder.decodeSingularFloatField(value: &_storage._stability) }()
+        case 4: try { try decoder.decodeSingularFloatField(value: &_storage._confidence) }()
+        case 5: try { try decoder.decodeSingularEnumField(value: &_storage._language) }()
+        case 6: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampMs) }()
+        case 7: try { try decoder.decodeRepeatedMessageField(value: &_storage._alternatives) }()
+        case 8: try { try decoder.decodeSingularStringField(value: &_storage._languageCode) }()
+        case 9: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
+        case 10: try { try decoder.decodeSingularInt32Field(value: &_storage._segmentIndex) }()
+        case 11: try { try decoder.decodeSingularInt64Field(value: &_storage._audioStartMs) }()
+        case 12: try { try decoder.decodeSingularInt64Field(value: &_storage._audioEndMs) }()
+        case 13: try { try decoder.decodeSingularMessageField(value: &_storage._finalOutput) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._text.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._text, fieldNumber: 1)
+      }
+      if _storage._isFinal != false {
+        try visitor.visitSingularBoolField(value: _storage._isFinal, fieldNumber: 2)
+      }
+      if _storage._stability.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._stability, fieldNumber: 3)
+      }
+      if _storage._confidence.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._confidence, fieldNumber: 4)
+      }
+      if _storage._language != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._language, fieldNumber: 5)
+      }
+      if _storage._timestampMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._timestampMs, fieldNumber: 6)
+      }
+      if !_storage._alternatives.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._alternatives, fieldNumber: 7)
+      }
+      try { if let v = _storage._languageCode {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+      } }()
+      if !_storage._requestID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._requestID, fieldNumber: 9)
+      }
+      if _storage._segmentIndex != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._segmentIndex, fieldNumber: 10)
+      }
+      if _storage._audioStartMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._audioStartMs, fieldNumber: 11)
+      }
+      if _storage._audioEndMs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._audioEndMs, fieldNumber: 12)
+      }
+      try { if let v = _storage._finalOutput {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 13)
+      } }()
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RASTTPartialResult, rhs: RASTTPartialResult) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._text != rhs_storage._text {return false}
+        if _storage._isFinal != rhs_storage._isFinal {return false}
+        if _storage._stability != rhs_storage._stability {return false}
+        if _storage._confidence != rhs_storage._confidence {return false}
+        if _storage._language != rhs_storage._language {return false}
+        if _storage._timestampMs != rhs_storage._timestampMs {return false}
+        if _storage._alternatives != rhs_storage._alternatives {return false}
+        if _storage._languageCode != rhs_storage._languageCode {return false}
+        if _storage._requestID != rhs_storage._requestID {return false}
+        if _storage._segmentIndex != rhs_storage._segmentIndex {return false}
+        if _storage._audioStartMs != rhs_storage._audioStartMs {return false}
+        if _storage._audioEndMs != rhs_storage._audioEndMs {return false}
+        if _storage._finalOutput != rhs_storage._finalOutput {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RASTTStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".STTStreamEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}partial\0\u{3}final_output\0\u{3}error_message\0\u{3}error_code\0")
+
+  fileprivate class _StorageClass {
+    var _seq: UInt64 = 0
+    var _timestampUs: Int64 = 0
+    var _requestID: String = String()
+    var _kind: RASTTStreamEventKind = .unspecified
+    var _partial: RASTTPartialResult? = nil
+    var _finalOutput: RASTTOutput? = nil
+    var _errorMessage: String? = nil
+    var _errorCode: Int32 = 0
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _seq = source._seq
+      _timestampUs = source._timestampUs
+      _requestID = source._requestID
+      _kind = source._kind
+      _partial = source._partial
+      _finalOutput = source._finalOutput
+      _errorMessage = source._errorMessage
+      _errorCode = source._errorCode
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularUInt64Field(value: &_storage._seq) }()
+        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
+        case 4: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
+        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._partial) }()
+        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._finalOutput) }()
+        case 7: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
+        case 8: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCode) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._seq != 0 {
+        try visitor.visitSingularUInt64Field(value: _storage._seq, fieldNumber: 1)
+      }
+      if _storage._timestampUs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._timestampUs, fieldNumber: 2)
+      }
+      if !_storage._requestID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._requestID, fieldNumber: 3)
+      }
+      if _storage._kind != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._kind, fieldNumber: 4)
+      }
+      try { if let v = _storage._partial {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+      } }()
+      try { if let v = _storage._finalOutput {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._errorMessage {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+      } }()
+      if _storage._errorCode != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._errorCode, fieldNumber: 8)
+      }
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RASTTStreamEvent, rhs: RASTTStreamEvent) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._seq != rhs_storage._seq {return false}
+        if _storage._timestampUs != rhs_storage._timestampUs {return false}
+        if _storage._requestID != rhs_storage._requestID {return false}
+        if _storage._kind != rhs_storage._kind {return false}
+        if _storage._partial != rhs_storage._partial {return false}
+        if _storage._finalOutput != rhs_storage._finalOutput {return false}
+        if _storage._errorMessage != rhs_storage._errorMessage {return false}
+        if _storage._errorCode != rhs_storage._errorCode {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RASTTServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".STTServiceState"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{3}current_model\0\u{3}supports_streaming\0\u{3}supported_language_codes\0\u{3}error_message\0\u{3}error_code\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -931,14 +1865,12 @@ extension RASTTPartialResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.text) }()
-      case 2: try { try decoder.decodeSingularBoolField(value: &self.isFinal) }()
-      case 3: try { try decoder.decodeSingularFloatField(value: &self.stability) }()
-      case 4: try { try decoder.decodeSingularFloatField(value: &self.confidence) }()
-      case 5: try { try decoder.decodeSingularEnumField(value: &self.language) }()
-      case 6: try { try decoder.decodeSingularInt64Field(value: &self.timestampMs) }()
-      case 7: try { try decoder.decodeRepeatedMessageField(value: &self.alternatives) }()
-      case 8: try { try decoder.decodeSingularStringField(value: &self._languageCode) }()
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.isReady) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._currentModel) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.supportsStreaming) }()
+      case 4: try { try decoder.decodeRepeatedStringField(value: &self.supportedLanguageCodes) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
+      case 6: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
       default: break
       }
     }
@@ -949,42 +1881,83 @@ extension RASTTPartialResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.text.isEmpty {
-      try visitor.visitSingularStringField(value: self.text, fieldNumber: 1)
+    if self.isReady != false {
+      try visitor.visitSingularBoolField(value: self.isReady, fieldNumber: 1)
     }
-    if self.isFinal != false {
-      try visitor.visitSingularBoolField(value: self.isFinal, fieldNumber: 2)
-    }
-    if self.stability.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.stability, fieldNumber: 3)
-    }
-    if self.confidence.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.confidence, fieldNumber: 4)
-    }
-    if self.language != .unspecified {
-      try visitor.visitSingularEnumField(value: self.language, fieldNumber: 5)
-    }
-    if self.timestampMs != 0 {
-      try visitor.visitSingularInt64Field(value: self.timestampMs, fieldNumber: 6)
-    }
-    if !self.alternatives.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.alternatives, fieldNumber: 7)
-    }
-    try { if let v = self._languageCode {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 8)
+    try { if let v = self._currentModel {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
     } }()
+    if self.supportsStreaming != false {
+      try visitor.visitSingularBoolField(value: self.supportsStreaming, fieldNumber: 3)
+    }
+    if !self.supportedLanguageCodes.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.supportedLanguageCodes, fieldNumber: 4)
+    }
+    try { if let v = self._errorMessage {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+    } }()
+    if self.errorCode != 0 {
+      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: RASTTPartialResult, rhs: RASTTPartialResult) -> Bool {
-    if lhs.text != rhs.text {return false}
-    if lhs.isFinal != rhs.isFinal {return false}
-    if lhs.stability != rhs.stability {return false}
-    if lhs.confidence != rhs.confidence {return false}
+  public static func ==(lhs: RASTTServiceState, rhs: RASTTServiceState) -> Bool {
+    if lhs.isReady != rhs.isReady {return false}
+    if lhs._currentModel != rhs._currentModel {return false}
+    if lhs.supportsStreaming != rhs.supportsStreaming {return false}
+    if lhs.supportedLanguageCodes != rhs.supportedLanguageCodes {return false}
+    if lhs._errorMessage != rhs._errorMessage {return false}
+    if lhs.errorCode != rhs.errorCode {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RASTTLanguageDetectionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".STTLanguageDetectionResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}language\0\u{3}language_code\0\u{1}confidence\0\u{1}alternatives\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.language) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self._languageCode) }()
+      case 3: try { try decoder.decodeSingularFloatField(value: &self.confidence) }()
+      case 4: try { try decoder.decodeRepeatedStringField(value: &self.alternatives) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.language != .unspecified {
+      try visitor.visitSingularEnumField(value: self.language, fieldNumber: 1)
+    }
+    try { if let v = self._languageCode {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+    } }()
+    if self.confidence.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.confidence, fieldNumber: 3)
+    }
+    if !self.alternatives.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.alternatives, fieldNumber: 4)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RASTTLanguageDetectionResult, rhs: RASTTLanguageDetectionResult) -> Bool {
     if lhs.language != rhs.language {return false}
-    if lhs.timestampMs != rhs.timestampMs {return false}
-    if lhs.alternatives != rhs.alternatives {return false}
     if lhs._languageCode != rhs._languageCode {return false}
+    if lhs.confidence != rhs.confidence {return false}
+    if lhs.alternatives != rhs.alternatives {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

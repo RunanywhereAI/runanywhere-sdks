@@ -317,7 +317,7 @@ fun SettingsScreen(viewModel: SettingsViewModel = viewModel()) {
                 subtitle = "",
                 icon = Icons.Filled.Delete,
                 color = AppColors.primaryOrange,
-                onClick = { viewModel.clearCache() },
+                onClick = { viewModel.clearAppCache() },
             )
             HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
             StorageManagementButton(

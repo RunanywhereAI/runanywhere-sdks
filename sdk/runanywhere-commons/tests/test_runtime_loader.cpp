@@ -38,6 +38,26 @@ void loader_destroy(void) {
     g_loader_destroy_called = true;
 }
 
+const rac_runtime_vtable_v2_t k_loader_vtable_v2 = {
+    /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION_V2,
+    /* .struct_size    = */ sizeof(rac_runtime_vtable_v2_t),
+    /* .run_session_v2 = */ nullptr,
+    /* .alloc_buffer   = */ nullptr,
+    /* .buffer_info    = */ nullptr,
+    /* .map_buffer     = */ nullptr,
+    /* .unmap_buffer   = */ nullptr,
+    /* .copy_buffer    = */ nullptr,
+    /* .release_tensor = */ nullptr,
+    /* .reserved_0     = */ nullptr,
+    /* .reserved_1     = */ nullptr,
+    /* .reserved_2     = */ nullptr,
+    /* .reserved_3     = */ nullptr,
+    /* .reserved_4     = */ nullptr,
+    /* .reserved_5     = */ nullptr,
+    /* .reserved_6     = */ nullptr,
+    /* .reserved_7     = */ nullptr,
+};
+
 const rac_runtime_vtable_t k_loader_vtable = {
     /* .metadata = */ {
         /* .abi_version             = */ RAC_RUNTIME_ABI_VERSION,
@@ -62,7 +82,7 @@ const rac_runtime_vtable_t k_loader_vtable = {
     /* .free_buffer     = */ nullptr,
     /* .device_info     = */ nullptr,
     /* .capabilities    = */ nullptr,
-    /* .reserved_slot_0 = */ nullptr,
+    /* .reserved_slot_0 = */ &k_loader_vtable_v2,
     /* .reserved_slot_1 = */ nullptr,
     /* .reserved_slot_2 = */ nullptr,
     /* .reserved_slot_3 = */ nullptr,
@@ -107,6 +127,10 @@ int main() {
     /* (2) Entry-point returns the same vtable address. */
     CHECK(rac_runtime_entry_test_static_runtime() == &k_loader_vtable,
           "(2) rac_runtime_entry_<name> returns the vtable pointer");
+    CHECK(rac_runtime_abi_version() == RAC_RUNTIME_ABI_VERSION,
+          "(2) runtime ABI version API matches header");
+    CHECK(rac_runtime_load(nullptr) == RAC_ERROR_NULL_POINTER,
+          "(2) dynamic runtime loader rejects NULL path");
 
     /* (3) Unregister → re-register cycle preserves vtable identity. */
     g_loader_destroy_called = false;
@@ -127,7 +151,8 @@ int main() {
           "(3) vtable pointer stable across re-register cycle");
 
     /* Leave the registry clean. */
-    rac_runtime_unregister(RAC_RUNTIME_QNN);
+    CHECK(rac_runtime_unload(RAC_RUNTIME_QNN) == RAC_SUCCESS,
+          "(3) runtime unload unregisters the fixture");
 
     std::fprintf(stdout, "\n%d checks, %d failed\n", g_test_count, g_fail_count);
     return g_fail_count == 0 ? 0 : 1;

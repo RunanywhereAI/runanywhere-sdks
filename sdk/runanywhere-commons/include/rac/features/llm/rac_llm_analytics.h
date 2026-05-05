@@ -9,6 +9,12 @@
  * Actual token counts may vary depending on the model's tokenizer and input content.
  *
  * Swift Source: Sources/RunAnywhere/Features/LLM/Analytics/GenerationAnalyticsService.swift
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal`.
+ * Telemetry/analytics implementation owned by commons. SDK-facing
+ * generation events arrive as runanywhere.v1.SDKEvent / LLMStreamEvent
+ * bytes through rac_sdk_event_subscribe and the proto-byte stream
+ * callbacks.
  */
 
 #ifndef RAC_LLM_ANALYTICS_H

@@ -17,6 +17,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_primitive.h"
 #include "rac/plugin/rac_runtime_registry.h"
@@ -40,6 +41,26 @@ rac_result_t runtime_ok_init(void) {
 
 void runtime_noop_destroy(void) {}
 
+const rac_runtime_vtable_v2_t k_noop_runtime_v2 = {
+    /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION_V2,
+    /* .struct_size    = */ sizeof(rac_runtime_vtable_v2_t),
+    /* .run_session_v2 = */ nullptr,
+    /* .alloc_buffer   = */ nullptr,
+    /* .buffer_info    = */ nullptr,
+    /* .map_buffer     = */ nullptr,
+    /* .unmap_buffer   = */ nullptr,
+    /* .copy_buffer    = */ nullptr,
+    /* .release_tensor = */ nullptr,
+    /* .reserved_0     = */ nullptr,
+    /* .reserved_1     = */ nullptr,
+    /* .reserved_2     = */ nullptr,
+    /* .reserved_3     = */ nullptr,
+    /* .reserved_4     = */ nullptr,
+    /* .reserved_5     = */ nullptr,
+    /* .reserved_6     = */ nullptr,
+    /* .reserved_7     = */ nullptr,
+};
+
 rac_runtime_vtable_t make_runtime_vt(rac_runtime_id_t id, const char* name, int32_t priority = 100) {
     rac_runtime_vtable_t v{};
     v.metadata.abi_version = RAC_RUNTIME_ABI_VERSION;
@@ -49,6 +70,7 @@ rac_runtime_vtable_t make_runtime_vt(rac_runtime_id_t id, const char* name, int3
     v.metadata.priority = priority;
     v.init = runtime_ok_init;
     v.destroy = runtime_noop_destroy;
+    v.reserved_slot_0 = &k_noop_runtime_v2;
     return v;
 }
 
@@ -250,7 +272,7 @@ int main() {
 
         const rac_runtime_id_t qnn_rts[] = {RAC_RUNTIME_QNN};
         const rac_runtime_id_t cuda_rts[] = {RAC_RUNTIME_CUDA};
-        const uint32_t onnx_fmt[] = {3};
+        const uint32_t onnx_fmt[] = {RAC_MODEL_FORMAT_ID_ONNX};
         auto rt_qnn = make_runtime_vt(RAC_RUNTIME_QNN, "qnn-test");
         rac_runtime_register(&rt_qnn);
 
@@ -262,7 +284,7 @@ int main() {
         rac::router::RouteRequest req;
         req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
         req.preferred_runtime = RAC_RUNTIME_QNN;
-        req.format = 3;
+        req.format = RAC_MODEL_FORMAT_ID_ONNX;
         auto result = router.route(req);
         CHECK(result.vtable == &registered,
               "(7) registered runtime candidate wins over higher-priority missing runtime");
@@ -369,6 +391,187 @@ int main() {
         rac_plugin_unregister("c_abi_smoke");
     }
 
+    /* --- (CPP-05) Runtime availability gating ---------------------------- */
+    /*
+     * Hard-reject contract: when an engine declares one or more L1 runtimes
+     * and NONE of them are registered with the runtime registry, the router
+     * must drop it from candidate selection — this is a hard filter, not a
+     * scoring penalty. When every candidate fails this filter, the C ABI
+     * surfaces a dedicated `RAC_ERROR_RUNTIME_UNAVAILABLE` so callers can
+     * distinguish a runtime-mismatch from "no plugin registered at all".
+     */
+
+    /* (CPP-05.1) Engine declares Metal-only; only CPU is registered → reject */
+    {
+        rac::router::HardwareProfile prof{};
+        rac::router::EngineRouter router(prof);
+
+        const rac_runtime_id_t metal_only[] = {RAC_RUNTIME_METAL};
+        auto v = make_vt("metal_only_engine", 50, metal_only, 1, nullptr, 0);
+        rac_plugin_register(&v);
+
+        rac::router::RouteRequest req;
+        req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
+        auto result = router.route(req);
+        CHECK(result.vtable == nullptr,
+              "(CPP-05.1) Metal-only engine rejected when Metal runtime not registered");
+        CHECK(!result.rejection_reason.empty(),
+              "(CPP-05.1) router populates rejection_reason");
+
+        const rac_engine_vtable_t* out = nullptr;
+        rac_result_t rc = rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT, 0, nullptr, &out);
+        CHECK(rc == RAC_ERROR_RUNTIME_UNAVAILABLE,
+              "(CPP-05.1) rac_plugin_route surfaces RAC_ERROR_RUNTIME_UNAVAILABLE");
+        CHECK(out == nullptr,
+              "(CPP-05.1) rac_plugin_route leaves out_vtable NULL on runtime miss");
+
+        rac_plugin_unregister("metal_only_engine");
+    }
+
+    /* (CPP-05.2) Engine declares Metal+CPU; only CPU registered → accepted */
+    {
+        rac::router::HardwareProfile prof{};
+        rac::router::EngineRouter router(prof);
+
+        const rac_runtime_id_t metal_cpu[] = {RAC_RUNTIME_METAL, RAC_RUNTIME_CPU};
+        auto v = make_vt("multi_runtime_engine", 50, metal_cpu, 2, nullptr, 0);
+        rac_plugin_register(&v);
+
+        /* CPU is registered automatically by the bootstrap path inside the
+         * runtime registry; no Metal runtime is registered. The engine
+         * declares both, so a single-match (CPU) is enough to pass the
+         * runtime-availability filter. */
+        CHECK(rac_runtime_is_registered(RAC_RUNTIME_CPU) == 1,
+              "(CPP-05.2) CPU runtime is registered via bootstrap");
+        CHECK(rac_runtime_is_registered(RAC_RUNTIME_METAL) == 0,
+              "(CPP-05.2) Metal runtime is not registered");
+
+        rac::router::RouteRequest req;
+        req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
+        auto result = router.route(req);
+        CHECK(result.vtable == &v,
+              "(CPP-05.2) engine accepted when at least one declared runtime is registered");
+
+        rac_plugin_unregister("multi_runtime_engine");
+    }
+
+    /* (CPP-05.3) Engine declares no runtimes → priority-only scoring */
+    {
+        rac::router::HardwareProfile prof{};
+        rac::router::EngineRouter router(prof);
+
+        /* Two engines, both with NULL runtimes; the higher-priority one wins
+         * regardless of registered runtimes. Confirms the runtime-availability
+         * filter only applies when `metadata.runtimes != NULL`. */
+        auto v_lo = make_vt("legacy_lo", 10, nullptr, 0, nullptr, 0);
+        auto v_hi = make_vt("legacy_hi", 90, nullptr, 0, nullptr, 0);
+        rac_plugin_register(&v_lo);
+        rac_plugin_register(&v_hi);
+
+        rac::router::RouteRequest req;
+        req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
+        auto result = router.route(req);
+        CHECK(result.vtable == &v_hi,
+              "(CPP-05.3) legacy NULL-runtime engines bypass runtime check, "
+              "highest-priority wins");
+        CHECK(result.score == 90,
+              "(CPP-05.3) legacy engines score on priority alone (no runtime bonus)");
+
+        rac_plugin_unregister("legacy_lo");
+        rac_plugin_unregister("legacy_hi");
+    }
+
+    /* (CPP-05.4) Two engines compete: CoreML-only (unavailable) vs CPU
+     *            (available). Even when CoreML engine has higher priority,
+     *            the CPU one wins because the router hard-rejects engines
+     *            whose runtimes aren't registered. */
+    {
+        rac::router::HardwareProfile prof{};
+        rac::router::EngineRouter router(prof);
+
+        const rac_runtime_id_t coreml_rts[] = {RAC_RUNTIME_COREML};
+        const rac_runtime_id_t cpu_rts[]    = {RAC_RUNTIME_CPU};
+
+        auto v_coreml = make_vt("coreml_high_prio", 500, coreml_rts, 1, nullptr, 0);
+        auto v_cpu    = make_vt("cpu_low_prio",      10, cpu_rts,    1, nullptr, 0);
+        rac_plugin_register(&v_coreml);
+        rac_plugin_register(&v_cpu);
+
+        CHECK(rac_runtime_is_registered(RAC_RUNTIME_COREML) == 0,
+              "(CPP-05.4) CoreML runtime is not registered on this host");
+
+        rac::router::RouteRequest req;
+        req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
+        auto result = router.route(req);
+        CHECK(result.vtable == &v_cpu,
+              "(CPP-05.4) CPU engine wins over higher-priority CoreML engine "
+              "when CoreML is unavailable");
+
+        /* Confirm the rejection scoring keeps the CoreML engine out of the
+         * candidate set (route_all surfaces every plugin including rejects). */
+        auto all = router.route_all(req);
+        bool saw_coreml_rejected = false;
+        for (const auto& item : all) {
+            if (item.vtable == &v_coreml && item.score <= -1000) {
+                saw_coreml_rejected = true;
+            }
+        }
+        CHECK(saw_coreml_rejected,
+              "(CPP-05.4) CoreML engine appears in route_all() with reject score");
+
+        rac_plugin_unregister("coreml_high_prio");
+        rac_plugin_unregister("cpu_low_prio");
+    }
+
+    /* (CPP-05.5) When the only LLM-serving plugin's runtimes are unavailable
+     *            the C ABI surfaces RAC_ERROR_RUNTIME_UNAVAILABLE. A second
+     *            engine that serves a different primitive (STT) does not
+     *            interfere because it is filed under a different bucket. */
+    {
+        rac::router::HardwareProfile prof{};
+        rac::router::EngineRouter router(prof);
+
+        const rac_runtime_id_t cuda_rts[] = {RAC_RUNTIME_CUDA};
+        auto v_cuda = make_vt("cuda_only_engine", 50, cuda_rts, 1, nullptr, 0);
+        rac_plugin_register(&v_cuda);
+
+        /* Engine that serves STT, never LLM — primitive bucket isolation. */
+        auto v_stt = make_vt("stt_only_engine", 50, nullptr, 0, nullptr, 0);
+        v_stt.llm_ops = nullptr;
+        v_stt.stt_ops =
+            reinterpret_cast<const struct rac_stt_service_ops*>(&k_sentinel);
+        rac_plugin_register(&v_stt);
+
+        const rac_engine_vtable_t* out = nullptr;
+        rac_result_t rc = rac_plugin_route(RAC_PRIMITIVE_GENERATE_TEXT, 0, nullptr, &out);
+        CHECK(rc == RAC_ERROR_RUNTIME_UNAVAILABLE,
+              "(CPP-05.5) C ABI returns RAC_ERROR_RUNTIME_UNAVAILABLE when "
+              "all LLM candidates are runtime-rejected");
+        CHECK(out == nullptr,
+              "(CPP-05.5) C ABI leaves out_vtable NULL on runtime rejection");
+
+        rac_plugin_unregister("cuda_only_engine");
+        rac_plugin_unregister("stt_only_engine");
+    }
+
+    /* (CPP-05.6) rac_runtime_is_registered alias matches rac_runtime_is_available */
+    {
+        /* CPU is bootstrapped lazily on first registry touch — calling either
+         * accessor triggers the bootstrap, so both must agree afterwards. */
+        int avail = rac_runtime_is_available(RAC_RUNTIME_CPU);
+        int reg   = rac_runtime_is_registered(RAC_RUNTIME_CPU);
+        CHECK(avail == reg,
+              "(CPP-05.6) rac_runtime_is_registered mirrors rac_runtime_is_available");
+        CHECK(reg == 1,
+              "(CPP-05.6) CPU runtime is registered after bootstrap");
+
+        /* An obviously-not-registered id should report 0 from both. */
+        CHECK(rac_runtime_is_registered(RAC_RUNTIME_CUDA) == 0,
+              "(CPP-05.6) unregistered CUDA reports 0");
+        CHECK(rac_runtime_is_available(RAC_RUNTIME_CUDA) == 0,
+              "(CPP-05.6) unregistered CUDA reports 0 from available alias too");
+    }
+
     /* --- (bonus) Genie SDK-absent plugins are not routable --------------- */
     {
         rac::router::HardwareProfile prof{};
@@ -376,7 +579,7 @@ int main() {
         rac::router::EngineRouter router(prof);
 
         const rac_runtime_id_t qnn_rts[] = {RAC_RUNTIME_QNN};
-        const uint32_t onnx_fmt[] = {3};
+        const uint32_t onnx_fmt[] = {RAC_MODEL_FORMAT_ID_ONNX};
         auto fallback = make_vt("fallback_llm", 10, nullptr, 0, nullptr, 0);
         auto genie_without_sdk = make_vt("genie", 200, qnn_rts, 1, onnx_fmt, 1,
                                         backend_unavailable_capability_check);
@@ -389,7 +592,7 @@ int main() {
         rac::router::RouteRequest req;
         req.primitive = RAC_PRIMITIVE_GENERATE_TEXT;
         req.preferred_runtime = RAC_RUNTIME_QNN;
-        req.format = 3;
+        req.format = RAC_MODEL_FORMAT_ID_ONNX;
         CHECK(rac_plugin_find(RAC_PRIMITIVE_GENERATE_TEXT) == &fallback,
               "(G) SDK-absent Genie is not in the primitive registry");
         auto result = router.route(req);

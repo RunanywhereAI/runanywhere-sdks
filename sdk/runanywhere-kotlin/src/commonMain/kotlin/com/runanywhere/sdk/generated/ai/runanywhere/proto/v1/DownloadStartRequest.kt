@@ -49,6 +49,22 @@ public class DownloadStartRequest(
     schemaIndex = 2,
   )
   public val resume: Boolean = false,
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "resumeToken",
+    schemaIndex = 3,
+  )
+  public val resume_token: String = "",
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "updateRegistryOnCompletion",
+    schemaIndex = 4,
+  )
+  public val update_registry_on_completion: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DownloadStartRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -65,6 +81,8 @@ public class DownloadStartRequest(
     if (model_id != other.model_id) return false
     if (plan != other.plan) return false
     if (resume != other.resume) return false
+    if (resume_token != other.resume_token) return false
+    if (update_registry_on_completion != other.update_registry_on_completion) return false
     return true
   }
 
@@ -75,6 +93,8 @@ public class DownloadStartRequest(
       result = result * 37 + model_id.hashCode()
       result = result * 37 + (plan?.hashCode() ?: 0)
       result = result * 37 + resume.hashCode()
+      result = result * 37 + resume_token.hashCode()
+      result = result * 37 + update_registry_on_completion.hashCode()
       super.hashCode = result
     }
     return result
@@ -85,6 +105,8 @@ public class DownloadStartRequest(
     result += """model_id=${sanitize(model_id)}"""
     if (plan != null) result += """plan=$plan"""
     result += """resume=$resume"""
+    result += """resume_token=${sanitize(resume_token)}"""
+    result += """update_registry_on_completion=$update_registry_on_completion"""
     return result.joinToString(prefix = "DownloadStartRequest{", separator = ", ", postfix = "}")
   }
 
@@ -92,8 +114,11 @@ public class DownloadStartRequest(
     model_id: String = this.model_id,
     plan: DownloadPlanResult? = this.plan,
     resume: Boolean = this.resume,
+    resume_token: String = this.resume_token,
+    update_registry_on_completion: Boolean = this.update_registry_on_completion,
     unknownFields: ByteString = this.unknownFields,
-  ): DownloadStartRequest = DownloadStartRequest(model_id, plan, resume, unknownFields)
+  ): DownloadStartRequest = DownloadStartRequest(model_id, plan, resume, resume_token,
+      update_registry_on_completion, unknownFields)
 
   public companion object {
     @JvmField
@@ -111,6 +136,10 @@ public class DownloadStartRequest(
         if (value.model_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.model_id)
         if (value.plan != null) size += DownloadPlanResult.ADAPTER.encodedSizeWithTag(2, value.plan)
         if (value.resume != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(3, value.resume)
+        if (value.resume_token != "") size += ProtoAdapter.STRING.encodedSizeWithTag(4,
+            value.resume_token)
+        if (value.update_registry_on_completion != false) size +=
+            ProtoAdapter.BOOL.encodedSizeWithTag(5, value.update_registry_on_completion)
         return size
       }
 
@@ -118,11 +147,19 @@ public class DownloadStartRequest(
         if (value.model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
         if (value.plan != null) DownloadPlanResult.ADAPTER.encodeWithTag(writer, 2, value.plan)
         if (value.resume != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.resume)
+        if (value.resume_token != "") ProtoAdapter.STRING.encodeWithTag(writer, 4,
+            value.resume_token)
+        if (value.update_registry_on_completion != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
+            value.update_registry_on_completion)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DownloadStartRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.update_registry_on_completion != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
+            value.update_registry_on_completion)
+        if (value.resume_token != "") ProtoAdapter.STRING.encodeWithTag(writer, 4,
+            value.resume_token)
         if (value.resume != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.resume)
         if (value.plan != null) DownloadPlanResult.ADAPTER.encodeWithTag(writer, 2, value.plan)
         if (value.model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
@@ -132,11 +169,15 @@ public class DownloadStartRequest(
         var model_id: String = ""
         var plan: DownloadPlanResult? = null
         var resume: Boolean = false
+        var resume_token: String = ""
+        var update_registry_on_completion: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
             2 -> plan = DownloadPlanResult.ADAPTER.decode(reader)
             3 -> resume = ProtoAdapter.BOOL.decode(reader)
+            4 -> resume_token = ProtoAdapter.STRING.decode(reader)
+            5 -> update_registry_on_completion = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -144,6 +185,8 @@ public class DownloadStartRequest(
           model_id = model_id,
           plan = plan,
           resume = resume,
+          resume_token = resume_token,
+          update_registry_on_completion = update_registry_on_completion,
           unknownFields = unknownFields
         )
       }

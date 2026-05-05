@@ -66,6 +66,14 @@ public class DownloadStartResult(
     schemaIndex = 4,
   )
   public val error_message: String = "",
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "resumeToken",
+    schemaIndex = 5,
+  )
+  public val resume_token: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DownloadStartResult, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -84,6 +92,7 @@ public class DownloadStartResult(
     if (model_id != other.model_id) return false
     if (initial_progress != other.initial_progress) return false
     if (error_message != other.error_message) return false
+    if (resume_token != other.resume_token) return false
     return true
   }
 
@@ -96,6 +105,7 @@ public class DownloadStartResult(
       result = result * 37 + model_id.hashCode()
       result = result * 37 + (initial_progress?.hashCode() ?: 0)
       result = result * 37 + error_message.hashCode()
+      result = result * 37 + resume_token.hashCode()
       super.hashCode = result
     }
     return result
@@ -108,6 +118,7 @@ public class DownloadStartResult(
     result += """model_id=${sanitize(model_id)}"""
     if (initial_progress != null) result += """initial_progress=$initial_progress"""
     result += """error_message=${sanitize(error_message)}"""
+    result += """resume_token=${sanitize(resume_token)}"""
     return result.joinToString(prefix = "DownloadStartResult{", separator = ", ", postfix = "}")
   }
 
@@ -117,9 +128,10 @@ public class DownloadStartResult(
     model_id: String = this.model_id,
     initial_progress: DownloadProgress? = this.initial_progress,
     error_message: String = this.error_message,
+    resume_token: String = this.resume_token,
     unknownFields: ByteString = this.unknownFields,
   ): DownloadStartResult = DownloadStartResult(accepted, task_id, model_id, initial_progress,
-      error_message, unknownFields)
+      error_message, resume_token, unknownFields)
 
   public companion object {
     @JvmField
@@ -141,6 +153,8 @@ public class DownloadStartResult(
             value.initial_progress)
         if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(5,
             value.error_message)
+        if (value.resume_token != "") size += ProtoAdapter.STRING.encodedSizeWithTag(6,
+            value.resume_token)
         return size
       }
 
@@ -152,11 +166,15 @@ public class DownloadStartResult(
             value.initial_progress)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 5,
             value.error_message)
+        if (value.resume_token != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
+            value.resume_token)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DownloadStartResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.resume_token != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
+            value.resume_token)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 5,
             value.error_message)
         if (value.initial_progress != null) DownloadProgress.ADAPTER.encodeWithTag(writer, 4,
@@ -172,6 +190,7 @@ public class DownloadStartResult(
         var model_id: String = ""
         var initial_progress: DownloadProgress? = null
         var error_message: String = ""
+        var resume_token: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> accepted = ProtoAdapter.BOOL.decode(reader)
@@ -179,6 +198,7 @@ public class DownloadStartResult(
             3 -> model_id = ProtoAdapter.STRING.decode(reader)
             4 -> initial_progress = DownloadProgress.ADAPTER.decode(reader)
             5 -> error_message = ProtoAdapter.STRING.decode(reader)
+            6 -> resume_token = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -188,6 +208,7 @@ public class DownloadStartResult(
           model_id = model_id,
           initial_progress = initial_progress,
           error_message = error_message,
+          resume_token = resume_token,
           unknownFields = unknownFields
         )
       }

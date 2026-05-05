@@ -42,9 +42,6 @@ ktlint {
     enableExperimentalRules.set(false)
     filter {
         exclude("**/generated/**")
-        // tests/streaming files are mounted as a srcDir but live outside the SDK
-        // source tree and follow repo-level naming conventions, not SDK conventions.
-        exclude { it.file.canonicalPath.contains("/tests/streaming/") }
         include("**/kotlin/**")
     }
 }
@@ -109,6 +106,85 @@ val nativeLibVersion: String =
         ?: resolvedVersion // Default to SDK version
 
 logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, nativeLibVersion=$nativeLibVersion")
+
+val androidRuntimeAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+
+fun androidNdkHomeForRuntime(): File {
+    val explicitNdk = System.getenv("ANDROID_NDK_HOME") ?: System.getenv("NDK_HOME")
+    if (!explicitNdk.isNullOrBlank()) return file(explicitNdk)
+
+    val androidSdk =
+        System.getenv("ANDROID_HOME")
+            ?: System.getenv("ANDROID_SDK_ROOT")
+            ?: "${System.getProperty("user.home")}/Library/Android/sdk"
+    val ndkVersion =
+        rootProject.findProperty("racNdkVersion")?.toString()
+            ?: project.findProperty("racNdkVersion")?.toString()
+            ?: "27.0.12077973"
+    return file("$androidSdk/ndk/$ndkVersion")
+}
+
+fun androidNdkHostTag(): String =
+    when {
+        System.getProperty("os.name").lowercase().contains("mac") -> "darwin-x86_64"
+        System.getProperty("os.name").lowercase().contains("linux") -> "linux-x86_64"
+        else -> throw GradleException("Unsupported host for Android NDK runtime lookup: ${System.getProperty("os.name")}")
+    }
+
+fun androidNdkTripleForAbi(abi: String): String =
+    when (abi) {
+        "arm64-v8a" -> "aarch64-linux-android"
+        "armeabi-v7a" -> "arm-linux-androideabi"
+        "x86_64" -> "x86_64-linux-android"
+        else -> throw GradleException("Unsupported Android ABI for libc++ runtime lookup: $abi")
+    }
+
+fun androidNdkOmpArchForAbi(abi: String): String =
+    when (abi) {
+        "arm64-v8a" -> "aarch64"
+        "armeabi-v7a" -> "arm"
+        "x86_64" -> "x86_64"
+        else -> throw GradleException("Unsupported Android ABI for libomp runtime lookup: $abi")
+    }
+
+fun latestAndroidClangDir(prebuiltDir: File): File {
+    val clangRoot = prebuiltDir.resolve("lib/clang")
+    return clangRoot
+        .listFiles { file -> file.isDirectory }
+        ?.maxByOrNull { it.name }
+        ?: throw GradleException("No Clang runtime directory found under $clangRoot")
+}
+
+fun syncAndroidNdkRuntimeLibs(
+    outputDir: File,
+    includeLibcxx: Boolean,
+    includeLibomp: Boolean,
+) {
+    val ndkHome = androidNdkHomeForRuntime()
+    val prebuiltDir = ndkHome.resolve("toolchains/llvm/prebuilt/${androidNdkHostTag()}")
+    if (!prebuiltDir.isDirectory) {
+        throw GradleException("Android NDK prebuilt directory not found: $prebuiltDir")
+    }
+
+    val clangDir = if (includeLibomp) latestAndroidClangDir(prebuiltDir) else null
+    androidRuntimeAbis.forEach { abi ->
+        val abiDir = outputDir.resolve(abi)
+        val hasNativeLibs = abiDir.isDirectory && abiDir.listFiles { file -> file.extension == "so" }?.isNotEmpty() == true
+        if (!hasNativeLibs) return@forEach
+
+        if (includeLibcxx) {
+            val libcxx = prebuiltDir.resolve("sysroot/usr/lib/${androidNdkTripleForAbi(abi)}/libc++_shared.so")
+            if (!libcxx.isFile) throw GradleException("libc++_shared.so not found for $abi at $libcxx")
+            libcxx.copyTo(abiDir.resolve("libc++_shared.so"), overwrite = true)
+        }
+
+        if (includeLibomp && clangDir != null) {
+            val libomp = clangDir.resolve("lib/linux/${androidNdkOmpArchForAbi(abi)}/libomp.so")
+            if (!libomp.isFile) throw GradleException("libomp.so not found for $abi at $libomp")
+            libomp.copyTo(abiDir.resolve("libomp.so"), overwrite = true)
+        }
+    }
+}
 
 kotlin {
     // Use Java 17 toolchain across targets
@@ -211,15 +287,6 @@ kotlin {
         }
 
         jvmTest {
-            // Phase E + T7.2: the repo-level streaming fixtures live outside
-            // the Kotlin source tree but are imported by the JVM tests:
-            //   - tests/streaming/parity_test.kt      → StreamingParityTests
-            //   - tests/streaming/cancel_parity/*.kt  → CancelParity consumer
-            //   - tests/streaming/perf_bench/*.kt     → PerfBench consumer
-            // Mount the whole `tests/streaming` directory; Kotlin only picks
-            // up `.kt` files, so the C++/Swift/Dart/TS fixtures next to them
-            // are ignored.
-            kotlin.srcDir("../../tests/streaming")
             dependencies {
                 implementation(libs.junit)
                 implementation(libs.mockk)
@@ -588,22 +655,33 @@ tasks.register("downloadJniLibs") {
     }
 }
 
-// Ensure JNI libs are available before Android build
-tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") }.configureEach {
+tasks.register("syncAndroidRuntimeLibs") {
+    group = "runanywhere"
+    description = "Stage 16 KB-aligned Android NDK runtime libraries into commons JNI libs"
+
     if (testLocal) {
         dependsOn("buildLocalJniLibs")
     } else {
         dependsOn("downloadJniLibs")
     }
+
+    val outputDir = file("src/androidMain/jniLibs")
+    outputs.dirs(androidRuntimeAbis.map { file("$outputDir/$it") })
+
+    doLast {
+        syncAndroidNdkRuntimeLibs(outputDir, includeLibcxx = true, includeLibomp = true)
+        logger.lifecycle("Synced 16 KB-aligned Android NDK runtime libs into $outputDir")
+    }
+}
+
+// Ensure JNI libs are available before Android build
+tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") }.configureEach {
+    dependsOn("syncAndroidRuntimeLibs")
 }
 
 // Also ensure preBuild triggers JNI lib preparation
 tasks.matching { it.name == "preBuild" }.configureEach {
-    if (testLocal) {
-        dependsOn("buildLocalJniLibs")
-    } else {
-        dependsOn("downloadJniLibs")
-    }
+    dependsOn("syncAndroidRuntimeLibs")
 }
 
 // Bundle third-party licenses in JVM JAR

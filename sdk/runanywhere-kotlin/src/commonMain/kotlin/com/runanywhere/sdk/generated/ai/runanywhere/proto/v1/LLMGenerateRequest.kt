@@ -27,6 +27,8 @@ import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
 import kotlin.collections.List
+import kotlin.collections.Map
+import kotlin.lazy
 import okio.ByteString
 
 public class LLMGenerateRequest(
@@ -132,6 +134,93 @@ public class LLMGenerateRequest(
     schemaIndex = 12,
   )
   public val execution_target: String = "",
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "requestId",
+    schemaIndex = 13,
+  )
+  public val request_id: String = "",
+  @field:WireField(
+    tag = 15,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "modelId",
+    schemaIndex = 14,
+  )
+  public val model_id: String = "",
+  @field:WireField(
+    tag = 16,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "conversationId",
+    schemaIndex = 15,
+  )
+  public val conversation_id: String = "",
+  @field:WireField(
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 16,
+  )
+  public val seed: Long = 0L,
+  @field:WireField(
+    tag = 18,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "frequencyPenalty",
+    schemaIndex = 17,
+  )
+  public val frequency_penalty: Float = 0f,
+  @field:WireField(
+    tag = 19,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "presencePenalty",
+    schemaIndex = 18,
+  )
+  public val presence_penalty: Float = 0f,
+  @field:WireField(
+    tag = 20,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "minP",
+    schemaIndex = 19,
+  )
+  public val min_p: Float = 0f,
+  @field:WireField(
+    tag = 21,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 20,
+  )
+  public val grammar: String = "",
+  @field:WireField(
+    tag = 22,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "responseFormat",
+    schemaIndex = 21,
+  )
+  public val response_format: String = "",
+  @field:WireField(
+    tag = 23,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "echoPrompt",
+    schemaIndex = 22,
+  )
+  public val echo_prompt: Boolean = false,
+  @field:WireField(
+    tag = 24,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "nThreads",
+    schemaIndex = 23,
+  )
+  public val n_threads: Int = 0,
+  metadata: Map<String, String> = emptyMap(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMGenerateRequest, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -142,6 +231,14 @@ public class LLMGenerateRequest(
     schemaIndex = 8,
   )
   public val stop_sequences: List<String> = immutableCopyOf("stop_sequences", stop_sequences)
+
+  @field:WireField(
+    tag = 25,
+    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    schemaIndex = 24,
+  )
+  public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -167,6 +264,18 @@ public class LLMGenerateRequest(
     if (preferred_framework != other.preferred_framework) return false
     if (json_schema != other.json_schema) return false
     if (execution_target != other.execution_target) return false
+    if (request_id != other.request_id) return false
+    if (model_id != other.model_id) return false
+    if (conversation_id != other.conversation_id) return false
+    if (seed != other.seed) return false
+    if (frequency_penalty != other.frequency_penalty) return false
+    if (presence_penalty != other.presence_penalty) return false
+    if (min_p != other.min_p) return false
+    if (grammar != other.grammar) return false
+    if (response_format != other.response_format) return false
+    if (echo_prompt != other.echo_prompt) return false
+    if (n_threads != other.n_threads) return false
+    if (metadata != other.metadata) return false
     return true
   }
 
@@ -187,6 +296,18 @@ public class LLMGenerateRequest(
       result = result * 37 + preferred_framework.hashCode()
       result = result * 37 + json_schema.hashCode()
       result = result * 37 + execution_target.hashCode()
+      result = result * 37 + request_id.hashCode()
+      result = result * 37 + model_id.hashCode()
+      result = result * 37 + conversation_id.hashCode()
+      result = result * 37 + seed.hashCode()
+      result = result * 37 + frequency_penalty.hashCode()
+      result = result * 37 + presence_penalty.hashCode()
+      result = result * 37 + min_p.hashCode()
+      result = result * 37 + grammar.hashCode()
+      result = result * 37 + response_format.hashCode()
+      result = result * 37 + echo_prompt.hashCode()
+      result = result * 37 + n_threads.hashCode()
+      result = result * 37 + metadata.hashCode()
       super.hashCode = result
     }
     return result
@@ -207,6 +328,18 @@ public class LLMGenerateRequest(
     result += """preferred_framework=${sanitize(preferred_framework)}"""
     result += """json_schema=${sanitize(json_schema)}"""
     result += """execution_target=${sanitize(execution_target)}"""
+    result += """request_id=${sanitize(request_id)}"""
+    result += """model_id=${sanitize(model_id)}"""
+    result += """conversation_id=${sanitize(conversation_id)}"""
+    result += """seed=$seed"""
+    result += """frequency_penalty=$frequency_penalty"""
+    result += """presence_penalty=$presence_penalty"""
+    result += """min_p=$min_p"""
+    result += """grammar=${sanitize(grammar)}"""
+    result += """response_format=${sanitize(response_format)}"""
+    result += """echo_prompt=$echo_prompt"""
+    result += """n_threads=$n_threads"""
+    if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     return result.joinToString(prefix = "LLMGenerateRequest{", separator = ", ", postfix = "}")
   }
 
@@ -224,10 +357,24 @@ public class LLMGenerateRequest(
     preferred_framework: String = this.preferred_framework,
     json_schema: String = this.json_schema,
     execution_target: String = this.execution_target,
+    request_id: String = this.request_id,
+    model_id: String = this.model_id,
+    conversation_id: String = this.conversation_id,
+    seed: Long = this.seed,
+    frequency_penalty: Float = this.frequency_penalty,
+    presence_penalty: Float = this.presence_penalty,
+    min_p: Float = this.min_p,
+    grammar: String = this.grammar,
+    response_format: String = this.response_format,
+    echo_prompt: Boolean = this.echo_prompt,
+    n_threads: Int = this.n_threads,
+    metadata: Map<String, String> = this.metadata,
     unknownFields: ByteString = this.unknownFields,
   ): LLMGenerateRequest = LLMGenerateRequest(prompt, max_tokens, temperature, top_p, top_k,
       system_prompt, emit_thoughts, repetition_penalty, stop_sequences, streaming_enabled,
-      preferred_framework, json_schema, execution_target, unknownFields)
+      preferred_framework, json_schema, execution_target, request_id, model_id, conversation_id,
+      seed, frequency_penalty, presence_penalty, min_p, grammar, response_format, echo_prompt,
+      n_threads, metadata, unknownFields)
 
   public companion object {
     @JvmField
@@ -240,6 +387,9 @@ public class LLMGenerateRequest(
       null, 
       "llm_service.proto"
     ) {
+      private val metadataAdapter: ProtoAdapter<Map<String, String>> by lazy {
+          ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ProtoAdapter.STRING) }
+
       override fun encodedSize(`value`: LLMGenerateRequest): Int {
         var size = value.unknownFields.size
         if (value.prompt != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.prompt)
@@ -264,6 +414,24 @@ public class LLMGenerateRequest(
             value.json_schema)
         if (value.execution_target != "") size += ProtoAdapter.STRING.encodedSizeWithTag(13,
             value.execution_target)
+        if (value.request_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(14,
+            value.request_id)
+        if (value.model_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(15, value.model_id)
+        if (value.conversation_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(16,
+            value.conversation_id)
+        if (value.seed != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(17, value.seed)
+        if (!value.frequency_penalty.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(18,
+            value.frequency_penalty)
+        if (!value.presence_penalty.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(19,
+            value.presence_penalty)
+        if (!value.min_p.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(20, value.min_p)
+        if (value.grammar != "") size += ProtoAdapter.STRING.encodedSizeWithTag(21, value.grammar)
+        if (value.response_format != "") size += ProtoAdapter.STRING.encodedSizeWithTag(22,
+            value.response_format)
+        if (value.echo_prompt != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(23,
+            value.echo_prompt)
+        if (value.n_threads != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(24, value.n_threads)
+        size += metadataAdapter.encodedSizeWithTag(25, value.metadata)
         return size
       }
 
@@ -289,11 +457,45 @@ public class LLMGenerateRequest(
             value.json_schema)
         if (value.execution_target != "") ProtoAdapter.STRING.encodeWithTag(writer, 13,
             value.execution_target)
+        if (value.request_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 14, value.request_id)
+        if (value.model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 15, value.model_id)
+        if (value.conversation_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 16,
+            value.conversation_id)
+        if (value.seed != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 17, value.seed)
+        if (!value.frequency_penalty.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 18,
+            value.frequency_penalty)
+        if (!value.presence_penalty.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 19,
+            value.presence_penalty)
+        if (!value.min_p.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 20, value.min_p)
+        if (value.grammar != "") ProtoAdapter.STRING.encodeWithTag(writer, 21, value.grammar)
+        if (value.response_format != "") ProtoAdapter.STRING.encodeWithTag(writer, 22,
+            value.response_format)
+        if (value.echo_prompt != false) ProtoAdapter.BOOL.encodeWithTag(writer, 23,
+            value.echo_prompt)
+        if (value.n_threads != 0) ProtoAdapter.INT32.encodeWithTag(writer, 24, value.n_threads)
+        metadataAdapter.encodeWithTag(writer, 25, value.metadata)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMGenerateRequest) {
         writer.writeBytes(value.unknownFields)
+        metadataAdapter.encodeWithTag(writer, 25, value.metadata)
+        if (value.n_threads != 0) ProtoAdapter.INT32.encodeWithTag(writer, 24, value.n_threads)
+        if (value.echo_prompt != false) ProtoAdapter.BOOL.encodeWithTag(writer, 23,
+            value.echo_prompt)
+        if (value.response_format != "") ProtoAdapter.STRING.encodeWithTag(writer, 22,
+            value.response_format)
+        if (value.grammar != "") ProtoAdapter.STRING.encodeWithTag(writer, 21, value.grammar)
+        if (!value.min_p.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 20, value.min_p)
+        if (!value.presence_penalty.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 19,
+            value.presence_penalty)
+        if (!value.frequency_penalty.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 18,
+            value.frequency_penalty)
+        if (value.seed != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 17, value.seed)
+        if (value.conversation_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 16,
+            value.conversation_id)
+        if (value.model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 15, value.model_id)
+        if (value.request_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 14, value.request_id)
         if (value.execution_target != "") ProtoAdapter.STRING.encodeWithTag(writer, 13,
             value.execution_target)
         if (value.json_schema != "") ProtoAdapter.STRING.encodeWithTag(writer, 12,
@@ -331,6 +533,18 @@ public class LLMGenerateRequest(
         var preferred_framework: String = ""
         var json_schema: String = ""
         var execution_target: String = ""
+        var request_id: String = ""
+        var model_id: String = ""
+        var conversation_id: String = ""
+        var seed: Long = 0L
+        var frequency_penalty: Float = 0f
+        var presence_penalty: Float = 0f
+        var min_p: Float = 0f
+        var grammar: String = ""
+        var response_format: String = ""
+        var echo_prompt: Boolean = false
+        var n_threads: Int = 0
+        val metadata = mutableMapOf<String, String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
@@ -346,6 +560,18 @@ public class LLMGenerateRequest(
             11 -> preferred_framework = ProtoAdapter.STRING.decode(reader)
             12 -> json_schema = ProtoAdapter.STRING.decode(reader)
             13 -> execution_target = ProtoAdapter.STRING.decode(reader)
+            14 -> request_id = ProtoAdapter.STRING.decode(reader)
+            15 -> model_id = ProtoAdapter.STRING.decode(reader)
+            16 -> conversation_id = ProtoAdapter.STRING.decode(reader)
+            17 -> seed = ProtoAdapter.INT64.decode(reader)
+            18 -> frequency_penalty = ProtoAdapter.FLOAT.decode(reader)
+            19 -> presence_penalty = ProtoAdapter.FLOAT.decode(reader)
+            20 -> min_p = ProtoAdapter.FLOAT.decode(reader)
+            21 -> grammar = ProtoAdapter.STRING.decode(reader)
+            22 -> response_format = ProtoAdapter.STRING.decode(reader)
+            23 -> echo_prompt = ProtoAdapter.BOOL.decode(reader)
+            24 -> n_threads = ProtoAdapter.INT32.decode(reader)
+            25 -> metadata.putAll(metadataAdapter.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -363,6 +589,18 @@ public class LLMGenerateRequest(
           preferred_framework = preferred_framework,
           json_schema = json_schema,
           execution_target = execution_target,
+          request_id = request_id,
+          model_id = model_id,
+          conversation_id = conversation_id,
+          seed = seed,
+          frequency_penalty = frequency_penalty,
+          presence_penalty = presence_penalty,
+          min_p = min_p,
+          grammar = grammar,
+          response_format = response_format,
+          echo_prompt = echo_prompt,
+          n_threads = n_threads,
+          metadata = metadata,
           unknownFields = unknownFields
         )
       }

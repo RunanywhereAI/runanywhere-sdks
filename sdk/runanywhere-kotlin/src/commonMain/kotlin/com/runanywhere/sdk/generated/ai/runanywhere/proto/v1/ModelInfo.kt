@@ -73,6 +73,12 @@ public class ModelInfo(
     schemaIndex = 4,
   )
   public val framework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED,
+  /**
+   * Portable URL/URI string for catalog metadata and download planning.
+   * SDK/platform adapters own native HTTP execution, authentication/session
+   * state, browser fetch handles, URLSession/background-transfer objects,
+   * and permission prompts.
+   */
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -81,6 +87,12 @@ public class ModelInfo(
     schemaIndex = 5,
   )
   public val download_url: String = "",
+  /**
+   * Stable path or URI string after platform adapters have normalized native
+   * file handles. Do not place Android SAF/content URI permissions, iOS
+   * security-scoped bookmarks, browser FileSystemHandle objects, or other
+   * OS-governed capabilities in this C++-owned metadata field.
+   */
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",

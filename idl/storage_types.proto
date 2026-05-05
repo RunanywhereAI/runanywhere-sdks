@@ -171,6 +171,8 @@ message StorageAvailability {
     int64           available_bytes  = 3;
     optional string warning_message  = 4;
     optional string recommendation   = 5;
+    int64           shortfall_bytes  = 6;
+    float           required_to_available_ratio = 7;
 }
 
 // ---------------------------------------------------------------------------
@@ -204,12 +206,14 @@ message StorageInfoRequest {
     bool include_device = 1;
     bool include_app    = 2;
     bool include_models = 3;
+    bool include_cache  = 4;
 }
 
 message StorageInfoResult {
     bool        success       = 1;
     StorageInfo info          = 2;
     string      error_message = 3;
+    repeated string warnings  = 4;
 }
 
 message StorageAvailabilityRequest {
@@ -217,6 +221,8 @@ message StorageAvailabilityRequest {
     int64  required_bytes            = 2;
     double safety_margin             = 3;
     bool   include_existing_model_bytes = 4;
+    bool   include_delete_plan       = 5;
+    bool   allow_cache_reclamation   = 6;
 }
 
 message StorageAvailabilityResult {
@@ -224,6 +230,7 @@ message StorageAvailabilityResult {
     StorageAvailability availability  = 2;
     repeated string     warnings      = 3;
     string              error_message = 4;
+    optional StorageDeletePlan delete_plan = 5;
 }
 
 message StorageDeletePlanRequest {
@@ -231,6 +238,8 @@ message StorageDeletePlanRequest {
     int64           required_bytes  = 2;
     bool            include_cache   = 3;
     bool            oldest_first    = 4;
+    bool            allow_loaded_models = 5;
+    bool            include_download_partials = 6;
 }
 
 message StorageDeleteCandidate {
@@ -239,6 +248,9 @@ message StorageDeleteCandidate {
     optional int64 last_used_ms      = 3;
     bool           is_loaded         = 4;
     string         local_path        = 5;
+    bool           requires_unload   = 6;
+    bool           requires_platform_delete = 7;
+    string         storage_key       = 8;
 }
 
 message StorageDeletePlan {
@@ -248,6 +260,9 @@ message StorageDeletePlan {
     repeated StorageDeleteCandidate candidates                 = 4;
     repeated string                 warnings                   = 5;
     string                          error_message              = 6;
+    bool                            requires_unload            = 7;
+    bool                            requires_platform_delete   = 8;
+    int32                           candidate_count            = 9;
 }
 
 message StorageDeleteRequest {
@@ -256,6 +271,9 @@ message StorageDeleteRequest {
     bool            clear_registry_paths = 3;
     bool            unload_if_loaded     = 4;
     bool            dry_run              = 5;
+    optional StorageDeletePlan plan      = 6;
+    bool            require_plan_match   = 7;
+    bool            allow_platform_delete = 8;
 }
 
 message StorageDeleteResult {
@@ -265,4 +283,30 @@ message StorageDeleteResult {
     repeated string failed_model_ids  = 4;
     repeated string warnings          = 5;
     string          error_message     = 6;
+    repeated string skipped_model_ids = 7;
+    bool            dry_run           = 8;
+    bool            registry_updated  = 9;
+    bool            files_deleted     = 10;
+}
+
+// Logical Storage service contract. Platform adapters remain responsible for
+// directory resolution, sandbox/bookmark/SAF/File System Access handles, OS
+// free-space facts, permissions, and destructive file operations that require
+// platform participation. C++ consumes only serialized request/result messages
+// for metadata aggregation, availability checks, safe delete planning, and
+// scoped delete execution.
+service Storage {
+    // Aggregate normalized storage metadata for device, app, cache, and models.
+    rpc Info(StorageInfoRequest) returns (StorageInfoResult);
+
+    // Check whether required bytes fit under the configured policy and optional
+    // delete-plan inputs.
+    rpc Availability(StorageAvailabilityRequest) returns (StorageAvailabilityResult);
+
+    // Build a non-destructive plan for reclaiming model/cache bytes.
+    rpc DeletePlan(StorageDeletePlanRequest) returns (StorageDeletePlan);
+
+    // Execute or dry-run a scoped delete request using a validated plan when
+    // supplied by the caller.
+    rpc Delete(StorageDeleteRequest) returns (StorageDeleteResult);
 }

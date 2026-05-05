@@ -97,7 +97,9 @@ RAC_API rac_result_t rac_solution_cancel(rac_solution_handle_t handle);
 /**
  * Feed one item into the root input edge. Intended for pipelines with
  * an externally-driven source (e.g. microphone captures, file feeders,
- * tests). Payload is a NUL-terminated UTF-8 string.
+ * tests). Payload is wrapped as a `text.utf8` solution payload with a typed
+ * text body; graphs whose root input expects another payload type reject it
+ * with RAC_ERROR_INVALID_ARGUMENT.
  *
  * @return RAC_SUCCESS or RAC_ERROR_COMPONENT_NOT_READY if the solution
  *         has not been started.

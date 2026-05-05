@@ -1,168 +1,356 @@
 /**
  * RunAnywhere+VAD.ts
  *
- * Top-level VAD (Voice Activity Detection) namespace — mirrors Swift's
- * `RunAnywhere+VAD.swift`. Provides a `RunAnywhere.vad.*` capability surface
- * around the existing convenience verbs (detectSpeech / startVAD / stopVAD /
- * cleanupVAD / setVADCallback / isVADReady) plus the canonical §6 methods.
+ * Voice activity detection namespace — mirrors Swift's `RunAnywhere+VAD.swift`.
+ * Provides `RunAnywhere.vad.*` capability surface for owning VAD component
+ * handles plus a top-level `RunAnywhere.detectVoice(audio, options)` shortcut.
  *
- * Phase C-prime WEB: closes the gap where the Web SDK exposed VAD verbs only
- * as flat top-level functions. The new namespace is symmetric with the
- * `RunAnywhere.solutions`, `RunAnywhere.storage`, `RunAnywhere.plugins`
- * surfaces and matches the Swift / Kotlin / RN `RunAnywhere.vad` shape.
+ * The proto-byte adapters (`VADProtoAdapter`) take a numeric `handle` argument
+ * — it comes from `_rac_vad_component_create()` followed by
+ * `_rac_vad_component_initialize()` (and optionally
+ * `_rac_vad_component_load_model()` when using a Silero model). This facade
+ * owns those calls so consumers never have to touch raw exports.
  */
 
 import {
-  detectSpeech,
-  setVADCallback,
-  startVAD,
-  stopVAD,
-  cleanupVAD,
-  isVADReady,
-} from './RunAnywhere+Convenience';
-import type {
-  SpeechActivityCallback,
-  VADResult,
-  VADOptions,
-  VADConfiguration,
-} from '../../types/index';
+  type VADConfiguration,
+  type VADOptions,
+  type VADResult,
+  type VADStatistics,
+  type SpeechActivityEvent,
+} from '@runanywhere/proto-ts/vad_options';
 import { SDKException } from '../../Foundation/SDKException';
-import { ExtensionPoint } from '../../Infrastructure/ExtensionPoint';
+import { SDKLogger } from '../../Foundation/SDKLogger';
+import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
+import {
+  tryRunanywhereModule,
+  type EmscriptenRunanywhereModule,
+} from '../../runtime/EmscriptenModule';
+import { VADProtoAdapter, type ProtoEventHandler } from '../../Adapters/ModalityProtoAdapter';
+import { ModelLifecycle } from './RunAnywhere+ModelLifecycle';
 
-/** Extended VAD provider with model management and full canonical surface. */
-interface VADModelProvider {
-  detectVoiceActivity?(audio: Uint8Array, options?: VADOptions): Promise<VADResult>;
-  streamVAD?(audio: AsyncIterable<Uint8Array>): AsyncIterable<VADResult>;
-  initializeVAD?(config?: VADConfiguration): Promise<void>;
-  resetVAD?(): Promise<void>;
-  setVADAudioBufferCallback?(cb: (buffer: Uint8Array) => void): void;
-  setVADStatisticsCallback?(cb: (stats: unknown) => void): void;
-  loadVADModel?(modelId: string): Promise<void>;
-  unloadVADModel?(): Promise<void>;
-  isVADModelLoaded?: boolean;
+export type { VADConfiguration, VADOptions, VADResult, VADStatistics, SpeechActivityEvent };
+
+const logger = new SDKLogger('VAD');
+
+interface VADComponentModule extends EmscriptenRunanywhereModule {
+  _rac_vad_component_create?(outHandlePtr: number): number;
+  _rac_vad_component_initialize?(handle: number): number;
+  _rac_vad_component_destroy?(handle: number): void;
+  _rac_vad_component_is_initialized?(handle: number): number;
+  _rac_vad_component_load_model?(
+    handle: number,
+    modelPathPtr: number,
+    modelIdPtr: number,
+    modelNamePtr: number,
+  ): number;
+  _rac_vad_component_unload?(handle: number): number;
+  _rac_vad_component_reset?(handle: number): number;
+  _rac_vad_component_start?(handle: number): number;
+  _rac_vad_component_stop?(handle: number): number;
 }
 
-function getVADProvider(): VADModelProvider | null {
-  return ExtensionPoint.getProvider('vad') as VADModelProvider | null;
+function requireVADModule(feature: string): VADComponentModule {
+  const module = tryRunanywhereModule() as VADComponentModule | null;
+  if (!module) {
+    throw SDKException.backendNotAvailable(
+      feature,
+      'RunAnywhere WASM module is not initialized. Call a backend.register() first.',
+    );
+  }
+  return module;
 }
 
-/**
- * Free-function namespace mirroring Swift's `RunAnywhere.vad` extension.
- *
- * Each entry is a thin wrapper around the corresponding verb in
- * `RunAnywhere+Convenience.ts`. Apps can use either form:
- *   - `RunAnywhere.detectSpeech(audio)` — flat top-level (Swift parity)
- *   - `RunAnywhere.vad.detect(audio)`   — namespace form (Swift parity too)
- */
+function defaultVADConfig(overrides?: Partial<VADConfiguration>): VADConfiguration {
+  return {
+    modelId: '',
+    sampleRate: 16000,
+    frameLengthMs: 100,
+    threshold: 0.015,
+    enableAutoCalibration: false,
+    calibrationMultiplier: 1.5,
+    preferredFramework: undefined,
+    ...(overrides ?? {}),
+  } as VADConfiguration;
+}
+
+function defaultVADOptions(overrides?: Partial<VADOptions>): VADOptions {
+  return {
+    threshold: 0,
+    minSpeechDurationMs: 100,
+    minSilenceDurationMs: 300,
+    maxSpeechDurationMs: 0,
+    ...(overrides ?? {}),
+  } as VADOptions;
+}
+
+function callCreate(module: VADComponentModule): number {
+  if (typeof module._rac_vad_component_create !== 'function') {
+    throw SDKException.backendNotAvailable(
+      'VAD.create',
+      'Loaded WASM module does not export _rac_vad_component_create.',
+    );
+  }
+  const bridge = new ProtoWasmBridge(module, logger);
+  const outPtr = bridge.allocOutPtr();
+  if (!outPtr) {
+    throw SDKException.fromCode(-180, 'VAD.create: failed to allocate output handle slot');
+  }
+  try {
+    const rc = module._rac_vad_component_create(outPtr);
+    if (rc !== 0) {
+      throw SDKException.fromRACResult(
+        rc,
+        `rac_vad_component_create failed with code ${rc}`,
+      );
+    }
+    const handle = bridge.readU32(outPtr);
+    if (!handle) {
+      throw SDKException.componentNotReady(
+        'vad',
+        'rac_vad_component_create returned null handle',
+      );
+    }
+    return handle;
+  } finally {
+    bridge.free(outPtr);
+  }
+}
+
+function callLoadModel(
+  module: VADComponentModule,
+  handle: number,
+  modelPath: string,
+  modelId?: string,
+  modelName?: string,
+): void {
+  if (typeof module._rac_vad_component_load_model !== 'function') {
+    // Energy-based VAD does not require model loading. The proto-byte
+    // configure path is the only requirement. Treat absence as a no-op.
+    return;
+  }
+  const bridge = new ProtoWasmBridge(module, logger);
+  const pathPtr = bridge.allocUtf8(modelPath);
+  if (!pathPtr) {
+    throw SDKException.fromCode(-180, 'VAD.loadModel: failed to allocate model path');
+  }
+  const idPtr = modelId ? bridge.allocUtf8(modelId) : 0;
+  const namePtr = modelName ? bridge.allocUtf8(modelName) : 0;
+  try {
+    const rc = module._rac_vad_component_load_model(handle, pathPtr, idPtr, namePtr);
+    if (rc !== 0) {
+      throw SDKException.fromRACResult(
+        rc,
+        `rac_vad_component_load_model failed with code ${rc}`,
+      );
+    }
+  } finally {
+    bridge.free(pathPtr);
+    if (idPtr) bridge.free(idPtr);
+    if (namePtr) bridge.free(namePtr);
+  }
+}
+
+/** Top-level detectVoice options for the ergonomic shortcut. */
+export interface DetectVoiceOptions extends Partial<VADOptions> {
+  /** Optional explicit model id. */
+  modelId?: string;
+  /** Optional explicit model file path (only needed for non-energy VAD). */
+  modelPath?: string;
+  /** Optional configuration override. */
+  config?: Partial<VADConfiguration>;
+}
+
 export const VAD = {
-  /** Run VAD on a single buffer; returns true when speech is present. */
-  detect(audio: Float32Array): boolean {
-    return detectSpeech(audio);
+  /**
+   * Returns true when the WASM module is loaded with both the proto-byte VAD
+   * exports AND the component lifecycle exports (create / destroy).
+   */
+  supportsProtoVAD(): boolean {
+    const module = tryRunanywhereModule() as VADComponentModule | null;
+    if (!module) return false;
+    if (typeof module._rac_vad_component_create !== 'function') return false;
+    if (typeof module._rac_vad_component_destroy !== 'function') return false;
+    return VADProtoAdapter.tryDefault()?.supportsProtoVAD() ?? false;
   },
 
   /**
-   * Full VAD inference with result (§6 `detectVoiceActivity`).
-   * Returns a structured `VADResult` with probability, timing, and segments.
+   * Create a fresh VAD component handle. Caller owns lifecycle and MUST call
+   * `VAD.destroy(handle)` when finished.
    */
-  async detectVoiceActivity(audio: Uint8Array, options?: VADOptions): Promise<VADResult> {
-    const provider = getVADProvider();
-    if (typeof provider?.detectVoiceActivity === 'function') {
-      return provider.detectVoiceActivity(audio, options);
-    }
-    throw SDKException.backendNotAvailable(
-      'detectVoiceActivity',
-      'The active VAD provider does not implement detectVoiceActivity.',
-    );
+  create(): number {
+    const module = requireVADModule('VAD.create');
+    return callCreate(module);
   },
 
   /**
-   * Streaming VAD over an audio stream (§6 `streamVAD`).
-   * Returns an AsyncIterable of VADResult, one per chunk.
+   * Configure the VAD component (sample rate, threshold, etc). Wraps the
+   * proto-byte configure call.
    */
-  streamVAD(audio: AsyncIterable<Uint8Array>): AsyncIterable<VADResult> {
-    const provider = getVADProvider();
-    if (typeof provider?.streamVAD === 'function') {
-      return provider.streamVAD(audio);
+  configure(handle: number, config?: Partial<VADConfiguration>): boolean {
+    const adapter = VADProtoAdapter.tryDefault();
+    if (!adapter || !adapter.supportsProtoVAD()) {
+      throw SDKException.backendNotAvailable(
+        'VAD.configure',
+        'No Web WASM backend with rac_vad_*_proto exports is registered.',
+      );
     }
-    throw SDKException.backendNotAvailable(
-      'streamVAD',
-      'The active VAD provider does not implement streaming VAD.',
-    );
+    return adapter.configure(handle, defaultVADConfig(config));
   },
 
-  /** Initialize VAD with optional config (§6). */
-  async initializeVAD(config?: VADConfiguration): Promise<void> {
-    const provider = getVADProvider();
-    if (typeof provider?.initializeVAD === 'function') {
-      return provider.initializeVAD(config);
+  /**
+   * Initialize the VAD pipeline. Required after `configure`.
+   */
+  initialize(handle: number): boolean {
+    const module = tryRunanywhereModule() as VADComponentModule | null;
+    if (!module || typeof module._rac_vad_component_initialize !== 'function') {
+      throw SDKException.backendNotAvailable(
+        'VAD.initialize',
+        'Loaded WASM module does not export _rac_vad_component_initialize.',
+      );
     }
+    const rc = module._rac_vad_component_initialize(handle);
+    return rc === 0;
   },
 
-  /** Set the speech-activity callback (§6 `setVADSpeechActivityCallback`). Replaces previous, pass null to clear. */
-  setVADSpeechActivityCallback(callback: SpeechActivityCallback | null): void {
-    setVADCallback(callback);
+  /** Whether the VAD component has finished initialization. */
+  isInitialized(handle: number): boolean {
+    const module = tryRunanywhereModule() as VADComponentModule | null;
+    if (!module || typeof module._rac_vad_component_is_initialized !== 'function') return false;
+    return Boolean(module._rac_vad_component_is_initialized(handle));
   },
 
-  /** Set a callback for raw audio buffers (§6 `setVADAudioBufferCallback`). */
-  setVADAudioBufferCallback(cb: (buffer: Uint8Array) => void): void {
-    getVADProvider()?.setVADAudioBufferCallback?.(cb);
+  /**
+   * Load a Silero (or other ONNX) VAD model into the component. Optional —
+   * the energy-based VAD path needs only `configure` + `initialize`.
+   */
+  loadModel(handle: number, modelPath: string, modelId?: string, modelName?: string): void {
+    const module = requireVADModule('VAD.loadModel');
+    callLoadModel(module, handle, modelPath, modelId, modelName);
   },
 
-  /** Set a callback for VAD statistics (§6 `setVADStatisticsCallback`). */
-  setVADStatisticsCallback(cb: (stats: unknown) => void): void {
-    getVADProvider()?.setVADStatisticsCallback?.(cb);
-  },
-
-  /** Mirror of Swift `RunAnywhere.startVAD()`. */
-  async start(): Promise<void> {
-    return startVAD();
-  },
-
-  /** Mirror of Swift `RunAnywhere.stopVAD()`. */
-  async stop(): Promise<void> {
-    return stopVAD();
-  },
-
-  /** Mirror of Swift `RunAnywhere.cleanupVAD()`. */
-  async cleanup(): Promise<void> {
-    return cleanupVAD();
-  },
-
-  /** Reset VAD internal state (§6). */
-  async resetVAD(): Promise<void> {
-    const provider = getVADProvider();
-    if (typeof provider?.resetVAD === 'function') {
-      return provider.resetVAD();
+  /**
+   * Process a chunk of audio samples. Returns `VADResult` with the speech
+   * decision; subscribe to activity events via `setActivityHandler`.
+   */
+  process(
+    handle: number,
+    samples: Float32Array,
+    options?: Partial<VADOptions>,
+  ): VADResult {
+    const adapter = VADProtoAdapter.tryDefault();
+    if (!adapter || !adapter.supportsProtoVAD()) {
+      throw SDKException.backendNotAvailable(
+        'VAD.process',
+        'No Web WASM backend with rac_vad_*_proto exports is registered.',
+      );
     }
-  },
-
-  /** Load a VAD model by ID (§6). */
-  async loadVADModel(modelId: string): Promise<void> {
-    const provider = getVADProvider();
-    if (typeof provider?.loadVADModel === 'function') {
-      return provider.loadVADModel(modelId);
+    const result = adapter.process(handle, samples, defaultVADOptions(options));
+    if (!result) {
+      throw SDKException.backendNotAvailable(
+        'VAD.process',
+        'rac_vad_component_process_proto returned no VADResult bytes.',
+      );
     }
-    throw SDKException.backendNotAvailable(
-      'loadVADModel',
-      'No VAD provider registered. Install and register @runanywhere/web-onnx.',
-    );
+    return result;
   },
 
-  /** Unload the active VAD model (§6). */
-  async unloadVADModel(): Promise<void> {
-    const provider = getVADProvider();
-    if (typeof provider?.unloadVADModel === 'function') {
-      return provider.unloadVADModel();
+  /** Latest aggregate VAD statistics (frames processed, segments, etc). */
+  statistics(handle: number): VADStatistics {
+    const adapter = VADProtoAdapter.tryDefault();
+    if (!adapter || !adapter.supportsProtoVAD()) {
+      throw SDKException.backendNotAvailable(
+        'VAD.statistics',
+        'No Web WASM backend with rac_vad_*_proto exports is registered.',
+      );
     }
+    const stats = adapter.statistics(handle);
+    if (!stats) {
+      throw SDKException.backendNotAvailable(
+        'VAD.statistics',
+        'rac_vad_component_get_statistics_proto returned no VADStatistics bytes.',
+      );
+    }
+    return stats;
   },
 
-  /** Whether a VAD model is currently loaded (§6). */
-  get isVADModelLoaded(): boolean {
-    return getVADProvider()?.isVADModelLoaded ?? false;
+  /**
+   * Subscribe to speech-activity events (started / ended). Pass `null` to
+   * unsubscribe.
+   */
+  setActivityHandler(
+    handle: number,
+    handler: ProtoEventHandler<SpeechActivityEvent> | null,
+  ): boolean {
+    const adapter = VADProtoAdapter.tryDefault();
+    if (!adapter || !adapter.supportsProtoVAD()) {
+      throw SDKException.backendNotAvailable(
+        'VAD.setActivityHandler',
+        'No Web WASM backend with rac_vad_*_proto exports is registered.',
+      );
+    }
+    return adapter.setActivityHandler(handle, handler);
   },
 
-  /** Whether the VAD provider is registered and its model loaded. */
-  isReady(): boolean {
-    return isVADReady();
+  /** Start the VAD pipeline. */
+  start(handle: number): boolean {
+    const module = tryRunanywhereModule() as VADComponentModule | null;
+    if (!module || typeof module._rac_vad_component_start !== 'function') return false;
+    return module._rac_vad_component_start(handle) === 0;
+  },
+
+  /** Stop the VAD pipeline. */
+  stop(handle: number): boolean {
+    const module = tryRunanywhereModule() as VADComponentModule | null;
+    if (!module || typeof module._rac_vad_component_stop !== 'function') return false;
+    return module._rac_vad_component_stop(handle) === 0;
+  },
+
+  /** Reset the VAD state (clears any speech-segment buffers). */
+  reset(handle: number): boolean {
+    const module = tryRunanywhereModule() as VADComponentModule | null;
+    if (!module || typeof module._rac_vad_component_reset !== 'function') return false;
+    return module._rac_vad_component_reset(handle) === 0;
+  },
+
+  /** Destroy the component handle. Idempotent. */
+  destroy(handle: number): void {
+    const module = tryRunanywhereModule() as VADComponentModule | null;
+    if (!module || typeof module._rac_vad_component_destroy !== 'function') return;
+    module._rac_vad_component_destroy(handle);
   },
 };
+
+/**
+ * Top-level ergonomic shortcut: auto-creates a handle, applies default config,
+ * runs `process`, and destroys the handle.
+ */
+export async function detectVoice(
+  audio: Float32Array,
+  options?: DetectVoiceOptions,
+): Promise<VADResult> {
+  const module = requireVADModule('RunAnywhere.detectVoice');
+  let modelPath = options?.modelPath;
+  let modelId = options?.modelId;
+  let modelName: string | undefined;
+
+  if (!modelPath && ModelLifecycle.supportsNativeLifecycle()) {
+    const current = ModelLifecycle.currentModel({ includeModelMetadata: true });
+    if (current?.modelId) {
+      modelPath = current.resolvedPath || current.modelId;
+      modelId = current.modelId;
+    }
+  }
+
+  const handle = callCreate(module);
+  try {
+    if (modelPath) {
+      callLoadModel(module, handle, modelPath, modelId, modelName);
+    }
+    VAD.configure(handle, options?.config);
+    VAD.initialize(handle);
+    return VAD.process(handle, audio, options);
+  } finally {
+    VAD.destroy(handle);
+  }
+}

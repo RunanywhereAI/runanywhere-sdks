@@ -6,14 +6,14 @@
  *
  * Model registration is done via RunAnywhere.registerModel() / RunAnywhere.registerMultiFileModel()
  * on the core SDK, matching the Swift SDK pattern where ONNX only exposes
- * register(), unregister(), and canHandle*().
+ * register() and unregister().
  *
  * Reference: sdk/runanywhere-swift/Sources/ONNXRuntime/ONNX.swift
  */
 
 import { ONNXProvider } from './ONNXProvider';
+import { InferenceFramework } from '@runanywhere/proto-ts/model_types';
 import {
-  LLMFramework,
   SDKComponent,
   SDKLogger,
 } from '@runanywhere/core';
@@ -26,15 +26,15 @@ const logger = new SDKLogger('ONNX');
  * Matches iOS: public enum ONNX: RunAnywhereModule
  *
  * Only provides backend registration. Model registration is done via
- * RunAnywhere.registerModel(framework: LLMFramework.ONNX, ...) on the core SDK.
+ * RunAnywhere.registerModel(framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX, ...) on the core SDK.
  *
  * ## Usage
  *
  * ```typescript
  * import { ONNX } from '@runanywhere/onnx';
- * import { RunAnywhere, ModelCategory, LLMFramework } from '@runanywhere/core';
+ * import { RunAnywhere, ModelCategory, InferenceFramework } from '@runanywhere/core';
  *
- * // Register ONNX backend
+ * // Register ONNX backend providers
  * await ONNX.register();
  *
  * // Register models via RunAnywhere (matching iOS pattern)
@@ -42,8 +42,8 @@ const logger = new SDKLogger('ONNX');
  *   id: 'sherpa-onnx-whisper-tiny.en',
  *   name: 'Sherpa Whisper Tiny (ONNX)',
  *   url: '...',
- *   framework: LLMFramework.ONNX,
- *   modality: ModelCategory.SpeechRecognition,
+ *   framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+ *   modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
  *   memoryRequirement: 75_000_000
  * });
  * ```
@@ -55,7 +55,7 @@ export const ONNX = {
    */
   moduleId: 'onnx',
   moduleName: 'ONNX Runtime',
-  inferenceFramework: LLMFramework.ONNX,
+  inferenceFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
   capabilities: [SDKComponent.SDK_COMPONENT_STT, SDKComponent.SDK_COMPONENT_TTS, SDKComponent.SDK_COMPONENT_VAD] as const,
   defaultPriority: 100,
 
@@ -67,10 +67,13 @@ export const ONNX = {
    *
    * Matches iOS: static func register(priority: Int = defaultPriority)
    */
-  async register(): Promise<void> {
+  async register(): Promise<boolean> {
     logger.info('Registering ONNX module (STT + TTS + VAD)');
-    await ONNXProvider.register();
-    logger.info('ONNX module registered');
+    const registered = await ONNXProvider.register();
+    if (registered) {
+      logger.info('ONNX module registered');
+    }
+    return registered;
   },
 
   /**
@@ -84,26 +87,9 @@ export const ONNX = {
   },
 
   /**
-   * Check if this module can handle STT for the given model
-   * Matches iOS: static func canHandleSTT(modelId: String?) -> Bool
+   * Check if this module is registered with the native backend registry.
    */
-  canHandleSTT(modelId?: string): boolean {
-    return ONNXProvider.canHandleSTT(modelId);
-  },
-
-  /**
-   * Check if this module can handle TTS for the given model
-   * Matches iOS: static func canHandleTTS(modelId: String?) -> Bool
-   */
-  canHandleTTS(modelId?: string): boolean {
-    return ONNXProvider.canHandleTTS(modelId);
-  },
-
-  /**
-   * Check if this module can handle VAD for the given model
-   * Matches iOS: static func canHandleVAD(modelId: String?) -> Bool
-   */
-  canHandleVAD(modelId?: string): boolean {
-    return ONNXProvider.canHandleVAD(modelId);
+  async isRegistered(): Promise<boolean> {
+    return ONNXProvider.isRegistered();
   },
 };

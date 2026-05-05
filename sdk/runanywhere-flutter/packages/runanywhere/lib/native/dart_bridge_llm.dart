@@ -20,7 +20,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
-import 'package:runanywhere/features/llm/llm_configuration.dart';
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationResult;
@@ -508,13 +508,26 @@ class DartBridgeLLM {
     String? systemPrompt,
     bool streamingEnabled = false,
   }) {
-    LLMComponentConfig(
-      contextLength: contextLength,
-      maxTokens: maxTokens,
-      temperature: temperature,
-      systemPrompt: systemPrompt,
-      streamingEnabled: streamingEnabled,
-    ).validate();
+    if (contextLength <= 0) {
+      throw SDKException.validationFailed(
+        'Context length must be greater than 0',
+      );
+    }
+    if (!temperature.isFinite || temperature < 0 || temperature > 2.0) {
+      throw SDKException.validationFailed(
+        'Temperature must be between 0 and 2.0',
+      );
+    }
+    if (maxTokens <= 0 || maxTokens > contextLength) {
+      throw SDKException.validationFailed(
+        'Max tokens must be between 1 and context length',
+      );
+    }
+    if (systemPrompt != null && systemPrompt.length > contextLength * 4) {
+      throw SDKException.validationFailed(
+        "systemPrompt length (${systemPrompt.length} chars) exceeds the model's context window",
+      );
+    }
   }
 
   // MARK: - Cleanup

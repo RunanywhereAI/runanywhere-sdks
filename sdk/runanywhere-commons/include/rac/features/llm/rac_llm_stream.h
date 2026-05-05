@@ -23,6 +23,11 @@
  * copy them out — the C++ side reuses a thread-local scratch buffer and
  * an arena-backed proto message (`cc_enable_arenas` in llm_service.proto)
  * across events, so holding onto the pointer is undefined behavior.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `SDK-facing default`.
+ * rac_llm_set_stream_proto_callback / rac_llm_unset_stream_proto_callback
+ * and the callback typedef rac_llm_stream_proto_callback_fn carry
+ * runanywhere.v1.LLMStreamEvent bytes.
  */
 
 #ifndef RAC_FEATURES_LLM_RAC_LLM_STREAM_H

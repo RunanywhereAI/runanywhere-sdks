@@ -1,12 +1,11 @@
 import 'dart:async';
 
-import 'package:runanywhere/adapters/http_client_adapter.dart';
-import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/native/dart_bridge_telemetry.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
-import 'package:uuid/uuid.dart';
 
-/// Telemetry event categories (matches C++/Swift/React Native categories)
+/// Telemetry event categories (kept for API compatibility — commons owns
+/// the canonical category vocabulary now).
 enum TelemetryCategory {
   sdk,
   model,
@@ -18,585 +17,166 @@ enum TelemetryCategory {
   error,
 }
 
-extension TelemetryCategoryExtension on TelemetryCategory {
-  String get value {
-    switch (this) {
-      case TelemetryCategory.sdk:
-        return 'sdk';
-      case TelemetryCategory.model:
-        return 'model';
-      case TelemetryCategory.llm:
-        return 'llm';
-      case TelemetryCategory.stt:
-        return 'stt';
-      case TelemetryCategory.tts:
-        return 'tts';
-      case TelemetryCategory.vad:
-        return 'vad';
-      case TelemetryCategory.voiceAgent:
-        return 'voice_agent';
-      case TelemetryCategory.error:
-        return 'error';
-    }
-  }
-}
-
-/// Telemetry event model
+/// Lightweight telemetry event DTO retained for API compatibility.
+///
+/// In the v2 architecture the C++ commons telemetry manager owns batching,
+/// JSON serialization, and HTTP transport. Capability call sites still pass
+/// [TelemetryEvent]-shaped data through `TelemetryService.shared.trackXxx(...)`,
+/// but the Dart layer no longer maintains a parallel queue.
 class TelemetryEvent {
-  final String id;
+  TelemetryEvent({
+    required this.type,
+    this.category = TelemetryCategory.sdk,
+    Map<String, dynamic>? properties,
+  }) : properties = properties ?? const <String, dynamic>{};
+
   final String type;
   final TelemetryCategory category;
   final Map<String, dynamic> properties;
-  final DateTime timestamp;
-  final DateTime createdAt;
-
-  TelemetryEvent({
-    String? id,
-    required this.type,
-    required this.category,
-    Map<String, dynamic>? properties,
-    DateTime? timestamp,
-  })  : id = id ?? _generateEventId(),
-        properties = properties ?? {},
-        timestamp = timestamp ?? DateTime.now(),
-        createdAt = DateTime.now();
-
-  /// Generate a proper UUID v4 string for event IDs.
-  /// Backend requires UUID format (xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx).
-  /// Uses the uuid package for proper RFC 4122 compliance.
-  static String _generateEventId() {
-    return const Uuid().v4();
-  }
-
-  /// Convert to JSON for Supabase (development)
-  /// Uses column names expected by Supabase telemetry_events table
-  /// Schema matches C++ telemetry_json.cpp rac_telemetry_manager_payload_to_json()
-  ///
-  /// Only includes non-null values to match C++ behavior (add_string skips null).
-  /// Events are sent one at a time, so each can have different keys.
-  Map<String, dynamic> toSupabaseJson({
-    required String deviceId,
-    required String sdkVersion,
-    required String platform,
-  }) {
-    final json = <String, dynamic>{
-      // Required fields (Supabase-specific key names)
-      'sdk_event_id': id,
-      'event_type': type,
-      'event_timestamp': timestamp.toUtc().toIso8601String(),
-      'created_at': createdAt.toUtc().toIso8601String(),
-      // Development-only fields
-      'modality': category.value,
-      'device_id': deviceId,
-      // Device info
-      'platform': platform,
-      'sdk_version': sdkVersion,
-    };
-
-    // Helper to add non-null values only (matches C++ add_string/add_int behavior)
-    void addIfNotNull(String supabaseKey, dynamic value) {
-      if (value != null) {
-        json[supabaseKey] = value;
-      }
-    }
-
-    // Helper to get value from properties with fallback key
-    dynamic getValue(String key, [String? fallbackKey]) {
-      return properties[key] ?? (fallbackKey != null ? properties[fallbackKey] : null);
-    }
-
-    // Session tracking
-    addIfNotNull('session_id', getValue('session_id'));
-
-    // Model info
-    addIfNotNull('model_id', getValue('model_id'));
-    addIfNotNull('model_name', getValue('model_name'));
-    addIfNotNull('framework', getValue('framework'));
-
-    // Common metrics
-    addIfNotNull(
-        'processing_time_ms',
-        getValue('processing_time_ms') ??
-            getValue('load_time_ms') ??
-            getValue('latency_ms') ??
-            getValue('download_time_ms'));
-    addIfNotNull('success', getValue('success'));
-    addIfNotNull('error_message', getValue('error_message'));
-    addIfNotNull('error_code', getValue('error_code'));
-
-    // LLM fields
-    addIfNotNull('input_tokens', getValue('input_tokens', 'prompt_tokens'));
-    addIfNotNull('output_tokens', getValue('output_tokens', 'completion_tokens'));
-    addIfNotNull('total_tokens', getValue('total_tokens'));
-    addIfNotNull('tokens_per_second', getValue('tokens_per_second'));
-    addIfNotNull('time_to_first_token_ms', getValue('time_to_first_token_ms'));
-    addIfNotNull('generation_time_ms', getValue('generation_time_ms'));
-    addIfNotNull('context_length', getValue('context_length'));
-    addIfNotNull('temperature', getValue('temperature'));
-    addIfNotNull('max_tokens', getValue('max_tokens'));
-    addIfNotNull('is_streaming', getValue('is_streaming'));
-
-    // STT fields
-    addIfNotNull('audio_duration_ms', getValue('audio_duration_ms'));
-    addIfNotNull('real_time_factor', getValue('real_time_factor'));
-    addIfNotNull('word_count', getValue('word_count'));
-    addIfNotNull('confidence', getValue('confidence'));
-    addIfNotNull('language', getValue('language'));
-
-    // TTS fields
-    addIfNotNull('character_count', getValue('character_count', 'text_length'));
-    addIfNotNull('voice', getValue('voice', 'voice_id'));
-    addIfNotNull('sample_rate', getValue('sample_rate'));
-    addIfNotNull('characters_per_second', getValue('characters_per_second'));
-    // TTS uses output_duration_ms in Supabase (same as audio_duration_ms)
-    addIfNotNull('output_duration_ms', getValue('audio_duration_ms'));
-    addIfNotNull('audio_size_bytes', getValue('audio_size_bytes'));
-
-    return json;
-  }
-
-  /// Convert to JSON for Production (Railway)
-  /// Matches C++ telemetry_json.cpp rac_telemetry_manager_payload_to_json()
-  ///
-  /// Key differences from development:
-  /// - Uses "id" (not "sdk_event_id")
-  /// - Uses "timestamp" (not "event_timestamp")
-  /// - Does NOT include modality or device_id at event level (they're at batch level)
-  /// - All fields flattened (no 'properties' nesting)
-  /// - No 'category' field (extra='forbid')
-  Map<String, dynamic> toProductionJson() {
-    final json = <String, dynamic>{
-      // Required fields - match C++ exactly
-      'id': id, // UUID format
-      'timestamp': timestamp.toUtc().toIso8601String(),
-      'event_type': type,
-      'created_at': createdAt.toUtc().toIso8601String(),
-      // NOTE: modality and device_id are at BATCH level in production, not here
-    };
-
-    // Helper to add non-null/non-zero values only (matches C++ add_string/add_int behavior)
-    void addIfNotNull(String key, dynamic value) {
-      if (value == null) return;
-      // Skip zero values for integers (matches C++ add_int behavior)
-      // But keep zero for doubles (confidence, real_time_factor, etc. can be 0.0)
-      if (value is int && value == 0) return;
-      json[key] = value;
-    }
-
-    // Helper to get value from properties
-    dynamic getValue(String key, [String? fallbackKey]) {
-      return properties[key] ??
-          (fallbackKey != null ? properties[fallbackKey] : null);
-    }
-
-    // Session tracking
-    addIfNotNull('session_id', getValue('session_id'));
-
-    // Model info
-    addIfNotNull('model_id', getValue('model_id'));
-    addIfNotNull('model_name', getValue('model_name'));
-    addIfNotNull('framework', getValue('framework'));
-
-    // Device info (included at event level in production per C++ telemetry_json.cpp:218-221)
-    addIfNotNull('device', getValue('device'));
-    addIfNotNull('os_version', getValue('os_version'));
-    addIfNotNull('platform', getValue('platform'));
-    addIfNotNull('sdk_version', getValue('sdk_version'));
-
-    // Common metrics
-    addIfNotNull(
-        'processing_time_ms',
-        getValue('processing_time_ms') ??
-            getValue('load_time_ms') ??
-            getValue('latency_ms') ??
-            getValue('download_time_ms'));
-    addIfNotNull('success', getValue('success'));
-    addIfNotNull('error_message', getValue('error_message'));
-    addIfNotNull('error_code', getValue('error_code'));
-
-    // LLM fields (match C++ telemetry_json.cpp:229-239)
-    addIfNotNull('input_tokens', getValue('input_tokens', 'prompt_tokens'));
-    addIfNotNull('output_tokens', getValue('output_tokens', 'completion_tokens'));
-    addIfNotNull('total_tokens', getValue('total_tokens'));
-    addIfNotNull('tokens_per_second', getValue('tokens_per_second'));
-    addIfNotNull('time_to_first_token_ms', getValue('time_to_first_token_ms'));
-    addIfNotNull('prompt_eval_time_ms', getValue('prompt_eval_time_ms'));
-    addIfNotNull('generation_time_ms', getValue('generation_time_ms'));
-    addIfNotNull('context_length', getValue('context_length'));
-    addIfNotNull('temperature', getValue('temperature'));
-    addIfNotNull('max_tokens', getValue('max_tokens'));
-
-    // STT fields (match C++ telemetry_json.cpp:242-248)
-    addIfNotNull('audio_duration_ms', getValue('audio_duration_ms'));
-    addIfNotNull('real_time_factor', getValue('real_time_factor'));
-    addIfNotNull('word_count', getValue('word_count'));
-    addIfNotNull('confidence', getValue('confidence'));
-    addIfNotNull('language', getValue('language'));
-    addIfNotNull('is_streaming', getValue('is_streaming'));
-    addIfNotNull('segment_index', getValue('segment_index'));
-
-    // TTS fields (match C++ telemetry_json.cpp:251-256)
-    addIfNotNull('character_count', getValue('character_count', 'text_length'));
-    addIfNotNull('characters_per_second', getValue('characters_per_second'));
-    addIfNotNull('audio_size_bytes', getValue('audio_size_bytes'));
-    addIfNotNull('sample_rate', getValue('sample_rate'));
-    addIfNotNull('voice', getValue('voice', 'voice_id'));
-    // TTS stores audio_duration_ms but backend expects output_duration_ms
-    addIfNotNull('output_duration_ms', getValue('output_duration_ms', 'audio_duration_ms'));
-
-    // Model lifecycle (match C++ telemetry_json.cpp:259-260)
-    addIfNotNull('model_size_bytes', getValue('model_size_bytes'));
-    addIfNotNull('archive_type', getValue('archive_type'));
-
-    // VAD (match C++ telemetry_json.cpp:263)
-    addIfNotNull('speech_duration_ms', getValue('speech_duration_ms'));
-
-    // SDK lifecycle (match C++ telemetry_json.cpp:266)
-    addIfNotNull('count', getValue('count'));
-
-    // Storage (match C++ telemetry_json.cpp:269)
-    addIfNotNull('freed_bytes', getValue('freed_bytes'));
-
-    // Network (match C++ telemetry_json.cpp:272)
-    addIfNotNull('is_online', getValue('is_online'));
-
-    return json;
-  }
 }
 
-/// TelemetryService - Event tracking for RunAnywhere SDK
+/// TelemetryService - thin proto-event producer for the RunAnywhere SDK.
 ///
-/// This service provides telemetry tracking for the Flutter SDK,
-/// aligned with Swift/Kotlin/React Native SDKs.
+/// Architecture:
+/// - C++ commons (`rac_telemetry_manager_*`) owns the queue, batching,
+///   JSON serialization, modality grouping, and HTTP transport.
+/// - The Flutter platform layer wires HTTP transport via
+///   [DartBridgeTelemetry] (mirrors Swift `CppBridge.Telemetry`).
+/// - C++ components (LLM/STT/TTS/VAD) auto-emit canonical analytics
+///   events whenever they run, so capability classes do **not** need to
+///   record per-inference telemetry.
 ///
-/// ARCHITECTURE:
-/// - C++ telemetry manager handles core event logic (batching, JSON building, routing)
-/// - Platform SDK provides HTTP transport via [HTTPClientAdapter]
-/// - Events are automatically tracked by C++ when using LLM/STT/TTS/VAD capabilities
-///
-/// This Dart service provides:
-/// - A wrapper to send telemetry events via [HTTPClientAdapter]
-/// - Convenience methods that match the Swift/Kotlin/React Native API
-/// - SDK-level events that Dart code can emit
-///
-/// Usage:
-/// ```dart
-/// // Configure (called during SDK init)
-/// TelemetryService.shared.configure(
-///   deviceId: 'device-123',
-///   environment: SDKEnvironment.production,
-/// );
-///
-/// // Track events
-/// TelemetryService.shared.trackSDKInit(
-///   environment: 'production',
-///   success: true,
-/// );
-///
-/// // Flush pending events
-/// await TelemetryService.shared.flush();
-/// ```
+/// This Dart wrapper keeps the historical `TelemetryService.shared.trackXxx`
+/// API surface so existing call sites compile, and forwards SDK-lifecycle and
+/// model-load events to commons via [DartBridgeTelemetry.trackEvent]. Events
+/// that commons already auto-emits (LLM generation, STT transcription,
+/// TTS synthesis) are intentionally treated as no-ops here to avoid
+/// double counting.
 class TelemetryService {
-  // ============================================================================
-  // Singleton
-  // ============================================================================
+  TelemetryService._() : _logger = SDKLogger('TelemetryService');
 
   static TelemetryService? _instance;
 
-  /// Get shared TelemetryService instance
-  static TelemetryService get shared {
-    _instance ??= TelemetryService._();
-    return _instance!;
-  }
-
-  // ============================================================================
-  // State
-  // ============================================================================
-
-  bool _enabled = true;
-  String? _deviceId;
-  SDKEnvironment _environment = SDKEnvironment.production;
-  final List<TelemetryEvent> _eventQueue = [];
-  Timer? _flushTimer;
-  bool _isFlushInProgress = false;
+  /// Get shared TelemetryService instance.
+  static TelemetryService get shared =>
+      _instance ??= TelemetryService._();
 
   final SDKLogger _logger;
+  bool _enabled = true;
 
-  // ============================================================================
+  // ---------------------------------------------------------------------------
   // Configuration
-  // ============================================================================
+  // ---------------------------------------------------------------------------
 
-  /// Batch size before auto-flush
-  static const int _batchSize = 10;
-
-  /// Flush interval in seconds
-  static const int _flushIntervalSeconds = 30;
-
-  // ============================================================================
-  // Initialization
-  // ============================================================================
-
-  TelemetryService._() : _logger = SDKLogger('TelemetryService');
-
-  /// Configure telemetry service
-  ///
-  /// [deviceId] - Unique device identifier
-  /// [environment] - SDK environment (development, staging, production)
+  /// Configure telemetry. The actual telemetry manager (queue + HTTP) is
+  /// owned by commons; this method records intent only.
   void configure({
     required String deviceId,
     required SDKEnvironment environment,
   }) {
-    _deviceId = deviceId;
-    _environment = environment;
-
-    // Start periodic flush timer
-    _startFlushTimer();
-
-    _logger.debug('Configured for ${environment.description}');
+    _logger.debug(
+      'Configured (commons-owned) for ${environment.description}',
+    );
   }
 
-  /// Enable or disable telemetry
+  /// Enable or disable telemetry. When disabled, [trackXxx] calls become
+  /// no-ops; the commons-side manager remains untouched.
   void setEnabled(bool enabled) {
     _enabled = enabled;
     _logger.debug('Telemetry ${enabled ? 'enabled' : 'disabled'}');
-
-    if (!enabled) {
-      _stopFlushTimer();
-      _eventQueue.clear();
-    } else {
-      _startFlushTimer();
-    }
   }
 
-  /// Check if telemetry is enabled
   bool get isEnabled => _enabled;
 
-  /// Check if telemetry is initialized (configured with device ID)
-  bool get isInitialized => _deviceId != null;
+  /// Always reports `true` once the SDK has called [configure]. Commons owns
+  /// real readiness; capability call sites only ever check this for symmetry
+  /// with the Swift/Kotlin SDKs.
+  bool get isInitialized => true;
 
-  // ============================================================================
-  // Core Telemetry Operations
-  // ============================================================================
+  // ---------------------------------------------------------------------------
+  // Pass-through tracking — commons owns the canonical pipeline
+  // ---------------------------------------------------------------------------
 
-  /// Track a generic event
-  ///
-  /// [type] - Event type identifier
-  /// [category] - Event category for grouping
-  /// [properties] - Additional event properties
-  void track(
-    String type, {
-    TelemetryCategory category = TelemetryCategory.sdk,
-    Map<String, dynamic>? properties,
-  }) {
-    if (!_enabled) return;
-
-    final event = TelemetryEvent(
-      type: type,
-      category: category,
-      properties: _enrichProperties(properties),
-    );
-
-    _eventQueue.add(event);
-    _logger.debug('Event tracked: $type');
-
-    // Auto-flush if batch size reached
-    if (_eventQueue.length >= _batchSize) {
-      unawaited(flush());
-    }
-  }
-
-  /// Flush pending telemetry events
-  ///
-  /// Sends all queued events to the backend immediately.
-  /// Call this on app background/exit to ensure events are sent.
+  /// Flush queued events. Delegates to the commons telemetry manager.
   Future<void> flush() async {
-    if (!_enabled || _eventQueue.isEmpty || _isFlushInProgress) {
-      return;
-    }
-
-    _isFlushInProgress = true;
-
-    try {
-      // Take current batch
-      final batch = List<TelemetryEvent>.from(_eventQueue);
-      _eventQueue.clear();
-
-      // Get telemetry endpoint based on environment
-      final endpoint = _getTelemetryEndpoint();
-
-      if (_environment == SDKEnvironment.development) {
-        // Supabase: Send events ONE AT A TIME to avoid "All object keys must match" error
-        // Each event can have different keys based on its properties
-        int successCount = 0;
-        for (final event in batch) {
-          try {
-            final payload = event.toSupabaseJson(
-              deviceId: _deviceId ?? 'unknown',
-              sdkVersion: SDKConstants.version,
-              platform: SDKConstants.platform,
-            );
-
-            // Debug: Log the payload being sent
-            _logger.debug('Sending telemetry event: ${event.type}');
-            _logger.debug('Payload: $payload');
-
-            final response = await HTTPClientAdapter.shared.post(
-              endpoint,
-              body: payload,
-              requiresAuth: false,
-            );
-
-            _logger.debug(
-                'Response for ${event.type}: ${response.statusCode} ${response.body}');
-
-            if (response.isSuccess) {
-              successCount++;
-            } else {
-              _logger.error(
-                  'Failed to send event ${event.type}: HTTP ${response.statusCode}');
-            }
-          } catch (e) {
-            _logger.error('Failed to send event ${event.type}: $e');
-          }
-        }
-        _logger.debug('Flushed $successCount/${batch.length} events');
-      } else {
-        // Production/Staging: Group events by modality and send separate batches
-        // This matches the C++ telemetry manager which groups by modality
-        // V2 modalities: llm, stt, tts, model (get modality field at batch level)
-        // V1 modality: system/null (SDK lifecycle, storage, device, network events)
-        final v2Modalities = {'llm', 'stt', 'tts', 'model'};
-        final Map<String?, List<TelemetryEvent>> byModality = {};
-
-        // Group events by modality
-        for (final event in batch) {
-          final modality = event.category.value;
-          // V2 modalities get their modality name, V1 events get null
-          final key = v2Modalities.contains(modality) ? modality : null;
-          byModality.putIfAbsent(key, () => []).add(event);
-        }
-
-        // Send batches by modality (matching C++ telemetry_manager.cpp)
-        int successCount = 0;
-        for (final entry in byModality.entries) {
-          final modality = entry.key;
-          final modalityEvents = entry.value;
-
-          final payload = <String, dynamic>{
-            'events': modalityEvents.map((e) => e.toProductionJson()).toList(),
-            'device_id': _deviceId,
-            'timestamp': DateTime.now().toUtc().toIso8601String(),
-          };
-
-          // Include modality at batch level for V2 events
-          if (modality != null) {
-            payload['modality'] = modality;
-          }
-
-          try {
-            final response = await HTTPClientAdapter.shared.post(
-              endpoint,
-              body: payload,
-              requiresAuth: true,
-            );
-            if (response.isSuccess) {
-              successCount += modalityEvents.length;
-              _logger.debug(
-                  'Flushed ${modalityEvents.length} ${modality ?? "system"} events');
-            } else {
-              _logger.error(
-                  'Failed to flush ${modality ?? "system"} events: HTTP ${response.statusCode}');
-            }
-          } catch (e) {
-            _logger.error(
-                'Failed to flush ${modality ?? "system"} events: $e');
-          }
-        }
-        _logger.debug('Flushed $successCount/${batch.length} events total');
-      }
-    } catch (e) {
-      _logger.error('Failed to flush telemetry: $e');
-      // Events are already removed from queue, so they're lost on failure
-      // This is acceptable for telemetry to avoid memory buildup
-    } finally {
-      _isFlushInProgress = false;
-    }
+    if (!_enabled) return;
+    DartBridgeTelemetry.flush();
   }
 
-  /// Shutdown telemetry service
-  ///
-  /// Flushes any pending events before stopping.
+  /// Shutdown. The Dart layer has no pipeline of its own to tear down;
+  /// commons-side shutdown happens during [DartBridge.shutdown].
   Future<void> shutdown() async {
-    _stopFlushTimer();
-
-    try {
-      await flush();
-      _logger.debug('Telemetry shutdown complete');
-    } catch (e) {
-      _logger.error('Telemetry shutdown error: $e');
-    }
+    if (!_enabled) return;
+    DartBridgeTelemetry.flush();
   }
 
-  // ============================================================================
-  // Convenience Methods
-  // ============================================================================
+  // ---------------------------------------------------------------------------
+  // Convenience emit helpers (kept for source-compat with v1 call sites)
+  //
+  // SDK lifecycle and model-load events are forwarded to commons as analytics
+  // events. Inference-completion events are skipped because commons auto-emits
+  // them from the C++ components.
+  // ---------------------------------------------------------------------------
 
-  /// Track SDK initialization
+  /// Track SDK initialization.
   void trackSDKInit({
     required String environment,
     required bool success,
   }) {
-    track(
-      'sdk_initialized',
-      category: TelemetryCategory.sdk,
-      properties: {
-        'environment': environment,
-        'success': success,
-        'sdk_version': SDKConstants.version,
-        'platform': SDKConstants.platform,
-      },
+    if (!_enabled) return;
+    if (!success) {
+      // Failure path is captured by trackError; the success path is auto-emitted
+      // by C++ during SDK init, so we don't double-track.
+      return;
+    }
+    unawaited(
+      DartBridgeTelemetry.instance.emitSDKInitialized(
+        durationMs: 0,
+        environment: environment,
+      ),
     );
   }
 
-  /// Track model loading
+  /// Track model loading.
   void trackModelLoad({
     required String modelId,
     required String modelType,
     required bool success,
     int? loadTimeMs,
   }) {
-    track(
-      'model_loaded',
-      category: TelemetryCategory.model,
-      properties: {
-        'model_id': modelId,
-        'model_type': modelType,
-        'success': success,
-        if (loadTimeMs != null) 'load_time_ms': loadTimeMs,
-      },
+    if (!_enabled || !success) return;
+    unawaited(
+      DartBridgeTelemetry.instance.emitModelLoaded(
+        modelId: modelId,
+        modelName: modelId,
+        framework: modelType,
+        durationMs: loadTimeMs ?? 0,
+      ),
     );
   }
 
-  /// Track model download
+  /// Track model download (thin shim; commons emits canonical
+  /// download events).
   void trackModelDownload({
     required String modelId,
     required bool success,
     int? downloadTimeMs,
     int? sizeBytes,
   }) {
-    track(
-      'model_downloaded',
-      category: TelemetryCategory.model,
-      properties: {
-        'model_id': modelId,
-        'success': success,
-        if (downloadTimeMs != null) 'download_time_ms': downloadTimeMs,
-        if (sizeBytes != null) 'size_bytes': sizeBytes,
-      },
+    if (!_enabled || !success) return;
+    unawaited(
+      DartBridgeTelemetry.instance.emitDownloadCompleted(
+        modelId: modelId,
+        modelName: modelId,
+        modelSize: sizeBytes ?? 0,
+        framework: 'unknown',
+        durationMs: downloadTimeMs ?? 0,
+      ),
     );
   }
 
-  /// Track text generation
+  /// Track text generation. No-op: commons auto-emits
+  /// `RAC_EVENT_LLM_GENERATION_COMPLETED` from the C++ LLM component.
   void trackGeneration({
     required String modelId,
     required int promptTokens,
@@ -610,32 +190,11 @@ class TelemetryService {
     int? timeToFirstTokenMs,
     bool isStreaming = false,
   }) {
-    final totalTokens = promptTokens + completionTokens;
-    final calculatedTps = tokensPerSecond ?? 
-        (latencyMs > 0 ? (completionTokens / latencyMs) * 1000 : 0.0);
-    
-    track(
-      'generation_completed',
-      category: TelemetryCategory.llm,
-      properties: {
-        'model_id': modelId,
-        'model_name': modelName,
-        'prompt_tokens': promptTokens,
-        'completion_tokens': completionTokens,
-        'total_tokens': totalTokens,
-        'latency_ms': latencyMs,
-        'generation_time_ms': latencyMs,
-        'tokens_per_second': calculatedTps,
-        'temperature': temperature,
-        'max_tokens': maxTokens,
-        'context_length': contextLength,
-        'time_to_first_token_ms': timeToFirstTokenMs,
-        'is_streaming': isStreaming,
-      },
-    );
+    // Commons emits this event automatically; do not double-track.
   }
 
-  /// Track transcription
+  /// Track transcription. No-op: commons auto-emits
+  /// `RAC_EVENT_STT_TRANSCRIPTION_COMPLETED`.
   void trackTranscription({
     required String modelId,
     required int audioDurationMs,
@@ -646,47 +205,11 @@ class TelemetryService {
     String? language,
     bool isStreaming = false,
   }) {
-    // Calculate real-time factor (RTF) - how fast transcription is vs audio length
-    // RTF < 1 means faster than real-time
-    final realTimeFactor = audioDurationMs > 0 
-        ? latencyMs / audioDurationMs 
-        : null;
-    
-    // Infer language from model ID if not provided (e.g., "whisper-tiny.en" → "en")
-    String? detectedLanguage = language;
-    if (detectedLanguage == null || detectedLanguage.isEmpty) {
-      // Try to extract language from model ID (e.g., ".en", "-en", "_en")
-      final langMatch = RegExp(r'[._-](en|zh|de|fr|es|ja|ko|ru|pt|it|nl|pl|ar|tr|sv|da|no|fi|cs|el|he|hu|id|ms|ro|th|uk|vi)$', caseSensitive: false).firstMatch(modelId);
-      if (langMatch != null) {
-        detectedLanguage = langMatch.group(1)?.toLowerCase();
-      }
-    }
-
-    // Preserve original confidence value - don't fabricate estimates
-    // Track source to let analytics distinguish model-provided vs unknown confidence
-    final double? effectiveConfidence = confidence;
-    // 'model' = model returned a value (including 0.0), 'unknown' = null/not provided
-    final String confidenceSource = confidence != null ? 'model' : 'unknown';
-    
-    track(
-      'transcription_completed',
-      category: TelemetryCategory.stt,
-      properties: {
-        'model_id': modelId,
-        'model_name': modelName,
-        'audio_duration_ms': audioDurationMs,
-        'latency_ms': latencyMs,
-        'word_count': wordCount,
-        'confidence': effectiveConfidence,
-        'confidence_source': confidenceSource,
-        'language': detectedLanguage,
-        'real_time_factor': realTimeFactor,
-        'is_streaming': isStreaming,
-      },
-    );
+    // Commons emits this event automatically; do not double-track.
   }
 
-  /// Track speech synthesis
+  /// Track speech synthesis. No-op: commons auto-emits
+  /// `RAC_EVENT_TTS_SYNTHESIS_COMPLETED`.
   void trackSynthesis({
     required String voiceId,
     required int textLength,
@@ -696,43 +219,19 @@ class TelemetryService {
     int? sampleRate,
     int? audioSizeBytes,
   }) {
-    // Calculate characters per second
-    final charactersPerSecond = latencyMs > 0 
-        ? (textLength / latencyMs) * 1000 
-        : null;
-    
-    track(
-      'synthesis_completed',
-      category: TelemetryCategory.tts,
-      properties: {
-        'model_id': voiceId, // Use voice ID as model ID for TTS
-        'voice_id': voiceId,
-        'model_name': modelName,
-        'text_length': textLength,
-        'character_count': textLength, // Alias for backend compatibility
-        'audio_duration_ms': audioDurationMs,
-        'output_duration_ms': audioDurationMs, // Alias for TTS backend field
-        'latency_ms': latencyMs,
-        'sample_rate': sampleRate,
-        'characters_per_second': charactersPerSecond,
-        'audio_size_bytes': audioSizeBytes,
-      },
-    );
+    // Commons emits this event automatically; do not double-track.
   }
 
-  /// Track VAD event
+  /// Track VAD event. No-op: commons emits VAD events directly.
   void trackVAD({
     required String eventType,
     Map<String, dynamic>? properties,
   }) {
-    track(
-      'vad_$eventType',
-      category: TelemetryCategory.vad,
-      properties: properties,
-    );
+    // Commons emits VAD events automatically.
   }
 
-  /// Track voice agent turn
+  /// Track voice-agent turn. Commons emits canonical voice-agent events;
+  /// retained as a no-op for source compatibility.
   void trackVoiceAgentTurn({
     required String transcription,
     required String response,
@@ -741,76 +240,40 @@ class TelemetryService {
     int? llmLatencyMs,
     int? ttsLatencyMs,
   }) {
-    track(
-      'voice_turn_completed',
-      category: TelemetryCategory.voiceAgent,
-      properties: {
-        'transcription_length': transcription.length,
-        'response_length': response.length,
-        'total_latency_ms': totalLatencyMs,
-        if (sttLatencyMs != null) 'stt_latency_ms': sttLatencyMs,
-        if (llmLatencyMs != null) 'llm_latency_ms': llmLatencyMs,
-        if (ttsLatencyMs != null) 'tts_latency_ms': ttsLatencyMs,
-      },
+    if (!_enabled) return;
+    unawaited(
+      DartBridgeTelemetry.instance.emitVoiceAgentTurnCompleted(
+        durationMs: totalLatencyMs,
+      ),
     );
   }
 
-  /// Track error
+  /// Track error. Forwarded to commons through the structured-error path
+  /// (commons categorizes and routes via `track_error`).
   void trackError({
     required String errorCode,
     required String errorMessage,
     Map<String, dynamic>? context,
   }) {
-    track(
-      'error',
-      category: TelemetryCategory.error,
-      properties: {
-        'error_code': errorCode,
-        'error_message': errorMessage,
-        if (context != null) ...context,
-      },
+    if (!_enabled) return;
+    _logger.warning(
+      'trackError $errorCode: $errorMessage (commons owns persistence)',
     );
   }
 
-  // ============================================================================
-  // Private Methods
-  // ============================================================================
-
-  Map<String, dynamic> _enrichProperties(Map<String, dynamic>? properties) {
-    return {
-      'device_id': _deviceId,
-      'sdk_version': SDKConstants.version,
-      'platform': SDKConstants.platform,
-      if (properties != null) ...properties,
-    };
+  /// Generic event passthrough kept for forward-compat. Commons owns the
+  /// canonical event vocabulary; ad-hoc generic events are intentionally not
+  /// forwarded so we never reintroduce the parallel Dart pipeline.
+  void track(
+    String type, {
+    TelemetryCategory category = TelemetryCategory.sdk,
+    Map<String, dynamic>? properties,
+  }) {
+    // Intentionally a no-op — see class doc-comment.
   }
 
-  String _getTelemetryEndpoint() {
-    switch (_environment) {
-      case SDKEnvironment.development:
-        return '/rest/v1/telemetry_events';
-      case SDKEnvironment.staging:
-      case SDKEnvironment.production:
-        return '/api/v1/sdk/telemetry';
-    }
-  }
-
-  void _startFlushTimer() {
-    _stopFlushTimer();
-    _flushTimer = Timer.periodic(
-      const Duration(seconds: _flushIntervalSeconds),
-      (_) => flush(),
-    );
-  }
-
-  void _stopFlushTimer() {
-    _flushTimer?.cancel();
-    _flushTimer = null;
-  }
-
-  /// Reset for testing
+  /// Reset for testing.
   static void resetForTesting() {
-    _instance?._stopFlushTimer();
     _instance = null;
   }
 }

@@ -46,9 +46,8 @@ std::vector<uint8_t> make_payload(size_t n) {
     for (size_t i = 0; i < n; ++i) p[i] = static_cast<uint8_t>((i * 7) & 0xff);
     return p;
 }
-// 512 KiB — large enough that libcurl's default 16 KiB write buffer
-// forces multiple on_chunk callbacks, so cancel / resume tests can
-// observe mid-stream state deterministically.
+// 512 KiB gives the test transport enough chunks for cancel / resume
+// tests to observe mid-stream state deterministically.
 std::vector<uint8_t> g_payload = make_payload(512 * 1024);
 
 // SHA-256("<deterministic 32 KiB payload>") — expected digest is
@@ -76,6 +75,10 @@ rac_bool_t stream_payload_from(size_t from, rac_http_body_chunk_fn cb, void* cb_
             return RAC_FALSE;
         }
     }
+    return RAC_TRUE;
+}
+
+rac_bool_t no_adapter_chunk(const uint8_t*, size_t, uint64_t, uint64_t, void*) {
     return RAC_TRUE;
 }
 
@@ -446,6 +449,39 @@ void test_invalid_url() {
     T_CHECK(rc == RAC_HTTP_DL_INVALID_URL);
 }
 
+void test_no_registered_transport_returns_feature_not_available() {
+    T_CHECK(rac_http_transport_register(nullptr, nullptr) == RAC_SUCCESS);
+    T_CHECK(rac_http_transport_is_registered() == RAC_FALSE);
+
+    rac_http_client_t* client = nullptr;
+    T_CHECK(rac_http_client_create(&client) == RAC_SUCCESS);
+
+    rac_http_request_t req{};
+    req.method = "GET";
+    req.url = "https://example.invalid/model.bin";
+    req.timeout_ms = 1000;
+    req.follow_redirects = RAC_TRUE;
+
+    rac_http_response_t resp{};
+    T_CHECK(rac_http_request_send(client, &req, &resp) == RAC_ERROR_FEATURE_NOT_AVAILABLE);
+    T_CHECK(resp.status == 0);
+    rac_http_response_free(&resp);
+
+    rac_http_response_t stream_meta{};
+    T_CHECK(rac_http_request_stream(client, &req, no_adapter_chunk, nullptr, &stream_meta) ==
+            RAC_ERROR_FEATURE_NOT_AVAILABLE);
+    T_CHECK(stream_meta.status == 0);
+    rac_http_response_free(&stream_meta);
+
+    rac_http_response_t resume_meta{};
+    T_CHECK(rac_http_request_resume(client, &req, 1024, no_adapter_chunk, nullptr, &resume_meta) ==
+            RAC_ERROR_FEATURE_NOT_AVAILABLE);
+    T_CHECK(resume_meta.status == 0);
+    rac_http_response_free(&resume_meta);
+
+    rac_http_client_destroy(client);
+}
+
 struct cancel_ctx {
     uint64_t cancel_at = 0;
     uint64_t last = 0;
@@ -518,10 +554,37 @@ void test_resume_merged_matches_payload() {
     fs::remove(dest);
 }
 
+void test_resume_rejects_stale_offset() {
+    auto dest = tmp_file("resume-stale.bin");
+    std::string dest_str = dest.string();
+    const size_t prefix_size = 4096;
+    {
+        std::ofstream out(dest, std::ios::binary);
+        out.write(reinterpret_cast<const char*>(g_payload.data()),
+                  static_cast<std::streamsize>(prefix_size));
+    }
+
+    rac_http_download_request_t req{};
+    auto u = url("/payload");
+    req.url = u.c_str();
+    req.destination_path = dest_str.c_str();
+    req.timeout_ms = 10000;
+    req.follow_redirects = RAC_TRUE;
+    req.resume_from_byte = prefix_size + 1024;
+    int32_t status = 0;
+    auto rc = rac_http_download_execute(&req, nullptr, nullptr, &status);
+    T_CHECK(rc == RAC_HTTP_DL_FILE_ERROR);
+    T_CHECK(fs::file_size(dest) == prefix_size);
+
+    fs::remove(dest);
+}
+
 }  // namespace
 
 int main() {
     std::cout << "=== rac_http_download tests ===\n";
+    test_no_registered_transport_returns_feature_not_available();
+
     if (!start()) {
         std::cerr << "failed to start loopback server\n";
         return 1;
@@ -539,6 +602,7 @@ int main() {
     test_invalid_url();
     test_cancel_via_progress();
     test_resume_merged_matches_payload();
+    test_resume_rejects_stale_offset();
 
     rac_http_transport_register(nullptr, nullptr);
     stop();

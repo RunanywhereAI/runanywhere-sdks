@@ -27,6 +27,8 @@ import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
 import kotlin.collections.List
+import kotlin.collections.Map
+import kotlin.lazy
 import okio.ByteString
 
 /**
@@ -112,6 +114,32 @@ public class ChatMessage(
     schemaIndex = 8,
   )
   public val tool_result: ToolResult? = null,
+  /**
+   * Optional threading and delivery metadata.
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "parentId",
+    schemaIndex = 9,
+  )
+  public val parent_id: String? = null,
+  @field:WireField(
+    tag = 11,
+    adapter = "ai.runanywhere.proto.v1.ChatMessageStatus#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 10,
+  )
+  public val status: ChatMessageStatus = ChatMessageStatus.CHAT_MESSAGE_STATUS_UNSPECIFIED,
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "errorMessage",
+    schemaIndex = 11,
+  )
+  public val error_message: String? = null,
+  metadata: Map<String, String> = emptyMap(),
+  attachments: List<ChatAttachment> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ChatMessage, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -142,6 +170,26 @@ public class ChatMessage(
   )
   public val tool_calls: List<ToolCall> = immutableCopyOf("tool_calls", tool_calls)
 
+  @field:WireField(
+    tag = 13,
+    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    schemaIndex = 12,
+  )
+  public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
+
+  /**
+   * Opaque attachments normalized by platform adapters. Capture, picker,
+   * and permission flows remain native/Web-owned.
+   */
+  @field:WireField(
+    tag = 14,
+    adapter = "ai.runanywhere.proto.v1.ChatAttachment#ADAPTER",
+    label = WireField.Label.REPEATED,
+    schemaIndex = 13,
+  )
+  public val attachments: List<ChatAttachment> = immutableCopyOf("attachments", attachments)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -162,6 +210,11 @@ public class ChatMessage(
     if (tool_call_id != other.tool_call_id) return false
     if (tool_calls != other.tool_calls) return false
     if (tool_result != other.tool_result) return false
+    if (parent_id != other.parent_id) return false
+    if (status != other.status) return false
+    if (error_message != other.error_message) return false
+    if (metadata != other.metadata) return false
+    if (attachments != other.attachments) return false
     return true
   }
 
@@ -178,6 +231,11 @@ public class ChatMessage(
       result = result * 37 + (tool_call_id?.hashCode() ?: 0)
       result = result * 37 + tool_calls.hashCode()
       result = result * 37 + (tool_result?.hashCode() ?: 0)
+      result = result * 37 + (parent_id?.hashCode() ?: 0)
+      result = result * 37 + status.hashCode()
+      result = result * 37 + (error_message?.hashCode() ?: 0)
+      result = result * 37 + metadata.hashCode()
+      result = result * 37 + attachments.hashCode()
       super.hashCode = result
     }
     return result
@@ -194,6 +252,11 @@ public class ChatMessage(
     if (tool_call_id != null) result += """tool_call_id=${sanitize(tool_call_id)}"""
     if (tool_calls.isNotEmpty()) result += """tool_calls=$tool_calls"""
     if (tool_result != null) result += """tool_result=$tool_result"""
+    if (parent_id != null) result += """parent_id=${sanitize(parent_id)}"""
+    result += """status=$status"""
+    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
+    if (metadata.isNotEmpty()) result += """metadata=$metadata"""
+    if (attachments.isNotEmpty()) result += """attachments=$attachments"""
     return result.joinToString(prefix = "ChatMessage{", separator = ", ", postfix = "}")
   }
 
@@ -207,9 +270,15 @@ public class ChatMessage(
     tool_call_id: String? = this.tool_call_id,
     tool_calls: List<ToolCall> = this.tool_calls,
     tool_result: ToolResult? = this.tool_result,
+    parent_id: String? = this.parent_id,
+    status: ChatMessageStatus = this.status,
+    error_message: String? = this.error_message,
+    metadata: Map<String, String> = this.metadata,
+    attachments: List<ChatAttachment> = this.attachments,
     unknownFields: ByteString = this.unknownFields,
   ): ChatMessage = ChatMessage(id, role, content, timestamp_us, name, tool_calls_json, tool_call_id,
-      tool_calls, tool_result, unknownFields)
+      tool_calls, tool_result, parent_id, status, error_message, metadata, attachments,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -221,6 +290,9 @@ public class ChatMessage(
       null, 
       "chat.proto"
     ) {
+      private val metadataAdapter: ProtoAdapter<Map<String, String>> by lazy {
+          ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ProtoAdapter.STRING) }
+
       override fun encodedSize(`value`: ChatMessage): Int {
         var size = value.unknownFields.size
         if (value.id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.id)
@@ -234,6 +306,12 @@ public class ChatMessage(
         size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.tool_call_id)
         size += ToolCall.ADAPTER.asRepeated().encodedSizeWithTag(8, value.tool_calls)
         size += ToolResult.ADAPTER.encodedSizeWithTag(9, value.tool_result)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.parent_id)
+        if (value.status != ChatMessageStatus.CHAT_MESSAGE_STATUS_UNSPECIFIED) size +=
+            ChatMessageStatus.ADAPTER.encodedSizeWithTag(11, value.status)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(12, value.error_message)
+        size += metadataAdapter.encodedSizeWithTag(13, value.metadata)
+        size += ChatAttachment.ADAPTER.asRepeated().encodedSizeWithTag(14, value.attachments)
         return size
       }
 
@@ -249,11 +327,23 @@ public class ChatMessage(
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.tool_call_id)
         ToolCall.ADAPTER.asRepeated().encodeWithTag(writer, 8, value.tool_calls)
         ToolResult.ADAPTER.encodeWithTag(writer, 9, value.tool_result)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.parent_id)
+        if (value.status != ChatMessageStatus.CHAT_MESSAGE_STATUS_UNSPECIFIED)
+            ChatMessageStatus.ADAPTER.encodeWithTag(writer, 11, value.status)
+        ProtoAdapter.STRING.encodeWithTag(writer, 12, value.error_message)
+        metadataAdapter.encodeWithTag(writer, 13, value.metadata)
+        ChatAttachment.ADAPTER.asRepeated().encodeWithTag(writer, 14, value.attachments)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ChatMessage) {
         writer.writeBytes(value.unknownFields)
+        ChatAttachment.ADAPTER.asRepeated().encodeWithTag(writer, 14, value.attachments)
+        metadataAdapter.encodeWithTag(writer, 13, value.metadata)
+        ProtoAdapter.STRING.encodeWithTag(writer, 12, value.error_message)
+        if (value.status != ChatMessageStatus.CHAT_MESSAGE_STATUS_UNSPECIFIED)
+            ChatMessageStatus.ADAPTER.encodeWithTag(writer, 11, value.status)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.parent_id)
         ToolResult.ADAPTER.encodeWithTag(writer, 9, value.tool_result)
         ToolCall.ADAPTER.asRepeated().encodeWithTag(writer, 8, value.tool_calls)
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.tool_call_id)
@@ -277,6 +367,11 @@ public class ChatMessage(
         var tool_call_id: String? = null
         val tool_calls = mutableListOf<ToolCall>()
         var tool_result: ToolResult? = null
+        var parent_id: String? = null
+        var status: ChatMessageStatus = ChatMessageStatus.CHAT_MESSAGE_STATUS_UNSPECIFIED
+        var error_message: String? = null
+        val metadata = mutableMapOf<String, String>()
+        val attachments = mutableListOf<ChatAttachment>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> id = ProtoAdapter.STRING.decode(reader)
@@ -292,6 +387,15 @@ public class ChatMessage(
             7 -> tool_call_id = ProtoAdapter.STRING.decode(reader)
             8 -> tool_calls.add(ToolCall.ADAPTER.decode(reader))
             9 -> tool_result = ToolResult.ADAPTER.decode(reader)
+            10 -> parent_id = ProtoAdapter.STRING.decode(reader)
+            11 -> try {
+              status = ChatMessageStatus.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            12 -> error_message = ProtoAdapter.STRING.decode(reader)
+            13 -> metadata.putAll(metadataAdapter.decode(reader))
+            14 -> attachments.add(ChatAttachment.ADAPTER.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -305,6 +409,11 @@ public class ChatMessage(
           tool_call_id = tool_call_id,
           tool_calls = tool_calls,
           tool_result = tool_result,
+          parent_id = parent_id,
+          status = status,
+          error_message = error_message,
+          metadata = metadata,
+          attachments = attachments,
           unknownFields = unknownFields
         )
       }
@@ -312,6 +421,7 @@ public class ChatMessage(
       override fun redact(`value`: ChatMessage): ChatMessage = value.copy(
         tool_calls = value.tool_calls.redactElements(ToolCall.ADAPTER),
         tool_result = value.tool_result?.let(ToolResult.ADAPTER::redact),
+        attachments = value.attachments.redactElements(ChatAttachment.ADAPTER),
         unknownFields = ByteString.EMPTY
       )
     }

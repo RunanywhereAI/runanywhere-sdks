@@ -22,7 +22,7 @@ import ai.runanywhere.proto.v1.DiffusionConfig
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
 import ai.runanywhere.proto.v1.DiffusionProgress
 import ai.runanywhere.proto.v1.DiffusionResult
-import com.runanywhere.sdk.core.types.InferenceFramework
+import ai.runanywhere.proto.v1.InferenceFramework
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.Flow
 

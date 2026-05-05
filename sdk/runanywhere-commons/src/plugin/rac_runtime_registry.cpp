@@ -16,7 +16,9 @@
 #include "rac/plugin/rac_runtime_registry.h"
 
 #include <algorithm>
+#include <cstring>
 #include <mutex>
+#include <string>
 #include <vector>
 
 #include "rac/core/rac_logger.h"
@@ -28,6 +30,40 @@
  * per-platform linker-keep-alive trick. */
 extern "C" const rac_runtime_vtable_t* rac_runtime_entry_cpu(void);
 
+#if !defined(RAC_PLUGIN_MODE_STATIC) || !RAC_PLUGIN_MODE_STATIC
+  #if defined(_WIN32)
+    #include <windows.h>
+    using rac_lib_handle_t = HMODULE;
+    static rac_lib_handle_t rac_runtime_dl_open(const char* p) {
+        return LoadLibraryA(p);
+    }
+    static void* rac_runtime_dl_sym(rac_lib_handle_t h, const char* s) {
+        return reinterpret_cast<void*>(GetProcAddress(h, s));
+    }
+    static void rac_runtime_dl_close(rac_lib_handle_t h) {
+        FreeLibrary(h);
+    }
+    static const char* rac_runtime_dl_error() {
+        return "LoadLibrary failed";
+    }
+  #else
+    #include <dlfcn.h>
+    using rac_lib_handle_t = void*;
+    static rac_lib_handle_t rac_runtime_dl_open(const char* p) {
+        return dlopen(p, RTLD_NOW | RTLD_LOCAL);
+    }
+    static void* rac_runtime_dl_sym(rac_lib_handle_t h, const char* s) {
+        return dlsym(h, s);
+    }
+    static void rac_runtime_dl_close(rac_lib_handle_t h) {
+        dlclose(h);
+    }
+    static const char* rac_runtime_dl_error() {
+        return dlerror();
+    }
+  #endif
+#endif
+
 namespace {
 
 constexpr const char* LOG_CAT = "RuntimeRegistry";
@@ -36,6 +72,7 @@ struct Entry {
     rac_runtime_id_t             id;
     int32_t                      priority;
     const rac_runtime_vtable_t*  vtable;
+    void*                        dl_handle;
 };
 
 struct State {
@@ -70,7 +107,7 @@ void insert_builtin(const rac_runtime_vtable_t* v, State& s) {
     for (const Entry& e : s.entries) {
         if (e.id == v->metadata.id) return;
     }
-    Entry entry{v->metadata.id, v->metadata.priority, v};
+    Entry entry{v->metadata.id, v->metadata.priority, v, nullptr};
     auto pos = std::lower_bound(s.entries.begin(), s.entries.end(), entry,
                                 [](const Entry& a, const Entry& b) {
                                     return a.priority > b.priority;
@@ -103,15 +140,59 @@ bool has_required_ops(const rac_runtime_vtable_t* v) {
     return v->init != nullptr && v->destroy != nullptr;
 }
 
+bool abi_version_supported(uint32_t abi_version) {
+    return abi_version == RAC_RUNTIME_ABI_VERSION;
+}
+
+rac_result_t validate_v2_extension(const rac_runtime_vtable_t* v) {
+    if (v->reserved_slot_0 == nullptr) {
+        RAC_LOG_ERROR(LOG_CAT,
+                      "rac_runtime_register: '%s' missing required v2 extension",
+                      v->metadata.name);
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    const auto* v2 =
+        reinterpret_cast<const rac_runtime_vtable_v2_t*>(v->reserved_slot_0);
+    if (v2->abi_version != RAC_RUNTIME_ABI_VERSION_V2) {
+        RAC_LOG_ERROR(LOG_CAT,
+                      "rac_runtime_register: '%s' v2 extension ABI mismatch "
+                      "(plugin=%u host=%u)",
+                      v->metadata.name,
+                      v2->abi_version,
+                      RAC_RUNTIME_ABI_VERSION_V2);
+        return RAC_ERROR_ABI_VERSION_MISMATCH;
+    }
+    if (v2->struct_size < RAC_RUNTIME_VTABLE_V2_MIN_SIZE) {
+        RAC_LOG_ERROR(LOG_CAT,
+                      "rac_runtime_register: '%s' v2 extension too small "
+                      "(plugin=%u minimum=%u)",
+                      v->metadata.name,
+                      v2->struct_size,
+                      RAC_RUNTIME_VTABLE_V2_MIN_SIZE);
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    return RAC_SUCCESS;
+}
+
+void close_dynamic_handle(void* handle) {
+#if !defined(RAC_PLUGIN_MODE_STATIC) || !RAC_PLUGIN_MODE_STATIC
+    if (handle != nullptr) {
+        rac_runtime_dl_close(static_cast<rac_lib_handle_t>(handle));
+    }
+#else
+    (void)handle;
+#endif
+}
+
 /** Remove the entry matching `id` (if any); returns the erased vtable so
  *  the caller can invoke `destroy()` outside the lock. */
-const rac_runtime_vtable_t* take_entry_locked(State& s, rac_runtime_id_t id) {
+Entry take_entry_locked(State& s, rac_runtime_id_t id) {
     auto it = std::find_if(s.entries.begin(), s.entries.end(),
                            [&](const Entry& e) { return e.id == id; });
-    if (it == s.entries.end()) return nullptr;
-    const rac_runtime_vtable_t* v = it->vtable;
+    if (it == s.entries.end()) return Entry{RAC_RUNTIME_UNSPECIFIED, 0, nullptr, nullptr};
+    Entry entry = *it;
     s.entries.erase(it);
-    return v;
+    return entry;
 }
 
 /** Insert preserving descending priority order. */
@@ -121,6 +202,33 @@ void insert_locked(State& s, Entry e) {
                                     return a.priority > b.priority;
                                 });
     s.entries.insert(pos, e);
+}
+
+bool attach_handle_locked(State& s, rac_runtime_id_t id, void* handle) {
+    for (Entry& e : s.entries) {
+        if (e.id == id) {
+            if (e.dl_handle != nullptr && e.dl_handle != handle) {
+                close_dynamic_handle(e.dl_handle);
+            }
+            e.dl_handle = handle;
+            return true;
+        }
+    }
+    return false;
+}
+
+std::string entry_symbol_from_path(const char* path) {
+    if (path == nullptr) return {};
+    std::string s(path);
+    auto last_sep = s.find_last_of("/\\");
+    if (last_sep != std::string::npos) s.erase(0, last_sep + 1);
+    if (s.rfind("lib", 0) == 0) s.erase(0, 3);
+    auto dot = s.find('.');
+    if (dot != std::string::npos) s.erase(dot);
+    if (s.rfind("runanywhere_", 0) == 0) {
+        s.erase(0, std::strlen("runanywhere_"));
+    }
+    return std::string("rac_runtime_entry_") + s;
 }
 
 }  // namespace
@@ -143,19 +251,25 @@ rac_result_t rac_runtime_register(const rac_runtime_vtable_t* vtable) {
                       vtable->metadata.name);
         return RAC_ERROR_INVALID_PARAMETER;
     }
-    if (vtable->metadata.abi_version != RAC_RUNTIME_ABI_VERSION) {
+    if (!abi_version_supported(vtable->metadata.abi_version)) {
         RAC_LOG_ERROR(LOG_CAT,
-                      "rac_runtime_register: '%s' ABI mismatch (plugin=%u host=%u)",
+                      "rac_runtime_register: '%s' ABI mismatch (plugin=%u "
+                      "host_min=%u host_max=%u)",
                       vtable->metadata.name,
                       vtable->metadata.abi_version,
+                      RAC_RUNTIME_ABI_VERSION_MIN,
                       RAC_RUNTIME_ABI_VERSION);
         return RAC_ERROR_ABI_VERSION_MISMATCH;
+    }
+    rac_result_t rc = validate_v2_extension(vtable);
+    if (rc != RAC_SUCCESS) {
+        return rc;
     }
 
     /* Call init() OUTSIDE the registry lock so a slow probe never blocks
      * unrelated lookups. If init returns non-zero the runtime is silently
      * rejected (e.g. Metal on Linux, CUDA on a CPU-only host). */
-    rac_result_t rc = vtable->init();
+    rc = vtable->init();
     if (rc != RAC_SUCCESS) {
         RAC_LOG_DEBUG(LOG_CAT,
                       "rac_runtime_register: '%s' init rejected (%d) — not loading",
@@ -185,16 +299,18 @@ rac_result_t rac_runtime_register(const rac_runtime_vtable_t* vtable) {
         }
         /* Tear down the evicted vtable with its own destroy(), still outside
          * the registry mutex. */
-        const rac_runtime_vtable_t* evicted = existing->vtable;
+        Entry evicted = *existing;
         s.entries.erase(existing);
         lock.unlock();
-        evicted->destroy();
+        evicted.vtable->destroy();
+        close_dynamic_handle(evicted.dl_handle);
         lock.lock();
     }
 
     insert_locked(s, Entry{vtable->metadata.id,
                            vtable->metadata.priority,
-                           vtable});
+                           vtable,
+                           nullptr});
 
     RAC_LOG_DEBUG(LOG_CAT, "rac_runtime_register: '%s' (id=%d) ok",
                   vtable->metadata.name, (int)vtable->metadata.id);
@@ -205,12 +321,13 @@ rac_result_t rac_runtime_unregister(rac_runtime_id_t id) {
     ensure_builtins_registered();
     auto& s = state();
     std::unique_lock<std::mutex> lock(s.mu);
-    const rac_runtime_vtable_t* erased = take_entry_locked(s, id);
-    if (erased == nullptr) {
+    Entry erased = take_entry_locked(s, id);
+    if (erased.vtable == nullptr) {
         return RAC_ERROR_NOT_FOUND;
     }
     lock.unlock();
-    erased->destroy();
+    erased.vtable->destroy();
+    close_dynamic_handle(erased.dl_handle);
     RAC_LOG_DEBUG(LOG_CAT, "rac_runtime_unregister: id=%d ok", (int)id);
     return RAC_SUCCESS;
 }
@@ -252,6 +369,105 @@ size_t rac_runtime_count(void) {
 
 int rac_runtime_is_available(rac_runtime_id_t id) {
     return rac_runtime_get_by_id(id) != nullptr ? 1 : 0;
+}
+
+int rac_runtime_is_registered(rac_runtime_id_t id) {
+    /* Behaviorally identical to rac_runtime_is_available — exposed under a
+     * second name so the engine router's pre-flight check reads as
+     * "is the runtime registered?" rather than "is it available?". The two
+     * are the same predicate by construction: a runtime is registered iff
+     * it survived `init()` + dedup and is currently in the entries list. */
+    return rac_runtime_is_available(id);
+}
+
+uint32_t rac_runtime_abi_version(void) {
+    return RAC_RUNTIME_ABI_VERSION;
+}
+
+#if defined(RAC_PLUGIN_MODE_STATIC) && RAC_PLUGIN_MODE_STATIC
+
+rac_result_t rac_runtime_load(const char* path) {
+    if (path == nullptr) return RAC_ERROR_NULL_POINTER;
+    RAC_LOG_DEBUG(LOG_CAT,
+                  "rac_runtime_load('%s'): host built with "
+                  "RAC_STATIC_PLUGINS=ON; dynamic runtime loading is disabled.",
+                  path);
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+}
+
+#else
+
+rac_result_t rac_runtime_load(const char* path) {
+    if (path == nullptr) return RAC_ERROR_NULL_POINTER;
+
+    rac_lib_handle_t handle = rac_runtime_dl_open(path);
+    if (handle == nullptr) {
+        RAC_LOG_ERROR(LOG_CAT,
+                      "rac_runtime_load('%s'): dlopen failed (%s)",
+                      path,
+                      rac_runtime_dl_error());
+        return RAC_ERROR_PLUGIN_LOAD_FAILED;
+    }
+
+    const std::string sym = entry_symbol_from_path(path);
+    void* entry_sym = rac_runtime_dl_sym(handle, sym.c_str());
+    if (entry_sym == nullptr) {
+        RAC_LOG_ERROR(LOG_CAT,
+                      "rac_runtime_load('%s'): dlsym('%s') failed (%s)",
+                      path,
+                      sym.c_str(),
+                      rac_runtime_dl_error());
+        rac_runtime_dl_close(handle);
+        return RAC_ERROR_PLUGIN_LOAD_FAILED;
+    }
+
+    auto entry = reinterpret_cast<rac_runtime_entry_fn>(entry_sym);
+    const rac_runtime_vtable_t* vt = entry();
+    if (vt == nullptr || vt->metadata.name == nullptr) {
+        RAC_LOG_ERROR(LOG_CAT,
+                      "rac_runtime_load('%s'): entry '%s' returned NULL or unnamed vtable",
+                      path,
+                      sym.c_str());
+        rac_runtime_dl_close(handle);
+        return RAC_ERROR_PLUGIN_LOAD_FAILED;
+    }
+
+    rac_result_t rc = rac_runtime_register(vt);
+    if (rc != RAC_SUCCESS) {
+        RAC_LOG_ERROR(LOG_CAT,
+                      "rac_runtime_load('%s'): rac_runtime_register('%s') -> %d",
+                      path,
+                      vt->metadata.name,
+                      static_cast<int>(rc));
+        rac_runtime_dl_close(handle);
+        return rc;
+    }
+
+    auto& s = state();
+    {
+        std::lock_guard<std::mutex> lock(s.mu);
+        if (!attach_handle_locked(s, vt->metadata.id, handle)) {
+            rc = RAC_ERROR_NOT_FOUND;
+        }
+    }
+    if (rc != RAC_SUCCESS) {
+        rac_runtime_unregister(vt->metadata.id);
+        rac_runtime_dl_close(handle);
+        return rc;
+    }
+
+    RAC_LOG_DEBUG(LOG_CAT,
+                  "rac_runtime_load('%s'): registered '%s' from '%s'",
+                  path,
+                  vt->metadata.name,
+                  sym.c_str());
+    return RAC_SUCCESS;
+}
+
+#endif
+
+rac_result_t rac_runtime_unload(rac_runtime_id_t id) {
+    return rac_runtime_unregister(id);
 }
 
 }  // extern "C"

@@ -183,6 +183,12 @@ class ErrorContext extends $pb.GeneratedMessage {
 ///    * `nested_message` — optional. Underlying-error message as captured at
 ///      wrap time. Mirrors Swift's RunAnywhereError.underlyingError.localizedDesc
 ///      and Kotlin's Throwable.cause.message.
+///    * `retryable` — canonical retry hint. This is business-policy metadata
+///      owned by the portable layer; the platform adapter still decides how to
+///      schedule the retry through native/background APIs when appropriate.
+///    * `correlation_id` — stable cross-event/request correlation key. SDKEvent
+///      also carries this field so callers can join success/progress/failure
+///      events without parsing free-form properties.
 ///  ---------------------------------------------------------------------------
 class SDKError extends $pb.GeneratedMessage {
   factory SDKError({
@@ -195,6 +201,9 @@ class SDKError extends $pb.GeneratedMessage {
     $fixnum.Int64? timestampMs,
     ErrorSeverity? severity,
     $core.String? component,
+    $core.bool? retryable,
+    $core.String? remediationHint,
+    $core.String? correlationId,
   }) {
     final $result = create();
     if (code != null) {
@@ -224,6 +233,15 @@ class SDKError extends $pb.GeneratedMessage {
     if (component != null) {
       $result.component = component;
     }
+    if (retryable != null) {
+      $result.retryable = retryable;
+    }
+    if (remediationHint != null) {
+      $result.remediationHint = remediationHint;
+    }
+    if (correlationId != null) {
+      $result.correlationId = correlationId;
+    }
     return $result;
   }
   SDKError._() : super();
@@ -240,6 +258,9 @@ class SDKError extends $pb.GeneratedMessage {
     ..aInt64(7, _omitFieldNames ? '' : 'timestampMs')
     ..e<ErrorSeverity>(8, _omitFieldNames ? '' : 'severity', $pb.PbFieldType.OE, defaultOrMaker: ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED, valueOf: ErrorSeverity.valueOf, enumValues: ErrorSeverity.values)
     ..aOS(9, _omitFieldNames ? '' : 'component')
+    ..aOB(10, _omitFieldNames ? '' : 'retryable')
+    ..aOS(11, _omitFieldNames ? '' : 'remediationHint')
+    ..aOS(12, _omitFieldNames ? '' : 'correlationId')
     ..hasRequiredFields = false
   ;
 
@@ -353,6 +374,33 @@ class SDKError extends $pb.GeneratedMessage {
   $core.bool hasComponent() => $_has(8);
   @$pb.TagNumber(9)
   void clearComponent() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.bool get retryable => $_getBF(9);
+  @$pb.TagNumber(10)
+  set retryable($core.bool v) { $_setBool(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasRetryable() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearRetryable() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.String get remediationHint => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set remediationHint($core.String v) { $_setString(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasRemediationHint() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearRemediationHint() => clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.String get correlationId => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set correlationId($core.String v) { $_setString(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasCorrelationId() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearCorrelationId() => clearField(12);
 }
 
 

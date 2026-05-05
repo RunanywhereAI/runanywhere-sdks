@@ -170,6 +170,52 @@ public class DownloadProgress(
     schemaIndex = 14,
   )
   public val local_path: String = "",
+  /**
+   * 0.0..1.0 across all planned files/stages
+   */
+  @field:WireField(
+    tag = 16,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "overallProgress",
+    schemaIndex = 15,
+  )
+  public val overall_progress: Float = 0f,
+  @field:WireField(
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "startedAtUnixMs",
+    schemaIndex = 16,
+  )
+  public val started_at_unix_ms: Long = 0L,
+  @field:WireField(
+    tag = 18,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "updatedAtUnixMs",
+    schemaIndex = 17,
+  )
+  public val updated_at_unix_ms: Long = 0L,
+  @field:WireField(
+    tag = 19,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "currentFileName",
+    schemaIndex = 18,
+  )
+  public val current_file_name: String = "",
+  /**
+   * logical resume marker, not a native handle
+   */
+  @field:WireField(
+    tag = 20,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "resumeToken",
+    schemaIndex = 19,
+  )
+  public val resume_token: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DownloadProgress, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -198,6 +244,11 @@ public class DownloadProgress(
     if (total_files != other.total_files) return false
     if (storage_key != other.storage_key) return false
     if (local_path != other.local_path) return false
+    if (overall_progress != other.overall_progress) return false
+    if (started_at_unix_ms != other.started_at_unix_ms) return false
+    if (updated_at_unix_ms != other.updated_at_unix_ms) return false
+    if (current_file_name != other.current_file_name) return false
+    if (resume_token != other.resume_token) return false
     return true
   }
 
@@ -220,6 +271,11 @@ public class DownloadProgress(
       result = result * 37 + total_files.hashCode()
       result = result * 37 + storage_key.hashCode()
       result = result * 37 + local_path.hashCode()
+      result = result * 37 + overall_progress.hashCode()
+      result = result * 37 + started_at_unix_ms.hashCode()
+      result = result * 37 + updated_at_unix_ms.hashCode()
+      result = result * 37 + current_file_name.hashCode()
+      result = result * 37 + resume_token.hashCode()
       super.hashCode = result
     }
     return result
@@ -242,6 +298,11 @@ public class DownloadProgress(
     result += """total_files=$total_files"""
     result += """storage_key=${sanitize(storage_key)}"""
     result += """local_path=${sanitize(local_path)}"""
+    result += """overall_progress=$overall_progress"""
+    result += """started_at_unix_ms=$started_at_unix_ms"""
+    result += """updated_at_unix_ms=$updated_at_unix_ms"""
+    result += """current_file_name=${sanitize(current_file_name)}"""
+    result += """resume_token=${sanitize(resume_token)}"""
     return result.joinToString(prefix = "DownloadProgress{", separator = ", ", postfix = "}")
   }
 
@@ -261,10 +322,16 @@ public class DownloadProgress(
     total_files: Int = this.total_files,
     storage_key: String = this.storage_key,
     local_path: String = this.local_path,
+    overall_progress: Float = this.overall_progress,
+    started_at_unix_ms: Long = this.started_at_unix_ms,
+    updated_at_unix_ms: Long = this.updated_at_unix_ms,
+    current_file_name: String = this.current_file_name,
+    resume_token: String = this.resume_token,
     unknownFields: ByteString = this.unknownFields,
   ): DownloadProgress = DownloadProgress(model_id, stage, bytes_downloaded, total_bytes,
       stage_progress, overall_speed_bps, eta_seconds, state, retry_attempt, error_message, task_id,
-      current_file_index, total_files, storage_key, local_path, unknownFields)
+      current_file_index, total_files, storage_key, local_path, overall_progress,
+      started_at_unix_ms, updated_at_unix_ms, current_file_name, resume_token, unknownFields)
 
   public companion object {
     @JvmField
@@ -306,6 +373,16 @@ public class DownloadProgress(
             value.storage_key)
         if (value.local_path != "") size += ProtoAdapter.STRING.encodedSizeWithTag(15,
             value.local_path)
+        if (!value.overall_progress.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(16,
+            value.overall_progress)
+        if (value.started_at_unix_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(17,
+            value.started_at_unix_ms)
+        if (value.updated_at_unix_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(18,
+            value.updated_at_unix_ms)
+        if (value.current_file_name != "") size += ProtoAdapter.STRING.encodedSizeWithTag(19,
+            value.current_file_name)
+        if (value.resume_token != "") size += ProtoAdapter.STRING.encodedSizeWithTag(20,
+            value.resume_token)
         return size
       }
 
@@ -334,11 +411,31 @@ public class DownloadProgress(
         if (value.storage_key != "") ProtoAdapter.STRING.encodeWithTag(writer, 14,
             value.storage_key)
         if (value.local_path != "") ProtoAdapter.STRING.encodeWithTag(writer, 15, value.local_path)
+        if (!value.overall_progress.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 16,
+            value.overall_progress)
+        if (value.started_at_unix_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 17,
+            value.started_at_unix_ms)
+        if (value.updated_at_unix_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 18,
+            value.updated_at_unix_ms)
+        if (value.current_file_name != "") ProtoAdapter.STRING.encodeWithTag(writer, 19,
+            value.current_file_name)
+        if (value.resume_token != "") ProtoAdapter.STRING.encodeWithTag(writer, 20,
+            value.resume_token)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DownloadProgress) {
         writer.writeBytes(value.unknownFields)
+        if (value.resume_token != "") ProtoAdapter.STRING.encodeWithTag(writer, 20,
+            value.resume_token)
+        if (value.current_file_name != "") ProtoAdapter.STRING.encodeWithTag(writer, 19,
+            value.current_file_name)
+        if (value.updated_at_unix_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 18,
+            value.updated_at_unix_ms)
+        if (value.started_at_unix_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 17,
+            value.started_at_unix_ms)
+        if (!value.overall_progress.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 16,
+            value.overall_progress)
         if (value.local_path != "") ProtoAdapter.STRING.encodeWithTag(writer, 15, value.local_path)
         if (value.storage_key != "") ProtoAdapter.STRING.encodeWithTag(writer, 14,
             value.storage_key)
@@ -381,6 +478,11 @@ public class DownloadProgress(
         var total_files: Int = 0
         var storage_key: String = ""
         var local_path: String = ""
+        var overall_progress: Float = 0f
+        var started_at_unix_ms: Long = 0L
+        var updated_at_unix_ms: Long = 0L
+        var current_file_name: String = ""
+        var resume_token: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
@@ -406,6 +508,11 @@ public class DownloadProgress(
             13 -> total_files = ProtoAdapter.INT32.decode(reader)
             14 -> storage_key = ProtoAdapter.STRING.decode(reader)
             15 -> local_path = ProtoAdapter.STRING.decode(reader)
+            16 -> overall_progress = ProtoAdapter.FLOAT.decode(reader)
+            17 -> started_at_unix_ms = ProtoAdapter.INT64.decode(reader)
+            18 -> updated_at_unix_ms = ProtoAdapter.INT64.decode(reader)
+            19 -> current_file_name = ProtoAdapter.STRING.decode(reader)
+            20 -> resume_token = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -425,6 +532,11 @@ public class DownloadProgress(
           total_files = total_files,
           storage_key = storage_key,
           local_path = local_path,
+          overall_progress = overall_progress,
+          started_at_unix_ms = started_at_unix_ms,
+          updated_at_unix_ms = updated_at_unix_ms,
+          current_file_name = current_file_name,
+          resume_token = resume_token,
           unknownFields = unknownFields
         )
       }

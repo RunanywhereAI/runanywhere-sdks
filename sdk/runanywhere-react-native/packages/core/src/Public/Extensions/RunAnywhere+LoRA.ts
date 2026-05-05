@@ -1,32 +1,50 @@
 /**
  * RunAnywhere+LoRA.ts
  *
- * Public API for LoRA adapter management. Wave 2: aligned to
- * proto-canonical LoRA shapes (`@runanywhere/proto-ts/lora_options`).
+ * Public API for LoRA adapter management. The namespace mirrors the generated
+ * LoRA service contract from `lora_options.proto`:
  *
- * Matches Swift: `Public/Extensions/LLM/RunAnywhere+LoRA.swift`. Surface
- * follows the canonical cross-SDK namespace shape — `RunAnywhere.lora.*`:
- *
- *   await RunAnywhere.lora.load({ adapterPath, scale })
- *   await RunAnywhere.lora.remove(adapterPath)
- *   await RunAnywhere.lora.clear()
- *   const loaded = await RunAnywhere.lora.getLoaded()
- *   const compat = await RunAnywhere.lora.checkCompatibility(adapterPath)
- *   await RunAnywhere.lora.register({ id, name, ... })
- *   const list = await RunAnywhere.lora.adaptersForModel(modelId)
- *   const all  = await RunAnywhere.lora.allRegistered()
+ *   await RunAnywhere.lora.apply(request)
+ *   await RunAnywhere.lora.remove(request)
+ *   const current = await RunAnywhere.lora.list()
+ *   const state = await RunAnywhere.lora.state()
+ *   const compat = await RunAnywhere.lora.checkCompatibility(config)
+ *   const entry = await RunAnywhere.lora.catalog.register(entry)
+ *   const catalog = await RunAnywhere.lora.catalog.list(request)
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import type {
   LoRAAdapterConfig,
-  LoRAAdapterInfo,
+  LoRAApplyRequest,
+  LoRAApplyResult,
+  LoRARemoveRequest,
+  LoRAState,
+  LoraAdapterCatalogEntry,
+  LoraAdapterCatalogGetRequest,
+  LoraAdapterCatalogGetResult,
+  LoraAdapterCatalogListRequest,
+  LoraAdapterCatalogListResult,
+  LoraAdapterCatalogQuery,
+  LoraAdapterDownloadCompletedRequest,
+  LoraAdapterDownloadCompletedResult,
   LoraCompatibilityResult,
 } from '@runanywhere/proto-ts/lora_options';
 import {
   LoRAAdapterConfig as LoRAAdapterConfigMessage,
-  LoRAAdapterInfo as LoRAAdapterInfoMessage,
+  LoRAApplyRequest as LoRAApplyRequestMessage,
+  LoRAApplyResult as LoRAApplyResultMessage,
+  LoRARemoveRequest as LoRARemoveRequestMessage,
+  LoRAState as LoRAStateMessage,
+  LoraAdapterCatalogEntry as LoraAdapterCatalogEntryMessage,
+  LoraAdapterCatalogGetRequest as LoraAdapterCatalogGetRequestMessage,
+  LoraAdapterCatalogGetResult as LoraAdapterCatalogGetResultMessage,
+  LoraAdapterCatalogListRequest as LoraAdapterCatalogListRequestMessage,
+  LoraAdapterCatalogListResult as LoraAdapterCatalogListResultMessage,
+  LoraAdapterCatalogQuery as LoraAdapterCatalogQueryMessage,
+  LoraAdapterDownloadCompletedRequest as LoraAdapterDownloadCompletedRequestMessage,
+  LoraAdapterDownloadCompletedResult as LoraAdapterDownloadCompletedResultMessage,
   LoraCompatibilityResult as LoraCompatibilityResultMessage,
 } from '@runanywhere/proto-ts/lora_options';
 import {
@@ -36,18 +54,99 @@ import {
 
 const logger = new SDKLogger('RunAnywhere.LoRA');
 
-function encodeConfig(config: LoRAAdapterConfig): ArrayBuffer {
-  return bytesToArrayBuffer(LoRAAdapterConfigMessage.encode(
-    LoRAAdapterConfigMessage.create(config)
-  ).finish());
+function ensureNative() {
+  if (!isNativeModuleAvailable()) {
+    throw new Error('Native module not available');
+  }
+  return requireNativeModule();
 }
 
-function decodeAdapterInfo(buffer: ArrayBuffer, operation: string): LoRAAdapterInfo {
+function decodeRequired<T>(
+  buffer: ArrayBuffer,
+  decode: (bytes: Uint8Array) => T,
+  operation: string
+): T {
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
     throw new Error(`${operation} returned an empty LoRA proto result`);
   }
-  return LoRAAdapterInfoMessage.decode(bytes);
+  return decode(bytes);
+}
+
+function encodeConfig(config: LoRAAdapterConfig): ArrayBuffer {
+  return bytesToArrayBuffer(
+    LoRAAdapterConfigMessage.encode(
+      LoRAAdapterConfigMessage.create(config)
+    ).finish()
+  );
+}
+
+function encodeApplyRequest(request: LoRAApplyRequest): ArrayBuffer {
+  return bytesToArrayBuffer(
+    LoRAApplyRequestMessage.encode(
+      LoRAApplyRequestMessage.create(request)
+    ).finish()
+  );
+}
+
+function encodeRemoveRequest(request: LoRARemoveRequest): ArrayBuffer {
+  return bytesToArrayBuffer(
+    LoRARemoveRequestMessage.encode(
+      LoRARemoveRequestMessage.create(request)
+    ).finish()
+  );
+}
+
+function encodeStateRequest(request?: LoRAState): ArrayBuffer {
+  return bytesToArrayBuffer(
+    LoRAStateMessage.encode(LoRAStateMessage.create(request ?? {})).finish()
+  );
+}
+
+function encodeCatalogEntry(entry: LoraAdapterCatalogEntry): ArrayBuffer {
+  return bytesToArrayBuffer(
+    LoraAdapterCatalogEntryMessage.encode(
+      LoraAdapterCatalogEntryMessage.create(entry)
+    ).finish()
+  );
+}
+
+function encodeCatalogListRequest(
+  request?: LoraAdapterCatalogListRequest
+): ArrayBuffer {
+  return bytesToArrayBuffer(
+    LoraAdapterCatalogListRequestMessage.encode(
+      LoraAdapterCatalogListRequestMessage.create(request ?? {})
+    ).finish()
+  );
+}
+
+function encodeCatalogQuery(query: LoraAdapterCatalogQuery): ArrayBuffer {
+  return bytesToArrayBuffer(
+    LoraAdapterCatalogQueryMessage.encode(
+      LoraAdapterCatalogQueryMessage.create(query)
+    ).finish()
+  );
+}
+
+function encodeCatalogGetRequest(
+  request: LoraAdapterCatalogGetRequest
+): ArrayBuffer {
+  return bytesToArrayBuffer(
+    LoraAdapterCatalogGetRequestMessage.encode(
+      LoraAdapterCatalogGetRequestMessage.create(request)
+    ).finish()
+  );
+}
+
+function encodeDownloadCompletedRequest(
+  request: LoraAdapterDownloadCompletedRequest
+): ArrayBuffer {
+  return bytesToArrayBuffer(
+    LoraAdapterDownloadCompletedRequestMessage.encode(
+      LoraAdapterDownloadCompletedRequestMessage.create(request)
+    ).finish()
+  );
 }
 
 // ============================================================================
@@ -55,130 +154,137 @@ function decodeAdapterInfo(buffer: ArrayBuffer, operation: string): LoRAAdapterI
 // ============================================================================
 
 /**
- * Load and apply a LoRA adapter to the currently loaded model.
- *
- * Returns `LoRAAdapterInfo` describing the applied adapter, as specified by
- * the canonical cross-SDK spec §3.
- *
- * Canonical: `RunAnywhere.lora.load(config) → LoRAAdapterInfo`.
+ * Apply one or more LoRA adapters to the current logical LLM session.
  */
-async function load(config: LoRAAdapterConfig): Promise<LoRAAdapterInfo> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
-  }
-  const native = requireNativeModule();
-  const info = decodeAdapterInfo(
-    await native.loraLoadProto(encodeConfig(config)),
-    'loraLoadProto'
+async function apply(request: LoRAApplyRequest): Promise<LoRAApplyResult> {
+  const native = ensureNative();
+  const result = decodeRequired(
+    await native.loraApplyProto(encodeApplyRequest(request)),
+    LoRAApplyResultMessage.decode,
+    'loraApplyProto'
   );
-  logger.info(`LoRA adapter loaded: ${config.adapterPath}`);
-  return info;
+  logger.info(`LoRA apply completed: ${result.adapters.length} adapter(s)`);
+  return result;
 }
 
 /**
- * Remove a specific LoRA adapter by path.
- *
- * Canonical: `RunAnywhere.lora.remove(adapterId)`.
+ * Remove named/path adapters, or clear all adapters when `clearAll` is true.
  */
-async function remove(adapterId: string): Promise<void> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
-  }
-  const native = requireNativeModule();
-  await native.loraRemoveProto(encodeConfig({
-    adapterId,
-    adapterPath: adapterId,
-    scale: 1.0,
-  }));
-  logger.info(`LoRA adapter removed: ${adapterId}`);
-}
-
-/** Remove all loaded LoRA adapters. Canonical: `RunAnywhere.lora.clear()`. */
-async function clear(): Promise<void> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
-  }
-  await requireNativeModule().loraClearProto();
-  logger.info('All LoRA adapters cleared');
+async function remove(request: LoRARemoveRequest): Promise<LoRAState> {
+  const native = ensureNative();
+  const result = decodeRequired(
+    await native.loraRemoveProto(encodeRemoveRequest(request)),
+    LoRAStateMessage.decode,
+    'loraRemoveProto'
+  );
+  logger.info(
+    `LoRA remove completed: ${result.loadedAdapters.length} adapter(s) active`
+  );
+  return result;
 }
 
 /**
- * Get info about all currently loaded LoRA adapters.
- *
- * Canonical: `RunAnywhere.lora.getLoaded()`.
+ * Return the current loaded-adapter snapshot.
  */
-async function getLoaded(): Promise<LoRAAdapterInfo[]> {
-  return [];
+async function list(request?: LoRAState): Promise<LoRAState> {
+  const native = ensureNative();
+  return decodeRequired(
+    await native.loraListProto(encodeStateRequest(request)),
+    LoRAStateMessage.decode,
+    'loraListProto'
+  );
+}
+
+/**
+ * Return the logical LoRA service state.
+ */
+async function state(request?: LoRAState): Promise<LoRAState> {
+  const native = ensureNative();
+  return decodeRequired(
+    await native.loraStateProto(encodeStateRequest(request)),
+    LoRAStateMessage.decode,
+    'loraStateProto'
+  );
 }
 
 /**
  * Check LoRA adapter compatibility with a model.
  *
- * Both `adapterId` and `modelId` are forwarded to the native bridge. When
- * `modelId` is omitted the bridge checks against the currently loaded model.
- *
- * Canonical: `RunAnywhere.lora.checkCompatibility(adapterId, modelId)` (§3).
+ * The request is the generated `LoRAAdapterConfig`; model/session selection
+ * remains a native/provider concern behind the bridge.
  */
 async function checkCompatibility(
-  adapterId: string,
-  modelId?: string,
+  config: LoRAAdapterConfig
 ): Promise<LoraCompatibilityResult> {
-  if (!isNativeModuleAvailable()) {
-    return { isCompatible: false, errorMessage: 'SDK not initialized' };
-  }
-  const native = requireNativeModule();
-  const config = LoRAAdapterConfigMessage.create({
-    adapterId,
-    adapterPath: adapterId,
-    scale: 1.0,
-  });
-  void modelId;
-  const bytes = arrayBufferToBytes(
-    await native.loraCompatibilityProto(
-      bytesToArrayBuffer(LoRAAdapterConfigMessage.encode(config).finish())
-    )
+  const native = ensureNative();
+  return decodeRequired(
+    await native.loraCompatibilityProto(encodeConfig(config)),
+    LoraCompatibilityResultMessage.decode,
+    'loraCompatibilityProto'
   );
-  return bytes.byteLength > 0
-    ? LoraCompatibilityResultMessage.decode(bytes)
-    : { isCompatible: false, errorMessage: 'LoRA proto ABI unavailable' };
 }
 
 // ============================================================================
 // Catalog Operations
 // ============================================================================
 
-/**
- * Register a LoRA adapter configuration with the SDK so it can be
- * referenced by `adapterId` in subsequent `load` calls.
- *
- * Accepts `LoRAAdapterConfig` per the canonical cross-SDK spec §3.
- *
- * Canonical: `RunAnywhere.lora.register(config: LoRAAdapterConfig) → void`.
- */
-async function register(config: LoRAAdapterConfig): Promise<void> {
-  void config;
-  throw new Error('LoRA catalog registration is not exposed by the RN core bridge because commons does not provide a lifecycle-owned LoRA registry handle.');
+async function registerCatalogEntry(
+  entry: LoraAdapterCatalogEntry
+): Promise<LoraAdapterCatalogEntry> {
+  const native = ensureNative();
+  const result = decodeRequired(
+    await native.loraRegisterCatalogEntryProto(encodeCatalogEntry(entry)),
+    LoraAdapterCatalogEntryMessage.decode,
+    'loraRegisterCatalogEntryProto'
+  );
+  logger.info(`LoRA catalog registered: ${result.id}`);
+  return result;
 }
 
-/**
- * Get all LoRA adapters compatible with a specific model.
- *
- * Canonical: `RunAnywhere.lora.adaptersForModel(modelId) → LoRAAdapterInfo[]` (§3).
- */
-async function adaptersForModel(
-  modelId: string,
-): Promise<LoRAAdapterInfo[]> {
-  void modelId;
-  return [];
+async function listCatalogEntries(
+  request?: LoraAdapterCatalogListRequest
+): Promise<LoraAdapterCatalogListResult> {
+  const native = ensureNative();
+  return decodeRequired(
+    await native.loraCatalogListProto(encodeCatalogListRequest(request)),
+    LoraAdapterCatalogListResultMessage.decode,
+    'loraCatalogListProto'
+  );
 }
 
-/**
- * Get all registered LoRA adapters.
- *
- * Canonical: `RunAnywhere.lora.allRegistered() → LoRAAdapterInfo[]` (§3).
- */
-async function allRegistered(): Promise<LoRAAdapterInfo[]> {
-  return [];
+async function queryCatalogEntries(
+  query: LoraAdapterCatalogQuery
+): Promise<LoraAdapterCatalogListResult> {
+  const native = ensureNative();
+  return decodeRequired(
+    await native.loraCatalogQueryProto(encodeCatalogQuery(query)),
+    LoraAdapterCatalogListResultMessage.decode,
+    'loraCatalogQueryProto'
+  );
+}
+
+async function getCatalogEntry(
+  request: LoraAdapterCatalogGetRequest
+): Promise<LoraAdapterCatalogGetResult> {
+  const native = ensureNative();
+  return decodeRequired(
+    await native.loraCatalogGetProto(encodeCatalogGetRequest(request)),
+    LoraAdapterCatalogGetResultMessage.decode,
+    'loraCatalogGetProto'
+  );
+}
+
+async function markCatalogDownloadCompleted(
+  request: LoraAdapterDownloadCompletedRequest
+): Promise<LoraAdapterDownloadCompletedResult> {
+  const native = ensureNative();
+  return decodeRequired(
+    await native.loraCatalogMarkDownloadCompletedProto(
+      encodeDownloadCompletedRequest(request)
+    ),
+    LoraAdapterDownloadCompletedResultMessage.decode,
+    'loraCatalogMarkDownloadCompletedProto'
+  );
 }
 
 // ============================================================================
@@ -186,19 +292,19 @@ async function allRegistered(): Promise<LoRAAdapterInfo[]> {
 // ============================================================================
 
 /**
- * `RunAnywhere.lora` namespace — canonical cross-SDK shape.
- *
- * Mirror of Swift `RunAnywhere.lora.load(...)` and Web/Flutter/Kotlin
- * once the same alignment lands there. Stateless wrapper: each call
- * dispatches into the LLM component native bridge.
+ * `RunAnywhere.lora` namespace backed by the generated LoRA service messages.
  */
 export const lora = {
-  load,
+  apply,
   remove,
-  clear,
-  getLoaded,
+  list,
+  state,
   checkCompatibility,
-  register,
-  adaptersForModel,
-  allRegistered,
+  catalog: {
+    register: registerCatalogEntry,
+    list: listCatalogEntries,
+    query: queryCatalogEntries,
+    get: getCatalogEntry,
+    markDownloadCompleted: markCatalogDownloadCompleted,
+  },
 };

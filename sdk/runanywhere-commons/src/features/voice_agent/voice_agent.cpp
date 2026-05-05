@@ -149,6 +149,8 @@ void publish_voice_pipeline_sdk_event(const runanywhere::v1::VoiceEvent& voice_e
     sdk_event.set_component(runanywhere::v1::SDK_COMPONENT_VOICE_AGENT);
     sdk_event.set_severity(severity);
     sdk_event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    sdk_event.set_source("cpp");
+    sdk_event.set_operation_id("voice_agent.pipeline");
     sdk_event.mutable_voice_pipeline()->CopyFrom(voice_event);
     const size_t size = sdk_event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);

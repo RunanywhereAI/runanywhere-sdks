@@ -14,8 +14,8 @@ namespace runtime {
 namespace onnxrt {
 
 enum class ElementType : uint32_t {
-    Float32 = 1,
-    Int64 = 7,
+    Float32 = RAC_RUNTIME_DTYPE_F32,
+    Int64 = RAC_RUNTIME_DTYPE_I64,
 };
 
 struct TensorInput {

@@ -1,5 +1,9 @@
 package com.runanywhere.runanywhereai.presentation.tts
 
+import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_TTS
+import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.ModelEventKind
+import ai.runanywhere.proto.v1.TTSOptions
 import android.app.Application
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -8,15 +12,12 @@ import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.events.ModelEvent
-import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_TTS
-import ai.runanywhere.proto.v1.ModelEventKind
-import ai.runanywhere.proto.v1.TTSOptions
+import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
-import com.runanywhere.sdk.public.extensions.isTTSVoiceLoadedSync
+import com.runanywhere.sdk.public.extensions.isTTSVoiceLoaded
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
 import com.runanywhere.sdk.public.extensions.stopSynthesis
 import com.runanywhere.sdk.public.extensions.synthesize
@@ -219,7 +220,7 @@ class TextToSpeechViewModel(
      * Update TTS state from SDK
      */
     private fun updateTTSState() {
-        val isLoaded = RunAnywhere.isTTSVoiceLoadedSync
+        val isLoaded = RunAnywhere.isTTSVoiceLoaded
         val voiceId = RunAnywhere.currentTTSVoiceId
 
         _uiState.update {
@@ -261,7 +262,7 @@ class TextToSpeechViewModel(
     ) {
         Timber.i("Model loaded notification: $modelName (id: $modelId, framework: ${framework?.displayName})")
 
-        val isSystem = modelId == SYSTEM_TTS_MODEL_ID || framework == InferenceFramework.SYSTEM_TTS
+        val isSystem = modelId == SYSTEM_TTS_MODEL_ID || framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
 
         _uiState.update {
             it.copy(
@@ -341,7 +342,7 @@ class TextToSpeechViewModel(
             if (text.isEmpty()) return@launch
 
             val isSystem = _uiState.value.isSystemTTS
-            if (!isSystem && !RunAnywhere.isTTSVoiceLoadedSync) {
+            if (!isSystem && !RunAnywhere.isTTSVoiceLoaded) {
                 _uiState.update {
                     it.copy(errorMessage = "No TTS model loaded. Please select a voice first.")
                 }

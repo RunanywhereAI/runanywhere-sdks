@@ -7,6 +7,17 @@
  *
  * Actor-based LLM capability that owns model lifecycle and generation.
  * Uses lifecycle manager for unified lifecycle + analytics handling.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Component lifecycle/generation entry points
+ *     (rac_llm_component_create, configure, load_model, unload,
+ *     cleanup, cancel, generate, generate_stream,
+ *     generate_stream_with_timing, get_state, get_metrics, destroy):
+ *     `delete after SDK migration` for SDK callers — replaced by
+ *     rac_model_lifecycle_load_proto + rac_llm_*_proto.
+ *   - LoRA helpers (rac_llm_component_load_lora, remove_lora,
+ *     clear_lora, get_lora_info, check_lora_compat): `delete after
+ *     SDK migration`. Use rac_lora_*_proto.
  */
 
 #ifndef RAC_LLM_COMPONENT_H

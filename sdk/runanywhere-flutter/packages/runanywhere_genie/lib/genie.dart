@@ -24,12 +24,8 @@
 /// // Register the module (matches Swift: Genie.register())
 /// await Genie.register();
 ///
-/// // Add models
-/// Genie.addModel(
-///   name: 'Qwen3 4B NPU',
-///   url: 'https://huggingface.co/.../model.zip',
-///   memoryRequirement: 4000000000,
-/// );
+/// // Register models through RunAnywhereSDK.instance.models after register()
+/// // succeeds. The commons registry/router owns framework selection and routing.
 /// ```
 library runanywhere_genie;
 
@@ -37,12 +33,10 @@ import 'dart:async';
 
 import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
-    show InferenceFramework, ModelCategory;
+    show InferenceFramework;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/native/ffi_types.dart';
-import 'package:runanywhere/public/runanywhere_v4.dart' show RunAnywhereSDK;
 import 'package:runanywhere_genie/native/genie_bindings.dart';
 
 // Re-export for backward compatibility
@@ -98,9 +92,6 @@ class Genie implements RunAnywhereModule {
   static bool _isRegistered = false;
   static GenieBindings? _bindings;
   static final _logger = SDKLogger('Genie');
-
-  /// Internal model registry for models added via addModel
-  static final List<ModelInfo> _registeredModels = [];
 
   // ============================================================================
   // Registration (matches Swift Genie.register() exactly)
@@ -169,10 +160,6 @@ class Genie implements RunAnywhereModule {
     }
   }
 
-  // ============================================================================
-  // Model Handling (matches Swift exactly)
-  // ============================================================================
-
   /// Check if the native backend library can be loaded on this platform.
   ///
   /// Genie is experimental and Android/Snapdragon only:
@@ -181,62 +168,6 @@ class Genie implements RunAnywhereModule {
   /// - On iOS/other: Always returns false
   static bool get isAvailable => GenieBindings.checkAvailability();
 
-  /// Check if Genie can handle a given model.
-  /// Checks if the model ID contains "genie" or "npu" identifiers.
-  static bool canHandle(String? modelId) {
-    if (!_isRegistered) return false;
-    if (modelId == null) return false;
-    final lowered = modelId.toLowerCase();
-    return lowered.contains('genie') || lowered.contains('npu');
-  }
-
-  // ============================================================================
-  // Model Registration (convenience API)
-  // ============================================================================
-
-  /// Add a LLM model to the registry.
-  ///
-  /// This is a convenience method that registers a model with the SDK.
-  /// The model will be associated with the Genie NPU backend. Registration is
-  /// only useful when [isAvailable] is true.
-  ///
-  /// Matches Swift pattern - models are registered globally via RunAnywhere.
-  static void addModel({
-    String? id,
-    required String name,
-    required String url,
-    int? memoryRequirement,
-    bool supportsThinking = false,
-  }) {
-    final uri = Uri.tryParse(url);
-    if (uri == null) {
-      _logger.error('Invalid URL for model: $name');
-      return;
-    }
-
-    final modelId =
-        id ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
-
-    // Register with the global SDK registry (matches Swift pattern)
-    final model = RunAnywhereSDK.instance.models.register(
-      id: modelId,
-      name: name,
-      url: uri,
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_GENIE,
-      modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-      memoryRequirement: memoryRequirement,
-      supportsThinking: supportsThinking,
-    );
-
-    // Keep local reference for convenience
-    _registeredModels.add(model);
-    _logger.info('Added Genie model: $name ($modelId)');
-  }
-
-  /// Get all models registered with this module
-  static List<ModelInfo> get registeredModels =>
-      List.unmodifiable(_registeredModels);
-
   // ============================================================================
   // Cleanup
   // ============================================================================
@@ -244,7 +175,6 @@ class Genie implements RunAnywhereModule {
   /// Dispose of resources
   static void dispose() {
     _bindings = null;
-    _registeredModels.clear();
     _isRegistered = false;
     _logger.info('Genie disposed');
   }

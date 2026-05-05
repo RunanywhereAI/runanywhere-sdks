@@ -34,6 +34,18 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
     $core.String? preferredFramework,
     $core.String? jsonSchema,
     $core.String? executionTarget,
+    $core.String? requestId,
+    $core.String? modelId,
+    $core.String? conversationId,
+    $fixnum.Int64? seed,
+    $core.double? frequencyPenalty,
+    $core.double? presencePenalty,
+    $core.double? minP,
+    $core.String? grammar,
+    $core.String? responseFormat,
+    $core.bool? echoPrompt,
+    $core.int? nThreads,
+    $core.Map<$core.String, $core.String>? metadata,
   }) {
     final $result = create();
     if (prompt != null) {
@@ -75,6 +87,42 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
     if (executionTarget != null) {
       $result.executionTarget = executionTarget;
     }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (modelId != null) {
+      $result.modelId = modelId;
+    }
+    if (conversationId != null) {
+      $result.conversationId = conversationId;
+    }
+    if (seed != null) {
+      $result.seed = seed;
+    }
+    if (frequencyPenalty != null) {
+      $result.frequencyPenalty = frequencyPenalty;
+    }
+    if (presencePenalty != null) {
+      $result.presencePenalty = presencePenalty;
+    }
+    if (minP != null) {
+      $result.minP = minP;
+    }
+    if (grammar != null) {
+      $result.grammar = grammar;
+    }
+    if (responseFormat != null) {
+      $result.responseFormat = responseFormat;
+    }
+    if (echoPrompt != null) {
+      $result.echoPrompt = echoPrompt;
+    }
+    if (nThreads != null) {
+      $result.nThreads = nThreads;
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
+    }
     return $result;
   }
   LLMGenerateRequest._() : super();
@@ -95,6 +143,18 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
     ..aOS(11, _omitFieldNames ? '' : 'preferredFramework')
     ..aOS(12, _omitFieldNames ? '' : 'jsonSchema')
     ..aOS(13, _omitFieldNames ? '' : 'executionTarget')
+    ..aOS(14, _omitFieldNames ? '' : 'requestId')
+    ..aOS(15, _omitFieldNames ? '' : 'modelId')
+    ..aOS(16, _omitFieldNames ? '' : 'conversationId')
+    ..aInt64(17, _omitFieldNames ? '' : 'seed')
+    ..a<$core.double>(18, _omitFieldNames ? '' : 'frequencyPenalty', $pb.PbFieldType.OF)
+    ..a<$core.double>(19, _omitFieldNames ? '' : 'presencePenalty', $pb.PbFieldType.OF)
+    ..a<$core.double>(20, _omitFieldNames ? '' : 'minP', $pb.PbFieldType.OF)
+    ..aOS(21, _omitFieldNames ? '' : 'grammar')
+    ..aOS(22, _omitFieldNames ? '' : 'responseFormat')
+    ..aOB(23, _omitFieldNames ? '' : 'echoPrompt')
+    ..a<$core.int>(24, _omitFieldNames ? '' : 'nThreads', $pb.PbFieldType.O3)
+    ..m<$core.String, $core.String>(25, _omitFieldNames ? '' : 'metadata', entryClassName: 'LLMGenerateRequest.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
     ..hasRequiredFields = false
   ;
 
@@ -231,6 +291,108 @@ class LLMGenerateRequest extends $pb.GeneratedMessage {
   $core.bool hasExecutionTarget() => $_has(12);
   @$pb.TagNumber(13)
   void clearExecutionTarget() => clearField(13);
+
+  @$pb.TagNumber(14)
+  $core.String get requestId => $_getSZ(13);
+  @$pb.TagNumber(14)
+  set requestId($core.String v) { $_setString(13, v); }
+  @$pb.TagNumber(14)
+  $core.bool hasRequestId() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearRequestId() => clearField(14);
+
+  @$pb.TagNumber(15)
+  $core.String get modelId => $_getSZ(14);
+  @$pb.TagNumber(15)
+  set modelId($core.String v) { $_setString(14, v); }
+  @$pb.TagNumber(15)
+  $core.bool hasModelId() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearModelId() => clearField(15);
+
+  @$pb.TagNumber(16)
+  $core.String get conversationId => $_getSZ(15);
+  @$pb.TagNumber(16)
+  set conversationId($core.String v) { $_setString(15, v); }
+  @$pb.TagNumber(16)
+  $core.bool hasConversationId() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearConversationId() => clearField(16);
+
+  @$pb.TagNumber(17)
+  $fixnum.Int64 get seed => $_getI64(16);
+  @$pb.TagNumber(17)
+  set seed($fixnum.Int64 v) { $_setInt64(16, v); }
+  @$pb.TagNumber(17)
+  $core.bool hasSeed() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearSeed() => clearField(17);
+
+  @$pb.TagNumber(18)
+  $core.double get frequencyPenalty => $_getN(17);
+  @$pb.TagNumber(18)
+  set frequencyPenalty($core.double v) { $_setFloat(17, v); }
+  @$pb.TagNumber(18)
+  $core.bool hasFrequencyPenalty() => $_has(17);
+  @$pb.TagNumber(18)
+  void clearFrequencyPenalty() => clearField(18);
+
+  @$pb.TagNumber(19)
+  $core.double get presencePenalty => $_getN(18);
+  @$pb.TagNumber(19)
+  set presencePenalty($core.double v) { $_setFloat(18, v); }
+  @$pb.TagNumber(19)
+  $core.bool hasPresencePenalty() => $_has(18);
+  @$pb.TagNumber(19)
+  void clearPresencePenalty() => clearField(19);
+
+  @$pb.TagNumber(20)
+  $core.double get minP => $_getN(19);
+  @$pb.TagNumber(20)
+  set minP($core.double v) { $_setFloat(19, v); }
+  @$pb.TagNumber(20)
+  $core.bool hasMinP() => $_has(19);
+  @$pb.TagNumber(20)
+  void clearMinP() => clearField(20);
+
+  @$pb.TagNumber(21)
+  $core.String get grammar => $_getSZ(20);
+  @$pb.TagNumber(21)
+  set grammar($core.String v) { $_setString(20, v); }
+  @$pb.TagNumber(21)
+  $core.bool hasGrammar() => $_has(20);
+  @$pb.TagNumber(21)
+  void clearGrammar() => clearField(21);
+
+  @$pb.TagNumber(22)
+  $core.String get responseFormat => $_getSZ(21);
+  @$pb.TagNumber(22)
+  set responseFormat($core.String v) { $_setString(21, v); }
+  @$pb.TagNumber(22)
+  $core.bool hasResponseFormat() => $_has(21);
+  @$pb.TagNumber(22)
+  void clearResponseFormat() => clearField(22);
+
+  @$pb.TagNumber(23)
+  $core.bool get echoPrompt => $_getBF(22);
+  @$pb.TagNumber(23)
+  set echoPrompt($core.bool v) { $_setBool(22, v); }
+  @$pb.TagNumber(23)
+  $core.bool hasEchoPrompt() => $_has(22);
+  @$pb.TagNumber(23)
+  void clearEchoPrompt() => clearField(23);
+
+  @$pb.TagNumber(24)
+  $core.int get nThreads => $_getIZ(23);
+  @$pb.TagNumber(24)
+  set nThreads($core.int v) { $_setSignedInt32(23, v); }
+  @$pb.TagNumber(24)
+  $core.bool hasNThreads() => $_has(23);
+  @$pb.TagNumber(24)
+  void clearNThreads() => clearField(24);
+
+  @$pb.TagNumber(25)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(24);
 }
 
 /// Aggregate result carried on the terminal LLMStreamEvent. This intentionally
@@ -248,6 +410,10 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
     $fixnum.Int64? timeToFirstTokenMs,
     $core.double? tokensPerSecond,
     $core.String? finishReason,
+    $core.int? errorCode,
+    $core.String? errorMessage,
+    $fixnum.Int64? promptEvalTimeMs,
+    $fixnum.Int64? decodeTimeMs,
   }) {
     final $result = create();
     if (text != null) {
@@ -277,6 +443,18 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
     if (finishReason != null) {
       $result.finishReason = finishReason;
     }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (promptEvalTimeMs != null) {
+      $result.promptEvalTimeMs = promptEvalTimeMs;
+    }
+    if (decodeTimeMs != null) {
+      $result.decodeTimeMs = decodeTimeMs;
+    }
     return $result;
   }
   LLMStreamFinalResult._() : super();
@@ -293,6 +471,10 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
     ..aInt64(7, _omitFieldNames ? '' : 'timeToFirstTokenMs')
     ..a<$core.double>(8, _omitFieldNames ? '' : 'tokensPerSecond', $pb.PbFieldType.OF)
     ..aOS(9, _omitFieldNames ? '' : 'finishReason')
+    ..a<$core.int>(10, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..aOS(11, _omitFieldNames ? '' : 'errorMessage')
+    ..aInt64(12, _omitFieldNames ? '' : 'promptEvalTimeMs')
+    ..aInt64(13, _omitFieldNames ? '' : 'decodeTimeMs')
     ..hasRequiredFields = false
   ;
 
@@ -397,6 +579,42 @@ class LLMStreamFinalResult extends $pb.GeneratedMessage {
   $core.bool hasFinishReason() => $_has(8);
   @$pb.TagNumber(9)
   void clearFinishReason() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get errorCode => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set errorCode($core.int v) { $_setSignedInt32(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasErrorCode() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearErrorCode() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.String get errorMessage => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set errorMessage($core.String v) { $_setString(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasErrorMessage() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearErrorMessage() => clearField(11);
+
+  @$pb.TagNumber(12)
+  $fixnum.Int64 get promptEvalTimeMs => $_getI64(11);
+  @$pb.TagNumber(12)
+  set promptEvalTimeMs($fixnum.Int64 v) { $_setInt64(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasPromptEvalTimeMs() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearPromptEvalTimeMs() => clearField(12);
+
+  @$pb.TagNumber(13)
+  $fixnum.Int64 get decodeTimeMs => $_getI64(12);
+  @$pb.TagNumber(13)
+  set decodeTimeMs($fixnum.Int64 v) { $_setInt64(12, v); }
+  @$pb.TagNumber(13)
+  $core.bool hasDecodeTimeMs() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearDecodeTimeMs() => clearField(13);
 }
 
 /// v2 close-out Phase G-2: unified per-token streaming event. Replaces
@@ -417,6 +635,12 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     $core.String? errorMessage,
     LLMStreamFinalResult? result,
     $core.int? errorCode,
+    LLMStreamEventKind? eventKind,
+    $core.String? requestId,
+    $core.String? conversationId,
+    $core.int? promptTokensProcessed,
+    $core.int? completionTokensGenerated,
+    $fixnum.Int64? elapsedMs,
   }) {
     final $result = create();
     if (seq != null) {
@@ -452,6 +676,24 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     if (errorCode != null) {
       $result.errorCode = errorCode;
     }
+    if (eventKind != null) {
+      $result.eventKind = eventKind;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (conversationId != null) {
+      $result.conversationId = conversationId;
+    }
+    if (promptTokensProcessed != null) {
+      $result.promptTokensProcessed = promptTokensProcessed;
+    }
+    if (completionTokensGenerated != null) {
+      $result.completionTokensGenerated = completionTokensGenerated;
+    }
+    if (elapsedMs != null) {
+      $result.elapsedMs = elapsedMs;
+    }
     return $result;
   }
   LLMStreamEvent._() : super();
@@ -470,6 +712,12 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     ..aOS(9, _omitFieldNames ? '' : 'errorMessage')
     ..aOM<LLMStreamFinalResult>(10, _omitFieldNames ? '' : 'result', subBuilder: LLMStreamFinalResult.create)
     ..a<$core.int>(11, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..e<LLMStreamEventKind>(12, _omitFieldNames ? '' : 'eventKind', $pb.PbFieldType.OE, defaultOrMaker: LLMStreamEventKind.LLM_STREAM_EVENT_KIND_UNSPECIFIED, valueOf: LLMStreamEventKind.valueOf, enumValues: LLMStreamEventKind.values)
+    ..aOS(13, _omitFieldNames ? '' : 'requestId')
+    ..aOS(14, _omitFieldNames ? '' : 'conversationId')
+    ..a<$core.int>(15, _omitFieldNames ? '' : 'promptTokensProcessed', $pb.PbFieldType.O3)
+    ..a<$core.int>(16, _omitFieldNames ? '' : 'completionTokensGenerated', $pb.PbFieldType.O3)
+    ..aInt64(17, _omitFieldNames ? '' : 'elapsedMs')
     ..hasRequiredFields = false
   ;
 
@@ -613,6 +861,63 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   $core.bool hasErrorCode() => $_has(10);
   @$pb.TagNumber(11)
   void clearErrorCode() => clearField(11);
+
+  /// Event classification distinct from token semantic kind.
+  @$pb.TagNumber(12)
+  LLMStreamEventKind get eventKind => $_getN(11);
+  @$pb.TagNumber(12)
+  set eventKind(LLMStreamEventKind v) { setField(12, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasEventKind() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearEventKind() => clearField(12);
+
+  /// Request/session correlation fields.
+  @$pb.TagNumber(13)
+  $core.String get requestId => $_getSZ(12);
+  @$pb.TagNumber(13)
+  set requestId($core.String v) { $_setString(12, v); }
+  @$pb.TagNumber(13)
+  $core.bool hasRequestId() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearRequestId() => clearField(13);
+
+  @$pb.TagNumber(14)
+  $core.String get conversationId => $_getSZ(13);
+  @$pb.TagNumber(14)
+  set conversationId($core.String v) { $_setString(13, v); }
+  @$pb.TagNumber(14)
+  $core.bool hasConversationId() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearConversationId() => clearField(14);
+
+  /// Running counters for progress UIs.
+  @$pb.TagNumber(15)
+  $core.int get promptTokensProcessed => $_getIZ(14);
+  @$pb.TagNumber(15)
+  set promptTokensProcessed($core.int v) { $_setSignedInt32(14, v); }
+  @$pb.TagNumber(15)
+  $core.bool hasPromptTokensProcessed() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearPromptTokensProcessed() => clearField(15);
+
+  @$pb.TagNumber(16)
+  $core.int get completionTokensGenerated => $_getIZ(15);
+  @$pb.TagNumber(16)
+  set completionTokensGenerated($core.int v) { $_setSignedInt32(15, v); }
+  @$pb.TagNumber(16)
+  $core.bool hasCompletionTokensGenerated() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearCompletionTokensGenerated() => clearField(16);
+
+  @$pb.TagNumber(17)
+  $fixnum.Int64 get elapsedMs => $_getI64(16);
+  @$pb.TagNumber(17)
+  set elapsedMs($fixnum.Int64 v) { $_setInt64(16, v); }
+  @$pb.TagNumber(17)
+  $core.bool hasElapsedMs() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearElapsedMs() => clearField(17);
 }
 
 class LLMApi {

@@ -233,25 +233,6 @@ object RunAnywhereBridge {
     external fun racLlmCancelProto(): ByteArray?
 
     // ========================================================================
-    // LLM LORA ADAPTER (rac_llm_component.h - LoRA section)
-    // ========================================================================
-
-    @JvmStatic
-    external fun racLlmComponentLoadLora(handle: Long, adapterPath: String, scale: Float): Int
-
-    @JvmStatic
-    external fun racLlmComponentRemoveLora(handle: Long, adapterPath: String): Int
-
-    @JvmStatic
-    external fun racLlmComponentClearLora(handle: Long): Int
-
-    @JvmStatic
-    external fun racLlmComponentGetLoraInfo(handle: Long): String?
-
-    @JvmStatic
-    external fun racLlmComponentCheckLoraCompat(handle: Long, loraPath: String): String?
-
-    // ========================================================================
     // STT COMPONENT (rac_stt_component.h)
     // ========================================================================
 
@@ -278,9 +259,6 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racSttComponentTranscribeFile(handle: Long, audioPath: String, optionsJson: String?): String?
-
-    @JvmStatic
-    external fun racSttComponentTranscribeStream(handle: Long, audioData: ByteArray, optionsJson: String?): String?
 
     @JvmStatic
     external fun racSttComponentSupportsStreaming(handle: Long): Boolean
@@ -340,9 +318,6 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racTtsComponentSynthesizeToFile(handle: Long, text: String, outputPath: String, optionsJson: String?): Long
-
-    @JvmStatic
-    external fun racTtsComponentSynthesizeStream(handle: Long, text: String, optionsJson: String?): ByteArray?
 
     @JvmStatic
     external fun racTtsComponentGetVoices(handle: Long): String?
@@ -451,106 +426,6 @@ object RunAnywhereBridge {
     ): Int
 
     // ========================================================================
-    // VLM COMPONENT (rac_vlm_component.h)
-    // ========================================================================
-
-    @JvmStatic
-    external fun racVlmComponentCreate(): Long
-
-    @JvmStatic
-    external fun racVlmComponentDestroy(handle: Long)
-
-    @JvmStatic
-    external fun racVlmComponentLoadModel(
-        handle: Long,
-        modelPath: String,
-        mmprojPath: String?,
-        modelId: String,
-        modelName: String?,
-    ): Int
-
-    @JvmStatic
-    external fun racVlmComponentLoadModelById(handle: Long, modelId: String): Int
-
-    @JvmStatic
-    external fun racVlmComponentUnload(handle: Long): Int
-
-    @JvmStatic
-    external fun racVlmComponentCancel(handle: Long): Int
-
-    @JvmStatic
-    external fun racVlmComponentIsLoaded(handle: Long): Boolean
-
-    @JvmStatic
-    external fun racVlmComponentGetModelId(handle: Long): String?
-
-    /**
-     * Process an image (non-streaming).
-     *
-     * @param handle VLM component handle
-     * @param imageFormat Image format (0=FILE_PATH, 1=RGB_PIXELS, 2=BASE64)
-     * @param imagePath File path (for FILE_PATH format)
-     * @param imageData RGB pixel data (for RGB_PIXELS format)
-     * @param imageBase64 Base64-encoded data (for BASE64 format)
-     * @param imageWidth Image width (for RGB_PIXELS format)
-     * @param imageHeight Image height (for RGB_PIXELS format)
-     * @param prompt Text prompt
-     * @param optionsJson Generation options as JSON string
-     * @return JSON result string or null on error
-     */
-    @JvmStatic
-    external fun racVlmComponentProcess(
-        handle: Long,
-        imageFormat: Int,
-        imagePath: String?,
-        imageData: ByteArray?,
-        imageBase64: String?,
-        imageWidth: Int,
-        imageHeight: Int,
-        prompt: String,
-        optionsJson: String?,
-    ): String?
-
-    /**
-     * Process an image with streaming output.
-     * Calls tokenCallback for each generated token.
-     *
-     * @param handle VLM component handle
-     * @param imageFormat Image format (0=FILE_PATH, 1=RGB_PIXELS, 2=BASE64)
-     * @param imagePath File path (for FILE_PATH format)
-     * @param imageData RGB pixel data (for RGB_PIXELS format)
-     * @param imageBase64 Base64-encoded data (for BASE64 format)
-     * @param imageWidth Image width (for RGB_PIXELS format)
-     * @param imageHeight Image height (for RGB_PIXELS format)
-     * @param prompt Text prompt
-     * @param optionsJson Generation options as JSON string
-     * @param tokenCallback Callback invoked for each generated token
-     * @return JSON result string with final metrics, or null on error
-     */
-    @JvmStatic
-    external fun racVlmComponentProcessStream(
-        handle: Long,
-        imageFormat: Int,
-        imagePath: String?,
-        imageData: ByteArray?,
-        imageBase64: String?,
-        imageWidth: Int,
-        imageHeight: Int,
-        prompt: String,
-        optionsJson: String?,
-        tokenCallback: TokenCallback,
-    ): String?
-
-    @JvmStatic
-    external fun racVlmComponentSupportsStreaming(handle: Long): Boolean
-
-    @JvmStatic
-    external fun racVlmComponentGetState(handle: Long): Int
-
-    @JvmStatic
-    external fun racVlmComponentGetMetrics(handle: Long): String?
-
-    // ========================================================================
     // VLM GENERATED-PROTO SERVICE ABI (rac_vlm_service.h)
     // ========================================================================
 
@@ -558,7 +433,7 @@ object RunAnywhereBridge {
     external fun racVlmCreate(modelIdOrPath: String): Long
 
     @JvmStatic
-    external fun racVlmInitialize(handle: Long, modelPath: String, mmprojPath: String?): Int
+    external fun racVlmInitialize(handle: Long, modelPath: String, visionProjectorPath: String): Int
 
     @JvmStatic
     external fun racVlmProcessProto(
@@ -794,27 +669,13 @@ object RunAnywhereBridge {
     external fun racModelRegistryRemoveProto(modelId: String): Int
 
     /**
-     * Refresh the C++ model registry (T4.9).
+     * Refresh the C++ model registry using serialized runanywhere.v1.ModelRegistryRefreshRequest bytes.
      *
-     * Backed by `rac_model_registry_refresh` in commons. Each flag is
-     * independent; steps that require unavailable infrastructure (e.g. the
-     * model assignment HTTP callbacks) are skipped silently.
-     *
-     * @param includeRemoteCatalog Fetch the backend model catalog.
-     * @param rescanLocal Rescan the on-disk model directories (no-op from JVM
-     *   until the Kotlin SDK wires discovery callbacks; today discovery runs
-     *   in Kotlin via `ModelFileSystem`).
-     * @param pruneOrphans Clear `localPath` entries whose file no longer
-     *   exists (no-op from JVM for the same reason as `rescanLocal`).
-     * @return `RAC_SUCCESS` (0) on success, otherwise the first error code
-     *   encountered while running the requested steps.
+     * Returns serialized runanywhere.v1.ModelRegistryRefreshResult bytes, or null when the
+     * native proto ABI is unavailable.
      */
     @JvmStatic
-    external fun racModelRegistryRefresh(
-        includeRemoteCatalog: Boolean,
-        rescanLocal: Boolean,
-        pruneOrphans: Boolean,
-    ): Int
+    external fun racModelRegistryRefreshProto(requestProto: ByteArray): ByteArray?
 
     // ========================================================================
     // MODEL LIFECYCLE PROTO ABI (rac_model_lifecycle.h)
@@ -831,56 +692,6 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racComponentLifecycleSnapshotProto(component: Int): ByteArray?
-
-    // ========================================================================
-    // LORA REGISTRY (rac_lora_registry.h)
-    // ========================================================================
-
-    @JvmStatic
-    external fun racLoraRegistryRegister(
-        id: String,
-        name: String,
-        description: String,
-        downloadUrl: String,
-        filename: String,
-        compatibleModelIds: Array<String>,
-        fileSize: Long,
-        defaultScale: Float,
-    ): Int
-
-    @JvmStatic
-    external fun racLoraRegistryGetForModel(modelId: String): String
-
-    @JvmStatic
-    external fun racLoraRegistryGetAll(): String
-
-    // ========================================================================
-    // MODEL ASSIGNMENT (rac_model_assignment.h)
-    // Mirrors Swift SDK's CppBridge+ModelAssignment.swift
-    // ========================================================================
-
-    /**
-     * Set model assignment callbacks.
-     * The callback object must implement:
-     * - httpGet(endpoint: String, requiresAuth: Boolean): String (returns JSON response or "ERROR:message")
-     * - getDeviceInfo(): String (returns "deviceType|platform")
-     *
-     * @param callback Callback object implementing the required methods
-     * @param autoFetch If true, automatically fetch models after registration
-     * @return RAC_SUCCESS on success, error code on failure
-     */
-    @JvmStatic
-    external fun racModelAssignmentSetCallbacks(callback: Any, autoFetch: Boolean): Int
-
-    /**
-     * Fetch model assignments from backend.
-     * Results are cached and saved to the model registry.
-     *
-     * @param forceRefresh If true, bypass cache and fetch fresh data
-     * @return JSON array of model assignments
-     */
-    @JvmStatic
-    external fun racModelAssignmentFetch(forceRefresh: Boolean): String
 
     // ========================================================================
     // AUDIO UTILS (rac_audio_utils.h)
@@ -1270,91 +1081,14 @@ object RunAnywhereBridge {
     // Mirrors Swift SDK's CppBridge+ToolCalling.swift
     // ========================================================================
 
-    /**
-     * Parse LLM output for tool calls.
-     *
-     * @param llmOutput Raw LLM output text
-     * @return JSON string with parsed result, or null on error
-     */
     @JvmStatic
-    external fun racToolCallParse(llmOutput: String): String?
+    external fun racToolCallParseProto(requestProto: ByteArray): ByteArray?
 
-    /**
-     * Format tool definitions into system prompt.
-     *
-     * @param toolsJson JSON array of tool definitions
-     * @return Formatted prompt string, or null on error
-     */
     @JvmStatic
-    external fun racToolCallFormatPromptJson(toolsJson: String): String?
+    external fun racToolCallFormatPromptProto(requestProto: ByteArray): ByteArray?
 
-    /**
-     * Format tool definitions into system prompt with specified format (int).
-     *
-     * @param toolsJson JSON array of tool definitions
-     * @param format Tool calling format (0=AUTO, 1=DEFAULT, 2=LFM2, 3=OPENAI)
-     * @return Formatted prompt string, or null on error
-     */
     @JvmStatic
-    external fun racToolCallFormatPromptJsonWithFormat(toolsJson: String, format: Int): String?
-
-    /**
-     * Format tool definitions into system prompt with format specified by name.
-     *
-     * *** PREFERRED API - Uses string format name ***
-     *
-     * Valid format names (case-insensitive): "auto", "default", "lfm2", "openai"
-     * C++ is single source of truth for format validation.
-     *
-     * @param toolsJson JSON array of tool definitions
-     * @param formatName Format name string (e.g., "lfm2", "default")
-     * @return Formatted prompt string, or null on error
-     */
-    @JvmStatic
-    external fun racToolCallFormatPromptJsonWithFormatName(toolsJson: String, formatName: String): String?
-
-    /**
-     * Build initial prompt with tools and user query.
-     *
-     * @param userPrompt The user's question/request
-     * @param toolsJson JSON array of tool definitions
-     * @param optionsJson Options as JSON (nullable)
-     * @return Complete formatted prompt, or null on error
-     */
-    @JvmStatic
-    external fun racToolCallBuildInitialPrompt(
-        userPrompt: String,
-        toolsJson: String,
-        optionsJson: String?,
-    ): String?
-
-    /**
-     * Build follow-up prompt after tool execution.
-     *
-     * @param originalPrompt The original user prompt
-     * @param toolsPrompt Formatted tools prompt (nullable)
-     * @param toolName Name of the tool that was executed
-     * @param toolResultJson JSON string of the tool result
-     * @param keepToolsAvailable Whether to include tool definitions
-     * @return Follow-up prompt, or null on error
-     */
-    @JvmStatic
-    external fun racToolCallBuildFollowupPrompt(
-        originalPrompt: String,
-        toolsPrompt: String?,
-        toolName: String,
-        toolResultJson: String,
-        keepToolsAvailable: Boolean,
-    ): String?
-
-    /**
-     * Normalize JSON by adding quotes around unquoted keys.
-     *
-     * @param jsonStr Raw JSON string possibly with unquoted keys
-     * @return Normalized JSON string, or null on error
-     */
-    @JvmStatic
-    external fun racToolCallNormalizeJson(jsonStr: String): String?
+    external fun racToolCallValidateProto(requestProto: ByteArray): ByteArray?
 
     // ========================================================================
     // FILE MANAGER (rac_file_manager.h)
@@ -1636,15 +1370,26 @@ object RunAnywhereBridge {
     // LORA GENERATED-PROTO ABI (rac_lora_service.h)
     // ========================================================================
 
-    @JvmStatic external fun racLoraLoadProto(llmHandle: Long, configProto: ByteArray): ByteArray?
+    @JvmStatic external fun racLoraApplyProto(llmHandle: Long, requestProto: ByteArray): ByteArray?
 
-    @JvmStatic external fun racLoraRemoveProto(llmHandle: Long, configProto: ByteArray): ByteArray?
+    @JvmStatic external fun racLoraRemoveProto(llmHandle: Long, requestProto: ByteArray): ByteArray?
 
-    @JvmStatic external fun racLoraClearProto(llmHandle: Long): ByteArray?
+    @JvmStatic external fun racLoraListProto(llmHandle: Long, stateProto: ByteArray): ByteArray?
+
+    @JvmStatic external fun racLoraStateProto(llmHandle: Long, stateProto: ByteArray): ByteArray?
 
     @JvmStatic external fun racLoraCompatibilityProto(llmHandle: Long, configProto: ByteArray): ByteArray?
 
     @JvmStatic external fun racLoraRegisterProto(entryProto: ByteArray): ByteArray?
+
+    @JvmStatic external fun racLoraCatalogListProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic external fun racLoraCatalogQueryProto(queryProto: ByteArray): ByteArray?
+
+    @JvmStatic external fun racLoraCatalogGetProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic
+    external fun racLoraCatalogMarkDownloadCompletedProto(requestProto: ByteArray): ByteArray?
 
     // ========================================================================
     // PLUGIN LOADER (rac/router/rac_plugin_loader.h) — Round 1 G-A4
@@ -1668,38 +1413,12 @@ object RunAnywhereBridge {
     @JvmStatic external fun racRegistryGetRegisteredNames(): Array<String>?
 
     // ========================================================================
-    // LORA (rac/features/llm/rac_llm_lora.h) — Round 1 G-A7
-    // ========================================================================
-    //
-    // Round 1 KOTLIN (G-A7): added external thunks for canonical LoRA
-    // capability (RunAnywhere.lora.*). These wrap the per-handle LoRA
-    // ops in rac_llm_component plus the registry in rac_lora_registry.
-
-    /** Load a LoRA adapter. configBytes = serialized LoRAAdapterConfig proto. Returns rac_result_t. */
-    @JvmStatic external fun racLoraLoad(configBytes: ByteArray): Int
-
-    /** Remove a LoRA adapter by id. Returns rac_result_t. */
-    @JvmStatic external fun racLoraRemove(adapterId: String): Int
-
-    /** Clear all loaded LoRA adapters. */
-    @JvmStatic external fun racLoraClear(): Int
-
-    /** Snapshot of currently loaded adapters as JSON-encoded LoRAAdapterInfo[]. Null on error. */
-    @JvmStatic external fun racLoraGetLoaded(): String?
-
-    /** Check compatibility. Returns serialized LoraCompatibilityResult proto bytes. */
-    @JvmStatic external fun racLoraCheckCompatibility(adapterId: String, modelId: String): ByteArray?
-
-    // ========================================================================
     // NATIVE HTTP DOWNLOAD (rac/infrastructure/http/rac_http_download.h)
     // ========================================================================
     //
-    // v2 close-out Phase H. Replaces the 1.3 KLOC HttpURLConnection path
-    // that used to live in CppBridgeDownload.kt. The native runner
-    // streams chunks to disk through libcurl, updates SHA-256 inline,
-    // and forwards progress to the Kotlin listener via JNI on every
-    // chunk. Returning `false` from the listener's onProgress cancels
-    // the transfer.
+    // Legacy direct HTTP runner retained for modality-specific adapters that
+    // still need KOT-03 migration. Registry/model downloads use the generated
+    // Download* proto service in CppBridgeDownloadProto.
     //
     // @param url                  Absolute HTTP/HTTPS URL.
     // @param destPath             Local file path to write bytes to.
@@ -1711,8 +1430,7 @@ object RunAnywhereBridge {
     // @param outHttpStatus        Single-element int[] out-param: the
     //                             final HTTP status code. Pass null if
     //                             you don't need it.
-    // @return RAC_HTTP_DL_* code (see CppBridgeDownload.DownloadError for
-    //         the byte-for-byte mapping).
+    // @return RAC_HTTP_DL_* code from rac_http_download.h.
     @JvmStatic external fun racHttpDownloadExecute(
         url: String,
         destPath: String,
@@ -1843,16 +1561,13 @@ object RunAnywhereBridge {
 
     // ========================================================================
     // STRUCTURED OUTPUT (rac/features/llm/rac_structured_output.h)
-    // Round 1 KOTLIN: JNI thunk declaration for extractStructuredOutput.
-    // [CPP-BLOCKED]: the C++ side (rac_structured_output_extract_json) is not
-    // yet wired in runanywhere_commons_jni.cpp. The declaration lives here so
-    // the public SDK method calls the thunk naturally; callers will see
-    // UnsatisfiedLinkError at runtime until the C++ track lands.
     // ========================================================================
 
-    /** Extract a JSON object from [text], optionally validated against [schemaJson].
-     *  Returns serialized StructuredOutputResult proto bytes, or null on failure. */
-    @JvmStatic external fun racStructuredOutputExtractJson(text: String, schemaJson: String?): ByteArray?
+    @JvmStatic external fun racStructuredOutputParseProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic external fun racStructuredOutputPreparePromptProto(requestProto: ByteArray): ByteArray?
+
+    @JvmStatic external fun racStructuredOutputValidateProto(requestProto: ByteArray): ByteArray?
 
     // ========================================================================
     // HARDWARE PROFILE (rac/hardware/rac_hardware_profile.h) — Round 2

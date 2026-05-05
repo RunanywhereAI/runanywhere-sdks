@@ -11,6 +11,9 @@ validation_run_step "git_status_short" "${VALIDATION_REPO_ROOT}" \
 validation_run_step "diff_check" "${VALIDATION_REPO_ROOT}" \
   git diff --check
 
+validation_run_step "deprecated_surface_check" "${VALIDATION_REPO_ROOT}" \
+  "${SCRIPT_DIR}/check_deprecated_surfaces.sh"
+
 if [[ "${VALIDATION_RUN_IDL_DRIFT:-1}" == "1" ]]; then
   validation_run_step "idl_drift_check" "${VALIDATION_REPO_ROOT}" \
     "${SCRIPT_DIR}/run_idl_drift_check.sh"

@@ -9,10 +9,15 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
+
+import 'rag.pbenum.dart';
+
+export 'rag.pbenum.dart';
 
 ///  ---------------------------------------------------------------------------
 ///  RAGConfiguration — low-level pipeline config (pre-IDL hand-rolled).
@@ -35,6 +40,10 @@ class RAGConfiguration extends $pb.GeneratedMessage {
     $core.String? promptTemplate,
     $core.String? embeddingConfigJson,
     $core.String? llmConfigJson,
+    $core.String? indexPath,
+    $core.bool? persistIndex,
+    $core.bool? rerankResults,
+    $core.String? rerankerModelPath,
   }) {
     final $result = create();
     if (embeddingModelPath != null) {
@@ -70,6 +79,18 @@ class RAGConfiguration extends $pb.GeneratedMessage {
     if (llmConfigJson != null) {
       $result.llmConfigJson = llmConfigJson;
     }
+    if (indexPath != null) {
+      $result.indexPath = indexPath;
+    }
+    if (persistIndex != null) {
+      $result.persistIndex = persistIndex;
+    }
+    if (rerankResults != null) {
+      $result.rerankResults = rerankResults;
+    }
+    if (rerankerModelPath != null) {
+      $result.rerankerModelPath = rerankerModelPath;
+    }
     return $result;
   }
   RAGConfiguration._() : super();
@@ -88,6 +109,10 @@ class RAGConfiguration extends $pb.GeneratedMessage {
     ..aOS(9, _omitFieldNames ? '' : 'promptTemplate')
     ..aOS(10, _omitFieldNames ? '' : 'embeddingConfigJson')
     ..aOS(11, _omitFieldNames ? '' : 'llmConfigJson')
+    ..aOS(12, _omitFieldNames ? '' : 'indexPath')
+    ..aOB(13, _omitFieldNames ? '' : 'persistIndex')
+    ..aOB(14, _omitFieldNames ? '' : 'rerankResults')
+    ..aOS(15, _omitFieldNames ? '' : 'rerankerModelPath')
     ..hasRequiredFields = false
   ;
 
@@ -223,6 +248,43 @@ class RAGConfiguration extends $pb.GeneratedMessage {
   $core.bool hasLlmConfigJson() => $_has(10);
   @$pb.TagNumber(11)
   void clearLlmConfigJson() => clearField(11);
+
+  /// Index persistence and retrieval behavior. Empty path = in-memory index.
+  @$pb.TagNumber(12)
+  $core.String get indexPath => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set indexPath($core.String v) { $_setString(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasIndexPath() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearIndexPath() => clearField(12);
+
+  @$pb.TagNumber(13)
+  $core.bool get persistIndex => $_getBF(12);
+  @$pb.TagNumber(13)
+  set persistIndex($core.bool v) { $_setBool(12, v); }
+  @$pb.TagNumber(13)
+  $core.bool hasPersistIndex() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearPersistIndex() => clearField(13);
+
+  @$pb.TagNumber(14)
+  $core.bool get rerankResults => $_getBF(13);
+  @$pb.TagNumber(14)
+  set rerankResults($core.bool v) { $_setBool(13, v); }
+  @$pb.TagNumber(14)
+  $core.bool hasRerankResults() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearRerankResults() => clearField(14);
+
+  @$pb.TagNumber(15)
+  $core.String get rerankerModelPath => $_getSZ(14);
+  @$pb.TagNumber(15)
+  set rerankerModelPath($core.String v) { $_setString(14, v); }
+  @$pb.TagNumber(15)
+  $core.bool hasRerankerModelPath() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearRerankerModelPath() => clearField(15);
 }
 
 /// ---------------------------------------------------------------------------
@@ -234,6 +296,10 @@ class RAGDocument extends $pb.GeneratedMessage {
     $core.String? text,
     $core.String? metadataJson,
     $core.Map<$core.String, $core.String>? metadata,
+    $core.String? sourceUri,
+    $core.String? adapterHandle,
+    $core.String? mediaType,
+    $fixnum.Int64? sizeBytes,
   }) {
     final $result = create();
     if (id != null) {
@@ -248,6 +314,18 @@ class RAGDocument extends $pb.GeneratedMessage {
     if (metadata != null) {
       $result.metadata.addAll(metadata);
     }
+    if (sourceUri != null) {
+      $result.sourceUri = sourceUri;
+    }
+    if (adapterHandle != null) {
+      $result.adapterHandle = adapterHandle;
+    }
+    if (mediaType != null) {
+      $result.mediaType = mediaType;
+    }
+    if (sizeBytes != null) {
+      $result.sizeBytes = sizeBytes;
+    }
     return $result;
   }
   RAGDocument._() : super();
@@ -259,6 +337,10 @@ class RAGDocument extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'text')
     ..aOS(3, _omitFieldNames ? '' : 'metadataJson')
     ..m<$core.String, $core.String>(4, _omitFieldNames ? '' : 'metadata', entryClassName: 'RAGDocument.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
+    ..aOS(5, _omitFieldNames ? '' : 'sourceUri')
+    ..aOS(6, _omitFieldNames ? '' : 'adapterHandle')
+    ..aOS(7, _omitFieldNames ? '' : 'mediaType')
+    ..aInt64(8, _omitFieldNames ? '' : 'sizeBytes')
     ..hasRequiredFields = false
   ;
 
@@ -316,6 +398,124 @@ class RAGDocument extends $pb.GeneratedMessage {
   /// Typed metadata map for generated-proto callers.
   @$pb.TagNumber(4)
   $core.Map<$core.String, $core.String> get metadata => $_getMap(3);
+
+  /// Adapter-normalized document source. Pickers, sandbox bookmarks, and
+  /// platform file access remain SDK-owned.
+  @$pb.TagNumber(5)
+  $core.String get sourceUri => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set sourceUri($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasSourceUri() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSourceUri() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get adapterHandle => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set adapterHandle($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasAdapterHandle() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAdapterHandle() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get mediaType => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set mediaType($core.String v) { $_setString(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasMediaType() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearMediaType() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $fixnum.Int64 get sizeBytes => $_getI64(7);
+  @$pb.TagNumber(8)
+  set sizeBytes($fixnum.Int64 v) { $_setInt64(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasSizeBytes() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearSizeBytes() => clearField(8);
+}
+
+class RAGIngestRequest extends $pb.GeneratedMessage {
+  factory RAGIngestRequest({
+    $core.String? requestId,
+    $core.Iterable<RAGDocument>? documents,
+    $core.bool? replaceExisting,
+    $core.Map<$core.String, $core.String>? metadata,
+  }) {
+    final $result = create();
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (documents != null) {
+      $result.documents.addAll(documents);
+    }
+    if (replaceExisting != null) {
+      $result.replaceExisting = replaceExisting;
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
+    }
+    return $result;
+  }
+  RAGIngestRequest._() : super();
+  factory RAGIngestRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory RAGIngestRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'RAGIngestRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..pc<RAGDocument>(2, _omitFieldNames ? '' : 'documents', $pb.PbFieldType.PM, subBuilder: RAGDocument.create)
+    ..aOB(3, _omitFieldNames ? '' : 'replaceExisting')
+    ..m<$core.String, $core.String>(4, _omitFieldNames ? '' : 'metadata', entryClassName: 'RAGIngestRequest.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  RAGIngestRequest clone() => RAGIngestRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  RAGIngestRequest copyWith(void Function(RAGIngestRequest) updates) => super.copyWith((message) => updates(message as RAGIngestRequest)) as RAGIngestRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RAGIngestRequest create() => RAGIngestRequest._();
+  RAGIngestRequest createEmptyInstance() => create();
+  static $pb.PbList<RAGIngestRequest> createRepeated() => $pb.PbList<RAGIngestRequest>();
+  @$core.pragma('dart2js:noInline')
+  static RAGIngestRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RAGIngestRequest>(create);
+  static RAGIngestRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.List<RAGDocument> get documents => $_getList(1);
+
+  @$pb.TagNumber(3)
+  $core.bool get replaceExisting => $_getBF(2);
+  @$pb.TagNumber(3)
+  set replaceExisting($core.bool v) { $_setBool(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasReplaceExisting() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearReplaceExisting() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(3);
 }
 
 /// ---------------------------------------------------------------------------
@@ -329,6 +529,9 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
     $core.double? temperature,
     $core.double? topP,
     $core.int? topK,
+    $core.int? retrievalTopK,
+    $core.double? similarityThreshold,
+    $core.bool? stream,
   }) {
     final $result = create();
     if (question != null) {
@@ -349,6 +552,15 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
     if (topK != null) {
       $result.topK = topK;
     }
+    if (retrievalTopK != null) {
+      $result.retrievalTopK = retrievalTopK;
+    }
+    if (similarityThreshold != null) {
+      $result.similarityThreshold = similarityThreshold;
+    }
+    if (stream != null) {
+      $result.stream = stream;
+    }
     return $result;
   }
   RAGQueryOptions._() : super();
@@ -362,6 +574,9 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
     ..a<$core.double>(4, _omitFieldNames ? '' : 'temperature', $pb.PbFieldType.OF)
     ..a<$core.double>(5, _omitFieldNames ? '' : 'topP', $pb.PbFieldType.OF)
     ..a<$core.int>(6, _omitFieldNames ? '' : 'topK', $pb.PbFieldType.O3)
+    ..a<$core.int>(7, _omitFieldNames ? '' : 'retrievalTopK', $pb.PbFieldType.O3)
+    ..a<$core.double>(8, _omitFieldNames ? '' : 'similarityThreshold', $pb.PbFieldType.OF)
+    ..aOB(9, _omitFieldNames ? '' : 'stream')
     ..hasRequiredFields = false
   ;
 
@@ -445,6 +660,108 @@ class RAGQueryOptions extends $pb.GeneratedMessage {
   $core.bool hasTopK() => $_has(5);
   @$pb.TagNumber(6)
   void clearTopK() => clearField(6);
+
+  /// Retrieval overrides. 0/unset = use RAGConfiguration defaults.
+  @$pb.TagNumber(7)
+  $core.int get retrievalTopK => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set retrievalTopK($core.int v) { $_setSignedInt32(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasRetrievalTopK() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearRetrievalTopK() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.double get similarityThreshold => $_getN(7);
+  @$pb.TagNumber(8)
+  set similarityThreshold($core.double v) { $_setFloat(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasSimilarityThreshold() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearSimilarityThreshold() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.bool get stream => $_getBF(8);
+  @$pb.TagNumber(9)
+  set stream($core.bool v) { $_setBool(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasStream() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearStream() => clearField(9);
+}
+
+class RAGQueryRequest extends $pb.GeneratedMessage {
+  factory RAGQueryRequest({
+    $core.String? requestId,
+    RAGQueryOptions? options,
+    $core.Map<$core.String, $core.String>? metadata,
+  }) {
+    final $result = create();
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (options != null) {
+      $result.options = options;
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
+    }
+    return $result;
+  }
+  RAGQueryRequest._() : super();
+  factory RAGQueryRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory RAGQueryRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'RAGQueryRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aOM<RAGQueryOptions>(2, _omitFieldNames ? '' : 'options', subBuilder: RAGQueryOptions.create)
+    ..m<$core.String, $core.String>(3, _omitFieldNames ? '' : 'metadata', entryClassName: 'RAGQueryRequest.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  RAGQueryRequest clone() => RAGQueryRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  RAGQueryRequest copyWith(void Function(RAGQueryRequest) updates) => super.copyWith((message) => updates(message as RAGQueryRequest)) as RAGQueryRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RAGQueryRequest create() => RAGQueryRequest._();
+  RAGQueryRequest createEmptyInstance() => create();
+  static $pb.PbList<RAGQueryRequest> createRepeated() => $pb.PbList<RAGQueryRequest>();
+  @$core.pragma('dart2js:noInline')
+  static RAGQueryRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RAGQueryRequest>(create);
+  static RAGQueryRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  RAGQueryOptions get options => $_getN(1);
+  @$pb.TagNumber(2)
+  set options(RAGQueryOptions v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasOptions() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOptions() => clearField(2);
+  @$pb.TagNumber(2)
+  RAGQueryOptions ensureOptions() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(2);
 }
 
 /// ---------------------------------------------------------------------------
@@ -458,6 +775,10 @@ class RAGSearchResult extends $pb.GeneratedMessage {
     $core.String? sourceDocument,
     $core.Map<$core.String, $core.String>? metadata,
     $core.String? metadataJson,
+    $core.int? rank,
+    $core.int? startOffset,
+    $core.int? endOffset,
+    $core.int? tokenCount,
   }) {
     final $result = create();
     if (chunkId != null) {
@@ -478,6 +799,18 @@ class RAGSearchResult extends $pb.GeneratedMessage {
     if (metadataJson != null) {
       $result.metadataJson = metadataJson;
     }
+    if (rank != null) {
+      $result.rank = rank;
+    }
+    if (startOffset != null) {
+      $result.startOffset = startOffset;
+    }
+    if (endOffset != null) {
+      $result.endOffset = endOffset;
+    }
+    if (tokenCount != null) {
+      $result.tokenCount = tokenCount;
+    }
     return $result;
   }
   RAGSearchResult._() : super();
@@ -491,6 +824,10 @@ class RAGSearchResult extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'sourceDocument')
     ..m<$core.String, $core.String>(5, _omitFieldNames ? '' : 'metadata', entryClassName: 'RAGSearchResult.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
     ..aOS(6, _omitFieldNames ? '' : 'metadataJson')
+    ..a<$core.int>(7, _omitFieldNames ? '' : 'rank', $pb.PbFieldType.O3)
+    ..a<$core.int>(8, _omitFieldNames ? '' : 'startOffset', $pb.PbFieldType.O3)
+    ..a<$core.int>(9, _omitFieldNames ? '' : 'endOffset', $pb.PbFieldType.O3)
+    ..a<$core.int>(10, _omitFieldNames ? '' : 'tokenCount', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
@@ -572,6 +909,42 @@ class RAGSearchResult extends $pb.GeneratedMessage {
   $core.bool hasMetadataJson() => $_has(5);
   @$pb.TagNumber(6)
   void clearMetadataJson() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get rank => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set rank($core.int v) { $_setSignedInt32(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasRank() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearRank() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get startOffset => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set startOffset($core.int v) { $_setSignedInt32(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasStartOffset() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearStartOffset() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get endOffset => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set endOffset($core.int v) { $_setSignedInt32(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasEndOffset() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearEndOffset() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get tokenCount => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set tokenCount($core.int v) { $_setSignedInt32(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasTokenCount() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearTokenCount() => clearField(10);
 }
 
 /// ---------------------------------------------------------------------------
@@ -585,6 +958,12 @@ class RAGResult extends $pb.GeneratedMessage {
     $fixnum.Int64? retrievalTimeMs,
     $fixnum.Int64? generationTimeMs,
     $fixnum.Int64? totalTimeMs,
+    $core.int? promptTokens,
+    $core.int? completionTokens,
+    $core.int? totalTokens,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+    $core.String? requestId,
   }) {
     final $result = create();
     if (answer != null) {
@@ -605,6 +984,24 @@ class RAGResult extends $pb.GeneratedMessage {
     if (totalTimeMs != null) {
       $result.totalTimeMs = totalTimeMs;
     }
+    if (promptTokens != null) {
+      $result.promptTokens = promptTokens;
+    }
+    if (completionTokens != null) {
+      $result.completionTokens = completionTokens;
+    }
+    if (totalTokens != null) {
+      $result.totalTokens = totalTokens;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
     return $result;
   }
   RAGResult._() : super();
@@ -618,6 +1015,12 @@ class RAGResult extends $pb.GeneratedMessage {
     ..aInt64(4, _omitFieldNames ? '' : 'retrievalTimeMs')
     ..aInt64(5, _omitFieldNames ? '' : 'generationTimeMs')
     ..aInt64(6, _omitFieldNames ? '' : 'totalTimeMs')
+    ..a<$core.int>(7, _omitFieldNames ? '' : 'promptTokens', $pb.PbFieldType.O3)
+    ..a<$core.int>(8, _omitFieldNames ? '' : 'completionTokens', $pb.PbFieldType.O3)
+    ..a<$core.int>(9, _omitFieldNames ? '' : 'totalTokens', $pb.PbFieldType.O3)
+    ..aOS(10, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(11, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..aOS(12, _omitFieldNames ? '' : 'requestId')
     ..hasRequiredFields = false
   ;
 
@@ -698,6 +1101,60 @@ class RAGResult extends $pb.GeneratedMessage {
   $core.bool hasTotalTimeMs() => $_has(5);
   @$pb.TagNumber(6)
   void clearTotalTimeMs() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get promptTokens => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set promptTokens($core.int v) { $_setSignedInt32(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasPromptTokens() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearPromptTokens() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get completionTokens => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set completionTokens($core.int v) { $_setSignedInt32(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasCompletionTokens() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearCompletionTokens() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get totalTokens => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set totalTokens($core.int v) { $_setSignedInt32(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasTotalTokens() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearTotalTokens() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.String get errorMessage => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set errorMessage($core.String v) { $_setString(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasErrorMessage() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearErrorMessage() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.int get errorCode => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set errorCode($core.int v) { $_setSignedInt32(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasErrorCode() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearErrorCode() => clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.String get requestId => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set requestId($core.String v) { $_setString(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasRequestId() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearRequestId() => clearField(12);
 }
 
 ///  ---------------------------------------------------------------------------
@@ -714,6 +1171,10 @@ class RAGStatistics extends $pb.GeneratedMessage {
     $core.String? indexPath,
     $core.String? statsJson,
     $fixnum.Int64? vectorStoreSizeBytes,
+    $core.bool? isPersistent,
+    $fixnum.Int64? lastQueryMs,
+    $core.String? errorMessage,
+    $core.int? errorCode,
   }) {
     final $result = create();
     if (indexedDocuments != null) {
@@ -737,6 +1198,18 @@ class RAGStatistics extends $pb.GeneratedMessage {
     if (vectorStoreSizeBytes != null) {
       $result.vectorStoreSizeBytes = vectorStoreSizeBytes;
     }
+    if (isPersistent != null) {
+      $result.isPersistent = isPersistent;
+    }
+    if (lastQueryMs != null) {
+      $result.lastQueryMs = lastQueryMs;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
     return $result;
   }
   RAGStatistics._() : super();
@@ -751,6 +1224,10 @@ class RAGStatistics extends $pb.GeneratedMessage {
     ..aOS(5, _omitFieldNames ? '' : 'indexPath')
     ..aOS(6, _omitFieldNames ? '' : 'statsJson')
     ..aInt64(7, _omitFieldNames ? '' : 'vectorStoreSizeBytes')
+    ..aOB(8, _omitFieldNames ? '' : 'isPersistent')
+    ..aInt64(9, _omitFieldNames ? '' : 'lastQueryMs')
+    ..aOS(10, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(11, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
@@ -847,6 +1324,493 @@ class RAGStatistics extends $pb.GeneratedMessage {
   $core.bool hasVectorStoreSizeBytes() => $_has(6);
   @$pb.TagNumber(7)
   void clearVectorStoreSizeBytes() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get isPersistent => $_getBF(7);
+  @$pb.TagNumber(8)
+  set isPersistent($core.bool v) { $_setBool(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasIsPersistent() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearIsPersistent() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $fixnum.Int64 get lastQueryMs => $_getI64(8);
+  @$pb.TagNumber(9)
+  set lastQueryMs($fixnum.Int64 v) { $_setInt64(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasLastQueryMs() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearLastQueryMs() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.String get errorMessage => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set errorMessage($core.String v) { $_setString(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasErrorMessage() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearErrorMessage() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.int get errorCode => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set errorCode($core.int v) { $_setSignedInt32(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasErrorCode() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearErrorCode() => clearField(11);
+}
+
+class RAGIngestResult extends $pb.GeneratedMessage {
+  factory RAGIngestResult({
+    $core.String? requestId,
+    $fixnum.Int64? documentsIngested,
+    $fixnum.Int64? chunksIngested,
+    RAGStatistics? statistics,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (documentsIngested != null) {
+      $result.documentsIngested = documentsIngested;
+    }
+    if (chunksIngested != null) {
+      $result.chunksIngested = chunksIngested;
+    }
+    if (statistics != null) {
+      $result.statistics = statistics;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  RAGIngestResult._() : super();
+  factory RAGIngestResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory RAGIngestResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'RAGIngestResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aInt64(2, _omitFieldNames ? '' : 'documentsIngested')
+    ..aInt64(3, _omitFieldNames ? '' : 'chunksIngested')
+    ..aOM<RAGStatistics>(4, _omitFieldNames ? '' : 'statistics', subBuilder: RAGStatistics.create)
+    ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(6, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  RAGIngestResult clone() => RAGIngestResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  RAGIngestResult copyWith(void Function(RAGIngestResult) updates) => super.copyWith((message) => updates(message as RAGIngestResult)) as RAGIngestResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RAGIngestResult create() => RAGIngestResult._();
+  RAGIngestResult createEmptyInstance() => create();
+  static $pb.PbList<RAGIngestResult> createRepeated() => $pb.PbList<RAGIngestResult>();
+  @$core.pragma('dart2js:noInline')
+  static RAGIngestResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RAGIngestResult>(create);
+  static RAGIngestResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get documentsIngested => $_getI64(1);
+  @$pb.TagNumber(2)
+  set documentsIngested($fixnum.Int64 v) { $_setInt64(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasDocumentsIngested() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearDocumentsIngested() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get chunksIngested => $_getI64(2);
+  @$pb.TagNumber(3)
+  set chunksIngested($fixnum.Int64 v) { $_setInt64(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasChunksIngested() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearChunksIngested() => clearField(3);
+
+  @$pb.TagNumber(4)
+  RAGStatistics get statistics => $_getN(3);
+  @$pb.TagNumber(4)
+  set statistics(RAGStatistics v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasStatistics() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearStatistics() => clearField(4);
+  @$pb.TagNumber(4)
+  RAGStatistics ensureStatistics() => $_ensure(3);
+
+  @$pb.TagNumber(5)
+  $core.String get errorMessage => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set errorMessage($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasErrorMessage() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearErrorMessage() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get errorCode => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set errorCode($core.int v) { $_setSignedInt32(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasErrorCode() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearErrorCode() => clearField(6);
+}
+
+class RAGStreamEvent extends $pb.GeneratedMessage {
+  factory RAGStreamEvent({
+    $fixnum.Int64? seq,
+    $fixnum.Int64? timestampUs,
+    $core.String? requestId,
+    RAGStreamEventKind? kind,
+    RAGSearchResult? chunk,
+    $core.String? token,
+    RAGResult? result,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (seq != null) {
+      $result.seq = seq;
+    }
+    if (timestampUs != null) {
+      $result.timestampUs = timestampUs;
+    }
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (kind != null) {
+      $result.kind = kind;
+    }
+    if (chunk != null) {
+      $result.chunk = chunk;
+    }
+    if (token != null) {
+      $result.token = token;
+    }
+    if (result != null) {
+      $result.result = result;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  RAGStreamEvent._() : super();
+  factory RAGStreamEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory RAGStreamEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'RAGStreamEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
+    ..aOS(3, _omitFieldNames ? '' : 'requestId')
+    ..e<RAGStreamEventKind>(4, _omitFieldNames ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: RAGStreamEventKind.RAG_STREAM_EVENT_KIND_UNSPECIFIED, valueOf: RAGStreamEventKind.valueOf, enumValues: RAGStreamEventKind.values)
+    ..aOM<RAGSearchResult>(5, _omitFieldNames ? '' : 'chunk', subBuilder: RAGSearchResult.create)
+    ..aOS(6, _omitFieldNames ? '' : 'token')
+    ..aOM<RAGResult>(7, _omitFieldNames ? '' : 'result', subBuilder: RAGResult.create)
+    ..aOS(8, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(9, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  RAGStreamEvent clone() => RAGStreamEvent()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  RAGStreamEvent copyWith(void Function(RAGStreamEvent) updates) => super.copyWith((message) => updates(message as RAGStreamEvent)) as RAGStreamEvent;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RAGStreamEvent create() => RAGStreamEvent._();
+  RAGStreamEvent createEmptyInstance() => create();
+  static $pb.PbList<RAGStreamEvent> createRepeated() => $pb.PbList<RAGStreamEvent>();
+  @$core.pragma('dart2js:noInline')
+  static RAGStreamEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RAGStreamEvent>(create);
+  static RAGStreamEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get seq => $_getI64(0);
+  @$pb.TagNumber(1)
+  set seq($fixnum.Int64 v) { $_setInt64(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasSeq() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSeq() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get timestampUs => $_getI64(1);
+  @$pb.TagNumber(2)
+  set timestampUs($fixnum.Int64 v) { $_setInt64(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasTimestampUs() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTimestampUs() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get requestId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set requestId($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasRequestId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRequestId() => clearField(3);
+
+  @$pb.TagNumber(4)
+  RAGStreamEventKind get kind => $_getN(3);
+  @$pb.TagNumber(4)
+  set kind(RAGStreamEventKind v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasKind() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearKind() => clearField(4);
+
+  @$pb.TagNumber(5)
+  RAGSearchResult get chunk => $_getN(4);
+  @$pb.TagNumber(5)
+  set chunk(RAGSearchResult v) { setField(5, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasChunk() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearChunk() => clearField(5);
+  @$pb.TagNumber(5)
+  RAGSearchResult ensureChunk() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  $core.String get token => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set token($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasToken() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearToken() => clearField(6);
+
+  @$pb.TagNumber(7)
+  RAGResult get result => $_getN(6);
+  @$pb.TagNumber(7)
+  set result(RAGResult v) { setField(7, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasResult() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearResult() => clearField(7);
+  @$pb.TagNumber(7)
+  RAGResult ensureResult() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  $core.String get errorMessage => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set errorMessage($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasErrorMessage() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearErrorMessage() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.int get errorCode => $_getIZ(8);
+  @$pb.TagNumber(9)
+  set errorCode($core.int v) { $_setSignedInt32(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasErrorCode() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearErrorCode() => clearField(9);
+}
+
+class RAGServiceState extends $pb.GeneratedMessage {
+  factory RAGServiceState({
+    $core.bool? isReady,
+    RAGStatistics? statistics,
+    $core.bool? isIndexing,
+    $core.bool? isQuerying,
+    $core.String? activeRequestId,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (isReady != null) {
+      $result.isReady = isReady;
+    }
+    if (statistics != null) {
+      $result.statistics = statistics;
+    }
+    if (isIndexing != null) {
+      $result.isIndexing = isIndexing;
+    }
+    if (isQuerying != null) {
+      $result.isQuerying = isQuerying;
+    }
+    if (activeRequestId != null) {
+      $result.activeRequestId = activeRequestId;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  RAGServiceState._() : super();
+  factory RAGServiceState.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory RAGServiceState.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'RAGServiceState', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'isReady')
+    ..aOM<RAGStatistics>(2, _omitFieldNames ? '' : 'statistics', subBuilder: RAGStatistics.create)
+    ..aOB(3, _omitFieldNames ? '' : 'isIndexing')
+    ..aOB(4, _omitFieldNames ? '' : 'isQuerying')
+    ..aOS(5, _omitFieldNames ? '' : 'activeRequestId')
+    ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(7, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  RAGServiceState clone() => RAGServiceState()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  RAGServiceState copyWith(void Function(RAGServiceState) updates) => super.copyWith((message) => updates(message as RAGServiceState)) as RAGServiceState;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RAGServiceState create() => RAGServiceState._();
+  RAGServiceState createEmptyInstance() => create();
+  static $pb.PbList<RAGServiceState> createRepeated() => $pb.PbList<RAGServiceState>();
+  @$core.pragma('dart2js:noInline')
+  static RAGServiceState getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RAGServiceState>(create);
+  static RAGServiceState? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get isReady => $_getBF(0);
+  @$pb.TagNumber(1)
+  set isReady($core.bool v) { $_setBool(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasIsReady() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearIsReady() => clearField(1);
+
+  @$pb.TagNumber(2)
+  RAGStatistics get statistics => $_getN(1);
+  @$pb.TagNumber(2)
+  set statistics(RAGStatistics v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasStatistics() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearStatistics() => clearField(2);
+  @$pb.TagNumber(2)
+  RAGStatistics ensureStatistics() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $core.bool get isIndexing => $_getBF(2);
+  @$pb.TagNumber(3)
+  set isIndexing($core.bool v) { $_setBool(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasIsIndexing() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearIsIndexing() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.bool get isQuerying => $_getBF(3);
+  @$pb.TagNumber(4)
+  set isQuerying($core.bool v) { $_setBool(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasIsQuerying() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearIsQuerying() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get activeRequestId => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set activeRequestId($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasActiveRequestId() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearActiveRequestId() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get errorMessage => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set errorMessage($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasErrorMessage() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearErrorMessage() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get errorCode => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set errorCode($core.int v) { $_setSignedInt32(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasErrorCode() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearErrorCode() => clearField(7);
+}
+
+class RAGApi {
+  $pb.RpcClient _client;
+  RAGApi(this._client);
+
+  $async.Future<RAGServiceState> create_($pb.ClientContext? ctx, RAGConfiguration request) =>
+    _client.invoke<RAGServiceState>(ctx, 'RAG', 'Create', request, RAGServiceState())
+  ;
+  $async.Future<RAGIngestResult> ingest($pb.ClientContext? ctx, RAGIngestRequest request) =>
+    _client.invoke<RAGIngestResult>(ctx, 'RAG', 'Ingest', request, RAGIngestResult())
+  ;
+  $async.Future<RAGResult> query($pb.ClientContext? ctx, RAGQueryRequest request) =>
+    _client.invoke<RAGResult>(ctx, 'RAG', 'Query', request, RAGResult())
+  ;
+  $async.Future<RAGResult> search($pb.ClientContext? ctx, RAGQueryRequest request) =>
+    _client.invoke<RAGResult>(ctx, 'RAG', 'Search', request, RAGResult())
+  ;
+  $async.Future<RAGStatistics> stats($pb.ClientContext? ctx, RAGServiceState request) =>
+    _client.invoke<RAGStatistics>(ctx, 'RAG', 'Stats', request, RAGStatistics())
+  ;
+  $async.Future<RAGServiceState> clear_($pb.ClientContext? ctx, RAGServiceState request) =>
+    _client.invoke<RAGServiceState>(ctx, 'RAG', 'Clear', request, RAGServiceState())
+  ;
+  $async.Future<RAGStreamEvent> stream($pb.ClientContext? ctx, RAGQueryRequest request) =>
+    _client.invoke<RAGStreamEvent>(ctx, 'RAG', 'Stream', request, RAGStreamEvent())
+  ;
 }
 
 

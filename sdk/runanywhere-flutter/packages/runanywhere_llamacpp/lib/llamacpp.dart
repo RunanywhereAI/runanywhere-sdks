@@ -22,12 +22,8 @@
 /// // Register the module (matches Swift: LlamaCPP.register())
 /// await LlamaCpp.register();
 ///
-/// // Add models
-/// LlamaCpp.addModel(
-///   name: 'SmolLM2 360M Q8_0',
-///   url: 'https://huggingface.co/.../model.gguf',
-///   memoryRequirement: 500000000,
-/// );
+/// // Register models through RunAnywhereSDK.instance.models.
+/// // The commons registry/router owns framework selection and routing.
 /// ```
 library runanywhere_llamacpp;
 
@@ -35,12 +31,10 @@ import 'dart:async';
 
 import 'package:runanywhere/core/module/runanywhere_module.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
-    show InferenceFramework, ModelCategory;
+    show InferenceFramework;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/native/ffi_types.dart';
-import 'package:runanywhere/public/runanywhere_v4.dart' show RunAnywhereSDK;
 import 'package:runanywhere_llamacpp/native/llamacpp_bindings.dart';
 
 // Re-export for backward compatibility
@@ -102,9 +96,6 @@ class LlamaCpp implements RunAnywhereModule {
   static bool _isVlmRegistered = false;
   static LlamaCppBindings? _bindings;
   static final _logger = SDKLogger('LlamaCpp');
-
-  /// Internal model registry for models added via addModel
-  static final List<ModelInfo> _registeredModels = [];
 
   // ============================================================================
   // Registration (matches Swift LlamaCPP.register() exactly)
@@ -211,68 +202,11 @@ class LlamaCpp implements RunAnywhereModule {
     }
   }
 
-  // ============================================================================
-  // Model Handling (matches Swift exactly)
-  // ============================================================================
-
   /// Check if the native backend is available on this platform.
   ///
   /// On iOS: Checks DynamicLibrary.process() for statically linked symbols
   /// On Android: Checks if librac_backend_llamacpp_jni.so can be loaded
   static bool get isAvailable => LlamaCppBindings.checkAvailability();
-
-  /// Check if LlamaCPP can handle a given model.
-  /// Uses file extension pattern matching - actual framework info is in C++ registry.
-  static bool canHandle(String? modelId) {
-    if (modelId == null) return false;
-    return modelId.toLowerCase().endsWith('.gguf');
-  }
-
-  // ============================================================================
-  // Model Registration (convenience API)
-  // ============================================================================
-
-  /// Add a LLM model to the registry.
-  ///
-  /// This is a convenience method that registers a model with the SDK.
-  /// The model will be associated with the LlamaCPP backend.
-  ///
-  /// Matches Swift pattern - models are registered globally via RunAnywhere.
-  static void addModel({
-    String? id,
-    required String name,
-    required String url,
-    int? memoryRequirement,
-    bool supportsThinking = false,
-  }) {
-    final uri = Uri.tryParse(url);
-    if (uri == null) {
-      _logger.error('Invalid URL for model: $name');
-      return;
-    }
-
-    final modelId =
-        id ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
-
-    // Register with the global SDK registry (matches Swift pattern)
-    final model = RunAnywhereSDK.instance.models.register(
-      id: modelId,
-      name: name,
-      url: uri,
-      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
-      modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
-      memoryRequirement: memoryRequirement,
-      supportsThinking: supportsThinking,
-    );
-
-    // Keep local reference for convenience
-    _registeredModels.add(model);
-    _logger.info('Added LlamaCpp model: $name ($modelId)');
-  }
-
-  /// Get all models registered with this module
-  static List<ModelInfo> get registeredModels =>
-      List.unmodifiable(_registeredModels);
 
   // ============================================================================
   // Cleanup
@@ -281,7 +215,6 @@ class LlamaCpp implements RunAnywhereModule {
   /// Dispose of resources
   static void dispose() {
     _bindings = null;
-    _registeredModels.clear();
     _isRegistered = false;
     _logger.info('LlamaCpp disposed');
   }

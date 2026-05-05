@@ -10,10 +10,9 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
-import 'package:runanywhere/features/stt/stt_configuration.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/stt_options.pb.dart'
-    show STTOptions, STTOutput;
+    show STTAudioSource_Source, STTOptions, STTOutput, STTTranscriptionRequest;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
@@ -27,7 +26,6 @@ import 'package:runanywhere/native/platform_loader.dart';
 /// Usage:
 /// ```dart
 /// final stt = DartBridgeSTT.shared;
-/// await stt.loadModel('/path/to/model', 'model-id', 'Model Name');
 /// final text = await stt.transcribe(audioData);
 /// ```
 class DartBridgeSTT {
@@ -43,6 +41,14 @@ class DartBridgeSTT {
   RacHandle? _handle;
   String? _loadedModelId;
   final _logger = SDKLogger('DartBridge.STT');
+  static STTOutput Function(STTTranscriptionRequest)?
+      _transcribeLifecycleProtoForTesting;
+
+  static void setTranscribeLifecycleProtoForTesting(
+    STTOutput Function(STTTranscriptionRequest)? override,
+  ) {
+    _transcribeLifecycleProtoForTesting = override;
+  }
 
   // MARK: - Handle Management
 
@@ -103,59 +109,31 @@ class DartBridgeSTT {
     }
   }
 
-  // MARK: - Model Lifecycle
-
-  /// Load an STT model.
-  ///
-  /// [modelPath] - Full path to the model directory.
-  /// [modelId] - Unique identifier for the model.
-  /// [modelName] - Human-readable name.
-  ///
-  /// Throws on failure.
-  Future<void> loadModel(
-    String modelPath,
-    String modelId,
-    String modelName,
-  ) async {
-    final handle = getHandle();
-
-    final pathPtr = modelPath.toNativeUtf8();
-    final idPtr = modelId.toNativeUtf8();
-    final namePtr = modelName.toNativeUtf8();
-
-    try {
-      final result =
-          NativeFunctions.sttLoadModel(handle, pathPtr, idPtr, namePtr);
-
-      if (result != RAC_SUCCESS) {
-        throw StateError(
-          'Failed to load STT model: ${RacResultCode.getMessage(result)}',
-        );
-      }
-
-      _loadedModelId = modelId;
-      _logger.info('STT model loaded: $modelId');
-    } finally {
-      calloc.free(pathPtr);
-      calloc.free(idPtr);
-      calloc.free(namePtr);
-    }
-  }
-
-  /// Unload the current model.
-  void unload() {
-    if (_handle == null) return;
-
-    try {
-      NativeFunctions.sttCleanup(_handle!);
-      _loadedModelId = null;
-      _logger.info('STT model unloaded');
-    } catch (e) {
-      _logger.error('Failed to unload STT model: $e');
-    }
-  }
-
   // MARK: - Transcription
+
+  /// Transcribe audio through the lifecycle-owned generated-proto STT ABI.
+  STTOutput transcribeLifecycleProto(STTTranscriptionRequest request) {
+    _validateLifecycleRequest(request);
+
+    final override = _transcribeLifecycleProtoForTesting;
+    if (override != null) {
+      return override(request);
+    }
+
+    final fn = RacNative.bindings.rac_stt_transcribe_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+        'rac_stt_transcribe_lifecycle_proto is unavailable',
+      );
+    }
+
+    return DartBridgeProtoUtils.callRequest<STTOutput>(
+      request: request,
+      invoke: fn,
+      decode: STTOutput.fromBuffer,
+      symbol: 'rac_stt_transcribe_lifecycle_proto',
+    );
+  }
 
   /// Transcribe audio with serialized runanywhere.v1.STTOptions.
   Future<STTOutput> transcribeProto(
@@ -164,7 +142,10 @@ class DartBridgeSTT {
   ) async {
     final handle = getHandle();
     if (!isLoaded) {
-      throw StateError('No STT model loaded. Call loadModel() first.');
+      throw UnsupportedError(
+        'No STT component handle is loaded. Public STT uses '
+        'transcribeLifecycleProto instead of Dart-held component handles.',
+      );
     }
 
     final fn = RacNative.bindings.rac_stt_component_transcribe_proto;
@@ -231,12 +212,13 @@ class DartBridgeSTT {
     bool enableTimestamps = true,
     bool detectLanguage = false,
   }) async {
-    STTComponentConfig(sampleRate: sampleRate).validate();
-
     final handle = getHandle();
 
     if (!isLoaded) {
-      throw StateError('No STT model loaded. Call loadModel() first.');
+      throw UnsupportedError(
+        'rac_stt_component_transcribe requires a Dart-held component handle '
+        'and is not used by the public lifecycle-owned STT capability.',
+      );
     }
 
     _logger.debug(
@@ -426,6 +408,32 @@ class DartBridgeSTT {
       } catch (e) {
         _logger.error('Failed to destroy STT component: $e');
       }
+    }
+  }
+
+  void _validateLifecycleRequest(STTTranscriptionRequest request) {
+    if (!request.hasAudio()) {
+      throw ArgumentError(
+        'STTTranscriptionRequest.audio is required for lifecycle STT',
+      );
+    }
+    switch (request.audio.whichSource()) {
+      case STTAudioSource_Source.audioData:
+        if (request.audio.audioData.isEmpty) {
+          throw ArgumentError(
+            'STTTranscriptionRequest.audio.audio_data is required',
+          );
+        }
+        return;
+      case STTAudioSource_Source.fileUri:
+      case STTAudioSource_Source.adapterHandle:
+        throw UnsupportedError(
+          'STT audio file_uri/adapter_handle requires a platform adapter',
+        );
+      case STTAudioSource_Source.notSet:
+        throw ArgumentError(
+          'STTTranscriptionRequest.audio.audio_data is required',
+        );
     }
   }
 }

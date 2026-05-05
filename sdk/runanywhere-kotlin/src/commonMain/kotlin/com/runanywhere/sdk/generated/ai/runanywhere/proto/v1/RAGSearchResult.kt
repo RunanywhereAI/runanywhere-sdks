@@ -91,6 +91,37 @@ public class RAGSearchResult(
     schemaIndex = 5,
   )
   public val metadata_json: String? = null,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 6,
+  )
+  public val rank: Int = 0,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "startOffset",
+    schemaIndex = 7,
+  )
+  public val start_offset: Int = 0,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "endOffset",
+    schemaIndex = 8,
+  )
+  public val end_offset: Int = 0,
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "tokenCount",
+    schemaIndex = 9,
+  )
+  public val token_count: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGSearchResult, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -123,6 +154,10 @@ public class RAGSearchResult(
     if (source_document != other.source_document) return false
     if (metadata != other.metadata) return false
     if (metadata_json != other.metadata_json) return false
+    if (rank != other.rank) return false
+    if (start_offset != other.start_offset) return false
+    if (end_offset != other.end_offset) return false
+    if (token_count != other.token_count) return false
     return true
   }
 
@@ -136,6 +171,10 @@ public class RAGSearchResult(
       result = result * 37 + (source_document?.hashCode() ?: 0)
       result = result * 37 + metadata.hashCode()
       result = result * 37 + (metadata_json?.hashCode() ?: 0)
+      result = result * 37 + rank.hashCode()
+      result = result * 37 + start_offset.hashCode()
+      result = result * 37 + end_offset.hashCode()
+      result = result * 37 + token_count.hashCode()
       super.hashCode = result
     }
     return result
@@ -149,6 +188,10 @@ public class RAGSearchResult(
     if (source_document != null) result += """source_document=${sanitize(source_document)}"""
     if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     if (metadata_json != null) result += """metadata_json=${sanitize(metadata_json)}"""
+    result += """rank=$rank"""
+    result += """start_offset=$start_offset"""
+    result += """end_offset=$end_offset"""
+    result += """token_count=$token_count"""
     return result.joinToString(prefix = "RAGSearchResult{", separator = ", ", postfix = "}")
   }
 
@@ -159,9 +202,13 @@ public class RAGSearchResult(
     source_document: String? = this.source_document,
     metadata: Map<String, String> = this.metadata,
     metadata_json: String? = this.metadata_json,
+    rank: Int = this.rank,
+    start_offset: Int = this.start_offset,
+    end_offset: Int = this.end_offset,
+    token_count: Int = this.token_count,
     unknownFields: ByteString = this.unknownFields,
   ): RAGSearchResult = RAGSearchResult(chunk_id, text, similarity_score, source_document, metadata,
-      metadata_json, unknownFields)
+      metadata_json, rank, start_offset, end_offset, token_count, unknownFields)
 
   public companion object {
     @JvmField
@@ -185,6 +232,13 @@ public class RAGSearchResult(
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.source_document)
         size += metadataAdapter.encodedSizeWithTag(5, value.metadata)
         size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.metadata_json)
+        if (value.rank != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(7, value.rank)
+        if (value.start_offset != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(8,
+            value.start_offset)
+        if (value.end_offset != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(9,
+            value.end_offset)
+        if (value.token_count != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(10,
+            value.token_count)
         return size
       }
 
@@ -196,11 +250,19 @@ public class RAGSearchResult(
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.source_document)
         metadataAdapter.encodeWithTag(writer, 5, value.metadata)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.metadata_json)
+        if (value.rank != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7, value.rank)
+        if (value.start_offset != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8, value.start_offset)
+        if (value.end_offset != 0) ProtoAdapter.INT32.encodeWithTag(writer, 9, value.end_offset)
+        if (value.token_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 10, value.token_count)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGSearchResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.token_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 10, value.token_count)
+        if (value.end_offset != 0) ProtoAdapter.INT32.encodeWithTag(writer, 9, value.end_offset)
+        if (value.start_offset != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8, value.start_offset)
+        if (value.rank != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7, value.rank)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.metadata_json)
         metadataAdapter.encodeWithTag(writer, 5, value.metadata)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.source_document)
@@ -217,6 +279,10 @@ public class RAGSearchResult(
         var source_document: String? = null
         val metadata = mutableMapOf<String, String>()
         var metadata_json: String? = null
+        var rank: Int = 0
+        var start_offset: Int = 0
+        var end_offset: Int = 0
+        var token_count: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> chunk_id = ProtoAdapter.STRING.decode(reader)
@@ -225,6 +291,10 @@ public class RAGSearchResult(
             4 -> source_document = ProtoAdapter.STRING.decode(reader)
             5 -> metadata.putAll(metadataAdapter.decode(reader))
             6 -> metadata_json = ProtoAdapter.STRING.decode(reader)
+            7 -> rank = ProtoAdapter.INT32.decode(reader)
+            8 -> start_offset = ProtoAdapter.INT32.decode(reader)
+            9 -> end_offset = ProtoAdapter.INT32.decode(reader)
+            10 -> token_count = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -235,6 +305,10 @@ public class RAGSearchResult(
           source_document = source_document,
           metadata = metadata,
           metadata_json = metadata_json,
+          rank = rank,
+          start_offset = start_offset,
+          end_offset = end_offset,
+          token_count = token_count,
           unknownFields = unknownFields
         )
       }

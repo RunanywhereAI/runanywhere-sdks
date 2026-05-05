@@ -99,6 +99,8 @@ message LoRAAdapterConfig {
     string          adapter_path = 1;   // path on disk to the GGUF file
     float           scale        = 2;   // default 1.0 (set by codegen layer)
     optional string adapter_id   = 3;   // optional link to catalog entry id
+    map<string, string> metadata = 4;
+    repeated string target_modules = 5;
 }
 
 // ---------------------------------------------------------------------------
@@ -114,6 +116,8 @@ message LoRAAdapterInfo {
     float           scale         = 3;   // active scale factor
     bool            applied       = 4;   // currently applied to the context
     optional string error_message = 5;   // populated when applied = false
+    int32           error_code    = 6;
+    int64           loaded_at_ms  = 7;
 }
 
 // ---------------------------------------------------------------------------
@@ -136,6 +140,66 @@ message LoraAdapterCatalogEntry {
     optional string author            = 8;   // optional adapter author
     float           default_scale     = 9;   // recommended adapter scale
     optional string checksum_sha256   = 10;  // lowercase hex SHA-256
+    optional string license           = 11;
+    repeated string tags              = 12;
+    map<string, string> metadata      = 13;
+
+    // Stable platform-normalized local artifact path after native/Web has
+    // completed download/import and reported the result back to commons.
+    optional string local_path        = 14;
+    optional bool   is_downloaded     = 15;
+    optional int64  downloaded_at_unix_ms = 16;
+    optional bool   is_imported       = 17;
+    optional string status_message    = 18;
+}
+
+message LoraAdapterCatalogQuery {
+    optional string adapter_id      = 1;
+    optional string model_id        = 2;
+    optional bool   downloaded_only = 3;
+    optional string search_query    = 4;
+    repeated string tags            = 5;
+}
+
+message LoraAdapterCatalogListRequest {
+    optional LoraAdapterCatalogQuery query = 1;
+    bool include_counts = 2;
+}
+
+message LoraAdapterCatalogListResult {
+    bool success = 1;
+    repeated LoraAdapterCatalogEntry entries = 2;
+    string error_message = 3;
+    int32 total_count = 4;
+    int32 filtered_count = 5;
+    int32 downloaded_count = 6;
+}
+
+message LoraAdapterCatalogGetRequest {
+    string adapter_id = 1;
+}
+
+message LoraAdapterCatalogGetResult {
+    bool found = 1;
+    LoraAdapterCatalogEntry entry = 2;
+    string error_message = 3;
+}
+
+message LoraAdapterDownloadCompletedRequest {
+    string adapter_id = 1;
+    string local_path = 2;
+    optional int64 size_bytes = 3;
+    optional string checksum_sha256 = 4;
+    optional int64 completed_at_unix_ms = 5;
+    bool imported = 6;
+    string status_message = 7;
+}
+
+message LoraAdapterDownloadCompletedResult {
+    bool success = 1;
+    LoraAdapterCatalogEntry entry = 2;
+    string error_message = 3;
+    bool persisted = 4;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,4 +213,72 @@ message LoraCompatibilityResult {
     bool            is_compatible       = 1;
     optional string error_message       = 2;   // populated when is_compatible = false
     optional string base_model_required = 3;   // base model id this adapter expects
+    repeated string warnings           = 4;
+    int32           error_code          = 5;
+}
+
+message LoRAApplyRequest {
+    string request_id = 1;
+    repeated LoRAAdapterConfig adapters = 2;
+    bool replace_existing = 3;
+}
+
+message LoRAApplyResult {
+    string request_id = 1;
+    repeated LoRAAdapterInfo adapters = 2;
+    bool success = 3;
+    optional string error_message = 4;
+    int32 error_code = 5;
+}
+
+message LoRARemoveRequest {
+    string request_id = 1;
+    repeated string adapter_ids = 2;
+    repeated string adapter_paths = 3;
+    bool clear_all = 4;
+}
+
+message LoRAState {
+    repeated LoRAAdapterInfo loaded_adapters = 1;
+    bool has_active_adapters = 2;
+    optional string base_model_id = 3;
+    optional string error_message = 4;
+    int32 error_code = 5;
+}
+
+// Logical LoRA service contract. Adapter file acquisition, sandbox handles,
+// and backend-specific load/unload execution remain adapter/backend-owned;
+// C++ consumes only serialized request/result/state messages.
+service LoRA {
+    // Register catalog metadata. Local artifact state is ignored here and is
+    // persisted only by MarkDownloadCompleted after native/Web reports success.
+    rpc RegisterCatalogEntry(LoraAdapterCatalogEntry) returns (LoraAdapterCatalogEntry);
+
+    // Return catalog entries, optionally filtered by query.
+    rpc ListCatalog(LoraAdapterCatalogListRequest) returns (LoraAdapterCatalogListResult);
+
+    // Query catalog entries directly.
+    rpc QueryCatalog(LoraAdapterCatalogQuery) returns (LoraAdapterCatalogListResult);
+
+    // Return one catalog entry by id.
+    rpc GetCatalogEntry(LoraAdapterCatalogGetRequest) returns (LoraAdapterCatalogGetResult);
+
+    // Persist platform-reported local path state after download/import.
+    rpc MarkDownloadCompleted(LoraAdapterDownloadCompletedRequest) returns (LoraAdapterDownloadCompletedResult);
+
+    // Apply one or more adapters to the current logical model/session.
+    rpc Apply(LoRAApplyRequest) returns (LoRAApplyResult);
+
+    // Remove named/path adapters, or clear all when LoRARemoveRequest.clear_all is true.
+    rpc Remove(LoRARemoveRequest) returns (LoRAState);
+
+    // Check whether an adapter config is compatible with the current base model.
+    rpc CheckCompatibility(LoRAAdapterConfig) returns (LoraCompatibilityResult);
+
+    // Return the current loaded-adapter snapshot. The request state can carry
+    // optional base_model_id filtering without introducing an empty request type.
+    rpc List(LoRAState) returns (LoRAState);
+
+    // Return the logical LoRA service state.
+    rpc State(LoRAState) returns (LoRAState);
 }

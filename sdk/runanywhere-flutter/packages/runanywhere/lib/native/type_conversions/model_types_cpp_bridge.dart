@@ -10,7 +10,6 @@ import 'dart:io';
 
 import 'package:fixnum/fixnum.dart' as fixnum;
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
-import 'package:runanywhere/core/types/model_types.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pbenum.dart' as pb;
 
@@ -92,44 +91,6 @@ abstract class RacArchiveStructure {
   static const int rootFolder = 3;
 }
 
-// =============================================================================
-// ModelCategory C++ Conversion
-// =============================================================================
-
-extension ModelCategoryCppBridge on ModelCategory {
-  /// Convert to C++ model category type
-  int toC() {
-    switch (toProto()) {
-      case pb.ModelCategory.MODEL_CATEGORY_LANGUAGE:
-        return RacModelCategory.language;
-      case pb.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
-        return RacModelCategory.speechRecognition;
-      case pb.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
-        return RacModelCategory.speechSynthesis;
-      case pb.ModelCategory.MODEL_CATEGORY_VISION:
-        return RacModelCategory.vision;
-      case pb.ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION:
-        return RacModelCategory.imageGeneration;
-      case pb.ModelCategory.MODEL_CATEGORY_MULTIMODAL:
-        return RacModelCategory.multimodal;
-      case pb.ModelCategory.MODEL_CATEGORY_AUDIO:
-        return RacModelCategory.audio;
-      case pb.ModelCategory.MODEL_CATEGORY_EMBEDDING:
-        return RacModelCategory.embedding;
-      case pb.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
-        return RacModelCategory.voiceActivityDetection;
-      case pb.ModelCategory.MODEL_CATEGORY_UNSPECIFIED:
-      default:
-        return RacModelCategory.unknown;
-    }
-  }
-
-  /// Create from C++ model category type
-  static ModelCategory fromC(int cCategory) {
-    return ModelCategory.fromProto(_categoryProtoFromC(cCategory));
-  }
-}
-
 pb.ModelCategory _categoryProtoFromC(int cCategory) {
   switch (cCategory) {
     case RacModelCategory.language:
@@ -155,35 +116,6 @@ pb.ModelCategory _categoryProtoFromC(int cCategory) {
   }
 }
 
-// =============================================================================
-// ModelFormat C++ Conversion
-// =============================================================================
-
-extension ModelFormatCppBridge on ModelFormat {
-  /// Convert to C++ model format type
-  int toC() {
-    switch (toProto()) {
-      case pb.ModelFormat.MODEL_FORMAT_ONNX:
-        return RacModelFormat.onnx;
-      case pb.ModelFormat.MODEL_FORMAT_ORT:
-        return RacModelFormat.ort;
-      case pb.ModelFormat.MODEL_FORMAT_GGUF:
-        return RacModelFormat.gguf;
-      case pb.ModelFormat.MODEL_FORMAT_BIN:
-        return RacModelFormat.bin;
-      case pb.ModelFormat.MODEL_FORMAT_UNKNOWN:
-      case pb.ModelFormat.MODEL_FORMAT_UNSPECIFIED:
-      default:
-        return RacModelFormat.unknown;
-    }
-  }
-
-  /// Create from C++ model format type
-  static ModelFormat fromC(int cFormat) {
-    return ModelFormat.fromProto(_formatProtoFromC(cFormat));
-  }
-}
-
 pb.ModelFormat _formatProtoFromC(int cFormat) {
   switch (cFormat) {
     case RacModelFormat.onnx:
@@ -196,45 +128,6 @@ pb.ModelFormat _formatProtoFromC(int cFormat) {
       return pb.ModelFormat.MODEL_FORMAT_BIN;
     default:
       return pb.ModelFormat.MODEL_FORMAT_UNKNOWN;
-  }
-}
-
-// =============================================================================
-// InferenceFramework C++ Conversion
-// =============================================================================
-
-extension InferenceFrameworkCppBridge on InferenceFramework {
-  /// Convert to C++ inference framework type
-  int toC() {
-    switch (toProto()) {
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
-        return RacInferenceFramework.onnx;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
-        return RacInferenceFramework.llamaCpp;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-        return RacInferenceFramework.foundationModels;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
-        return RacInferenceFramework.systemTts;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
-        return RacInferenceFramework.fluidAudio;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN:
-        return RacInferenceFramework.builtIn;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_NONE:
-        return RacInferenceFramework.none;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
-        return RacInferenceFramework.genie;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
-        return RacInferenceFramework.sherpa;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN:
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED:
-      default:
-        return RacInferenceFramework.unknown;
-    }
-  }
-
-  /// Create from C++ inference framework type
-  static InferenceFramework fromC(int cFramework) {
-    return InferenceFramework.fromProto(_frameworkProtoFromC(cFramework));
   }
 }
 
@@ -260,30 +153,6 @@ pb.InferenceFramework _frameworkProtoFromC(int cFramework) {
       return pb.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA;
     default:
       return pb.InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
-  }
-}
-
-// =============================================================================
-// ModelSource C++ Conversion
-// =============================================================================
-
-extension ModelSourceCppBridge on ModelSource {
-  /// Convert to C++ model source type
-  int toC() {
-    switch (toProto()) {
-      case pb.ModelSource.MODEL_SOURCE_REMOTE:
-        return RacModelSource.remote;
-      case pb.ModelSource.MODEL_SOURCE_LOCAL:
-        return RacModelSource.local;
-      case pb.ModelSource.MODEL_SOURCE_UNSPECIFIED:
-      default:
-        return RacModelSource.remote;
-    }
-  }
-
-  /// Create from C++ model source type
-  static ModelSource fromC(int cSource) {
-    return ModelSource.fromProto(_sourceProtoFromC(cSource));
   }
 }
 
@@ -598,43 +467,5 @@ pb.ModelSource _sourceProtoFromC(int cSource) {
       return pb.ModelSource.MODEL_SOURCE_LOCAL;
     default:
       return pb.ModelSource.MODEL_SOURCE_UNSPECIFIED;
-  }
-}
-
-// =============================================================================
-// ModelArtifactType C++ Conversion
-// =============================================================================
-
-extension ModelArtifactTypeCppBridge on ModelArtifactType {
-  /// Convert to C++ artifact kind type
-  int toC() {
-    return switch (this) {
-      SingleFileArtifact() => RacArtifactKind.singleFile,
-      ArchiveArtifact() => RacArtifactKind.archive,
-      MultiFileArtifact() => RacArtifactKind.multiFile,
-      CustomArtifact() => RacArtifactKind.custom,
-      BuiltInArtifact() => RacArtifactKind.builtIn,
-    };
-  }
-
-  /// Create from C++ artifact kind type
-  static ModelArtifactType fromC(int cKind) {
-    switch (cKind) {
-      case RacArtifactKind.singleFile:
-        return const SingleFileArtifact();
-      case RacArtifactKind.archive:
-        return const ArchiveArtifact(
-          archiveType: ArchiveType.zip,
-          structure: ArchiveStructure.unknown,
-        );
-      case RacArtifactKind.multiFile:
-        return const MultiFileArtifact(files: []);
-      case RacArtifactKind.custom:
-        return const CustomArtifact(strategyId: '');
-      case RacArtifactKind.builtIn:
-        return const BuiltInArtifact();
-      default:
-        return const SingleFileArtifact();
-    }
   }
 }

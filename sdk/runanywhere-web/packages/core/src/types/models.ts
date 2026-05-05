@@ -9,28 +9,18 @@
 
 import type {
   AccelerationPreference,
-  SDKEnvironment,
-} from './enums';
-import type {
   ModelInfo as ProtoModelInfo,
+  ModelInfoMetadata as ProtoModelInfoMetadata,
+  ModelThinkingTagPattern as ProtoModelThinkingTagPattern,
+  SDKEnvironment,
 } from '@runanywhere/proto-ts/model_types';
 import type {
   StorageInfo as ProtoStorageInfo,
   StoredModel as ProtoStoredModel,
 } from '@runanywhere/proto-ts/storage_types';
 
-export interface ThinkingTagPattern {
-  openTag: string;
-  closeTag: string;
-}
-
-export interface ModelInfoMetadata {
-  description?: string;
-  author?: string;
-  license?: string;
-  tags?: string[];
-  version?: string;
-}
+export type ThinkingTagPattern = ProtoModelThinkingTagPattern;
+export type ModelInfoMetadata = ProtoModelInfoMetadata;
 
 export type ModelInfo = ProtoModelInfo;
 

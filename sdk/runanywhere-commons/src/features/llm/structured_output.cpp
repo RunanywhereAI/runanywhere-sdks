@@ -9,13 +9,28 @@
  * Do NOT add features not present in the Swift code.
  */
 
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
+#include <string>
+#include <vector>
+
+#include <nlohmann/json.hpp>
 
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
+#include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
+#include "rac/features/llm/rac_llm_thinking.h"
+
+#if defined(RAC_HAVE_PROTOBUF)
+#include "structured_output.pb.h"
+#endif
+
+using nlohmann::json;
 
 // =============================================================================
 // HELPER FUNCTIONS
@@ -49,25 +64,701 @@ static void trim_whitespace(const char* str, size_t* out_start, size_t* out_end)
     *out_end = end;
 }
 
-/**
- * @brief Find the first occurrence of a character in a string starting from a position
- *
- * @param str Input string
- * @param ch Character to find
- * @param start_pos Starting position
- * @param out_pos Output: Position of character if found
- * @return true if found, false otherwise
- */
-static bool find_char(const char* str, char ch, size_t start_pos, size_t* out_pos) {
-    size_t len = strlen(str);
-    for (size_t i = start_pos; i < len; i++) {
-        if (str[i] == ch) {
-            *out_pos = i;
-            return true;
+static char* dup_owned_string(const std::string& value) {
+    char* copy = static_cast<char*>(malloc(value.size() + 1));
+    if (!copy) {
+        return nullptr;
+    }
+    memcpy(copy, value.c_str(), value.size() + 1);
+    return copy;
+}
+
+static bool parse_json_value(const char* text, json* out_value) {
+    if (!text || !out_value) {
+        return false;
+    }
+    json parsed = json::parse(text, nullptr, false);
+    if (parsed.is_discarded()) {
+        return false;
+    }
+    *out_value = std::move(parsed);
+    return true;
+}
+
+static std::string validation_errors_to_json(const std::vector<std::string>& errors) {
+    json arr = json::array();
+    for (const auto& error : errors) {
+        arr.push_back(error);
+    }
+    return arr.dump();
+}
+
+static std::string json_type_name(const json& value) {
+    if (value.is_object()) {
+        return "object";
+    }
+    if (value.is_array()) {
+        return "array";
+    }
+    if (value.is_string()) {
+        return "string";
+    }
+    if (value.is_boolean()) {
+        return "boolean";
+    }
+    if (value.is_number_integer()) {
+        return "integer";
+    }
+    if (value.is_number()) {
+        return "number";
+    }
+    if (value.is_null()) {
+        return "null";
+    }
+    return "unknown";
+}
+
+static bool json_matches_schema_type(const json& value, const std::string& type) {
+    if (type == "object") {
+        return value.is_object();
+    }
+    if (type == "array") {
+        return value.is_array();
+    }
+    if (type == "string") {
+        return value.is_string();
+    }
+    if (type == "boolean") {
+        return value.is_boolean();
+    }
+    if (type == "integer") {
+        return value.is_number_integer();
+    }
+    if (type == "number") {
+        return value.is_number();
+    }
+    if (type == "null") {
+        return value.is_null();
+    }
+    return true;
+}
+
+static void validate_json_against_schema(const json& value,
+                                         const json& schema,
+                                         const std::string& path,
+                                         std::vector<std::string>* errors) {
+    if (!schema.is_object()) {
+        return;
+    }
+
+    const auto type_it = schema.find("type");
+    if (type_it != schema.end()) {
+        bool type_ok = true;
+        std::string expected_type;
+        if (type_it->is_string()) {
+            expected_type = type_it->get<std::string>();
+            type_ok = json_matches_schema_type(value, expected_type);
+        } else if (type_it->is_array()) {
+            type_ok = false;
+            for (const auto& candidate : *type_it) {
+                if (candidate.is_string()) {
+                    const std::string candidate_type = candidate.get<std::string>();
+                    if (json_matches_schema_type(value, candidate_type)) {
+                        type_ok = true;
+                        break;
+                    }
+                    if (!expected_type.empty()) {
+                        expected_type += "|";
+                    }
+                    expected_type += candidate_type;
+                }
+            }
+        }
+
+        if (!type_ok) {
+            errors->push_back(path + " must be " + expected_type + " but was " +
+                              json_type_name(value));
+            return;
         }
     }
-    return false;
+
+    const auto enum_it = schema.find("enum");
+    if (enum_it != schema.end() && enum_it->is_array()) {
+        bool matched = false;
+        for (const auto& enum_value : *enum_it) {
+            if (enum_value == value) {
+                matched = true;
+                break;
+            }
+        }
+        if (!matched) {
+            errors->push_back(path + " is not one of the allowed enum values");
+            return;
+        }
+    }
+
+    const bool schema_describes_object =
+        value.is_object() &&
+        (schema.contains("properties") || schema.contains("required") ||
+         (schema.contains("type") && schema["type"].is_string() &&
+          schema["type"].get<std::string>() == "object"));
+    if (schema_describes_object) {
+        const json properties =
+            schema.contains("properties") && schema["properties"].is_object()
+                ? schema["properties"]
+                : json::object();
+
+        const auto required_it = schema.find("required");
+        if (required_it != schema.end() && required_it->is_array()) {
+            for (const auto& required_name : *required_it) {
+                if (!required_name.is_string()) {
+                    continue;
+                }
+                const std::string name = required_name.get<std::string>();
+                if (!value.contains(name)) {
+                    errors->push_back(path + "." + name + " is required");
+                }
+            }
+        }
+
+        for (auto it = properties.begin(); it != properties.end(); ++it) {
+            if (value.contains(it.key())) {
+                validate_json_against_schema(value.at(it.key()), it.value(), path + "." + it.key(),
+                                             errors);
+            }
+        }
+
+        const auto additional_it = schema.find("additionalProperties");
+        if (additional_it != schema.end() && additional_it->is_boolean() &&
+            additional_it->get<bool>() == false) {
+            for (auto it = value.begin(); it != value.end(); ++it) {
+                if (!properties.contains(it.key())) {
+                    errors->push_back(path + "." + it.key() + " is not allowed");
+                }
+            }
+        }
+    }
+
+    if (value.is_array() && schema.contains("items")) {
+        const json& item_schema = schema["items"];
+        for (size_t i = 0; i < value.size(); ++i) {
+            validate_json_against_schema(value[i], item_schema,
+                                         path + "[" + std::to_string(i) + "]", errors);
+        }
+    }
 }
+
+static const char* expected_json_root_name(const char* json_schema) {
+    json schema;
+    if (!json_schema || !parse_json_value(json_schema, &schema) || !schema.is_object()) {
+        return "object";
+    }
+
+    const auto type_it = schema.find("type");
+    if (type_it != schema.end() && type_it->is_string()) {
+        const std::string type = type_it->get<std::string>();
+        if (type == "array") {
+            return "array";
+        }
+        if (type != "object") {
+            return "value";
+        }
+    }
+
+    if (schema.contains("items") && !schema.contains("properties")) {
+        return "array";
+    }
+
+    return "object";
+}
+
+static const char* expected_start_token(const char* root_name) {
+    return strcmp(root_name, "array") == 0 ? "[" : "{";
+}
+
+static const char* expected_end_token(const char* root_name) {
+    return strcmp(root_name, "array") == 0 ? "]" : "}";
+}
+
+#if defined(RAC_HAVE_PROTOBUF)
+template <typename ProtoMessage>
+static rac_result_t copy_serialized_proto(const ProtoMessage& message,
+                                          rac_proto_buffer_t* out_result,
+                                          const char* message_name) {
+    if (!out_result) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    const size_t size = message.ByteSizeLong();
+    if (size > static_cast<size_t>(std::numeric_limits<int>::max())) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_ENCODING_ERROR,
+                                          "serialized proto exceeds supported size");
+    }
+    std::vector<uint8_t> bytes(size);
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        std::string error = "failed to serialize ";
+        error += message_name;
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_ENCODING_ERROR,
+                                          error.c_str());
+    }
+    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(),
+                                 out_result);
+}
+
+static const char* json_schema_type_name(runanywhere::v1::JSONSchemaType type) {
+    switch (type) {
+        case runanywhere::v1::JSON_SCHEMA_TYPE_OBJECT:
+            return "object";
+        case runanywhere::v1::JSON_SCHEMA_TYPE_ARRAY:
+            return "array";
+        case runanywhere::v1::JSON_SCHEMA_TYPE_STRING:
+            return "string";
+        case runanywhere::v1::JSON_SCHEMA_TYPE_NUMBER:
+            return "number";
+        case runanywhere::v1::JSON_SCHEMA_TYPE_INTEGER:
+            return "integer";
+        case runanywhere::v1::JSON_SCHEMA_TYPE_BOOLEAN:
+            return "boolean";
+        case runanywhere::v1::JSON_SCHEMA_TYPE_NULL:
+            return "null";
+        case runanywhere::v1::JSON_SCHEMA_TYPE_UNSPECIFIED:
+        default:
+            return nullptr;
+    }
+}
+
+static json json_schema_proto_to_json(const runanywhere::v1::JSONSchema& schema);
+
+static json json_schema_property_proto_to_json(
+    const runanywhere::v1::JSONSchemaProperty& property) {
+    json object = json::object();
+    if (const char* type = json_schema_type_name(property.type())) {
+        object["type"] = type;
+    }
+    if (property.has_description()) {
+        object["description"] = property.description();
+    }
+    if (property.enum_values_size() > 0) {
+        object["enum"] = json::array();
+        for (const auto& value : property.enum_values()) {
+            object["enum"].push_back(value);
+        }
+    }
+    if (property.has_format()) {
+        object["format"] = property.format();
+    }
+    if (property.has_items_schema()) {
+        object["items"] = json_schema_proto_to_json(property.items_schema());
+    }
+    if (property.has_object_schema()) {
+        const json nested = json_schema_proto_to_json(property.object_schema());
+        if (nested.contains("properties")) {
+            object["properties"] = nested["properties"];
+        }
+        if (nested.contains("required")) {
+            object["required"] = nested["required"];
+        }
+        if (nested.contains("additionalProperties")) {
+            object["additionalProperties"] = nested["additionalProperties"];
+        }
+    }
+    if (property.has_minimum()) {
+        object["minimum"] = property.minimum();
+    }
+    if (property.has_maximum()) {
+        object["maximum"] = property.maximum();
+    }
+    if (property.has_min_length()) {
+        object["minLength"] = property.min_length();
+    }
+    if (property.has_max_length()) {
+        object["maxLength"] = property.max_length();
+    }
+    if (property.has_pattern()) {
+        object["pattern"] = property.pattern();
+    }
+    if (property.has_min_items()) {
+        object["minItems"] = property.min_items();
+    }
+    if (property.has_max_items()) {
+        object["maxItems"] = property.max_items();
+    }
+    if (property.has_default_json()) {
+        json default_value = json::parse(property.default_json(), nullptr, false);
+        object["default"] = default_value.is_discarded() ? json(property.default_json())
+                                                         : std::move(default_value);
+    }
+    return object;
+}
+
+static json json_schema_proto_to_json(const runanywhere::v1::JSONSchema& schema) {
+    if (schema.has_raw_json()) {
+        json raw = json::parse(schema.raw_json(), nullptr, false);
+        if (!raw.is_discarded()) {
+            return raw;
+        }
+    }
+
+    json object = json::object();
+    if (const char* type = json_schema_type_name(schema.type())) {
+        object["type"] = type;
+    }
+    if (schema.properties_size() > 0) {
+        object["properties"] = json::object();
+        for (const auto& entry : schema.properties()) {
+            object["properties"][entry.first] = json_schema_property_proto_to_json(entry.second);
+        }
+    }
+    if (schema.required_size() > 0) {
+        object["required"] = json::array();
+        for (const auto& required : schema.required()) {
+            object["required"].push_back(required);
+        }
+    }
+    if (schema.has_items()) {
+        object["items"] = json_schema_property_proto_to_json(schema.items());
+    }
+    if (schema.has_additional_properties()) {
+        object["additionalProperties"] = schema.additional_properties();
+    }
+    if (schema.has_schema_uri()) {
+        object["$schema"] = schema.schema_uri();
+    }
+    if (schema.has_id_uri()) {
+        object["$id"] = schema.id_uri();
+    }
+    if (schema.has_title()) {
+        object["title"] = schema.title();
+    }
+    if (schema.has_description()) {
+        object["description"] = schema.description();
+    }
+    if (schema.definitions_size() > 0) {
+        object["definitions"] = json::object();
+        for (const auto& entry : schema.definitions()) {
+            object["definitions"][entry.first] = json_schema_proto_to_json(entry.second);
+        }
+    }
+    if (schema.has_ref()) {
+        object["$ref"] = schema.ref();
+    }
+    if (schema.all_of_size() > 0) {
+        object["allOf"] = json::array();
+        for (const auto& item : schema.all_of()) {
+            object["allOf"].push_back(json_schema_proto_to_json(item));
+        }
+    }
+    if (schema.any_of_size() > 0) {
+        object["anyOf"] = json::array();
+        for (const auto& item : schema.any_of()) {
+            object["anyOf"].push_back(json_schema_proto_to_json(item));
+        }
+    }
+    if (schema.one_of_size() > 0) {
+        object["oneOf"] = json::array();
+        for (const auto& item : schema.one_of()) {
+            object["oneOf"].push_back(json_schema_proto_to_json(item));
+        }
+    }
+    if (schema.has_not_schema()) {
+        object["not"] = json_schema_proto_to_json(schema.not_schema());
+    }
+    return object;
+}
+
+static std::string json_schema_from_options(
+    const runanywhere::v1::StructuredOutputOptions& options) {
+    if (options.has_json_schema() && !options.json_schema().empty()) {
+        return options.json_schema();
+    }
+    if (options.has_schema()) {
+        return json_schema_proto_to_json(options.schema()).dump();
+    }
+    return std::string();
+}
+
+struct ProtoStructuredOutputConfig {
+    rac_structured_output_config_t config = RAC_STRUCTURED_OUTPUT_DEFAULT;
+    std::string json_schema;
+};
+
+static void refresh_proto_structured_output_config(ProtoStructuredOutputConfig* converted) {
+    if (!converted) {
+        return;
+    }
+    converted->config.json_schema =
+        converted->json_schema.empty() ? nullptr : converted->json_schema.c_str();
+}
+
+static ProtoStructuredOutputConfig structured_output_config_from_options(
+    const runanywhere::v1::StructuredOutputOptions& options) {
+    ProtoStructuredOutputConfig converted;
+    converted.json_schema = json_schema_from_options(options);
+    converted.config.include_schema_in_prompt =
+        options.include_schema_in_prompt() ? RAC_TRUE : RAC_FALSE;
+    refresh_proto_structured_output_config(&converted);
+    return converted;
+}
+
+static void add_structured_validation_errors_from_json(
+    const char* validation_errors_json,
+    runanywhere::v1::StructuredOutputValidation* validation) {
+    if (!validation_errors_json || !validation) {
+        return;
+    }
+
+    json errors = json::parse(validation_errors_json, nullptr, false);
+    if (!errors.is_array()) {
+        return;
+    }
+    for (const auto& error : errors) {
+        if (error.is_string()) {
+            validation->add_validation_errors(error.get<std::string>());
+        }
+    }
+}
+
+static void fill_structured_validation_proto(
+    const rac_structured_output_parse_result_t& parsed,
+    runanywhere::v1::StructuredOutputValidation* validation) {
+    validation->set_is_valid(parsed.is_valid == RAC_TRUE);
+    validation->set_contains_json(parsed.contains_json == RAC_TRUE);
+    if (parsed.error_message) {
+        validation->set_error_message(parsed.error_message);
+    }
+    if (parsed.raw_text) {
+        validation->set_raw_output(parsed.raw_text);
+    }
+    if (parsed.parsed_json) {
+        validation->set_extracted_json(parsed.parsed_json);
+    }
+    add_structured_validation_errors_from_json(parsed.validation_errors_json, validation);
+    validation->set_validation_time_ms(0);
+}
+
+static int64_t structured_now_us() {
+    using namespace std::chrono;
+    return duration_cast<microseconds>(system_clock::now().time_since_epoch()).count();
+}
+
+static rac_result_t structured_result_from_text(
+    const std::string& raw_text,
+    const rac_structured_output_config_t* config,
+    runanywhere::v1::StructuredOutputResult* result) {
+    if (!result) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    const char* response = nullptr;
+    size_t response_len = 0;
+    const char* thinking = nullptr;
+    size_t thinking_len = 0;
+    (void)rac_llm_extract_thinking(raw_text.c_str(), &response, &response_len,
+                                   &thinking, &thinking_len);
+    const std::string parse_text = response ? std::string(response, response_len) : raw_text;
+
+    rac_structured_output_parse_result_t parsed{};
+    const rac_result_t rc =
+        rac_structured_output_parse(parse_text.c_str(), config, &parsed);
+    if (rc != RAC_SUCCESS) {
+        rac_structured_output_parse_result_free(&parsed);
+        return rc;
+    }
+
+    if (parsed.parsed_json) {
+        result->set_parsed_json(parsed.parsed_json);
+    }
+    fill_structured_validation_proto(parsed, result->mutable_validation());
+    if (parsed.raw_text) {
+        result->set_raw_text(parsed.raw_text);
+    }
+    if (parsed.error_message) {
+        result->set_error_message(parsed.error_message);
+    }
+    result->set_error_code(static_cast<int32_t>(parsed.error_code));
+    rac_structured_output_parse_result_free(&parsed);
+    return RAC_SUCCESS;
+}
+
+static rac_result_t prepare_structured_generation(
+    const runanywhere::v1::StructuredOutputRequest& request,
+    ProtoStructuredOutputConfig* converted,
+    bool* has_options,
+    std::string* prepared_prompt,
+    std::string* system_prompt) {
+    if (!converted || !has_options || !prepared_prompt || !system_prompt) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    *has_options = false;
+    if (request.has_options()) {
+        *has_options = true;
+        *converted = structured_output_config_from_options(request.options());
+        refresh_proto_structured_output_config(converted);
+    }
+
+    char* prepared = nullptr;
+    const rac_result_t prepare_rc = rac_structured_output_prepare_prompt(
+        request.prompt().c_str(), *has_options ? &converted->config : nullptr, &prepared);
+    if (prepare_rc != RAC_SUCCESS) {
+        free(prepared);
+        return prepare_rc;
+    }
+    prepared_prompt->assign(prepared ? prepared : "");
+    free(prepared);
+
+    system_prompt->clear();
+    if (converted->config.json_schema) {
+        char* system = nullptr;
+        const rac_result_t system_rc =
+            rac_structured_output_get_system_prompt(converted->config.json_schema, &system);
+        if (system_rc != RAC_SUCCESS) {
+            free(system);
+            return system_rc;
+        }
+        system_prompt->assign(system ? system : "");
+        free(system);
+    }
+    return RAC_SUCCESS;
+}
+
+struct StructuredStreamContext {
+    rac_proto_bytes_callback_fn callback = nullptr;
+    void* user_data = nullptr;
+    rac::llm::LifecycleLlmRef* ref = nullptr;
+    const rac_structured_output_config_t* config = nullptr;
+    uint64_t seq = 0;
+    bool terminal_sent = false;
+    std::string request_id;
+    std::string raw_text;
+    std::string last_partial_json;
+};
+
+static void dispatch_structured_stream_event(
+    StructuredStreamContext* ctx,
+    runanywhere::v1::StructuredOutputStreamEventKind kind,
+    const char* token,
+    const char* partial_json,
+    const runanywhere::v1::StructuredOutputResult* result,
+    const char* error_message,
+    rac_result_t error_code) {
+    if (!ctx || !ctx->callback) {
+        return;
+    }
+
+    runanywhere::v1::StructuredOutputStreamEvent event;
+    event.set_seq(++ctx->seq);
+    event.set_timestamp_us(structured_now_us());
+    if (!ctx->request_id.empty()) {
+        event.set_request_id(ctx->request_id);
+    }
+    event.set_kind(kind);
+    if (token && token[0]) {
+        event.set_token(token);
+    }
+    if (partial_json && partial_json[0]) {
+        event.set_partial_json(partial_json);
+    }
+    if (result) {
+        *event.mutable_result() = *result;
+        if (result->has_validation()) {
+            *event.mutable_validation() = result->validation();
+        }
+    }
+    if (error_message && error_message[0]) {
+        event.set_error_message(error_message);
+    }
+    event.set_error_code(static_cast<int32_t>(error_code));
+
+    const size_t size = event.ByteSizeLong();
+    std::vector<uint8_t> bytes(size);
+    if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        return;
+    }
+    ctx->callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), ctx->user_data);
+}
+
+static void maybe_dispatch_partial_json(StructuredStreamContext* ctx) {
+    if (!ctx || ctx->raw_text.empty()) {
+        return;
+    }
+
+    const char* response = nullptr;
+    size_t response_len = 0;
+    const char* thinking = nullptr;
+    size_t thinking_len = 0;
+    (void)rac_llm_extract_thinking(ctx->raw_text.c_str(), &response, &response_len,
+                                   &thinking, &thinking_len);
+    const std::string scan_text =
+        response ? std::string(response, response_len) : ctx->raw_text;
+
+    size_t start = 0;
+    size_t end = 0;
+    if (rac_structured_output_find_complete_json(scan_text.c_str(), &start, &end) != RAC_TRUE ||
+        end <= start) {
+        return;
+    }
+
+    std::string partial = scan_text.substr(start, end - start);
+    if (partial == ctx->last_partial_json) {
+        return;
+    }
+    ctx->last_partial_json = partial;
+    dispatch_structured_stream_event(
+        ctx, runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON,
+        nullptr, partial.c_str(), nullptr, nullptr, RAC_SUCCESS);
+}
+
+static rac_bool_t structured_stream_token_callback(const char* token, void* user_data) {
+    auto* ctx = static_cast<StructuredStreamContext*>(user_data);
+    if (!ctx || !ctx->ref) {
+        return RAC_FALSE;
+    }
+    if (rac::llm::lifecycle_llm_cancel_requested(ctx->ref)) {
+        return RAC_FALSE;
+    }
+
+    const char* safe_token = token ? token : "";
+    ctx->raw_text += safe_token;
+    dispatch_structured_stream_event(
+        ctx, runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
+        safe_token, nullptr, nullptr, nullptr, RAC_SUCCESS);
+    maybe_dispatch_partial_json(ctx);
+    return RAC_TRUE;
+}
+
+static void dispatch_structured_terminal_once(StructuredStreamContext* ctx,
+                                              const char* finish_reason,
+                                              rac_result_t status) {
+    if (!ctx || ctx->terminal_sent) {
+        return;
+    }
+    ctx->terminal_sent = true;
+
+    runanywhere::v1::StructuredOutputResult result;
+    rac_result_t result_rc = structured_result_from_text(ctx->raw_text, ctx->config, &result);
+    if (result_rc != RAC_SUCCESS) {
+        dispatch_structured_stream_event(
+            ctx, runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR,
+            nullptr, nullptr, nullptr, rac_error_message(result_rc), result_rc);
+        return;
+    }
+
+    const bool transport_ok = status == RAC_SUCCESS;
+    const bool validation_ok = result.error_code() == static_cast<int32_t>(RAC_SUCCESS);
+    const auto kind = transport_ok && validation_ok
+                          ? runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED
+                          : runanywhere::v1::STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR;
+    const char* message = nullptr;
+    if (!transport_ok) {
+        message = finish_reason && finish_reason[0] ? finish_reason : rac_error_message(status);
+    } else if (!validation_ok && result.has_error_message()) {
+        message = result.error_message().c_str();
+    }
+    dispatch_structured_stream_event(
+        ctx, kind, nullptr, nullptr, &result, message,
+        transport_ok ? static_cast<rac_result_t>(result.error_code()) : status);
+}
+#endif
 
 // =============================================================================
 // FIND MATCHING BRACE - Ported from Swift lines 179-212
@@ -234,16 +925,34 @@ extern "C" rac_result_t rac_structured_output_extract_json(const char* text, cha
     size_t trimmed_len = trim_end - trim_start;
     const char* trimmed = text + trim_start;
 
-    // First, try to find a complete JSON object
-    size_t json_start, json_end;
-    if (rac_structured_output_find_complete_json(trimmed, &json_start, &json_end) != 0) {
-        size_t json_len = json_end - json_start;
+    bool saw_candidate = false;
+    for (size_t i = 0; i < trimmed_len; ++i) {
+        size_t candidate_end = 0;
+        if (trimmed[i] == '{') {
+            if (rac_structured_output_find_matching_brace(trimmed, i, &candidate_end) == 0) {
+                continue;
+            }
+        } else if (trimmed[i] == '[') {
+            if (rac_structured_output_find_matching_bracket(trimmed, i, &candidate_end) == 0) {
+                continue;
+            }
+        } else {
+            continue;
+        }
+
+        saw_candidate = true;
+        const size_t json_len = candidate_end - i + 1;
+        std::string candidate(trimmed + i, json_len);
+        json parsed = json::parse(candidate, nullptr, false);
+        if (parsed.is_discarded()) {
+            continue;
+        }
+
         char* result = static_cast<char*>(malloc(json_len + 1));
         if (!result) {
             return RAC_ERROR_OUT_OF_MEMORY;
         }
-        memcpy(result, trimmed + json_start, json_len);
-        result[json_len] = '\0';
+        memcpy(result, candidate.c_str(), json_len + 1);
         *out_json = result;
         if (out_length) {
             *out_length = json_len;
@@ -251,64 +960,9 @@ extern "C" rac_result_t rac_structured_output_extract_json(const char* text, cha
         return RAC_SUCCESS;
     }
 
-    // Fallback: Try to find JSON object boundaries with findMatchingBrace
-    size_t brace_start;
-    if (find_char(trimmed, '{', 0, &brace_start)) {
-        size_t brace_end;
-        if (rac_structured_output_find_matching_brace(trimmed, brace_start, &brace_end) != 0) {
-            size_t json_len = brace_end - brace_start + 1;
-            char* result = static_cast<char*>(malloc(json_len + 1));
-            if (!result) {
-                return RAC_ERROR_OUT_OF_MEMORY;
-            }
-            memcpy(result, trimmed + brace_start, json_len);
-            result[json_len] = '\0';
-            *out_json = result;
-            if (out_length) {
-                *out_length = json_len;
-            }
-            return RAC_SUCCESS;
-        }
-    }
-
-    // Try to find JSON array boundaries
-    size_t bracket_start;
-    if (find_char(trimmed, '[', 0, &bracket_start)) {
-        size_t bracket_end;
-        if (rac_structured_output_find_matching_bracket(trimmed, bracket_start, &bracket_end) !=
-            0) {
-            size_t json_len = bracket_end - bracket_start + 1;
-            char* result = static_cast<char*>(malloc(json_len + 1));
-            if (!result) {
-                return RAC_ERROR_OUT_OF_MEMORY;
-            }
-            memcpy(result, trimmed + bracket_start, json_len);
-            result[json_len] = '\0';
-            *out_json = result;
-            if (out_length) {
-                *out_length = json_len;
-            }
-            return RAC_SUCCESS;
-        }
-    }
-
-    // If no clear JSON boundaries, check if the entire text might be JSON
-    if (trimmed[0] == '{' || trimmed[0] == '[') {
-        char* result = static_cast<char*>(malloc(trimmed_len + 1));
-        if (!result) {
-            return RAC_ERROR_OUT_OF_MEMORY;
-        }
-        memcpy(result, trimmed, trimmed_len);
-        result[trimmed_len] = '\0';
-        *out_json = result;
-        if (out_length) {
-            *out_length = trimmed_len;
-        }
-        return RAC_SUCCESS;
-    }
-
     // Log the text that couldn't be parsed
-    RAC_LOG_ERROR("StructuredOutput", "No valid JSON found in the response");
+    RAC_LOG_ERROR("StructuredOutput", saw_candidate ? "JSON candidate failed to parse"
+                                                     : "No valid JSON found in the response");
     return RAC_ERROR_INVALID_FORMAT;
 }
 
@@ -323,6 +977,9 @@ extern "C" rac_result_t rac_structured_output_get_system_prompt(const char* json
     }
 
     const char* schema = json_schema ? json_schema : "{}";
+    const char* root_name = expected_json_root_name(schema);
+    const char* start_token = expected_start_token(root_name);
+    const char* end_token = expected_end_token(root_name);
 
     // Build the system prompt - matches Swift getSystemPrompt(for:)
     const char* format =
@@ -330,25 +987,27 @@ extern "C" rac_result_t rac_structured_output_get_system_prompt(const char* json
         "\n"
         "CRITICAL RULES:\n"
         "1. Your entire response must be valid JSON that can be parsed\n"
-        "2. Start with { and end with }\n"
-        "3. No text before the opening {\n"
-        "4. No text after the closing }\n"
-        "5. Follow the provided schema exactly\n"
-        "6. Include all required fields\n"
-        "7. Use proper JSON syntax (quotes, commas, etc.)\n"
+        "2. Output a JSON %s\n"
+        "3. Start with %s and end with %s\n"
+        "4. No text before the opening JSON token\n"
+        "5. No text after the closing JSON token\n"
+        "6. Follow the provided schema exactly\n"
+        "7. Include all required fields\n"
+        "8. Use proper JSON syntax (quotes, commas, etc.)\n"
         "\n"
         "Expected JSON Schema:\n"
         "%s\n"
         "\n"
-        "Remember: Output ONLY the JSON object, nothing else.";
+        "Remember: Output ONLY the JSON %s, nothing else.";
 
-    size_t needed = snprintf(NULL, 0, format, schema) + 1;
+    size_t needed =
+        snprintf(NULL, 0, format, root_name, start_token, end_token, schema, root_name) + 1;
     char* result = static_cast<char*>(malloc(needed));
     if (!result) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
 
-    snprintf(result, needed, format, schema);
+    snprintf(result, needed, format, root_name, start_token, end_token, schema, root_name);
     *out_prompt = result;
 
     return RAC_SUCCESS;
@@ -377,6 +1036,9 @@ extern "C" rac_result_t rac_structured_output_prepare_prompt(
     }
 
     const char* schema = config->json_schema ? config->json_schema : "{}";
+    const char* root_name = expected_json_root_name(schema);
+    const char* start_token = expected_start_token(root_name);
+    const char* end_token = expected_end_token(root_name);
 
     // Build structured output instructions - matches Swift preparePrompt()
     const char* format =
@@ -384,16 +1046,16 @@ extern "C" rac_result_t rac_structured_output_prepare_prompt(
         "\n"
         "%s\n"
         "\n"
-        "CRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON object. No other text is "
+        "CRITICAL INSTRUCTION: You MUST respond with ONLY a valid JSON %s. No other text is "
         "allowed.\n"
         "\n"
         "JSON Schema:\n"
         "%s\n"
         "\n"
         "RULES:\n"
-        "1. Start your response with { and end with }\n"
-        "2. Include NO text before the opening {\n"
-        "3. Include NO text after the closing }\n"
+        "1. Start your response with %s and end with %s\n"
+        "2. Include NO text before the opening JSON token\n"
+        "3. Include NO text after the closing JSON token\n"
         "4. Follow the schema exactly\n"
         "5. All required fields must be present\n"
         "6. Use exact field names from the schema\n"
@@ -402,15 +1064,18 @@ extern "C" rac_result_t rac_structured_output_prepare_prompt(
         "IMPORTANT: Your entire response must be valid JSON that can be parsed. Do not include any "
         "explanations, comments, or additional text.\n"
         "\n"
-        "Remember: Output ONLY the JSON object, nothing else.";
+        "Remember: Output ONLY the JSON %s, nothing else.";
 
-    size_t needed = snprintf(NULL, 0, format, original_prompt, schema) + 1;
+    size_t needed = snprintf(NULL, 0, format, original_prompt, root_name, schema, start_token,
+                             end_token, root_name) +
+                    1;
     char* result = static_cast<char*>(malloc(needed));
     if (!result) {
         return RAC_ERROR_OUT_OF_MEMORY;
     }
 
-    snprintf(result, needed, format, original_prompt, schema);
+    snprintf(result, needed, format, original_prompt, root_name, schema, start_token, end_token,
+             root_name);
     *out_prompt = result;
 
     return RAC_SUCCESS;
@@ -420,11 +1085,434 @@ extern "C" rac_result_t rac_structured_output_prepare_prompt(
 // VALIDATE STRUCTURED OUTPUT - Ported from Swift lines 264-282
 // =============================================================================
 
+static void init_parse_result(rac_structured_output_parse_result_t* result) {
+    result->is_valid = RAC_FALSE;
+    result->contains_json = RAC_FALSE;
+    result->parsed_json = nullptr;
+    result->raw_text = nullptr;
+    result->error_message = nullptr;
+    result->validation_errors_json = nullptr;
+    result->error_code = RAC_SUCCESS;
+}
+
+static bool text_contains_json_marker(const char* text) {
+    return text && (strchr(text, '{') != nullptr || strchr(text, '[') != nullptr);
+}
+
+static rac_result_t set_parse_errors(rac_structured_output_parse_result_t* out_result,
+                                     const std::vector<std::string>& errors,
+                                     rac_result_t error_code) {
+    out_result->validation_errors_json = dup_owned_string(validation_errors_to_json(errors));
+    if (!out_result->validation_errors_json) {
+        rac_structured_output_parse_result_free(out_result);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    if (!errors.empty()) {
+        out_result->error_message = dup_owned_string(errors.front());
+        if (!out_result->error_message) {
+            rac_structured_output_parse_result_free(out_result);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+    }
+
+    out_result->error_code = error_code;
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_result_t rac_structured_output_parse(
+    const char* text, const rac_structured_output_config_t* config,
+    rac_structured_output_parse_result_t* out_result) {
+    if (!text || !out_result) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    init_parse_result(out_result);
+    out_result->contains_json = text_contains_json_marker(text) ? RAC_TRUE : RAC_FALSE;
+    out_result->raw_text = dup_owned_string(text);
+    if (!out_result->raw_text) {
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    std::vector<std::string> errors;
+    char* extracted = nullptr;
+    const rac_result_t extract_result = rac_structured_output_extract_json(text, &extracted, nullptr);
+    if (extract_result != RAC_SUCCESS || !extracted) {
+        errors.push_back(out_result->contains_json == RAC_TRUE
+                             ? "JSON candidate failed to parse"
+                             : "No valid JSON found in the response");
+        out_result->is_valid = RAC_FALSE;
+        return set_parse_errors(out_result, errors, RAC_ERROR_INVALID_FORMAT);
+    }
+
+    out_result->contains_json = RAC_TRUE;
+    json parsed;
+    if (!parse_json_value(extracted, &parsed)) {
+        free(extracted);
+        errors.push_back("Extracted JSON failed to parse");
+        out_result->is_valid = RAC_FALSE;
+        return set_parse_errors(out_result, errors, RAC_ERROR_INVALID_FORMAT);
+    }
+    free(extracted);
+
+    out_result->parsed_json = dup_owned_string(parsed.dump());
+    if (!out_result->parsed_json) {
+        rac_structured_output_parse_result_free(out_result);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    if (config && config->json_schema && config->json_schema[0]) {
+        json schema;
+        if (!parse_json_value(config->json_schema, &schema) || !schema.is_object()) {
+            errors.push_back("JSON schema is invalid");
+        } else {
+            validate_json_against_schema(parsed, schema, "$", &errors);
+        }
+    }
+
+    out_result->is_valid = errors.empty() ? RAC_TRUE : RAC_FALSE;
+    return set_parse_errors(out_result, errors,
+                            errors.empty() ? RAC_SUCCESS : RAC_ERROR_VALIDATION_FAILED);
+}
+
+extern "C" rac_result_t rac_structured_output_parse_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
+#else
+    rac_result_t validation = rac_proto_bytes_validate(request_proto_bytes, request_proto_size);
+    if (validation != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "StructuredOutputParseRequest bytes are invalid");
+    }
+
+    runanywhere::v1::StructuredOutputParseRequest request;
+    if (!request.ParseFromArray(rac_proto_bytes_data_or_empty(request_proto_bytes,
+                                                              request_proto_size),
+                                static_cast<int>(request_proto_size))) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse StructuredOutputParseRequest");
+    }
+    if (request.text().empty()) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
+                                          "StructuredOutputParseRequest.text is required");
+    }
+
+    ProtoStructuredOutputConfig converted;
+    if (request.has_options()) {
+        converted = structured_output_config_from_options(request.options());
+        refresh_proto_structured_output_config(&converted);
+    }
+
+    rac_structured_output_parse_result_t parsed{};
+    rac_result_t rc = rac_structured_output_parse(
+        request.text().c_str(), converted.config.json_schema ? &converted.config : nullptr,
+        &parsed);
+    if (rc != RAC_SUCCESS) {
+        rac_structured_output_parse_result_free(&parsed);
+        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+    }
+
+    runanywhere::v1::StructuredOutputResult result;
+    if (parsed.parsed_json) {
+        result.set_parsed_json(parsed.parsed_json);
+    }
+    fill_structured_validation_proto(parsed, result.mutable_validation());
+    if (parsed.raw_text) {
+        result.set_raw_text(parsed.raw_text);
+    }
+    if (parsed.error_message) {
+        result.set_error_message(parsed.error_message);
+    }
+    result.set_error_code(static_cast<int32_t>(parsed.error_code));
+    rac_structured_output_parse_result_free(&parsed);
+
+    return copy_serialized_proto(result, out_result, "StructuredOutputResult");
+#endif
+}
+
+extern "C" rac_result_t rac_structured_output_generate_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
+#else
+    rac_result_t validation = rac_proto_bytes_validate(request_proto_bytes, request_proto_size);
+    if (validation != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "StructuredOutputRequest bytes are invalid");
+    }
+
+    runanywhere::v1::StructuredOutputRequest request;
+    if (!request.ParseFromArray(rac_proto_bytes_data_or_empty(request_proto_bytes,
+                                                              request_proto_size),
+                                static_cast<int>(request_proto_size))) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse StructuredOutputRequest");
+    }
+    if (request.prompt().empty()) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_ARGUMENT,
+                                          "StructuredOutputRequest.prompt is required");
+    }
+
+    ProtoStructuredOutputConfig converted;
+    bool has_options = false;
+    std::string prepared_prompt;
+    std::string system_prompt;
+    rac_result_t rc = prepare_structured_generation(
+        request, &converted, &has_options, &prepared_prompt, &system_prompt);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+    }
+
+    rac::llm::LifecycleLlmRef ref;
+    rc = rac::llm::acquire_lifecycle_llm(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, "no lifecycle LLM model loaded");
+    }
+
+    rac::llm::clear_lifecycle_llm_cancel(&ref);
+    rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
+    options.streaming_enabled = RAC_FALSE;
+    options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
+
+    rac_llm_result_t raw{};
+    rc = (ref.ops && ref.ops->generate)
+             ? ref.ops->generate(ref.impl, prepared_prompt.c_str(), &options, &raw)
+             : RAC_ERROR_NOT_SUPPORTED;
+    if (rc != RAC_SUCCESS) {
+        rac::llm::release_lifecycle_llm(&ref);
+        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+    }
+
+    runanywhere::v1::StructuredOutputResult result;
+    rc = structured_result_from_text(raw.text ? raw.text : "",
+                                     has_options ? &converted.config : nullptr, &result);
+    rac_llm_result_free(&raw);
+    rac::llm::release_lifecycle_llm(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+    }
+    return copy_serialized_proto(result, out_result, "StructuredOutputResult");
+#endif
+}
+
+extern "C" rac_result_t rac_structured_output_generate_stream_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_bytes_callback_fn callback, void* user_data) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    (void)callback;
+    (void)user_data;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    if (!callback) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    rac_result_t validation = rac_proto_bytes_validate(request_proto_bytes, request_proto_size);
+    if (validation != RAC_SUCCESS) {
+        return RAC_ERROR_DECODING_ERROR;
+    }
+
+    runanywhere::v1::StructuredOutputRequest request;
+    if (!request.ParseFromArray(rac_proto_bytes_data_or_empty(request_proto_bytes,
+                                                              request_proto_size),
+                                static_cast<int>(request_proto_size))) {
+        return RAC_ERROR_DECODING_ERROR;
+    }
+    if (request.prompt().empty()) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    ProtoStructuredOutputConfig converted;
+    bool has_options = false;
+    std::string prepared_prompt;
+    std::string system_prompt;
+    rac_result_t rc = prepare_structured_generation(
+        request, &converted, &has_options, &prepared_prompt, &system_prompt);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+
+    rac::llm::LifecycleLlmRef ref;
+    rc = rac::llm::acquire_lifecycle_llm(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rc;
+    }
+    if (!ref.ops || !ref.ops->generate_stream) {
+        rac::llm::release_lifecycle_llm(&ref);
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    rac::llm::clear_lifecycle_llm_cancel(&ref);
+    rac_llm_options_t options = RAC_LLM_OPTIONS_DEFAULT;
+    options.streaming_enabled = RAC_TRUE;
+    options.system_prompt = system_prompt.empty() ? nullptr : system_prompt.c_str();
+
+    StructuredStreamContext ctx;
+    ctx.callback = callback;
+    ctx.user_data = user_data;
+    ctx.ref = &ref;
+    ctx.config = has_options ? &converted.config : nullptr;
+    ctx.request_id = request.request_id();
+
+    rc = ref.ops->generate_stream(ref.impl, prepared_prompt.c_str(), &options,
+                                  structured_stream_token_callback, &ctx);
+
+    const bool cancelled =
+        rac::llm::lifecycle_llm_cancel_requested(&ref) ||
+        rc == RAC_ERROR_CANCELLED || rc == RAC_ERROR_STREAM_CANCELLED;
+    if (cancelled) {
+        dispatch_structured_terminal_once(&ctx, "cancelled", RAC_ERROR_CANCELLED);
+        rc = RAC_SUCCESS;
+    } else {
+        dispatch_structured_terminal_once(&ctx, rc == RAC_SUCCESS ? "stop" : rac_error_message(rc),
+                                          rc);
+    }
+
+    rac::llm::release_lifecycle_llm(&ref);
+    return rc;
+#endif
+}
+
+extern "C" rac_result_t rac_structured_output_prepare_prompt_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
+#else
+    rac_result_t validation = rac_proto_bytes_validate(request_proto_bytes, request_proto_size);
+    if (validation != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "StructuredOutputRequest bytes are invalid");
+    }
+
+    runanywhere::v1::StructuredOutputRequest request;
+    if (!request.ParseFromArray(rac_proto_bytes_data_or_empty(request_proto_bytes,
+                                                              request_proto_size),
+                                static_cast<int>(request_proto_size))) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse StructuredOutputRequest");
+    }
+
+    ProtoStructuredOutputConfig converted;
+    bool has_options = false;
+    if (request.has_options()) {
+        has_options = true;
+        converted = structured_output_config_from_options(request.options());
+        refresh_proto_structured_output_config(&converted);
+    }
+
+    char* prepared_prompt = nullptr;
+    const rac_result_t prepare_rc = rac_structured_output_prepare_prompt(
+        request.prompt().c_str(), has_options ? &converted.config : nullptr, &prepared_prompt);
+
+    runanywhere::v1::StructuredOutputPromptResult result;
+    if (prepare_rc != RAC_SUCCESS) {
+        result.set_error_message(rac_error_message(prepare_rc));
+        result.set_error_code(static_cast<int32_t>(prepare_rc));
+        free(prepared_prompt);
+        return copy_serialized_proto(result, out_result, "StructuredOutputPromptResult");
+    }
+
+    result.set_prepared_prompt(prepared_prompt ? prepared_prompt : "");
+    result.set_error_code(static_cast<int32_t>(RAC_SUCCESS));
+    if (converted.config.json_schema) {
+        result.set_json_schema(converted.config.json_schema);
+        char* system_prompt = nullptr;
+        const rac_result_t system_rc =
+            rac_structured_output_get_system_prompt(converted.config.json_schema, &system_prompt);
+        if (system_rc == RAC_SUCCESS && system_prompt) {
+            result.set_system_prompt(system_prompt);
+        }
+        free(system_prompt);
+    }
+    if (has_options) {
+        const auto& options = request.options();
+        if (options.has_regex_pattern()) {
+            result.set_regex_pattern(options.regex_pattern());
+        }
+        if (options.has_grammar()) {
+            result.set_grammar(options.grammar());
+        }
+    }
+
+    free(prepared_prompt);
+    return copy_serialized_proto(result, out_result, "StructuredOutputPromptResult");
+#endif
+}
+
+extern "C" rac_result_t rac_structured_output_validate_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
+#else
+    rac_result_t validation = rac_proto_bytes_validate(request_proto_bytes, request_proto_size);
+    if (validation != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "StructuredOutputValidationRequest bytes are invalid");
+    }
+
+    runanywhere::v1::StructuredOutputValidationRequest request;
+    if (!request.ParseFromArray(rac_proto_bytes_data_or_empty(request_proto_bytes,
+                                                              request_proto_size),
+                                static_cast<int>(request_proto_size))) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse StructuredOutputValidationRequest");
+    }
+
+    ProtoStructuredOutputConfig converted;
+    if (request.has_options()) {
+        converted = structured_output_config_from_options(request.options());
+        refresh_proto_structured_output_config(&converted);
+    }
+
+    rac_structured_output_parse_result_t parsed{};
+    const rac_result_t rc = rac_structured_output_parse(
+        request.text().c_str(), converted.config.json_schema ? &converted.config : nullptr,
+        &parsed);
+    if (rc != RAC_SUCCESS) {
+        rac_structured_output_parse_result_free(&parsed);
+        return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
+    }
+
+    runanywhere::v1::StructuredOutputValidation result;
+    fill_structured_validation_proto(parsed, &result);
+    rac_structured_output_parse_result_free(&parsed);
+    return copy_serialized_proto(result, out_result, "StructuredOutputValidation");
+#endif
+}
+
 extern "C" rac_result_t
 rac_structured_output_validate(const char* text, const rac_structured_output_config_t* config,
                                rac_structured_output_validation_t* out_validation) {
-    (void)config;  // Currently unused, reserved for future schema validation
-
     if (!text || !out_validation) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
@@ -434,20 +1522,30 @@ rac_structured_output_validate(const char* text, const rac_structured_output_con
     out_validation->error_message = nullptr;
     out_validation->extracted_json = nullptr;
 
-    // Try to extract JSON
-    char* extracted = nullptr;
-    rac_result_t result = rac_structured_output_extract_json(text, &extracted, nullptr);
-
-    if (result == RAC_SUCCESS && extracted) {
-        out_validation->is_valid = RAC_TRUE;
-        out_validation->extracted_json = extracted;
-        return RAC_SUCCESS;
+    rac_structured_output_parse_result_t parsed{};
+    const rac_result_t result = rac_structured_output_parse(text, config, &parsed);
+    if (result != RAC_SUCCESS) {
+        return result;
     }
 
-    // Extraction failed
-    out_validation->is_valid = RAC_FALSE;
-    out_validation->error_message = "No valid JSON found in the response";
+    out_validation->is_valid = parsed.is_valid;
+    if (parsed.parsed_json) {
+        out_validation->extracted_json = dup_owned_string(parsed.parsed_json);
+        if (!out_validation->extracted_json) {
+            rac_structured_output_parse_result_free(&parsed);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+    }
+    if (parsed.error_message) {
+        out_validation->error_message = dup_owned_string(parsed.error_message);
+        if (!out_validation->error_message) {
+            rac_structured_output_validation_free(out_validation);
+            rac_structured_output_parse_result_free(&parsed);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+    }
 
+    rac_structured_output_parse_result_free(&parsed);
     return RAC_SUCCESS;  // Function succeeded, validation just returned false
 }
 
@@ -466,7 +1564,37 @@ rac_structured_output_validation_free(rac_structured_output_validation_t* valida
         validation->extracted_json = nullptr;
     }
 
-    // error_message is static, don't free it
+    if (validation->error_message) {
+        free(const_cast<char*>(validation->error_message));
+    }
     validation->error_message = nullptr;
     validation->is_valid = RAC_FALSE;
+}
+
+extern "C" void
+rac_structured_output_parse_result_free(rac_structured_output_parse_result_t* result) {
+    if (!result) {
+        return;
+    }
+
+    if (result->parsed_json) {
+        free(result->parsed_json);
+        result->parsed_json = nullptr;
+    }
+    if (result->raw_text) {
+        free(result->raw_text);
+        result->raw_text = nullptr;
+    }
+    if (result->error_message) {
+        free(result->error_message);
+        result->error_message = nullptr;
+    }
+    if (result->validation_errors_json) {
+        free(result->validation_errors_json);
+        result->validation_errors_json = nullptr;
+    }
+
+    result->is_valid = RAC_FALSE;
+    result->contains_json = RAC_FALSE;
+    result->error_code = RAC_SUCCESS;
 }

@@ -110,6 +110,17 @@ export declare enum VLMErrorCode {
 }
 export declare function vLMErrorCodeFromJSON(object: any): VLMErrorCode;
 export declare function vLMErrorCodeToJSON(object: VLMErrorCode): string;
+export declare enum VLMStreamEventKind {
+    VLM_STREAM_EVENT_KIND_UNSPECIFIED = 0,
+    VLM_STREAM_EVENT_KIND_STARTED = 1,
+    VLM_STREAM_EVENT_KIND_IMAGE_ENCODED = 2,
+    VLM_STREAM_EVENT_KIND_TOKEN = 3,
+    VLM_STREAM_EVENT_KIND_COMPLETED = 4,
+    VLM_STREAM_EVENT_KIND_ERROR = 5,
+    UNRECOGNIZED = -1
+}
+export declare function vLMStreamEventKindFromJSON(object: any): VLMStreamEventKind;
+export declare function vLMStreamEventKindToJSON(object: VLMStreamEventKind): string;
 /**
  * ---------------------------------------------------------------------------
  * Custom VLM chat template.
@@ -151,6 +162,20 @@ export interface VLMImage {
     width: number;
     height: number;
     format: VLMImageFormat;
+    /**
+     * Optional source metadata. Adapters may populate this after camera/file
+     * picker capture without exposing native APIs to core.
+     */
+    mediaType?: string | undefined;
+    name?: string | undefined;
+    sizeBytes: number;
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface VLMImage_MetadataEntry {
+    key: string;
+    value: string;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -221,6 +246,24 @@ export interface VLMGenerationOptions {
     modelFamily: VLMModelFamily;
     customChatTemplate?: VLMChatTemplate | undefined;
     imageMarkerOverride?: string | undefined;
+    /** Additional llama.cpp sampling knobs and result controls. */
+    seed: number;
+    repetitionPenalty: number;
+    minP: number;
+    emitImageEmbeddings: boolean;
+}
+export interface VLMGenerationRequest {
+    requestId: string;
+    images: VLMImage[];
+    options?: VLMGenerationOptions | undefined;
+    modelId?: string | undefined;
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface VLMGenerationRequest_MetadataEntry {
+    key: string;
+    value: string;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -246,10 +289,9 @@ export interface VLMGenerationOptions {
  *                                  image_encode_time_ms, total_time_ms,
  *                                  tokens_per_second)
  *
- * Streaming note: streaming results reuse this VLMResult message; per-token
- * text deltas are emitted on the existing LLM stream channel
- * (llm_service.proto streaming surface). No VLM-specific stream-event message
- * is introduced here.
+ * Streaming note: the VLM service emits VLMStreamEvent messages for
+ * per-token deltas and terminal results; this aggregate result is carried on
+ * the unary Generate RPC and on terminal stream events.
  * ---------------------------------------------------------------------------
  */
 export interface VLMResult {
@@ -266,6 +308,33 @@ export interface VLMResult {
     timeToFirstTokenMs: number;
     imageEncodeTimeMs: number;
     hardwareUsed?: string | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
+    finishReason: string;
+    imagesProcessed: number;
+}
+export interface VLMStreamEvent {
+    seq: number;
+    timestampUs: number;
+    requestId: string;
+    kind: VLMStreamEventKind;
+    token: string;
+    tokenIndex: number;
+    isFinal: boolean;
+    tokensPerSecond: number;
+    result?: VLMResult | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+export interface VLMServiceState {
+    isReady: boolean;
+    currentModel?: string | undefined;
+    contextLength: number;
+    supportsStreaming: boolean;
+    supportsMultipleImages: boolean;
+    visionEncoderType?: string | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
 }
 export declare const VLMChatTemplate: {
     encode(message: VLMChatTemplate, writer?: _m0.Writer): _m0.Writer;
@@ -283,6 +352,14 @@ export declare const VLMImage: {
     create<I extends Exact<DeepPartial<VLMImage>, I>>(base?: I): VLMImage;
     fromPartial<I extends Exact<DeepPartial<VLMImage>, I>>(object: I): VLMImage;
 };
+export declare const VLMImage_MetadataEntry: {
+    encode(message: VLMImage_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VLMImage_MetadataEntry;
+    fromJSON(object: any): VLMImage_MetadataEntry;
+    toJSON(message: VLMImage_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<VLMImage_MetadataEntry>, I>>(base?: I): VLMImage_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<VLMImage_MetadataEntry>, I>>(object: I): VLMImage_MetadataEntry;
+};
 export declare const VLMConfiguration: {
     encode(message: VLMConfiguration, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): VLMConfiguration;
@@ -299,6 +376,22 @@ export declare const VLMGenerationOptions: {
     create<I extends Exact<DeepPartial<VLMGenerationOptions>, I>>(base?: I): VLMGenerationOptions;
     fromPartial<I extends Exact<DeepPartial<VLMGenerationOptions>, I>>(object: I): VLMGenerationOptions;
 };
+export declare const VLMGenerationRequest: {
+    encode(message: VLMGenerationRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VLMGenerationRequest;
+    fromJSON(object: any): VLMGenerationRequest;
+    toJSON(message: VLMGenerationRequest): unknown;
+    create<I extends Exact<DeepPartial<VLMGenerationRequest>, I>>(base?: I): VLMGenerationRequest;
+    fromPartial<I extends Exact<DeepPartial<VLMGenerationRequest>, I>>(object: I): VLMGenerationRequest;
+};
+export declare const VLMGenerationRequest_MetadataEntry: {
+    encode(message: VLMGenerationRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VLMGenerationRequest_MetadataEntry;
+    fromJSON(object: any): VLMGenerationRequest_MetadataEntry;
+    toJSON(message: VLMGenerationRequest_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<VLMGenerationRequest_MetadataEntry>, I>>(base?: I): VLMGenerationRequest_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<VLMGenerationRequest_MetadataEntry>, I>>(object: I): VLMGenerationRequest_MetadataEntry;
+};
 export declare const VLMResult: {
     encode(message: VLMResult, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): VLMResult;
@@ -306,6 +399,22 @@ export declare const VLMResult: {
     toJSON(message: VLMResult): unknown;
     create<I extends Exact<DeepPartial<VLMResult>, I>>(base?: I): VLMResult;
     fromPartial<I extends Exact<DeepPartial<VLMResult>, I>>(object: I): VLMResult;
+};
+export declare const VLMStreamEvent: {
+    encode(message: VLMStreamEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VLMStreamEvent;
+    fromJSON(object: any): VLMStreamEvent;
+    toJSON(message: VLMStreamEvent): unknown;
+    create<I extends Exact<DeepPartial<VLMStreamEvent>, I>>(base?: I): VLMStreamEvent;
+    fromPartial<I extends Exact<DeepPartial<VLMStreamEvent>, I>>(object: I): VLMStreamEvent;
+};
+export declare const VLMServiceState: {
+    encode(message: VLMServiceState, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VLMServiceState;
+    fromJSON(object: any): VLMServiceState;
+    toJSON(message: VLMServiceState): unknown;
+    create<I extends Exact<DeepPartial<VLMServiceState>, I>>(base?: I): VLMServiceState;
+    fromPartial<I extends Exact<DeepPartial<VLMServiceState>, I>>(object: I): VLMServiceState;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

@@ -134,9 +134,10 @@ Genie.register(priority = 200)     — NPU inference (Snapdragon only, higher pr
 - Export formats: clipboard, CSV, JSON
 
 ### LoRA Adapters (`presentation/lora/`)
-- **LoraViewModel**: Full lifecycle — download, load, unload, delete, compatibility check
-- SDK extensions: `loadLoraAdapter`, `removeLoraAdapter`, `clearLoraAdapters`, `checkLoraCompatibility`, `downloadLoraAdapter`
-- Proto-backed: `LoRAAdapterConfig`, `LoRAAdapterInfo`, `LoraCompatibilityResult`
+- **LoraViewModel**: Generated runtime operations for apply, remove, list, state, registration, and compatibility check
+- SDK namespace: `RunAnywhere.lora.apply/remove/list/state/register/checkCompatibility`
+- Proto-backed: `LoRAApplyRequest`, `LoRARemoveRequest`, `LoRAState`, `LoRAAdapterConfig`, `LoRAAdapterInfo`, `LoraCompatibilityResult`
+- Download/delete are intentionally limited until LoRA artifacts flow through the generated registry-backed download/storage path.
 
 ### Model Selection (`presentation/models/`)
 - **ModelSelectionViewModel**: Context-aware filtering via `ModelSelectionContext` enum (LLM, STT, TTS, VOICE, RAG_EMBEDDING, RAG_LLM, VLM)
@@ -145,7 +146,7 @@ Genie.register(priority = 200)     — NPU inference (Snapdragon only, higher pr
 - RAG contexts select by reference only (no memory load)
 
 ### Settings (`presentation/settings/`)
-- **SettingsViewModel**: Storage management via `RunAnywhere.storageInfo()`, `RunAnywhere.deleteModel()`, `RunAnywhere.clearCache()`
+- **SettingsViewModel**: Storage management via generated/proto-backed storage info and model deletion APIs. Do not restore deleted cache-clearing compatibility APIs; temporary/cache cleanup should flow through the V2 storage-plan bridge.
 - API config in `EncryptedSharedPreferences` (key: `runanywhere_encrypted_prefs`)
 - Generation settings (temperature, maxTokens, systemPrompt) in standard `SharedPreferences`
 
@@ -154,7 +155,7 @@ Genie.register(priority = 200)     — NPU inference (Snapdragon only, higher pr
 ### Models & Persistence
 - `ChatMessage.kt` — Serializable domain models: `ChatMessage`, `Conversation`, `MessageAnalytics`, `MessageRole`, `ToolCallInfo`, `PerformanceSummary`
 - `ConversationStore.kt` — Singleton, persists conversations as JSON in `filesDir/Conversations/` using kotlinx.serialization
-- `ModelList.kt` — Central model registry. All available models (LLM, STT, TTS, embedding, VLM, LoRA, Genie NPU) registered at startup
+- `ModelBootstrap.kt` — Central model bootstrap. All available models (LLM, STT, TTS, embedding, VLM, LoRA, Genie NPU) registered at startup
 
 ### Audio
 - `AudioCaptureService.kt` — Wraps `AudioRecord`, emits PCM chunks via `callbackFlow`. 16kHz, mono, 16-bit. Calculates RMS for level visualization.

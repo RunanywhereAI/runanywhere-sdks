@@ -2,13 +2,31 @@
  * @file rac_route.cpp
  * @brief Implementation of the C ABI route() wrapper.
  *
- * GAP 04 Phase 12.
+ * GAP 04 Phase 12. CPP-05: distinguish runtime-unavailable rejections from
+ * generic "no plugin" rejections via `RAC_ERROR_RUNTIME_UNAVAILABLE`.
  */
+
+#include <string>
 
 #include "rac/router/rac_route.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/router/rac_engine_router.h"
 #include "rac/router/rac_hardware_profile.h"
+
+namespace {
+
+/* Marker substring emitted by `EngineRouter::route` when every candidate was
+ * rejected purely because their declared L1 runtimes are not registered.
+ * Kept as a substring rather than a regex so the scoring/rejection plumbing
+ * stays in pure C++ with no extra dependencies. */
+constexpr const char* kRuntimeUnavailableMarker =
+    "no registered runtime satisfies";
+
+bool is_runtime_unavailable(const std::string& reason) {
+    return reason.find(kRuntimeUnavailableMarker) != std::string::npos;
+}
+
+}  // namespace
 
 extern "C" {
 
@@ -34,9 +52,12 @@ rac_result_t rac_plugin_route(rac_primitive_t              primitive,
     rac::router::EngineRouter router(rac::router::HardwareProfile::cached());
     auto result = router.route(req);
     if (result.vtable == nullptr) {
-        rac::events::publish_route_failed(primitive, RAC_ERROR_NOT_FOUND,
+        const rac_result_t rc = is_runtime_unavailable(result.rejection_reason)
+                                    ? RAC_ERROR_RUNTIME_UNAVAILABLE
+                                    : RAC_ERROR_NOT_FOUND;
+        rac::events::publish_route_failed(primitive, rc,
                                           result.rejection_reason.c_str());
-        return RAC_ERROR_NOT_FOUND;
+        return rc;
     }
     *out_vtable = result.vtable;
     rac::events::publish_route_selected(primitive, result.vtable, "engine_router");

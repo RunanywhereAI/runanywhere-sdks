@@ -10,9 +10,8 @@
  *   (SINGLE SOURCE OF TRUTH; lives under foundation/bridge/extensions).
  * - This file: extension-function surface on `RunAnywhere` matching Swift's
  *   `RunAnywhere.registerTool(...)` / `generateWithTools(...)` / etc.
- *   Delegates to the platform actual which forwards to the existing
- *   `com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling`
- *   object (registry + orchestration loop already lives there).
+ *   Delegates to the platform actual, which owns only the host executor
+ *   registry and callback invocation around generated proto data.
  *
  * *** ALL PARSING LOGIC IS IN C++ (rac_tool_calling.h) - NO KOTLIN FALLBACKS ***
  *
@@ -55,11 +54,12 @@ import com.runanywhere.sdk.public.extensions.LLM.ToolResult
  *             ),
  *         ),
  *     ),
- * ) { args ->
- *     val location = args["location"]?.string_value ?: "Unknown"
- *     mapOf(
- *         "temperature" to ToolValue(number_value = 72.0),
- *         "condition" to ToolValue(string_value = "Sunny"),
+ * ) { call ->
+ *     ToolResult(
+ *         tool_call_id = call.id,
+ *         name = call.name,
+ *         result_json = "{\"temperature\":72,\"condition\":\"Sunny\"}",
+ *         success = true,
  *     )
  * }
  * ```

@@ -5,6 +5,9 @@
 
 #include <cstdio>
 #include <cstring>
+#include <chrono>
+#include <filesystem>
+#include <fstream>
 #include <string>
 #include <vector>
 
@@ -14,6 +17,7 @@
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/vlm/rac_vlm_service.h"
 #include "rac/plugin/rac_plugin_entry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
@@ -50,6 +54,23 @@ struct DummyLlm {
     bool initialized{false};
 };
 
+struct DummyVlm {
+    std::string create_model_path;
+    std::string create_config_json;
+    std::string initialize_model_path;
+    std::string initialize_mmproj_path;
+    bool initialized{false};
+};
+
+std::string g_vlm_create_model_path;
+std::string g_vlm_create_config_json;
+std::string g_vlm_initialize_model_path;
+std::string g_vlm_initialize_mmproj_path;
+int g_vlm_create_count = 0;
+int g_vlm_initialize_count = 0;
+int g_vlm_cleanup_count = 0;
+int g_vlm_destroy_count = 0;
+
 rac_result_t dummy_llm_create(const char* model_id, const char*, void** out_impl) {
     if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
     auto* impl = new DummyLlm();
@@ -76,6 +97,40 @@ rac_result_t dummy_llm_cleanup(void*) {
 void dummy_llm_destroy(void* impl) {
     ++g_destroy_count;
     delete static_cast<DummyLlm*>(impl);
+}
+
+rac_result_t dummy_vlm_create(const char* model_id, const char* config_json, void** out_impl) {
+    if (!model_id || !out_impl) return RAC_ERROR_NULL_POINTER;
+    auto* impl = new DummyVlm();
+    impl->create_model_path = model_id;
+    impl->create_config_json = config_json ? config_json : "";
+    g_vlm_create_model_path = impl->create_model_path;
+    g_vlm_create_config_json = impl->create_config_json;
+    *out_impl = impl;
+    ++g_vlm_create_count;
+    return RAC_SUCCESS;
+}
+
+rac_result_t dummy_vlm_initialize(void* impl, const char* model_path, const char* mmproj_path) {
+    if (!impl || !model_path) return RAC_ERROR_NULL_POINTER;
+    auto* dummy = static_cast<DummyVlm*>(impl);
+    dummy->initialized = true;
+    dummy->initialize_model_path = model_path;
+    dummy->initialize_mmproj_path = mmproj_path ? mmproj_path : "";
+    g_vlm_initialize_model_path = dummy->initialize_model_path;
+    g_vlm_initialize_mmproj_path = dummy->initialize_mmproj_path;
+    ++g_vlm_initialize_count;
+    return RAC_SUCCESS;
+}
+
+rac_result_t dummy_vlm_cleanup(void*) {
+    ++g_vlm_cleanup_count;
+    return RAC_SUCCESS;
+}
+
+void dummy_vlm_destroy(void* impl) {
+    ++g_vlm_destroy_count;
+    delete static_cast<DummyVlm*>(impl);
 }
 
 bool serialize(const google::protobuf::MessageLite& message, std::vector<uint8_t>* out) {
@@ -127,6 +182,47 @@ runanywhere::v1::ModelInfo build_llm_model() {
     return model;
 }
 
+std::filesystem::path make_temp_dir(const char* prefix) {
+    const auto stamp = std::chrono::steady_clock::now().time_since_epoch().count();
+    std::filesystem::path dir =
+        std::filesystem::temp_directory_path() /
+        (std::string(prefix) + "-" + std::to_string(stamp));
+    std::filesystem::create_directories(dir);
+    return dir;
+}
+
+bool write_file(const std::filesystem::path& path, const std::string& contents) {
+    std::ofstream out(path, std::ios::binary);
+    if (!out.is_open()) return false;
+    out << contents;
+    return out.good();
+}
+
+runanywhere::v1::ModelInfo build_vlm_model(const std::filesystem::path& root) {
+    runanywhere::v1::ModelInfo model;
+    model.set_id("lifecycle.vlm");
+    model.set_name("Lifecycle VLM");
+    model.set_category(runanywhere::v1::MODEL_CATEGORY_MULTIMODAL);
+    model.set_format(runanywhere::v1::MODEL_FORMAT_GGUF);
+    model.set_framework(runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP);
+    model.set_local_path(root.string());
+    model.set_is_downloaded(true);
+    model.set_is_available(true);
+
+    auto* primary = model.mutable_multi_file()->add_files();
+    primary->set_filename("vision.gguf");
+    primary->set_destination_path("vision.gguf");
+    primary->set_is_required(true);
+    primary->set_role(runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL);
+
+    auto* projector = model.mutable_multi_file()->add_files();
+    projector->set_filename("projector.gguf");
+    projector->set_destination_path("projector.gguf");
+    projector->set_is_required(true);
+    projector->set_role(runanywhere::v1::MODEL_FILE_ROLE_VISION_PROJECTOR);
+    return model;
+}
+
 bool register_model(rac_model_registry_handle_t registry,
                     const runanywhere::v1::ModelInfo& model) {
     std::vector<uint8_t> bytes;
@@ -147,6 +243,31 @@ rac_engine_vtable_t make_dummy_llm_vtable(rac_llm_service_ops_t* ops,
     v.metadata.formats_count = 1;
     v.llm_ops = ops;
     return v;
+}
+
+rac_engine_vtable_t make_dummy_vlm_vtable(rac_vlm_service_ops_t* ops,
+                                          const uint32_t* formats) {
+    rac_engine_vtable_t v{};
+    v.metadata.abi_version = RAC_PLUGIN_API_VERSION;
+    v.metadata.name = "llamacpp_vlm";
+    v.metadata.display_name = "dummy llama.cpp VLM";
+    v.metadata.engine_version = "0.0.0";
+    v.metadata.priority = 100;
+    v.metadata.formats = formats;
+    v.metadata.formats_count = 1;
+    v.vlm_ops = ops;
+    return v;
+}
+
+bool has_artifact_role(const google::protobuf::RepeatedPtrField<runanywhere::v1::ModelFileDescriptor>& artifacts,
+                       runanywhere::v1::ModelFileRole role,
+                       const std::string& path) {
+    for (const auto& artifact : artifacts) {
+        if (artifact.role() == role && artifact.local_path() == path) {
+            return true;
+        }
+    }
+    return false;
 }
 
 int test_parse_error(rac_model_registry_handle_t registry) {
@@ -301,6 +422,105 @@ int test_success_current_snapshot_unload_events(rac_model_registry_handle_t regi
     return 0;
 }
 
+int test_vlm_lifecycle_resolved_artifacts(rac_model_registry_handle_t registry) {
+    g_vlm_create_model_path.clear();
+    g_vlm_create_config_json.clear();
+    g_vlm_initialize_model_path.clear();
+    g_vlm_initialize_mmproj_path.clear();
+    g_vlm_create_count = g_vlm_initialize_count = g_vlm_cleanup_count = g_vlm_destroy_count = 0;
+    rac_model_lifecycle_reset();
+    rac_sdk_event_clear_queue();
+
+    const std::filesystem::path root = make_temp_dir("rac-lifecycle-vlm");
+    const std::filesystem::path primary_path = root / "vision.gguf";
+    const std::filesystem::path projector_path = root / "projector.gguf";
+    CHECK(write_file(primary_path, "primary"), "VLM primary fixture writes");
+    CHECK(write_file(projector_path, "projector"), "VLM projector fixture writes");
+
+    rac_vlm_service_ops_t ops{};
+    ops.create = dummy_vlm_create;
+    ops.initialize = dummy_vlm_initialize;
+    ops.cleanup = dummy_vlm_cleanup;
+    ops.destroy = dummy_vlm_destroy;
+
+    const uint32_t formats[] = {
+        static_cast<uint32_t>(runanywhere::v1::MODEL_FORMAT_GGUF)};
+    auto vtable = make_dummy_vlm_vtable(&ops, formats);
+    (void)rac_plugin_unregister("llamacpp_vlm");
+    CHECK(rac_plugin_register(&vtable) == RAC_SUCCESS, "dummy VLM lifecycle plugin registers");
+    CHECK(register_model(registry, build_vlm_model(root)), "VLM model registers");
+
+    runanywhere::v1::ModelLoadRequest load;
+    load.set_model_id("lifecycle.vlm");
+    std::vector<uint8_t> load_bytes;
+    CHECK(serialize(load, &load_bytes), "VLM load request serializes");
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc =
+        rac_model_lifecycle_load_proto(registry, load_bytes.data(), load_bytes.size(), &out);
+    runanywhere::v1::ModelLoadResult load_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &load_result),
+          "VLM load returns parsable ModelLoadResult");
+    CHECK(load_result.success(), "VLM load reports success=true");
+    CHECK(load_result.resolved_path() == primary_path.string(),
+          "VLM load resolved_path selects primary artifact");
+    CHECK(has_artifact_role(load_result.resolved_artifacts(),
+                            runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL,
+                            primary_path.string()),
+          "VLM load exposes primary artifact role");
+    CHECK(has_artifact_role(load_result.resolved_artifacts(),
+                            runanywhere::v1::MODEL_FILE_ROLE_VISION_PROJECTOR,
+                            projector_path.string()),
+          "VLM load exposes vision projector artifact role");
+    CHECK(g_vlm_create_model_path == primary_path.string(),
+          "VLM lifecycle create receives primary path");
+    CHECK(g_vlm_create_config_json.find(projector_path.string()) != std::string::npos,
+          "VLM lifecycle create config carries projector path");
+    CHECK(g_vlm_initialize_model_path == primary_path.string() &&
+              g_vlm_initialize_mmproj_path == projector_path.string(),
+          "VLM lifecycle initialize receives primary and projector paths");
+    rac_proto_buffer_free(&out);
+
+    runanywhere::v1::CurrentModelRequest current;
+    current.set_category(runanywhere::v1::MODEL_CATEGORY_MULTIMODAL);
+    std::vector<uint8_t> current_bytes;
+    CHECK(serialize(current, &current_bytes), "VLM current request serializes");
+    rac_proto_buffer_init(&out);
+    rc = rac_model_lifecycle_current_model_proto(
+        current_bytes.data(), current_bytes.size(), &out);
+    runanywhere::v1::CurrentModelResult current_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &current_result),
+          "VLM current returns parsable CurrentModelResult");
+    CHECK(current_result.found(), "VLM current reports found=true");
+    CHECK(current_result.resolved_path() == primary_path.string(),
+          "VLM current exposes primary resolved_path");
+    CHECK(has_artifact_role(current_result.resolved_artifacts(),
+                            runanywhere::v1::MODEL_FILE_ROLE_VISION_PROJECTOR,
+                            projector_path.string()),
+          "VLM current exposes projector artifact role");
+    rac_proto_buffer_free(&out);
+
+    runanywhere::v1::ModelUnloadRequest unload;
+    unload.set_model_id("lifecycle.vlm");
+    std::vector<uint8_t> unload_bytes;
+    CHECK(serialize(unload, &unload_bytes), "VLM unload request serializes");
+    rac_proto_buffer_init(&out);
+    rc = rac_model_lifecycle_unload_proto(unload_bytes.data(), unload_bytes.size(), &out);
+    runanywhere::v1::ModelUnloadResult unload_result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &unload_result),
+          "VLM unload returns parsable ModelUnloadResult");
+    CHECK(unload_result.success(), "VLM unload reports success=true");
+    CHECK(g_vlm_cleanup_count == 1 && g_vlm_destroy_count == 1,
+          "VLM unload calls cleanup and destroy");
+    rac_proto_buffer_free(&out);
+
+    rac_plugin_unregister("llamacpp_vlm");
+    rac_model_lifecycle_reset();
+    std::filesystem::remove_all(root);
+    return 0;
+}
+
 #endif
 
 }  // namespace
@@ -319,6 +539,7 @@ int main() {
     test_model_missing(registry);
     test_unsupported_route(registry);
     test_success_current_snapshot_unload_events(registry);
+    test_vlm_lifecycle_resolved_artifacts(registry);
 
     rac_model_registry_destroy(registry);
     std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);

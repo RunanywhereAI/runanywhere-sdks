@@ -4,8 +4,10 @@
 #import <Metal/Metal.h>
 
 #include <cstdlib>
+#include <cstring>
 #include <new>
 
+#include "rac/plugin/rac_model_format_ids.h"
 #include "rac/plugin/rac_runtime_registry.h"
 #include "rac/plugin/rac_runtime_vtable.h"
 
@@ -22,10 +24,10 @@ struct MetalRuntimeBuffer {
 
 const rac_device_class_t k_supported_devices[] = {RAC_DEVICE_CLASS_GPU};
 const uint32_t k_supported_formats[] = {
-    1,  // MODEL_FORMAT_GGUF
-    5,  // MODEL_FORMAT_COREML
-    6,  // MODEL_FORMAT_COREML
-    8,  // MODEL_FORMAT_MLPACKAGE
+    RAC_MODEL_FORMAT_ID_GGUF,
+    RAC_MODEL_FORMAT_ID_COREML,
+    RAC_MODEL_FORMAT_ID_MLMODEL,
+    RAC_MODEL_FORMAT_ID_MLPACKAGE,
 };
 const rac_primitive_t k_supported_primitives[] = {
     RAC_PRIMITIVE_GENERATE_TEXT,
@@ -86,6 +88,95 @@ void metal_free_buffer(rac_runtime_buffer_t* buffer) {
     delete typed;
 }
 
+rac_result_t metal_alloc_buffer_v2(const rac_runtime_buffer_desc_t* desc,
+                                   rac_runtime_buffer_t** out) {
+    if (!desc || !out) return RAC_ERROR_NULL_POINTER;
+    if (desc->device_class != RAC_DEVICE_CLASS_UNSPECIFIED &&
+        desc->device_class != RAC_DEVICE_CLASS_GPU) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    if (desc->memory_space != RAC_RUNTIME_MEMORY_SPACE_UNSPECIFIED &&
+        desc->memory_space != RAC_RUNTIME_MEMORY_SPACE_SHARED &&
+        desc->memory_space != RAC_RUNTIME_MEMORY_SPACE_MANAGED) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    return metal_alloc_buffer(desc->bytes, out);
+}
+
+rac_result_t metal_buffer_info(rac_runtime_buffer_t* buffer,
+                               rac_runtime_buffer_info_t* out) {
+    if (!buffer || !out) return RAC_ERROR_NULL_POINTER;
+    auto* typed = reinterpret_cast<MetalRuntimeBuffer*>(buffer);
+    *out = rac_runtime_buffer_info_t{};
+    out->bytes = typed->bytes;
+    out->memory_space = RAC_RUNTIME_MEMORY_SPACE_SHARED;
+    out->device_class = RAC_DEVICE_CLASS_GPU;
+    out->device_id = "apple-metal";
+    out->native_handle = reinterpret_cast<void*>(typed->metal_buffer);
+    return RAC_SUCCESS;
+}
+
+rac_result_t metal_map_buffer(rac_runtime_buffer_t* buffer,
+                              size_t offset,
+                              size_t bytes,
+                              uint32_t map_flags,
+                              rac_runtime_buffer_mapping_t* out) {
+    if (!buffer || !out) return RAC_ERROR_NULL_POINTER;
+    auto* typed = reinterpret_cast<MetalRuntimeBuffer*>(buffer);
+    if (offset > typed->bytes) return RAC_ERROR_INVALID_PARAMETER;
+    const size_t available = typed->bytes - offset;
+    const size_t mapped_bytes = bytes == 0 ? available : bytes;
+    if (mapped_bytes > available) return RAC_ERROR_INVALID_PARAMETER;
+    *out = rac_runtime_buffer_mapping_t{};
+    out->data = static_cast<unsigned char*>(typed->data) + offset;
+    out->bytes = mapped_bytes;
+    out->memory_space = RAC_RUNTIME_MEMORY_SPACE_SHARED;
+    out->map_flags = map_flags;
+    return RAC_SUCCESS;
+}
+
+rac_result_t metal_unmap_buffer(rac_runtime_buffer_t* buffer,
+                                rac_runtime_buffer_mapping_t* mapping) {
+    if (!buffer || !mapping) return RAC_ERROR_NULL_POINTER;
+    *mapping = rac_runtime_buffer_mapping_t{};
+    return RAC_SUCCESS;
+}
+
+rac_result_t metal_copy_buffer(rac_runtime_buffer_t* dst,
+                               size_t dst_offset,
+                               const rac_runtime_buffer_t* src,
+                               size_t src_offset,
+                               size_t bytes) {
+    if (!dst || !src) return RAC_ERROR_NULL_POINTER;
+    auto* dst_typed = reinterpret_cast<MetalRuntimeBuffer*>(dst);
+    auto* src_typed = reinterpret_cast<const MetalRuntimeBuffer*>(src);
+    if (dst_offset > dst_typed->bytes || src_offset > src_typed->bytes) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    if (bytes > dst_typed->bytes - dst_offset ||
+        bytes > src_typed->bytes - src_offset) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    std::memmove(static_cast<unsigned char*>(dst_typed->data) + dst_offset,
+                 static_cast<const unsigned char*>(src_typed->data) + src_offset,
+                 bytes);
+    return RAC_SUCCESS;
+}
+
+void metal_release_tensor(rac_runtime_tensor_t* tensor) {
+    if (!tensor) return;
+    if (tensor->data_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->data) {
+        std::free(tensor->data);
+    }
+    if (tensor->shape_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->shape) {
+        std::free(tensor->shape);
+    }
+    if (tensor->buffer_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME && tensor->buffer) {
+        metal_free_buffer(tensor->buffer);
+    }
+    *tensor = rac_runtime_tensor_t{};
+}
+
 rac_result_t metal_device_info(rac_runtime_device_info_t* out) {
     if (!out) return RAC_ERROR_NULL_POINTER;
     if (g_device == nil) return RAC_ERROR_BACKEND_UNAVAILABLE;
@@ -100,7 +191,13 @@ rac_result_t metal_device_info(rac_runtime_device_info_t* out) {
 rac_result_t metal_capabilities(rac_runtime_capabilities_t* out) {
     if (!out) return RAC_ERROR_NULL_POINTER;
     *out = rac_runtime_capabilities_t{};
-    out->capability_flags = RAC_RUNTIME_CAP_FP16 | RAC_RUNTIME_CAP_ZERO_COPY;
+    out->capability_flags =
+        RAC_RUNTIME_CAP_FP16           |
+        RAC_RUNTIME_CAP_ZERO_COPY      |
+        RAC_RUNTIME_CAP_BUFFER_MAPPING |
+        RAC_RUNTIME_CAP_BUFFER_COPY    |
+        RAC_RUNTIME_CAP_DEVICE_ALLOC   |
+        RAC_RUNTIME_CAP_OWNED_OUTPUTS;
     out->supported_formats = k_supported_formats;
     out->supported_formats_count = sizeof(k_supported_formats) / sizeof(k_supported_formats[0]);
     // Capability shrunk: Metal runtime is buffer-allocator + device probe only; no session ops.
@@ -108,6 +205,26 @@ rac_result_t metal_capabilities(rac_runtime_capabilities_t* out) {
     out->supported_primitives_count = 0;
     return RAC_SUCCESS;
 }
+
+const rac_runtime_vtable_v2_t k_metal_vtable_v2 = {
+    /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION_V2,
+    /* .struct_size    = */ sizeof(rac_runtime_vtable_v2_t),
+    /* .run_session_v2 = */ nullptr,
+    /* .alloc_buffer   = */ metal_alloc_buffer_v2,
+    /* .buffer_info    = */ metal_buffer_info,
+    /* .map_buffer     = */ metal_map_buffer,
+    /* .unmap_buffer   = */ metal_unmap_buffer,
+    /* .copy_buffer    = */ metal_copy_buffer,
+    /* .release_tensor = */ metal_release_tensor,
+    /* .reserved_0     = */ nullptr,
+    /* .reserved_1     = */ nullptr,
+    /* .reserved_2     = */ nullptr,
+    /* .reserved_3     = */ nullptr,
+    /* .reserved_4     = */ nullptr,
+    /* .reserved_5     = */ nullptr,
+    /* .reserved_6     = */ nullptr,
+    /* .reserved_7     = */ nullptr,
+};
 
 const rac_runtime_vtable_t k_metal_vtable = {
     /* .metadata = */ {
@@ -133,7 +250,7 @@ const rac_runtime_vtable_t k_metal_vtable = {
     /* .free_buffer     = */ metal_free_buffer,
     /* .device_info     = */ metal_device_info,
     /* .capabilities    = */ metal_capabilities,
-    /* .reserved_slot_0 = */ nullptr,
+    /* .reserved_slot_0 = */ &k_metal_vtable_v2,
     /* .reserved_slot_1 = */ nullptr,
     /* .reserved_slot_2 = */ nullptr,
     /* .reserved_slot_3 = */ nullptr,

@@ -9,7 +9,7 @@ import _m0 from "protobufjs/minimal";
 import { DownloadCancelResult, DownloadPlanResult, DownloadProgress, DownloadResumeResult, DownloadStartResult, } from "./download_service";
 import { SDKError } from "./errors";
 import { HardwareProfileResult } from "./hardware_profile";
-import { CurrentModelResult, inferenceFrameworkFromJSON, inferenceFrameworkToJSON, ModelCompatibilityResult, ModelDeleteResult, ModelDiscoveryResult, ModelGetResult, ModelImportResult, ModelListResult, ModelLoadResult, ModelRegistryRefreshResult, ModelUnloadResult, } from "./model_types";
+import { CurrentModelResult, inferenceFrameworkFromJSON, inferenceFrameworkToJSON, modelCategoryFromJSON, modelCategoryToJSON, ModelCompatibilityResult, ModelDeleteResult, ModelDiscoveryResult, ModelGetResult, ModelImportResult, ModelInfo, ModelListResult, ModelLoadResult, ModelRegistryRefreshResult, ModelUnloadResult, } from "./model_types";
 import { StorageAvailabilityResult, StorageDeletePlan, StorageDeleteResult, StorageInfoResult } from "./storage_types";
 import { VoiceEvent } from "./voice_events";
 export const protobufPackage = "runanywhere.v1";
@@ -486,6 +486,10 @@ export var ComponentLifecycleState;
     ComponentLifecycleState[ComponentLifecycleState["COMPONENT_LIFECYCLE_STATE_UNLOADING"] = 4] = "COMPONENT_LIFECYCLE_STATE_UNLOADING";
     ComponentLifecycleState[ComponentLifecycleState["COMPONENT_LIFECYCLE_STATE_ERROR"] = 5] = "COMPONENT_LIFECYCLE_STATE_ERROR";
     ComponentLifecycleState[ComponentLifecycleState["COMPONENT_LIFECYCLE_STATE_SHUTDOWN"] = 6] = "COMPONENT_LIFECYCLE_STATE_SHUTDOWN";
+    ComponentLifecycleState[ComponentLifecycleState["COMPONENT_LIFECYCLE_STATE_DOWNLOADING"] = 7] = "COMPONENT_LIFECYCLE_STATE_DOWNLOADING";
+    ComponentLifecycleState[ComponentLifecycleState["COMPONENT_LIFECYCLE_STATE_DELETING"] = 8] = "COMPONENT_LIFECYCLE_STATE_DELETING";
+    ComponentLifecycleState[ComponentLifecycleState["COMPONENT_LIFECYCLE_STATE_PAUSED"] = 9] = "COMPONENT_LIFECYCLE_STATE_PAUSED";
+    ComponentLifecycleState[ComponentLifecycleState["COMPONENT_LIFECYCLE_STATE_UPDATING"] = 10] = "COMPONENT_LIFECYCLE_STATE_UPDATING";
     ComponentLifecycleState[ComponentLifecycleState["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(ComponentLifecycleState || (ComponentLifecycleState = {}));
 export function componentLifecycleStateFromJSON(object) {
@@ -511,6 +515,18 @@ export function componentLifecycleStateFromJSON(object) {
         case 6:
         case "COMPONENT_LIFECYCLE_STATE_SHUTDOWN":
             return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_SHUTDOWN;
+        case 7:
+        case "COMPONENT_LIFECYCLE_STATE_DOWNLOADING":
+            return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_DOWNLOADING;
+        case 8:
+        case "COMPONENT_LIFECYCLE_STATE_DELETING":
+            return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_DELETING;
+        case 9:
+        case "COMPONENT_LIFECYCLE_STATE_PAUSED":
+            return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_PAUSED;
+        case 10:
+        case "COMPONENT_LIFECYCLE_STATE_UPDATING":
+            return ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UPDATING;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -533,6 +549,14 @@ export function componentLifecycleStateToJSON(object) {
             return "COMPONENT_LIFECYCLE_STATE_ERROR";
         case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_SHUTDOWN:
             return "COMPONENT_LIFECYCLE_STATE_SHUTDOWN";
+        case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_DOWNLOADING:
+            return "COMPONENT_LIFECYCLE_STATE_DOWNLOADING";
+        case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_DELETING:
+            return "COMPONENT_LIFECYCLE_STATE_DELETING";
+        case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_PAUSED:
+            return "COMPONENT_LIFECYCLE_STATE_PAUSED";
+        case ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UPDATING:
+            return "COMPONENT_LIFECYCLE_STATE_UPDATING";
         case ComponentLifecycleState.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -2070,6 +2094,12 @@ export var ModelRegistryEventKind;
     ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED"] = 11] = "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_COMPLETED";
     ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED"] = 12] = "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED";
     ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED"] = 13] = "MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_LIST_STARTED"] = 14] = "MODEL_REGISTRY_EVENT_KIND_LIST_STARTED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED"] = 15] = "MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_LIST_FAILED"] = 16] = "MODEL_REGISTRY_EVENT_KIND_LIST_FAILED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_GET_STARTED"] = 17] = "MODEL_REGISTRY_EVENT_KIND_GET_STARTED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED"] = 18] = "MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED";
+    ModelRegistryEventKind[ModelRegistryEventKind["MODEL_REGISTRY_EVENT_KIND_GET_FAILED"] = 19] = "MODEL_REGISTRY_EVENT_KIND_GET_FAILED";
     ModelRegistryEventKind[ModelRegistryEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(ModelRegistryEventKind || (ModelRegistryEventKind = {}));
 export function modelRegistryEventKindFromJSON(object) {
@@ -2116,6 +2146,24 @@ export function modelRegistryEventKindFromJSON(object) {
         case 13:
         case "MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED":
             return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED;
+        case 14:
+        case "MODEL_REGISTRY_EVENT_KIND_LIST_STARTED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_LIST_STARTED;
+        case 15:
+        case "MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED;
+        case 16:
+        case "MODEL_REGISTRY_EVENT_KIND_LIST_FAILED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_LIST_FAILED;
+        case 17:
+        case "MODEL_REGISTRY_EVENT_KIND_GET_STARTED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_GET_STARTED;
+        case 18:
+        case "MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED;
+        case 19:
+        case "MODEL_REGISTRY_EVENT_KIND_GET_FAILED":
+            return ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_GET_FAILED;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -2152,6 +2200,18 @@ export function modelRegistryEventKindToJSON(object) {
             return "MODEL_REGISTRY_EVENT_KIND_DISCOVERY_FAILED";
         case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED:
             return "MODEL_REGISTRY_EVENT_KIND_CURRENT_MODEL_CHANGED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_LIST_STARTED:
+            return "MODEL_REGISTRY_EVENT_KIND_LIST_STARTED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED:
+            return "MODEL_REGISTRY_EVENT_KIND_LIST_COMPLETED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_LIST_FAILED:
+            return "MODEL_REGISTRY_EVENT_KIND_LIST_FAILED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_GET_STARTED:
+            return "MODEL_REGISTRY_EVENT_KIND_GET_STARTED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED:
+            return "MODEL_REGISTRY_EVENT_KIND_GET_COMPLETED";
+        case ModelRegistryEventKind.MODEL_REGISTRY_EVENT_KIND_GET_FAILED:
+            return "MODEL_REGISTRY_EVENT_KIND_GET_FAILED";
         case ModelRegistryEventKind.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -2171,6 +2231,8 @@ export var DownloadEventKind;
     DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_RESUMED"] = 9] = "DOWNLOAD_EVENT_KIND_RESUMED";
     DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_COMPLETED"] = 10] = "DOWNLOAD_EVENT_KIND_COMPLETED";
     DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_FAILED"] = 11] = "DOWNLOAD_EVENT_KIND_FAILED";
+    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_PAUSED"] = 12] = "DOWNLOAD_EVENT_KIND_PAUSED";
+    DownloadEventKind[DownloadEventKind["DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED"] = 13] = "DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED";
     DownloadEventKind[DownloadEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(DownloadEventKind || (DownloadEventKind = {}));
 export function downloadEventKindFromJSON(object) {
@@ -2211,6 +2273,12 @@ export function downloadEventKindFromJSON(object) {
         case 11:
         case "DOWNLOAD_EVENT_KIND_FAILED":
             return DownloadEventKind.DOWNLOAD_EVENT_KIND_FAILED;
+        case 12:
+        case "DOWNLOAD_EVENT_KIND_PAUSED":
+            return DownloadEventKind.DOWNLOAD_EVENT_KIND_PAUSED;
+        case 13:
+        case "DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED":
+            return DownloadEventKind.DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -2243,6 +2311,10 @@ export function downloadEventKindToJSON(object) {
             return "DOWNLOAD_EVENT_KIND_COMPLETED";
         case DownloadEventKind.DOWNLOAD_EVENT_KIND_FAILED:
             return "DOWNLOAD_EVENT_KIND_FAILED";
+        case DownloadEventKind.DOWNLOAD_EVENT_KIND_PAUSED:
+            return "DOWNLOAD_EVENT_KIND_PAUSED";
+        case DownloadEventKind.DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED:
+            return "DOWNLOAD_EVENT_KIND_PARTIAL_BYTES_DELETED";
         case DownloadEventKind.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -2261,6 +2333,9 @@ export var StorageLifecycleEventKind;
     StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED"] = 8] = "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_STARTED";
     StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED"] = 9] = "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED";
     StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED"] = 10] = "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED";
+    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED"] = 11] = "STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED";
+    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED"] = 12] = "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED";
+    StorageLifecycleEventKind[StorageLifecycleEventKind["STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED"] = 13] = "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED";
     StorageLifecycleEventKind[StorageLifecycleEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(StorageLifecycleEventKind || (StorageLifecycleEventKind = {}));
 export function storageLifecycleEventKindFromJSON(object) {
@@ -2298,6 +2373,15 @@ export function storageLifecycleEventKindFromJSON(object) {
         case 10:
         case "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED":
             return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED;
+        case 11:
+        case "STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED":
+            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED;
+        case 12:
+        case "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED":
+            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED;
+        case 13:
+        case "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED":
+            return StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -2328,6 +2412,12 @@ export function storageLifecycleEventKindToJSON(object) {
             return "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_COMPLETED";
         case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED:
             return "STORAGE_LIFECYCLE_EVENT_KIND_CACHE_CLEANUP_FAILED";
+        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED:
+            return "STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_FAILED";
+        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED:
+            return "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED";
+        case StorageLifecycleEventKind.STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED:
+            return "STORAGE_LIFECYCLE_EVENT_KIND_DELETE_DRY_RUN_COMPLETED";
         case StorageLifecycleEventKind.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -4881,7 +4971,18 @@ export const ComponentInitializationEvent = {
     },
 };
 function createBaseComponentLifecycleSnapshot() {
-    return { component: 0, state: 0, modelId: "", updatedAtMs: 0, errorMessage: "" };
+    return {
+        component: 0,
+        state: 0,
+        modelId: "",
+        updatedAtMs: 0,
+        errorMessage: "",
+        category: 0,
+        framework: 0,
+        resolvedPath: "",
+        loadedAtUnixMs: 0,
+        model: undefined,
+    };
 }
 export const ComponentLifecycleSnapshot = {
     encode(message, writer = _m0.Writer.create()) {
@@ -4899,6 +5000,21 @@ export const ComponentLifecycleSnapshot = {
         }
         if (message.errorMessage !== "") {
             writer.uint32(42).string(message.errorMessage);
+        }
+        if (message.category !== 0) {
+            writer.uint32(48).int32(message.category);
+        }
+        if (message.framework !== 0) {
+            writer.uint32(56).int32(message.framework);
+        }
+        if (message.resolvedPath !== "") {
+            writer.uint32(66).string(message.resolvedPath);
+        }
+        if (message.loadedAtUnixMs !== 0) {
+            writer.uint32(72).int64(message.loadedAtUnixMs);
+        }
+        if (message.model !== undefined) {
+            ModelInfo.encode(message.model, writer.uint32(82).fork()).ldelim();
         }
         return writer;
     },
@@ -4939,6 +5055,36 @@ export const ComponentLifecycleSnapshot = {
                     }
                     message.errorMessage = reader.string();
                     continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.category = reader.int32();
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.framework = reader.int32();
+                    continue;
+                case 8:
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.resolvedPath = reader.string();
+                    continue;
+                case 9:
+                    if (tag !== 72) {
+                        break;
+                    }
+                    message.loadedAtUnixMs = longToNumber(reader.int64());
+                    continue;
+                case 10:
+                    if (tag !== 82) {
+                        break;
+                    }
+                    message.model = ModelInfo.decode(reader, reader.uint32());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -4954,6 +5100,11 @@ export const ComponentLifecycleSnapshot = {
             modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
             updatedAtMs: isSet(object.updatedAtMs) ? globalThis.Number(object.updatedAtMs) : 0,
             errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+            category: isSet(object.category) ? modelCategoryFromJSON(object.category) : 0,
+            framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : 0,
+            resolvedPath: isSet(object.resolvedPath) ? globalThis.String(object.resolvedPath) : "",
+            loadedAtUnixMs: isSet(object.loadedAtUnixMs) ? globalThis.Number(object.loadedAtUnixMs) : 0,
+            model: isSet(object.model) ? ModelInfo.fromJSON(object.model) : undefined,
         };
     },
     toJSON(message) {
@@ -4973,6 +5124,21 @@ export const ComponentLifecycleSnapshot = {
         if (message.errorMessage !== "") {
             obj.errorMessage = message.errorMessage;
         }
+        if (message.category !== 0) {
+            obj.category = modelCategoryToJSON(message.category);
+        }
+        if (message.framework !== 0) {
+            obj.framework = inferenceFrameworkToJSON(message.framework);
+        }
+        if (message.resolvedPath !== "") {
+            obj.resolvedPath = message.resolvedPath;
+        }
+        if (message.loadedAtUnixMs !== 0) {
+            obj.loadedAtUnixMs = Math.round(message.loadedAtUnixMs);
+        }
+        if (message.model !== undefined) {
+            obj.model = ModelInfo.toJSON(message.model);
+        }
         return obj;
     },
     create(base) {
@@ -4984,6 +5150,161 @@ export const ComponentLifecycleSnapshot = {
         message.state = object.state ?? 0;
         message.modelId = object.modelId ?? "";
         message.updatedAtMs = object.updatedAtMs ?? 0;
+        message.errorMessage = object.errorMessage ?? "";
+        message.category = object.category ?? 0;
+        message.framework = object.framework ?? 0;
+        message.resolvedPath = object.resolvedPath ?? "";
+        message.loadedAtUnixMs = object.loadedAtUnixMs ?? 0;
+        message.model = (object.model !== undefined && object.model !== null)
+            ? ModelInfo.fromPartial(object.model)
+            : undefined;
+        return message;
+    },
+};
+function createBaseComponentLifecycleSnapshotRequest() {
+    return { component: 0, includeModel: false };
+}
+export const ComponentLifecycleSnapshotRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.component !== 0) {
+            writer.uint32(8).int32(message.component);
+        }
+        if (message.includeModel !== false) {
+            writer.uint32(16).bool(message.includeModel);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseComponentLifecycleSnapshotRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.component = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.includeModel = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            component: isSet(object.component) ? sDKComponentFromJSON(object.component) : 0,
+            includeModel: isSet(object.includeModel) ? globalThis.Boolean(object.includeModel) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.component !== 0) {
+            obj.component = sDKComponentToJSON(message.component);
+        }
+        if (message.includeModel !== false) {
+            obj.includeModel = message.includeModel;
+        }
+        return obj;
+    },
+    create(base) {
+        return ComponentLifecycleSnapshotRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseComponentLifecycleSnapshotRequest();
+        message.component = object.component ?? 0;
+        message.includeModel = object.includeModel ?? false;
+        return message;
+    },
+};
+function createBaseComponentLifecycleSnapshotResult() {
+    return { success: false, snapshots: [], errorMessage: "" };
+}
+export const ComponentLifecycleSnapshotResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.success !== false) {
+            writer.uint32(8).bool(message.success);
+        }
+        for (const v of message.snapshots) {
+            ComponentLifecycleSnapshot.encode(v, writer.uint32(18).fork()).ldelim();
+        }
+        if (message.errorMessage !== "") {
+            writer.uint32(26).string(message.errorMessage);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseComponentLifecycleSnapshotResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.success = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.snapshots.push(ComponentLifecycleSnapshot.decode(reader, reader.uint32()));
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+            snapshots: globalThis.Array.isArray(object?.snapshots)
+                ? object.snapshots.map((e) => ComponentLifecycleSnapshot.fromJSON(e))
+                : [],
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.success !== false) {
+            obj.success = message.success;
+        }
+        if (message.snapshots?.length) {
+            obj.snapshots = message.snapshots.map((e) => ComponentLifecycleSnapshot.toJSON(e));
+        }
+        if (message.errorMessage !== "") {
+            obj.errorMessage = message.errorMessage;
+        }
+        return obj;
+    },
+    create(base) {
+        return ComponentLifecycleSnapshotResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseComponentLifecycleSnapshotResult();
+        message.success = object.success ?? false;
+        message.snapshots = object.snapshots?.map((e) => ComponentLifecycleSnapshot.fromPartial(e)) || [];
         message.errorMessage = object.errorMessage ?? "";
         return message;
     },
@@ -5001,6 +5322,9 @@ function createBaseComponentLifecycleEvent() {
         downloadProgress: undefined,
         storageAvailability: undefined,
         storageDeleteResult: undefined,
+        snapshot: undefined,
+        snapshotResult: undefined,
+        storageDeletePlan: undefined,
     };
 }
 export const ComponentLifecycleEvent = {
@@ -5037,6 +5361,15 @@ export const ComponentLifecycleEvent = {
         }
         if (message.storageDeleteResult !== undefined) {
             StorageDeleteResult.encode(message.storageDeleteResult, writer.uint32(122).fork()).ldelim();
+        }
+        if (message.snapshot !== undefined) {
+            ComponentLifecycleSnapshot.encode(message.snapshot, writer.uint32(130).fork()).ldelim();
+        }
+        if (message.snapshotResult !== undefined) {
+            ComponentLifecycleSnapshotResult.encode(message.snapshotResult, writer.uint32(138).fork()).ldelim();
+        }
+        if (message.storageDeletePlan !== undefined) {
+            StorageDeletePlan.encode(message.storageDeletePlan, writer.uint32(146).fork()).ldelim();
         }
         return writer;
     },
@@ -5113,6 +5446,24 @@ export const ComponentLifecycleEvent = {
                     }
                     message.storageDeleteResult = StorageDeleteResult.decode(reader, reader.uint32());
                     continue;
+                case 16:
+                    if (tag !== 130) {
+                        break;
+                    }
+                    message.snapshot = ComponentLifecycleSnapshot.decode(reader, reader.uint32());
+                    continue;
+                case 17:
+                    if (tag !== 138) {
+                        break;
+                    }
+                    message.snapshotResult = ComponentLifecycleSnapshotResult.decode(reader, reader.uint32());
+                    continue;
+                case 18:
+                    if (tag !== 146) {
+                        break;
+                    }
+                    message.storageDeletePlan = StorageDeletePlan.decode(reader, reader.uint32());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -5141,6 +5492,13 @@ export const ComponentLifecycleEvent = {
                 : undefined,
             storageDeleteResult: isSet(object.storageDeleteResult)
                 ? StorageDeleteResult.fromJSON(object.storageDeleteResult)
+                : undefined,
+            snapshot: isSet(object.snapshot) ? ComponentLifecycleSnapshot.fromJSON(object.snapshot) : undefined,
+            snapshotResult: isSet(object.snapshotResult)
+                ? ComponentLifecycleSnapshotResult.fromJSON(object.snapshotResult)
+                : undefined,
+            storageDeletePlan: isSet(object.storageDeletePlan)
+                ? StorageDeletePlan.fromJSON(object.storageDeletePlan)
                 : undefined,
         };
     },
@@ -5179,6 +5537,15 @@ export const ComponentLifecycleEvent = {
         if (message.storageDeleteResult !== undefined) {
             obj.storageDeleteResult = StorageDeleteResult.toJSON(message.storageDeleteResult);
         }
+        if (message.snapshot !== undefined) {
+            obj.snapshot = ComponentLifecycleSnapshot.toJSON(message.snapshot);
+        }
+        if (message.snapshotResult !== undefined) {
+            obj.snapshotResult = ComponentLifecycleSnapshotResult.toJSON(message.snapshotResult);
+        }
+        if (message.storageDeletePlan !== undefined) {
+            obj.storageDeletePlan = StorageDeletePlan.toJSON(message.storageDeletePlan);
+        }
         return obj;
     },
     create(base) {
@@ -5208,6 +5575,15 @@ export const ComponentLifecycleEvent = {
             : undefined;
         message.storageDeleteResult = (object.storageDeleteResult !== undefined && object.storageDeleteResult !== null)
             ? StorageDeleteResult.fromPartial(object.storageDeleteResult)
+            : undefined;
+        message.snapshot = (object.snapshot !== undefined && object.snapshot !== null)
+            ? ComponentLifecycleSnapshot.fromPartial(object.snapshot)
+            : undefined;
+        message.snapshotResult = (object.snapshotResult !== undefined && object.snapshotResult !== null)
+            ? ComponentLifecycleSnapshotResult.fromPartial(object.snapshotResult)
+            : undefined;
+        message.storageDeletePlan = (object.storageDeletePlan !== undefined && object.storageDeletePlan !== null)
+            ? StorageDeletePlan.fromPartial(object.storageDeletePlan)
             : undefined;
         return message;
     },
@@ -6855,6 +7231,10 @@ function createBaseSDKEvent() {
         sessionId: "",
         destination: 0,
         properties: {},
+        operationId: "",
+        correlationId: "",
+        source: "",
+        traceId: "",
         initialization: undefined,
         configuration: undefined,
         generation: undefined,
@@ -6909,6 +7289,18 @@ export const SDKEvent = {
         Object.entries(message.properties).forEach(([key, value]) => {
             SDKEvent_PropertiesEntry.encode({ key: key, value }, writer.uint32(130).fork()).ldelim();
         });
+        if (message.operationId !== "") {
+            writer.uint32(266).string(message.operationId);
+        }
+        if (message.correlationId !== "") {
+            writer.uint32(274).string(message.correlationId);
+        }
+        if (message.source !== "") {
+            writer.uint32(282).string(message.source);
+        }
+        if (message.traceId !== "") {
+            writer.uint32(290).string(message.traceId);
+        }
         if (message.initialization !== undefined) {
             InitializationEvent.encode(message.initialization, writer.uint32(26).fork()).ldelim();
         }
@@ -7043,6 +7435,30 @@ export const SDKEvent = {
                     if (entry16.value !== undefined) {
                         message.properties[entry16.key] = entry16.value;
                     }
+                    continue;
+                case 33:
+                    if (tag !== 266) {
+                        break;
+                    }
+                    message.operationId = reader.string();
+                    continue;
+                case 34:
+                    if (tag !== 274) {
+                        break;
+                    }
+                    message.correlationId = reader.string();
+                    continue;
+                case 35:
+                    if (tag !== 282) {
+                        break;
+                    }
+                    message.source = reader.string();
+                    continue;
+                case 36:
+                    if (tag !== 290) {
+                        break;
+                    }
+                    message.traceId = reader.string();
                     continue;
                 case 3:
                     if (tag !== 26) {
@@ -7206,6 +7622,10 @@ export const SDKEvent = {
                     return acc;
                 }, {})
                 : {},
+            operationId: isSet(object.operationId) ? globalThis.String(object.operationId) : "",
+            correlationId: isSet(object.correlationId) ? globalThis.String(object.correlationId) : "",
+            source: isSet(object.source) ? globalThis.String(object.source) : "",
+            traceId: isSet(object.traceId) ? globalThis.String(object.traceId) : "",
             initialization: isSet(object.initialization) ? InitializationEvent.fromJSON(object.initialization) : undefined,
             configuration: isSet(object.configuration) ? ConfigurationEvent.fromJSON(object.configuration) : undefined,
             generation: isSet(object.generation) ? GenerationEvent.fromJSON(object.generation) : undefined,
@@ -7273,6 +7693,18 @@ export const SDKEvent = {
                     obj.properties[k] = v;
                 });
             }
+        }
+        if (message.operationId !== "") {
+            obj.operationId = message.operationId;
+        }
+        if (message.correlationId !== "") {
+            obj.correlationId = message.correlationId;
+        }
+        if (message.source !== "") {
+            obj.source = message.source;
+        }
+        if (message.traceId !== "") {
+            obj.traceId = message.traceId;
         }
         if (message.initialization !== undefined) {
             obj.initialization = InitializationEvent.toJSON(message.initialization);
@@ -7366,6 +7798,10 @@ export const SDKEvent = {
             }
             return acc;
         }, {});
+        message.operationId = object.operationId ?? "";
+        message.correlationId = object.correlationId ?? "";
+        message.source = object.source ?? "";
+        message.traceId = object.traceId ?? "";
         message.initialization = (object.initialization !== undefined && object.initialization !== null)
             ? InitializationEvent.fromPartial(object.initialization)
             : undefined;
@@ -7499,6 +7935,461 @@ export const SDKEvent_PropertiesEntry = {
         const message = createBaseSDKEvent_PropertiesEntry();
         message.key = object.key ?? "";
         message.value = object.value ?? "";
+        return message;
+    },
+};
+function createBaseSDKEventFilter() {
+    return {
+        categories: [],
+        components: [],
+        destinations: [],
+        minimumSeverity: 0,
+        sessionId: "",
+        operationId: "",
+        correlationId: "",
+        source: "",
+        traceId: "",
+    };
+}
+export const SDKEventFilter = {
+    encode(message, writer = _m0.Writer.create()) {
+        writer.uint32(10).fork();
+        for (const v of message.categories) {
+            writer.int32(v);
+        }
+        writer.ldelim();
+        writer.uint32(18).fork();
+        for (const v of message.components) {
+            writer.int32(v);
+        }
+        writer.ldelim();
+        writer.uint32(26).fork();
+        for (const v of message.destinations) {
+            writer.int32(v);
+        }
+        writer.ldelim();
+        if (message.minimumSeverity !== 0) {
+            writer.uint32(32).int32(message.minimumSeverity);
+        }
+        if (message.sessionId !== "") {
+            writer.uint32(42).string(message.sessionId);
+        }
+        if (message.operationId !== "") {
+            writer.uint32(50).string(message.operationId);
+        }
+        if (message.correlationId !== "") {
+            writer.uint32(58).string(message.correlationId);
+        }
+        if (message.source !== "") {
+            writer.uint32(66).string(message.source);
+        }
+        if (message.traceId !== "") {
+            writer.uint32(74).string(message.traceId);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseSDKEventFilter();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag === 8) {
+                        message.categories.push(reader.int32());
+                        continue;
+                    }
+                    if (tag === 10) {
+                        const end2 = reader.uint32() + reader.pos;
+                        while (reader.pos < end2) {
+                            message.categories.push(reader.int32());
+                        }
+                        continue;
+                    }
+                    break;
+                case 2:
+                    if (tag === 16) {
+                        message.components.push(reader.int32());
+                        continue;
+                    }
+                    if (tag === 18) {
+                        const end2 = reader.uint32() + reader.pos;
+                        while (reader.pos < end2) {
+                            message.components.push(reader.int32());
+                        }
+                        continue;
+                    }
+                    break;
+                case 3:
+                    if (tag === 24) {
+                        message.destinations.push(reader.int32());
+                        continue;
+                    }
+                    if (tag === 26) {
+                        const end2 = reader.uint32() + reader.pos;
+                        while (reader.pos < end2) {
+                            message.destinations.push(reader.int32());
+                        }
+                        continue;
+                    }
+                    break;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.minimumSeverity = reader.int32();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.sessionId = reader.string();
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.operationId = reader.string();
+                    continue;
+                case 7:
+                    if (tag !== 58) {
+                        break;
+                    }
+                    message.correlationId = reader.string();
+                    continue;
+                case 8:
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.source = reader.string();
+                    continue;
+                case 9:
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.traceId = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            categories: globalThis.Array.isArray(object?.categories)
+                ? object.categories.map((e) => eventCategoryFromJSON(e))
+                : [],
+            components: globalThis.Array.isArray(object?.components)
+                ? object.components.map((e) => sDKComponentFromJSON(e))
+                : [],
+            destinations: globalThis.Array.isArray(object?.destinations)
+                ? object.destinations.map((e) => eventDestinationFromJSON(e))
+                : [],
+            minimumSeverity: isSet(object.minimumSeverity) ? eventSeverityFromJSON(object.minimumSeverity) : 0,
+            sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
+            operationId: isSet(object.operationId) ? globalThis.String(object.operationId) : "",
+            correlationId: isSet(object.correlationId) ? globalThis.String(object.correlationId) : "",
+            source: isSet(object.source) ? globalThis.String(object.source) : "",
+            traceId: isSet(object.traceId) ? globalThis.String(object.traceId) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.categories?.length) {
+            obj.categories = message.categories.map((e) => eventCategoryToJSON(e));
+        }
+        if (message.components?.length) {
+            obj.components = message.components.map((e) => sDKComponentToJSON(e));
+        }
+        if (message.destinations?.length) {
+            obj.destinations = message.destinations.map((e) => eventDestinationToJSON(e));
+        }
+        if (message.minimumSeverity !== 0) {
+            obj.minimumSeverity = eventSeverityToJSON(message.minimumSeverity);
+        }
+        if (message.sessionId !== "") {
+            obj.sessionId = message.sessionId;
+        }
+        if (message.operationId !== "") {
+            obj.operationId = message.operationId;
+        }
+        if (message.correlationId !== "") {
+            obj.correlationId = message.correlationId;
+        }
+        if (message.source !== "") {
+            obj.source = message.source;
+        }
+        if (message.traceId !== "") {
+            obj.traceId = message.traceId;
+        }
+        return obj;
+    },
+    create(base) {
+        return SDKEventFilter.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseSDKEventFilter();
+        message.categories = object.categories?.map((e) => e) || [];
+        message.components = object.components?.map((e) => e) || [];
+        message.destinations = object.destinations?.map((e) => e) || [];
+        message.minimumSeverity = object.minimumSeverity ?? 0;
+        message.sessionId = object.sessionId ?? "";
+        message.operationId = object.operationId ?? "";
+        message.correlationId = object.correlationId ?? "";
+        message.source = object.source ?? "";
+        message.traceId = object.traceId ?? "";
+        return message;
+    },
+};
+function createBaseSDKEventPublishRequest() {
+    return { event: undefined, normalizeEnvelope: false };
+}
+export const SDKEventPublishRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.event !== undefined) {
+            SDKEvent.encode(message.event, writer.uint32(10).fork()).ldelim();
+        }
+        if (message.normalizeEnvelope !== false) {
+            writer.uint32(16).bool(message.normalizeEnvelope);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseSDKEventPublishRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.event = SDKEvent.decode(reader, reader.uint32());
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.normalizeEnvelope = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            event: isSet(object.event) ? SDKEvent.fromJSON(object.event) : undefined,
+            normalizeEnvelope: isSet(object.normalizeEnvelope) ? globalThis.Boolean(object.normalizeEnvelope) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.event !== undefined) {
+            obj.event = SDKEvent.toJSON(message.event);
+        }
+        if (message.normalizeEnvelope !== false) {
+            obj.normalizeEnvelope = message.normalizeEnvelope;
+        }
+        return obj;
+    },
+    create(base) {
+        return SDKEventPublishRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseSDKEventPublishRequest();
+        message.event = (object.event !== undefined && object.event !== null)
+            ? SDKEvent.fromPartial(object.event)
+            : undefined;
+        message.normalizeEnvelope = object.normalizeEnvelope ?? false;
+        return message;
+    },
+};
+function createBaseSDKEventPublishResult() {
+    return { accepted: false, eventId: "", normalizedEvent: undefined, errorMessage: "", error: undefined };
+}
+export const SDKEventPublishResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.accepted !== false) {
+            writer.uint32(8).bool(message.accepted);
+        }
+        if (message.eventId !== "") {
+            writer.uint32(18).string(message.eventId);
+        }
+        if (message.normalizedEvent !== undefined) {
+            SDKEvent.encode(message.normalizedEvent, writer.uint32(26).fork()).ldelim();
+        }
+        if (message.errorMessage !== "") {
+            writer.uint32(34).string(message.errorMessage);
+        }
+        if (message.error !== undefined) {
+            SDKError.encode(message.error, writer.uint32(42).fork()).ldelim();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseSDKEventPublishResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.accepted = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.eventId = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.normalizedEvent = SDKEvent.decode(reader, reader.uint32());
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.error = SDKError.decode(reader, reader.uint32());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            accepted: isSet(object.accepted) ? globalThis.Boolean(object.accepted) : false,
+            eventId: isSet(object.eventId) ? globalThis.String(object.eventId) : "",
+            normalizedEvent: isSet(object.normalizedEvent) ? SDKEvent.fromJSON(object.normalizedEvent) : undefined,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+            error: isSet(object.error) ? SDKError.fromJSON(object.error) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.accepted !== false) {
+            obj.accepted = message.accepted;
+        }
+        if (message.eventId !== "") {
+            obj.eventId = message.eventId;
+        }
+        if (message.normalizedEvent !== undefined) {
+            obj.normalizedEvent = SDKEvent.toJSON(message.normalizedEvent);
+        }
+        if (message.errorMessage !== "") {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.error !== undefined) {
+            obj.error = SDKError.toJSON(message.error);
+        }
+        return obj;
+    },
+    create(base) {
+        return SDKEventPublishResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseSDKEventPublishResult();
+        message.accepted = object.accepted ?? false;
+        message.eventId = object.eventId ?? "";
+        message.normalizedEvent = (object.normalizedEvent !== undefined && object.normalizedEvent !== null)
+            ? SDKEvent.fromPartial(object.normalizedEvent)
+            : undefined;
+        message.errorMessage = object.errorMessage ?? "";
+        message.error = (object.error !== undefined && object.error !== null)
+            ? SDKError.fromPartial(object.error)
+            : undefined;
+        return message;
+    },
+};
+function createBaseSDKEventSubscribeRequest() {
+    return { filter: undefined, replayQueuedEvents: false };
+}
+export const SDKEventSubscribeRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.filter !== undefined) {
+            SDKEventFilter.encode(message.filter, writer.uint32(10).fork()).ldelim();
+        }
+        if (message.replayQueuedEvents !== false) {
+            writer.uint32(16).bool(message.replayQueuedEvents);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseSDKEventSubscribeRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.filter = SDKEventFilter.decode(reader, reader.uint32());
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.replayQueuedEvents = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            filter: isSet(object.filter) ? SDKEventFilter.fromJSON(object.filter) : undefined,
+            replayQueuedEvents: isSet(object.replayQueuedEvents) ? globalThis.Boolean(object.replayQueuedEvents) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.filter !== undefined) {
+            obj.filter = SDKEventFilter.toJSON(message.filter);
+        }
+        if (message.replayQueuedEvents !== false) {
+            obj.replayQueuedEvents = message.replayQueuedEvents;
+        }
+        return obj;
+    },
+    create(base) {
+        return SDKEventSubscribeRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseSDKEventSubscribeRequest();
+        message.filter = (object.filter !== undefined && object.filter !== null)
+            ? SDKEventFilter.fromPartial(object.filter)
+            : undefined;
+        message.replayQueuedEvents = object.replayQueuedEvents ?? false;
         return message;
     },
 };

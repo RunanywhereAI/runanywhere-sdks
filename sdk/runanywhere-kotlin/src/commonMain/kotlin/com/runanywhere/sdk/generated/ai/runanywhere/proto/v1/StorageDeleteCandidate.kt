@@ -66,6 +66,30 @@ public class StorageDeleteCandidate(
     schemaIndex = 4,
   )
   public val local_path: String = "",
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "requiresUnload",
+    schemaIndex = 5,
+  )
+  public val requires_unload: Boolean = false,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "requiresPlatformDelete",
+    schemaIndex = 6,
+  )
+  public val requires_platform_delete: Boolean = false,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "storageKey",
+    schemaIndex = 7,
+  )
+  public val storage_key: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StorageDeleteCandidate, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -84,6 +108,9 @@ public class StorageDeleteCandidate(
     if (last_used_ms != other.last_used_ms) return false
     if (is_loaded != other.is_loaded) return false
     if (local_path != other.local_path) return false
+    if (requires_unload != other.requires_unload) return false
+    if (requires_platform_delete != other.requires_platform_delete) return false
+    if (storage_key != other.storage_key) return false
     return true
   }
 
@@ -96,6 +123,9 @@ public class StorageDeleteCandidate(
       result = result * 37 + (last_used_ms?.hashCode() ?: 0)
       result = result * 37 + is_loaded.hashCode()
       result = result * 37 + local_path.hashCode()
+      result = result * 37 + requires_unload.hashCode()
+      result = result * 37 + requires_platform_delete.hashCode()
+      result = result * 37 + storage_key.hashCode()
       super.hashCode = result
     }
     return result
@@ -108,6 +138,9 @@ public class StorageDeleteCandidate(
     if (last_used_ms != null) result += """last_used_ms=$last_used_ms"""
     result += """is_loaded=$is_loaded"""
     result += """local_path=${sanitize(local_path)}"""
+    result += """requires_unload=$requires_unload"""
+    result += """requires_platform_delete=$requires_platform_delete"""
+    result += """storage_key=${sanitize(storage_key)}"""
     return result.joinToString(prefix = "StorageDeleteCandidate{", separator = ", ", postfix = "}")
   }
 
@@ -117,9 +150,12 @@ public class StorageDeleteCandidate(
     last_used_ms: Long? = this.last_used_ms,
     is_loaded: Boolean = this.is_loaded,
     local_path: String = this.local_path,
+    requires_unload: Boolean = this.requires_unload,
+    requires_platform_delete: Boolean = this.requires_platform_delete,
+    storage_key: String = this.storage_key,
     unknownFields: ByteString = this.unknownFields,
   ): StorageDeleteCandidate = StorageDeleteCandidate(model_id, reclaimable_bytes, last_used_ms,
-      is_loaded, local_path, unknownFields)
+      is_loaded, local_path, requires_unload, requires_platform_delete, storage_key, unknownFields)
 
   public companion object {
     @JvmField
@@ -142,6 +178,12 @@ public class StorageDeleteCandidate(
             value.is_loaded)
         if (value.local_path != "") size += ProtoAdapter.STRING.encodedSizeWithTag(5,
             value.local_path)
+        if (value.requires_unload != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(6,
+            value.requires_unload)
+        if (value.requires_platform_delete != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(7,
+            value.requires_platform_delete)
+        if (value.storage_key != "") size += ProtoAdapter.STRING.encodedSizeWithTag(8,
+            value.storage_key)
         return size
       }
 
@@ -152,11 +194,21 @@ public class StorageDeleteCandidate(
         ProtoAdapter.INT64.encodeWithTag(writer, 3, value.last_used_ms)
         if (value.is_loaded != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.is_loaded)
         if (value.local_path != "") ProtoAdapter.STRING.encodeWithTag(writer, 5, value.local_path)
+        if (value.requires_unload != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.requires_unload)
+        if (value.requires_platform_delete != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.requires_platform_delete)
+        if (value.storage_key != "") ProtoAdapter.STRING.encodeWithTag(writer, 8, value.storage_key)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StorageDeleteCandidate) {
         writer.writeBytes(value.unknownFields)
+        if (value.storage_key != "") ProtoAdapter.STRING.encodeWithTag(writer, 8, value.storage_key)
+        if (value.requires_platform_delete != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.requires_platform_delete)
+        if (value.requires_unload != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.requires_unload)
         if (value.local_path != "") ProtoAdapter.STRING.encodeWithTag(writer, 5, value.local_path)
         if (value.is_loaded != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.is_loaded)
         ProtoAdapter.INT64.encodeWithTag(writer, 3, value.last_used_ms)
@@ -171,6 +223,9 @@ public class StorageDeleteCandidate(
         var last_used_ms: Long? = null
         var is_loaded: Boolean = false
         var local_path: String = ""
+        var requires_unload: Boolean = false
+        var requires_platform_delete: Boolean = false
+        var storage_key: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
@@ -178,6 +233,9 @@ public class StorageDeleteCandidate(
             3 -> last_used_ms = ProtoAdapter.INT64.decode(reader)
             4 -> is_loaded = ProtoAdapter.BOOL.decode(reader)
             5 -> local_path = ProtoAdapter.STRING.decode(reader)
+            6 -> requires_unload = ProtoAdapter.BOOL.decode(reader)
+            7 -> requires_platform_delete = ProtoAdapter.BOOL.decode(reader)
+            8 -> storage_key = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -187,6 +245,9 @@ public class StorageDeleteCandidate(
           last_used_ms = last_used_ms,
           is_loaded = is_loaded,
           local_path = local_path,
+          requires_unload = requires_unload,
+          requires_platform_delete = requires_platform_delete,
+          storage_key = storage_key,
           unknownFields = unknownFields
         )
       }

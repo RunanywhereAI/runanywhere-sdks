@@ -22,7 +22,7 @@ struct VLMBenchmarkProvider: BenchmarkScenarioProvider {
 
     func execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo
+        model: RAModelInfo
     ) async throws -> BenchmarkMetrics {
         #if canImport(UIKit)
         var metrics = BenchmarkMetrics()
@@ -44,9 +44,16 @@ struct VLMBenchmarkProvider: BenchmarkScenarioProvider {
 
             // Generate a small synthetic image inside an autoreleasepool so CoreGraphics
             // intermediates are released promptly before we allocate the vision encoder.
-            let vlmImage: VLMImage = autoreleasepool {
+            let maybeVLMImage = autoreleasepool {
                 let image = SyntheticInputGenerator.gradientImage()
-                return VLMImage(image: image)
+                return RAVLMImage.fromUIImage(image)
+            }
+            guard let vlmImage = maybeVLMImage else {
+                throw NSError(
+                    domain: "RunAnywhereAI.VLMBenchmark",
+                    code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Failed to convert synthetic image to VLM input"]
+                )
             }
 
             // Warmup: single token to prime the pipeline without large KV allocation
@@ -64,10 +71,10 @@ struct VLMBenchmarkProvider: BenchmarkScenarioProvider {
                 maxTokens: 128,
                 temperature: 0.0
             )
-            metrics.endToEndLatencyMs = result.totalTimeMs
-            metrics.tokensPerSecond = result.tokensPerSecond
-            metrics.promptTokens = result.promptTokens
-            metrics.completionTokens = result.completionTokens
+            metrics.endToEndLatencyMs = Double(result.processingTimeMs)
+            metrics.tokensPerSecond = Double(result.tokensPerSecond)
+            metrics.promptTokens = Int(result.promptTokens)
+            metrics.completionTokens = Int(result.completionTokens)
 
             let memAfter = SyntheticInputGenerator.availableMemoryBytes()
             metrics.memoryDeltaBytes = memBefore - memAfter

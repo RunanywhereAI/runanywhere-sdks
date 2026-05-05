@@ -131,7 +131,7 @@ RAC_API rac_result_t rac_solution_feed(rac_solution_handle_t handle,
     auto* runner = as_runner(handle);
     if (!runner) return RAC_ERROR_INVALID_HANDLE;
     if (!item)   return RAC_ERROR_INVALID_ARGUMENT;
-    return runner->feed(std::string(item));
+    return runner->feed(rac::solutions::Item::text(std::string(item)));
 }
 
 RAC_API rac_result_t rac_solution_close_input(rac_solution_handle_t handle) {

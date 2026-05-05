@@ -20,7 +20,7 @@ struct TTSBenchmarkProvider: BenchmarkScenarioProvider {
 
     func execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo
+        model: RAModelInfo
     ) async throws -> BenchmarkMetrics {
         var metrics = BenchmarkMetrics()
 
@@ -43,13 +43,13 @@ struct TTSBenchmarkProvider: BenchmarkScenarioProvider {
         do {
             // Synthesize (not speak)
             let benchStart = Date()
-            let options = TTSOptions()
+            let options = RATTSOptions.defaults()
             let result = try await RunAnywhere.synthesize(text, options: options)
             metrics.endToEndLatencyMs = Date().timeIntervalSince(benchStart) * 1000
 
             // processingTime is in seconds, convert to ms-context
             metrics.audioDurationSeconds = result.duration
-            metrics.charactersProcessed = result.metadata.characterCount
+            metrics.charactersProcessed = Int(result.metadata.characterCount)
 
             let memAfter = SyntheticInputGenerator.availableMemoryBytes()
             metrics.memoryDeltaBytes = memBefore - memAfter

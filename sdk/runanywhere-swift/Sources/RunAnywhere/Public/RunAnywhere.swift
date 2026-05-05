@@ -429,11 +429,10 @@ public enum RunAnywhere {
             logger.warning("Device registration failed (non-critical): \(error.localizedDescription)")
         }
 
-        // Step 6: Discover already-downloaded models on file system
-        // This scans the models directory and updates the registry for models found on disk
+        // Step 6: Reconcile registry entries that already have downloaded local paths.
         let discoveryResult = await CppBridge.ModelRegistry.shared.discoverDownloadedModels()
-        if discoveryResult.discoveredCount > 0 {
-            logger.info("Discovered \(discoveryResult.discoveredCount) downloaded models on startup")
+        if discoveryResult.linkedCount > 0 {
+            logger.info("Discovered \(discoveryResult.linkedCount) downloaded models on startup")
         }
 
         // Mark Phase 2 complete

@@ -7,8 +7,12 @@
  * `capability_check()` returns RAC_ERROR_CAPABILITY_UNSUPPORTED on non-Apple
  * hosts so the plugin silently declines registration when building Linux or
  * Windows hosts that link this TU by accident.
+ *
+ * CPP-04: declarative manifest publishes package ownership, Apple-only
+ * availability and the served primitive set alongside the routing metadata.
  */
 
+#include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/backends/rac_stt_whisperkit_coreml.h"
@@ -38,23 +42,35 @@ static const rac_runtime_id_t k_whisperkit_coreml_runtimes[] = {
 };
 
 static const uint32_t k_whisperkit_coreml_formats[] = {
-    6,  /* MODEL_FORMAT_COREML    */
-    8,  /* MODEL_FORMAT_MLPACKAGE */
+    RAC_MODEL_FORMAT_ID_COREML,
+    RAC_MODEL_FORMAT_ID_MLPACKAGE,
+};
+
+static const rac_primitive_t k_whisperkit_coreml_primitives[] = {
+    RAC_PRIMITIVE_TRANSCRIBE,
+};
+
+static const rac_engine_manifest_t k_whisperkit_coreml_manifest = {
+    .name             = "whisperkit_coreml",
+    .display_name     = "WhisperKit (CoreML)",
+    .version          = nullptr,
+    .package_owner    = "runanywhere",
+    .package_name     = "runanywhere_whisperkit_coreml",
+    .availability     = RAC_ENGINE_AVAILABILITY_PRIVATE,  /* Apple-only. */
+    .priority         = 110,  /* Hardware-accelerated, beats CPU backends. */
+    .capability_flags = 0,
+    .primitives       = k_whisperkit_coreml_primitives,
+    .primitives_count = sizeof(k_whisperkit_coreml_primitives) / sizeof(k_whisperkit_coreml_primitives[0]),
+    .runtimes         = k_whisperkit_coreml_runtimes,
+    .runtimes_count   = sizeof(k_whisperkit_coreml_runtimes) / sizeof(k_whisperkit_coreml_runtimes[0]),
+    .formats          = k_whisperkit_coreml_formats,
+    .formats_count    = sizeof(k_whisperkit_coreml_formats) / sizeof(k_whisperkit_coreml_formats[0]),
+    .reserved_0       = 0,
+    .reserved_1       = 0,
 };
 
 static const rac_engine_vtable_t g_whisperkit_coreml_engine_vtable = {
-    /* metadata */ {
-        .abi_version      = RAC_PLUGIN_API_VERSION,
-        .name             = "whisperkit_coreml",
-        .display_name     = "WhisperKit (CoreML)",
-        .engine_version   = nullptr,
-        .priority         = 110,  /* Hardware-accelerated, beats CPU backends. */
-        .capability_flags = 0,
-        .runtimes         = k_whisperkit_coreml_runtimes,
-        .runtimes_count   = sizeof(k_whisperkit_coreml_runtimes) / sizeof(k_whisperkit_coreml_runtimes[0]),
-        .formats          = k_whisperkit_coreml_formats,
-        .formats_count    = sizeof(k_whisperkit_coreml_formats) / sizeof(k_whisperkit_coreml_formats[0]),
-    },
+    /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_whisperkit_coreml_manifest),
     /* capability_check */ whisperkit_coreml_capability_check,
     /* on_unload        */ nullptr,
 
@@ -72,7 +88,8 @@ static const rac_engine_vtable_t g_whisperkit_coreml_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(whisperkit_coreml) {
-    return &g_whisperkit_coreml_engine_vtable;
+    return rac_engine_entry_with_manifest(&k_whisperkit_coreml_manifest,
+                                          &g_whisperkit_coreml_engine_vtable);
 }
 
 }  // extern "C"

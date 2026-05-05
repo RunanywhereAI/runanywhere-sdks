@@ -30,6 +30,7 @@ public enum class MessageRole(
    * tool call has been executed. Required for OpenAI-style tool flows.
    */
   MESSAGE_ROLE_TOOL(4),
+  MESSAGE_ROLE_DEVELOPER(5),
   ;
 
   public companion object {
@@ -49,6 +50,7 @@ public enum class MessageRole(
       2 -> MESSAGE_ROLE_ASSISTANT
       3 -> MESSAGE_ROLE_SYSTEM
       4 -> MESSAGE_ROLE_TOOL
+      5 -> MESSAGE_ROLE_DEVELOPER
       else -> null
     }
   }

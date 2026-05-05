@@ -240,6 +240,46 @@ void fill_stt_output(const rac_stt_result_t& result,
     }
 }
 
+int64_t current_time_us() {
+    return rac_get_current_time_ms() * 1000;
+}
+
+bool validate_stt_stream_event(const runanywhere::v1::STTStreamEvent& event) {
+    if (event.seq() == 0 || event.timestamp_us() <= 0 || event.request_id().empty()) {
+        return false;
+    }
+
+    switch (event.kind()) {
+        case runanywhere::v1::STT_STREAM_EVENT_KIND_STARTED:
+        case runanywhere::v1::STT_STREAM_EVENT_KIND_ENDPOINT:
+            return true;
+        case runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL:
+            return event.has_partial() && !event.partial().is_final();
+        case runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL:
+            return (event.has_partial() && event.partial().is_final()) ||
+                   event.has_final_output();
+        case runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR:
+            return event.error_code() != RAC_SUCCESS || event.has_error_message();
+        default:
+            return false;
+    }
+}
+
+void emit_stt_stream_event(const runanywhere::v1::STTStreamEvent& event,
+                           rac_stt_proto_stream_event_callback_fn callback,
+                           void* user_data) {
+    if (!callback || !validate_stt_stream_event(event)) {
+        return;
+    }
+
+    const size_t size = event.ByteSizeLong();
+    std::vector<uint8_t> bytes(size);
+    if (size == 0 ||
+        event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), user_data);
+    }
+}
+
 void publish_stt_voice_event(runanywhere::v1::VoiceEventKind kind,
                              const char* text,
                              float confidence,
@@ -250,6 +290,8 @@ void publish_stt_voice_event(runanywhere::v1::VoiceEventKind kind,
     event.set_category(runanywhere::v1::EVENT_CATEGORY_STT);
     event.set_component(runanywhere::v1::SDK_COMPONENT_STT);
     event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    event.set_source("cpp");
+    event.set_operation_id("stt.transcribe");
     event.set_severity(error_code == RAC_SUCCESS ? runanywhere::v1::EVENT_SEVERITY_INFO
                                                  : runanywhere::v1::EVENT_SEVERITY_ERROR);
     auto* voice = event.mutable_voice();
@@ -930,7 +972,7 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
     size_t audio_size,
     const uint8_t* options_proto_bytes,
     size_t options_proto_size,
-    rac_stt_proto_partial_callback_fn callback,
+    rac_stt_proto_stream_event_callback_fn callback,
     void* user_data) {
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)handle;
@@ -954,36 +996,71 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
                                       static_cast<int>(options_proto_size))) {
         return RAC_ERROR_DECODING_ERROR;
     }
+
+    const std::string request_id = generate_unique_id();
     if (!rac_stt_component_get_model_id(handle)) {
         const rac_result_t rc = RAC_ERROR_NOT_INITIALIZED;
         publish_stt_voice_event(runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED, nullptr, 0.0f, rc);
         (void)rac_sdk_event_publish_failure(rc, "STT model is not loaded", "stt",
                                             "transcribeStream", RAC_TRUE);
+        runanywhere::v1::STTStreamEvent error;
+        error.set_seq(1);
+        error.set_timestamp_us(current_time_us());
+        error.set_request_id(request_id);
+        error.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR);
+        error.set_error_code(rc);
+        error.set_error_message("STT model is not loaded");
+        emit_stt_stream_event(error, callback, user_data);
         return rc;
     }
 
+    rac_stt_options_t options = options_from_proto(proto_options, RAC_STT_OPTIONS_DEFAULT);
+
     struct StreamContext {
-        rac_stt_proto_partial_callback_fn callback;
+        rac_stt_proto_stream_event_callback_fn callback;
         void* user_data;
-    } context{callback, user_data};
+        std::string request_id;
+        uint64_t next_seq;
+        rac_stt_options_t options;
+        size_t audio_size;
+    } context{callback, user_data, request_id, 1, options, audio_size};
+
+    runanywhere::v1::STTStreamEvent started;
+    started.set_seq(context.next_seq++);
+    started.set_timestamp_us(current_time_us());
+    started.set_request_id(context.request_id);
+    started.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_STARTED);
+    emit_stt_stream_event(started, callback, user_data);
 
     auto bridge = [](const char* partial_text, rac_bool_t is_final, void* opaque) {
         auto* ctx = static_cast<StreamContext*>(opaque);
-        runanywhere::v1::STTPartialResult partial;
+        runanywhere::v1::STTStreamEvent event;
+        event.set_seq(ctx->next_seq++);
+        event.set_timestamp_us(current_time_us());
+        event.set_request_id(ctx->request_id);
+        event.set_kind(is_final == RAC_TRUE ? runanywhere::v1::STT_STREAM_EVENT_KIND_FINAL
+                                            : runanywhere::v1::STT_STREAM_EVENT_KIND_PARTIAL);
+        auto* partial = event.mutable_partial();
         if (partial_text) {
-            partial.set_text(partial_text);
+            partial->set_text(partial_text);
         }
-        partial.set_is_final(is_final == RAC_TRUE);
-        partial.set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
-        const size_t size = partial.ByteSizeLong();
-        std::vector<uint8_t> bytes(size);
-        if (size == 0 ||
-            partial.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-            ctx->callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), ctx->user_data);
+        partial->set_is_final(is_final == RAC_TRUE);
+        partial->set_stability(is_final == RAC_TRUE ? 1.0f : 0.0f);
+        partial->set_request_id(ctx->request_id);
+        partial->set_language(language_from_code(ctx->options.language));
+        if (is_final == RAC_TRUE) {
+            auto* final_output = event.mutable_final_output();
+            if (partial_text) {
+                final_output->set_text(partial_text);
+            }
+            final_output->set_language(language_from_code(ctx->options.language));
+            final_output->set_duration_ms(
+                estimate_audio_length_ms(ctx->audio_size, ctx->options.sample_rate));
+            final_output->mutable_metadata()->set_audio_length_ms(final_output->duration_ms());
         }
+        emit_stt_stream_event(event, ctx->callback, ctx->user_data);
     };
 
-    rac_stt_options_t options = options_from_proto(proto_options, RAC_STT_OPTIONS_DEFAULT);
     publish_stt_voice_event(runanywhere::v1::VOICE_EVENT_KIND_STT_PROCESSING, nullptr, 0.0f);
     rac_result_t rc = rac_stt_component_transcribe_stream(handle, audio_data, audio_size, &options,
                                                           bridge, &context);
@@ -991,6 +1068,14 @@ extern "C" rac_result_t rac_stt_component_transcribe_stream_proto(
         publish_stt_voice_event(runanywhere::v1::VOICE_EVENT_KIND_STT_FAILED, nullptr, 0.0f, rc);
         (void)rac_sdk_event_publish_failure(rc, "STT streaming transcription failed", "stt",
                                             "transcribeStream", RAC_TRUE);
+        runanywhere::v1::STTStreamEvent error;
+        error.set_seq(context.next_seq++);
+        error.set_timestamp_us(current_time_us());
+        error.set_request_id(context.request_id);
+        error.set_kind(runanywhere::v1::STT_STREAM_EVENT_KIND_ERROR);
+        error.set_error_code(rc);
+        error.set_error_message("STT streaming transcription failed");
+        emit_stt_stream_event(error, callback, user_data);
     }
     return rc;
 #endif

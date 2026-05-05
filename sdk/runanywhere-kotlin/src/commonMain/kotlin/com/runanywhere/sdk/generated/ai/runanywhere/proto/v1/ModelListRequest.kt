@@ -35,6 +35,17 @@ public class ModelListRequest(
     schemaIndex = 0,
   )
   public val query: ModelQuery? = null,
+  /**
+   * Include denormalized counts in ModelListResult.
+   */
+  @field:WireField(
+    tag = 2,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "includeCounts",
+    schemaIndex = 1,
+  )
+  public val include_counts: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelListRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -49,6 +60,7 @@ public class ModelListRequest(
     if (other !is ModelListRequest) return false
     if (unknownFields != other.unknownFields) return false
     if (query != other.query) return false
+    if (include_counts != other.include_counts) return false
     return true
   }
 
@@ -57,6 +69,7 @@ public class ModelListRequest(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + (query?.hashCode() ?: 0)
+      result = result * 37 + include_counts.hashCode()
       super.hashCode = result
     }
     return result
@@ -65,11 +78,15 @@ public class ModelListRequest(
   override fun toString(): String {
     val result = mutableListOf<String>()
     if (query != null) result += """query=$query"""
+    result += """include_counts=$include_counts"""
     return result.joinToString(prefix = "ModelListRequest{", separator = ", ", postfix = "}")
   }
 
-  public fun copy(query: ModelQuery? = this.query, unknownFields: ByteString = this.unknownFields):
-      ModelListRequest = ModelListRequest(query, unknownFields)
+  public fun copy(
+    query: ModelQuery? = this.query,
+    include_counts: Boolean = this.include_counts,
+    unknownFields: ByteString = this.unknownFields,
+  ): ModelListRequest = ModelListRequest(query, include_counts, unknownFields)
 
   public companion object {
     @JvmField
@@ -84,29 +101,38 @@ public class ModelListRequest(
       override fun encodedSize(`value`: ModelListRequest): Int {
         var size = value.unknownFields.size
         size += ModelQuery.ADAPTER.encodedSizeWithTag(1, value.query)
+        if (value.include_counts != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(2,
+            value.include_counts)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: ModelListRequest) {
         ModelQuery.ADAPTER.encodeWithTag(writer, 1, value.query)
+        if (value.include_counts != false) ProtoAdapter.BOOL.encodeWithTag(writer, 2,
+            value.include_counts)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelListRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.include_counts != false) ProtoAdapter.BOOL.encodeWithTag(writer, 2,
+            value.include_counts)
         ModelQuery.ADAPTER.encodeWithTag(writer, 1, value.query)
       }
 
       override fun decode(reader: ProtoReader): ModelListRequest {
         var query: ModelQuery? = null
+        var include_counts: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> query = ModelQuery.ADAPTER.decode(reader)
+            2 -> include_counts = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return ModelListRequest(
           query = query,
+          include_counts = include_counts,
           unknownFields = unknownFields
         )
       }

@@ -397,7 +397,7 @@ export const EmbeddingsOptions = {
     },
 };
 function createBaseEmbeddingVector() {
-    return { values: [], norm: undefined, text: undefined, dimension: 0 };
+    return { values: [], norm: undefined, text: undefined, dimension: 0, inputIndex: 0, metadata: {} };
 }
 export const EmbeddingVector = {
     encode(message, writer = _m0.Writer.create()) {
@@ -415,6 +415,12 @@ export const EmbeddingVector = {
         if (message.dimension !== 0) {
             writer.uint32(32).int32(message.dimension);
         }
+        if (message.inputIndex !== 0) {
+            writer.uint32(40).int32(message.inputIndex);
+        }
+        Object.entries(message.metadata).forEach(([key, value]) => {
+            EmbeddingVector_MetadataEntry.encode({ key: key, value }, writer.uint32(50).fork()).ldelim();
+        });
         return writer;
     },
     decode(input, length) {
@@ -455,6 +461,21 @@ export const EmbeddingVector = {
                     }
                     message.dimension = reader.int32();
                     continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.inputIndex = reader.int32();
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    const entry6 = EmbeddingVector_MetadataEntry.decode(reader, reader.uint32());
+                    if (entry6.value !== undefined) {
+                        message.metadata[entry6.key] = entry6.value;
+                    }
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -469,6 +490,13 @@ export const EmbeddingVector = {
             norm: isSet(object.norm) ? globalThis.Number(object.norm) : undefined,
             text: isSet(object.text) ? globalThis.String(object.text) : undefined,
             dimension: isSet(object.dimension) ? globalThis.Number(object.dimension) : 0,
+            inputIndex: isSet(object.inputIndex) ? globalThis.Number(object.inputIndex) : 0,
+            metadata: isObject(object.metadata)
+                ? Object.entries(object.metadata).reduce((acc, [key, value]) => {
+                    acc[key] = String(value);
+                    return acc;
+                }, {})
+                : {},
         };
     },
     toJSON(message) {
@@ -485,6 +513,18 @@ export const EmbeddingVector = {
         if (message.dimension !== 0) {
             obj.dimension = Math.round(message.dimension);
         }
+        if (message.inputIndex !== 0) {
+            obj.inputIndex = Math.round(message.inputIndex);
+        }
+        if (message.metadata) {
+            const entries = Object.entries(message.metadata);
+            if (entries.length > 0) {
+                obj.metadata = {};
+                entries.forEach(([k, v]) => {
+                    obj.metadata[k] = v;
+                });
+            }
+        }
         return obj;
     },
     create(base) {
@@ -496,11 +536,84 @@ export const EmbeddingVector = {
         message.norm = object.norm ?? undefined;
         message.text = object.text ?? undefined;
         message.dimension = object.dimension ?? 0;
+        message.inputIndex = object.inputIndex ?? 0;
+        message.metadata = Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
+            if (value !== undefined) {
+                acc[key] = globalThis.String(value);
+            }
+            return acc;
+        }, {});
+        return message;
+    },
+};
+function createBaseEmbeddingVector_MetadataEntry() {
+    return { key: "", value: "" };
+}
+export const EmbeddingVector_MetadataEntry = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.key !== "") {
+            writer.uint32(10).string(message.key);
+        }
+        if (message.value !== "") {
+            writer.uint32(18).string(message.value);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseEmbeddingVector_MetadataEntry();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.key = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.value = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            key: isSet(object.key) ? globalThis.String(object.key) : "",
+            value: isSet(object.value) ? globalThis.String(object.value) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.key !== "") {
+            obj.key = message.key;
+        }
+        if (message.value !== "") {
+            obj.value = message.value;
+        }
+        return obj;
+    },
+    create(base) {
+        return EmbeddingVector_MetadataEntry.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseEmbeddingVector_MetadataEntry();
+        message.key = object.key ?? "";
+        message.value = object.value ?? "";
         return message;
     },
 };
 function createBaseEmbeddingsRequest() {
-    return { texts: [], options: undefined };
+    return { texts: [], options: undefined, requestId: "", modelId: undefined, metadata: {} };
 }
 export const EmbeddingsRequest = {
     encode(message, writer = _m0.Writer.create()) {
@@ -510,6 +623,15 @@ export const EmbeddingsRequest = {
         if (message.options !== undefined) {
             EmbeddingsOptions.encode(message.options, writer.uint32(18).fork()).ldelim();
         }
+        if (message.requestId !== "") {
+            writer.uint32(26).string(message.requestId);
+        }
+        if (message.modelId !== undefined) {
+            writer.uint32(34).string(message.modelId);
+        }
+        Object.entries(message.metadata).forEach(([key, value]) => {
+            EmbeddingsRequest_MetadataEntry.encode({ key: key, value }, writer.uint32(42).fork()).ldelim();
+        });
         return writer;
     },
     decode(input, length) {
@@ -531,6 +653,27 @@ export const EmbeddingsRequest = {
                     }
                     message.options = EmbeddingsOptions.decode(reader, reader.uint32());
                     continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.requestId = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    const entry5 = EmbeddingsRequest_MetadataEntry.decode(reader, reader.uint32());
+                    if (entry5.value !== undefined) {
+                        message.metadata[entry5.key] = entry5.value;
+                    }
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -543,6 +686,14 @@ export const EmbeddingsRequest = {
         return {
             texts: globalThis.Array.isArray(object?.texts) ? object.texts.map((e) => globalThis.String(e)) : [],
             options: isSet(object.options) ? EmbeddingsOptions.fromJSON(object.options) : undefined,
+            requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : undefined,
+            metadata: isObject(object.metadata)
+                ? Object.entries(object.metadata).reduce((acc, [key, value]) => {
+                    acc[key] = String(value);
+                    return acc;
+                }, {})
+                : {},
         };
     },
     toJSON(message) {
@@ -552,6 +703,21 @@ export const EmbeddingsRequest = {
         }
         if (message.options !== undefined) {
             obj.options = EmbeddingsOptions.toJSON(message.options);
+        }
+        if (message.requestId !== "") {
+            obj.requestId = message.requestId;
+        }
+        if (message.modelId !== undefined) {
+            obj.modelId = message.modelId;
+        }
+        if (message.metadata) {
+            const entries = Object.entries(message.metadata);
+            if (entries.length > 0) {
+                obj.metadata = {};
+                entries.forEach(([k, v]) => {
+                    obj.metadata[k] = v;
+                });
+            }
         }
         return obj;
     },
@@ -564,11 +730,94 @@ export const EmbeddingsRequest = {
         message.options = (object.options !== undefined && object.options !== null)
             ? EmbeddingsOptions.fromPartial(object.options)
             : undefined;
+        message.requestId = object.requestId ?? "";
+        message.modelId = object.modelId ?? undefined;
+        message.metadata = Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
+            if (value !== undefined) {
+                acc[key] = globalThis.String(value);
+            }
+            return acc;
+        }, {});
+        return message;
+    },
+};
+function createBaseEmbeddingsRequest_MetadataEntry() {
+    return { key: "", value: "" };
+}
+export const EmbeddingsRequest_MetadataEntry = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.key !== "") {
+            writer.uint32(10).string(message.key);
+        }
+        if (message.value !== "") {
+            writer.uint32(18).string(message.value);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseEmbeddingsRequest_MetadataEntry();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.key = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.value = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            key: isSet(object.key) ? globalThis.String(object.key) : "",
+            value: isSet(object.value) ? globalThis.String(object.value) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.key !== "") {
+            obj.key = message.key;
+        }
+        if (message.value !== "") {
+            obj.value = message.value;
+        }
+        return obj;
+    },
+    create(base) {
+        return EmbeddingsRequest_MetadataEntry.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseEmbeddingsRequest_MetadataEntry();
+        message.key = object.key ?? "";
+        message.value = object.value ?? "";
         return message;
     },
 };
 function createBaseEmbeddingsResult() {
-    return { vectors: [], dimension: 0, processingTimeMs: 0, tokensUsed: 0 };
+    return {
+        vectors: [],
+        dimension: 0,
+        processingTimeMs: 0,
+        tokensUsed: 0,
+        modelId: undefined,
+        errorMessage: undefined,
+        errorCode: 0,
+        requestId: "",
+    };
 }
 export const EmbeddingsResult = {
     encode(message, writer = _m0.Writer.create()) {
@@ -583,6 +832,18 @@ export const EmbeddingsResult = {
         }
         if (message.tokensUsed !== 0) {
             writer.uint32(32).int32(message.tokensUsed);
+        }
+        if (message.modelId !== undefined) {
+            writer.uint32(42).string(message.modelId);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(50).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(56).int32(message.errorCode);
+        }
+        if (message.requestId !== "") {
+            writer.uint32(66).string(message.requestId);
         }
         return writer;
     },
@@ -617,6 +878,30 @@ export const EmbeddingsResult = {
                     }
                     message.tokensUsed = reader.int32();
                     continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+                case 8:
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.requestId = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -633,6 +918,10 @@ export const EmbeddingsResult = {
             dimension: isSet(object.dimension) ? globalThis.Number(object.dimension) : 0,
             processingTimeMs: isSet(object.processingTimeMs) ? globalThis.Number(object.processingTimeMs) : 0,
             tokensUsed: isSet(object.tokensUsed) ? globalThis.Number(object.tokensUsed) : 0,
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : undefined,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+            requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
         };
     },
     toJSON(message) {
@@ -649,6 +938,18 @@ export const EmbeddingsResult = {
         if (message.tokensUsed !== 0) {
             obj.tokensUsed = Math.round(message.tokensUsed);
         }
+        if (message.modelId !== undefined) {
+            obj.modelId = message.modelId;
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        if (message.requestId !== "") {
+            obj.requestId = message.requestId;
+        }
         return obj;
     },
     create(base) {
@@ -660,6 +961,132 @@ export const EmbeddingsResult = {
         message.dimension = object.dimension ?? 0;
         message.processingTimeMs = object.processingTimeMs ?? 0;
         message.tokensUsed = object.tokensUsed ?? 0;
+        message.modelId = object.modelId ?? undefined;
+        message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
+        message.requestId = object.requestId ?? "";
+        return message;
+    },
+};
+function createBaseEmbeddingsServiceState() {
+    return { isReady: false, currentModel: undefined, dimension: 0, maxTokens: 0, errorMessage: undefined, errorCode: 0 };
+}
+export const EmbeddingsServiceState = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.isReady !== false) {
+            writer.uint32(8).bool(message.isReady);
+        }
+        if (message.currentModel !== undefined) {
+            writer.uint32(18).string(message.currentModel);
+        }
+        if (message.dimension !== 0) {
+            writer.uint32(24).int32(message.dimension);
+        }
+        if (message.maxTokens !== 0) {
+            writer.uint32(32).int32(message.maxTokens);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(42).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(48).int32(message.errorCode);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseEmbeddingsServiceState();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.isReady = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.currentModel = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.dimension = reader.int32();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.maxTokens = reader.int32();
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            isReady: isSet(object.isReady) ? globalThis.Boolean(object.isReady) : false,
+            currentModel: isSet(object.currentModel) ? globalThis.String(object.currentModel) : undefined,
+            dimension: isSet(object.dimension) ? globalThis.Number(object.dimension) : 0,
+            maxTokens: isSet(object.maxTokens) ? globalThis.Number(object.maxTokens) : 0,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.isReady !== false) {
+            obj.isReady = message.isReady;
+        }
+        if (message.currentModel !== undefined) {
+            obj.currentModel = message.currentModel;
+        }
+        if (message.dimension !== 0) {
+            obj.dimension = Math.round(message.dimension);
+        }
+        if (message.maxTokens !== 0) {
+            obj.maxTokens = Math.round(message.maxTokens);
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        return obj;
+    },
+    create(base) {
+        return EmbeddingsServiceState.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseEmbeddingsServiceState();
+        message.isReady = object.isReady ?? false;
+        message.currentModel = object.currentModel ?? undefined;
+        message.dimension = object.dimension ?? 0;
+        message.maxTokens = object.maxTokens ?? 0;
+        message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
         return message;
     },
 };
@@ -675,6 +1102,9 @@ function longToNumber(long) {
 if (_m0.util.Long !== Long) {
     _m0.util.Long = Long;
     _m0.configure();
+}
+function isObject(value) {
+    return typeof value === "object" && value !== null;
 }
 function isSet(value) {
     return value !== null && value !== undefined;

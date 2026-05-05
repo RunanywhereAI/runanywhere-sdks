@@ -75,7 +75,7 @@ struct BenchmarkScenario: Codable, Sendable, Identifiable {
     }
 }
 
-// MARK: - Component Model Info (snapshot of ModelInfo for persistence)
+// MARK: - Component Model Info (snapshot of RAModelInfo for persistence)
 
 struct ComponentModelInfo: Codable, Sendable {
     let id: String
@@ -83,7 +83,7 @@ struct ComponentModelInfo: Codable, Sendable {
     let framework: String
     let category: String
 
-    init(from model: ModelInfo) {
+    init(from model: RAModelInfo) {
         self.id = model.id
         self.name = model.name
         self.framework = model.framework.displayName

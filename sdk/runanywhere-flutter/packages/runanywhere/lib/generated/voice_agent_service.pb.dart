@@ -12,6 +12,7 @@
 import 'dart:async' as $async;
 import 'dart:core' as $core;
 
+import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'voice_events.pb.dart' as $0;
@@ -23,10 +24,30 @@ import 'voice_events.pbenum.dart' as $0;
 class VoiceAgentRequest extends $pb.GeneratedMessage {
   factory VoiceAgentRequest({
     $core.String? eventFilter,
+    $core.String? sessionId,
+    $core.Iterable<$0.VoiceEventCategory>? categories,
+    $0.VoiceEventSeverity? minSeverity,
+    $fixnum.Int64? replayFromSeq,
+    $core.bool? includeAudio,
   }) {
     final $result = create();
     if (eventFilter != null) {
       $result.eventFilter = eventFilter;
+    }
+    if (sessionId != null) {
+      $result.sessionId = sessionId;
+    }
+    if (categories != null) {
+      $result.categories.addAll(categories);
+    }
+    if (minSeverity != null) {
+      $result.minSeverity = minSeverity;
+    }
+    if (replayFromSeq != null) {
+      $result.replayFromSeq = replayFromSeq;
+    }
+    if (includeAudio != null) {
+      $result.includeAudio = includeAudio;
     }
     return $result;
   }
@@ -36,6 +57,11 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceAgentRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'eventFilter')
+    ..aOS(2, _omitFieldNames ? '' : 'sessionId')
+    ..pc<$0.VoiceEventCategory>(3, _omitFieldNames ? '' : 'categories', $pb.PbFieldType.KE, valueOf: $0.VoiceEventCategory.valueOf, enumValues: $0.VoiceEventCategory.values, defaultEnumValue: $0.VoiceEventCategory.VOICE_EVENT_CATEGORY_UNSPECIFIED)
+    ..e<$0.VoiceEventSeverity>(4, _omitFieldNames ? '' : 'minSeverity', $pb.PbFieldType.OE, defaultOrMaker: $0.VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG, valueOf: $0.VoiceEventSeverity.valueOf, enumValues: $0.VoiceEventSeverity.values)
+    ..a<$fixnum.Int64>(5, _omitFieldNames ? '' : 'replayFromSeq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOB(6, _omitFieldNames ? '' : 'includeAudio')
     ..hasRequiredFields = false
   ;
 
@@ -70,6 +96,45 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
   $core.bool hasEventFilter() => $_has(0);
   @$pb.TagNumber(1)
   void clearEventFilter() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get sessionId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set sessionId($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasSessionId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSessionId() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.List<$0.VoiceEventCategory> get categories => $_getList(2);
+
+  @$pb.TagNumber(4)
+  $0.VoiceEventSeverity get minSeverity => $_getN(3);
+  @$pb.TagNumber(4)
+  set minSeverity($0.VoiceEventSeverity v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasMinSeverity() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMinSeverity() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get replayFromSeq => $_getI64(4);
+  @$pb.TagNumber(5)
+  set replayFromSeq($fixnum.Int64 v) { $_setInt64(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasReplayFromSeq() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearReplayFromSeq() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.bool get includeAudio => $_getBF(5);
+  @$pb.TagNumber(6)
+  set includeAudio($core.bool v) { $_setBool(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasIncludeAudio() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearIncludeAudio() => clearField(6);
 }
 
 ///  ---------------------------------------------------------------------------
@@ -93,6 +158,14 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
     $core.int? synthesizedAudioSampleRateHz,
     $core.int? synthesizedAudioChannels,
     $0.AudioEncoding? synthesizedAudioEncoding,
+    $core.String? sessionId,
+    $core.String? turnId,
+    $fixnum.Int64? sttTimeMs,
+    $fixnum.Int64? llmTimeMs,
+    $fixnum.Int64? ttsTimeMs,
+    $fixnum.Int64? totalTimeMs,
+    $core.String? errorMessage,
+    $core.int? errorCode,
   }) {
     final $result = create();
     if (speechDetected != null) {
@@ -122,6 +195,30 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
     if (synthesizedAudioEncoding != null) {
       $result.synthesizedAudioEncoding = synthesizedAudioEncoding;
     }
+    if (sessionId != null) {
+      $result.sessionId = sessionId;
+    }
+    if (turnId != null) {
+      $result.turnId = turnId;
+    }
+    if (sttTimeMs != null) {
+      $result.sttTimeMs = sttTimeMs;
+    }
+    if (llmTimeMs != null) {
+      $result.llmTimeMs = llmTimeMs;
+    }
+    if (ttsTimeMs != null) {
+      $result.ttsTimeMs = ttsTimeMs;
+    }
+    if (totalTimeMs != null) {
+      $result.totalTimeMs = totalTimeMs;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
     return $result;
   }
   VoiceAgentResult._() : super();
@@ -138,6 +235,14 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
     ..a<$core.int>(7, _omitFieldNames ? '' : 'synthesizedAudioSampleRateHz', $pb.PbFieldType.O3)
     ..a<$core.int>(8, _omitFieldNames ? '' : 'synthesizedAudioChannels', $pb.PbFieldType.O3)
     ..e<$0.AudioEncoding>(9, _omitFieldNames ? '' : 'synthesizedAudioEncoding', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED, valueOf: $0.AudioEncoding.valueOf, enumValues: $0.AudioEncoding.values)
+    ..aOS(10, _omitFieldNames ? '' : 'sessionId')
+    ..aOS(11, _omitFieldNames ? '' : 'turnId')
+    ..aInt64(12, _omitFieldNames ? '' : 'sttTimeMs')
+    ..aInt64(13, _omitFieldNames ? '' : 'llmTimeMs')
+    ..aInt64(14, _omitFieldNames ? '' : 'ttsTimeMs')
+    ..aInt64(15, _omitFieldNames ? '' : 'totalTimeMs')
+    ..aOS(16, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(17, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
@@ -259,6 +364,222 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
   $core.bool hasSynthesizedAudioEncoding() => $_has(8);
   @$pb.TagNumber(9)
   void clearSynthesizedAudioEncoding() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.String get sessionId => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set sessionId($core.String v) { $_setString(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasSessionId() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearSessionId() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.String get turnId => $_getSZ(10);
+  @$pb.TagNumber(11)
+  set turnId($core.String v) { $_setString(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasTurnId() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearTurnId() => clearField(11);
+
+  @$pb.TagNumber(12)
+  $fixnum.Int64 get sttTimeMs => $_getI64(11);
+  @$pb.TagNumber(12)
+  set sttTimeMs($fixnum.Int64 v) { $_setInt64(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasSttTimeMs() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearSttTimeMs() => clearField(12);
+
+  @$pb.TagNumber(13)
+  $fixnum.Int64 get llmTimeMs => $_getI64(12);
+  @$pb.TagNumber(13)
+  set llmTimeMs($fixnum.Int64 v) { $_setInt64(12, v); }
+  @$pb.TagNumber(13)
+  $core.bool hasLlmTimeMs() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearLlmTimeMs() => clearField(13);
+
+  @$pb.TagNumber(14)
+  $fixnum.Int64 get ttsTimeMs => $_getI64(13);
+  @$pb.TagNumber(14)
+  set ttsTimeMs($fixnum.Int64 v) { $_setInt64(13, v); }
+  @$pb.TagNumber(14)
+  $core.bool hasTtsTimeMs() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearTtsTimeMs() => clearField(14);
+
+  @$pb.TagNumber(15)
+  $fixnum.Int64 get totalTimeMs => $_getI64(14);
+  @$pb.TagNumber(15)
+  set totalTimeMs($fixnum.Int64 v) { $_setInt64(14, v); }
+  @$pb.TagNumber(15)
+  $core.bool hasTotalTimeMs() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearTotalTimeMs() => clearField(15);
+
+  @$pb.TagNumber(16)
+  $core.String get errorMessage => $_getSZ(15);
+  @$pb.TagNumber(16)
+  set errorMessage($core.String v) { $_setString(15, v); }
+  @$pb.TagNumber(16)
+  $core.bool hasErrorMessage() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearErrorMessage() => clearField(16);
+
+  @$pb.TagNumber(17)
+  $core.int get errorCode => $_getIZ(16);
+  @$pb.TagNumber(17)
+  set errorCode($core.int v) { $_setSignedInt32(16, v); }
+  @$pb.TagNumber(17)
+  $core.bool hasErrorCode() => $_has(16);
+  @$pb.TagNumber(17)
+  void clearErrorCode() => clearField(17);
+}
+
+class VoiceAgentTurnRequest extends $pb.GeneratedMessage {
+  factory VoiceAgentTurnRequest({
+    $core.String? requestId,
+    $core.String? sessionId,
+    $core.List<$core.int>? audioData,
+    $core.int? sampleRateHz,
+    $core.int? channels,
+    $0.AudioEncoding? encoding,
+    VoiceSessionConfig? sessionConfig,
+    $core.Map<$core.String, $core.String>? metadata,
+  }) {
+    final $result = create();
+    if (requestId != null) {
+      $result.requestId = requestId;
+    }
+    if (sessionId != null) {
+      $result.sessionId = sessionId;
+    }
+    if (audioData != null) {
+      $result.audioData = audioData;
+    }
+    if (sampleRateHz != null) {
+      $result.sampleRateHz = sampleRateHz;
+    }
+    if (channels != null) {
+      $result.channels = channels;
+    }
+    if (encoding != null) {
+      $result.encoding = encoding;
+    }
+    if (sessionConfig != null) {
+      $result.sessionConfig = sessionConfig;
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
+    }
+    return $result;
+  }
+  VoiceAgentTurnRequest._() : super();
+  factory VoiceAgentTurnRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory VoiceAgentTurnRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceAgentTurnRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'requestId')
+    ..aOS(2, _omitFieldNames ? '' : 'sessionId')
+    ..a<$core.List<$core.int>>(3, _omitFieldNames ? '' : 'audioData', $pb.PbFieldType.OY)
+    ..a<$core.int>(4, _omitFieldNames ? '' : 'sampleRateHz', $pb.PbFieldType.O3)
+    ..a<$core.int>(5, _omitFieldNames ? '' : 'channels', $pb.PbFieldType.O3)
+    ..e<$0.AudioEncoding>(6, _omitFieldNames ? '' : 'encoding', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED, valueOf: $0.AudioEncoding.valueOf, enumValues: $0.AudioEncoding.values)
+    ..aOM<VoiceSessionConfig>(7, _omitFieldNames ? '' : 'sessionConfig', subBuilder: VoiceSessionConfig.create)
+    ..m<$core.String, $core.String>(8, _omitFieldNames ? '' : 'metadata', entryClassName: 'VoiceAgentTurnRequest.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  VoiceAgentTurnRequest clone() => VoiceAgentTurnRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  VoiceAgentTurnRequest copyWith(void Function(VoiceAgentTurnRequest) updates) => super.copyWith((message) => updates(message as VoiceAgentTurnRequest)) as VoiceAgentTurnRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VoiceAgentTurnRequest create() => VoiceAgentTurnRequest._();
+  VoiceAgentTurnRequest createEmptyInstance() => create();
+  static $pb.PbList<VoiceAgentTurnRequest> createRepeated() => $pb.PbList<VoiceAgentTurnRequest>();
+  @$core.pragma('dart2js:noInline')
+  static VoiceAgentTurnRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VoiceAgentTurnRequest>(create);
+  static VoiceAgentTurnRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get requestId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set requestId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasRequestId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearRequestId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get sessionId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set sessionId($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasSessionId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSessionId() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.List<$core.int> get audioData => $_getN(2);
+  @$pb.TagNumber(3)
+  set audioData($core.List<$core.int> v) { $_setBytes(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasAudioData() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAudioData() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get sampleRateHz => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set sampleRateHz($core.int v) { $_setSignedInt32(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasSampleRateHz() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearSampleRateHz() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get channels => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set channels($core.int v) { $_setSignedInt32(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasChannels() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearChannels() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $0.AudioEncoding get encoding => $_getN(5);
+  @$pb.TagNumber(6)
+  set encoding($0.AudioEncoding v) { setField(6, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasEncoding() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearEncoding() => clearField(6);
+
+  @$pb.TagNumber(7)
+  VoiceSessionConfig get sessionConfig => $_getN(6);
+  @$pb.TagNumber(7)
+  set sessionConfig(VoiceSessionConfig v) { setField(7, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasSessionConfig() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearSessionConfig() => clearField(7);
+  @$pb.TagNumber(7)
+  VoiceSessionConfig ensureSessionConfig() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(7);
 }
 
 ///  ---------------------------------------------------------------------------
@@ -277,6 +598,9 @@ class VoiceSessionConfig extends $pb.GeneratedMessage {
     $core.bool? continuousMode,
     $core.bool? thinkingModeEnabled,
     $core.int? maxTokens,
+    $core.int? maxRecordingDurationMs,
+    $core.String? languageCode,
+    $core.String? voiceId,
   }) {
     final $result = create();
     if (silenceDurationMs != null) {
@@ -297,6 +621,15 @@ class VoiceSessionConfig extends $pb.GeneratedMessage {
     if (maxTokens != null) {
       $result.maxTokens = maxTokens;
     }
+    if (maxRecordingDurationMs != null) {
+      $result.maxRecordingDurationMs = maxRecordingDurationMs;
+    }
+    if (languageCode != null) {
+      $result.languageCode = languageCode;
+    }
+    if (voiceId != null) {
+      $result.voiceId = voiceId;
+    }
     return $result;
   }
   VoiceSessionConfig._() : super();
@@ -310,6 +643,9 @@ class VoiceSessionConfig extends $pb.GeneratedMessage {
     ..aOB(4, _omitFieldNames ? '' : 'continuousMode')
     ..aOB(5, _omitFieldNames ? '' : 'thinkingModeEnabled')
     ..a<$core.int>(6, _omitFieldNames ? '' : 'maxTokens', $pb.PbFieldType.O3)
+    ..a<$core.int>(7, _omitFieldNames ? '' : 'maxRecordingDurationMs', $pb.PbFieldType.O3)
+    ..aOS(8, _omitFieldNames ? '' : 'languageCode')
+    ..aOS(9, _omitFieldNames ? '' : 'voiceId')
     ..hasRequiredFields = false
   ;
 
@@ -396,6 +732,35 @@ class VoiceSessionConfig extends $pb.GeneratedMessage {
   $core.bool hasMaxTokens() => $_has(5);
   @$pb.TagNumber(6)
   void clearMaxTokens() => clearField(6);
+
+  /// Maximum recording duration before forcing an end-of-turn. 0 = default.
+  @$pb.TagNumber(7)
+  $core.int get maxRecordingDurationMs => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set maxRecordingDurationMs($core.int v) { $_setSignedInt32(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasMaxRecordingDurationMs() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearMaxRecordingDurationMs() => clearField(7);
+
+  /// Optional language/voice hints passed to STT/TTS adapters.
+  @$pb.TagNumber(8)
+  $core.String get languageCode => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set languageCode($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasLanguageCode() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearLanguageCode() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get voiceId => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set voiceId($core.String v) { $_setString(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasVoiceId() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearVoiceId() => clearField(9);
 }
 
 ///  ---------------------------------------------------------------------------
@@ -518,6 +883,8 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
     $core.String? wakewordVadModelPath,
     VoiceSessionConfig? sessionConfig,
     AudioPipelineConfig? audioPipelineConfig,
+    $core.String? sessionId,
+    $core.String? defaultLanguageCode,
   }) {
     final $result = create();
     if (sttModelPath != null) {
@@ -583,6 +950,12 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
     if (audioPipelineConfig != null) {
       $result.audioPipelineConfig = audioPipelineConfig;
     }
+    if (sessionId != null) {
+      $result.sessionId = sessionId;
+    }
+    if (defaultLanguageCode != null) {
+      $result.defaultLanguageCode = defaultLanguageCode;
+    }
     return $result;
   }
   VoiceAgentComposeConfig._() : super();
@@ -611,6 +984,8 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
     ..aOS(19, _omitFieldNames ? '' : 'wakewordVadModelPath')
     ..aOM<VoiceSessionConfig>(20, _omitFieldNames ? '' : 'sessionConfig', subBuilder: VoiceSessionConfig.create)
     ..aOM<AudioPipelineConfig>(21, _omitFieldNames ? '' : 'audioPipelineConfig', subBuilder: AudioPipelineConfig.create)
+    ..aOS(22, _omitFieldNames ? '' : 'sessionId')
+    ..aOS(23, _omitFieldNames ? '' : 'defaultLanguageCode')
     ..hasRequiredFields = false
   ;
 
@@ -849,6 +1224,25 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
   void clearAudioPipelineConfig() => clearField(21);
   @$pb.TagNumber(21)
   AudioPipelineConfig ensureAudioPipelineConfig() => $_ensure(20);
+
+  /// Correlation and defaults for event streams and one-shot turn APIs.
+  @$pb.TagNumber(22)
+  $core.String get sessionId => $_getSZ(21);
+  @$pb.TagNumber(22)
+  set sessionId($core.String v) { $_setString(21, v); }
+  @$pb.TagNumber(22)
+  $core.bool hasSessionId() => $_has(21);
+  @$pb.TagNumber(22)
+  void clearSessionId() => clearField(22);
+
+  @$pb.TagNumber(23)
+  $core.String get defaultLanguageCode => $_getSZ(22);
+  @$pb.TagNumber(23)
+  set defaultLanguageCode($core.String v) { $_setString(22, v); }
+  @$pb.TagNumber(23)
+  $core.bool hasDefaultLanguageCode() => $_has(22);
+  @$pb.TagNumber(23)
+  void clearDefaultLanguageCode() => clearField(23);
 }
 
 class VoiceAgentApi {

@@ -227,8 +227,12 @@ rac_add_engine_plugin(llamacpp
                         ${llamacpp_SOURCE_DIR}/ggml/include
                         ${llamacpp_SOURCE_DIR}/vendor # nlohmann/json.hpp
     COMPILE_DEFINITIONS RAC_LLAMACPP_BUILDING
+    PRIMITIVES          GENERATE_TEXT
     RUNTIMES            CPU METAL CUDA
     FORMATS             GGUF GGML BIN
+    AVAILABILITY        PUBLIC
+    PACKAGE_OWNER       runanywhere
+    PACKAGE_NAME        runanywhere_llamacpp
 )
 
 # VLM multimodal mtmd includes/defs — engine-specific, applied after the macro.

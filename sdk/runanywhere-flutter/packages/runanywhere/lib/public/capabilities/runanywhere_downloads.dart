@@ -3,7 +3,6 @@
 // runanywhere_downloads.dart — v4 Downloads capability. Owns model
 // download lifecycle, delete, and storage inspection.
 
-import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/download_service.pb.dart';
@@ -12,8 +11,7 @@ import 'package:runanywhere/generated/storage_types.pb.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
-import 'package:runanywhere/native/dart_bridge_model_registry.dart'
-    hide ModelInfo;
+import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/dart_bridge_storage.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 // §15 type-discipline: `DownloadStage` + `DownloadProgress` from
@@ -57,14 +55,16 @@ class RunAnywhereDownloads {
 
   /// Start a model download. Emits per-chunk progress until COMPLETED
   /// or FAILED; telemetry is recorded at each terminal state.
+  ///
+  /// Progress events are delivered via the commons-owned proto callback
+  /// (`rac_download_set_progress_proto_callback`). No Dart-side polling.
   Stream<DownloadProgress> start(String modelId) async* {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
 
     final logger = SDKLogger('RunAnywhere.Download');
-    logger.info('📥 Starting download for model: $modelId');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
+    logger.info('Starting download for model: $modelId');
 
     final models = await RunAnywhereModels.shared.available();
     final model = models.cast<ModelInfo?>().firstWhere(
@@ -97,6 +97,11 @@ class RunAnywhereDownloads {
       return;
     }
 
+    // Subscribe BEFORE starting so we don't lose early native callbacks.
+    // Filter the process-wide stream down to this model id.
+    final progressStream = DartBridgeDownload.instance.progressStream
+        .where((p) => p.modelId == modelId);
+
     final startResult = await startDownload(DownloadStartRequest(
       modelId: modelId,
       plan: planResult,
@@ -115,16 +120,13 @@ class RunAnywhereDownloads {
 
     if (startResult.hasInitialProgress()) {
       yield startResult.initialProgress;
+      if (_isTerminalState(startResult.initialProgress.state)) {
+        _activeTaskIdsByModel.remove(modelId);
+        return;
+      }
     }
 
-    var terminal = false;
-    while (!terminal) {
-      await Future<void>.delayed(const Duration(milliseconds: 250));
-      final progress = await pollProgress(DownloadSubscribeRequest(
-        modelId: modelId,
-        taskId: startResult.taskId,
-      ));
-      if (progress == null) continue;
+    await for (final progress in progressStream) {
       yield progress;
 
       if (progress.stage == DownloadStage.DOWNLOAD_STAGE_DOWNLOADING) {
@@ -135,37 +137,23 @@ class RunAnywhereDownloads {
       } else if (progress.stage == DownloadStage.DOWNLOAD_STAGE_EXTRACTING) {
         logger.info('Extracting model...');
       } else if (progress.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) {
-        final downloadTimeMs =
-            DateTime.now().millisecondsSinceEpoch - startTime;
-        logger.info('✅ Download completed for model: $modelId');
-        TelemetryService.shared.trackModelDownload(
-          modelId: modelId,
-          success: true,
-          downloadTimeMs: downloadTimeMs,
-          sizeBytes: progress.totalBytes.toInt(),
-        );
+        logger.info('Download completed for model: $modelId');
       } else if (progress.errorMessage.isNotEmpty) {
-        terminal = true;
-        logger.error('❌ Download failed: ${progress.errorMessage}');
-        TelemetryService.shared.trackModelDownload(
-          modelId: modelId,
-          success: false,
-        );
-        TelemetryService.shared.trackError(
-          errorCode: 'download_failed',
-          errorMessage: progress.errorMessage,
-          context: {'model_id': modelId},
-        );
+        logger.error('Download failed: ${progress.errorMessage}');
       }
 
-      if (progress.state == DownloadState.DOWNLOAD_STATE_COMPLETED ||
-          progress.state == DownloadState.DOWNLOAD_STATE_FAILED ||
-          progress.state == DownloadState.DOWNLOAD_STATE_CANCELLED) {
-        terminal = true;
+      if (_isTerminalState(progress.state)) {
+        break;
       }
     }
 
     _activeTaskIdsByModel.remove(modelId);
+  }
+
+  static bool _isTerminalState(DownloadState state) {
+    return state == DownloadState.DOWNLOAD_STATE_COMPLETED ||
+        state == DownloadState.DOWNLOAD_STATE_FAILED ||
+        state == DownloadState.DOWNLOAD_STATE_CANCELLED;
   }
 
   /// Cancel an active model download if the adapter still owns it.

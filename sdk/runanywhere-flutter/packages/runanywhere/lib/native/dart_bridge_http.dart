@@ -207,8 +207,7 @@ class DartBridgeHTTP {
         url: url,
         headers: requestHeaders,
         body: bodyBytes,
-        timeoutMs:
-            (timeout ?? const Duration(seconds: 30)).inMilliseconds,
+        timeoutMs: (timeout ?? const Duration(seconds: 30)).inMilliseconds,
       );
 
       // 401-retry is owned by the C++ `auth_manager` — no Dart-side
@@ -326,12 +325,14 @@ class DartBridgeHTTP {
 
   String _getDefaultBaseURL(SDKEnvironment environment) {
     switch (environment) {
-      case SDKEnvironment.development:
+      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 'https://dev-api.runanywhere.ai';
-      case SDKEnvironment.staging:
+      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
         return 'https://staging-api.runanywhere.ai';
-      case SDKEnvironment.production:
+      case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 'https://api.runanywhere.ai';
+      default:
+        return 'https://dev-api.runanywhere.ai';
     }
   }
 

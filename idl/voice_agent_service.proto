@@ -32,6 +32,11 @@ message VoiceAgentRequest {
     // Optional: filter the stream to only certain VoiceEvent.payload arms
     // (e.g. "user_said,assistant_token"). Empty = all events.
     string event_filter = 1;
+    string session_id = 2;
+    repeated VoiceEventCategory categories = 3;
+    VoiceEventSeverity min_severity = 4;
+    uint64 replay_from_seq = 5;
+    bool include_audio = 6;
 }
 
 service VoiceAgent {
@@ -81,6 +86,26 @@ message VoiceAgentResult {
     int32 synthesized_audio_sample_rate_hz = 7;
     int32 synthesized_audio_channels       = 8;
     AudioEncoding synthesized_audio_encoding = 9;
+
+    string session_id = 10;
+    string turn_id = 11;
+    int64 stt_time_ms = 12;
+    int64 llm_time_ms = 13;
+    int64 tts_time_ms = 14;
+    int64 total_time_ms = 15;
+    optional string error_message = 16;
+    int32 error_code = 17;
+}
+
+message VoiceAgentTurnRequest {
+    string request_id = 1;
+    string session_id = 2;
+    bytes audio_data = 3;
+    int32 sample_rate_hz = 4;
+    int32 channels = 5;
+    AudioEncoding encoding = 6;
+    optional VoiceSessionConfig session_config = 7;
+    map<string, string> metadata = 8;
 }
 
 // ---------------------------------------------------------------------------
@@ -112,6 +137,13 @@ message VoiceSessionConfig {
 
     // Optional per-turn LLM max token limit. 0 = LLM/default.
     int32 max_tokens = 6;
+
+    // Maximum recording duration before forcing an end-of-turn. 0 = default.
+    int32 max_recording_duration_ms = 7;
+
+    // Optional language/voice hints passed to STT/TTS adapters.
+    optional string language_code = 8;
+    optional string voice_id = 9;
 }
 
 // ---------------------------------------------------------------------------
@@ -189,4 +221,8 @@ message VoiceAgentComposeConfig {
     // Audio state-machine behavior. Optional so defaults can be applied by
     // the native voice-agent implementation.
     optional AudioPipelineConfig audio_pipeline_config = 21;
+
+    // Correlation and defaults for event streams and one-shot turn APIs.
+    optional string session_id = 22;
+    optional string default_language_code = 23;
 }

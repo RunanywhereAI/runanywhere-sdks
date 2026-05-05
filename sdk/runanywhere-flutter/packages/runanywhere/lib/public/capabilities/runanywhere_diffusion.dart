@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Diffusion capability using the generated-proto C++ service ABI.
+// Diffusion capability backed by commons model lifecycle and lifecycle-owned
+// generated-proto image generation.
 
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
@@ -9,56 +10,71 @@ import 'package:runanywhere/generated/diffusion_options.pb.dart'
         DiffusionCapabilities,
         DiffusionConfiguration,
         DiffusionGenerationOptions,
+        DiffusionGenerationRequest,
         DiffusionProgress,
         DiffusionResult;
+import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
+import 'package:runanywhere/generated/sdk_events.pb.dart'
+    show ComponentLifecycleSnapshot;
+import 'package:runanywhere/generated/sdk_events.pbenum.dart'
+    show ComponentLifecycleState, SDKComponent;
 import 'package:runanywhere/internal/sdk_state.dart';
-import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_diffusion.dart';
-import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 
 /// Diffusion (image generation) capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.diffusion`.
+/// Access via `RunAnywhereSDK.instance.diffusion`. Load/current/unload state is
+/// owned by commons lifecycle; one-shot generation uses the lifecycle-owned
+/// generated-proto commons ABI.
 class RunAnywhereDiffusion {
   RunAnywhereDiffusion._();
   static final RunAnywhereDiffusion _instance = RunAnywhereDiffusion._();
   static RunAnywhereDiffusion get shared => _instance;
 
-  String? _currentModelId;
-
-  /// True when a diffusion model is currently loaded.
-  bool get isLoaded => DartBridgeDiffusion.isLoaded();
+  /// True when commons lifecycle has a ready diffusion model.
+  bool get isLoaded {
+    final snapshot = _lifecycleSnapshot;
+    return snapshot != null &&
+        snapshot.state ==
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+        snapshot.modelId.isNotEmpty;
+  }
 
   /// Currently-loaded diffusion model id, or null.
-  String? get currentModelId => _currentModelId;
+  String? get currentModelId {
+    final snapshot = _lifecycleSnapshot;
+    if (snapshot == null ||
+        snapshot.state !=
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY ||
+        snapshot.modelId.isEmpty) {
+      return null;
+    }
+    return snapshot.modelId;
+  }
 
-  /// Load a diffusion model by registry ID.
+  /// Load a diffusion model by registry ID through commons lifecycle routing.
   Future<void> load(String modelId, [DiffusionConfiguration? config]) async {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
 
-    final models = await RunAnywhereModels.shared.available();
-    final model = models.where((m) => m.id == modelId).firstOrNull;
-    if (model == null) {
-      throw SDKException.modelNotFound('Diffusion model not found: $modelId');
-    }
-    if (model.localPath.isEmpty) {
-      throw SDKException.modelNotDownloaded(
-        'Diffusion model is not downloaded. Call downloadModel() first.',
+    final result = await RunAnywhereModelLifecycle.shared.load(
+      model_pb.ModelLoadRequest(
+        modelId: modelId,
+        category: _diffusionCategory,
+        forceReload: true,
+        validateAvailability: true,
+      ),
+    );
+    if (!result.success) {
+      throw SDKException.modelLoadFailed(
+        modelId,
+        result.errorMessage.isNotEmpty
+            ? result.errorMessage
+            : 'Diffusion lifecycle load failed',
       );
     }
-
-    final resolvedPath =
-        await DartBridge.modelPaths.resolveModelFilePath(model);
-    if (resolvedPath == null) {
-      throw SDKException.modelNotFound(
-        'Could not resolve diffusion model file path for: $modelId',
-      );
-    }
-
-    DartBridgeDiffusion.loadModel(modelId, resolvedPath);
-    _currentModelId = modelId;
   }
 
   /// Unload the currently-loaded diffusion model.
@@ -66,8 +82,27 @@ class RunAnywhereDiffusion {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    DartBridgeDiffusion.unload();
-    _currentModelId = null;
+
+    final modelId = currentModelId ??
+        (await RunAnywhereModelLifecycle.shared.current(
+          model_pb.CurrentModelRequest(category: _diffusionCategory),
+        ))
+            .modelId;
+    if (modelId.isEmpty) return;
+
+    final result = await RunAnywhereModelLifecycle.shared.unload(
+      model_pb.ModelUnloadRequest(
+        modelId: modelId,
+        category: _diffusionCategory,
+      ),
+    );
+    if (!result.success) {
+      throw SDKException.invalidState(
+        result.errorMessage.isNotEmpty
+            ? result.errorMessage
+            : 'Diffusion lifecycle unload failed',
+      );
+    }
   }
 
   /// Generate an image from a text prompt.
@@ -78,20 +113,30 @@ class RunAnywhereDiffusion {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
+    final modelId = await _requireLoadedModelId();
     return DartBridgeDiffusion.generateProto(
-        _effectiveOptions(prompt, options));
+      DiffusionGenerationRequest(
+        modelId: modelId,
+        options: _effectiveOptions(prompt, options),
+        metadata: {'model_id': modelId},
+      ),
+    );
   }
 
   /// Stream generation progress.
   Stream<DiffusionProgress> generateStream(
     String prompt, [
     DiffusionGenerationOptions? options,
-  ]) {
+  ]) async* {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    return DartBridgeDiffusion.generateWithProgressProto(
-      _effectiveOptions(prompt, options, reportProgress: true),
+    await _requireLoadedModelId();
+    _effectiveOptions(prompt, options, reportProgress: true);
+    throw SDKException.featureNotAvailable(
+      'Lifecycle-owned diffusion progress streaming is unavailable in '
+      'Flutter. Use generate() for one-shot generation until commons exposes '
+      'rac_diffusion_generate_stream_lifecycle_proto.',
     );
   }
 
@@ -100,13 +145,19 @@ class RunAnywhereDiffusion {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    DartBridgeDiffusion.cancel();
+    throw SDKException.featureNotAvailable(
+      'Lifecycle-owned diffusion cancellation is unavailable in Flutter until '
+      'commons exposes rac_diffusion_cancel_lifecycle_proto.',
+    );
   }
 
   /// Backend capability discovery.
   DiffusionCapabilities capabilities() {
     if (!SdkState.shared.isInitialized) return DiffusionCapabilities();
-    return DartBridgeDiffusion.capabilitiesProto();
+    throw SDKException.featureNotAvailable(
+      'Lifecycle-owned diffusion capability discovery is unavailable in '
+      'Flutter until commons exposes rac_diffusion_capabilities_proto.',
+    );
   }
 
   DiffusionGenerationOptions _effectiveOptions(
@@ -124,4 +175,28 @@ class RunAnywhereDiffusion {
     }
     return request;
   }
+
+  Future<String> _requireLoadedModelId() async {
+    final snapshotModelId = currentModelId;
+    if (snapshotModelId != null) {
+      return snapshotModelId;
+    }
+    final current = await RunAnywhereModelLifecycle.shared.current(
+      model_pb.CurrentModelRequest(category: _diffusionCategory),
+    );
+    if (current.found && current.modelId.isNotEmpty) {
+      return current.modelId;
+    }
+    throw SDKException.componentNotReady(
+      'No diffusion model loaded through commons lifecycle. Call load() first.',
+    );
+  }
+
+  ComponentLifecycleSnapshot? get _lifecycleSnapshot =>
+      RunAnywhereModelLifecycle.shared.componentSnapshot(
+        SDKComponent.SDK_COMPONENT_DIFFUSION,
+      );
+
+  static const _diffusionCategory =
+      model_pb.ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION;
 }

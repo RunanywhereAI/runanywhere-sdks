@@ -37,8 +37,8 @@ class RunAnywhereVoiceAgent {
   Future<void> initializeWithLoadedModels() =>
       RunAnywhereVoice.shared.initializeWithLoadedModels();
 
-  /// Initialize from a [VoiceAgentConfiguration].
-  Future<void> initialize(VoiceAgentConfiguration config) =>
+  /// Initialize from a generated [voice_agent_proto.VoiceAgentComposeConfig].
+  Future<void> initialize(voice_agent_proto.VoiceAgentComposeConfig config) =>
       RunAnywhereVoice.shared.initializeVoiceAgent(config);
 
   /// Cleanup voice agent native resources.

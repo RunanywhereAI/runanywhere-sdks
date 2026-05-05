@@ -4,10 +4,16 @@
  *
  * GAP 02 + GAP 06 T5.3. Apple-only Stable Diffusion plugin backed by
  * CoreML MLModel components.
+ *
+ * CPP-04: declarative manifest publishes package ownership, Apple-only
+ * (private) availability and the served primitive set alongside the routing
+ * metadata. The manifest mirrors the conditional ops slot so registry
+ * validation accepts both routable and stub builds.
  */
 
 #include "diffusion_coreml_backend.h"
 
+#include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/features/diffusion/rac_diffusion_service.h"
@@ -120,55 +126,77 @@ static const rac_runtime_id_t k_dcoreml_runtimes[] = {
 };
 
 static const uint32_t k_dcoreml_formats[] = {
-    5,  /* MODEL_FORMAT_COREML */
+    RAC_MODEL_FORMAT_ID_COREML,
+};
+
+static const rac_primitive_t k_dcoreml_primitives[] = {
+    RAC_PRIMITIVE_DIFFUSION,
 };
 #endif
 
+static const rac_engine_manifest_t k_diffusion_coreml_manifest = {
+    /* The plugin name is kept distinct ("diffusion-coreml") so tooling
+     * can refer to it unambiguously. */
+    .name             = "diffusion-coreml",
+    .display_name     =
+#if RAC_DIFFUSION_COREML_ROUTABLE
+        "Apple CoreML Diffusion",
+#else
+        "Apple CoreML Diffusion [generate unavailable]",
+#endif
+    .version          = nullptr,
+    .package_owner    = "runanywhere",
+    .package_name     = "runanywhere_diffusion_coreml",
+    .availability     = RAC_ENGINE_AVAILABILITY_PRIVATE,  /* Apple-only. */
+    .priority         =
+#if RAC_DIFFUSION_COREML_ROUTABLE
+        100,
+#else
+        0,
+#endif
+    .capability_flags = 0,
+    .primitives       =
+#if RAC_DIFFUSION_COREML_ROUTABLE
+        k_dcoreml_primitives,
+#else
+        nullptr,
+#endif
+    .primitives_count =
+#if RAC_DIFFUSION_COREML_ROUTABLE
+        sizeof(k_dcoreml_primitives) / sizeof(k_dcoreml_primitives[0]),
+#else
+        0,
+#endif
+    .runtimes         =
+#if RAC_DIFFUSION_COREML_ROUTABLE
+        k_dcoreml_runtimes,
+#else
+        nullptr,
+#endif
+    .runtimes_count   =
+#if RAC_DIFFUSION_COREML_ROUTABLE
+        sizeof(k_dcoreml_runtimes) / sizeof(k_dcoreml_runtimes[0]),
+#else
+        0,
+#endif
+    .formats          =
+#if RAC_DIFFUSION_COREML_ROUTABLE
+        k_dcoreml_formats,
+#else
+        nullptr,
+#endif
+    .formats_count    =
+#if RAC_DIFFUSION_COREML_ROUTABLE
+        sizeof(k_dcoreml_formats) / sizeof(k_dcoreml_formats[0]),
+#else
+        0,
+#endif
+    .reserved_0       = 0,
+    .reserved_1       = 0,
+};
+
 static const rac_engine_vtable_t g_diffusion_coreml_engine_vtable = {
-    /* metadata */ {
-        .abi_version      = RAC_PLUGIN_API_VERSION,
-        /* The plugin name is kept distinct ("diffusion-coreml") so tooling
-         * can refer to it unambiguously. */
-        .name             = "diffusion-coreml",
-        .display_name     =
-#if RAC_DIFFUSION_COREML_ROUTABLE
-            "Apple CoreML Diffusion",
-#else
-            "Apple CoreML Diffusion [generate unavailable]",
-#endif
-        .engine_version   = nullptr,
-        .priority         =
-#if RAC_DIFFUSION_COREML_ROUTABLE
-            100,
-#else
-            0,
-#endif
-        .capability_flags = 0,
-        .runtimes         =
-#if RAC_DIFFUSION_COREML_ROUTABLE
-            k_dcoreml_runtimes,
-#else
-            nullptr,
-#endif
-        .runtimes_count   =
-#if RAC_DIFFUSION_COREML_ROUTABLE
-            sizeof(k_dcoreml_runtimes) / sizeof(k_dcoreml_runtimes[0]),
-#else
-            0,
-#endif
-        .formats          =
-#if RAC_DIFFUSION_COREML_ROUTABLE
-            k_dcoreml_formats,
-#else
-            nullptr,
-#endif
-        .formats_count    =
-#if RAC_DIFFUSION_COREML_ROUTABLE
-            sizeof(k_dcoreml_formats) / sizeof(k_dcoreml_formats[0]),
-#else
-            0,
-#endif
-    },
+    /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_diffusion_coreml_manifest),
     /* capability_check */ diffusion_coreml_capability_check,
     /* on_unload        */ nullptr,
 
@@ -191,7 +219,8 @@ static const rac_engine_vtable_t g_diffusion_coreml_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(diffusion_coreml) {
-    return &g_diffusion_coreml_engine_vtable;
+    return rac_engine_entry_with_manifest(&k_diffusion_coreml_manifest,
+                                          &g_diffusion_coreml_engine_vtable);
 }
 
 }  // extern "C"

@@ -140,7 +140,7 @@ struct LoadingDeviceRow: View {
 
 /// A model row designed for flat list display with prominent framework badge
 struct FlatModelRow: View {
-    let model: ModelInfo
+    let model: RAModelInfo
     let availabilityReason: String?
     let isSelected: Bool
     let isLoading: Bool
@@ -150,7 +150,7 @@ struct FlatModelRow: View {
 
     @State private var isDownloading = false
     @State private var downloadProgress: Double = 0.0
-    @State private var downloadStage: DownloadStage = .downloading
+    @State private var downloadStage: RADownloadStage = .downloading
 
     private var frameworkColor: Color {
         switch model.framework {
@@ -166,20 +166,20 @@ struct FlatModelRow: View {
         case .llamaCpp: return "Fast"
         case .onnx: return "ONNX"
         case .foundationModels: return "Apple"
-        case .systemTTS: return "System"
+        case .systemTts: return "System"
         default: return model.framework.displayName
         }
     }
 
     /// Check if any LoRA adapters are compatible with this model
     private var hasLoRAAdapters: Bool {
-        LoRAAdapterCatalog.adapters.contains { $0.compatibleModelIds.contains(model.id) }
+        model.supportsLora
     }
 
     /// Check if this is a built-in model that doesn't require download
     private var isBuiltIn: Bool {
         model.framework == .foundationModels ||
-        model.framework == .systemTTS ||
+        model.framework == .systemTts ||
         model.artifactType == .builtIn
     }
 
@@ -188,7 +188,7 @@ struct FlatModelRow: View {
             return "exclamationmark.triangle.fill"
         } else if isBuiltIn {
             return "checkmark.circle.fill"
-        } else if model.localPath != nil {
+        } else if model.localPathURL != nil {
             return "checkmark.circle.fill"
         } else {
             return "arrow.down.circle"
@@ -198,7 +198,7 @@ struct FlatModelRow: View {
     private var statusColor: Color {
         if availabilityReason != nil {
             return AppColors.statusOrange
-        } else if isBuiltIn || model.localPath != nil {
+        } else if isBuiltIn || model.localPathURL != nil {
             return AppColors.statusGreen
         } else {
             return AppColors.primaryAccent
@@ -210,7 +210,7 @@ struct FlatModelRow: View {
             return availabilityReason
         } else if isBuiltIn {
             return "Built-in"
-        } else if model.localPath != nil {
+        } else if model.localPathURL != nil {
             return "Ready"
         } else {
             return ""  // Removed "Download" text
@@ -338,7 +338,7 @@ struct FlatModelRow: View {
             .tint(AppColors.primaryAccent)
             .controlSize(.small)
             .disabled(isLoading || isSelected)
-        } else if model.localPath == nil {
+        } else if model.localPathURL == nil {
             // Model needs to be downloaded
             if isDownloading {
                 ProgressView()
@@ -352,7 +352,8 @@ struct FlatModelRow: View {
                     HStack(spacing: AppSpacing.xxSmall) {
                         Image(systemName: "arrow.down.circle.fill")
                         // Show file size instead of "Get"
-                        if let size = model.downloadSize, size > 0 {
+                        let size = model.downloadSizeBytes
+                        if size > 0 {
                             Text(ByteCountFormatter.string(fromByteCount: size, countStyle: .memory))
                         } else {
                             Text("Get")
@@ -388,34 +389,18 @@ struct FlatModelRow: View {
         }
 
         do {
-            let progressStream = try await RunAnywhere.downloadModel(model.id)
-
-            for await progress in progressStream {
-                switch progress.state {
-                case .completed:
-                    await MainActor.run {
-                        self.downloadProgress = 1.0
-                        self.isDownloading = false
-                        self.downloadStage = .downloading
-                        onDownloadCompleted()
-                    }
-                    return
-
-                case .failed:
-                    await MainActor.run {
-                        self.downloadProgress = 0.0
-                        self.isDownloading = false
-                        self.downloadStage = .downloading
-                    }
-                    return
-
-                default:
-                    await MainActor.run {
-                        self.downloadProgress = progress.overallProgress
-                        self.downloadStage = progress.stage
-                    }
-                    continue
+            try await RunAnywhere.downloadModel(model) { progress in
+                await MainActor.run {
+                    self.downloadProgress = Double(progress.overallProgress)
+                    self.downloadStage = progress.stage
                 }
+            }
+
+            await MainActor.run {
+                self.downloadProgress = 1.0
+                self.isDownloading = false
+                self.downloadStage = .downloading
+                onDownloadCompleted()
             }
         } catch {
             await MainActor.run {

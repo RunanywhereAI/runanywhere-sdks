@@ -143,14 +143,28 @@ namespace {
 using runanywhere::v1::ArchiveArtifact;
 using runanywhere::v1::ArchiveStructure;
 using runanywhere::v1::ArchiveType;
+using runanywhere::v1::DiscoveredModel;
 using runanywhere::v1::InferenceFramework;
 using runanywhere::v1::ModelCategory;
+using runanywhere::v1::ModelDeleteResult;
+using runanywhere::v1::ModelDiscoveryRequest;
+using runanywhere::v1::ModelDiscoveryResult;
 using runanywhere::v1::ModelFileDescriptor;
+using runanywhere::v1::ModelFileRole;
 using runanywhere::v1::ModelFormat;
+using runanywhere::v1::ModelGetRequest;
+using runanywhere::v1::ModelGetResult;
+using runanywhere::v1::ModelImportRequest;
+using runanywhere::v1::ModelImportResult;
 using runanywhere::v1::ModelInfo;
 using runanywhere::v1::ModelInfoList;
+using runanywhere::v1::ModelListRequest;
+using runanywhere::v1::ModelListResult;
 using runanywhere::v1::ModelQuery;
 using runanywhere::v1::ModelQuerySortField;
+using runanywhere::v1::ModelRegistryRefreshRequest;
+using runanywhere::v1::ModelRegistryRefreshResult;
+using runanywhere::v1::ModelRegistryStatus;
 using runanywhere::v1::ModelSource;
 using runanywhere::v1::MultiFileArtifact;
 using runanywhere::v1::SingleFileArtifact;
@@ -208,52 +222,17 @@ static rac_model_category_t model_category_from_proto(ModelCategory category) {
 }
 
 static ModelFormat model_format_to_proto(rac_model_format_t format) {
-    switch (format) {
-        case RAC_MODEL_FORMAT_ONNX:
-            return runanywhere::v1::MODEL_FORMAT_ONNX;
-        case RAC_MODEL_FORMAT_ORT:
-            return runanywhere::v1::MODEL_FORMAT_ORT;
-        case RAC_MODEL_FORMAT_GGUF:
-            return runanywhere::v1::MODEL_FORMAT_GGUF;
-        case RAC_MODEL_FORMAT_BIN:
-            return runanywhere::v1::MODEL_FORMAT_BIN;
-        case RAC_MODEL_FORMAT_COREML:
-            return runanywhere::v1::MODEL_FORMAT_COREML;
-        case RAC_MODEL_FORMAT_QNN_CONTEXT:
-            return runanywhere::v1::MODEL_FORMAT_QNN_CONTEXT;
-        case RAC_MODEL_FORMAT_UNKNOWN:
-        default:
-            return runanywhere::v1::MODEL_FORMAT_UNKNOWN;
-    }
+    const int value = static_cast<int>(format);
+    return runanywhere::v1::ModelFormat_IsValid(value)
+               ? static_cast<ModelFormat>(value)
+               : runanywhere::v1::MODEL_FORMAT_UNKNOWN;
 }
 
 static rac_model_format_t model_format_from_proto(ModelFormat format) {
-    switch (format) {
-        case runanywhere::v1::MODEL_FORMAT_ONNX:
-            return RAC_MODEL_FORMAT_ONNX;
-        case runanywhere::v1::MODEL_FORMAT_ORT:
-            return RAC_MODEL_FORMAT_ORT;
-        case runanywhere::v1::MODEL_FORMAT_GGUF:
-            return RAC_MODEL_FORMAT_GGUF;
-        case runanywhere::v1::MODEL_FORMAT_BIN:
-            return RAC_MODEL_FORMAT_BIN;
-        case runanywhere::v1::MODEL_FORMAT_COREML:
-        case runanywhere::v1::MODEL_FORMAT_MLMODEL:
-        case runanywhere::v1::MODEL_FORMAT_MLPACKAGE:
-            return RAC_MODEL_FORMAT_COREML;
-        case runanywhere::v1::MODEL_FORMAT_QNN_CONTEXT:
-            return RAC_MODEL_FORMAT_QNN_CONTEXT;
-        case runanywhere::v1::MODEL_FORMAT_UNSPECIFIED:
-        case runanywhere::v1::MODEL_FORMAT_GGML:
-        case runanywhere::v1::MODEL_FORMAT_TFLITE:
-        case runanywhere::v1::MODEL_FORMAT_SAFETENSORS:
-        case runanywhere::v1::MODEL_FORMAT_ZIP:
-        case runanywhere::v1::MODEL_FORMAT_FOLDER:
-        case runanywhere::v1::MODEL_FORMAT_PROPRIETARY:
-        case runanywhere::v1::MODEL_FORMAT_UNKNOWN:
-        default:
-            return RAC_MODEL_FORMAT_UNKNOWN;
-    }
+    const int value = static_cast<int>(format);
+    return runanywhere::v1::ModelFormat_IsValid(value)
+               ? static_cast<rac_model_format_t>(value)
+               : RAC_MODEL_FORMAT_UNKNOWN;
 }
 
 static InferenceFramework inference_framework_to_proto(rac_inference_framework_t framework) {
@@ -407,6 +386,54 @@ static rac_archive_structure_t archive_structure_from_proto(ArchiveStructure str
     }
 }
 
+static ModelFileRole model_file_role_to_proto(rac_model_file_role_t role) {
+    switch (role) {
+        case RAC_MODEL_FILE_ROLE_PRIMARY_MODEL:
+            return runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL;
+        case RAC_MODEL_FILE_ROLE_COMPANION:
+            return runanywhere::v1::MODEL_FILE_ROLE_COMPANION;
+        case RAC_MODEL_FILE_ROLE_VISION_PROJECTOR:
+            return runanywhere::v1::MODEL_FILE_ROLE_VISION_PROJECTOR;
+        case RAC_MODEL_FILE_ROLE_TOKENIZER:
+            return runanywhere::v1::MODEL_FILE_ROLE_TOKENIZER;
+        case RAC_MODEL_FILE_ROLE_CONFIG:
+            return runanywhere::v1::MODEL_FILE_ROLE_CONFIG;
+        case RAC_MODEL_FILE_ROLE_VOCABULARY:
+            return runanywhere::v1::MODEL_FILE_ROLE_VOCABULARY;
+        case RAC_MODEL_FILE_ROLE_MERGES:
+            return runanywhere::v1::MODEL_FILE_ROLE_MERGES;
+        case RAC_MODEL_FILE_ROLE_LABELS:
+            return runanywhere::v1::MODEL_FILE_ROLE_LABELS;
+        case RAC_MODEL_FILE_ROLE_UNSPECIFIED:
+        default:
+            return runanywhere::v1::MODEL_FILE_ROLE_UNSPECIFIED;
+    }
+}
+
+static rac_model_file_role_t model_file_role_from_proto(ModelFileRole role) {
+    switch (role) {
+        case runanywhere::v1::MODEL_FILE_ROLE_PRIMARY_MODEL:
+            return RAC_MODEL_FILE_ROLE_PRIMARY_MODEL;
+        case runanywhere::v1::MODEL_FILE_ROLE_COMPANION:
+            return RAC_MODEL_FILE_ROLE_COMPANION;
+        case runanywhere::v1::MODEL_FILE_ROLE_VISION_PROJECTOR:
+            return RAC_MODEL_FILE_ROLE_VISION_PROJECTOR;
+        case runanywhere::v1::MODEL_FILE_ROLE_TOKENIZER:
+            return RAC_MODEL_FILE_ROLE_TOKENIZER;
+        case runanywhere::v1::MODEL_FILE_ROLE_CONFIG:
+            return RAC_MODEL_FILE_ROLE_CONFIG;
+        case runanywhere::v1::MODEL_FILE_ROLE_VOCABULARY:
+            return RAC_MODEL_FILE_ROLE_VOCABULARY;
+        case runanywhere::v1::MODEL_FILE_ROLE_MERGES:
+            return RAC_MODEL_FILE_ROLE_MERGES;
+        case runanywhere::v1::MODEL_FILE_ROLE_LABELS:
+            return RAC_MODEL_FILE_ROLE_LABELS;
+        case runanywhere::v1::MODEL_FILE_ROLE_UNSPECIFIED:
+        default:
+            return RAC_MODEL_FILE_ROLE_UNSPECIFIED;
+    }
+}
+
 static char* dup_optional_proto_string(const std::string& value) {
     return value.empty() ? nullptr : rac_strdup(value.c_str());
 }
@@ -503,12 +530,108 @@ static void add_file_descriptors_to_proto(const rac_model_artifact_info_t* artif
         if (in.relative_path) file->set_url(in.relative_path);
         if (in.destination_path) file->set_filename(in.destination_path);
         file->set_is_required(in.is_required == RAC_TRUE);
+        file->set_role(model_file_role_to_proto(in.role));
+    }
+}
+
+static bool has_nonempty_local_path(const ModelInfo& model) {
+    return !model.local_path().empty();
+}
+
+static bool registry_status_is_downloaded(ModelRegistryStatus status) {
+    return status == runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED ||
+           status == runanywhere::v1::MODEL_REGISTRY_STATUS_LOADED;
+}
+
+static bool model_is_downloaded_from_fields(const ModelInfo& model) {
+    if (has_nonempty_local_path(model)) {
+        return true;
+    }
+    if (model.has_is_downloaded()) {
+        return model.is_downloaded();
+    }
+    if (model.has_registry_status()) {
+        return registry_status_is_downloaded(model.registry_status());
+    }
+    return false;
+}
+
+static ModelRegistryStatus effective_registry_status(const ModelInfo& model) {
+    if (model.has_registry_status()) {
+        return model.registry_status();
+    }
+    return model_is_downloaded_from_fields(model)
+               ? runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED
+               : runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED;
+}
+
+static void normalize_model_registry_state(ModelInfo* model) {
+    if (!model) {
+        return;
+    }
+
+    const bool downloaded = model_is_downloaded_from_fields(*model);
+    if (!model->has_is_downloaded()) {
+        model->set_is_downloaded(downloaded);
+    }
+    if (!model->has_is_available()) {
+        model->set_is_available(downloaded);
+    }
+    if (!model->has_registry_status()) {
+        model->set_registry_status(downloaded
+                                       ? runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED
+                                       : runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
+    }
+}
+
+static void overwrite_download_state_from_local_path(ModelInfo* model) {
+    if (!model) {
+        return;
+    }
+
+    const bool downloaded = has_nonempty_local_path(*model);
+    model->set_is_downloaded(downloaded);
+    model->set_is_available(downloaded);
+
+    const ModelRegistryStatus current = effective_registry_status(*model);
+    if (downloaded) {
+        if (current != runanywhere::v1::MODEL_REGISTRY_STATUS_LOADED &&
+            current != runanywhere::v1::MODEL_REGISTRY_STATUS_LOADING &&
+            current != runanywhere::v1::MODEL_REGISTRY_STATUS_ERROR) {
+            model->set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED);
+        }
+    } else if (registry_status_is_downloaded(current) ||
+               current == runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADING ||
+               current == runanywhere::v1::MODEL_REGISTRY_STATUS_LOADING ||
+               current == runanywhere::v1::MODEL_REGISTRY_STATUS_UNSPECIFIED) {
+        model->set_registry_status(runanywhere::v1::MODEL_REGISTRY_STATUS_REGISTERED);
+    }
+}
+
+static void overlay_struct_runtime_fields_to_proto(const rac_model_info_t* in,
+                                                   ModelInfo* out,
+                                                   bool overwrite_registry_state) {
+    if (!in || !out) {
+        return;
+    }
+
+    out->set_local_path(in->local_path ? in->local_path : "");
+    out->set_updated_at_unix_ms(in->updated_at);
+    if (in->last_used > 0) {
+        out->set_last_used_at_unix_ms(in->last_used);
+    }
+    if (in->usage_count > 0) {
+        out->set_usage_count(in->usage_count);
+    }
+    if (overwrite_registry_state) {
+        overwrite_download_state_from_local_path(out);
     }
 }
 
 static void model_info_to_proto(const rac_model_info_t* in,
                                 ModelInfo* out,
-                                bool overwrite_artifact) {
+                                bool overwrite_artifact,
+                                bool overwrite_registry_state) {
     if (!in || !out) {
         return;
     }
@@ -536,6 +659,9 @@ static void model_info_to_proto(const rac_model_info_t* in,
     }
     if (in->usage_count > 0) {
         out->set_usage_count(in->usage_count);
+    }
+    if (overwrite_registry_state) {
+        overwrite_download_state_from_local_path(out);
     }
 
     if (!overwrite_artifact) {
@@ -613,9 +739,18 @@ static bool apply_proto_artifact_to_model(const ModelInfo& proto, rac_model_info
                     const ModelFileDescriptor& file = proto.multi_file().files(i);
                     rac_model_file_descriptor_t& out =
                         model->artifact_info.file_descriptors[static_cast<size_t>(i)];
-                    out.relative_path = dup_optional_proto_string(file.url());
-                    out.destination_path = dup_optional_proto_string(file.filename());
+                    const std::string relative =
+                        file.has_relative_path() && !file.relative_path().empty()
+                            ? file.relative_path()
+                            : (!file.url().empty() ? file.url() : file.filename());
+                    const std::string destination =
+                        file.has_destination_path() && !file.destination_path().empty()
+                            ? file.destination_path()
+                            : file.filename();
+                    out.relative_path = dup_optional_proto_string(relative);
+                    out.destination_path = dup_optional_proto_string(destination);
                     out.is_required = file.is_required() ? RAC_TRUE : RAC_FALSE;
+                    out.role = model_file_role_from_proto(file.role());
                 }
             }
             break;
@@ -722,16 +857,76 @@ static rac_result_t serialize_proto_to_owned_buffer(const ProtoMessage& message,
         proto_size_out);
 }
 
+template <typename ProtoMessage>
+static rac_result_t serialize_proto_to_buffer(const ProtoMessage& message,
+                                              rac_proto_buffer_t* out_buffer) {
+    if (!out_buffer) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    std::string bytes;
+    if (!message.SerializeToString(&bytes)) {
+        return rac_proto_buffer_set_error(out_buffer,
+                                          RAC_ERROR_ENCODING_ERROR,
+                                          "failed to serialize registry proto result");
+    }
+
+    return rac_proto_buffer_copy(reinterpret_cast<const uint8_t*>(bytes.data()),
+                                 bytes.size(),
+                                 out_buffer);
+}
+
+static rac_result_t proto_buffer_error(rac_proto_buffer_t* out_buffer,
+                                       rac_result_t status,
+                                       const char* message) {
+    if (!out_buffer) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    return rac_proto_buffer_set_error(out_buffer,
+                                      status,
+                                      message ? message : rac_error_message(status));
+}
+
+template <typename ProtoMessage>
+static rac_result_t parse_proto_message_bytes(const uint8_t* proto_bytes,
+                                              size_t proto_size,
+                                              ProtoMessage* out,
+                                              const char* message_name,
+                                              rac_proto_buffer_t* error_out) {
+    if (!out) {
+        return proto_buffer_error(error_out,
+                                  RAC_ERROR_INVALID_ARGUMENT,
+                                  "output proto message is required");
+    }
+
+    rac_result_t validation = rac_proto_bytes_validate(proto_bytes, proto_size);
+    if (validation != RAC_SUCCESS) {
+        return proto_buffer_error(error_out,
+                                  validation,
+                                  "proto bytes are null or too large");
+    }
+
+    if (!out->ParseFromArray(rac_proto_bytes_data_or_empty(proto_bytes, proto_size),
+                             static_cast<int>(proto_size))) {
+        std::string message = "failed to parse ";
+        message += message_name ? message_name : "proto message";
+        return proto_buffer_error(error_out, RAC_ERROR_INVALID_FORMAT, message.c_str());
+    }
+    return RAC_SUCCESS;
+}
+
 static rac_result_t parse_model_info_bytes(const uint8_t* proto_bytes,
                                            size_t proto_size,
                                            ModelInfo* out) {
-    if (!proto_bytes || proto_size == 0 || !out) {
+    if (!out) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    if (proto_size > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    rac_result_t validation = rac_proto_bytes_validate(proto_bytes, proto_size);
+    if (validation != RAC_SUCCESS) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    if (!out->ParseFromArray(proto_bytes, static_cast<int>(proto_size))) {
+    if (!out->ParseFromArray(rac_proto_bytes_data_or_empty(proto_bytes, proto_size),
+                             static_cast<int>(proto_size))) {
         return RAC_ERROR_INVALID_FORMAT;
     }
     if (out->id().empty()) {
@@ -743,13 +938,15 @@ static rac_result_t parse_model_info_bytes(const uint8_t* proto_bytes,
 static rac_result_t parse_model_query_bytes(const uint8_t* query_proto_bytes,
                                             size_t query_proto_size,
                                             ModelQuery* out) {
-    if (!query_proto_bytes || query_proto_size == 0 || !out) {
+    if (!out) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    if (query_proto_size > static_cast<size_t>(std::numeric_limits<int>::max())) {
+    rac_result_t validation = rac_proto_bytes_validate(query_proto_bytes, query_proto_size);
+    if (validation != RAC_SUCCESS) {
         return RAC_ERROR_INVALID_ARGUMENT;
     }
-    if (!out->ParseFromArray(query_proto_bytes, static_cast<int>(query_proto_size))) {
+    if (!out->ParseFromArray(rac_proto_bytes_data_or_empty(query_proto_bytes, query_proto_size),
+                             static_cast<int>(query_proto_size))) {
         return RAC_ERROR_INVALID_FORMAT;
     }
     return RAC_SUCCESS;
@@ -839,7 +1036,8 @@ static void preserve_absent_proto_fields(const ModelInfo& existing, ModelInfo* i
 static rac_result_t store_proto_snapshot_locked(rac_model_registry_handle_t handle,
                                                 const std::string& model_id,
                                                 const rac_model_info_t* model,
-                                                bool preserve_proto_only_fields) {
+                                                bool preserve_proto_only_fields,
+                                                bool overwrite_registry_state) {
     ModelInfo snapshot;
     bool parsed_existing = false;
     if (preserve_proto_only_fields) {
@@ -852,7 +1050,16 @@ static rac_result_t store_proto_snapshot_locked(rac_model_registry_handle_t hand
         snapshot.Clear();
     }
 
-    model_info_to_proto(model, &snapshot, /*overwrite_artifact=*/!parsed_existing);
+    if (parsed_existing) {
+        overlay_struct_runtime_fields_to_proto(model,
+                                               &snapshot,
+                                               overwrite_registry_state);
+    } else {
+        model_info_to_proto(model,
+                            &snapshot,
+                            /*overwrite_artifact=*/true,
+                            overwrite_registry_state);
+    }
     if (!snapshot.SerializeToString(&handle->model_proto_bytes[model_id])) {
         handle->model_proto_bytes.erase(model_id);
         return RAC_ERROR_UNKNOWN;
@@ -869,7 +1076,10 @@ static rac_result_t store_parsed_proto_snapshot_locked(rac_model_registry_handle
     }
 
     ModelInfo snapshot(parsed_proto);
-    model_info_to_proto(it->second, &snapshot, /*overwrite_artifact=*/false);
+    normalize_model_registry_state(&snapshot);
+    overlay_struct_runtime_fields_to_proto(it->second,
+                                           &snapshot,
+                                           /*overwrite_registry_state=*/false);
     if (!snapshot.SerializeToString(&handle->model_proto_bytes[model_id])) {
         handle->model_proto_bytes.erase(model_id);
         return RAC_ERROR_UNKNOWN;
@@ -884,10 +1094,15 @@ static ModelInfo model_snapshot_locked(rac_model_registry_handle_t handle,
     auto proto_it = handle->model_proto_bytes.find(model_id);
     if (proto_it != handle->model_proto_bytes.end() &&
         snapshot.ParseFromString(proto_it->second)) {
-        model_info_to_proto(model, &snapshot, /*overwrite_artifact=*/false);
+        overlay_struct_runtime_fields_to_proto(model,
+                                               &snapshot,
+                                               /*overwrite_registry_state=*/false);
     } else {
         snapshot.Clear();
-        model_info_to_proto(model, &snapshot, /*overwrite_artifact=*/true);
+        model_info_to_proto(model,
+                            &snapshot,
+                            /*overwrite_artifact=*/true,
+                            /*overwrite_registry_state=*/true);
     }
     return snapshot;
 }
@@ -916,17 +1131,7 @@ static bool contains_text_case_insensitive(const std::string& value,
 }
 
 static bool model_is_downloaded_proto(const ModelInfo& model) {
-    if (model.has_is_downloaded()) {
-        return model.is_downloaded();
-    }
-    if (!model.local_path().empty()) {
-        return true;
-    }
-    if (model.has_registry_status()) {
-        return model.registry_status() == runanywhere::v1::MODEL_REGISTRY_STATUS_DOWNLOADED ||
-               model.registry_status() == runanywhere::v1::MODEL_REGISTRY_STATUS_LOADED;
-    }
-    return false;
+    return model_is_downloaded_from_fields(model);
 }
 
 static bool model_is_available_proto(const ModelInfo& model) {
@@ -1009,6 +1214,10 @@ static bool model_matches_query(const ModelInfo& model, const ModelQuery& query)
         return false;
     }
     if (query.has_source() && model.source() != query.source()) {
+        return false;
+    }
+    if (query.has_registry_status() &&
+        effective_registry_status(model) != query.registry_status()) {
         return false;
     }
     if (query.has_downloaded_only() && query.downloaded_only() &&
@@ -1099,9 +1308,14 @@ static void sort_query_results(const ModelQuery& query, std::vector<ModelInfo>* 
 static void append_query_results_locked(rac_model_registry_handle_t handle,
                                         const ModelQuery& query,
                                         ModelInfoList* out) {
+    if (!out) {
+        return;
+    }
+
     std::vector<ModelInfo> matches;
     for (const auto& pair : handle->models) {
         ModelInfo snapshot = model_snapshot_locked(handle, pair.first, pair.second);
+        normalize_model_registry_state(&snapshot);
         if (model_matches_query(snapshot, query)) {
             matches.push_back(std::move(snapshot));
         }
@@ -1110,6 +1324,194 @@ static void append_query_results_locked(rac_model_registry_handle_t handle,
     for (ModelInfo& model : matches) {
         out->add_models()->Swap(&model);
     }
+}
+
+static std::vector<ModelInfo> collect_model_snapshots_locked(
+    rac_model_registry_handle_t handle) {
+    std::vector<ModelInfo> models;
+    if (!handle) {
+        return models;
+    }
+
+    models.reserve(handle->models.size());
+    for (const auto& pair : handle->models) {
+        ModelInfo snapshot = model_snapshot_locked(handle, pair.first, pair.second);
+        normalize_model_registry_state(&snapshot);
+        models.push_back(std::move(snapshot));
+    }
+    return models;
+}
+
+static std::vector<ModelInfo> query_model_snapshots_locked(
+    rac_model_registry_handle_t handle,
+    const ModelQuery& query) {
+    std::vector<ModelInfo> matches;
+    if (!handle) {
+        return matches;
+    }
+
+    for (ModelInfo& model : collect_model_snapshots_locked(handle)) {
+        if (model_matches_query(model, query)) {
+            matches.push_back(std::move(model));
+        }
+    }
+    sort_query_results(query, &matches);
+    return matches;
+}
+
+static void move_models_to_list(std::vector<ModelInfo>* models,
+                                ModelInfoList* out) {
+    if (!models || !out) {
+        return;
+    }
+    for (ModelInfo& model : *models) {
+        out->add_models()->Swap(&model);
+    }
+}
+
+struct ModelCounts {
+    int32_t total{0};
+    int32_t downloaded{0};
+    int32_t available{0};
+    int32_t errors{0};
+};
+
+static ModelCounts count_models(const std::vector<ModelInfo>& models) {
+    ModelCounts counts;
+    counts.total = static_cast<int32_t>(models.size());
+    for (const ModelInfo& model : models) {
+        if (model_is_downloaded_proto(model)) {
+            ++counts.downloaded;
+        }
+        if (model_is_available_proto(model)) {
+            ++counts.available;
+        }
+        if (effective_registry_status(model) ==
+            runanywhere::v1::MODEL_REGISTRY_STATUS_ERROR) {
+            ++counts.errors;
+        }
+    }
+    return counts;
+}
+
+static bool model_is_built_in(const ModelInfo& model) {
+    return (model.has_artifact_type() &&
+            model.artifact_type() == runanywhere::v1::MODEL_ARTIFACT_TYPE_BUILT_IN) ||
+           model.artifact_case() == ModelInfo::kBuiltIn ||
+           model.source() == runanywhere::v1::MODEL_SOURCE_BUILT_IN;
+}
+
+static bool path_matches_roots(const std::string& path,
+                               const google::protobuf::RepeatedPtrField<std::string>& roots) {
+    if (roots.empty()) {
+        return true;
+    }
+    for (const std::string& root : roots) {
+        if (root.empty() || path.find(root) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static std::string basename_from_path(const std::string& path) {
+    const size_t slash = path.find_last_of("/\\");
+    if (slash == std::string::npos) {
+        return path;
+    }
+    if (slash + 1 >= path.size()) {
+        return "";
+    }
+    return path.substr(slash + 1);
+}
+
+static bool ends_with(const std::string& value, const std::string& suffix) {
+    return value.size() >= suffix.size() &&
+           value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
+static std::string strip_known_model_extension(const std::string& basename) {
+    std::string lower = lowercase_copy(basename);
+    const char* archive_suffixes[] = {".tar.gz", ".tar.bz2", ".tar.xz"};
+    for (const char* suffix : archive_suffixes) {
+        if (ends_with(lower, suffix)) {
+            return basename.substr(0, basename.size() - std::strlen(suffix));
+        }
+    }
+
+    const size_t dot = basename.find_last_of('.');
+    if (dot == std::string::npos || dot == 0) {
+        return basename;
+    }
+    return basename.substr(0, dot);
+}
+
+static ModelFormat infer_format_from_path(const std::string& path) {
+    const std::string lower = lowercase_copy(path);
+    if (ends_with(lower, ".gguf")) return runanywhere::v1::MODEL_FORMAT_GGUF;
+    if (ends_with(lower, ".ggml")) return runanywhere::v1::MODEL_FORMAT_GGML;
+    if (ends_with(lower, ".onnx")) return runanywhere::v1::MODEL_FORMAT_ONNX;
+    if (ends_with(lower, ".ort")) return runanywhere::v1::MODEL_FORMAT_ORT;
+    if (ends_with(lower, ".bin")) return runanywhere::v1::MODEL_FORMAT_BIN;
+    if (ends_with(lower, ".tflite")) return runanywhere::v1::MODEL_FORMAT_TFLITE;
+    if (ends_with(lower, ".safetensors")) return runanywhere::v1::MODEL_FORMAT_SAFETENSORS;
+    if (ends_with(lower, ".mlmodel")) return runanywhere::v1::MODEL_FORMAT_MLMODEL;
+    if (ends_with(lower, ".mlpackage")) return runanywhere::v1::MODEL_FORMAT_MLPACKAGE;
+    if (ends_with(lower, ".zip")) return runanywhere::v1::MODEL_FORMAT_ZIP;
+    if (ends_with(lower, ".tar.gz") || ends_with(lower, ".tar.bz2") ||
+        ends_with(lower, ".tar.xz")) {
+        return runanywhere::v1::MODEL_FORMAT_ZIP;
+    }
+    return runanywhere::v1::MODEL_FORMAT_UNKNOWN;
+}
+
+static InferenceFramework infer_framework_from_format(ModelFormat format) {
+    switch (format) {
+        case runanywhere::v1::MODEL_FORMAT_GGUF:
+        case runanywhere::v1::MODEL_FORMAT_GGML:
+            return runanywhere::v1::INFERENCE_FRAMEWORK_LLAMA_CPP;
+        case runanywhere::v1::MODEL_FORMAT_ONNX:
+        case runanywhere::v1::MODEL_FORMAT_ORT:
+            return runanywhere::v1::INFERENCE_FRAMEWORK_ONNX;
+        case runanywhere::v1::MODEL_FORMAT_TFLITE:
+            return runanywhere::v1::INFERENCE_FRAMEWORK_TFLITE;
+        case runanywhere::v1::MODEL_FORMAT_COREML:
+        case runanywhere::v1::MODEL_FORMAT_MLMODEL:
+        case runanywhere::v1::MODEL_FORMAT_MLPACKAGE:
+            return runanywhere::v1::INFERENCE_FRAMEWORK_COREML;
+        default:
+            return runanywhere::v1::INFERENCE_FRAMEWORK_UNKNOWN;
+    }
+}
+
+static int64_t imported_size_for_request(const ModelImportRequest& request,
+                                         const ModelInfo& model) {
+    int64_t total = 0;
+    for (const ModelFileDescriptor& file : request.files()) {
+        if (file.has_size_bytes() && file.size_bytes() > 0) {
+            total += file.size_bytes();
+        }
+    }
+    if (total > 0) {
+        return total;
+    }
+    return model.download_size_bytes() > 0 ? model.download_size_bytes() : 0;
+}
+
+static bool get_model_snapshot_by_id(rac_model_registry_handle_t handle,
+                                     const std::string& model_id,
+                                     ModelInfo* out) {
+    if (!handle || !out) {
+        return false;
+    }
+    std::lock_guard<std::mutex> lock(handle->mutex);
+    auto it = handle->models.find(model_id);
+    if (it == handle->models.end()) {
+        return false;
+    }
+    *out = model_snapshot_locked(handle, model_id, it->second);
+    normalize_model_registry_state(out);
+    return true;
 }
 
 }  // namespace
@@ -1202,7 +1604,8 @@ rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
     if (stored != handle->models.end()) {
         rac_result_t proto_rc =
             store_proto_snapshot_locked(handle, model_id, stored->second,
-                                        /*preserve_proto_only_fields=*/false);
+                                        /*preserve_proto_only_fields=*/false,
+                                        /*overwrite_registry_state=*/true);
         if (proto_rc != RAC_SUCCESS) {
             return proto_rc;
         }
@@ -1387,7 +1790,8 @@ rac_result_t rac_model_registry_update_last_used(rac_model_registry_handle_t han
 
 #ifdef RAC_HAVE_PROTOBUF
     return store_proto_snapshot_locked(handle, model_id, model,
-                                       /*preserve_proto_only_fields=*/true);
+                                       /*preserve_proto_only_fields=*/true,
+                                       /*overwrite_registry_state=*/false);
 #else
     return RAC_SUCCESS;
 #endif
@@ -1488,7 +1892,8 @@ rac_result_t rac_model_registry_update_download_status(rac_model_registry_handle
 
 #ifdef RAC_HAVE_PROTOBUF
     return store_proto_snapshot_locked(handle, model_id, model,
-                                       /*preserve_proto_only_fields=*/true);
+                                       /*preserve_proto_only_fields=*/true,
+                                       /*overwrite_registry_state=*/true);
 #else
     return RAC_SUCCESS;
 #endif
@@ -1516,6 +1921,7 @@ rac_result_t rac_model_registry_register_proto(rac_model_registry_handle_t handl
     if (parse_rc != RAC_SUCCESS) {
         return parse_rc;
     }
+    normalize_model_registry_state(&proto_model);
 
     rac_model_info_t* model = model_info_from_proto(proto_model);
     if (!model) {
@@ -1562,6 +1968,7 @@ rac_result_t rac_model_registry_update_proto(rac_model_registry_handle_t handle,
         ModelInfo existing = model_snapshot_locked(handle, proto_model.id(), model_it->second);
         preserve_absent_proto_fields(existing, &proto_model);
     }
+    normalize_model_registry_state(&proto_model);
 
     rac_model_info_t* model = model_info_from_proto(proto_model);
     if (!model) {
@@ -1707,6 +2114,669 @@ rac_result_t rac_model_registry_remove_proto(rac_model_registry_handle_t handle,
 
 void rac_model_registry_proto_free(uint8_t* proto_bytes) {
     rac_proto_buffer_free_data(proto_bytes);
+}
+
+rac_result_t rac_model_registry_register_proto_buffer(rac_model_registry_handle_t handle,
+                                                      const uint8_t* proto_bytes,
+                                                      size_t proto_size,
+                                                      rac_proto_buffer_t* out_model) {
+    if (!out_model) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#ifndef RAC_HAVE_PROTOBUF
+    (void)handle;
+    (void)proto_bytes;
+    (void)proto_size;
+    return rac_proto_buffer_set_error(out_model,
+                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf runtime is not available");
+#else
+    if (!handle) {
+        return proto_buffer_error(out_model,
+                                  RAC_ERROR_INVALID_ARGUMENT,
+                                  "registry handle is required");
+    }
+
+    ModelInfo parsed;
+    rac_result_t parse_rc = parse_model_info_bytes(proto_bytes, proto_size, &parsed);
+    if (parse_rc != RAC_SUCCESS) {
+        return proto_buffer_error(out_model,
+                                  parse_rc,
+                                  parse_rc == RAC_ERROR_INVALID_FORMAT
+                                      ? "failed to parse ModelInfo"
+                                      : "ModelInfo.id is required");
+    }
+
+    rac_result_t rc = rac_model_registry_register_proto(handle, proto_bytes, proto_size);
+    if (rc != RAC_SUCCESS) {
+        return proto_buffer_error(out_model, rc, rac_error_message(rc));
+    }
+
+    ModelInfo saved;
+    if (!get_model_snapshot_by_id(handle, parsed.id(), &saved)) {
+        return proto_buffer_error(out_model,
+                                  RAC_ERROR_NOT_FOUND,
+                                  "registered model was not found");
+    }
+    return serialize_proto_to_buffer(saved, out_model);
+#endif
+}
+
+rac_result_t rac_model_registry_update_proto_buffer(rac_model_registry_handle_t handle,
+                                                    const uint8_t* proto_bytes,
+                                                    size_t proto_size,
+                                                    rac_proto_buffer_t* out_model) {
+    if (!out_model) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#ifndef RAC_HAVE_PROTOBUF
+    (void)handle;
+    (void)proto_bytes;
+    (void)proto_size;
+    return rac_proto_buffer_set_error(out_model,
+                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf runtime is not available");
+#else
+    if (!handle) {
+        return proto_buffer_error(out_model,
+                                  RAC_ERROR_INVALID_ARGUMENT,
+                                  "registry handle is required");
+    }
+
+    ModelInfo parsed;
+    rac_result_t parse_rc = parse_model_info_bytes(proto_bytes, proto_size, &parsed);
+    if (parse_rc != RAC_SUCCESS) {
+        return proto_buffer_error(out_model,
+                                  parse_rc,
+                                  parse_rc == RAC_ERROR_INVALID_FORMAT
+                                      ? "failed to parse ModelInfo"
+                                      : "ModelInfo.id is required");
+    }
+
+    rac_result_t rc = rac_model_registry_update_proto(handle, proto_bytes, proto_size);
+    if (rc != RAC_SUCCESS) {
+        return proto_buffer_error(out_model, rc, rac_error_message(rc));
+    }
+
+    ModelInfo saved;
+    if (!get_model_snapshot_by_id(handle, parsed.id(), &saved)) {
+        return proto_buffer_error(out_model,
+                                  RAC_ERROR_NOT_FOUND,
+                                  "updated model was not found");
+    }
+    return serialize_proto_to_buffer(saved, out_model);
+#endif
+}
+
+rac_result_t rac_model_registry_get_proto_buffer(rac_model_registry_handle_t handle,
+                                                 const char* model_id,
+                                                 rac_proto_buffer_t* out_model) {
+    if (!out_model) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#ifndef RAC_HAVE_PROTOBUF
+    (void)handle;
+    (void)model_id;
+    return rac_proto_buffer_set_error(out_model,
+                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf runtime is not available");
+#else
+    if (!handle || !model_id) {
+        return proto_buffer_error(out_model,
+                                  RAC_ERROR_INVALID_ARGUMENT,
+                                  "registry handle and model_id are required");
+    }
+
+    ModelInfo model;
+    if (!get_model_snapshot_by_id(handle, model_id, &model)) {
+        return proto_buffer_error(out_model, RAC_ERROR_NOT_FOUND, "model not found");
+    }
+    return serialize_proto_to_buffer(model, out_model);
+#endif
+}
+
+rac_result_t rac_model_registry_list_proto_buffer(rac_model_registry_handle_t handle,
+                                                  rac_proto_buffer_t* out_models) {
+    if (!out_models) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#ifndef RAC_HAVE_PROTOBUF
+    (void)handle;
+    return rac_proto_buffer_set_error(out_models,
+                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf runtime is not available");
+#else
+    if (!handle) {
+        return proto_buffer_error(out_models,
+                                  RAC_ERROR_INVALID_ARGUMENT,
+                                  "registry handle is required");
+    }
+
+    ModelInfoList list;
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        std::vector<ModelInfo> models = collect_model_snapshots_locked(handle);
+        move_models_to_list(&models, &list);
+    }
+    return serialize_proto_to_buffer(list, out_models);
+#endif
+}
+
+rac_result_t rac_model_registry_query_proto_buffer(rac_model_registry_handle_t handle,
+                                                   const uint8_t* query_proto_bytes,
+                                                   size_t query_proto_size,
+                                                   rac_proto_buffer_t* out_models) {
+    if (!out_models) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#ifndef RAC_HAVE_PROTOBUF
+    (void)handle;
+    (void)query_proto_bytes;
+    (void)query_proto_size;
+    return rac_proto_buffer_set_error(out_models,
+                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf runtime is not available");
+#else
+    if (!handle) {
+        return proto_buffer_error(out_models,
+                                  RAC_ERROR_INVALID_ARGUMENT,
+                                  "registry handle is required");
+    }
+
+    ModelQuery query;
+    rac_result_t parse_rc =
+        parse_model_query_bytes(query_proto_bytes, query_proto_size, &query);
+    if (parse_rc != RAC_SUCCESS) {
+        return proto_buffer_error(out_models,
+                                  parse_rc,
+                                  parse_rc == RAC_ERROR_INVALID_FORMAT
+                                      ? "failed to parse ModelQuery"
+                                      : "invalid ModelQuery bytes");
+    }
+
+    ModelInfoList list;
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        std::vector<ModelInfo> models = query_model_snapshots_locked(handle, query);
+        move_models_to_list(&models, &list);
+    }
+    return serialize_proto_to_buffer(list, out_models);
+#endif
+}
+
+rac_result_t rac_model_registry_list_downloaded_proto_buffer(
+    rac_model_registry_handle_t handle,
+    rac_proto_buffer_t* out_models) {
+    if (!out_models) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#ifndef RAC_HAVE_PROTOBUF
+    (void)handle;
+    return rac_proto_buffer_set_error(out_models,
+                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf runtime is not available");
+#else
+    ModelQuery query;
+    query.set_downloaded_only(true);
+    std::string bytes;
+    if (!query.SerializeToString(&bytes)) {
+        return proto_buffer_error(out_models,
+                                  RAC_ERROR_ENCODING_ERROR,
+                                  "failed to serialize downloaded-only query");
+    }
+    return rac_model_registry_query_proto_buffer(
+        handle,
+        reinterpret_cast<const uint8_t*>(bytes.data()),
+        bytes.size(),
+        out_models);
+#endif
+}
+
+rac_result_t rac_model_registry_remove_proto_buffer(rac_model_registry_handle_t handle,
+                                                    const char* model_id,
+                                                    rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#ifndef RAC_HAVE_PROTOBUF
+    (void)handle;
+    (void)model_id;
+    return rac_proto_buffer_set_error(out_result,
+                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf runtime is not available");
+#else
+    if (!handle || !model_id || model_id[0] == '\0') {
+        return proto_buffer_error(out_result,
+                                  RAC_ERROR_INVALID_ARGUMENT,
+                                  "registry handle and model_id are required");
+    }
+
+    ModelDeleteResult result;
+    result.set_model_id(model_id);
+    rac_result_t rc = rac_model_registry_remove(handle, model_id);
+    if (rc == RAC_SUCCESS) {
+        result.set_success(true);
+        result.set_registry_updated(true);
+        result.set_files_deleted(false);
+    } else {
+        result.set_success(false);
+        result.set_registry_updated(false);
+        result.set_files_deleted(false);
+        result.set_error_message(rac_error_message(rc));
+    }
+    return serialize_proto_to_buffer(result, out_result);
+#endif
+}
+
+rac_result_t rac_model_registry_get_model_proto(rac_model_registry_handle_t handle,
+                                                const uint8_t* request_proto_bytes,
+                                                size_t request_proto_size,
+                                                rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#ifndef RAC_HAVE_PROTOBUF
+    (void)handle;
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return rac_proto_buffer_set_error(out_result,
+                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf runtime is not available");
+#else
+    if (!handle) {
+        return proto_buffer_error(out_result,
+                                  RAC_ERROR_INVALID_ARGUMENT,
+                                  "registry handle is required");
+    }
+
+    ModelGetRequest request;
+    rac_result_t parse_rc = parse_proto_message_bytes(request_proto_bytes,
+                                                      request_proto_size,
+                                                      &request,
+                                                      "ModelGetRequest",
+                                                      out_result);
+    if (parse_rc != RAC_SUCCESS) {
+        return parse_rc;
+    }
+    if (request.model_id().empty()) {
+        return proto_buffer_error(out_result,
+                                  RAC_ERROR_INVALID_ARGUMENT,
+                                  "ModelGetRequest.model_id is required");
+    }
+
+    ModelGetResult result;
+    ModelInfo model;
+    if (get_model_snapshot_by_id(handle, request.model_id(), &model)) {
+        result.set_found(true);
+        result.mutable_model()->CopyFrom(model);
+    } else {
+        result.set_found(false);
+        result.set_error_message("model not found");
+    }
+    return serialize_proto_to_buffer(result, out_result);
+#endif
+}
+
+rac_result_t rac_model_registry_list_models_proto(rac_model_registry_handle_t handle,
+                                                  const uint8_t* request_proto_bytes,
+                                                  size_t request_proto_size,
+                                                  rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#ifndef RAC_HAVE_PROTOBUF
+    (void)handle;
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return rac_proto_buffer_set_error(out_result,
+                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf runtime is not available");
+#else
+    if (!handle) {
+        return proto_buffer_error(out_result,
+                                  RAC_ERROR_INVALID_ARGUMENT,
+                                  "registry handle is required");
+    }
+
+    ModelListRequest request;
+    rac_result_t parse_rc = parse_proto_message_bytes(request_proto_bytes,
+                                                      request_proto_size,
+                                                      &request,
+                                                      "ModelListRequest",
+                                                      out_result);
+    if (parse_rc != RAC_SUCCESS) {
+        return parse_rc;
+    }
+
+    std::vector<ModelInfo> all_models;
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        all_models = collect_model_snapshots_locked(handle);
+    }
+
+    std::vector<ModelInfo> filtered;
+    if (request.has_query()) {
+        for (const ModelInfo& model : all_models) {
+            if (model_matches_query(model, request.query())) {
+                filtered.push_back(model);
+            }
+        }
+        sort_query_results(request.query(), &filtered);
+    } else {
+        filtered = all_models;
+    }
+
+    const ModelCounts all_counts = count_models(all_models);
+    const ModelCounts filtered_counts = count_models(filtered);
+
+    ModelListResult result;
+    result.set_success(true);
+    move_models_to_list(&filtered, result.mutable_models());
+    if (request.include_counts()) {
+        result.set_total_count(all_counts.total);
+        result.set_downloaded_count(filtered_counts.downloaded);
+        result.set_available_count(filtered_counts.available);
+        result.set_filtered_count(filtered_counts.total);
+    }
+    return serialize_proto_to_buffer(result, out_result);
+#endif
+}
+
+rac_result_t rac_model_registry_import_proto(rac_model_registry_handle_t handle,
+                                             const uint8_t* request_proto_bytes,
+                                             size_t request_proto_size,
+                                             rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#ifndef RAC_HAVE_PROTOBUF
+    (void)handle;
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return rac_proto_buffer_set_error(out_result,
+                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf runtime is not available");
+#else
+    if (!handle) {
+        return proto_buffer_error(out_result,
+                                  RAC_ERROR_INVALID_ARGUMENT,
+                                  "registry handle is required");
+    }
+
+    ModelImportRequest request;
+    rac_result_t parse_rc = parse_proto_message_bytes(request_proto_bytes,
+                                                      request_proto_size,
+                                                      &request,
+                                                      "ModelImportRequest",
+                                                      out_result);
+    if (parse_rc != RAC_SUCCESS) {
+        return parse_rc;
+    }
+
+    ModelImportResult result;
+    ModelInfo model;
+    if (request.has_model()) {
+        model.CopyFrom(request.model());
+    }
+
+    const std::string source_path = request.source_path();
+    if (model.id().empty()) {
+        const std::string base = strip_known_model_extension(basename_from_path(source_path));
+        if (base.empty()) {
+            result.set_success(false);
+            result.set_error_message("ModelImportRequest.model.id or source_path is required");
+            return serialize_proto_to_buffer(result, out_result);
+        }
+        model.set_id(base);
+    }
+    if (model.name().empty()) {
+        model.set_name(model.id());
+    }
+    if (!source_path.empty()) {
+        model.set_local_path(source_path);
+        if (model.source() == runanywhere::v1::MODEL_SOURCE_UNSPECIFIED) {
+            model.set_source(runanywhere::v1::MODEL_SOURCE_LOCAL);
+        }
+    }
+    if (model.format() == runanywhere::v1::MODEL_FORMAT_UNSPECIFIED ||
+        model.format() == runanywhere::v1::MODEL_FORMAT_UNKNOWN) {
+        model.set_format(infer_format_from_path(source_path));
+    }
+    if (model.framework() == runanywhere::v1::INFERENCE_FRAMEWORK_UNSPECIFIED ||
+        model.framework() == runanywhere::v1::INFERENCE_FRAMEWORK_UNKNOWN) {
+        model.set_framework(infer_framework_from_format(model.format()));
+    }
+    if (request.files_size() > 0 && model.artifact_case() == ModelInfo::ARTIFACT_NOT_SET) {
+        for (const ModelFileDescriptor& file : request.files()) {
+            model.mutable_multi_file()->add_files()->CopyFrom(file);
+        }
+        model.set_artifact_type(runanywhere::v1::MODEL_ARTIFACT_TYPE_MULTI_FILE);
+    }
+    normalize_model_registry_state(&model);
+    if (!source_path.empty()) {
+        overwrite_download_state_from_local_path(&model);
+    }
+
+    ModelInfo existing;
+    const bool exists = get_model_snapshot_by_id(handle, model.id(), &existing);
+    if (exists && !request.overwrite_existing()) {
+        result.set_success(false);
+        result.mutable_model()->CopyFrom(existing);
+        result.set_local_path(existing.local_path());
+        result.set_error_message("model already exists");
+        result.set_registered(false);
+        return serialize_proto_to_buffer(result, out_result);
+    }
+
+    if (request.copy_into_managed_storage()) {
+        result.add_warnings(
+            "copy_into_managed_storage is platform-owned and was not executed by commons");
+    }
+    if (request.validate_before_register()) {
+        result.add_warnings(
+            "validate_before_register requires platform filesystem facts and was not executed");
+    }
+
+    std::string model_bytes;
+    if (!model.SerializeToString(&model_bytes)) {
+        return proto_buffer_error(out_result,
+                                  RAC_ERROR_ENCODING_ERROR,
+                                  "failed to serialize ModelImportRequest.model");
+    }
+
+    rac_result_t rc = exists
+                          ? rac_model_registry_update_proto(
+                                handle,
+                                reinterpret_cast<const uint8_t*>(model_bytes.data()),
+                                model_bytes.size())
+                          : rac_model_registry_register_proto(
+                                handle,
+                                reinterpret_cast<const uint8_t*>(model_bytes.data()),
+                                model_bytes.size());
+    if (rc != RAC_SUCCESS) {
+        return proto_buffer_error(out_result, rc, rac_error_message(rc));
+    }
+
+    ModelInfo saved;
+    if (!get_model_snapshot_by_id(handle, model.id(), &saved)) {
+        return proto_buffer_error(out_result,
+                                  RAC_ERROR_NOT_FOUND,
+                                  "imported model was not found");
+    }
+
+    result.set_success(true);
+    result.mutable_model()->CopyFrom(saved);
+    result.set_local_path(saved.local_path());
+    result.set_imported_bytes(imported_size_for_request(request, saved));
+    result.set_registered(true);
+    result.set_copied_into_managed_storage(false);
+    return serialize_proto_to_buffer(result, out_result);
+#endif
+}
+
+rac_result_t rac_model_registry_discover_proto(rac_model_registry_handle_t handle,
+                                               const uint8_t* request_proto_bytes,
+                                               size_t request_proto_size,
+                                               rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#ifndef RAC_HAVE_PROTOBUF
+    (void)handle;
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return rac_proto_buffer_set_error(out_result,
+                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf runtime is not available");
+#else
+    if (!handle) {
+        return proto_buffer_error(out_result,
+                                  RAC_ERROR_INVALID_ARGUMENT,
+                                  "registry handle is required");
+    }
+
+    ModelDiscoveryRequest request;
+    rac_result_t parse_rc = parse_proto_message_bytes(request_proto_bytes,
+                                                      request_proto_size,
+                                                      &request,
+                                                      "ModelDiscoveryRequest",
+                                                      out_result);
+    if (parse_rc != RAC_SUCCESS) {
+        return parse_rc;
+    }
+
+    std::vector<ModelInfo> models;
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        models = collect_model_snapshots_locked(handle);
+    }
+
+    ModelDiscoveryResult result;
+    result.set_success(true);
+    int32_t scanned = 0;
+    for (const ModelInfo& model : models) {
+        if (!request.include_built_in() && model_is_built_in(model)) {
+            continue;
+        }
+        ++scanned;
+        if (model.local_path().empty()) {
+            continue;
+        }
+        if (!path_matches_roots(model.local_path(), request.search_roots())) {
+            continue;
+        }
+        if (request.has_query() && !model_matches_query(model, request.query())) {
+            continue;
+        }
+
+        DiscoveredModel* discovered = result.add_discovered_models();
+        discovered->set_model_id(model.id());
+        discovered->set_local_path(model.local_path());
+        discovered->set_matched_registry(true);
+        discovered->mutable_model()->CopyFrom(model);
+        discovered->set_size_bytes(model.download_size_bytes());
+    }
+
+    if (request.purge_invalid()) {
+        result.add_warnings(
+            "purge_invalid requires platform filesystem callbacks and was not executed");
+    }
+    result.set_scanned_count(scanned);
+    result.set_linked_count(result.discovered_models_size());
+    result.set_purged_count(0);
+    result.set_imported_count(0);
+    return serialize_proto_to_buffer(result, out_result);
+#endif
+}
+
+rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle,
+                                              const uint8_t* request_proto_bytes,
+                                              size_t request_proto_size,
+                                              rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+#ifndef RAC_HAVE_PROTOBUF
+    (void)handle;
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return rac_proto_buffer_set_error(out_result,
+                                      RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf runtime is not available");
+#else
+    if (!handle) {
+        return proto_buffer_error(out_result,
+                                  RAC_ERROR_INVALID_ARGUMENT,
+                                  "registry handle is required");
+    }
+
+    ModelRegistryRefreshRequest request;
+    rac_result_t parse_rc = parse_proto_message_bytes(request_proto_bytes,
+                                                      request_proto_size,
+                                                      &request,
+                                                      "ModelRegistryRefreshRequest",
+                                                      out_result);
+    if (parse_rc != RAC_SUCCESS) {
+        return parse_rc;
+    }
+
+    rac_model_registry_refresh_opts_t opts = {};
+    opts.include_remote_catalog = request.include_remote_catalog() ? RAC_TRUE : RAC_FALSE;
+    opts.rescan_local = request.rescan_local() ? RAC_TRUE : RAC_FALSE;
+    opts.prune_orphans = request.prune_orphans() ? RAC_TRUE : RAC_FALSE;
+    opts.discovery_callbacks = nullptr;
+
+    rac_result_t refresh_rc = RAC_SUCCESS;
+    if (opts.include_remote_catalog == RAC_TRUE || opts.rescan_local == RAC_TRUE ||
+        opts.prune_orphans == RAC_TRUE) {
+        refresh_rc = rac_model_registry_refresh(handle, opts);
+    }
+
+    std::vector<ModelInfo> models;
+    {
+        std::lock_guard<std::mutex> lock(handle->mutex);
+        models = collect_model_snapshots_locked(handle);
+    }
+    if (request.has_query()) {
+        std::vector<ModelInfo> filtered;
+        for (const ModelInfo& model : models) {
+            if (model_matches_query(model, request.query())) {
+                filtered.push_back(model);
+            }
+        }
+        sort_query_results(request.query(), &filtered);
+        models = std::move(filtered);
+    }
+    const ModelCounts counts = count_models(models);
+
+    ModelRegistryRefreshResult result;
+    result.set_success(refresh_rc == RAC_SUCCESS);
+    result.set_registered_count(counts.total);
+    result.set_updated_count(0);
+    result.set_discovered_count(0);
+    result.set_pruned_count(0);
+    result.set_refreshed_at_unix_ms(rac_get_current_time_ms());
+    result.set_downloaded_count(counts.downloaded);
+    result.set_available_count(counts.available);
+    result.set_error_count(counts.errors);
+    if (refresh_rc != RAC_SUCCESS) {
+        result.set_error_message(rac_error_message(refresh_rc));
+    }
+    if (request.rescan_local()) {
+        result.add_warnings(
+            "rescan_local requires platform filesystem callbacks in the C ABI refresh path");
+    }
+    if (request.prune_orphans()) {
+        result.add_warnings(
+            "prune_orphans requires platform filesystem callbacks in the C ABI refresh path");
+    }
+    if (!request.catalog_uri().empty()) {
+        result.add_warnings(
+            "catalog_uri transport is platform-owned and was not executed by commons");
+    }
+    move_models_to_list(&models, result.mutable_models());
+    return serialize_proto_to_buffer(result, out_result);
+#endif
 }
 
 // =============================================================================
@@ -1929,7 +2999,8 @@ rac_result_t rac_model_registry_discover_downloaded(rac_model_registry_handle_t 
                     model->updated_at = rac_get_current_time_ms() / 1000;
 #ifdef RAC_HAVE_PROTOBUF
                     store_proto_snapshot_locked(handle, model_id, model,
-                                                /*preserve_proto_only_fields=*/true);
+                                                /*preserve_proto_only_fields=*/true,
+                                                /*overwrite_registry_state=*/true);
 #endif
 
                     // Add to discovered list
@@ -2048,7 +3119,8 @@ rac_result_t rac_model_registry_refresh(rac_model_registry_handle_t handle,
                     model->updated_at = rac_get_current_time_ms() / 1000;
 #ifdef RAC_HAVE_PROTOBUF
                     store_proto_snapshot_locked(handle, pair.first, model,
-                                                /*preserve_proto_only_fields=*/true);
+                                                /*preserve_proto_only_fields=*/true,
+                                                /*overwrite_registry_state=*/true);
 #endif
                     ++pruned;
                 }

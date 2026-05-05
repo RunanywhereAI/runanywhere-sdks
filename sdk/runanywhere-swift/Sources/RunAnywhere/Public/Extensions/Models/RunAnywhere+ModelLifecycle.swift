@@ -19,7 +19,11 @@ public extension RunAnywhere {
             return result
         }
         try? await ensureServicesReady()
-        return await CppBridge.ModelLifecycle.load(request)
+        let result = await CppBridge.ModelLifecycle.load(request)
+        guard result.success, result.category.isVLMCategory else {
+            return result
+        }
+        return await synchronizeVLMComponentLoad(result)
     }
 
     static func unloadModel(_ request: RAModelUnloadRequest) async -> RAModelUnloadResult {
@@ -29,7 +33,12 @@ public extension RunAnywhere {
             result.errorMessage = "SDK not initialized"
             return result
         }
-        return CppBridge.ModelLifecycle.unload(request)
+        let loadedVLMModelId = await CppBridge.VLM.shared.currentModelId
+        let result = CppBridge.ModelLifecycle.unload(request)
+        if shouldUnloadVLMComponent(request: request, result: result, loadedModelId: loadedVLMModelId) {
+            await CppBridge.VLM.shared.unload()
+        }
+        return result
     }
 
     static func currentModel(_ request: RACurrentModelRequest = RACurrentModelRequest()) -> RACurrentModelResult {
@@ -40,5 +49,48 @@ public extension RunAnywhere {
         _ component: RASDKComponent
     ) -> RAComponentLifecycleSnapshot? {
         CppBridge.ModelLifecycle.componentSnapshot(component: component)
+    }
+}
+
+private extension RunAnywhere {
+    static func synchronizeVLMComponentLoad(_ result: RAModelLoadResult) async -> RAModelLoadResult {
+        do {
+            try await CppBridge.VLM.shared.loadModel(from: result)
+            return result
+        } catch {
+            var unloadRequest = RAModelUnloadRequest()
+            unloadRequest.modelID = result.modelID
+            unloadRequest.category = result.category
+            _ = CppBridge.ModelLifecycle.unload(unloadRequest)
+            await CppBridge.VLM.shared.unload()
+
+            var failed = result
+            failed.success = false
+            failed.errorMessage = error.localizedDescription
+            return failed
+        }
+    }
+
+    static func shouldUnloadVLMComponent(
+        request: RAModelUnloadRequest,
+        result: RAModelUnloadResult,
+        loadedModelId: String?
+    ) -> Bool {
+        if request.unloadAll {
+            return true
+        }
+        if request.hasCategory, request.category.isVLMCategory {
+            return true
+        }
+        guard let loadedModelId else {
+            return false
+        }
+        return result.unloadedModelIds.contains(loadedModelId)
+    }
+}
+
+private extension RAModelCategory {
+    var isVLMCategory: Bool {
+        self == .multimodal || self == .vision
     }
 }

@@ -21,6 +21,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
+#include "rac/plugin/rac_model_format_ids.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -76,6 +77,23 @@ typedef struct rac_expected_model_files {
 } rac_expected_model_files_t;
 
 /**
+ * @brief Role of a file inside a model artifact.
+ *
+ * Values mirror runanywhere.v1.ModelFileRole.
+ */
+typedef enum rac_model_file_role {
+    RAC_MODEL_FILE_ROLE_UNSPECIFIED = 0,
+    RAC_MODEL_FILE_ROLE_PRIMARY_MODEL = 1,
+    RAC_MODEL_FILE_ROLE_COMPANION = 2,
+    RAC_MODEL_FILE_ROLE_VISION_PROJECTOR = 3,
+    RAC_MODEL_FILE_ROLE_TOKENIZER = 4,
+    RAC_MODEL_FILE_ROLE_CONFIG = 5,
+    RAC_MODEL_FILE_ROLE_VOCABULARY = 6,
+    RAC_MODEL_FILE_ROLE_MERGES = 7,
+    RAC_MODEL_FILE_ROLE_LABELS = 8
+} rac_model_file_role_t;
+
+/**
  * @brief Multi-file model descriptor.
  * Mirrors Swift's ModelFileDescriptor struct.
  */
@@ -88,6 +106,9 @@ typedef struct rac_model_file_descriptor {
 
     /** Whether this file is required (vs optional) */
     rac_bool_t is_required;
+
+    /** Semantic role for this file in the artifact */
+    rac_model_file_role_t role;
 } rac_model_file_descriptor_t;
 
 // =============================================================================
@@ -153,21 +174,30 @@ typedef enum rac_model_category {
 } rac_model_category_t;
 
 // =============================================================================
-// MODEL FORMAT - From ModelFormat.swift
+// MODEL FORMAT
 // =============================================================================
 
 /**
  * @brief Supported model file formats.
- * Mirrors Swift's ModelFormat enum.
+ * Values mirror runanywhere.v1.ModelFormat and RAC_MODEL_FORMAT_ID_*.
  */
 typedef enum rac_model_format {
-    RAC_MODEL_FORMAT_ONNX = 0,        /**< ONNX format */
-    RAC_MODEL_FORMAT_ORT = 1,         /**< ONNX Runtime format */
-    RAC_MODEL_FORMAT_GGUF = 2,        /**< GGUF format (llama.cpp) */
-    RAC_MODEL_FORMAT_BIN = 3,         /**< Binary format */
-    RAC_MODEL_FORMAT_COREML = 4,      /**< Core ML format (.mlmodelc, .mlpackage) */
-    RAC_MODEL_FORMAT_QNN_CONTEXT = 5, /**< QNN context binary (Qualcomm Genie) */
-    RAC_MODEL_FORMAT_UNKNOWN = 99     /**< Unknown format */
+    RAC_MODEL_FORMAT_UNSPECIFIED = RAC_MODEL_FORMAT_ID_UNSPECIFIED,
+    RAC_MODEL_FORMAT_GGUF = RAC_MODEL_FORMAT_ID_GGUF,               /**< GGUF format */
+    RAC_MODEL_FORMAT_GGML = RAC_MODEL_FORMAT_ID_GGML,               /**< GGML format */
+    RAC_MODEL_FORMAT_ONNX = RAC_MODEL_FORMAT_ID_ONNX,               /**< ONNX format */
+    RAC_MODEL_FORMAT_ORT = RAC_MODEL_FORMAT_ID_ORT,                 /**< ONNX Runtime format */
+    RAC_MODEL_FORMAT_BIN = RAC_MODEL_FORMAT_ID_BIN,                 /**< Binary format */
+    RAC_MODEL_FORMAT_COREML = RAC_MODEL_FORMAT_ID_COREML,           /**< Core ML compiled format */
+    RAC_MODEL_FORMAT_MLMODEL = RAC_MODEL_FORMAT_ID_MLMODEL,         /**< Core ML .mlmodel */
+    RAC_MODEL_FORMAT_MLPACKAGE = RAC_MODEL_FORMAT_ID_MLPACKAGE,     /**< Core ML .mlpackage */
+    RAC_MODEL_FORMAT_TFLITE = RAC_MODEL_FORMAT_ID_TFLITE,           /**< TensorFlow Lite */
+    RAC_MODEL_FORMAT_SAFETENSORS = RAC_MODEL_FORMAT_ID_SAFETENSORS, /**< Safetensors */
+    RAC_MODEL_FORMAT_QNN_CONTEXT = RAC_MODEL_FORMAT_ID_QNN_CONTEXT, /**< QNN context binary */
+    RAC_MODEL_FORMAT_ZIP = RAC_MODEL_FORMAT_ID_ZIP,                 /**< Archive wrapping a model */
+    RAC_MODEL_FORMAT_FOLDER = RAC_MODEL_FORMAT_ID_FOLDER,           /**< Folder-backed model */
+    RAC_MODEL_FORMAT_PROPRIETARY = RAC_MODEL_FORMAT_ID_PROPRIETARY, /**< Built-in system model */
+    RAC_MODEL_FORMAT_UNKNOWN = RAC_MODEL_FORMAT_ID_UNKNOWN          /**< Unknown format */
 } rac_model_format_t;
 
 // =============================================================================
@@ -518,7 +548,7 @@ typedef struct rac_model_filter {
     /** Filter by framework (RAC_FRAMEWORK_UNKNOWN = any) */
     rac_inference_framework_t framework;
 
-    /** Filter by format (RAC_MODEL_FORMAT_UNKNOWN = any) */
+    /** Filter by format (RAC_MODEL_FORMAT_UNSPECIFIED or RAC_MODEL_FORMAT_UNKNOWN = any) */
     rac_model_format_t format;
 
     /** Maximum download size in bytes (0 = no limit) */

@@ -73,6 +73,14 @@ enum Sentiment {
     SENTIMENT_MIXED       = 4;
 }
 
+enum StructuredOutputMode {
+    STRUCTURED_OUTPUT_MODE_UNSPECIFIED = 0;
+    STRUCTURED_OUTPUT_MODE_JSON_SCHEMA = 1;
+    STRUCTURED_OUTPUT_MODE_JSON_OBJECT = 2;
+    STRUCTURED_OUTPUT_MODE_REGEX       = 3;
+    STRUCTURED_OUTPUT_MODE_GRAMMAR     = 4;
+}
+
 // ---------------------------------------------------------------------------
 // JSON Schema property — describes a single property within a schema.
 // Sources pre-IDL:
@@ -108,6 +116,16 @@ message JSONSchemaProperty {
 
     // Nested object schema when `type == JSON_SCHEMA_TYPE_OBJECT`.
     optional JSONSchema object_schema = 6;
+
+    // Common validation constraints carried by RN/Web schema builders.
+    optional double minimum = 7;
+    optional double maximum = 8;
+    optional int32 min_length = 9;
+    optional int32 max_length = 10;
+    optional string pattern = 11;
+    optional int32 min_items = 12;
+    optional int32 max_items = 13;
+    optional string default_json = 14;
 }
 
 // ---------------------------------------------------------------------------
@@ -145,6 +163,7 @@ message JSONSchema {
     repeated JSONSchema                  any_of                = 13;
     repeated JSONSchema                  one_of                = 14;
     optional JSONSchema                  not_schema            = 15;
+    optional string                      raw_json              = 16;
 }
 
 // ---------------------------------------------------------------------------
@@ -173,6 +192,12 @@ message StructuredOutputOptions {
     // Optional generated type/name hints used by Swift/Kotlin/Dart wrappers.
     optional string type_name               = 5;
     optional string name                    = 6;
+
+    StructuredOutputMode mode               = 7;
+    optional string regex_pattern           = 8;
+    optional string grammar                 = 9;
+    bool repair_json                        = 10;
+    int32 max_retries                       = 11;
 }
 
 // ---------------------------------------------------------------------------
@@ -198,6 +223,9 @@ message StructuredOutputValidation {
     // JSON substring extracted from raw_output before validation, when the
     // extractor found one.
     optional string extracted_json = 5;
+
+    repeated string validation_errors = 6;
+    int64 validation_time_ms = 7;
 }
 
 // ---------------------------------------------------------------------------
@@ -219,6 +247,60 @@ message StructuredOutputResult {
 
     // Raw model text prior to parsing (optional, useful for retries).
     optional string             raw_text    = 3;
+
+    optional string             error_message = 4;
+    int32                       error_code = 5;
+}
+
+message StructuredOutputParseRequest {
+    string request_id = 1;
+    string text = 2;
+    optional StructuredOutputOptions options = 3;
+    map<string, string> metadata = 4;
+}
+
+message StructuredOutputValidationRequest {
+    string text = 1;
+    optional StructuredOutputOptions options = 2;
+}
+
+message StructuredOutputPromptResult {
+    string prepared_prompt = 1;
+    optional string system_prompt = 2;
+    optional string json_schema = 3;
+    optional string regex_pattern = 4;
+    optional string grammar = 5;
+    optional string error_message = 6;
+    int32 error_code = 7;
+}
+
+message StructuredOutputRequest {
+    string request_id = 1;
+    string prompt = 2;
+    optional StructuredOutputOptions options = 3;
+    map<string, string> metadata = 4;
+}
+
+enum StructuredOutputStreamEventKind {
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED = 0;
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN = 1;
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON = 2;
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION = 3;
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED = 4;
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR = 5;
+}
+
+message StructuredOutputStreamEvent {
+    uint64 seq = 1;
+    int64 timestamp_us = 2;
+    string request_id = 3;
+    StructuredOutputStreamEventKind kind = 4;
+    string token = 5;
+    optional string partial_json = 6;
+    optional StructuredOutputValidation validation = 7;
+    optional StructuredOutputResult result = 8;
+    optional string error_message = 9;
+    int32 error_code = 10;
 }
 
 // ---------------------------------------------------------------------------
@@ -308,4 +390,27 @@ message SentimentResult {
 // ---------------------------------------------------------------------------
 message NERResult {
     repeated NamedEntity entities = 1;
+}
+
+// Logical structured-output service contract. Model execution, retries, UI
+// callbacks, and platform-specific JSON parser choices remain adapter-owned;
+// this service describes portable prompt preparation, extraction/parsing,
+// validation, and generation semantics over generated messages.
+//
+// Generate / GenerateStream mirror the C ABI entry points
+// rac_structured_output_generate_proto / rac_structured_output_generate_stream_proto
+// (see sdk/runanywhere-commons/include/rac/features/llm/rac_llm_structured_output.h).
+service StructuredOutput {
+    rpc PreparePrompt(StructuredOutputRequest) returns (StructuredOutputPromptResult);
+    rpc Validate(StructuredOutputValidationRequest) returns (StructuredOutputValidation);
+    rpc Parse(StructuredOutputParseRequest) returns (StructuredOutputResult);
+
+    // Run the lifecycle-owned LLM with a structured-output prompt and return
+    // the parsed JSON result. Mirrors rac_structured_output_generate_proto.
+    rpc Generate(StructuredOutputRequest) returns (StructuredOutputResult);
+
+    // Server-streaming: emit StructuredOutputStreamEvent payloads (token +
+    // partial JSON + validation events) until kind=COMPLETED|ERROR. Mirrors
+    // rac_structured_output_generate_stream_proto.
+    rpc GenerateStream(StructuredOutputRequest) returns (stream StructuredOutputStreamEvent);
 }

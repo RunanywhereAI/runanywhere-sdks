@@ -108,10 +108,10 @@ extension InferenceFramework {
     }
 }
 
-// MARK: - ModelArtifactType C++ Conversion
+// MARK: - Generated Artifact C++ Conversion
 
-extension ModelArtifactType {
-    /// Convert to C++ artifact info struct
+extension RAModelInfo.OneOf_Artifact {
+    /// Convert generated artifact oneof to C++ artifact info struct.
     func toCInfo() -> rac_model_artifact_info_t {
         var info = rac_model_artifact_info_t()
 
@@ -121,54 +121,70 @@ extension ModelArtifactType {
             info.archive_type = RAC_ARCHIVE_TYPE_NONE
             info.archive_structure = RAC_ARCHIVE_STRUCTURE_UNKNOWN
 
-        case .archive(let archiveType, let structure, _):
+        case .archive(let archive):
             info.kind = RAC_ARTIFACT_KIND_ARCHIVE
-            info.archive_type = archiveType.toC()
-            info.archive_structure = structure.toC()
+            info.archive_type = archive.type.toC()
+            info.archive_structure = archive.structure.toC()
 
         case .multiFile:
             info.kind = RAC_ARTIFACT_KIND_MULTI_FILE
             info.archive_type = RAC_ARCHIVE_TYPE_NONE
             info.archive_structure = RAC_ARCHIVE_STRUCTURE_UNKNOWN
 
-        case .custom(let strategyId):
+        case .customStrategyID(let strategyId):
             info.kind = RAC_ARTIFACT_KIND_CUSTOM
             info.archive_type = RAC_ARCHIVE_TYPE_NONE
             info.archive_structure = RAC_ARCHIVE_STRUCTURE_UNKNOWN
             info.strategy_id = UnsafePointer(strdup(strategyId))
 
-        case .builtIn:
-            info.kind = RAC_ARTIFACT_KIND_BUILT_IN
+        case .builtIn(let enabled):
+            info.kind = enabled ? RAC_ARTIFACT_KIND_BUILT_IN : RAC_ARTIFACT_KIND_SINGLE_FILE
             info.archive_type = RAC_ARCHIVE_TYPE_NONE
             info.archive_structure = RAC_ARCHIVE_STRUCTURE_UNKNOWN
         }
 
         return info
     }
+}
 
-    /// Initialize from C++ artifact info
-    init(from cArtifact: rac_model_artifact_info_t) {
-        switch cArtifact.kind {
-        case RAC_ARTIFACT_KIND_SINGLE_FILE:
-            self = .singleFile(expectedFiles: .none)
-
-        case RAC_ARTIFACT_KIND_ARCHIVE:
-            // Map archive type - use ArchiveType initializer from CppBridge+Strategy.swift
-            let archiveType = ArchiveType(from: cArtifact.archive_type) ?? .zip
-            let structure = ArchiveStructure(from: cArtifact.archive_structure)
-            self = .archive(archiveType, structure: structure, expectedFiles: .none)
-
-        case RAC_ARTIFACT_KIND_MULTI_FILE:
-            self = .multiFile([])
-
-        case RAC_ARTIFACT_KIND_CUSTOM:
-            self = .custom(strategyId: cArtifact.strategy_id.map { String(cString: $0) } ?? "")
-
-        case RAC_ARTIFACT_KIND_BUILT_IN:
-            self = .builtIn
-
+extension RAModelArtifactType {
+    func toCInfo() -> rac_model_artifact_info_t {
+        var info = rac_model_artifact_info_t()
+        switch self {
+        case .archive, .zipArchive, .tarGzArchive, .tarBz2Archive, .tarXzArchive:
+            info.kind = RAC_ARTIFACT_KIND_ARCHIVE
+            info.archive_type = archiveTypeForC.toC()
+            info.archive_structure = RAC_ARCHIVE_STRUCTURE_UNKNOWN
+        case .multiFile, .directory:
+            info.kind = RAC_ARTIFACT_KIND_MULTI_FILE
+            info.archive_type = RAC_ARCHIVE_TYPE_NONE
+            info.archive_structure = RAC_ARCHIVE_STRUCTURE_UNKNOWN
+        case .custom:
+            info.kind = RAC_ARTIFACT_KIND_CUSTOM
+            info.archive_type = RAC_ARCHIVE_TYPE_NONE
+            info.archive_structure = RAC_ARCHIVE_STRUCTURE_UNKNOWN
+        case .builtIn:
+            info.kind = RAC_ARTIFACT_KIND_BUILT_IN
+            info.archive_type = RAC_ARCHIVE_TYPE_NONE
+            info.archive_structure = RAC_ARCHIVE_STRUCTURE_UNKNOWN
         default:
-            self = .singleFile(expectedFiles: .none)
+            info.kind = RAC_ARTIFACT_KIND_SINGLE_FILE
+            info.archive_type = RAC_ARCHIVE_TYPE_NONE
+            info.archive_structure = RAC_ARCHIVE_STRUCTURE_UNKNOWN
+        }
+        return info
+    }
+
+    private var archiveTypeForC: ArchiveType {
+        switch self {
+        case .tarGzArchive:
+            return .tarGz
+        case .tarBz2Archive:
+            return .tarBz2
+        case .tarXzArchive:
+            return .tarXz
+        default:
+            return .zip
         }
     }
 }
@@ -195,9 +211,9 @@ extension ModelSource {
     }
 }
 
-// MARK: - ModelInfo C++ Conversion
+// MARK: - Generated Model Metadata C++ Conversion
 
-extension ModelInfo {
+extension RAModelInfo {
     /// Convert to C++ model info struct
     /// Note: The returned struct contains allocated strings that must be freed
     func toCModelInfo() -> rac_model_info_t {
@@ -208,114 +224,72 @@ extension ModelInfo {
         cModel.category = category.toC()
         cModel.format = format.toC()
         cModel.framework = framework.toC()
-        cModel.download_url = downloadURL.map { strdup($0.absoluteString) }
-        cModel.local_path = localPath.map { strdup($0.path) }
-        cModel.artifact_info = artifactType.toCInfo()  // Use full conversion including archive_type
-        cModel.download_size = downloadSize ?? 0
-        cModel.context_length = Int32(contextLength ?? 0)
+        cModel.download_url = downloadURL.isEmpty ? nil : strdup(downloadURL)
+        cModel.local_path = localPath.isEmpty ? nil : strdup(localPath)
+        cModel.artifact_info = artifact?.toCInfo() ?? artifactType.toCInfo()
+        cModel.download_size = downloadSizeBytes
+        cModel.context_length = contextLength
         cModel.supports_thinking = supportsThinking ? RAC_TRUE : RAC_FALSE
-        cModel.description = description.map { strdup($0) }
+        cModel.description = description_p.isEmpty ? nil : strdup(description_p)
         cModel.source = source.toC()
-        cModel.created_at = Int64(createdAt.timeIntervalSince1970)
-        cModel.updated_at = Int64(updatedAt.timeIntervalSince1970)
+        cModel.created_at = Self.unixSeconds(fromUnixMillisecondsOrSeconds: createdAtUnixMs)
+        cModel.updated_at = Self.unixSeconds(fromUnixMillisecondsOrSeconds: updatedAtUnixMs)
 
         return cModel
     }
 
     /// Initialize from C++ model info struct
     init(from cModel: rac_model_info_t) {
-        self.id = cModel.id.map { String(cString: $0) } ?? ""
-        self.name = cModel.name.map { String(cString: $0) } ?? ""
-        self.category = ModelCategory(from: cModel.category)
-        self.format = ModelFormat(from: cModel.format)
-        self.framework = InferenceFramework(from: cModel.framework)
-
-        if let urlStr = cModel.download_url.map({ String(cString: $0) }), !urlStr.isEmpty {
-            self.downloadURL = URL(string: urlStr)
-        } else {
-            self.downloadURL = nil
-        }
-
-        if let pathStr = cModel.local_path.map({ String(cString: $0) }), !pathStr.isEmpty {
-            self.localPath = URL(fileURLWithPath: pathStr)
-        } else {
-            self.localPath = nil
-        }
-
-        self.artifactType = ModelArtifactType(from: cModel.artifact_info)
-        self.downloadSize = cModel.download_size > 0 ? cModel.download_size : nil
-        self.contextLength = cModel.context_length > 0 ? Int(cModel.context_length) : nil
-        self.supportsThinking = cModel.supports_thinking == RAC_TRUE
-        self.thinkingPattern = supportsThinking ? .defaultPattern : nil
-        self.description = cModel.description.map { String(cString: $0) }
-        self.source = ModelSource(from: cModel.source)
-        self.createdAt = Date(timeIntervalSince1970: TimeInterval(cModel.created_at))
-        self.updatedAt = Date(timeIntervalSince1970: TimeInterval(cModel.updated_at))
-    }
-}
-
-// MARK: - DownloadStage C++ Conversion
-
-extension DownloadStage {
-    /// Initialize from C++ download stage
-    init(from cStage: rac_download_stage_t) {
-        switch cStage {
-        case RAC_DOWNLOAD_STAGE_DOWNLOADING:
-            self = .downloading
-        case RAC_DOWNLOAD_STAGE_EXTRACTING:
-            self = .extracting
-        case RAC_DOWNLOAD_STAGE_VALIDATING:
-            self = .validating
-        case RAC_DOWNLOAD_STAGE_COMPLETED:
-            self = .completed
-        default:
-            self = .downloading
-        }
-    }
-}
-
-// MARK: - DownloadState C++ Conversion
-
-extension DownloadState {
-    /// Initialize from C++ download state.
-    init(from cState: rac_download_state_t) {
-        switch cState {
-        case RAC_DOWNLOAD_STATE_PENDING:
-            self = .pending
-        case RAC_DOWNLOAD_STATE_DOWNLOADING:
-            self = .downloading
-        case RAC_DOWNLOAD_STATE_EXTRACTING:
-            self = .extracting
-        case RAC_DOWNLOAD_STATE_RETRYING:
-            self = .retrying
-        case RAC_DOWNLOAD_STATE_COMPLETED:
-            self = .completed
-        case RAC_DOWNLOAD_STATE_FAILED:
-            self = .failed
-        case RAC_DOWNLOAD_STATE_CANCELLED:
-            self = .cancelled
-        default:
-            self = .pending
-        }
-    }
-}
-
-// MARK: - DownloadProgress C++ Conversion
-
-extension DownloadProgress {
-    /// Initialize from C++ download progress struct
-    init(from cProgress: rac_download_progress_t) {
         self.init()
-        self.stage = DownloadStage(from: cProgress.stage)
-        self.state = DownloadState(from: cProgress.state)
-        self.bytesDownloaded = cProgress.bytes_downloaded
-        self.totalBytes = cProgress.total_bytes
-        self.stageProgress = Float(cProgress.stage_progress)
-        self.overallSpeedBps = cProgress.speed > 0 ? Float(cProgress.speed) : 0
-        self.etaSeconds = cProgress.estimated_time_remaining >= 0 ? Int64(cProgress.estimated_time_remaining) : -1
-        self.retryAttempt = cProgress.retry_attempt
-        if let errMsg = cProgress.error_message.map({ String(cString: $0) }) {
-            self.errorMessage = errMsg
+        id = cModel.id.map { String(cString: $0) } ?? ""
+        name = cModel.name.map { String(cString: $0) } ?? ""
+        category = ModelCategory(from: cModel.category)
+        format = ModelFormat(from: cModel.format)
+        framework = InferenceFramework(from: cModel.framework)
+        downloadURL = cModel.download_url.map { String(cString: $0) } ?? ""
+        localPath = cModel.local_path.map { String(cString: $0) } ?? ""
+        downloadSizeBytes = cModel.download_size
+        contextLength = cModel.context_length
+        supportsThinking = cModel.supports_thinking == RAC_TRUE
+        if supportsThinking {
+            thinkingPattern = .defaultPattern
+        }
+        description_p = cModel.description.map { String(cString: $0) } ?? ""
+        source = ModelSource(from: cModel.source)
+        createdAtUnixMs = cModel.created_at * 1_000
+        updatedAtUnixMs = cModel.updated_at * 1_000
+        apply(cArtifact: cModel.artifact_info)
+        isDownloaded = isDownloadedOnDisk
+        isAvailable = isAvailableForUse
+    }
+
+    private static func unixSeconds(fromUnixMillisecondsOrSeconds value: Int64) -> Int64 {
+        let absolute = value < 0 ? -value : value
+        return absolute > 10_000_000_000 ? value / 1_000 : value
+    }
+
+    private mutating func apply(cArtifact: rac_model_artifact_info_t) {
+        switch cArtifact.kind {
+        case RAC_ARTIFACT_KIND_SINGLE_FILE:
+            setArtifact(.singleFile(RASingleFileArtifact()))
+
+        case RAC_ARTIFACT_KIND_ARCHIVE:
+            var archive = RAArchiveArtifact()
+            archive.type = ArchiveType(from: cArtifact.archive_type) ?? .zip
+            archive.structure = ArchiveStructure(from: cArtifact.archive_structure)
+            setArtifact(.archive(archive))
+
+        case RAC_ARTIFACT_KIND_MULTI_FILE:
+            setArtifact(.multiFile(RAMultiFileArtifact()))
+
+        case RAC_ARTIFACT_KIND_CUSTOM:
+            setArtifact(.customStrategyID(cArtifact.strategy_id.map { String(cString: $0) } ?? ""))
+
+        case RAC_ARTIFACT_KIND_BUILT_IN:
+            setArtifact(.builtIn(true))
+
+        default:
+            setArtifact(.singleFile(RASingleFileArtifact()))
         }
     }
 }

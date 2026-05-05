@@ -20,12 +20,22 @@ const VoiceAgentRequest$json = {
   '1': 'VoiceAgentRequest',
   '2': [
     {'1': 'event_filter', '3': 1, '4': 1, '5': 9, '10': 'eventFilter'},
+    {'1': 'session_id', '3': 2, '4': 1, '5': 9, '10': 'sessionId'},
+    {'1': 'categories', '3': 3, '4': 3, '5': 14, '6': '.runanywhere.v1.VoiceEventCategory', '10': 'categories'},
+    {'1': 'min_severity', '3': 4, '4': 1, '5': 14, '6': '.runanywhere.v1.VoiceEventSeverity', '10': 'minSeverity'},
+    {'1': 'replay_from_seq', '3': 5, '4': 1, '5': 4, '10': 'replayFromSeq'},
+    {'1': 'include_audio', '3': 6, '4': 1, '5': 8, '10': 'includeAudio'},
   ],
 };
 
 /// Descriptor for `VoiceAgentRequest`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List voiceAgentRequestDescriptor = $convert.base64Decode(
-    'ChFWb2ljZUFnZW50UmVxdWVzdBIhCgxldmVudF9maWx0ZXIYASABKAlSC2V2ZW50RmlsdGVy');
+    'ChFWb2ljZUFnZW50UmVxdWVzdBIhCgxldmVudF9maWx0ZXIYASABKAlSC2V2ZW50RmlsdGVyEh'
+    '0KCnNlc3Npb25faWQYAiABKAlSCXNlc3Npb25JZBJCCgpjYXRlZ29yaWVzGAMgAygOMiIucnVu'
+    'YW55d2hlcmUudjEuVm9pY2VFdmVudENhdGVnb3J5UgpjYXRlZ29yaWVzEkUKDG1pbl9zZXZlcm'
+    'l0eRgEIAEoDjIiLnJ1bmFueXdoZXJlLnYxLlZvaWNlRXZlbnRTZXZlcml0eVILbWluU2V2ZXJp'
+    'dHkSJgoPcmVwbGF5X2Zyb21fc2VxGAUgASgEUg1yZXBsYXlGcm9tU2VxEiMKDWluY2x1ZGVfYX'
+    'VkaW8YBiABKAhSDGluY2x1ZGVBdWRpbw==');
 
 @$core.Deprecated('Use voiceAgentResultDescriptor instead')
 const VoiceAgentResult$json = {
@@ -40,6 +50,14 @@ const VoiceAgentResult$json = {
     {'1': 'synthesized_audio_sample_rate_hz', '3': 7, '4': 1, '5': 5, '10': 'synthesizedAudioSampleRateHz'},
     {'1': 'synthesized_audio_channels', '3': 8, '4': 1, '5': 5, '10': 'synthesizedAudioChannels'},
     {'1': 'synthesized_audio_encoding', '3': 9, '4': 1, '5': 14, '6': '.runanywhere.v1.AudioEncoding', '10': 'synthesizedAudioEncoding'},
+    {'1': 'session_id', '3': 10, '4': 1, '5': 9, '10': 'sessionId'},
+    {'1': 'turn_id', '3': 11, '4': 1, '5': 9, '10': 'turnId'},
+    {'1': 'stt_time_ms', '3': 12, '4': 1, '5': 3, '10': 'sttTimeMs'},
+    {'1': 'llm_time_ms', '3': 13, '4': 1, '5': 3, '10': 'llmTimeMs'},
+    {'1': 'tts_time_ms', '3': 14, '4': 1, '5': 3, '10': 'ttsTimeMs'},
+    {'1': 'total_time_ms', '3': 15, '4': 1, '5': 3, '10': 'totalTimeMs'},
+    {'1': 'error_message', '3': 16, '4': 1, '5': 9, '9': 5, '10': 'errorMessage', '17': true},
+    {'1': 'error_code', '3': 17, '4': 1, '5': 5, '10': 'errorCode'},
   ],
   '8': [
     {'1': '_transcription'},
@@ -47,6 +65,7 @@ const VoiceAgentResult$json = {
     {'1': '_thinking_content'},
     {'1': '_synthesized_audio'},
     {'1': '_final_state'},
+    {'1': '_error_message'},
   ],
 };
 
@@ -62,8 +81,54 @@ final $typed_data.Uint8List voiceAgentResultDescriptor = $convert.base64Decode(
     'F1ZGlvU2FtcGxlUmF0ZUh6EjwKGnN5bnRoZXNpemVkX2F1ZGlvX2NoYW5uZWxzGAggASgFUhhz'
     'eW50aGVzaXplZEF1ZGlvQ2hhbm5lbHMSWwoac3ludGhlc2l6ZWRfYXVkaW9fZW5jb2RpbmcYCS'
     'ABKA4yHS5ydW5hbnl3aGVyZS52MS5BdWRpb0VuY29kaW5nUhhzeW50aGVzaXplZEF1ZGlvRW5j'
-    'b2RpbmdCEAoOX3RyYW5zY3JpcHRpb25CFQoTX2Fzc2lzdGFudF9yZXNwb25zZUITChFfdGhpbm'
-    'tpbmdfY29udGVudEIUChJfc3ludGhlc2l6ZWRfYXVkaW9CDgoMX2ZpbmFsX3N0YXRl');
+    'b2RpbmcSHQoKc2Vzc2lvbl9pZBgKIAEoCVIJc2Vzc2lvbklkEhcKB3R1cm5faWQYCyABKAlSBn'
+    'R1cm5JZBIeCgtzdHRfdGltZV9tcxgMIAEoA1IJc3R0VGltZU1zEh4KC2xsbV90aW1lX21zGA0g'
+    'ASgDUglsbG1UaW1lTXMSHgoLdHRzX3RpbWVfbXMYDiABKANSCXR0c1RpbWVNcxIiCg10b3RhbF'
+    '90aW1lX21zGA8gASgDUgt0b3RhbFRpbWVNcxIoCg1lcnJvcl9tZXNzYWdlGBAgASgJSAVSDGVy'
+    'cm9yTWVzc2FnZYgBARIdCgplcnJvcl9jb2RlGBEgASgFUgllcnJvckNvZGVCEAoOX3RyYW5zY3'
+    'JpcHRpb25CFQoTX2Fzc2lzdGFudF9yZXNwb25zZUITChFfdGhpbmtpbmdfY29udGVudEIUChJf'
+    'c3ludGhlc2l6ZWRfYXVkaW9CDgoMX2ZpbmFsX3N0YXRlQhAKDl9lcnJvcl9tZXNzYWdl');
+
+@$core.Deprecated('Use voiceAgentTurnRequestDescriptor instead')
+const VoiceAgentTurnRequest$json = {
+  '1': 'VoiceAgentTurnRequest',
+  '2': [
+    {'1': 'request_id', '3': 1, '4': 1, '5': 9, '10': 'requestId'},
+    {'1': 'session_id', '3': 2, '4': 1, '5': 9, '10': 'sessionId'},
+    {'1': 'audio_data', '3': 3, '4': 1, '5': 12, '10': 'audioData'},
+    {'1': 'sample_rate_hz', '3': 4, '4': 1, '5': 5, '10': 'sampleRateHz'},
+    {'1': 'channels', '3': 5, '4': 1, '5': 5, '10': 'channels'},
+    {'1': 'encoding', '3': 6, '4': 1, '5': 14, '6': '.runanywhere.v1.AudioEncoding', '10': 'encoding'},
+    {'1': 'session_config', '3': 7, '4': 1, '5': 11, '6': '.runanywhere.v1.VoiceSessionConfig', '9': 0, '10': 'sessionConfig', '17': true},
+    {'1': 'metadata', '3': 8, '4': 3, '5': 11, '6': '.runanywhere.v1.VoiceAgentTurnRequest.MetadataEntry', '10': 'metadata'},
+  ],
+  '3': [VoiceAgentTurnRequest_MetadataEntry$json],
+  '8': [
+    {'1': '_session_config'},
+  ],
+};
+
+@$core.Deprecated('Use voiceAgentTurnRequestDescriptor instead')
+const VoiceAgentTurnRequest_MetadataEntry$json = {
+  '1': 'MetadataEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'value', '3': 2, '4': 1, '5': 9, '10': 'value'},
+  ],
+  '7': {'7': true},
+};
+
+/// Descriptor for `VoiceAgentTurnRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List voiceAgentTurnRequestDescriptor = $convert.base64Decode(
+    'ChVWb2ljZUFnZW50VHVyblJlcXVlc3QSHQoKcmVxdWVzdF9pZBgBIAEoCVIJcmVxdWVzdElkEh'
+    '0KCnNlc3Npb25faWQYAiABKAlSCXNlc3Npb25JZBIdCgphdWRpb19kYXRhGAMgASgMUglhdWRp'
+    'b0RhdGESJAoOc2FtcGxlX3JhdGVfaHoYBCABKAVSDHNhbXBsZVJhdGVIehIaCghjaGFubmVscx'
+    'gFIAEoBVIIY2hhbm5lbHMSOQoIZW5jb2RpbmcYBiABKA4yHS5ydW5hbnl3aGVyZS52MS5BdWRp'
+    'b0VuY29kaW5nUghlbmNvZGluZxJOCg5zZXNzaW9uX2NvbmZpZxgHIAEoCzIiLnJ1bmFueXdoZX'
+    'JlLnYxLlZvaWNlU2Vzc2lvbkNvbmZpZ0gAUg1zZXNzaW9uQ29uZmlniAEBEk8KCG1ldGFkYXRh'
+    'GAggAygLMjMucnVuYW55d2hlcmUudjEuVm9pY2VBZ2VudFR1cm5SZXF1ZXN0Lk1ldGFkYXRhRW'
+    '50cnlSCG1ldGFkYXRhGjsKDU1ldGFkYXRhRW50cnkSEAoDa2V5GAEgASgJUgNrZXkSFAoFdmFs'
+    'dWUYAiABKAlSBXZhbHVlOgI4AUIRCg9fc2Vzc2lvbl9jb25maWc=');
 
 @$core.Deprecated('Use voiceSessionConfigDescriptor instead')
 const VoiceSessionConfig$json = {
@@ -75,6 +140,13 @@ const VoiceSessionConfig$json = {
     {'1': 'continuous_mode', '3': 4, '4': 1, '5': 8, '10': 'continuousMode'},
     {'1': 'thinking_mode_enabled', '3': 5, '4': 1, '5': 8, '10': 'thinkingModeEnabled'},
     {'1': 'max_tokens', '3': 6, '4': 1, '5': 5, '10': 'maxTokens'},
+    {'1': 'max_recording_duration_ms', '3': 7, '4': 1, '5': 5, '10': 'maxRecordingDurationMs'},
+    {'1': 'language_code', '3': 8, '4': 1, '5': 9, '9': 0, '10': 'languageCode', '17': true},
+    {'1': 'voice_id', '3': 9, '4': 1, '5': 9, '9': 1, '10': 'voiceId', '17': true},
+  ],
+  '8': [
+    {'1': '_language_code'},
+    {'1': '_voice_id'},
   ],
 };
 
@@ -84,7 +156,10 @@ final $typed_data.Uint8List voiceSessionConfigDescriptor = $convert.base64Decode
     '5jZUR1cmF0aW9uTXMSKQoQc3BlZWNoX3RocmVzaG9sZBgCIAEoAlIPc3BlZWNoVGhyZXNob2xk'
     'EiIKDWF1dG9fcGxheV90dHMYAyABKAhSC2F1dG9QbGF5VHRzEicKD2NvbnRpbnVvdXNfbW9kZR'
     'gEIAEoCFIOY29udGludW91c01vZGUSMgoVdGhpbmtpbmdfbW9kZV9lbmFibGVkGAUgASgIUhN0'
-    'aGlua2luZ01vZGVFbmFibGVkEh0KCm1heF90b2tlbnMYBiABKAVSCW1heFRva2Vucw==');
+    'aGlua2luZ01vZGVFbmFibGVkEh0KCm1heF90b2tlbnMYBiABKAVSCW1heFRva2VucxI5ChltYX'
+    'hfcmVjb3JkaW5nX2R1cmF0aW9uX21zGAcgASgFUhZtYXhSZWNvcmRpbmdEdXJhdGlvbk1zEigK'
+    'DWxhbmd1YWdlX2NvZGUYCCABKAlIAFIMbGFuZ3VhZ2VDb2RliAEBEh4KCHZvaWNlX2lkGAkgAS'
+    'gJSAFSB3ZvaWNlSWSIAQFCEAoOX2xhbmd1YWdlX2NvZGVCCwoJX3ZvaWNlX2lk');
 
 @$core.Deprecated('Use audioPipelineConfigDescriptor instead')
 const AudioPipelineConfig$json = {
@@ -127,6 +202,8 @@ const VoiceAgentComposeConfig$json = {
     {'1': 'wakeword_vad_model_path', '3': 19, '4': 1, '5': 9, '9': 13, '10': 'wakewordVadModelPath', '17': true},
     {'1': 'session_config', '3': 20, '4': 1, '5': 11, '6': '.runanywhere.v1.VoiceSessionConfig', '9': 14, '10': 'sessionConfig', '17': true},
     {'1': 'audio_pipeline_config', '3': 21, '4': 1, '5': 11, '6': '.runanywhere.v1.AudioPipelineConfig', '9': 15, '10': 'audioPipelineConfig', '17': true},
+    {'1': 'session_id', '3': 22, '4': 1, '5': 9, '9': 16, '10': 'sessionId', '17': true},
+    {'1': 'default_language_code', '3': 23, '4': 1, '5': 9, '9': 17, '10': 'defaultLanguageCode', '17': true},
   ],
   '8': [
     {'1': '_stt_model_path'},
@@ -145,6 +222,8 @@ const VoiceAgentComposeConfig$json = {
     {'1': '_wakeword_vad_model_path'},
     {'1': '_session_config'},
     {'1': '_audio_pipeline_config'},
+    {'1': '_session_id'},
+    {'1': '_default_language_code'},
   ],
 };
 
@@ -169,13 +248,15 @@ final $typed_data.Uint8List voiceAgentComposeConfigDescriptor = $convert.base64D
     'YWRNb2RlbFBhdGiIAQESTgoOc2Vzc2lvbl9jb25maWcYFCABKAsyIi5ydW5hbnl3aGVyZS52MS'
     '5Wb2ljZVNlc3Npb25Db25maWdIDlINc2Vzc2lvbkNvbmZpZ4gBARJcChVhdWRpb19waXBlbGlu'
     'ZV9jb25maWcYFSABKAsyIy5ydW5hbnl3aGVyZS52MS5BdWRpb1BpcGVsaW5lQ29uZmlnSA9SE2'
-    'F1ZGlvUGlwZWxpbmVDb25maWeIAQFCEQoPX3N0dF9tb2RlbF9wYXRoQg8KDV9zdHRfbW9kZWxf'
-    'aWRCEQoPX3N0dF9tb2RlbF9uYW1lQhEKD19sbG1fbW9kZWxfcGF0aEIPCg1fbGxtX21vZGVsX2'
-    'lkQhEKD19sbG1fbW9kZWxfbmFtZUIRCg9fdHRzX3ZvaWNlX3BhdGhCDwoNX3R0c192b2ljZV9p'
-    'ZEIRCg9fdHRzX3ZvaWNlX25hbWVCFgoUX3dha2V3b3JkX21vZGVsX3BhdGhCFAoSX3dha2V3b3'
-    'JkX21vZGVsX2lkQhIKEF93YWtld29yZF9waHJhc2VCIAoeX3dha2V3b3JkX2VtYmVkZGluZ19t'
-    'b2RlbF9wYXRoQhoKGF93YWtld29yZF92YWRfbW9kZWxfcGF0aEIRCg9fc2Vzc2lvbl9jb25maW'
-    'dCGAoWX2F1ZGlvX3BpcGVsaW5lX2NvbmZpZw==');
+    'F1ZGlvUGlwZWxpbmVDb25maWeIAQESIgoKc2Vzc2lvbl9pZBgWIAEoCUgQUglzZXNzaW9uSWSI'
+    'AQESNwoVZGVmYXVsdF9sYW5ndWFnZV9jb2RlGBcgASgJSBFSE2RlZmF1bHRMYW5ndWFnZUNvZG'
+    'WIAQFCEQoPX3N0dF9tb2RlbF9wYXRoQg8KDV9zdHRfbW9kZWxfaWRCEQoPX3N0dF9tb2RlbF9u'
+    'YW1lQhEKD19sbG1fbW9kZWxfcGF0aEIPCg1fbGxtX21vZGVsX2lkQhEKD19sbG1fbW9kZWxfbm'
+    'FtZUIRCg9fdHRzX3ZvaWNlX3BhdGhCDwoNX3R0c192b2ljZV9pZEIRCg9fdHRzX3ZvaWNlX25h'
+    'bWVCFgoUX3dha2V3b3JkX21vZGVsX3BhdGhCFAoSX3dha2V3b3JkX21vZGVsX2lkQhIKEF93YW'
+    'tld29yZF9waHJhc2VCIAoeX3dha2V3b3JkX2VtYmVkZGluZ19tb2RlbF9wYXRoQhoKGF93YWtl'
+    'd29yZF92YWRfbW9kZWxfcGF0aEIRCg9fc2Vzc2lvbl9jb25maWdCGAoWX2F1ZGlvX3BpcGVsaW'
+    '5lX2NvbmZpZ0INCgtfc2Vzc2lvbl9pZEIYChZfZGVmYXVsdF9sYW5ndWFnZV9jb2Rl');
 
 const $core.Map<$core.String, $core.dynamic> VoiceAgentServiceBase$json = {
   '1': 'VoiceAgent',
@@ -205,6 +286,9 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> VoiceAgent
   '.runanywhere.v1.SpeechTurnDetectionEvent': $0.SpeechTurnDetectionEvent$json,
   '.runanywhere.v1.TurnLifecycleEvent': $0.TurnLifecycleEvent$json,
   '.runanywhere.v1.WakeWordDetectedEvent': $0.WakeWordDetectedEvent$json,
+  '.runanywhere.v1.AudioLevelEvent': $0.AudioLevelEvent$json,
+  '.runanywhere.v1.ComponentProgressEvent': $0.ComponentProgressEvent$json,
+  '.runanywhere.v1.VoiceEvent.MetadataEntry': $0.VoiceEvent_MetadataEntry$json,
 };
 
 /// Descriptor for `VoiceAgent`. Decode as a `google.protobuf.ServiceDescriptorProto`.

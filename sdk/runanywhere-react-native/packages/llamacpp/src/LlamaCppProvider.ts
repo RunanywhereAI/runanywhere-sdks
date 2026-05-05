@@ -17,8 +17,8 @@ const vlmLog = new SDKLogger('VLM.LlamaCppProvider');
 /**
  * LlamaCPP Module
  *
- * Provides LLM capabilities using llama.cpp with GGUF models.
- * The actual service is provided by the C++ backend.
+ * Registers llama.cpp LLM and VLM providers. Core owns public model lifecycle
+ * and inference surfaces.
  *
  * ## Registration
  *
@@ -34,19 +34,19 @@ export class LlamaCppProvider {
   static readonly moduleName = 'LlamaCPP';
   static readonly version = '2.0.0';
 
-  private static isRegistered = false;
+  private static registered = false;
   private static isVLMRegistered = false;
 
   /**
    * Register LlamaCPP backend with the C++ service registry.
    * Calls rac_backend_llamacpp_register() to register the
    * LlamaCPP service provider with the C++ commons layer.
-   * Also registers the VLM backend (matching iOS SDK pattern).
+   * Also registers the VLM backend provider; core owns VLM model lifecycle.
    * Safe to call multiple times - subsequent calls are no-ops.
    * @returns Promise<boolean> true if registered successfully
    */
   static async register(): Promise<boolean> {
-    if (this.isRegistered) {
+    if (this.registered) {
       log.debug('LlamaCPP already registered, returning');
       return true;
     }
@@ -63,10 +63,10 @@ export class LlamaCppProvider {
       // Call the native registration method from the Llama module
       const success = await native.registerBackend();
       if (success) {
-        this.isRegistered = true;
+        this.registered = true;
         log.info('LlamaCPP backend registered successfully');
 
-        // Register VLM backend (matches iOS: LlamaCPP.register() also registers VLM)
+        // Register the VLM provider; core owns VLM lifecycle and proto calls.
         await this.registerVLM();
       }
       return success;
@@ -78,9 +78,8 @@ export class LlamaCppProvider {
   }
 
   /**
-   * Register VLM (Vision Language Model) backend.
-   * Called automatically by register() to match iOS SDK pattern.
-   * Matches iOS: LlamaCPP.registerVLM()
+   * Register VLM (Vision Language Model) backend provider.
+   * Called automatically by register().
    */
   private static async registerVLM(): Promise<void> {
     if (this.isVLMRegistered) {
@@ -110,7 +109,7 @@ export class LlamaCppProvider {
 
   /**
    * Unregister the LlamaCPP backend from C++ registry.
-   * Also unregisters the VLM backend (matching iOS SDK pattern).
+   * Also unregisters the VLM backend provider.
    * @returns Promise<boolean> true if unregistered successfully
    */
   static async unregister(): Promise<boolean> {
@@ -120,10 +119,11 @@ export class LlamaCppProvider {
 
     const native = requireNativeLlamaModule();
 
-    // Unregister VLM first (matches iOS: unregister VLM before LLM)
+    // Unregister VLM first. VLM model handles are lifecycle-owned by core;
+    // backend unregistration only removes the provider.
     if (this.isVLMRegistered) {
       try {
-        await native.unloadVLMModel();
+        await native.unregisterVLMBackend();
         this.isVLMRegistered = false;
         vlmLog.info('LlamaCPP VLM backend unregistered');
       } catch (error) {
@@ -131,14 +131,14 @@ export class LlamaCppProvider {
       }
     }
 
-    if (!this.isRegistered) {
+    if (!this.registered) {
       return true;
     }
 
     try {
       const success = await native.unregisterBackend();
       if (success) {
-        this.isRegistered = false;
+        this.registered = false;
         log.debug('LlamaCPP backend unregistered');
       }
       return success;
@@ -149,22 +149,21 @@ export class LlamaCppProvider {
   }
 
   /**
-   * Check if LlamaCPP can handle a given model
+   * Check native registration state. Falls back to JS state if the native
+   * object cannot be created.
    */
-  static canHandle(modelId: string | null | undefined): boolean {
-    if (!modelId) {
+  static async isRegistered(): Promise<boolean> {
+    if (!isNativeLlamaModuleAvailable()) {
       return false;
     }
-    const lowercased = modelId.toLowerCase();
-    return lowercased.includes('gguf') || lowercased.endsWith('.gguf');
-  }
-}
 
-/**
- * Auto-register when module is imported
- */
-export function autoRegister(): void {
-  LlamaCppProvider.register().catch(() => {
-    // Silently handle registration failure during auto-registration
-  });
+    try {
+      const native = requireNativeLlamaModule();
+      const registered = await native.isBackendRegistered();
+      this.registered = registered;
+      return registered;
+    } catch {
+      return this.registered;
+    }
+  }
 }

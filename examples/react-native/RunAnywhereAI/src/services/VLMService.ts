@@ -3,33 +3,26 @@ import {
   loadVLMModel as sdkLoadModel,
   isVLMModelLoaded as sdkCheckLoaded,
   cancelVLMGeneration,
-} from '@runanywhere/llamacpp';
-import { VLMImageFormat, type VLMImage } from '@runanywhere/core';
-import { VLMModelFamily } from '@runanywhere/proto-ts/vlm_options';
+} from '@runanywhere/core';
+import {
+  VLMGenerationOptions,
+  VLMImage,
+  VLMImageFormat,
+  VLMModelFamily,
+} from '@runanywhere/proto-ts/vlm_options';
 
 export class VLMService {
   private _isLoaded: boolean = false;
 
   /**
    * Load the model and track internal state
-   * Updated to accept modelName (3rd argument)
    */
-  async loadModel(
-    modelPath: string,
-    mmprojPath?: string,
-    modelName?: string
-  ): Promise<void> {
+  async loadModel(modelId: string, modelName?: string): Promise<void> {
     try {
       // eslint-disable-next-line no-console -- demo VLM lifecycle diagnostic
-      console.log(`[VLMService] Loading model: ${modelName}`);
+      console.log(`[VLMService] Loading model: ${modelName ?? modelId}`);
 
-      // Pass 'undefined' for loraPath (3rd arg) as per SDK requirement
-      const success = await sdkLoadModel(
-        modelPath,
-        mmprojPath,
-        undefined,
-        modelName
-      );
+      const success = await sdkLoadModel(modelId);
 
       if (success) {
         this._isLoaded = true;
@@ -71,18 +64,20 @@ export class VLMService {
       throw new Error('Model not loaded. Please select a model first.');
     }
 
-    const image: VLMImage = {
+    const image = VLMImage.fromPartial({
       format: VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
       filePath: imagePath,
       width: 0,
       height: 0,
-    };
+      sizeBytes: 0,
+      metadata: {},
+    });
 
     // eslint-disable-next-line no-console -- demo VLM inference diagnostic
     console.log(`[VLMService] Processing image: ${imagePath}`);
 
     try {
-      const response = await processImageStream(image, prompt, {
+      const response = await processImageStream(image, prompt, VLMGenerationOptions.fromPartial({
         prompt,
         maxTokens,
         temperature: 0.7,
@@ -94,7 +89,11 @@ export class VLMService {
         nThreads: 0,
         useGpu: true,
         modelFamily: VLMModelFamily.VLM_MODEL_FAMILY_AUTO,
-      });
+        seed: 0,
+        repetitionPenalty: 1,
+        minP: 0,
+        emitImageEmbeddings: false,
+      }));
 
       // Manual async iteration — Hermes doesn't recognise NitroModules async iterables with for-await
       const iter = response.stream[Symbol.asyncIterator]();

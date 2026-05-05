@@ -11,10 +11,13 @@
 #include <vector>
 
 #include "rac/foundation/rac_proto_buffer.h"
+#include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/storage/rac_storage_analyzer.h"
 
 #ifdef RAC_HAVE_PROTOBUF
+#include "sdk_events.pb.h"
 #include "storage_types.pb.h"
 #endif
 
@@ -156,14 +159,38 @@ bool parse_buffer(const rac_proto_buffer_t& buffer, Proto* out) {
     return out->ParseFromArray(buffer.data, static_cast<int>(buffer.size));
 }
 
+bool poll_sdk_event(runanywhere::v1::SDKEvent* out) {
+    rac_proto_buffer_t buffer;
+    rac_proto_buffer_init(&buffer);
+    if (rac_sdk_event_poll(&buffer) != RAC_SUCCESS) {
+        return false;
+    }
+    bool parsed = parse_buffer(buffer, out);
+    rac_proto_buffer_free(&buffer);
+    return parsed;
+}
+
+bool storage_event_has_kind(const runanywhere::v1::SDKEvent& event,
+                            runanywhere::v1::StorageLifecycleEventKind kind) {
+    return event.category() == runanywhere::v1::EVENT_CATEGORY_STORAGE &&
+           event.has_storage_lifecycle() &&
+           event.storage_lifecycle().kind() == kind;
+}
+
 int test_info_aggregation_and_model_breakdown() {
+    ASSERT_EQ(rac_model_paths_set_base_dir("/base"), RAC_SUCCESS);
+    rac_sdk_event_clear_queue();
+
     MockStorage storage;
     storage.total_space = 1000;
     storage.free_space = 400;
     storage.path_sizes["/base/RunAnywhere"] = 175;
+    storage.path_sizes["/base/RunAnywhere/Cache"] = 25;
+    storage.path_sizes["/base/RunAnywhere/Temp"] = 10;
     storage.path_sizes["/models/m1"] = 100;
     storage.path_sizes["/models/m2"] = 50;
-    storage.existing_paths = {"/models/m1", "/models/m2"};
+    storage.existing_paths = {"/base/RunAnywhere", "/base/RunAnywhere/Cache",
+                              "/base/RunAnywhere/Temp", "/models/m1", "/models/m2"};
 
     rac_storage_callbacks_t callbacks = callbacks_for(&storage);
     rac_storage_analyzer_handle_t analyzer = nullptr;
@@ -177,6 +204,7 @@ int test_info_aggregation_and_model_breakdown() {
     request.set_include_device(true);
     request.set_include_app(true);
     request.set_include_models(true);
+    request.set_include_cache(true);
     std::string request_bytes = serialize(request);
 
     rac_proto_buffer_t buffer;
@@ -193,9 +221,27 @@ int test_info_aggregation_and_model_breakdown() {
     ASSERT_EQ(result.info().device().free_bytes(), 400);
     ASSERT_EQ(result.info().device().used_bytes(), 600);
     ASSERT_TRUE(result.info().device().used_percent() > 59.9f);
+    ASSERT_EQ(result.info().app().documents_bytes(), 175);
+    ASSERT_EQ(result.info().app().cache_bytes(), 25);
+    ASSERT_EQ(result.info().app().app_support_bytes(), 10);
+    ASSERT_EQ(result.info().app().total_bytes(), 210);
     ASSERT_EQ(result.info().total_models(), 2);
     ASSERT_EQ(result.info().total_models_bytes(), 150);
     ASSERT_EQ(result.info().models_size(), 2);
+    bool found_last_used = false;
+    for (const auto& metrics : result.info().models()) {
+        if (metrics.model_id() == "m2" && metrics.has_last_used_ms() &&
+            metrics.last_used_ms() == 20) {
+            found_last_used = true;
+        }
+    }
+    ASSERT_TRUE(found_last_used);
+
+    runanywhere::v1::SDKEvent event;
+    ASSERT_TRUE(poll_sdk_event(&event));
+    ASSERT_TRUE(storage_event_has_kind(
+        event, runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_INFO_COMPLETED));
+    ASSERT_TRUE(event.storage_lifecycle().has_info_result());
 
     rac_proto_buffer_free(&buffer);
     rac_model_registry_destroy(registry);
@@ -204,6 +250,8 @@ int test_info_aggregation_and_model_breakdown() {
 }
 
 int test_availability_offsets_existing_model_bytes() {
+    rac_sdk_event_clear_queue();
+
     MockStorage storage;
     storage.total_space = 2000;
     storage.free_space = 500;
@@ -236,6 +284,64 @@ int test_availability_offsets_existing_model_bytes() {
     ASSERT_EQ(result.availability().required_bytes(), 450);
     ASSERT_EQ(result.availability().available_bytes(), 500);
     ASSERT_TRUE(result.availability().is_available());
+    ASSERT_EQ(result.availability().shortfall_bytes(), 0);
+    ASSERT_TRUE(result.availability().required_to_available_ratio() > 0.89f);
+
+    runanywhere::v1::SDKEvent event;
+    ASSERT_TRUE(poll_sdk_event(&event));
+    ASSERT_TRUE(storage_event_has_kind(
+        event, runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_AVAILABILITY_CHECKED));
+
+    rac_proto_buffer_free(&buffer);
+    rac_model_registry_destroy(registry);
+    rac_storage_analyzer_destroy(analyzer);
+    return 0;
+}
+
+int test_availability_includes_cache_delete_plan() {
+    ASSERT_EQ(rac_model_paths_set_base_dir("/base"), RAC_SUCCESS);
+    rac_sdk_event_clear_queue();
+
+    MockStorage storage;
+    storage.total_space = 2000;
+    storage.free_space = 500;
+    storage.path_sizes["/base/RunAnywhere/Cache"] = 125;
+    storage.path_sizes["/base/RunAnywhere/Temp"] = 50;
+    storage.path_sizes["/base/RunAnywhere/Downloads"] = 100;
+    storage.existing_paths = {"/base/RunAnywhere/Cache", "/base/RunAnywhere/Temp",
+                              "/base/RunAnywhere/Downloads"};
+
+    rac_storage_callbacks_t callbacks = callbacks_for(&storage);
+    rac_storage_analyzer_handle_t analyzer = nullptr;
+    rac_model_registry_handle_t registry = nullptr;
+    ASSERT_EQ(rac_storage_analyzer_create(&callbacks, &analyzer), RAC_SUCCESS);
+    ASSERT_EQ(rac_model_registry_create(&registry), RAC_SUCCESS);
+
+    runanywhere::v1::StorageAvailabilityRequest request;
+    request.set_required_bytes(700);
+    request.set_include_delete_plan(true);
+    request.set_allow_cache_reclamation(true);
+    std::string request_bytes = serialize(request);
+
+    rac_proto_buffer_t buffer;
+    rac_proto_buffer_init(&buffer);
+    ASSERT_EQ(rac_storage_analyzer_availability_proto(
+                  analyzer, registry, reinterpret_cast<const uint8_t*>(request_bytes.data()),
+                  request_bytes.size(), &buffer),
+              RAC_SUCCESS);
+
+    runanywhere::v1::StorageAvailabilityResult result;
+    ASSERT_TRUE(parse_buffer(buffer, &result));
+    ASSERT_TRUE(result.success());
+    ASSERT_TRUE(!result.availability().is_available());
+    ASSERT_EQ(result.availability().shortfall_bytes(), 200);
+    ASSERT_TRUE(result.has_delete_plan());
+    ASSERT_TRUE(result.delete_plan().can_reclaim_required_bytes());
+    ASSERT_EQ(result.delete_plan().required_bytes(), 200);
+    ASSERT_EQ(result.delete_plan().reclaimable_bytes(), 275);
+    ASSERT_EQ(result.delete_plan().candidate_count(), 3);
+    ASSERT_TRUE(result.delete_plan().requires_platform_delete());
+    ASSERT_EQ(result.delete_plan().candidates(0).storage_key(), "cache");
 
     rac_proto_buffer_free(&buffer);
     rac_model_registry_destroy(registry);
@@ -244,6 +350,8 @@ int test_availability_offsets_existing_model_bytes() {
 }
 
 int test_delete_plan_blocks_loaded_missing_and_missing_path() {
+    rac_sdk_event_clear_queue();
+
     MockStorage storage;
     storage.total_space = 2000;
     storage.free_space = 500;
@@ -281,10 +389,43 @@ int test_delete_plan_blocks_loaded_missing_and_missing_path() {
     ASSERT_TRUE(parse_buffer(buffer, &plan));
     ASSERT_EQ(plan.candidates_size(), 1);
     ASSERT_EQ(plan.candidates(0).model_id(), "m1");
+    ASSERT_EQ(plan.candidates(0).storage_key(), "model:m1");
+    ASSERT_TRUE(plan.candidates(0).requires_platform_delete());
     ASSERT_EQ(plan.reclaimable_bytes(), 100);
+    ASSERT_EQ(plan.candidate_count(), 1);
+    ASSERT_TRUE(plan.requires_platform_delete());
+    ASSERT_TRUE(!plan.requires_unload());
     ASSERT_TRUE(!plan.can_reclaim_required_bytes());
     ASSERT_TRUE(plan.warnings_size() >= 3);
     ASSERT_TRUE(!plan.error_message().empty());
+
+    runanywhere::v1::SDKEvent event;
+    ASSERT_TRUE(poll_sdk_event(&event));
+    ASSERT_TRUE(storage_event_has_kind(
+        event, runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED));
+    ASSERT_TRUE(event.has_error());
+    ASSERT_EQ(event.error().c_abi_code(), RAC_ERROR_INSUFFICIENT_STORAGE);
+
+    rac_proto_buffer_free(&buffer);
+
+    request.set_allow_loaded_models(true);
+    request.clear_model_ids();
+    request.add_model_ids("m2");
+    request.set_required_bytes(75);
+    request_bytes = serialize(request);
+    rac_proto_buffer_init(&buffer);
+    ASSERT_EQ(rac_storage_analyzer_delete_plan_proto(
+                  analyzer, registry, reinterpret_cast<const uint8_t*>(request_bytes.data()),
+                  request_bytes.size(), &buffer),
+              RAC_SUCCESS);
+
+    runanywhere::v1::StorageDeletePlan loaded_plan;
+    ASSERT_TRUE(parse_buffer(buffer, &loaded_plan));
+    ASSERT_EQ(loaded_plan.candidates_size(), 1);
+    ASSERT_EQ(loaded_plan.candidates(0).model_id(), "m2");
+    ASSERT_TRUE(loaded_plan.candidates(0).is_loaded());
+    ASSERT_TRUE(loaded_plan.candidates(0).requires_unload());
+    ASSERT_TRUE(loaded_plan.requires_unload());
 
     rac_proto_buffer_free(&buffer);
     rac_model_registry_destroy(registry);
@@ -293,6 +434,8 @@ int test_delete_plan_blocks_loaded_missing_and_missing_path() {
 }
 
 int test_delete_dry_run_vs_execute() {
+    rac_sdk_event_clear_queue();
+
     MockStorage storage;
     storage.total_space = 2000;
     storage.free_space = 500;
@@ -324,6 +467,9 @@ int test_delete_dry_run_vs_execute() {
     ASSERT_TRUE(dry_run.success());
     ASSERT_EQ(dry_run.deleted_bytes(), 100);
     ASSERT_EQ(dry_run.deleted_model_ids_size(), 1);
+    ASSERT_TRUE(dry_run.dry_run());
+    ASSERT_TRUE(!dry_run.files_deleted());
+    ASSERT_TRUE(!dry_run.registry_updated());
     ASSERT_TRUE(storage.deleted_paths.empty());
     rac_proto_buffer_free(&buffer);
 
@@ -336,8 +482,24 @@ int test_delete_dry_run_vs_execute() {
               RAC_SUCCESS);
     runanywhere::v1::StorageDeleteResult executed;
     ASSERT_TRUE(parse_buffer(buffer, &executed));
+    ASSERT_TRUE(!executed.success());
+    ASSERT_EQ(executed.skipped_model_ids_size(), 1);
+    ASSERT_EQ(executed.skipped_model_ids(0), "m1");
+    ASSERT_TRUE(storage.deleted_paths.empty());
+    rac_proto_buffer_free(&buffer);
+
+    request.set_allow_platform_delete(true);
+    request_bytes = serialize(request);
+    rac_proto_buffer_init(&buffer);
+    ASSERT_EQ(rac_storage_analyzer_delete_proto(
+                  analyzer, registry, reinterpret_cast<const uint8_t*>(request_bytes.data()),
+                  request_bytes.size(), &buffer),
+              RAC_SUCCESS);
+    ASSERT_TRUE(parse_buffer(buffer, &executed));
     ASSERT_TRUE(executed.success());
     ASSERT_EQ(executed.deleted_bytes(), 100);
+    ASSERT_TRUE(executed.files_deleted());
+    ASSERT_TRUE(executed.registry_updated());
     ASSERT_EQ(storage.deleted_paths.size(), 1U);
     ASSERT_EQ(storage.deleted_paths[0], "/models/m1");
 
@@ -355,6 +517,8 @@ int test_delete_dry_run_vs_execute() {
 }
 
 int test_empty_storage_info() {
+    rac_sdk_event_clear_queue();
+
     MockStorage storage;
     rac_storage_callbacks_t callbacks = callbacks_for(&storage);
     rac_storage_analyzer_handle_t analyzer = nullptr;
@@ -382,6 +546,41 @@ int test_empty_storage_info() {
     return 0;
 }
 
+int test_invalid_request_publishes_typed_storage_error() {
+    rac_sdk_event_clear_queue();
+
+    MockStorage storage;
+    rac_storage_callbacks_t callbacks = callbacks_for(&storage);
+    rac_storage_analyzer_handle_t analyzer = nullptr;
+    rac_model_registry_handle_t registry = nullptr;
+    ASSERT_EQ(rac_storage_analyzer_create(&callbacks, &analyzer), RAC_SUCCESS);
+    ASSERT_EQ(rac_model_registry_create(&registry), RAC_SUCCESS);
+
+    const uint8_t invalid_bytes[] = {0xff, 0xff, 0xff};
+    rac_proto_buffer_t buffer;
+    rac_proto_buffer_init(&buffer);
+    ASSERT_EQ(rac_storage_analyzer_delete_plan_proto(analyzer, registry, invalid_bytes,
+                                                     sizeof(invalid_bytes), &buffer),
+              RAC_SUCCESS);
+
+    runanywhere::v1::StorageDeletePlan plan;
+    ASSERT_TRUE(parse_buffer(buffer, &plan));
+    ASSERT_TRUE(!plan.error_message().empty());
+
+    runanywhere::v1::SDKEvent event;
+    ASSERT_TRUE(poll_sdk_event(&event));
+    ASSERT_TRUE(storage_event_has_kind(
+        event, runanywhere::v1::STORAGE_LIFECYCLE_EVENT_KIND_DELETE_PLAN_FAILED));
+    ASSERT_TRUE(event.has_error());
+    ASSERT_EQ(event.error().c_abi_code(), RAC_ERROR_DECODING_ERROR);
+    ASSERT_EQ(event.error().category(), runanywhere::v1::ERROR_CATEGORY_VALIDATION);
+
+    rac_proto_buffer_free(&buffer);
+    rac_model_registry_destroy(registry);
+    rac_storage_analyzer_destroy(analyzer);
+    return 0;
+}
+
 #endif
 
 }  // namespace
@@ -402,9 +601,11 @@ int main() {
 
     RUN(test_info_aggregation_and_model_breakdown);
     RUN(test_availability_offsets_existing_model_bytes);
+    RUN(test_availability_includes_cache_delete_plan);
     RUN(test_delete_plan_blocks_loaded_missing_and_missing_path);
     RUN(test_delete_dry_run_vs_execute);
     RUN(test_empty_storage_info);
+    RUN(test_invalid_request_publishes_typed_storage_error);
 
     std::printf("\n%d test(s) failed\n", failures);
     return failures == 0 ? 0 : 1;

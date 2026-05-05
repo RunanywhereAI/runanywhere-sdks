@@ -22,7 +22,7 @@ class HTTPServiceConfig {
   const HTTPServiceConfig({
     required this.baseURL,
     required this.apiKey,
-    this.environment = SDKEnvironment.production,
+    this.environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
     this.timeoutMs = defaultTimeoutMs,
   });
 
@@ -73,7 +73,7 @@ class NetworkConfig {
   const NetworkConfig({
     this.baseURL,
     required this.apiKey,
-    this.environment = SDKEnvironment.production,
+    this.environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
     this.supabase,
     this.timeoutMs = defaultTimeoutMs,
   });
@@ -112,17 +112,17 @@ NetworkConfig createNetworkConfig({
   int? timeoutMs,
 }) {
   // Map string environment to enum if provided
-  SDKEnvironment env = environment ?? SDKEnvironment.production;
+  SDKEnvironment env = environment ?? SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
   if (environmentStr != null) {
     switch (environmentStr.toLowerCase()) {
       case 'development':
-        env = SDKEnvironment.development;
+        env = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
         break;
       case 'staging':
-        env = SDKEnvironment.staging;
+        env = SDKEnvironment.SDK_ENVIRONMENT_STAGING;
         break;
       case 'production':
-        env = SDKEnvironment.production;
+        env = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
         break;
     }
   }
@@ -147,26 +147,28 @@ NetworkConfig createNetworkConfig({
 /// Get environment name string
 String getEnvironmentName(SDKEnvironment env) {
   switch (env) {
-    case SDKEnvironment.development:
+    case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
       return 'development';
-    case SDKEnvironment.staging:
+    case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
       return 'staging';
-    case SDKEnvironment.production:
+    case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
       return 'production';
+    default:
+      return 'development';
   }
 }
 
 /// Check if environment is development
 bool isDevelopment(SDKEnvironment env) {
-  return env == SDKEnvironment.development;
+  return env == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
 }
 
 /// Check if environment is production
 bool isProduction(SDKEnvironment env) {
-  return env == SDKEnvironment.production;
+  return env == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
 }
 
 /// Check if environment is staging
 bool isStaging(SDKEnvironment env) {
-  return env == SDKEnvironment.staging;
+  return env == SDKEnvironment.SDK_ENVIRONMENT_STAGING;
 }

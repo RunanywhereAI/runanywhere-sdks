@@ -1,8 +1,8 @@
 package com.runanywhere.sdk.llm.llamacpp
 
+import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.core.module.RunAnywhereModule
-import com.runanywhere.sdk.core.types.InferenceFramework
-import com.runanywhere.sdk.core.types.SDKComponent
 import com.runanywhere.sdk.foundation.SDKLogger
 
 /**
@@ -57,12 +57,12 @@ object LlamaCPP : RunAnywhereModule {
 
     override val moduleName: String = "LlamaCPP"
 
-    override val capabilities: Set<SDKComponent> = setOf(SDKComponent.LLM)
+    override val capabilities: Set<SDKComponent> = setOf(SDKComponent.SDK_COMPONENT_LLM)
 
     override val defaultPriority: Int = 100
 
     /** LlamaCPP uses the llama.cpp inference framework */
-    override val inferenceFramework: InferenceFramework = InferenceFramework.LLAMA_CPP
+    override val inferenceFramework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
 
     // MARK: - Registration State
 

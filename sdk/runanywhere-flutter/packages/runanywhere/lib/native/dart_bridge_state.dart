@@ -104,8 +104,8 @@ class DartBridgeState {
       resetState();
       // Also reset the auth manager so state/auth stay in sync.
       try {
-        final resetAuth = lib.lookupFunction<Void Function(), void Function()>(
-            'rac_auth_reset');
+        final resetAuth = lib
+            .lookupFunction<Void Function(), void Function()>('rac_auth_reset');
         resetAuth();
       } catch (_) {
         // rac_auth_reset may not be linked yet; ignore.
@@ -124,8 +124,8 @@ class DartBridgeState {
               'rac_state_shutdown');
       shutdownState();
       try {
-        final resetAuth = lib.lookupFunction<Void Function(), void Function()>(
-            'rac_auth_reset');
+        final resetAuth = lib
+            .lookupFunction<Void Function(), void Function()>('rac_auth_reset');
         resetAuth();
       } catch (_) {
         // rac_auth_reset may not be linked yet; ignore.
@@ -147,7 +147,7 @@ class DartBridgeState {
           'rac_state_get_environment');
       return _intToEnvironment(getEnv());
     } catch (e) {
-      return SDKEnvironment.development;
+      return SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
     }
   }
 
@@ -311,8 +311,8 @@ class DartBridgeState {
   Future<void> clearAuth() async {
     try {
       final lib = PlatformLoader.loadCommons();
-      final clearAuthFn = lib.lookupFunction<Void Function(), void Function()>(
-          'rac_auth_clear');
+      final clearAuthFn = lib
+          .lookupFunction<Void Function(), void Function()>('rac_auth_clear');
       clearAuthFn();
 
       _logger.debug('Auth state cleared');
@@ -356,26 +356,27 @@ class DartBridgeState {
 
   int _environmentToInt(SDKEnvironment env) {
     switch (env) {
-      case SDKEnvironment.development:
+      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 0;
-      case SDKEnvironment.staging:
+      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
         return 1;
-      case SDKEnvironment.production:
+      case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 2;
+      default:
+        return 0;
     }
   }
 
   SDKEnvironment _intToEnvironment(int value) {
     switch (value) {
       case 0:
-        return SDKEnvironment.development;
+        return SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
       case 1:
-        return SDKEnvironment.staging;
+        return SDKEnvironment.SDK_ENVIRONMENT_STAGING;
       case 2:
-        return SDKEnvironment.production;
+        return SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
       default:
-        return SDKEnvironment.development;
+        return SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
     }
   }
 }
-

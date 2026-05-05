@@ -9,8 +9,10 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
+import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'tool_calling.pbenum.dart';
@@ -269,6 +271,8 @@ class ToolParameter extends $pb.GeneratedMessage {
     $core.String? description,
     $core.bool? required,
     $core.Iterable<$core.String>? enumValues,
+    $core.String? jsonSchema,
+    ToolValue? defaultValue,
   }) {
     final $result = create();
     if (name != null) {
@@ -286,6 +290,12 @@ class ToolParameter extends $pb.GeneratedMessage {
     if (enumValues != null) {
       $result.enumValues.addAll(enumValues);
     }
+    if (jsonSchema != null) {
+      $result.jsonSchema = jsonSchema;
+    }
+    if (defaultValue != null) {
+      $result.defaultValue = defaultValue;
+    }
     return $result;
   }
   ToolParameter._() : super();
@@ -298,6 +308,8 @@ class ToolParameter extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'description')
     ..aOB(4, _omitFieldNames ? '' : 'required')
     ..pPS(5, _omitFieldNames ? '' : 'enumValues')
+    ..aOS(6, _omitFieldNames ? '' : 'jsonSchema')
+    ..aOM<ToolValue>(7, _omitFieldNames ? '' : 'defaultValue', subBuilder: ToolValue.create)
     ..hasRequiredFields = false
   ;
 
@@ -361,6 +373,26 @@ class ToolParameter extends $pb.GeneratedMessage {
   /// Allowed values for enum-like parameters. Empty = unconstrained.
   @$pb.TagNumber(5)
   $core.List<$core.String> get enumValues => $_getList(4);
+
+  @$pb.TagNumber(6)
+  $core.String get jsonSchema => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set jsonSchema($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasJsonSchema() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearJsonSchema() => clearField(6);
+
+  @$pb.TagNumber(7)
+  ToolValue get defaultValue => $_getN(6);
+  @$pb.TagNumber(7)
+  set defaultValue(ToolValue v) { setField(7, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasDefaultValue() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearDefaultValue() => clearField(7);
+  @$pb.TagNumber(7)
+  ToolValue ensureDefaultValue() => $_ensure(6);
 }
 
 /// ---------------------------------------------------------------------------
@@ -372,6 +404,8 @@ class ToolDefinition extends $pb.GeneratedMessage {
     $core.String? description,
     $core.Iterable<ToolParameter>? parameters,
     $core.String? category,
+    $core.String? jsonSchema,
+    $core.Map<$core.String, $core.String>? metadata,
   }) {
     final $result = create();
     if (name != null) {
@@ -386,6 +420,12 @@ class ToolDefinition extends $pb.GeneratedMessage {
     if (category != null) {
       $result.category = category;
     }
+    if (jsonSchema != null) {
+      $result.jsonSchema = jsonSchema;
+    }
+    if (metadata != null) {
+      $result.metadata.addAll(metadata);
+    }
     return $result;
   }
   ToolDefinition._() : super();
@@ -397,6 +437,8 @@ class ToolDefinition extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'description')
     ..pc<ToolParameter>(3, _omitFieldNames ? '' : 'parameters', $pb.PbFieldType.PM, subBuilder: ToolParameter.create)
     ..aOS(4, _omitFieldNames ? '' : 'category')
+    ..aOS(5, _omitFieldNames ? '' : 'jsonSchema')
+    ..m<$core.String, $core.String>(6, _omitFieldNames ? '' : 'metadata', entryClassName: 'ToolDefinition.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
     ..hasRequiredFields = false
   ;
 
@@ -451,6 +493,18 @@ class ToolDefinition extends $pb.GeneratedMessage {
   $core.bool hasCategory() => $_has(3);
   @$pb.TagNumber(4)
   void clearCategory() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get jsonSchema => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set jsonSchema($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasJsonSchema() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearJsonSchema() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(5);
 }
 
 /// ---------------------------------------------------------------------------
@@ -465,6 +519,8 @@ class ToolCall extends $pb.GeneratedMessage {
     $core.String? type,
     $core.Map<$core.String, ToolValue>? arguments,
     $core.String? callId,
+    $fixnum.Int64? createdAtMs,
+    $core.String? rawText,
   }) {
     final $result = create();
     if (id != null) {
@@ -485,6 +541,12 @@ class ToolCall extends $pb.GeneratedMessage {
     if (callId != null) {
       $result.callId = callId;
     }
+    if (createdAtMs != null) {
+      $result.createdAtMs = createdAtMs;
+    }
+    if (rawText != null) {
+      $result.rawText = rawText;
+    }
     return $result;
   }
   ToolCall._() : super();
@@ -498,6 +560,8 @@ class ToolCall extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'type')
     ..m<$core.String, ToolValue>(5, _omitFieldNames ? '' : 'arguments', entryClassName: 'ToolCall.ArgumentsEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OM, valueCreator: ToolValue.create, valueDefaultOrMaker: ToolValue.getDefault, packageName: const $pb.PackageName('runanywhere.v1'))
     ..aOS(6, _omitFieldNames ? '' : 'callId')
+    ..aInt64(7, _omitFieldNames ? '' : 'createdAtMs')
+    ..aOS(8, _omitFieldNames ? '' : 'rawText')
     ..hasRequiredFields = false
   ;
 
@@ -578,6 +642,24 @@ class ToolCall extends $pb.GeneratedMessage {
   $core.bool hasCallId() => $_has(5);
   @$pb.TagNumber(6)
   void clearCallId() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get createdAtMs => $_getI64(6);
+  @$pb.TagNumber(7)
+  set createdAtMs($fixnum.Int64 v) { $_setInt64(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasCreatedAtMs() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearCreatedAtMs() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.String get rawText => $_getSZ(7);
+  @$pb.TagNumber(8)
+  set rawText($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasRawText() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearRawText() => clearField(8);
 }
 
 /// ---------------------------------------------------------------------------
@@ -593,6 +675,8 @@ class ToolResult extends $pb.GeneratedMessage {
     $core.bool? success,
     $core.Map<$core.String, ToolValue>? result,
     $core.String? callId,
+    $fixnum.Int64? startedAtMs,
+    $fixnum.Int64? completedAtMs,
   }) {
     final $result = create();
     if (toolCallId != null) {
@@ -616,6 +700,12 @@ class ToolResult extends $pb.GeneratedMessage {
     if (callId != null) {
       $result.callId = callId;
     }
+    if (startedAtMs != null) {
+      $result.startedAtMs = startedAtMs;
+    }
+    if (completedAtMs != null) {
+      $result.completedAtMs = completedAtMs;
+    }
     return $result;
   }
   ToolResult._() : super();
@@ -630,6 +720,8 @@ class ToolResult extends $pb.GeneratedMessage {
     ..aOB(5, _omitFieldNames ? '' : 'success')
     ..m<$core.String, ToolValue>(6, _omitFieldNames ? '' : 'result', entryClassName: 'ToolResult.ResultEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OM, valueCreator: ToolValue.create, valueDefaultOrMaker: ToolValue.getDefault, packageName: const $pb.PackageName('runanywhere.v1'))
     ..aOS(7, _omitFieldNames ? '' : 'callId')
+    ..aInt64(8, _omitFieldNames ? '' : 'startedAtMs')
+    ..aInt64(9, _omitFieldNames ? '' : 'completedAtMs')
     ..hasRequiredFields = false
   ;
 
@@ -716,6 +808,24 @@ class ToolResult extends $pb.GeneratedMessage {
   $core.bool hasCallId() => $_has(6);
   @$pb.TagNumber(7)
   void clearCallId() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $fixnum.Int64 get startedAtMs => $_getI64(7);
+  @$pb.TagNumber(8)
+  set startedAtMs($fixnum.Int64 v) { $_setInt64(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasStartedAtMs() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearStartedAtMs() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $fixnum.Int64 get completedAtMs => $_getI64(8);
+  @$pb.TagNumber(9)
+  set completedAtMs($fixnum.Int64 v) { $_setInt64(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasCompletedAtMs() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearCompletedAtMs() => clearField(9);
 }
 
 /// ---------------------------------------------------------------------------
@@ -735,6 +845,10 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
     ToolCallFormatName? format,
     $core.String? customSystemPrompt,
     $core.int? maxToolCalls,
+    ToolChoiceMode? toolChoice,
+    $core.String? forcedToolName,
+    $core.bool? parallelToolCalls,
+    $core.bool? requireJsonArguments,
   }) {
     final $result = create();
     if (tools != null) {
@@ -773,6 +887,18 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
     if (maxToolCalls != null) {
       $result.maxToolCalls = maxToolCalls;
     }
+    if (toolChoice != null) {
+      $result.toolChoice = toolChoice;
+    }
+    if (forcedToolName != null) {
+      $result.forcedToolName = forcedToolName;
+    }
+    if (parallelToolCalls != null) {
+      $result.parallelToolCalls = parallelToolCalls;
+    }
+    if (requireJsonArguments != null) {
+      $result.requireJsonArguments = requireJsonArguments;
+    }
     return $result;
   }
   ToolCallingOptions._() : super();
@@ -792,6 +918,10 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
     ..e<ToolCallFormatName>(10, _omitFieldNames ? '' : 'format', $pb.PbFieldType.OE, defaultOrMaker: ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED, valueOf: ToolCallFormatName.valueOf, enumValues: ToolCallFormatName.values)
     ..aOS(11, _omitFieldNames ? '' : 'customSystemPrompt')
     ..a<$core.int>(12, _omitFieldNames ? '' : 'maxToolCalls', $pb.PbFieldType.O3)
+    ..e<ToolChoiceMode>(13, _omitFieldNames ? '' : 'toolChoice', $pb.PbFieldType.OE, defaultOrMaker: ToolChoiceMode.TOOL_CHOICE_MODE_UNSPECIFIED, valueOf: ToolChoiceMode.valueOf, enumValues: ToolChoiceMode.values)
+    ..aOS(14, _omitFieldNames ? '' : 'forcedToolName')
+    ..aOB(15, _omitFieldNames ? '' : 'parallelToolCalls')
+    ..aOB(16, _omitFieldNames ? '' : 'requireJsonArguments')
     ..hasRequiredFields = false
   ;
 
@@ -940,6 +1070,42 @@ class ToolCallingOptions extends $pb.GeneratedMessage {
   $core.bool hasMaxToolCalls() => $_has(11);
   @$pb.TagNumber(12)
   void clearMaxToolCalls() => clearField(12);
+
+  @$pb.TagNumber(13)
+  ToolChoiceMode get toolChoice => $_getN(12);
+  @$pb.TagNumber(13)
+  set toolChoice(ToolChoiceMode v) { setField(13, v); }
+  @$pb.TagNumber(13)
+  $core.bool hasToolChoice() => $_has(12);
+  @$pb.TagNumber(13)
+  void clearToolChoice() => clearField(13);
+
+  @$pb.TagNumber(14)
+  $core.String get forcedToolName => $_getSZ(13);
+  @$pb.TagNumber(14)
+  set forcedToolName($core.String v) { $_setString(13, v); }
+  @$pb.TagNumber(14)
+  $core.bool hasForcedToolName() => $_has(13);
+  @$pb.TagNumber(14)
+  void clearForcedToolName() => clearField(14);
+
+  @$pb.TagNumber(15)
+  $core.bool get parallelToolCalls => $_getBF(14);
+  @$pb.TagNumber(15)
+  set parallelToolCalls($core.bool v) { $_setBool(14, v); }
+  @$pb.TagNumber(15)
+  $core.bool hasParallelToolCalls() => $_has(14);
+  @$pb.TagNumber(15)
+  void clearParallelToolCalls() => clearField(15);
+
+  @$pb.TagNumber(16)
+  $core.bool get requireJsonArguments => $_getBF(15);
+  @$pb.TagNumber(16)
+  set requireJsonArguments($core.bool v) { $_setBool(15, v); }
+  @$pb.TagNumber(16)
+  $core.bool hasRequireJsonArguments() => $_has(15);
+  @$pb.TagNumber(16)
+  void clearRequireJsonArguments() => clearField(16);
 }
 
 /// ---------------------------------------------------------------------------
@@ -953,6 +1119,9 @@ class ToolCallingResult extends $pb.GeneratedMessage {
     $core.bool? isComplete,
     $core.String? conversationId,
     $core.int? iterationsUsed,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+    $core.String? rawText,
   }) {
     final $result = create();
     if (text != null) {
@@ -973,6 +1142,15 @@ class ToolCallingResult extends $pb.GeneratedMessage {
     if (iterationsUsed != null) {
       $result.iterationsUsed = iterationsUsed;
     }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    if (rawText != null) {
+      $result.rawText = rawText;
+    }
     return $result;
   }
   ToolCallingResult._() : super();
@@ -986,6 +1164,9 @@ class ToolCallingResult extends $pb.GeneratedMessage {
     ..aOB(4, _omitFieldNames ? '' : 'isComplete')
     ..aOS(5, _omitFieldNames ? '' : 'conversationId')
     ..a<$core.int>(6, _omitFieldNames ? '' : 'iterationsUsed', $pb.PbFieldType.O3)
+    ..aOS(7, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(8, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..aOS(9, _omitFieldNames ? '' : 'rawText')
     ..hasRequiredFields = false
   ;
 
@@ -1057,6 +1238,840 @@ class ToolCallingResult extends $pb.GeneratedMessage {
   $core.bool hasIterationsUsed() => $_has(5);
   @$pb.TagNumber(6)
   void clearIterationsUsed() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.String get errorMessage => $_getSZ(6);
+  @$pb.TagNumber(7)
+  set errorMessage($core.String v) { $_setString(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasErrorMessage() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearErrorMessage() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get errorCode => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set errorCode($core.int v) { $_setSignedInt32(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasErrorCode() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearErrorCode() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get rawText => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set rawText($core.String v) { $_setString(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasRawText() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearRawText() => clearField(9);
+}
+
+class ToolParseRequest extends $pb.GeneratedMessage {
+  factory ToolParseRequest({
+    $core.String? text,
+    ToolCallingOptions? options,
+  }) {
+    final $result = create();
+    if (text != null) {
+      $result.text = text;
+    }
+    if (options != null) {
+      $result.options = options;
+    }
+    return $result;
+  }
+  ToolParseRequest._() : super();
+  factory ToolParseRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ToolParseRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ToolParseRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'text')
+    ..aOM<ToolCallingOptions>(2, _omitFieldNames ? '' : 'options', subBuilder: ToolCallingOptions.create)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ToolParseRequest clone() => ToolParseRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ToolParseRequest copyWith(void Function(ToolParseRequest) updates) => super.copyWith((message) => updates(message as ToolParseRequest)) as ToolParseRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToolParseRequest create() => ToolParseRequest._();
+  ToolParseRequest createEmptyInstance() => create();
+  static $pb.PbList<ToolParseRequest> createRepeated() => $pb.PbList<ToolParseRequest>();
+  @$core.pragma('dart2js:noInline')
+  static ToolParseRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ToolParseRequest>(create);
+  static ToolParseRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get text => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set text($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasText() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearText() => clearField(1);
+
+  @$pb.TagNumber(2)
+  ToolCallingOptions get options => $_getN(1);
+  @$pb.TagNumber(2)
+  set options(ToolCallingOptions v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasOptions() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOptions() => clearField(2);
+  @$pb.TagNumber(2)
+  ToolCallingOptions ensureOptions() => $_ensure(1);
+}
+
+class ToolParseResult extends $pb.GeneratedMessage {
+  factory ToolParseResult({
+    $core.bool? hasToolCall,
+    $core.Iterable<ToolCall>? toolCalls,
+    $core.String? remainingText,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (hasToolCall != null) {
+      $result.hasToolCall = hasToolCall;
+    }
+    if (toolCalls != null) {
+      $result.toolCalls.addAll(toolCalls);
+    }
+    if (remainingText != null) {
+      $result.remainingText = remainingText;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  ToolParseResult._() : super();
+  factory ToolParseResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ToolParseResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ToolParseResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'hasToolCall')
+    ..pc<ToolCall>(2, _omitFieldNames ? '' : 'toolCalls', $pb.PbFieldType.PM, subBuilder: ToolCall.create)
+    ..aOS(3, _omitFieldNames ? '' : 'remainingText')
+    ..aOS(4, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(5, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ToolParseResult clone() => ToolParseResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ToolParseResult copyWith(void Function(ToolParseResult) updates) => super.copyWith((message) => updates(message as ToolParseResult)) as ToolParseResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToolParseResult create() => ToolParseResult._();
+  ToolParseResult createEmptyInstance() => create();
+  static $pb.PbList<ToolParseResult> createRepeated() => $pb.PbList<ToolParseResult>();
+  @$core.pragma('dart2js:noInline')
+  static ToolParseResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ToolParseResult>(create);
+  static ToolParseResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get hasToolCall => $_getBF(0);
+  @$pb.TagNumber(1)
+  set hasToolCall($core.bool v) { $_setBool(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasHasToolCall() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHasToolCall() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.List<ToolCall> get toolCalls => $_getList(1);
+
+  @$pb.TagNumber(3)
+  $core.String get remainingText => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set remainingText($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasRemainingText() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearRemainingText() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get errorMessage => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set errorMessage($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasErrorMessage() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearErrorMessage() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get errorCode => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set errorCode($core.int v) { $_setSignedInt32(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasErrorCode() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearErrorCode() => clearField(5);
+}
+
+class ToolPromptFormatRequest extends $pb.GeneratedMessage {
+  factory ToolPromptFormatRequest({
+    $core.String? userPrompt,
+    ToolCallingOptions? options,
+    $core.Iterable<ToolResult>? toolResults,
+    $core.String? assistantText,
+  }) {
+    final $result = create();
+    if (userPrompt != null) {
+      $result.userPrompt = userPrompt;
+    }
+    if (options != null) {
+      $result.options = options;
+    }
+    if (toolResults != null) {
+      $result.toolResults.addAll(toolResults);
+    }
+    if (assistantText != null) {
+      $result.assistantText = assistantText;
+    }
+    return $result;
+  }
+  ToolPromptFormatRequest._() : super();
+  factory ToolPromptFormatRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ToolPromptFormatRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ToolPromptFormatRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'userPrompt')
+    ..aOM<ToolCallingOptions>(2, _omitFieldNames ? '' : 'options', subBuilder: ToolCallingOptions.create)
+    ..pc<ToolResult>(3, _omitFieldNames ? '' : 'toolResults', $pb.PbFieldType.PM, subBuilder: ToolResult.create)
+    ..aOS(4, _omitFieldNames ? '' : 'assistantText')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ToolPromptFormatRequest clone() => ToolPromptFormatRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ToolPromptFormatRequest copyWith(void Function(ToolPromptFormatRequest) updates) => super.copyWith((message) => updates(message as ToolPromptFormatRequest)) as ToolPromptFormatRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToolPromptFormatRequest create() => ToolPromptFormatRequest._();
+  ToolPromptFormatRequest createEmptyInstance() => create();
+  static $pb.PbList<ToolPromptFormatRequest> createRepeated() => $pb.PbList<ToolPromptFormatRequest>();
+  @$core.pragma('dart2js:noInline')
+  static ToolPromptFormatRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ToolPromptFormatRequest>(create);
+  static ToolPromptFormatRequest? _defaultInstance;
+
+  /// User prompt to merge with tool instructions. Empty means return only
+  /// the tool-instruction block for the selected format.
+  @$pb.TagNumber(1)
+  $core.String get userPrompt => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set userPrompt($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasUserPrompt() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUserPrompt() => clearField(1);
+
+  /// Carries available tools plus format/choice/iteration constraints.
+  @$pb.TagNumber(2)
+  ToolCallingOptions get options => $_getN(1);
+  @$pb.TagNumber(2)
+  set options(ToolCallingOptions v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasOptions() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOptions() => clearField(2);
+  @$pb.TagNumber(2)
+  ToolCallingOptions ensureOptions() => $_ensure(1);
+
+  /// Tool results to include when formatting a follow-up prompt after host
+  /// execution. Empty means an initial tool-enabled prompt.
+  @$pb.TagNumber(3)
+  $core.List<ToolResult> get toolResults => $_getList(2);
+
+  /// Assistant text emitted before tool execution, when available.
+  @$pb.TagNumber(4)
+  $core.String get assistantText => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set assistantText($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasAssistantText() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearAssistantText() => clearField(4);
+}
+
+class ToolPromptFormatResult extends $pb.GeneratedMessage {
+  factory ToolPromptFormatResult({
+    $core.String? formattedPrompt,
+    ToolCallFormatName? format,
+    $core.String? formatHint,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (formattedPrompt != null) {
+      $result.formattedPrompt = formattedPrompt;
+    }
+    if (format != null) {
+      $result.format = format;
+    }
+    if (formatHint != null) {
+      $result.formatHint = formatHint;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  ToolPromptFormatResult._() : super();
+  factory ToolPromptFormatResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ToolPromptFormatResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ToolPromptFormatResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'formattedPrompt')
+    ..e<ToolCallFormatName>(2, _omitFieldNames ? '' : 'format', $pb.PbFieldType.OE, defaultOrMaker: ToolCallFormatName.TOOL_CALL_FORMAT_NAME_UNSPECIFIED, valueOf: ToolCallFormatName.valueOf, enumValues: ToolCallFormatName.values)
+    ..aOS(3, _omitFieldNames ? '' : 'formatHint')
+    ..aOS(4, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(5, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ToolPromptFormatResult clone() => ToolPromptFormatResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ToolPromptFormatResult copyWith(void Function(ToolPromptFormatResult) updates) => super.copyWith((message) => updates(message as ToolPromptFormatResult)) as ToolPromptFormatResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToolPromptFormatResult create() => ToolPromptFormatResult._();
+  ToolPromptFormatResult createEmptyInstance() => create();
+  static $pb.PbList<ToolPromptFormatResult> createRepeated() => $pb.PbList<ToolPromptFormatResult>();
+  @$core.pragma('dart2js:noInline')
+  static ToolPromptFormatResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ToolPromptFormatResult>(create);
+  static ToolPromptFormatResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get formattedPrompt => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set formattedPrompt($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasFormattedPrompt() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearFormattedPrompt() => clearField(1);
+
+  @$pb.TagNumber(2)
+  ToolCallFormatName get format => $_getN(1);
+  @$pb.TagNumber(2)
+  set format(ToolCallFormatName v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasFormat() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearFormat() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get formatHint => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set formatHint($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasFormatHint() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFormatHint() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get errorMessage => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set errorMessage($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasErrorMessage() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearErrorMessage() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get errorCode => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set errorCode($core.int v) { $_setSignedInt32(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasErrorCode() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearErrorCode() => clearField(5);
+}
+
+class ToolCallValidationRequest extends $pb.GeneratedMessage {
+  factory ToolCallValidationRequest({
+    ToolCall? toolCall,
+    ToolCallingOptions? options,
+  }) {
+    final $result = create();
+    if (toolCall != null) {
+      $result.toolCall = toolCall;
+    }
+    if (options != null) {
+      $result.options = options;
+    }
+    return $result;
+  }
+  ToolCallValidationRequest._() : super();
+  factory ToolCallValidationRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ToolCallValidationRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ToolCallValidationRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOM<ToolCall>(1, _omitFieldNames ? '' : 'toolCall', subBuilder: ToolCall.create)
+    ..aOM<ToolCallingOptions>(2, _omitFieldNames ? '' : 'options', subBuilder: ToolCallingOptions.create)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ToolCallValidationRequest clone() => ToolCallValidationRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ToolCallValidationRequest copyWith(void Function(ToolCallValidationRequest) updates) => super.copyWith((message) => updates(message as ToolCallValidationRequest)) as ToolCallValidationRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToolCallValidationRequest create() => ToolCallValidationRequest._();
+  ToolCallValidationRequest createEmptyInstance() => create();
+  static $pb.PbList<ToolCallValidationRequest> createRepeated() => $pb.PbList<ToolCallValidationRequest>();
+  @$core.pragma('dart2js:noInline')
+  static ToolCallValidationRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ToolCallValidationRequest>(create);
+  static ToolCallValidationRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  ToolCall get toolCall => $_getN(0);
+  @$pb.TagNumber(1)
+  set toolCall(ToolCall v) { setField(1, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasToolCall() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearToolCall() => clearField(1);
+  @$pb.TagNumber(1)
+  ToolCall ensureToolCall() => $_ensure(0);
+
+  /// Validation uses options.tools as the registry snapshot and honors
+  /// portable flags such as require_json_arguments and forced_tool_name.
+  @$pb.TagNumber(2)
+  ToolCallingOptions get options => $_getN(1);
+  @$pb.TagNumber(2)
+  set options(ToolCallingOptions v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasOptions() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearOptions() => clearField(2);
+  @$pb.TagNumber(2)
+  ToolCallingOptions ensureOptions() => $_ensure(1);
+}
+
+class ToolCallValidationResult extends $pb.GeneratedMessage {
+  factory ToolCallValidationResult({
+    $core.bool? isValid,
+    $core.Iterable<$core.String>? validationErrors,
+    ToolDefinition? matchedTool,
+    $core.String? normalizedArgumentsJson,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (isValid != null) {
+      $result.isValid = isValid;
+    }
+    if (validationErrors != null) {
+      $result.validationErrors.addAll(validationErrors);
+    }
+    if (matchedTool != null) {
+      $result.matchedTool = matchedTool;
+    }
+    if (normalizedArgumentsJson != null) {
+      $result.normalizedArgumentsJson = normalizedArgumentsJson;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  ToolCallValidationResult._() : super();
+  factory ToolCallValidationResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ToolCallValidationResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ToolCallValidationResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'isValid')
+    ..pPS(2, _omitFieldNames ? '' : 'validationErrors')
+    ..aOM<ToolDefinition>(3, _omitFieldNames ? '' : 'matchedTool', subBuilder: ToolDefinition.create)
+    ..aOS(4, _omitFieldNames ? '' : 'normalizedArgumentsJson')
+    ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(6, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ToolCallValidationResult clone() => ToolCallValidationResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ToolCallValidationResult copyWith(void Function(ToolCallValidationResult) updates) => super.copyWith((message) => updates(message as ToolCallValidationResult)) as ToolCallValidationResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToolCallValidationResult create() => ToolCallValidationResult._();
+  ToolCallValidationResult createEmptyInstance() => create();
+  static $pb.PbList<ToolCallValidationResult> createRepeated() => $pb.PbList<ToolCallValidationResult>();
+  @$core.pragma('dart2js:noInline')
+  static ToolCallValidationResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ToolCallValidationResult>(create);
+  static ToolCallValidationResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get isValid => $_getBF(0);
+  @$pb.TagNumber(1)
+  set isValid($core.bool v) { $_setBool(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasIsValid() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearIsValid() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.List<$core.String> get validationErrors => $_getList(1);
+
+  @$pb.TagNumber(3)
+  ToolDefinition get matchedTool => $_getN(2);
+  @$pb.TagNumber(3)
+  set matchedTool(ToolDefinition v) { setField(3, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasMatchedTool() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMatchedTool() => clearField(3);
+  @$pb.TagNumber(3)
+  ToolDefinition ensureMatchedTool() => $_ensure(2);
+
+  @$pb.TagNumber(4)
+  $core.String get normalizedArgumentsJson => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set normalizedArgumentsJson($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasNormalizedArgumentsJson() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearNormalizedArgumentsJson() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get errorMessage => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set errorMessage($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasErrorMessage() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearErrorMessage() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get errorCode => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set errorCode($core.int v) { $_setSignedInt32(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasErrorCode() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearErrorCode() => clearField(6);
+}
+
+class ToolCallingStreamEvent extends $pb.GeneratedMessage {
+  factory ToolCallingStreamEvent({
+    $fixnum.Int64? seq,
+    $fixnum.Int64? timestampUs,
+    $core.String? conversationId,
+    ToolCallingStreamEventKind? kind,
+    $core.String? token,
+    ToolCall? toolCall,
+    ToolResult? toolResult,
+    ToolCallingResult? result,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (seq != null) {
+      $result.seq = seq;
+    }
+    if (timestampUs != null) {
+      $result.timestampUs = timestampUs;
+    }
+    if (conversationId != null) {
+      $result.conversationId = conversationId;
+    }
+    if (kind != null) {
+      $result.kind = kind;
+    }
+    if (token != null) {
+      $result.token = token;
+    }
+    if (toolCall != null) {
+      $result.toolCall = toolCall;
+    }
+    if (toolResult != null) {
+      $result.toolResult = toolResult;
+    }
+    if (result != null) {
+      $result.result = result;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  ToolCallingStreamEvent._() : super();
+  factory ToolCallingStreamEvent.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ToolCallingStreamEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ToolCallingStreamEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
+    ..aOS(3, _omitFieldNames ? '' : 'conversationId')
+    ..e<ToolCallingStreamEventKind>(4, _omitFieldNames ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: ToolCallingStreamEventKind.TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED, valueOf: ToolCallingStreamEventKind.valueOf, enumValues: ToolCallingStreamEventKind.values)
+    ..aOS(5, _omitFieldNames ? '' : 'token')
+    ..aOM<ToolCall>(6, _omitFieldNames ? '' : 'toolCall', subBuilder: ToolCall.create)
+    ..aOM<ToolResult>(7, _omitFieldNames ? '' : 'toolResult', subBuilder: ToolResult.create)
+    ..aOM<ToolCallingResult>(8, _omitFieldNames ? '' : 'result', subBuilder: ToolCallingResult.create)
+    ..aOS(9, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(10, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ToolCallingStreamEvent clone() => ToolCallingStreamEvent()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ToolCallingStreamEvent copyWith(void Function(ToolCallingStreamEvent) updates) => super.copyWith((message) => updates(message as ToolCallingStreamEvent)) as ToolCallingStreamEvent;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToolCallingStreamEvent create() => ToolCallingStreamEvent._();
+  ToolCallingStreamEvent createEmptyInstance() => create();
+  static $pb.PbList<ToolCallingStreamEvent> createRepeated() => $pb.PbList<ToolCallingStreamEvent>();
+  @$core.pragma('dart2js:noInline')
+  static ToolCallingStreamEvent getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ToolCallingStreamEvent>(create);
+  static ToolCallingStreamEvent? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get seq => $_getI64(0);
+  @$pb.TagNumber(1)
+  set seq($fixnum.Int64 v) { $_setInt64(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasSeq() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSeq() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get timestampUs => $_getI64(1);
+  @$pb.TagNumber(2)
+  set timestampUs($fixnum.Int64 v) { $_setInt64(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasTimestampUs() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearTimestampUs() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get conversationId => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set conversationId($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasConversationId() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearConversationId() => clearField(3);
+
+  @$pb.TagNumber(4)
+  ToolCallingStreamEventKind get kind => $_getN(3);
+  @$pb.TagNumber(4)
+  set kind(ToolCallingStreamEventKind v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasKind() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearKind() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.String get token => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set token($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasToken() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearToken() => clearField(5);
+
+  @$pb.TagNumber(6)
+  ToolCall get toolCall => $_getN(5);
+  @$pb.TagNumber(6)
+  set toolCall(ToolCall v) { setField(6, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasToolCall() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearToolCall() => clearField(6);
+  @$pb.TagNumber(6)
+  ToolCall ensureToolCall() => $_ensure(5);
+
+  @$pb.TagNumber(7)
+  ToolResult get toolResult => $_getN(6);
+  @$pb.TagNumber(7)
+  set toolResult(ToolResult v) { setField(7, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasToolResult() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearToolResult() => clearField(7);
+  @$pb.TagNumber(7)
+  ToolResult ensureToolResult() => $_ensure(6);
+
+  @$pb.TagNumber(8)
+  ToolCallingResult get result => $_getN(7);
+  @$pb.TagNumber(8)
+  set result(ToolCallingResult v) { setField(8, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasResult() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearResult() => clearField(8);
+  @$pb.TagNumber(8)
+  ToolCallingResult ensureResult() => $_ensure(7);
+
+  @$pb.TagNumber(9)
+  $core.String get errorMessage => $_getSZ(8);
+  @$pb.TagNumber(9)
+  set errorMessage($core.String v) { $_setString(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasErrorMessage() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearErrorMessage() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get errorCode => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set errorCode($core.int v) { $_setSignedInt32(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasErrorCode() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearErrorCode() => clearField(10);
+}
+
+class ToolRegistrySnapshot extends $pb.GeneratedMessage {
+  factory ToolRegistrySnapshot({
+    $core.Iterable<ToolDefinition>? tools,
+    $fixnum.Int64? updatedAtMs,
+  }) {
+    final $result = create();
+    if (tools != null) {
+      $result.tools.addAll(tools);
+    }
+    if (updatedAtMs != null) {
+      $result.updatedAtMs = updatedAtMs;
+    }
+    return $result;
+  }
+  ToolRegistrySnapshot._() : super();
+  factory ToolRegistrySnapshot.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ToolRegistrySnapshot.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ToolRegistrySnapshot', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..pc<ToolDefinition>(1, _omitFieldNames ? '' : 'tools', $pb.PbFieldType.PM, subBuilder: ToolDefinition.create)
+    ..aInt64(2, _omitFieldNames ? '' : 'updatedAtMs')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ToolRegistrySnapshot clone() => ToolRegistrySnapshot()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ToolRegistrySnapshot copyWith(void Function(ToolRegistrySnapshot) updates) => super.copyWith((message) => updates(message as ToolRegistrySnapshot)) as ToolRegistrySnapshot;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToolRegistrySnapshot create() => ToolRegistrySnapshot._();
+  ToolRegistrySnapshot createEmptyInstance() => create();
+  static $pb.PbList<ToolRegistrySnapshot> createRepeated() => $pb.PbList<ToolRegistrySnapshot>();
+  @$core.pragma('dart2js:noInline')
+  static ToolRegistrySnapshot getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ToolRegistrySnapshot>(create);
+  static ToolRegistrySnapshot? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<ToolDefinition> get tools => $_getList(0);
+
+  @$pb.TagNumber(2)
+  $fixnum.Int64 get updatedAtMs => $_getI64(1);
+  @$pb.TagNumber(2)
+  set updatedAtMs($fixnum.Int64 v) { $_setInt64(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasUpdatedAtMs() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearUpdatedAtMs() => clearField(2);
+}
+
+class ToolCallingApi {
+  $pb.RpcClient _client;
+  ToolCallingApi(this._client);
+
+  $async.Future<ToolParseResult> parse($pb.ClientContext? ctx, ToolParseRequest request) =>
+    _client.invoke<ToolParseResult>(ctx, 'ToolCalling', 'Parse', request, ToolParseResult())
+  ;
+  $async.Future<ToolPromptFormatResult> formatPrompt($pb.ClientContext? ctx, ToolPromptFormatRequest request) =>
+    _client.invoke<ToolPromptFormatResult>(ctx, 'ToolCalling', 'FormatPrompt', request, ToolPromptFormatResult())
+  ;
+  $async.Future<ToolCallValidationResult> validateCall($pb.ClientContext? ctx, ToolCallValidationRequest request) =>
+    _client.invoke<ToolCallValidationResult>(ctx, 'ToolCalling', 'ValidateCall', request, ToolCallValidationResult())
+  ;
 }
 
 

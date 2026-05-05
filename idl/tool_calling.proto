@@ -95,6 +95,14 @@ enum ToolCallFormatName {
     TOOL_CALL_FORMAT_NAME_HERMES           = 6;
 }
 
+enum ToolChoiceMode {
+    TOOL_CHOICE_MODE_UNSPECIFIED = 0;
+    TOOL_CHOICE_MODE_AUTO        = 1;
+    TOOL_CHOICE_MODE_NONE        = 2;
+    TOOL_CHOICE_MODE_REQUIRED    = 3;
+    TOOL_CHOICE_MODE_SPECIFIC    = 4;
+}
+
 // ---------------------------------------------------------------------------
 // A single parameter definition for a tool.
 // ---------------------------------------------------------------------------
@@ -105,6 +113,8 @@ message ToolParameter {
     bool   required                  = 4;
     // Allowed values for enum-like parameters. Empty = unconstrained.
     repeated string enum_values      = 5;
+    optional string json_schema      = 6;
+    optional ToolValue default_value  = 7;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,6 +126,8 @@ message ToolDefinition {
     repeated ToolParameter parameters = 3;
     // Optional category for grouping tools in catalogs / UIs.
     optional string category         = 4;
+    optional string json_schema      = 5;
+    map<string, string> metadata     = 6;
 }
 
 // ---------------------------------------------------------------------------
@@ -140,6 +152,9 @@ message ToolCall {
 
     // Alias for id used by pre-proto SDK surfaces.
     optional string call_id          = 6;
+
+    int64 created_at_ms              = 7;
+    optional string raw_text         = 8;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,6 +178,9 @@ message ToolResult {
 
     // Alias for tool_call_id used by pre-proto SDK surfaces.
     optional string call_id          = 7;
+
+    int64 started_at_ms              = 8;
+    int64 completed_at_ms            = 9;
 }
 
 // ---------------------------------------------------------------------------
@@ -215,6 +233,11 @@ message ToolCallingOptions {
     // C ABI / SDK field name for max_iterations. 0 = use max_iterations or
     // SDK default.
     optional int32 max_tool_calls = 12;
+
+    ToolChoiceMode tool_choice = 13;
+    optional string forced_tool_name = 14;
+    bool parallel_tool_calls = 15;
+    bool require_json_arguments = 16;
 }
 
 // ---------------------------------------------------------------------------
@@ -233,4 +256,100 @@ message ToolCallingResult {
     optional string conversation_id  = 5;
     // Number of tool-call iterations actually used.
     int32  iterations_used           = 6;
+
+    optional string error_message    = 7;
+    int32 error_code                 = 8;
+    string raw_text                  = 9;
+}
+
+message ToolParseRequest {
+    string text = 1;
+    optional ToolCallingOptions options = 2;
+}
+
+message ToolParseResult {
+    bool has_tool_call = 1;
+    repeated ToolCall tool_calls = 2;
+    string remaining_text = 3;
+    optional string error_message = 4;
+    int32 error_code = 5;
+}
+
+message ToolPromptFormatRequest {
+    // User prompt to merge with tool instructions. Empty means return only
+    // the tool-instruction block for the selected format.
+    string user_prompt = 1;
+
+    // Carries available tools plus format/choice/iteration constraints.
+    optional ToolCallingOptions options = 2;
+
+    // Tool results to include when formatting a follow-up prompt after host
+    // execution. Empty means an initial tool-enabled prompt.
+    repeated ToolResult tool_results = 3;
+
+    // Assistant text emitted before tool execution, when available.
+    optional string assistant_text = 4;
+}
+
+message ToolPromptFormatResult {
+    string formatted_prompt = 1;
+    ToolCallFormatName format = 2;
+    string format_hint = 3;
+    optional string error_message = 4;
+    int32 error_code = 5;
+}
+
+message ToolCallValidationRequest {
+    ToolCall tool_call = 1;
+
+    // Validation uses options.tools as the registry snapshot and honors
+    // portable flags such as require_json_arguments and forced_tool_name.
+    optional ToolCallingOptions options = 2;
+}
+
+message ToolCallValidationResult {
+    bool is_valid = 1;
+    repeated string validation_errors = 2;
+    optional ToolDefinition matched_tool = 3;
+    string normalized_arguments_json = 4;
+    optional string error_message = 5;
+    int32 error_code = 6;
+}
+
+enum ToolCallingStreamEventKind {
+    TOOL_CALLING_STREAM_EVENT_KIND_UNSPECIFIED = 0;
+    TOOL_CALLING_STREAM_EVENT_KIND_MODEL_TOKEN = 1;
+    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_CALL_PARSED = 2;
+    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_STARTED = 3;
+    TOOL_CALLING_STREAM_EVENT_KIND_TOOL_EXECUTION_COMPLETED = 4;
+    TOOL_CALLING_STREAM_EVENT_KIND_COMPLETED = 5;
+    TOOL_CALLING_STREAM_EVENT_KIND_ERROR = 6;
+}
+
+message ToolCallingStreamEvent {
+    uint64 seq = 1;
+    int64 timestamp_us = 2;
+    string conversation_id = 3;
+    ToolCallingStreamEventKind kind = 4;
+    string token = 5;
+    optional ToolCall tool_call = 6;
+    optional ToolResult tool_result = 7;
+    optional ToolCallingResult result = 8;
+    optional string error_message = 9;
+    int32 error_code = 10;
+}
+
+message ToolRegistrySnapshot {
+    repeated ToolDefinition tools = 1;
+    int64 updated_at_ms = 2;
+}
+
+// Logical tool-calling service contract. Host tool registration, permission
+// checks, execution, callbacks, browser/native APIs, and side effects remain
+// adapter-owned; this service describes only portable parsing, prompt
+// formatting, and validation semantics over generated messages.
+service ToolCalling {
+    rpc Parse(ToolParseRequest) returns (ToolParseResult);
+    rpc FormatPrompt(ToolPromptFormatRequest) returns (ToolPromptFormatResult);
+    rpc ValidateCall(ToolCallValidationRequest) returns (ToolCallValidationResult);
 }

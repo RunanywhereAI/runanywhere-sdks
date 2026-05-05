@@ -7,7 +7,8 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
-import { ToolCall, ToolResult } from "./tool_calling";
+import { LLMGenerationOptions, LLMGenerationResult } from "./llm_options";
+import { ToolCall, ToolCallingOptions, ToolResult } from "./tool_calling";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -26,6 +27,7 @@ export enum MessageRole {
    * tool call has been executed. Required for OpenAI-style tool flows.
    */
   MESSAGE_ROLE_TOOL = 4,
+  MESSAGE_ROLE_DEVELOPER = 5,
   UNRECOGNIZED = -1,
 }
 
@@ -46,6 +48,9 @@ export function messageRoleFromJSON(object: any): MessageRole {
     case 4:
     case "MESSAGE_ROLE_TOOL":
       return MessageRole.MESSAGE_ROLE_TOOL;
+    case 5:
+    case "MESSAGE_ROLE_DEVELOPER":
+      return MessageRole.MESSAGE_ROLE_DEVELOPER;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -65,10 +70,149 @@ export function messageRoleToJSON(object: MessageRole): string {
       return "MESSAGE_ROLE_SYSTEM";
     case MessageRole.MESSAGE_ROLE_TOOL:
       return "MESSAGE_ROLE_TOOL";
+    case MessageRole.MESSAGE_ROLE_DEVELOPER:
+      return "MESSAGE_ROLE_DEVELOPER";
     case MessageRole.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
+}
+
+export enum ChatMessageStatus {
+  CHAT_MESSAGE_STATUS_UNSPECIFIED = 0,
+  CHAT_MESSAGE_STATUS_PENDING = 1,
+  CHAT_MESSAGE_STATUS_STREAMING = 2,
+  CHAT_MESSAGE_STATUS_COMPLETE = 3,
+  CHAT_MESSAGE_STATUS_FAILED = 4,
+  CHAT_MESSAGE_STATUS_CANCELLED = 5,
+  UNRECOGNIZED = -1,
+}
+
+export function chatMessageStatusFromJSON(object: any): ChatMessageStatus {
+  switch (object) {
+    case 0:
+    case "CHAT_MESSAGE_STATUS_UNSPECIFIED":
+      return ChatMessageStatus.CHAT_MESSAGE_STATUS_UNSPECIFIED;
+    case 1:
+    case "CHAT_MESSAGE_STATUS_PENDING":
+      return ChatMessageStatus.CHAT_MESSAGE_STATUS_PENDING;
+    case 2:
+    case "CHAT_MESSAGE_STATUS_STREAMING":
+      return ChatMessageStatus.CHAT_MESSAGE_STATUS_STREAMING;
+    case 3:
+    case "CHAT_MESSAGE_STATUS_COMPLETE":
+      return ChatMessageStatus.CHAT_MESSAGE_STATUS_COMPLETE;
+    case 4:
+    case "CHAT_MESSAGE_STATUS_FAILED":
+      return ChatMessageStatus.CHAT_MESSAGE_STATUS_FAILED;
+    case 5:
+    case "CHAT_MESSAGE_STATUS_CANCELLED":
+      return ChatMessageStatus.CHAT_MESSAGE_STATUS_CANCELLED;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ChatMessageStatus.UNRECOGNIZED;
+  }
+}
+
+export function chatMessageStatusToJSON(object: ChatMessageStatus): string {
+  switch (object) {
+    case ChatMessageStatus.CHAT_MESSAGE_STATUS_UNSPECIFIED:
+      return "CHAT_MESSAGE_STATUS_UNSPECIFIED";
+    case ChatMessageStatus.CHAT_MESSAGE_STATUS_PENDING:
+      return "CHAT_MESSAGE_STATUS_PENDING";
+    case ChatMessageStatus.CHAT_MESSAGE_STATUS_STREAMING:
+      return "CHAT_MESSAGE_STATUS_STREAMING";
+    case ChatMessageStatus.CHAT_MESSAGE_STATUS_COMPLETE:
+      return "CHAT_MESSAGE_STATUS_COMPLETE";
+    case ChatMessageStatus.CHAT_MESSAGE_STATUS_FAILED:
+      return "CHAT_MESSAGE_STATUS_FAILED";
+    case ChatMessageStatus.CHAT_MESSAGE_STATUS_CANCELLED:
+      return "CHAT_MESSAGE_STATUS_CANCELLED";
+    case ChatMessageStatus.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum ChatStreamEventKind {
+  CHAT_STREAM_EVENT_KIND_UNSPECIFIED = 0,
+  CHAT_STREAM_EVENT_KIND_MESSAGE_STARTED = 1,
+  CHAT_STREAM_EVENT_KIND_TOKEN = 2,
+  CHAT_STREAM_EVENT_KIND_TOOL_CALL = 3,
+  CHAT_STREAM_EVENT_KIND_TOOL_RESULT = 4,
+  CHAT_STREAM_EVENT_KIND_MESSAGE_COMPLETED = 5,
+  CHAT_STREAM_EVENT_KIND_ERROR = 6,
+  UNRECOGNIZED = -1,
+}
+
+export function chatStreamEventKindFromJSON(object: any): ChatStreamEventKind {
+  switch (object) {
+    case 0:
+    case "CHAT_STREAM_EVENT_KIND_UNSPECIFIED":
+      return ChatStreamEventKind.CHAT_STREAM_EVENT_KIND_UNSPECIFIED;
+    case 1:
+    case "CHAT_STREAM_EVENT_KIND_MESSAGE_STARTED":
+      return ChatStreamEventKind.CHAT_STREAM_EVENT_KIND_MESSAGE_STARTED;
+    case 2:
+    case "CHAT_STREAM_EVENT_KIND_TOKEN":
+      return ChatStreamEventKind.CHAT_STREAM_EVENT_KIND_TOKEN;
+    case 3:
+    case "CHAT_STREAM_EVENT_KIND_TOOL_CALL":
+      return ChatStreamEventKind.CHAT_STREAM_EVENT_KIND_TOOL_CALL;
+    case 4:
+    case "CHAT_STREAM_EVENT_KIND_TOOL_RESULT":
+      return ChatStreamEventKind.CHAT_STREAM_EVENT_KIND_TOOL_RESULT;
+    case 5:
+    case "CHAT_STREAM_EVENT_KIND_MESSAGE_COMPLETED":
+      return ChatStreamEventKind.CHAT_STREAM_EVENT_KIND_MESSAGE_COMPLETED;
+    case 6:
+    case "CHAT_STREAM_EVENT_KIND_ERROR":
+      return ChatStreamEventKind.CHAT_STREAM_EVENT_KIND_ERROR;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ChatStreamEventKind.UNRECOGNIZED;
+  }
+}
+
+export function chatStreamEventKindToJSON(object: ChatStreamEventKind): string {
+  switch (object) {
+    case ChatStreamEventKind.CHAT_STREAM_EVENT_KIND_UNSPECIFIED:
+      return "CHAT_STREAM_EVENT_KIND_UNSPECIFIED";
+    case ChatStreamEventKind.CHAT_STREAM_EVENT_KIND_MESSAGE_STARTED:
+      return "CHAT_STREAM_EVENT_KIND_MESSAGE_STARTED";
+    case ChatStreamEventKind.CHAT_STREAM_EVENT_KIND_TOKEN:
+      return "CHAT_STREAM_EVENT_KIND_TOKEN";
+    case ChatStreamEventKind.CHAT_STREAM_EVENT_KIND_TOOL_CALL:
+      return "CHAT_STREAM_EVENT_KIND_TOOL_CALL";
+    case ChatStreamEventKind.CHAT_STREAM_EVENT_KIND_TOOL_RESULT:
+      return "CHAT_STREAM_EVENT_KIND_TOOL_RESULT";
+    case ChatStreamEventKind.CHAT_STREAM_EVENT_KIND_MESSAGE_COMPLETED:
+      return "CHAT_STREAM_EVENT_KIND_MESSAGE_COMPLETED";
+    case ChatStreamEventKind.CHAT_STREAM_EVENT_KIND_ERROR:
+      return "CHAT_STREAM_EVENT_KIND_ERROR";
+    case ChatStreamEventKind.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export interface ChatAttachment {
+  id: string;
+  /** MIME type or SDK-known media class. */
+  mediaType: string;
+  data?: Uint8Array | undefined;
+  uri?: string | undefined;
+  adapterHandle?: string | undefined;
+  name?: string | undefined;
+  sizeBytes: number;
+  metadata: { [key: string]: string };
+}
+
+export interface ChatAttachment_MetadataEntry {
+  key: string;
+  value: string;
 }
 
 /**
@@ -121,8 +265,343 @@ export interface ChatMessage {
    */
   toolCalls: ToolCall[];
   /** Typed tool result carried by role == MESSAGE_ROLE_TOOL messages. */
-  toolResult?: ToolResult | undefined;
+  toolResult?:
+    | ToolResult
+    | undefined;
+  /** Optional threading and delivery metadata. */
+  parentId?: string | undefined;
+  status: ChatMessageStatus;
+  errorMessage?: string | undefined;
+  metadata: { [key: string]: string };
+  /**
+   * Opaque attachments normalized by platform adapters. Capture, picker,
+   * and permission flows remain native/Web-owned.
+   */
+  attachments: ChatAttachment[];
 }
+
+export interface ChatMessage_MetadataEntry {
+  key: string;
+  value: string;
+}
+
+export interface ChatGenerationRequest {
+  requestId: string;
+  conversationId: string;
+  messages: ChatMessage[];
+  options?: LLMGenerationOptions | undefined;
+  toolCalling?: ToolCallingOptions | undefined;
+  metadata: { [key: string]: string };
+}
+
+export interface ChatGenerationRequest_MetadataEntry {
+  key: string;
+  value: string;
+}
+
+export interface ChatGenerationResult {
+  conversationId: string;
+  message?: ChatMessage | undefined;
+  generation?: LLMGenerationResult | undefined;
+  toolCalls: ToolCall[];
+  toolResults: ToolResult[];
+  errorMessage?: string | undefined;
+  errorCode: number;
+}
+
+export interface ChatStreamEvent {
+  seq: number;
+  timestampUs: number;
+  requestId: string;
+  conversationId: string;
+  kind: ChatStreamEventKind;
+  token?: string | undefined;
+  message?: ChatMessage | undefined;
+  toolCall?: ToolCall | undefined;
+  toolResult?: ToolResult | undefined;
+  finalResult?: LLMGenerationResult | undefined;
+  errorMessage?: string | undefined;
+  errorCode: number;
+}
+
+export interface ChatConversationState {
+  conversationId: string;
+  messages: ChatMessage[];
+  createdAtMs: number;
+  updatedAtMs: number;
+  metadata: { [key: string]: string };
+}
+
+export interface ChatConversationState_MetadataEntry {
+  key: string;
+  value: string;
+}
+
+function createBaseChatAttachment(): ChatAttachment {
+  return {
+    id: "",
+    mediaType: "",
+    data: undefined,
+    uri: undefined,
+    adapterHandle: undefined,
+    name: undefined,
+    sizeBytes: 0,
+    metadata: {},
+  };
+}
+
+export const ChatAttachment = {
+  encode(message: ChatAttachment, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.id !== "") {
+      writer.uint32(10).string(message.id);
+    }
+    if (message.mediaType !== "") {
+      writer.uint32(18).string(message.mediaType);
+    }
+    if (message.data !== undefined) {
+      writer.uint32(26).bytes(message.data);
+    }
+    if (message.uri !== undefined) {
+      writer.uint32(34).string(message.uri);
+    }
+    if (message.adapterHandle !== undefined) {
+      writer.uint32(42).string(message.adapterHandle);
+    }
+    if (message.name !== undefined) {
+      writer.uint32(50).string(message.name);
+    }
+    if (message.sizeBytes !== 0) {
+      writer.uint32(56).int64(message.sizeBytes);
+    }
+    Object.entries(message.metadata).forEach(([key, value]) => {
+      ChatAttachment_MetadataEntry.encode({ key: key as any, value }, writer.uint32(66).fork()).ldelim();
+    });
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ChatAttachment {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseChatAttachment();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.id = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.mediaType = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.data = reader.bytes();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.uri = reader.string();
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.adapterHandle = reader.string();
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.sizeBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          const entry8 = ChatAttachment_MetadataEntry.decode(reader, reader.uint32());
+          if (entry8.value !== undefined) {
+            message.metadata[entry8.key] = entry8.value;
+          }
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ChatAttachment {
+    return {
+      id: isSet(object.id) ? globalThis.String(object.id) : "",
+      mediaType: isSet(object.mediaType) ? globalThis.String(object.mediaType) : "",
+      data: isSet(object.data) ? bytesFromBase64(object.data) : undefined,
+      uri: isSet(object.uri) ? globalThis.String(object.uri) : undefined,
+      adapterHandle: isSet(object.adapterHandle) ? globalThis.String(object.adapterHandle) : undefined,
+      name: isSet(object.name) ? globalThis.String(object.name) : undefined,
+      sizeBytes: isSet(object.sizeBytes) ? globalThis.Number(object.sizeBytes) : 0,
+      metadata: isObject(object.metadata)
+        ? Object.entries(object.metadata).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+        : {},
+    };
+  },
+
+  toJSON(message: ChatAttachment): unknown {
+    const obj: any = {};
+    if (message.id !== "") {
+      obj.id = message.id;
+    }
+    if (message.mediaType !== "") {
+      obj.mediaType = message.mediaType;
+    }
+    if (message.data !== undefined) {
+      obj.data = base64FromBytes(message.data);
+    }
+    if (message.uri !== undefined) {
+      obj.uri = message.uri;
+    }
+    if (message.adapterHandle !== undefined) {
+      obj.adapterHandle = message.adapterHandle;
+    }
+    if (message.name !== undefined) {
+      obj.name = message.name;
+    }
+    if (message.sizeBytes !== 0) {
+      obj.sizeBytes = Math.round(message.sizeBytes);
+    }
+    if (message.metadata) {
+      const entries = Object.entries(message.metadata);
+      if (entries.length > 0) {
+        obj.metadata = {};
+        entries.forEach(([k, v]) => {
+          obj.metadata[k] = v;
+        });
+      }
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ChatAttachment>, I>>(base?: I): ChatAttachment {
+    return ChatAttachment.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ChatAttachment>, I>>(object: I): ChatAttachment {
+    const message = createBaseChatAttachment();
+    message.id = object.id ?? "";
+    message.mediaType = object.mediaType ?? "";
+    message.data = object.data ?? undefined;
+    message.uri = object.uri ?? undefined;
+    message.adapterHandle = object.adapterHandle ?? undefined;
+    message.name = object.name ?? undefined;
+    message.sizeBytes = object.sizeBytes ?? 0;
+    message.metadata = Object.entries(object.metadata ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = globalThis.String(value);
+      }
+      return acc;
+    }, {});
+    return message;
+  },
+};
+
+function createBaseChatAttachment_MetadataEntry(): ChatAttachment_MetadataEntry {
+  return { key: "", value: "" };
+}
+
+export const ChatAttachment_MetadataEntry = {
+  encode(message: ChatAttachment_MetadataEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ChatAttachment_MetadataEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseChatAttachment_MetadataEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ChatAttachment_MetadataEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: ChatAttachment_MetadataEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ChatAttachment_MetadataEntry>, I>>(base?: I): ChatAttachment_MetadataEntry {
+    return ChatAttachment_MetadataEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ChatAttachment_MetadataEntry>, I>>(object: I): ChatAttachment_MetadataEntry {
+    const message = createBaseChatAttachment_MetadataEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
+    return message;
+  },
+};
 
 function createBaseChatMessage(): ChatMessage {
   return {
@@ -135,6 +614,11 @@ function createBaseChatMessage(): ChatMessage {
     toolCallId: undefined,
     toolCalls: [],
     toolResult: undefined,
+    parentId: undefined,
+    status: 0,
+    errorMessage: undefined,
+    metadata: {},
+    attachments: [],
   };
 }
 
@@ -166,6 +650,21 @@ export const ChatMessage = {
     }
     if (message.toolResult !== undefined) {
       ToolResult.encode(message.toolResult, writer.uint32(74).fork()).ldelim();
+    }
+    if (message.parentId !== undefined) {
+      writer.uint32(82).string(message.parentId);
+    }
+    if (message.status !== 0) {
+      writer.uint32(88).int32(message.status);
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(98).string(message.errorMessage);
+    }
+    Object.entries(message.metadata).forEach(([key, value]) => {
+      ChatMessage_MetadataEntry.encode({ key: key as any, value }, writer.uint32(106).fork()).ldelim();
+    });
+    for (const v of message.attachments) {
+      ChatAttachment.encode(v!, writer.uint32(114).fork()).ldelim();
     }
     return writer;
   },
@@ -240,6 +739,44 @@ export const ChatMessage = {
 
           message.toolResult = ToolResult.decode(reader, reader.uint32());
           continue;
+        case 10:
+          if (tag !== 82) {
+            break;
+          }
+
+          message.parentId = reader.string();
+          continue;
+        case 11:
+          if (tag !== 88) {
+            break;
+          }
+
+          message.status = reader.int32() as any;
+          continue;
+        case 12:
+          if (tag !== 98) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 13:
+          if (tag !== 106) {
+            break;
+          }
+
+          const entry13 = ChatMessage_MetadataEntry.decode(reader, reader.uint32());
+          if (entry13.value !== undefined) {
+            message.metadata[entry13.key] = entry13.value;
+          }
+          continue;
+        case 14:
+          if (tag !== 114) {
+            break;
+          }
+
+          message.attachments.push(ChatAttachment.decode(reader, reader.uint32()));
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -264,6 +801,18 @@ export const ChatMessage = {
         ? object.toolCalls.map((e: any) => ToolCall.fromJSON(e))
         : [],
       toolResult: isSet(object.toolResult) ? ToolResult.fromJSON(object.toolResult) : undefined,
+      parentId: isSet(object.parentId) ? globalThis.String(object.parentId) : undefined,
+      status: isSet(object.status) ? chatMessageStatusFromJSON(object.status) : 0,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      metadata: isObject(object.metadata)
+        ? Object.entries(object.metadata).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+        : {},
+      attachments: globalThis.Array.isArray(object?.attachments)
+        ? object.attachments.map((e: any) => ChatAttachment.fromJSON(e))
+        : [],
     };
   },
 
@@ -296,6 +845,27 @@ export const ChatMessage = {
     if (message.toolResult !== undefined) {
       obj.toolResult = ToolResult.toJSON(message.toolResult);
     }
+    if (message.parentId !== undefined) {
+      obj.parentId = message.parentId;
+    }
+    if (message.status !== 0) {
+      obj.status = chatMessageStatusToJSON(message.status);
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.metadata) {
+      const entries = Object.entries(message.metadata);
+      if (entries.length > 0) {
+        obj.metadata = {};
+        entries.forEach(([k, v]) => {
+          obj.metadata[k] = v;
+        });
+      }
+    }
+    if (message.attachments?.length) {
+      obj.attachments = message.attachments.map((e) => ChatAttachment.toJSON(e));
+    }
     return obj;
   },
 
@@ -315,9 +885,975 @@ export const ChatMessage = {
     message.toolResult = (object.toolResult !== undefined && object.toolResult !== null)
       ? ToolResult.fromPartial(object.toolResult)
       : undefined;
+    message.parentId = object.parentId ?? undefined;
+    message.status = object.status ?? 0;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.metadata = Object.entries(object.metadata ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = globalThis.String(value);
+      }
+      return acc;
+    }, {});
+    message.attachments = object.attachments?.map((e) => ChatAttachment.fromPartial(e)) || [];
     return message;
   },
 };
+
+function createBaseChatMessage_MetadataEntry(): ChatMessage_MetadataEntry {
+  return { key: "", value: "" };
+}
+
+export const ChatMessage_MetadataEntry = {
+  encode(message: ChatMessage_MetadataEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ChatMessage_MetadataEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseChatMessage_MetadataEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ChatMessage_MetadataEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: ChatMessage_MetadataEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ChatMessage_MetadataEntry>, I>>(base?: I): ChatMessage_MetadataEntry {
+    return ChatMessage_MetadataEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ChatMessage_MetadataEntry>, I>>(object: I): ChatMessage_MetadataEntry {
+    const message = createBaseChatMessage_MetadataEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
+function createBaseChatGenerationRequest(): ChatGenerationRequest {
+  return { requestId: "", conversationId: "", messages: [], options: undefined, toolCalling: undefined, metadata: {} };
+}
+
+export const ChatGenerationRequest = {
+  encode(message: ChatGenerationRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    if (message.conversationId !== "") {
+      writer.uint32(18).string(message.conversationId);
+    }
+    for (const v of message.messages) {
+      ChatMessage.encode(v!, writer.uint32(26).fork()).ldelim();
+    }
+    if (message.options !== undefined) {
+      LLMGenerationOptions.encode(message.options, writer.uint32(34).fork()).ldelim();
+    }
+    if (message.toolCalling !== undefined) {
+      ToolCallingOptions.encode(message.toolCalling, writer.uint32(42).fork()).ldelim();
+    }
+    Object.entries(message.metadata).forEach(([key, value]) => {
+      ChatGenerationRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(50).fork()).ldelim();
+    });
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ChatGenerationRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseChatGenerationRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.conversationId = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.messages.push(ChatMessage.decode(reader, reader.uint32()));
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.options = LLMGenerationOptions.decode(reader, reader.uint32());
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.toolCalling = ToolCallingOptions.decode(reader, reader.uint32());
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          const entry6 = ChatGenerationRequest_MetadataEntry.decode(reader, reader.uint32());
+          if (entry6.value !== undefined) {
+            message.metadata[entry6.key] = entry6.value;
+          }
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ChatGenerationRequest {
+    return {
+      requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+      conversationId: isSet(object.conversationId) ? globalThis.String(object.conversationId) : "",
+      messages: globalThis.Array.isArray(object?.messages)
+        ? object.messages.map((e: any) => ChatMessage.fromJSON(e))
+        : [],
+      options: isSet(object.options) ? LLMGenerationOptions.fromJSON(object.options) : undefined,
+      toolCalling: isSet(object.toolCalling) ? ToolCallingOptions.fromJSON(object.toolCalling) : undefined,
+      metadata: isObject(object.metadata)
+        ? Object.entries(object.metadata).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+        : {},
+    };
+  },
+
+  toJSON(message: ChatGenerationRequest): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.conversationId !== "") {
+      obj.conversationId = message.conversationId;
+    }
+    if (message.messages?.length) {
+      obj.messages = message.messages.map((e) => ChatMessage.toJSON(e));
+    }
+    if (message.options !== undefined) {
+      obj.options = LLMGenerationOptions.toJSON(message.options);
+    }
+    if (message.toolCalling !== undefined) {
+      obj.toolCalling = ToolCallingOptions.toJSON(message.toolCalling);
+    }
+    if (message.metadata) {
+      const entries = Object.entries(message.metadata);
+      if (entries.length > 0) {
+        obj.metadata = {};
+        entries.forEach(([k, v]) => {
+          obj.metadata[k] = v;
+        });
+      }
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ChatGenerationRequest>, I>>(base?: I): ChatGenerationRequest {
+    return ChatGenerationRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ChatGenerationRequest>, I>>(object: I): ChatGenerationRequest {
+    const message = createBaseChatGenerationRequest();
+    message.requestId = object.requestId ?? "";
+    message.conversationId = object.conversationId ?? "";
+    message.messages = object.messages?.map((e) => ChatMessage.fromPartial(e)) || [];
+    message.options = (object.options !== undefined && object.options !== null)
+      ? LLMGenerationOptions.fromPartial(object.options)
+      : undefined;
+    message.toolCalling = (object.toolCalling !== undefined && object.toolCalling !== null)
+      ? ToolCallingOptions.fromPartial(object.toolCalling)
+      : undefined;
+    message.metadata = Object.entries(object.metadata ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = globalThis.String(value);
+      }
+      return acc;
+    }, {});
+    return message;
+  },
+};
+
+function createBaseChatGenerationRequest_MetadataEntry(): ChatGenerationRequest_MetadataEntry {
+  return { key: "", value: "" };
+}
+
+export const ChatGenerationRequest_MetadataEntry = {
+  encode(message: ChatGenerationRequest_MetadataEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ChatGenerationRequest_MetadataEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseChatGenerationRequest_MetadataEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ChatGenerationRequest_MetadataEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: ChatGenerationRequest_MetadataEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ChatGenerationRequest_MetadataEntry>, I>>(
+    base?: I,
+  ): ChatGenerationRequest_MetadataEntry {
+    return ChatGenerationRequest_MetadataEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ChatGenerationRequest_MetadataEntry>, I>>(
+    object: I,
+  ): ChatGenerationRequest_MetadataEntry {
+    const message = createBaseChatGenerationRequest_MetadataEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
+function createBaseChatGenerationResult(): ChatGenerationResult {
+  return {
+    conversationId: "",
+    message: undefined,
+    generation: undefined,
+    toolCalls: [],
+    toolResults: [],
+    errorMessage: undefined,
+    errorCode: 0,
+  };
+}
+
+export const ChatGenerationResult = {
+  encode(message: ChatGenerationResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.conversationId !== "") {
+      writer.uint32(10).string(message.conversationId);
+    }
+    if (message.message !== undefined) {
+      ChatMessage.encode(message.message, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.generation !== undefined) {
+      LLMGenerationResult.encode(message.generation, writer.uint32(26).fork()).ldelim();
+    }
+    for (const v of message.toolCalls) {
+      ToolCall.encode(v!, writer.uint32(34).fork()).ldelim();
+    }
+    for (const v of message.toolResults) {
+      ToolResult.encode(v!, writer.uint32(42).fork()).ldelim();
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(50).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(56).int32(message.errorCode);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ChatGenerationResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseChatGenerationResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.conversationId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.message = ChatMessage.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.generation = LLMGenerationResult.decode(reader, reader.uint32());
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.toolCalls.push(ToolCall.decode(reader, reader.uint32()));
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.toolResults.push(ToolResult.decode(reader, reader.uint32()));
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ChatGenerationResult {
+    return {
+      conversationId: isSet(object.conversationId) ? globalThis.String(object.conversationId) : "",
+      message: isSet(object.message) ? ChatMessage.fromJSON(object.message) : undefined,
+      generation: isSet(object.generation) ? LLMGenerationResult.fromJSON(object.generation) : undefined,
+      toolCalls: globalThis.Array.isArray(object?.toolCalls)
+        ? object.toolCalls.map((e: any) => ToolCall.fromJSON(e))
+        : [],
+      toolResults: globalThis.Array.isArray(object?.toolResults)
+        ? object.toolResults.map((e: any) => ToolResult.fromJSON(e))
+        : [],
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+    };
+  },
+
+  toJSON(message: ChatGenerationResult): unknown {
+    const obj: any = {};
+    if (message.conversationId !== "") {
+      obj.conversationId = message.conversationId;
+    }
+    if (message.message !== undefined) {
+      obj.message = ChatMessage.toJSON(message.message);
+    }
+    if (message.generation !== undefined) {
+      obj.generation = LLMGenerationResult.toJSON(message.generation);
+    }
+    if (message.toolCalls?.length) {
+      obj.toolCalls = message.toolCalls.map((e) => ToolCall.toJSON(e));
+    }
+    if (message.toolResults?.length) {
+      obj.toolResults = message.toolResults.map((e) => ToolResult.toJSON(e));
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ChatGenerationResult>, I>>(base?: I): ChatGenerationResult {
+    return ChatGenerationResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ChatGenerationResult>, I>>(object: I): ChatGenerationResult {
+    const message = createBaseChatGenerationResult();
+    message.conversationId = object.conversationId ?? "";
+    message.message = (object.message !== undefined && object.message !== null)
+      ? ChatMessage.fromPartial(object.message)
+      : undefined;
+    message.generation = (object.generation !== undefined && object.generation !== null)
+      ? LLMGenerationResult.fromPartial(object.generation)
+      : undefined;
+    message.toolCalls = object.toolCalls?.map((e) => ToolCall.fromPartial(e)) || [];
+    message.toolResults = object.toolResults?.map((e) => ToolResult.fromPartial(e)) || [];
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
+    return message;
+  },
+};
+
+function createBaseChatStreamEvent(): ChatStreamEvent {
+  return {
+    seq: 0,
+    timestampUs: 0,
+    requestId: "",
+    conversationId: "",
+    kind: 0,
+    token: undefined,
+    message: undefined,
+    toolCall: undefined,
+    toolResult: undefined,
+    finalResult: undefined,
+    errorMessage: undefined,
+    errorCode: 0,
+  };
+}
+
+export const ChatStreamEvent = {
+  encode(message: ChatStreamEvent, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.seq !== 0) {
+      writer.uint32(8).uint64(message.seq);
+    }
+    if (message.timestampUs !== 0) {
+      writer.uint32(16).int64(message.timestampUs);
+    }
+    if (message.requestId !== "") {
+      writer.uint32(26).string(message.requestId);
+    }
+    if (message.conversationId !== "") {
+      writer.uint32(34).string(message.conversationId);
+    }
+    if (message.kind !== 0) {
+      writer.uint32(40).int32(message.kind);
+    }
+    if (message.token !== undefined) {
+      writer.uint32(50).string(message.token);
+    }
+    if (message.message !== undefined) {
+      ChatMessage.encode(message.message, writer.uint32(58).fork()).ldelim();
+    }
+    if (message.toolCall !== undefined) {
+      ToolCall.encode(message.toolCall, writer.uint32(66).fork()).ldelim();
+    }
+    if (message.toolResult !== undefined) {
+      ToolResult.encode(message.toolResult, writer.uint32(74).fork()).ldelim();
+    }
+    if (message.finalResult !== undefined) {
+      LLMGenerationResult.encode(message.finalResult, writer.uint32(82).fork()).ldelim();
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(90).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(96).int32(message.errorCode);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ChatStreamEvent {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseChatStreamEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.seq = longToNumber(reader.uint64() as Long);
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.timestampUs = longToNumber(reader.int64() as Long);
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.conversationId = reader.string();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.kind = reader.int32() as any;
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.token = reader.string();
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.message = ChatMessage.decode(reader, reader.uint32());
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.toolCall = ToolCall.decode(reader, reader.uint32());
+          continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.toolResult = ToolResult.decode(reader, reader.uint32());
+          continue;
+        case 10:
+          if (tag !== 82) {
+            break;
+          }
+
+          message.finalResult = LLMGenerationResult.decode(reader, reader.uint32());
+          continue;
+        case 11:
+          if (tag !== 90) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 12:
+          if (tag !== 96) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ChatStreamEvent {
+    return {
+      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
+      timestampUs: isSet(object.timestampUs) ? globalThis.Number(object.timestampUs) : 0,
+      requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+      conversationId: isSet(object.conversationId) ? globalThis.String(object.conversationId) : "",
+      kind: isSet(object.kind) ? chatStreamEventKindFromJSON(object.kind) : 0,
+      token: isSet(object.token) ? globalThis.String(object.token) : undefined,
+      message: isSet(object.message) ? ChatMessage.fromJSON(object.message) : undefined,
+      toolCall: isSet(object.toolCall) ? ToolCall.fromJSON(object.toolCall) : undefined,
+      toolResult: isSet(object.toolResult) ? ToolResult.fromJSON(object.toolResult) : undefined,
+      finalResult: isSet(object.finalResult) ? LLMGenerationResult.fromJSON(object.finalResult) : undefined,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+    };
+  },
+
+  toJSON(message: ChatStreamEvent): unknown {
+    const obj: any = {};
+    if (message.seq !== 0) {
+      obj.seq = Math.round(message.seq);
+    }
+    if (message.timestampUs !== 0) {
+      obj.timestampUs = Math.round(message.timestampUs);
+    }
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.conversationId !== "") {
+      obj.conversationId = message.conversationId;
+    }
+    if (message.kind !== 0) {
+      obj.kind = chatStreamEventKindToJSON(message.kind);
+    }
+    if (message.token !== undefined) {
+      obj.token = message.token;
+    }
+    if (message.message !== undefined) {
+      obj.message = ChatMessage.toJSON(message.message);
+    }
+    if (message.toolCall !== undefined) {
+      obj.toolCall = ToolCall.toJSON(message.toolCall);
+    }
+    if (message.toolResult !== undefined) {
+      obj.toolResult = ToolResult.toJSON(message.toolResult);
+    }
+    if (message.finalResult !== undefined) {
+      obj.finalResult = LLMGenerationResult.toJSON(message.finalResult);
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ChatStreamEvent>, I>>(base?: I): ChatStreamEvent {
+    return ChatStreamEvent.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ChatStreamEvent>, I>>(object: I): ChatStreamEvent {
+    const message = createBaseChatStreamEvent();
+    message.seq = object.seq ?? 0;
+    message.timestampUs = object.timestampUs ?? 0;
+    message.requestId = object.requestId ?? "";
+    message.conversationId = object.conversationId ?? "";
+    message.kind = object.kind ?? 0;
+    message.token = object.token ?? undefined;
+    message.message = (object.message !== undefined && object.message !== null)
+      ? ChatMessage.fromPartial(object.message)
+      : undefined;
+    message.toolCall = (object.toolCall !== undefined && object.toolCall !== null)
+      ? ToolCall.fromPartial(object.toolCall)
+      : undefined;
+    message.toolResult = (object.toolResult !== undefined && object.toolResult !== null)
+      ? ToolResult.fromPartial(object.toolResult)
+      : undefined;
+    message.finalResult = (object.finalResult !== undefined && object.finalResult !== null)
+      ? LLMGenerationResult.fromPartial(object.finalResult)
+      : undefined;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
+    return message;
+  },
+};
+
+function createBaseChatConversationState(): ChatConversationState {
+  return { conversationId: "", messages: [], createdAtMs: 0, updatedAtMs: 0, metadata: {} };
+}
+
+export const ChatConversationState = {
+  encode(message: ChatConversationState, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.conversationId !== "") {
+      writer.uint32(10).string(message.conversationId);
+    }
+    for (const v of message.messages) {
+      ChatMessage.encode(v!, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.createdAtMs !== 0) {
+      writer.uint32(24).int64(message.createdAtMs);
+    }
+    if (message.updatedAtMs !== 0) {
+      writer.uint32(32).int64(message.updatedAtMs);
+    }
+    Object.entries(message.metadata).forEach(([key, value]) => {
+      ChatConversationState_MetadataEntry.encode({ key: key as any, value }, writer.uint32(42).fork()).ldelim();
+    });
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ChatConversationState {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseChatConversationState();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.conversationId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.messages.push(ChatMessage.decode(reader, reader.uint32()));
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.createdAtMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.updatedAtMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          const entry5 = ChatConversationState_MetadataEntry.decode(reader, reader.uint32());
+          if (entry5.value !== undefined) {
+            message.metadata[entry5.key] = entry5.value;
+          }
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ChatConversationState {
+    return {
+      conversationId: isSet(object.conversationId) ? globalThis.String(object.conversationId) : "",
+      messages: globalThis.Array.isArray(object?.messages)
+        ? object.messages.map((e: any) => ChatMessage.fromJSON(e))
+        : [],
+      createdAtMs: isSet(object.createdAtMs) ? globalThis.Number(object.createdAtMs) : 0,
+      updatedAtMs: isSet(object.updatedAtMs) ? globalThis.Number(object.updatedAtMs) : 0,
+      metadata: isObject(object.metadata)
+        ? Object.entries(object.metadata).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+        : {},
+    };
+  },
+
+  toJSON(message: ChatConversationState): unknown {
+    const obj: any = {};
+    if (message.conversationId !== "") {
+      obj.conversationId = message.conversationId;
+    }
+    if (message.messages?.length) {
+      obj.messages = message.messages.map((e) => ChatMessage.toJSON(e));
+    }
+    if (message.createdAtMs !== 0) {
+      obj.createdAtMs = Math.round(message.createdAtMs);
+    }
+    if (message.updatedAtMs !== 0) {
+      obj.updatedAtMs = Math.round(message.updatedAtMs);
+    }
+    if (message.metadata) {
+      const entries = Object.entries(message.metadata);
+      if (entries.length > 0) {
+        obj.metadata = {};
+        entries.forEach(([k, v]) => {
+          obj.metadata[k] = v;
+        });
+      }
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ChatConversationState>, I>>(base?: I): ChatConversationState {
+    return ChatConversationState.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ChatConversationState>, I>>(object: I): ChatConversationState {
+    const message = createBaseChatConversationState();
+    message.conversationId = object.conversationId ?? "";
+    message.messages = object.messages?.map((e) => ChatMessage.fromPartial(e)) || [];
+    message.createdAtMs = object.createdAtMs ?? 0;
+    message.updatedAtMs = object.updatedAtMs ?? 0;
+    message.metadata = Object.entries(object.metadata ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = globalThis.String(value);
+      }
+      return acc;
+    }, {});
+    return message;
+  },
+};
+
+function createBaseChatConversationState_MetadataEntry(): ChatConversationState_MetadataEntry {
+  return { key: "", value: "" };
+}
+
+export const ChatConversationState_MetadataEntry = {
+  encode(message: ChatConversationState_MetadataEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ChatConversationState_MetadataEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseChatConversationState_MetadataEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ChatConversationState_MetadataEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: ChatConversationState_MetadataEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ChatConversationState_MetadataEntry>, I>>(
+    base?: I,
+  ): ChatConversationState_MetadataEntry {
+    return ChatConversationState_MetadataEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ChatConversationState_MetadataEntry>, I>>(
+    object: I,
+  ): ChatConversationState_MetadataEntry {
+    const message = createBaseChatConversationState_MetadataEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
+function bytesFromBase64(b64: string): Uint8Array {
+  const bin = globalThis.atob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; ++i) {
+    arr[i] = bin.charCodeAt(i);
+  }
+  return arr;
+}
+
+function base64FromBytes(arr: Uint8Array): string {
+  const bin: string[] = [];
+  arr.forEach((byte) => {
+    bin.push(globalThis.String.fromCharCode(byte));
+  });
+  return globalThis.btoa(bin.join(""));
+}
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 
@@ -344,6 +1880,10 @@ function longToNumber(long: Long): number {
 if (_m0.util.Long !== Long) {
   _m0.util.Long = Long as any;
   _m0.configure();
+}
+
+function isObject(value: any): boolean {
+  return typeof value === "object" && value !== null;
 }
 
 function isSet(value: any): boolean {

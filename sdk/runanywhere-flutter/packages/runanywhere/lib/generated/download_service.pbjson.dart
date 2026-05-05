@@ -93,6 +93,11 @@ const DownloadProgress$json = {
     {'1': 'total_files', '3': 13, '4': 1, '5': 5, '10': 'totalFiles'},
     {'1': 'storage_key', '3': 14, '4': 1, '5': 9, '10': 'storageKey'},
     {'1': 'local_path', '3': 15, '4': 1, '5': 9, '10': 'localPath'},
+    {'1': 'overall_progress', '3': 16, '4': 1, '5': 2, '10': 'overallProgress'},
+    {'1': 'started_at_unix_ms', '3': 17, '4': 1, '5': 3, '10': 'startedAtUnixMs'},
+    {'1': 'updated_at_unix_ms', '3': 18, '4': 1, '5': 3, '10': 'updatedAtUnixMs'},
+    {'1': 'current_file_name', '3': 19, '4': 1, '5': 9, '10': 'currentFileName'},
+    {'1': 'resume_token', '3': 20, '4': 1, '5': 9, '10': 'resumeToken'},
   ],
 };
 
@@ -108,7 +113,11 @@ final $typed_data.Uint8List downloadProgressDescriptor = $convert.base64Decode(
     'JfbWVzc2FnZRgKIAEoCVIMZXJyb3JNZXNzYWdlEhcKB3Rhc2tfaWQYCyABKAlSBnRhc2tJZBIs'
     'ChJjdXJyZW50X2ZpbGVfaW5kZXgYDCABKAVSEGN1cnJlbnRGaWxlSW5kZXgSHwoLdG90YWxfZm'
     'lsZXMYDSABKAVSCnRvdGFsRmlsZXMSHwoLc3RvcmFnZV9rZXkYDiABKAlSCnN0b3JhZ2VLZXkS'
-    'HQoKbG9jYWxfcGF0aBgPIAEoCVIJbG9jYWxQYXRo');
+    'HQoKbG9jYWxfcGF0aBgPIAEoCVIJbG9jYWxQYXRoEikKEG92ZXJhbGxfcHJvZ3Jlc3MYECABKA'
+    'JSD292ZXJhbGxQcm9ncmVzcxIrChJzdGFydGVkX2F0X3VuaXhfbXMYESABKANSD3N0YXJ0ZWRB'
+    'dFVuaXhNcxIrChJ1cGRhdGVkX2F0X3VuaXhfbXMYEiABKANSD3VwZGF0ZWRBdFVuaXhNcxIqCh'
+    'FjdXJyZW50X2ZpbGVfbmFtZRgTIAEoCVIPY3VycmVudEZpbGVOYW1lEiEKDHJlc3VtZV90b2tl'
+    'bhgUIAEoCVILcmVzdW1lVG9rZW4=');
 
 @$core.Deprecated('Use downloadPlanRequestDescriptor instead')
 const DownloadPlanRequest$json = {
@@ -119,6 +128,10 @@ const DownloadPlanRequest$json = {
     {'1': 'resume_existing', '3': 3, '4': 1, '5': 8, '10': 'resumeExisting'},
     {'1': 'available_storage_bytes', '3': 4, '4': 1, '5': 3, '10': 'availableStorageBytes'},
     {'1': 'allow_metered_network', '3': 5, '4': 1, '5': 8, '10': 'allowMeteredNetwork'},
+    {'1': 'storage_namespace', '3': 6, '4': 1, '5': 9, '10': 'storageNamespace'},
+    {'1': 'validate_existing_bytes', '3': 7, '4': 1, '5': 8, '10': 'validateExistingBytes'},
+    {'1': 'verify_checksums', '3': 8, '4': 1, '5': 8, '10': 'verifyChecksums'},
+    {'1': 'required_free_bytes_after_download', '3': 9, '4': 1, '5': 3, '10': 'requiredFreeBytesAfterDownload'},
   ],
   '8': [
     {'1': '_model'},
@@ -131,7 +144,11 @@ final $typed_data.Uint8List downloadPlanRequestDescriptor = $convert.base64Decod
     'VsGAIgASgLMhkucnVuYW55d2hlcmUudjEuTW9kZWxJbmZvSABSBW1vZGVsiAEBEicKD3Jlc3Vt'
     'ZV9leGlzdGluZxgDIAEoCFIOcmVzdW1lRXhpc3RpbmcSNgoXYXZhaWxhYmxlX3N0b3JhZ2VfYn'
     'l0ZXMYBCABKANSFWF2YWlsYWJsZVN0b3JhZ2VCeXRlcxIyChVhbGxvd19tZXRlcmVkX25ldHdv'
-    'cmsYBSABKAhSE2FsbG93TWV0ZXJlZE5ldHdvcmtCCAoGX21vZGVs');
+    'cmsYBSABKAhSE2FsbG93TWV0ZXJlZE5ldHdvcmsSKwoRc3RvcmFnZV9uYW1lc3BhY2UYBiABKA'
+    'lSEHN0b3JhZ2VOYW1lc3BhY2USNgoXdmFsaWRhdGVfZXhpc3RpbmdfYnl0ZXMYByABKAhSFXZh'
+    'bGlkYXRlRXhpc3RpbmdCeXRlcxIpChB2ZXJpZnlfY2hlY2tzdW1zGAggASgIUg92ZXJpZnlDaG'
+    'Vja3N1bXMSSgoicmVxdWlyZWRfZnJlZV9ieXRlc19hZnRlcl9kb3dubG9hZBgJIAEoA1IecmVx'
+    'dWlyZWRGcmVlQnl0ZXNBZnRlckRvd25sb2FkQggKBl9tb2RlbA==');
 
 @$core.Deprecated('Use downloadFilePlanDescriptor instead')
 const DownloadFilePlan$json = {
@@ -143,6 +160,7 @@ const DownloadFilePlan$json = {
     {'1': 'expected_bytes', '3': 4, '4': 1, '5': 3, '10': 'expectedBytes'},
     {'1': 'requires_extraction', '3': 5, '4': 1, '5': 8, '10': 'requiresExtraction'},
     {'1': 'checksum_sha256', '3': 6, '4': 1, '5': 9, '10': 'checksumSha256'},
+    {'1': 'is_resume_candidate', '3': 7, '4': 1, '5': 8, '10': 'isResumeCandidate'},
   ],
 };
 
@@ -153,7 +171,7 @@ final $typed_data.Uint8List downloadFilePlanDescriptor = $convert.base64Decode(
     'EGRlc3RpbmF0aW9uX3BhdGgYAyABKAlSD2Rlc3RpbmF0aW9uUGF0aBIlCg5leHBlY3RlZF9ieX'
     'RlcxgEIAEoA1INZXhwZWN0ZWRCeXRlcxIvChNyZXF1aXJlc19leHRyYWN0aW9uGAUgASgIUhJy'
     'ZXF1aXJlc0V4dHJhY3Rpb24SJwoPY2hlY2tzdW1fc2hhMjU2GAYgASgJUg5jaGVja3N1bVNoYT'
-    'I1Ng==');
+    'I1NhIuChNpc19yZXN1bWVfY2FuZGlkYXRlGAcgASgIUhFpc1Jlc3VtZUNhbmRpZGF0ZQ==');
 
 @$core.Deprecated('Use downloadPlanResultDescriptor instead')
 const DownloadPlanResult$json = {
@@ -168,6 +186,9 @@ const DownloadPlanResult$json = {
     {'1': 'resume_from_bytes', '3': 7, '4': 1, '5': 3, '10': 'resumeFromBytes'},
     {'1': 'warnings', '3': 8, '4': 3, '5': 9, '10': 'warnings'},
     {'1': 'error_message', '3': 9, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'storage_namespace', '3': 10, '4': 1, '5': 9, '10': 'storageNamespace'},
+    {'1': 'resume_token', '3': 11, '4': 1, '5': 9, '10': 'resumeToken'},
+    {'1': 'required_free_bytes_after_download', '3': 12, '4': 1, '5': 3, '10': 'requiredFreeBytesAfterDownload'},
   ],
 };
 
@@ -179,7 +200,10 @@ final $typed_data.Uint8List downloadPlanResultDescriptor = $convert.base64Decode
     '8KE3JlcXVpcmVzX2V4dHJhY3Rpb24YBSABKAhSEnJlcXVpcmVzRXh0cmFjdGlvbhIdCgpjYW5f'
     'cmVzdW1lGAYgASgIUgljYW5SZXN1bWUSKgoRcmVzdW1lX2Zyb21fYnl0ZXMYByABKANSD3Jlc3'
     'VtZUZyb21CeXRlcxIaCgh3YXJuaW5ncxgIIAMoCVIId2FybmluZ3MSIwoNZXJyb3JfbWVzc2Fn'
-    'ZRgJIAEoCVIMZXJyb3JNZXNzYWdl');
+    'ZRgJIAEoCVIMZXJyb3JNZXNzYWdlEisKEXN0b3JhZ2VfbmFtZXNwYWNlGAogASgJUhBzdG9yYW'
+    'dlTmFtZXNwYWNlEiEKDHJlc3VtZV90b2tlbhgLIAEoCVILcmVzdW1lVG9rZW4SSgoicmVxdWly'
+    'ZWRfZnJlZV9ieXRlc19hZnRlcl9kb3dubG9hZBgMIAEoA1IecmVxdWlyZWRGcmVlQnl0ZXNBZn'
+    'RlckRvd25sb2Fk');
 
 @$core.Deprecated('Use downloadStartRequestDescriptor instead')
 const DownloadStartRequest$json = {
@@ -188,6 +212,8 @@ const DownloadStartRequest$json = {
     {'1': 'model_id', '3': 1, '4': 1, '5': 9, '10': 'modelId'},
     {'1': 'plan', '3': 2, '4': 1, '5': 11, '6': '.runanywhere.v1.DownloadPlanResult', '10': 'plan'},
     {'1': 'resume', '3': 3, '4': 1, '5': 8, '10': 'resume'},
+    {'1': 'resume_token', '3': 4, '4': 1, '5': 9, '10': 'resumeToken'},
+    {'1': 'update_registry_on_completion', '3': 5, '4': 1, '5': 8, '10': 'updateRegistryOnCompletion'},
   ],
 };
 
@@ -195,7 +221,9 @@ const DownloadStartRequest$json = {
 final $typed_data.Uint8List downloadStartRequestDescriptor = $convert.base64Decode(
     'ChREb3dubG9hZFN0YXJ0UmVxdWVzdBIZCghtb2RlbF9pZBgBIAEoCVIHbW9kZWxJZBI2CgRwbG'
     'FuGAIgASgLMiIucnVuYW55d2hlcmUudjEuRG93bmxvYWRQbGFuUmVzdWx0UgRwbGFuEhYKBnJl'
-    'c3VtZRgDIAEoCFIGcmVzdW1l');
+    'c3VtZRgDIAEoCFIGcmVzdW1lEiEKDHJlc3VtZV90b2tlbhgEIAEoCVILcmVzdW1lVG9rZW4SQQ'
+    'oddXBkYXRlX3JlZ2lzdHJ5X29uX2NvbXBsZXRpb24YBSABKAhSGnVwZGF0ZVJlZ2lzdHJ5T25D'
+    'b21wbGV0aW9u');
 
 @$core.Deprecated('Use downloadStartResultDescriptor instead')
 const DownloadStartResult$json = {
@@ -206,6 +234,7 @@ const DownloadStartResult$json = {
     {'1': 'model_id', '3': 3, '4': 1, '5': 9, '10': 'modelId'},
     {'1': 'initial_progress', '3': 4, '4': 1, '5': 11, '6': '.runanywhere.v1.DownloadProgress', '10': 'initialProgress'},
     {'1': 'error_message', '3': 5, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'resume_token', '3': 6, '4': 1, '5': 9, '10': 'resumeToken'},
   ],
 };
 
@@ -214,7 +243,8 @@ final $typed_data.Uint8List downloadStartResultDescriptor = $convert.base64Decod
     'ChNEb3dubG9hZFN0YXJ0UmVzdWx0EhoKCGFjY2VwdGVkGAEgASgIUghhY2NlcHRlZBIXCgd0YX'
     'NrX2lkGAIgASgJUgZ0YXNrSWQSGQoIbW9kZWxfaWQYAyABKAlSB21vZGVsSWQSSwoQaW5pdGlh'
     'bF9wcm9ncmVzcxgEIAEoCzIgLnJ1bmFueXdoZXJlLnYxLkRvd25sb2FkUHJvZ3Jlc3NSD2luaX'
-    'RpYWxQcm9ncmVzcxIjCg1lcnJvcl9tZXNzYWdlGAUgASgJUgxlcnJvck1lc3NhZ2U=');
+    'RpYWxQcm9ncmVzcxIjCg1lcnJvcl9tZXNzYWdlGAUgASgJUgxlcnJvck1lc3NhZ2USIQoMcmVz'
+    'dW1lX3Rva2VuGAYgASgJUgtyZXN1bWVUb2tlbg==');
 
 @$core.Deprecated('Use downloadCancelRequestDescriptor instead')
 const DownloadCancelRequest$json = {
@@ -241,6 +271,9 @@ const DownloadCancelResult$json = {
     {'1': 'model_id', '3': 3, '4': 1, '5': 9, '10': 'modelId'},
     {'1': 'partial_bytes_deleted', '3': 4, '4': 1, '5': 3, '10': 'partialBytesDeleted'},
     {'1': 'error_message', '3': 5, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'was_running', '3': 6, '4': 1, '5': 8, '10': 'wasRunning'},
+    {'1': 'partial_bytes_preserved', '3': 7, '4': 1, '5': 8, '10': 'partialBytesPreserved'},
+    {'1': 'resume_token', '3': 8, '4': 1, '5': 9, '10': 'resumeToken'},
   ],
 };
 
@@ -249,7 +282,9 @@ final $typed_data.Uint8List downloadCancelResultDescriptor = $convert.base64Deco
     'ChREb3dubG9hZENhbmNlbFJlc3VsdBIYCgdzdWNjZXNzGAEgASgIUgdzdWNjZXNzEhcKB3Rhc2'
     'tfaWQYAiABKAlSBnRhc2tJZBIZCghtb2RlbF9pZBgDIAEoCVIHbW9kZWxJZBIyChVwYXJ0aWFs'
     'X2J5dGVzX2RlbGV0ZWQYBCABKANSE3BhcnRpYWxCeXRlc0RlbGV0ZWQSIwoNZXJyb3JfbWVzc2'
-    'FnZRgFIAEoCVIMZXJyb3JNZXNzYWdl');
+    'FnZRgFIAEoCVIMZXJyb3JNZXNzYWdlEh8KC3dhc19ydW5uaW5nGAYgASgIUgp3YXNSdW5uaW5n'
+    'EjYKF3BhcnRpYWxfYnl0ZXNfcHJlc2VydmVkGAcgASgIUhVwYXJ0aWFsQnl0ZXNQcmVzZXJ2ZW'
+    'QSIQoMcmVzdW1lX3Rva2VuGAggASgJUgtyZXN1bWVUb2tlbg==');
 
 @$core.Deprecated('Use downloadResumeRequestDescriptor instead')
 const DownloadResumeRequest$json = {
@@ -258,6 +293,8 @@ const DownloadResumeRequest$json = {
     {'1': 'task_id', '3': 1, '4': 1, '5': 9, '10': 'taskId'},
     {'1': 'model_id', '3': 2, '4': 1, '5': 9, '10': 'modelId'},
     {'1': 'resume_from_bytes', '3': 3, '4': 1, '5': 3, '10': 'resumeFromBytes'},
+    {'1': 'resume_token', '3': 4, '4': 1, '5': 9, '10': 'resumeToken'},
+    {'1': 'validate_partial_bytes', '3': 5, '4': 1, '5': 8, '10': 'validatePartialBytes'},
   ],
 };
 
@@ -265,7 +302,8 @@ const DownloadResumeRequest$json = {
 final $typed_data.Uint8List downloadResumeRequestDescriptor = $convert.base64Decode(
     'ChVEb3dubG9hZFJlc3VtZVJlcXVlc3QSFwoHdGFza19pZBgBIAEoCVIGdGFza0lkEhkKCG1vZG'
     'VsX2lkGAIgASgJUgdtb2RlbElkEioKEXJlc3VtZV9mcm9tX2J5dGVzGAMgASgDUg9yZXN1bWVG'
-    'cm9tQnl0ZXM=');
+    'cm9tQnl0ZXMSIQoMcmVzdW1lX3Rva2VuGAQgASgJUgtyZXN1bWVUb2tlbhI0ChZ2YWxpZGF0ZV'
+    '9wYXJ0aWFsX2J5dGVzGAUgASgIUhR2YWxpZGF0ZVBhcnRpYWxCeXRlcw==');
 
 @$core.Deprecated('Use downloadResumeResultDescriptor instead')
 const DownloadResumeResult$json = {
@@ -276,6 +314,7 @@ const DownloadResumeResult$json = {
     {'1': 'model_id', '3': 3, '4': 1, '5': 9, '10': 'modelId'},
     {'1': 'initial_progress', '3': 4, '4': 1, '5': 11, '6': '.runanywhere.v1.DownloadProgress', '10': 'initialProgress'},
     {'1': 'error_message', '3': 5, '4': 1, '5': 9, '10': 'errorMessage'},
+    {'1': 'resume_token', '3': 6, '4': 1, '5': 9, '10': 'resumeToken'},
   ],
 };
 
@@ -284,7 +323,8 @@ final $typed_data.Uint8List downloadResumeResultDescriptor = $convert.base64Deco
     'ChREb3dubG9hZFJlc3VtZVJlc3VsdBIaCghhY2NlcHRlZBgBIAEoCFIIYWNjZXB0ZWQSFwoHdG'
     'Fza19pZBgCIAEoCVIGdGFza0lkEhkKCG1vZGVsX2lkGAMgASgJUgdtb2RlbElkEksKEGluaXRp'
     'YWxfcHJvZ3Jlc3MYBCABKAsyIC5ydW5hbnl3aGVyZS52MS5Eb3dubG9hZFByb2dyZXNzUg9pbm'
-    'l0aWFsUHJvZ3Jlc3MSIwoNZXJyb3JfbWVzc2FnZRgFIAEoCVIMZXJyb3JNZXNzYWdl');
+    'l0aWFsUHJvZ3Jlc3MSIwoNZXJyb3JfbWVzc2FnZRgFIAEoCVIMZXJyb3JNZXNzYWdlEiEKDHJl'
+    'c3VtZV90b2tlbhgGIAEoCVILcmVzdW1lVG9rZW4=');
 
 const $core.Map<$core.String, $core.dynamic> DownloadServiceBase$json = {
   '1': 'Download',
@@ -304,10 +344,10 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> DownloadSe
   '.runanywhere.v1.ModelThinkingTagPattern': $3.ModelThinkingTagPattern$json,
   '.runanywhere.v1.ModelInfoMetadata': $3.ModelInfoMetadata$json,
   '.runanywhere.v1.SingleFileArtifact': $3.SingleFileArtifact$json,
+  '.runanywhere.v1.ExpectedModelFiles': $3.ExpectedModelFiles$json,
+  '.runanywhere.v1.ModelFileDescriptor': $3.ModelFileDescriptor$json,
   '.runanywhere.v1.ArchiveArtifact': $3.ArchiveArtifact$json,
   '.runanywhere.v1.MultiFileArtifact': $3.MultiFileArtifact$json,
-  '.runanywhere.v1.ModelFileDescriptor': $3.ModelFileDescriptor$json,
-  '.runanywhere.v1.ExpectedModelFiles': $3.ExpectedModelFiles$json,
   '.runanywhere.v1.ModelRuntimeCompatibility': $3.ModelRuntimeCompatibility$json,
   '.runanywhere.v1.DownloadPlanResult': DownloadPlanResult$json,
   '.runanywhere.v1.DownloadFilePlan': DownloadFilePlan$json,

@@ -92,6 +92,53 @@ public class RAGResult(
     schemaIndex = 5,
   )
   public val total_time_ms: Long = 0L,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "promptTokens",
+    schemaIndex = 6,
+  )
+  public val prompt_tokens: Int = 0,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "completionTokens",
+    schemaIndex = 7,
+  )
+  public val completion_tokens: Int = 0,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "totalTokens",
+    schemaIndex = 8,
+  )
+  public val total_tokens: Int = 0,
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "errorMessage",
+    schemaIndex = 9,
+  )
+  public val error_message: String? = null,
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "errorCode",
+    schemaIndex = 10,
+  )
+  public val error_code: Int = 0,
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "requestId",
+    schemaIndex = 11,
+  )
+  public val request_id: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGResult, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -125,6 +172,12 @@ public class RAGResult(
     if (retrieval_time_ms != other.retrieval_time_ms) return false
     if (generation_time_ms != other.generation_time_ms) return false
     if (total_time_ms != other.total_time_ms) return false
+    if (prompt_tokens != other.prompt_tokens) return false
+    if (completion_tokens != other.completion_tokens) return false
+    if (total_tokens != other.total_tokens) return false
+    if (error_message != other.error_message) return false
+    if (error_code != other.error_code) return false
+    if (request_id != other.request_id) return false
     return true
   }
 
@@ -138,6 +191,12 @@ public class RAGResult(
       result = result * 37 + retrieval_time_ms.hashCode()
       result = result * 37 + generation_time_ms.hashCode()
       result = result * 37 + total_time_ms.hashCode()
+      result = result * 37 + prompt_tokens.hashCode()
+      result = result * 37 + completion_tokens.hashCode()
+      result = result * 37 + total_tokens.hashCode()
+      result = result * 37 + (error_message?.hashCode() ?: 0)
+      result = result * 37 + error_code.hashCode()
+      result = result * 37 + request_id.hashCode()
       super.hashCode = result
     }
     return result
@@ -151,6 +210,12 @@ public class RAGResult(
     result += """retrieval_time_ms=$retrieval_time_ms"""
     result += """generation_time_ms=$generation_time_ms"""
     result += """total_time_ms=$total_time_ms"""
+    result += """prompt_tokens=$prompt_tokens"""
+    result += """completion_tokens=$completion_tokens"""
+    result += """total_tokens=$total_tokens"""
+    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
+    result += """error_code=$error_code"""
+    result += """request_id=${sanitize(request_id)}"""
     return result.joinToString(prefix = "RAGResult{", separator = ", ", postfix = "}")
   }
 
@@ -161,9 +226,16 @@ public class RAGResult(
     retrieval_time_ms: Long = this.retrieval_time_ms,
     generation_time_ms: Long = this.generation_time_ms,
     total_time_ms: Long = this.total_time_ms,
+    prompt_tokens: Int = this.prompt_tokens,
+    completion_tokens: Int = this.completion_tokens,
+    total_tokens: Int = this.total_tokens,
+    error_message: String? = this.error_message,
+    error_code: Int = this.error_code,
+    request_id: String = this.request_id,
     unknownFields: ByteString = this.unknownFields,
   ): RAGResult = RAGResult(answer, retrieved_chunks, context_used, retrieval_time_ms,
-      generation_time_ms, total_time_ms, unknownFields)
+      generation_time_ms, total_time_ms, prompt_tokens, completion_tokens, total_tokens,
+      error_message, error_code, request_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -187,6 +259,17 @@ public class RAGResult(
             value.generation_time_ms)
         if (value.total_time_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(6,
             value.total_time_ms)
+        if (value.prompt_tokens != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(7,
+            value.prompt_tokens)
+        if (value.completion_tokens != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(8,
+            value.completion_tokens)
+        if (value.total_tokens != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(9,
+            value.total_tokens)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.error_message)
+        if (value.error_code != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(11,
+            value.error_code)
+        if (value.request_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(12,
+            value.request_id)
         return size
       }
 
@@ -201,11 +284,27 @@ public class RAGResult(
             value.generation_time_ms)
         if (value.total_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 6,
             value.total_time_ms)
+        if (value.prompt_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
+            value.prompt_tokens)
+        if (value.completion_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8,
+            value.completion_tokens)
+        if (value.total_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 9, value.total_tokens)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.error_message)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 11, value.error_code)
+        if (value.request_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 12, value.request_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.request_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 12, value.request_id)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 11, value.error_code)
+        ProtoAdapter.STRING.encodeWithTag(writer, 10, value.error_message)
+        if (value.total_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 9, value.total_tokens)
+        if (value.completion_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8,
+            value.completion_tokens)
+        if (value.prompt_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
+            value.prompt_tokens)
         if (value.total_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 6,
             value.total_time_ms)
         if (value.generation_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 5,
@@ -225,6 +324,12 @@ public class RAGResult(
         var retrieval_time_ms: Long = 0L
         var generation_time_ms: Long = 0L
         var total_time_ms: Long = 0L
+        var prompt_tokens: Int = 0
+        var completion_tokens: Int = 0
+        var total_tokens: Int = 0
+        var error_message: String? = null
+        var error_code: Int = 0
+        var request_id: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> answer = ProtoAdapter.STRING.decode(reader)
@@ -233,6 +338,12 @@ public class RAGResult(
             4 -> retrieval_time_ms = ProtoAdapter.INT64.decode(reader)
             5 -> generation_time_ms = ProtoAdapter.INT64.decode(reader)
             6 -> total_time_ms = ProtoAdapter.INT64.decode(reader)
+            7 -> prompt_tokens = ProtoAdapter.INT32.decode(reader)
+            8 -> completion_tokens = ProtoAdapter.INT32.decode(reader)
+            9 -> total_tokens = ProtoAdapter.INT32.decode(reader)
+            10 -> error_message = ProtoAdapter.STRING.decode(reader)
+            11 -> error_code = ProtoAdapter.INT32.decode(reader)
+            12 -> request_id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -243,6 +354,12 @@ public class RAGResult(
           retrieval_time_ms = retrieval_time_ms,
           generation_time_ms = generation_time_ms,
           total_time_ms = total_time_ms,
+          prompt_tokens = prompt_tokens,
+          completion_tokens = completion_tokens,
+          total_tokens = total_tokens,
+          error_message = error_message,
+          error_code = error_code,
+          request_id = request_id,
           unknownFields = unknownFields
         )
       }

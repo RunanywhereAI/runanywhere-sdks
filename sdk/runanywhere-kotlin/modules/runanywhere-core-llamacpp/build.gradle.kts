@@ -41,6 +41,55 @@ val testLocal: Boolean = useLocalNatives
 
 logger.lifecycle("LlamaCPP Module: useLocalNatives=$useLocalNatives")
 
+val androidRuntimeAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
+
+fun androidNdkHomeForRuntime(): File {
+    val explicitNdk = System.getenv("ANDROID_NDK_HOME") ?: System.getenv("NDK_HOME")
+    if (!explicitNdk.isNullOrBlank()) return file(explicitNdk)
+
+    val androidSdk =
+        System.getenv("ANDROID_HOME")
+            ?: System.getenv("ANDROID_SDK_ROOT")
+            ?: "${System.getProperty("user.home")}/Library/Android/sdk"
+    val ndkVersion =
+        rootProject.findProperty("racNdkVersion")?.toString()
+            ?: project.findProperty("racNdkVersion")?.toString()
+            ?: "27.0.12077973"
+    return file("$androidSdk/ndk/$ndkVersion")
+}
+
+fun androidNdkHostTag(): String =
+    when {
+        System.getProperty("os.name").lowercase().contains("mac") -> "darwin-x86_64"
+        System.getProperty("os.name").lowercase().contains("linux") -> "linux-x86_64"
+        else -> throw GradleException("Unsupported host for Android NDK runtime lookup: ${System.getProperty("os.name")}")
+    }
+
+fun androidNdkTripleForAbi(abi: String): String =
+    when (abi) {
+        "arm64-v8a" -> "aarch64-linux-android"
+        "armeabi-v7a" -> "arm-linux-androideabi"
+        "x86_64" -> "x86_64-linux-android"
+        else -> throw GradleException("Unsupported Android ABI for libc++ runtime lookup: $abi")
+    }
+
+fun syncAndroidNdkRuntimeLibs(outputDir: File) {
+    val prebuiltDir = androidNdkHomeForRuntime().resolve("toolchains/llvm/prebuilt/${androidNdkHostTag()}")
+    if (!prebuiltDir.isDirectory) {
+        throw GradleException("Android NDK prebuilt directory not found: $prebuiltDir")
+    }
+
+    androidRuntimeAbis.forEach { abi ->
+        val abiDir = outputDir.resolve(abi)
+        val hasNativeLibs = abiDir.isDirectory && abiDir.listFiles { file -> file.extension == "so" }?.isNotEmpty() == true
+        if (!hasNativeLibs) return@forEach
+
+        val libcxx = prebuiltDir.resolve("sysroot/usr/lib/${androidNdkTripleForAbi(abi)}/libc++_shared.so")
+        if (!libcxx.isFile) throw GradleException("libc++_shared.so not found for $abi at $libcxx")
+        libcxx.copyTo(abiDir.resolve("libc++_shared.so"), overwrite = true)
+    }
+}
+
 // Detekt
 detekt {
     buildUponDefaultConfig = true
@@ -248,11 +297,26 @@ tasks.register("downloadJniLibs") {
     }
 }
 
-tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") }.configureEach {
+tasks.register("syncAndroidRuntimeLibs") {
+    group = "runanywhere"
+    description = "Stage 16 KB-aligned Android NDK libc++ into LlamaCPP JNI libs"
+
     if (!testLocal) dependsOn("downloadJniLibs")
+
+    val outputDir = file("src/androidMain/jniLibs")
+    outputs.dirs(androidRuntimeAbis.map { file("$outputDir/$it") })
+
+    doLast {
+        syncAndroidNdkRuntimeLibs(outputDir)
+        logger.lifecycle("LlamaCPP: synced 16 KB-aligned Android NDK libc++ into $outputDir")
+    }
+}
+
+tasks.matching { it.name.contains("merge") && it.name.contains("JniLibFolders") }.configureEach {
+    dependsOn("syncAndroidRuntimeLibs")
 }
 tasks.matching { it.name == "preBuild" }.configureEach {
-    if (!testLocal) dependsOn("downloadJniLibs")
+    dependsOn("syncAndroidRuntimeLibs")
 }
 
 tasks.named<Jar>("jvmJar") {

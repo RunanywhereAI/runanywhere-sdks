@@ -38,6 +38,14 @@ public class CurrentModelRequest(
     schemaIndex = 1,
   )
   public val framework: InferenceFramework? = null,
+  @field:WireField(
+    tag = 3,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "includeModelMetadata",
+    schemaIndex = 2,
+  )
+  public val include_model_metadata: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<CurrentModelRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -53,6 +61,7 @@ public class CurrentModelRequest(
     if (unknownFields != other.unknownFields) return false
     if (category != other.category) return false
     if (framework != other.framework) return false
+    if (include_model_metadata != other.include_model_metadata) return false
     return true
   }
 
@@ -62,6 +71,7 @@ public class CurrentModelRequest(
       result = unknownFields.hashCode()
       result = result * 37 + (category?.hashCode() ?: 0)
       result = result * 37 + (framework?.hashCode() ?: 0)
+      result = result * 37 + include_model_metadata.hashCode()
       super.hashCode = result
     }
     return result
@@ -71,14 +81,17 @@ public class CurrentModelRequest(
     val result = mutableListOf<String>()
     if (category != null) result += """category=$category"""
     if (framework != null) result += """framework=$framework"""
+    result += """include_model_metadata=$include_model_metadata"""
     return result.joinToString(prefix = "CurrentModelRequest{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
     category: ModelCategory? = this.category,
     framework: InferenceFramework? = this.framework,
+    include_model_metadata: Boolean = this.include_model_metadata,
     unknownFields: ByteString = this.unknownFields,
-  ): CurrentModelRequest = CurrentModelRequest(category, framework, unknownFields)
+  ): CurrentModelRequest = CurrentModelRequest(category, framework, include_model_metadata,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -95,17 +108,23 @@ public class CurrentModelRequest(
         var size = value.unknownFields.size
         size += ModelCategory.ADAPTER.encodedSizeWithTag(1, value.category)
         size += InferenceFramework.ADAPTER.encodedSizeWithTag(2, value.framework)
+        if (value.include_model_metadata != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(3,
+            value.include_model_metadata)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: CurrentModelRequest) {
         ModelCategory.ADAPTER.encodeWithTag(writer, 1, value.category)
         InferenceFramework.ADAPTER.encodeWithTag(writer, 2, value.framework)
+        if (value.include_model_metadata != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3,
+            value.include_model_metadata)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: CurrentModelRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.include_model_metadata != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3,
+            value.include_model_metadata)
         InferenceFramework.ADAPTER.encodeWithTag(writer, 2, value.framework)
         ModelCategory.ADAPTER.encodeWithTag(writer, 1, value.category)
       }
@@ -113,6 +132,7 @@ public class CurrentModelRequest(
       override fun decode(reader: ProtoReader): CurrentModelRequest {
         var category: ModelCategory? = null
         var framework: InferenceFramework? = null
+        var include_model_metadata: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -125,12 +145,14 @@ public class CurrentModelRequest(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
+            3 -> include_model_metadata = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return CurrentModelRequest(
           category = category,
           framework = framework,
+          include_model_metadata = include_model_metadata,
           unknownFields = unknownFields
         )
       }

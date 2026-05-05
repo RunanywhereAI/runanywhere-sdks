@@ -10,12 +10,17 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.ModelInfo
+import ai.runanywhere.proto.v1.RAGConfig
 import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
 import ai.runanywhere.proto.v1.RAGStatistics
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.Models.resolvedPrimaryModelPath
+import com.runanywhere.sdk.public.extensions.Models.resolvedVocabularyPath
 
 // MARK: - Pipeline Lifecycle
 
@@ -28,6 +33,18 @@ import com.runanywhere.sdk.public.RunAnywhere
  * @throws IllegalStateException if pipeline creation fails
  */
 expect suspend fun RunAnywhere.ragCreatePipeline(config: RAGConfiguration)
+
+/**
+ * Create the RAG pipeline from a generated solution RAG config.
+ *
+ * The generated [RAGConfig] carries model ids. The current native RAG session
+ * ABI still consumes [RAGConfiguration], so this helper resolves those ids
+ * through the model registry and generated model file descriptors before
+ * creating the pipeline.
+ */
+suspend fun RunAnywhere.ragCreatePipeline(config: RAGConfig) {
+    ragCreatePipeline(resolveRAGConfiguration(config))
+}
 
 /**
  * Destroy the RAG pipeline and release all resources.
@@ -98,3 +115,91 @@ expect suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RAGDocument>
  * @throws IllegalStateException if the pipeline is not created
  */
 expect suspend fun RunAnywhere.ragGetStatistics(): RAGStatistics
+
+private suspend fun RunAnywhere.resolveRAGConfiguration(config: RAGConfig): RAGConfiguration {
+    val embeddingModelId =
+        config.embed_model_id.takeIf { it.isNotBlank() }
+            ?: throw SDKException.invalidConfiguration("RAGConfig.embed_model_id is required")
+    val llmModelId =
+        config.llm_model_id.takeIf { it.isNotBlank() }
+            ?: throw SDKException.invalidConfiguration("RAGConfig.llm_model_id is required")
+
+    val embeddingModel =
+        model(embeddingModelId)
+            ?: throw SDKException.modelNotFound(embeddingModelId)
+    val llmModel =
+        model(llmModelId)
+            ?: throw SDKException.modelNotFound(llmModelId)
+    val rerankerModel =
+        config.rerank_model_id
+            .takeIf { it.isNotBlank() }
+            ?.let { rerankerId ->
+                model(rerankerId)
+                    ?: throw SDKException.modelNotFound(rerankerId)
+            }
+
+    return RAGConfiguration(
+        embedding_model_path =
+            embeddingModel.resolvedPrimaryPathOrThrow(
+                modelId = embeddingModelId,
+                roleDescription = "embedding model",
+            ),
+        llm_model_path =
+            llmModel.resolvedPrimaryPathOrThrow(
+                modelId = llmModelId,
+                roleDescription = "LLM model",
+            ),
+        top_k = config.retrieve_k.takeIf { it > 0 } ?: config.rerank_top.takeIf { it > 0 } ?: 0,
+        prompt_template = config.prompt_template.takeIf { it.isNotBlank() },
+        embedding_config_json = embeddingModel.ragEmbeddingConfigJson(),
+        index_path = config.vector_store_path.takeIf { it.isNotBlank() },
+        persist_index = config.vector_store_path.isNotBlank(),
+        rerank_results = rerankerModel != null,
+        reranker_model_path =
+            rerankerModel?.resolvedPrimaryPathOrThrow(
+                modelId = config.rerank_model_id,
+                roleDescription = "reranker model",
+            ),
+    )
+}
+
+private fun ModelInfo.resolvedPrimaryPathOrThrow(
+    modelId: String,
+    roleDescription: String,
+): String =
+    resolvedPrimaryModelPath()
+        ?: throw SDKException.model(
+            "RAG $roleDescription '$modelId' is registered but has no descriptor-resolved primary model path",
+        )
+
+private fun ModelInfo.ragEmbeddingConfigJson(): String? =
+    resolvedVocabularyPath()
+        ?.let { vocabPath -> """{"vocab_path":${vocabPath.toJsonStringLiteral()}}""" }
+
+private fun String.toJsonStringLiteral(): String =
+    buildString(length + 2) {
+        append('"')
+        for (char in this@toJsonStringLiteral) {
+            when (char) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '\b' -> append("\\b")
+                '\u000C' -> append("\\f")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> {
+                    if (char.code < JSON_CONTROL_CHAR_LIMIT) {
+                        append("\\u")
+                        append(char.code.toString(16).padStart(JSON_HEX_DIGITS, '0'))
+                    } else {
+                        append(char)
+                    }
+                }
+            }
+        }
+        append('"')
+    }
+
+private const val JSON_CONTROL_CHAR_LIMIT = 0x20
+private const val JSON_HEX_DIGITS = 4

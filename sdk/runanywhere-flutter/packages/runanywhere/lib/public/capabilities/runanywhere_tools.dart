@@ -44,7 +44,7 @@ typedef ToolExecutor = Future<Map<String, dynamic>> Function(
 ///
 /// The actual format logic is handled in C++ commons (single source
 /// of truth). Mirrors Swift SDK's `ToolCallFormatName` enum.
-abstract class ToolCallFormatNames {
+abstract class _ToolFormatHints {
   /// JSON format: `<tool_call>{"tool":"name","arguments":{...}}</tool_call>`
   /// Use for most general-purpose models (Llama, Qwen, Mistral, etc.)
   static const String defaultFormat = 'default';
@@ -62,9 +62,9 @@ String _formatHint(ToolCallingOptions opts) {
   // "default" and "lfm2". We map the proto enum onto the string keys
   // via `formatHint`. PYTHONIC ↔ "lfm2", everything else ↔ "default".
   if (opts.format == ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC) {
-    return ToolCallFormatNames.lfm2;
+    return _ToolFormatHints.lfm2;
   }
-  return ToolCallFormatNames.defaultFormat;
+  return _ToolFormatHints.defaultFormat;
 }
 
 String _toolDefinitionsToJson(List<ToolDefinition> tools) {

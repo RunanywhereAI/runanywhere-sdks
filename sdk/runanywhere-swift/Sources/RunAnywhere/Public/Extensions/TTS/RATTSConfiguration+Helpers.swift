@@ -59,10 +59,13 @@ extension RATTSConfiguration {
 extension RATTSOptions {
     public static func defaults() -> RATTSOptions {
         var o = RATTSOptions()
+        o.languageCode = "en-US"
         o.speakingRate = 1.0
         o.pitch = 1.0
         o.volume = 1.0
         o.enableSsml = false
+        o.audioFormat = .pcm
+        o.sampleRate = 22_050
         return o
     }
 }
@@ -92,6 +95,27 @@ extension RATTSSynthesisMetadata {
 // MARK: - RATTSOutput
 
 extension RATTSOutput {
+    public var duration: TimeInterval { TimeInterval(durationMs) / 1000.0 }
+    public var timestamp: Date {
+        Date(timeIntervalSince1970: TimeInterval(timestampMs) / 1000.0)
+    }
+}
+
+// MARK: - RATTSSpeakResult
+
+extension RATTSSpeakResult {
+    public init(output: RATTSOutput) {
+        self.init()
+        self.audioFormat = output.audioFormat
+        self.sampleRate = output.sampleRate
+        self.durationMs = output.durationMs
+        self.audioSizeBytes = output.audioSizeBytes > 0 ? output.audioSizeBytes : Int64(output.audioData.count)
+        if output.hasMetadata {
+            self.metadata = output.metadata
+        }
+        self.timestampMs = output.timestampMs
+    }
+
     public var duration: TimeInterval { TimeInterval(durationMs) / 1000.0 }
     public var timestamp: Date {
         Date(timeIntervalSince1970: TimeInterval(timestampMs) / 1000.0)

@@ -67,6 +67,12 @@ protoc \
     --dart_out="${OUT_DIR}" \
     hardware_profile.proto
 
+# CPP-02 — model lifecycle service stub mirroring rac_model_lifecycle.h.
+protoc \
+    --proto_path="${PROTO_DIR}" \
+    --dart_out="${OUT_DIR}" \
+    lifecycle_service.proto
+
 # Belt-and-braces: strip any accidentally-regenerated .pbgrpc.dart files
 # (some older protoc_plugin versions emit them even without the grpc: prefix).
 rm -f "${OUT_DIR}"/*.pbgrpc.dart

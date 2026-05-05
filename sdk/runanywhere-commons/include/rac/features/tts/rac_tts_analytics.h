@@ -9,6 +9,10 @@
  * Formula: audioDurationMs = (bytes / 2) / 22050 * 1000
  *
  * Swift Source: Sources/RunAnywhere/Features/TTS/Analytics/TTSAnalyticsService.swift
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal`.
+ * Telemetry/analytics implementation owned by commons; SDK-facing TTS
+ * progress crosses via runanywhere.v1.SDKEvent / TTSOutput bytes.
  */
 
 #ifndef RAC_TTS_ANALYTICS_H

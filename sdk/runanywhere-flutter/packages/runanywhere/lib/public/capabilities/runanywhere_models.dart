@@ -8,14 +8,13 @@ import 'dart:async';
 
 import 'package:fixnum/fixnum.dart' as fixnum;
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
-import 'package:runanywhere/core/types/model_types.dart' as legacy;
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart';
 import 'package:runanywhere/internal/sdk_init.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
-import 'package:runanywhere/native/dart_bridge_model_registry.dart'
-    hide ModelInfo;
+import 'package:runanywhere/native/dart_bridge.dart';
+import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
 
 /// Model registry capability surface.
@@ -26,10 +25,11 @@ class RunAnywhereModels {
   static final RunAnywhereModels _instance = RunAnywhereModels._();
   static RunAnywhereModels get shared => _instance;
 
-  /// All available models from the C++ registry, merged with metadata
-  /// from Dart-registered generated ModelInfo entries.
+  /// All available models from the C++ registry.
   ///
-  /// Runs one-shot filesystem discovery on first call.
+  /// Runs one-shot filesystem discovery on first call. Dart registration writes
+  /// generated ModelInfo bytes into commons; this list does not maintain a
+  /// parallel Dart registry.
   Future<List<ModelInfo>> available() async {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
@@ -42,26 +42,7 @@ class RunAnywhereModels {
 
     final cppModels =
         await DartBridgeModelRegistry.instance.getAllProtoModels();
-
-    final uniqueModels = <String, ModelInfo>{};
-
-    for (final model in cppModels) {
-      uniqueModels[model.id] = model;
-    }
-
-    for (final dartModel in SdkState.shared.registeredModels) {
-      final existing = uniqueModels[dartModel.id];
-      if (existing != null) {
-        uniqueModels[dartModel.id] = _mergeRegistryModel(
-          registered: dartModel,
-          existing: existing,
-        );
-      } else {
-        uniqueModels[dartModel.id] = dartModel;
-      }
-    }
-
-    return List.unmodifiable(uniqueModels.values.toList());
+    return List.unmodifiable(cppModels);
   }
 
   /// Generated-proto registry list surface.
@@ -130,8 +111,8 @@ class RunAnywhereModels {
     String? id,
     required String name,
     required Uri url,
-    required Object framework,
-    Object modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    required InferenceFramework framework,
+    ModelCategory modality = ModelCategory.MODEL_CATEGORY_LANGUAGE,
     Object? artifactType,
     int? memoryRequirement,
     bool supportsThinking = false,
@@ -139,15 +120,13 @@ class RunAnywhereModels {
     final modelId =
         id ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
     final format = protoModelFormatFromPath(url.path);
-    final protoFramework = _frameworkFromAny(framework);
-    final protoCategory = _categoryFromAny(modality);
 
     final baseModel = ModelInfo(
       id: modelId,
       name: name,
-      category: protoCategory,
+      category: modality,
       format: format,
-      framework: protoFramework,
+      framework: framework,
       downloadUrl: url.toString(),
       downloadSizeBytes: fixnum.Int64(memoryRequirement ?? 0),
       supportsThinking: supportsThinking,
@@ -155,7 +134,6 @@ class RunAnywhereModels {
     );
     final model = _applyArtifact(baseModel, artifactType);
 
-    SdkState.shared.registeredModels.add(model);
     _saveToCppRegistry(model);
     return model;
   }
@@ -164,14 +142,14 @@ class RunAnywhereModels {
   ModelInfo registerMultiFile({
     String? id,
     required String name,
-    required List<Object> files,
-    required Object framework,
-    Object modality = ModelCategory.MODEL_CATEGORY_EMBEDDING,
+    required List<ModelFileDescriptor> files,
+    required InferenceFramework framework,
+    ModelCategory modality = ModelCategory.MODEL_CATEGORY_EMBEDDING,
     int? memoryRequirement,
   }) {
     final modelId =
         id ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
-    final protoFiles = files.map(_fileDescriptorFromAny).toList();
+    final protoFiles = files;
     final primaryUrl = protoFiles.isNotEmpty && protoFiles.first.url.isNotEmpty
         ? protoFiles.first.url
         : null;
@@ -179,9 +157,9 @@ class RunAnywhereModels {
     final model = ModelInfo(
       id: modelId,
       name: name,
-      category: _categoryFromAny(modality),
+      category: modality,
       format: ModelFormat.MODEL_FORMAT_ONNX,
-      framework: _frameworkFromAny(framework),
+      framework: framework,
       downloadUrl: primaryUrl ?? '',
       multiFile: MultiFileArtifact(files: protoFiles),
       artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY,
@@ -189,7 +167,6 @@ class RunAnywhereModels {
       source: ModelSource.MODEL_SOURCE_LOCAL,
     );
 
-    SdkState.shared.registeredModels.add(model);
     _saveToCppRegistry(model);
     return model;
   }
@@ -204,25 +181,30 @@ class RunAnywhereModels {
   Future<void> remove(String modelId) =>
       DartBridgeModelRegistry.instance.removeModel(modelId);
 
-  // -- private helpers ------------------------------------------------------
+  /// Resolve the primary load target for a generated [ModelInfo].
+  ///
+  /// Delegates artifact layout, archive shape, and companion-file handling to
+  /// the commons model-path resolver so callers do not scan model directories
+  /// or infer filenames in Dart.
+  Future<String> resolveModelFilePath(ModelInfo model) {
+    if (!SdkState.shared.isInitialized) {
+      throw SDKException.notInitialized();
+    }
 
-  static ModelInfo _mergeRegistryModel({
-    required ModelInfo registered,
-    required ModelInfo existing,
-  }) {
-    final merged = registered.deepCopy();
-    if (existing.localPath.isNotEmpty) merged.localPath = existing.localPath;
-    if (existing.downloadSizeBytes > fixnum.Int64.ZERO) {
-      merged.downloadSizeBytes = existing.downloadSizeBytes;
+    final resolution = DartBridge.modelPaths.resolveArtifact(model);
+    final path = resolution?.primaryModelPath;
+    if (resolution == null ||
+        !resolution.isComplete ||
+        path == null ||
+        path.isEmpty) {
+      throw SDKException.modelNotFound(
+        'Could not resolve complete model artifact for: ${model.id}',
+      );
     }
-    if (existing.createdAtUnixMs > fixnum.Int64.ZERO) {
-      merged.createdAtUnixMs = existing.createdAtUnixMs;
-    }
-    if (existing.updatedAtUnixMs > fixnum.Int64.ZERO) {
-      merged.updatedAtUnixMs = existing.updatedAtUnixMs;
-    }
-    return merged;
+    return Future.value(path);
   }
+
+  // -- private helpers ------------------------------------------------------
 
   static void _saveToCppRegistry(ModelInfo model) {
     unawaited(
@@ -236,31 +218,6 @@ class RunAnywhereModels {
             .error('Error saving model to C++ registry: $error');
       }),
     );
-  }
-
-  static ModelCategory _categoryFromAny(Object? value) {
-    if (value is ModelCategory) return value;
-    if (value is legacy.ModelCategory) return value.toProto();
-    return ModelCategory.MODEL_CATEGORY_LANGUAGE;
-  }
-
-  static InferenceFramework _frameworkFromAny(Object value) {
-    if (value is InferenceFramework) return value;
-    if (value is legacy.InferenceFramework) return value.toProto();
-    return InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
-  }
-
-  static ModelFileDescriptor _fileDescriptorFromAny(Object value) {
-    if (value is ModelFileDescriptor) return value;
-    if (value is legacy.ModelFileDescriptor) {
-      return ModelFileDescriptor(
-        url: value.url?.toString() ?? '',
-        filename: value.destinationPath,
-        isRequired: value.isRequired,
-        checksum: value.checksumSha256 ?? '',
-      );
-    }
-    throw ArgumentError.value(value, 'files', 'Unsupported model file type');
   }
 
   static ModelInfo _applyArtifact(ModelInfo model, Object? artifactType) {
@@ -279,60 +236,7 @@ class RunAnywhereModels {
         ..multiFile = artifactType
         ..artifactType = ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY;
     }
-    if (artifactType is legacy.BuiltInArtifact) {
-      return model.deepCopy()
-        ..builtIn = true
-        ..artifactType = ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY;
-    }
-    if (artifactType is legacy.ArchiveArtifact) {
-      final archive = ArchiveArtifact(
-        type: _archiveTypeFromLegacy(artifactType.archiveType),
-        structure: _archiveStructureFromLegacy(artifactType.structure),
-      );
-      return model.deepCopy()
-        ..archive = archive
-        ..artifactType = _artifactTypeForArchive(archive.type);
-    }
-    if (artifactType is legacy.MultiFileArtifact) {
-      final files = artifactType.files.map(_fileDescriptorFromAny).toList();
-      return model.deepCopy()
-        ..multiFile = MultiFileArtifact(files: files)
-        ..artifactType = ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY;
-    }
-    if (artifactType is legacy.CustomArtifact) {
-      return model.deepCopy()
-        ..customStrategyId = artifactType.strategyId
-        ..artifactType = ModelArtifactType.MODEL_ARTIFACT_TYPE_CUSTOM;
-    }
     return withInferredArtifact(model);
-  }
-
-  static ArchiveType _archiveTypeFromLegacy(legacy.ArchiveType type) {
-    switch (type) {
-      case legacy.ArchiveType.zip:
-        return ArchiveType.ARCHIVE_TYPE_ZIP;
-      case legacy.ArchiveType.tarBz2:
-        return ArchiveType.ARCHIVE_TYPE_TAR_BZ2;
-      case legacy.ArchiveType.tarGz:
-        return ArchiveType.ARCHIVE_TYPE_TAR_GZ;
-      case legacy.ArchiveType.tarXz:
-        return ArchiveType.ARCHIVE_TYPE_TAR_XZ;
-    }
-  }
-
-  static ArchiveStructure _archiveStructureFromLegacy(
-    legacy.ArchiveStructure structure,
-  ) {
-    switch (structure) {
-      case legacy.ArchiveStructure.singleFileNested:
-        return ArchiveStructure.ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED;
-      case legacy.ArchiveStructure.directoryBased:
-        return ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED;
-      case legacy.ArchiveStructure.nestedDirectory:
-        return ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY;
-      case legacy.ArchiveStructure.unknown:
-        return ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN;
-    }
   }
 
   static ModelArtifactType _artifactTypeForArchive(ArchiveType archiveType) {

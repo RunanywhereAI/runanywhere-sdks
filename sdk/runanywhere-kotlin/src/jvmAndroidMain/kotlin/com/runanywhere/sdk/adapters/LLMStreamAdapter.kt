@@ -9,7 +9,7 @@
  * Wire-generated type from `idl/llm_service.proto`.
  *
  * This is the unified LLM streaming path — the hand-rolled
- * `callbackFlow { CppBridgeLLM.generateStream(...) { token -> trySend(token) } }`
+ * `callbackFlow { CppBridgeLLMProto.generateStream(...) { token -> trySend(token) } }`
  * shim in `RunAnywhere+TextGeneration.jvmAndroid.kt` was DELETED in
  * the same change; the public `generateStream` now pulls from this
  * adapter and re-emits `event.token` for legacy callers that want the
@@ -44,7 +44,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * Streams [LLMStreamEvent]s from a C++ LLM component handle.
  *
  * The adapter holds onto the handle but does NOT own its lifecycle —
- * callers own the C++ component (via `CppBridgeLLM` / `RunAnywhere.loadModel`)
+ * callers own the C++ component (via `CppBridgeLLMProto` / `RunAnywhere.loadModel`)
  * and pass its handle in.
  *
  * Backpressure: each collector gets its own buffered channel (capacity 64

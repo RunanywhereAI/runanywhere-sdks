@@ -47,7 +47,7 @@ import 'package:runanywhere/public/configuration/sdk_environment.dart';
 /// Usage:
 /// ```dart
 /// // Phase 1: Core init (sync, ~1-5ms)
-/// DartBridge.initialize(SDKEnvironment.production);
+/// DartBridge.initialize(SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION);
 ///
 /// // Phase 2: Services init (async, ~100-500ms)
 /// await DartBridge.initializeServices();
@@ -61,7 +61,8 @@ class DartBridge {
   // State
   // -------------------------------------------------------------------------
 
-  static SDKEnvironment _environment = SDKEnvironment.development;
+  static SDKEnvironment _environment =
+      SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
   static bool _isInitialized = false;
   static bool _servicesInitialized = false;
   static DynamicLibrary? _lib;
@@ -209,7 +210,8 @@ class DartBridge {
 
     // Step 3a: Model assignment callbacks
     // Only auto-fetch in staging/production, not development
-    final shouldAutoFetch = _environment != SDKEnvironment.development;
+    final shouldAutoFetch =
+        _environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
     await DartBridgeModelAssignment.register(
       environment: _environment,
       autoFetch: shouldAutoFetch,
@@ -342,14 +344,17 @@ class DartBridge {
   static void _configureLogging(SDKEnvironment environment) {
     int logLevel;
     switch (environment) {
-      case SDKEnvironment.development:
+      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         logLevel = RacLogLevel.debug;
         break;
-      case SDKEnvironment.staging:
+      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
         logLevel = RacLogLevel.info;
         break;
-      case SDKEnvironment.production:
+      case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         logLevel = RacLogLevel.warning;
+        break;
+      default:
+        logLevel = RacLogLevel.debug;
         break;
     }
 
@@ -400,12 +405,14 @@ class DartBridge {
   /// Convert environment to C int value
   static int _environmentToInt(SDKEnvironment env) {
     switch (env) {
-      case SDKEnvironment.development:
+      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 0;
-      case SDKEnvironment.staging:
+      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
         return 1;
-      case SDKEnvironment.production:
+      case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 2;
+      default:
+        return 0;
     }
   }
 }

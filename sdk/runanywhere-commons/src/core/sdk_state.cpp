@@ -63,14 +63,26 @@ class SDKState {
     }
 
     void reset() {
-        std::lock_guard<std::mutex> lock(mutex_);
-        // Clear device state only; environment config survives reset.
-        is_device_registered_ = false;
+        bool emit_device_unregistered = false;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            // Clear device state only; environment config survives reset.
+            emit_device_unregistered = is_device_registered_;
+            is_device_registered_ = false;
+        }
+
+        if (emit_device_unregistered) {
+            rac::events::publish_device_registration_state_changed(false);
+        }
     }
 
     void shutdown() {
+        bool was_initialized = false;
+        bool emit_device_unregistered = false;
         {
             std::lock_guard<std::mutex> lock(mutex_);
+            was_initialized = is_initialized_;
+            emit_device_unregistered = is_device_registered_;
 
             // Clear everything
             is_device_registered_ = false;
@@ -81,7 +93,12 @@ class SDKState {
             device_id_.clear();
         }
 
-        rac::events::publish_shutdown();
+        if (emit_device_unregistered) {
+            rac::events::publish_device_registration_state_changed(false);
+        }
+        if (was_initialized) {
+            rac::events::publish_shutdown();
+        }
     }
 
     // ==========================================================================

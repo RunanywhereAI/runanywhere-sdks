@@ -39,7 +39,14 @@ void add_edge(PipelineSpec* spec,
 }
 
 // ---------------------------------------------------------------------------
-// VoiceAgent — VAD → STT → LLM → TTS (mirrors voice_agent_pipeline.cpp).
+// These expansions intentionally reference engine-backed operator type names
+// without installing factories for them. PipelineExecutor must fail with
+// RAC_ERROR_FEATURE_NOT_AVAILABLE until the host registers real factories or a
+// test registers explicit stand-ins with matching port contracts.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// VoiceAgent — VAD → STT → LLM → TTS solution signature.
 // ---------------------------------------------------------------------------
 void expand_voice_agent(const runanywhere::v1::VoiceAgentConfig& cfg,
                         PipelineSpec* out) {
@@ -77,7 +84,7 @@ void expand_voice_agent(const runanywhere::v1::VoiceAgentConfig& cfg,
 }
 
 // ---------------------------------------------------------------------------
-// RAG — Query → Embed → Retrieve → LLM (mirrors rac_rag_pipeline.cpp).
+// RAG — Query → Embed → Retrieve → Context → LLM solution signature.
 // ---------------------------------------------------------------------------
 void expand_rag(const runanywhere::v1::RAGConfig& cfg, PipelineSpec* out) {
     out->set_name("rag");

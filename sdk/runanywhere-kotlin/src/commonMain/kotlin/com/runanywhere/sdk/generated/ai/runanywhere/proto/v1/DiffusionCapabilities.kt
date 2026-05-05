@@ -128,6 +128,15 @@ public class DiffusionCapabilities(
     schemaIndex = 10,
   )
   public val safety_checker_enabled: Boolean = false,
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "supportsBatchGeneration",
+    schemaIndex = 11,
+  )
+  public val supports_batch_generation: Boolean = false,
+  supported_output_media_types: List<String> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DiffusionCapabilities, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -169,6 +178,16 @@ public class DiffusionCapabilities(
   public val supported_modes: List<DiffusionMode> = immutableCopyOf("supported_modes",
       supported_modes)
 
+  @field:WireField(
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    jsonName = "supportedOutputMediaTypes",
+    schemaIndex = 12,
+  )
+  public val supported_output_media_types: List<String> =
+      immutableCopyOf("supported_output_media_types", supported_output_media_types)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -191,6 +210,8 @@ public class DiffusionCapabilities(
     if (is_ready != other.is_ready) return false
     if (current_model != other.current_model) return false
     if (safety_checker_enabled != other.safety_checker_enabled) return false
+    if (supports_batch_generation != other.supports_batch_generation) return false
+    if (supported_output_media_types != other.supported_output_media_types) return false
     return true
   }
 
@@ -209,6 +230,8 @@ public class DiffusionCapabilities(
       result = result * 37 + is_ready.hashCode()
       result = result * 37 + (current_model?.hashCode() ?: 0)
       result = result * 37 + safety_checker_enabled.hashCode()
+      result = result * 37 + supports_batch_generation.hashCode()
+      result = result * 37 + supported_output_media_types.hashCode()
       super.hashCode = result
     }
     return result
@@ -228,6 +251,9 @@ public class DiffusionCapabilities(
     result += """is_ready=$is_ready"""
     if (current_model != null) result += """current_model=${sanitize(current_model)}"""
     result += """safety_checker_enabled=$safety_checker_enabled"""
+    result += """supports_batch_generation=$supports_batch_generation"""
+    if (supported_output_media_types.isNotEmpty()) result +=
+        """supported_output_media_types=${sanitize(supported_output_media_types)}"""
     return result.joinToString(prefix = "DiffusionCapabilities{", separator = ", ", postfix = "}")
   }
 
@@ -243,10 +269,13 @@ public class DiffusionCapabilities(
     is_ready: Boolean = this.is_ready,
     current_model: String? = this.current_model,
     safety_checker_enabled: Boolean = this.safety_checker_enabled,
+    supports_batch_generation: Boolean = this.supports_batch_generation,
+    supported_output_media_types: List<String> = this.supported_output_media_types,
     unknownFields: ByteString = this.unknownFields,
   ): DiffusionCapabilities = DiffusionCapabilities(supported_variants, supported_schedulers,
       max_resolution_px, supported_modes, max_width_px, max_height_px, supports_intermediate_images,
-      supports_safety_checker, is_ready, current_model, safety_checker_enabled, unknownFields)
+      supports_safety_checker, is_ready, current_model, safety_checker_enabled,
+      supports_batch_generation, supported_output_media_types, unknownFields)
 
   public companion object {
     @JvmField
@@ -280,6 +309,10 @@ public class DiffusionCapabilities(
         size += ProtoAdapter.STRING.encodedSizeWithTag(10, value.current_model)
         if (value.safety_checker_enabled != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(11,
             value.safety_checker_enabled)
+        if (value.supports_batch_generation != false) size +=
+            ProtoAdapter.BOOL.encodedSizeWithTag(12, value.supports_batch_generation)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(13,
+            value.supported_output_media_types)
         return size
       }
 
@@ -301,11 +334,19 @@ public class DiffusionCapabilities(
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.current_model)
         if (value.safety_checker_enabled != false) ProtoAdapter.BOOL.encodeWithTag(writer, 11,
             value.safety_checker_enabled)
+        if (value.supports_batch_generation != false) ProtoAdapter.BOOL.encodeWithTag(writer, 12,
+            value.supports_batch_generation)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 13,
+            value.supported_output_media_types)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DiffusionCapabilities) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 13,
+            value.supported_output_media_types)
+        if (value.supports_batch_generation != false) ProtoAdapter.BOOL.encodeWithTag(writer, 12,
+            value.supports_batch_generation)
         if (value.safety_checker_enabled != false) ProtoAdapter.BOOL.encodeWithTag(writer, 11,
             value.safety_checker_enabled)
         ProtoAdapter.STRING.encodeWithTag(writer, 10, value.current_model)
@@ -337,6 +378,8 @@ public class DiffusionCapabilities(
         var is_ready: Boolean = false
         var current_model: String? = null
         var safety_checker_enabled: Boolean = false
+        var supports_batch_generation: Boolean = false
+        val supported_output_media_types = mutableListOf<String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -362,6 +405,8 @@ public class DiffusionCapabilities(
             9 -> is_ready = ProtoAdapter.BOOL.decode(reader)
             10 -> current_model = ProtoAdapter.STRING.decode(reader)
             11 -> safety_checker_enabled = ProtoAdapter.BOOL.decode(reader)
+            12 -> supports_batch_generation = ProtoAdapter.BOOL.decode(reader)
+            13 -> supported_output_media_types.add(ProtoAdapter.STRING.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -377,6 +422,8 @@ public class DiffusionCapabilities(
           is_ready = is_ready,
           current_model = current_model,
           safety_checker_enabled = safety_checker_enabled,
+          supports_batch_generation = supports_batch_generation,
+          supported_output_media_types = supported_output_media_types,
           unknownFields = unknownFields
         )
       }

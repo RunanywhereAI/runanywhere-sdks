@@ -15,7 +15,7 @@ protocol BenchmarkScenarioProvider: Sendable {
     func scenarios() -> [BenchmarkScenario]
     func execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo
+        model: RAModelInfo
     ) async throws -> BenchmarkMetrics
 }
 
@@ -39,7 +39,7 @@ enum BenchmarkRunnerError: LocalizedError {
 // MARK: - Pre-flight Result
 
 struct BenchmarkPreflightResult: Sendable {
-    let availableCategories: [BenchmarkCategory: [ModelInfo]]
+    let availableCategories: [BenchmarkCategory: [RAModelInfo]]
     let skippedCategories: [BenchmarkCategory]
     let totalWorkItems: Int
 }
@@ -49,7 +49,7 @@ struct BenchmarkPreflightResult: Sendable {
 /// One scenario/model pair to execute in a single benchmark category.
 struct BenchmarkWorkItem: Sendable {
     let category: BenchmarkCategory
-    let model: ModelInfo
+    let model: RAModelInfo
     let scenario: BenchmarkScenario
 }
 
@@ -78,14 +78,19 @@ final class BenchmarkRunner {
     /// Checks which categories have downloaded models before running. This lets the UI
     /// inform the user which categories will be skipped.
     func preflight(categories: Set<BenchmarkCategory>) async throws -> BenchmarkPreflightResult {
-        let allModels: [ModelInfo]
-        do {
-            allModels = try await RunAnywhere.availableModels()
-        } catch {
-            throw BenchmarkRunnerError.fetchModelsFailed(underlying: error)
+        let allModels: [RAModelInfo]
+        let listResult = await RunAnywhere.listModels()
+        guard listResult.success else {
+            throw BenchmarkRunnerError.fetchModelsFailed(
+                underlying: SDKException.general(
+                    .processingFailed,
+                    listResult.errorMessage.isEmpty ? "model registry" : listResult.errorMessage
+                )
+            )
         }
+        allModels = listResult.models.models
 
-        var available: [BenchmarkCategory: [ModelInfo]] = [:]
+        var available: [BenchmarkCategory: [RAModelInfo]] = [:]
         var skipped: [BenchmarkCategory] = []
 
         for category in BenchmarkCategory.allCases where categories.contains(category) {
@@ -200,7 +205,7 @@ final class BenchmarkRunner {
         for category in BenchmarkCategory.allCases where categories.contains(category) {
             guard let provider = providers[category],
                   let models = preflight.availableCategories[category] else { continue }
-            let filteredModels: [ModelInfo]
+            let filteredModels: [RAModelInfo]
             if let modelIds {
                 filteredModels = models.filter { modelIds.contains($0.id) }
             } else {

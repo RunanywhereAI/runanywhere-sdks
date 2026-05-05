@@ -22,13 +22,13 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /** Result of [CppBridgeLlmThinking.extract]: the response text plus
  *  the optional thinking chunk. */
-data class LlmThinkingExtraction(
+internal data class LlmThinkingExtraction(
     val response: String,
     val thinking: String?,
 )
 
 /** Token-split result from [CppBridgeLlmThinking.splitTokens]. */
-data class LlmThinkingTokenSplit(
+internal data class LlmThinkingTokenSplit(
     val thinkingTokens: Int,
     val responseTokens: Int,
 )
@@ -49,7 +49,7 @@ data class LlmThinkingTokenSplit(
  *     and response by character-length ratio. Used for accurate
  *     per-segment cost/usage accounting.
  */
-object CppBridgeLlmThinking {
+internal object CppBridgeLlmThinking {
     /**
      * Extract the first think block.
      *

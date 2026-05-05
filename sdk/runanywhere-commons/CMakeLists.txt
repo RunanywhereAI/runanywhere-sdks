@@ -566,13 +566,14 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/http/rac_http_download.cpp
     # v2 close-out Phase H2 — platform HTTP transport vtable / registry.
     # Platform SDKs register a native-stack adapter here (Swift URLSession,
-    # Kotlin OkHttp, Web fetch, Flutter dart:io, RN fetch/JSI); when
-    # nothing is registered the libcurl / emscripten defaults above run.
+    # Kotlin OkHttp, Web fetch, Flutter dart:io, RN fetch/JSI); when no
+    # adapter is registered, native public HTTP calls fail with
+    # RAC_ERROR_FEATURE_NOT_AVAILABLE. Emscripten uses its Web fetch adapter.
     src/infrastructure/http/rac_http_transport.cpp
     # v2 close-out Phase H Stage 2 — internal C++ HTTP facade.
     # Every commons component that needs HTTP funnels through
     # rac::http::execute / execute_stream. The facade routes through the
-    # platform transport vtable above when registered, else libcurl.
+    # platform transport vtable above and has no portable HTTP fallback.
     src/infrastructure/http/rac_http_internal.cpp
     src/infrastructure/telemetry/telemetry_types.cpp
     src/infrastructure/telemetry/telemetry_json.cpp
@@ -620,23 +621,25 @@ set(RAC_FEATURES_SOURCES
     src/features/stt/stt_component.cpp
     src/features/stt/rac_stt_service.cpp
     src/features/stt/stt_analytics.cpp
+    # CPP-03: lifecycle-owned proto-byte STTStreamEvent ABI
+    src/features/stt/rac_stt_stream.cpp
     # TTS
     src/features/tts/tts_component.cpp
     src/features/tts/rac_tts_service.cpp
     src/features/tts/tts_analytics.cpp
+    # CPP-03: lifecycle-owned proto-byte TTSStreamEvent ABI
+    src/features/tts/rac_tts_stream.cpp
     # VAD
     src/features/vad/vad_component.cpp
     src/features/vad/energy_vad.cpp
     src/features/vad/vad_analytics.cpp
+    # CPP-03: lifecycle-owned proto-byte VADStreamEvent ABI
+    src/features/vad/rac_vad_stream.cpp
     # Wake Word — high-level service scaffold was removed in Phase F of the
     # v2 close-out (see docs/v2_closeout_engine_decisions.md). All real
     # consumers call the speech backend's rac_wakeword_onnx_* compatibility
     # API directly. The shared types in
     # include/rac/features/wakeword/rac_wakeword_types.h remain.
-    # Round-1 CPP fix (§9): Wake Word C ABI stubs so frontends link without crashing.
-    src/features/wakeword/rac_wake_word.cpp
-    # Round-1 CPP fix (§8): Speaker Diarization C ABI stubs.
-    src/features/speaker_diarization/rac_speaker_diarization.cpp
     # VLM (Vision Language Model)
     src/features/vlm/vlm_component.cpp
     src/features/vlm/rac_vlm_service.cpp
@@ -646,12 +649,15 @@ set(RAC_FEATURES_SOURCES
     src/features/diffusion/rac_diffusion_service.cpp
     src/features/diffusion/rac_diffusion_proto_abi.cpp
     src/features/diffusion/diffusion_model_registry.cpp
-    src/features/diffusion/diffusion_json.cpp
     src/features/diffusion/rac_diffusion_tokenizer.cpp
+    # CPP-03: lifecycle-owned proto-byte DiffusionStreamEvent ABI
+    src/features/diffusion/rac_diffusion_stream.cpp
     # Embeddings
     src/features/embeddings/rac_embeddings_service.cpp
     src/features/embeddings/rac_embeddings_proto_abi.cpp
     src/features/embeddings/embeddings_component.cpp
+    # Lifecycle-owned generated-proto ABI for non-LLM one-shot operations
+    src/features/rac_nonllm_lifecycle_proto_abi.cpp
     # Platform service availability callback registry (always built; platform
     # implementations remain Apple-gated below).
     src/features/platform/rac_platform_services.cpp
@@ -741,6 +747,12 @@ if(EXISTS "${RAC_CPU_RUNTIME_DIR}/rac_runtime_entry_cpu.h")
         "${RAC_CPU_RUNTIME_DIR}"
     )
 endif()
+
+# Mark every commons translation unit as an "internal" build so legacy event
+# headers (rac_analytics_events.h, rac_events.h, rac_*_events.h) compile
+# without their public-API #warning. SDK code outside commons does NOT see
+# this define, so accidental SDK-side inclusion still triggers the warning.
+target_compile_definitions(rac_commons PRIVATE RAC_BUILDING_COMMONS=1)
 
 # Symbol visibility for shared builds
 if(RAC_BUILD_SHARED)
@@ -939,9 +951,10 @@ if(RAC_ENABLE_PROTOBUF)
         set(protobuf_INSTALL               OFF CACHE BOOL "" FORCE)
         set(protobuf_BUILD_SHARED_LIBS     OFF CACHE BOOL "" FORCE)
         set(protobuf_WITH_ZLIB             OFF CACHE BOOL "" FORCE)
-        # protobuf v28+ depends on abseil. "module" keeps mobile/xcompile
-        # builds self-contained instead of relying on host/sysroot packages.
+        # protobuf v28+ depends on abseil. Force FetchContent dependencies so
+        # Apple static packages do not capture host/Homebrew absl dylibs.
         set(protobuf_ABSL_PROVIDER         "module" CACHE STRING "" FORCE)
+        set(protobuf_FORCE_FETCH_DEPENDENCIES ON CACHE BOOL "" FORCE)
         set(ABSL_PROPAGATE_CXX_STD         ON CACHE BOOL "" FORCE)
         FetchContent_Declare(
             protobuf_fetched
@@ -1051,6 +1064,7 @@ if(RAC_ENABLE_SOLUTIONS)
     message(STATUS "RAC_ENABLE_SOLUTIONS=ON — building full Solutions API")
     target_sources(rac_commons PRIVATE
         src/solutions/operator_registry.cpp
+        src/solutions/operators/op_engine_backed.cpp
         src/solutions/pipeline_executor.cpp
         src/solutions/solution_converter.cpp
         src/solutions/solution_runner.cpp

@@ -44,7 +44,10 @@ extern "C" {
  *
  * @return RAC_SUCCESS, RAC_ERROR_NULL_POINTER, RAC_ERROR_NOT_FOUND
  *         (no eligible plugin / pinned name unavailable with no_fallback=1),
- *         or RAC_ERROR_CAPABILITY_NOT_FOUND (registry empty).
+ *         RAC_ERROR_RUNTIME_UNAVAILABLE (every candidate was rejected because
+ *         its declared L1 runtimes are not registered on this host — e.g.
+ *         an engine pinned to CoreML on Android), or
+ *         RAC_ERROR_CAPABILITY_NOT_FOUND (registry empty).
  *
  * Thread-safe. The first call also triggers HardwareProfile::detect();
  * subsequent calls reuse the memoized profile.

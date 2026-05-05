@@ -7,6 +7,19 @@
  * results, and streaming callbacks.
  *
  * For the service interface, see rac_vlm_service.h.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Public structs/callbacks (rac_vlm_config_t, rac_vlm_options_t,
+ *     rac_vlm_image_t, rac_vlm_result_t, rac_vlm_info_t,
+ *     rac_vlm_token_event_t, rac_vlm_stream_callback_fn,
+ *     rac_vlm_token_event_callback_fn, rac_vlm_component_*_callback_fn):
+ *     `delete after SDK migration`. Replaced by serialized
+ *     runanywhere.v1.VLMImage / VLMGenerationOptions / VLMResult /
+ *     VLMStreamEvent bytes via rac_vlm_*_proto APIs.
+ *   - Chat-template/family helpers (rac_vlm_chat_template_t,
+ *     rac_vlm_model_family_t, rac_vlm_image_format_t,
+ *     rac_vlm_get_builtin_template): `internal` portable helpers used
+ *     by commons; not part of the public SDK contract.
  */
 
 #ifndef RAC_VLM_TYPES_H

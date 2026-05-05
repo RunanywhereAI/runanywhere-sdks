@@ -7,50 +7,83 @@
 
 import Foundation
 
-// MARK: - Model Download API
-
 public extension RunAnywhere {
-
-    /// Download a model by ID with progress tracking
-    ///
-    /// ```swift
-    /// for await progress in try await RunAnywhere.downloadModel("my-model-id") {
-    ///     print("Progress: \(Int(progress.overallProgress * 100))%")
-    /// }
-    /// ```
-    static func downloadModel(_ modelId: String) async throws -> AsyncStream<DownloadProgress> {
-        let logger = SDKLogger(category: "RunAnywhere.Download")
-        let models = try await availableModels()
-        logger.info("Available models count: \(models.count)")
-        for candidate in models where candidate.id == modelId {
-            logger.info("Found model \(candidate.id) with framework: \(candidate.framework.wireString) (\(candidate.framework.displayName))")
-        }
-        guard let model = models.first(where: { $0.id == modelId }) else {
-            throw SDKException.general(.modelNotFound, "Model not found: \(modelId)")
-        }
-
-        let task = try await DownloadAdapter.shared.downloadModel(model)
-        return task.progress
-    }
-
-    /// Download a model with a completion handler
+    /// Download a registered model with the generated download plan/start/progress
+    /// contracts. Commons owns planning and registry updates; Swift owns the
+    /// native URLSession transfer behind the C++ download adapter.
+    @discardableResult
     static func downloadModel(
-        _ modelId: String,
-        progressHandler: @escaping (Double) -> Void
-    ) async throws {
-        let progressStream = try await downloadModel(modelId)
+        _ model: RAModelInfo,
+        onProgress: ((RADownloadProgress) async -> Void)? = nil
+    ) async throws -> RADownloadProgress {
+        guard isInitialized else {
+            throw SDKException.download(.notInitialized, "SDK not initialized")
+        }
+        try await ensureServicesReady()
 
-        for await progress in progressStream {
-            progressHandler(progress.overallProgress)
-            if progress.stage == .completed {
-                break
+        var planRequest = RADownloadPlanRequest()
+        planRequest.modelID = model.id
+        planRequest.model = model
+        planRequest.resumeExisting = true
+        planRequest.validateExistingBytes = true
+        planRequest.verifyChecksums = !model.checksumSha256.isEmpty
+
+        let plan = await downloadPlan(planRequest)
+        guard plan.canStart else {
+            throw SDKException.download(
+                .downloadFailed,
+                plan.errorMessage.isEmpty ? "Unable to create a download plan" : plan.errorMessage
+            )
+        }
+
+        var startRequest = RADownloadStartRequest()
+        startRequest.modelID = model.id
+        startRequest.plan = plan
+        startRequest.resume = plan.canResume
+        startRequest.resumeToken = plan.resumeToken
+        // Commons currently owns planning/progress but not the final registry
+        // mutation behind this flag. Persist completion explicitly through the
+        // generated model import contract below.
+        startRequest.updateRegistryOnCompletion = false
+
+        let startResult = await startDownload(startRequest)
+        guard startResult.accepted else {
+            throw SDKException.download(
+                .downloadFailed,
+                startResult.errorMessage.isEmpty ? "The download could not be started" : startResult.errorMessage
+            )
+        }
+
+        if startResult.hasInitialProgress {
+            let progress = startResult.initialProgress
+            if try await reportDownloadProgress(progress, onProgress: onProgress) {
+                return try await persistDownloadCompletion(model: model, progress: progress)
+            }
+        }
+
+        var subscribeRequest = RADownloadSubscribeRequest()
+        subscribeRequest.modelID = startResult.modelID.isEmpty ? model.id : startResult.modelID
+        subscribeRequest.taskID = startResult.taskID
+
+        while true {
+            try Task.checkCancellation()
+            try await Task.sleep(nanoseconds: 250_000_000)
+
+            let progress = await pollDownloadProgress(subscribeRequest)
+            if try await reportDownloadProgress(progress, onProgress: onProgress) {
+                return try await persistDownloadCompletion(model: model, progress: progress)
             }
         }
     }
 
-    /// Cancel an active model download.
-    static func cancelDownload(_ modelId: String) {
-        DownloadAdapter.shared.cancelDownload(taskId: modelId)
+    /// Import a stable, platform-normalized local model path into the generated
+    /// registry. This is also the public local-import entry point for file
+    /// picker/bookmark flows after Swift has handled sandbox access.
+    static func importModel(_ request: RAModelImportRequest) async throws -> RAModelImportResult {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
+        }
+        return try await CppBridge.ModelRegistry.shared.importModel(request)
     }
 
     /// Build a native download plan using canonical generated proto data.
@@ -82,30 +115,10 @@ public extension RunAnywhere {
     static func downloadProgressEvents() -> AsyncStream<RADownloadProgress> {
         CppBridge.Download.shared.progressEvents()
     }
-}
-
-// MARK: - Storage Extensions
-
-public extension RunAnywhere {
-
-    /// Get storage information
-    /// Business logic is in C++ via CppBridge.Storage
-    static func getStorageInfo() async -> StorageInfo {
-        var request = RAStorageInfoRequest()
-        request.includeApp = true
-        request.includeDevice = true
-        request.includeModels = true
-        return await getStorageInfo(request).info
-    }
 
     /// Get storage information as the canonical generated proto result.
-    static func getStorageInfo(_ request: RAStorageInfoRequest) async -> RAStorageInfoResult {
+    static func getStorageInfo(_ request: RAStorageInfoRequest = RAStorageInfoRequest()) async -> RAStorageInfoResult {
         await CppBridge.Storage.shared.info(request)
-    }
-
-    /// Check if storage is available for a model download
-    static func checkStorageAvailable(for modelSize: Int64, safetyMargin: Double = 0.1) -> StorageAvailability {
-        return CppBridge.Storage.shared.checkStorageAvailable(modelSize: modelSize, safetyMargin: safetyMargin)
     }
 
     /// Check storage availability as the canonical generated proto result.
@@ -113,71 +126,6 @@ public extension RunAnywhere {
         _ request: RAStorageAvailabilityRequest
     ) async -> RAStorageAvailabilityResult {
         await CppBridge.Storage.shared.availability(request)
-    }
-
-    /// Get storage metrics for a specific model
-    static func getModelStorageMetrics(modelId: String, framework: InferenceFramework) async -> ModelStorageMetrics? {
-        return await CppBridge.Storage.shared.getModelStorageMetrics(modelId: modelId, framework: framework)
-    }
-
-    /// Clear cache
-    static func clearCache() async throws {
-        try SimplifiedFileManager.shared.clearCache()
-        // Emit via C++ event system
-        CppBridge.Events.emitStorageCacheCleared(freedBytes: 0)
-    }
-
-    /// Clean temporary files
-    static func cleanTempFiles() async throws {
-        try SimplifiedFileManager.shared.cleanTempFiles()
-        // Emit via C++ event system
-        CppBridge.Events.emitStorageTempCleaned(freedBytes: 0)
-    }
-
-    /// Delete a stored model
-    /// - Parameters:
-    ///   - modelId: The model identifier
-    ///   - framework: The framework the model belongs to
-    static func deleteStoredModel(_ modelId: String, framework: InferenceFramework) async throws {
-        var request = RAStorageDeleteRequest()
-        request.modelIds = [modelId]
-        request.deleteFiles = true
-        request.clearRegistryPaths_p = true
-        request.unloadIfLoaded = true
-
-        let result = await CppBridge.Storage.shared.delete(request)
-        guard result.success else {
-            try SimplifiedFileManager.shared.deleteModel(modelId: modelId, framework: framework)
-            try await CppBridge.ModelRegistry.shared.updateDownloadStatus(modelId: modelId, localPath: nil)
-            CppBridge.Events.emitModelDeleted(modelId: modelId)
-            return
-        }
-        CppBridge.Events.emitModelDeleted(modelId: modelId)
-    }
-
-    /// Delete a stored model by ID while preserving its registry entry.
-    static func deleteModel(_ modelId: String) async throws {
-        var request = RAStorageDeleteRequest()
-        request.modelIds = [modelId]
-        request.deleteFiles = true
-        request.clearRegistryPaths_p = true
-        request.unloadIfLoaded = true
-        let result = await deleteStorage(request)
-        guard result.success else {
-            throw SDKException.general(.modelNotFound, "Model not found: \(modelId)")
-        }
-    }
-
-    /// Delete all downloaded models while keeping catalog entries registered.
-    static func deleteAllModels() async throws {
-        var request = RAStorageDeleteRequest()
-        request.deleteFiles = true
-        request.clearRegistryPaths_p = true
-        request.unloadIfLoaded = true
-        let result = await deleteStorage(request)
-        guard result.success else {
-            throw SDKException.general(.processingFailed, result.errorMessage)
-        }
     }
 
     /// Build a storage delete plan as canonical generated proto data.
@@ -189,20 +137,68 @@ public extension RunAnywhere {
     static func deleteStorage(_ request: RAStorageDeleteRequest) async -> RAStorageDeleteResult {
         await CppBridge.Storage.shared.delete(request)
     }
+}
 
-    /// Get base directory URL
-    static func getBaseDirectoryURL() -> URL {
-        SimplifiedFileManager.shared.getBaseDirectoryURL()
+private extension RunAnywhere {
+    static func reportDownloadProgress(
+        _ progress: RADownloadProgress,
+        onProgress: ((RADownloadProgress) async -> Void)?
+    ) async throws -> Bool {
+        if let onProgress {
+            await onProgress(progress)
+        }
+
+        switch progress.state {
+        case .completed:
+            return true
+        case .failed:
+            throw SDKException.download(
+                .downloadFailed,
+                progress.errorMessage.isEmpty ? "Download failed" : progress.errorMessage
+            )
+        case .cancelled:
+            throw SDKException.download(.cancelled, "Download cancelled")
+        default:
+            return progress.stage == .completed
+        }
     }
 
-    /// Get all downloaded models
-    static func getDownloadedModels() async -> [InferenceFramework: [String]] {
-        await SimplifiedFileManager.shared.getDownloadedModels()
-    }
+    static func persistDownloadCompletion(
+        model: RAModelInfo,
+        progress: RADownloadProgress
+    ) async throws -> RADownloadProgress {
+        let localPath = progress.localPath.isEmpty ? model.localPath : progress.localPath
+        guard !localPath.isEmpty else {
+            throw SDKException.download(
+                .invalidState,
+                "Download completed without a local_path; cannot import completion into the model registry"
+            )
+        }
 
-    /// Check if a model is downloaded
-    @MainActor
-    static func isModelDownloaded(_ modelId: String, framework: InferenceFramework) -> Bool {
-        SimplifiedFileManager.shared.isModelDownloaded(modelId: modelId, framework: framework)
+        var importedModel = model
+        importedModel.localPath = localPath
+        importedModel.isDownloaded = true
+        importedModel.isAvailable = true
+        importedModel.updatedAtUnixMs = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+
+        var request = RAModelImportRequest()
+        request.model = importedModel
+        request.sourcePath = localPath
+        request.overwriteExisting = true
+        request.copyIntoManagedStorage = false
+        request.validateBeforeRegister = false
+        request.files = importedModel.multiFileDescriptors
+
+        let result = try await importModel(request)
+        guard result.success else {
+            throw SDKException.download(
+                .downloadFailed,
+                result.errorMessage.isEmpty
+                    ? "Downloaded model could not be imported into the registry"
+                    : result.errorMessage
+            )
+        }
+
+        return progress
     }
 }

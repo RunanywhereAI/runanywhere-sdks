@@ -22,7 +22,7 @@ extension CppBridge {
         private var handle: rac_handle_t?
         private var loadedModelId: String?
         private var loadedModelPath: String?
-        private var loadedMmprojPath: String?
+        private var loadedVisionProjectorPath: String?
         private let logger = SDKLogger(category: "CppBridge.VLM")
 
         private init() {}
@@ -60,32 +60,87 @@ extension CppBridge {
         /// Get the currently loaded model path
         public var currentModelPath: String? { loadedModelPath }
 
-        /// Get the currently loaded mmproj path
-        public var currentMmprojPath: String? { loadedMmprojPath }
-
         // MARK: - Model Lifecycle
 
-        /// Load a VLM model
-        /// - Parameters:
-        ///   - modelPath: Path to the main model file (GGUF)
-        ///   - mmprojPath: Path to the vision projector file (required for llama.cpp VLM)
-        ///   - modelId: Model identifier for telemetry
-        ///   - modelName: Human-readable model name
-        public func loadModel(
+        func loadModel(from result: RAModelLoadResult, modelName: String? = nil) throws {
+            if loadedModelId == result.modelID, isLoaded {
+                return
+            }
+            guard result.success else {
+                throw SDKException.vlm(
+                    .modelLoadFailed,
+                    result.errorMessage.isEmpty ? "VLM lifecycle load failed" : result.errorMessage
+                )
+            }
+            guard let primaryPath = result.resolvedPrimaryModelPath else {
+                throw SDKException.vlm(
+                    .modelLoadFailed,
+                    "VLM lifecycle result did not include a primary model artifact"
+                )
+            }
+
+            let projectorPath = result.resolvedVisionProjectorPath
+            if result.framework == .llamaCpp && projectorPath == nil {
+                throw SDKException.vlm(
+                    .modelLoadFailed,
+                    "VLM lifecycle result did not include a vision projector artifact"
+                )
+            }
+
+            try loadResolvedModel(
+                primaryPath,
+                visionProjectorPath: projectorPath,
+                modelId: result.modelID,
+                modelName: modelName ?? result.modelID
+            )
+        }
+
+        func loadModel(from result: RACurrentModelResult) throws {
+            if loadedModelId == result.modelID, isLoaded {
+                return
+            }
+            guard result.found else {
+                throw SDKException.vlm(.modelLoadFailed, "No lifecycle-loaded VLM model found")
+            }
+            guard let primaryPath = result.resolvedPrimaryModelPath else {
+                throw SDKException.vlm(
+                    .modelLoadFailed,
+                    "Current VLM lifecycle result did not include a primary model artifact"
+                )
+            }
+
+            let projectorPath = result.resolvedVisionProjectorPath
+            if result.framework == .llamaCpp && projectorPath == nil {
+                throw SDKException.vlm(
+                    .modelLoadFailed,
+                    "Current VLM lifecycle result did not include a vision projector artifact"
+                )
+            }
+
+            try loadResolvedModel(
+                primaryPath,
+                visionProjectorPath: projectorPath,
+                modelId: result.modelID,
+                modelName: result.hasModel && !result.model.name.isEmpty ? result.model.name : result.modelID
+            )
+        }
+
+        /// Load a VLM model using artifacts already resolved by commons lifecycle.
+        func loadResolvedModel(
             _ modelPath: String,
-            mmprojPath: String?,
+            visionProjectorPath: String?,
             modelId: String,
             modelName: String
         ) throws {
             let handle = try getHandle()
 
             let result: rac_result_t
-            if let mmprojPath = mmprojPath {
+            if let visionProjectorPath = visionProjectorPath {
                 result = modelPath.withCString { pathPtr in
-                    mmprojPath.withCString { mmprojPtr in
+                    visionProjectorPath.withCString { projectorPtr in
                         modelId.withCString { idPtr in
                             modelName.withCString { namePtr in
-                                rac_vlm_component_load_model(handle, pathPtr, mmprojPtr, idPtr, namePtr)
+                                rac_vlm_component_load_model(handle, pathPtr, projectorPtr, idPtr, namePtr)
                             }
                         }
                     }
@@ -106,30 +161,8 @@ extension CppBridge {
 
             loadedModelId = modelId
             loadedModelPath = modelPath
-            loadedMmprojPath = mmprojPath
+            loadedVisionProjectorPath = visionProjectorPath
             logger.info("VLM model loaded: \(modelId)")
-        }
-
-        /// Load a VLM model by ID using the C++ model registry for path resolution.
-        /// The C++ layer handles finding the main model and mmproj files automatically.
-        ///
-        /// - Parameter modelId: Model identifier (must be registered in the global model registry)
-        public func loadModelById(_ modelId: String) throws {
-            let handle = try getHandle()
-
-            let result = modelId.withCString { idPtr in
-                rac_vlm_component_load_model_by_id(handle, idPtr)
-            }
-
-            guard result == RAC_SUCCESS else {
-                throw SDKException.vlm(.modelLoadFailed, "Failed to load VLM model by ID: \(modelId) (error: \(result))")
-            }
-
-            loadedModelId = modelId
-            // Clear path properties since C++ layer owns path resolution for loadModelById
-            loadedModelPath = nil
-            loadedMmprojPath = nil
-            logger.info("VLM model loaded by ID: \(modelId)")
         }
 
         /// Unload the current model
@@ -138,7 +171,7 @@ extension CppBridge {
             rac_vlm_component_cleanup(handle)
             loadedModelId = nil
             loadedModelPath = nil
-            loadedMmprojPath = nil
+            loadedVisionProjectorPath = nil
             logger.info("VLM model unloaded")
         }
 
@@ -169,7 +202,7 @@ extension CppBridge {
                 self.handle = nil
                 loadedModelId = nil
                 loadedModelPath = nil
-                loadedMmprojPath = nil
+                loadedVisionProjectorPath = nil
                 logger.debug("VLM component destroyed")
             }
         }

@@ -351,6 +351,56 @@ public enum RADiffusionTokenizerSourceKind: SwiftProtobuf.Enum, Swift.CaseIterab
 
 }
 
+public enum RADiffusionStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
+  public typealias RawValue = Int
+  case unspecified // = 0
+  case started // = 1
+  case progress // = 2
+  case intermediateImage // = 3
+  case completed // = 4
+  case error // = 5
+  case UNRECOGNIZED(Int)
+
+  public init() {
+    self = .unspecified
+  }
+
+  public init?(rawValue: Int) {
+    switch rawValue {
+    case 0: self = .unspecified
+    case 1: self = .started
+    case 2: self = .progress
+    case 3: self = .intermediateImage
+    case 4: self = .completed
+    case 5: self = .error
+    default: self = .UNRECOGNIZED(rawValue)
+    }
+  }
+
+  public var rawValue: Int {
+    switch self {
+    case .unspecified: return 0
+    case .started: return 1
+    case .progress: return 2
+    case .intermediateImage: return 3
+    case .completed: return 4
+    case .error: return 5
+    case .UNRECOGNIZED(let i): return i
+    }
+  }
+
+  // The compiler won't synthesize support with the UNRECOGNIZED case.
+  public static let allCases: [RADiffusionStreamEventKind] = [
+    .unspecified,
+    .started,
+    .progress,
+    .intermediateImage,
+    .completed,
+    .error,
+  ]
+
+}
+
 /// ---------------------------------------------------------------------------
 /// Tokenizer source descriptor. `kind` is the preset; `custom_path` is only
 /// meaningful when kind == CUSTOM and points at a directory URL containing
@@ -518,81 +568,187 @@ public struct RADiffusionConfig: Sendable {
 ///                                                DiffusionProgress
 ///                                                streaming semantics
 /// ---------------------------------------------------------------------------
-public struct RADiffusionGenerationOptions: Sendable {
+public struct RADiffusionGenerationOptions: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   /// Text prompt describing the desired image. Required.
-  public var prompt: String = String()
+  public var prompt: String {
+    get {_storage._prompt}
+    set {_uniqueStorage()._prompt = newValue}
+  }
 
   /// Things to avoid in the image. Empty = no negative prompt.
-  public var negativePrompt: String = String()
+  public var negativePrompt: String {
+    get {_storage._negativePrompt}
+    set {_uniqueStorage()._negativePrompt = newValue}
+  }
 
   /// Output image width  in pixels.  0 = use variant default
   /// (512 for SD 1.5 / SDXS / LCM, 768 for SD 2.1, 1024 for SDXL / Turbo).
-  public var width: Int32 = 0
+  public var width: Int32 {
+    get {_storage._width}
+    set {_uniqueStorage()._width = newValue}
+  }
 
   /// Output image height in pixels.  0 = use variant default.
-  public var height: Int32 = 0
+  public var height: Int32 {
+    get {_storage._height}
+    set {_uniqueStorage()._height = newValue}
+  }
 
   /// Number of denoising steps. Range 1–50 (variant-dependent: SDXS=1,
   /// SDXL_Turbo / LCM=4, SD*=20–28). 0 = use variant default.
-  public var numInferenceSteps: Int32 = 0
+  public var numInferenceSteps: Int32 {
+    get {_storage._numInferenceSteps}
+    set {_uniqueStorage()._numInferenceSteps = newValue}
+  }
 
   /// Classifier-free guidance scale. 0.0 = no CFG (required for SDXS /
   /// SDXL_Turbo). Typical SD range 1.0–20.0; default 7.5.
-  public var guidanceScale: Float = 0
+  public var guidanceScale: Float {
+    get {_storage._guidanceScale}
+    set {_uniqueStorage()._guidanceScale = newValue}
+  }
 
   /// RNG seed for reproducibility. -1 = pick a random seed.
-  public var seed: Int64 = 0
+  public var seed: Int64 {
+    get {_storage._seed}
+    set {_uniqueStorage()._seed = newValue}
+  }
 
   /// Sampler algorithm. UNSPECIFIED = backend picks (recommended:
   /// DPMPP_2M_KARRAS).
-  public var scheduler: RADiffusionScheduler = .unspecified
+  public var scheduler: RADiffusionScheduler {
+    get {_storage._scheduler}
+    set {_uniqueStorage()._scheduler = newValue}
+  }
 
   /// Generation mode (txt2img / img2img / inpainting). UNSPECIFIED =
   /// TEXT_TO_IMAGE.
-  public var mode: RADiffusionMode = .unspecified
+  public var mode: RADiffusionMode {
+    get {_storage._mode}
+    set {_uniqueStorage()._mode = newValue}
+  }
 
   /// Image-to-image / inpainting payloads from rac_diffusion_options_t.
   public var inputImage: Data {
-    get {_inputImage ?? Data()}
-    set {_inputImage = newValue}
+    get {_storage._inputImage ?? Data()}
+    set {_uniqueStorage()._inputImage = newValue}
   }
   /// Returns true if `inputImage` has been explicitly set.
-  public var hasInputImage: Bool {self._inputImage != nil}
+  public var hasInputImage: Bool {_storage._inputImage != nil}
   /// Clears the value of `inputImage`. Subsequent reads from it will return its default value.
-  public mutating func clearInputImage() {self._inputImage = nil}
+  public mutating func clearInputImage() {_uniqueStorage()._inputImage = nil}
 
   public var maskImage: Data {
-    get {_maskImage ?? Data()}
-    set {_maskImage = newValue}
+    get {_storage._maskImage ?? Data()}
+    set {_uniqueStorage()._maskImage = newValue}
   }
   /// Returns true if `maskImage` has been explicitly set.
-  public var hasMaskImage: Bool {self._maskImage != nil}
+  public var hasMaskImage: Bool {_storage._maskImage != nil}
   /// Clears the value of `maskImage`. Subsequent reads from it will return its default value.
-  public mutating func clearMaskImage() {self._maskImage = nil}
+  public mutating func clearMaskImage() {_uniqueStorage()._maskImage = nil}
 
-  public var denoiseStrength: Float = 0
+  public var denoiseStrength: Float {
+    get {_storage._denoiseStrength}
+    set {_uniqueStorage()._denoiseStrength = newValue}
+  }
 
   /// Progress reporting controls.
-  public var reportIntermediateImages: Bool = false
+  public var reportIntermediateImages: Bool {
+    get {_storage._reportIntermediateImages}
+    set {_uniqueStorage()._reportIntermediateImages = newValue}
+  }
 
-  public var progressStride: Int32 = 0
+  public var progressStride: Int32 {
+    get {_storage._progressStride}
+    set {_uniqueStorage()._progressStride = newValue}
+  }
 
   /// Dimensions for raw input_image payloads when the backend cannot infer
   /// them from an encoded container.
-  public var inputImageWidth: Int32 = 0
+  public var inputImageWidth: Int32 {
+    get {_storage._inputImageWidth}
+    set {_uniqueStorage()._inputImageWidth = newValue}
+  }
 
-  public var inputImageHeight: Int32 = 0
+  public var inputImageHeight: Int32 {
+    get {_storage._inputImageHeight}
+    set {_uniqueStorage()._inputImageHeight = newValue}
+  }
+
+  /// Input image/mask media hints. Empty = backend infer/default.
+  public var inputImageMediaType: String {
+    get {_storage._inputImageMediaType ?? String()}
+    set {_uniqueStorage()._inputImageMediaType = newValue}
+  }
+  /// Returns true if `inputImageMediaType` has been explicitly set.
+  public var hasInputImageMediaType: Bool {_storage._inputImageMediaType != nil}
+  /// Clears the value of `inputImageMediaType`. Subsequent reads from it will return its default value.
+  public mutating func clearInputImageMediaType() {_uniqueStorage()._inputImageMediaType = nil}
+
+  public var maskImageMediaType: String {
+    get {_storage._maskImageMediaType ?? String()}
+    set {_uniqueStorage()._maskImageMediaType = newValue}
+  }
+  /// Returns true if `maskImageMediaType` has been explicitly set.
+  public var hasMaskImageMediaType: Bool {_storage._maskImageMediaType != nil}
+  /// Clears the value of `maskImageMediaType`. Subsequent reads from it will return its default value.
+  public mutating func clearMaskImageMediaType() {_uniqueStorage()._maskImageMediaType = nil}
+
+  /// 0 = one image/backend default
+  public var batchSize: Int32 {
+    get {_storage._batchSize}
+    set {_uniqueStorage()._batchSize = newValue}
+  }
+
+  public var returnLatents: Bool {
+    get {_storage._returnLatents}
+    set {_uniqueStorage()._returnLatents = newValue}
+  }
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _inputImage: Data? = nil
-  fileprivate var _maskImage: Data? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public struct RADiffusionGenerationRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var requestID: String = String()
+
+  public var options: RADiffusionGenerationOptions {
+    get {_options ?? RADiffusionGenerationOptions()}
+    set {_options = newValue}
+  }
+  /// Returns true if `options` has been explicitly set.
+  public var hasOptions: Bool {self._options != nil}
+  /// Clears the value of `options`. Subsequent reads from it will return its default value.
+  public mutating func clearOptions() {self._options = nil}
+
+  public var modelID: String {
+    get {_modelID ?? String()}
+    set {_modelID = newValue}
+  }
+  /// Returns true if `modelID` has been explicitly set.
+  public var hasModelID: Bool {self._modelID != nil}
+  /// Clears the value of `modelID`. Subsequent reads from it will return its default value.
+  public mutating func clearModelID() {self._modelID = nil}
+
+  public var metadata: Dictionary<String,String> = [:]
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _options: RADiffusionGenerationOptions? = nil
+  fileprivate var _modelID: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -638,11 +794,25 @@ public struct RADiffusionProgress: Sendable {
 
   public var intermediateImageHeight: Int32 = 0
 
+  public var timestampMs: Int64 = 0
+
+  public var etaMs: Int64 = 0
+
+  public var intermediateImageMediaType: String {
+    get {_intermediateImageMediaType ?? String()}
+    set {_intermediateImageMediaType = newValue}
+  }
+  /// Returns true if `intermediateImageMediaType` has been explicitly set.
+  public var hasIntermediateImageMediaType: Bool {self._intermediateImageMediaType != nil}
+  /// Clears the value of `intermediateImageMediaType`. Subsequent reads from it will return its default value.
+  public mutating func clearIntermediateImageMediaType() {self._intermediateImageMediaType = nil}
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _intermediateImageData: Data? = nil
+  fileprivate var _intermediateImageMediaType: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -703,11 +873,26 @@ public struct RADiffusionResult: Sendable {
 
   public var errorCode: Int32 = 0
 
+  /// Output image media type, e.g. "image/png" or "image/raw-rgba".
+  public var imageMediaType: String {
+    get {_imageMediaType ?? String()}
+    set {_imageMediaType = newValue}
+  }
+  /// Returns true if `imageMediaType` has been explicitly set.
+  public var hasImageMediaType: Bool {self._imageMediaType != nil}
+  /// Clears the value of `imageMediaType`. Subsequent reads from it will return its default value.
+  public mutating func clearImageMediaType() {self._imageMediaType = nil}
+
+  public var batchImages: [Data] = []
+
+  public var imagesGenerated: Int32 = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _errorMessage: String? = nil
+  fileprivate var _imageMediaType: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -774,11 +959,142 @@ public struct RADiffusionCapabilities: Sendable {
 
   public var safetyCheckerEnabled: Bool = false
 
+  public var supportsBatchGeneration: Bool = false
+
+  public var supportedOutputMediaTypes: [String] = []
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
   fileprivate var _currentModel: String? = nil
+}
+
+public struct RADiffusionStreamEvent: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var seq: UInt64 {
+    get {_storage._seq}
+    set {_uniqueStorage()._seq = newValue}
+  }
+
+  public var timestampUs: Int64 {
+    get {_storage._timestampUs}
+    set {_uniqueStorage()._timestampUs = newValue}
+  }
+
+  public var requestID: String {
+    get {_storage._requestID}
+    set {_uniqueStorage()._requestID = newValue}
+  }
+
+  public var kind: RADiffusionStreamEventKind {
+    get {_storage._kind}
+    set {_uniqueStorage()._kind = newValue}
+  }
+
+  public var progress: RADiffusionProgress {
+    get {_storage._progress ?? RADiffusionProgress()}
+    set {_uniqueStorage()._progress = newValue}
+  }
+  /// Returns true if `progress` has been explicitly set.
+  public var hasProgress: Bool {_storage._progress != nil}
+  /// Clears the value of `progress`. Subsequent reads from it will return its default value.
+  public mutating func clearProgress() {_uniqueStorage()._progress = nil}
+
+  public var result: RADiffusionResult {
+    get {_storage._result ?? RADiffusionResult()}
+    set {_uniqueStorage()._result = newValue}
+  }
+  /// Returns true if `result` has been explicitly set.
+  public var hasResult: Bool {_storage._result != nil}
+  /// Clears the value of `result`. Subsequent reads from it will return its default value.
+  public mutating func clearResult() {_uniqueStorage()._result = nil}
+
+  public var errorMessage: String {
+    get {_storage._errorMessage ?? String()}
+    set {_uniqueStorage()._errorMessage = newValue}
+  }
+  /// Returns true if `errorMessage` has been explicitly set.
+  public var hasErrorMessage: Bool {_storage._errorMessage != nil}
+  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
+  public mutating func clearErrorMessage() {_uniqueStorage()._errorMessage = nil}
+
+  public var errorCode: Int32 {
+    get {_storage._errorCode}
+    set {_uniqueStorage()._errorCode = newValue}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
+}
+
+public struct RADiffusionServiceState: @unchecked Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var isReady: Bool {
+    get {_storage._isReady}
+    set {_uniqueStorage()._isReady = newValue}
+  }
+
+  public var currentModel: String {
+    get {_storage._currentModel ?? String()}
+    set {_uniqueStorage()._currentModel = newValue}
+  }
+  /// Returns true if `currentModel` has been explicitly set.
+  public var hasCurrentModel: Bool {_storage._currentModel != nil}
+  /// Clears the value of `currentModel`. Subsequent reads from it will return its default value.
+  public mutating func clearCurrentModel() {_uniqueStorage()._currentModel = nil}
+
+  public var capabilities: RADiffusionCapabilities {
+    get {_storage._capabilities ?? RADiffusionCapabilities()}
+    set {_uniqueStorage()._capabilities = newValue}
+  }
+  /// Returns true if `capabilities` has been explicitly set.
+  public var hasCapabilities: Bool {_storage._capabilities != nil}
+  /// Clears the value of `capabilities`. Subsequent reads from it will return its default value.
+  public mutating func clearCapabilities() {_uniqueStorage()._capabilities = nil}
+
+  public var isGenerating: Bool {
+    get {_storage._isGenerating}
+    set {_uniqueStorage()._isGenerating = newValue}
+  }
+
+  public var activeRequestID: String {
+    get {_storage._activeRequestID ?? String()}
+    set {_uniqueStorage()._activeRequestID = newValue}
+  }
+  /// Returns true if `activeRequestID` has been explicitly set.
+  public var hasActiveRequestID: Bool {_storage._activeRequestID != nil}
+  /// Clears the value of `activeRequestID`. Subsequent reads from it will return its default value.
+  public mutating func clearActiveRequestID() {_uniqueStorage()._activeRequestID = nil}
+
+  public var errorMessage: String {
+    get {_storage._errorMessage ?? String()}
+    set {_uniqueStorage()._errorMessage = newValue}
+  }
+  /// Returns true if `errorMessage` has been explicitly set.
+  public var hasErrorMessage: Bool {_storage._errorMessage != nil}
+  /// Clears the value of `errorMessage`. Subsequent reads from it will return its default value.
+  public mutating func clearErrorMessage() {_uniqueStorage()._errorMessage = nil}
+
+  public var errorCode: Int32 {
+    get {_storage._errorCode}
+    set {_uniqueStorage()._errorCode = newValue}
+  }
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
@@ -799,6 +1115,10 @@ extension RADiffusionModelVariant: SwiftProtobuf._ProtoNameProviding {
 
 extension RADiffusionTokenizerSourceKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DIFFUSION_TOKENIZER_SOURCE_KIND_UNSPECIFIED\0\u{1}DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD15\0\u{1}DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SD2\0\u{1}DIFFUSION_TOKENIZER_SOURCE_KIND_BUNDLED_SDXL\0\u{1}DIFFUSION_TOKENIZER_SOURCE_KIND_CUSTOM\0")
+}
+
+extension RADiffusionStreamEventKind: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}DIFFUSION_STREAM_EVENT_KIND_STARTED\0\u{1}DIFFUSION_STREAM_EVENT_KIND_PROGRESS\0\u{1}DIFFUSION_STREAM_EVENT_KIND_INTERMEDIATE_IMAGE\0\u{1}DIFFUSION_STREAM_EVENT_KIND_COMPLETED\0\u{1}DIFFUSION_STREAM_EVENT_KIND_ERROR\0")
 }
 
 extension RADiffusionTokenizerSource: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -960,7 +1280,210 @@ extension RADiffusionConfig: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
 
 extension RADiffusionGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionGenerationOptions"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}negative_prompt\0\u{1}width\0\u{1}height\0\u{3}num_inference_steps\0\u{3}guidance_scale\0\u{1}seed\0\u{1}scheduler\0\u{1}mode\0\u{3}input_image\0\u{3}mask_image\0\u{3}denoise_strength\0\u{3}report_intermediate_images\0\u{3}progress_stride\0\u{3}input_image_width\0\u{3}input_image_height\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{3}negative_prompt\0\u{1}width\0\u{1}height\0\u{3}num_inference_steps\0\u{3}guidance_scale\0\u{1}seed\0\u{1}scheduler\0\u{1}mode\0\u{3}input_image\0\u{3}mask_image\0\u{3}denoise_strength\0\u{3}report_intermediate_images\0\u{3}progress_stride\0\u{3}input_image_width\0\u{3}input_image_height\0\u{3}input_image_media_type\0\u{3}mask_image_media_type\0\u{3}batch_size\0\u{3}return_latents\0")
+
+  fileprivate class _StorageClass {
+    var _prompt: String = String()
+    var _negativePrompt: String = String()
+    var _width: Int32 = 0
+    var _height: Int32 = 0
+    var _numInferenceSteps: Int32 = 0
+    var _guidanceScale: Float = 0
+    var _seed: Int64 = 0
+    var _scheduler: RADiffusionScheduler = .unspecified
+    var _mode: RADiffusionMode = .unspecified
+    var _inputImage: Data? = nil
+    var _maskImage: Data? = nil
+    var _denoiseStrength: Float = 0
+    var _reportIntermediateImages: Bool = false
+    var _progressStride: Int32 = 0
+    var _inputImageWidth: Int32 = 0
+    var _inputImageHeight: Int32 = 0
+    var _inputImageMediaType: String? = nil
+    var _maskImageMediaType: String? = nil
+    var _batchSize: Int32 = 0
+    var _returnLatents: Bool = false
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _prompt = source._prompt
+      _negativePrompt = source._negativePrompt
+      _width = source._width
+      _height = source._height
+      _numInferenceSteps = source._numInferenceSteps
+      _guidanceScale = source._guidanceScale
+      _seed = source._seed
+      _scheduler = source._scheduler
+      _mode = source._mode
+      _inputImage = source._inputImage
+      _maskImage = source._maskImage
+      _denoiseStrength = source._denoiseStrength
+      _reportIntermediateImages = source._reportIntermediateImages
+      _progressStride = source._progressStride
+      _inputImageWidth = source._inputImageWidth
+      _inputImageHeight = source._inputImageHeight
+      _inputImageMediaType = source._inputImageMediaType
+      _maskImageMediaType = source._maskImageMediaType
+      _batchSize = source._batchSize
+      _returnLatents = source._returnLatents
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularStringField(value: &_storage._prompt) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._negativePrompt) }()
+        case 3: try { try decoder.decodeSingularInt32Field(value: &_storage._width) }()
+        case 4: try { try decoder.decodeSingularInt32Field(value: &_storage._height) }()
+        case 5: try { try decoder.decodeSingularInt32Field(value: &_storage._numInferenceSteps) }()
+        case 6: try { try decoder.decodeSingularFloatField(value: &_storage._guidanceScale) }()
+        case 7: try { try decoder.decodeSingularInt64Field(value: &_storage._seed) }()
+        case 8: try { try decoder.decodeSingularEnumField(value: &_storage._scheduler) }()
+        case 9: try { try decoder.decodeSingularEnumField(value: &_storage._mode) }()
+        case 10: try { try decoder.decodeSingularBytesField(value: &_storage._inputImage) }()
+        case 11: try { try decoder.decodeSingularBytesField(value: &_storage._maskImage) }()
+        case 12: try { try decoder.decodeSingularFloatField(value: &_storage._denoiseStrength) }()
+        case 13: try { try decoder.decodeSingularBoolField(value: &_storage._reportIntermediateImages) }()
+        case 14: try { try decoder.decodeSingularInt32Field(value: &_storage._progressStride) }()
+        case 15: try { try decoder.decodeSingularInt32Field(value: &_storage._inputImageWidth) }()
+        case 16: try { try decoder.decodeSingularInt32Field(value: &_storage._inputImageHeight) }()
+        case 17: try { try decoder.decodeSingularStringField(value: &_storage._inputImageMediaType) }()
+        case 18: try { try decoder.decodeSingularStringField(value: &_storage._maskImageMediaType) }()
+        case 19: try { try decoder.decodeSingularInt32Field(value: &_storage._batchSize) }()
+        case 20: try { try decoder.decodeSingularBoolField(value: &_storage._returnLatents) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._prompt.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._prompt, fieldNumber: 1)
+      }
+      if !_storage._negativePrompt.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._negativePrompt, fieldNumber: 2)
+      }
+      if _storage._width != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._width, fieldNumber: 3)
+      }
+      if _storage._height != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._height, fieldNumber: 4)
+      }
+      if _storage._numInferenceSteps != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._numInferenceSteps, fieldNumber: 5)
+      }
+      if _storage._guidanceScale.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._guidanceScale, fieldNumber: 6)
+      }
+      if _storage._seed != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._seed, fieldNumber: 7)
+      }
+      if _storage._scheduler != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._scheduler, fieldNumber: 8)
+      }
+      if _storage._mode != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._mode, fieldNumber: 9)
+      }
+      try { if let v = _storage._inputImage {
+        try visitor.visitSingularBytesField(value: v, fieldNumber: 10)
+      } }()
+      try { if let v = _storage._maskImage {
+        try visitor.visitSingularBytesField(value: v, fieldNumber: 11)
+      } }()
+      if _storage._denoiseStrength.bitPattern != 0 {
+        try visitor.visitSingularFloatField(value: _storage._denoiseStrength, fieldNumber: 12)
+      }
+      if _storage._reportIntermediateImages != false {
+        try visitor.visitSingularBoolField(value: _storage._reportIntermediateImages, fieldNumber: 13)
+      }
+      if _storage._progressStride != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._progressStride, fieldNumber: 14)
+      }
+      if _storage._inputImageWidth != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._inputImageWidth, fieldNumber: 15)
+      }
+      if _storage._inputImageHeight != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._inputImageHeight, fieldNumber: 16)
+      }
+      try { if let v = _storage._inputImageMediaType {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 17)
+      } }()
+      try { if let v = _storage._maskImageMediaType {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 18)
+      } }()
+      if _storage._batchSize != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._batchSize, fieldNumber: 19)
+      }
+      if _storage._returnLatents != false {
+        try visitor.visitSingularBoolField(value: _storage._returnLatents, fieldNumber: 20)
+      }
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RADiffusionGenerationOptions, rhs: RADiffusionGenerationOptions) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._prompt != rhs_storage._prompt {return false}
+        if _storage._negativePrompt != rhs_storage._negativePrompt {return false}
+        if _storage._width != rhs_storage._width {return false}
+        if _storage._height != rhs_storage._height {return false}
+        if _storage._numInferenceSteps != rhs_storage._numInferenceSteps {return false}
+        if _storage._guidanceScale != rhs_storage._guidanceScale {return false}
+        if _storage._seed != rhs_storage._seed {return false}
+        if _storage._scheduler != rhs_storage._scheduler {return false}
+        if _storage._mode != rhs_storage._mode {return false}
+        if _storage._inputImage != rhs_storage._inputImage {return false}
+        if _storage._maskImage != rhs_storage._maskImage {return false}
+        if _storage._denoiseStrength != rhs_storage._denoiseStrength {return false}
+        if _storage._reportIntermediateImages != rhs_storage._reportIntermediateImages {return false}
+        if _storage._progressStride != rhs_storage._progressStride {return false}
+        if _storage._inputImageWidth != rhs_storage._inputImageWidth {return false}
+        if _storage._inputImageHeight != rhs_storage._inputImageHeight {return false}
+        if _storage._inputImageMediaType != rhs_storage._inputImageMediaType {return false}
+        if _storage._maskImageMediaType != rhs_storage._maskImageMediaType {return false}
+        if _storage._batchSize != rhs_storage._batchSize {return false}
+        if _storage._returnLatents != rhs_storage._returnLatents {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RADiffusionGenerationRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DiffusionGenerationRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}request_id\0\u{1}options\0\u{3}model_id\0\u{1}metadata\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -968,22 +1491,10 @@ extension RADiffusionGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._Me
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.prompt) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.negativePrompt) }()
-      case 3: try { try decoder.decodeSingularInt32Field(value: &self.width) }()
-      case 4: try { try decoder.decodeSingularInt32Field(value: &self.height) }()
-      case 5: try { try decoder.decodeSingularInt32Field(value: &self.numInferenceSteps) }()
-      case 6: try { try decoder.decodeSingularFloatField(value: &self.guidanceScale) }()
-      case 7: try { try decoder.decodeSingularInt64Field(value: &self.seed) }()
-      case 8: try { try decoder.decodeSingularEnumField(value: &self.scheduler) }()
-      case 9: try { try decoder.decodeSingularEnumField(value: &self.mode) }()
-      case 10: try { try decoder.decodeSingularBytesField(value: &self._inputImage) }()
-      case 11: try { try decoder.decodeSingularBytesField(value: &self._maskImage) }()
-      case 12: try { try decoder.decodeSingularFloatField(value: &self.denoiseStrength) }()
-      case 13: try { try decoder.decodeSingularBoolField(value: &self.reportIntermediateImages) }()
-      case 14: try { try decoder.decodeSingularInt32Field(value: &self.progressStride) }()
-      case 15: try { try decoder.decodeSingularInt32Field(value: &self.inputImageWidth) }()
-      case 16: try { try decoder.decodeSingularInt32Field(value: &self.inputImageHeight) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.requestID) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._options) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._modelID) }()
+      case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
       default: break
       }
     }
@@ -994,74 +1505,26 @@ extension RADiffusionGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._Me
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.prompt.isEmpty {
-      try visitor.visitSingularStringField(value: self.prompt, fieldNumber: 1)
+    if !self.requestID.isEmpty {
+      try visitor.visitSingularStringField(value: self.requestID, fieldNumber: 1)
     }
-    if !self.negativePrompt.isEmpty {
-      try visitor.visitSingularStringField(value: self.negativePrompt, fieldNumber: 2)
-    }
-    if self.width != 0 {
-      try visitor.visitSingularInt32Field(value: self.width, fieldNumber: 3)
-    }
-    if self.height != 0 {
-      try visitor.visitSingularInt32Field(value: self.height, fieldNumber: 4)
-    }
-    if self.numInferenceSteps != 0 {
-      try visitor.visitSingularInt32Field(value: self.numInferenceSteps, fieldNumber: 5)
-    }
-    if self.guidanceScale.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.guidanceScale, fieldNumber: 6)
-    }
-    if self.seed != 0 {
-      try visitor.visitSingularInt64Field(value: self.seed, fieldNumber: 7)
-    }
-    if self.scheduler != .unspecified {
-      try visitor.visitSingularEnumField(value: self.scheduler, fieldNumber: 8)
-    }
-    if self.mode != .unspecified {
-      try visitor.visitSingularEnumField(value: self.mode, fieldNumber: 9)
-    }
-    try { if let v = self._inputImage {
-      try visitor.visitSingularBytesField(value: v, fieldNumber: 10)
+    try { if let v = self._options {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
-    try { if let v = self._maskImage {
-      try visitor.visitSingularBytesField(value: v, fieldNumber: 11)
+    try { if let v = self._modelID {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
     } }()
-    if self.denoiseStrength.bitPattern != 0 {
-      try visitor.visitSingularFloatField(value: self.denoiseStrength, fieldNumber: 12)
-    }
-    if self.reportIntermediateImages != false {
-      try visitor.visitSingularBoolField(value: self.reportIntermediateImages, fieldNumber: 13)
-    }
-    if self.progressStride != 0 {
-      try visitor.visitSingularInt32Field(value: self.progressStride, fieldNumber: 14)
-    }
-    if self.inputImageWidth != 0 {
-      try visitor.visitSingularInt32Field(value: self.inputImageWidth, fieldNumber: 15)
-    }
-    if self.inputImageHeight != 0 {
-      try visitor.visitSingularInt32Field(value: self.inputImageHeight, fieldNumber: 16)
+    if !self.metadata.isEmpty {
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 4)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  public static func ==(lhs: RADiffusionGenerationOptions, rhs: RADiffusionGenerationOptions) -> Bool {
-    if lhs.prompt != rhs.prompt {return false}
-    if lhs.negativePrompt != rhs.negativePrompt {return false}
-    if lhs.width != rhs.width {return false}
-    if lhs.height != rhs.height {return false}
-    if lhs.numInferenceSteps != rhs.numInferenceSteps {return false}
-    if lhs.guidanceScale != rhs.guidanceScale {return false}
-    if lhs.seed != rhs.seed {return false}
-    if lhs.scheduler != rhs.scheduler {return false}
-    if lhs.mode != rhs.mode {return false}
-    if lhs._inputImage != rhs._inputImage {return false}
-    if lhs._maskImage != rhs._maskImage {return false}
-    if lhs.denoiseStrength != rhs.denoiseStrength {return false}
-    if lhs.reportIntermediateImages != rhs.reportIntermediateImages {return false}
-    if lhs.progressStride != rhs.progressStride {return false}
-    if lhs.inputImageWidth != rhs.inputImageWidth {return false}
-    if lhs.inputImageHeight != rhs.inputImageHeight {return false}
+  public static func ==(lhs: RADiffusionGenerationRequest, rhs: RADiffusionGenerationRequest) -> Bool {
+    if lhs.requestID != rhs.requestID {return false}
+    if lhs._options != rhs._options {return false}
+    if lhs._modelID != rhs._modelID {return false}
+    if lhs.metadata != rhs.metadata {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1069,7 +1532,7 @@ extension RADiffusionGenerationOptions: SwiftProtobuf.Message, SwiftProtobuf._Me
 
 extension RADiffusionProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionProgress"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}progress_percent\0\u{3}current_step\0\u{3}total_steps\0\u{1}stage\0\u{3}intermediate_image_data\0\u{3}intermediate_image_width\0\u{3}intermediate_image_height\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}progress_percent\0\u{3}current_step\0\u{3}total_steps\0\u{1}stage\0\u{3}intermediate_image_data\0\u{3}intermediate_image_width\0\u{3}intermediate_image_height\0\u{3}timestamp_ms\0\u{3}eta_ms\0\u{3}intermediate_image_media_type\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1084,6 +1547,9 @@ extension RADiffusionProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
       case 5: try { try decoder.decodeSingularBytesField(value: &self._intermediateImageData) }()
       case 6: try { try decoder.decodeSingularInt32Field(value: &self.intermediateImageWidth) }()
       case 7: try { try decoder.decodeSingularInt32Field(value: &self.intermediateImageHeight) }()
+      case 8: try { try decoder.decodeSingularInt64Field(value: &self.timestampMs) }()
+      case 9: try { try decoder.decodeSingularInt64Field(value: &self.etaMs) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self._intermediateImageMediaType) }()
       default: break
       }
     }
@@ -1115,6 +1581,15 @@ extension RADiffusionProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     if self.intermediateImageHeight != 0 {
       try visitor.visitSingularInt32Field(value: self.intermediateImageHeight, fieldNumber: 7)
     }
+    if self.timestampMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.timestampMs, fieldNumber: 8)
+    }
+    if self.etaMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.etaMs, fieldNumber: 9)
+    }
+    try { if let v = self._intermediateImageMediaType {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 10)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1126,6 +1601,9 @@ extension RADiffusionProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     if lhs._intermediateImageData != rhs._intermediateImageData {return false}
     if lhs.intermediateImageWidth != rhs.intermediateImageWidth {return false}
     if lhs.intermediateImageHeight != rhs.intermediateImageHeight {return false}
+    if lhs.timestampMs != rhs.timestampMs {return false}
+    if lhs.etaMs != rhs.etaMs {return false}
+    if lhs._intermediateImageMediaType != rhs._intermediateImageMediaType {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1133,7 +1611,7 @@ extension RADiffusionProgress: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
 
 extension RADiffusionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}image_data\0\u{1}width\0\u{1}height\0\u{3}seed_used\0\u{3}total_time_ms\0\u{3}safety_flag\0\u{3}used_scheduler\0\u{3}error_message\0\u{3}error_code\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}image_data\0\u{1}width\0\u{1}height\0\u{3}seed_used\0\u{3}total_time_ms\0\u{3}safety_flag\0\u{3}used_scheduler\0\u{3}error_message\0\u{3}error_code\0\u{3}image_media_type\0\u{3}batch_images\0\u{3}images_generated\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1150,6 +1628,9 @@ extension RADiffusionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       case 7: try { try decoder.decodeSingularEnumField(value: &self.usedScheduler) }()
       case 8: try { try decoder.decodeSingularStringField(value: &self._errorMessage) }()
       case 9: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self._imageMediaType) }()
+      case 11: try { try decoder.decodeRepeatedBytesField(value: &self.batchImages) }()
+      case 12: try { try decoder.decodeSingularInt32Field(value: &self.imagesGenerated) }()
       default: break
       }
     }
@@ -1187,6 +1668,15 @@ extension RADiffusionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if self.errorCode != 0 {
       try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 9)
     }
+    try { if let v = self._imageMediaType {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 10)
+    } }()
+    if !self.batchImages.isEmpty {
+      try visitor.visitRepeatedBytesField(value: self.batchImages, fieldNumber: 11)
+    }
+    if self.imagesGenerated != 0 {
+      try visitor.visitSingularInt32Field(value: self.imagesGenerated, fieldNumber: 12)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1200,6 +1690,9 @@ extension RADiffusionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if lhs.usedScheduler != rhs.usedScheduler {return false}
     if lhs._errorMessage != rhs._errorMessage {return false}
     if lhs.errorCode != rhs.errorCode {return false}
+    if lhs._imageMediaType != rhs._imageMediaType {return false}
+    if lhs.batchImages != rhs.batchImages {return false}
+    if lhs.imagesGenerated != rhs.imagesGenerated {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1207,7 +1700,7 @@ extension RADiffusionResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
 
 extension RADiffusionCapabilities: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".DiffusionCapabilities"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}supported_variants\0\u{3}supported_schedulers\0\u{3}max_resolution_px\0\u{3}supported_modes\0\u{3}max_width_px\0\u{3}max_height_px\0\u{3}supports_intermediate_images\0\u{3}supports_safety_checker\0\u{3}is_ready\0\u{3}current_model\0\u{3}safety_checker_enabled\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}supported_variants\0\u{3}supported_schedulers\0\u{3}max_resolution_px\0\u{3}supported_modes\0\u{3}max_width_px\0\u{3}max_height_px\0\u{3}supports_intermediate_images\0\u{3}supports_safety_checker\0\u{3}is_ready\0\u{3}current_model\0\u{3}safety_checker_enabled\0\u{3}supports_batch_generation\0\u{3}supported_output_media_types\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1226,6 +1719,8 @@ extension RADiffusionCapabilities: SwiftProtobuf.Message, SwiftProtobuf._Message
       case 9: try { try decoder.decodeSingularBoolField(value: &self.isReady) }()
       case 10: try { try decoder.decodeSingularStringField(value: &self._currentModel) }()
       case 11: try { try decoder.decodeSingularBoolField(value: &self.safetyCheckerEnabled) }()
+      case 12: try { try decoder.decodeSingularBoolField(value: &self.supportsBatchGeneration) }()
+      case 13: try { try decoder.decodeRepeatedStringField(value: &self.supportedOutputMediaTypes) }()
       default: break
       }
     }
@@ -1269,6 +1764,12 @@ extension RADiffusionCapabilities: SwiftProtobuf.Message, SwiftProtobuf._Message
     if self.safetyCheckerEnabled != false {
       try visitor.visitSingularBoolField(value: self.safetyCheckerEnabled, fieldNumber: 11)
     }
+    if self.supportsBatchGeneration != false {
+      try visitor.visitSingularBoolField(value: self.supportsBatchGeneration, fieldNumber: 12)
+    }
+    if !self.supportedOutputMediaTypes.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.supportedOutputMediaTypes, fieldNumber: 13)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1284,6 +1785,239 @@ extension RADiffusionCapabilities: SwiftProtobuf.Message, SwiftProtobuf._Message
     if lhs.isReady != rhs.isReady {return false}
     if lhs._currentModel != rhs._currentModel {return false}
     if lhs.safetyCheckerEnabled != rhs.safetyCheckerEnabled {return false}
+    if lhs.supportsBatchGeneration != rhs.supportsBatchGeneration {return false}
+    if lhs.supportedOutputMediaTypes != rhs.supportedOutputMediaTypes {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RADiffusionStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DiffusionStreamEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}seq\0\u{3}timestamp_us\0\u{3}request_id\0\u{1}kind\0\u{1}progress\0\u{1}result\0\u{3}error_message\0\u{3}error_code\0")
+
+  fileprivate class _StorageClass {
+    var _seq: UInt64 = 0
+    var _timestampUs: Int64 = 0
+    var _requestID: String = String()
+    var _kind: RADiffusionStreamEventKind = .unspecified
+    var _progress: RADiffusionProgress? = nil
+    var _result: RADiffusionResult? = nil
+    var _errorMessage: String? = nil
+    var _errorCode: Int32 = 0
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _seq = source._seq
+      _timestampUs = source._timestampUs
+      _requestID = source._requestID
+      _kind = source._kind
+      _progress = source._progress
+      _result = source._result
+      _errorMessage = source._errorMessage
+      _errorCode = source._errorCode
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularUInt64Field(value: &_storage._seq) }()
+        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
+        case 3: try { try decoder.decodeSingularStringField(value: &_storage._requestID) }()
+        case 4: try { try decoder.decodeSingularEnumField(value: &_storage._kind) }()
+        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._progress) }()
+        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._result) }()
+        case 7: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
+        case 8: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCode) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._seq != 0 {
+        try visitor.visitSingularUInt64Field(value: _storage._seq, fieldNumber: 1)
+      }
+      if _storage._timestampUs != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._timestampUs, fieldNumber: 2)
+      }
+      if !_storage._requestID.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._requestID, fieldNumber: 3)
+      }
+      if _storage._kind != .unspecified {
+        try visitor.visitSingularEnumField(value: _storage._kind, fieldNumber: 4)
+      }
+      try { if let v = _storage._progress {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+      } }()
+      try { if let v = _storage._result {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+      } }()
+      try { if let v = _storage._errorMessage {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 7)
+      } }()
+      if _storage._errorCode != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._errorCode, fieldNumber: 8)
+      }
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RADiffusionStreamEvent, rhs: RADiffusionStreamEvent) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._seq != rhs_storage._seq {return false}
+        if _storage._timestampUs != rhs_storage._timestampUs {return false}
+        if _storage._requestID != rhs_storage._requestID {return false}
+        if _storage._kind != rhs_storage._kind {return false}
+        if _storage._progress != rhs_storage._progress {return false}
+        if _storage._result != rhs_storage._result {return false}
+        if _storage._errorMessage != rhs_storage._errorMessage {return false}
+        if _storage._errorCode != rhs_storage._errorCode {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RADiffusionServiceState: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".DiffusionServiceState"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_ready\0\u{3}current_model\0\u{1}capabilities\0\u{3}is_generating\0\u{3}active_request_id\0\u{3}error_message\0\u{3}error_code\0")
+
+  fileprivate class _StorageClass {
+    var _isReady: Bool = false
+    var _currentModel: String? = nil
+    var _capabilities: RADiffusionCapabilities? = nil
+    var _isGenerating: Bool = false
+    var _activeRequestID: String? = nil
+    var _errorMessage: String? = nil
+    var _errorCode: Int32 = 0
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _isReady = source._isReady
+      _currentModel = source._currentModel
+      _capabilities = source._capabilities
+      _isGenerating = source._isGenerating
+      _activeRequestID = source._activeRequestID
+      _errorMessage = source._errorMessage
+      _errorCode = source._errorCode
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularBoolField(value: &_storage._isReady) }()
+        case 2: try { try decoder.decodeSingularStringField(value: &_storage._currentModel) }()
+        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._capabilities) }()
+        case 4: try { try decoder.decodeSingularBoolField(value: &_storage._isGenerating) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._activeRequestID) }()
+        case 6: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
+        case 7: try { try decoder.decodeSingularInt32Field(value: &_storage._errorCode) }()
+        default: break
+        }
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._isReady != false {
+        try visitor.visitSingularBoolField(value: _storage._isReady, fieldNumber: 1)
+      }
+      try { if let v = _storage._currentModel {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 2)
+      } }()
+      try { if let v = _storage._capabilities {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      } }()
+      if _storage._isGenerating != false {
+        try visitor.visitSingularBoolField(value: _storage._isGenerating, fieldNumber: 4)
+      }
+      try { if let v = _storage._activeRequestID {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 5)
+      } }()
+      try { if let v = _storage._errorMessage {
+        try visitor.visitSingularStringField(value: v, fieldNumber: 6)
+      } }()
+      if _storage._errorCode != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._errorCode, fieldNumber: 7)
+      }
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RADiffusionServiceState, rhs: RADiffusionServiceState) -> Bool {
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._isReady != rhs_storage._isReady {return false}
+        if _storage._currentModel != rhs_storage._currentModel {return false}
+        if _storage._capabilities != rhs_storage._capabilities {return false}
+        if _storage._isGenerating != rhs_storage._isGenerating {return false}
+        if _storage._activeRequestID != rhs_storage._activeRequestID {return false}
+        if _storage._errorMessage != rhs_storage._errorMessage {return false}
+        if _storage._errorCode != rhs_storage._errorCode {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

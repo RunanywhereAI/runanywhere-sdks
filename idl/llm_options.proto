@@ -22,6 +22,7 @@ package runanywhere.v1;
 
 import "model_types.proto";
 import "structured_output.proto";
+import "tool_calling.proto";
 
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
@@ -90,6 +91,35 @@ message LLMGenerationOptions {
     // Enable per-token/cost dashboard tracking for SDKs that surface live
     // generation telemetry. No-op for backends without a telemetry sink.
     bool enable_real_time_tracking = 14;
+
+    // Deterministic sampling seed. 0 = backend/default random seed.
+    int64 seed = 15;
+
+    // OpenAI-compatible sampling penalties. 0.0 = disabled.
+    float frequency_penalty = 16;
+    float presence_penalty = 17;
+
+    // Repeat-penalty lookback window. 0 = backend default.
+    int32 repeat_last_n = 18;
+
+    // Minimum probability sampling. 0.0 = disabled.
+    float min_p = 19;
+
+    // Grammar or constrained-decoding rule text (GBNF/regex/backend-specific).
+    optional string grammar = 20;
+
+    // Caller-visible format hint: "text", "json_object", "json_schema", etc.
+    optional string response_format = 21;
+
+    // Include prompt text in the result/stream when the backend supports echo.
+    bool echo_prompt = 22;
+
+    // Per-request backend thread hint. 0 = backend/runtime default.
+    int32 n_threads = 23;
+
+    // Tool-calling contract for this generation. The SDK owns executor
+    // functions; proto carries only definitions and parser options.
+    optional ToolCallingOptions tool_calling = 24;
 }
 
 // ---------------------------------------------------------------------------
@@ -160,6 +190,55 @@ message LLMGenerationResult {
     // Backend error text for result-producing APIs that return a terminal
     // result envelope instead of throwing through the host language.
     optional string error_message = 18;
+
+    // Numeric backend status code when a result envelope carries an error.
+    int32 error_code = 19;
+
+    // Prompt/cache accounting surfaced by llama.cpp/CoreML-style backends.
+    int32 cached_prompt_tokens = 20;
+    int64 prompt_eval_time_ms = 21;
+    int64 decode_time_ms = 22;
+
+    // Tool calls parsed from the final assistant response, if any.
+    repeated ToolCall tool_calls = 23;
+
+    // Tool results incorporated during auto-execute loops.
+    repeated ToolResult tool_results = 24;
+}
+
+// Request envelope for one non-streaming LLM generation call. This is the
+// proto-owned DTO SDKs can use instead of parallel prompt/options tuples.
+message LLMGenerationRequest {
+    string request_id = 1;
+    string model_id = 2;
+    string prompt = 3;
+    optional LLMGenerationOptions options = 4;
+    repeated string context_chunks = 5;
+    map<string, string> metadata = 6;
+    optional string conversation_id = 7;
+}
+
+enum LLMGenerationState {
+    LLM_GENERATION_STATE_UNSPECIFIED = 0;
+    LLM_GENERATION_STATE_QUEUED = 1;
+    LLM_GENERATION_STATE_PREFILLING = 2;
+    LLM_GENERATION_STATE_DECODING = 3;
+    LLM_GENERATION_STATE_TOOL_CALLING = 4;
+    LLM_GENERATION_STATE_COMPLETED = 5;
+    LLM_GENERATION_STATE_CANCELLED = 6;
+    LLM_GENERATION_STATE_FAILED = 7;
+}
+
+message LLMGenerationStatus {
+    string request_id = 1;
+    LLMGenerationState state = 2;
+    int32 prompt_tokens_processed = 3;
+    int32 completion_tokens_generated = 4;
+    float progress = 5;
+    int64 elapsed_ms = 6;
+    optional string message = 7;
+    optional string error_message = 8;
+    int32 error_code = 9;
 }
 
 // ---------------------------------------------------------------------------

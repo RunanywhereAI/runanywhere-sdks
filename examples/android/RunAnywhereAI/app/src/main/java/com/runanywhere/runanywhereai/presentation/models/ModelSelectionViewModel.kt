@@ -1,20 +1,19 @@
 package com.runanywhere.runanywhereai.presentation.models
 
+import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelEventKind
+import ai.runanywhere.proto.v1.ModelInfo
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import ai.runanywhere.proto.v1.ModelEventKind
-import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.models.DeviceInfo
 import com.runanywhere.sdk.models.collectDeviceInfo
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
-import com.runanywhere.sdk.public.events.ModelEvent
-import com.runanywhere.sdk.public.extensions.Models.ModelCategory
-import com.runanywhere.sdk.public.extensions.Models.ModelInfo
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
+import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.availableModels
-// Round 3 KOTLIN: currentLLMModel is now a sync val property.
 import com.runanywhere.sdk.public.extensions.currentLLMModel
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
@@ -125,8 +124,8 @@ class ModelSelectionViewModel(
                         .toMutableList()
 
                 // For TTS context, ensure System TTS is included (matches iOS behavior)
-                if (context == ModelSelectionContext.TTS && !relevantFrameworks.contains(InferenceFramework.SYSTEM_TTS)) {
-                    relevantFrameworks.add(0, InferenceFramework.SYSTEM_TTS)
+                if (context == ModelSelectionContext.TTS && !relevantFrameworks.contains(InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS)) {
+                    relevantFrameworks.add(0, InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS)
                     Timber.d("📱 Added System TTS for TTS context")
                 }
 
@@ -201,23 +200,23 @@ class ModelSelectionViewModel(
         ctx: ModelSelectionContext,
     ): Boolean {
         return when (ctx) {
-            ModelSelectionContext.LLM -> category == ModelCategory.LANGUAGE
-            ModelSelectionContext.STT -> category == ModelCategory.SPEECH_RECOGNITION
-            ModelSelectionContext.TTS -> category == ModelCategory.SPEECH_SYNTHESIS
+            ModelSelectionContext.LLM -> category == ModelCategory.MODEL_CATEGORY_LANGUAGE
+            ModelSelectionContext.STT -> category == ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+            ModelSelectionContext.TTS -> category == ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
             ModelSelectionContext.VOICE ->
                 category in
                     listOf(
-                        ModelCategory.LANGUAGE,
-                        ModelCategory.SPEECH_RECOGNITION,
-                        ModelCategory.SPEECH_SYNTHESIS,
+                        ModelCategory.MODEL_CATEGORY_LANGUAGE,
+                        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+                        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
                     )
             ModelSelectionContext.RAG_EMBEDDING ->
-                category == ModelCategory.EMBEDDING
+                category == ModelCategory.MODEL_CATEGORY_EMBEDDING
             ModelSelectionContext.RAG_LLM ->
-                category == ModelCategory.LANGUAGE
+                category == ModelCategory.MODEL_CATEGORY_LANGUAGE
             ModelSelectionContext.VLM ->
-                category == ModelCategory.MULTIMODAL ||
-                    category == ModelCategory.VISION
+                category == ModelCategory.MODEL_CATEGORY_MULTIMODAL ||
+                    category == ModelCategory.MODEL_CATEGORY_VISION
         }
     }
 
@@ -342,8 +341,8 @@ class ModelSelectionViewModel(
                 ModelSelectionContext.VOICE -> {
                     val model = _uiState.value.models.find { it.id == modelId }
                     when (model?.category) {
-                        ModelCategory.SPEECH_RECOGNITION -> RunAnywhere.loadSTTModel(modelId)
-                        ModelCategory.SPEECH_SYNTHESIS -> RunAnywhere.loadTTSVoice(modelId)
+                        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> RunAnywhere.loadSTTModel(modelId)
+                        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> RunAnywhere.loadTTSVoice(modelId)
                         else -> RunAnywhere.loadLLMModel(modelId)
                     }
                 }

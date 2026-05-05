@@ -5,6 +5,14 @@
  * Actor-based embeddings capability that owns model lifecycle
  * and embedding generation. Uses lifecycle manager for unified
  * lifecycle + analytics handling.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Struct APIs (rac_embeddings_component_create, configure,
+ *     load_model, unload, cleanup, embed, embed_batch, get_state,
+ *     get_metrics, destroy): `delete after SDK migration` for SDK
+ *     callers — replaced by rac_embeddings_embed_batch_proto and
+ *     rac_embeddings_embed_batch_lifecycle_proto over generated
+ *     EmbeddingsRequest / EmbeddingsResult bytes.
  */
 
 #ifndef RAC_EMBEDDINGS_COMPONENT_H

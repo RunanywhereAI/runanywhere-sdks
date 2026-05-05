@@ -20,6 +20,7 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
+import kotlin.Double
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -96,6 +97,62 @@ public class JSONSchemaProperty(
     schemaIndex = 5,
   )
   public val object_schema: JSONSchema? = null,
+  /**
+   * Common validation constraints carried by RN/Web schema builders.
+   */
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
+    schemaIndex = 6,
+  )
+  public val minimum: Double? = null,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#DOUBLE",
+    schemaIndex = 7,
+  )
+  public val maximum: Double? = null,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    jsonName = "minLength",
+    schemaIndex = 8,
+  )
+  public val min_length: Int? = null,
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    jsonName = "maxLength",
+    schemaIndex = 9,
+  )
+  public val max_length: Int? = null,
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    schemaIndex = 10,
+  )
+  public val pattern: String? = null,
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    jsonName = "minItems",
+    schemaIndex = 11,
+  )
+  public val min_items: Int? = null,
+  @field:WireField(
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    jsonName = "maxItems",
+    schemaIndex = 12,
+  )
+  public val max_items: Int? = null,
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "defaultJson",
+    schemaIndex = 13,
+  )
+  public val default_json: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<JSONSchemaProperty, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -128,6 +185,14 @@ public class JSONSchemaProperty(
     if (format != other.format) return false
     if (items_schema != other.items_schema) return false
     if (object_schema != other.object_schema) return false
+    if (minimum != other.minimum) return false
+    if (maximum != other.maximum) return false
+    if (min_length != other.min_length) return false
+    if (max_length != other.max_length) return false
+    if (pattern != other.pattern) return false
+    if (min_items != other.min_items) return false
+    if (max_items != other.max_items) return false
+    if (default_json != other.default_json) return false
     return true
   }
 
@@ -141,6 +206,14 @@ public class JSONSchemaProperty(
       result = result * 37 + (format?.hashCode() ?: 0)
       result = result * 37 + (items_schema?.hashCode() ?: 0)
       result = result * 37 + (object_schema?.hashCode() ?: 0)
+      result = result * 37 + (minimum?.hashCode() ?: 0)
+      result = result * 37 + (maximum?.hashCode() ?: 0)
+      result = result * 37 + (min_length?.hashCode() ?: 0)
+      result = result * 37 + (max_length?.hashCode() ?: 0)
+      result = result * 37 + (pattern?.hashCode() ?: 0)
+      result = result * 37 + (min_items?.hashCode() ?: 0)
+      result = result * 37 + (max_items?.hashCode() ?: 0)
+      result = result * 37 + (default_json?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -154,6 +227,14 @@ public class JSONSchemaProperty(
     if (format != null) result += """format=${sanitize(format)}"""
     if (items_schema != null) result += """items_schema=$items_schema"""
     if (object_schema != null) result += """object_schema=$object_schema"""
+    if (minimum != null) result += """minimum=$minimum"""
+    if (maximum != null) result += """maximum=$maximum"""
+    if (min_length != null) result += """min_length=$min_length"""
+    if (max_length != null) result += """max_length=$max_length"""
+    if (pattern != null) result += """pattern=${sanitize(pattern)}"""
+    if (min_items != null) result += """min_items=$min_items"""
+    if (max_items != null) result += """max_items=$max_items"""
+    if (default_json != null) result += """default_json=${sanitize(default_json)}"""
     return result.joinToString(prefix = "JSONSchemaProperty{", separator = ", ", postfix = "}")
   }
 
@@ -164,9 +245,18 @@ public class JSONSchemaProperty(
     format: String? = this.format,
     items_schema: JSONSchema? = this.items_schema,
     object_schema: JSONSchema? = this.object_schema,
+    minimum: Double? = this.minimum,
+    maximum: Double? = this.maximum,
+    min_length: Int? = this.min_length,
+    max_length: Int? = this.max_length,
+    pattern: String? = this.pattern,
+    min_items: Int? = this.min_items,
+    max_items: Int? = this.max_items,
+    default_json: String? = this.default_json,
     unknownFields: ByteString = this.unknownFields,
   ): JSONSchemaProperty = JSONSchemaProperty(type, description, enum_values, format, items_schema,
-      object_schema, unknownFields)
+      object_schema, minimum, maximum, min_length, max_length, pattern, min_items, max_items,
+      default_json, unknownFields)
 
   public companion object {
     @JvmField
@@ -188,6 +278,14 @@ public class JSONSchemaProperty(
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.format)
         size += JSONSchema.ADAPTER.encodedSizeWithTag(5, value.items_schema)
         size += JSONSchema.ADAPTER.encodedSizeWithTag(6, value.object_schema)
+        size += ProtoAdapter.DOUBLE.encodedSizeWithTag(7, value.minimum)
+        size += ProtoAdapter.DOUBLE.encodedSizeWithTag(8, value.maximum)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(9, value.min_length)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(10, value.max_length)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.pattern)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(12, value.min_items)
+        size += ProtoAdapter.INT32.encodedSizeWithTag(13, value.max_items)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.default_json)
         return size
       }
 
@@ -199,11 +297,27 @@ public class JSONSchemaProperty(
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.format)
         JSONSchema.ADAPTER.encodeWithTag(writer, 5, value.items_schema)
         JSONSchema.ADAPTER.encodeWithTag(writer, 6, value.object_schema)
+        ProtoAdapter.DOUBLE.encodeWithTag(writer, 7, value.minimum)
+        ProtoAdapter.DOUBLE.encodeWithTag(writer, 8, value.maximum)
+        ProtoAdapter.INT32.encodeWithTag(writer, 9, value.min_length)
+        ProtoAdapter.INT32.encodeWithTag(writer, 10, value.max_length)
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.pattern)
+        ProtoAdapter.INT32.encodeWithTag(writer, 12, value.min_items)
+        ProtoAdapter.INT32.encodeWithTag(writer, 13, value.max_items)
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.default_json)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: JSONSchemaProperty) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 14, value.default_json)
+        ProtoAdapter.INT32.encodeWithTag(writer, 13, value.max_items)
+        ProtoAdapter.INT32.encodeWithTag(writer, 12, value.min_items)
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.pattern)
+        ProtoAdapter.INT32.encodeWithTag(writer, 10, value.max_length)
+        ProtoAdapter.INT32.encodeWithTag(writer, 9, value.min_length)
+        ProtoAdapter.DOUBLE.encodeWithTag(writer, 8, value.maximum)
+        ProtoAdapter.DOUBLE.encodeWithTag(writer, 7, value.minimum)
         JSONSchema.ADAPTER.encodeWithTag(writer, 6, value.object_schema)
         JSONSchema.ADAPTER.encodeWithTag(writer, 5, value.items_schema)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.format)
@@ -220,6 +334,14 @@ public class JSONSchemaProperty(
         var format: String? = null
         var items_schema: JSONSchema? = null
         var object_schema: JSONSchema? = null
+        var minimum: Double? = null
+        var maximum: Double? = null
+        var min_length: Int? = null
+        var max_length: Int? = null
+        var pattern: String? = null
+        var min_items: Int? = null
+        var max_items: Int? = null
+        var default_json: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -232,6 +354,14 @@ public class JSONSchemaProperty(
             4 -> format = ProtoAdapter.STRING.decode(reader)
             5 -> items_schema = JSONSchema.ADAPTER.decode(reader)
             6 -> object_schema = JSONSchema.ADAPTER.decode(reader)
+            7 -> minimum = ProtoAdapter.DOUBLE.decode(reader)
+            8 -> maximum = ProtoAdapter.DOUBLE.decode(reader)
+            9 -> min_length = ProtoAdapter.INT32.decode(reader)
+            10 -> max_length = ProtoAdapter.INT32.decode(reader)
+            11 -> pattern = ProtoAdapter.STRING.decode(reader)
+            12 -> min_items = ProtoAdapter.INT32.decode(reader)
+            13 -> max_items = ProtoAdapter.INT32.decode(reader)
+            14 -> default_json = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -242,6 +372,14 @@ public class JSONSchemaProperty(
           format = format,
           items_schema = items_schema,
           object_schema = object_schema,
+          minimum = minimum,
+          maximum = maximum,
+          min_length = min_length,
+          max_length = max_length,
+          pattern = pattern,
+          min_items = min_items,
+          max_items = max_items,
+          default_json = default_json,
           unknownFields = unknownFields
         )
       }

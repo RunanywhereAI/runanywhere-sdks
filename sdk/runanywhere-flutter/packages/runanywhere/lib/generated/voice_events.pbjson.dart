@@ -306,10 +306,27 @@ const VoiceEvent$json = {
     {'1': 'speech_turn_detection', '3': 24, '4': 1, '5': 11, '6': '.runanywhere.v1.SpeechTurnDetectionEvent', '9': 0, '10': 'speechTurnDetection'},
     {'1': 'turn_lifecycle', '3': 25, '4': 1, '5': 11, '6': '.runanywhere.v1.TurnLifecycleEvent', '9': 0, '10': 'turnLifecycle'},
     {'1': 'wakeword_detected', '3': 26, '4': 1, '5': 11, '6': '.runanywhere.v1.WakeWordDetectedEvent', '9': 0, '10': 'wakewordDetected'},
+    {'1': 'audio_level', '3': 27, '4': 1, '5': 11, '6': '.runanywhere.v1.AudioLevelEvent', '9': 0, '10': 'audioLevel'},
+    {'1': 'component_progress', '3': 28, '4': 1, '5': 11, '6': '.runanywhere.v1.ComponentProgressEvent', '9': 0, '10': 'componentProgress'},
+    {'1': 'session_id', '3': 30, '4': 1, '5': 9, '10': 'sessionId'},
+    {'1': 'turn_id', '3': 31, '4': 1, '5': 9, '10': 'turnId'},
+    {'1': 'request_id', '3': 32, '4': 1, '5': 9, '10': 'requestId'},
+    {'1': 'metadata', '3': 33, '4': 3, '5': 11, '6': '.runanywhere.v1.VoiceEvent.MetadataEntry', '10': 'metadata'},
   ],
+  '3': [VoiceEvent_MetadataEntry$json],
   '8': [
     {'1': 'payload'},
   ],
+};
+
+@$core.Deprecated('Use voiceEventDescriptor instead')
+const VoiceEvent_MetadataEntry$json = {
+  '1': 'MetadataEntry',
+  '2': [
+    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
+    {'1': 'value', '3': 2, '4': 1, '5': 9, '10': 'value'},
+  ],
+  '7': {'7': true},
 };
 
 /// Descriptor for `VoiceEvent`. Decode as a `google.protobuf.DescriptorProto`.
@@ -341,8 +358,14 @@ final $typed_data.Uint8List voiceEventDescriptor = $convert.base64Decode(
     'MS5TcGVlY2hUdXJuRGV0ZWN0aW9uRXZlbnRIAFITc3BlZWNoVHVybkRldGVjdGlvbhJLCg50dX'
     'JuX2xpZmVjeWNsZRgZIAEoCzIiLnJ1bmFueXdoZXJlLnYxLlR1cm5MaWZlY3ljbGVFdmVudEgA'
     'Ug10dXJuTGlmZWN5Y2xlElQKEXdha2V3b3JkX2RldGVjdGVkGBogASgLMiUucnVuYW55d2hlcm'
-    'UudjEuV2FrZVdvcmREZXRlY3RlZEV2ZW50SABSEHdha2V3b3JkRGV0ZWN0ZWRCCQoHcGF5bG9h'
-    'ZA==');
+    'UudjEuV2FrZVdvcmREZXRlY3RlZEV2ZW50SABSEHdha2V3b3JkRGV0ZWN0ZWQSQgoLYXVkaW9f'
+    'bGV2ZWwYGyABKAsyHy5ydW5hbnl3aGVyZS52MS5BdWRpb0xldmVsRXZlbnRIAFIKYXVkaW9MZX'
+    'ZlbBJXChJjb21wb25lbnRfcHJvZ3Jlc3MYHCABKAsyJi5ydW5hbnl3aGVyZS52MS5Db21wb25l'
+    'bnRQcm9ncmVzc0V2ZW50SABSEWNvbXBvbmVudFByb2dyZXNzEh0KCnNlc3Npb25faWQYHiABKA'
+    'lSCXNlc3Npb25JZBIXCgd0dXJuX2lkGB8gASgJUgZ0dXJuSWQSHQoKcmVxdWVzdF9pZBggIAEo'
+    'CVIJcmVxdWVzdElkEkQKCG1ldGFkYXRhGCEgAygLMigucnVuYW55d2hlcmUudjEuVm9pY2VFdm'
+    'VudC5NZXRhZGF0YUVudHJ5UghtZXRhZGF0YRo7Cg1NZXRhZGF0YUVudHJ5EhAKA2tleRgBIAEo'
+    'CVIDa2V5EhQKBXZhbHVlGAIgASgJUgV2YWx1ZToCOAFCCQoHcGF5bG9hZA==');
 
 @$core.Deprecated('Use userSaidEventDescriptor instead')
 const UserSaidEvent$json = {
@@ -353,6 +376,8 @@ const UserSaidEvent$json = {
     {'1': 'confidence', '3': 3, '4': 1, '5': 2, '10': 'confidence'},
     {'1': 'audio_start_us', '3': 4, '4': 1, '5': 3, '10': 'audioStartUs'},
     {'1': 'audio_end_us', '3': 5, '4': 1, '5': 3, '10': 'audioEndUs'},
+    {'1': 'language_code', '3': 6, '4': 1, '5': 9, '10': 'languageCode'},
+    {'1': 'segment_index', '3': 7, '4': 1, '5': 5, '10': 'segmentIndex'},
   ],
 };
 
@@ -360,8 +385,9 @@ const UserSaidEvent$json = {
 final $typed_data.Uint8List userSaidEventDescriptor = $convert.base64Decode(
     'Cg1Vc2VyU2FpZEV2ZW50EhIKBHRleHQYASABKAlSBHRleHQSGQoIaXNfZmluYWwYAiABKAhSB2'
     'lzRmluYWwSHgoKY29uZmlkZW5jZRgDIAEoAlIKY29uZmlkZW5jZRIkCg5hdWRpb19zdGFydF91'
-    'cxgEIAEoA1IMYXVkaW9TdGFydFVzEiAKDGF1ZGlvX2VuZF91cxgFIAEoA1IKYXVkaW9FbmRVcw'
-    '==');
+    'cxgEIAEoA1IMYXVkaW9TdGFydFVzEiAKDGF1ZGlvX2VuZF91cxgFIAEoA1IKYXVkaW9FbmRVcx'
+    'IjCg1sYW5ndWFnZV9jb2RlGAYgASgJUgxsYW5ndWFnZUNvZGUSIwoNc2VnbWVudF9pbmRleBgH'
+    'IAEoBVIMc2VnbWVudEluZGV4');
 
 @$core.Deprecated('Use assistantTokenEventDescriptor instead')
 const AssistantTokenEvent$json = {
@@ -370,6 +396,9 @@ const AssistantTokenEvent$json = {
     {'1': 'text', '3': 1, '4': 1, '5': 9, '10': 'text'},
     {'1': 'is_final', '3': 2, '4': 1, '5': 8, '10': 'isFinal'},
     {'1': 'kind', '3': 3, '4': 1, '5': 14, '6': '.runanywhere.v1.TokenKind', '10': 'kind'},
+    {'1': 'token_id', '3': 4, '4': 1, '5': 13, '10': 'tokenId'},
+    {'1': 'logprob', '3': 5, '4': 1, '5': 2, '10': 'logprob'},
+    {'1': 'finish_reason', '3': 6, '4': 1, '5': 9, '10': 'finishReason'},
   ],
 };
 
@@ -377,7 +406,8 @@ const AssistantTokenEvent$json = {
 final $typed_data.Uint8List assistantTokenEventDescriptor = $convert.base64Decode(
     'ChNBc3Npc3RhbnRUb2tlbkV2ZW50EhIKBHRleHQYASABKAlSBHRleHQSGQoIaXNfZmluYWwYAi'
     'ABKAhSB2lzRmluYWwSLQoEa2luZBgDIAEoDjIZLnJ1bmFueXdoZXJlLnYxLlRva2VuS2luZFIE'
-    'a2luZA==');
+    'a2luZBIZCgh0b2tlbl9pZBgEIAEoDVIHdG9rZW5JZBIYCgdsb2dwcm9iGAUgASgCUgdsb2dwcm'
+    '9iEiMKDWZpbmlzaF9yZWFzb24YBiABKAlSDGZpbmlzaFJlYXNvbg==');
 
 @$core.Deprecated('Use audioFrameEventDescriptor instead')
 const AudioFrameEvent$json = {
@@ -388,6 +418,8 @@ const AudioFrameEvent$json = {
     {'1': 'channels', '3': 3, '4': 1, '5': 5, '10': 'channels'},
     {'1': 'encoding', '3': 4, '4': 1, '5': 14, '6': '.runanywhere.v1.AudioEncoding', '10': 'encoding'},
     {'1': 'is_final', '3': 5, '4': 1, '5': 8, '10': 'isFinal'},
+    {'1': 'chunk_index', '3': 6, '4': 1, '5': 5, '10': 'chunkIndex'},
+    {'1': 'duration_ms', '3': 7, '4': 1, '5': 3, '10': 'durationMs'},
   ],
 };
 
@@ -396,7 +428,8 @@ final $typed_data.Uint8List audioFrameEventDescriptor = $convert.base64Decode(
     'Cg9BdWRpb0ZyYW1lRXZlbnQSEAoDcGNtGAEgASgMUgNwY20SJAoOc2FtcGxlX3JhdGVfaHoYAi'
     'ABKAVSDHNhbXBsZVJhdGVIehIaCghjaGFubmVscxgDIAEoBVIIY2hhbm5lbHMSOQoIZW5jb2Rp'
     'bmcYBCABKA4yHS5ydW5hbnl3aGVyZS52MS5BdWRpb0VuY29kaW5nUghlbmNvZGluZxIZCghpc1'
-    '9maW5hbBgFIAEoCFIHaXNGaW5hbA==');
+    '9maW5hbBgFIAEoCFIHaXNGaW5hbBIfCgtjaHVua19pbmRleBgGIAEoBVIKY2h1bmtJbmRleBIf'
+    'CgtkdXJhdGlvbl9tcxgHIAEoA1IKZHVyYXRpb25Ncw==');
 
 @$core.Deprecated('Use vADEventDescriptor instead')
 const VADEvent$json = {
@@ -458,6 +491,8 @@ const ErrorEvent$json = {
     {'1': 'message', '3': 2, '4': 1, '5': 9, '10': 'message'},
     {'1': 'component', '3': 3, '4': 1, '5': 9, '10': 'component'},
     {'1': 'is_recoverable', '3': 4, '4': 1, '5': 8, '10': 'isRecoverable'},
+    {'1': 'operation', '3': 5, '4': 1, '5': 9, '10': 'operation'},
+    {'1': 'details_json', '3': 6, '4': 1, '5': 9, '10': 'detailsJson'},
   ],
 };
 
@@ -465,7 +500,8 @@ const ErrorEvent$json = {
 final $typed_data.Uint8List errorEventDescriptor = $convert.base64Decode(
     'CgpFcnJvckV2ZW50EhIKBGNvZGUYASABKAVSBGNvZGUSGAoHbWVzc2FnZRgCIAEoCVIHbWVzc2'
     'FnZRIcCgljb21wb25lbnQYAyABKAlSCWNvbXBvbmVudBIlCg5pc19yZWNvdmVyYWJsZRgEIAEo'
-    'CFINaXNSZWNvdmVyYWJsZQ==');
+    'CFINaXNSZWNvdmVyYWJsZRIcCglvcGVyYXRpb24YBSABKAlSCW9wZXJhdGlvbhIhCgxkZXRhaW'
+    'xzX2pzb24YBiABKAlSC2RldGFpbHNKc29u');
 
 @$core.Deprecated('Use metricsEventDescriptor instead')
 const MetricsEvent$json = {
@@ -479,6 +515,10 @@ const MetricsEvent$json = {
     {'1': 'audio_samples_played', '3': 6, '4': 1, '5': 3, '10': 'audioSamplesPlayed'},
     {'1': 'is_over_budget', '3': 7, '4': 1, '5': 8, '10': 'isOverBudget'},
     {'1': 'created_at_ns', '3': 8, '4': 1, '5': 3, '10': 'createdAtNs'},
+    {'1': 'vad_first_speech_ms', '3': 9, '4': 1, '5': 1, '10': 'vadFirstSpeechMs'},
+    {'1': 'stt_first_partial_ms', '3': 10, '4': 1, '5': 1, '10': 'sttFirstPartialMs'},
+    {'1': 'llm_total_ms', '3': 11, '4': 1, '5': 1, '10': 'llmTotalMs'},
+    {'1': 'tts_total_ms', '3': 12, '4': 1, '5': 1, '10': 'ttsTotalMs'},
   ],
 };
 
@@ -490,7 +530,45 @@ final $typed_data.Uint8List metricsEventDescriptor = $convert.base64Decode(
     'RvRW5kTXMSKQoQdG9rZW5zX2dlbmVyYXRlZBgFIAEoA1IPdG9rZW5zR2VuZXJhdGVkEjAKFGF1'
     'ZGlvX3NhbXBsZXNfcGxheWVkGAYgASgDUhJhdWRpb1NhbXBsZXNQbGF5ZWQSJAoOaXNfb3Zlcl'
     '9idWRnZXQYByABKAhSDGlzT3ZlckJ1ZGdldBIiCg1jcmVhdGVkX2F0X25zGAggASgDUgtjcmVh'
-    'dGVkQXROcw==');
+    'dGVkQXROcxItChN2YWRfZmlyc3Rfc3BlZWNoX21zGAkgASgBUhB2YWRGaXJzdFNwZWVjaE1zEi'
+    '8KFHN0dF9maXJzdF9wYXJ0aWFsX21zGAogASgBUhFzdHRGaXJzdFBhcnRpYWxNcxIgCgxsbG1f'
+    'dG90YWxfbXMYCyABKAFSCmxsbVRvdGFsTXMSIAoMdHRzX3RvdGFsX21zGAwgASgBUgp0dHNUb3'
+    'RhbE1z');
+
+@$core.Deprecated('Use audioLevelEventDescriptor instead')
+const AudioLevelEvent$json = {
+  '1': 'AudioLevelEvent',
+  '2': [
+    {'1': 'rms', '3': 1, '4': 1, '5': 2, '10': 'rms'},
+    {'1': 'peak', '3': 2, '4': 1, '5': 2, '10': 'peak'},
+    {'1': 'noise_floor_db', '3': 3, '4': 1, '5': 2, '10': 'noiseFloorDb'},
+    {'1': 'is_speech', '3': 4, '4': 1, '5': 8, '10': 'isSpeech'},
+  ],
+};
+
+/// Descriptor for `AudioLevelEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List audioLevelEventDescriptor = $convert.base64Decode(
+    'Cg9BdWRpb0xldmVsRXZlbnQSEAoDcm1zGAEgASgCUgNybXMSEgoEcGVhaxgCIAEoAlIEcGVhax'
+    'IkCg5ub2lzZV9mbG9vcl9kYhgDIAEoAlIMbm9pc2VGbG9vckRiEhsKCWlzX3NwZWVjaBgEIAEo'
+    'CFIIaXNTcGVlY2g=');
+
+@$core.Deprecated('Use componentProgressEventDescriptor instead')
+const ComponentProgressEvent$json = {
+  '1': 'ComponentProgressEvent',
+  '2': [
+    {'1': 'component', '3': 1, '4': 1, '5': 14, '6': '.runanywhere.v1.VoicePipelineComponent', '10': 'component'},
+    {'1': 'operation', '3': 2, '4': 1, '5': 9, '10': 'operation'},
+    {'1': 'progress', '3': 3, '4': 1, '5': 2, '10': 'progress'},
+    {'1': 'message', '3': 4, '4': 1, '5': 9, '10': 'message'},
+  ],
+};
+
+/// Descriptor for `ComponentProgressEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List componentProgressEventDescriptor = $convert.base64Decode(
+    'ChZDb21wb25lbnRQcm9ncmVzc0V2ZW50EkQKCWNvbXBvbmVudBgBIAEoDjImLnJ1bmFueXdoZX'
+    'JlLnYxLlZvaWNlUGlwZWxpbmVDb21wb25lbnRSCWNvbXBvbmVudBIcCglvcGVyYXRpb24YAiAB'
+    'KAlSCW9wZXJhdGlvbhIaCghwcm9ncmVzcxgDIAEoAlIIcHJvZ3Jlc3MSGAoHbWVzc2FnZRgEIA'
+    'EoCVIHbWVzc2FnZQ==');
 
 @$core.Deprecated('Use voiceAgentComponentStatesDescriptor instead')
 const VoiceAgentComponentStates$json = {
@@ -502,6 +580,11 @@ const VoiceAgentComponentStates$json = {
     {'1': 'vad_state', '3': 4, '4': 1, '5': 14, '6': '.runanywhere.v1.ComponentLoadState', '10': 'vadState'},
     {'1': 'ready', '3': 5, '4': 1, '5': 8, '10': 'ready'},
     {'1': 'any_loading', '3': 6, '4': 1, '5': 8, '10': 'anyLoading'},
+    {'1': 'wakeword_state', '3': 7, '4': 1, '5': 14, '6': '.runanywhere.v1.ComponentLoadState', '10': 'wakewordState'},
+    {'1': 'error_message', '3': 8, '4': 1, '5': 9, '9': 0, '10': 'errorMessage', '17': true},
+  ],
+  '8': [
+    {'1': '_error_message'},
   ],
 };
 
@@ -513,7 +596,9 @@ final $typed_data.Uint8List voiceAgentComponentStatesDescriptor = $convert.base6
     'RhdGUYAyABKA4yIi5ydW5hbnl3aGVyZS52MS5Db21wb25lbnRMb2FkU3RhdGVSCHR0c1N0YXRl'
     'Ej8KCXZhZF9zdGF0ZRgEIAEoDjIiLnJ1bmFueXdoZXJlLnYxLkNvbXBvbmVudExvYWRTdGF0ZV'
     'IIdmFkU3RhdGUSFAoFcmVhZHkYBSABKAhSBXJlYWR5Eh8KC2FueV9sb2FkaW5nGAYgASgIUgph'
-    'bnlMb2FkaW5n');
+    'bnlMb2FkaW5nEkkKDndha2V3b3JkX3N0YXRlGAcgASgOMiIucnVuYW55d2hlcmUudjEuQ29tcG'
+    '9uZW50TG9hZFN0YXRlUg13YWtld29yZFN0YXRlEigKDWVycm9yX21lc3NhZ2UYCCABKAlIAFIM'
+    'ZXJyb3JNZXNzYWdliAEBQhAKDl9lcnJvcl9tZXNzYWdl');
 
 @$core.Deprecated('Use voiceSessionErrorDescriptor instead')
 const VoiceSessionError$json = {
@@ -522,6 +607,8 @@ const VoiceSessionError$json = {
     {'1': 'code', '3': 1, '4': 1, '5': 14, '6': '.runanywhere.v1.VoiceSessionErrorCode', '10': 'code'},
     {'1': 'message', '3': 2, '4': 1, '5': 9, '10': 'message'},
     {'1': 'failed_component', '3': 3, '4': 1, '5': 9, '9': 0, '10': 'failedComponent', '17': true},
+    {'1': 'c_abi_code', '3': 4, '4': 1, '5': 5, '10': 'cAbiCode'},
+    {'1': 'recoverable', '3': 5, '4': 1, '5': 8, '10': 'recoverable'},
   ],
   '8': [
     {'1': '_failed_component'},
@@ -532,44 +619,61 @@ const VoiceSessionError$json = {
 final $typed_data.Uint8List voiceSessionErrorDescriptor = $convert.base64Decode(
     'ChFWb2ljZVNlc3Npb25FcnJvchI5CgRjb2RlGAEgASgOMiUucnVuYW55d2hlcmUudjEuVm9pY2'
     'VTZXNzaW9uRXJyb3JDb2RlUgRjb2RlEhgKB21lc3NhZ2UYAiABKAlSB21lc3NhZ2USLgoQZmFp'
-    'bGVkX2NvbXBvbmVudBgDIAEoCUgAUg9mYWlsZWRDb21wb25lbnSIAQFCEwoRX2ZhaWxlZF9jb2'
-    '1wb25lbnQ=');
+    'bGVkX2NvbXBvbmVudBgDIAEoCUgAUg9mYWlsZWRDb21wb25lbnSIAQESHAoKY19hYmlfY29kZR'
+    'gEIAEoBVIIY0FiaUNvZGUSIAoLcmVjb3ZlcmFibGUYBSABKAhSC3JlY292ZXJhYmxlQhMKEV9m'
+    'YWlsZWRfY29tcG9uZW50');
 
 @$core.Deprecated('Use sessionStartedEventDescriptor instead')
 const SessionStartedEvent$json = {
   '1': 'SessionStartedEvent',
+  '2': [
+    {'1': 'session_id', '3': 1, '4': 1, '5': 9, '10': 'sessionId'},
+  ],
 };
 
 /// Descriptor for `SessionStartedEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List sessionStartedEventDescriptor = $convert.base64Decode(
-    'ChNTZXNzaW9uU3RhcnRlZEV2ZW50');
+    'ChNTZXNzaW9uU3RhcnRlZEV2ZW50Eh0KCnNlc3Npb25faWQYASABKAlSCXNlc3Npb25JZA==');
 
 @$core.Deprecated('Use sessionStoppedEventDescriptor instead')
 const SessionStoppedEvent$json = {
   '1': 'SessionStoppedEvent',
+  '2': [
+    {'1': 'session_id', '3': 1, '4': 1, '5': 9, '10': 'sessionId'},
+    {'1': 'reason', '3': 2, '4': 1, '5': 9, '10': 'reason'},
+  ],
 };
 
 /// Descriptor for `SessionStoppedEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List sessionStoppedEventDescriptor = $convert.base64Decode(
-    'ChNTZXNzaW9uU3RvcHBlZEV2ZW50');
+    'ChNTZXNzaW9uU3RvcHBlZEV2ZW50Eh0KCnNlc3Npb25faWQYASABKAlSCXNlc3Npb25JZBIWCg'
+    'ZyZWFzb24YAiABKAlSBnJlYXNvbg==');
 
 @$core.Deprecated('Use agentResponseStartedEventDescriptor instead')
 const AgentResponseStartedEvent$json = {
   '1': 'AgentResponseStartedEvent',
+  '2': [
+    {'1': 'turn_id', '3': 1, '4': 1, '5': 9, '10': 'turnId'},
+  ],
 };
 
 /// Descriptor for `AgentResponseStartedEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List agentResponseStartedEventDescriptor = $convert.base64Decode(
-    'ChlBZ2VudFJlc3BvbnNlU3RhcnRlZEV2ZW50');
+    'ChlBZ2VudFJlc3BvbnNlU3RhcnRlZEV2ZW50EhcKB3R1cm5faWQYASABKAlSBnR1cm5JZA==');
 
 @$core.Deprecated('Use agentResponseCompletedEventDescriptor instead')
 const AgentResponseCompletedEvent$json = {
   '1': 'AgentResponseCompletedEvent',
+  '2': [
+    {'1': 'turn_id', '3': 1, '4': 1, '5': 9, '10': 'turnId'},
+    {'1': 'response_duration_ms', '3': 2, '4': 1, '5': 3, '10': 'responseDurationMs'},
+  ],
 };
 
 /// Descriptor for `AgentResponseCompletedEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List agentResponseCompletedEventDescriptor = $convert.base64Decode(
-    'ChtBZ2VudFJlc3BvbnNlQ29tcGxldGVkRXZlbnQ=');
+    'ChtBZ2VudFJlc3BvbnNlQ29tcGxldGVkRXZlbnQSFwoHdHVybl9pZBgBIAEoCVIGdHVybklkEj'
+    'AKFHJlc3BvbnNlX2R1cmF0aW9uX21zGAIgASgDUhJyZXNwb25zZUR1cmF0aW9uTXM=');
 
 @$core.Deprecated('Use speechTurnDetectionEventDescriptor instead')
 const SpeechTurnDetectionEvent$json = {
@@ -604,6 +708,8 @@ const TurnLifecycleEvent$json = {
     {'1': 'transcript', '3': 4, '4': 1, '5': 9, '10': 'transcript'},
     {'1': 'response', '3': 5, '4': 1, '5': 9, '10': 'response'},
     {'1': 'error', '3': 6, '4': 1, '5': 9, '10': 'error'},
+    {'1': 'started_at_ms', '3': 7, '4': 1, '5': 3, '10': 'startedAtMs'},
+    {'1': 'completed_at_ms', '3': 8, '4': 1, '5': 3, '10': 'completedAtMs'},
   ],
 };
 
@@ -612,7 +718,9 @@ final $typed_data.Uint8List turnLifecycleEventDescriptor = $convert.base64Decode
     'ChJUdXJuTGlmZWN5Y2xlRXZlbnQSOgoEa2luZBgBIAEoDjImLnJ1bmFueXdoZXJlLnYxLlR1cm'
     '5MaWZlY3ljbGVFdmVudEtpbmRSBGtpbmQSFwoHdHVybl9pZBgCIAEoCVIGdHVybklkEh0KCnNl'
     'c3Npb25faWQYAyABKAlSCXNlc3Npb25JZBIeCgp0cmFuc2NyaXB0GAQgASgJUgp0cmFuc2NyaX'
-    'B0EhoKCHJlc3BvbnNlGAUgASgJUghyZXNwb25zZRIUCgVlcnJvchgGIAEoCVIFZXJyb3I=');
+    'B0EhoKCHJlc3BvbnNlGAUgASgJUghyZXNwb25zZRIUCgVlcnJvchgGIAEoCVIFZXJyb3ISIgoN'
+    'c3RhcnRlZF9hdF9tcxgHIAEoA1ILc3RhcnRlZEF0TXMSJgoPY29tcGxldGVkX2F0X21zGAggAS'
+    'gDUg1jb21wbGV0ZWRBdE1z');
 
 @$core.Deprecated('Use wakeWordDetectedEventDescriptor instead')
 const WakeWordDetectedEvent$json = {

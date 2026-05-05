@@ -52,6 +52,13 @@ public class StorageAvailabilityResult(
     schemaIndex = 3,
   )
   public val error_message: String = "",
+  @field:WireField(
+    tag = 5,
+    adapter = "ai.runanywhere.proto.v1.StorageDeletePlan#ADAPTER",
+    jsonName = "deletePlan",
+    schemaIndex = 4,
+  )
+  public val delete_plan: StorageDeletePlan? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StorageAvailabilityResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -77,6 +84,7 @@ public class StorageAvailabilityResult(
     if (availability != other.availability) return false
     if (warnings != other.warnings) return false
     if (error_message != other.error_message) return false
+    if (delete_plan != other.delete_plan) return false
     return true
   }
 
@@ -88,6 +96,7 @@ public class StorageAvailabilityResult(
       result = result * 37 + (availability?.hashCode() ?: 0)
       result = result * 37 + warnings.hashCode()
       result = result * 37 + error_message.hashCode()
+      result = result * 37 + (delete_plan?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -99,6 +108,7 @@ public class StorageAvailabilityResult(
     if (availability != null) result += """availability=$availability"""
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
     result += """error_message=${sanitize(error_message)}"""
+    if (delete_plan != null) result += """delete_plan=$delete_plan"""
     return result.joinToString(prefix = "StorageAvailabilityResult{", separator = ", ", postfix =
         "}")
   }
@@ -108,9 +118,10 @@ public class StorageAvailabilityResult(
     availability: StorageAvailability? = this.availability,
     warnings: List<String> = this.warnings,
     error_message: String = this.error_message,
+    delete_plan: StorageDeletePlan? = this.delete_plan,
     unknownFields: ByteString = this.unknownFields,
   ): StorageAvailabilityResult = StorageAvailabilityResult(success, availability, warnings,
-      error_message, unknownFields)
+      error_message, delete_plan, unknownFields)
 
   public companion object {
     @JvmField
@@ -131,6 +142,7 @@ public class StorageAvailabilityResult(
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(3, value.warnings)
         if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(4,
             value.error_message)
+        size += StorageDeletePlan.ADAPTER.encodedSizeWithTag(5, value.delete_plan)
         return size
       }
 
@@ -141,11 +153,13 @@ public class StorageAvailabilityResult(
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 3, value.warnings)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 4,
             value.error_message)
+        StorageDeletePlan.ADAPTER.encodeWithTag(writer, 5, value.delete_plan)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StorageAvailabilityResult) {
         writer.writeBytes(value.unknownFields)
+        StorageDeletePlan.ADAPTER.encodeWithTag(writer, 5, value.delete_plan)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 4,
             value.error_message)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 3, value.warnings)
@@ -159,12 +173,14 @@ public class StorageAvailabilityResult(
         var availability: StorageAvailability? = null
         val warnings = mutableListOf<String>()
         var error_message: String = ""
+        var delete_plan: StorageDeletePlan? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> availability = StorageAvailability.ADAPTER.decode(reader)
             3 -> warnings.add(ProtoAdapter.STRING.decode(reader))
             4 -> error_message = ProtoAdapter.STRING.decode(reader)
+            5 -> delete_plan = StorageDeletePlan.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -173,6 +189,7 @@ public class StorageAvailabilityResult(
           availability = availability,
           warnings = warnings,
           error_message = error_message,
+          delete_plan = delete_plan,
           unknownFields = unknownFields
         )
       }
@@ -180,6 +197,7 @@ public class StorageAvailabilityResult(
       override fun redact(`value`: StorageAvailabilityResult): StorageAvailabilityResult =
           value.copy(
         availability = value.availability?.let(StorageAvailability.ADAPTER::redact),
+        delete_plan = value.delete_plan?.let(StorageDeletePlan.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

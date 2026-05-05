@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
 import 'package:runanywhere/runanywhere.dart'
-    show ToolCallingOptions, ToolCallFormatNames;
+    show ToolCallingOptions, ToolCallFormatName;
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
@@ -167,18 +167,20 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 
   /// Determines the optimal tool calling format based on the model name/ID.
   /// Different models are trained on different tool calling formats.
-  /// Returns format name string (C++ is single source of truth for valid formats).
-  String _detectToolCallFormat(String? modelName) {
-    if (modelName == null) return ToolCallFormatNames.defaultFormat;
+  /// Returns the generated tool-call format enum.
+  ToolCallFormatName _detectToolCallFormat(String? modelName) {
+    if (modelName == null) {
+      return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON;
+    }
     final name = modelName.toLowerCase();
 
     // LFM2-Tool models use Pythonic format: <|tool_call_start|>[func(args)]<|tool_call_end|>
     if (name.contains('lfm2') && name.contains('tool')) {
-      return ToolCallFormatNames.lfm2;
+      return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC;
     }
 
     // Default JSON format for general-purpose models
-    return ToolCallFormatNames.defaultFormat;
+    return ToolCallFormatName.TOOL_CALL_FORMAT_NAME_JSON;
   }
 
   Future<void> _generateWithToolCalling(
@@ -192,7 +194,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     // Auto-detect the tool calling format based on the loaded model
     final format = _detectToolCallFormat(modelName);
     debugPrint(
-        'Using tool calling with format: $format for model: ${modelName ?? "unknown"}');
+        'Using tool calling with format: ${format.name} for model: ${modelName ?? "unknown"}');
 
     // Add empty assistant message
     final assistantMessage = ChatMessage(
@@ -214,7 +216,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
         options: ToolCallingOptions(
           maxIterations: 3,
           autoExecute: true,
-          formatHint: format,
+          format: format,
           maxTokens: maxTokens,
           temperature: temperature,
         ),

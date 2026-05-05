@@ -10,5 +10,37 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
+import 'dart:core' as $core;
+
+import 'package:protobuf/protobuf.dart' as $pb;
+
+import 'vad_options.pb.dart' as $14;
+import 'vad_options.pbjson.dart';
+
 export 'vad_options.pb.dart';
+
+abstract class VADServiceBase extends $pb.GeneratedService {
+  $async.Future<$14.VADResult> processFrame($pb.ServerContext ctx, $14.VADProcessRequest request);
+  $async.Future<$14.VADStreamEvent> stream($pb.ServerContext ctx, $14.VADProcessRequest request);
+
+  $pb.GeneratedMessage createRequest($core.String methodName) {
+    switch (methodName) {
+      case 'ProcessFrame': return $14.VADProcessRequest();
+      case 'Stream': return $14.VADProcessRequest();
+      default: throw $core.ArgumentError('Unknown method: $methodName');
+    }
+  }
+
+  $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx, $core.String methodName, $pb.GeneratedMessage request) {
+    switch (methodName) {
+      case 'ProcessFrame': return this.processFrame(ctx, request as $14.VADProcessRequest);
+      case 'Stream': return this.stream(ctx, request as $14.VADProcessRequest);
+      default: throw $core.ArgumentError('Unknown method: $methodName');
+    }
+  }
+
+  $core.Map<$core.String, $core.dynamic> get $json => VADServiceBase$json;
+  $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> get $messageJson => VADServiceBase$messageJson;
+}
 

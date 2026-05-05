@@ -23,6 +23,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
+#include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/plugin/rac_primitive.h"
@@ -49,6 +50,10 @@ struct State {
      *  `rac_registry_load_plugin()`. Statically-registered plugins have no
      *  entry here. Populated by the loader, drained by `rac_plugin_unregister`. */
     std::unordered_map<std::string, void*> dl_handles;
+    /** Manifest attached by an engine entry before the vtable is registered. */
+    std::unordered_map<const rac_engine_vtable_t*, const rac_engine_manifest_t*> manifests_by_vtable;
+    /** Accepted manifest by engine name. Values are plugin-owned .rodata. */
+    std::unordered_map<std::string, const rac_engine_manifest_t*> manifests_by_name;
 };
 
 State& state() {
@@ -65,7 +70,6 @@ void each_served_primitive(const rac_engine_vtable_t* v,
     if (v->tts_ops)       fn(RAC_PRIMITIVE_SYNTHESIZE);
     if (v->vad_ops)       fn(RAC_PRIMITIVE_DETECT_VOICE);
     if (v->embedding_ops) fn(RAC_PRIMITIVE_EMBED);
-    if (v->rerank_ops)    fn(RAC_PRIMITIVE_RERANK);
     if (v->vlm_ops)       fn(RAC_PRIMITIVE_VLM);
     if (v->diffusion_ops) fn(RAC_PRIMITIVE_DIFFUSION);
 }
@@ -79,6 +83,49 @@ void insert_by_priority(std::vector<Entry>& bucket, Entry e) {
     bucket.insert(pos, std::move(e));
 }
 
+template <typename T>
+bool arrays_equal(const T* lhs, size_t lhs_count, const T* rhs, size_t rhs_count) {
+    if (lhs_count != rhs_count) return false;
+    if (lhs_count == 0) return true;
+    if (lhs == nullptr || rhs == nullptr) return false;
+    for (size_t i = 0; i < lhs_count; ++i) {
+        if (lhs[i] != rhs[i]) return false;
+    }
+    return true;
+}
+
+bool strings_equal(const char* lhs, const char* rhs) {
+    if (lhs == nullptr && rhs == nullptr) return true;
+    if (lhs == nullptr || rhs == nullptr) return false;
+    return std::strcmp(lhs, rhs) == 0;
+}
+
+bool manifest_declares_primitive(const rac_engine_manifest_t* manifest,
+                                 rac_primitive_t primitive) {
+    if (manifest == nullptr || manifest->primitives == nullptr) return false;
+    for (size_t i = 0; i < manifest->primitives_count; ++i) {
+        if (manifest->primitives[i] == primitive) return true;
+    }
+    return false;
+}
+
+bool valid_manifest_availability(rac_engine_availability_t availability) {
+    return availability == RAC_ENGINE_AVAILABILITY_PUBLIC ||
+           availability == RAC_ENGINE_AVAILABILITY_PRIVATE;
+}
+
+const rac_engine_manifest_t* attached_manifest_locked(const State& s,
+                                                      const rac_engine_vtable_t* vtable) {
+    auto it = s.manifests_by_vtable.find(vtable);
+    return it == s.manifests_by_vtable.end() ? nullptr : it->second;
+}
+
+void detach_pending_manifest(const rac_engine_vtable_t* vtable) {
+    auto& s = state();
+    std::lock_guard<std::mutex> lock(s.mu);
+    s.manifests_by_vtable.erase(vtable);
+}
+
 }  // namespace
 
 // =============================================================================
@@ -86,6 +133,122 @@ void insert_by_priority(std::vector<Entry>& bucket, Entry e) {
 // =============================================================================
 
 extern "C" {
+
+const char* rac_engine_availability_name(rac_engine_availability_t availability) {
+    switch (availability) {
+        case RAC_ENGINE_AVAILABILITY_PUBLIC:      return "public";
+        case RAC_ENGINE_AVAILABILITY_PRIVATE:     return "private";
+        case RAC_ENGINE_AVAILABILITY_UNSPECIFIED: return "unspecified";
+        default:                                  return "unknown";
+    }
+}
+
+rac_result_t rac_engine_manifest_validate_vtable(
+    const rac_engine_manifest_t* manifest,
+    const rac_engine_vtable_t* vtable) {
+    if (manifest == nullptr || vtable == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    if (manifest->name == nullptr ||
+        manifest->package_owner == nullptr ||
+        manifest->package_name == nullptr ||
+        vtable->metadata.name == nullptr) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    if (!valid_manifest_availability(manifest->availability)) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    if (vtable->metadata.abi_version != RAC_PLUGIN_API_VERSION) {
+        return RAC_ERROR_ABI_VERSION_MISMATCH;
+    }
+    if (!strings_equal(manifest->name, vtable->metadata.name) ||
+        !strings_equal(manifest->display_name, vtable->metadata.display_name) ||
+        !strings_equal(manifest->version, vtable->metadata.engine_version) ||
+        manifest->priority != vtable->metadata.priority ||
+        manifest->capability_flags != vtable->metadata.capability_flags) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    if ((manifest->primitives_count > 0 && manifest->primitives == nullptr) ||
+        (manifest->runtimes_count > 0 && manifest->runtimes == nullptr) ||
+        (manifest->formats_count > 0 && manifest->formats == nullptr)) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    if (!arrays_equal(manifest->runtimes,
+                      manifest->runtimes_count,
+                      vtable->metadata.runtimes,
+                      vtable->metadata.runtimes_count) ||
+        !arrays_equal(manifest->formats,
+                      manifest->formats_count,
+                      vtable->metadata.formats,
+                      vtable->metadata.formats_count)) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+
+    for (size_t i = 0; i < manifest->primitives_count; ++i) {
+        rac_primitive_t primitive = manifest->primitives[i];
+        if (primitive <= RAC_PRIMITIVE_UNSPECIFIED ||
+            primitive > RAC_PRIMITIVE_DIFFUSION ||
+            rac_engine_vtable_slot(vtable, primitive) == nullptr) {
+            return RAC_ERROR_INVALID_PARAMETER;
+        }
+    }
+
+    for (int p = RAC_PRIMITIVE_GENERATE_TEXT; p <= RAC_PRIMITIVE_DIFFUSION; ++p) {
+        rac_primitive_t primitive = static_cast<rac_primitive_t>(p);
+        if (rac_engine_vtable_slot(vtable, primitive) != nullptr &&
+            !manifest_declares_primitive(manifest, primitive)) {
+            return RAC_ERROR_INVALID_PARAMETER;
+        }
+    }
+
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_engine_manifest_attach_vtable(
+    const rac_engine_manifest_t* manifest,
+    const rac_engine_vtable_t* vtable) {
+    rac_result_t rc = rac_engine_manifest_validate_vtable(manifest, vtable);
+    if (rc != RAC_SUCCESS) return rc;
+
+    auto& s = state();
+    std::lock_guard<std::mutex> lock(s.mu);
+    s.manifests_by_vtable[vtable] = manifest;
+    return RAC_SUCCESS;
+}
+
+rac_result_t rac_engine_manifest_detach_vtable(const rac_engine_vtable_t* vtable) {
+    if (vtable == nullptr) return RAC_ERROR_NULL_POINTER;
+
+    auto& s = state();
+    std::lock_guard<std::mutex> lock(s.mu);
+    const rac_engine_manifest_t* manifest = nullptr;
+    auto it = s.manifests_by_vtable.find(vtable);
+    if (it != s.manifests_by_vtable.end()) {
+        manifest = it->second;
+        s.manifests_by_vtable.erase(it);
+    }
+    if (manifest != nullptr && vtable->metadata.name != nullptr) {
+        auto accepted = s.manifests_by_name.find(vtable->metadata.name);
+        if (accepted != s.manifests_by_name.end() && accepted->second == manifest) {
+            s.manifests_by_name.erase(accepted);
+        }
+    }
+    return RAC_SUCCESS;
+}
+
+const rac_engine_manifest_t* rac_engine_manifest_find(const char* name) {
+    if (name == nullptr) return nullptr;
+    auto& s = state();
+    std::lock_guard<std::mutex> lock(s.mu);
+    auto it = s.manifests_by_name.find(name);
+    return it == s.manifests_by_name.end() ? nullptr : it->second;
+}
+
+size_t rac_engine_manifest_count(void) {
+    auto& s = state();
+    std::lock_guard<std::mutex> lock(s.mu);
+    return s.manifests_by_name.size();
+}
 
 rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) {
     if (vtable == nullptr) {
@@ -105,6 +268,24 @@ rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) {
         return RAC_ERROR_ABI_VERSION_MISMATCH;
     }
 
+    const rac_engine_manifest_t* manifest = nullptr;
+    {
+        auto& s = state();
+        std::lock_guard<std::mutex> lock(s.mu);
+        manifest = attached_manifest_locked(s, vtable);
+    }
+    if (manifest != nullptr) {
+        rac_result_t manifest_rc = rac_engine_manifest_validate_vtable(manifest, vtable);
+        if (manifest_rc != RAC_SUCCESS) {
+            RAC_LOG_ERROR(LOG_CAT,
+                          "rac_plugin_register: '%s' manifest validation failed (%d)",
+                          vtable->metadata.name,
+                          (int)manifest_rc);
+            detach_pending_manifest(vtable);
+            return manifest_rc;
+        }
+    }
+
     if (vtable->capability_check != nullptr) {
         rac_result_t cap = vtable->capability_check();
         if (cap != RAC_SUCCESS) {
@@ -114,6 +295,7 @@ rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) {
                           (int)cap);
             // Return the registry-level code; capability_check's raw status
             // is visible in the log above for debugging.
+            detach_pending_manifest(vtable);
             return RAC_ERROR_CAPABILITY_UNSUPPORTED;
         }
     }
@@ -123,6 +305,7 @@ rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) {
 
     std::string name(vtable->metadata.name);
     auto dup = s.by_name.find(name);
+    const bool replacing_existing = dup != s.by_name.end();
     if (dup != s.by_name.end()) {
         // Duplicate by name: replace only if incoming priority >= existing.
         int32_t existing_prio = dup->second->metadata.priority;
@@ -132,6 +315,7 @@ rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) {
                           name.c_str(),
                           (int)vtable->metadata.priority,
                           (int)existing_prio);
+            s.manifests_by_vtable.erase(vtable);
             return RAC_ERROR_PLUGIN_DUPLICATE;
         }
         // Evict the existing one from every primitive bucket.
@@ -144,6 +328,11 @@ rac_result_t rac_plugin_register(const rac_engine_vtable_t* vtable) {
     }
 
     s.by_name[name] = vtable;
+    if (manifest != nullptr) {
+        s.manifests_by_name[name] = manifest;
+    } else if (replacing_existing) {
+        s.manifests_by_name.erase(name);
+    }
 
     each_served_primitive(vtable, [&](rac_primitive_t p) {
         Entry e{name, vtable->metadata.priority, vtable};
@@ -173,6 +362,8 @@ rac_result_t rac_plugin_unregister(const char* name) {
     }
 
     s.by_name.erase(it);
+    s.manifests_by_name.erase(key);
+    s.manifests_by_vtable.erase(v);
     for (auto& kv : s.by_primitive) {
         auto& vec = kv.second;
         vec.erase(std::remove_if(vec.begin(), vec.end(),
@@ -282,7 +473,7 @@ const char* rac_primitive_name(rac_primitive_t p) {
         case RAC_PRIMITIVE_SYNTHESIZE:    return "synthesize";
         case RAC_PRIMITIVE_DETECT_VOICE:  return "detect_voice";
         case RAC_PRIMITIVE_EMBED:         return "embed";
-        case RAC_PRIMITIVE_RERANK:        return "rerank";
+        case RAC_PRIMITIVE_RERANK:        return "reserved_6";
         case RAC_PRIMITIVE_VLM:           return "vlm";
         case RAC_PRIMITIVE_DIFFUSION:     return "diffusion";
         case RAC_PRIMITIVE_UNSPECIFIED:   return "unspecified";
@@ -319,7 +510,7 @@ const void* rac_engine_vtable_slot(const rac_engine_vtable_t* vt,
         case RAC_PRIMITIVE_SYNTHESIZE:    return vt->tts_ops;
         case RAC_PRIMITIVE_DETECT_VOICE:  return vt->vad_ops;
         case RAC_PRIMITIVE_EMBED:         return vt->embedding_ops;
-        case RAC_PRIMITIVE_RERANK:        return vt->rerank_ops;
+        case RAC_PRIMITIVE_RERANK:        return nullptr;
         case RAC_PRIMITIVE_VLM:           return vt->vlm_ops;
         case RAC_PRIMITIVE_DIFFUSION:     return vt->diffusion_ops;
         default:                           return nullptr;

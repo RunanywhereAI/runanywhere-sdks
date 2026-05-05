@@ -1,46 +1,20 @@
 /**
  * @runanywhere/web-onnx
  *
- * ONNX backend for the RunAnywhere Web SDK.
- * Provides on-device STT (speech-to-text), TTS (text-to-speech),
- * and VAD (voice activity detection) via sherpa-onnx compiled to WASM.
+ * V2-canonical ONNX backend for the RunAnywhere Web SDK.
+ *
+ * This package is a thin shell — all STT/TTS/VAD inference flows through
+ * the RACommons proto-byte C ABI (`rac_stt_component_*_proto`,
+ * `rac_tts_component_*_proto`, `rac_vad_component_*_proto`) exposed by the
+ * commons WASM module. Calling `ONNX.register()` simply registers the
+ * sherpa-onnx vtable with the C++ plugin registry; the typed adapters in
+ * `@runanywhere/web` (STTProtoAdapter, TTSProtoAdapter, VADProtoAdapter)
+ * dispatch through it from then on.
  *
  * @packageDocumentation
- *
- * @example
- * ```typescript
- * import { RunAnywhere } from '@runanywhere/web';
- * import { ONNX } from '@runanywhere/web-onnx';
- *
- * await RunAnywhere.initialize();
- * await ONNX.register();
- *
- * // Now STT, TTS, VAD are available
- * const result = await STT.transcribe(audioData);
- * ```
  */
 
-// Module facade & provider
 export { ONNX, autoRegister } from './ONNX';
 export type { ONNXRegisterOptions } from './ONNX';
-export { ONNXProvider } from './ONNXProvider';
-
-// Extensions (backend-specific implementations + backend-specific config types)
-export { STT, STTModelType } from './Extensions/RunAnywhere+STT';
-export type { STTModelConfig, STTWhisperFiles, STTZipformerFiles, STTParaformerFiles } from './Extensions/RunAnywhere+STT';
-export { TTS } from './Extensions/RunAnywhere+TTS';
-export type { TTSVoiceConfig } from './Extensions/RunAnywhere+TTS';
-export { VAD } from './Extensions/RunAnywhere+VAD';
-export type { VADModelConfig } from './Extensions/RunAnywhere+VAD';
-
-// Backward-compatible re-exports of shared contract types
-export type {
-  STTTranscriptionResult, STTWord, STTTranscribeOptions,
-  STTStreamCallback, STTStreamingSession,
-  TTSSynthesisResult, TTSSynthesizeOptions,
-  SpeechActivityCallback, SpeechSegment,
-} from '@runanywhere/web';
-export { SpeechActivity } from '@runanywhere/web';
-
-// Foundation
 export { SherpaONNXBridge } from './Foundation/SherpaONNXBridge';
+export type { SherpaONNXBridgeLoadOptions } from './Foundation/SherpaONNXBridge';

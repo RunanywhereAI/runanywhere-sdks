@@ -46,8 +46,6 @@ dependencies:
   collection: ^1.18.0
   json_annotation: ^4.9.0
   path: ^1.9.0
-  # TTS fallback (system TTS)
-  flutter_tts: ^3.8.0
   # Audio recording for voice sessions
   record: '>=5.1.2 <7.0.0'
   # Audio playback for TTS

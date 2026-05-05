@@ -10,5 +10,4 @@ export type { AudioDataCallback, AudioLevelCallback, AudioCaptureConfig, AudioCa
 export { AudioPlaybackManager } from './AudioPlaybackManager';
 export type { PlaybackState, PlaybackCompletionCallback, PlaybackErrorCallback, PlaybackConfig } from './AudioPlaybackManager';
 
-// v3.1: VoiceSessionHandle + related types DELETED. Use
-// VoiceAgentStreamAdapter (exported at package root) instead.
+// Voice session state is exposed through VoiceAgentStreamAdapter at package root.

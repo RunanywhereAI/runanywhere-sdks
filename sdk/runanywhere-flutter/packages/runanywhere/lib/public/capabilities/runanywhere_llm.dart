@@ -4,7 +4,11 @@
 // LLMGenerationResult; streams Stream<LLMStreamEvent>.
 
 import 'dart:async';
+import 'dart:ffi' as ffi;
+import 'dart:typed_data';
 
+import 'package:ffi/ffi.dart';
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
@@ -14,13 +18,16 @@ import 'package:runanywhere/generated/llm_service.pb.dart'
     show LLMGenerateRequest, LLMStreamEvent;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
+import 'package:runanywhere/generated/sdk_events.pb.dart'
+    show ComponentLifecycleSnapshot, SDKEvent;
+import 'package:runanywhere/generated/sdk_events.pbenum.dart'
+    show ComponentLifecycleState, SDKComponent;
+import 'package:runanywhere/internal/sdk_event_factories.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
-import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/native/dart_bridge_model_registry.dart'
-    hide ModelInfo;
-import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
+import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
-import 'package:runanywhere/public/events/sdk_event.dart';
 
 /// LLM (text generation) capability surface.
 ///
@@ -30,25 +37,40 @@ class RunAnywhereLLM {
   static final RunAnywhereLLM _instance = RunAnywhereLLM._();
   static RunAnywhereLLM get shared => _instance;
 
-  /// True when an LLM model is currently loaded in the C++ backend.
-  bool get isLoaded => DartBridge.llm.isLoaded;
-
-  /// Currently-loaded LLM model ID, or null.
-  String? get currentModelId => DartBridge.llm.currentModelId;
-
-  /// Currently-loaded LLM model as `ModelInfo`, or null.
-  Future<ModelInfo?> currentModel() async {
-    final modelId = currentModelId;
-    if (modelId == null) return null;
-    final models = await RunAnywhereModels.shared.available();
-    return models.cast<ModelInfo?>().firstWhere(
-          (m) => m?.id == modelId,
-          orElse: () => null,
-        );
+  /// True when commons lifecycle has a ready LLM model.
+  bool get isLoaded {
+    final snapshot = _lifecycleSnapshot;
+    return snapshot != null &&
+        snapshot.state ==
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+        snapshot.modelId.isNotEmpty;
   }
 
-  /// Load an LLM model by ID. Resolves the model path, unloads any
-  /// previously-loaded model, then hands off to the native bridge.
+  /// Currently-loaded LLM model ID from commons lifecycle, or null.
+  String? get currentModelId {
+    final snapshot = _lifecycleSnapshot;
+    if (snapshot == null ||
+        snapshot.state !=
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY ||
+        snapshot.modelId.isEmpty) {
+      return null;
+    }
+    return snapshot.modelId;
+  }
+
+  /// Currently-loaded LLM model metadata from commons lifecycle, or null.
+  Future<ModelInfo?> currentModel() async {
+    final current = await RunAnywhereModelLifecycle.shared.current(
+      model_pb.CurrentModelRequest(
+        category: model_pb.ModelCategory.MODEL_CATEGORY_LANGUAGE,
+        includeModelMetadata: true,
+      ),
+    );
+    if (current.modelId.isEmpty || !current.hasModel()) return null;
+    return current.model;
+  }
+
+  /// Load an LLM model by ID through commons lifecycle routing.
   Future<void> load(String modelId) async {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
@@ -58,53 +80,15 @@ class RunAnywhereLLM {
     logger.info('Loading model: $modelId');
     final startTime = DateTime.now().millisecondsSinceEpoch;
 
-    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
+    EventBus.shared.publish(SdkEventFactory.modelLoadStarted(modelId));
 
     try {
-      final models = await RunAnywhereModels.shared.available();
-      final model = models.where((m) => m.id == modelId).firstOrNull;
-
-      if (model == null) {
-        throw SDKException.modelNotFound('Model not found: $modelId');
-      }
-
-      if (model.localPath.isEmpty) {
-        throw SDKException.modelNotDownloaded(
-          'Model is not downloaded. Call downloadModel() first.',
-        );
-      }
-
-      final resolvedPath =
-          await DartBridge.modelPaths.resolveModelFilePath(model);
-      if (resolvedPath == null) {
-        throw SDKException.modelNotFound(
-            'Could not resolve model file path for: $modelId');
-      }
-      logger.info('Resolved model path: $resolvedPath');
-
-      if (DartBridge.llm.isLoaded) {
-        logger.debug('Unloading previous model');
-        DartBridge.llm.unload();
-      }
-
-      logger.debug('Loading model via C++ bridge: $resolvedPath');
-      await DartBridge.llm.loadModel(
-        resolvedPath,
-        modelId,
-        model.name,
-        model.contextLength,
-      );
-
-      final framework = model.framework ==
-              model_pb.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
-          ? model_pb.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
-          : model.framework;
-      final lifecycleResult = await DartBridge.modelLifecycle.load(
+      final lifecycleResult = await RunAnywhereModelLifecycle.shared.load(
         model_pb.ModelLoadRequest(
           modelId: modelId,
           category: model_pb.ModelCategory.MODEL_CATEGORY_LANGUAGE,
-          framework: framework,
           forceReload: true,
+          validateAvailability: true,
         ),
       );
       if (!lifecycleResult.success) {
@@ -116,16 +100,8 @@ class RunAnywhereLLM {
         );
       }
 
-      if (!DartBridge.llm.isLoaded) {
-        throw SDKException.modelLoadFailed(
-          modelId,
-          'LLM model failed to load - model may not be compatible',
-        );
-      }
-
       final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      logger.info(
-          'Model loaded successfully: ${model.name} (isLoaded=${DartBridge.llm.isLoaded})');
+      logger.info('Model loaded successfully: $modelId');
 
       TelemetryService.shared.trackModelLoad(
         modelId: modelId,
@@ -134,7 +110,7 @@ class RunAnywhereLLM {
         loadTimeMs: loadTimeMs,
       );
 
-      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
+      EventBus.shared.publish(SdkEventFactory.modelLoadCompleted(modelId));
     } catch (e) {
       logger.error('Failed to load model: $e');
       TelemetryService.shared.trackModelLoad(
@@ -147,10 +123,7 @@ class RunAnywhereLLM {
         errorMessage: e.toString(),
         context: {'model_id': modelId},
       );
-      EventBus.shared.publish(SDKModelEvent.loadFailed(
-        modelId: modelId,
-        error: e.toString(),
-      ));
+      EventBus.shared.publish(SdkEventFactory.modelLoadFailed(modelId, e));
       rethrow;
     }
   }
@@ -160,14 +133,26 @@ class RunAnywhereLLM {
     if (!SdkState.shared.isInitialized) return;
 
     final logger = SDKLogger('RunAnywhere.UnloadModel');
-    if (DartBridge.llm.isLoaded) {
-      final modelId = DartBridge.llm.currentModelId ?? 'unknown';
-      logger.info('Unloading model: $modelId');
-      EventBus.shared.publish(SDKModelEvent.unloadStarted(modelId: modelId));
-      DartBridge.llm.unload();
-      EventBus.shared.publish(SDKModelEvent.unloadCompleted(modelId: modelId));
-      logger.info('Model unloaded');
+    final modelId = currentModelId;
+    if (modelId == null) return;
+
+    logger.info('Unloading model: $modelId');
+    EventBus.shared.publish(SdkEventFactory.modelUnloadStarted(modelId));
+    final result = await RunAnywhereModelLifecycle.shared.unload(
+      model_pb.ModelUnloadRequest(
+        modelId: modelId,
+        category: model_pb.ModelCategory.MODEL_CATEGORY_LANGUAGE,
+      ),
+    );
+    if (!result.success) {
+      throw SDKException.invalidState(
+        result.errorMessage.isNotEmpty
+            ? result.errorMessage
+            : 'LLM lifecycle unload failed',
+      );
     }
+    EventBus.shared.publish(SdkEventFactory.modelUnloadCompleted(modelId));
+    logger.info('Model unloaded');
   }
 
   /// Simple text generation — returns just the generated text.
@@ -189,20 +174,25 @@ class RunAnywhereLLM {
     final opts = options ?? LLMGenerationOptions();
     final startTime = DateTime.now();
 
-    if (!DartBridge.llm.isLoaded) {
+    final modelId = currentModelId;
+    if (modelId == null) {
       throw SDKException.componentNotReady(
         'LLM model not loaded. Call loadModel() first.',
       );
     }
 
-    final modelId = DartBridge.llm.currentModelId ?? 'unknown';
-    final modelInfo =
-        await DartBridgeModelRegistry.instance.getProtoModel(modelId);
+    final current = await RunAnywhereModelLifecycle.shared.current(
+      model_pb.CurrentModelRequest(
+        category: model_pb.ModelCategory.MODEL_CATEGORY_LANGUAGE,
+        includeModelMetadata: true,
+      ),
+    );
+    final modelInfo = current.hasModel() ? current.model : null;
     final modelName = modelInfo?.name;
 
     try {
       final request = _toGenerateRequest(prompt, opts);
-      final result = DartBridge.llm.generateProto(request);
+      final result = _generateProto(request);
 
       final endTime = DateTime.now();
       final latencyMs = endTime.difference(startTime).inMicroseconds / 1000.0;
@@ -250,13 +240,13 @@ class RunAnywhereLLM {
 
     final opts = options ?? LLMGenerationOptions();
 
-    if (!DartBridge.llm.isLoaded) {
+    if (currentModelId == null) {
       throw SDKException.componentNotReady(
         'LLM model not loaded. Call loadModel() first.',
       );
     }
 
-    return DartBridge.llm.generateStreamProto(
+    return _generateStreamProto(
       _toGenerateRequest(prompt, opts, streaming: true),
     );
   }
@@ -293,6 +283,122 @@ class RunAnywhereLLM {
 
   /// Cancel any in-flight LLM generation.
   Future<void> cancel() async {
-    DartBridge.llm.cancelProto();
+    _cancelProto();
+  }
+
+  ComponentLifecycleSnapshot? get _lifecycleSnapshot =>
+      RunAnywhereModelLifecycle.shared.componentSnapshot(
+        SDKComponent.SDK_COMPONENT_LLM,
+      );
+
+  LLMGenerationResult _generateProto(LLMGenerateRequest request) {
+    final fn = RacNative.bindings.rac_llm_generate_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_llm_generate_proto is unavailable');
+    }
+
+    return DartBridgeProtoUtils.callRequest<LLMGenerationResult>(
+      request: request,
+      invoke: fn,
+      decode: LLMGenerationResult.fromBuffer,
+      symbol: 'rac_llm_generate_proto',
+    );
+  }
+
+  Stream<LLMStreamEvent> _generateStreamProto(LLMGenerateRequest request) {
+    final fn = RacNative.bindings.rac_llm_generate_stream_proto;
+    if (fn == null) {
+      return Stream<LLMStreamEvent>.error(
+        UnsupportedError('rac_llm_generate_stream_proto is unavailable'),
+      );
+    }
+
+    final controller = StreamController<LLMStreamEvent>(sync: false);
+    ffi.NativeCallable<RacLlmStreamProtoCallbackNative>? callback;
+    var sawTerminalEvent = false;
+
+    Future<void> run() async {
+      final bytes = request.writeToBuffer();
+      final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
+
+      try {
+        callback = ffi.NativeCallable<RacLlmStreamProtoCallbackNative>.listener(
+          (
+            ffi.Pointer<ffi.Uint8> bytesPtr,
+            int bytesLen,
+            ffi.Pointer<ffi.Void> _,
+          ) {
+            if (controller.isClosed ||
+                bytesPtr == ffi.nullptr ||
+                bytesLen <= 0) {
+              return;
+            }
+
+            try {
+              final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+              final event = LLMStreamEvent.fromBuffer(copy);
+              sawTerminalEvent = sawTerminalEvent || event.isFinal;
+              controller.add(event);
+              if (event.isFinal) {
+                unawaited(controller.close());
+              }
+            } catch (e, st) {
+              controller.addError(e, st);
+              unawaited(controller.close());
+            }
+          },
+        );
+
+        final rc = fn(
+          requestPtr,
+          bytes.length,
+          callback!.nativeFunction,
+          ffi.nullptr,
+        );
+        if (rc != RacResultCode.success && !controller.isClosed) {
+          controller.addError(StateError(
+            'rac_llm_generate_stream_proto failed: '
+            '${RacResultCode.getMessage(rc)}',
+          ));
+          await controller.close();
+        } else if (!sawTerminalEvent && !controller.isClosed) {
+          await controller.close();
+        }
+      } catch (e, st) {
+        if (!controller.isClosed) {
+          controller.addError(e, st);
+          await controller.close();
+        }
+      } finally {
+        calloc.free(requestPtr);
+        callback?.close();
+        callback = null;
+      }
+    }
+
+    controller.onCancel = () {
+      try {
+        _cancelProto();
+      } finally {
+        callback?.close();
+        callback = null;
+      }
+    };
+
+    unawaited(run());
+    return controller.stream;
+  }
+
+  void _cancelProto() {
+    final fn = RacNative.bindings.rac_llm_cancel_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_llm_cancel_proto is unavailable');
+    }
+
+    DartBridgeProtoUtils.callOut<SDKEvent>(
+      invoke: fn,
+      decode: SDKEvent.fromBuffer,
+      symbol: 'rac_llm_cancel_proto',
+    );
   }
 }

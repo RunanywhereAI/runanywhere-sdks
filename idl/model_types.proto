@@ -152,6 +152,7 @@ enum ModelSource {
     MODEL_SOURCE_UNSPECIFIED = 0;
     MODEL_SOURCE_REMOTE      = 1;   // Downloaded from a URL
     MODEL_SOURCE_LOCAL       = 2;   // Bundled or user-imported
+    MODEL_SOURCE_BUILT_IN    = 3;   // Platform/system model with no portable download artifact
 }
 
 // ---------------------------------------------------------------------------
@@ -191,6 +192,11 @@ enum ModelArtifactType {
     MODEL_ARTIFACT_TYPE_DIRECTORY     = 3;
     MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE   = 4;
     MODEL_ARTIFACT_TYPE_CUSTOM        = 5;
+    MODEL_ARTIFACT_TYPE_ARCHIVE       = 6;
+    MODEL_ARTIFACT_TYPE_MULTI_FILE    = 7;
+    MODEL_ARTIFACT_TYPE_BUILT_IN      = 8;
+    MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE = 9;
+    MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE  = 10;
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +320,16 @@ message ModelInfo {
     ModelFormat        format              = 4;
     InferenceFramework framework           = 5;
 
+    // Portable URL/URI string for catalog metadata and download planning.
+    // SDK/platform adapters own native HTTP execution, authentication/session
+    // state, browser fetch handles, URLSession/background-transfer objects,
+    // and permission prompts.
     string             download_url        = 6;
+
+    // Stable path or URI string after platform adapters have normalized native
+    // file handles. Do not place Android SAF/content URI permissions, iOS
+    // security-scoped bookmarks, browser FileSystemHandle objects, or other
+    // OS-governed capabilities in this C++-owned metadata field.
     string             local_path          = 7;
     int64              download_size_bytes = 8;
 
@@ -391,6 +406,11 @@ message ModelInfoList {
 message SingleFileArtifact {
     repeated string required_patterns = 1;
     repeated string optional_patterns = 2;
+
+    // Full manifest form for SDK-local wrappers that attach expected files to
+    // a single-file artifact. The pattern fields above remain for existing
+    // generated consumers.
+    optional ExpectedModelFiles expected_files = 3;
 }
 
 message ArchiveArtifact {
@@ -398,6 +418,11 @@ message ArchiveArtifact {
     ArchiveStructure structure         = 2;
     repeated string  required_patterns = 3;
     repeated string  optional_patterns = 4;
+
+    // Full manifest form for archive artifacts after extraction. Archive
+    // extraction policy is portable; native filesystem permissions and handles
+    // remain adapter-owned.
+    optional ExpectedModelFiles expected_files = 5;
 }
 
 message ModelFileDescriptor {
@@ -410,6 +435,9 @@ message ModelFileDescriptor {
     // canonical "required" flag — the documented `required` boolean from
     // newer SDK sources maps onto it (default true, mirrored in Swift).
     optional int64  size_bytes = 4;
+
+    // Legacy checksum field kept for generated consumers that already use it.
+    // Prefer checksum_sha256 for new manifests when the algorithm is known.
     optional string checksum   = 5;
 
     // Path fields used by SDK-local wrappers/catalogs. `filename` is the
@@ -419,6 +447,7 @@ message ModelFileDescriptor {
     optional string        destination_path = 7;
     optional ModelFileRole role             = 8;
     optional string        local_path       = 9;
+    optional string        checksum_sha256  = 10;
 }
 
 message MultiFileArtifact {
@@ -454,6 +483,7 @@ message ModelQuery {
     optional ModelSource        source          = 8;
     optional ModelQuerySortField sort_field     = 9;
     optional ModelQuerySortOrder sort_order     = 10;
+    optional ModelRegistryStatus registry_status = 11;
 }
 
 message ModelCompatibilityResult {
@@ -490,6 +520,16 @@ message ModelRegistryRefreshRequest {
 
     // Optional post-refresh filter for the returned model list.
     optional ModelQuery query = 4;
+
+    // Portable catalog selector. Auth state, cookies, native HTTP clients, and
+    // background transfer handles are supplied by platform adapters.
+    string catalog_uri = 5;
+
+    // Ignore cached catalog metadata and force a fresh adapter-backed refresh.
+    bool force_refresh = 6;
+
+    // Include local downloaded/available state reconciliation in the refresh.
+    bool include_downloaded_state = 7;
 }
 
 message ModelRegistryRefreshResult {
@@ -502,17 +542,27 @@ message ModelRegistryRefreshResult {
     int64         refreshed_at_unix_ms = 7;
     repeated string warnings          = 8;
     string        error_message       = 9;
+    int32         downloaded_count    = 10;
+    int32         available_count     = 11;
+    int32         error_count         = 12;
 }
 
 message ModelListRequest {
     // Set query.downloaded_only for downloaded-only lists.
     optional ModelQuery query = 1;
+
+    // Include denormalized counts in ModelListResult.
+    bool include_counts = 2;
 }
 
 message ModelListResult {
     bool          success       = 1;
     ModelInfoList models        = 2;
     string        error_message = 3;
+    int32         total_count   = 4;
+    int32         downloaded_count = 5;
+    int32         available_count  = 6;
+    int32         filtered_count   = 7;
 }
 
 message ModelGetRequest {
@@ -538,6 +588,9 @@ message ModelImportRequest {
     bool copy_into_managed_storage = 3;
     bool overwrite_existing        = 4;
     repeated ModelFileDescriptor files = 5;
+
+    // Validate format, expected files, and checksums before registry mutation.
+    bool validate_before_register = 6;
 }
 
 message ModelImportResult {
@@ -547,6 +600,8 @@ message ModelImportResult {
     int64     imported_bytes   = 4;
     repeated string warnings   = 5;
     string    error_message    = 6;
+    bool      registered       = 7;
+    bool      copied_into_managed_storage = 8;
 }
 
 message ModelDiscoveryRequest {
@@ -557,6 +612,8 @@ message ModelDiscoveryRequest {
     bool            link_downloaded = 3;
     bool            purge_invalid   = 4;
     optional ModelQuery query     = 5;
+    bool            include_built_in = 6;
+    bool            include_user_imports = 7;
 }
 
 message DiscoveredModel {
@@ -575,6 +632,8 @@ message ModelDiscoveryResult {
     int32                 purged_count      = 4;
     repeated string       warnings          = 5;
     string                error_message     = 6;
+    int32                 scanned_count     = 7;
+    int32                 imported_count    = 8;
 }
 
 message ModelLoadRequest {
@@ -582,6 +641,7 @@ message ModelLoadRequest {
     optional ModelCategory category     = 2;
     optional InferenceFramework framework = 3;
     bool               force_reload     = 4;
+    bool               validate_availability = 5;
 }
 
 message ModelLoadResult {
@@ -592,23 +652,34 @@ message ModelLoadResult {
     string             resolved_path    = 5;
     int64              loaded_at_unix_ms = 6;
     string             error_message    = 7;
+    repeated string    warnings         = 8;
+    bool               already_loaded   = 9;
+
+    // Concrete artifacts selected by C++ model path resolution. The primary
+    // model entry mirrors resolved_path; companion entries carry explicit
+    // ModelFileRole values such as MODEL_FILE_ROLE_VISION_PROJECTOR.
+    repeated ModelFileDescriptor resolved_artifacts = 10;
 }
 
 message ModelUnloadRequest {
     string             model_id     = 1;
     optional ModelCategory category = 2;
     bool               unload_all   = 3;
+    optional InferenceFramework framework = 4;
 }
 
 message ModelUnloadResult {
     bool            success            = 1;
     repeated string unloaded_model_ids = 2;
     string          error_message      = 3;
+    int64           unloaded_at_unix_ms = 4;
+    repeated string warnings           = 5;
 }
 
 message CurrentModelRequest {
     optional ModelCategory      category  = 1;
     optional InferenceFramework framework = 2;
+    bool include_model_metadata = 3;
 }
 
 message CurrentModelResult {
@@ -617,6 +688,12 @@ message CurrentModelResult {
     string    model_id          = 2;
     ModelInfo model             = 3;
     int64     loaded_at_unix_ms = 4;
+    bool      found             = 5;
+    string    error_message     = 6;
+    ModelCategory category      = 7;
+    InferenceFramework framework = 8;
+    string    resolved_path     = 9;
+    repeated ModelFileDescriptor resolved_artifacts = 10;
 }
 
 message ModelDeleteRequest {
@@ -634,4 +711,36 @@ message ModelDeleteResult {
     bool   registry_updated = 5;
     bool   was_loaded       = 6;
     string error_message    = 7;
+    repeated string warnings = 8;
+}
+
+// Logical ModelRegistry service contract. Platform adapters remain
+// responsible for native file handles, sandbox permissions, HTTP execution,
+// and destructive filesystem operations. This service carries only the
+// portable registry metadata and workflow messages owned by the IDL/C++ layer.
+service ModelRegistry {
+    // Register new model metadata and return the normalized saved entry.
+    rpc Register(ModelInfo) returns (ModelInfo);
+
+    // Update an existing model metadata entry and return the normalized entry.
+    rpc Update(ModelInfo) returns (ModelInfo);
+
+    // Fetch a single registry entry by id.
+    rpc Get(ModelGetRequest) returns (ModelGetResult);
+
+    // List entries, optionally filtered by ModelListRequest.query.
+    rpc List(ModelListRequest) returns (ModelListResult);
+
+    // Remove a registry entry. File deletion/unload work remains platform or
+    // lifecycle owned even when ModelDeleteRequest flags are populated.
+    rpc Remove(ModelDeleteRequest) returns (ModelDeleteResult);
+
+    // Import stable, platform-normalized local metadata into the registry.
+    rpc Import(ModelImportRequest) returns (ModelImportResult);
+
+    // Discover models from normalized roots supplied by platform adapters.
+    rpc Discover(ModelDiscoveryRequest) returns (ModelDiscoveryResult);
+
+    // Refresh registry state from assignment/cache/local reconciliation inputs.
+    rpc Refresh(ModelRegistryRefreshRequest) returns (ModelRegistryRefreshResult);
 }

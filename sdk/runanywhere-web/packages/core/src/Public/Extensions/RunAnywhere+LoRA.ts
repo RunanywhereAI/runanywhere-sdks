@@ -1,143 +1,216 @@
 /**
  * RunAnywhere+LoRA.ts
  *
- * Top-level LoRA adapter API — mirrors Swift `RunAnywhere+LoRA.swift`.
- *
- * The Web SDK has not yet wired the `rac_lora_*` C ABI into its WASM build,
- * so each method delegates to a `LoRAProvider` registered by a backend
- * package. When no provider is registered (today's default), the methods
- * throw a clear `BackendNotAvailable` SDK error instead of silently failing.
- *
- * Provider contract (extends-pattern; backends declare any subset):
- *   - `loadLoraAdapter(config)`
- *   - `removeLoraAdapter(path)`
- *   - `clearLoraAdapters()`
- *   - `getLoadedLoraAdapters() -> LoRAAdapterInfo[]`
- *   - `checkLoraCompatibility(path) -> LoraCompatibilityResult`
- *   - `registerLoraAdapter(entry)`
- *   - `loraAdaptersForModel(modelId) -> LoraAdapterCatalogEntry[]`
- *   - `allRegisteredLoraAdapters() -> LoraAdapterCatalogEntry[]`
+ * Top-level Web LoRA API backed by the generated proto-byte C ABI.
  */
 
+import { LoRAProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
 import { SDKException } from '../../Foundation/SDKException';
-import { SDKLogger } from '../../Foundation/SDKLogger';
 import type {
   LoRAAdapterConfig,
-  LoRAAdapterInfo,
+  LoRAApplyRequest,
+  LoRAApplyResult,
+  LoRARemoveRequest,
+  LoRAState,
   LoraAdapterCatalogEntry,
+  LoraAdapterCatalogGetRequest,
+  LoraAdapterCatalogGetResult,
+  LoraAdapterCatalogListRequest,
+  LoraAdapterCatalogListResult,
+  LoraAdapterCatalogQuery,
+  LoraAdapterDownloadCompletedRequest,
+  LoraAdapterDownloadCompletedResult,
   LoraCompatibilityResult,
 } from '@runanywhere/proto-ts/lora_options';
 
-const logger = new SDKLogger('LoRA');
+export type {
+  LoRAAdapterConfig,
+  LoRAAdapterInfo,
+  LoRAApplyRequest,
+  LoRAApplyResult,
+  LoRARemoveRequest,
+  LoRAState,
+  LoraAdapterCatalogEntry,
+  LoraAdapterCatalogGetRequest,
+  LoraAdapterCatalogGetResult,
+  LoraAdapterCatalogListRequest,
+  LoraAdapterCatalogListResult,
+  LoraAdapterCatalogQuery,
+  LoraAdapterDownloadCompletedRequest,
+  LoraAdapterDownloadCompletedResult,
+  LoraCompatibilityResult,
+} from '@runanywhere/proto-ts/lora_options';
 
-/**
- * Backend-supplied implementation. Optional methods let backends declare
- * partial support without breaking compile-time typing of the public API.
- */
-export interface LoRAProvider {
-  loadLoraAdapter?(config: LoRAAdapterConfig): Promise<LoRAAdapterInfo | void>;
-  removeLoraAdapter?(path: string): Promise<void>;
-  clearLoraAdapters?(): Promise<void>;
-  getLoadedLoraAdapters?(): Promise<LoRAAdapterInfo[]>;
-  checkLoraCompatibility?(adapterId: string, modelId: string): Promise<LoraCompatibilityResult>;
-  registerLoraAdapter?(entry: LoraAdapterCatalogEntry): Promise<void>;
-  loraAdaptersForModel?(modelId: string): Promise<LoraAdapterCatalogEntry[]>;
-  allRegisteredLoraAdapters?(): Promise<LoraAdapterCatalogEntry[]>;
-}
-
-let _provider: LoRAProvider | null = null;
-
-/** Backend hook: register the LoRA implementation. */
-export function setLoRAProvider(provider: LoRAProvider | null): void {
-  _provider = provider;
-}
-
-function require<TKey extends keyof LoRAProvider>(method: TKey): NonNullable<LoRAProvider[TKey]> {
-  if (_provider == null || _provider[method] == null) {
-    // Phase C-prime: throw SDKException — wraps proto-typed wire envelope.
+function requireAdapter(operation: string): LoRAProtoAdapter {
+  const adapter = LoRAProtoAdapter.tryDefault();
+  if (!adapter) {
     throw SDKException.backendNotAvailable(
-      `LoRA.${String(method)}`,
-      'No LoRA backend registered. Install the @runanywhere/web-llamacpp ' +
-      'package (with LoRA WASM exports) and register it via `LlamaCPP.register()`.',
+      operation,
+      'RunAnywhere WASM module is not installed.',
     );
   }
-  return _provider[method] as NonNullable<LoRAProvider[TKey]>;
+  return adapter;
 }
 
-// ---------------------------------------------------------------------------
-// Public API — mirror Swift signatures one-to-one.
-// ---------------------------------------------------------------------------
-
-/**
- * Load a LoRA adapter and return its info (§3 `lora.load`).
- * Returns `LoRAAdapterInfo` describing the loaded adapter.
- */
-export async function loadLoraAdapter(config: LoRAAdapterConfig): Promise<LoRAAdapterInfo> {
-  const result = await require('loadLoraAdapter')(config);
-  logger.info(`LoRA adapter loaded: ${config.adapterPath}`);
-  // If the backend returns LoRAAdapterInfo, use it; otherwise synthesize from config.
-  if (result != null && typeof result === 'object' && 'adapterPath' in result) {
-    return result as LoRAAdapterInfo;
+function requireResult<T>(operation: string, result: T | null): T {
+  if (result == null) {
+    throw SDKException.backendNotAvailable(
+      operation,
+      'LoRA proto ABI is unavailable or returned an empty result.',
+    );
   }
+  return result;
+}
+
+function emptyLoRAState(): LoRAState {
   return {
-    adapterId: config.adapterId ?? '',
-    adapterPath: config.adapterPath,
-    scale: config.scale,
-    applied: true,
+    loadedAdapters: [],
+    hasActiveAdapters: false,
+    errorCode: 0,
   };
 }
 
-export async function removeLoraAdapter(path: string): Promise<void> {
-  await require('removeLoraAdapter')(path);
-  logger.info(`LoRA adapter removed: ${path}`);
+function emptyCatalogListRequest(): LoraAdapterCatalogListRequest {
+  return {
+    includeCounts: true,
+  };
 }
 
-export async function clearLoraAdapters(): Promise<void> {
-  await require('clearLoraAdapters')();
-  logger.info('All LoRA adapters cleared');
+export function supportsNativeLoRA(): boolean {
+  return LoRAProtoAdapter.tryDefault()?.supportsProtoLoRA() ?? false;
 }
 
-export async function getLoadedLoraAdapters(): Promise<LoRAAdapterInfo[]> {
-  return require('getLoadedLoraAdapters')();
+export function missingLoRAExports(): string[] {
+  return LoRAProtoAdapter.tryDefault()?.missingLoRAExports() ?? [];
 }
 
-/**
- * Check LoRA adapter / model compatibility (§3 `lora.checkCompatibility`).
- * Canonical signature: `(adapterId: string, modelId: string)`.
- */
+export function supportsNativeLoRACatalog(): boolean {
+  return LoRAProtoAdapter.tryDefault()?.supportsProtoLoRACatalog() ?? false;
+}
+
+export function missingLoRACatalogExports(): string[] {
+  return LoRAProtoAdapter.tryDefault()?.missingLoRACatalogExports() ?? [];
+}
+
+export async function applyLoraAdapters(
+  llmComponent: number,
+  request: LoRAApplyRequest,
+): Promise<LoRAApplyResult> {
+  return requireResult(
+    'LoRA.apply',
+    requireAdapter('LoRA.apply').apply(llmComponent, request),
+  );
+}
+
+export async function removeLoraAdapters(
+  llmComponent: number,
+  request: LoRARemoveRequest,
+): Promise<LoRAState> {
+  return requireResult(
+    'LoRA.remove',
+    requireAdapter('LoRA.remove').remove(llmComponent, request),
+  );
+}
+
+export async function listLoraAdapters(
+  llmComponent: number,
+  request: LoRAState = emptyLoRAState(),
+): Promise<LoRAState> {
+  return requireResult(
+    'LoRA.list',
+    requireAdapter('LoRA.list').list(llmComponent, request),
+  );
+}
+
+export async function getLoraState(
+  llmComponent: number,
+  request: LoRAState = emptyLoRAState(),
+): Promise<LoRAState> {
+  return requireResult(
+    'LoRA.state',
+    requireAdapter('LoRA.state').state(llmComponent, request),
+  );
+}
+
 export async function checkLoraCompatibility(
-  adapterId: string,
-  modelId: string,
+  llmComponent: number,
+  config: LoRAAdapterConfig,
 ): Promise<LoraCompatibilityResult> {
-  if (_provider?.checkLoraCompatibility == null) {
-    return { isCompatible: false, errorMessage: 'LoRA support not available' };
-  }
-  return _provider.checkLoraCompatibility(adapterId, modelId);
+  return requireResult(
+    'LoRA.checkCompatibility',
+    requireAdapter('LoRA.checkCompatibility').compatibility(llmComponent, config),
+  );
 }
 
-export async function registerLoraAdapter(entry: LoraAdapterCatalogEntry): Promise<void> {
-  await require('registerLoraAdapter')(entry);
-  logger.info(`LoRA adapter registered: ${entry.id}`);
+export async function registerLoraAdapter(
+  entry: LoraAdapterCatalogEntry,
+): Promise<LoraAdapterCatalogEntry> {
+  return requireResult(
+    'LoRA.register',
+    requireAdapter('LoRA.register').register(entry),
+  );
 }
 
-export async function loraAdaptersForModel(modelId: string): Promise<LoraAdapterCatalogEntry[]> {
-  if (_provider?.loraAdaptersForModel == null) return [];
-  return _provider.loraAdaptersForModel(modelId);
+export async function listLoraCatalog(
+  request: LoraAdapterCatalogListRequest = emptyCatalogListRequest(),
+): Promise<LoraAdapterCatalogListResult> {
+  return requireResult(
+    'LoRA.catalog.list',
+    requireAdapter('LoRA.catalog.list').listCatalog(request),
+  );
 }
 
-export async function allRegisteredLoraAdapters(): Promise<LoraAdapterCatalogEntry[]> {
-  if (_provider?.allRegisteredLoraAdapters == null) return [];
-  return _provider.allRegisteredLoraAdapters();
+export async function queryLoraCatalog(
+  query: LoraAdapterCatalogQuery,
+): Promise<LoraAdapterCatalogListResult> {
+  return requireResult(
+    'LoRA.catalog.query',
+    requireAdapter('LoRA.catalog.query').queryCatalog(query),
+  );
 }
+
+export async function getLoraCatalogEntry(
+  request: LoraAdapterCatalogGetRequest,
+): Promise<LoraAdapterCatalogGetResult> {
+  return requireResult(
+    'LoRA.catalog.get',
+    requireAdapter('LoRA.catalog.get').getCatalogEntry(request),
+  );
+}
+
+export async function markLoraAdapterDownloadCompleted(
+  request: LoraAdapterDownloadCompletedRequest,
+): Promise<LoraAdapterDownloadCompletedResult> {
+  return requireResult(
+    'LoRA.catalog.markDownloadCompleted',
+    requireAdapter('LoRA.catalog.markDownloadCompleted').markDownloadCompleted(request),
+  );
+}
+
+const LoraCatalog = {
+  supportsNative: supportsNativeLoRACatalog,
+  missingExports: missingLoRACatalogExports,
+  register: registerLoraAdapter,
+  list: listLoraCatalog,
+  query: queryLoraCatalog,
+  get: getLoraCatalogEntry,
+  markDownloadCompleted: markLoraAdapterDownloadCompleted,
+};
 
 export const LoRA = {
-  setProvider: setLoRAProvider,
-  load: loadLoraAdapter,
-  remove: removeLoraAdapter,
-  clear: clearLoraAdapters,
-  getLoaded: getLoadedLoraAdapters,
+  supportsNative: supportsNativeLoRA,
+  missingExports: missingLoRAExports,
+  supportsNativeCatalog: supportsNativeLoRACatalog,
+  missingCatalogExports: missingLoRACatalogExports,
+  apply: applyLoraAdapters,
+  remove: removeLoraAdapters,
+  list: listLoraAdapters,
+  state: getLoraState,
   checkCompatibility: checkLoraCompatibility,
   register: registerLoraAdapter,
-  adaptersForModel: loraAdaptersForModel,
-  allRegistered: allRegisteredLoraAdapters,
+  listCatalog: listLoraCatalog,
+  queryCatalog: queryLoraCatalog,
+  getCatalogEntry: getLoraCatalogEntry,
+  markDownloadCompleted: markLoraAdapterDownloadCompleted,
+  catalog: LoraCatalog,
 };

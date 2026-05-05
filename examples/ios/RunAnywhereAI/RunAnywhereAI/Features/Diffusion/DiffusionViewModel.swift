@@ -14,9 +14,9 @@ class DiffusionViewModel: ObservableObject {
 
     @Published var isModelLoaded = false
     @Published var currentModelName: String?
-    @Published var currentBackend: String = "" // "CoreML" or "ONNX"
-    @Published var availableModels: [ModelInfo] = []
-    @Published var selectedModel: ModelInfo?
+    @Published var currentBackend: String = ""
+    @Published var availableModels: [RAModelInfo] = []
+    @Published var selectedModel: RAModelInfo?
 
     @Published var isDownloading = false
     @Published var downloadProgress: Double = 0.0
@@ -60,37 +60,33 @@ class DiffusionViewModel: ObservableObject {
     // MARK: - Models
 
     func loadAvailableModels() async {
-        do {
-            let allModels = try await RunAnywhere.availableModels()
-            availableModels = allModels.filter {
-                $0.category == ModelCategory.imageGeneration && !$0.isBuiltIn && $0.artifactType.requiresDownload
-            }
-            if let downloaded = availableModels.first(where: { $0.isDownloaded }) {
-                selectedModel = downloaded
-            } else if let first = availableModels.first {
-                selectedModel = first
-            }
-        } catch {
-            logger.error("Failed to load models: \(error.localizedDescription)")
+        let listResult = await RunAnywhere.listModels()
+        guard listResult.success else {
+            logger.error("Failed to load models: \(listResult.errorMessage)")
+            return
+        }
+        availableModels = listResult.models.models.filter {
+            $0.category == ModelCategory.imageGeneration && !$0.isBuiltIn && $0.artifactType.requiresDownload
+        }
+        if let downloaded = availableModels.first(where: { $0.isDownloaded }) {
+            selectedModel = downloaded
+        } else if let first = availableModels.first {
+            selectedModel = first
         }
     }
 
     func checkModelState() async {
-        do {
-            isModelLoaded = try await RunAnywhere.isDiffusionModelLoaded
-            if isModelLoaded {
-                currentModelName = try await RunAnywhere.currentDiffusionModelId
-                // Determine backend from selected model
-                if let model = selectedModel {
-                    currentBackend = model.framework.displayName
-                }
+        isModelLoaded = await RunAnywhere.isDiffusionModelLoaded
+        if isModelLoaded {
+            currentModelName = await RunAnywhere.currentDiffusionModelId
+            // Determine backend from selected model
+            if let model = selectedModel {
+                currentBackend = model.framework.displayName
             }
-        } catch {
-            logger.error("Failed to check model state: \(error.localizedDescription)")
         }
     }
 
-    func downloadModel(_ model: ModelInfo) async {
+    func downloadModel(_ model: RAModelInfo) async {
         guard !isDownloading, !model.isBuiltIn else { return }
 
         isDownloading = true
@@ -99,11 +95,11 @@ class DiffusionViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let stream = try await RunAnywhere.downloadModel(model.id)
-            for await progress in stream {
-                downloadProgress = progress.overallProgress
-                downloadStatus = "Downloading: \(Int(progress.overallProgress * 100))%"
-                if progress.stage == .completed { break }
+            try await RunAnywhere.downloadModel(model) { progress in
+                await MainActor.run {
+                    self.downloadProgress = Double(progress.overallProgress)
+                    self.downloadStatus = "\(progress.stage.displayName): \(Int(Double(progress.overallProgress) * 100))%"
+                }
             }
             await loadAvailableModels()
             selectedModel = availableModels.first { $0.id == model.id }
@@ -114,10 +110,10 @@ class DiffusionViewModel: ObservableObject {
         isDownloading = false
     }
 
-    @Published var currentModelVariant: DiffusionModelVariant = .sd15
+    @Published var currentModelVariant: RADiffusionModelVariant = .sd15
 
     func loadSelectedModel() async {
-        guard let model = selectedModel, model.isDownloaded, let path = model.localPath else {
+        guard let model = selectedModel, model.isDownloaded else {
             errorMessage = "Model not downloaded"
             return
         }
@@ -129,29 +125,24 @@ class DiffusionViewModel: ObservableObject {
         defer { isLoadingModel = false }
 
         do {
-            // App only supports Apple SD 1.5 (CoreML); use .sd15 for configuration
-            let variant: DiffusionModelVariant = .sd15
+            // Use SD 1.5 defaults unless the registry adds variant-specific metadata.
+            let variant: RADiffusionModelVariant = .sd15
             currentModelVariant = variant
 
-            let config = DiffusionConfiguration(
-                modelVariant: variant,
-                enableSafetyChecker: true,
-                reduceMemory: true
-            )
-            try await RunAnywhere.loadDiffusionModel(
-                modelPath: path.path,
-                modelId: model.id,
-                modelName: model.name,
-                configuration: config
-            )
+            var config = RADiffusionConfiguration.defaults()
+            config.modelVariant = variant
+            config.enableSafetyChecker = true
+            config.reduceMemory = true
+            try await RunAnywhere.loadDiffusionModel(model, configuration: config)
             isModelLoaded = true
             currentModelName = model.name
             currentBackend = model.framework.displayName
 
             // Show helpful info about the model
-            let stepsInfo = variant.defaultSteps == 1 ? "1 step (ultra-fast)" : "\(variant.defaultSteps) steps"
+            let defaultSteps = self.defaultInferenceSteps(for: variant)
+            let stepsInfo = defaultSteps == 1 ? "1 step (ultra-fast)" : "\(defaultSteps) steps"
             statusMessage = "Model loaded (\(currentBackend), \(stepsInfo))"
-            logger.info("Loaded \(model.name) as \(variant.rawValue) - \(stepsInfo)")
+            logger.info("Loaded \(model.name) as \(self.displayName(for: variant)) - \(stepsInfo)")
         } catch {
             errorMessage = "Load failed: \(error.localizedDescription)"
             statusMessage = "Failed"
@@ -179,31 +170,29 @@ class DiffusionViewModel: ObservableObject {
             // - LCM: 512x512, 4 steps, low CFG (fast ~15-30 sec)
             // - SD 1.5/Turbo: defaults based on variant
             let variant = self.currentModelVariant
-            let resolution = variant.defaultResolution
-            let steps = variant.defaultSteps
-            let guidanceScale = variant.defaultGuidanceScale
+            let resolution = self.defaultResolution(for: variant)
+            let steps = self.defaultInferenceSteps(for: variant)
+            let guidanceScale = self.defaultGuidanceScale(for: variant)
 
             // For mobile, cap resolution to avoid memory issues
             let maxMobileRes = 512
             let width = min(resolution.width, maxMobileRes)
             let height = min(resolution.height, maxMobileRes)
 
-            logger.info("Generating with \(variant.rawValue): \(width)x\(height), \(steps) steps, CFG=\(guidanceScale)")
+            logger.info("Generating with \(self.displayName(for: variant)): \(width)x\(height), \(steps) steps, CFG=\(guidanceScale)")
 
-            let options = DiffusionGenerationOptions(
-                prompt: prompt,
-                width: width,
-                height: height,
-                steps: steps,
-                guidanceScale: guidanceScale
-            )
+            var options = RADiffusionGenerationOptions.defaults(prompt: prompt)
+            options.width = Int32(width)
+            options.height = Int32(height)
+            options.numInferenceSteps = steps
+            options.guidanceScale = guidanceScale
             // Use the progress-callback overload so the pipeline runs only once.
             let result = try await RunAnywhere.generateImage(
                 prompt: prompt,
                 options: options
             ) { [weak self] update in
                 Task { @MainActor [weak self] in
-                    self?.progress = update.progress
+                    self?.progress = update.progressPercent
                     if steps == 1 {
                         self?.statusMessage = "Processing (1-step model)..."
                     } else {
@@ -212,13 +201,17 @@ class DiffusionViewModel: ObservableObject {
                 }
                 return true // continue generation
             }
-            if let platformImage = createImage(from: result.imageData, width: result.width, height: result.height) {
+            if let platformImage = createImage(
+                from: result.imageData,
+                width: Int(result.width),
+                height: Int(result.height)
+            ) {
                 #if os(iOS)
                 generatedImage = Image(uiImage: platformImage)
                 #elseif os(macOS)
                 generatedImage = Image(nsImage: platformImage)
                 #endif
-                statusMessage = "Done in \(result.generationTimeMs)ms"
+                statusMessage = "Done in \(result.totalTimeMs)ms"
             } else {
                 errorMessage = "Failed to create image"
             }
@@ -283,4 +276,58 @@ class DiffusionViewModel: ObservableObject {
         return NSImage(cgImage: cgImage, size: NSSize(width: width, height: height))
     }
     #endif
+
+    private func defaultResolution(for variant: RADiffusionModelVariant) -> (width: Int, height: Int) {
+        switch variant {
+        case .sdxl, .sdxlTurbo:
+            return (1024, 1024)
+        case .sd21:
+            return (768, 768)
+        default:
+            return (512, 512)
+        }
+    }
+
+    private func defaultInferenceSteps(for variant: RADiffusionModelVariant) -> Int32 {
+        switch variant {
+        case .sdxs:
+            return 1
+        case .sdxlTurbo, .lcm:
+            return 4
+        case .sd21:
+            return 28
+        default:
+            return 20
+        }
+    }
+
+    private func defaultGuidanceScale(for variant: RADiffusionModelVariant) -> Float {
+        switch variant {
+        case .sdxs, .sdxlTurbo:
+            return 0.0
+        case .lcm:
+            return 1.5
+        default:
+            return 7.5
+        }
+    }
+
+    private func displayName(for variant: RADiffusionModelVariant) -> String {
+        switch variant {
+        case .sd15:
+            return "SD 1.5"
+        case .sd21:
+            return "SD 2.1"
+        case .sdxl:
+            return "SDXL"
+        case .sdxlTurbo:
+            return "SDXL Turbo"
+        case .sdxs:
+            return "SDXS"
+        case .lcm:
+            return "LCM"
+        default:
+            return "Diffusion"
+        }
+    }
 }

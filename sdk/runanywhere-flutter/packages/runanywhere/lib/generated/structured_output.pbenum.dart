@@ -77,5 +77,49 @@ class Sentiment extends $pb.ProtobufEnum {
   const Sentiment._($core.int v, $core.String n) : super(v, n);
 }
 
+class StructuredOutputMode extends $pb.ProtobufEnum {
+  static const StructuredOutputMode STRUCTURED_OUTPUT_MODE_UNSPECIFIED = StructuredOutputMode._(0, _omitEnumNames ? '' : 'STRUCTURED_OUTPUT_MODE_UNSPECIFIED');
+  static const StructuredOutputMode STRUCTURED_OUTPUT_MODE_JSON_SCHEMA = StructuredOutputMode._(1, _omitEnumNames ? '' : 'STRUCTURED_OUTPUT_MODE_JSON_SCHEMA');
+  static const StructuredOutputMode STRUCTURED_OUTPUT_MODE_JSON_OBJECT = StructuredOutputMode._(2, _omitEnumNames ? '' : 'STRUCTURED_OUTPUT_MODE_JSON_OBJECT');
+  static const StructuredOutputMode STRUCTURED_OUTPUT_MODE_REGEX = StructuredOutputMode._(3, _omitEnumNames ? '' : 'STRUCTURED_OUTPUT_MODE_REGEX');
+  static const StructuredOutputMode STRUCTURED_OUTPUT_MODE_GRAMMAR = StructuredOutputMode._(4, _omitEnumNames ? '' : 'STRUCTURED_OUTPUT_MODE_GRAMMAR');
+
+  static const $core.List<StructuredOutputMode> values = <StructuredOutputMode> [
+    STRUCTURED_OUTPUT_MODE_UNSPECIFIED,
+    STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
+    STRUCTURED_OUTPUT_MODE_JSON_OBJECT,
+    STRUCTURED_OUTPUT_MODE_REGEX,
+    STRUCTURED_OUTPUT_MODE_GRAMMAR,
+  ];
+
+  static final $core.Map<$core.int, StructuredOutputMode> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static StructuredOutputMode? valueOf($core.int value) => _byValue[value];
+
+  const StructuredOutputMode._($core.int v, $core.String n) : super(v, n);
+}
+
+class StructuredOutputStreamEventKind extends $pb.ProtobufEnum {
+  static const StructuredOutputStreamEventKind STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED = StructuredOutputStreamEventKind._(0, _omitEnumNames ? '' : 'STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED');
+  static const StructuredOutputStreamEventKind STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN = StructuredOutputStreamEventKind._(1, _omitEnumNames ? '' : 'STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN');
+  static const StructuredOutputStreamEventKind STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON = StructuredOutputStreamEventKind._(2, _omitEnumNames ? '' : 'STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON');
+  static const StructuredOutputStreamEventKind STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION = StructuredOutputStreamEventKind._(3, _omitEnumNames ? '' : 'STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION');
+  static const StructuredOutputStreamEventKind STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED = StructuredOutputStreamEventKind._(4, _omitEnumNames ? '' : 'STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED');
+  static const StructuredOutputStreamEventKind STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR = StructuredOutputStreamEventKind._(5, _omitEnumNames ? '' : 'STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR');
+
+  static const $core.List<StructuredOutputStreamEventKind> values = <StructuredOutputStreamEventKind> [
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED,
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN,
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON,
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION,
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED,
+    STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR,
+  ];
+
+  static final $core.Map<$core.int, StructuredOutputStreamEventKind> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static StructuredOutputStreamEventKind? valueOf($core.int value) => _byValue[value];
+
+  const StructuredOutputStreamEventKind._($core.int v, $core.String n) : super(v, n);
+}
+
 
 const _omitEnumNames = $core.bool.fromEnvironment('protobuf.omit_enum_names');

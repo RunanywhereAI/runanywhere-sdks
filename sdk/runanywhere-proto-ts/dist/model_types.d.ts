@@ -175,6 +175,8 @@ export declare enum ModelSource {
     MODEL_SOURCE_REMOTE = 1,
     /** MODEL_SOURCE_LOCAL - Bundled or user-imported */
     MODEL_SOURCE_LOCAL = 2,
+    /** MODEL_SOURCE_BUILT_IN - Platform/system model with no portable download artifact */
+    MODEL_SOURCE_BUILT_IN = 3,
     UNRECOGNIZED = -1
 }
 export declare function modelSourceFromJSON(object: any): ModelSource;
@@ -224,6 +226,11 @@ export declare enum ModelArtifactType {
     MODEL_ARTIFACT_TYPE_DIRECTORY = 3,
     MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE = 4,
     MODEL_ARTIFACT_TYPE_CUSTOM = 5,
+    MODEL_ARTIFACT_TYPE_ARCHIVE = 6,
+    MODEL_ARTIFACT_TYPE_MULTI_FILE = 7,
+    MODEL_ARTIFACT_TYPE_BUILT_IN = 8,
+    MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE = 9,
+    MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE = 10,
     UNRECOGNIZED = -1
 }
 export declare function modelArtifactTypeFromJSON(object: any): ModelArtifactType;
@@ -374,7 +381,19 @@ export interface ModelInfo {
     category: ModelCategory;
     format: ModelFormat;
     framework: InferenceFramework;
+    /**
+     * Portable URL/URI string for catalog metadata and download planning.
+     * SDK/platform adapters own native HTTP execution, authentication/session
+     * state, browser fetch handles, URLSession/background-transfer objects,
+     * and permission prompts.
+     */
     downloadUrl: string;
+    /**
+     * Stable path or URI string after platform adapters have normalized native
+     * file handles. Do not place Android SAF/content URI permissions, iOS
+     * security-scoped bookmarks, browser FileSystemHandle objects, or other
+     * OS-governed capabilities in this C++-owned metadata field.
+     */
     localPath: string;
     downloadSizeBytes: number;
     contextLength: number;
@@ -450,12 +469,24 @@ export interface ModelInfoList {
 export interface SingleFileArtifact {
     requiredPatterns: string[];
     optionalPatterns: string[];
+    /**
+     * Full manifest form for SDK-local wrappers that attach expected files to
+     * a single-file artifact. The pattern fields above remain for existing
+     * generated consumers.
+     */
+    expectedFiles?: ExpectedModelFiles | undefined;
 }
 export interface ArchiveArtifact {
     type: ArchiveType;
     structure: ArchiveStructure;
     requiredPatterns: string[];
     optionalPatterns: string[];
+    /**
+     * Full manifest form for archive artifacts after extraction. Archive
+     * extraction policy is portable; native filesystem permissions and handles
+     * remain adapter-owned.
+     */
+    expectedFiles?: ExpectedModelFiles | undefined;
 }
 export interface ModelFileDescriptor {
     url: string;
@@ -468,6 +499,10 @@ export interface ModelFileDescriptor {
      * newer SDK sources maps onto it (default true, mirrored in Swift).
      */
     sizeBytes?: number | undefined;
+    /**
+     * Legacy checksum field kept for generated consumers that already use it.
+     * Prefer checksum_sha256 for new manifests when the algorithm is known.
+     */
     checksum?: string | undefined;
     /**
      * Path fields used by SDK-local wrappers/catalogs. `filename` is the
@@ -478,6 +513,7 @@ export interface ModelFileDescriptor {
     destinationPath?: string | undefined;
     role?: ModelFileRole | undefined;
     localPath?: string | undefined;
+    checksumSha256?: string | undefined;
 }
 export interface MultiFileArtifact {
     files: ModelFileDescriptor[];
@@ -514,6 +550,7 @@ export interface ModelQuery {
     source?: ModelSource | undefined;
     sortField?: ModelQuerySortField | undefined;
     sortOrder?: ModelQuerySortOrder | undefined;
+    registryStatus?: ModelRegistryStatus | undefined;
 }
 export interface ModelCompatibilityResult {
     isCompatible: boolean;
@@ -534,6 +571,15 @@ export interface ModelRegistryRefreshRequest {
     pruneOrphans: boolean;
     /** Optional post-refresh filter for the returned model list. */
     query?: ModelQuery | undefined;
+    /**
+     * Portable catalog selector. Auth state, cookies, native HTTP clients, and
+     * background transfer handles are supplied by platform adapters.
+     */
+    catalogUri: string;
+    /** Ignore cached catalog metadata and force a fresh adapter-backed refresh. */
+    forceRefresh: boolean;
+    /** Include local downloaded/available state reconciliation in the refresh. */
+    includeDownloadedState: boolean;
 }
 export interface ModelRegistryRefreshResult {
     success: boolean;
@@ -545,15 +591,24 @@ export interface ModelRegistryRefreshResult {
     refreshedAtUnixMs: number;
     warnings: string[];
     errorMessage: string;
+    downloadedCount: number;
+    availableCount: number;
+    errorCount: number;
 }
 export interface ModelListRequest {
     /** Set query.downloaded_only for downloaded-only lists. */
     query?: ModelQuery | undefined;
+    /** Include denormalized counts in ModelListResult. */
+    includeCounts: boolean;
 }
 export interface ModelListResult {
     success: boolean;
     models?: ModelInfoList | undefined;
     errorMessage: string;
+    totalCount: number;
+    downloadedCount: number;
+    availableCount: number;
+    filteredCount: number;
 }
 export interface ModelGetRequest {
     modelId: string;
@@ -578,6 +633,8 @@ export interface ModelImportRequest {
     copyIntoManagedStorage: boolean;
     overwriteExisting: boolean;
     files: ModelFileDescriptor[];
+    /** Validate format, expected files, and checksums before registry mutation. */
+    validateBeforeRegister: boolean;
 }
 export interface ModelImportResult {
     success: boolean;
@@ -586,6 +643,8 @@ export interface ModelImportResult {
     importedBytes: number;
     warnings: string[];
     errorMessage: string;
+    registered: boolean;
+    copiedIntoManagedStorage: boolean;
 }
 export interface ModelDiscoveryRequest {
     /**
@@ -597,6 +656,8 @@ export interface ModelDiscoveryRequest {
     linkDownloaded: boolean;
     purgeInvalid: boolean;
     query?: ModelQuery | undefined;
+    includeBuiltIn: boolean;
+    includeUserImports: boolean;
 }
 export interface DiscoveredModel {
     modelId: string;
@@ -613,12 +674,15 @@ export interface ModelDiscoveryResult {
     purgedCount: number;
     warnings: string[];
     errorMessage: string;
+    scannedCount: number;
+    importedCount: number;
 }
 export interface ModelLoadRequest {
     modelId: string;
     category?: ModelCategory | undefined;
     framework?: InferenceFramework | undefined;
     forceReload: boolean;
+    validateAvailability: boolean;
 }
 export interface ModelLoadResult {
     success: boolean;
@@ -628,25 +692,43 @@ export interface ModelLoadResult {
     resolvedPath: string;
     loadedAtUnixMs: number;
     errorMessage: string;
+    warnings: string[];
+    alreadyLoaded: boolean;
+    /**
+     * Concrete artifacts selected by C++ model path resolution. The primary
+     * model entry mirrors resolved_path; companion entries carry explicit
+     * ModelFileRole values such as MODEL_FILE_ROLE_VISION_PROJECTOR.
+     */
+    resolvedArtifacts: ModelFileDescriptor[];
 }
 export interface ModelUnloadRequest {
     modelId: string;
     category?: ModelCategory | undefined;
     unloadAll: boolean;
+    framework?: InferenceFramework | undefined;
 }
 export interface ModelUnloadResult {
     success: boolean;
     unloadedModelIds: string[];
     errorMessage: string;
+    unloadedAtUnixMs: number;
+    warnings: string[];
 }
 export interface CurrentModelRequest {
     category?: ModelCategory | undefined;
     framework?: InferenceFramework | undefined;
+    includeModelMetadata: boolean;
 }
 export interface CurrentModelResult {
     modelId: string;
     model?: ModelInfo | undefined;
     loadedAtUnixMs: number;
+    found: boolean;
+    errorMessage: string;
+    category: ModelCategory;
+    framework: InferenceFramework;
+    resolvedPath: string;
+    resolvedArtifacts: ModelFileDescriptor[];
 }
 export interface ModelDeleteRequest {
     modelId: string;
@@ -662,6 +744,7 @@ export interface ModelDeleteResult {
     registryUpdated: boolean;
     wasLoaded: boolean;
     errorMessage: string;
+    warnings: string[];
 }
 export declare const ModelThinkingTagPattern: {
     encode(message: ModelThinkingTagPattern, writer?: _m0.Writer): _m0.Writer;

@@ -262,12 +262,12 @@ VAD.processSamples(audioChunk);
 ### 6. Vision Language Model (VLM)
 
 ```typescript
-import { VLM, VLMImageFormat } from '@runanywhere/web-llamacpp';
+import { RunAnywhere, VisionLanguage, VLMImageFormat } from '@runanywhere/web';
 
-await VLM.loadModel('/models/qwen2-vl.gguf', '/models/mmproj.gguf', 'qwen2-vl');
+await RunAnywhere.loadModel('qwen2-vl');
 
-const result = await VLM.process(
-  { format: VLMImageFormat.RGB, rgbPixels: pixelData, width: 256, height: 256 },
+const result = await VisionLanguage.processImage(
+  { format: VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB, rawRgb: pixelData, width: 256, height: 256 },
   'Describe this image.',
   { maxTokens: 100 },
 );

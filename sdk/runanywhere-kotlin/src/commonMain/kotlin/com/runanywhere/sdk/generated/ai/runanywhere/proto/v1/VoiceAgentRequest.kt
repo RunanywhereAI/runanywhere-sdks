@@ -13,6 +13,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -24,6 +25,7 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.List
 import okio.ByteString
 
 /**
@@ -44,8 +46,49 @@ public class VoiceAgentRequest(
     schemaIndex = 0,
   )
   public val event_filter: String = "",
+  @field:WireField(
+    tag = 2,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "sessionId",
+    schemaIndex = 1,
+  )
+  public val session_id: String = "",
+  categories: List<VoiceEventCategory> = emptyList(),
+  @field:WireField(
+    tag = 4,
+    adapter = "ai.runanywhere.proto.v1.VoiceEventSeverity#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "minSeverity",
+    schemaIndex = 3,
+  )
+  public val min_severity: VoiceEventSeverity = VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG,
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#UINT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "replayFromSeq",
+    schemaIndex = 4,
+  )
+  public val replay_from_seq: Long = 0L,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "includeAudio",
+    schemaIndex = 5,
+  )
+  public val include_audio: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceAgentRequest, Nothing>(ADAPTER, unknownFields) {
+  @field:WireField(
+    tag = 3,
+    adapter = "ai.runanywhere.proto.v1.VoiceEventCategory#ADAPTER",
+    label = WireField.Label.REPEATED,
+    schemaIndex = 2,
+  )
+  public val categories: List<VoiceEventCategory> = immutableCopyOf("categories", categories)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -58,6 +101,11 @@ public class VoiceAgentRequest(
     if (other !is VoiceAgentRequest) return false
     if (unknownFields != other.unknownFields) return false
     if (event_filter != other.event_filter) return false
+    if (session_id != other.session_id) return false
+    if (categories != other.categories) return false
+    if (min_severity != other.min_severity) return false
+    if (replay_from_seq != other.replay_from_seq) return false
+    if (include_audio != other.include_audio) return false
     return true
   }
 
@@ -66,6 +114,11 @@ public class VoiceAgentRequest(
     if (result == 0) {
       result = unknownFields.hashCode()
       result = result * 37 + event_filter.hashCode()
+      result = result * 37 + session_id.hashCode()
+      result = result * 37 + categories.hashCode()
+      result = result * 37 + min_severity.hashCode()
+      result = result * 37 + replay_from_seq.hashCode()
+      result = result * 37 + include_audio.hashCode()
       super.hashCode = result
     }
     return result
@@ -74,11 +127,24 @@ public class VoiceAgentRequest(
   override fun toString(): String {
     val result = mutableListOf<String>()
     result += """event_filter=${sanitize(event_filter)}"""
+    result += """session_id=${sanitize(session_id)}"""
+    if (categories.isNotEmpty()) result += """categories=$categories"""
+    result += """min_severity=$min_severity"""
+    result += """replay_from_seq=$replay_from_seq"""
+    result += """include_audio=$include_audio"""
     return result.joinToString(prefix = "VoiceAgentRequest{", separator = ", ", postfix = "}")
   }
 
-  public fun copy(event_filter: String = this.event_filter, unknownFields: ByteString =
-      this.unknownFields): VoiceAgentRequest = VoiceAgentRequest(event_filter, unknownFields)
+  public fun copy(
+    event_filter: String = this.event_filter,
+    session_id: String = this.session_id,
+    categories: List<VoiceEventCategory> = this.categories,
+    min_severity: VoiceEventSeverity = this.min_severity,
+    replay_from_seq: Long = this.replay_from_seq,
+    include_audio: Boolean = this.include_audio,
+    unknownFields: ByteString = this.unknownFields,
+  ): VoiceAgentRequest = VoiceAgentRequest(event_filter, session_id, categories, min_severity,
+      replay_from_seq, include_audio, unknownFields)
 
   public companion object {
     @JvmField
@@ -94,31 +160,79 @@ public class VoiceAgentRequest(
         var size = value.unknownFields.size
         if (value.event_filter != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1,
             value.event_filter)
+        if (value.session_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(2,
+            value.session_id)
+        size += VoiceEventCategory.ADAPTER.asRepeated().encodedSizeWithTag(3, value.categories)
+        if (value.min_severity != VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG) size +=
+            VoiceEventSeverity.ADAPTER.encodedSizeWithTag(4, value.min_severity)
+        if (value.replay_from_seq != 0L) size += ProtoAdapter.UINT64.encodedSizeWithTag(5,
+            value.replay_from_seq)
+        if (value.include_audio != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(6,
+            value.include_audio)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: VoiceAgentRequest) {
         if (value.event_filter != "") ProtoAdapter.STRING.encodeWithTag(writer, 1,
             value.event_filter)
+        if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.session_id)
+        VoiceEventCategory.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.categories)
+        if (value.min_severity != VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG)
+            VoiceEventSeverity.ADAPTER.encodeWithTag(writer, 4, value.min_severity)
+        if (value.replay_from_seq != 0L) ProtoAdapter.UINT64.encodeWithTag(writer, 5,
+            value.replay_from_seq)
+        if (value.include_audio != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.include_audio)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceAgentRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.include_audio != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.include_audio)
+        if (value.replay_from_seq != 0L) ProtoAdapter.UINT64.encodeWithTag(writer, 5,
+            value.replay_from_seq)
+        if (value.min_severity != VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG)
+            VoiceEventSeverity.ADAPTER.encodeWithTag(writer, 4, value.min_severity)
+        VoiceEventCategory.ADAPTER.asRepeated().encodeWithTag(writer, 3, value.categories)
+        if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.session_id)
         if (value.event_filter != "") ProtoAdapter.STRING.encodeWithTag(writer, 1,
             value.event_filter)
       }
 
       override fun decode(reader: ProtoReader): VoiceAgentRequest {
         var event_filter: String = ""
+        var session_id: String = ""
+        val categories = mutableListOf<VoiceEventCategory>()
+        var min_severity: VoiceEventSeverity = VoiceEventSeverity.VOICE_EVENT_SEVERITY_DEBUG
+        var replay_from_seq: Long = 0L
+        var include_audio: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> event_filter = ProtoAdapter.STRING.decode(reader)
+            2 -> session_id = ProtoAdapter.STRING.decode(reader)
+            3 -> try {
+              VoiceEventCategory.ADAPTER.tryDecode(reader, categories)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            4 -> try {
+              min_severity = VoiceEventSeverity.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            5 -> replay_from_seq = ProtoAdapter.UINT64.decode(reader)
+            6 -> include_audio = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return VoiceAgentRequest(
           event_filter = event_filter,
+          session_id = session_id,
+          categories = categories,
+          min_severity = min_severity,
+          replay_from_seq = replay_from_seq,
+          include_audio = include_audio,
           unknownFields = unknownFields
         )
       }

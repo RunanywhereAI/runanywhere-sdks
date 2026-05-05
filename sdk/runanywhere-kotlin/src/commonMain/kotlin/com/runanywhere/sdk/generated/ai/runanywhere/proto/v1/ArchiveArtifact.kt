@@ -45,6 +45,18 @@ public class ArchiveArtifact(
   public val structure: ArchiveStructure = ArchiveStructure.ARCHIVE_STRUCTURE_UNSPECIFIED,
   required_patterns: List<String> = emptyList(),
   optional_patterns: List<String> = emptyList(),
+  /**
+   * Full manifest form for archive artifacts after extraction. Archive
+   * extraction policy is portable; native filesystem permissions and handles
+   * remain adapter-owned.
+   */
+  @field:WireField(
+    tag = 5,
+    adapter = "ai.runanywhere.proto.v1.ExpectedModelFiles#ADAPTER",
+    jsonName = "expectedFiles",
+    schemaIndex = 4,
+  )
+  public val expected_files: ExpectedModelFiles? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ArchiveArtifact, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -82,6 +94,7 @@ public class ArchiveArtifact(
     if (structure != other.structure) return false
     if (required_patterns != other.required_patterns) return false
     if (optional_patterns != other.optional_patterns) return false
+    if (expected_files != other.expected_files) return false
     return true
   }
 
@@ -93,6 +106,7 @@ public class ArchiveArtifact(
       result = result * 37 + structure.hashCode()
       result = result * 37 + required_patterns.hashCode()
       result = result * 37 + optional_patterns.hashCode()
+      result = result * 37 + (expected_files?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -106,6 +120,7 @@ public class ArchiveArtifact(
         """required_patterns=${sanitize(required_patterns)}"""
     if (optional_patterns.isNotEmpty()) result +=
         """optional_patterns=${sanitize(optional_patterns)}"""
+    if (expected_files != null) result += """expected_files=$expected_files"""
     return result.joinToString(prefix = "ArchiveArtifact{", separator = ", ", postfix = "}")
   }
 
@@ -114,9 +129,10 @@ public class ArchiveArtifact(
     structure: ArchiveStructure = this.structure,
     required_patterns: List<String> = this.required_patterns,
     optional_patterns: List<String> = this.optional_patterns,
+    expected_files: ExpectedModelFiles? = this.expected_files,
     unknownFields: ByteString = this.unknownFields,
   ): ArchiveArtifact = ArchiveArtifact(type, structure, required_patterns, optional_patterns,
-      unknownFields)
+      expected_files, unknownFields)
 
   public companion object {
     @JvmField
@@ -136,6 +152,7 @@ public class ArchiveArtifact(
             ArchiveStructure.ADAPTER.encodedSizeWithTag(2, value.structure)
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(3, value.required_patterns)
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(4, value.optional_patterns)
+        size += ExpectedModelFiles.ADAPTER.encodedSizeWithTag(5, value.expected_files)
         return size
       }
 
@@ -146,11 +163,13 @@ public class ArchiveArtifact(
             ArchiveStructure.ADAPTER.encodeWithTag(writer, 2, value.structure)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 3, value.required_patterns)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.optional_patterns)
+        ExpectedModelFiles.ADAPTER.encodeWithTag(writer, 5, value.expected_files)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ArchiveArtifact) {
         writer.writeBytes(value.unknownFields)
+        ExpectedModelFiles.ADAPTER.encodeWithTag(writer, 5, value.expected_files)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 4, value.optional_patterns)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 3, value.required_patterns)
         if (value.structure != ArchiveStructure.ARCHIVE_STRUCTURE_UNSPECIFIED)
@@ -164,6 +183,7 @@ public class ArchiveArtifact(
         var structure: ArchiveStructure = ArchiveStructure.ARCHIVE_STRUCTURE_UNSPECIFIED
         val required_patterns = mutableListOf<String>()
         val optional_patterns = mutableListOf<String>()
+        var expected_files: ExpectedModelFiles? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -178,6 +198,7 @@ public class ArchiveArtifact(
             }
             3 -> required_patterns.add(ProtoAdapter.STRING.decode(reader))
             4 -> optional_patterns.add(ProtoAdapter.STRING.decode(reader))
+            5 -> expected_files = ExpectedModelFiles.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -186,11 +207,13 @@ public class ArchiveArtifact(
           structure = structure,
           required_patterns = required_patterns,
           optional_patterns = optional_patterns,
+          expected_files = expected_files,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ArchiveArtifact): ArchiveArtifact = value.copy(
+        expected_files = value.expected_files?.let(ExpectedModelFiles.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

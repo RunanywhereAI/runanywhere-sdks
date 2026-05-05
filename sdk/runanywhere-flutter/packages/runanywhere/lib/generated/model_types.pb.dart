@@ -9,6 +9,7 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -531,6 +532,10 @@ class ModelInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearFramework() => clearField(5);
 
+  /// Portable URL/URI string for catalog metadata and download planning.
+  /// SDK/platform adapters own native HTTP execution, authentication/session
+  /// state, browser fetch handles, URLSession/background-transfer objects,
+  /// and permission prompts.
   @$pb.TagNumber(6)
   $core.String get downloadUrl => $_getSZ(5);
   @$pb.TagNumber(6)
@@ -540,6 +545,10 @@ class ModelInfo extends $pb.GeneratedMessage {
   @$pb.TagNumber(6)
   void clearDownloadUrl() => clearField(6);
 
+  /// Stable path or URI string after platform adapters have normalized native
+  /// file handles. Do not place Android SAF/content URI permissions, iOS
+  /// security-scoped bookmarks, browser FileSystemHandle objects, or other
+  /// OS-governed capabilities in this C++-owned metadata field.
   @$pb.TagNumber(7)
   $core.String get localPath => $_getSZ(6);
   @$pb.TagNumber(7)
@@ -903,6 +912,7 @@ class SingleFileArtifact extends $pb.GeneratedMessage {
   factory SingleFileArtifact({
     $core.Iterable<$core.String>? requiredPatterns,
     $core.Iterable<$core.String>? optionalPatterns,
+    ExpectedModelFiles? expectedFiles,
   }) {
     final $result = create();
     if (requiredPatterns != null) {
@@ -910,6 +920,9 @@ class SingleFileArtifact extends $pb.GeneratedMessage {
     }
     if (optionalPatterns != null) {
       $result.optionalPatterns.addAll(optionalPatterns);
+    }
+    if (expectedFiles != null) {
+      $result.expectedFiles = expectedFiles;
     }
     return $result;
   }
@@ -920,6 +933,7 @@ class SingleFileArtifact extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'SingleFileArtifact', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..pPS(1, _omitFieldNames ? '' : 'requiredPatterns')
     ..pPS(2, _omitFieldNames ? '' : 'optionalPatterns')
+    ..aOM<ExpectedModelFiles>(3, _omitFieldNames ? '' : 'expectedFiles', subBuilder: ExpectedModelFiles.create)
     ..hasRequiredFields = false
   ;
 
@@ -949,6 +963,20 @@ class SingleFileArtifact extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(2)
   $core.List<$core.String> get optionalPatterns => $_getList(1);
+
+  /// Full manifest form for SDK-local wrappers that attach expected files to
+  /// a single-file artifact. The pattern fields above remain for existing
+  /// generated consumers.
+  @$pb.TagNumber(3)
+  ExpectedModelFiles get expectedFiles => $_getN(2);
+  @$pb.TagNumber(3)
+  set expectedFiles(ExpectedModelFiles v) { setField(3, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasExpectedFiles() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearExpectedFiles() => clearField(3);
+  @$pb.TagNumber(3)
+  ExpectedModelFiles ensureExpectedFiles() => $_ensure(2);
 }
 
 class ArchiveArtifact extends $pb.GeneratedMessage {
@@ -957,6 +985,7 @@ class ArchiveArtifact extends $pb.GeneratedMessage {
     ArchiveStructure? structure,
     $core.Iterable<$core.String>? requiredPatterns,
     $core.Iterable<$core.String>? optionalPatterns,
+    ExpectedModelFiles? expectedFiles,
   }) {
     final $result = create();
     if (type != null) {
@@ -971,6 +1000,9 @@ class ArchiveArtifact extends $pb.GeneratedMessage {
     if (optionalPatterns != null) {
       $result.optionalPatterns.addAll(optionalPatterns);
     }
+    if (expectedFiles != null) {
+      $result.expectedFiles = expectedFiles;
+    }
     return $result;
   }
   ArchiveArtifact._() : super();
@@ -982,6 +1014,7 @@ class ArchiveArtifact extends $pb.GeneratedMessage {
     ..e<ArchiveStructure>(2, _omitFieldNames ? '' : 'structure', $pb.PbFieldType.OE, defaultOrMaker: ArchiveStructure.ARCHIVE_STRUCTURE_UNSPECIFIED, valueOf: ArchiveStructure.valueOf, enumValues: ArchiveStructure.values)
     ..pPS(3, _omitFieldNames ? '' : 'requiredPatterns')
     ..pPS(4, _omitFieldNames ? '' : 'optionalPatterns')
+    ..aOM<ExpectedModelFiles>(5, _omitFieldNames ? '' : 'expectedFiles', subBuilder: ExpectedModelFiles.create)
     ..hasRequiredFields = false
   ;
 
@@ -1029,6 +1062,20 @@ class ArchiveArtifact extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(4)
   $core.List<$core.String> get optionalPatterns => $_getList(3);
+
+  /// Full manifest form for archive artifacts after extraction. Archive
+  /// extraction policy is portable; native filesystem permissions and handles
+  /// remain adapter-owned.
+  @$pb.TagNumber(5)
+  ExpectedModelFiles get expectedFiles => $_getN(4);
+  @$pb.TagNumber(5)
+  set expectedFiles(ExpectedModelFiles v) { setField(5, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasExpectedFiles() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearExpectedFiles() => clearField(5);
+  @$pb.TagNumber(5)
+  ExpectedModelFiles ensureExpectedFiles() => $_ensure(4);
 }
 
 class ModelFileDescriptor extends $pb.GeneratedMessage {
@@ -1042,6 +1089,7 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
     $core.String? destinationPath,
     ModelFileRole? role,
     $core.String? localPath,
+    $core.String? checksumSha256,
   }) {
     final $result = create();
     if (url != null) {
@@ -1071,6 +1119,9 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
     if (localPath != null) {
       $result.localPath = localPath;
     }
+    if (checksumSha256 != null) {
+      $result.checksumSha256 = checksumSha256;
+    }
     return $result;
   }
   ModelFileDescriptor._() : super();
@@ -1087,6 +1138,7 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
     ..aOS(7, _omitFieldNames ? '' : 'destinationPath')
     ..e<ModelFileRole>(8, _omitFieldNames ? '' : 'role', $pb.PbFieldType.OE, defaultOrMaker: ModelFileRole.MODEL_FILE_ROLE_UNSPECIFIED, valueOf: ModelFileRole.valueOf, enumValues: ModelFileRole.values)
     ..aOS(9, _omitFieldNames ? '' : 'localPath')
+    ..aOS(10, _omitFieldNames ? '' : 'checksumSha256')
     ..hasRequiredFields = false
   ;
 
@@ -1151,6 +1203,8 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearSizeBytes() => clearField(4);
 
+  /// Legacy checksum field kept for generated consumers that already use it.
+  /// Prefer checksum_sha256 for new manifests when the algorithm is known.
   @$pb.TagNumber(5)
   $core.String get checksum => $_getSZ(4);
   @$pb.TagNumber(5)
@@ -1198,6 +1252,15 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
   $core.bool hasLocalPath() => $_has(8);
   @$pb.TagNumber(9)
   void clearLocalPath() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.String get checksumSha256 => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set checksumSha256($core.String v) { $_setString(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasChecksumSha256() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearChecksumSha256() => clearField(10);
 }
 
 class MultiFileArtifact extends $pb.GeneratedMessage {
@@ -1354,6 +1417,7 @@ class ModelQuery extends $pb.GeneratedMessage {
     ModelSource? source,
     ModelQuerySortField? sortField,
     ModelQuerySortOrder? sortOrder,
+    ModelRegistryStatus? registryStatus,
   }) {
     final $result = create();
     if (framework != null) {
@@ -1386,6 +1450,9 @@ class ModelQuery extends $pb.GeneratedMessage {
     if (sortOrder != null) {
       $result.sortOrder = sortOrder;
     }
+    if (registryStatus != null) {
+      $result.registryStatus = registryStatus;
+    }
     return $result;
   }
   ModelQuery._() : super();
@@ -1403,6 +1470,7 @@ class ModelQuery extends $pb.GeneratedMessage {
     ..e<ModelSource>(8, _omitFieldNames ? '' : 'source', $pb.PbFieldType.OE, defaultOrMaker: ModelSource.MODEL_SOURCE_UNSPECIFIED, valueOf: ModelSource.valueOf, enumValues: ModelSource.values)
     ..e<ModelQuerySortField>(9, _omitFieldNames ? '' : 'sortField', $pb.PbFieldType.OE, defaultOrMaker: ModelQuerySortField.MODEL_QUERY_SORT_FIELD_UNSPECIFIED, valueOf: ModelQuerySortField.valueOf, enumValues: ModelQuerySortField.values)
     ..e<ModelQuerySortOrder>(10, _omitFieldNames ? '' : 'sortOrder', $pb.PbFieldType.OE, defaultOrMaker: ModelQuerySortOrder.MODEL_QUERY_SORT_ORDER_UNSPECIFIED, valueOf: ModelQuerySortOrder.valueOf, enumValues: ModelQuerySortOrder.values)
+    ..e<ModelRegistryStatus>(11, _omitFieldNames ? '' : 'registryStatus', $pb.PbFieldType.OE, defaultOrMaker: ModelRegistryStatus.MODEL_REGISTRY_STATUS_UNSPECIFIED, valueOf: ModelRegistryStatus.valueOf, enumValues: ModelRegistryStatus.values)
     ..hasRequiredFields = false
   ;
 
@@ -1516,6 +1584,15 @@ class ModelQuery extends $pb.GeneratedMessage {
   $core.bool hasSortOrder() => $_has(9);
   @$pb.TagNumber(10)
   void clearSortOrder() => clearField(10);
+
+  @$pb.TagNumber(11)
+  ModelRegistryStatus get registryStatus => $_getN(10);
+  @$pb.TagNumber(11)
+  set registryStatus(ModelRegistryStatus v) { setField(11, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasRegistryStatus() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearRegistryStatus() => clearField(11);
 }
 
 class ModelCompatibilityResult extends $pb.GeneratedMessage {
@@ -1666,6 +1743,9 @@ class ModelRegistryRefreshRequest extends $pb.GeneratedMessage {
     $core.bool? rescanLocal,
     $core.bool? pruneOrphans,
     ModelQuery? query,
+    $core.String? catalogUri,
+    $core.bool? forceRefresh,
+    $core.bool? includeDownloadedState,
   }) {
     final $result = create();
     if (includeRemoteCatalog != null) {
@@ -1680,6 +1760,15 @@ class ModelRegistryRefreshRequest extends $pb.GeneratedMessage {
     if (query != null) {
       $result.query = query;
     }
+    if (catalogUri != null) {
+      $result.catalogUri = catalogUri;
+    }
+    if (forceRefresh != null) {
+      $result.forceRefresh = forceRefresh;
+    }
+    if (includeDownloadedState != null) {
+      $result.includeDownloadedState = includeDownloadedState;
+    }
     return $result;
   }
   ModelRegistryRefreshRequest._() : super();
@@ -1691,6 +1780,9 @@ class ModelRegistryRefreshRequest extends $pb.GeneratedMessage {
     ..aOB(2, _omitFieldNames ? '' : 'rescanLocal')
     ..aOB(3, _omitFieldNames ? '' : 'pruneOrphans')
     ..aOM<ModelQuery>(4, _omitFieldNames ? '' : 'query', subBuilder: ModelQuery.create)
+    ..aOS(5, _omitFieldNames ? '' : 'catalogUri')
+    ..aOB(6, _omitFieldNames ? '' : 'forceRefresh')
+    ..aOB(7, _omitFieldNames ? '' : 'includeDownloadedState')
     ..hasRequiredFields = false
   ;
 
@@ -1756,6 +1848,37 @@ class ModelRegistryRefreshRequest extends $pb.GeneratedMessage {
   void clearQuery() => clearField(4);
   @$pb.TagNumber(4)
   ModelQuery ensureQuery() => $_ensure(3);
+
+  /// Portable catalog selector. Auth state, cookies, native HTTP clients, and
+  /// background transfer handles are supplied by platform adapters.
+  @$pb.TagNumber(5)
+  $core.String get catalogUri => $_getSZ(4);
+  @$pb.TagNumber(5)
+  set catalogUri($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasCatalogUri() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearCatalogUri() => clearField(5);
+
+  /// Ignore cached catalog metadata and force a fresh adapter-backed refresh.
+  @$pb.TagNumber(6)
+  $core.bool get forceRefresh => $_getBF(5);
+  @$pb.TagNumber(6)
+  set forceRefresh($core.bool v) { $_setBool(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasForceRefresh() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearForceRefresh() => clearField(6);
+
+  /// Include local downloaded/available state reconciliation in the refresh.
+  @$pb.TagNumber(7)
+  $core.bool get includeDownloadedState => $_getBF(6);
+  @$pb.TagNumber(7)
+  set includeDownloadedState($core.bool v) { $_setBool(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasIncludeDownloadedState() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearIncludeDownloadedState() => clearField(7);
 }
 
 class ModelRegistryRefreshResult extends $pb.GeneratedMessage {
@@ -1769,6 +1892,9 @@ class ModelRegistryRefreshResult extends $pb.GeneratedMessage {
     $fixnum.Int64? refreshedAtUnixMs,
     $core.Iterable<$core.String>? warnings,
     $core.String? errorMessage,
+    $core.int? downloadedCount,
+    $core.int? availableCount,
+    $core.int? errorCount,
   }) {
     final $result = create();
     if (success != null) {
@@ -1798,6 +1924,15 @@ class ModelRegistryRefreshResult extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (downloadedCount != null) {
+      $result.downloadedCount = downloadedCount;
+    }
+    if (availableCount != null) {
+      $result.availableCount = availableCount;
+    }
+    if (errorCount != null) {
+      $result.errorCount = errorCount;
+    }
     return $result;
   }
   ModelRegistryRefreshResult._() : super();
@@ -1814,6 +1949,9 @@ class ModelRegistryRefreshResult extends $pb.GeneratedMessage {
     ..aInt64(7, _omitFieldNames ? '' : 'refreshedAtUnixMs')
     ..pPS(8, _omitFieldNames ? '' : 'warnings')
     ..aOS(9, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(10, _omitFieldNames ? '' : 'downloadedCount', $pb.PbFieldType.O3)
+    ..a<$core.int>(11, _omitFieldNames ? '' : 'availableCount', $pb.PbFieldType.O3)
+    ..a<$core.int>(12, _omitFieldNames ? '' : 'errorCount', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
@@ -1914,15 +2052,46 @@ class ModelRegistryRefreshResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(8);
   @$pb.TagNumber(9)
   void clearErrorMessage() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.int get downloadedCount => $_getIZ(9);
+  @$pb.TagNumber(10)
+  set downloadedCount($core.int v) { $_setSignedInt32(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasDownloadedCount() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearDownloadedCount() => clearField(10);
+
+  @$pb.TagNumber(11)
+  $core.int get availableCount => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set availableCount($core.int v) { $_setSignedInt32(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasAvailableCount() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearAvailableCount() => clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.int get errorCount => $_getIZ(11);
+  @$pb.TagNumber(12)
+  set errorCount($core.int v) { $_setSignedInt32(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasErrorCount() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearErrorCount() => clearField(12);
 }
 
 class ModelListRequest extends $pb.GeneratedMessage {
   factory ModelListRequest({
     ModelQuery? query,
+    $core.bool? includeCounts,
   }) {
     final $result = create();
     if (query != null) {
       $result.query = query;
+    }
+    if (includeCounts != null) {
+      $result.includeCounts = includeCounts;
     }
     return $result;
   }
@@ -1932,6 +2101,7 @@ class ModelListRequest extends $pb.GeneratedMessage {
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ModelListRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..aOM<ModelQuery>(1, _omitFieldNames ? '' : 'query', subBuilder: ModelQuery.create)
+    ..aOB(2, _omitFieldNames ? '' : 'includeCounts')
     ..hasRequiredFields = false
   ;
 
@@ -1967,6 +2137,16 @@ class ModelListRequest extends $pb.GeneratedMessage {
   void clearQuery() => clearField(1);
   @$pb.TagNumber(1)
   ModelQuery ensureQuery() => $_ensure(0);
+
+  /// Include denormalized counts in ModelListResult.
+  @$pb.TagNumber(2)
+  $core.bool get includeCounts => $_getBF(1);
+  @$pb.TagNumber(2)
+  set includeCounts($core.bool v) { $_setBool(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasIncludeCounts() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearIncludeCounts() => clearField(2);
 }
 
 class ModelListResult extends $pb.GeneratedMessage {
@@ -1974,6 +2154,10 @@ class ModelListResult extends $pb.GeneratedMessage {
     $core.bool? success,
     ModelInfoList? models,
     $core.String? errorMessage,
+    $core.int? totalCount,
+    $core.int? downloadedCount,
+    $core.int? availableCount,
+    $core.int? filteredCount,
   }) {
     final $result = create();
     if (success != null) {
@@ -1985,6 +2169,18 @@ class ModelListResult extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (totalCount != null) {
+      $result.totalCount = totalCount;
+    }
+    if (downloadedCount != null) {
+      $result.downloadedCount = downloadedCount;
+    }
+    if (availableCount != null) {
+      $result.availableCount = availableCount;
+    }
+    if (filteredCount != null) {
+      $result.filteredCount = filteredCount;
+    }
     return $result;
   }
   ModelListResult._() : super();
@@ -1995,6 +2191,10 @@ class ModelListResult extends $pb.GeneratedMessage {
     ..aOB(1, _omitFieldNames ? '' : 'success')
     ..aOM<ModelInfoList>(2, _omitFieldNames ? '' : 'models', subBuilder: ModelInfoList.create)
     ..aOS(3, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(4, _omitFieldNames ? '' : 'totalCount', $pb.PbFieldType.O3)
+    ..a<$core.int>(5, _omitFieldNames ? '' : 'downloadedCount', $pb.PbFieldType.O3)
+    ..a<$core.int>(6, _omitFieldNames ? '' : 'availableCount', $pb.PbFieldType.O3)
+    ..a<$core.int>(7, _omitFieldNames ? '' : 'filteredCount', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
@@ -2047,6 +2247,42 @@ class ModelListResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(2);
   @$pb.TagNumber(3)
   void clearErrorMessage() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get totalCount => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set totalCount($core.int v) { $_setSignedInt32(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasTotalCount() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearTotalCount() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get downloadedCount => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set downloadedCount($core.int v) { $_setSignedInt32(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasDownloadedCount() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearDownloadedCount() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.int get availableCount => $_getIZ(5);
+  @$pb.TagNumber(6)
+  set availableCount($core.int v) { $_setSignedInt32(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasAvailableCount() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearAvailableCount() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get filteredCount => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set filteredCount($core.int v) { $_setSignedInt32(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasFilteredCount() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearFilteredCount() => clearField(7);
 }
 
 class ModelGetRequest extends $pb.GeneratedMessage {
@@ -2186,6 +2422,7 @@ class ModelImportRequest extends $pb.GeneratedMessage {
     $core.bool? copyIntoManagedStorage,
     $core.bool? overwriteExisting,
     $core.Iterable<ModelFileDescriptor>? files,
+    $core.bool? validateBeforeRegister,
   }) {
     final $result = create();
     if (model != null) {
@@ -2203,6 +2440,9 @@ class ModelImportRequest extends $pb.GeneratedMessage {
     if (files != null) {
       $result.files.addAll(files);
     }
+    if (validateBeforeRegister != null) {
+      $result.validateBeforeRegister = validateBeforeRegister;
+    }
     return $result;
   }
   ModelImportRequest._() : super();
@@ -2215,6 +2455,7 @@ class ModelImportRequest extends $pb.GeneratedMessage {
     ..aOB(3, _omitFieldNames ? '' : 'copyIntoManagedStorage')
     ..aOB(4, _omitFieldNames ? '' : 'overwriteExisting')
     ..pc<ModelFileDescriptor>(5, _omitFieldNames ? '' : 'files', $pb.PbFieldType.PM, subBuilder: ModelFileDescriptor.create)
+    ..aOB(6, _omitFieldNames ? '' : 'validateBeforeRegister')
     ..hasRequiredFields = false
   ;
 
@@ -2284,6 +2525,16 @@ class ModelImportRequest extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(5)
   $core.List<ModelFileDescriptor> get files => $_getList(4);
+
+  /// Validate format, expected files, and checksums before registry mutation.
+  @$pb.TagNumber(6)
+  $core.bool get validateBeforeRegister => $_getBF(5);
+  @$pb.TagNumber(6)
+  set validateBeforeRegister($core.bool v) { $_setBool(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasValidateBeforeRegister() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearValidateBeforeRegister() => clearField(6);
 }
 
 class ModelImportResult extends $pb.GeneratedMessage {
@@ -2294,6 +2545,8 @@ class ModelImportResult extends $pb.GeneratedMessage {
     $fixnum.Int64? importedBytes,
     $core.Iterable<$core.String>? warnings,
     $core.String? errorMessage,
+    $core.bool? registered,
+    $core.bool? copiedIntoManagedStorage,
   }) {
     final $result = create();
     if (success != null) {
@@ -2314,6 +2567,12 @@ class ModelImportResult extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (registered != null) {
+      $result.registered = registered;
+    }
+    if (copiedIntoManagedStorage != null) {
+      $result.copiedIntoManagedStorage = copiedIntoManagedStorage;
+    }
     return $result;
   }
   ModelImportResult._() : super();
@@ -2327,6 +2586,8 @@ class ModelImportResult extends $pb.GeneratedMessage {
     ..aInt64(4, _omitFieldNames ? '' : 'importedBytes')
     ..pPS(5, _omitFieldNames ? '' : 'warnings')
     ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
+    ..aOB(7, _omitFieldNames ? '' : 'registered')
+    ..aOB(8, _omitFieldNames ? '' : 'copiedIntoManagedStorage')
     ..hasRequiredFields = false
   ;
 
@@ -2400,6 +2661,24 @@ class ModelImportResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(5);
   @$pb.TagNumber(6)
   void clearErrorMessage() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get registered => $_getBF(6);
+  @$pb.TagNumber(7)
+  set registered($core.bool v) { $_setBool(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasRegistered() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearRegistered() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.bool get copiedIntoManagedStorage => $_getBF(7);
+  @$pb.TagNumber(8)
+  set copiedIntoManagedStorage($core.bool v) { $_setBool(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasCopiedIntoManagedStorage() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearCopiedIntoManagedStorage() => clearField(8);
 }
 
 class ModelDiscoveryRequest extends $pb.GeneratedMessage {
@@ -2409,6 +2688,8 @@ class ModelDiscoveryRequest extends $pb.GeneratedMessage {
     $core.bool? linkDownloaded,
     $core.bool? purgeInvalid,
     ModelQuery? query,
+    $core.bool? includeBuiltIn,
+    $core.bool? includeUserImports,
   }) {
     final $result = create();
     if (searchRoots != null) {
@@ -2426,6 +2707,12 @@ class ModelDiscoveryRequest extends $pb.GeneratedMessage {
     if (query != null) {
       $result.query = query;
     }
+    if (includeBuiltIn != null) {
+      $result.includeBuiltIn = includeBuiltIn;
+    }
+    if (includeUserImports != null) {
+      $result.includeUserImports = includeUserImports;
+    }
     return $result;
   }
   ModelDiscoveryRequest._() : super();
@@ -2438,6 +2725,8 @@ class ModelDiscoveryRequest extends $pb.GeneratedMessage {
     ..aOB(3, _omitFieldNames ? '' : 'linkDownloaded')
     ..aOB(4, _omitFieldNames ? '' : 'purgeInvalid')
     ..aOM<ModelQuery>(5, _omitFieldNames ? '' : 'query', subBuilder: ModelQuery.create)
+    ..aOB(6, _omitFieldNames ? '' : 'includeBuiltIn')
+    ..aOB(7, _omitFieldNames ? '' : 'includeUserImports')
     ..hasRequiredFields = false
   ;
 
@@ -2504,6 +2793,24 @@ class ModelDiscoveryRequest extends $pb.GeneratedMessage {
   void clearQuery() => clearField(5);
   @$pb.TagNumber(5)
   ModelQuery ensureQuery() => $_ensure(4);
+
+  @$pb.TagNumber(6)
+  $core.bool get includeBuiltIn => $_getBF(5);
+  @$pb.TagNumber(6)
+  set includeBuiltIn($core.bool v) { $_setBool(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasIncludeBuiltIn() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearIncludeBuiltIn() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.bool get includeUserImports => $_getBF(6);
+  @$pb.TagNumber(7)
+  set includeUserImports($core.bool v) { $_setBool(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasIncludeUserImports() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearIncludeUserImports() => clearField(7);
 }
 
 class DiscoveredModel extends $pb.GeneratedMessage {
@@ -2630,6 +2937,8 @@ class ModelDiscoveryResult extends $pb.GeneratedMessage {
     $core.int? purgedCount,
     $core.Iterable<$core.String>? warnings,
     $core.String? errorMessage,
+    $core.int? scannedCount,
+    $core.int? importedCount,
   }) {
     final $result = create();
     if (success != null) {
@@ -2650,6 +2959,12 @@ class ModelDiscoveryResult extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (scannedCount != null) {
+      $result.scannedCount = scannedCount;
+    }
+    if (importedCount != null) {
+      $result.importedCount = importedCount;
+    }
     return $result;
   }
   ModelDiscoveryResult._() : super();
@@ -2663,6 +2978,8 @@ class ModelDiscoveryResult extends $pb.GeneratedMessage {
     ..a<$core.int>(4, _omitFieldNames ? '' : 'purgedCount', $pb.PbFieldType.O3)
     ..pPS(5, _omitFieldNames ? '' : 'warnings')
     ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(7, _omitFieldNames ? '' : 'scannedCount', $pb.PbFieldType.O3)
+    ..a<$core.int>(8, _omitFieldNames ? '' : 'importedCount', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
   ;
 
@@ -2728,6 +3045,24 @@ class ModelDiscoveryResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(5);
   @$pb.TagNumber(6)
   void clearErrorMessage() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $core.int get scannedCount => $_getIZ(6);
+  @$pb.TagNumber(7)
+  set scannedCount($core.int v) { $_setSignedInt32(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasScannedCount() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearScannedCount() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.int get importedCount => $_getIZ(7);
+  @$pb.TagNumber(8)
+  set importedCount($core.int v) { $_setSignedInt32(7, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasImportedCount() => $_has(7);
+  @$pb.TagNumber(8)
+  void clearImportedCount() => clearField(8);
 }
 
 class ModelLoadRequest extends $pb.GeneratedMessage {
@@ -2736,6 +3071,7 @@ class ModelLoadRequest extends $pb.GeneratedMessage {
     ModelCategory? category,
     InferenceFramework? framework,
     $core.bool? forceReload,
+    $core.bool? validateAvailability,
   }) {
     final $result = create();
     if (modelId != null) {
@@ -2750,6 +3086,9 @@ class ModelLoadRequest extends $pb.GeneratedMessage {
     if (forceReload != null) {
       $result.forceReload = forceReload;
     }
+    if (validateAvailability != null) {
+      $result.validateAvailability = validateAvailability;
+    }
     return $result;
   }
   ModelLoadRequest._() : super();
@@ -2761,6 +3100,7 @@ class ModelLoadRequest extends $pb.GeneratedMessage {
     ..e<ModelCategory>(2, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: ModelCategory.MODEL_CATEGORY_UNSPECIFIED, valueOf: ModelCategory.valueOf, enumValues: ModelCategory.values)
     ..e<InferenceFramework>(3, _omitFieldNames ? '' : 'framework', $pb.PbFieldType.OE, defaultOrMaker: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: InferenceFramework.valueOf, enumValues: InferenceFramework.values)
     ..aOB(4, _omitFieldNames ? '' : 'forceReload')
+    ..aOB(5, _omitFieldNames ? '' : 'validateAvailability')
     ..hasRequiredFields = false
   ;
 
@@ -2820,6 +3160,15 @@ class ModelLoadRequest extends $pb.GeneratedMessage {
   $core.bool hasForceReload() => $_has(3);
   @$pb.TagNumber(4)
   void clearForceReload() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get validateAvailability => $_getBF(4);
+  @$pb.TagNumber(5)
+  set validateAvailability($core.bool v) { $_setBool(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasValidateAvailability() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearValidateAvailability() => clearField(5);
 }
 
 class ModelLoadResult extends $pb.GeneratedMessage {
@@ -2831,6 +3180,9 @@ class ModelLoadResult extends $pb.GeneratedMessage {
     $core.String? resolvedPath,
     $fixnum.Int64? loadedAtUnixMs,
     $core.String? errorMessage,
+    $core.Iterable<$core.String>? warnings,
+    $core.bool? alreadyLoaded,
+    $core.Iterable<ModelFileDescriptor>? resolvedArtifacts,
   }) {
     final $result = create();
     if (success != null) {
@@ -2854,6 +3206,15 @@ class ModelLoadResult extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (warnings != null) {
+      $result.warnings.addAll(warnings);
+    }
+    if (alreadyLoaded != null) {
+      $result.alreadyLoaded = alreadyLoaded;
+    }
+    if (resolvedArtifacts != null) {
+      $result.resolvedArtifacts.addAll(resolvedArtifacts);
+    }
     return $result;
   }
   ModelLoadResult._() : super();
@@ -2868,6 +3229,9 @@ class ModelLoadResult extends $pb.GeneratedMessage {
     ..aOS(5, _omitFieldNames ? '' : 'resolvedPath')
     ..aInt64(6, _omitFieldNames ? '' : 'loadedAtUnixMs')
     ..aOS(7, _omitFieldNames ? '' : 'errorMessage')
+    ..pPS(8, _omitFieldNames ? '' : 'warnings')
+    ..aOB(9, _omitFieldNames ? '' : 'alreadyLoaded')
+    ..pc<ModelFileDescriptor>(10, _omitFieldNames ? '' : 'resolvedArtifacts', $pb.PbFieldType.PM, subBuilder: ModelFileDescriptor.create)
     ..hasRequiredFields = false
   ;
 
@@ -2954,6 +3318,24 @@ class ModelLoadResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(6);
   @$pb.TagNumber(7)
   void clearErrorMessage() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.List<$core.String> get warnings => $_getList(7);
+
+  @$pb.TagNumber(9)
+  $core.bool get alreadyLoaded => $_getBF(8);
+  @$pb.TagNumber(9)
+  set alreadyLoaded($core.bool v) { $_setBool(8, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasAlreadyLoaded() => $_has(8);
+  @$pb.TagNumber(9)
+  void clearAlreadyLoaded() => clearField(9);
+
+  /// Concrete artifacts selected by C++ model path resolution. The primary
+  /// model entry mirrors resolved_path; companion entries carry explicit
+  /// ModelFileRole values such as MODEL_FILE_ROLE_VISION_PROJECTOR.
+  @$pb.TagNumber(10)
+  $core.List<ModelFileDescriptor> get resolvedArtifacts => $_getList(9);
 }
 
 class ModelUnloadRequest extends $pb.GeneratedMessage {
@@ -2961,6 +3343,7 @@ class ModelUnloadRequest extends $pb.GeneratedMessage {
     $core.String? modelId,
     ModelCategory? category,
     $core.bool? unloadAll,
+    InferenceFramework? framework,
   }) {
     final $result = create();
     if (modelId != null) {
@@ -2972,6 +3355,9 @@ class ModelUnloadRequest extends $pb.GeneratedMessage {
     if (unloadAll != null) {
       $result.unloadAll = unloadAll;
     }
+    if (framework != null) {
+      $result.framework = framework;
+    }
     return $result;
   }
   ModelUnloadRequest._() : super();
@@ -2982,6 +3368,7 @@ class ModelUnloadRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
     ..e<ModelCategory>(2, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: ModelCategory.MODEL_CATEGORY_UNSPECIFIED, valueOf: ModelCategory.valueOf, enumValues: ModelCategory.values)
     ..aOB(3, _omitFieldNames ? '' : 'unloadAll')
+    ..e<InferenceFramework>(4, _omitFieldNames ? '' : 'framework', $pb.PbFieldType.OE, defaultOrMaker: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: InferenceFramework.valueOf, enumValues: InferenceFramework.values)
     ..hasRequiredFields = false
   ;
 
@@ -3032,6 +3419,15 @@ class ModelUnloadRequest extends $pb.GeneratedMessage {
   $core.bool hasUnloadAll() => $_has(2);
   @$pb.TagNumber(3)
   void clearUnloadAll() => clearField(3);
+
+  @$pb.TagNumber(4)
+  InferenceFramework get framework => $_getN(3);
+  @$pb.TagNumber(4)
+  set framework(InferenceFramework v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasFramework() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFramework() => clearField(4);
 }
 
 class ModelUnloadResult extends $pb.GeneratedMessage {
@@ -3039,6 +3435,8 @@ class ModelUnloadResult extends $pb.GeneratedMessage {
     $core.bool? success,
     $core.Iterable<$core.String>? unloadedModelIds,
     $core.String? errorMessage,
+    $fixnum.Int64? unloadedAtUnixMs,
+    $core.Iterable<$core.String>? warnings,
   }) {
     final $result = create();
     if (success != null) {
@@ -3050,6 +3448,12 @@ class ModelUnloadResult extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (unloadedAtUnixMs != null) {
+      $result.unloadedAtUnixMs = unloadedAtUnixMs;
+    }
+    if (warnings != null) {
+      $result.warnings.addAll(warnings);
+    }
     return $result;
   }
   ModelUnloadResult._() : super();
@@ -3060,6 +3464,8 @@ class ModelUnloadResult extends $pb.GeneratedMessage {
     ..aOB(1, _omitFieldNames ? '' : 'success')
     ..pPS(2, _omitFieldNames ? '' : 'unloadedModelIds')
     ..aOS(3, _omitFieldNames ? '' : 'errorMessage')
+    ..aInt64(4, _omitFieldNames ? '' : 'unloadedAtUnixMs')
+    ..pPS(5, _omitFieldNames ? '' : 'warnings')
     ..hasRequiredFields = false
   ;
 
@@ -3104,12 +3510,25 @@ class ModelUnloadResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(2);
   @$pb.TagNumber(3)
   void clearErrorMessage() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get unloadedAtUnixMs => $_getI64(3);
+  @$pb.TagNumber(4)
+  set unloadedAtUnixMs($fixnum.Int64 v) { $_setInt64(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasUnloadedAtUnixMs() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearUnloadedAtUnixMs() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.List<$core.String> get warnings => $_getList(4);
 }
 
 class CurrentModelRequest extends $pb.GeneratedMessage {
   factory CurrentModelRequest({
     ModelCategory? category,
     InferenceFramework? framework,
+    $core.bool? includeModelMetadata,
   }) {
     final $result = create();
     if (category != null) {
@@ -3117,6 +3536,9 @@ class CurrentModelRequest extends $pb.GeneratedMessage {
     }
     if (framework != null) {
       $result.framework = framework;
+    }
+    if (includeModelMetadata != null) {
+      $result.includeModelMetadata = includeModelMetadata;
     }
     return $result;
   }
@@ -3127,6 +3549,7 @@ class CurrentModelRequest extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'CurrentModelRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..e<ModelCategory>(1, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: ModelCategory.MODEL_CATEGORY_UNSPECIFIED, valueOf: ModelCategory.valueOf, enumValues: ModelCategory.values)
     ..e<InferenceFramework>(2, _omitFieldNames ? '' : 'framework', $pb.PbFieldType.OE, defaultOrMaker: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: InferenceFramework.valueOf, enumValues: InferenceFramework.values)
+    ..aOB(3, _omitFieldNames ? '' : 'includeModelMetadata')
     ..hasRequiredFields = false
   ;
 
@@ -3168,6 +3591,15 @@ class CurrentModelRequest extends $pb.GeneratedMessage {
   $core.bool hasFramework() => $_has(1);
   @$pb.TagNumber(2)
   void clearFramework() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get includeModelMetadata => $_getBF(2);
+  @$pb.TagNumber(3)
+  set includeModelMetadata($core.bool v) { $_setBool(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasIncludeModelMetadata() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearIncludeModelMetadata() => clearField(3);
 }
 
 class CurrentModelResult extends $pb.GeneratedMessage {
@@ -3175,6 +3607,12 @@ class CurrentModelResult extends $pb.GeneratedMessage {
     $core.String? modelId,
     ModelInfo? model,
     $fixnum.Int64? loadedAtUnixMs,
+    $core.bool? found,
+    $core.String? errorMessage,
+    ModelCategory? category,
+    InferenceFramework? framework,
+    $core.String? resolvedPath,
+    $core.Iterable<ModelFileDescriptor>? resolvedArtifacts,
   }) {
     final $result = create();
     if (modelId != null) {
@@ -3186,6 +3624,24 @@ class CurrentModelResult extends $pb.GeneratedMessage {
     if (loadedAtUnixMs != null) {
       $result.loadedAtUnixMs = loadedAtUnixMs;
     }
+    if (found != null) {
+      $result.found = found;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (category != null) {
+      $result.category = category;
+    }
+    if (framework != null) {
+      $result.framework = framework;
+    }
+    if (resolvedPath != null) {
+      $result.resolvedPath = resolvedPath;
+    }
+    if (resolvedArtifacts != null) {
+      $result.resolvedArtifacts.addAll(resolvedArtifacts);
+    }
     return $result;
   }
   CurrentModelResult._() : super();
@@ -3196,6 +3652,12 @@ class CurrentModelResult extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'modelId')
     ..aOM<ModelInfo>(3, _omitFieldNames ? '' : 'model', subBuilder: ModelInfo.create)
     ..aInt64(4, _omitFieldNames ? '' : 'loadedAtUnixMs')
+    ..aOB(5, _omitFieldNames ? '' : 'found')
+    ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
+    ..e<ModelCategory>(7, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: ModelCategory.MODEL_CATEGORY_UNSPECIFIED, valueOf: ModelCategory.valueOf, enumValues: ModelCategory.values)
+    ..e<InferenceFramework>(8, _omitFieldNames ? '' : 'framework', $pb.PbFieldType.OE, defaultOrMaker: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: InferenceFramework.valueOf, enumValues: InferenceFramework.values)
+    ..aOS(9, _omitFieldNames ? '' : 'resolvedPath')
+    ..pc<ModelFileDescriptor>(10, _omitFieldNames ? '' : 'resolvedArtifacts', $pb.PbFieldType.PM, subBuilder: ModelFileDescriptor.create)
     ..hasRequiredFields = false
   ;
 
@@ -3248,6 +3710,54 @@ class CurrentModelResult extends $pb.GeneratedMessage {
   $core.bool hasLoadedAtUnixMs() => $_has(2);
   @$pb.TagNumber(4)
   void clearLoadedAtUnixMs() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.bool get found => $_getBF(3);
+  @$pb.TagNumber(5)
+  set found($core.bool v) { $_setBool(3, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasFound() => $_has(3);
+  @$pb.TagNumber(5)
+  void clearFound() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get errorMessage => $_getSZ(4);
+  @$pb.TagNumber(6)
+  set errorMessage($core.String v) { $_setString(4, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasErrorMessage() => $_has(4);
+  @$pb.TagNumber(6)
+  void clearErrorMessage() => clearField(6);
+
+  @$pb.TagNumber(7)
+  ModelCategory get category => $_getN(5);
+  @$pb.TagNumber(7)
+  set category(ModelCategory v) { setField(7, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasCategory() => $_has(5);
+  @$pb.TagNumber(7)
+  void clearCategory() => clearField(7);
+
+  @$pb.TagNumber(8)
+  InferenceFramework get framework => $_getN(6);
+  @$pb.TagNumber(8)
+  set framework(InferenceFramework v) { setField(8, v); }
+  @$pb.TagNumber(8)
+  $core.bool hasFramework() => $_has(6);
+  @$pb.TagNumber(8)
+  void clearFramework() => clearField(8);
+
+  @$pb.TagNumber(9)
+  $core.String get resolvedPath => $_getSZ(7);
+  @$pb.TagNumber(9)
+  set resolvedPath($core.String v) { $_setString(7, v); }
+  @$pb.TagNumber(9)
+  $core.bool hasResolvedPath() => $_has(7);
+  @$pb.TagNumber(9)
+  void clearResolvedPath() => clearField(9);
+
+  @$pb.TagNumber(10)
+  $core.List<ModelFileDescriptor> get resolvedArtifacts => $_getList(8);
 }
 
 class ModelDeleteRequest extends $pb.GeneratedMessage {
@@ -3351,6 +3861,7 @@ class ModelDeleteResult extends $pb.GeneratedMessage {
     $core.bool? registryUpdated,
     $core.bool? wasLoaded,
     $core.String? errorMessage,
+    $core.Iterable<$core.String>? warnings,
   }) {
     final $result = create();
     if (success != null) {
@@ -3374,6 +3885,9 @@ class ModelDeleteResult extends $pb.GeneratedMessage {
     if (errorMessage != null) {
       $result.errorMessage = errorMessage;
     }
+    if (warnings != null) {
+      $result.warnings.addAll(warnings);
+    }
     return $result;
   }
   ModelDeleteResult._() : super();
@@ -3388,6 +3902,7 @@ class ModelDeleteResult extends $pb.GeneratedMessage {
     ..aOB(5, _omitFieldNames ? '' : 'registryUpdated')
     ..aOB(6, _omitFieldNames ? '' : 'wasLoaded')
     ..aOS(7, _omitFieldNames ? '' : 'errorMessage')
+    ..pPS(8, _omitFieldNames ? '' : 'warnings')
     ..hasRequiredFields = false
   ;
 
@@ -3474,6 +3989,39 @@ class ModelDeleteResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(6);
   @$pb.TagNumber(7)
   void clearErrorMessage() => clearField(7);
+
+  @$pb.TagNumber(8)
+  $core.List<$core.String> get warnings => $_getList(7);
+}
+
+class ModelRegistryApi {
+  $pb.RpcClient _client;
+  ModelRegistryApi(this._client);
+
+  $async.Future<ModelInfo> register($pb.ClientContext? ctx, ModelInfo request) =>
+    _client.invoke<ModelInfo>(ctx, 'ModelRegistry', 'Register', request, ModelInfo())
+  ;
+  $async.Future<ModelInfo> update($pb.ClientContext? ctx, ModelInfo request) =>
+    _client.invoke<ModelInfo>(ctx, 'ModelRegistry', 'Update', request, ModelInfo())
+  ;
+  $async.Future<ModelGetResult> get($pb.ClientContext? ctx, ModelGetRequest request) =>
+    _client.invoke<ModelGetResult>(ctx, 'ModelRegistry', 'Get', request, ModelGetResult())
+  ;
+  $async.Future<ModelListResult> list($pb.ClientContext? ctx, ModelListRequest request) =>
+    _client.invoke<ModelListResult>(ctx, 'ModelRegistry', 'List', request, ModelListResult())
+  ;
+  $async.Future<ModelDeleteResult> remove($pb.ClientContext? ctx, ModelDeleteRequest request) =>
+    _client.invoke<ModelDeleteResult>(ctx, 'ModelRegistry', 'Remove', request, ModelDeleteResult())
+  ;
+  $async.Future<ModelImportResult> import($pb.ClientContext? ctx, ModelImportRequest request) =>
+    _client.invoke<ModelImportResult>(ctx, 'ModelRegistry', 'Import', request, ModelImportResult())
+  ;
+  $async.Future<ModelDiscoveryResult> discover($pb.ClientContext? ctx, ModelDiscoveryRequest request) =>
+    _client.invoke<ModelDiscoveryResult>(ctx, 'ModelRegistry', 'Discover', request, ModelDiscoveryResult())
+  ;
+  $async.Future<ModelRegistryRefreshResult> refresh($pb.ClientContext? ctx, ModelRegistryRefreshRequest request) =>
+    _client.invoke<ModelRegistryRefreshResult>(ctx, 'ModelRegistry', 'Refresh', request, ModelRegistryRefreshResult())
+  ;
 }
 
 

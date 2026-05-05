@@ -63,6 +63,20 @@ public class ToolParameter(
   )
   public val required: Boolean = false,
   enum_values: List<String> = emptyList(),
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "jsonSchema",
+    schemaIndex = 5,
+  )
+  public val json_schema: String? = null,
+  @field:WireField(
+    tag = 7,
+    adapter = "ai.runanywhere.proto.v1.ToolValue#ADAPTER",
+    jsonName = "defaultValue",
+    schemaIndex = 6,
+  )
+  public val default_value: ToolValue? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolParameter, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -93,6 +107,8 @@ public class ToolParameter(
     if (description != other.description) return false
     if (required != other.required) return false
     if (enum_values != other.enum_values) return false
+    if (json_schema != other.json_schema) return false
+    if (default_value != other.default_value) return false
     return true
   }
 
@@ -105,6 +121,8 @@ public class ToolParameter(
       result = result * 37 + description.hashCode()
       result = result * 37 + required.hashCode()
       result = result * 37 + enum_values.hashCode()
+      result = result * 37 + (json_schema?.hashCode() ?: 0)
+      result = result * 37 + (default_value?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -117,6 +135,8 @@ public class ToolParameter(
     result += """description=${sanitize(description)}"""
     result += """required=$required"""
     if (enum_values.isNotEmpty()) result += """enum_values=${sanitize(enum_values)}"""
+    if (json_schema != null) result += """json_schema=${sanitize(json_schema)}"""
+    if (default_value != null) result += """default_value=$default_value"""
     return result.joinToString(prefix = "ToolParameter{", separator = ", ", postfix = "}")
   }
 
@@ -126,8 +146,11 @@ public class ToolParameter(
     description: String = this.description,
     required: Boolean = this.required,
     enum_values: List<String> = this.enum_values,
+    json_schema: String? = this.json_schema,
+    default_value: ToolValue? = this.default_value,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolParameter = ToolParameter(name, type, description, required, enum_values, unknownFields)
+  ): ToolParameter = ToolParameter(name, type, description, required, enum_values, json_schema,
+      default_value, unknownFields)
 
   public companion object {
     @JvmField
@@ -148,6 +171,8 @@ public class ToolParameter(
             value.description)
         if (value.required != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.required)
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(5, value.enum_values)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.json_schema)
+        size += ToolValue.ADAPTER.encodedSizeWithTag(7, value.default_value)
         return size
       }
 
@@ -158,11 +183,15 @@ public class ToolParameter(
         if (value.description != "") ProtoAdapter.STRING.encodeWithTag(writer, 3, value.description)
         if (value.required != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.required)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.enum_values)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.json_schema)
+        ToolValue.ADAPTER.encodeWithTag(writer, 7, value.default_value)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ToolParameter) {
         writer.writeBytes(value.unknownFields)
+        ToolValue.ADAPTER.encodeWithTag(writer, 7, value.default_value)
+        ProtoAdapter.STRING.encodeWithTag(writer, 6, value.json_schema)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.enum_values)
         if (value.required != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.required)
         if (value.description != "") ProtoAdapter.STRING.encodeWithTag(writer, 3, value.description)
@@ -177,6 +206,8 @@ public class ToolParameter(
         var description: String = ""
         var required: Boolean = false
         val enum_values = mutableListOf<String>()
+        var json_schema: String? = null
+        var default_value: ToolValue? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> name = ProtoAdapter.STRING.decode(reader)
@@ -188,6 +219,8 @@ public class ToolParameter(
             3 -> description = ProtoAdapter.STRING.decode(reader)
             4 -> required = ProtoAdapter.BOOL.decode(reader)
             5 -> enum_values.add(ProtoAdapter.STRING.decode(reader))
+            6 -> json_schema = ProtoAdapter.STRING.decode(reader)
+            7 -> default_value = ToolValue.ADAPTER.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -197,11 +230,14 @@ public class ToolParameter(
           description = description,
           required = required,
           enum_values = enum_values,
+          json_schema = json_schema,
+          default_value = default_value,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ToolParameter): ToolParameter = value.copy(
+        default_value = value.default_value?.let(ToolValue.ADAPTER::redact),
         unknownFields = ByteString.EMPTY
       )
     }

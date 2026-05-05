@@ -6,19 +6,236 @@
  */
 
 import type { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
-import type {
-  StructuredOutputOptions,
-  StructuredOutputResult,
+import {
+  StructuredOutputMode,
+  StructuredOutputOptions as StructuredOutputOptionsMessage,
+  StructuredOutputPromptResult as StructuredOutputPromptResultMessage,
+  StructuredOutputRequest as StructuredOutputRequestMessage,
+  StructuredOutputValidation as StructuredOutputValidationMessage,
+  StructuredOutputValidationRequest as StructuredOutputValidationRequestMessage,
+  type StructuredOutputOptions,
+  type StructuredOutputPromptResult,
+  type StructuredOutputRequest,
+  type StructuredOutputResult,
+  type StructuredOutputValidation,
+  type StructuredOutputValidationRequest,
 } from '@runanywhere/proto-ts/structured_output';
 import { SDKException } from '../../Foundation/SDKException';
+import { SDKLogger } from '../../Foundation/SDKLogger';
+import { ProtoWasmBridge } from '../../runtime/ProtoWasm';
+import {
+  tryRunanywhereModule,
+  type EmscriptenRunanywhereModule,
+} from '../../runtime/EmscriptenModule';
 import { generateStructuredStream } from './RunAnywhere+TextGeneration';
 
-export type { StructuredOutputOptions, StructuredOutputResult };
+export type {
+  StructuredOutputOptions,
+  StructuredOutputPromptResult,
+  StructuredOutputRequest,
+  StructuredOutputResult,
+  StructuredOutputValidation,
+  StructuredOutputValidationRequest,
+};
+
+const logger = new SDKLogger('StructuredOutput');
+
+type StructuredOutputExport =
+  | '_rac_structured_output_prepare_prompt_proto'
+  | '_rac_structured_output_validate_proto';
+
+type StructuredOutputSchema<T = unknown> = {
+  jsonSchema: string;
+  parse?: (text: string) => T;
+} & Partial<Pick<
+  StructuredOutputOptions,
+  | 'includeSchemaInPrompt'
+  | 'strictMode'
+  | 'typeName'
+  | 'name'
+  | 'mode'
+  | 'regexPattern'
+  | 'grammar'
+  | 'repairJson'
+  | 'maxRetries'
+>>;
+
+function missingStructuredOutputExports(
+  module: EmscriptenRunanywhereModule,
+  names: StructuredOutputExport[],
+): string[] {
+  return names.filter((name) => typeof module[name] !== 'function');
+}
+
+function requireStructuredOutputModule(
+  feature: string,
+  names: StructuredOutputExport[],
+): EmscriptenRunanywhereModule {
+  const module = tryRunanywhereModule();
+  if (!module) {
+    throw SDKException.backendNotAvailable(
+      feature,
+      'RunAnywhere WASM module is not initialized.',
+    );
+  }
+
+  const missing = [
+    ...missingStructuredOutputExports(module, names),
+    ...new ProtoWasmBridge(module, logger).missingProtoBufferExports(),
+  ];
+  if (missing.length > 0) {
+    throw SDKException.backendNotAvailable(
+      feature,
+      `This Web WASM build does not export ${missing.join(', ')}.`,
+    );
+  }
+  return module;
+}
+
+function buildStructuredOutputOptions(
+  options: Partial<StructuredOutputOptions> | StructuredOutputSchema,
+): StructuredOutputOptions {
+  const { parse: _parse, ...serializableOptions } = (
+    options as StructuredOutputSchema & Partial<StructuredOutputOptions>
+  );
+  return StructuredOutputOptionsMessage.fromPartial({
+    ...serializableOptions,
+    includeSchemaInPrompt: options.includeSchemaInPrompt ?? true,
+    mode: options.mode ?? StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
+    repairJson: options.repairJson ?? false,
+    maxRetries: options.maxRetries ?? 0,
+  });
+}
+
+function normalizePreparePromptRequest(
+  requestOrPrompt: StructuredOutputRequest | string,
+  options?: Partial<StructuredOutputOptions> | StructuredOutputSchema,
+): StructuredOutputRequest {
+  if (typeof requestOrPrompt !== 'string') {
+    return StructuredOutputRequestMessage.fromPartial(requestOrPrompt);
+  }
+  return StructuredOutputRequestMessage.fromPartial({
+    requestId: '',
+    prompt: requestOrPrompt,
+    options: options ? buildStructuredOutputOptions(options) : undefined,
+    metadata: {},
+  });
+}
+
+function normalizeValidationRequest(
+  requestOrText: StructuredOutputValidationRequest | string,
+  options?: Partial<StructuredOutputOptions> | StructuredOutputSchema,
+): StructuredOutputValidationRequest {
+  if (typeof requestOrText !== 'string') {
+    return StructuredOutputValidationRequestMessage.fromPartial(requestOrText);
+  }
+  return StructuredOutputValidationRequestMessage.fromPartial({
+    text: requestOrText,
+    options: options ? buildStructuredOutputOptions(options) : undefined,
+  });
+}
+
+function readStructuredOutputPrompt(
+  request: StructuredOutputRequest,
+): StructuredOutputPromptResult {
+  const module = requireStructuredOutputModule('structuredOutput.preparePrompt', [
+    '_rac_structured_output_prepare_prompt_proto',
+  ]);
+  const result = new ProtoWasmBridge(module, logger).withEncodedRequest(
+    StructuredOutputRequestMessage.fromPartial(request),
+    StructuredOutputRequestMessage,
+    StructuredOutputPromptResultMessage,
+    (requestPtr, requestSize, outResult) => (
+      module._rac_structured_output_prepare_prompt_proto!(
+        requestPtr,
+        requestSize,
+        outResult,
+      )
+    ),
+    'rac_structured_output_prepare_prompt_proto',
+  );
+  if (!result) {
+    throw SDKException.backendNotAvailable(
+      'structuredOutput.preparePrompt',
+      'rac_structured_output_prepare_prompt_proto returned no StructuredOutputPromptResult bytes.',
+    );
+  }
+  return result;
+}
+
+function readStructuredOutputValidation(
+  request: StructuredOutputValidationRequest,
+): StructuredOutputValidation {
+  const module = requireStructuredOutputModule('structuredOutput.validate', [
+    '_rac_structured_output_validate_proto',
+  ]);
+  const result = new ProtoWasmBridge(module, logger).withEncodedRequest(
+    StructuredOutputValidationRequestMessage.fromPartial(request),
+    StructuredOutputValidationRequestMessage,
+    StructuredOutputValidationMessage,
+    (requestPtr, requestSize, outResult) => (
+      module._rac_structured_output_validate_proto!(requestPtr, requestSize, outResult)
+    ),
+    'rac_structured_output_validate_proto',
+  );
+  if (!result) {
+    throw SDKException.backendNotAvailable(
+      'structuredOutput.validate',
+      'rac_structured_output_validate_proto returned no StructuredOutputValidation bytes.',
+    );
+  }
+  return result;
+}
+
+function preparePrompt(
+  request: StructuredOutputRequest,
+): StructuredOutputPromptResult;
+function preparePrompt(
+  prompt: string,
+  options?: Partial<StructuredOutputOptions> | StructuredOutputSchema,
+): StructuredOutputPromptResult;
+function preparePrompt(
+  requestOrPrompt: StructuredOutputRequest | string,
+  options?: Partial<StructuredOutputOptions> | StructuredOutputSchema,
+): StructuredOutputPromptResult {
+  return readStructuredOutputPrompt(
+    normalizePreparePromptRequest(requestOrPrompt, options),
+  );
+}
+
+function validate(
+  request: StructuredOutputValidationRequest,
+): StructuredOutputValidation;
+function validate(
+  text: string,
+  options?: Partial<StructuredOutputOptions> | StructuredOutputSchema,
+): StructuredOutputValidation;
+function validate(
+  requestOrText: StructuredOutputValidationRequest | string,
+  options?: Partial<StructuredOutputOptions> | StructuredOutputSchema,
+): StructuredOutputValidation {
+  return readStructuredOutputValidation(
+    normalizeValidationRequest(requestOrText, options),
+  );
+}
 
 export const StructuredOutput = {
+  supportsProtoStructuredOutput(): boolean {
+    const module = tryRunanywhereModule();
+    if (!module) return false;
+    return missingStructuredOutputExports(module, [
+      '_rac_structured_output_prepare_prompt_proto',
+      '_rac_structured_output_validate_proto',
+    ]).length === 0 && new ProtoWasmBridge(module, logger).hasProtoBufferExports();
+  },
+
+  preparePrompt,
+
+  validate,
+
   async generate<T = unknown>(
     prompt: string,
-    schema: { jsonSchema: string; parse?: (text: string) => T },
+    schema: StructuredOutputSchema<T>,
     options?: Partial<LLMGenerationOptions>,
   ): Promise<T> {
     let result: StructuredOutputResult | undefined;

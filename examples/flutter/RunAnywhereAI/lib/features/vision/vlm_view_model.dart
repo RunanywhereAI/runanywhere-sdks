@@ -128,9 +128,12 @@ class VLMViewModel extends ChangeNotifier {
       notifyListeners();
       if (context.mounted) {
         unawaited(
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to load model: $e')),
-          ).closed.then((_) => null),
+          ScaffoldMessenger.of(context)
+              .showSnackBar(
+                SnackBar(content: Text('Failed to load model: $e')),
+              )
+              .closed
+              .then((_) => null),
         );
       }
     }
@@ -157,21 +160,23 @@ class VLMViewModel extends ChangeNotifier {
       // Create VLMImage from file path
       final image = sdk.VLMImage(filePath: xFile.path);
 
-      final result = await sdk.RunAnywhereSDK.instance.vlm.processImageStream(
+      final events = sdk.RunAnywhereSDK.instance.vlm.processImageStream(
         image,
         prompt: 'Describe what you see briefly.',
         options: sdk.VLMGenerationOptions(maxTokens: 200),
       );
 
-      // Listen to stream and append tokens
+      // Listen to stream events and append token payloads.
       final buffer = StringBuffer(_currentDescription);
-      await for (final token in result.stream) {
-        buffer.write(token);
+      await for (final event in events) {
+        if (event.token.isEmpty) continue;
+        buffer.write(event.token);
         _currentDescription = buffer.toString();
         notifyListeners();
       }
 
-      debugPrint('✅ Single capture complete: ${_currentDescription.length} chars');
+      debugPrint(
+          '✅ Single capture complete: ${_currentDescription.length} chars');
     } catch (e) {
       debugPrint('❌ Single capture error: $e');
       _error = e.toString();
@@ -196,21 +201,23 @@ class VLMViewModel extends ChangeNotifier {
       // Create VLMImage from file path
       final image = sdk.VLMImage(filePath: imagePath);
 
-      final result = await sdk.RunAnywhereSDK.instance.vlm.processImageStream(
+      final events = sdk.RunAnywhereSDK.instance.vlm.processImageStream(
         image,
         prompt: 'Describe this image in detail.',
         options: sdk.VLMGenerationOptions(maxTokens: 300),
       );
 
-      // Listen to stream and append tokens
+      // Listen to stream events and append token payloads.
       final buffer = StringBuffer(_currentDescription);
-      await for (final token in result.stream) {
-        buffer.write(token);
+      await for (final event in events) {
+        if (event.token.isEmpty) continue;
+        buffer.write(event.token);
         _currentDescription = buffer.toString();
         notifyListeners();
       }
 
-      debugPrint('✅ Gallery photo described: ${_currentDescription.length} chars');
+      debugPrint(
+          '✅ Gallery photo described: ${_currentDescription.length} chars');
     } catch (e) {
       debugPrint('❌ Gallery photo error: $e');
       _error = e.toString();
@@ -244,7 +251,8 @@ class VLMViewModel extends ChangeNotifier {
         unawaited(_describeCurrentFrameForAutoStream());
       }
     });
-    debugPrint('🔴 Auto-streaming started (${autoStreamInterval.inMilliseconds}ms interval)');
+    debugPrint(
+        '🔴 Auto-streaming started (${autoStreamInterval.inMilliseconds}ms interval)');
   }
 
   /// Stop auto-streaming
@@ -279,22 +287,24 @@ class VLMViewModel extends ChangeNotifier {
       // Create VLMImage from file path
       final image = sdk.VLMImage(filePath: xFile.path);
 
-      final result = await sdk.RunAnywhereSDK.instance.vlm.processImageStream(
+      final events = sdk.RunAnywhereSDK.instance.vlm.processImageStream(
         image,
         prompt: 'Describe what you see in one sentence.',
         options: sdk.VLMGenerationOptions(maxTokens: 100),
       );
 
-      // Listen to stream and build description
+      // Listen to stream events and build description from token payloads.
       final buffer = StringBuffer(newDescription);
-      await for (final token in result.stream) {
-        buffer.write(token);
+      await for (final event in events) {
+        if (event.token.isEmpty) continue;
+        buffer.write(event.token);
         newDescription = buffer.toString();
         _currentDescription = newDescription;
         notifyListeners();
       }
 
-      debugPrint('🔴 Auto-stream capture complete: ${newDescription.length} chars');
+      debugPrint(
+          '🔴 Auto-stream capture complete: ${newDescription.length} chars');
     } catch (e) {
       // Only log errors in auto-stream mode (per iOS pattern)
       debugPrint('⚠️ Auto-stream error (non-critical): $e');

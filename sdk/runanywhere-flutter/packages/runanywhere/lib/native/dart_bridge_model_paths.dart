@@ -7,8 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart' as model_enum;
-import 'package:runanywhere/native/dart_bridge_model_registry.dart'
-    hide ModelInfo;
+import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';

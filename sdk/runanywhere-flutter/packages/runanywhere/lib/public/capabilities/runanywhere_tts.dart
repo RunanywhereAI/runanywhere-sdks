@@ -1,66 +1,77 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// Wave 2 TTS capability — aligned to Swift + proto. Returns proto TTSOutput.
+// TTS capability backed by commons model lifecycle and lifecycle-owned
+// generated-proto synthesis.
 
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/data/network/telemetry_service.dart';
-import 'package:runanywhere/features/tts/system_tts_service.dart' as sys_tts;
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
-import 'package:runanywhere/generated/model_types.pbenum.dart' as pb_models;
+import 'package:runanywhere/generated/sdk_events.pb.dart'
+    show ComponentLifecycleSnapshot;
+import 'package:runanywhere/generated/sdk_events.pbenum.dart'
+    show ComponentLifecycleState, SDKComponent;
 import 'package:runanywhere/generated/tts_options.pb.dart';
+import 'package:runanywhere/internal/sdk_event_factories.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
-import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/native/dart_bridge_model_registry.dart'
-    hide ModelInfo;
+import 'package:runanywhere/native/dart_bridge_tts.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
-import 'package:runanywhere/public/events/sdk_event.dart';
-
-/// Sentinel voice ID for the platform's built-in System TTS engine
-/// (iOS AVSpeechSynthesizer, Android android.speech.tts.TextToSpeech).
-/// Registered as a pseudo-model with no download URL; routed through
-/// [sys_tts.SystemTTSService] (flutter_tts) instead of the C++ bridge.
-const String _systemTtsVoiceId = 'system-tts';
 
 /// TTS (text-to-speech) capability surface.
 ///
-/// Access via `RunAnywhereSDK.instance.tts`. Mirrors Swift's
-/// `RunAnywhere+TTS.swift`. Returns proto [TTSOutput].
+/// Access via `RunAnywhereSDK.instance.tts`. Load/current/unload state is owned
+/// by commons lifecycle; one-shot synthesis uses the lifecycle-owned
+/// generated-proto commons ABI.
 class RunAnywhereTTS {
   RunAnywhereTTS._();
   static final RunAnywhereTTS _instance = RunAnywhereTTS._();
   static RunAnywhereTTS get shared => _instance;
 
-  /// Lazy-initialized System TTS service (flutter_tts wrapper). Created on
-  /// first use of the `system-tts` pseudo-voice; cleaned up on unload.
-  sys_tts.SystemTTSService? _systemTts;
-  bool _systemTtsLoaded = false;
+  bool _isSpeaking = false;
 
-  /// True when a TTS voice is currently loaded.
-  bool get isLoaded => _systemTtsLoaded || DartBridge.tts.isLoaded;
+  /// True when commons lifecycle has a ready TTS voice.
+  bool get isLoaded {
+    final snapshot = _lifecycleSnapshot;
+    return snapshot != null &&
+        snapshot.state ==
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+        snapshot.modelId.isNotEmpty;
+  }
 
-  /// Currently-loaded TTS voice ID, or null.
-  String? get currentVoiceId =>
-      _systemTtsLoaded ? _systemTtsVoiceId : DartBridge.tts.currentVoiceId;
+  /// Currently-loaded TTS voice ID from commons lifecycle, or null.
+  String? get currentVoiceId {
+    final snapshot = _lifecycleSnapshot;
+    if (snapshot == null ||
+        snapshot.state !=
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY ||
+        snapshot.modelId.isEmpty) {
+      return null;
+    }
+    return snapshot.modelId;
+  }
 
   /// Currently-loaded TTS voice as `ModelInfo`, or null.
   Future<ModelInfo?> currentVoice() async {
-    final voiceId = currentVoiceId;
-    if (voiceId == null) return null;
-    final models = await RunAnywhereModels.shared.available();
-    return models.cast<ModelInfo?>().firstWhere(
-          (m) => m?.id == voiceId,
-          orElse: () => null,
-        );
+    final current = await RunAnywhereModelLifecycle.shared.current(
+      model_pb.CurrentModelRequest(
+        category: _ttsCategory,
+        includeModelMetadata: true,
+      ),
+    );
+    if (!current.found || current.modelId.isEmpty || !current.hasModel()) {
+      return null;
+    }
+    return current.model;
   }
 
-  /// Load a TTS voice by ID.
+  /// Load a TTS voice by ID through commons lifecycle routing.
   Future<void> loadVoice(String voiceId) async {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
@@ -70,62 +81,27 @@ class RunAnywhereTTS {
     logger.info('Loading TTS voice: $voiceId');
     final startTime = DateTime.now().millisecondsSinceEpoch;
 
-    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: voiceId));
+    EventBus.shared.publish(SdkEventFactory.modelLoadStarted(voiceId));
 
     try {
-      // System TTS short-circuit: route to platform engine (AVSpeechSynthesizer
-      // on iOS, android.speech.tts.TextToSpeech on Android) via flutter_tts.
-      // The pseudo-model has no download URL / localPath, so it must bypass
-      // the C++ voice-load path that expects an on-disk model file.
-      if (voiceId == _systemTtsVoiceId) {
-        await _loadSystemTTS();
-
-        final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-        TelemetryService.shared.trackModelLoad(
+      final result = await RunAnywhereModelLifecycle.shared.load(
+        model_pb.ModelLoadRequest(
           modelId: voiceId,
-          modelType: 'tts',
-          success: true,
-          loadTimeMs: loadTimeMs,
-        );
-        EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: voiceId));
-        logger.info('TTS voice loaded: System TTS');
-        return;
-      }
-
-      final models = await RunAnywhereModels.shared.available();
-      final model = models.where((m) => m.id == voiceId).firstOrNull;
-
-      if (model == null) {
-        throw SDKException.modelNotFound('TTS voice not found: $voiceId');
-      }
-
-      if (model.localPath.isEmpty) {
-        throw SDKException.modelNotDownloaded(
-          'TTS voice is not downloaded. Call downloadModel() first.',
-        );
-      }
-
-      final resolvedPath =
-          await DartBridge.modelPaths.resolveModelFilePath(model);
-      if (resolvedPath == null) {
-        throw SDKException.modelNotFound(
-            'Could not resolve TTS voice path for: $voiceId');
-      }
-
-      // Unload any prior voice (native OR system) before loading the next.
-      await _unloadCurrent();
-
-      logger.debug('Loading TTS voice via C++ bridge: $resolvedPath');
-      await DartBridge.tts.loadVoice(resolvedPath, voiceId, model.name);
-
-      if (!DartBridge.tts.isLoaded) {
-        throw SDKException.ttsNotAvailable(
-          'TTS voice failed to load - voice may not be compatible',
+          category: _ttsCategory,
+          forceReload: true,
+          validateAvailability: true,
+        ),
+      );
+      if (!result.success) {
+        throw SDKException.modelLoadFailed(
+          voiceId,
+          result.errorMessage.isNotEmpty
+              ? result.errorMessage
+              : 'TTS lifecycle load failed',
         );
       }
 
       final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-
       TelemetryService.shared.trackModelLoad(
         modelId: voiceId,
         modelType: 'tts',
@@ -133,8 +109,8 @@ class RunAnywhereTTS {
         loadTimeMs: loadTimeMs,
       );
 
-      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: voiceId));
-      logger.info('TTS voice loaded: ${model.name}');
+      EventBus.shared.publish(SdkEventFactory.modelLoadCompleted(voiceId));
+      logger.info('TTS voice loaded: $voiceId');
     } catch (e) {
       logger.error('Failed to load TTS voice: $e');
       TelemetryService.shared.trackModelLoad(
@@ -147,45 +123,43 @@ class RunAnywhereTTS {
         errorMessage: e.toString(),
         context: {'voice_id': voiceId},
       );
-      EventBus.shared.publish(SDKModelEvent.loadFailed(
-        modelId: voiceId,
-        error: e.toString(),
-      ));
+      EventBus.shared.publish(SdkEventFactory.modelLoadFailed(voiceId, e));
       rethrow;
     }
   }
 
-  /// Unload the currently-loaded TTS voice.
+  /// Unload the currently-loaded TTS voice through commons lifecycle routing.
   Future<void> unloadVoice() async {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    await _unloadCurrent();
-  }
 
-  /// Internal: unload whichever voice is currently active (system or native).
-  Future<void> _unloadCurrent() async {
-    if (_systemTtsLoaded) {
-      await _systemTts?.cleanup();
-      _systemTtsLoaded = false;
+    final voiceId = currentVoiceId ??
+        (await RunAnywhereModelLifecycle.shared.current(
+          model_pb.CurrentModelRequest(category: _ttsCategory),
+        ))
+            .modelId;
+    if (voiceId.isEmpty) return;
+
+    EventBus.shared.publish(SdkEventFactory.modelUnloadStarted(voiceId));
+    final result = await RunAnywhereModelLifecycle.shared.unload(
+      model_pb.ModelUnloadRequest(
+        modelId: voiceId,
+        category: _ttsCategory,
+      ),
+    );
+    if (!result.success) {
+      throw SDKException.invalidState(
+        result.errorMessage.isNotEmpty
+            ? result.errorMessage
+            : 'TTS lifecycle unload failed',
+      );
     }
-    if (DartBridge.tts.isLoaded) {
-      DartBridge.tts.unload();
-    }
+    _isSpeaking = false;
+    EventBus.shared.publish(SdkEventFactory.modelUnloadCompleted(voiceId));
   }
 
-  /// Internal: initialize / re-initialize the System TTS service. Unloads any
-  /// native voice first so the two paths never claim to be loaded at once.
-  Future<void> _loadSystemTTS() async {
-    await _unloadCurrent();
-    _systemTts ??= sys_tts.SystemTTSService();
-    await _systemTts!.initialize();
-    _systemTtsLoaded = true;
-  }
-
-  /// Synthesize speech from [text]. Returns proto [TTSOutput] with PCM
-  /// float samples encoded as bytes in `audioData`. Mirrors Swift's
-  /// `synthesize(_:options:)`.
+  /// Synthesize speech from [text]. Returns proto [TTSOutput].
   Future<TTSOutput> synthesize(
     String text, [
     TTSOptions? options,
@@ -193,106 +167,46 @@ class RunAnywhereTTS {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    if (!isLoaded) {
-      throw SDKException.ttsNotAvailable(
-        'No TTS voice loaded. Call loadTTSVoice() first.',
-      );
-    }
-
+    final voiceId = await _requireLoadedVoiceId();
     final opts = _effectiveOptions(options ?? TTSOptions());
-    final logger = SDKLogger('RunAnywhere.Synthesize');
-    logger.debug(
-        'Synthesizing: "${text.substring(0, text.length.clamp(0, 50))}..."');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
-
-    // System TTS short-circuit: flutter_tts plays audio directly through the
-    // platform engine and does not expose raw PCM samples. We return an empty
-    // audio buffer with accurate timing metadata so callers can drive UI
-    // state; the actual audible output is produced by the platform engine.
-    if (_systemTtsLoaded) {
-      return _synthesizeSystemTTS(text, opts, logger, startTime);
-    }
-
-    final voiceId = currentVoiceId ?? 'unknown';
-
-    final modelInfo =
-        await DartBridgeModelRegistry.instance.getProtoModel(voiceId);
-    final modelName = modelInfo?.name;
-
-    try {
-      final result = await DartBridge.tts.synthesizeProto(text, opts);
-      final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      final durationMs = result.hasDurationMs() ? result.durationMs.toInt() : 0;
-
-      TelemetryService.shared.trackSynthesis(
-        voiceId: voiceId,
-        modelName: modelName,
-        textLength: text.length,
-        audioDurationMs: durationMs,
-        latencyMs: latencyMs,
-        sampleRate: result.sampleRate,
-        audioSizeBytes: result.audioData.length,
-      );
-
-      logger.info(
-          'Synthesis complete: ${result.audioData.length} bytes, ${result.sampleRate} Hz');
-      return result;
-    } catch (e) {
-      TelemetryService.shared.trackError(
-        errorCode: 'synthesis_failed',
-        errorMessage: e.toString(),
-        context: {'voice_id': voiceId, 'text_length': text.length},
-      );
-      logger.error('Synthesis failed: $e');
-      rethrow;
-    }
+    final request = TTSSynthesisRequest(
+      text: opts.enableSsml ? null : text,
+      ssml: opts.enableSsml ? text : null,
+      options: opts,
+      metadata: {'voice_id': voiceId},
+    );
+    return DartBridgeTTS.shared.synthesizeLifecycleProto(request);
   }
 
-  /// Stream synthesis chunks as they are generated. Yields raw byte
-  /// buffers (PCM Float32 samples encoded as bytes).
-  Stream<Uint8List> synthesizeStream(
+  /// Stream generated [TTSOutput] chunks as they are produced.
+  Stream<TTSOutput> synthesizeStream(
     String text, {
     TTSOptions? options,
-    void Function(Uint8List chunk)? onAudioChunk,
   }) async* {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    if (!isLoaded) {
-      throw SDKException.ttsNotAvailable('No TTS voice loaded.');
-    }
-    final opts = _effectiveOptions(options ?? TTSOptions());
-
-    // System TTS does not expose per-chunk PCM; plays through the platform
-    // engine and returns no samples. Emit a single empty chunk after playback
-    // completes so stream consumers can terminate cleanly.
-    if (_systemTtsLoaded) {
-      final output = await synthesize(text, opts);
-      final bytes = Uint8List.fromList(output.audioData);
-      onAudioChunk?.call(bytes);
-      yield bytes;
-      return;
-    }
-
-    await for (final chunk
-        in DartBridge.tts.synthesizeStreamProto(text, opts)) {
-      final bytes = Uint8List.fromList(chunk.audioData);
-      onAudioChunk?.call(bytes);
-      yield bytes;
-    }
+    await _requireLoadedVoiceId();
+    _effectiveOptions(options ?? TTSOptions());
+    throw SDKException.featureNotAvailable(
+      'Lifecycle-owned TTS streaming is unavailable in Flutter. '
+      'Use synthesize() for one-shot TTS until commons exposes '
+      'rac_tts_synthesize_stream_lifecycle_proto.',
+    );
   }
 
-  /// Stop in-flight synthesis (no-op if nothing is playing).
+  /// Stop in-flight synthesis.
   Future<void> stopSynthesis() async {
-    if (_systemTtsLoaded) {
-      await _systemTts?.stop();
-      return;
+    if (!SdkState.shared.isInitialized) {
+      throw SDKException.notInitialized();
     }
-    DartBridge.tts.stop();
+    throw SDKException.featureNotAvailable(
+      'Lifecycle-owned TTS stop is unavailable in Flutter until commons '
+      'exposes rac_tts_stop_lifecycle_proto.',
+    );
   }
 
   /// Synthesize-and-play. Mirrors Swift's `RunAnywhere.speak(_:options:)`.
-  /// Returns proto [TTSSpeakResult] (metadata-only view).
   Future<TTSSpeakResult> speak(String text, [TTSOptions? options]) async {
     final output = await synthesize(text, options);
     _isSpeaking = true;
@@ -310,8 +224,6 @@ class RunAnywhereTTS {
     }
   }
 
-  bool _isSpeaking = false;
-
   /// True while a `speak()` invocation is in flight.
   bool get isSpeaking => _isSpeaking;
 
@@ -321,78 +233,28 @@ class RunAnywhereTTS {
     await stopSynthesis();
   }
 
-  /// List available TTS voice ids.
+  /// List available TTS voice ids from the generated registry surface.
   Future<List<String>> availableVoices() async {
-    final all = await RunAnywhereModels.shared.available();
-    return all
-        .where((m) =>
-            m.category ==
-            pb_models.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS)
-        .map((m) => m.id)
-        .toList(growable: false);
+    final result = await RunAnywhereModels.shared.list(
+      query: model_pb.ModelQuery(category: _ttsCategory),
+    );
+    return result.models.models.map((m) => m.id).toList(growable: false);
   }
 
-  /// Internal: synthesize via the platform's System TTS engine. flutter_tts
-  /// plays audio directly (no PCM samples exposed), so we return an empty
-  /// [TTSOutput] with accurate timing metadata. Callers that auto-play PCM
-  /// should treat an empty `audioData` as "already playing via platform".
-  Future<TTSOutput> _synthesizeSystemTTS(
-    String text,
-    TTSOptions opts,
-    SDKLogger logger,
-    int startTime,
-  ) async {
-    const voiceId = _systemTtsVoiceId;
-    try {
-      final service = _systemTts;
-      if (service == null) {
-        throw SDKException.ttsNotAvailable('System TTS not initialized.');
-      }
-
-      await service.synthesize(sys_tts.TTSInput(
-        text: text,
-        voiceId:
-            opts.hasVoice() && opts.voice.isNotEmpty ? opts.voice : 'system',
-        rate: opts.hasSpeakingRate() ? opts.speakingRate : 1.0,
-        pitch: opts.hasPitch() ? opts.pitch : 1.0,
-      ));
-
-      final latencyMs = DateTime.now().millisecondsSinceEpoch - startTime;
-
-      TelemetryService.shared.trackSynthesis(
-        voiceId: voiceId,
-        modelName: 'System TTS',
-        textLength: text.length,
-        audioDurationMs: latencyMs,
-        latencyMs: latencyMs,
-        sampleRate: 22050,
-        audioSizeBytes: 0,
-      );
-
-      logger.info('System TTS synthesis complete (${latencyMs}ms wall-clock)');
-
-      return TTSOutput(
-        audioData: Uint8List(0),
-        audioFormat: pb_models.AudioFormat.AUDIO_FORMAT_PCM,
-        sampleRate: 22050,
-        durationMs: Int64(latencyMs),
-        metadata: TTSSynthesisMetadata(
-          voiceId: voiceId,
-          processingTimeMs: Int64(latencyMs),
-          characterCount: text.length,
-          audioDurationMs: Int64(latencyMs),
-        ),
-        timestampMs: Int64(DateTime.now().millisecondsSinceEpoch),
-      );
-    } catch (e) {
-      TelemetryService.shared.trackError(
-        errorCode: 'synthesis_failed',
-        errorMessage: e.toString(),
-        context: {'voice_id': voiceId, 'text_length': text.length},
-      );
-      logger.error('System TTS synthesis failed: $e');
-      rethrow;
+  Future<String> _requireLoadedVoiceId() async {
+    final snapshotVoiceId = currentVoiceId;
+    if (snapshotVoiceId != null) {
+      return snapshotVoiceId;
     }
+    final current = await RunAnywhereModelLifecycle.shared.current(
+      model_pb.CurrentModelRequest(category: _ttsCategory),
+    );
+    if (current.found && current.modelId.isNotEmpty) {
+      return current.modelId;
+    }
+    throw SDKException.ttsNotAvailable(
+      'No TTS voice loaded through commons lifecycle. Call loadTTSVoice() first.',
+    );
   }
 
   TTSOptions _effectiveOptions(TTSOptions options) {
@@ -410,11 +272,19 @@ class RunAnywhereTTS {
       opts.volume = 1.0;
     }
     if (!opts.hasAudioFormat()) {
-      opts.audioFormat = pb_models.AudioFormat.AUDIO_FORMAT_PCM;
+      opts.audioFormat = model_pb.AudioFormat.AUDIO_FORMAT_PCM;
     }
     if (!opts.hasSampleRate()) {
       opts.sampleRate = 22050;
     }
     return opts;
   }
+
+  ComponentLifecycleSnapshot? get _lifecycleSnapshot =>
+      RunAnywhereModelLifecycle.shared.componentSnapshot(
+        SDKComponent.SDK_COMPONENT_TTS,
+      );
+
+  static const _ttsCategory =
+      model_pb.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS;
 }

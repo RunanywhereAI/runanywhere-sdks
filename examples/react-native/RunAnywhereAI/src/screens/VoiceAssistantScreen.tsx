@@ -30,16 +30,15 @@ import {
   ModelSelectionSheet,
   ModelSelectionContext,
 } from '../components/model';
-import type { ModelInfo } from '../types/model';
-import { LLMFramework } from '../types/model';
 import type { VoiceConversationEntry } from '../types/voice';
 import { VoicePipelineStatus } from '../types/voice';
+import { createModelInfoSummary } from '../utils/modelDisplay';
 
-// Import RunAnywhere SDK
-// v3.1: migrated off deprecated VoiceSessionHandle / VoiceSessionEvent.
-// Now uses the proto-stream adapter with a handle obtained via the
-// RunAnywhereCore.getVoiceAgentHandle() Nitro method (v3.1 addition).
+// Import RunAnywhere SDK. Voice uses the proto-stream adapter with a handle
+// obtained via RunAnywhereCore.getVoiceAgentHandle().
 import {
+  InferenceFramework,
+  ModelCategory,
   RunAnywhere,
   type ModelInfo as SDKModelInfo,
   VoiceAgentStreamAdapter,
@@ -50,14 +49,18 @@ import {
 } from '@runanywhere/proto-ts/voice_events';
 import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 
+// Canonical SDK methods (Swift / Kotlin / Flutter / Web parity).
+const getAvailableModels = RunAnywhere.getAvailableModels;
+const loadModelById = RunAnywhere.loadModel;
+
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
 
 export const VoiceAssistantScreen: React.FC = () => {
   // Model states
-  const [sttModel, setSTTModel] = useState<ModelInfo | null>(null);
-  const [llmModel, setLLMModel] = useState<ModelInfo | null>(null);
-  const [ttsModel, setTTSModel] = useState<ModelInfo | null>(null);
+  const [sttModel, setSTTModel] = useState<SDKModelInfo | null>(null);
+  const [llmModel, setLLMModel] = useState<SDKModelInfo | null>(null);
+  const [ttsModel, setTTSModel] = useState<SDKModelInfo | null>(null);
   const [_availableModels, setAvailableModels] = useState<SDKModelInfo[]>([]);
 
   // Session state
@@ -77,9 +80,8 @@ export const VoiceAssistantScreen: React.FC = () => {
   // Safe area insets for header status bar handling
   const insets = useSafeAreaInsets();
 
-  // v3.1: voice-agent adapter ref + unsubscribe. Replaces the deprecated
-  // VoiceSessionHandle. The unsubscribe is returned by the adapter's
-  // AsyncIterable consumer; calling it deregisters the C-side callback.
+  // Voice-agent adapter ref + unsubscribe. The unsubscribe is returned by the
+  // adapter's AsyncIterable consumer; calling it deregisters the C-side callback.
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
   // Check if all models are loaded
@@ -106,7 +108,7 @@ export const VoiceAssistantScreen: React.FC = () => {
    */
   const loadAvailableModels = async () => {
     try {
-      const models = await RunAnywhere.getAvailableModels();
+      const models = await getAvailableModels();
       setAvailableModels(models);
     } catch (error) {
       console.warn('[VoiceAssistant] Error loading models:', error);
@@ -123,22 +125,28 @@ export const VoiceAssistantScreen: React.FC = () => {
       const ttsLoaded = await RunAnywhere.isTTSModelLoaded();
 
       if (sttLoaded) {
-        setSTTModel({
+        setSTTModel(createModelInfoSummary({
           id: 'stt-loaded',
           name: 'STT Model (Loaded)',
-        } as ModelInfo);
+          category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+          framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+        }));
       }
       if (llmLoaded) {
-        setLLMModel({
+        setLLMModel(createModelInfoSummary({
           id: 'llm-loaded',
           name: 'LLM Model (Loaded)',
-        } as ModelInfo);
+          category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+          framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        }));
       }
       if (ttsLoaded) {
-        setTTSModel({
+        setTTSModel(createModelInfoSummary({
           id: 'tts-loaded',
           name: 'TTS Model (Loaded)',
-        } as ModelInfo);
+          category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+          framework: InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS,
+        }));
       }
     } catch (error) {
       console.warn('[VoiceAssistant] Error checking model status:', error);
@@ -346,49 +354,58 @@ export const VoiceAssistantScreen: React.FC = () => {
       setShowModelSelection(false);
 
       try {
+        // Path-first loading was removed in V2 — model ID is the canonical
+        // handle and the native registry resolves the artifact path.
+        const ready = model.isDownloaded || !!model.localPath;
+        if (!ready) {
+          Alert.alert(
+            'Error',
+            'Model has not been downloaded. Open the model picker to download it first.',
+          );
+          return;
+        }
         switch (activeSelectionContext) {
-          case ModelSelectionContext.STT:
-            if (model.localPath) {
-              const sttSuccess = await RunAnywhere.loadSTTModel(
-                model.localPath,
-                'whisper'
-              );
-              if (sttSuccess) {
-                setSTTModel({
-                  id: model.id,
-                  name: model.name,
-                  preferredFramework: LLMFramework.ONNX,
-                } as ModelInfo);
-              }
+          case ModelSelectionContext.STT: {
+            const ok = await loadModelById(
+              model.id,
+              ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+            );
+            if (ok) {
+              setSTTModel({
+                ...model,
+                preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+              });
             }
             break;
-          case ModelSelectionContext.LLM:
-            if (model.localPath) {
-              const llmSuccess = await RunAnywhere.loadModel(model.localPath);
-              if (llmSuccess) {
-                setLLMModel({
-                  id: model.id,
-                  name: model.name,
-                  preferredFramework: LLMFramework.LlamaCpp,
-                } as ModelInfo);
-              }
+          }
+          case ModelSelectionContext.LLM: {
+            const ok = await loadModelById(
+              model.id,
+              ModelCategory.MODEL_CATEGORY_LANGUAGE,
+            );
+            if (ok) {
+              setLLMModel({
+                ...model,
+                preferredFramework:
+                  InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+              });
             }
             break;
-          case ModelSelectionContext.TTS:
-            if (model.localPath) {
-              const ttsSuccess = await RunAnywhere.loadTTSModel(
-                model.localPath,
-                'piper'
-              );
-              if (ttsSuccess) {
-                setTTSModel({
-                  id: model.id,
-                  name: model.name,
-                  preferredFramework: LLMFramework.PiperTTS,
-                } as ModelInfo);
-              }
+          }
+          case ModelSelectionContext.TTS: {
+            const ok = await loadModelById(
+              model.id,
+              ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+            );
+            if (ok) {
+              setTTSModel({
+                ...model,
+                preferredFramework:
+                  InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS,
+              });
             }
             break;
+          }
         }
       } catch (error) {
         Alert.alert('Error', `Failed to load model: ${error}`);
@@ -410,7 +427,7 @@ export const VoiceAssistantScreen: React.FC = () => {
   const renderModelBadge = (
     icon: string,
     label: string,
-    model: ModelInfo | null,
+    model: SDKModelInfo | null,
     color: string,
     onPress: () => void
   ) => (

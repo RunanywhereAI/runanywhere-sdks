@@ -1,8 +1,5 @@
 import 'dart:async';
-import 'dart:ffi';
-import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:runanywhere/runanywhere.dart';
@@ -33,33 +30,8 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _eagerLoadNativeLibraries();
       unawaited(_initializeSDK());
     });
-  }
-
-  /// Force [DynamicLibrary.open] for every .so we ship in jniLibs.
-  /// Failures are logged but do not abort startup — devices that can't
-  /// load a particular backend still get a working SDK with that
-  /// backend disabled.
-  void _eagerLoadNativeLibraries() {
-    if (!Platform.isAndroid) return;
-    const libs = <String>[
-      'librac_commons.so',
-      'librac_backend_llamacpp.so',
-      'librac_backend_genie.so',
-      'librac_backend_genie_jni.so',
-      'librunanywhere_genie.so',
-      'librunanywhere_llamacpp.so',
-    ];
-    for (final lib in libs) {
-      try {
-        DynamicLibrary.open(lib);
-        if (kDebugMode) debugPrint('🔗 Eager-loaded $lib');
-      } catch (e) {
-        if (kDebugMode) debugPrint('⚠️ Eager-load skipped for $lib: $e');
-      }
-    }
   }
 
   /// Normalize base URL by adding https:// if no scheme is present
@@ -96,7 +68,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         await RunAnywhereSDK.instance.initialize(
           apiKey: customApiKey,
           baseURL: normalizedURL,
-          environment: SDKEnvironment.production,
+          environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
         );
         debugPrint('✅ SDK initialized with CUSTOM configuration (production)');
       } else {
@@ -251,8 +223,27 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
   /// True once we've registered modules + models exactly once. Without
   /// this guard, hot-reload (or any second call) re-runs the entire
-  /// LlamaCpp.addModel block, which is wasteful (B-FL-3-002).
+  /// LLM catalog registration block, which is wasteful (B-FL-3-002).
   static bool _modulesRegistered = false;
+
+  void _registerLanguageModel({
+    required String id,
+    required String name,
+    required String url,
+    required InferenceFramework framework,
+    required int memoryRequirement,
+    bool supportsThinking = false,
+  }) {
+    RunAnywhereSDK.instance.models.register(
+      id: id,
+      name: name,
+      url: Uri.parse(url),
+      framework: framework,
+      modality: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+      memoryRequirement: memoryRequirement,
+      supportsThinking: supportsThinking,
+    );
+  }
 
   /// Register modules with their associated models
   /// Each module explicitly owns its models - the framework is determined by the module
@@ -268,68 +259,77 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     await LlamaCpp.register();
     await Future<void>.delayed(Duration.zero);
 
-    LlamaCpp.addModel(
+    _registerLanguageModel(
       id: 'smollm2-360m-q8_0',
       name: 'SmolLM2 360M Q8_0',
       url:
           'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 500000000,
     );
-    LlamaCpp.addModel(
+    _registerLanguageModel(
       id: 'llama-2-7b-chat-q4_k_m',
       name: 'Llama 2 7B Chat Q4_K_M',
       url:
           'https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 4000000000,
     );
-    LlamaCpp.addModel(
+    _registerLanguageModel(
       id: 'mistral-7b-instruct-q4_k_m',
       name: 'Mistral 7B Instruct Q4_K_M',
       url:
           'https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 4000000000,
     );
-    LlamaCpp.addModel(
+    _registerLanguageModel(
       id: 'qwen2.5-0.5b-instruct-q6_k',
       name: 'Qwen 2.5 0.5B Instruct Q6_K',
       url:
           'https://huggingface.co/Triangle104/Qwen2.5-0.5B-Instruct-Q6_K-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 600000000,
     );
-    LlamaCpp.addModel(
+    _registerLanguageModel(
       id: 'qwen3-0.6b-q4_k_m',
       name: 'Qwen3 0.6B Q4_K_M',
       url:
           'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 477000000,
     );
-    LlamaCpp.addModel(
+    _registerLanguageModel(
       id: 'lfm2-350m-q4_k_m',
       name: 'LiquidAI LFM2 350M Q4_K_M',
       url:
           'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 250000000,
     );
-    LlamaCpp.addModel(
+    _registerLanguageModel(
       id: 'lfm2-350m-q8_0',
       name: 'LiquidAI LFM2 350M Q8_0',
       url:
           'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 400000000,
     );
 
-    LlamaCpp.addModel(
+    _registerLanguageModel(
       id: 'lfm2-1.2b-tool-q4_k_m',
       name: 'LiquidAI LFM2 1.2B Tool Q4_K_M',
       url:
           'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 800000000,
     );
-    LlamaCpp.addModel(
+    _registerLanguageModel(
       id: 'lfm2-1.2b-tool-q8_0',
       name: 'LiquidAI LFM2 1.2B Tool Q8_0',
       url:
           'https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 1400000000,
     );
     debugPrint('✅ LlamaCPP module registered');
@@ -338,57 +338,8 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     // --- GENIE NPU MODULE (Android/Snapdragon only) ---
     if (Genie.isAvailable) {
       await Genie.register(priority: 200);
-      final chip = await RunAnywhereSDK.instance.hardware.getChipEnum();
-      if (chip != null) {
-        // Models with per-chip availability
-        const genieModels = [
-          // Qwen3 4B — Gen 5 only
-          (
-            slug: 'qwen3-4b',
-            name: 'Qwen3 4B',
-            mem: 2800000000,
-            quant: 'w4a16',
-            chips: {NPUChip.snapdragon8EliteGen5}
-          ),
-          // Llama 3.2 1B Instruct — both chips
-          (
-            slug: 'llama3.2-1b-instruct',
-            name: 'Llama 3.2 1B Instruct',
-            mem: 1200000000,
-            quant: 'w4a16',
-            chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5}
-          ),
-          // SEA-LION v3.5 8B Instruct — both chips
-          (
-            slug: 'sea-lion3.5-8b-instruct',
-            name: 'SEA-LION v3.5 8B Instruct',
-            mem: 4800000000,
-            quant: 'w4a16',
-            chips: {NPUChip.snapdragon8Elite, NPUChip.snapdragon8EliteGen5}
-          ),
-          // Qwen 2.5 7B Instruct — 8elite only, w8a16 quant
-          (
-            slug: 'qwen2.5-7b-instruct',
-            name: 'Qwen 2.5 7B Instruct',
-            mem: 4200000000,
-            quant: 'w8a16',
-            chips: {NPUChip.snapdragon8Elite}
-          ),
-        ];
-        for (final m in genieModels) {
-          if (m.chips.contains(chip)) {
-            Genie.addModel(
-              id: '${m.slug}-npu-${chip.identifier}',
-              name: '${m.name} (NPU - ${chip.displayName})',
-              url: chip.downloadUrl(m.slug, quant: m.quant),
-              memoryRequirement: m.mem,
-            );
-          }
-        }
-        debugPrint('✅ Genie NPU module registered (chip: ${chip.displayName})');
-      } else {
-        debugPrint('ℹ️ Genie available but no supported NPU chip detected');
-      }
+      debugPrint(
+          '✅ Genie backend registered; NPU model catalog is pending generated registry/catalog support');
     } else {
       debugPrint('ℹ️ Genie NPU not available (non-Snapdragon device)');
     }

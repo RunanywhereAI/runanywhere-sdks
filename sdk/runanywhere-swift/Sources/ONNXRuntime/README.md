@@ -401,7 +401,7 @@ Performance varies based on model size and device thermal state.
 
 ### Model Load Fails
 
-1. Ensure the model is downloaded: check `ModelInfo.isDownloaded`
+1. Ensure the model is downloaded: check `RAModelInfo.isDownloaded`
 2. Verify the model format matches the capability (Whisper for STT, Piper for TTS)
 3. Check available memory
 

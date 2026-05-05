@@ -176,7 +176,7 @@ extension CppBridge {
                     do {
                         let response = try await service.generate(
                             prompt: prompt,
-                            options: LLMGenerationOptions()
+                            options: RALLMGenerationOptions.defaults()
                         )
                         outResponsePtr.pointee = strdup(response)
                         result = RAC_SUCCESS
@@ -261,7 +261,7 @@ extension CppBridge {
                 var rate: Float = 1.0
                 var pitch: Float = 1.0
                 var volume: Float = 1.0
-                var voice: String?
+                var voice = ""
 
                 if let optionsPtr = optionsPtr {
                     rate = optionsPtr.pointee.rate
@@ -272,12 +272,11 @@ extension CppBridge {
                     }
                 }
 
-                let options = TTSOptions(
-                    voice: voice,
-                    rate: rate,
-                    pitch: pitch,
-                    volume: volume
-                )
+                var options = RATTSOptions.defaults()
+                options.voice = voice
+                options.speakingRate = rate
+                options.pitch = pitch
+                options.volume = volume
 
                 var result: rac_result_t = RAC_ERROR_INTERNAL
                 let group = DispatchGroup()
@@ -369,12 +368,12 @@ extension CppBridge {
                 // Parse config
                 var reduceMemory = true
                 var disableSafety = false
-                var modelVariant: DiffusionModelVariant = .sd15
+                var modelVariant: RADiffusionModelVariant = .sd15
 
                 if let configPtr = configPtr {
                     reduceMemory = configPtr.pointee.reduce_memory == RAC_TRUE
                     disableSafety = configPtr.pointee.enable_safety_checker == RAC_FALSE
-                    modelVariant = DiffusionModelVariant(cValue: configPtr.pointee.model_variant)
+                    modelVariant = RADiffusionModelVariant(cValue: configPtr.pointee.model_variant)
                 }
 
                 // Determine tokenizer source from model variant
@@ -605,7 +604,7 @@ extension CppBridge {
 
         /// Get the cached Diffusion service (if created)
         @available(iOS 16.2, macOS 13.1, *)
-        public static func getDiffusionService() -> DiffusionPlatformService? {
+        static func getDiffusionService() -> DiffusionPlatformService? {
             return diffusionService as? DiffusionPlatformService
         }
 

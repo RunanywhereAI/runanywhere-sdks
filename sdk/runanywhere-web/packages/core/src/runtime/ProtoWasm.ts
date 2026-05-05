@@ -1,4 +1,4 @@
-import { SDKLogger } from '../Foundation/SDKLogger';
+import type { SDKLogger } from '../Foundation/SDKLogger';
 
 const OUT_PTR_SIZE = 4;
 const RAC_SUCCESS = 0;

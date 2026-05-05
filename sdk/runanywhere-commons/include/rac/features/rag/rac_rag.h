@@ -3,6 +3,10 @@
  * @brief RunAnywhere Commons - RAG Pipeline Public API
  *
  * Registration and control functions for the RAG pipeline module.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal`.
+ * The register/unregister entry points wire the RAG plugin into the
+ * registry; SDK callers do not invoke them directly.
  */
 
 #ifndef RAC_RAG_H

@@ -31,9 +31,7 @@ class ThinkingExtractionResult {
 }
 
 /// Pure-Dart utilities for thinking-token parsing and structured output
-/// extraction. Exposed as a static helper class; the public-facing
-/// flat aliases on [RunAnywhereSDK] (in `runanywhere_flat_aliases.dart`)
-/// delegate here.
+/// extraction. Exposed as a static helper class.
 class RunAnywhereThinkingUtils {
   RunAnywhereThinkingUtils._();
 

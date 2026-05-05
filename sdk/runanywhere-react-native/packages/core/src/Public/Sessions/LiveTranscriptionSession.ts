@@ -19,19 +19,17 @@
 
 import { AudioCaptureManager } from '../../Features/VoiceSession/AudioCaptureManager';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+import { transcribeStream } from '../Extensions/RunAnywhere+STT';
+import type { STTPartialResult } from '@runanywhere/proto-ts/stt_options';
 import {
-  transcribeStream,
-  stopStreamingTranscription,
-} from '../Extensions/RunAnywhere+STT';
-import {
-  type STTOptions,
+  STTOptions,
   STTLanguage,
 } from '@runanywhere/proto-ts/stt_options';
 import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 
 /** Default proto STTOptions for live transcription. */
 function defaultLiveSTTOptions(): STTOptions {
-  return {
+  return STTOptions.fromPartial({
     language: STTLanguage.STT_LANGUAGE_AUTO,
     enablePunctuation: true,
     enableDiarization: false,
@@ -43,7 +41,7 @@ function defaultLiveSTTOptions(): STTOptions {
     audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
     sampleRate: 16000,
     maxAlternatives: 0,
-  };
+  });
 }
 
 /**
@@ -131,6 +129,10 @@ export class LiveTranscriptionSession {
   private readonly textQueue: string[] = [];
   private textResolver: ((value: IteratorResult<string>) => void) | null = null;
   private streamFinished = false;
+  // Active streaming-transcribe iterator; held so `stop()` can call `return()`
+  // (the canonical cancellation hook now that `stopStreamingTranscription`
+  // has been removed from the public API).
+  private activeIterator: AsyncIterator<STTPartialResult> | null = null;
 
   constructor(options: STTOptions = defaultLiveSTTOptions()) {
     this.audioCapture = new AudioCaptureManager({ sampleRate: 16000 });
@@ -267,19 +269,36 @@ export class LiveTranscriptionSession {
     this._currentText = '';
     for (const listener of this.listeners) listener.onActiveChange?.(true);
 
-    try {
-      // Kick off the streaming transcription. The native side feeds back
-      // partials via the async generator. We deliberately pass an empty
-      // buffer because audio is being driven by the audio capture path
-      // below — the native streaming STT pipeline reads from its own ring
-      // buffer.
-      for await (const partial of transcribeStream(new Uint8Array(0), this.options)) {
-        this.pushText(partial.text);
-        if (partial.isFinal) break;
+    // Kick off the streaming transcription. The native side feeds back
+    // partials via the async generator. We deliberately pass an empty
+    // buffer because audio is being driven by the audio capture path
+    // below — the native streaming STT pipeline reads from its own ring
+    // buffer.
+    //
+    // Hermes does not support `for await...of` with NitroModules custom async
+    // iterables (see CLAUDE.md). Use a manual `iterator.next()` loop and
+    // store the iterator so `stop()` can invoke `return()` for cancellation.
+    const stream = transcribeStream(new Uint8Array(0), this.options);
+    const iterator = stream[Symbol.asyncIterator]();
+    this.activeIterator = iterator;
+
+    void (async () => {
+      try {
+        let result = await iterator.next();
+        while (!result.done) {
+          const partial = result.value;
+          this.pushText(partial.text);
+          if (partial.isFinal) break;
+          result = await iterator.next();
+        }
+      } catch (err) {
+        this.handleError(err as Error);
+      } finally {
+        if (this.activeIterator === iterator) {
+          this.activeIterator = null;
+        }
       }
-    } catch (err) {
-      this.handleError(err as Error);
-    }
+    })();
 
     try {
       await this.audioCapture.startRecording((audioData) => {
@@ -310,7 +329,19 @@ export class LiveTranscriptionSession {
 
     this.logger.info('Stopping live transcription');
 
-    await stopStreamingTranscription();
+    // Cancel the streaming-transcribe iterator. The transcribeStream()
+    // iterator's `return()` ends the native subscription and unblocks any
+    // pending `next()` resolver — equivalent to the deleted
+    // `stopStreamingTranscription()` shim.
+    const iterator = this.activeIterator;
+    this.activeIterator = null;
+    if (iterator?.return) {
+      try {
+        await iterator.return();
+      } catch (err) {
+        this.logger.warning(`Error stopping STT stream: ${String(err)}`);
+      }
+    }
 
     try {
       await this.audioCapture.stopRecording();

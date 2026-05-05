@@ -73,7 +73,7 @@ final class VLMViewModel: NSObject {
     @objc
     private func vlmModelLoaded(_ notification: Notification) {
         Task {
-            if let model = notification.object as? ModelInfo {
+            if let model = notification.object as? RAModelInfo {
                 isModelLoaded = true
                 loadedModelName = model.name
             } else {
@@ -142,14 +142,15 @@ final class VLMViewModel: NSObject {
         currentDescription = ""
 
         do {
-            let image = VLMImage(pixelBuffer: pixelBuffer)
-            let result = try await RunAnywhere.processImageStream(
-                image,
-                prompt: "Describe what you see briefly.",
-                maxTokens: 200
-            )
+            guard let image = RAVLMImage.fromPixelBuffer(pixelBuffer) else {
+                throw Self.imageConversionError("Failed to convert camera frame to VLM input")
+            }
+            let prompt = "Describe what you see briefly."
+            var options = RAVLMGenerationOptions.defaults(prompt: prompt)
+            options.maxTokens = 200
+            let stream = RunAnywhere.processImageStream(image, prompt: prompt, options: options)
 
-            for try await token in result.stream {
+            for await token in stream {
                 currentDescription += token
             }
         } catch {
@@ -167,14 +168,15 @@ final class VLMViewModel: NSObject {
         currentDescription = ""
 
         do {
-            let image = VLMImage(image: uiImage)
-            let result = try await RunAnywhere.processImageStream(
-                image,
-                prompt: "Describe this image in detail.",
-                maxTokens: 300
-            )
+            guard let image = RAVLMImage.fromUIImage(uiImage) else {
+                throw Self.imageConversionError("Failed to convert image to VLM input")
+            }
+            let prompt = "Describe this image in detail."
+            var options = RAVLMGenerationOptions.defaults(prompt: prompt)
+            options.maxTokens = 300
+            let stream = RunAnywhere.processImageStream(image, prompt: prompt, options: options)
 
-            for try await token in result.stream {
+            for await token in stream {
                 currentDescription += token
             }
         } catch {
@@ -206,14 +208,13 @@ final class VLMViewModel: NSObject {
             let width = cgImage.width
             let height = cgImage.height
             let rgbData = Self.rgbData(from: cgImage, width: width, height: height)
-            let image = VLMImage(rgbPixels: rgbData, width: width, height: height)
-            let result = try await RunAnywhere.processImageStream(
-                image,
-                prompt: "Describe this image in detail.",
-                maxTokens: 300
-            )
+            let image = RAVLMImage.fromRawRGB(rgbData, width: width, height: height)
+            let prompt = "Describe this image in detail."
+            var options = RAVLMGenerationOptions.defaults(prompt: prompt)
+            options.maxTokens = 300
+            let stream = RunAnywhere.processImageStream(image, prompt: prompt, options: options)
 
-            for try await token in result.stream {
+            for await token in stream {
                 currentDescription += token
             }
         } catch {
@@ -306,14 +307,15 @@ final class VLMViewModel: NSObject {
         var newDescription = ""
 
         do {
-            let image = VLMImage(pixelBuffer: pixelBuffer)
-            let result = try await RunAnywhere.processImageStream(
-                image,
-                prompt: "Describe what you see in one sentence.",
-                maxTokens: 100
-            )
+            guard let image = RAVLMImage.fromPixelBuffer(pixelBuffer) else {
+                throw Self.imageConversionError("Failed to convert camera frame to VLM input")
+            }
+            let prompt = "Describe what you see in one sentence."
+            var options = RAVLMGenerationOptions.defaults(prompt: prompt)
+            options.maxTokens = 100
+            let stream = RunAnywhere.processImageStream(image, prompt: prompt, options: options)
 
-            for try await token in result.stream {
+            for await token in stream {
                 newDescription += token
                 currentDescription = newDescription
             }
@@ -323,6 +325,14 @@ final class VLMViewModel: NSObject {
         }
 
         isProcessing = false
+    }
+
+    private static func imageConversionError(_ message: String) -> NSError {
+        NSError(
+            domain: "com.runanywhere.RunAnywhereAI",
+            code: -1,
+            userInfo: [NSLocalizedDescriptionKey: message]
+        )
     }
 }
 

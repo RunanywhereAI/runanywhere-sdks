@@ -215,8 +215,11 @@ println("Text: ${output.text}")
 println("Confidence: ${output.confidence}")
 
 // Streaming transcription
-RunAnywhere.transcribeStream(audioData) { partial ->
-    println("Partial: ${partial.transcript}")
+RunAnywhere.transcribeStream(audioData).collect { event ->
+    val text = event.final_output?.text ?: event.partial?.text.orEmpty()
+    if (text.isNotBlank()) {
+        println("STT event: $text")
+    }
 }
 ```
 

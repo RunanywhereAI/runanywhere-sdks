@@ -1,3 +1,4 @@
+from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
@@ -209,7 +210,14 @@ TURN_LIFECYCLE_EVENT_KIND_CANCELLED: TurnLifecycleEventKind
 TURN_LIFECYCLE_EVENT_KIND_FAILED: TurnLifecycleEventKind
 
 class VoiceEvent(_message.Message):
-    __slots__ = ("seq", "timestamp_us", "category", "severity", "component", "user_said", "assistant_token", "audio", "vad", "interrupted", "state", "error", "metrics", "component_state_changed", "session_error", "session_started", "session_stopped", "agent_response_started", "agent_response_completed", "speech_turn_detection", "turn_lifecycle", "wakeword_detected")
+    __slots__ = ("seq", "timestamp_us", "category", "severity", "component", "user_said", "assistant_token", "audio", "vad", "interrupted", "state", "error", "metrics", "component_state_changed", "session_error", "session_started", "session_stopped", "agent_response_started", "agent_response_completed", "speech_turn_detection", "turn_lifecycle", "wakeword_detected", "audio_level", "component_progress", "session_id", "turn_id", "request_id", "metadata")
+    class MetadataEntry(_message.Message):
+        __slots__ = ("key", "value")
+        KEY_FIELD_NUMBER: _ClassVar[int]
+        VALUE_FIELD_NUMBER: _ClassVar[int]
+        key: str
+        value: str
+        def __init__(self, key: _Optional[str] = ..., value: _Optional[str] = ...) -> None: ...
     SEQ_FIELD_NUMBER: _ClassVar[int]
     TIMESTAMP_US_FIELD_NUMBER: _ClassVar[int]
     CATEGORY_FIELD_NUMBER: _ClassVar[int]
@@ -232,6 +240,12 @@ class VoiceEvent(_message.Message):
     SPEECH_TURN_DETECTION_FIELD_NUMBER: _ClassVar[int]
     TURN_LIFECYCLE_FIELD_NUMBER: _ClassVar[int]
     WAKEWORD_DETECTED_FIELD_NUMBER: _ClassVar[int]
+    AUDIO_LEVEL_FIELD_NUMBER: _ClassVar[int]
+    COMPONENT_PROGRESS_FIELD_NUMBER: _ClassVar[int]
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    TURN_ID_FIELD_NUMBER: _ClassVar[int]
+    REQUEST_ID_FIELD_NUMBER: _ClassVar[int]
+    METADATA_FIELD_NUMBER: _ClassVar[int]
     seq: int
     timestamp_us: int
     category: VoiceEventCategory
@@ -254,45 +268,65 @@ class VoiceEvent(_message.Message):
     speech_turn_detection: SpeechTurnDetectionEvent
     turn_lifecycle: TurnLifecycleEvent
     wakeword_detected: WakeWordDetectedEvent
-    def __init__(self, seq: _Optional[int] = ..., timestamp_us: _Optional[int] = ..., category: _Optional[_Union[VoiceEventCategory, str]] = ..., severity: _Optional[_Union[VoiceEventSeverity, str]] = ..., component: _Optional[_Union[VoicePipelineComponent, str]] = ..., user_said: _Optional[_Union[UserSaidEvent, _Mapping]] = ..., assistant_token: _Optional[_Union[AssistantTokenEvent, _Mapping]] = ..., audio: _Optional[_Union[AudioFrameEvent, _Mapping]] = ..., vad: _Optional[_Union[VADEvent, _Mapping]] = ..., interrupted: _Optional[_Union[InterruptedEvent, _Mapping]] = ..., state: _Optional[_Union[StateChangeEvent, _Mapping]] = ..., error: _Optional[_Union[ErrorEvent, _Mapping]] = ..., metrics: _Optional[_Union[MetricsEvent, _Mapping]] = ..., component_state_changed: _Optional[_Union[VoiceAgentComponentStates, _Mapping]] = ..., session_error: _Optional[_Union[VoiceSessionError, _Mapping]] = ..., session_started: _Optional[_Union[SessionStartedEvent, _Mapping]] = ..., session_stopped: _Optional[_Union[SessionStoppedEvent, _Mapping]] = ..., agent_response_started: _Optional[_Union[AgentResponseStartedEvent, _Mapping]] = ..., agent_response_completed: _Optional[_Union[AgentResponseCompletedEvent, _Mapping]] = ..., speech_turn_detection: _Optional[_Union[SpeechTurnDetectionEvent, _Mapping]] = ..., turn_lifecycle: _Optional[_Union[TurnLifecycleEvent, _Mapping]] = ..., wakeword_detected: _Optional[_Union[WakeWordDetectedEvent, _Mapping]] = ...) -> None: ...
+    audio_level: AudioLevelEvent
+    component_progress: ComponentProgressEvent
+    session_id: str
+    turn_id: str
+    request_id: str
+    metadata: _containers.ScalarMap[str, str]
+    def __init__(self, seq: _Optional[int] = ..., timestamp_us: _Optional[int] = ..., category: _Optional[_Union[VoiceEventCategory, str]] = ..., severity: _Optional[_Union[VoiceEventSeverity, str]] = ..., component: _Optional[_Union[VoicePipelineComponent, str]] = ..., user_said: _Optional[_Union[UserSaidEvent, _Mapping]] = ..., assistant_token: _Optional[_Union[AssistantTokenEvent, _Mapping]] = ..., audio: _Optional[_Union[AudioFrameEvent, _Mapping]] = ..., vad: _Optional[_Union[VADEvent, _Mapping]] = ..., interrupted: _Optional[_Union[InterruptedEvent, _Mapping]] = ..., state: _Optional[_Union[StateChangeEvent, _Mapping]] = ..., error: _Optional[_Union[ErrorEvent, _Mapping]] = ..., metrics: _Optional[_Union[MetricsEvent, _Mapping]] = ..., component_state_changed: _Optional[_Union[VoiceAgentComponentStates, _Mapping]] = ..., session_error: _Optional[_Union[VoiceSessionError, _Mapping]] = ..., session_started: _Optional[_Union[SessionStartedEvent, _Mapping]] = ..., session_stopped: _Optional[_Union[SessionStoppedEvent, _Mapping]] = ..., agent_response_started: _Optional[_Union[AgentResponseStartedEvent, _Mapping]] = ..., agent_response_completed: _Optional[_Union[AgentResponseCompletedEvent, _Mapping]] = ..., speech_turn_detection: _Optional[_Union[SpeechTurnDetectionEvent, _Mapping]] = ..., turn_lifecycle: _Optional[_Union[TurnLifecycleEvent, _Mapping]] = ..., wakeword_detected: _Optional[_Union[WakeWordDetectedEvent, _Mapping]] = ..., audio_level: _Optional[_Union[AudioLevelEvent, _Mapping]] = ..., component_progress: _Optional[_Union[ComponentProgressEvent, _Mapping]] = ..., session_id: _Optional[str] = ..., turn_id: _Optional[str] = ..., request_id: _Optional[str] = ..., metadata: _Optional[_Mapping[str, str]] = ...) -> None: ...
 
 class UserSaidEvent(_message.Message):
-    __slots__ = ("text", "is_final", "confidence", "audio_start_us", "audio_end_us")
+    __slots__ = ("text", "is_final", "confidence", "audio_start_us", "audio_end_us", "language_code", "segment_index")
     TEXT_FIELD_NUMBER: _ClassVar[int]
     IS_FINAL_FIELD_NUMBER: _ClassVar[int]
     CONFIDENCE_FIELD_NUMBER: _ClassVar[int]
     AUDIO_START_US_FIELD_NUMBER: _ClassVar[int]
     AUDIO_END_US_FIELD_NUMBER: _ClassVar[int]
+    LANGUAGE_CODE_FIELD_NUMBER: _ClassVar[int]
+    SEGMENT_INDEX_FIELD_NUMBER: _ClassVar[int]
     text: str
     is_final: bool
     confidence: float
     audio_start_us: int
     audio_end_us: int
-    def __init__(self, text: _Optional[str] = ..., is_final: _Optional[bool] = ..., confidence: _Optional[float] = ..., audio_start_us: _Optional[int] = ..., audio_end_us: _Optional[int] = ...) -> None: ...
+    language_code: str
+    segment_index: int
+    def __init__(self, text: _Optional[str] = ..., is_final: _Optional[bool] = ..., confidence: _Optional[float] = ..., audio_start_us: _Optional[int] = ..., audio_end_us: _Optional[int] = ..., language_code: _Optional[str] = ..., segment_index: _Optional[int] = ...) -> None: ...
 
 class AssistantTokenEvent(_message.Message):
-    __slots__ = ("text", "is_final", "kind")
+    __slots__ = ("text", "is_final", "kind", "token_id", "logprob", "finish_reason")
     TEXT_FIELD_NUMBER: _ClassVar[int]
     IS_FINAL_FIELD_NUMBER: _ClassVar[int]
     KIND_FIELD_NUMBER: _ClassVar[int]
+    TOKEN_ID_FIELD_NUMBER: _ClassVar[int]
+    LOGPROB_FIELD_NUMBER: _ClassVar[int]
+    FINISH_REASON_FIELD_NUMBER: _ClassVar[int]
     text: str
     is_final: bool
     kind: TokenKind
-    def __init__(self, text: _Optional[str] = ..., is_final: _Optional[bool] = ..., kind: _Optional[_Union[TokenKind, str]] = ...) -> None: ...
+    token_id: int
+    logprob: float
+    finish_reason: str
+    def __init__(self, text: _Optional[str] = ..., is_final: _Optional[bool] = ..., kind: _Optional[_Union[TokenKind, str]] = ..., token_id: _Optional[int] = ..., logprob: _Optional[float] = ..., finish_reason: _Optional[str] = ...) -> None: ...
 
 class AudioFrameEvent(_message.Message):
-    __slots__ = ("pcm", "sample_rate_hz", "channels", "encoding", "is_final")
+    __slots__ = ("pcm", "sample_rate_hz", "channels", "encoding", "is_final", "chunk_index", "duration_ms")
     PCM_FIELD_NUMBER: _ClassVar[int]
     SAMPLE_RATE_HZ_FIELD_NUMBER: _ClassVar[int]
     CHANNELS_FIELD_NUMBER: _ClassVar[int]
     ENCODING_FIELD_NUMBER: _ClassVar[int]
     IS_FINAL_FIELD_NUMBER: _ClassVar[int]
+    CHUNK_INDEX_FIELD_NUMBER: _ClassVar[int]
+    DURATION_MS_FIELD_NUMBER: _ClassVar[int]
     pcm: bytes
     sample_rate_hz: int
     channels: int
     encoding: AudioEncoding
     is_final: bool
-    def __init__(self, pcm: _Optional[bytes] = ..., sample_rate_hz: _Optional[int] = ..., channels: _Optional[int] = ..., encoding: _Optional[_Union[AudioEncoding, str]] = ..., is_final: _Optional[bool] = ...) -> None: ...
+    chunk_index: int
+    duration_ms: int
+    def __init__(self, pcm: _Optional[bytes] = ..., sample_rate_hz: _Optional[int] = ..., channels: _Optional[int] = ..., encoding: _Optional[_Union[AudioEncoding, str]] = ..., is_final: _Optional[bool] = ..., chunk_index: _Optional[int] = ..., duration_ms: _Optional[int] = ...) -> None: ...
 
 class VADEvent(_message.Message):
     __slots__ = ("type", "frame_offset_us", "confidence", "is_speech", "speech_duration_ms", "silence_duration_ms", "noise_floor_db")
@@ -329,19 +363,23 @@ class StateChangeEvent(_message.Message):
     def __init__(self, previous: _Optional[_Union[PipelineState, str]] = ..., current: _Optional[_Union[PipelineState, str]] = ...) -> None: ...
 
 class ErrorEvent(_message.Message):
-    __slots__ = ("code", "message", "component", "is_recoverable")
+    __slots__ = ("code", "message", "component", "is_recoverable", "operation", "details_json")
     CODE_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
     COMPONENT_FIELD_NUMBER: _ClassVar[int]
     IS_RECOVERABLE_FIELD_NUMBER: _ClassVar[int]
+    OPERATION_FIELD_NUMBER: _ClassVar[int]
+    DETAILS_JSON_FIELD_NUMBER: _ClassVar[int]
     code: int
     message: str
     component: str
     is_recoverable: bool
-    def __init__(self, code: _Optional[int] = ..., message: _Optional[str] = ..., component: _Optional[str] = ..., is_recoverable: _Optional[bool] = ...) -> None: ...
+    operation: str
+    details_json: str
+    def __init__(self, code: _Optional[int] = ..., message: _Optional[str] = ..., component: _Optional[str] = ..., is_recoverable: _Optional[bool] = ..., operation: _Optional[str] = ..., details_json: _Optional[str] = ...) -> None: ...
 
 class MetricsEvent(_message.Message):
-    __slots__ = ("stt_final_ms", "llm_first_token_ms", "tts_first_audio_ms", "end_to_end_ms", "tokens_generated", "audio_samples_played", "is_over_budget", "created_at_ns")
+    __slots__ = ("stt_final_ms", "llm_first_token_ms", "tts_first_audio_ms", "end_to_end_ms", "tokens_generated", "audio_samples_played", "is_over_budget", "created_at_ns", "vad_first_speech_ms", "stt_first_partial_ms", "llm_total_ms", "tts_total_ms")
     STT_FINAL_MS_FIELD_NUMBER: _ClassVar[int]
     LLM_FIRST_TOKEN_MS_FIELD_NUMBER: _ClassVar[int]
     TTS_FIRST_AUDIO_MS_FIELD_NUMBER: _ClassVar[int]
@@ -350,6 +388,10 @@ class MetricsEvent(_message.Message):
     AUDIO_SAMPLES_PLAYED_FIELD_NUMBER: _ClassVar[int]
     IS_OVER_BUDGET_FIELD_NUMBER: _ClassVar[int]
     CREATED_AT_NS_FIELD_NUMBER: _ClassVar[int]
+    VAD_FIRST_SPEECH_MS_FIELD_NUMBER: _ClassVar[int]
+    STT_FIRST_PARTIAL_MS_FIELD_NUMBER: _ClassVar[int]
+    LLM_TOTAL_MS_FIELD_NUMBER: _ClassVar[int]
+    TTS_TOTAL_MS_FIELD_NUMBER: _ClassVar[int]
     stt_final_ms: float
     llm_first_token_ms: float
     tts_first_audio_ms: float
@@ -358,49 +400,97 @@ class MetricsEvent(_message.Message):
     audio_samples_played: int
     is_over_budget: bool
     created_at_ns: int
-    def __init__(self, stt_final_ms: _Optional[float] = ..., llm_first_token_ms: _Optional[float] = ..., tts_first_audio_ms: _Optional[float] = ..., end_to_end_ms: _Optional[float] = ..., tokens_generated: _Optional[int] = ..., audio_samples_played: _Optional[int] = ..., is_over_budget: _Optional[bool] = ..., created_at_ns: _Optional[int] = ...) -> None: ...
+    vad_first_speech_ms: float
+    stt_first_partial_ms: float
+    llm_total_ms: float
+    tts_total_ms: float
+    def __init__(self, stt_final_ms: _Optional[float] = ..., llm_first_token_ms: _Optional[float] = ..., tts_first_audio_ms: _Optional[float] = ..., end_to_end_ms: _Optional[float] = ..., tokens_generated: _Optional[int] = ..., audio_samples_played: _Optional[int] = ..., is_over_budget: _Optional[bool] = ..., created_at_ns: _Optional[int] = ..., vad_first_speech_ms: _Optional[float] = ..., stt_first_partial_ms: _Optional[float] = ..., llm_total_ms: _Optional[float] = ..., tts_total_ms: _Optional[float] = ...) -> None: ...
+
+class AudioLevelEvent(_message.Message):
+    __slots__ = ("rms", "peak", "noise_floor_db", "is_speech")
+    RMS_FIELD_NUMBER: _ClassVar[int]
+    PEAK_FIELD_NUMBER: _ClassVar[int]
+    NOISE_FLOOR_DB_FIELD_NUMBER: _ClassVar[int]
+    IS_SPEECH_FIELD_NUMBER: _ClassVar[int]
+    rms: float
+    peak: float
+    noise_floor_db: float
+    is_speech: bool
+    def __init__(self, rms: _Optional[float] = ..., peak: _Optional[float] = ..., noise_floor_db: _Optional[float] = ..., is_speech: _Optional[bool] = ...) -> None: ...
+
+class ComponentProgressEvent(_message.Message):
+    __slots__ = ("component", "operation", "progress", "message")
+    COMPONENT_FIELD_NUMBER: _ClassVar[int]
+    OPERATION_FIELD_NUMBER: _ClassVar[int]
+    PROGRESS_FIELD_NUMBER: _ClassVar[int]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    component: VoicePipelineComponent
+    operation: str
+    progress: float
+    message: str
+    def __init__(self, component: _Optional[_Union[VoicePipelineComponent, str]] = ..., operation: _Optional[str] = ..., progress: _Optional[float] = ..., message: _Optional[str] = ...) -> None: ...
 
 class VoiceAgentComponentStates(_message.Message):
-    __slots__ = ("stt_state", "llm_state", "tts_state", "vad_state", "ready", "any_loading")
+    __slots__ = ("stt_state", "llm_state", "tts_state", "vad_state", "ready", "any_loading", "wakeword_state", "error_message")
     STT_STATE_FIELD_NUMBER: _ClassVar[int]
     LLM_STATE_FIELD_NUMBER: _ClassVar[int]
     TTS_STATE_FIELD_NUMBER: _ClassVar[int]
     VAD_STATE_FIELD_NUMBER: _ClassVar[int]
     READY_FIELD_NUMBER: _ClassVar[int]
     ANY_LOADING_FIELD_NUMBER: _ClassVar[int]
+    WAKEWORD_STATE_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
     stt_state: ComponentLoadState
     llm_state: ComponentLoadState
     tts_state: ComponentLoadState
     vad_state: ComponentLoadState
     ready: bool
     any_loading: bool
-    def __init__(self, stt_state: _Optional[_Union[ComponentLoadState, str]] = ..., llm_state: _Optional[_Union[ComponentLoadState, str]] = ..., tts_state: _Optional[_Union[ComponentLoadState, str]] = ..., vad_state: _Optional[_Union[ComponentLoadState, str]] = ..., ready: _Optional[bool] = ..., any_loading: _Optional[bool] = ...) -> None: ...
+    wakeword_state: ComponentLoadState
+    error_message: str
+    def __init__(self, stt_state: _Optional[_Union[ComponentLoadState, str]] = ..., llm_state: _Optional[_Union[ComponentLoadState, str]] = ..., tts_state: _Optional[_Union[ComponentLoadState, str]] = ..., vad_state: _Optional[_Union[ComponentLoadState, str]] = ..., ready: _Optional[bool] = ..., any_loading: _Optional[bool] = ..., wakeword_state: _Optional[_Union[ComponentLoadState, str]] = ..., error_message: _Optional[str] = ...) -> None: ...
 
 class VoiceSessionError(_message.Message):
-    __slots__ = ("code", "message", "failed_component")
+    __slots__ = ("code", "message", "failed_component", "c_abi_code", "recoverable")
     CODE_FIELD_NUMBER: _ClassVar[int]
     MESSAGE_FIELD_NUMBER: _ClassVar[int]
     FAILED_COMPONENT_FIELD_NUMBER: _ClassVar[int]
+    C_ABI_CODE_FIELD_NUMBER: _ClassVar[int]
+    RECOVERABLE_FIELD_NUMBER: _ClassVar[int]
     code: VoiceSessionErrorCode
     message: str
     failed_component: str
-    def __init__(self, code: _Optional[_Union[VoiceSessionErrorCode, str]] = ..., message: _Optional[str] = ..., failed_component: _Optional[str] = ...) -> None: ...
+    c_abi_code: int
+    recoverable: bool
+    def __init__(self, code: _Optional[_Union[VoiceSessionErrorCode, str]] = ..., message: _Optional[str] = ..., failed_component: _Optional[str] = ..., c_abi_code: _Optional[int] = ..., recoverable: _Optional[bool] = ...) -> None: ...
 
 class SessionStartedEvent(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("session_id",)
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    session_id: str
+    def __init__(self, session_id: _Optional[str] = ...) -> None: ...
 
 class SessionStoppedEvent(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("session_id", "reason")
+    SESSION_ID_FIELD_NUMBER: _ClassVar[int]
+    REASON_FIELD_NUMBER: _ClassVar[int]
+    session_id: str
+    reason: str
+    def __init__(self, session_id: _Optional[str] = ..., reason: _Optional[str] = ...) -> None: ...
 
 class AgentResponseStartedEvent(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("turn_id",)
+    TURN_ID_FIELD_NUMBER: _ClassVar[int]
+    turn_id: str
+    def __init__(self, turn_id: _Optional[str] = ...) -> None: ...
 
 class AgentResponseCompletedEvent(_message.Message):
-    __slots__ = ()
-    def __init__(self) -> None: ...
+    __slots__ = ("turn_id", "response_duration_ms")
+    TURN_ID_FIELD_NUMBER: _ClassVar[int]
+    RESPONSE_DURATION_MS_FIELD_NUMBER: _ClassVar[int]
+    turn_id: str
+    response_duration_ms: int
+    def __init__(self, turn_id: _Optional[str] = ..., response_duration_ms: _Optional[int] = ...) -> None: ...
 
 class SpeechTurnDetectionEvent(_message.Message):
     __slots__ = ("kind", "speaker_id", "turn_start_us", "turn_end_us", "confidence", "speech_duration_ms", "silence_duration_ms")
@@ -421,20 +511,24 @@ class SpeechTurnDetectionEvent(_message.Message):
     def __init__(self, kind: _Optional[_Union[SpeechTurnDetectionEventKind, str]] = ..., speaker_id: _Optional[str] = ..., turn_start_us: _Optional[int] = ..., turn_end_us: _Optional[int] = ..., confidence: _Optional[float] = ..., speech_duration_ms: _Optional[float] = ..., silence_duration_ms: _Optional[float] = ...) -> None: ...
 
 class TurnLifecycleEvent(_message.Message):
-    __slots__ = ("kind", "turn_id", "session_id", "transcript", "response", "error")
+    __slots__ = ("kind", "turn_id", "session_id", "transcript", "response", "error", "started_at_ms", "completed_at_ms")
     KIND_FIELD_NUMBER: _ClassVar[int]
     TURN_ID_FIELD_NUMBER: _ClassVar[int]
     SESSION_ID_FIELD_NUMBER: _ClassVar[int]
     TRANSCRIPT_FIELD_NUMBER: _ClassVar[int]
     RESPONSE_FIELD_NUMBER: _ClassVar[int]
     ERROR_FIELD_NUMBER: _ClassVar[int]
+    STARTED_AT_MS_FIELD_NUMBER: _ClassVar[int]
+    COMPLETED_AT_MS_FIELD_NUMBER: _ClassVar[int]
     kind: TurnLifecycleEventKind
     turn_id: str
     session_id: str
     transcript: str
     response: str
     error: str
-    def __init__(self, kind: _Optional[_Union[TurnLifecycleEventKind, str]] = ..., turn_id: _Optional[str] = ..., session_id: _Optional[str] = ..., transcript: _Optional[str] = ..., response: _Optional[str] = ..., error: _Optional[str] = ...) -> None: ...
+    started_at_ms: int
+    completed_at_ms: int
+    def __init__(self, kind: _Optional[_Union[TurnLifecycleEventKind, str]] = ..., turn_id: _Optional[str] = ..., session_id: _Optional[str] = ..., transcript: _Optional[str] = ..., response: _Optional[str] = ..., error: _Optional[str] = ..., started_at_ms: _Optional[int] = ..., completed_at_ms: _Optional[int] = ...) -> None: ...
 
 class WakeWordDetectedEvent(_message.Message):
     __slots__ = ("wake_word", "confidence", "timestamp_ms", "model_id", "model_index", "duration_ms")

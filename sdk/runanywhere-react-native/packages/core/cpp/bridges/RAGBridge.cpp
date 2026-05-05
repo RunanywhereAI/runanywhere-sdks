@@ -1,6 +1,17 @@
 /**
  * @file RAGBridge.cpp
  * @brief RAG pipeline bridge implementation
+ *
+ * V2 bridge classification (CPP-09 — see docs/CPP_PROTO_OWNERSHIP.md
+ * "Bridge Layer Audit"):
+ *   - This whole file is `delete after SDK migration`. It wraps the
+ *     non-proto `rac_rag_pipeline_*` struct ABI through JSON config /
+ *     query / statistics. The Nitro layer already exposes
+ *     `ragCreatePipelineProto`, `ragIngestProto`, `ragQueryProto`,
+ *     `ragClearProto`, `ragStatsProto` over `rac_rag_*_proto` (see
+ *     HybridRunAnywhereCore+Tools.cpp). Once the RN TS callers move to
+ *     those proto methods, delete this bridge and the legacy `rag*`
+ *     non-proto Hybrid methods.
  */
 
 #include "RAGBridge.hpp"

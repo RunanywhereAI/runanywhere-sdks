@@ -94,7 +94,15 @@ message VoiceEvent {
         SpeechTurnDetectionEvent  speech_turn_detection   = 24;
         TurnLifecycleEvent        turn_lifecycle          = 25;
         WakeWordDetectedEvent     wakeword_detected       = 26;
+        AudioLevelEvent           audio_level             = 27;
+        ComponentProgressEvent    component_progress      = 28;
     }
+
+    // Correlation fields shared by streaming and one-shot voice turns.
+    string session_id = 30;
+    string turn_id = 31;
+    string request_id = 32;
+    map<string, string> metadata = 33;
 }
 
 // User speech finalized by STT (is_final=false → partial hypothesis).
@@ -104,6 +112,8 @@ message UserSaidEvent {
     float  confidence     = 3;    // 0.0..1.0, engine-dependent
     int64  audio_start_us = 4;
     int64  audio_end_us   = 5;
+    string language_code  = 6;
+    int32  segment_index  = 7;
 }
 
 // Single token decoded by the LLM. is_final=true on the last token of a
@@ -112,6 +122,9 @@ message AssistantTokenEvent {
     string text           = 1;
     bool   is_final       = 2;
     TokenKind kind        = 3;
+    uint32 token_id       = 4;
+    float  logprob        = 5;
+    string finish_reason  = 6;
 }
 
 enum TokenKind {
@@ -131,6 +144,8 @@ message AudioFrameEvent {
 
     // True for the final audio chunk in a TTS/voice-agent audio stream.
     bool  is_final        = 5;
+    int32 chunk_index      = 6;
+    int64 duration_ms      = 7;
 }
 
 enum AudioEncoding {
@@ -204,6 +219,8 @@ message ErrorEvent {
     string message        = 2;
     string component      = 3;   // "llm", "stt", "tts", "vad", "pipeline", ...
     bool   is_recoverable = 4;
+    string operation      = 5;
+    string details_json   = 6;
 }
 
 // Per-primitive latency breakdown. Emitted at barge-in and at pipeline stop.
@@ -227,6 +244,24 @@ message MetricsEvent {
     // std::chrono::steady_clock::now().time_since_epoch() values fit
     // directly (2^63 ns ≈ 292 years of runtime headroom).
     int64  created_at_ns      = 8;
+    double vad_first_speech_ms = 9;
+    double stt_first_partial_ms = 10;
+    double llm_total_ms = 11;
+    double tts_total_ms = 12;
+}
+
+message AudioLevelEvent {
+    float rms = 1;
+    float peak = 2;
+    float noise_floor_db = 3;
+    bool is_speech = 4;
+}
+
+message ComponentProgressEvent {
+    VoicePipelineComponent component = 1;
+    string operation = 2;
+    float progress = 3;
+    string message = 4;
 }
 
 // ---------------------------------------------------------------------------
@@ -266,6 +301,9 @@ message VoiceAgentComponentStates {
 
     // Computed: true when any of the four states is COMPONENT_LOAD_STATE_LOADING.
     bool any_loading = 6;
+
+    ComponentLoadState wakeword_state = 7;
+    optional string error_message = 8;
 }
 
 // ---------------------------------------------------------------------------
@@ -289,6 +327,8 @@ message VoiceSessionError {
     VoiceSessionErrorCode code            = 1;
     string                message         = 2;
     optional string       failed_component = 3;
+    int32                 c_abi_code      = 4;
+    bool                  recoverable     = 5;
 }
 
 // ---------------------------------------------------------------------------
@@ -300,13 +340,23 @@ message VoiceSessionError {
 // the latency breakdown.
 // ---------------------------------------------------------------------------
 
-message SessionStartedEvent {}
+message SessionStartedEvent {
+    string session_id = 1;
+}
 
-message SessionStoppedEvent {}
+message SessionStoppedEvent {
+    string session_id = 1;
+    string reason = 2;
+}
 
-message AgentResponseStartedEvent {}
+message AgentResponseStartedEvent {
+    string turn_id = 1;
+}
 
-message AgentResponseCompletedEvent {}
+message AgentResponseCompletedEvent {
+    string turn_id = 1;
+    int64 response_duration_ms = 2;
+}
 
 message SpeechTurnDetectionEvent {
     SpeechTurnDetectionEventKind kind = 1;
@@ -333,6 +383,8 @@ message TurnLifecycleEvent {
     string transcript = 4;
     string response = 5;
     string error = 6;
+    int64 started_at_ms = 7;
+    int64 completed_at_ms = 8;
 }
 
 message WakeWordDetectedEvent {

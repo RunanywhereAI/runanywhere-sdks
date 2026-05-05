@@ -15,17 +15,47 @@ public extension RunAnywhere {
 
     // MARK: - Pipeline Lifecycle
 
+    /// Build a generated RAG configuration from registry models by using
+    /// commons lifecycle resolution for primary and sidecar artifacts.
+    static func ragResolvedConfiguration(
+        embeddingModel: RAModelInfo,
+        llmModel: RAModelInfo,
+        baseConfiguration: RARAGConfiguration = .defaults()
+    ) async throws -> RARAGConfiguration {
+        let embedding = try await loadRAGArtifactModel(
+            embeddingModel,
+            fallbackCategory: .embedding,
+            errorLabel: "Embedding"
+        )
+        let llm = try await loadRAGArtifactModel(
+            llmModel,
+            fallbackCategory: .language,
+            errorLabel: "LLM"
+        )
+        return try baseConfiguration.resolvingLifecycleArtifacts(embedding: embedding, llm: llm)
+    }
+
+    /// Create the RAG pipeline from registry models. Model artifact layout is
+    /// resolved by commons lifecycle rather than by Swift file-name heuristics.
+    static func ragCreatePipeline(
+        embeddingModel: RAModelInfo,
+        llmModel: RAModelInfo,
+        baseConfiguration: RARAGConfiguration = .defaults()
+    ) async throws {
+        let config = try await ragResolvedConfiguration(
+            embeddingModel: embeddingModel,
+            llmModel: llmModel,
+            baseConfiguration: baseConfiguration
+        )
+        try await ragCreatePipeline(config: config)
+    }
+
     /// Create the RAG pipeline with the given configuration.
     ///
     /// Must be called before ingesting documents or running queries.
     ///
     /// - Parameter config: RAG pipeline configuration (model paths, tuning parameters)
     /// - Throws: `SDKException` if the SDK is not initialized or pipeline creation fails
-    static func ragCreatePipeline(config: RAGConfiguration) async throws {
-        try await ragCreatePipeline(config: config.toRARAGConfiguration())
-    }
-
-    /// Create the RAG pipeline through the generated-proto C++ RAG ABI.
     static func ragCreatePipeline(config: RARAGConfiguration) async throws {
         guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
@@ -33,13 +63,11 @@ public extension RunAnywhere {
         try await ensureServicesReady()
 
         try await CppBridge.RAG.shared.createPipeline(config: config)
-        EventBus.shared.publish(RAGEvent.pipelineCreated())
     }
 
     /// Destroy the RAG pipeline and release all resources.
     static func ragDestroyPipeline() async {
         await CppBridge.RAG.shared.destroy()
-        EventBus.shared.publish(RAGEvent.pipelineDestroyed())
     }
 
     // MARK: - Document Ingestion
@@ -54,7 +82,10 @@ public extension RunAnywhere {
     ///   - metadataJSON: Optional JSON string attached to all chunks from this document
     /// - Throws: `SDKException` if the SDK or pipeline is not ready, or ingestion fails
     static func ragIngest(text: String, metadataJSON: String? = nil) async throws {
-        try await ragIngest(RAGDocument(text: text, metadataJSON: metadataJSON).toRARAGDocument())
+        var document = RARAGDocument()
+        document.text = text
+        if let metadataJSON { document.metadataJson = metadataJSON }
+        try await ragIngest(document)
     }
 
     /// Ingest a generated-proto document through the C++ RAG ABI.
@@ -65,15 +96,7 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
-        EventBus.shared.publish(RAGEvent.ingestionStarted(documentLength: document.text.count))
-        let startTime = Date()
-
-        let stats = try await CppBridge.RAG.shared.ingest(document)
-
-        let durationMs = Date().timeIntervalSince(startTime) * 1000
-        let chunkCount = Int(stats.indexedChunks)
-        EventBus.shared.publish(RAGEvent.ingestionComplete(chunkCount: chunkCount, durationMs: durationMs))
-        return stats
+        return try await CppBridge.RAG.shared.ingest(document)
     }
 
     /// Ingest multiple text documents into the RAG pipeline in a single batch.
@@ -81,27 +104,18 @@ public extension RunAnywhere {
     /// Equivalent to calling `ragIngest` for each document but more efficient because
     /// the C++ layer can embed all documents in a single pass.
     ///
-    /// - Parameter documents: Array of `RAGDocument` values (each with `text` and optional `metadataJSON`).
+    /// - Parameter documents: Array of `RARAGDocument` values.
     /// - Throws: `SDKException` if the SDK or pipeline is not ready, or ingestion fails.
-    static func ragAddDocumentsBatch(documents: [RAGDocument]) async throws {
+    static func ragAddDocumentsBatch(documents: [RARAGDocument]) async throws {
         guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
         guard !documents.isEmpty else { return }
         try await ensureServicesReady()
 
-        let totalLength = documents.reduce(0) { $0 + $1.text.count }
-        EventBus.shared.publish(RAGEvent.ingestionStarted(documentLength: totalLength))
-        let startTime = Date()
-
-        var latestStats = RARAGStatistics()
         for document in documents {
-            latestStats = try await CppBridge.RAG.shared.ingest(document.toRARAGDocument())
+            _ = try await CppBridge.RAG.shared.ingest(document)
         }
-
-        let durationMs = Date().timeIntervalSince(startTime) * 1000
-        let chunkCount = Int(latestStats.indexedChunks)
-        EventBus.shared.publish(RAGEvent.ingestionComplete(chunkCount: chunkCount, durationMs: durationMs))
     }
 
     /// Get the number of indexed document chunks in the pipeline as a function call.
@@ -158,12 +172,14 @@ public extension RunAnywhere {
     ///   - question: The user's question
     ///   - options: Optional query parameters (temperature, max tokens, etc.).
     ///              Pass `nil` to use defaults derived from the question.
-    /// - Returns: A `RAGResult` containing the generated answer and retrieved chunks
+    /// - Returns: A `RARAGResult` containing the generated answer and retrieved chunks
     /// - Throws: `SDKException` if the SDK or pipeline is not ready, or the query fails
-    static func ragQuery(question: String, options: RAGQueryOptions? = nil) async throws -> RAGResult {
-        let queryOptions = options ?? RAGQueryOptions(question: question)
-        let result = try await ragQuery(queryOptions.toRARAGQueryOptions())
-        return RAGResult(from: result)
+    static func ragQuery(question: String, options: RARAGQueryOptions? = nil) async throws -> RARAGResult {
+        var queryOptions = options ?? RARAGQueryOptions.defaults(question: question)
+        if queryOptions.question.isEmpty {
+            queryOptions.question = question
+        }
+        return try await ragQuery(queryOptions)
     }
 
     /// Query through the generated-proto C++ RAG ABI.
@@ -173,11 +189,32 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
-        EventBus.shared.publish(RAGEvent.queryStarted(question: options.question))
+        return try await CppBridge.RAG.shared.query(options)
+    }
+}
 
-        let result = try await CppBridge.RAG.shared.query(options)
-
-        EventBus.shared.publish(RAGEvent.queryComplete(result: RAGResult(from: result)))
+private extension RunAnywhere {
+    static func loadRAGArtifactModel(
+        _ model: RAModelInfo,
+        fallbackCategory: RAModelCategory,
+        errorLabel: String
+    ) async throws -> RAModelLoadResult {
+        var request = RAModelLoadRequest()
+        request.modelID = model.id
+        request.category = model.category == .unspecified ? fallbackCategory : model.category
+        if model.framework != .unspecified {
+            request.framework = model.framework
+        }
+        let result = await loadModel(request)
+        guard result.success else {
+            let message = result.errorMessage.isEmpty
+                ? "\(errorLabel) model lifecycle artifact resolution failed"
+                : result.errorMessage
+            let code: RAErrorCode = message.contains(NativeProtoABI.unavailableMessage)
+                ? .featureNotAvailable
+                : .modelLoadFailed
+            throw SDKException.rag(code, "\(errorLabel) model '\(model.id)': \(message)")
+        }
         return result
     }
 }

@@ -11,6 +11,7 @@ package com.runanywhere.sdk.public
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
+import com.runanywhere.sdk.public.events.EventBus
 
 private const val TAG = "PlatformBridge"
 private val logger = SDKLogger(TAG)
@@ -42,6 +43,13 @@ internal actual fun initializePlatformBridge(environment: SDKEnvironment, apiKey
 
     CppBridge.initialize(cppEnvironment, apiKey, baseURL)
 
+    // Wire the public EventBus to the canonical native SDKEvent stream
+    // so consumers see lifecycle/error/model events emitted by C++.
+    // Mirrors Swift EventBus's lazy CppBridge.Events.subscribeSDKEvents
+    // call. Safe to invoke even when the native lib failed to load
+    // (the actual no-ops on UnsatisfiedLinkError).
+    EventBus.start()
+
     logger.info("CppBridge initialization complete. Native library loaded: ${CppBridge.isNativeLibraryLoaded}")
 }
 
@@ -60,6 +68,9 @@ internal actual suspend fun initializePlatformBridgeServices() {
  */
 internal actual fun shutdownPlatformBridge() {
     logger.info("Shutting down CppBridge...")
+    // Tear down the native SDKEvent subscription before C++ commons is
+    // shutdown so the unsubscribe call still has a working ABI surface.
+    EventBus.stop()
     CppBridge.shutdown()
     logger.info("CppBridge shutdown complete")
 }

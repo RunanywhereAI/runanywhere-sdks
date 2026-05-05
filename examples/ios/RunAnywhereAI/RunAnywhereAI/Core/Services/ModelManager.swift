@@ -19,7 +19,7 @@ class ModelManager: ObservableObject {
 
     // MARK: - Model Operations
 
-    func loadModel(_ modelInfo: ModelInfo) async throws {
+    func loadModel(_ modelInfo: RAModelInfo) async throws {
         isLoading = true
         defer { isLoading = false }
 
@@ -45,16 +45,16 @@ class ModelManager: ObservableObject {
         }
     }
 
-    func getAvailableModels() async -> [ModelInfo] {
-        do {
-            return try await RunAnywhere.availableModels()
-        } catch {
-            print("Failed to get available models: \(error)")
+    func getAvailableModels() async -> [RAModelInfo] {
+        let result = await RunAnywhere.listModels()
+        guard result.success else {
+            print("Failed to get available models: \(result.errorMessage)")
             return []
         }
+        return result.models.models
     }
 
-    func getCurrentModel() async -> ModelInfo? {
+    func getCurrentModel() async -> RAModelInfo? {
         // Get current model ID from SDK and look up the model info
         guard let modelId = await RunAnywhere.getCurrentModelId() else {
             return nil

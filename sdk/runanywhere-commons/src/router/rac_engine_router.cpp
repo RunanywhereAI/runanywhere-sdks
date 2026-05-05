@@ -3,7 +3,10 @@
  * @brief Engine-router scoring implementation.
  *
  * GAP 04 Phase 10 — see v2_gap_specs/GAP_04_ENGINE_ROUTER.md.
- * T4.1 extension.
+ * T4.1 extension. CPP-05 hardening: declared runtimes are now an executable
+ * contract — engines whose declared L1 runtimes are not registered on this
+ * host are removed from candidate selection and surface a dedicated
+ * `RAC_ERROR_RUNTIME_UNAVAILABLE` through `rac_plugin_route`.
  *
  * Scoring stack (all weights deliberately explicit so a routing decision can
  * be explained as primitive/model/runtime/hardware components):
@@ -27,6 +30,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <string>
 #include <vector>
 
 #include "rac/plugin/rac_plugin_entry.h"
@@ -38,6 +42,12 @@ namespace router {
 namespace {
 
 constexpr int kRejectScore = -1000;
+/* Sentinel score used when a candidate is hard-rejected specifically
+ * because none of its declared runtimes are registered. Distinct from
+ * kRejectScore so the router can emit a precise rejection reason without
+ * adding a parallel bookkeeping vector. Both values are filtered out by
+ * `score > kRejectScore` (strict >) so neither becomes a candidate. */
+constexpr int kRuntimeRejectScore = -1001;
 constexpr int kPinnedEngineBonus = 10000;
 constexpr int kRuntimeCompatibilityWeight = 40;
 constexpr int kHardwareProfileWeight = 20;
@@ -64,16 +74,20 @@ bool declares_runtime(const rac_engine_vtable_t& vt, rac_runtime_id_t runtime) {
     return false;
 }
 
+/* True when the engine either (a) declares no runtimes (legacy / opt-out of
+ * runtime-aware routing) or (b) at least one of its declared runtimes is
+ * currently registered with the L1 runtime registry. False is the only
+ * value that triggers the runtime-unavailable hard reject. */
 bool has_registered_declared_runtime(const rac_engine_vtable_t& vt) {
     if (vt.metadata.runtimes == nullptr || vt.metadata.runtimes_count == 0) return true;
     for (size_t i = 0; i < vt.metadata.runtimes_count; ++i) {
-        if (rac_runtime_is_available(vt.metadata.runtimes[i])) return true;
+        if (rac_runtime_is_registered(vt.metadata.runtimes[i])) return true;
     }
     return false;
 }
 
 bool preferred_runtime_registered(const rac_engine_vtable_t& vt, rac_runtime_id_t runtime) {
-    return declares_runtime(vt, runtime) && rac_runtime_is_available(runtime);
+    return declares_runtime(vt, runtime) && rac_runtime_is_registered(runtime);
 }
 
 bool matches_model_format(const rac_engine_vtable_t& vt, uint32_t format) {
@@ -107,7 +121,11 @@ int EngineRouter::score(const rac_engine_vtable_t& vt, const RouteRequest& req) 
         return kPinnedEngineBonus + vt.metadata.priority;
     }
 
-    if (!has_registered_declared_runtime(vt)) return kRejectScore;
+    /* Hard reject — distinct sentinel: engine declares one or more L1 runtimes
+     * but none of them are registered on this host. Surfaced as
+     * `RAC_ERROR_RUNTIME_UNAVAILABLE` through the C ABI when no other
+     * candidate survives. */
+    if (!has_registered_declared_runtime(vt)) return kRuntimeRejectScore;
 
     /* Base score = plugin's declared priority. */
     int s = vt.metadata.priority;
@@ -144,11 +162,21 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
     };
     std::vector<Scored> scored;
     scored.reserve(candidates.size());
+    /* Track whether every rejected candidate failed *only* because of
+     * runtime unavailability — that promotes the rejection_reason from the
+     * generic "all hard-rejected" message to a runtime-specific one that
+     * the C ABI maps to `RAC_ERROR_RUNTIME_UNAVAILABLE`. */
+    bool any_runtime_reject = false;
+    bool any_other_reject = false;
     for (auto* vt : candidates) {
         if (vt == nullptr) continue;
         int s = score(*vt, req);
         if (s > kRejectScore) {
             scored.push_back({s, vt});
+        } else if (s == kRuntimeRejectScore) {
+            any_runtime_reject = true;
+        } else {
+            any_other_reject = true;
         }
     }
     if (scored.empty()) {
@@ -157,6 +185,11 @@ RouteResult EngineRouter::route(const RouteRequest& req) const {
                                std::string("pinned engine '") +
                                std::string(req.pinned_engine) +
                                "' not registered; no_fallback=true"};
+        }
+        if (any_runtime_reject && !any_other_reject) {
+            return RouteResult{nullptr, -1,
+                               "no registered runtime satisfies any candidate "
+                               "engine's declared runtimes"};
         }
         return RouteResult{nullptr, -1, "no eligible plugin (all hard-rejected)"};
     }

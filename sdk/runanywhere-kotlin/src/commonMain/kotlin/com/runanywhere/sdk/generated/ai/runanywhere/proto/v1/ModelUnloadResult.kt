@@ -45,6 +45,15 @@ public class ModelUnloadResult(
     schemaIndex = 2,
   )
   public val error_message: String = "",
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "unloadedAtUnixMs",
+    schemaIndex = 3,
+  )
+  public val unloaded_at_unix_ms: Long = 0L,
+  warnings: List<String> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelUnloadResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -56,6 +65,14 @@ public class ModelUnloadResult(
   )
   public val unloaded_model_ids: List<String> = immutableCopyOf("unloaded_model_ids",
       unloaded_model_ids)
+
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    schemaIndex = 4,
+  )
+  public val warnings: List<String> = immutableCopyOf("warnings", warnings)
 
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
@@ -71,6 +88,8 @@ public class ModelUnloadResult(
     if (success != other.success) return false
     if (unloaded_model_ids != other.unloaded_model_ids) return false
     if (error_message != other.error_message) return false
+    if (unloaded_at_unix_ms != other.unloaded_at_unix_ms) return false
+    if (warnings != other.warnings) return false
     return true
   }
 
@@ -81,6 +100,8 @@ public class ModelUnloadResult(
       result = result * 37 + success.hashCode()
       result = result * 37 + unloaded_model_ids.hashCode()
       result = result * 37 + error_message.hashCode()
+      result = result * 37 + unloaded_at_unix_ms.hashCode()
+      result = result * 37 + warnings.hashCode()
       super.hashCode = result
     }
     return result
@@ -92,6 +113,8 @@ public class ModelUnloadResult(
     if (unloaded_model_ids.isNotEmpty()) result +=
         """unloaded_model_ids=${sanitize(unloaded_model_ids)}"""
     result += """error_message=${sanitize(error_message)}"""
+    result += """unloaded_at_unix_ms=$unloaded_at_unix_ms"""
+    if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
     return result.joinToString(prefix = "ModelUnloadResult{", separator = ", ", postfix = "}")
   }
 
@@ -99,9 +122,11 @@ public class ModelUnloadResult(
     success: Boolean = this.success,
     unloaded_model_ids: List<String> = this.unloaded_model_ids,
     error_message: String = this.error_message,
+    unloaded_at_unix_ms: Long = this.unloaded_at_unix_ms,
+    warnings: List<String> = this.warnings,
     unknownFields: ByteString = this.unknownFields,
   ): ModelUnloadResult = ModelUnloadResult(success, unloaded_model_ids, error_message,
-      unknownFields)
+      unloaded_at_unix_ms, warnings, unknownFields)
 
   public companion object {
     @JvmField
@@ -119,6 +144,9 @@ public class ModelUnloadResult(
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(2, value.unloaded_model_ids)
         if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(3,
             value.error_message)
+        if (value.unloaded_at_unix_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(4,
+            value.unloaded_at_unix_ms)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(5, value.warnings)
         return size
       }
 
@@ -127,11 +155,17 @@ public class ModelUnloadResult(
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 2, value.unloaded_model_ids)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 3,
             value.error_message)
+        if (value.unloaded_at_unix_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 4,
+            value.unloaded_at_unix_ms)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.warnings)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelUnloadResult) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.warnings)
+        if (value.unloaded_at_unix_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 4,
+            value.unloaded_at_unix_ms)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 3,
             value.error_message)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 2, value.unloaded_model_ids)
@@ -142,11 +176,15 @@ public class ModelUnloadResult(
         var success: Boolean = false
         val unloaded_model_ids = mutableListOf<String>()
         var error_message: String = ""
+        var unloaded_at_unix_ms: Long = 0L
+        val warnings = mutableListOf<String>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> success = ProtoAdapter.BOOL.decode(reader)
             2 -> unloaded_model_ids.add(ProtoAdapter.STRING.decode(reader))
             3 -> error_message = ProtoAdapter.STRING.decode(reader)
+            4 -> unloaded_at_unix_ms = ProtoAdapter.INT64.decode(reader)
+            5 -> warnings.add(ProtoAdapter.STRING.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -154,6 +192,8 @@ public class ModelUnloadResult(
           success = success,
           unloaded_model_ids = unloaded_model_ids,
           error_message = error_message,
+          unloaded_at_unix_ms = unloaded_at_unix_ms,
+          warnings = warnings,
           unknownFields = unknownFields
         )
       }

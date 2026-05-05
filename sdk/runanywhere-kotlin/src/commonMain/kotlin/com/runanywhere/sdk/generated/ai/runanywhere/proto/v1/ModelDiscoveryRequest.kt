@@ -59,6 +59,22 @@ public class ModelDiscoveryRequest(
     schemaIndex = 4,
   )
   public val query: ModelQuery? = null,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "includeBuiltIn",
+    schemaIndex = 5,
+  )
+  public val include_built_in: Boolean = false,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "includeUserImports",
+    schemaIndex = 6,
+  )
+  public val include_user_imports: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelDiscoveryRequest, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -90,6 +106,8 @@ public class ModelDiscoveryRequest(
     if (link_downloaded != other.link_downloaded) return false
     if (purge_invalid != other.purge_invalid) return false
     if (query != other.query) return false
+    if (include_built_in != other.include_built_in) return false
+    if (include_user_imports != other.include_user_imports) return false
     return true
   }
 
@@ -102,6 +120,8 @@ public class ModelDiscoveryRequest(
       result = result * 37 + link_downloaded.hashCode()
       result = result * 37 + purge_invalid.hashCode()
       result = result * 37 + (query?.hashCode() ?: 0)
+      result = result * 37 + include_built_in.hashCode()
+      result = result * 37 + include_user_imports.hashCode()
       super.hashCode = result
     }
     return result
@@ -114,6 +134,8 @@ public class ModelDiscoveryRequest(
     result += """link_downloaded=$link_downloaded"""
     result += """purge_invalid=$purge_invalid"""
     if (query != null) result += """query=$query"""
+    result += """include_built_in=$include_built_in"""
+    result += """include_user_imports=$include_user_imports"""
     return result.joinToString(prefix = "ModelDiscoveryRequest{", separator = ", ", postfix = "}")
   }
 
@@ -123,9 +145,11 @@ public class ModelDiscoveryRequest(
     link_downloaded: Boolean = this.link_downloaded,
     purge_invalid: Boolean = this.purge_invalid,
     query: ModelQuery? = this.query,
+    include_built_in: Boolean = this.include_built_in,
+    include_user_imports: Boolean = this.include_user_imports,
     unknownFields: ByteString = this.unknownFields,
   ): ModelDiscoveryRequest = ModelDiscoveryRequest(search_roots, recursive, link_downloaded,
-      purge_invalid, query, unknownFields)
+      purge_invalid, query, include_built_in, include_user_imports, unknownFields)
 
   public companion object {
     @JvmField
@@ -148,6 +172,10 @@ public class ModelDiscoveryRequest(
         if (value.purge_invalid != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(4,
             value.purge_invalid)
         size += ModelQuery.ADAPTER.encodedSizeWithTag(5, value.query)
+        if (value.include_built_in != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(6,
+            value.include_built_in)
+        if (value.include_user_imports != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(7,
+            value.include_user_imports)
         return size
       }
 
@@ -159,11 +187,19 @@ public class ModelDiscoveryRequest(
         if (value.purge_invalid != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
             value.purge_invalid)
         ModelQuery.ADAPTER.encodeWithTag(writer, 5, value.query)
+        if (value.include_built_in != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.include_built_in)
+        if (value.include_user_imports != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.include_user_imports)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelDiscoveryRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.include_user_imports != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.include_user_imports)
+        if (value.include_built_in != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.include_built_in)
         ModelQuery.ADAPTER.encodeWithTag(writer, 5, value.query)
         if (value.purge_invalid != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
             value.purge_invalid)
@@ -179,6 +215,8 @@ public class ModelDiscoveryRequest(
         var link_downloaded: Boolean = false
         var purge_invalid: Boolean = false
         var query: ModelQuery? = null
+        var include_built_in: Boolean = false
+        var include_user_imports: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> search_roots.add(ProtoAdapter.STRING.decode(reader))
@@ -186,6 +224,8 @@ public class ModelDiscoveryRequest(
             3 -> link_downloaded = ProtoAdapter.BOOL.decode(reader)
             4 -> purge_invalid = ProtoAdapter.BOOL.decode(reader)
             5 -> query = ModelQuery.ADAPTER.decode(reader)
+            6 -> include_built_in = ProtoAdapter.BOOL.decode(reader)
+            7 -> include_user_imports = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -195,6 +235,8 @@ public class ModelDiscoveryRequest(
           link_downloaded = link_downloaded,
           purge_invalid = purge_invalid,
           query = query,
+          include_built_in = include_built_in,
+          include_user_imports = include_user_imports,
           unknownFields = unknownFields
         )
       }

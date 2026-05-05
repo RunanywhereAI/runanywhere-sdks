@@ -1,5 +1,7 @@
 package com.runanywhere.runanywhereai.presentation.vision
 
+import ai.runanywhere.proto.v1.SDKEvent
+import ai.runanywhere.proto.v1.VLMGenerationOptions
 import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
@@ -15,8 +17,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.public.RunAnywhere
-import ai.runanywhere.proto.v1.VLMGenerationOptions
-import ai.runanywhere.proto.v1.VLMImage
 import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
 import com.runanywhere.sdk.public.extensions.isVLMModelLoaded
 import com.runanywhere.sdk.public.extensions.processImageStream
@@ -258,8 +258,10 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                         image,
                         "Describe what you see briefly.",
                         options,
-                    ).collect { token ->
-                        _uiState.update { it.copy(currentDescription = it.currentDescription + token) }
+                    ).collect { event ->
+                        _uiState.update {
+                            it.copy(currentDescription = applyVlmStreamEvent(it.currentDescription, event))
+                        }
                     }
 
                     _uiState.update { it.copy(currentDescription = it.currentDescription.trim()) }
@@ -302,8 +304,10 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                     Timber.i("Starting VLM streaming for image: ${tempFile.name}")
 
                     RunAnywhere.processImageStream(image, prompt, options)
-                        .collect { token ->
-                            _uiState.update { it.copy(currentDescription = it.currentDescription + token) }
+                        .collect { event ->
+                            _uiState.update {
+                                it.copy(currentDescription = applyVlmStreamEvent(it.currentDescription, event))
+                            }
                         }
 
                     _uiState.update { it.copy(currentDescription = it.currentDescription.trim()) }
@@ -382,8 +386,8 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                 image,
                 "Describe what you see in one sentence.",
                 options,
-            ).collect { token ->
-                newDescription += token
+            ).collect { event ->
+                newDescription = applyVlmStreamEvent(newDescription, event)
                 _uiState.update { it.copy(currentDescription = newDescription) }
             }
             _uiState.update { it.copy(currentDescription = newDescription.trim()) }
@@ -434,6 +438,19 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                 null
             }
         }
+
+    private fun applyVlmStreamEvent(
+        currentText: String,
+        event: SDKEvent,
+    ): String {
+        val generation = event.generation ?: return currentText
+        return when {
+            generation.token.isNotBlank() -> currentText + generation.token
+            generation.streaming_text.isNotBlank() -> generation.streaming_text
+            generation.response.isNotBlank() -> generation.response
+            else -> currentText
+        }
+    }
 
     override fun onCleared() {
         super.onCleared()

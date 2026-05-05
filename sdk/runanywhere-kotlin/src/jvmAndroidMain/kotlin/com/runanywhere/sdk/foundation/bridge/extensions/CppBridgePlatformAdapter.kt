@@ -400,15 +400,10 @@ object CppBridgePlatformAdapter {
     }
 
     // ========================================================================
-    // v2 close-out Phase H: the platform-adapter HTTP transport that used to
-    // live here (~170 LOC of HttpURLConnection + executor + task lifecycle)
-    // has been DELETED. Commons (runanywhere-commons) now owns HTTP transport
-    // natively via libcurl behind the `rac_http_download_execute` ABI. The
-    // commons JNI bridge never bound `http_download`/`http_download_cancel`
-    // into the `rac_platform_adapter_t` struct, so this code was dead — all
-    // Kotlin downloads now flow through `CppBridgeDownload` →
-    // `RunAnywhereBridge.racHttpDownloadExecute(...)`.
-    // Native HTTP rationale now lives with the commons implementation.
+    // Platform HTTP byte execution is registered through OkHttpTransport.
+    // Download workflow planning/progress/state now flows through generated
+    // Download* proto calls; direct HTTP callbacks here remain intentionally
+    // absent from the platform adapter surface.
     // ========================================================================
 
     // ========================================================================

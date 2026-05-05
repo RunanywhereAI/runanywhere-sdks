@@ -49,6 +49,9 @@
     "expo"
   ],
   "license": "MIT",
+  "dependencies": {
+    "@runanywhere/proto-ts": "workspace:*"
+  },
   "peerDependencies": {
     "@runanywhere/core": ">=0.16.0",
     "react": ">=18.0.0",

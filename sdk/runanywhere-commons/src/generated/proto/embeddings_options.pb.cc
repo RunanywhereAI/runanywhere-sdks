@@ -28,6 +28,59 @@ namespace _fl = ::google::protobuf::internal::field_layout;
 namespace runanywhere {
 namespace v1 {
 
+inline constexpr EmbeddingsServiceState::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        current_model_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        error_message_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        is_ready_{false},
+        dimension_{0},
+        max_tokens_{0},
+        error_code_{0} {}
+
+template <typename>
+constexpr EmbeddingsServiceState::EmbeddingsServiceState(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(EmbeddingsServiceState_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct EmbeddingsServiceStateDefaultTypeInternal {
+  constexpr EmbeddingsServiceStateDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~EmbeddingsServiceStateDefaultTypeInternal() {}
+  union {
+    EmbeddingsServiceState _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 EmbeddingsServiceStateDefaultTypeInternal _EmbeddingsServiceState_default_instance_;
+template <typename>
+constexpr EmbeddingsRequest_MetadataEntry_DoNotUse::EmbeddingsRequest_MetadataEntry_DoNotUse(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : EmbeddingsRequest_MetadataEntry_DoNotUse::MapEntry(EmbeddingsRequest_MetadataEntry_DoNotUse_class_data_.base()){}
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : EmbeddingsRequest_MetadataEntry_DoNotUse::MapEntry() {
+}
+#endif  // PROTOBUF_CUSTOM_VTABLE
+struct EmbeddingsRequest_MetadataEntry_DoNotUseDefaultTypeInternal {
+  constexpr EmbeddingsRequest_MetadataEntry_DoNotUseDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~EmbeddingsRequest_MetadataEntry_DoNotUseDefaultTypeInternal() {}
+  union {
+    EmbeddingsRequest_MetadataEntry_DoNotUse _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 EmbeddingsRequest_MetadataEntry_DoNotUseDefaultTypeInternal _EmbeddingsRequest_MetadataEntry_DoNotUse_default_instance_;
+
 inline constexpr EmbeddingsOptions::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
@@ -96,6 +149,74 @@ struct EmbeddingsConfigurationDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 EmbeddingsConfigurationDefaultTypeInternal _EmbeddingsConfiguration_default_instance_;
+template <typename>
+constexpr EmbeddingVector_MetadataEntry_DoNotUse::EmbeddingVector_MetadataEntry_DoNotUse(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : EmbeddingVector_MetadataEntry_DoNotUse::MapEntry(EmbeddingVector_MetadataEntry_DoNotUse_class_data_.base()){}
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : EmbeddingVector_MetadataEntry_DoNotUse::MapEntry() {
+}
+#endif  // PROTOBUF_CUSTOM_VTABLE
+struct EmbeddingVector_MetadataEntry_DoNotUseDefaultTypeInternal {
+  constexpr EmbeddingVector_MetadataEntry_DoNotUseDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~EmbeddingVector_MetadataEntry_DoNotUseDefaultTypeInternal() {}
+  union {
+    EmbeddingVector_MetadataEntry_DoNotUse _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 EmbeddingVector_MetadataEntry_DoNotUseDefaultTypeInternal _EmbeddingVector_MetadataEntry_DoNotUse_default_instance_;
+
+inline constexpr EmbeddingsRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        texts_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::EmbeddingsRequest,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest, _impl_.texts_)>()
+        }
+        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
+        texts_ {}
+        #endif
+        ,
+        request_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        model_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        options_{nullptr},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
+        metadata_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::EmbeddingsRequest,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest, _impl_.metadata_)>()
+        }
+        #else
+        metadata_ {}
+        #endif
+     {}
+
+template <typename>
+constexpr EmbeddingsRequest::EmbeddingsRequest(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(EmbeddingsRequest_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct EmbeddingsRequestDefaultTypeInternal {
+  constexpr EmbeddingsRequestDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~EmbeddingsRequestDefaultTypeInternal() {}
+  union {
+    EmbeddingsRequest _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 EmbeddingsRequestDefaultTypeInternal _EmbeddingsRequest_default_instance_;
 
 inline constexpr EmbeddingVector::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
@@ -114,7 +235,17 @@ inline constexpr EmbeddingVector::Impl_::Impl_(
             &::google::protobuf::internal::fixed_address_empty_string,
             ::_pbi::ConstantInitialized()),
         norm_{0},
-        dimension_{0} {}
+        dimension_{0},
+        input_index_{0},
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
+        metadata_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::EmbeddingVector,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingVector, _impl_.metadata_)>()
+        }
+        #else
+        metadata_ {}
+        #endif
+     {}
 
 template <typename>
 constexpr EmbeddingVector::EmbeddingVector(::_pbi::ConstantInitialized)
@@ -149,9 +280,19 @@ inline constexpr EmbeddingsResult::Impl_::Impl_(
         vectors_ {}
         #endif
         ,
+        model_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        error_message_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        request_id_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
         processing_time_ms_{::int64_t{0}},
         dimension_{0},
-        tokens_used_{0} {}
+        tokens_used_{0},
+        error_code_{0} {}
 
 template <typename>
 constexpr EmbeddingsResult::EmbeddingsResult(::_pbi::ConstantInitialized)
@@ -172,41 +313,6 @@ struct EmbeddingsResultDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 EmbeddingsResultDefaultTypeInternal _EmbeddingsResult_default_instance_;
-
-inline constexpr EmbeddingsRequest::Impl_::Impl_(
-    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
-    ::_pbi::ConstantInitialized) noexcept
-      : _cached_size_{0},
-        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
-        texts_{visibility, ::_pbi::InternalMetadataOffset::Build<
-            ::runanywhere::v1::EmbeddingsRequest,
-            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest, _impl_.texts_)>()
-        }
-        #else  // !PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_REPEATED_PTR_FIELD
-        texts_ {}
-        #endif
-        ,
-        options_{nullptr} {}
-
-template <typename>
-constexpr EmbeddingsRequest::EmbeddingsRequest(::_pbi::ConstantInitialized)
-#if defined(PROTOBUF_CUSTOM_VTABLE)
-    : ::google::protobuf::Message(EmbeddingsRequest_class_data_.base()),
-#else   // PROTOBUF_CUSTOM_VTABLE
-    : ::google::protobuf::Message(),
-#endif  // PROTOBUF_CUSTOM_VTABLE
-      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
-}
-struct EmbeddingsRequestDefaultTypeInternal {
-  constexpr EmbeddingsRequestDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
-  ~EmbeddingsRequestDefaultTypeInternal() {}
-  union {
-    EmbeddingsRequest _instance;
-  };
-};
-
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
-    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 EmbeddingsRequestDefaultTypeInternal _EmbeddingsRequest_default_instance_;
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
@@ -253,50 +359,103 @@ const ::uint32_t
         4,
         5,
         0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingVector_MetadataEntry_DoNotUse, _impl_._has_bits_),
+        5, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingVector_MetadataEntry_DoNotUse, _impl_.key_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingVector_MetadataEntry_DoNotUse, _impl_.value_),
+        0,
+        1,
+        0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingVector, _impl_._has_bits_),
-        7, // hasbit index offset
+        9, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingVector, _impl_.values_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingVector, _impl_.norm_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingVector, _impl_.text_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingVector, _impl_.dimension_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingVector, _impl_.input_index_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingVector, _impl_.metadata_),
         0,
         2,
         1,
         3,
+        4,
+        5,
         0x081, // bitmap
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest, _impl_._has_bits_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest_MetadataEntry_DoNotUse, _impl_._has_bits_),
         5, // hasbit index offset
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest, _impl_.texts_),
-        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest, _impl_.options_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest_MetadataEntry_DoNotUse, _impl_.key_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest_MetadataEntry_DoNotUse, _impl_.value_),
         0,
         1,
         0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest, _impl_._has_bits_),
+        8, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest, _impl_.texts_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest, _impl_.options_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest, _impl_.request_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest, _impl_.model_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest, _impl_.metadata_),
+        0,
+        3,
+        1,
+        2,
+        4,
+        0x081, // bitmap
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsResult, _impl_._has_bits_),
-        7, // hasbit index offset
+        11, // hasbit index offset
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsResult, _impl_.vectors_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsResult, _impl_.dimension_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsResult, _impl_.processing_time_ms_),
         PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsResult, _impl_.tokens_used_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsResult, _impl_.model_id_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsResult, _impl_.error_message_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsResult, _impl_.error_code_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsResult, _impl_.request_id_),
         0,
-        2,
+        5,
+        4,
+        6,
         1,
+        2,
+        7,
         3,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsServiceState, _impl_._has_bits_),
+        9, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsServiceState, _impl_.is_ready_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsServiceState, _impl_.current_model_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsServiceState, _impl_.dimension_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsServiceState, _impl_.max_tokens_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsServiceState, _impl_.error_message_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsServiceState, _impl_.error_code_),
+        2,
+        0,
+        3,
+        4,
+        1,
+        5,
 };
 
 static const ::_pbi::MigrationSchema
     schemas[] ABSL_ATTRIBUTE_SECTION_VARIABLE(protodesc_cold) = {
         {0, sizeof(::runanywhere::v1::EmbeddingsConfiguration)},
         {21, sizeof(::runanywhere::v1::EmbeddingsOptions)},
-        {36, sizeof(::runanywhere::v1::EmbeddingVector)},
-        {47, sizeof(::runanywhere::v1::EmbeddingsRequest)},
-        {54, sizeof(::runanywhere::v1::EmbeddingsResult)},
+        {36, sizeof(::runanywhere::v1::EmbeddingVector_MetadataEntry_DoNotUse)},
+        {43, sizeof(::runanywhere::v1::EmbeddingVector)},
+        {58, sizeof(::runanywhere::v1::EmbeddingsRequest_MetadataEntry_DoNotUse)},
+        {65, sizeof(::runanywhere::v1::EmbeddingsRequest)},
+        {78, sizeof(::runanywhere::v1::EmbeddingsResult)},
+        {97, sizeof(::runanywhere::v1::EmbeddingsServiceState)},
 };
 static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::runanywhere::v1::_EmbeddingsConfiguration_default_instance_._instance,
     &::runanywhere::v1::_EmbeddingsOptions_default_instance_._instance,
+    &::runanywhere::v1::_EmbeddingVector_MetadataEntry_DoNotUse_default_instance_._instance,
     &::runanywhere::v1::_EmbeddingVector_default_instance_._instance,
+    &::runanywhere::v1::_EmbeddingsRequest_MetadataEntry_DoNotUse_default_instance_._instance,
     &::runanywhere::v1::_EmbeddingsRequest_default_instance_._instance,
     &::runanywhere::v1::_EmbeddingsResult_default_instance_._instance,
+    &::runanywhere::v1::_EmbeddingsServiceState_default_instance_._instance,
 };
 const char descriptor_table_protodef_embeddings_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
@@ -318,28 +477,48 @@ const char descriptor_table_protodef_embeddings_5foptions_2eproto[] ABSL_ATTRIBU
     "runanywhere.v1.EmbeddingsNormalizeMode\022:"
     "\n\007pooling\030\005 \001(\0162).runanywhere.v1.Embeddi"
     "ngsPoolingStrategy\022\021\n\tn_threads\030\006 \001(\005B\013\n"
-    "\t_truncateB\r\n\013_batch_size\"l\n\017EmbeddingVe"
-    "ctor\022\016\n\006values\030\001 \003(\002\022\021\n\004norm\030\002 \001(\002H\000\210\001\001\022"
-    "\021\n\004text\030\003 \001(\tH\001\210\001\001\022\021\n\tdimension\030\004 \001(\005B\007\n"
-    "\005_normB\007\n\005_text\"g\n\021EmbeddingsRequest\022\r\n\005"
-    "texts\030\001 \003(\t\0227\n\007options\030\002 \001(\0132!.runanywhe"
-    "re.v1.EmbeddingsOptionsH\000\210\001\001B\n\n\010_options"
-    "\"\210\001\n\020EmbeddingsResult\0220\n\007vectors\030\001 \003(\0132\037"
-    ".runanywhere.v1.EmbeddingVector\022\021\n\tdimen"
-    "sion\030\002 \001(\005\022\032\n\022processing_time_ms\030\003 \001(\003\022\023"
-    "\n\013tokens_used\030\004 \001(\005*\212\001\n\027EmbeddingsNormal"
-    "izeMode\022)\n%EMBEDDINGS_NORMALIZE_MODE_UNS"
-    "PECIFIED\020\000\022\"\n\036EMBEDDINGS_NORMALIZE_MODE_"
-    "NONE\020\001\022 \n\034EMBEDDINGS_NORMALIZE_MODE_L2\020\002"
-    "*\271\001\n\031EmbeddingsPoolingStrategy\022+\n\'EMBEDD"
-    "INGS_POOLING_STRATEGY_UNSPECIFIED\020\000\022$\n E"
-    "MBEDDINGS_POOLING_STRATEGY_MEAN\020\001\022#\n\037EMB"
-    "EDDINGS_POOLING_STRATEGY_CLS\020\002\022$\n EMBEDD"
-    "INGS_POOLING_STRATEGY_LAST\020\003B\221\001\n\027ai.runa"
-    "nywhere.proto.v1B\026EmbeddingsOptionsProto"
-    "P\001Z<github.com/runanywhere/runanywhere-s"
-    "dks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Run"
-    "anywhere.V1\272\002\002RAb\006proto3"
+    "\t_truncateB\r\n\013_batch_size\"\363\001\n\017EmbeddingV"
+    "ector\022\016\n\006values\030\001 \003(\002\022\021\n\004norm\030\002 \001(\002H\000\210\001\001"
+    "\022\021\n\004text\030\003 \001(\tH\001\210\001\001\022\021\n\tdimension\030\004 \001(\005\022\023"
+    "\n\013input_index\030\005 \001(\005\022\?\n\010metadata\030\006 \003(\0132-."
+    "runanywhere.v1.EmbeddingVector.MetadataE"
+    "ntry\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005va"
+    "lue\030\002 \001(\t:\0028\001B\007\n\005_normB\007\n\005_text\"\223\002\n\021Embe"
+    "ddingsRequest\022\r\n\005texts\030\001 \003(\t\0227\n\007options\030"
+    "\002 \001(\0132!.runanywhere.v1.EmbeddingsOptions"
+    "H\000\210\001\001\022\022\n\nrequest_id\030\003 \001(\t\022\025\n\010model_id\030\004 "
+    "\001(\tH\001\210\001\001\022A\n\010metadata\030\005 \003(\0132/.runanywhere"
+    ".v1.EmbeddingsRequest.MetadataEntry\032/\n\rM"
+    "etadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t"
+    ":\0028\001B\n\n\010_optionsB\013\n\t_model_id\"\202\002\n\020Embedd"
+    "ingsResult\0220\n\007vectors\030\001 \003(\0132\037.runanywher"
+    "e.v1.EmbeddingVector\022\021\n\tdimension\030\002 \001(\005\022"
+    "\032\n\022processing_time_ms\030\003 \001(\003\022\023\n\013tokens_us"
+    "ed\030\004 \001(\005\022\025\n\010model_id\030\005 \001(\tH\000\210\001\001\022\032\n\rerror"
+    "_message\030\006 \001(\tH\001\210\001\001\022\022\n\nerror_code\030\007 \001(\005\022"
+    "\022\n\nrequest_id\030\010 \001(\tB\013\n\t_model_idB\020\n\016_err"
+    "or_message\"\301\001\n\026EmbeddingsServiceState\022\020\n"
+    "\010is_ready\030\001 \001(\010\022\032\n\rcurrent_model\030\002 \001(\tH\000"
+    "\210\001\001\022\021\n\tdimension\030\003 \001(\005\022\022\n\nmax_tokens\030\004 \001"
+    "(\005\022\032\n\rerror_message\030\005 \001(\tH\001\210\001\001\022\022\n\nerror_"
+    "code\030\006 \001(\005B\020\n\016_current_modelB\020\n\016_error_m"
+    "essage*\212\001\n\027EmbeddingsNormalizeMode\022)\n%EM"
+    "BEDDINGS_NORMALIZE_MODE_UNSPECIFIED\020\000\022\"\n"
+    "\036EMBEDDINGS_NORMALIZE_MODE_NONE\020\001\022 \n\034EMB"
+    "EDDINGS_NORMALIZE_MODE_L2\020\002*\271\001\n\031Embeddin"
+    "gsPoolingStrategy\022+\n\'EMBEDDINGS_POOLING_"
+    "STRATEGY_UNSPECIFIED\020\000\022$\n EMBEDDINGS_POO"
+    "LING_STRATEGY_MEAN\020\001\022#\n\037EMBEDDINGS_POOLI"
+    "NG_STRATEGY_CLS\020\002\022$\n EMBEDDINGS_POOLING_"
+    "STRATEGY_LAST\020\0032\255\001\n\nEmbeddings\022L\n\005Embed\022"
+    "!.runanywhere.v1.EmbeddingsRequest\032 .run"
+    "anywhere.v1.EmbeddingsResult\022Q\n\nEmbedBat"
+    "ch\022!.runanywhere.v1.EmbeddingsRequest\032 ."
+    "runanywhere.v1.EmbeddingsResultB\221\001\n\027ai.r"
+    "unanywhere.proto.v1B\026EmbeddingsOptionsPr"
+    "otoP\001Z<github.com/runanywhere/runanywher"
+    "e-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016"
+    "Runanywhere.V1\272\002\002RAb\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_embeddings_5foptions_2eproto_deps[1] = {
@@ -349,13 +528,13 @@ static ::absl::once_flag descriptor_table_embeddings_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_embeddings_5foptions_2eproto = {
     false,
     false,
-    1584,
+    2387,
     descriptor_table_protodef_embeddings_5foptions_2eproto,
     "embeddings_options.proto",
     &descriptor_table_embeddings_5foptions_2eproto_once,
     descriptor_table_embeddings_5foptions_2eproto_deps,
     1,
-    5,
+    8,
     schemas,
     file_default_instances,
     TableStruct_embeddings_5foptions_2eproto::offsets,
@@ -1281,6 +1460,103 @@ void EmbeddingsOptions::InternalSwap(EmbeddingsOptions* PROTOBUF_RESTRICT PROTOB
 }
 // ===================================================================
 
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+EmbeddingVector_MetadataEntry_DoNotUse::EmbeddingVector_MetadataEntry_DoNotUse()
+    : SuperType(EmbeddingVector_MetadataEntry_DoNotUse_class_data_.base()) {}
+EmbeddingVector_MetadataEntry_DoNotUse::EmbeddingVector_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+    : SuperType(arena, EmbeddingVector_MetadataEntry_DoNotUse_class_data_.base()) {}
+#else   // PROTOBUF_CUSTOM_VTABLE
+EmbeddingVector_MetadataEntry_DoNotUse::EmbeddingVector_MetadataEntry_DoNotUse() : SuperType() {}
+EmbeddingVector_MetadataEntry_DoNotUse::EmbeddingVector_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena) : SuperType(arena) {}
+#endif  // PROTOBUF_CUSTOM_VTABLE
+inline void* PROTOBUF_NONNULL EmbeddingVector_MetadataEntry_DoNotUse::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) EmbeddingVector_MetadataEntry_DoNotUse(arena);
+}
+constexpr auto EmbeddingVector_MetadataEntry_DoNotUse::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(EmbeddingVector_MetadataEntry_DoNotUse),
+                                            alignof(EmbeddingVector_MetadataEntry_DoNotUse));
+}
+constexpr auto EmbeddingVector_MetadataEntry_DoNotUse::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_EmbeddingVector_MetadataEntry_DoNotUse_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &EmbeddingVector_MetadataEntry_DoNotUse::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<EmbeddingVector_MetadataEntry_DoNotUse>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &EmbeddingVector_MetadataEntry_DoNotUse::SharedDtor,
+          static_cast<void (::google::protobuf::MessageLite::*)()>(&EmbeddingVector_MetadataEntry_DoNotUse::ClearImpl),
+              ::google::protobuf::Message::ByteSizeLongImpl, ::google::protobuf::Message::_InternalSerializeImpl
+              ,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(EmbeddingVector_MetadataEntry_DoNotUse, _impl_._cached_size_),
+          false,
+      },
+      &EmbeddingVector_MetadataEntry_DoNotUse::kDescriptorMethods,
+      &descriptor_table_embeddings_5foptions_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull EmbeddingVector_MetadataEntry_DoNotUse_class_data_ =
+        EmbeddingVector_MetadataEntry_DoNotUse::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+EmbeddingVector_MetadataEntry_DoNotUse::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&EmbeddingVector_MetadataEntry_DoNotUse_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(EmbeddingVector_MetadataEntry_DoNotUse_class_data_.tc_table);
+  return EmbeddingVector_MetadataEntry_DoNotUse_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<1, 2, 0, 61, 2>
+EmbeddingVector_MetadataEntry_DoNotUse::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(EmbeddingVector_MetadataEntry_DoNotUse, _impl_._has_bits_),
+    0, // no _extensions_
+    2, 8,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967292,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    2,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    EmbeddingVector_MetadataEntry_DoNotUse_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::DiscardEverythingFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::EmbeddingVector_MetadataEntry_DoNotUse>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // string value = 2;
+    {::_pbi::TcParser::FastUS1,
+     {18, 1, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingVector_MetadataEntry_DoNotUse, _impl_.value_)}},
+    // string key = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingVector_MetadataEntry_DoNotUse, _impl_.key_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // string key = 1;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingVector_MetadataEntry_DoNotUse, _impl_.key_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // string value = 2;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingVector_MetadataEntry_DoNotUse, _impl_.value_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  // no aux_entries
+  {{
+    "\54\3\5\0\0\0\0\0"
+    "runanywhere.v1.EmbeddingVector.MetadataEntry"
+    "key"
+    "value"
+  }},
+};
+// ===================================================================
+
 class EmbeddingVector::_Internal {
  public:
   using HasBits =
@@ -1313,7 +1589,16 @@ PROTOBUF_NDEBUG_INLINE EmbeddingVector::Impl_::Impl_(
         values_ { visibility, arena, from.values_ }
         #endif
         ,
-        text_(arena, from.text_) {}
+        text_(arena, from.text_),
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
+        metadata_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::EmbeddingVector,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingVector, _impl_.metadata_)>()
+        , from.metadata_}
+        #else
+        metadata_ { visibility, arena, from.metadata_ }
+        #endif
+     {}
 
 EmbeddingVector::EmbeddingVector(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -1332,9 +1617,9 @@ EmbeddingVector::EmbeddingVector(
                offsetof(Impl_, norm_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, norm_),
-           offsetof(Impl_, dimension_) -
+           offsetof(Impl_, input_index_) -
                offsetof(Impl_, norm_) +
-               sizeof(Impl_::dimension_));
+               sizeof(Impl_::input_index_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.EmbeddingVector)
 }
@@ -1351,16 +1636,25 @@ PROTOBUF_NDEBUG_INLINE EmbeddingVector::Impl_::Impl_(
         values_ { visibility, arena }
         #endif
         ,
-        text_(arena) {}
+        text_(arena),
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
+        metadata_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::EmbeddingVector,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingVector, _impl_.metadata_)>()
+        }
+        #else
+        metadata_ { visibility, arena }
+        #endif
+     {}
 
 inline void EmbeddingVector::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, norm_),
            0,
-           offsetof(Impl_, dimension_) -
+           offsetof(Impl_, input_index_) -
                offsetof(Impl_, norm_) +
-               sizeof(Impl_::dimension_));
+               sizeof(Impl_::input_index_));
 }
 EmbeddingVector::~EmbeddingVector() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.EmbeddingVector)
@@ -1392,6 +1686,10 @@ constexpr auto EmbeddingVector::InternalNewImpl_() {
   constexpr auto arena_bits = ::google::protobuf::internal::EncodePlacementArenaOffsets({
       PROTOBUF_FIELD_OFFSET(EmbeddingVector, _impl_.values_) +
           decltype(EmbeddingVector::_impl_.values_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
+      PROTOBUF_FIELD_OFFSET(EmbeddingVector, _impl_.metadata_) +
+          decltype(EmbeddingVector::_impl_.metadata_)::
               InternalGetArenaOffset(
                   ::google::protobuf::Message::internal_visibility()),
   });
@@ -1438,18 +1736,18 @@ EmbeddingVector::GetClassData() const {
   return EmbeddingVector_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<2, 4, 0, 43, 2>
+const ::_pbi::TcParseTable<3, 6, 1, 51, 2>
 EmbeddingVector::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(EmbeddingVector, _impl_._has_bits_),
     0, // no _extensions_
-    4, 24,  // max_field_number, fast_idx_mask
+    6, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967280,  // skipmap
+    4294967232,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    4,  // num_field_entries
-    0,  // num_aux_entries
-    offsetof(decltype(_table_), field_names),  // no aux_entries
+    6,  // num_field_entries
+    1,  // num_aux_entries
+    offsetof(decltype(_table_), aux_entries),
     EmbeddingVector_class_data_.base(),
     nullptr,  // post_loop_handler
     ::_pbi::TcParser::GenericFallback,  // fallback
@@ -1457,10 +1755,7 @@ EmbeddingVector::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::EmbeddingVector>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    // int32 dimension = 4;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingVector, _impl_.dimension_), 3>(),
-     {32, 3, 0,
-      PROTOBUF_FIELD_OFFSET(EmbeddingVector, _impl_.dimension_)}},
+    {::_pbi::TcParser::MiniParse, {}},
     // repeated float values = 1;
     {::_pbi::TcParser::FastF32P1,
      {10, 0, 0,
@@ -1473,6 +1768,16 @@ EmbeddingVector::_table_ = {
     {::_pbi::TcParser::FastUS1,
      {26, 1, 0,
       PROTOBUF_FIELD_OFFSET(EmbeddingVector, _impl_.text_)}},
+    // int32 dimension = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingVector, _impl_.dimension_), 3>(),
+     {32, 3, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingVector, _impl_.dimension_)}},
+    // int32 input_index = 5;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingVector, _impl_.input_index_), 4>(),
+     {40, 4, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingVector, _impl_.input_index_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
   }}, {{
     65535, 65535
   }}, {{
@@ -1484,12 +1789,20 @@ EmbeddingVector::_table_ = {
     {PROTOBUF_FIELD_OFFSET(EmbeddingVector, _impl_.text_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // int32 dimension = 4;
     {PROTOBUF_FIELD_OFFSET(EmbeddingVector, _impl_.dimension_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    // int32 input_index = 5;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingVector, _impl_.input_index_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    // map<string, string> metadata = 6;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingVector, _impl_.metadata_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMap)},
   }},
-  // no aux_entries
   {{
-    "\36\0\0\4\0\0\0\0"
+      {::_pbi::TcParser::GetMapAuxInfo(
+          1, 0, 9, 9, 0)},
+  }},
+  {{
+    "\36\0\0\4\0\0\10\0"
     "runanywhere.v1.EmbeddingVector"
     "text"
+    "metadata"
   }},
 };
 PROTOBUF_NOINLINE void EmbeddingVector::Clear() {
@@ -1508,10 +1821,13 @@ PROTOBUF_NOINLINE void EmbeddingVector::Clear() {
       _impl_.text_.ClearNonDefaultToEmpty();
     }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000cU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003cU)) {
     ::memset(&_impl_.norm_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.dimension_) -
-        reinterpret_cast<char*>(&_impl_.norm_)) + sizeof(_impl_.dimension_));
+        reinterpret_cast<char*>(&_impl_.input_index_) -
+        reinterpret_cast<char*>(&_impl_.norm_)) + sizeof(_impl_.input_index_));
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000020U)) {
+      _impl_.metadata_.Clear();
+    }
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -1567,6 +1883,50 @@ PROTOBUF_NOINLINE void EmbeddingVector::Clear() {
     }
   }
 
+  // int32 input_index = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (this_._internal_input_index() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<5>(
+              stream, this_._internal_input_index(), target);
+    }
+  }
+
+  // map<string, string> metadata = 6;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000020U)) {
+    if (!this_._internal_metadata().empty()) {
+      using MapType = ::google::protobuf::Map<::std::string, ::std::string>;
+      using WireHelper = _pbi::MapEntryFuncs<::std::string, ::std::string,
+                                     _pbi::WireFormatLite::TYPE_STRING,
+                                     _pbi::WireFormatLite::TYPE_STRING>;
+      const auto& field = this_._internal_metadata();
+
+      if (stream->IsSerializationDeterministic() && field.size() > 1) {
+        for (const auto& entry : ::google::protobuf::internal::MapSorterPtr<MapType>(field)) {
+          target = WireHelper::InternalSerialize(
+              6, entry.first, entry.second, target, stream);
+          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+              entry.first.data(), static_cast<int>(entry.first.length()),
+ ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.EmbeddingVector.metadata");
+          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+              entry.second.data(), static_cast<int>(entry.second.length()),
+ ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.EmbeddingVector.metadata");
+        }
+      } else {
+        for (const auto& entry : field) {
+          target = WireHelper::InternalSerialize(
+              6, entry.first, entry.second, target, stream);
+          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+              entry.first.data(), static_cast<int>(entry.first.length()),
+ ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.EmbeddingVector.metadata");
+          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+              entry.second.data(), static_cast<int>(entry.second.length()),
+ ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.EmbeddingVector.metadata");
+        }
+      }
+    }
+  }
+
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
     target =
         ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
@@ -1593,7 +1953,7 @@ PROTOBUF_NOINLINE void EmbeddingVector::Clear() {
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
   total_size += static_cast<bool>(0x00000004U & cached_has_bits) * 5;
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000bU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003bU)) {
     // repeated float values = 1;
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       ::size_t data_size = ::size_t{4} *
@@ -1616,6 +1976,23 @@ PROTOBUF_NOINLINE void EmbeddingVector::Clear() {
             this_._internal_dimension());
       }
     }
+    // int32 input_index = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_input_index() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_input_index());
+      }
+    }
+    // map<string, string> metadata = 6;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000020U)) {
+      total_size +=
+          1 * ::google::protobuf::internal::FromIntSize(this_._internal_metadata_size());
+      for (const auto& entry : this_._internal_metadata()) {
+        total_size += _pbi::MapEntryFuncs<::std::string, ::std::string,
+                                       _pbi::WireFormatLite::TYPE_STRING,
+                                       _pbi::WireFormatLite::TYPE_STRING>::ByteSizeLong(entry.first, entry.second);
+      }
+    }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
                                              &this_._impl_._cached_size_);
@@ -1635,7 +2012,7 @@ void EmbeddingVector::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       _this->_internal_mutable_values()->MergeFrom(from._internal_values());
     }
@@ -1649,6 +2026,14 @@ void EmbeddingVector::MergeImpl(::google::protobuf::MessageLite& to_msg,
       if (from._internal_dimension() != 0) {
         _this->_impl_.dimension_ = from._impl_.dimension_;
       }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_input_index() != 0) {
+        _this->_impl_.input_index_ = from._impl_.input_index_;
+      }
+    }
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000020U)) {
+      _this->_impl_.metadata_.MergeFrom(from._impl_.metadata_);
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -1673,16 +2058,114 @@ void EmbeddingVector::InternalSwap(EmbeddingVector* PROTOBUF_RESTRICT PROTOBUF_N
   _impl_.values_.InternalSwap(&other->_impl_.values_);
   ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.text_, &other->_impl_.text_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(EmbeddingVector, _impl_.dimension_)
-      + sizeof(EmbeddingVector::_impl_.dimension_)
+      PROTOBUF_FIELD_OFFSET(EmbeddingVector, _impl_.input_index_)
+      + sizeof(EmbeddingVector::_impl_.input_index_)
       - PROTOBUF_FIELD_OFFSET(EmbeddingVector, _impl_.norm_)>(
           reinterpret_cast<char*>(&_impl_.norm_),
           reinterpret_cast<char*>(&other->_impl_.norm_));
+  _impl_.metadata_.InternalSwap(&other->_impl_.metadata_);
 }
 
 ::google::protobuf::Metadata EmbeddingVector::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
+// ===================================================================
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+EmbeddingsRequest_MetadataEntry_DoNotUse::EmbeddingsRequest_MetadataEntry_DoNotUse()
+    : SuperType(EmbeddingsRequest_MetadataEntry_DoNotUse_class_data_.base()) {}
+EmbeddingsRequest_MetadataEntry_DoNotUse::EmbeddingsRequest_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+    : SuperType(arena, EmbeddingsRequest_MetadataEntry_DoNotUse_class_data_.base()) {}
+#else   // PROTOBUF_CUSTOM_VTABLE
+EmbeddingsRequest_MetadataEntry_DoNotUse::EmbeddingsRequest_MetadataEntry_DoNotUse() : SuperType() {}
+EmbeddingsRequest_MetadataEntry_DoNotUse::EmbeddingsRequest_MetadataEntry_DoNotUse(::google::protobuf::Arena* PROTOBUF_NULLABLE arena) : SuperType(arena) {}
+#endif  // PROTOBUF_CUSTOM_VTABLE
+inline void* PROTOBUF_NONNULL EmbeddingsRequest_MetadataEntry_DoNotUse::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) EmbeddingsRequest_MetadataEntry_DoNotUse(arena);
+}
+constexpr auto EmbeddingsRequest_MetadataEntry_DoNotUse::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(EmbeddingsRequest_MetadataEntry_DoNotUse),
+                                            alignof(EmbeddingsRequest_MetadataEntry_DoNotUse));
+}
+constexpr auto EmbeddingsRequest_MetadataEntry_DoNotUse::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_EmbeddingsRequest_MetadataEntry_DoNotUse_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &EmbeddingsRequest_MetadataEntry_DoNotUse::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<EmbeddingsRequest_MetadataEntry_DoNotUse>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &EmbeddingsRequest_MetadataEntry_DoNotUse::SharedDtor,
+          static_cast<void (::google::protobuf::MessageLite::*)()>(&EmbeddingsRequest_MetadataEntry_DoNotUse::ClearImpl),
+              ::google::protobuf::Message::ByteSizeLongImpl, ::google::protobuf::Message::_InternalSerializeImpl
+              ,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(EmbeddingsRequest_MetadataEntry_DoNotUse, _impl_._cached_size_),
+          false,
+      },
+      &EmbeddingsRequest_MetadataEntry_DoNotUse::kDescriptorMethods,
+      &descriptor_table_embeddings_5foptions_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull EmbeddingsRequest_MetadataEntry_DoNotUse_class_data_ =
+        EmbeddingsRequest_MetadataEntry_DoNotUse::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+EmbeddingsRequest_MetadataEntry_DoNotUse::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&EmbeddingsRequest_MetadataEntry_DoNotUse_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(EmbeddingsRequest_MetadataEntry_DoNotUse_class_data_.tc_table);
+  return EmbeddingsRequest_MetadataEntry_DoNotUse_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<1, 2, 0, 63, 2>
+EmbeddingsRequest_MetadataEntry_DoNotUse::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(EmbeddingsRequest_MetadataEntry_DoNotUse, _impl_._has_bits_),
+    0, // no _extensions_
+    2, 8,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967292,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    2,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    EmbeddingsRequest_MetadataEntry_DoNotUse_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::DiscardEverythingFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::EmbeddingsRequest_MetadataEntry_DoNotUse>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    // string value = 2;
+    {::_pbi::TcParser::FastUS1,
+     {18, 1, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsRequest_MetadataEntry_DoNotUse, _impl_.value_)}},
+    // string key = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsRequest_MetadataEntry_DoNotUse, _impl_.key_)}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // string key = 1;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsRequest_MetadataEntry_DoNotUse, _impl_.key_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // string value = 2;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsRequest_MetadataEntry_DoNotUse, _impl_.value_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+  }},
+  // no aux_entries
+  {{
+    "\56\3\5\0\0\0\0\0"
+    "runanywhere.v1.EmbeddingsRequest.MetadataEntry"
+    "key"
+    "value"
+  }},
+};
 // ===================================================================
 
 class EmbeddingsRequest::_Internal {
@@ -1716,6 +2199,17 @@ PROTOBUF_NDEBUG_INLINE EmbeddingsRequest::Impl_::Impl_(
         #else
         texts_ { visibility, arena, from.texts_ }
         #endif
+        ,
+        request_id_(arena, from.request_id_),
+        model_id_(arena, from.model_id_),
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
+        metadata_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::EmbeddingsRequest,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest, _impl_.metadata_)>()
+        , from.metadata_}
+        #else
+        metadata_ { visibility, arena, from.metadata_ }
+        #endif
      {}
 
 EmbeddingsRequest::EmbeddingsRequest(
@@ -1732,7 +2226,7 @@ EmbeddingsRequest::EmbeddingsRequest(
       from._internal_metadata_);
   new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
   ::uint32_t cached_has_bits = _impl_._has_bits_[0];
-  _impl_.options_ = (CheckHasBit(cached_has_bits, 0x00000002U))
+  _impl_.options_ = (CheckHasBit(cached_has_bits, 0x00000008U))
                 ? ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.options_)
                 : nullptr;
 
@@ -1749,6 +2243,17 @@ PROTOBUF_NDEBUG_INLINE EmbeddingsRequest::Impl_::Impl_(
         }
         #else
         texts_ { visibility, arena }
+        #endif
+        ,
+        request_id_(arena),
+        model_id_(arena),
+        #ifdef PROTOBUF_INTERNAL_REMOVE_ARENA_PTRS_MAP_FIELD
+        metadata_{visibility, ::_pbi::InternalMetadataOffset::Build<
+            ::runanywhere::v1::EmbeddingsRequest,
+            PROTOBUF_FIELD_OFFSET(::runanywhere::v1::EmbeddingsRequest, _impl_.metadata_)>()
+        }
+        #else
+        metadata_ { visibility, arena }
         #endif
      {}
 
@@ -1767,6 +2272,8 @@ inline void EmbeddingsRequest::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.request_id_.Destroy();
+  this_._impl_.model_id_.Destroy();
   delete this_._impl_.options_;
   this_._impl_.~Impl_();
 }
@@ -1788,9 +2295,13 @@ constexpr auto EmbeddingsRequest::InternalNewImpl_() {
           decltype(EmbeddingsRequest::_impl_.texts_)::
               InternalGetArenaOffset(
                   ::google::protobuf::Message::internal_visibility()),
+      PROTOBUF_FIELD_OFFSET(EmbeddingsRequest, _impl_.metadata_) +
+          decltype(EmbeddingsRequest::_impl_.metadata_)::
+              InternalGetArenaOffset(
+                  ::google::protobuf::Message::internal_visibility()),
   });
   if (arena_bits.has_value()) {
-    return ::google::protobuf::internal::MessageCreator::ZeroInit(
+    return ::google::protobuf::internal::MessageCreator::CopyInit(
         sizeof(EmbeddingsRequest), alignof(EmbeddingsRequest), *arena_bits);
   } else {
     return ::google::protobuf::internal::MessageCreator(&EmbeddingsRequest::PlacementNew_,
@@ -1832,17 +2343,17 @@ EmbeddingsRequest::GetClassData() const {
   return EmbeddingsRequest_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<1, 2, 1, 46, 2>
+const ::_pbi::TcParseTable<2, 5, 2, 72, 2>
 EmbeddingsRequest::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(EmbeddingsRequest, _impl_._has_bits_),
     0, // no _extensions_
-    2, 8,  // max_field_number, fast_idx_mask
+    5, 24,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967292,  // skipmap
+    4294967264,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    2,  // num_field_entries
-    1,  // num_aux_entries
+    5,  // num_field_entries
+    2,  // num_aux_entries
     offsetof(decltype(_table_), aux_entries),
     EmbeddingsRequest_class_data_.base(),
     nullptr,  // post_loop_handler
@@ -1851,29 +2362,48 @@ EmbeddingsRequest::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::EmbeddingsRequest>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    // optional .runanywhere.v1.EmbeddingsOptions options = 2;
-    {::_pbi::TcParser::FastMtS1,
-     {18, 1, 0,
-      PROTOBUF_FIELD_OFFSET(EmbeddingsRequest, _impl_.options_)}},
+    // optional string model_id = 4;
+    {::_pbi::TcParser::FastUS1,
+     {34, 2, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsRequest, _impl_.model_id_)}},
     // repeated string texts = 1;
     {::_pbi::TcParser::FastUR1,
      {10, 0, 0,
       PROTOBUF_FIELD_OFFSET(EmbeddingsRequest, _impl_.texts_)}},
+    // optional .runanywhere.v1.EmbeddingsOptions options = 2;
+    {::_pbi::TcParser::FastMtS1,
+     {18, 3, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsRequest, _impl_.options_)}},
+    // string request_id = 3;
+    {::_pbi::TcParser::FastUS1,
+     {26, 1, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsRequest, _impl_.request_id_)}},
   }}, {{
     65535, 65535
   }}, {{
     // repeated string texts = 1;
     {PROTOBUF_FIELD_OFFSET(EmbeddingsRequest, _impl_.texts_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
     // optional .runanywhere.v1.EmbeddingsOptions options = 2;
-    {PROTOBUF_FIELD_OFFSET(EmbeddingsRequest, _impl_.options_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsRequest, _impl_.options_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kMessage | ::_fl::kTvTable)},
+    // string request_id = 3;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsRequest, _impl_.request_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // optional string model_id = 4;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsRequest, _impl_.model_id_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // map<string, string> metadata = 5;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsRequest, _impl_.metadata_), _Internal::kHasBitsOffset + 4, 1, (0 | ::_fl::kFcRepeated | ::_fl::kMap)},
   }},
   {{
       {::_pbi::TcParser::GetTable<::runanywhere::v1::EmbeddingsOptions>()},
+      {::_pbi::TcParser::GetMapAuxInfo(
+          1, 0, 9, 9, 0)},
   }},
   {{
-    "\40\5\0\0\0\0\0\0"
+    "\40\5\0\12\10\10\0\0"
     "runanywhere.v1.EmbeddingsRequest"
     "texts"
+    "request_id"
+    "model_id"
+    "metadata"
   }},
 };
 PROTOBUF_NOINLINE void EmbeddingsRequest::Clear() {
@@ -1884,13 +2414,22 @@ PROTOBUF_NOINLINE void EmbeddingsRequest::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       _impl_.texts_.Clear();
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.request_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _impl_.model_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       ABSL_DCHECK(_impl_.options_ != nullptr);
       _impl_.options_->Clear();
+    }
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000010U)) {
+      _impl_.metadata_.Clear();
     }
   }
   _impl_._has_bits_.Clear();
@@ -1927,10 +2466,63 @@ PROTOBUF_NOINLINE void EmbeddingsRequest::Clear() {
   }
 
   // optional .runanywhere.v1.EmbeddingsOptions options = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     target = ::google::protobuf::internal::WireFormatLite::InternalWriteMessage(
         2, *this_._impl_.options_, this_._impl_.options_->GetCachedSize(), target,
         stream);
+  }
+
+  // string request_id = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_request_id().empty()) {
+      const ::std::string& _s = this_._internal_request_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.EmbeddingsRequest.request_id");
+      target = stream->WriteStringMaybeAliased(3, _s, target);
+    }
+  }
+
+  // optional string model_id = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    const ::std::string& _s = this_._internal_model_id();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.EmbeddingsRequest.model_id");
+    target = stream->WriteStringMaybeAliased(4, _s, target);
+  }
+
+  // map<string, string> metadata = 5;
+  if (CheckHasBitForRepeated(cached_has_bits, 0x00000010U)) {
+    if (!this_._internal_metadata().empty()) {
+      using MapType = ::google::protobuf::Map<::std::string, ::std::string>;
+      using WireHelper = _pbi::MapEntryFuncs<::std::string, ::std::string,
+                                     _pbi::WireFormatLite::TYPE_STRING,
+                                     _pbi::WireFormatLite::TYPE_STRING>;
+      const auto& field = this_._internal_metadata();
+
+      if (stream->IsSerializationDeterministic() && field.size() > 1) {
+        for (const auto& entry : ::google::protobuf::internal::MapSorterPtr<MapType>(field)) {
+          target = WireHelper::InternalSerialize(
+              5, entry.first, entry.second, target, stream);
+          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+              entry.first.data(), static_cast<int>(entry.first.length()),
+ ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.EmbeddingsRequest.metadata");
+          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+              entry.second.data(), static_cast<int>(entry.second.length()),
+ ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.EmbeddingsRequest.metadata");
+        }
+      } else {
+        for (const auto& entry : field) {
+          target = WireHelper::InternalSerialize(
+              5, entry.first, entry.second, target, stream);
+          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+              entry.first.data(), static_cast<int>(entry.first.length()),
+ ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.EmbeddingsRequest.metadata");
+          ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+              entry.second.data(), static_cast<int>(entry.second.length()),
+ ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.EmbeddingsRequest.metadata");
+        }
+      }
+    }
   }
 
   if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
@@ -1958,7 +2550,7 @@ PROTOBUF_NOINLINE void EmbeddingsRequest::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     // repeated string texts = 1;
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       total_size +=
@@ -1968,10 +2560,32 @@ PROTOBUF_NOINLINE void EmbeddingsRequest::Clear() {
             this_._internal_texts().Get(i));
       }
     }
-    // optional .runanywhere.v1.EmbeddingsOptions options = 2;
+    // string request_id = 3;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_request_id().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_request_id());
+      }
+    }
+    // optional string model_id = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_model_id());
+    }
+    // optional .runanywhere.v1.EmbeddingsOptions options = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       total_size += 1 +
                     ::google::protobuf::internal::WireFormatLite::MessageSize(*this_._impl_.options_);
+    }
+    // map<string, string> metadata = 5;
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000010U)) {
+      total_size +=
+          1 * ::google::protobuf::internal::FromIntSize(this_._internal_metadata_size());
+      for (const auto& entry : this_._internal_metadata()) {
+        total_size += _pbi::MapEntryFuncs<::std::string, ::std::string,
+                                       _pbi::WireFormatLite::TYPE_STRING,
+                                       _pbi::WireFormatLite::TYPE_STRING>::ByteSizeLong(entry.first, entry.second);
+      }
     }
   }
   return this_.MaybeComputeUnknownFieldsSize(total_size,
@@ -1993,19 +2607,34 @@ void EmbeddingsRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       _this->_internal_mutable_texts()->InternalMergeFromWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), arena,
           from._internal_texts());
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_request_id().empty()) {
+        _this->_internal_set_request_id(from._internal_request_id());
+      } else {
+        if (_this->_impl_.request_id_.IsDefault()) {
+          _this->_internal_set_request_id("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _this->_internal_set_model_id(from._internal_model_id());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       ABSL_DCHECK(from._impl_.options_ != nullptr);
       if (_this->_impl_.options_ == nullptr) {
         _this->_impl_.options_ = ::google::protobuf::Message::CopyConstruct(arena, *from._impl_.options_);
       } else {
         _this->_impl_.options_->MergeFrom(*from._impl_.options_);
       }
+    }
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000010U)) {
+      _this->_impl_.metadata_.MergeFrom(from._impl_.metadata_);
     }
   }
   _this->_impl_._has_bits_[0] |= cached_has_bits;
@@ -2023,10 +2652,15 @@ void EmbeddingsRequest::CopyFrom(const EmbeddingsRequest& from) {
 
 void EmbeddingsRequest::InternalSwap(EmbeddingsRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
   using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   _impl_.texts_.InternalSwap(&other->_impl_.texts_);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.request_id_, &other->_impl_.request_id_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
   swap(_impl_.options_, other->_impl_.options_);
+  _impl_.metadata_.InternalSwap(&other->_impl_.metadata_);
 }
 
 ::google::protobuf::Metadata EmbeddingsRequest::GetMetadata() const {
@@ -2065,7 +2699,10 @@ PROTOBUF_NDEBUG_INLINE EmbeddingsResult::Impl_::Impl_(
         #else
         vectors_ { visibility, arena, from.vectors_ }
         #endif
-     {}
+        ,
+        model_id_(arena, from.model_id_),
+        error_message_(arena, from.error_message_),
+        request_id_(arena, from.request_id_) {}
 
 EmbeddingsResult::EmbeddingsResult(
     ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
@@ -2084,9 +2721,9 @@ EmbeddingsResult::EmbeddingsResult(
                offsetof(Impl_, processing_time_ms_),
            reinterpret_cast<const char*>(&from._impl_) +
                offsetof(Impl_, processing_time_ms_),
-           offsetof(Impl_, tokens_used_) -
+           offsetof(Impl_, error_code_) -
                offsetof(Impl_, processing_time_ms_) +
-               sizeof(Impl_::tokens_used_));
+               sizeof(Impl_::error_code_));
 
   // @@protoc_insertion_point(copy_constructor:runanywhere.v1.EmbeddingsResult)
 }
@@ -2102,16 +2739,19 @@ PROTOBUF_NDEBUG_INLINE EmbeddingsResult::Impl_::Impl_(
         #else
         vectors_ { visibility, arena }
         #endif
-     {}
+        ,
+        model_id_(arena),
+        error_message_(arena),
+        request_id_(arena) {}
 
 inline void EmbeddingsResult::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
   new (&_impl_) Impl_(internal_visibility(), arena);
   ::memset(reinterpret_cast<char*>(&_impl_) +
                offsetof(Impl_, processing_time_ms_),
            0,
-           offsetof(Impl_, tokens_used_) -
+           offsetof(Impl_, error_code_) -
                offsetof(Impl_, processing_time_ms_) +
-               sizeof(Impl_::tokens_used_));
+               sizeof(Impl_::error_code_));
 }
 EmbeddingsResult::~EmbeddingsResult() {
   // @@protoc_insertion_point(destructor:runanywhere.v1.EmbeddingsResult)
@@ -2124,6 +2764,9 @@ inline void EmbeddingsResult::SharedDtor(MessageLite& self) {
   }
   this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
   ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.model_id_.Destroy();
+  this_._impl_.error_message_.Destroy();
+  this_._impl_.request_id_.Destroy();
   this_._impl_.~Impl_();
 }
 
@@ -2146,7 +2789,7 @@ constexpr auto EmbeddingsResult::InternalNewImpl_() {
                   ::google::protobuf::Message::internal_visibility()),
   });
   if (arena_bits.has_value()) {
-    return ::google::protobuf::internal::MessageCreator::ZeroInit(
+    return ::google::protobuf::internal::MessageCreator::CopyInit(
         sizeof(EmbeddingsResult), alignof(EmbeddingsResult), *arena_bits);
   } else {
     return ::google::protobuf::internal::MessageCreator(&EmbeddingsResult::PlacementNew_,
@@ -2188,16 +2831,16 @@ EmbeddingsResult::GetClassData() const {
   return EmbeddingsResult_class_data_.base();
 }
 PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
-const ::_pbi::TcParseTable<2, 4, 1, 0, 2>
+const ::_pbi::TcParseTable<3, 8, 1, 79, 2>
 EmbeddingsResult::_table_ = {
   {
     PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_._has_bits_),
     0, // no _extensions_
-    4, 24,  // max_field_number, fast_idx_mask
+    8, 56,  // max_field_number, fast_idx_mask
     offsetof(decltype(_table_), field_lookup_table),
-    4294967280,  // skipmap
+    4294967040,  // skipmap
     offsetof(decltype(_table_), field_entries),
-    4,  // num_field_entries
+    8,  // num_field_entries
     1,  // num_aux_entries
     offsetof(decltype(_table_), aux_entries),
     EmbeddingsResult_class_data_.base(),
@@ -2207,38 +2850,67 @@ EmbeddingsResult::_table_ = {
     ::_pbi::TcParser::GetTable<::runanywhere::v1::EmbeddingsResult>(),  // to_prefetch
     #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
   }, {{
-    // int32 tokens_used = 4;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsResult, _impl_.tokens_used_), 3>(),
-     {32, 3, 0,
-      PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.tokens_used_)}},
+    // string request_id = 8;
+    {::_pbi::TcParser::FastUS1,
+     {66, 3, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.request_id_)}},
     // repeated .runanywhere.v1.EmbeddingVector vectors = 1;
     {::_pbi::TcParser::FastMtR1,
      {10, 0, 0,
       PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.vectors_)}},
     // int32 dimension = 2;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsResult, _impl_.dimension_), 2>(),
-     {16, 2, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsResult, _impl_.dimension_), 5>(),
+     {16, 5, 0,
       PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.dimension_)}},
     // int64 processing_time_ms = 3;
-    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(EmbeddingsResult, _impl_.processing_time_ms_), 1>(),
-     {24, 1, 0,
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint64_t, offsetof(EmbeddingsResult, _impl_.processing_time_ms_), 4>(),
+     {24, 4, 0,
       PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.processing_time_ms_)}},
+    // int32 tokens_used = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsResult, _impl_.tokens_used_), 6>(),
+     {32, 6, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.tokens_used_)}},
+    // optional string model_id = 5;
+    {::_pbi::TcParser::FastUS1,
+     {42, 1, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.model_id_)}},
+    // optional string error_message = 6;
+    {::_pbi::TcParser::FastUS1,
+     {50, 2, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.error_message_)}},
+    // int32 error_code = 7;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsResult, _impl_.error_code_), 7>(),
+     {56, 7, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.error_code_)}},
   }}, {{
     65535, 65535
   }}, {{
     // repeated .runanywhere.v1.EmbeddingVector vectors = 1;
     {PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.vectors_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kMessage | ::_fl::kTvTable)},
     // int32 dimension = 2;
-    {PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.dimension_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.dimension_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
     // int64 processing_time_ms = 3;
-    {PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.processing_time_ms_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.processing_time_ms_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt64)},
     // int32 tokens_used = 4;
-    {PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.tokens_used_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.tokens_used_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    // optional string model_id = 5;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.model_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // optional string error_message = 6;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.error_message_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // int32 error_code = 7;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.error_code_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    // string request_id = 8;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.request_id_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
   }},
   {{
       {::_pbi::TcParser::GetTable<::runanywhere::v1::EmbeddingVector>()},
   }},
   {{
+    "\37\0\0\0\0\10\15\0\12\0\0\0\0\0\0\0"
+    "runanywhere.v1.EmbeddingsResult"
+    "model_id"
+    "error_message"
+    "request_id"
   }},
 };
 PROTOBUF_NOINLINE void EmbeddingsResult::Clear() {
@@ -2249,13 +2921,24 @@ PROTOBUF_NOINLINE void EmbeddingsResult::Clear() {
   (void) cached_has_bits;
 
   cached_has_bits = _impl_._has_bits_[0];
-  if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
-    _impl_.vectors_.Clear();
+  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+    if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
+      _impl_.vectors_.Clear();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.model_id_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _impl_.error_message_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      _impl_.request_id_.ClearNonDefaultToEmpty();
+    }
   }
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000eU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000f0U)) {
     ::memset(&_impl_.processing_time_ms_, 0, static_cast<::size_t>(
-        reinterpret_cast<char*>(&_impl_.tokens_used_) -
-        reinterpret_cast<char*>(&_impl_.processing_time_ms_)) + sizeof(_impl_.tokens_used_));
+        reinterpret_cast<char*>(&_impl_.error_code_) -
+        reinterpret_cast<char*>(&_impl_.processing_time_ms_)) + sizeof(_impl_.error_code_));
   }
   _impl_._has_bits_.Clear();
   _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
@@ -2294,7 +2977,7 @@ PROTOBUF_NOINLINE void EmbeddingsResult::Clear() {
   }
 
   // int32 dimension = 2;
-  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
     if (this_._internal_dimension() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<2>(
@@ -2303,7 +2986,7 @@ PROTOBUF_NOINLINE void EmbeddingsResult::Clear() {
   }
 
   // int64 processing_time_ms = 3;
-  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_processing_time_ms() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt64ToArrayWithField<3>(
@@ -2312,11 +2995,46 @@ PROTOBUF_NOINLINE void EmbeddingsResult::Clear() {
   }
 
   // int32 tokens_used = 4;
-  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+  if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_tokens_used() != 0) {
       target =
           ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
               stream, this_._internal_tokens_used(), target);
+    }
+  }
+
+  // optional string model_id = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    const ::std::string& _s = this_._internal_model_id();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.EmbeddingsResult.model_id");
+    target = stream->WriteStringMaybeAliased(5, _s, target);
+  }
+
+  // optional string error_message = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    const ::std::string& _s = this_._internal_error_message();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.EmbeddingsResult.error_message");
+    target = stream->WriteStringMaybeAliased(6, _s, target);
+  }
+
+  // int32 error_code = 7;
+  if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+    if (this_._internal_error_code() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<7>(
+              stream, this_._internal_error_code(), target);
+    }
+  }
+
+  // string request_id = 8;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (!this_._internal_request_id().empty()) {
+      const ::std::string& _s = this_._internal_request_id();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.EmbeddingsResult.request_id");
+      target = stream->WriteStringMaybeAliased(8, _s, target);
     }
   }
 
@@ -2345,7 +3063,7 @@ PROTOBUF_NOINLINE void EmbeddingsResult::Clear() {
 
   ::_pbi::Prefetch5LinesFrom7Lines(&this_);
   cached_has_bits = this_._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     // repeated .runanywhere.v1.EmbeddingVector vectors = 1;
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       total_size += 1UL * this_._internal_vectors_size();
@@ -2353,25 +3071,49 @@ PROTOBUF_NOINLINE void EmbeddingsResult::Clear() {
         total_size += ::google::protobuf::internal::WireFormatLite::MessageSize(msg);
       }
     }
-    // int64 processing_time_ms = 3;
+    // optional string model_id = 5;
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_model_id());
+    }
+    // optional string error_message = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_error_message());
+    }
+    // string request_id = 8;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (!this_._internal_request_id().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_request_id());
+      }
+    }
+    // int64 processing_time_ms = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_processing_time_ms() != 0) {
         total_size += ::_pbi::WireFormatLite::Int64SizePlusOne(
             this_._internal_processing_time_ms());
       }
     }
     // int32 dimension = 2;
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (this_._internal_dimension() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_dimension());
       }
     }
     // int32 tokens_used = 4;
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_tokens_used() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
             this_._internal_tokens_used());
+      }
+    }
+    // int32 error_code = 7;
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (this_._internal_error_code() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_error_code());
       }
     }
   }
@@ -2394,25 +3136,45 @@ void EmbeddingsResult::MergeImpl(::google::protobuf::MessageLite& to_msg,
   (void)cached_has_bits;
 
   cached_has_bits = from._impl_._has_bits_[0];
-  if (BatchCheckHasBit(cached_has_bits, 0x0000000fU)) {
+  if (BatchCheckHasBit(cached_has_bits, 0x000000ffU)) {
     if (CheckHasBitForRepeated(cached_has_bits, 0x00000001U)) {
       _this->_internal_mutable_vectors()->InternalMergeFromWithArena(
           ::google::protobuf::MessageLite::internal_visibility(), arena,
           from._internal_vectors());
     }
     if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _this->_internal_set_model_id(from._internal_model_id());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _this->_internal_set_error_message(from._internal_error_message());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (!from._internal_request_id().empty()) {
+        _this->_internal_set_request_id(from._internal_request_id());
+      } else {
+        if (_this->_impl_.request_id_.IsDefault()) {
+          _this->_internal_set_request_id("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (from._internal_processing_time_ms() != 0) {
         _this->_impl_.processing_time_ms_ = from._impl_.processing_time_ms_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
       if (from._internal_dimension() != 0) {
         _this->_impl_.dimension_ = from._impl_.dimension_;
       }
     }
-    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (from._internal_tokens_used() != 0) {
         _this->_impl_.tokens_used_ = from._impl_.tokens_used_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000080U)) {
+      if (from._internal_error_code() != 0) {
+        _this->_impl_.error_code_ = from._impl_.error_code_;
       }
     }
   }
@@ -2431,18 +3193,455 @@ void EmbeddingsResult::CopyFrom(const EmbeddingsResult& from) {
 
 void EmbeddingsResult::InternalSwap(EmbeddingsResult* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
   using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
   swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
   _impl_.vectors_.InternalSwap(&other->_impl_.vectors_);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.model_id_, &other->_impl_.model_id_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.request_id_, &other->_impl_.request_id_, arena);
   ::google::protobuf::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.tokens_used_)
-      + sizeof(EmbeddingsResult::_impl_.tokens_used_)
+      PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.error_code_)
+      + sizeof(EmbeddingsResult::_impl_.error_code_)
       - PROTOBUF_FIELD_OFFSET(EmbeddingsResult, _impl_.processing_time_ms_)>(
           reinterpret_cast<char*>(&_impl_.processing_time_ms_),
           reinterpret_cast<char*>(&other->_impl_.processing_time_ms_));
 }
 
 ::google::protobuf::Metadata EmbeddingsResult::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class EmbeddingsServiceState::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<EmbeddingsServiceState>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_._has_bits_);
+};
+
+EmbeddingsServiceState::EmbeddingsServiceState(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, EmbeddingsServiceState_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.EmbeddingsServiceState)
+}
+PROTOBUF_NDEBUG_INLINE EmbeddingsServiceState::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::EmbeddingsServiceState& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        current_model_(arena, from.current_model_),
+        error_message_(arena, from.error_message_) {}
+
+EmbeddingsServiceState::EmbeddingsServiceState(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const EmbeddingsServiceState& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, EmbeddingsServiceState_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  EmbeddingsServiceState* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, is_ready_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, is_ready_),
+           offsetof(Impl_, error_code_) -
+               offsetof(Impl_, is_ready_) +
+               sizeof(Impl_::error_code_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.EmbeddingsServiceState)
+}
+PROTOBUF_NDEBUG_INLINE EmbeddingsServiceState::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        current_model_(arena),
+        error_message_(arena) {}
+
+inline void EmbeddingsServiceState::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, is_ready_),
+           0,
+           offsetof(Impl_, error_code_) -
+               offsetof(Impl_, is_ready_) +
+               sizeof(Impl_::error_code_));
+}
+EmbeddingsServiceState::~EmbeddingsServiceState() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.EmbeddingsServiceState)
+  SharedDtor(*this);
+}
+inline void EmbeddingsServiceState::SharedDtor(MessageLite& self) {
+  EmbeddingsServiceState& this_ = static_cast<EmbeddingsServiceState&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.current_model_.Destroy();
+  this_._impl_.error_message_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL EmbeddingsServiceState::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) EmbeddingsServiceState(arena);
+}
+constexpr auto EmbeddingsServiceState::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(EmbeddingsServiceState),
+                                            alignof(EmbeddingsServiceState));
+}
+constexpr auto EmbeddingsServiceState::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_EmbeddingsServiceState_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &EmbeddingsServiceState::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<EmbeddingsServiceState>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &EmbeddingsServiceState::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<EmbeddingsServiceState>(), &EmbeddingsServiceState::ByteSizeLong,
+              &EmbeddingsServiceState::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_._cached_size_),
+          false,
+      },
+      &EmbeddingsServiceState::kDescriptorMethods,
+      &descriptor_table_embeddings_5foptions_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull EmbeddingsServiceState_class_data_ =
+        EmbeddingsServiceState::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+EmbeddingsServiceState::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&EmbeddingsServiceState_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(EmbeddingsServiceState_class_data_.tc_table);
+  return EmbeddingsServiceState_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<3, 6, 0, 72, 2>
+EmbeddingsServiceState::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_._has_bits_),
+    0, // no _extensions_
+    6, 56,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967232,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    6,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    EmbeddingsServiceState_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::EmbeddingsServiceState>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    {::_pbi::TcParser::MiniParse, {}},
+    // bool is_ready = 1;
+    {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(EmbeddingsServiceState, _impl_.is_ready_), 2>(),
+     {8, 2, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_.is_ready_)}},
+    // optional string current_model = 2;
+    {::_pbi::TcParser::FastUS1,
+     {18, 0, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_.current_model_)}},
+    // int32 dimension = 3;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsServiceState, _impl_.dimension_), 3>(),
+     {24, 3, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_.dimension_)}},
+    // int32 max_tokens = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsServiceState, _impl_.max_tokens_), 4>(),
+     {32, 4, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_.max_tokens_)}},
+    // optional string error_message = 5;
+    {::_pbi::TcParser::FastUS1,
+     {42, 1, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_.error_message_)}},
+    // int32 error_code = 6;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(EmbeddingsServiceState, _impl_.error_code_), 5>(),
+     {48, 5, 0,
+      PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_.error_code_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // bool is_ready = 1;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_.is_ready_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
+    // optional string current_model = 2;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_.current_model_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // int32 dimension = 3;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_.dimension_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    // int32 max_tokens = 4;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_.max_tokens_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+    // optional string error_message = 5;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_.error_message_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // int32 error_code = 6;
+    {PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_.error_code_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
+  }},
+  // no aux_entries
+  {{
+    "\45\0\15\0\0\15\0\0"
+    "runanywhere.v1.EmbeddingsServiceState"
+    "current_model"
+    "error_message"
+  }},
+};
+PROTOBUF_NOINLINE void EmbeddingsServiceState::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.EmbeddingsServiceState)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.current_model_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.error_message_.ClearNonDefaultToEmpty();
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003cU)) {
+    ::memset(&_impl_.is_ready_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.error_code_) -
+        reinterpret_cast<char*>(&_impl_.is_ready_)) + sizeof(_impl_.error_code_));
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL EmbeddingsServiceState::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const EmbeddingsServiceState& this_ = static_cast<const EmbeddingsServiceState&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL EmbeddingsServiceState::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const EmbeddingsServiceState& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.EmbeddingsServiceState)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // bool is_ready = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    if (this_._internal_is_ready() != 0) {
+      target = stream->EnsureSpace(target);
+      target = ::_pbi::WireFormatLite::WriteBoolToArray(
+          1, this_._internal_is_ready(), target);
+    }
+  }
+
+  // optional string current_model = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    const ::std::string& _s = this_._internal_current_model();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.EmbeddingsServiceState.current_model");
+    target = stream->WriteStringMaybeAliased(2, _s, target);
+  }
+
+  // int32 dimension = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    if (this_._internal_dimension() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<3>(
+              stream, this_._internal_dimension(), target);
+    }
+  }
+
+  // int32 max_tokens = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    if (this_._internal_max_tokens() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<4>(
+              stream, this_._internal_max_tokens(), target);
+    }
+  }
+
+  // optional string error_message = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    const ::std::string& _s = this_._internal_error_message();
+    ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+        _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.EmbeddingsServiceState.error_message");
+    target = stream->WriteStringMaybeAliased(5, _s, target);
+  }
+
+  // int32 error_code = 6;
+  if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+    if (this_._internal_error_code() != 0) {
+      target =
+          ::google::protobuf::internal::WireFormatLite::WriteInt32ToArrayWithField<6>(
+              stream, this_._internal_error_code(), target);
+    }
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.EmbeddingsServiceState)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t EmbeddingsServiceState::ByteSizeLong(const MessageLite& base) {
+  const EmbeddingsServiceState& this_ = static_cast<const EmbeddingsServiceState&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t EmbeddingsServiceState::ByteSizeLong() const {
+  const EmbeddingsServiceState& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.EmbeddingsServiceState)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+    // optional string current_model = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_current_model());
+    }
+    // optional string error_message = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                      this_._internal_error_message());
+    }
+    // bool is_ready = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (this_._internal_is_ready() != 0) {
+        total_size += 2;
+      }
+    }
+    // int32 dimension = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (this_._internal_dimension() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_dimension());
+      }
+    }
+    // int32 max_tokens = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (this_._internal_max_tokens() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_max_tokens());
+      }
+    }
+    // int32 error_code = 6;
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (this_._internal_error_code() != 0) {
+        total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
+            this_._internal_error_code());
+      }
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void EmbeddingsServiceState::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<EmbeddingsServiceState*>(&to_msg);
+  auto& from = static_cast<const EmbeddingsServiceState&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.EmbeddingsServiceState)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000003fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _this->_internal_set_current_model(from._internal_current_model());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _this->_internal_set_error_message(from._internal_error_message());
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      if (from._internal_is_ready() != 0) {
+        _this->_impl_.is_ready_ = from._impl_.is_ready_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      if (from._internal_dimension() != 0) {
+        _this->_impl_.dimension_ = from._impl_.dimension_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      if (from._internal_max_tokens() != 0) {
+        _this->_impl_.max_tokens_ = from._impl_.max_tokens_;
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000020U)) {
+      if (from._internal_error_code() != 0) {
+        _this->_impl_.error_code_ = from._impl_.error_code_;
+      }
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void EmbeddingsServiceState::CopyFrom(const EmbeddingsServiceState& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.EmbeddingsServiceState)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void EmbeddingsServiceState::InternalSwap(EmbeddingsServiceState* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.current_model_, &other->_impl_.current_model_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.error_message_, &other->_impl_.error_message_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_.error_code_)
+      + sizeof(EmbeddingsServiceState::_impl_.error_code_)
+      - PROTOBUF_FIELD_OFFSET(EmbeddingsServiceState, _impl_.is_ready_)>(
+          reinterpret_cast<char*>(&_impl_.is_ready_),
+          reinterpret_cast<char*>(&other->_impl_.is_ready_));
+}
+
+::google::protobuf::Metadata EmbeddingsServiceState::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // @@protoc_insertion_point(namespace_scope)

@@ -60,6 +60,22 @@ public class StorageAvailabilityRequest(
     schemaIndex = 3,
   )
   public val include_existing_model_bytes: Boolean = false,
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "includeDeletePlan",
+    schemaIndex = 4,
+  )
+  public val include_delete_plan: Boolean = false,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "allowCacheReclamation",
+    schemaIndex = 5,
+  )
+  public val allow_cache_reclamation: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StorageAvailabilityRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -77,6 +93,8 @@ public class StorageAvailabilityRequest(
     if (required_bytes != other.required_bytes) return false
     if (safety_margin != other.safety_margin) return false
     if (include_existing_model_bytes != other.include_existing_model_bytes) return false
+    if (include_delete_plan != other.include_delete_plan) return false
+    if (allow_cache_reclamation != other.allow_cache_reclamation) return false
     return true
   }
 
@@ -88,6 +106,8 @@ public class StorageAvailabilityRequest(
       result = result * 37 + required_bytes.hashCode()
       result = result * 37 + safety_margin.hashCode()
       result = result * 37 + include_existing_model_bytes.hashCode()
+      result = result * 37 + include_delete_plan.hashCode()
+      result = result * 37 + allow_cache_reclamation.hashCode()
       super.hashCode = result
     }
     return result
@@ -99,6 +119,8 @@ public class StorageAvailabilityRequest(
     result += """required_bytes=$required_bytes"""
     result += """safety_margin=$safety_margin"""
     result += """include_existing_model_bytes=$include_existing_model_bytes"""
+    result += """include_delete_plan=$include_delete_plan"""
+    result += """allow_cache_reclamation=$allow_cache_reclamation"""
     return result.joinToString(prefix = "StorageAvailabilityRequest{", separator = ", ", postfix =
         "}")
   }
@@ -108,9 +130,12 @@ public class StorageAvailabilityRequest(
     required_bytes: Long = this.required_bytes,
     safety_margin: Double = this.safety_margin,
     include_existing_model_bytes: Boolean = this.include_existing_model_bytes,
+    include_delete_plan: Boolean = this.include_delete_plan,
+    allow_cache_reclamation: Boolean = this.allow_cache_reclamation,
     unknownFields: ByteString = this.unknownFields,
   ): StorageAvailabilityRequest = StorageAvailabilityRequest(model_id, required_bytes,
-      safety_margin, include_existing_model_bytes, unknownFields)
+      safety_margin, include_existing_model_bytes, include_delete_plan, allow_cache_reclamation,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -132,6 +157,10 @@ public class StorageAvailabilityRequest(
             value.safety_margin)
         if (value.include_existing_model_bytes != false) size +=
             ProtoAdapter.BOOL.encodedSizeWithTag(4, value.include_existing_model_bytes)
+        if (value.include_delete_plan != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5,
+            value.include_delete_plan)
+        if (value.allow_cache_reclamation != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(6,
+            value.allow_cache_reclamation)
         return size
       }
 
@@ -143,11 +172,19 @@ public class StorageAvailabilityRequest(
             value.safety_margin)
         if (value.include_existing_model_bytes != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
             value.include_existing_model_bytes)
+        if (value.include_delete_plan != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
+            value.include_delete_plan)
+        if (value.allow_cache_reclamation != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.allow_cache_reclamation)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StorageAvailabilityRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.allow_cache_reclamation != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.allow_cache_reclamation)
+        if (value.include_delete_plan != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
+            value.include_delete_plan)
         if (value.include_existing_model_bytes != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
             value.include_existing_model_bytes)
         if (!value.safety_margin.equals(0.0)) ProtoAdapter.DOUBLE.encodeWithTag(writer, 3,
@@ -162,12 +199,16 @@ public class StorageAvailabilityRequest(
         var required_bytes: Long = 0L
         var safety_margin: Double = 0.0
         var include_existing_model_bytes: Boolean = false
+        var include_delete_plan: Boolean = false
+        var allow_cache_reclamation: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
             2 -> required_bytes = ProtoAdapter.INT64.decode(reader)
             3 -> safety_margin = ProtoAdapter.DOUBLE.decode(reader)
             4 -> include_existing_model_bytes = ProtoAdapter.BOOL.decode(reader)
+            5 -> include_delete_plan = ProtoAdapter.BOOL.decode(reader)
+            6 -> allow_cache_reclamation = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -176,6 +217,8 @@ public class StorageAvailabilityRequest(
           required_bytes = required_bytes,
           safety_margin = safety_margin,
           include_existing_model_bytes = include_existing_model_bytes,
+          include_delete_plan = include_delete_plan,
+          allow_cache_reclamation = allow_cache_reclamation,
           unknownFields = unknownFields
         )
       }

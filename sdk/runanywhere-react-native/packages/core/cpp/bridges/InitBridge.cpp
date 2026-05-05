@@ -437,8 +437,8 @@ extern "C" {
     bool PlatformAdapter_getArchitecture(char** outValue);
     bool PlatformAdapter_getGPUFamily(char** outValue);
     
-    // Platform HTTP download fallback used only by the RACommons platform adapter.
-    // Public RN downloads use HybridRunAnywhereCore::downloadModel -> rac_http_download_execute.
+    // Platform HTTP download fallback used by the RACommons platform adapter.
+    // Public RN downloads enter commons through the rac_download_*_proto ABI.
     int PlatformAdapter_httpDownload(
         const char* url,
         const char* destinationPath,
@@ -966,9 +966,8 @@ void InitBridge::registerPlatformAdapter() {
     // Error tracking
     adapter_.track_error = platformTrackErrorCallback;
 
-    // HTTP download fallback for RACommons platform-adapter-only callers.
-    // Public RN model downloads use HybridRunAnywhereCore::downloadModel,
-    // which calls rac_http_download_execute directly.
+    // HTTP download fallback for RACommons platform-adapter callers.
+    // Public RN model downloads use the rac_download_*_proto ABI.
     adapter_.http_download = platformHttpDownloadCallback;
     adapter_.http_download_cancel = platformHttpDownloadCancelCallback;
 
@@ -1473,6 +1472,5 @@ extern "C" int RunAnywhereHttpDownloadReportComplete(const char* task_id,
 
 // M5: The `SyncHttpDownload` helper that used to live here — the B-RN-3-001 /
 // G-A6 platform-adapter workaround around libcurl HTTPS on Android — has been
-// deleted. `HybridRunAnywhereCore::downloadModel` now goes straight through
-// `rac_http_download_execute` (commons), which routes via the registered
-// platform HTTP transport (OkHttp / URLSession) wired by Task M1.2.
+// deleted. RN downloads now enter commons through the rac_download_*_proto ABI,
+// which routes via the registered platform HTTP transport (OkHttp / URLSession).

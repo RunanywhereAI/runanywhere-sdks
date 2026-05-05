@@ -9,6 +9,26 @@
  * Do NOT add features not present in the Swift code.
  *
  * Composes STT, LLM, TTS, and VAD capabilities for end-to-end voice processing.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Proto-byte APIs at the bottom of this header
+ *     (rac_voice_agent_initialize_proto,
+ *     rac_voice_agent_component_states_proto,
+ *     rac_voice_agent_process_voice_turn_proto) and
+ *     rac_voice_agent_set_proto_callback in rac_voice_event_abi.h are
+ *     the `SDK-facing default`. They emit/consume serialized
+ *     runanywhere.v1.VoiceAgentComposeConfig / VoiceAgentComponentStates /
+ *     VoiceAgentResult / VoiceEvent bytes.
+ *   - Struct-based event/result/config APIs (rac_voice_agent_event_t,
+ *     rac_voice_agent_event_callback_fn, rac_voice_agent_result_t, the
+ *     per-component rac_voice_agent_*_config_t structs, the legacy
+ *     rac_voice_agent_create_, process_voice_turn, transcribe,
+ *     generate_response, synthesize_speech, detect_speech APIs):
+ *     `delete after SDK migration`.
+ *   - Audio pipeline state-manager helpers
+ *     (rac_audio_pipeline_state_t, rac_audio_pipeline_config_t,
+ *     rac_audio_pipeline_*) are `internal` voice-agent feedback
+ *     prevention plumbing.
  */
 
 #ifndef RAC_VOICE_AGENT_H

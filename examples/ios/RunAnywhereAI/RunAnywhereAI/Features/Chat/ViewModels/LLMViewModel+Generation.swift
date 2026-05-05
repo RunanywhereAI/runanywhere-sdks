@@ -13,7 +13,7 @@ extension LLMViewModel {
 
     func generateStreamingResponse(
         prompt: String,
-        options: LLMGenerationOptions,
+        options: RALLMGenerationOptions,
         messageIndex: Int
     ) async throws {
         // v2 close-out Phase G-2: generateStream now returns
@@ -58,19 +58,18 @@ extension LLMViewModel {
         let ttft = firstTokenTime.map { $0.timeIntervalSince(startTime) * 1000 }
 
         let modelId = ModelListViewModel.shared.currentModel?.id ?? "unknown"
-        let result = LLMGenerationResult(
-            text: Self.stripThinkTags(from: fullResponse),
-            thinkingContent: nil,
-            inputTokens: max(1, prompt.count / 4),
-            tokensUsed: tokenCount,
-            modelUsed: modelId,
-            latencyMs: totalLatency,
-            framework: "llamacpp",
-            tokensPerSecond: totalLatency > 0 ? Double(tokenCount) / (totalLatency / 1000) : 0,
-            timeToFirstTokenMs: ttft,
-            thinkingTokens: nil,
-            responseTokens: tokenCount
-        )
+        var result = RALLMGenerationResult()
+        result.text = Self.stripThinkTags(from: fullResponse)
+        result.inputTokens = Int32(max(1, prompt.count / 4))
+        result.tokensGenerated = Int32(tokenCount)
+        result.modelUsed = modelId
+        result.generationTimeMs = totalLatency
+        result.framework = "llamacpp"
+        result.tokensPerSecond = totalLatency > 0 ? Double(tokenCount) / (totalLatency / 1000) : 0
+        if let ttft {
+            result.ttftMs = ttft
+        }
+        result.responseTokens = Int32(tokenCount)
 
         await updateMessageWithResult(
             at: messageIndex,
@@ -85,7 +84,7 @@ extension LLMViewModel {
 
     func generateNonStreamingResponse(
         prompt: String,
-        options: LLMGenerationOptions,
+        options: RALLMGenerationOptions,
         messageIndex: Int
     ) async throws {
         let result = try await RunAnywhere.generate(prompt, options: options)
@@ -115,9 +114,9 @@ extension LLMViewModel {
 
     func updateMessageWithResult(
         at index: Int,
-        result: LLMGenerationResult,
+        result: RALLMGenerationResult,
         prompt: String,
-        options: LLMGenerationOptions,
+        options: RALLMGenerationOptions,
         wasInterrupted: Bool
     ) async {
         // LLMViewModel is @MainActor (class-level); this extension inherits that
@@ -146,7 +145,7 @@ extension LLMViewModel {
             id: currentMessage.id,
             role: currentMessage.role,
             content: result.text,
-            thinkingContent: result.thinkingContent,
+            thinkingContent: result.hasThinkingContent ? result.thinkingContent : nil,
             timestamp: currentMessage.timestamp,
             analytics: analytics,
             modelInfo: modelInfo

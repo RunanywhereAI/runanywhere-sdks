@@ -5,13 +5,13 @@
  *
  * Provides convenience overloads for loading a VLM model from a
  * `ModelInfo` object (vs the lower-level `loadVLMModelById(string)`).
- * File resolution (main model + mmproj) is handled in C++ commons.
+ * File resolution is handled by commons lifecycle resolved artifacts.
  */
 
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
-import type { ModelInfo } from '../../types';
-import { ModelCategory } from '../../types';
+import { ModelCategory } from '@runanywhere/proto-ts/model_types';
+import type { ModelInfo } from '@runanywhere/proto-ts/model_types';
 import {
   loadVLMModelById,
   isVLMModelLoaded,
@@ -31,7 +31,10 @@ export async function loadVLMModel(model: ModelInfo): Promise<void> {
     );
   }
   logger.info(`Loading VLM model by ID: ${model.id}`);
-  await loadVLMModelById(model.id);
+  const loaded = await loadVLMModelById(model.id);
+  if (!loaded) {
+    throw SDKException.modelLoadFailed(model.id);
+  }
   logger.info(`VLM model loaded successfully: ${model.id}`);
 }
 

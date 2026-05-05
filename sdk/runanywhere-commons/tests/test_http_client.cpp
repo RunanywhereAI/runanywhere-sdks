@@ -57,9 +57,8 @@ std::vector<uint8_t> make_payload(size_t n) {
     return p;
 }
 
-// 512 KiB ensures libcurl splits the response across many chunk
-// callbacks (default write buffer is 16 KiB), so cancellation /
-// resume tests can reliably observe mid-stream state.
+// 512 KiB gives transport adapters enough chunks for cancellation /
+// resume tests to reliably observe mid-stream state.
 std::vector<uint8_t> g_payload = make_payload(512 * 1024);
 
 void write_all(int fd, const void* buf, size_t n) {

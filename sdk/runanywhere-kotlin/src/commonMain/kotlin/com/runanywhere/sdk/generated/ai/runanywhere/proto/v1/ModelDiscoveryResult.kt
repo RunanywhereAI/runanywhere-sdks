@@ -63,6 +63,22 @@ public class ModelDiscoveryResult(
     schemaIndex = 5,
   )
   public val error_message: String = "",
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "scannedCount",
+    schemaIndex = 6,
+  )
+  public val scanned_count: Int = 0,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "importedCount",
+    schemaIndex = 7,
+  )
+  public val imported_count: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelDiscoveryResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -100,6 +116,8 @@ public class ModelDiscoveryResult(
     if (purged_count != other.purged_count) return false
     if (warnings != other.warnings) return false
     if (error_message != other.error_message) return false
+    if (scanned_count != other.scanned_count) return false
+    if (imported_count != other.imported_count) return false
     return true
   }
 
@@ -113,6 +131,8 @@ public class ModelDiscoveryResult(
       result = result * 37 + purged_count.hashCode()
       result = result * 37 + warnings.hashCode()
       result = result * 37 + error_message.hashCode()
+      result = result * 37 + scanned_count.hashCode()
+      result = result * 37 + imported_count.hashCode()
       super.hashCode = result
     }
     return result
@@ -126,6 +146,8 @@ public class ModelDiscoveryResult(
     result += """purged_count=$purged_count"""
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
     result += """error_message=${sanitize(error_message)}"""
+    result += """scanned_count=$scanned_count"""
+    result += """imported_count=$imported_count"""
     return result.joinToString(prefix = "ModelDiscoveryResult{", separator = ", ", postfix = "}")
   }
 
@@ -136,9 +158,11 @@ public class ModelDiscoveryResult(
     purged_count: Int = this.purged_count,
     warnings: List<String> = this.warnings,
     error_message: String = this.error_message,
+    scanned_count: Int = this.scanned_count,
+    imported_count: Int = this.imported_count,
     unknownFields: ByteString = this.unknownFields,
   ): ModelDiscoveryResult = ModelDiscoveryResult(success, discovered_models, linked_count,
-      purged_count, warnings, error_message, unknownFields)
+      purged_count, warnings, error_message, scanned_count, imported_count, unknownFields)
 
   public companion object {
     @JvmField
@@ -162,6 +186,10 @@ public class ModelDiscoveryResult(
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(5, value.warnings)
         if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(6,
             value.error_message)
+        if (value.scanned_count != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(7,
+            value.scanned_count)
+        if (value.imported_count != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(8,
+            value.imported_count)
         return size
       }
 
@@ -173,11 +201,19 @@ public class ModelDiscoveryResult(
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.warnings)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
             value.error_message)
+        if (value.scanned_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
+            value.scanned_count)
+        if (value.imported_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8,
+            value.imported_count)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelDiscoveryResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.imported_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8,
+            value.imported_count)
+        if (value.scanned_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 7,
+            value.scanned_count)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
             value.error_message)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.warnings)
@@ -194,6 +230,8 @@ public class ModelDiscoveryResult(
         var purged_count: Int = 0
         val warnings = mutableListOf<String>()
         var error_message: String = ""
+        var scanned_count: Int = 0
+        var imported_count: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> success = ProtoAdapter.BOOL.decode(reader)
@@ -202,6 +240,8 @@ public class ModelDiscoveryResult(
             4 -> purged_count = ProtoAdapter.INT32.decode(reader)
             5 -> warnings.add(ProtoAdapter.STRING.decode(reader))
             6 -> error_message = ProtoAdapter.STRING.decode(reader)
+            7 -> scanned_count = ProtoAdapter.INT32.decode(reader)
+            8 -> imported_count = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -212,6 +252,8 @@ public class ModelDiscoveryResult(
           purged_count = purged_count,
           warnings = warnings,
           error_message = error_message,
+          scanned_count = scanned_count,
+          imported_count = imported_count,
           unknownFields = unknownFields
         )
       }

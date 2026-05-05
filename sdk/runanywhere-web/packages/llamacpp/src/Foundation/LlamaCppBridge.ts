@@ -1,207 +1,117 @@
 /**
- * LlamaCppBridge - Independent WASM module bridge for the llama.cpp backend
+ * LlamaCppBridge — V2 canonical proto-byte WASM bridge for `@runanywhere/web-llamacpp`.
  *
- * Loads racommons-llamacpp.wasm (which contains rac_commons + llama.cpp)
- * as a fully independent WASM module with its own Emscripten runtime,
- * linear memory, and virtual filesystem.
+ * Loads `racommons-llamacpp.wasm` (CPU) or `racommons-llamacpp-webgpu.wasm` (WebGPU)
+ * as a fully independent Emscripten module, registers the platform adapter,
+ * runs `rac_init`, registers the llama.cpp + llama.cpp-VLM backends, then
+ * installs the loaded module on every core proto-byte adapter through
+ * `setRunanywhereModule(...)`.
  *
- * Follows the same pattern as SherpaONNXBridge in @runanywhere/web-onnx:
- *   - Singleton with lazy loading
- *   - Dynamic import of glue JS + fetch of .wasm binary
- *   - Async WebAssembly.instantiate
- *   - Own MEMFS for model files
- *   - Platform adapter registration
- *   - rac_init() + backend registration
- *
- * This module is completely independent from any core WASM — the core
- * package (@runanywhere/web) is pure TypeScript.
+ * This is intentionally MINIMAL — the heavy lifting (LLM/VLM/structured/tool
+ * calling/embeddings/diffusion) flows through `@runanywhere/web` core's
+ * proto-byte adapters (`LLMProtoAdapter`, `VLMProtoAdapter`, etc.) once the
+ * module is installed on the singleton.
  */
 
 import {
+  HTTPAdapter,
+  ModelRegistryAdapter,
   SDKException,
   SDKErrorCode,
   SDKLogger,
-  EventBus,
-  SDKEventType,
-  SDKEnvironment,
-  RunAnywhere,
-  HTTPAdapter,
-  ModelRegistryAdapter,
   clearRunanywhereModule,
   setRunanywhereModule,
+  type AccelerationMode,
+  type EmscriptenRunanywhereModule,
 } from '@runanywhere/web';
-import type { AccelerationMode, EmscriptenRunanywhereModule } from '@runanywhere/web';
-import { getDeviceInfo } from '@runanywhere/web';
+
 import { PlatformAdapter } from './PlatformAdapter';
-import { AnalyticsEventsBridge } from './AnalyticsEventsBridge';
-import { TelemetryService } from './TelemetryService';
 
 const logger = new SDKLogger('LlamaCppBridge');
 
 // ---------------------------------------------------------------------------
-// Module Type
+// LlamaCppModule — extends the typed core module surface with the few
+// LLAMACPP-specific exports the bridge needs (rac_init, ping, sizeof helpers,
+// platform adapter setter, backend register entry points).
 // ---------------------------------------------------------------------------
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+export interface LlamaCppModule extends EmscriptenRunanywhereModule {
+  // Core init / shutdown
+  _rac_init?(configPtr: number): number;
+  _rac_shutdown?(): void;
+  _rac_set_platform_adapter?(adapterPtr: number): number;
+  _rac_error_message?(code: number): number;
 
-/**
- * Emscripten module interface for the racommons-llamacpp WASM.
- * Contains both core RACommons functions and llama.cpp backend functions.
- */
-export interface LlamaCppModule {
-  // Emscripten runtime
-  ccall: (ident: string, returnType: string | null, argTypes: string[], args: unknown[], opts?: object) => unknown;
-  cwrap: (ident: string, returnType: string | null, argTypes: string[]) => (...args: unknown[]) => unknown;
-  addFunction: (func: (...args: number[]) => number | void, signature: string) => number;
-  removeFunction: (ptr: number) => void;
-  _malloc: (size: number) => number;
-  _free: (ptr: number) => void;
-  setValue: (ptr: number, value: number, type: string) => void;
-  getValue: (ptr: number, type: string) => number;
-  UTF8ToString: (ptr: number, maxBytesToRead?: number) => string;
-  stringToUTF8: (str: string, outPtr: number, maxBytesToWrite: number) => void;
-  lengthBytesUTF8: (str: string) => number;
-  HEAPU8?: Uint8Array;
-  HEAP32?: Int32Array;
-  HEAPU32?: Uint32Array;
-  HEAPF32?: Float32Array;
+  // Smoke check
+  _rac_wasm_ping?(): number;
 
-  // Core
-  _rac_init: (configPtr: number) => number;
-  _rac_shutdown: () => void;
-  _rac_wasm_ping: () => number;
-  _rac_wasm_sizeof_platform_adapter: () => number;
-  _rac_wasm_sizeof_config: () => number;
-  _rac_set_platform_adapter: (adapterPtr: number) => number;
-  _rac_error_message: (code: number) => number;
+  // Struct size/offset helpers used during init
+  _rac_wasm_sizeof_platform_adapter?(): number;
+  _rac_wasm_sizeof_config?(): number;
+  _rac_wasm_offsetof_config_platform_adapter?(): number;
+  _rac_wasm_offsetof_config_log_level?(): number;
 
-  // Backend registration
-  _rac_backend_llamacpp_register?: () => number;
-  _rac_backend_llamacpp_vlm_register?: () => number;
+  // Backend registration entry points
+  _rac_backend_llamacpp_register?(): number;
+  _rac_backend_llamacpp_vlm_register?(): number;
 
-  // LLM Component
-  _rac_llm_component_create: (outHandlePtr: number) => number;
-  _rac_llm_component_load_model: (handle: number, pathPtr: number, idPtr: number, namePtr: number) => number;
-  _rac_llm_component_unload: (handle: number) => number;
-  _rac_llm_component_generate: (handle: number, promptPtr: number, optionsPtr: number, outResultPtr: number) => number;
-  _rac_llm_component_generate_stream: (
-    handle: number, promptPtr: number, optionsPtr: number,
-    tokenCb: number, completeCb: number, errorCb: number, userData: number,
-  ) => number;
-  _rac_llm_component_cancel: (handle: number) => number;
-  _rac_llm_component_destroy: (handle: number) => void;
-  _rac_llm_component_is_loaded: (handle: number) => number;
-  _rac_llm_component_get_model_id: (handle: number) => number;
-  _rac_llm_result_free: (resultPtr: number) => void;
+  // Emscripten runtime helpers (loose-typed; not on the core proto module surface)
+  setValue(ptr: number, value: number, type: string): void;
+  getValue(ptr: number, type: string): number;
+  ccall(
+    ident: string,
+    returnType: string | null,
+    argTypes: string[],
+    args: unknown[],
+    opts?: { async?: boolean },
+  ): unknown;
 
-  // VLM Component
-  _rac_vlm_component_create?: (outHandlePtr: number) => number;
-  _rac_vlm_component_load_model?: (handle: number, modelPath: number, mmprojPath: number, modelId: number, modelName: number) => number;
-  _rac_vlm_component_process?: (handle: number, imagePtr: number, promptPtr: number, optionsPtr: number, resultPtr: number) => number;
-  _rac_vlm_component_destroy?: (handle: number) => void;
-  _rac_vlm_component_cancel?: (handle: number) => void;
-  _rac_vlm_result_free?: (resultPtr: number) => void;
+  // HEAPU8 / HEAP32 / HEAPU32 are inherited (required, readonly) from
+  // EmscriptenRunanywhereModule. The Emscripten runtime always exposes them
+  // after the module factory resolves.
 
-  // Sizeof / offset helpers
-  _rac_wasm_sizeof_llm_options: () => number;
-  _rac_wasm_sizeof_llm_result: () => number;
-  _rac_wasm_sizeof_vlm_image: () => number;
-  _rac_wasm_sizeof_vlm_options: () => number;
-  _rac_wasm_sizeof_vlm_result: () => number;
-  _rac_wasm_sizeof_structured_output_config: () => number;
-  _rac_wasm_sizeof_embeddings_options: () => number;
-  _rac_wasm_sizeof_embeddings_result: () => number;
-  _rac_wasm_sizeof_diffusion_options: () => number;
-  _rac_wasm_sizeof_diffusion_result: () => number;
-  _rac_wasm_create_llm_options_default: () => number;
+  // Optional Emscripten FS pieces used by the platform adapter file callbacks.
+  FS?: {
+    analyzePath(path: string): { exists: boolean };
+    readFile(path: string): Uint8Array;
+    writeFile(path: string, data: Uint8Array): void;
+    unlink(path: string): void;
+    mkdir?(path: string): void;
+  };
+  FS_createPath?(parent: string, path: string, canRead: boolean, canWrite: boolean): void;
 
-  // Structured Output
-  _rac_structured_output_prepare_prompt?: (promptPtr: number, schemaPtr: number) => number;
-  _rac_structured_output_validate?: (textPtr: number, schemaPtr: number) => number;
-
-  // Embeddings
-  _rac_embeddings_component_create?: (outHandlePtr: number) => number;
-
-  // Diffusion
-  _rac_diffusion_component_create?: (outHandlePtr: number) => number;
-
-  // Tool Calling
-  _rac_tool_call_parse?: (textPtr: number, outResultPtr: number) => number;
-
-  // Telemetry Manager
-  _rac_telemetry_manager_create?: (env: number, deviceIdPtr: number, platformPtr: number, sdkVersionPtr: number) => number;
-  _rac_telemetry_manager_destroy?: (handle: number) => void;
-  _rac_telemetry_manager_set_device_info?: (handle: number, modelPtr: number, osVersionPtr: number) => void;
-  _rac_telemetry_manager_set_http_callback?: (handle: number, callbackPtr: number, userData: number) => void;
-  _rac_telemetry_manager_track_analytics?: (handle: number, eventType: number, dataPtr: number) => number;
-  _rac_telemetry_manager_flush?: (handle: number) => number;
-  _rac_telemetry_manager_http_complete?: (handle: number, success: number, responsePtr: number, errorPtr: number) => void;
-
-  // Analytics Events
-  _rac_analytics_events_set_callback?: (callbackPtr: number, userData: number) => number;
-  _rac_analytics_events_has_callback?: () => number;
-
-  // Platform Emit Helpers (STT/TTS/VAD/Download — called from TypeScript via ccall)
-  _rac_analytics_emit_stt_model_load_completed?: (modelIdPtr: number, modelNamePtr: number, durationMs: number, framework: number) => void;
-  _rac_analytics_emit_stt_model_load_failed?: (modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
-  _rac_analytics_emit_stt_transcription_completed?: (
-    transcriptionIdPtr: number, modelIdPtr: number, textPtr: number, confidence: number,
-    durationMs: number, audioLengthMs: number, audioSizeBytes: number, wordCount: number,
-    realTimeFactor: number, languagePtr: number, sampleRate: number, framework: number,
-  ) => void;
-  _rac_analytics_emit_stt_transcription_failed?: (transcriptionIdPtr: number, modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
-  _rac_analytics_emit_tts_voice_load_completed?: (modelIdPtr: number, modelNamePtr: number, durationMs: number, framework: number) => void;
-  _rac_analytics_emit_tts_voice_load_failed?: (modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
-  _rac_analytics_emit_tts_synthesis_completed?: (
-    synthesisIdPtr: number, modelIdPtr: number, characterCount: number,
-    audioDurationMs: number, audioSizeBytes: number, processingDurationMs: number,
-    charactersPerSecond: number, sampleRate: number, framework: number,
-  ) => void;
-  _rac_analytics_emit_tts_synthesis_failed?: (synthesisIdPtr: number, modelIdPtr: number, errorCode: number, errorMsgPtr: number) => void;
-  _rac_analytics_emit_vad_speech_started?: () => void;
-  _rac_analytics_emit_vad_speech_ended?: (speechDurationMs: number, energyLevel: number) => void;
-  _rac_analytics_emit_model_download_started?: (modelIdPtr: number) => void;
-  _rac_analytics_emit_model_download_completed?: (modelIdPtr: number, fileSizeBytes: number, durationMs: number) => void;
-  _rac_analytics_emit_model_download_failed?: (modelIdPtr: number, errorMsgPtr: number) => void;
-
-  // Dev Config (WASM wrappers)
-  _rac_wasm_dev_config_is_available?: () => number;
-  _rac_wasm_dev_config_get_supabase_url?: () => number;
-  _rac_wasm_dev_config_get_supabase_key?: () => number;
-  _rac_wasm_dev_config_get_build_token?: () => number;
-
-  // Emscripten FS helpers
-  FS_createPath?: (parent: string, path: string, canRead: boolean, canWrite: boolean) => void;
-  FS_createDataFile?: (parent: string, name: string, data: Uint8Array, canRead: boolean, canWrite: boolean, canOwn: boolean) => void;
-  FS_unlink?: (path: string) => void;
-  FS_mkdir?: (path: string) => void;
-  FS_rmdir?: (path: string) => void;
-  FS_mount?: (type: any, opts: any, mountpoint: string) => void;
-  FS_unmount?: (mountpoint: string) => void;
-  WORKERFS?: any;
-
-  // Generic index access for dynamic function lookups
+  // Generic key index for any other rac_* exports the proto-byte adapters consume.
   [key: string]: unknown;
 }
 
 // ---------------------------------------------------------------------------
-// LlamaCppBridge
+// Glue-loader factory shape — Emscripten's `MODULARIZE=1`/`EXPORT_ES6=1`
+// outputs a `default` async factory that resolves to a typed module.
+// ---------------------------------------------------------------------------
+
+interface CreateModuleOptions {
+  print?: (text: string) => void;
+  printErr?: (text: string) => void;
+  locateFile?: (path: string) => string;
+}
+type CreateModuleFn = (options?: CreateModuleOptions) => Promise<LlamaCppModule>;
+
+// ---------------------------------------------------------------------------
+// LlamaCppBridge — singleton WASM loader
 // ---------------------------------------------------------------------------
 
 export class LlamaCppBridge {
   private static _instance: LlamaCppBridge | null = null;
-  private static _nextMountId = 0;
+
   private _module: LlamaCppModule | null = null;
   private _loaded = false;
   private _loading: Promise<void> | null = null;
   private _accelerationMode: AccelerationMode = 'cpu';
   private _platformAdapter: PlatformAdapter | null = null;
-  private _analyticsEventsBridge: AnalyticsEventsBridge | null = null;
-  private _telemetryService: TelemetryService | null = null;
 
-  /** Override the default URL to the racommons-llamacpp.js glue file. */
+  /** Override the default URL to the racommons-llamacpp.js glue file (CPU). */
   wasmUrl: string | null = null;
-  /** Override the URL for the WebGPU variant. */
+  /** Override the URL for the WebGPU variant glue file. */
   webgpuWasmUrl: string | null = null;
 
   static get shared(): LlamaCppBridge {
@@ -249,54 +159,18 @@ export class LlamaCppBridge {
 
   /**
    * Switch the acceleration mode by tearing down the current WASM module and
-   * re-loading the variant for the requested mode. Keeps the singleton
-   * instance so that callers holding a reference to `LlamaCppBridge.shared`
-   * (e.g. ExtensionPoint, telemetry) keep working — only the underlying
-   * Emscripten module is replaced.
-   *
-   * Used by Qwen models that crash on WebGPU due to a llama.cpp Flash
-   * Attention cross-backend issue (see B-WEB-4-001). The CPU build does
-   * not auto-disable FA at load time and runs Qwen correctly.
-   *
-   * No-op if the bridge is already in the requested mode.
+   * re-loading the variant for the requested mode.
    */
   async switchToAcceleration(mode: 'webgpu' | 'cpu'): Promise<void> {
     if (this._accelerationMode === mode && this._loaded) return;
-
     if (this._loading) {
       await this._loading;
       if (this._accelerationMode === mode) return;
     }
 
     logger.info(`Switching LlamaCpp acceleration mode: ${this._accelerationMode} → ${mode}`);
+    this._teardown();
 
-    // Tear down the current WASM module while keeping the singleton wrapper.
-    if (this._analyticsEventsBridge) {
-      try { this._analyticsEventsBridge.cleanup(); } catch { /* ignore */ }
-      this._analyticsEventsBridge = null;
-    }
-    if (this._telemetryService) {
-      try { this._telemetryService.shutdown(); } catch { /* ignore */ }
-      this._telemetryService = null;
-    }
-    if (this._module && this._loaded) {
-      try { this._module._rac_shutdown(); } catch { /* ignore */ }
-    }
-    if (this._platformAdapter) {
-      try { this._platformAdapter.cleanup(); } catch { /* ignore */ }
-      this._platformAdapter = null;
-    }
-
-    HTTPAdapter.clearDefaultModule();
-    ModelRegistryAdapter.clearDefaultModule();
-    clearRunanywhereModule();
-
-    this._module = null;
-    this._loaded = false;
-    this._loading = null;
-    this._accelerationMode = 'cpu';
-
-    // Re-load with the explicit acceleration mode (no auto-detect / no fallback).
     this._loading = this._doLoad(mode);
     try {
       await this._loading;
@@ -305,97 +179,90 @@ export class LlamaCppBridge {
     }
   }
 
+  private _teardown(): void {
+    if (this._module && this._loaded) {
+      try {
+        this._module._rac_shutdown?.();
+      } catch { /* ignore */ }
+    }
+    if (this._platformAdapter) {
+      try { this._platformAdapter.cleanup(); } catch { /* ignore */ }
+      this._platformAdapter = null;
+    }
+    HTTPAdapter.clearDefaultModule();
+    ModelRegistryAdapter.clearDefaultModule();
+    clearRunanywhereModule();
+    this._module = null;
+    this._loaded = false;
+    this._loading = null;
+    this._accelerationMode = 'cpu';
+  }
+
   private async _doLoad(acceleration: 'auto' | 'webgpu' | 'cpu'): Promise<void> {
     logger.info('Loading LlamaCpp WASM module...');
-
     try {
-      // Determine acceleration mode
-      const useWebGPU = acceleration === 'webgpu' ||
-        (acceleration === 'auto' && await this.detectWebGPUWithJSPI());
+      const useWebGPU =
+        acceleration === 'webgpu' ||
+        (acceleration === 'auto' && (await LlamaCppBridge.detectWebGPUWithJSPI()));
       this._accelerationMode = useWebGPU ? 'webgpu' : 'cpu';
 
-      // Select module URL
       const moduleUrl = useWebGPU
-        ? (this.webgpuWasmUrl ?? new URL('../../wasm/racommons-llamacpp-webgpu.js', import.meta.url).href)
-        : (this.wasmUrl ?? new URL('../../wasm/racommons-llamacpp.js', import.meta.url).href);
-
+        ? (this.webgpuWasmUrl
+          ?? new URL('../../wasm/racommons-llamacpp-webgpu.js', import.meta.url).href)
+        : (this.wasmUrl
+          ?? new URL('../../wasm/racommons-llamacpp.js', import.meta.url).href);
       logger.info(`Loading ${useWebGPU ? 'WebGPU' : 'CPU'} variant: ${moduleUrl}`);
 
-      // Persist the resolved URL so VLMWorkerBridge (and others) can read it.
-      // Keep WebGPU and CPU URLs separate so a CPU fallback after a WebGPU
-      // failure does not reuse the WebGPU glue URL.
-      if (useWebGPU) {
-        this.webgpuWasmUrl = moduleUrl;
-      } else {
-        this.wasmUrl = moduleUrl;
-      }
+      if (useWebGPU) this.webgpuWasmUrl = moduleUrl;
+      else this.wasmUrl = moduleUrl;
 
-      // Dynamic import of Emscripten glue JS
-      const { default: createModule } = await import(/* @vite-ignore */ moduleUrl);
+      // Dynamic import of Emscripten glue JS (vite-friendly).
+      const glue = (await import(/* @vite-ignore */ moduleUrl)) as { default: CreateModuleFn };
+      const createModule = glue.default;
 
       // Derive the base URL so the Emscripten glue resolves the companion
-      // .wasm binary from the same directory, regardless of bundler output.
+      // .wasm binary from the same directory regardless of bundler output.
       const baseUrl = moduleUrl.substring(0, moduleUrl.lastIndexOf('/') + 1);
 
-      // Instantiate the WASM module
       this._module = await createModule({
-        print: (text: string) => logger.info(text),
-        printErr: (text: string) => logger.error(text),
-        locateFile: (path: string) => baseUrl + path,
-      }) as LlamaCppModule;
+        print: (text) => logger.info(text),
+        printErr: (text) => logger.error(text),
+        locateFile: (path) => baseUrl + path,
+      });
 
-      // Verify module loaded
-      const pingResult = this._module._rac_wasm_ping();
+      // Smoke check
+      const pingFn = this._module._rac_wasm_ping;
+      if (typeof pingFn !== 'function') {
+        throw new Error('WASM module missing _rac_wasm_ping export');
+      }
+      const pingResult = pingFn();
       const ping = typeof pingResult === 'object' && pingResult !== null && 'then' in pingResult
-        ? await (pingResult as unknown as Promise<number>)
-        : pingResult as number;
+        ? await (pingResult as Promise<number>)
+        : pingResult;
       if (ping !== 42) {
         throw new Error(`WASM ping failed: expected 42, got ${ping}`);
       }
 
-      // Register platform adapter (browser callbacks for logging, file ops, etc.)
-      this._platformAdapter = new PlatformAdapter();
+      // Register platform adapter (browser callbacks for log/file/secure/etc.)
+      this._platformAdapter = new PlatformAdapter(this._module);
       this._platformAdapter.register();
 
       // Initialize RACommons core within this WASM module
-      await this.initRACommons(this._platformAdapter.getAdapterPtr());
+      await this._initRACommons(this._platformAdapter.getAdapterPtr());
 
-      // Register the llama.cpp backend
-      await this.registerBackend();
+      // Register the llama.cpp backend (and the VLM variant if available).
+      await this._registerBackend();
 
-      // Initialize analytics events bridge (subscribe to C++ events → TypeScript EventBus)
-      this._analyticsEventsBridge = new AnalyticsEventsBridge();
-
-      // Initialize telemetry service (C++ telemetry manager → browser fetch)
-      this._telemetryService = TelemetryService.shared;
-      const deviceInfo = await getDeviceInfo();
-      const environment = RunAnywhere.environment ?? SDKEnvironment.Production;
-      await this._telemetryService.initialize(this._module!, environment, deviceInfo);
-
-      // Wire analytics bridge: forwards C++ events to EventBus + TelemetryService
-      this._analyticsEventsBridge.register(
-        this._module!,
-        (eventType, dataPtr) => this._telemetryService?.trackAnalyticsEvent(eventType, dataPtr),
-      );
-
-      // Publish this module as the default HTTP transport (T3.13) so
-      // core's ModelDownloader can route through the commons libcurl
-      // C ABI without taking a hard dependency on this backend package.
-      const coreModule = this._module! as unknown as EmscriptenRunanywhereModule;
-      setRunanywhereModule(coreModule);
-      HTTPAdapter.setDefaultModule(this._module! as unknown as Parameters<typeof HTTPAdapter.setDefaultModule>[0]);
-      ModelRegistryAdapter.setDefaultModule(
-        this._module! as unknown as Parameters<typeof ModelRegistryAdapter.setDefaultModule>[0],
-      );
+      // Install the module on every core adapter so proto-byte calls can find
+      // it without taking a hard dependency on this backend package.
+      setRunanywhereModule(this._module);
+      HTTPAdapter.setDefaultModule(this._module);
+      ModelRegistryAdapter.setDefaultModule(this._module);
 
       this._loaded = true;
       logger.info(`LlamaCpp WASM module loaded successfully (${this._accelerationMode})`);
-
-      EventBus.shared.emit('llamacpp.wasmLoaded', SDKEventType.Initialization, {
-        accelerationMode: this._accelerationMode,
-      });
     } catch (error) {
-      // WebGPU fallback to CPU
+      // WebGPU → CPU fallback in 'auto' mode
       if (this._accelerationMode === 'webgpu' && acceleration === 'auto') {
         const reason = error instanceof Error ? error.message : String(error);
         logger.warning(`WebGPU WASM failed (${reason}), falling back to CPU`);
@@ -404,7 +271,6 @@ export class LlamaCppBridge {
         this._accelerationMode = 'cpu';
         return this._doLoad('cpu');
       }
-
       this._module = null;
       this._loaded = false;
       const message = error instanceof Error ? error.message : String(error);
@@ -416,51 +282,81 @@ export class LlamaCppBridge {
     }
   }
 
-  private async initRACommons(adapterPtr: number): Promise<void> {
+  private async _initRACommons(adapterPtr: number): Promise<void> {
     const m = this._module!;
+    const sizeofConfig = m._rac_wasm_sizeof_config;
+    const racInit = m._rac_init;
+    if (typeof sizeofConfig !== 'function' || typeof racInit !== 'function') {
+      throw new Error('WASM module missing rac_init / rac_wasm_sizeof_config exports');
+    }
 
-    // Create rac_config_t
-    const configSize = m._rac_wasm_sizeof_config();
+    const configSize = sizeofConfig();
     const configPtr = m._malloc(configSize);
-    for (let i = 0; i < configSize; i++) {
-      m.setValue(configPtr + i, 0, 'i8');
+    try {
+      // Zero-init the entire struct
+      for (let i = 0; i < configSize; i++) {
+        m.setValue(configPtr + i, 0, 'i8');
+      }
+
+      // platform_adapter is the first field (offset 0). Use the runtime
+      // offset helper if it's exported so we don't bake the layout in.
+      const adapterOffset = typeof m._rac_wasm_offsetof_config_platform_adapter === 'function'
+        ? m._rac_wasm_offsetof_config_platform_adapter()
+        : 0;
+      m.setValue(configPtr + adapterOffset, adapterPtr, '*');
+
+      // log_level — INFO (2). Same fallback approach.
+      const logLevelOffset = typeof m._rac_wasm_offsetof_config_log_level === 'function'
+        ? m._rac_wasm_offsetof_config_log_level()
+        : 4; // pointer (4) on wasm32
+      m.setValue(configPtr + logLevelOffset, 2, 'i32');
+
+      const result = (await m.ccall(
+        'rac_init',
+        'number',
+        ['number'],
+        [configPtr],
+        { async: true },
+      )) as number;
+
+      if (result !== 0) {
+        const errPtr = m._rac_error_message?.(result) ?? 0;
+        const errMsg = errPtr ? m.UTF8ToString(errPtr) : `rac_init failed with code ${result}`;
+        throw new Error(`rac_init failed in LlamaCpp module: ${errMsg}`);
+      }
+      logger.info('RACommons initialized within LlamaCpp WASM module');
+    } finally {
+      m._free(configPtr);
     }
-
-    // Set platform_adapter pointer (offset 0)
-    m.setValue(configPtr, adapterPtr, '*');
-    // Set log_level (offset queried at runtime)
-    const logLevelOffset = this.wasmOffsetOf('config_log_level');
-    m.setValue(configPtr + logLevelOffset, 2, 'i32'); // INFO level
-
-    const result = await (m.ccall('rac_init', 'number', ['number'], [configPtr], { async: true }) as unknown as Promise<number>);
-    m._free(configPtr);
-
-    if (result !== 0) {
-      const errMsg = this.readString(m._rac_error_message(result));
-      throw new Error(`rac_init failed in LlamaCpp module: ${errMsg}`);
-    }
-
-    logger.info('RACommons initialized within LlamaCpp WASM module');
   }
 
-  private async registerBackend(): Promise<void> {
+  private async _registerBackend(): Promise<void> {
     const m = this._module!;
-
     if (typeof m._rac_backend_llamacpp_register === 'function') {
-      const result = await (m.ccall(
-        'rac_backend_llamacpp_register', 'number', [], [], { async: true },
-      ) as unknown as Promise<number>);
+      const result = (await m.ccall(
+        'rac_backend_llamacpp_register',
+        'number',
+        [],
+        [],
+        { async: true },
+      )) as number;
       if (result === 0) {
-        logger.info('llama.cpp C++ backend registered');
+        logger.info('llama.cpp backend registered');
       } else {
         logger.warning(`llama.cpp backend registration returned: ${result}`);
       }
+    } else {
+      logger.warning('WASM module does not export _rac_backend_llamacpp_register');
     }
 
     if (typeof m._rac_backend_llamacpp_vlm_register === 'function') {
-      const result = await (m.ccall(
-        'rac_backend_llamacpp_vlm_register', 'number', [], [], { async: true },
-      ) as unknown as Promise<number>);
+      const result = (await m.ccall(
+        'rac_backend_llamacpp_vlm_register',
+        'number',
+        [],
+        [],
+        { async: true },
+      )) as number;
       if (result === 0) {
         logger.info('llama.cpp VLM backend registered');
       }
@@ -468,247 +364,20 @@ export class LlamaCppBridge {
   }
 
   // -----------------------------------------------------------------------
-  // Filesystem (model files written to this module's MEMFS)
+  // WebGPU Detection (CPU + JSPI gate — same logic as the previous bridge)
   // -----------------------------------------------------------------------
 
-  /**
-   * Write a model file to this WASM module's Emscripten virtual filesystem.
-   */
-  writeFile(path: string, data: Uint8Array): void {
-    const m = this.module;
-    const dir = path.substring(0, path.lastIndexOf('/'));
-    if (dir && typeof m.FS_createPath === 'function') {
-      m.FS_createPath('/', dir.replace(/^\//, ''), true, true);
-    }
-
-    if (typeof m.FS_createDataFile === 'function') {
-      const parentDir = dir || '/';
-      const filename = path.substring(path.lastIndexOf('/') + 1);
-      try { m.FS_unlink?.(path); } catch { /* doesn't exist */ }
-      m.FS_createDataFile(parentDir, filename, data, true, true, true);
-      logger.debug(`Wrote ${data.length} bytes to LlamaCpp FS: ${path}`);
-    }
-  }
-
-  /**
-   * Write a model from a ReadableStream to this WASM module's Emscripten virtual filesystem.
-   * Useful for loading models without buffering the entire file in JS memory.
-   */
-  async writeFileStream(path: string, stream: ReadableStream<Uint8Array>): Promise<void> {
-    const m = this.module as any;
-    const FS = m.FS;
-    if (!FS) throw new Error('Emscripten FS not available on module');
-
-    const dir = path.substring(0, path.lastIndexOf('/'));
-    if (dir && typeof m.FS_createPath === 'function') {
-      m.FS_createPath('/', dir.replace(/^\//, ''), true, true);
-    }
-
-    try { FS.unlink(path); } catch { /* ignore */ }
-
-    logger.debug(`Streaming to LlamaCpp FS: ${path}...`);
-    const fileStream = FS.open(path, 'w+');
-    try {
-      const reader = stream.getReader();
-      let totalBytes = 0;
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          FS.write(fileStream, value, 0, value.length, undefined);
-          totalBytes += value.length;
-        }
-        logger.debug(`Finished streaming ${totalBytes} bytes to LlamaCpp FS: ${path}`);
-      } finally {
-        reader.releaseLock();
-      }
-    } finally {
-      FS.close(fileStream);
-    }
-  }
-
-  /**
-   * Remove a file from this WASM module's filesystem.
-   */
-  unlinkFile(path: string): void {
-    try { this.module.FS_unlink?.(path); } catch { /* doesn't exist */ }
-  }
-
-  /**
-   * Mount a File object into the WASM filesystem (if WORKERFS is available).
-   * Returns the path to the mounted file, or null if mounting failed/unsupported.
-   *
-   * @param file - The browser File object
-   * @returns The absolute path to the file in WASM FS (e.g. /mnt-123/model.gguf) or null
-   */
-  mountFile(file: File): string | null {
-    const m = this.module;
-    if (!m.FS_mount || !m.WORKERFS) return null;
-
-    let createdMountDir = false;
-    let mountDir = '';
-
-    try {
-      // Create a unique mount point directory
-      const mountId = LlamaCppBridge._nextMountId++;
-      mountDir = `/mnt-${mountId}`;
-
-      if (m.FS_mkdir) {
-        m.FS_mkdir(mountDir);
-        createdMountDir = true;
-      }
-
-      // Mount the file. WORKERFS expects { files: [File, ...] } or { files: [{name, data: File}] }
-      // We assume the standard Emscripten WORKERFS behavior where `files` array mounts them by name.
-      m.FS_mount(m.WORKERFS, { files: [file] }, mountDir);
-
-      logger.debug(`Mounted ${file.name} to ${mountDir}`);
-      return `${mountDir}/${file.name}`;
-    } catch (err) {
-      if (createdMountDir && m.FS_rmdir) {
-        try { m.FS_rmdir(mountDir); } catch { logger.warning(`Failed to clean up mount dir ${mountDir}`); }
-      }
-      const msg = err instanceof Error ? err.message : String(err);
-      logger.warning(`Failed to mount file (WORKERFS): ${msg}`);
-      return null;
-    }
-  }
-
-  /**
-   * Unmount a directory (and remove it).
-   * @param mountDir - The directory path (e.g. /mnt-123)
-   */
-  unmount(mountPath: string): void {
-    if (!mountPath.startsWith('/mnt-')) return; // Safety check
-
-    // Strip filename if present
-    const parts = mountPath.split('/');
-    // formatted like ["", "mnt-123", "filename"]
-    let dir = mountPath;
-    if (parts.length >= 3) {
-      dir = `/${parts[1]}`;
-    }
-
-    try {
-      const m = this.module;
-      if (m.FS_unmount) m.FS_unmount(dir);
-      if (m.FS_rmdir) m.FS_rmdir(dir);
-      logger.debug(`Unmounted ${dir}`);
-    } catch {
-      /* ignore cleanup errors */
-    }
-  }
-
-  // -----------------------------------------------------------------------
-  // WebGPU Detection
-  // -----------------------------------------------------------------------
-
-  private async detectWebGPUWithJSPI(): Promise<boolean> {
+  private static async detectWebGPUWithJSPI(): Promise<boolean> {
     if (typeof navigator === 'undefined' || !('gpu' in navigator)) return false;
     try {
-      const gpu = (navigator as any).gpu;
+      const gpu = (navigator as Navigator & { gpu?: { requestAdapter(): Promise<unknown> } }).gpu;
       const adapter = await gpu?.requestAdapter();
       if (!adapter) return false;
-
-      // Also need JSPI
-      return typeof WebAssembly !== 'undefined' &&
-        'promising' in WebAssembly &&
-        'Suspending' in WebAssembly;
+      const wasm = WebAssembly as unknown as { promising?: unknown; Suspending?: unknown };
+      return typeof WebAssembly !== 'undefined' && 'promising' in wasm && 'Suspending' in wasm;
     } catch {
       return false;
     }
-  }
-
-  // -----------------------------------------------------------------------
-  // String / Memory Helpers (same as WASMBridge)
-  // -----------------------------------------------------------------------
-
-  allocString(str: string): number {
-    const m = this.module;
-    const len = m.lengthBytesUTF8(str) + 1;
-    const ptr = m._malloc(len);
-    m.stringToUTF8(str, ptr, len);
-    return ptr;
-  }
-
-  readString(ptr: number): string {
-    if (ptr === 0) return '';
-    return this.module.UTF8ToString(ptr);
-  }
-
-  free(ptr: number): void {
-    if (ptr !== 0) this.module._free(ptr);
-  }
-
-  writeBytes(src: Uint8Array, destPtr: number): void {
-    const m = this.module;
-    if (m.HEAPU8) { m.HEAPU8.set(src, destPtr); return; }
-    for (let i = 0; i < src.length; i++) m.setValue(destPtr + i, src[i], 'i8');
-  }
-
-  readBytes(srcPtr: number, length: number): Uint8Array {
-    const m = this.module;
-    if (m.HEAPU8) return m.HEAPU8.slice(srcPtr, srcPtr + length);
-    const result = new Uint8Array(length);
-    for (let i = 0; i < length; i++) result[i] = m.getValue(srcPtr + i, 'i8') & 0xFF;
-    return result;
-  }
-
-  readFloat32Array(srcPtr: number, count: number): Float32Array {
-    const m = this.module;
-    if (m.HEAPF32) return m.HEAPF32.slice(srcPtr >> 2, (srcPtr >> 2) + count);
-    const result = new Float32Array(count);
-    for (let i = 0; i < count; i++) result[i] = m.getValue(srcPtr + i * 4, 'float');
-    return result;
-  }
-
-  writeFloat32Array(src: Float32Array, destPtr: number): void {
-    const m = this.module;
-    if (m.HEAPF32) { m.HEAPF32.set(src, destPtr >> 2); return; }
-    for (let i = 0; i < src.length; i++) m.setValue(destPtr + i * 4, src[i], 'float');
-  }
-
-  readFloat32(ptr: number): number {
-    const m = this.module;
-    if (m.HEAPF32) return m.HEAPF32[ptr >> 2];
-    return m.getValue(ptr, 'float');
-  }
-
-  checkResult(result: number, operation: string): void {
-    if (result !== 0) {
-      const errMsgPtr = this.module._rac_error_message(result);
-      const errMsg = this.readString(errMsgPtr);
-      throw new SDKException(SDKErrorCode.BackendError, `${operation}: ${errMsg}`);
-    }
-  }
-
-  getErrorMessage(resultCode: number): string {
-    return this.readString(this.module._rac_error_message(resultCode));
-  }
-
-  callFunction<T = number>(
-    funcName: string,
-    returnType: string | null,
-    argTypes: string[],
-    args: unknown[],
-    opts?: { async?: boolean },
-  ): T {
-    if (!this._module) throw new SDKException(SDKErrorCode.WASMNotLoaded, 'LlamaCpp WASM not loaded');
-    return this._module.ccall(funcName, returnType, argTypes, args, opts) as T;
-  }
-
-  // -----------------------------------------------------------------------
-  // Offset Helpers
-  // -----------------------------------------------------------------------
-
-  wasmOffsetOf(name: string): number {
-    const fn = this.module[`_rac_wasm_offsetof_${name}`];
-    return typeof fn === 'function' ? (fn as () => number)() : 0;
-  }
-
-  wasmSizeOf(name: string): number {
-    const fn = this.module[`_rac_wasm_sizeof_${name}`];
-    return typeof fn === 'function' ? (fn as () => number)() : 0;
   }
 
   // -----------------------------------------------------------------------
@@ -716,47 +385,7 @@ export class LlamaCppBridge {
   // -----------------------------------------------------------------------
 
   shutdown(): void {
-    // Flush and teardown telemetry before shutting down WASM
-    if (this._analyticsEventsBridge) {
-      try { this._analyticsEventsBridge.cleanup(); } catch { /* ignore */ }
-      this._analyticsEventsBridge = null;
-    }
-
-    if (this._telemetryService) {
-      try { this._telemetryService.shutdown(); } catch { /* ignore */ }
-      this._telemetryService = null;
-    }
-
-    if (this._module && this._loaded) {
-      try {
-        this._module._rac_shutdown();
-      } catch (err) {
-        logger.debug(
-          `LlamaCpp module shutdown failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-    }
-
-    // Clean up platform adapter
-    if (this._platformAdapter) {
-      try {
-        this._platformAdapter.cleanup();
-      } catch (err) {
-        logger.debug(
-          `Platform adapter cleanup failed (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
-        );
-      }
-      this._platformAdapter = null;
-    }
-
-    HTTPAdapter.clearDefaultModule();
-    ModelRegistryAdapter.clearDefaultModule();
-    clearRunanywhereModule();
-
-    this._module = null;
-    this._loaded = false;
-    this._loading = null;
-    this._accelerationMode = 'cpu';
+    this._teardown();
     LlamaCppBridge._instance = null;
     logger.info('LlamaCpp bridge shut down');
   }

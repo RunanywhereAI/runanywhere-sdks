@@ -64,5 +64,47 @@ class STTLanguage extends $pb.ProtobufEnum {
   const STTLanguage._($core.int v, $core.String n) : super(v, n);
 }
 
+class STTAudioEncoding extends $pb.ProtobufEnum {
+  static const STTAudioEncoding STT_AUDIO_ENCODING_UNSPECIFIED = STTAudioEncoding._(0, _omitEnumNames ? '' : 'STT_AUDIO_ENCODING_UNSPECIFIED');
+  static const STTAudioEncoding STT_AUDIO_ENCODING_PCM_S16_LE = STTAudioEncoding._(1, _omitEnumNames ? '' : 'STT_AUDIO_ENCODING_PCM_S16_LE');
+  static const STTAudioEncoding STT_AUDIO_ENCODING_PCM_F32_LE = STTAudioEncoding._(2, _omitEnumNames ? '' : 'STT_AUDIO_ENCODING_PCM_F32_LE');
+  static const STTAudioEncoding STT_AUDIO_ENCODING_CONTAINER = STTAudioEncoding._(3, _omitEnumNames ? '' : 'STT_AUDIO_ENCODING_CONTAINER');
+
+  static const $core.List<STTAudioEncoding> values = <STTAudioEncoding> [
+    STT_AUDIO_ENCODING_UNSPECIFIED,
+    STT_AUDIO_ENCODING_PCM_S16_LE,
+    STT_AUDIO_ENCODING_PCM_F32_LE,
+    STT_AUDIO_ENCODING_CONTAINER,
+  ];
+
+  static final $core.Map<$core.int, STTAudioEncoding> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static STTAudioEncoding? valueOf($core.int value) => _byValue[value];
+
+  const STTAudioEncoding._($core.int v, $core.String n) : super(v, n);
+}
+
+class STTStreamEventKind extends $pb.ProtobufEnum {
+  static const STTStreamEventKind STT_STREAM_EVENT_KIND_UNSPECIFIED = STTStreamEventKind._(0, _omitEnumNames ? '' : 'STT_STREAM_EVENT_KIND_UNSPECIFIED');
+  static const STTStreamEventKind STT_STREAM_EVENT_KIND_STARTED = STTStreamEventKind._(1, _omitEnumNames ? '' : 'STT_STREAM_EVENT_KIND_STARTED');
+  static const STTStreamEventKind STT_STREAM_EVENT_KIND_PARTIAL = STTStreamEventKind._(2, _omitEnumNames ? '' : 'STT_STREAM_EVENT_KIND_PARTIAL');
+  static const STTStreamEventKind STT_STREAM_EVENT_KIND_FINAL = STTStreamEventKind._(3, _omitEnumNames ? '' : 'STT_STREAM_EVENT_KIND_FINAL');
+  static const STTStreamEventKind STT_STREAM_EVENT_KIND_ENDPOINT = STTStreamEventKind._(4, _omitEnumNames ? '' : 'STT_STREAM_EVENT_KIND_ENDPOINT');
+  static const STTStreamEventKind STT_STREAM_EVENT_KIND_ERROR = STTStreamEventKind._(5, _omitEnumNames ? '' : 'STT_STREAM_EVENT_KIND_ERROR');
+
+  static const $core.List<STTStreamEventKind> values = <STTStreamEventKind> [
+    STT_STREAM_EVENT_KIND_UNSPECIFIED,
+    STT_STREAM_EVENT_KIND_STARTED,
+    STT_STREAM_EVENT_KIND_PARTIAL,
+    STT_STREAM_EVENT_KIND_FINAL,
+    STT_STREAM_EVENT_KIND_ENDPOINT,
+    STT_STREAM_EVENT_KIND_ERROR,
+  ];
+
+  static final $core.Map<$core.int, STTStreamEventKind> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static STTStreamEventKind? valueOf($core.int value) => _byValue[value];
+
+  const STTStreamEventKind._($core.int v, $core.String n) : super(v, n);
+}
+
 
 const _omitEnumNames = $core.bool.fromEnvironment('protobuf.omit_enum_names');

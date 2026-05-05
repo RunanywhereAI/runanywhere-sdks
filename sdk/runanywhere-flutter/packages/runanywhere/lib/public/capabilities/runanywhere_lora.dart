@@ -3,11 +3,10 @@
 // runanywhere_lora.dart — LoRA capability surface (canonical §3 namespace).
 // Mirrors Swift `RunAnywhere.LoRA` and Kotlin `RunAnywhere.lora` (G-A7).
 //
-// Eight-method spec required by canonical API:
-//   load / remove / clear / getLoaded / checkCompatibility /
-//   register / adaptersForModel / allRegistered
-
-import 'package:fixnum/fixnum.dart';
+// Canonical runtime and catalog surface:
+//   apply / remove / list / state / checkCompatibility /
+//   register / listCatalog / queryCatalog / getCatalogEntry /
+//   markDownloadCompleted / adaptersForModel / allRegistered
 
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/generated/lora_options.pb.dart';
@@ -26,43 +25,41 @@ class RunAnywhereLoRACapability {
 
   // --- Runtime adapter operations ----------------------------------------
 
-  /// Load and apply a LoRA adapter to the current model. Context is
-  /// recreated internally and the KV cache is cleared.
-  Future<LoRAAdapterInfo> load(LoRAAdapterConfig config) async {
+  /// Apply one or more LoRA adapters to the current model.
+  Future<LoRAApplyResult> apply(LoRAApplyRequest request) async {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    return DartBridgeLora.shared.loadAdapterProto(config);
+    return DartBridgeLora.shared.apply(request);
   }
 
-  /// Remove a specific LoRA adapter by id (path).
-  Future<void> remove(String adapterId) async {
+  /// Remove one or more LoRA adapters, or clear all adapters.
+  Future<LoRAState> remove(LoRARemoveRequest request) async {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    DartBridgeLora.shared.removeAdapterProto(
-      LoRAAdapterConfig(adapterId: adapterId, adapterPath: adapterId),
-    );
+    return DartBridgeLora.shared.remove(request);
   }
 
-  /// Remove all LoRA adapters.
-  Future<void> clear() async {
+  /// Currently loaded LoRA adapters.
+  Future<LoRAState> list() async {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    DartBridgeLora.shared.clearAdaptersProto();
+    return DartBridgeLora.shared.list();
   }
 
-  /// Currently-loaded LoRA adapters; empty when none.
-  Future<List<LoRAAdapterInfo>> getLoaded() async {
-    if (!SdkState.shared.isInitialized) return const [];
-    return DartBridgeLora.shared.getLoadedAdapters();
+  /// LoRA service state reported by commons.
+  Future<LoRAState> state() async {
+    if (!SdkState.shared.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    return DartBridgeLora.shared.state();
   }
 
-  /// Whether the current backend supports the given adapter for [modelId].
+  /// Whether the current backend supports the given adapter.
   Future<LoraCompatibilityResult> checkCompatibility(
-    String adapterId,
-    String modelId,
+    LoRAAdapterConfig config,
   ) async {
     if (!SdkState.shared.isInitialized) {
       return LoraCompatibilityResult(
@@ -70,55 +67,77 @@ class RunAnywhereLoRACapability {
         errorMessage: 'SDK not initialized',
       );
     }
-    return DartBridgeLora.shared.checkCompatibilityProto(
-      LoRAAdapterConfig(adapterId: adapterId, adapterPath: adapterId),
-    );
+    return DartBridgeLora.shared.checkCompatibility(config);
   }
 
   // --- Catalog operations -----------------------------------------------
 
   /// Register a LoRA adapter in the global registry. Entry is
   /// deep-copied internally by C++.
-  Future<void> register(LoRAAdapterConfig config) async {
+  Future<LoraAdapterCatalogEntry> register(
+    LoraAdapterCatalogEntry entry,
+  ) async {
     if (!SdkState.shared.isInitialized) {
       throw SDKException.notInitialized();
     }
-    DartBridgeLoraRegistry.shared.register(
-      LoraAdapterCatalogEntry(
-        id: config.adapterPath,
-        name: config.adapterPath,
-        description: '',
-        url: '',
-        filename: config.adapterPath,
-        compatibleModels: const <String>[],
-        sizeBytes: Int64.ZERO,
-      ),
+    return DartBridgeLoraRegistry.shared.register(entry);
+  }
+
+  /// Generated-proto LoRA catalog list surface.
+  Future<LoraAdapterCatalogListResult> listCatalog([
+    LoraAdapterCatalogListRequest? request,
+  ]) async {
+    if (!SdkState.shared.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    return DartBridgeLoraRegistry.shared.listCatalog(
+      request ?? LoraAdapterCatalogListRequest(),
     );
   }
 
+  /// Generated-proto LoRA catalog query surface.
+  Future<LoraAdapterCatalogListResult> queryCatalog(
+    LoraAdapterCatalogQuery query,
+  ) async {
+    if (!SdkState.shared.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    return DartBridgeLoraRegistry.shared.queryCatalog(query);
+  }
+
+  /// Generated-proto LoRA catalog get surface.
+  Future<LoraAdapterCatalogGetResult> getCatalogEntry(
+    LoraAdapterCatalogGetRequest request,
+  ) async {
+    if (!SdkState.shared.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    return DartBridgeLoraRegistry.shared.getCatalogEntry(request);
+  }
+
+  /// Record native-owned download/import completion in the commons LoRA catalog.
+  Future<LoraAdapterDownloadCompletedResult> markDownloadCompleted(
+    LoraAdapterDownloadCompletedRequest request,
+  ) async {
+    if (!SdkState.shared.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    return DartBridgeLoraRegistry.shared.markDownloadCompleted(request);
+  }
+
   /// All registered LoRA adapters compatible with [modelId].
-  Future<List<LoRAAdapterInfo>> adaptersForModel(String modelId) async {
-    if (!SdkState.shared.isInitialized) return const [];
-    final entries = DartBridgeLoraRegistry.shared.getForModel(modelId);
-    return entries
-        .map((e) => LoRAAdapterInfo(
-              adapterPath: e.filename.isNotEmpty ? e.filename : e.id,
-              scale: 1.0,
-              applied: false,
-            ))
-        .toList();
+  Future<List<LoraAdapterCatalogEntry>> adaptersForModel(String modelId) async {
+    if (!SdkState.shared.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    return DartBridgeLoraRegistry.shared.getForModel(modelId);
   }
 
   /// All registered LoRA adapters.
-  Future<List<LoRAAdapterInfo>> allRegistered() async {
-    if (!SdkState.shared.isInitialized) return const [];
-    final entries = DartBridgeLoraRegistry.shared.getAll();
-    return entries
-        .map((e) => LoRAAdapterInfo(
-              adapterPath: e.filename.isNotEmpty ? e.filename : e.id,
-              scale: 1.0,
-              applied: false,
-            ))
-        .toList();
+  Future<List<LoraAdapterCatalogEntry>> allRegistered() async {
+    if (!SdkState.shared.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    return DartBridgeLoraRegistry.shared.getAll();
   }
 }

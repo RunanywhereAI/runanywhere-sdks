@@ -79,6 +79,22 @@ public class AudioFrameEvent(
     schemaIndex = 4,
   )
   public val is_final: Boolean = false,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "chunkIndex",
+    schemaIndex = 5,
+  )
+  public val chunk_index: Int = 0,
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "durationMs",
+    schemaIndex = 6,
+  )
+  public val duration_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<AudioFrameEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -97,6 +113,8 @@ public class AudioFrameEvent(
     if (channels != other.channels) return false
     if (encoding != other.encoding) return false
     if (is_final != other.is_final) return false
+    if (chunk_index != other.chunk_index) return false
+    if (duration_ms != other.duration_ms) return false
     return true
   }
 
@@ -109,6 +127,8 @@ public class AudioFrameEvent(
       result = result * 37 + channels.hashCode()
       result = result * 37 + encoding.hashCode()
       result = result * 37 + is_final.hashCode()
+      result = result * 37 + chunk_index.hashCode()
+      result = result * 37 + duration_ms.hashCode()
       super.hashCode = result
     }
     return result
@@ -121,6 +141,8 @@ public class AudioFrameEvent(
     result += """channels=$channels"""
     result += """encoding=$encoding"""
     result += """is_final=$is_final"""
+    result += """chunk_index=$chunk_index"""
+    result += """duration_ms=$duration_ms"""
     return result.joinToString(prefix = "AudioFrameEvent{", separator = ", ", postfix = "}")
   }
 
@@ -130,9 +152,11 @@ public class AudioFrameEvent(
     channels: Int = this.channels,
     encoding: AudioEncoding = this.encoding,
     is_final: Boolean = this.is_final,
+    chunk_index: Int = this.chunk_index,
+    duration_ms: Long = this.duration_ms,
     unknownFields: ByteString = this.unknownFields,
   ): AudioFrameEvent = AudioFrameEvent(pcm, sample_rate_hz, channels, encoding, is_final,
-      unknownFields)
+      chunk_index, duration_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -154,6 +178,10 @@ public class AudioFrameEvent(
         if (value.encoding != AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) size +=
             AudioEncoding.ADAPTER.encodedSizeWithTag(4, value.encoding)
         if (value.is_final != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.is_final)
+        if (value.chunk_index != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(6,
+            value.chunk_index)
+        if (value.duration_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(7,
+            value.duration_ms)
         return size
       }
 
@@ -165,11 +193,15 @@ public class AudioFrameEvent(
         if (value.encoding != AudioEncoding.AUDIO_ENCODING_UNSPECIFIED)
             AudioEncoding.ADAPTER.encodeWithTag(writer, 4, value.encoding)
         if (value.is_final != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.is_final)
+        if (value.chunk_index != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.chunk_index)
+        if (value.duration_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7, value.duration_ms)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: AudioFrameEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.duration_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7, value.duration_ms)
+        if (value.chunk_index != 0) ProtoAdapter.INT32.encodeWithTag(writer, 6, value.chunk_index)
         if (value.is_final != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.is_final)
         if (value.encoding != AudioEncoding.AUDIO_ENCODING_UNSPECIFIED)
             AudioEncoding.ADAPTER.encodeWithTag(writer, 4, value.encoding)
@@ -185,6 +217,8 @@ public class AudioFrameEvent(
         var channels: Int = 0
         var encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED
         var is_final: Boolean = false
+        var chunk_index: Int = 0
+        var duration_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> pcm = ProtoAdapter.BYTES.decode(reader)
@@ -196,6 +230,8 @@ public class AudioFrameEvent(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             5 -> is_final = ProtoAdapter.BOOL.decode(reader)
+            6 -> chunk_index = ProtoAdapter.INT32.decode(reader)
+            7 -> duration_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -205,6 +241,8 @@ public class AudioFrameEvent(
           channels = channels,
           encoding = encoding,
           is_final = is_final,
+          chunk_index = chunk_index,
+          duration_ms = duration_ms,
           unknownFields = unknownFields
         )
       }

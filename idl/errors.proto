@@ -517,6 +517,12 @@ message ErrorContext {
 //   * `nested_message` — optional. Underlying-error message as captured at
 //     wrap time. Mirrors Swift's RunAnywhereError.underlyingError.localizedDesc
 //     and Kotlin's Throwable.cause.message.
+//   * `retryable` — canonical retry hint. This is business-policy metadata
+//     owned by the portable layer; the platform adapter still decides how to
+//     schedule the retry through native/background APIs when appropriate.
+//   * `correlation_id` — stable cross-event/request correlation key. SDKEvent
+//     also carries this field so callers can join success/progress/failure
+//     events without parsing free-form properties.
 // ---------------------------------------------------------------------------
 message SDKError {
     ErrorCode             code           = 1;
@@ -538,4 +544,7 @@ message SDKError {
     int64                 timestamp_ms   = 7;
     ErrorSeverity         severity       = 8;
     string                component      = 9;
+    bool                  retryable      = 10;
+    string                remediation_hint = 11;
+    string                correlation_id = 12;
 }

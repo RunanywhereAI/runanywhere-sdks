@@ -8,30 +8,17 @@ import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
+import 'package:runanywhere/generated/sdk_events.pb.dart'
+    show ComponentLifecycleSnapshot;
+import 'package:runanywhere/generated/sdk_events.pbenum.dart'
+    show ComponentLifecycleState, SDKComponent;
 import 'package:runanywhere/generated/vlm_options.pb.dart';
+import 'package:runanywhere/internal/sdk_event_factories.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
-import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
-import 'package:runanywhere/public/events/sdk_event.dart';
-
-/// Streaming wrapper returned by `processImageStream`.
-class VLMStreamingResult {
-  /// Stream of tokens as they are generated.
-  final Stream<String> stream;
-
-  /// Future that completes with final result metrics when streaming finishes.
-  final Future<VLMResult> metrics;
-
-  /// Function to cancel the ongoing generation.
-  final void Function() cancel;
-
-  const VLMStreamingResult({
-    required this.stream,
-    required this.metrics,
-    required this.cancel,
-  });
-}
 
 /// VLM (vision-language model) capability surface.
 ///
@@ -41,11 +28,26 @@ class RunAnywhereVLM {
   static final RunAnywhereVLM _instance = RunAnywhereVLM._();
   static RunAnywhereVLM get shared => _instance;
 
-  /// True when a VLM model is currently loaded.
-  bool get isLoaded => DartBridge.vlm.isLoaded;
+  /// True when commons lifecycle has a ready VLM model.
+  bool get isLoaded {
+    final snapshot = _lifecycleSnapshot;
+    return snapshot != null &&
+        snapshot.state ==
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+        snapshot.modelId.isNotEmpty;
+  }
 
-  /// Currently-loaded VLM model ID, or null.
-  String? get currentModelId => DartBridge.vlm.currentModelId;
+  /// Currently-loaded VLM model ID from commons lifecycle, or null.
+  String? get currentModelId {
+    final snapshot = _lifecycleSnapshot;
+    if (snapshot == null ||
+        snapshot.state !=
+            ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY ||
+        snapshot.modelId.isEmpty) {
+      return null;
+    }
+    return snapshot.modelId;
+  }
 
   /// Load a VLM model by ID.
   Future<void> load(String modelId) async {
@@ -57,47 +59,26 @@ class RunAnywhereVLM {
     logger.info('Loading VLM model: $modelId');
     final startTime = DateTime.now().millisecondsSinceEpoch;
 
-    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
+    EventBus.shared.publish(SdkEventFactory.modelLoadStarted(modelId));
 
     try {
-      final models = await RunAnywhereModels.shared.available();
-      final model = models.where((m) => m.id == modelId).firstOrNull;
-
-      if (model == null) {
-        throw SDKException.modelNotFound('VLM model not found: $modelId');
-      }
-
-      if (model.localPath.isEmpty) {
-        throw SDKException.modelNotDownloaded(
-          'VLM model is not downloaded. Call downloadModel() first.',
-        );
-      }
-
-      final resolution = DartBridge.modelPaths.resolveArtifact(model);
-      final modelPath = resolution?.primaryModelPath;
-      if (modelPath == null) {
-        throw SDKException.modelNotFound(
-          'Could not resolve main VLM model path for: $modelId',
-        );
-      }
-
-      final mmprojPath = resolution?.mmprojPath;
-
-      if (DartBridge.vlm.isLoaded) {
-        DartBridge.vlm.unload();
-      }
-
-      await DartBridge.vlm
-          .loadModel(modelPath, mmprojPath, modelId, model.name);
-
-      if (!DartBridge.vlm.isLoaded) {
+      final lifecycleResult = await RunAnywhereModelLifecycle.shared.load(
+        model_pb.ModelLoadRequest(
+          modelId: modelId,
+          forceReload: true,
+          validateAvailability: true,
+        ),
+      );
+      if (!lifecycleResult.success) {
         throw SDKException.vlmModelLoadFailed(
-          'VLM model failed to load - model may not be compatible',
+          lifecycleResult.errorMessage.isNotEmpty
+              ? lifecycleResult.errorMessage
+              : 'VLM lifecycle load failed',
         );
       }
 
       final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      logger.info('VLM model loaded successfully: ${model.name}');
+      logger.info('VLM model loaded successfully: $modelId');
 
       TelemetryService.shared.trackModelLoad(
         modelId: modelId,
@@ -106,7 +87,7 @@ class RunAnywhereVLM {
         loadTimeMs: loadTimeMs,
       );
 
-      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
+      EventBus.shared.publish(SdkEventFactory.modelLoadCompleted(modelId));
     } catch (e) {
       logger.error('Failed to load VLM model: $e');
       TelemetryService.shared.trackModelLoad(
@@ -119,40 +100,7 @@ class RunAnywhereVLM {
         errorMessage: e.toString(),
         context: {'model_id': modelId},
       );
-      EventBus.shared.publish(SDKModelEvent.loadFailed(
-        modelId: modelId,
-        error: e.toString(),
-      ));
-      rethrow;
-    }
-  }
-
-  /// Load a VLM model from explicit file paths.
-  Future<void> loadWithPath(
-    String modelPath, {
-    String? mmprojPath,
-    required String modelId,
-    required String modelName,
-  }) async {
-    if (!SdkState.shared.isInitialized) throw SDKException.notInitialized();
-
-    EventBus.shared.publish(SDKModelEvent.loadStarted(modelId: modelId));
-    try {
-      if (DartBridge.vlm.isLoaded) {
-        DartBridge.vlm.unload();
-      }
-      await DartBridge.vlm.loadModel(modelPath, mmprojPath, modelId, modelName);
-      if (!DartBridge.vlm.isLoaded) {
-        throw SDKException.vlmModelLoadFailed(
-          'VLM model failed to load - model may not be compatible',
-        );
-      }
-      EventBus.shared.publish(SDKModelEvent.loadCompleted(modelId: modelId));
-    } catch (e) {
-      EventBus.shared.publish(SDKModelEvent.loadFailed(
-        modelId: modelId,
-        error: e.toString(),
-      ));
+      EventBus.shared.publish(SdkEventFactory.modelLoadFailed(modelId, e));
       rethrow;
     }
   }
@@ -160,7 +108,30 @@ class RunAnywhereVLM {
   /// Unload the currently-loaded VLM model.
   Future<void> unload() async {
     if (!SdkState.shared.isInitialized) throw SDKException.notInitialized();
-    DartBridge.vlm.unload();
+    var modelId = currentModelId;
+    var category = model_pb.ModelCategory.MODEL_CATEGORY_UNSPECIFIED;
+    if (modelId == null) {
+      final current = await _currentVlmLifecycleResult();
+      modelId = current?.modelId;
+      category = current?.category ??
+          model_pb.ModelCategory.MODEL_CATEGORY_UNSPECIFIED;
+    }
+    if (modelId == null) {
+      return;
+    }
+    final result = await RunAnywhereModelLifecycle.shared.unload(
+      model_pb.ModelUnloadRequest(
+        modelId: modelId,
+        category: category,
+      ),
+    );
+    if (!result.success) {
+      throw SDKException.invalidState(
+        result.errorMessage.isNotEmpty
+            ? result.errorMessage
+            : 'VLM lifecycle unload failed',
+      );
+    }
   }
 
   /// Cancel any in-flight VLM generation.
@@ -196,14 +167,15 @@ class RunAnywhereVLM {
     VLMGenerationOptions? options,
   }) async {
     if (!SdkState.shared.isInitialized) throw SDKException.notInitialized();
-    if (!DartBridge.vlm.isLoaded) throw SDKException.vlmNotInitialized();
+    final modelId = await _requireLoadedModelId();
 
     final logger = SDKLogger('RunAnywhere.VLM.ProcessImage');
-    final modelId = DartBridge.vlm.currentModelId ?? 'unknown';
     final opts = _effectiveOptions(prompt, options ?? VLMGenerationOptions());
 
     try {
-      final result = DartBridge.vlm.processImageProto(image, opts);
+      final result = await DartBridge.vlm.processImageProto(
+        _toGenerationRequest(image, opts, modelId),
+      );
 
       logger.info(
         'VLM processing complete: ${result.completionTokens} tokens, '
@@ -212,7 +184,7 @@ class RunAnywhereVLM {
 
       TelemetryService.shared.trackGeneration(
         modelId: modelId,
-        modelName: DartBridge.vlm.currentModelId,
+        modelName: modelId,
         promptTokens: result.promptTokens,
         completionTokens: result.completionTokens,
         latencyMs: result.processingTimeMs.toInt(),
@@ -234,14 +206,14 @@ class RunAnywhereVLM {
     }
   }
 
-  /// Stream image processing with real-time tokens.
-  Future<VLMStreamingResult> processImageStream(
+  /// Stream image processing with generated VLM stream events.
+  Stream<VLMStreamEvent> processImageStream(
     VLMImage image, {
     required String prompt,
     VLMGenerationOptions? options,
-  }) async {
+  }) async* {
     if (!SdkState.shared.isInitialized) throw SDKException.notInitialized();
-    if (!DartBridge.vlm.isLoaded) throw SDKException.vlmNotInitialized();
+    final modelId = await _requireLoadedModelId();
 
     final logger = SDKLogger('RunAnywhere.VLM.ProcessImageStream');
     final opts = _effectiveOptions(
@@ -251,11 +223,8 @@ class RunAnywhereVLM {
     );
 
     try {
-      final stream = DartBridge.vlm.processImageStreamProto(image, opts);
-      return VLMStreamingResult(
-        stream: stream.stream,
-        metrics: stream.metrics,
-        cancel: stream.cancel,
+      yield* DartBridge.vlm.processImageStreamProto(
+        _toGenerationRequest(image, opts, modelId),
       );
     } catch (e) {
       logger.error('Failed to start VLM streaming: $e');
@@ -287,4 +256,53 @@ class RunAnywhereVLM {
     opts.streamingEnabled = streaming;
     return opts;
   }
+
+  VLMGenerationRequest _toGenerationRequest(
+    VLMImage image,
+    VLMGenerationOptions options,
+    String modelId,
+  ) {
+    return VLMGenerationRequest(
+      images: [image],
+      options: options,
+      modelId: modelId,
+    );
+  }
+
+  Future<String> _requireLoadedModelId() async {
+    final snapshotModelId = currentModelId;
+    if (snapshotModelId != null) {
+      return snapshotModelId;
+    }
+    final current = await _currentVlmLifecycleResult();
+    if (current == null) {
+      throw SDKException.vlmNotInitialized();
+    }
+    return current.modelId;
+  }
+
+  Future<model_pb.CurrentModelResult?> _currentVlmLifecycleResult() async {
+    for (final category in _vlmCategories) {
+      final current = await RunAnywhereModelLifecycle.shared.current(
+        model_pb.CurrentModelRequest(
+          category: category,
+          includeModelMetadata: true,
+        ),
+      );
+      if (current.found && current.modelId.isNotEmpty) {
+        return current;
+      }
+    }
+    return null;
+  }
+
+  ComponentLifecycleSnapshot? get _lifecycleSnapshot =>
+      RunAnywhereModelLifecycle.shared.componentSnapshot(
+        SDKComponent.SDK_COMPONENT_VLM,
+      );
+
+  static const List<model_pb.ModelCategory> _vlmCategories = [
+    model_pb.ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+    model_pb.ModelCategory.MODEL_CATEGORY_VISION,
+  ];
 }

@@ -7,6 +7,15 @@
  *
  * This header defines the service interface. For data types,
  * see rac_vad_types.h.
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - rac_vad_service_ops_t and rac_vad_service_t: `internal`.
+ *   - Public C functions (rac_vad_create, initialize,
+ *     set_activity_callback, set_audio_callback, start, stop, reset,
+ *     process, is_speech_active, get/set_threshold, destroy):
+ *     `delete after SDK migration` — replaced by VAD proto APIs in
+ *     rac_vad_component.h over runanywhere.v1.VADResult /
+ *     VADStreamEvent bytes.
  */
 
 #ifndef RAC_VAD_SERVICE_H
@@ -14,6 +23,7 @@
 
 #include "rac/core/rac_error.h"
 #include "rac/features/vad/rac_vad_types.h"
+#include "rac/foundation/rac_proto_buffer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -222,6 +232,18 @@ RAC_API rac_result_t rac_vad_get_info(rac_handle_t handle, rac_vad_info_t* out_i
  * @param handle Service handle to destroy
  */
 RAC_API void rac_vad_destroy(rac_handle_t handle);
+
+/**
+ * @brief Process one audio frame using the lifecycle-loaded VAD model.
+ *
+ * request_proto_bytes encodes runanywhere.v1.VADProcessRequest. The portable
+ * ABI accepts embedded PCM bytes only; native stream adapter handles remain
+ * platform-owned. out_result receives serialized runanywhere.v1.VADResult
+ * bytes.
+ */
+RAC_API rac_result_t rac_vad_process_lifecycle_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
 
 #ifdef __cplusplus
 }

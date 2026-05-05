@@ -24,6 +24,26 @@ export declare enum SpeechActivityKind {
 }
 export declare function speechActivityKindFromJSON(object: any): SpeechActivityKind;
 export declare function speechActivityKindToJSON(object: SpeechActivityKind): string;
+export declare enum VADAudioEncoding {
+    VAD_AUDIO_ENCODING_UNSPECIFIED = 0,
+    VAD_AUDIO_ENCODING_PCM_F32_LE = 1,
+    VAD_AUDIO_ENCODING_PCM_S16_LE = 2,
+    UNRECOGNIZED = -1
+}
+export declare function vADAudioEncodingFromJSON(object: any): VADAudioEncoding;
+export declare function vADAudioEncodingToJSON(object: VADAudioEncoding): string;
+export declare enum VADStreamEventKind {
+    VAD_STREAM_EVENT_KIND_UNSPECIFIED = 0,
+    VAD_STREAM_EVENT_KIND_STARTED = 1,
+    VAD_STREAM_EVENT_KIND_FRAME = 2,
+    VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY = 3,
+    VAD_STREAM_EVENT_KIND_STATISTICS = 4,
+    VAD_STREAM_EVENT_KIND_STOPPED = 5,
+    VAD_STREAM_EVENT_KIND_ERROR = 6,
+    UNRECOGNIZED = -1
+}
+export declare function vADStreamEventKindFromJSON(object: any): VADStreamEventKind;
+export declare function vADStreamEventKindToJSON(object: VADStreamEventKind): string;
 /**
  * ---------------------------------------------------------------------------
  * Compile-time / load-time configuration for a VAD instance.
@@ -132,6 +152,28 @@ export interface VADOptions {
      * 0 = backend/default.
      */
     maxSpeechDurationMs: number;
+    /** Whether to include VADStatistics in stream events when available. */
+    includeStatistics: boolean;
+}
+export interface VADAudioSource {
+    audioData?: Uint8Array | undefined;
+    adapterHandle?: string | undefined;
+    encoding: VADAudioEncoding;
+    sampleRate: number;
+    channels: number;
+    frameOffsetMs: number;
+}
+export interface VADProcessRequest {
+    requestId: string;
+    audio?: VADAudioSource | undefined;
+    options?: VADOptions | undefined;
+    metadata: {
+        [key: string]: string;
+    };
+}
+export interface VADProcessRequest_MetadataEntry {
+    key: string;
+    value: string;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -174,6 +216,10 @@ export interface VADResult {
     /** Optional detected segment start/end times, in milliseconds. 0 = unset. */
     startTimeMs: number;
     endTimeMs: number;
+    /** Optional statistics snapshot and result-envelope error details. */
+    statistics?: VADStatistics | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -252,6 +298,30 @@ export interface SpeechActivityEvent {
      * utterance length; left zero on SPEECH_STARTED.
      */
     durationMs: number;
+    confidence: number;
+    result?: VADResult | undefined;
+    segmentId?: string | undefined;
+}
+export interface VADStreamEvent {
+    seq: number;
+    timestampUs: number;
+    requestId: string;
+    kind: VADStreamEventKind;
+    result?: VADResult | undefined;
+    activity?: SpeechActivityEvent | undefined;
+    statistics?: VADStatistics | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+export interface VADServiceState {
+    isReady: boolean;
+    isSpeechActive: boolean;
+    energyThreshold: number;
+    sampleRate: number;
+    frameLengthMs: number;
+    currentModel?: string | undefined;
+    errorMessage?: string | undefined;
+    errorCode: number;
 }
 export declare const VADConfiguration: {
     encode(message: VADConfiguration, writer?: _m0.Writer): _m0.Writer;
@@ -268,6 +338,30 @@ export declare const VADOptions: {
     toJSON(message: VADOptions): unknown;
     create<I extends Exact<DeepPartial<VADOptions>, I>>(base?: I): VADOptions;
     fromPartial<I extends Exact<DeepPartial<VADOptions>, I>>(object: I): VADOptions;
+};
+export declare const VADAudioSource: {
+    encode(message: VADAudioSource, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VADAudioSource;
+    fromJSON(object: any): VADAudioSource;
+    toJSON(message: VADAudioSource): unknown;
+    create<I extends Exact<DeepPartial<VADAudioSource>, I>>(base?: I): VADAudioSource;
+    fromPartial<I extends Exact<DeepPartial<VADAudioSource>, I>>(object: I): VADAudioSource;
+};
+export declare const VADProcessRequest: {
+    encode(message: VADProcessRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VADProcessRequest;
+    fromJSON(object: any): VADProcessRequest;
+    toJSON(message: VADProcessRequest): unknown;
+    create<I extends Exact<DeepPartial<VADProcessRequest>, I>>(base?: I): VADProcessRequest;
+    fromPartial<I extends Exact<DeepPartial<VADProcessRequest>, I>>(object: I): VADProcessRequest;
+};
+export declare const VADProcessRequest_MetadataEntry: {
+    encode(message: VADProcessRequest_MetadataEntry, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VADProcessRequest_MetadataEntry;
+    fromJSON(object: any): VADProcessRequest_MetadataEntry;
+    toJSON(message: VADProcessRequest_MetadataEntry): unknown;
+    create<I extends Exact<DeepPartial<VADProcessRequest_MetadataEntry>, I>>(base?: I): VADProcessRequest_MetadataEntry;
+    fromPartial<I extends Exact<DeepPartial<VADProcessRequest_MetadataEntry>, I>>(object: I): VADProcessRequest_MetadataEntry;
 };
 export declare const VADResult: {
     encode(message: VADResult, writer?: _m0.Writer): _m0.Writer;
@@ -292,6 +386,22 @@ export declare const SpeechActivityEvent: {
     toJSON(message: SpeechActivityEvent): unknown;
     create<I extends Exact<DeepPartial<SpeechActivityEvent>, I>>(base?: I): SpeechActivityEvent;
     fromPartial<I extends Exact<DeepPartial<SpeechActivityEvent>, I>>(object: I): SpeechActivityEvent;
+};
+export declare const VADStreamEvent: {
+    encode(message: VADStreamEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VADStreamEvent;
+    fromJSON(object: any): VADStreamEvent;
+    toJSON(message: VADStreamEvent): unknown;
+    create<I extends Exact<DeepPartial<VADStreamEvent>, I>>(base?: I): VADStreamEvent;
+    fromPartial<I extends Exact<DeepPartial<VADStreamEvent>, I>>(object: I): VADStreamEvent;
+};
+export declare const VADServiceState: {
+    encode(message: VADServiceState, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VADServiceState;
+    fromJSON(object: any): VADServiceState;
+    toJSON(message: VADServiceState): unknown;
+    create<I extends Exact<DeepPartial<VADServiceState>, I>>(base?: I): VADServiceState;
+    fromPartial<I extends Exact<DeepPartial<VADServiceState>, I>>(object: I): VADServiceState;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

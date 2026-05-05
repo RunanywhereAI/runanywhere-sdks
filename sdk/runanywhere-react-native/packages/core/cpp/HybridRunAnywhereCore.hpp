@@ -110,11 +110,6 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> queryModelsProto(
     const std::shared_ptr<ArrayBuffer>& queryBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getDownloadedModelsProto() override;
-  std::shared_ptr<Promise<std::string>> getAvailableModels() override;
-  std::shared_ptr<Promise<std::string>> getModelInfo(const std::string& modelId) override;
-  std::shared_ptr<Promise<bool>> isModelDownloaded(const std::string& modelId) override;
-  std::shared_ptr<Promise<std::string>> getModelPath(const std::string& modelId) override;
-  std::shared_ptr<Promise<bool>> registerModel(const std::string& modelJson) override;
   std::shared_ptr<Promise<std::string>> checkCompatibility(const std::string& modelId) override;
   std::shared_ptr<Promise<bool>> refreshModelRegistry(
     bool includeRemoteCatalog,
@@ -122,17 +117,10 @@ public:
     bool pruneOrphans) override;
 
   // ============================================================================
-  // Download Service - libcurl-backed rac_http_download_execute runner with
-  // a cancel-token registry so JS can abort in-flight downloads.
+  // Download Service - proto-byte download workflow over the registered
+  // platform HTTP transport.
   // ============================================================================
 
-  std::shared_ptr<Promise<void>> downloadModel(
-    const std::string& url,
-    const std::string& destPath,
-    const std::string& cancelToken,
-    const std::function<void(const std::string&)>& onProgress,
-    const std::optional<std::string>& expectedSha256Hex) override;
-  std::shared_ptr<Promise<bool>> cancelDownload(const std::string& cancelToken) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadPlanProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadStartProto(
@@ -151,9 +139,7 @@ public:
   // Storage - Delegates to StorageBridge
   // ============================================================================
 
-  std::shared_ptr<Promise<std::string>> getStorageInfo() override;
   std::shared_ptr<Promise<bool>> clearCache() override;
-  std::shared_ptr<Promise<bool>> deleteModel(const std::string& modelId) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageInfoProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> storageAvailabilityProto(
@@ -173,8 +159,6 @@ public:
   // Events - Delegates to EventBridge
   // ============================================================================
 
-  std::shared_ptr<Promise<void>> emitEvent(const std::string& eventJson) override;
-  std::shared_ptr<Promise<std::string>> pollEvents() override;
   std::shared_ptr<Promise<double>> subscribeSDKEventsProto(
     const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) override;
   std::shared_ptr<Promise<void>> unsubscribeSDKEventsProto(double subscriptionId) override;
@@ -348,6 +332,26 @@ public:
     const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onActivityBytes) override;
 
   // ============================================================================
+  // VLM Capability (Backend-Agnostic)
+  // Uses commons VLM service lifecycle plus rac_vlm_*_proto ABI.
+  // ============================================================================
+
+  std::shared_ptr<Promise<bool>> loadVLMModelFromArtifacts(
+    const std::string& primaryModelPath,
+    const std::string& visionProjectorPath,
+    const std::string& modelId) override;
+  std::shared_ptr<Promise<bool>> isVLMModelLoaded() override;
+  std::shared_ptr<Promise<bool>> unloadVLMModel() override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vlmProcessProto(
+    const std::shared_ptr<ArrayBuffer>& imageBytes,
+    const std::shared_ptr<ArrayBuffer>& optionsBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> vlmProcessStreamProto(
+    const std::shared_ptr<ArrayBuffer>& imageBytes,
+    const std::shared_ptr<ArrayBuffer>& optionsBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) override;
+  std::shared_ptr<Promise<bool>> vlmCancelProto() override;
+
+  // ============================================================================
   // Secure Storage
   // Matches Swift: KeychainManager.swift
   // Uses platform adapter callbacks for Keychain/Keystore
@@ -360,7 +364,7 @@ public:
     const std::string& key) override;
   std::shared_ptr<Promise<bool>> secureStorageDelete(const std::string& key) override;
   std::shared_ptr<Promise<bool>> secureStorageExists(const std::string& key) override;
-  
+
   // Aliases for semantic clarity (forward to Set/Get implementations)
   std::shared_ptr<Promise<void>> secureStorageStore(
     const std::string& key,
@@ -400,15 +404,23 @@ public:
     const std::shared_ptr<ArrayBuffer>& audioBytes) override;
 
   // ============================================================================
-  // Tool Calling - Delegates to ToolCallingBridge
-  // Single source of truth for parsing, formatting, and prompt building
+  // Tool Calling - delegates generated proto bytes to commons C ABI.
+  // Single source of truth for parsing, formatting, and prompt building.
   // Tool registry and execution are in TypeScript (RunAnywhere+ToolCalling.ts)
   // ============================================================================
 
-  std::shared_ptr<Promise<std::string>> parseToolCallFromOutput(const std::string& llmOutput) override;
-  std::shared_ptr<Promise<std::string>> formatToolsForPrompt(const std::string& toolsJson, const std::string& format) override;
-  std::shared_ptr<Promise<std::string>> buildInitialPrompt(const std::string& userPrompt, const std::string& toolsJson, const std::string& optionsJson) override;
-  std::shared_ptr<Promise<std::string>> buildFollowupPrompt(const std::string& originalPrompt, const std::string& toolsPrompt, const std::string& toolName, const std::string& resultJson, bool keepToolsAvailable) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolParseProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolFormatPromptProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> toolValidateProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputParseProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputPreparePromptProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> structuredOutputValidateProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
 
   // ============================================================================
   // RAG Pipeline - Delegates to RAGBridge
@@ -438,13 +450,26 @@ public:
     double handle,
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<void>> embeddingsDestroyProto(double handle) override;
-  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraLoadProto(
-    const std::shared_ptr<ArrayBuffer>& configBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraApplyProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraRemoveProto(
-    const std::shared_ptr<ArrayBuffer>& configBytes) override;
-  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraClearProto() override;
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraListProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraStateProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCompatibilityProto(
     const std::shared_ptr<ArrayBuffer>& configBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraRegisterCatalogEntryProto(
+    const std::shared_ptr<ArrayBuffer>& entryBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogListProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogQueryProto(
+    const std::shared_ptr<ArrayBuffer>& queryBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogGetProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogMarkDownloadCompletedProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
 
   // ============================================================================
   // Solutions Runtime (rac/solutions/rac_solution.h) — T4.7 / T4.8

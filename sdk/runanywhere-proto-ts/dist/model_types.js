@@ -573,6 +573,8 @@ export var ModelSource;
     ModelSource[ModelSource["MODEL_SOURCE_REMOTE"] = 1] = "MODEL_SOURCE_REMOTE";
     /** MODEL_SOURCE_LOCAL - Bundled or user-imported */
     ModelSource[ModelSource["MODEL_SOURCE_LOCAL"] = 2] = "MODEL_SOURCE_LOCAL";
+    /** MODEL_SOURCE_BUILT_IN - Platform/system model with no portable download artifact */
+    ModelSource[ModelSource["MODEL_SOURCE_BUILT_IN"] = 3] = "MODEL_SOURCE_BUILT_IN";
     ModelSource[ModelSource["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(ModelSource || (ModelSource = {}));
 export function modelSourceFromJSON(object) {
@@ -586,6 +588,9 @@ export function modelSourceFromJSON(object) {
         case 2:
         case "MODEL_SOURCE_LOCAL":
             return ModelSource.MODEL_SOURCE_LOCAL;
+        case 3:
+        case "MODEL_SOURCE_BUILT_IN":
+            return ModelSource.MODEL_SOURCE_BUILT_IN;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -600,6 +605,8 @@ export function modelSourceToJSON(object) {
             return "MODEL_SOURCE_REMOTE";
         case ModelSource.MODEL_SOURCE_LOCAL:
             return "MODEL_SOURCE_LOCAL";
+        case ModelSource.MODEL_SOURCE_BUILT_IN:
+            return "MODEL_SOURCE_BUILT_IN";
         case ModelSource.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -729,6 +736,11 @@ export var ModelArtifactType;
     ModelArtifactType[ModelArtifactType["MODEL_ARTIFACT_TYPE_DIRECTORY"] = 3] = "MODEL_ARTIFACT_TYPE_DIRECTORY";
     ModelArtifactType[ModelArtifactType["MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE"] = 4] = "MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE";
     ModelArtifactType[ModelArtifactType["MODEL_ARTIFACT_TYPE_CUSTOM"] = 5] = "MODEL_ARTIFACT_TYPE_CUSTOM";
+    ModelArtifactType[ModelArtifactType["MODEL_ARTIFACT_TYPE_ARCHIVE"] = 6] = "MODEL_ARTIFACT_TYPE_ARCHIVE";
+    ModelArtifactType[ModelArtifactType["MODEL_ARTIFACT_TYPE_MULTI_FILE"] = 7] = "MODEL_ARTIFACT_TYPE_MULTI_FILE";
+    ModelArtifactType[ModelArtifactType["MODEL_ARTIFACT_TYPE_BUILT_IN"] = 8] = "MODEL_ARTIFACT_TYPE_BUILT_IN";
+    ModelArtifactType[ModelArtifactType["MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE"] = 9] = "MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE";
+    ModelArtifactType[ModelArtifactType["MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE"] = 10] = "MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE";
     ModelArtifactType[ModelArtifactType["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(ModelArtifactType || (ModelArtifactType = {}));
 export function modelArtifactTypeFromJSON(object) {
@@ -751,6 +763,21 @@ export function modelArtifactTypeFromJSON(object) {
         case 5:
         case "MODEL_ARTIFACT_TYPE_CUSTOM":
             return ModelArtifactType.MODEL_ARTIFACT_TYPE_CUSTOM;
+        case 6:
+        case "MODEL_ARTIFACT_TYPE_ARCHIVE":
+            return ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE;
+        case 7:
+        case "MODEL_ARTIFACT_TYPE_MULTI_FILE":
+            return ModelArtifactType.MODEL_ARTIFACT_TYPE_MULTI_FILE;
+        case 8:
+        case "MODEL_ARTIFACT_TYPE_BUILT_IN":
+            return ModelArtifactType.MODEL_ARTIFACT_TYPE_BUILT_IN;
+        case 9:
+        case "MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE":
+            return ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE;
+        case 10:
+        case "MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE":
+            return ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -771,6 +798,16 @@ export function modelArtifactTypeToJSON(object) {
             return "MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE";
         case ModelArtifactType.MODEL_ARTIFACT_TYPE_CUSTOM:
             return "MODEL_ARTIFACT_TYPE_CUSTOM";
+        case ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE:
+            return "MODEL_ARTIFACT_TYPE_ARCHIVE";
+        case ModelArtifactType.MODEL_ARTIFACT_TYPE_MULTI_FILE:
+            return "MODEL_ARTIFACT_TYPE_MULTI_FILE";
+        case ModelArtifactType.MODEL_ARTIFACT_TYPE_BUILT_IN:
+            return "MODEL_ARTIFACT_TYPE_BUILT_IN";
+        case ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE:
+            return "MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE";
+        case ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE:
+            return "MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE";
         case ModelArtifactType.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
@@ -2101,7 +2138,7 @@ export const ModelInfoList = {
     },
 };
 function createBaseSingleFileArtifact() {
-    return { requiredPatterns: [], optionalPatterns: [] };
+    return { requiredPatterns: [], optionalPatterns: [], expectedFiles: undefined };
 }
 export const SingleFileArtifact = {
     encode(message, writer = _m0.Writer.create()) {
@@ -2110,6 +2147,9 @@ export const SingleFileArtifact = {
         }
         for (const v of message.optionalPatterns) {
             writer.uint32(18).string(v);
+        }
+        if (message.expectedFiles !== undefined) {
+            ExpectedModelFiles.encode(message.expectedFiles, writer.uint32(26).fork()).ldelim();
         }
         return writer;
     },
@@ -2132,6 +2172,12 @@ export const SingleFileArtifact = {
                     }
                     message.optionalPatterns.push(reader.string());
                     continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.expectedFiles = ExpectedModelFiles.decode(reader, reader.uint32());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2148,6 +2194,7 @@ export const SingleFileArtifact = {
             optionalPatterns: globalThis.Array.isArray(object?.optionalPatterns)
                 ? object.optionalPatterns.map((e) => globalThis.String(e))
                 : [],
+            expectedFiles: isSet(object.expectedFiles) ? ExpectedModelFiles.fromJSON(object.expectedFiles) : undefined,
         };
     },
     toJSON(message) {
@@ -2158,6 +2205,9 @@ export const SingleFileArtifact = {
         if (message.optionalPatterns?.length) {
             obj.optionalPatterns = message.optionalPatterns;
         }
+        if (message.expectedFiles !== undefined) {
+            obj.expectedFiles = ExpectedModelFiles.toJSON(message.expectedFiles);
+        }
         return obj;
     },
     create(base) {
@@ -2167,11 +2217,14 @@ export const SingleFileArtifact = {
         const message = createBaseSingleFileArtifact();
         message.requiredPatterns = object.requiredPatterns?.map((e) => e) || [];
         message.optionalPatterns = object.optionalPatterns?.map((e) => e) || [];
+        message.expectedFiles = (object.expectedFiles !== undefined && object.expectedFiles !== null)
+            ? ExpectedModelFiles.fromPartial(object.expectedFiles)
+            : undefined;
         return message;
     },
 };
 function createBaseArchiveArtifact() {
-    return { type: 0, structure: 0, requiredPatterns: [], optionalPatterns: [] };
+    return { type: 0, structure: 0, requiredPatterns: [], optionalPatterns: [], expectedFiles: undefined };
 }
 export const ArchiveArtifact = {
     encode(message, writer = _m0.Writer.create()) {
@@ -2186,6 +2239,9 @@ export const ArchiveArtifact = {
         }
         for (const v of message.optionalPatterns) {
             writer.uint32(34).string(v);
+        }
+        if (message.expectedFiles !== undefined) {
+            ExpectedModelFiles.encode(message.expectedFiles, writer.uint32(42).fork()).ldelim();
         }
         return writer;
     },
@@ -2220,6 +2276,12 @@ export const ArchiveArtifact = {
                     }
                     message.optionalPatterns.push(reader.string());
                     continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.expectedFiles = ExpectedModelFiles.decode(reader, reader.uint32());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2238,6 +2300,7 @@ export const ArchiveArtifact = {
             optionalPatterns: globalThis.Array.isArray(object?.optionalPatterns)
                 ? object.optionalPatterns.map((e) => globalThis.String(e))
                 : [],
+            expectedFiles: isSet(object.expectedFiles) ? ExpectedModelFiles.fromJSON(object.expectedFiles) : undefined,
         };
     },
     toJSON(message) {
@@ -2254,6 +2317,9 @@ export const ArchiveArtifact = {
         if (message.optionalPatterns?.length) {
             obj.optionalPatterns = message.optionalPatterns;
         }
+        if (message.expectedFiles !== undefined) {
+            obj.expectedFiles = ExpectedModelFiles.toJSON(message.expectedFiles);
+        }
         return obj;
     },
     create(base) {
@@ -2265,6 +2331,9 @@ export const ArchiveArtifact = {
         message.structure = object.structure ?? 0;
         message.requiredPatterns = object.requiredPatterns?.map((e) => e) || [];
         message.optionalPatterns = object.optionalPatterns?.map((e) => e) || [];
+        message.expectedFiles = (object.expectedFiles !== undefined && object.expectedFiles !== null)
+            ? ExpectedModelFiles.fromPartial(object.expectedFiles)
+            : undefined;
         return message;
     },
 };
@@ -2279,6 +2348,7 @@ function createBaseModelFileDescriptor() {
         destinationPath: undefined,
         role: undefined,
         localPath: undefined,
+        checksumSha256: undefined,
     };
 }
 export const ModelFileDescriptor = {
@@ -2309,6 +2379,9 @@ export const ModelFileDescriptor = {
         }
         if (message.localPath !== undefined) {
             writer.uint32(74).string(message.localPath);
+        }
+        if (message.checksumSha256 !== undefined) {
+            writer.uint32(82).string(message.checksumSha256);
         }
         return writer;
     },
@@ -2373,6 +2446,12 @@ export const ModelFileDescriptor = {
                     }
                     message.localPath = reader.string();
                     continue;
+                case 10:
+                    if (tag !== 82) {
+                        break;
+                    }
+                    message.checksumSha256 = reader.string();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2392,6 +2471,7 @@ export const ModelFileDescriptor = {
             destinationPath: isSet(object.destinationPath) ? globalThis.String(object.destinationPath) : undefined,
             role: isSet(object.role) ? modelFileRoleFromJSON(object.role) : undefined,
             localPath: isSet(object.localPath) ? globalThis.String(object.localPath) : undefined,
+            checksumSha256: isSet(object.checksumSha256) ? globalThis.String(object.checksumSha256) : undefined,
         };
     },
     toJSON(message) {
@@ -2423,6 +2503,9 @@ export const ModelFileDescriptor = {
         if (message.localPath !== undefined) {
             obj.localPath = message.localPath;
         }
+        if (message.checksumSha256 !== undefined) {
+            obj.checksumSha256 = message.checksumSha256;
+        }
         return obj;
     },
     create(base) {
@@ -2439,6 +2522,7 @@ export const ModelFileDescriptor = {
         message.destinationPath = object.destinationPath ?? undefined;
         message.role = object.role ?? undefined;
         message.localPath = object.localPath ?? undefined;
+        message.checksumSha256 = object.checksumSha256 ?? undefined;
         return message;
     },
 };
@@ -2622,6 +2706,7 @@ function createBaseModelQuery() {
         source: undefined,
         sortField: undefined,
         sortOrder: undefined,
+        registryStatus: undefined,
     };
 }
 export const ModelQuery = {
@@ -2655,6 +2740,9 @@ export const ModelQuery = {
         }
         if (message.sortOrder !== undefined) {
             writer.uint32(80).int32(message.sortOrder);
+        }
+        if (message.registryStatus !== undefined) {
+            writer.uint32(88).int32(message.registryStatus);
         }
         return writer;
     },
@@ -2725,6 +2813,12 @@ export const ModelQuery = {
                     }
                     message.sortOrder = reader.int32();
                     continue;
+                case 11:
+                    if (tag !== 88) {
+                        break;
+                    }
+                    message.registryStatus = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -2745,6 +2839,7 @@ export const ModelQuery = {
             source: isSet(object.source) ? modelSourceFromJSON(object.source) : undefined,
             sortField: isSet(object.sortField) ? modelQuerySortFieldFromJSON(object.sortField) : undefined,
             sortOrder: isSet(object.sortOrder) ? modelQuerySortOrderFromJSON(object.sortOrder) : undefined,
+            registryStatus: isSet(object.registryStatus) ? modelRegistryStatusFromJSON(object.registryStatus) : undefined,
         };
     },
     toJSON(message) {
@@ -2779,6 +2874,9 @@ export const ModelQuery = {
         if (message.sortOrder !== undefined) {
             obj.sortOrder = modelQuerySortOrderToJSON(message.sortOrder);
         }
+        if (message.registryStatus !== undefined) {
+            obj.registryStatus = modelRegistryStatusToJSON(message.registryStatus);
+        }
         return obj;
     },
     create(base) {
@@ -2796,6 +2894,7 @@ export const ModelQuery = {
         message.source = object.source ?? undefined;
         message.sortField = object.sortField ?? undefined;
         message.sortOrder = object.sortOrder ?? undefined;
+        message.registryStatus = object.registryStatus ?? undefined;
         return message;
     },
 };
@@ -2959,7 +3058,15 @@ export const ModelCompatibilityResult = {
     },
 };
 function createBaseModelRegistryRefreshRequest() {
-    return { includeRemoteCatalog: false, rescanLocal: false, pruneOrphans: false, query: undefined };
+    return {
+        includeRemoteCatalog: false,
+        rescanLocal: false,
+        pruneOrphans: false,
+        query: undefined,
+        catalogUri: "",
+        forceRefresh: false,
+        includeDownloadedState: false,
+    };
 }
 export const ModelRegistryRefreshRequest = {
     encode(message, writer = _m0.Writer.create()) {
@@ -2974,6 +3081,15 @@ export const ModelRegistryRefreshRequest = {
         }
         if (message.query !== undefined) {
             ModelQuery.encode(message.query, writer.uint32(34).fork()).ldelim();
+        }
+        if (message.catalogUri !== "") {
+            writer.uint32(42).string(message.catalogUri);
+        }
+        if (message.forceRefresh !== false) {
+            writer.uint32(48).bool(message.forceRefresh);
+        }
+        if (message.includeDownloadedState !== false) {
+            writer.uint32(56).bool(message.includeDownloadedState);
         }
         return writer;
     },
@@ -3008,6 +3124,24 @@ export const ModelRegistryRefreshRequest = {
                     }
                     message.query = ModelQuery.decode(reader, reader.uint32());
                     continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.catalogUri = reader.string();
+                    continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.forceRefresh = reader.bool();
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.includeDownloadedState = reader.bool();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3024,6 +3158,11 @@ export const ModelRegistryRefreshRequest = {
             rescanLocal: isSet(object.rescanLocal) ? globalThis.Boolean(object.rescanLocal) : false,
             pruneOrphans: isSet(object.pruneOrphans) ? globalThis.Boolean(object.pruneOrphans) : false,
             query: isSet(object.query) ? ModelQuery.fromJSON(object.query) : undefined,
+            catalogUri: isSet(object.catalogUri) ? globalThis.String(object.catalogUri) : "",
+            forceRefresh: isSet(object.forceRefresh) ? globalThis.Boolean(object.forceRefresh) : false,
+            includeDownloadedState: isSet(object.includeDownloadedState)
+                ? globalThis.Boolean(object.includeDownloadedState)
+                : false,
         };
     },
     toJSON(message) {
@@ -3040,6 +3179,15 @@ export const ModelRegistryRefreshRequest = {
         if (message.query !== undefined) {
             obj.query = ModelQuery.toJSON(message.query);
         }
+        if (message.catalogUri !== "") {
+            obj.catalogUri = message.catalogUri;
+        }
+        if (message.forceRefresh !== false) {
+            obj.forceRefresh = message.forceRefresh;
+        }
+        if (message.includeDownloadedState !== false) {
+            obj.includeDownloadedState = message.includeDownloadedState;
+        }
         return obj;
     },
     create(base) {
@@ -3053,6 +3201,9 @@ export const ModelRegistryRefreshRequest = {
         message.query = (object.query !== undefined && object.query !== null)
             ? ModelQuery.fromPartial(object.query)
             : undefined;
+        message.catalogUri = object.catalogUri ?? "";
+        message.forceRefresh = object.forceRefresh ?? false;
+        message.includeDownloadedState = object.includeDownloadedState ?? false;
         return message;
     },
 };
@@ -3067,6 +3218,9 @@ function createBaseModelRegistryRefreshResult() {
         refreshedAtUnixMs: 0,
         warnings: [],
         errorMessage: "",
+        downloadedCount: 0,
+        availableCount: 0,
+        errorCount: 0,
     };
 }
 export const ModelRegistryRefreshResult = {
@@ -3097,6 +3251,15 @@ export const ModelRegistryRefreshResult = {
         }
         if (message.errorMessage !== "") {
             writer.uint32(74).string(message.errorMessage);
+        }
+        if (message.downloadedCount !== 0) {
+            writer.uint32(80).int32(message.downloadedCount);
+        }
+        if (message.availableCount !== 0) {
+            writer.uint32(88).int32(message.availableCount);
+        }
+        if (message.errorCount !== 0) {
+            writer.uint32(96).int32(message.errorCount);
         }
         return writer;
     },
@@ -3161,6 +3324,24 @@ export const ModelRegistryRefreshResult = {
                     }
                     message.errorMessage = reader.string();
                     continue;
+                case 10:
+                    if (tag !== 80) {
+                        break;
+                    }
+                    message.downloadedCount = reader.int32();
+                    continue;
+                case 11:
+                    if (tag !== 88) {
+                        break;
+                    }
+                    message.availableCount = reader.int32();
+                    continue;
+                case 12:
+                    if (tag !== 96) {
+                        break;
+                    }
+                    message.errorCount = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3180,6 +3361,9 @@ export const ModelRegistryRefreshResult = {
             refreshedAtUnixMs: isSet(object.refreshedAtUnixMs) ? globalThis.Number(object.refreshedAtUnixMs) : 0,
             warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
             errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+            downloadedCount: isSet(object.downloadedCount) ? globalThis.Number(object.downloadedCount) : 0,
+            availableCount: isSet(object.availableCount) ? globalThis.Number(object.availableCount) : 0,
+            errorCount: isSet(object.errorCount) ? globalThis.Number(object.errorCount) : 0,
         };
     },
     toJSON(message) {
@@ -3211,6 +3395,15 @@ export const ModelRegistryRefreshResult = {
         if (message.errorMessage !== "") {
             obj.errorMessage = message.errorMessage;
         }
+        if (message.downloadedCount !== 0) {
+            obj.downloadedCount = Math.round(message.downloadedCount);
+        }
+        if (message.availableCount !== 0) {
+            obj.availableCount = Math.round(message.availableCount);
+        }
+        if (message.errorCount !== 0) {
+            obj.errorCount = Math.round(message.errorCount);
+        }
         return obj;
     },
     create(base) {
@@ -3229,16 +3422,22 @@ export const ModelRegistryRefreshResult = {
         message.refreshedAtUnixMs = object.refreshedAtUnixMs ?? 0;
         message.warnings = object.warnings?.map((e) => e) || [];
         message.errorMessage = object.errorMessage ?? "";
+        message.downloadedCount = object.downloadedCount ?? 0;
+        message.availableCount = object.availableCount ?? 0;
+        message.errorCount = object.errorCount ?? 0;
         return message;
     },
 };
 function createBaseModelListRequest() {
-    return { query: undefined };
+    return { query: undefined, includeCounts: false };
 }
 export const ModelListRequest = {
     encode(message, writer = _m0.Writer.create()) {
         if (message.query !== undefined) {
             ModelQuery.encode(message.query, writer.uint32(10).fork()).ldelim();
+        }
+        if (message.includeCounts !== false) {
+            writer.uint32(16).bool(message.includeCounts);
         }
         return writer;
     },
@@ -3255,6 +3454,12 @@ export const ModelListRequest = {
                     }
                     message.query = ModelQuery.decode(reader, reader.uint32());
                     continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.includeCounts = reader.bool();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3264,12 +3469,18 @@ export const ModelListRequest = {
         return message;
     },
     fromJSON(object) {
-        return { query: isSet(object.query) ? ModelQuery.fromJSON(object.query) : undefined };
+        return {
+            query: isSet(object.query) ? ModelQuery.fromJSON(object.query) : undefined,
+            includeCounts: isSet(object.includeCounts) ? globalThis.Boolean(object.includeCounts) : false,
+        };
     },
     toJSON(message) {
         const obj = {};
         if (message.query !== undefined) {
             obj.query = ModelQuery.toJSON(message.query);
+        }
+        if (message.includeCounts !== false) {
+            obj.includeCounts = message.includeCounts;
         }
         return obj;
     },
@@ -3281,11 +3492,20 @@ export const ModelListRequest = {
         message.query = (object.query !== undefined && object.query !== null)
             ? ModelQuery.fromPartial(object.query)
             : undefined;
+        message.includeCounts = object.includeCounts ?? false;
         return message;
     },
 };
 function createBaseModelListResult() {
-    return { success: false, models: undefined, errorMessage: "" };
+    return {
+        success: false,
+        models: undefined,
+        errorMessage: "",
+        totalCount: 0,
+        downloadedCount: 0,
+        availableCount: 0,
+        filteredCount: 0,
+    };
 }
 export const ModelListResult = {
     encode(message, writer = _m0.Writer.create()) {
@@ -3297,6 +3517,18 @@ export const ModelListResult = {
         }
         if (message.errorMessage !== "") {
             writer.uint32(26).string(message.errorMessage);
+        }
+        if (message.totalCount !== 0) {
+            writer.uint32(32).int32(message.totalCount);
+        }
+        if (message.downloadedCount !== 0) {
+            writer.uint32(40).int32(message.downloadedCount);
+        }
+        if (message.availableCount !== 0) {
+            writer.uint32(48).int32(message.availableCount);
+        }
+        if (message.filteredCount !== 0) {
+            writer.uint32(56).int32(message.filteredCount);
         }
         return writer;
     },
@@ -3325,6 +3557,30 @@ export const ModelListResult = {
                     }
                     message.errorMessage = reader.string();
                     continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.totalCount = reader.int32();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.downloadedCount = reader.int32();
+                    continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.availableCount = reader.int32();
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.filteredCount = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3338,6 +3594,10 @@ export const ModelListResult = {
             success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
             models: isSet(object.models) ? ModelInfoList.fromJSON(object.models) : undefined,
             errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+            totalCount: isSet(object.totalCount) ? globalThis.Number(object.totalCount) : 0,
+            downloadedCount: isSet(object.downloadedCount) ? globalThis.Number(object.downloadedCount) : 0,
+            availableCount: isSet(object.availableCount) ? globalThis.Number(object.availableCount) : 0,
+            filteredCount: isSet(object.filteredCount) ? globalThis.Number(object.filteredCount) : 0,
         };
     },
     toJSON(message) {
@@ -3351,6 +3611,18 @@ export const ModelListResult = {
         if (message.errorMessage !== "") {
             obj.errorMessage = message.errorMessage;
         }
+        if (message.totalCount !== 0) {
+            obj.totalCount = Math.round(message.totalCount);
+        }
+        if (message.downloadedCount !== 0) {
+            obj.downloadedCount = Math.round(message.downloadedCount);
+        }
+        if (message.availableCount !== 0) {
+            obj.availableCount = Math.round(message.availableCount);
+        }
+        if (message.filteredCount !== 0) {
+            obj.filteredCount = Math.round(message.filteredCount);
+        }
         return obj;
     },
     create(base) {
@@ -3363,6 +3635,10 @@ export const ModelListResult = {
             ? ModelInfoList.fromPartial(object.models)
             : undefined;
         message.errorMessage = object.errorMessage ?? "";
+        message.totalCount = object.totalCount ?? 0;
+        message.downloadedCount = object.downloadedCount ?? 0;
+        message.availableCount = object.availableCount ?? 0;
+        message.filteredCount = object.filteredCount ?? 0;
         return message;
     },
 };
@@ -3499,7 +3775,14 @@ export const ModelGetResult = {
     },
 };
 function createBaseModelImportRequest() {
-    return { model: undefined, sourcePath: "", copyIntoManagedStorage: false, overwriteExisting: false, files: [] };
+    return {
+        model: undefined,
+        sourcePath: "",
+        copyIntoManagedStorage: false,
+        overwriteExisting: false,
+        files: [],
+        validateBeforeRegister: false,
+    };
 }
 export const ModelImportRequest = {
     encode(message, writer = _m0.Writer.create()) {
@@ -3517,6 +3800,9 @@ export const ModelImportRequest = {
         }
         for (const v of message.files) {
             ModelFileDescriptor.encode(v, writer.uint32(42).fork()).ldelim();
+        }
+        if (message.validateBeforeRegister !== false) {
+            writer.uint32(48).bool(message.validateBeforeRegister);
         }
         return writer;
     },
@@ -3557,6 +3843,12 @@ export const ModelImportRequest = {
                     }
                     message.files.push(ModelFileDescriptor.decode(reader, reader.uint32()));
                     continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.validateBeforeRegister = reader.bool();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3576,6 +3868,9 @@ export const ModelImportRequest = {
             files: globalThis.Array.isArray(object?.files)
                 ? object.files.map((e) => ModelFileDescriptor.fromJSON(e))
                 : [],
+            validateBeforeRegister: isSet(object.validateBeforeRegister)
+                ? globalThis.Boolean(object.validateBeforeRegister)
+                : false,
         };
     },
     toJSON(message) {
@@ -3595,6 +3890,9 @@ export const ModelImportRequest = {
         if (message.files?.length) {
             obj.files = message.files.map((e) => ModelFileDescriptor.toJSON(e));
         }
+        if (message.validateBeforeRegister !== false) {
+            obj.validateBeforeRegister = message.validateBeforeRegister;
+        }
         return obj;
     },
     create(base) {
@@ -3609,11 +3907,21 @@ export const ModelImportRequest = {
         message.copyIntoManagedStorage = object.copyIntoManagedStorage ?? false;
         message.overwriteExisting = object.overwriteExisting ?? false;
         message.files = object.files?.map((e) => ModelFileDescriptor.fromPartial(e)) || [];
+        message.validateBeforeRegister = object.validateBeforeRegister ?? false;
         return message;
     },
 };
 function createBaseModelImportResult() {
-    return { success: false, model: undefined, localPath: "", importedBytes: 0, warnings: [], errorMessage: "" };
+    return {
+        success: false,
+        model: undefined,
+        localPath: "",
+        importedBytes: 0,
+        warnings: [],
+        errorMessage: "",
+        registered: false,
+        copiedIntoManagedStorage: false,
+    };
 }
 export const ModelImportResult = {
     encode(message, writer = _m0.Writer.create()) {
@@ -3634,6 +3942,12 @@ export const ModelImportResult = {
         }
         if (message.errorMessage !== "") {
             writer.uint32(50).string(message.errorMessage);
+        }
+        if (message.registered !== false) {
+            writer.uint32(56).bool(message.registered);
+        }
+        if (message.copiedIntoManagedStorage !== false) {
+            writer.uint32(64).bool(message.copiedIntoManagedStorage);
         }
         return writer;
     },
@@ -3680,6 +3994,18 @@ export const ModelImportResult = {
                     }
                     message.errorMessage = reader.string();
                     continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.registered = reader.bool();
+                    continue;
+                case 8:
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.copiedIntoManagedStorage = reader.bool();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3696,6 +4022,10 @@ export const ModelImportResult = {
             importedBytes: isSet(object.importedBytes) ? globalThis.Number(object.importedBytes) : 0,
             warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
             errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+            registered: isSet(object.registered) ? globalThis.Boolean(object.registered) : false,
+            copiedIntoManagedStorage: isSet(object.copiedIntoManagedStorage)
+                ? globalThis.Boolean(object.copiedIntoManagedStorage)
+                : false,
         };
     },
     toJSON(message) {
@@ -3718,6 +4048,12 @@ export const ModelImportResult = {
         if (message.errorMessage !== "") {
             obj.errorMessage = message.errorMessage;
         }
+        if (message.registered !== false) {
+            obj.registered = message.registered;
+        }
+        if (message.copiedIntoManagedStorage !== false) {
+            obj.copiedIntoManagedStorage = message.copiedIntoManagedStorage;
+        }
         return obj;
     },
     create(base) {
@@ -3733,11 +4069,21 @@ export const ModelImportResult = {
         message.importedBytes = object.importedBytes ?? 0;
         message.warnings = object.warnings?.map((e) => e) || [];
         message.errorMessage = object.errorMessage ?? "";
+        message.registered = object.registered ?? false;
+        message.copiedIntoManagedStorage = object.copiedIntoManagedStorage ?? false;
         return message;
     },
 };
 function createBaseModelDiscoveryRequest() {
-    return { searchRoots: [], recursive: false, linkDownloaded: false, purgeInvalid: false, query: undefined };
+    return {
+        searchRoots: [],
+        recursive: false,
+        linkDownloaded: false,
+        purgeInvalid: false,
+        query: undefined,
+        includeBuiltIn: false,
+        includeUserImports: false,
+    };
 }
 export const ModelDiscoveryRequest = {
     encode(message, writer = _m0.Writer.create()) {
@@ -3755,6 +4101,12 @@ export const ModelDiscoveryRequest = {
         }
         if (message.query !== undefined) {
             ModelQuery.encode(message.query, writer.uint32(42).fork()).ldelim();
+        }
+        if (message.includeBuiltIn !== false) {
+            writer.uint32(48).bool(message.includeBuiltIn);
+        }
+        if (message.includeUserImports !== false) {
+            writer.uint32(56).bool(message.includeUserImports);
         }
         return writer;
     },
@@ -3795,6 +4147,18 @@ export const ModelDiscoveryRequest = {
                     }
                     message.query = ModelQuery.decode(reader, reader.uint32());
                     continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.includeBuiltIn = reader.bool();
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.includeUserImports = reader.bool();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3812,6 +4176,8 @@ export const ModelDiscoveryRequest = {
             linkDownloaded: isSet(object.linkDownloaded) ? globalThis.Boolean(object.linkDownloaded) : false,
             purgeInvalid: isSet(object.purgeInvalid) ? globalThis.Boolean(object.purgeInvalid) : false,
             query: isSet(object.query) ? ModelQuery.fromJSON(object.query) : undefined,
+            includeBuiltIn: isSet(object.includeBuiltIn) ? globalThis.Boolean(object.includeBuiltIn) : false,
+            includeUserImports: isSet(object.includeUserImports) ? globalThis.Boolean(object.includeUserImports) : false,
         };
     },
     toJSON(message) {
@@ -3831,6 +4197,12 @@ export const ModelDiscoveryRequest = {
         if (message.query !== undefined) {
             obj.query = ModelQuery.toJSON(message.query);
         }
+        if (message.includeBuiltIn !== false) {
+            obj.includeBuiltIn = message.includeBuiltIn;
+        }
+        if (message.includeUserImports !== false) {
+            obj.includeUserImports = message.includeUserImports;
+        }
         return obj;
     },
     create(base) {
@@ -3845,6 +4217,8 @@ export const ModelDiscoveryRequest = {
         message.query = (object.query !== undefined && object.query !== null)
             ? ModelQuery.fromPartial(object.query)
             : undefined;
+        message.includeBuiltIn = object.includeBuiltIn ?? false;
+        message.includeUserImports = object.includeUserImports ?? false;
         return message;
     },
 };
@@ -3973,7 +4347,16 @@ export const DiscoveredModel = {
     },
 };
 function createBaseModelDiscoveryResult() {
-    return { success: false, discoveredModels: [], linkedCount: 0, purgedCount: 0, warnings: [], errorMessage: "" };
+    return {
+        success: false,
+        discoveredModels: [],
+        linkedCount: 0,
+        purgedCount: 0,
+        warnings: [],
+        errorMessage: "",
+        scannedCount: 0,
+        importedCount: 0,
+    };
 }
 export const ModelDiscoveryResult = {
     encode(message, writer = _m0.Writer.create()) {
@@ -3994,6 +4377,12 @@ export const ModelDiscoveryResult = {
         }
         if (message.errorMessage !== "") {
             writer.uint32(50).string(message.errorMessage);
+        }
+        if (message.scannedCount !== 0) {
+            writer.uint32(56).int32(message.scannedCount);
+        }
+        if (message.importedCount !== 0) {
+            writer.uint32(64).int32(message.importedCount);
         }
         return writer;
     },
@@ -4040,6 +4429,18 @@ export const ModelDiscoveryResult = {
                     }
                     message.errorMessage = reader.string();
                     continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.scannedCount = reader.int32();
+                    continue;
+                case 8:
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.importedCount = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -4058,6 +4459,8 @@ export const ModelDiscoveryResult = {
             purgedCount: isSet(object.purgedCount) ? globalThis.Number(object.purgedCount) : 0,
             warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
             errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+            scannedCount: isSet(object.scannedCount) ? globalThis.Number(object.scannedCount) : 0,
+            importedCount: isSet(object.importedCount) ? globalThis.Number(object.importedCount) : 0,
         };
     },
     toJSON(message) {
@@ -4080,6 +4483,12 @@ export const ModelDiscoveryResult = {
         if (message.errorMessage !== "") {
             obj.errorMessage = message.errorMessage;
         }
+        if (message.scannedCount !== 0) {
+            obj.scannedCount = Math.round(message.scannedCount);
+        }
+        if (message.importedCount !== 0) {
+            obj.importedCount = Math.round(message.importedCount);
+        }
         return obj;
     },
     create(base) {
@@ -4093,11 +4502,13 @@ export const ModelDiscoveryResult = {
         message.purgedCount = object.purgedCount ?? 0;
         message.warnings = object.warnings?.map((e) => e) || [];
         message.errorMessage = object.errorMessage ?? "";
+        message.scannedCount = object.scannedCount ?? 0;
+        message.importedCount = object.importedCount ?? 0;
         return message;
     },
 };
 function createBaseModelLoadRequest() {
-    return { modelId: "", category: undefined, framework: undefined, forceReload: false };
+    return { modelId: "", category: undefined, framework: undefined, forceReload: false, validateAvailability: false };
 }
 export const ModelLoadRequest = {
     encode(message, writer = _m0.Writer.create()) {
@@ -4112,6 +4523,9 @@ export const ModelLoadRequest = {
         }
         if (message.forceReload !== false) {
             writer.uint32(32).bool(message.forceReload);
+        }
+        if (message.validateAvailability !== false) {
+            writer.uint32(40).bool(message.validateAvailability);
         }
         return writer;
     },
@@ -4146,6 +4560,12 @@ export const ModelLoadRequest = {
                     }
                     message.forceReload = reader.bool();
                     continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.validateAvailability = reader.bool();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -4160,6 +4580,9 @@ export const ModelLoadRequest = {
             category: isSet(object.category) ? modelCategoryFromJSON(object.category) : undefined,
             framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : undefined,
             forceReload: isSet(object.forceReload) ? globalThis.Boolean(object.forceReload) : false,
+            validateAvailability: isSet(object.validateAvailability)
+                ? globalThis.Boolean(object.validateAvailability)
+                : false,
         };
     },
     toJSON(message) {
@@ -4176,6 +4599,9 @@ export const ModelLoadRequest = {
         if (message.forceReload !== false) {
             obj.forceReload = message.forceReload;
         }
+        if (message.validateAvailability !== false) {
+            obj.validateAvailability = message.validateAvailability;
+        }
         return obj;
     },
     create(base) {
@@ -4187,6 +4613,7 @@ export const ModelLoadRequest = {
         message.category = object.category ?? undefined;
         message.framework = object.framework ?? undefined;
         message.forceReload = object.forceReload ?? false;
+        message.validateAvailability = object.validateAvailability ?? false;
         return message;
     },
 };
@@ -4199,6 +4626,9 @@ function createBaseModelLoadResult() {
         resolvedPath: "",
         loadedAtUnixMs: 0,
         errorMessage: "",
+        warnings: [],
+        alreadyLoaded: false,
+        resolvedArtifacts: [],
     };
 }
 export const ModelLoadResult = {
@@ -4223,6 +4653,15 @@ export const ModelLoadResult = {
         }
         if (message.errorMessage !== "") {
             writer.uint32(58).string(message.errorMessage);
+        }
+        for (const v of message.warnings) {
+            writer.uint32(66).string(v);
+        }
+        if (message.alreadyLoaded !== false) {
+            writer.uint32(72).bool(message.alreadyLoaded);
+        }
+        for (const v of message.resolvedArtifacts) {
+            ModelFileDescriptor.encode(v, writer.uint32(82).fork()).ldelim();
         }
         return writer;
     },
@@ -4275,6 +4714,24 @@ export const ModelLoadResult = {
                     }
                     message.errorMessage = reader.string();
                     continue;
+                case 8:
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.warnings.push(reader.string());
+                    continue;
+                case 9:
+                    if (tag !== 72) {
+                        break;
+                    }
+                    message.alreadyLoaded = reader.bool();
+                    continue;
+                case 10:
+                    if (tag !== 82) {
+                        break;
+                    }
+                    message.resolvedArtifacts.push(ModelFileDescriptor.decode(reader, reader.uint32()));
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -4292,6 +4749,11 @@ export const ModelLoadResult = {
             resolvedPath: isSet(object.resolvedPath) ? globalThis.String(object.resolvedPath) : "",
             loadedAtUnixMs: isSet(object.loadedAtUnixMs) ? globalThis.Number(object.loadedAtUnixMs) : 0,
             errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+            warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
+            alreadyLoaded: isSet(object.alreadyLoaded) ? globalThis.Boolean(object.alreadyLoaded) : false,
+            resolvedArtifacts: globalThis.Array.isArray(object?.resolvedArtifacts)
+                ? object.resolvedArtifacts.map((e) => ModelFileDescriptor.fromJSON(e))
+                : [],
         };
     },
     toJSON(message) {
@@ -4317,6 +4779,15 @@ export const ModelLoadResult = {
         if (message.errorMessage !== "") {
             obj.errorMessage = message.errorMessage;
         }
+        if (message.warnings?.length) {
+            obj.warnings = message.warnings;
+        }
+        if (message.alreadyLoaded !== false) {
+            obj.alreadyLoaded = message.alreadyLoaded;
+        }
+        if (message.resolvedArtifacts?.length) {
+            obj.resolvedArtifacts = message.resolvedArtifacts.map((e) => ModelFileDescriptor.toJSON(e));
+        }
         return obj;
     },
     create(base) {
@@ -4331,11 +4802,14 @@ export const ModelLoadResult = {
         message.resolvedPath = object.resolvedPath ?? "";
         message.loadedAtUnixMs = object.loadedAtUnixMs ?? 0;
         message.errorMessage = object.errorMessage ?? "";
+        message.warnings = object.warnings?.map((e) => e) || [];
+        message.alreadyLoaded = object.alreadyLoaded ?? false;
+        message.resolvedArtifacts = object.resolvedArtifacts?.map((e) => ModelFileDescriptor.fromPartial(e)) || [];
         return message;
     },
 };
 function createBaseModelUnloadRequest() {
-    return { modelId: "", category: undefined, unloadAll: false };
+    return { modelId: "", category: undefined, unloadAll: false, framework: undefined };
 }
 export const ModelUnloadRequest = {
     encode(message, writer = _m0.Writer.create()) {
@@ -4347,6 +4821,9 @@ export const ModelUnloadRequest = {
         }
         if (message.unloadAll !== false) {
             writer.uint32(24).bool(message.unloadAll);
+        }
+        if (message.framework !== undefined) {
+            writer.uint32(32).int32(message.framework);
         }
         return writer;
     },
@@ -4375,6 +4852,12 @@ export const ModelUnloadRequest = {
                     }
                     message.unloadAll = reader.bool();
                     continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.framework = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -4388,6 +4871,7 @@ export const ModelUnloadRequest = {
             modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
             category: isSet(object.category) ? modelCategoryFromJSON(object.category) : undefined,
             unloadAll: isSet(object.unloadAll) ? globalThis.Boolean(object.unloadAll) : false,
+            framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : undefined,
         };
     },
     toJSON(message) {
@@ -4401,6 +4885,9 @@ export const ModelUnloadRequest = {
         if (message.unloadAll !== false) {
             obj.unloadAll = message.unloadAll;
         }
+        if (message.framework !== undefined) {
+            obj.framework = inferenceFrameworkToJSON(message.framework);
+        }
         return obj;
     },
     create(base) {
@@ -4411,11 +4898,12 @@ export const ModelUnloadRequest = {
         message.modelId = object.modelId ?? "";
         message.category = object.category ?? undefined;
         message.unloadAll = object.unloadAll ?? false;
+        message.framework = object.framework ?? undefined;
         return message;
     },
 };
 function createBaseModelUnloadResult() {
-    return { success: false, unloadedModelIds: [], errorMessage: "" };
+    return { success: false, unloadedModelIds: [], errorMessage: "", unloadedAtUnixMs: 0, warnings: [] };
 }
 export const ModelUnloadResult = {
     encode(message, writer = _m0.Writer.create()) {
@@ -4427,6 +4915,12 @@ export const ModelUnloadResult = {
         }
         if (message.errorMessage !== "") {
             writer.uint32(26).string(message.errorMessage);
+        }
+        if (message.unloadedAtUnixMs !== 0) {
+            writer.uint32(32).int64(message.unloadedAtUnixMs);
+        }
+        for (const v of message.warnings) {
+            writer.uint32(42).string(v);
         }
         return writer;
     },
@@ -4455,6 +4949,18 @@ export const ModelUnloadResult = {
                     }
                     message.errorMessage = reader.string();
                     continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.unloadedAtUnixMs = longToNumber(reader.int64());
+                    continue;
+                case 5:
+                    if (tag !== 42) {
+                        break;
+                    }
+                    message.warnings.push(reader.string());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -4470,6 +4976,8 @@ export const ModelUnloadResult = {
                 ? object.unloadedModelIds.map((e) => globalThis.String(e))
                 : [],
             errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+            unloadedAtUnixMs: isSet(object.unloadedAtUnixMs) ? globalThis.Number(object.unloadedAtUnixMs) : 0,
+            warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
         };
     },
     toJSON(message) {
@@ -4483,6 +4991,12 @@ export const ModelUnloadResult = {
         if (message.errorMessage !== "") {
             obj.errorMessage = message.errorMessage;
         }
+        if (message.unloadedAtUnixMs !== 0) {
+            obj.unloadedAtUnixMs = Math.round(message.unloadedAtUnixMs);
+        }
+        if (message.warnings?.length) {
+            obj.warnings = message.warnings;
+        }
         return obj;
     },
     create(base) {
@@ -4493,11 +5007,13 @@ export const ModelUnloadResult = {
         message.success = object.success ?? false;
         message.unloadedModelIds = object.unloadedModelIds?.map((e) => e) || [];
         message.errorMessage = object.errorMessage ?? "";
+        message.unloadedAtUnixMs = object.unloadedAtUnixMs ?? 0;
+        message.warnings = object.warnings?.map((e) => e) || [];
         return message;
     },
 };
 function createBaseCurrentModelRequest() {
-    return { category: undefined, framework: undefined };
+    return { category: undefined, framework: undefined, includeModelMetadata: false };
 }
 export const CurrentModelRequest = {
     encode(message, writer = _m0.Writer.create()) {
@@ -4506,6 +5022,9 @@ export const CurrentModelRequest = {
         }
         if (message.framework !== undefined) {
             writer.uint32(16).int32(message.framework);
+        }
+        if (message.includeModelMetadata !== false) {
+            writer.uint32(24).bool(message.includeModelMetadata);
         }
         return writer;
     },
@@ -4528,6 +5047,12 @@ export const CurrentModelRequest = {
                     }
                     message.framework = reader.int32();
                     continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.includeModelMetadata = reader.bool();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -4540,6 +5065,9 @@ export const CurrentModelRequest = {
         return {
             category: isSet(object.category) ? modelCategoryFromJSON(object.category) : undefined,
             framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : undefined,
+            includeModelMetadata: isSet(object.includeModelMetadata)
+                ? globalThis.Boolean(object.includeModelMetadata)
+                : false,
         };
     },
     toJSON(message) {
@@ -4550,6 +5078,9 @@ export const CurrentModelRequest = {
         if (message.framework !== undefined) {
             obj.framework = inferenceFrameworkToJSON(message.framework);
         }
+        if (message.includeModelMetadata !== false) {
+            obj.includeModelMetadata = message.includeModelMetadata;
+        }
         return obj;
     },
     create(base) {
@@ -4559,11 +5090,22 @@ export const CurrentModelRequest = {
         const message = createBaseCurrentModelRequest();
         message.category = object.category ?? undefined;
         message.framework = object.framework ?? undefined;
+        message.includeModelMetadata = object.includeModelMetadata ?? false;
         return message;
     },
 };
 function createBaseCurrentModelResult() {
-    return { modelId: "", model: undefined, loadedAtUnixMs: 0 };
+    return {
+        modelId: "",
+        model: undefined,
+        loadedAtUnixMs: 0,
+        found: false,
+        errorMessage: "",
+        category: 0,
+        framework: 0,
+        resolvedPath: "",
+        resolvedArtifacts: [],
+    };
 }
 export const CurrentModelResult = {
     encode(message, writer = _m0.Writer.create()) {
@@ -4575,6 +5117,24 @@ export const CurrentModelResult = {
         }
         if (message.loadedAtUnixMs !== 0) {
             writer.uint32(32).int64(message.loadedAtUnixMs);
+        }
+        if (message.found !== false) {
+            writer.uint32(40).bool(message.found);
+        }
+        if (message.errorMessage !== "") {
+            writer.uint32(50).string(message.errorMessage);
+        }
+        if (message.category !== 0) {
+            writer.uint32(56).int32(message.category);
+        }
+        if (message.framework !== 0) {
+            writer.uint32(64).int32(message.framework);
+        }
+        if (message.resolvedPath !== "") {
+            writer.uint32(74).string(message.resolvedPath);
+        }
+        for (const v of message.resolvedArtifacts) {
+            ModelFileDescriptor.encode(v, writer.uint32(82).fork()).ldelim();
         }
         return writer;
     },
@@ -4603,6 +5163,42 @@ export const CurrentModelResult = {
                     }
                     message.loadedAtUnixMs = longToNumber(reader.int64());
                     continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.found = reader.bool();
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.category = reader.int32();
+                    continue;
+                case 8:
+                    if (tag !== 64) {
+                        break;
+                    }
+                    message.framework = reader.int32();
+                    continue;
+                case 9:
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.resolvedPath = reader.string();
+                    continue;
+                case 10:
+                    if (tag !== 82) {
+                        break;
+                    }
+                    message.resolvedArtifacts.push(ModelFileDescriptor.decode(reader, reader.uint32()));
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -4616,6 +5212,14 @@ export const CurrentModelResult = {
             modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
             model: isSet(object.model) ? ModelInfo.fromJSON(object.model) : undefined,
             loadedAtUnixMs: isSet(object.loadedAtUnixMs) ? globalThis.Number(object.loadedAtUnixMs) : 0,
+            found: isSet(object.found) ? globalThis.Boolean(object.found) : false,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+            category: isSet(object.category) ? modelCategoryFromJSON(object.category) : 0,
+            framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : 0,
+            resolvedPath: isSet(object.resolvedPath) ? globalThis.String(object.resolvedPath) : "",
+            resolvedArtifacts: globalThis.Array.isArray(object?.resolvedArtifacts)
+                ? object.resolvedArtifacts.map((e) => ModelFileDescriptor.fromJSON(e))
+                : [],
         };
     },
     toJSON(message) {
@@ -4629,6 +5233,24 @@ export const CurrentModelResult = {
         if (message.loadedAtUnixMs !== 0) {
             obj.loadedAtUnixMs = Math.round(message.loadedAtUnixMs);
         }
+        if (message.found !== false) {
+            obj.found = message.found;
+        }
+        if (message.errorMessage !== "") {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.category !== 0) {
+            obj.category = modelCategoryToJSON(message.category);
+        }
+        if (message.framework !== 0) {
+            obj.framework = inferenceFrameworkToJSON(message.framework);
+        }
+        if (message.resolvedPath !== "") {
+            obj.resolvedPath = message.resolvedPath;
+        }
+        if (message.resolvedArtifacts?.length) {
+            obj.resolvedArtifacts = message.resolvedArtifacts.map((e) => ModelFileDescriptor.toJSON(e));
+        }
         return obj;
     },
     create(base) {
@@ -4641,6 +5263,12 @@ export const CurrentModelResult = {
             ? ModelInfo.fromPartial(object.model)
             : undefined;
         message.loadedAtUnixMs = object.loadedAtUnixMs ?? 0;
+        message.found = object.found ?? false;
+        message.errorMessage = object.errorMessage ?? "";
+        message.category = object.category ?? 0;
+        message.framework = object.framework ?? 0;
+        message.resolvedPath = object.resolvedPath ?? "";
+        message.resolvedArtifacts = object.resolvedArtifacts?.map((e) => ModelFileDescriptor.fromPartial(e)) || [];
         return message;
     },
 };
@@ -4747,6 +5375,7 @@ function createBaseModelDeleteResult() {
         registryUpdated: false,
         wasLoaded: false,
         errorMessage: "",
+        warnings: [],
     };
 }
 export const ModelDeleteResult = {
@@ -4771,6 +5400,9 @@ export const ModelDeleteResult = {
         }
         if (message.errorMessage !== "") {
             writer.uint32(58).string(message.errorMessage);
+        }
+        for (const v of message.warnings) {
+            writer.uint32(66).string(v);
         }
         return writer;
     },
@@ -4823,6 +5455,12 @@ export const ModelDeleteResult = {
                     }
                     message.errorMessage = reader.string();
                     continue;
+                case 8:
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.warnings.push(reader.string());
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -4840,6 +5478,7 @@ export const ModelDeleteResult = {
             registryUpdated: isSet(object.registryUpdated) ? globalThis.Boolean(object.registryUpdated) : false,
             wasLoaded: isSet(object.wasLoaded) ? globalThis.Boolean(object.wasLoaded) : false,
             errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+            warnings: globalThis.Array.isArray(object?.warnings) ? object.warnings.map((e) => globalThis.String(e)) : [],
         };
     },
     toJSON(message) {
@@ -4865,6 +5504,9 @@ export const ModelDeleteResult = {
         if (message.errorMessage !== "") {
             obj.errorMessage = message.errorMessage;
         }
+        if (message.warnings?.length) {
+            obj.warnings = message.warnings;
+        }
         return obj;
     },
     create(base) {
@@ -4879,6 +5521,7 @@ export const ModelDeleteResult = {
         message.registryUpdated = object.registryUpdated ?? false;
         message.wasLoaded = object.wasLoaded ?? false;
         message.errorMessage = object.errorMessage ?? "";
+        message.warnings = object.warnings?.map((e) => e) || [];
         return message;
     },
 };

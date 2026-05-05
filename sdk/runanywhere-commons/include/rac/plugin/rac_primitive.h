@@ -38,7 +38,7 @@ typedef enum rac_primitive {
     RAC_PRIMITIVE_SYNTHESIZE    = 3,   /**< Text-to-Speech. */
     RAC_PRIMITIVE_DETECT_VOICE  = 4,   /**< Voice Activity Detection. */
     RAC_PRIMITIVE_EMBED         = 5,   /**< Embedding / vectorization. */
-    RAC_PRIMITIVE_RERANK        = 6,   /**< Cross-encoder reranking for RAG. */
+    RAC_PRIMITIVE_RERANK        = 6,   /**< Dormant ABI slot; not a routable engine primitive. */
     RAC_PRIMITIVE_VLM           = 7,   /**< Vision-Language Models. */
     RAC_PRIMITIVE_DIFFUSION     = 8,   /**< Text-to-Image / Image-to-Image diffusion. */
 

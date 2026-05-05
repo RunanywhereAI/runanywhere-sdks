@@ -29,6 +29,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <mutex>
 #include <new>
@@ -44,6 +45,7 @@
 namespace {
 
 constexpr uint64_t kCpuSessionMagic = 0x5241434350555345ull; /* "RACCPUSE" */
+constexpr uint64_t kCpuBufferMagic = 0x5241434350554255ull;  /* "RACCPUBU" */
 
 /* --------------------------------------------------------------------------
  * Metadata (lives in .rodata; registry does NOT copy).
@@ -70,6 +72,17 @@ struct CpuRuntimeSession {
     uint64_t magic = kCpuSessionMagic;
     rac_cpu_runtime_provider_t provider{};
     rac_runtime_session_t* provider_session = nullptr;
+};
+
+struct CpuRuntimeBuffer {
+    uint64_t magic = kCpuBufferMagic;
+    void* data = nullptr;
+    size_t bytes = 0;
+    rac_runtime_memory_space_t memory_space = RAC_RUNTIME_MEMORY_SPACE_HOST;
+    rac_device_class_t device_class = RAC_DEVICE_CLASS_CPU;
+    uint32_t device_index = 0;
+    uint32_t alignment = 0;
+    uint64_t usage_flags = 0;
 };
 
 std::mutex& provider_mutex() {
@@ -121,6 +134,22 @@ CpuRuntimeSession* as_cpu_session(rac_runtime_session_t* session) {
     return cpu_session;
 }
 
+CpuRuntimeBuffer* as_cpu_buffer(rac_runtime_buffer_t* buffer) {
+    auto* cpu_buffer = reinterpret_cast<CpuRuntimeBuffer*>(buffer);
+    if (cpu_buffer == nullptr || cpu_buffer->magic != kCpuBufferMagic) {
+        return nullptr;
+    }
+    return cpu_buffer;
+}
+
+const CpuRuntimeBuffer* as_cpu_buffer_const(const rac_runtime_buffer_t* buffer) {
+    auto* cpu_buffer = reinterpret_cast<const CpuRuntimeBuffer*>(buffer);
+    if (cpu_buffer == nullptr || cpu_buffer->magic != kCpuBufferMagic) {
+        return nullptr;
+    }
+    return cpu_buffer;
+}
+
 /* --------------------------------------------------------------------------
  * Vtable op implementations.
  * -------------------------------------------------------------------------- */
@@ -170,7 +199,11 @@ rac_result_t cpu_capabilities(rac_runtime_capabilities_t* out) {
         RAC_RUNTIME_CAP_QUANTIZED_INT8 |
         RAC_RUNTIME_CAP_QUANTIZED_INT4 |
         RAC_RUNTIME_CAP_FP16           |
-        RAC_RUNTIME_CAP_DYNAMIC_SHAPES;
+        RAC_RUNTIME_CAP_DYNAMIC_SHAPES |
+        RAC_RUNTIME_CAP_BUFFER_MAPPING |
+        RAC_RUNTIME_CAP_BUFFER_COPY    |
+        RAC_RUNTIME_CAP_DEVICE_ALLOC   |
+        RAC_RUNTIME_CAP_OWNED_OUTPUTS;
     out->supported_formats       = nullptr;     /* format-agnostic */
     out->supported_formats_count = 0;
     out->supported_primitives    = k_supported_primitives;
@@ -229,6 +262,72 @@ rac_result_t cpu_run_session(rac_runtime_session_t* session,
         cpu_session->provider_session, inputs, n_in, outputs, n_out);
 }
 
+rac_result_t cpu_run_session_v2(rac_runtime_session_t* session,
+                                const rac_runtime_tensor_t* inputs,
+                                size_t n_in,
+                                rac_runtime_tensor_t* outputs,
+                                size_t n_out) {
+    auto* cpu_session = as_cpu_session(session);
+    if (cpu_session == nullptr) return RAC_ERROR_INVALID_HANDLE;
+    if (n_in > 0 && inputs == nullptr) return RAC_ERROR_NULL_POINTER;
+    if (n_out > 0 && outputs == nullptr) return RAC_ERROR_NULL_POINTER;
+
+    std::vector<rac_runtime_io_t> legacy_inputs(n_in);
+    std::vector<rac_runtime_io_t> legacy_outputs(n_out);
+
+    for (size_t i = 0; i < n_in; ++i) {
+        const void* data = inputs[i].data;
+        size_t data_bytes = inputs[i].data_bytes;
+        if (inputs[i].buffer != nullptr) {
+            const auto* buffer = as_cpu_buffer_const(inputs[i].buffer);
+            if (buffer == nullptr) return RAC_ERROR_INVALID_HANDLE;
+            data = buffer->data;
+            data_bytes = buffer->bytes;
+        }
+        legacy_inputs[i].name = inputs[i].name;
+        legacy_inputs[i].data = const_cast<void*>(data);
+        legacy_inputs[i].data_bytes = data_bytes;
+        legacy_inputs[i].dtype = static_cast<uint32_t>(inputs[i].dtype);
+        legacy_inputs[i].shape = inputs[i].shape;
+        legacy_inputs[i].rank = inputs[i].rank;
+    }
+
+    for (size_t i = 0; i < n_out; ++i) {
+        void* data = outputs[i].data;
+        size_t data_bytes =
+            outputs[i].data_capacity_bytes != 0
+                ? outputs[i].data_capacity_bytes
+                : outputs[i].data_bytes;
+        if (outputs[i].buffer != nullptr) {
+            auto* buffer = as_cpu_buffer(outputs[i].buffer);
+            if (buffer == nullptr) return RAC_ERROR_INVALID_HANDLE;
+            data = buffer->data;
+            data_bytes = buffer->bytes;
+        }
+        legacy_outputs[i].name = outputs[i].name;
+        legacy_outputs[i].data = data;
+        legacy_outputs[i].data_bytes = data_bytes;
+        legacy_outputs[i].dtype = static_cast<uint32_t>(outputs[i].dtype);
+        legacy_outputs[i].shape = outputs[i].shape;
+        legacy_outputs[i].rank = outputs[i].rank;
+    }
+
+    rac_result_t rc = cpu_session->provider.run_session(
+        cpu_session->provider_session,
+        legacy_inputs.data(),
+        legacy_inputs.size(),
+        legacy_outputs.data(),
+        legacy_outputs.size());
+    if (rc != RAC_SUCCESS) return rc;
+
+    for (size_t i = 0; i < n_out; ++i) {
+        outputs[i].data_bytes = legacy_outputs[i].data_bytes;
+        outputs[i].dtype = static_cast<rac_runtime_dtype_t>(legacy_outputs[i].dtype);
+        outputs[i].rank = legacy_outputs[i].rank;
+    }
+    return RAC_SUCCESS;
+}
+
 void cpu_destroy_session(rac_runtime_session_t* session) {
     auto* cpu_session = as_cpu_session(session);
     if (cpu_session == nullptr) return;
@@ -240,11 +339,188 @@ void cpu_destroy_session(rac_runtime_session_t* session) {
     delete cpu_session;
 }
 
+rac_result_t cpu_alloc_buffer_v2(const rac_runtime_buffer_desc_t* desc,
+                                 rac_runtime_buffer_t** out) {
+    if (desc == nullptr || out == nullptr) return RAC_ERROR_NULL_POINTER;
+    *out = nullptr;
+    if (desc->bytes == 0) return RAC_ERROR_INVALID_PARAMETER;
+
+    rac_runtime_memory_space_t space = desc->memory_space;
+    if (space == RAC_RUNTIME_MEMORY_SPACE_UNSPECIFIED) {
+        space = RAC_RUNTIME_MEMORY_SPACE_HOST;
+    }
+    if (space != RAC_RUNTIME_MEMORY_SPACE_HOST &&
+        space != RAC_RUNTIME_MEMORY_SPACE_SHARED &&
+        space != RAC_RUNTIME_MEMORY_SPACE_MANAGED) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    if (desc->device_class != RAC_DEVICE_CLASS_UNSPECIFIED &&
+        desc->device_class != RAC_DEVICE_CLASS_CPU) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+    const uint32_t default_alignment =
+        static_cast<uint32_t>(alignof(std::max_align_t));
+    if (desc->alignment > default_alignment) {
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    auto* buffer = new (std::nothrow) CpuRuntimeBuffer();
+    if (buffer == nullptr) return RAC_ERROR_OUT_OF_MEMORY;
+
+    buffer->data = std::malloc(desc->bytes);
+    if (buffer->data == nullptr) {
+        delete buffer;
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    buffer->bytes = desc->bytes;
+    buffer->memory_space = space;
+    buffer->device_class = RAC_DEVICE_CLASS_CPU;
+    buffer->device_index = desc->device_index;
+    buffer->alignment = desc->alignment == 0 ? default_alignment : desc->alignment;
+    buffer->usage_flags = desc->usage_flags;
+    *out = reinterpret_cast<rac_runtime_buffer_t*>(buffer);
+    return RAC_SUCCESS;
+}
+
+rac_result_t cpu_alloc_buffer(size_t bytes, rac_runtime_buffer_t** out) {
+    rac_runtime_buffer_desc_t desc{};
+    desc.bytes = bytes;
+    desc.memory_space = RAC_RUNTIME_MEMORY_SPACE_HOST;
+    desc.device_class = RAC_DEVICE_CLASS_CPU;
+    desc.usage_flags =
+        RAC_RUNTIME_BUFFER_USAGE_MAP_READ | RAC_RUNTIME_BUFFER_USAGE_MAP_WRITE;
+    return cpu_alloc_buffer_v2(&desc, out);
+}
+
+void cpu_free_buffer(rac_runtime_buffer_t* buffer) {
+    auto* cpu_buffer = as_cpu_buffer(buffer);
+    if (cpu_buffer == nullptr) return;
+    cpu_buffer->magic = 0;
+    std::free(cpu_buffer->data);
+    cpu_buffer->data = nullptr;
+    delete cpu_buffer;
+}
+
+rac_result_t cpu_buffer_info(rac_runtime_buffer_t* buffer,
+                             rac_runtime_buffer_info_t* out) {
+    if (out == nullptr) return RAC_ERROR_NULL_POINTER;
+    auto* cpu_buffer = as_cpu_buffer(buffer);
+    if (cpu_buffer == nullptr) return RAC_ERROR_INVALID_HANDLE;
+    *out = rac_runtime_buffer_info_t{};
+    out->bytes = cpu_buffer->bytes;
+    out->memory_space = cpu_buffer->memory_space;
+    out->device_class = cpu_buffer->device_class;
+    out->device_index = cpu_buffer->device_index;
+    out->alignment = cpu_buffer->alignment;
+    out->usage_flags = cpu_buffer->usage_flags;
+    out->device_id = "cpu-generic";
+    out->native_handle = cpu_buffer->data;
+    return RAC_SUCCESS;
+}
+
+rac_result_t cpu_map_buffer(rac_runtime_buffer_t* buffer,
+                            size_t offset,
+                            size_t bytes,
+                            uint32_t map_flags,
+                            rac_runtime_buffer_mapping_t* out) {
+    if (out == nullptr) return RAC_ERROR_NULL_POINTER;
+    auto* cpu_buffer = as_cpu_buffer(buffer);
+    if (cpu_buffer == nullptr) return RAC_ERROR_INVALID_HANDLE;
+    if (offset > cpu_buffer->bytes) return RAC_ERROR_INVALID_PARAMETER;
+    const size_t available = cpu_buffer->bytes - offset;
+    const size_t mapped_bytes = bytes == 0 ? available : bytes;
+    if (mapped_bytes > available) return RAC_ERROR_INVALID_PARAMETER;
+    *out = rac_runtime_buffer_mapping_t{};
+    out->data = static_cast<unsigned char*>(cpu_buffer->data) + offset;
+    out->bytes = mapped_bytes;
+    out->memory_space = RAC_RUNTIME_MEMORY_SPACE_HOST;
+    out->map_flags = map_flags;
+    return RAC_SUCCESS;
+}
+
+rac_result_t cpu_unmap_buffer(rac_runtime_buffer_t* buffer,
+                              rac_runtime_buffer_mapping_t* mapping) {
+    if (mapping == nullptr) return RAC_ERROR_NULL_POINTER;
+    auto* cpu_buffer = as_cpu_buffer(buffer);
+    if (cpu_buffer == nullptr) return RAC_ERROR_INVALID_HANDLE;
+    *mapping = rac_runtime_buffer_mapping_t{};
+    return RAC_SUCCESS;
+}
+
+rac_result_t cpu_copy_buffer(rac_runtime_buffer_t* dst,
+                             size_t dst_offset,
+                             const rac_runtime_buffer_t* src,
+                             size_t src_offset,
+                             size_t bytes) {
+    auto* dst_buffer = as_cpu_buffer(dst);
+    const auto* src_buffer = as_cpu_buffer_const(src);
+    if (dst_buffer == nullptr || src_buffer == nullptr) {
+        return RAC_ERROR_INVALID_HANDLE;
+    }
+    if (dst_offset > dst_buffer->bytes || src_offset > src_buffer->bytes) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    if (bytes > dst_buffer->bytes - dst_offset ||
+        bytes > src_buffer->bytes - src_offset) {
+        return RAC_ERROR_INVALID_PARAMETER;
+    }
+    std::memmove(static_cast<unsigned char*>(dst_buffer->data) + dst_offset,
+                 static_cast<const unsigned char*>(src_buffer->data) + src_offset,
+                 bytes);
+    return RAC_SUCCESS;
+}
+
+void cpu_release_tensor(rac_runtime_tensor_t* tensor) {
+    if (tensor == nullptr) return;
+    if (tensor->data_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME &&
+        tensor->data != nullptr) {
+        std::free(tensor->data);
+    }
+    if (tensor->shape_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME &&
+        tensor->shape != nullptr) {
+        std::free(tensor->shape);
+    }
+    if (tensor->buffer_ownership == RAC_RUNTIME_OWNERSHIP_RUNTIME &&
+        tensor->buffer != nullptr) {
+        cpu_free_buffer(tensor->buffer);
+    }
+    tensor->buffer = nullptr;
+    tensor->data = nullptr;
+    tensor->data_bytes = 0;
+    tensor->data_capacity_bytes = 0;
+    tensor->shape = nullptr;
+    tensor->rank = 0;
+    tensor->shape_capacity = 0;
+    tensor->buffer_ownership = RAC_RUNTIME_OWNERSHIP_NONE;
+    tensor->data_ownership = RAC_RUNTIME_OWNERSHIP_NONE;
+    tensor->shape_ownership = RAC_RUNTIME_OWNERSHIP_NONE;
+}
+
 /* --------------------------------------------------------------------------
  * Vtable singleton. Every op slot is filled explicitly (including the
  * intentionally-NULL session ops) so layout matches the header exactly and
  * a future reserved-slot promotion is a compile-time error.
  * -------------------------------------------------------------------------- */
+
+const rac_runtime_vtable_v2_t k_cpu_vtable_v2 = {
+    /* .abi_version    = */ RAC_RUNTIME_ABI_VERSION_V2,
+    /* .struct_size    = */ sizeof(rac_runtime_vtable_v2_t),
+    /* .run_session_v2 = */ cpu_run_session_v2,
+    /* .alloc_buffer   = */ cpu_alloc_buffer_v2,
+    /* .buffer_info    = */ cpu_buffer_info,
+    /* .map_buffer     = */ cpu_map_buffer,
+    /* .unmap_buffer   = */ cpu_unmap_buffer,
+    /* .copy_buffer    = */ cpu_copy_buffer,
+    /* .release_tensor = */ cpu_release_tensor,
+    /* .reserved_0     = */ nullptr,
+    /* .reserved_1     = */ nullptr,
+    /* .reserved_2     = */ nullptr,
+    /* .reserved_3     = */ nullptr,
+    /* .reserved_4     = */ nullptr,
+    /* .reserved_5     = */ nullptr,
+    /* .reserved_6     = */ nullptr,
+    /* .reserved_7     = */ nullptr,
+};
 
 const rac_runtime_vtable_t k_cpu_vtable = {
     /* .metadata = */ {
@@ -267,11 +543,11 @@ const rac_runtime_vtable_t k_cpu_vtable = {
     /* .create_session  = */ cpu_create_session,
     /* .run_session     = */ cpu_run_session,
     /* .destroy_session = */ cpu_destroy_session,
-    /* .alloc_buffer    = */ nullptr,
-    /* .free_buffer     = */ nullptr,
+    /* .alloc_buffer    = */ cpu_alloc_buffer,
+    /* .free_buffer     = */ cpu_free_buffer,
     /* .device_info     = */ cpu_device_info,
     /* .capabilities    = */ cpu_capabilities,
-    /* .reserved_slot_0 = */ nullptr,
+    /* .reserved_slot_0 = */ &k_cpu_vtable_v2,
     /* .reserved_slot_1 = */ nullptr,
     /* .reserved_slot_2 = */ nullptr,
     /* .reserved_slot_3 = */ nullptr,

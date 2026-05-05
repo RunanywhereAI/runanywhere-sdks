@@ -1,14 +1,14 @@
 package com.runanywhere.runanywhereai
 
+import ai.runanywhere.proto.v1.SDKEnvironment
 import android.app.Application
 import android.os.Handler
 import android.os.Looper
-import com.runanywhere.runanywhereai.data.ModelList
+import com.runanywhere.runanywhereai.data.ModelBootstrap
 import com.runanywhere.runanywhereai.presentation.settings.SettingsViewModel
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.wireString
 import com.runanywhere.sdk.storage.AndroidPlatformContext
-import ai.runanywhere.proto.v1.SDKEnvironment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -256,7 +256,7 @@ class RunAnywhereApplication : Application() {
         }
     }
 
-    private fun registerModulesAndModels() {
-        ModelList.setupModels()
+    private suspend fun registerModulesAndModels() {
+        ModelBootstrap.setupModels()
     }
 }

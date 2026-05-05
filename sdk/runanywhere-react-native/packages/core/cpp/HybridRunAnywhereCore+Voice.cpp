@@ -2,9 +2,28 @@
  * HybridRunAnywhereCore+Voice.cpp
  *
  * Domain implementation for HybridRunAnywhereCore.
+ *
+ * V2 bridge classification (CPP-09 — see docs/CPP_PROTO_OWNERSHIP.md
+ * "Bridge Layer Audit"):
+ *   - SDK-facing pass-through: every `*Proto` method (LLM gen/cancel,
+ *     STT/TTS/VAD/VLM/diffusion/embeddings proto thunks, voice agent
+ *     proto thunks, LoRA proto thunks). Each takes/returns ArrayBuffer
+ *     bytes and calls the matching `rac_*_proto` C ABI through
+ *     proto_compat::symbol or, on Apple, via static linking.
+ *   - Bridge-internal helper: `getGlobalLLMHandle()` calls
+ *     `rac_llm_component_create()` directly to maintain a single LLM
+ *     handle shared across HybridRunAnywhereCore instances. Migration
+ *     target: source the live LLM handle from
+ *     `rac_model_lifecycle_load_proto` (which returns the handle on
+ *     load) so this bridge no longer creates components on its own.
+ *     Tracked under react-native gap.
+ *   - Other helpers (`callLoraRequestProto`, `callLoraCatalogProto`,
+ *     proto callbacks, VAD activity callback) are pure pass-through.
  */
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "HybridRunAnywhereCore+ProtoCompat.hpp"
+
+#include <stdexcept>
 
 namespace margelo::nitro::runanywhere {
 
@@ -129,6 +148,64 @@ static rac_handle_t getGlobalLLMHandle() {
         }
     }
     return g_llm_component_handle;
+}
+
+static std::shared_ptr<ArrayBuffer> callLoraRequestProto(
+    const std::vector<uint8_t>& bytes,
+    const char* symbolName,
+    const char* operation) {
+    rac_handle_t handle = getGlobalLLMHandle();
+    auto fn = proto_compat::symbol<proto_compat::LoRARequestProtoFn>(symbolName);
+    if (!handle || !fn) {
+        LOGE("%s: LLM handle or %s unavailable", operation, symbolName);
+        return emptyVoiceProtoBuffer();
+    }
+    rac_proto_buffer_t out;
+    proto_compat::initBuffer(&out);
+    const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
+    rac_result_t rc = fn(handle, data, bytes.size(), &out);
+    if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+        LOGE("%s: rc=%d", operation, rc);
+        proto_compat::freeBuffer(&out);
+        return emptyVoiceProtoBuffer();
+    }
+    return copyVoiceProtoBuffer(out, operation);
+}
+
+static std::shared_ptr<ArrayBuffer> callLoraCatalogProto(
+    const std::vector<uint8_t>& bytes,
+    const char* symbolName,
+    const char* operation) {
+    auto getRegistry = proto_compat::symbol<proto_compat::LoraRegistryGetFn>(
+        "rac_get_lora_registry");
+    auto fn = proto_compat::symbol<proto_compat::LoraCatalogProtoFn>(symbolName);
+    if (!getRegistry || !fn) {
+        throw std::runtime_error(
+            std::string(operation) +
+            " unavailable: missing rac_get_lora_registry or " + symbolName);
+    }
+
+    rac_lora_registry_handle_t registry = getRegistry();
+    if (!registry) {
+        throw std::runtime_error(
+            std::string(operation) +
+            " unavailable: rac_get_lora_registry returned null");
+    }
+
+    rac_proto_buffer_t out;
+    proto_compat::initBuffer(&out);
+    const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
+    rac_result_t rc = fn(registry, data, bytes.size(), &out);
+    if (rc != RAC_SUCCESS || out.status != RAC_SUCCESS) {
+        rac_result_t status = out.status != RAC_SUCCESS ? out.status : rc;
+        std::string message = out.error_message && out.error_message[0]
+            ? std::string(out.error_message)
+            : std::string(rac_error_message(status));
+        proto_compat::freeBuffer(&out);
+        throw std::runtime_error(std::string(operation) + " failed: " + message);
+    }
+
+    return copyVoiceProtoBuffer(out, operation);
 }
 
 std::shared_ptr<Promise<double>> HybridRunAnywhereCore::getLLMHandle() {
@@ -501,70 +578,46 @@ HybridRunAnywhereCore::llmCancelProto() {
 }
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
-HybridRunAnywhereCore::loraLoadProto(const std::shared_ptr<ArrayBuffer>& configBytes) {
-    auto bytes = copyVoiceArrayBufferBytes(configBytes);
+HybridRunAnywhereCore::loraApplyProto(const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
-        rac_handle_t handle = getGlobalLLMHandle();
-        auto fn = proto_compat::symbol<proto_compat::LoRAConfigProtoFn>(
-            "rac_lora_load_proto");
-        if (!handle || !fn) {
-            LOGE("loraLoadProto: LLM handle or rac_lora_load_proto unavailable");
-            return emptyVoiceProtoBuffer();
-        }
-        rac_proto_buffer_t out;
-        proto_compat::initBuffer(&out);
-        rac_result_t rc = fn(handle, bytes.data(), bytes.size(), &out);
-        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
-            LOGE("loraLoadProto: rc=%d", rc);
-            proto_compat::freeBuffer(&out);
-            return emptyVoiceProtoBuffer();
-        }
-        return copyVoiceProtoBuffer(out, "loraLoadProto");
+        return callLoraRequestProto(
+            bytes,
+            "rac_lora_apply_proto",
+            "loraApplyProto");
     });
 }
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
-HybridRunAnywhereCore::loraRemoveProto(const std::shared_ptr<ArrayBuffer>& configBytes) {
-    auto bytes = copyVoiceArrayBufferBytes(configBytes);
+HybridRunAnywhereCore::loraRemoveProto(const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
-        rac_handle_t handle = getGlobalLLMHandle();
-        auto fn = proto_compat::symbol<proto_compat::LoRAConfigProtoFn>(
-            "rac_lora_remove_proto");
-        if (!handle || !fn) {
-            LOGE("loraRemoveProto: LLM handle or rac_lora_remove_proto unavailable");
-            return emptyVoiceProtoBuffer();
-        }
-        rac_proto_buffer_t out;
-        proto_compat::initBuffer(&out);
-        rac_result_t rc = fn(handle, bytes.data(), bytes.size(), &out);
-        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
-            LOGE("loraRemoveProto: rc=%d", rc);
-            proto_compat::freeBuffer(&out);
-            return emptyVoiceProtoBuffer();
-        }
-        return copyVoiceProtoBuffer(out, "loraRemoveProto");
+        return callLoraRequestProto(
+            bytes,
+            "rac_lora_remove_proto",
+            "loraRemoveProto");
     });
 }
 
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
-HybridRunAnywhereCore::loraClearProto() {
-    return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
-        rac_handle_t handle = getGlobalLLMHandle();
-        auto fn = proto_compat::symbol<proto_compat::LoRAClearProtoFn>(
-            "rac_lora_clear_proto");
-        if (!handle || !fn) {
-            LOGE("loraClearProto: LLM handle or rac_lora_clear_proto unavailable");
-            return emptyVoiceProtoBuffer();
-        }
-        rac_proto_buffer_t out;
-        proto_compat::initBuffer(&out);
-        rac_result_t rc = fn(handle, &out);
-        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
-            LOGE("loraClearProto: rc=%d", rc);
-            proto_compat::freeBuffer(&out);
-            return emptyVoiceProtoBuffer();
-        }
-        return copyVoiceProtoBuffer(out, "loraClearProto");
+HybridRunAnywhereCore::loraListProto(const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callLoraRequestProto(
+            bytes,
+            "rac_lora_list_proto",
+            "loraListProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::loraStateProto(const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callLoraRequestProto(
+            bytes,
+            "rac_lora_state_proto",
+            "loraStateProto");
     });
 }
 
@@ -573,22 +626,70 @@ HybridRunAnywhereCore::loraCompatibilityProto(
     const std::shared_ptr<ArrayBuffer>& configBytes) {
     auto bytes = copyVoiceArrayBufferBytes(configBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
-        rac_handle_t handle = getGlobalLLMHandle();
-        auto fn = proto_compat::symbol<proto_compat::LoRAConfigProtoFn>(
-            "rac_lora_compatibility_proto");
-        if (!handle || !fn) {
-            LOGE("loraCompatibilityProto: LLM handle or rac_lora_compatibility_proto unavailable");
-            return emptyVoiceProtoBuffer();
-        }
-        rac_proto_buffer_t out;
-        proto_compat::initBuffer(&out);
-        rac_result_t rc = fn(handle, bytes.data(), bytes.size(), &out);
-        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
-            LOGE("loraCompatibilityProto: rc=%d", rc);
-            proto_compat::freeBuffer(&out);
-            return emptyVoiceProtoBuffer();
-        }
-        return copyVoiceProtoBuffer(out, "loraCompatibilityProto");
+        return callLoraRequestProto(
+            bytes,
+            "rac_lora_compatibility_proto",
+            "loraCompatibilityProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::loraRegisterCatalogEntryProto(
+    const std::shared_ptr<ArrayBuffer>& entryBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(entryBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callLoraCatalogProto(
+            bytes,
+            "rac_lora_register_proto",
+            "loraRegisterCatalogEntryProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::loraCatalogListProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callLoraCatalogProto(
+            bytes,
+            "rac_lora_catalog_list_proto",
+            "loraCatalogListProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::loraCatalogQueryProto(
+    const std::shared_ptr<ArrayBuffer>& queryBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(queryBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callLoraCatalogProto(
+            bytes,
+            "rac_lora_catalog_query_proto",
+            "loraCatalogQueryProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::loraCatalogGetProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callLoraCatalogProto(
+            bytes,
+            "rac_lora_catalog_get_proto",
+            "loraCatalogGetProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::loraCatalogMarkDownloadCompletedProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
+        return callLoraCatalogProto(
+            bytes,
+            "rac_lora_catalog_mark_download_completed_proto",
+            "loraCatalogMarkDownloadCompletedProto");
     });
 }
 
@@ -1542,6 +1643,204 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::vadSetActivityCallbackProt
         rac_result_t rc = fn(handle, vadActivityProtoCallback, nullptr);
         if (rc != RAC_SUCCESS) {
             LOGE("vadSetActivityCallbackProto: rc=%d", rc);
+            return false;
+        }
+        return true;
+    });
+}
+
+// ============================================================================
+// VLM Capability (Backend-Agnostic)
+// Uses commons VLM service lifecycle plus rac_vlm_*_proto APIs.
+// ============================================================================
+
+static rac_handle_t g_vlm_service_handle = nullptr;
+static std::mutex g_vlm_mutex;
+static std::string g_vlm_model_id;
+
+static rac_bool_t vlmProtoBytesCallback(const uint8_t* protoBytes,
+                                        size_t protoSize,
+                                        void* userData) {
+    protoBytesCallback(protoBytes, protoSize, userData);
+    return RAC_TRUE;
+}
+
+static void destroyGlobalVLMServiceLocked() {
+    if (!g_vlm_service_handle) {
+        return;
+    }
+
+    if (auto cleanup = proto_compat::symbol<proto_compat::VLMCleanupFn>("rac_vlm_cleanup")) {
+        (void)cleanup(g_vlm_service_handle);
+    }
+    if (auto destroy = proto_compat::symbol<proto_compat::VLMDestroyFn>("rac_vlm_destroy")) {
+        destroy(g_vlm_service_handle);
+    } else {
+        LOGE("destroyGlobalVLMServiceLocked: rac_vlm_destroy unavailable");
+    }
+    g_vlm_service_handle = nullptr;
+    g_vlm_model_id.clear();
+}
+
+static bool loadGlobalVLMService(const std::string& primaryModelPath,
+                                 const std::string& visionProjectorPath,
+                                 const std::string& modelId) {
+    auto create = proto_compat::symbol<proto_compat::VLMCreateFn>("rac_vlm_create");
+    auto initialize =
+        proto_compat::symbol<proto_compat::VLMInitializeFn>("rac_vlm_initialize");
+    if (!create || !initialize) {
+        LOGE("loadVLMModelFromArtifacts: rac_vlm_create/rac_vlm_initialize unavailable");
+        return false;
+    }
+
+    std::lock_guard<std::mutex> lock(g_vlm_mutex);
+    destroyGlobalVLMServiceLocked();
+
+    rac_handle_t handle = nullptr;
+    const std::string createKey = modelId.empty() ? primaryModelPath : modelId;
+    rac_result_t rc = create(createKey.c_str(), &handle);
+    if (rc != RAC_SUCCESS || !handle) {
+        LOGE("loadVLMModelFromArtifacts: rac_vlm_create failed: %d", rc);
+        return false;
+    }
+
+    rc = initialize(handle, primaryModelPath.c_str(), visionProjectorPath.c_str());
+    if (rc != RAC_SUCCESS) {
+        LOGE("loadVLMModelFromArtifacts: rac_vlm_initialize failed: %d", rc);
+        if (auto destroy = proto_compat::symbol<proto_compat::VLMDestroyFn>("rac_vlm_destroy")) {
+            destroy(handle);
+        }
+        return false;
+    }
+
+    g_vlm_service_handle = handle;
+    g_vlm_model_id = createKey;
+    return true;
+}
+
+static rac_handle_t getGlobalVLMServiceHandle() {
+    std::lock_guard<std::mutex> lock(g_vlm_mutex);
+    return g_vlm_service_handle;
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::loadVLMModelFromArtifacts(
+    const std::string& primaryModelPath,
+    const std::string& visionProjectorPath,
+    const std::string& modelId) {
+    return Promise<bool>::async([primaryModelPath, visionProjectorPath, modelId]() -> bool {
+        if (primaryModelPath.empty()) {
+            LOGE("loadVLMModelFromArtifacts: primaryModelPath is empty");
+            return false;
+        }
+        if (visionProjectorPath.empty()) {
+            LOGE("loadVLMModelFromArtifacts: visionProjectorPath is empty");
+            return false;
+        }
+        return loadGlobalVLMService(primaryModelPath, visionProjectorPath, modelId);
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isVLMModelLoaded() {
+    return Promise<bool>::async([]() -> bool {
+        return getGlobalVLMServiceHandle() != nullptr;
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::unloadVLMModel() {
+    return Promise<bool>::async([]() -> bool {
+        std::lock_guard<std::mutex> lock(g_vlm_mutex);
+        const bool hadHandle = g_vlm_service_handle != nullptr;
+        destroyGlobalVLMServiceLocked();
+        return hadHandle;
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::vlmProcessProto(
+    const std::shared_ptr<ArrayBuffer>& imageBytes,
+    const std::shared_ptr<ArrayBuffer>& optionsBytes) {
+    auto image = copyVoiceArrayBufferBytes(imageBytes);
+    auto options = copyVoiceArrayBufferBytes(optionsBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async(
+        [image = std::move(image), options = std::move(options)]() {
+        rac_handle_t handle = getGlobalVLMServiceHandle();
+        auto fn = proto_compat::symbol<proto_compat::VLMProcessProtoFn>(
+            "rac_vlm_process_proto");
+        if (!handle || !fn) {
+            LOGE("vlmProcessProto: VLM handle or proto ABI unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        const uint8_t* imageData = image.empty() ? nullptr : image.data();
+        const uint8_t* optionsData = options.empty() ? nullptr : options.data();
+        rac_result_t rc = fn(
+            handle,
+            imageData,
+            image.size(),
+            optionsData,
+            options.size(),
+            &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("vlmProcessProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "vlmProcessProto");
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::vlmProcessStreamProto(
+    const std::shared_ptr<ArrayBuffer>& imageBytes,
+    const std::shared_ptr<ArrayBuffer>& optionsBytes,
+    const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) {
+    auto image = copyVoiceArrayBufferBytes(imageBytes);
+    auto options = copyVoiceArrayBufferBytes(optionsBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async(
+        [image = std::move(image), options = std::move(options), onEventBytes]() {
+        rac_handle_t handle = getGlobalVLMServiceHandle();
+        auto fn = proto_compat::symbol<proto_compat::VLMProcessStreamProtoFn>(
+            "rac_vlm_process_stream_proto");
+        if (!handle || !fn) {
+            LOGE("vlmProcessStreamProto: VLM handle or proto stream ABI unavailable");
+            return emptyVoiceProtoBuffer();
+        }
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        auto callback = onEventBytes;
+        const uint8_t* imageData = image.empty() ? nullptr : image.data();
+        const uint8_t* optionsData = options.empty() ? nullptr : options.data();
+        rac_result_t rc = fn(
+            handle,
+            imageData,
+            image.size(),
+            optionsData,
+            options.size(),
+            vlmProtoBytesCallback,
+            &callback,
+            &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("vlmProcessStreamProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
+        }
+        return copyVoiceProtoBuffer(out, "vlmProcessStreamProto");
+    });
+}
+
+std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::vlmCancelProto() {
+    return Promise<bool>::async([]() -> bool {
+        rac_handle_t handle = getGlobalVLMServiceHandle();
+        auto fn = proto_compat::symbol<proto_compat::VLMCancelProtoFn>(
+            "rac_vlm_cancel_proto");
+        if (!handle || !fn) {
+            LOGE("vlmCancelProto: VLM handle or cancel ABI unavailable");
+            return false;
+        }
+        rac_result_t rc = fn(handle);
+        if (rc != RAC_SUCCESS) {
+            LOGE("vlmCancelProto: rc=%d", rc);
             return false;
         }
         return true;

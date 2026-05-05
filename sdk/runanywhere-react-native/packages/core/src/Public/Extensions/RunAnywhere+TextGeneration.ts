@@ -42,8 +42,8 @@ function buildLLMGenerateRequest(
   prompt: string,
   options?: LLMGenerationOptions,
   streamingEnabled: boolean = false
-) {
-  return LLMGenerateRequest.create({
+): LLMGenerateRequest {
+  return LLMGenerateRequest.fromPartial({
     prompt,
     maxTokens: options?.maxTokens ?? 1000,
     temperature: options?.temperature ?? 0.7,
@@ -63,6 +63,14 @@ function buildLLMGenerateRequest(
       options?.executionTarget !== undefined
         ? executionTargetToJSON(options.executionTarget)
         : '',
+    seed: options?.seed ?? 0,
+    frequencyPenalty: options?.frequencyPenalty ?? 0,
+    presencePenalty: options?.presencePenalty ?? 0,
+    minP: options?.minP ?? 0,
+    grammar: options?.grammar ?? '',
+    responseFormat: options?.responseFormat ?? '',
+    echoPrompt: options?.echoPrompt ?? false,
+    nThreads: options?.nThreads ?? 0,
   });
 }
 
@@ -83,29 +91,12 @@ function decodeLLMGenerationResult(buffer: ArrayBuffer): LLMGenerationResult {
 // ============================================================================
 
 /**
- * Load an LLM model by ID or path
- *
- * Matches iOS: `RunAnywhere.loadModel(_:)`
- * @throws Error if no LLM backend is registered
- */
-export async function loadModel(
-  modelPathOrId: string,
-  config?: Record<string, unknown>
-): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    logger.warning('Native module not available for loadModel');
-    return false;
-  }
-  const native = requireNativeModule();
-  return native.loadTextModel(
-    modelPathOrId,
-    config ? JSON.stringify(config) : undefined
-  );
-}
-
-/**
  * Check if an LLM model is loaded
  * Matches iOS: `RunAnywhere.isModelLoaded`
+ *
+ * Loading models is handled by `loadModelLifecycle` in
+ * `RunAnywhere+Lifecycle.ts`, which resolves a `modelId` through the
+ * native commons registry and then drives the LLM component lifecycle.
  */
 export async function isModelLoaded(): Promise<boolean> {
   if (!isNativeModuleAvailable()) {

@@ -67,6 +67,12 @@ import okio.ByteString
  *   * `nested_message` — optional. Underlying-error message as captured at
  *     wrap time. Mirrors Swift's RunAnywhereError.underlyingError.localizedDesc
  *     and Kotlin's Throwable.cause.message.
+ *   * `retryable` — canonical retry hint. This is business-policy metadata
+ *     owned by the portable layer; the platform adapter still decides how to
+ *     schedule the retry through native/background APIs when appropriate.
+ *   * `correlation_id` — stable cross-event/request correlation key. SDKEvent
+ *     also carries this field so callers can join success/progress/failure
+ *     events without parsing free-form properties.
  * ---------------------------------------------------------------------------
  */
 public class SDKError(
@@ -146,6 +152,29 @@ public class SDKError(
     schemaIndex = 8,
   )
   public val component: String = "",
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 9,
+  )
+  public val retryable: Boolean = false,
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "remediationHint",
+    schemaIndex = 10,
+  )
+  public val remediation_hint: String = "",
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "correlationId",
+    schemaIndex = 11,
+  )
+  public val correlation_id: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SDKError, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -168,6 +197,9 @@ public class SDKError(
     if (timestamp_ms != other.timestamp_ms) return false
     if (severity != other.severity) return false
     if (component != other.component) return false
+    if (retryable != other.retryable) return false
+    if (remediation_hint != other.remediation_hint) return false
+    if (correlation_id != other.correlation_id) return false
     return true
   }
 
@@ -184,6 +216,9 @@ public class SDKError(
       result = result * 37 + timestamp_ms.hashCode()
       result = result * 37 + severity.hashCode()
       result = result * 37 + component.hashCode()
+      result = result * 37 + retryable.hashCode()
+      result = result * 37 + remediation_hint.hashCode()
+      result = result * 37 + correlation_id.hashCode()
       super.hashCode = result
     }
     return result
@@ -200,6 +235,9 @@ public class SDKError(
     result += """timestamp_ms=$timestamp_ms"""
     result += """severity=$severity"""
     result += """component=${sanitize(component)}"""
+    result += """retryable=$retryable"""
+    result += """remediation_hint=${sanitize(remediation_hint)}"""
+    result += """correlation_id=${sanitize(correlation_id)}"""
     return result.joinToString(prefix = "SDKError{", separator = ", ", postfix = "}")
   }
 
@@ -213,9 +251,12 @@ public class SDKError(
     timestamp_ms: Long = this.timestamp_ms,
     severity: ErrorSeverity = this.severity,
     component: String = this.component,
+    retryable: Boolean = this.retryable,
+    remediation_hint: String = this.remediation_hint,
+    correlation_id: String = this.correlation_id,
     unknownFields: ByteString = this.unknownFields,
   ): SDKError = SDKError(code, category, message, context, c_abi_code, nested_message, timestamp_ms,
-      severity, component, unknownFields)
+      severity, component, retryable, remediation_hint, correlation_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -243,6 +284,12 @@ public class SDKError(
             ErrorSeverity.ADAPTER.encodedSizeWithTag(8, value.severity)
         if (value.component != "") size += ProtoAdapter.STRING.encodedSizeWithTag(9,
             value.component)
+        if (value.retryable != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(10,
+            value.retryable)
+        if (value.remediation_hint != "") size += ProtoAdapter.STRING.encodedSizeWithTag(11,
+            value.remediation_hint)
+        if (value.correlation_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(12,
+            value.correlation_id)
         return size
       }
 
@@ -260,11 +307,21 @@ public class SDKError(
         if (value.severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED)
             ErrorSeverity.ADAPTER.encodeWithTag(writer, 8, value.severity)
         if (value.component != "") ProtoAdapter.STRING.encodeWithTag(writer, 9, value.component)
+        if (value.retryable != false) ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.retryable)
+        if (value.remediation_hint != "") ProtoAdapter.STRING.encodeWithTag(writer, 11,
+            value.remediation_hint)
+        if (value.correlation_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 12,
+            value.correlation_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SDKError) {
         writer.writeBytes(value.unknownFields)
+        if (value.correlation_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 12,
+            value.correlation_id)
+        if (value.remediation_hint != "") ProtoAdapter.STRING.encodeWithTag(writer, 11,
+            value.remediation_hint)
+        if (value.retryable != false) ProtoAdapter.BOOL.encodeWithTag(writer, 10, value.retryable)
         if (value.component != "") ProtoAdapter.STRING.encodeWithTag(writer, 9, value.component)
         if (value.severity != ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED)
             ErrorSeverity.ADAPTER.encodeWithTag(writer, 8, value.severity)
@@ -290,6 +347,9 @@ public class SDKError(
         var timestamp_ms: Long = 0L
         var severity: ErrorSeverity = ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED
         var component: String = ""
+        var retryable: Boolean = false
+        var remediation_hint: String = ""
+        var correlation_id: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -313,6 +373,9 @@ public class SDKError(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             9 -> component = ProtoAdapter.STRING.decode(reader)
+            10 -> retryable = ProtoAdapter.BOOL.decode(reader)
+            11 -> remediation_hint = ProtoAdapter.STRING.decode(reader)
+            12 -> correlation_id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -326,6 +389,9 @@ public class SDKError(
           timestamp_ms = timestamp_ms,
           severity = severity,
           component = component,
+          retryable = retryable,
+          remediation_hint = remediation_hint,
+          correlation_id = correlation_id,
           unknownFields = unknownFields
         )
       }

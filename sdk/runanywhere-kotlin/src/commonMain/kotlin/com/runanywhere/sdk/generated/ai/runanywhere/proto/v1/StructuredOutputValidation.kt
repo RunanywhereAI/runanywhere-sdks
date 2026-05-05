@@ -13,6 +13,7 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -24,6 +25,7 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.List
 import okio.ByteString
 
 /**
@@ -89,8 +91,27 @@ public class StructuredOutputValidation(
     schemaIndex = 4,
   )
   public val extracted_json: String? = null,
+  validation_errors: List<String> = emptyList(),
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "validationTimeMs",
+    schemaIndex = 6,
+  )
+  public val validation_time_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StructuredOutputValidation, Nothing>(ADAPTER, unknownFields) {
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    jsonName = "validationErrors",
+    schemaIndex = 5,
+  )
+  public val validation_errors: List<String> = immutableCopyOf("validation_errors",
+      validation_errors)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -107,6 +128,8 @@ public class StructuredOutputValidation(
     if (error_message != other.error_message) return false
     if (raw_output != other.raw_output) return false
     if (extracted_json != other.extracted_json) return false
+    if (validation_errors != other.validation_errors) return false
+    if (validation_time_ms != other.validation_time_ms) return false
     return true
   }
 
@@ -119,6 +142,8 @@ public class StructuredOutputValidation(
       result = result * 37 + (error_message?.hashCode() ?: 0)
       result = result * 37 + (raw_output?.hashCode() ?: 0)
       result = result * 37 + (extracted_json?.hashCode() ?: 0)
+      result = result * 37 + validation_errors.hashCode()
+      result = result * 37 + validation_time_ms.hashCode()
       super.hashCode = result
     }
     return result
@@ -131,6 +156,9 @@ public class StructuredOutputValidation(
     if (error_message != null) result += """error_message=${sanitize(error_message)}"""
     if (raw_output != null) result += """raw_output=${sanitize(raw_output)}"""
     if (extracted_json != null) result += """extracted_json=${sanitize(extracted_json)}"""
+    if (validation_errors.isNotEmpty()) result +=
+        """validation_errors=${sanitize(validation_errors)}"""
+    result += """validation_time_ms=$validation_time_ms"""
     return result.joinToString(prefix = "StructuredOutputValidation{", separator = ", ", postfix =
         "}")
   }
@@ -141,9 +169,11 @@ public class StructuredOutputValidation(
     error_message: String? = this.error_message,
     raw_output: String? = this.raw_output,
     extracted_json: String? = this.extracted_json,
+    validation_errors: List<String> = this.validation_errors,
+    validation_time_ms: Long = this.validation_time_ms,
     unknownFields: ByteString = this.unknownFields,
   ): StructuredOutputValidation = StructuredOutputValidation(is_valid, contains_json, error_message,
-      raw_output, extracted_json, unknownFields)
+      raw_output, extracted_json, validation_errors, validation_time_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -164,6 +194,9 @@ public class StructuredOutputValidation(
         size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.error_message)
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.raw_output)
         size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.extracted_json)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(6, value.validation_errors)
+        if (value.validation_time_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(7,
+            value.validation_time_ms)
         return size
       }
 
@@ -174,11 +207,17 @@ public class StructuredOutputValidation(
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.raw_output)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.extracted_json)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.validation_errors)
+        if (value.validation_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
+            value.validation_time_ms)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StructuredOutputValidation) {
         writer.writeBytes(value.unknownFields)
+        if (value.validation_time_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
+            value.validation_time_ms)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.validation_errors)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.extracted_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.raw_output)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.error_message)
@@ -193,6 +232,8 @@ public class StructuredOutputValidation(
         var error_message: String? = null
         var raw_output: String? = null
         var extracted_json: String? = null
+        val validation_errors = mutableListOf<String>()
+        var validation_time_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> is_valid = ProtoAdapter.BOOL.decode(reader)
@@ -200,6 +241,8 @@ public class StructuredOutputValidation(
             3 -> error_message = ProtoAdapter.STRING.decode(reader)
             4 -> raw_output = ProtoAdapter.STRING.decode(reader)
             5 -> extracted_json = ProtoAdapter.STRING.decode(reader)
+            6 -> validation_errors.add(ProtoAdapter.STRING.decode(reader))
+            7 -> validation_time_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -209,6 +252,8 @@ public class StructuredOutputValidation(
           error_message = error_message,
           raw_output = raw_output,
           extracted_json = extracted_json,
+          validation_errors = validation_errors,
+          validation_time_ms = validation_time_ms,
           unknownFields = unknownFields
         )
       }

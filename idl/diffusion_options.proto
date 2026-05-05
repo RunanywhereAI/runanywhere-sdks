@@ -278,6 +278,19 @@ message DiffusionGenerationOptions {
     // them from an encoded container.
     int32              input_image_width   = 15;
     int32              input_image_height  = 16;
+
+    // Input image/mask media hints. Empty = backend infer/default.
+    optional string     input_image_media_type = 17;
+    optional string     mask_image_media_type  = 18;
+    int32               batch_size             = 19;  // 0 = one image/backend default
+    bool                return_latents         = 20;
+}
+
+message DiffusionGenerationRequest {
+    string request_id = 1;
+    optional DiffusionGenerationOptions options = 2;
+    optional string model_id = 3;
+    map<string, string> metadata = 4;
 }
 
 // ---------------------------------------------------------------------------
@@ -310,6 +323,10 @@ message DiffusionProgress {
     // Dimensions for intermediate_image_data when it is raw pixel data.
     int32  intermediate_image_width        = 6;
     int32  intermediate_image_height       = 7;
+
+    int64  timestamp_ms                    = 8;
+    int64  eta_ms                          = 9;
+    optional string intermediate_image_media_type = 10;
 }
 
 // ---------------------------------------------------------------------------
@@ -357,6 +374,11 @@ message DiffusionResult {
     // Failure details for result-envelope APIs.
     optional string     error_message   = 8;
     int32               error_code      = 9;
+
+    // Output image media type, e.g. "image/png" or "image/raw-rgba".
+    optional string     image_media_type = 10;
+    repeated bytes      batch_images     = 11;
+    int32               images_generated = 12;
 }
 
 // ---------------------------------------------------------------------------
@@ -406,4 +428,49 @@ message DiffusionCapabilities {
     bool                           is_ready                     = 9;
     optional string                current_model                = 10;
     bool                           safety_checker_enabled       = 11;
+    bool                           supports_batch_generation    = 12;
+    repeated string                supported_output_media_types = 13;
+}
+
+enum DiffusionStreamEventKind {
+    DIFFUSION_STREAM_EVENT_KIND_UNSPECIFIED = 0;
+    DIFFUSION_STREAM_EVENT_KIND_STARTED = 1;
+    DIFFUSION_STREAM_EVENT_KIND_PROGRESS = 2;
+    DIFFUSION_STREAM_EVENT_KIND_INTERMEDIATE_IMAGE = 3;
+    DIFFUSION_STREAM_EVENT_KIND_COMPLETED = 4;
+    DIFFUSION_STREAM_EVENT_KIND_ERROR = 5;
+}
+
+message DiffusionStreamEvent {
+    uint64 seq = 1;
+    int64 timestamp_us = 2;
+    string request_id = 3;
+    DiffusionStreamEventKind kind = 4;
+    optional DiffusionProgress progress = 5;
+    optional DiffusionResult result = 6;
+    optional string error_message = 7;
+    int32 error_code = 8;
+}
+
+message DiffusionServiceState {
+    bool is_ready = 1;
+    optional string current_model = 2;
+    optional DiffusionCapabilities capabilities = 3;
+    bool is_generating = 4;
+    optional string active_request_id = 5;
+    optional string error_message = 6;
+    int32 error_code = 7;
+}
+
+// Logical Diffusion service contract. Native photo-library/camera/file
+// acquisition, OS-visible image operations, and platform-specific backend
+// execution remain adapter-owned; C++ consumes only serialized
+// request/result/event messages.
+service Diffusion {
+    // One-shot image generation returning the final image result envelope.
+    rpc Generate(DiffusionGenerationRequest) returns (DiffusionResult);
+
+    // Server-streaming generation events: start, denoising progress,
+    // intermediate images, terminal completion, and errors.
+    rpc Stream(DiffusionGenerationRequest) returns (stream DiffusionStreamEvent);
 }

@@ -1,13 +1,14 @@
 package com.runanywhere.runanywhereai.presentation.benchmarks.models
 
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelInfo
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.ui.graphics.vector.ImageVector
-import com.runanywhere.sdk.public.extensions.Models.ModelCategory
-import com.runanywhere.sdk.public.extensions.Models.ModelInfo
+import com.runanywhere.sdk.public.extensions.Models.displayName
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.util.UUID
@@ -50,10 +51,10 @@ enum class BenchmarkCategory(val value: String) {
     val modelCategory: ModelCategory
         get() =
             when (this) {
-                LLM -> ModelCategory.LANGUAGE
-                STT -> ModelCategory.SPEECH_RECOGNITION
-                TTS -> ModelCategory.SPEECH_SYNTHESIS
-                VLM -> ModelCategory.MULTIMODAL
+                LLM -> ModelCategory.MODEL_CATEGORY_LANGUAGE
+                STT -> ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+                TTS -> ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+                VLM -> ModelCategory.MODEL_CATEGORY_MULTIMODAL
             }
 }
 
@@ -99,7 +100,7 @@ data class ComponentModelInfo(
                 id = model.id,
                 name = model.name,
                 framework = model.framework.displayName,
-                category = model.category.value,
+                category = model.category.name,
             )
     }
 }

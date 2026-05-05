@@ -5,6 +5,8 @@
  * Provides `RunAnywhere.textGeneration.*` capability surface (generate / generateStream / chat).
  * Also exposes the canonical §3 verbs `generateStructuredStream` and
  * `extractStructuredOutput` as flat top-level functions for use by RunAnywhere.ts.
+ *
+ * All paths go through proto-byte adapters — there is no JS provider routing.
  */
 
 import type { LLMGenerateRequest, LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
@@ -12,12 +14,15 @@ import type {
   LLMGenerationOptions,
   LLMGenerationResult,
 } from '@runanywhere/proto-ts/llm_options';
-import type { StructuredOutputResult } from '@runanywhere/proto-ts/structured_output';
+import {
+  StructuredOutputMode,
+  type StructuredOutputOptions,
+  type StructuredOutputResult,
+} from '@runanywhere/proto-ts/structured_output';
 import type { LLMStreamingResult } from '../../types/index';
-import { chat, generate as generateViaProvider, generateStream as generateStreamViaProvider } from './RunAnywhere+Convenience';
 import { AsyncQueue } from '../../Foundation/AsyncQueue';
 import { SDKException } from '../../Foundation/SDKException';
-import { LLMProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
+import { LLMProtoAdapter, StructuredOutputProtoAdapter } from '../../Adapters/ModalityProtoAdapter';
 
 export type { LLMGenerationOptions, LLMGenerationResult };
 export type { LLMStreamingResult };
@@ -60,24 +65,30 @@ function buildLLMGenerateRequest(
     executionTarget: options.executionTarget == null
       ? ''
       : String(options.executionTarget),
+    requestId: '',
+    modelId: '',
+    conversationId: '',
+    seed: options.seed ?? 0,
+    frequencyPenalty: options.frequencyPenalty ?? 0,
+    presencePenalty: options.presencePenalty ?? 0,
+    minP: options.minP ?? 0,
+    grammar: options.grammar ?? '',
+    responseFormat: options.responseFormat ?? '',
+    echoPrompt: options.echoPrompt ?? false,
+    nThreads: options.nThreads ?? 0,
+    metadata: {},
   };
 }
 
-function structuredResultFromGeneration(result: LLMGenerationResult): StructuredOutputResult {
-  const extractedJson = result.jsonOutput
-    ?? result.structuredOutputValidation?.extractedJson
-    ?? '';
-  const jsonBytes = new TextEncoder().encode(extractedJson || 'null');
+function structuredOutputOptionsFromSchema(
+  schema: JSONSchemaDescriptor,
+): StructuredOutputOptions {
   return {
-    parsedJson: jsonBytes,
-    rawText: result.text,
-    validation: result.structuredOutputValidation ?? {
-      isValid: extractedJson.length > 0,
-      containsJson: extractedJson.length > 0,
-      errorMessage: result.errorMessage || undefined,
-      rawOutput: result.text,
-      extractedJson: extractedJson || undefined,
-    },
+    includeSchemaInPrompt: true,
+    jsonSchema: schema.jsonSchema,
+    mode: StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
+    repairJson: false,
+    maxRetries: 0,
   };
 }
 
@@ -164,7 +175,25 @@ function finalLLMResult(
     responseTokens: tokensGenerated,
     totalTokens: final?.totalTokens ?? inputTokens + tokensGenerated,
     errorMessage: finalEvent?.errorMessage || undefined,
+    errorCode: final?.errorCode ?? finalEvent?.errorCode ?? 0,
+    cachedPromptTokens: 0,
+    promptEvalTimeMs: final?.promptEvalTimeMs ?? 0,
+    decodeTimeMs: final?.decodeTimeMs ?? 0,
+    toolCalls: [],
+    toolResults: [],
   };
+}
+
+function requireProtoLLM(verb: string): NonNullable<ReturnType<typeof LLMProtoAdapter.tryDefault>> {
+  const adapter = LLMProtoAdapter.tryDefault();
+  if (!adapter || !adapter.supportsProtoLLM()) {
+    throw SDKException.backendNotAvailable(
+      verb,
+      'No Web WASM backend with rac_llm_*_proto exports is registered. ' +
+      'Install a backend package and call its register() before generating text.',
+    );
+  }
+  return adapter;
 }
 
 // ---------------------------------------------------------------------------
@@ -174,8 +203,8 @@ function finalLLMResult(
 /**
  * Streaming structured output (§3 `generateStructuredStream`).
  *
- * Uses the generated-proto LLM request shape and lets the native LLM service
- * own schema prompting, JSON extraction, and validation.
+ * Uses the generated-proto LLM request shape for generation, then routes
+ * extraction and validation through the structured-output proto ABI.
  */
 export async function* generateStructuredStream(
   prompt: string,
@@ -187,11 +216,14 @@ export async function* generateStructuredStream(
     prompt,
     jsonSchema: schema.jsonSchema,
   } as Partial<LLMGenerationOptions> & { prompt: string });
-  yield structuredResultFromGeneration(result);
+  yield extractStructuredOutput(
+    result.text || result.jsonOutput || result.structuredOutputValidation?.extractedJson || '',
+    schema,
+  );
 }
 
 // ---------------------------------------------------------------------------
-// §3 `extractStructuredOutput` — canonical flat verb (pure TS)
+// §3 `extractStructuredOutput` — canonical flat verb
 // ---------------------------------------------------------------------------
 
 /**
@@ -203,11 +235,19 @@ export function extractStructuredOutput(
   text: string,
   schema: JSONSchemaDescriptor,
 ): StructuredOutputResult {
-  void text;
-  void schema;
+  const adapter = StructuredOutputProtoAdapter.tryDefault();
+  if (adapter?.supportsProtoParse()) {
+    const result = adapter.parse({
+      requestId: '',
+      text,
+      options: structuredOutputOptionsFromSchema(schema),
+      metadata: {},
+    });
+    if (result) return result;
+  }
   throw SDKException.backendNotAvailable(
     'extractStructuredOutput',
-    'Use generateStructuredStream/generate with jsonSchema so C++ can extract and validate structured output.',
+    'This Web WASM build does not export rac_structured_output_parse_proto.',
   );
 }
 
@@ -218,28 +258,32 @@ export function extractStructuredOutput(
 export const TextGeneration = {
   async generate(options: Partial<LLMGenerationOptions>): Promise<LLMGenerationResult> {
     const prompt = (options as { prompt?: string }).prompt ?? '';
-    const adapter = LLMProtoAdapter.tryDefault();
-    if (adapter?.supportsProtoLLM()) {
-      const result = adapter.generate(buildLLMGenerateRequest(prompt, options, false));
-      if (result) return result;
+    const adapter = requireProtoLLM('TextGeneration.generate');
+    const result = adapter.generate(buildLLMGenerateRequest(prompt, options, false));
+    if (!result) {
+      throw SDKException.backendNotAvailable(
+        'TextGeneration.generate',
+        'Native LLM proto path returned no result.',
+      );
     }
-    return generateViaProvider(prompt, options);
+    return result;
   },
 
   async generateStream(options: Partial<LLMGenerationOptions>): Promise<LLMStreamingResult> {
     const prompt = (options as { prompt?: string }).prompt ?? '';
-    const adapter = LLMProtoAdapter.tryDefault();
-    if (adapter?.supportsProtoLLM()) {
-      const events = adapter.generateStream(buildLLMGenerateRequest(prompt, options, true));
-      return streamingResultFromEvents(events, () => {
-        adapter.cancel();
-      });
-    }
-    return generateStreamViaProvider(prompt, options);
+    const adapter = requireProtoLLM('TextGeneration.generateStream');
+    const events = adapter.generateStream(buildLLMGenerateRequest(prompt, options, true));
+    return streamingResultFromEvents(events, () => {
+      adapter.cancel();
+    });
   },
 
   async chat(prompt: string, options?: Partial<LLMGenerationOptions>): Promise<string> {
-    return chat(prompt, options);
+    const result = await TextGeneration.generate({
+      ...(options ?? {}),
+      prompt,
+    } as Partial<LLMGenerationOptions> & { prompt: string });
+    return result.text;
   },
 
   generateStructuredStream,

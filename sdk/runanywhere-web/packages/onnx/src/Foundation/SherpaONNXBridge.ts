@@ -1,221 +1,99 @@
 /**
- * RunAnywhere Web SDK - Sherpa-ONNX WASM Bridge
+ * SherpaONNXBridge - V2 canonical ONNX backend bridge
  *
- * Loads the sherpa-onnx WASM module (separate from RACommons) and provides
- * typed access to the sherpa-onnx C API for:
- *   - STT (Speech-to-Text) via Whisper, Zipformer, Paraformer
- *   - TTS (Text-to-Speech) via Piper/VITS
- *   - VAD (Voice Activity Detection) via Silero
+ * In the V2 architecture, STT/TTS/VAD inference flows entirely through the
+ * RACommons proto-byte C ABI:
+ *   `_rac_stt_component_*_proto`, `_rac_tts_component_*_proto`,
+ *   `_rac_vad_component_*_proto`.
  *
- * Architecture:
- *   RACommons WASM handles LLM, VLM, Embeddings (llama.cpp)
- *   Sherpa-ONNX WASM handles STT, TTS, VAD (onnxruntime)
+ * Those exports are produced by the RACommons WASM module
+ * (`racommons-llamacpp.wasm`, exposed by the `@runanywhere/web-llamacpp`
+ * package). This bridge does NOT load `sherpa-onnx.wasm` directly — that
+ * file is a standalone Sherpa-ONNX library used only by the legacy
+ * direct-sherpa-JS path which V2 deletes.
  *
- * The sherpa-onnx module is lazy-loaded on first use of STT/TTS/VAD.
+ * Responsibilities:
+ *  1. Acquire the commons WASM module — either from a sibling backend that
+ *     already called `setRunanywhereModule(...)` (preferred) or by loading
+ *     `racommons-llamacpp.wasm` itself.
+ *  2. If we loaded the module ourselves, call `rac_init()` and install it
+ *     via `setRunanywhereModule(...)` so the proto-byte adapters in core
+ *     can find it.
+ *  3. Call `_rac_backend_onnx_register()` to register the ONNX (sherpa-onnx)
+ *     vtable with the C++ plugin registry. After this, all proto-byte
+ *     STT/TTS/VAD calls in core route through the registered backend.
+ *
+ * Backend availability requirement:
+ *   The RACommons WASM module MUST be built with `RAC_WASM_ONNX=ON`
+ *   (i.e. `./scripts/build-web.sh --build-wasm --llamacpp --onnx`) so that
+ *   `_rac_backend_onnx_register` is exported and `rac_backend_onnx` is
+ *   linked. Without that, `register()` reports a typed
+ *   `BackendNotAvailable` error and STT/TTS/VAD calls return null/error.
  */
 
-import { SDKException, SDKErrorCode, SDKLogger, HTTPAdapter } from '@runanywhere/web';
+import {
+  SDKException,
+  SDKLogger,
+  setRunanywhereModule,
+  tryRunanywhereModule,
+} from '@runanywhere/web';
+import type { EmscriptenRunanywhereModule } from '@runanywhere/web';
 
-const logger = new SDKLogger('SherpaONNX');
-
-// ---------------------------------------------------------------------------
-// Sherpa-ONNX Module Type
-// ---------------------------------------------------------------------------
+const logger = new SDKLogger('SherpaONNXBridge');
 
 /**
- * Emscripten module interface for sherpa-onnx WASM.
- * Based on sherpa-onnx's wasm/nodejs C API exports.
+ * Subset of the Emscripten module surface we touch when the ONNX package
+ * is the one loading the commons WASM (vs. piggy-backing on a module that
+ * was already installed by a sibling package).
  */
-export interface SherpaONNXModule {
-  // Emscripten runtime
-  ccall: (ident: string, returnType: string | null, argTypes: string[], args: unknown[]) => unknown;
-  cwrap: (ident: string, returnType: string | null, argTypes: string[]) => (...args: unknown[]) => unknown;
-  _malloc: (size: number) => number;
-  _free: (ptr: number) => void;
-  setValue: (ptr: number, value: number, type: string) => void;
-  getValue: (ptr: number, type: string) => number;
-  UTF8ToString: (ptr: number) => string;
-  stringToUTF8: (str: string, ptr: number, maxLen: number) => void;
-  lengthBytesUTF8: (str: string) => number;
-  HEAPU8: Uint8Array;
-  HEAP16: Int16Array;
-  HEAP32: Int32Array;
-  HEAPF32: Float32Array;
-  HEAPF64: Float64Array;
-  FS: SherpaFS;
-
-  // STT - Offline recognizer (Whisper, etc.)
-  _SherpaOnnxCreateOfflineRecognizer: (configPtr: number) => number;
-  _SherpaOnnxDestroyOfflineRecognizer: (handle: number) => void;
-  _SherpaOnnxCreateOfflineStream: (handle: number) => number;
-  _SherpaOnnxDestroyOfflineStream: (stream: number) => void;
-  _SherpaOnnxAcceptWaveformOffline: (stream: number, sampleRate: number, samplesPtr: number, numSamples: number) => void;
-  _SherpaOnnxDecodeOfflineStream: (handle: number, stream: number) => void;
-  _SherpaOnnxGetOfflineStreamResultAsJson: (stream: number) => number;
-  _SherpaOnnxDestroyOfflineStreamResultJson: (ptr: number) => void;
-
-  // STT - Online recognizer (streaming)
-  _SherpaOnnxCreateOnlineRecognizer: (configPtr: number) => number;
-  _SherpaOnnxDestroyOnlineRecognizer: (handle: number) => void;
-  _SherpaOnnxCreateOnlineStream: (handle: number) => number;
-  _SherpaOnnxDestroyOnlineStream: (stream: number) => void;
-  _SherpaOnnxOnlineStreamAcceptWaveform: (stream: number, sampleRate: number, samplesPtr: number, numSamples: number) => void;
-  _SherpaOnnxIsOnlineStreamReady: (handle: number, stream: number) => number;
-  _SherpaOnnxDecodeOnlineStream: (handle: number, stream: number) => void;
-  _SherpaOnnxGetOnlineStreamResultAsJson: (handle: number, stream: number) => number;
-  _SherpaOnnxDestroyOnlineStreamResultJson: (ptr: number) => void;
-  _SherpaOnnxOnlineStreamInputFinished: (stream: number) => void;
-  _SherpaOnnxOnlineStreamIsEndpoint: (handle: number, stream: number) => number;
-  _SherpaOnnxOnlineStreamReset: (handle: number, stream: number) => void;
-
-  // TTS
-  _SherpaOnnxCreateOfflineTts: (configPtr: number) => number;
-  _SherpaOnnxDestroyOfflineTts: (handle: number) => void;
-  _SherpaOnnxOfflineTtsGenerate: (handle: number, textPtr: number, sid: number, speed: number) => number;
-  _SherpaOnnxDestroyOfflineTtsGeneratedAudio: (audio: number) => void;
-  _SherpaOnnxOfflineTtsSampleRate: (handle: number) => number;
-  _SherpaOnnxOfflineTtsNumSpeakers: (handle: number) => number;
-
-  // VAD
-  _SherpaOnnxCreateVoiceActivityDetector: (configPtr: number, bufferSizeInSeconds: number) => number;
-  _SherpaOnnxDestroyVoiceActivityDetector: (handle: number) => void;
-  _SherpaOnnxVoiceActivityDetectorAcceptWaveform: (handle: number, samplesPtr: number, numSamples: number) => void;
-  _SherpaOnnxVoiceActivityDetectorEmpty: (handle: number) => number;
-  _SherpaOnnxVoiceActivityDetectorDetected: (handle: number) => number;
-  _SherpaOnnxVoiceActivityDetectorPop: (handle: number) => void;
-  _SherpaOnnxVoiceActivityDetectorFront: (handle: number) => number;
-  _SherpaOnnxDestroySpeechSegment: (segment: number) => void;
-  _SherpaOnnxVoiceActivityDetectorReset: (handle: number) => void;
-  _SherpaOnnxVoiceActivityDetectorFlush: (handle: number) => void;
-
-  // Memory helpers
-  _CopyHeap?: (srcPtr: number, numBytes: number, dstPtr: number) => void;
+interface CommonsModule extends EmscriptenRunanywhereModule {
+  ccall?: (
+    fname: string,
+    returnType: string | null,
+    argTypes: string[],
+    args: unknown[],
+    opts?: { async?: boolean },
+  ) => unknown;
+  _rac_wasm_ping?(): number;
+  _rac_wasm_sizeof_platform_adapter?(): number;
+  _rac_wasm_sizeof_config?(): number;
+  _rac_set_platform_adapter?(adapterPtr: number): number;
+  _rac_init?(configPtr: number): number;
+  _rac_backend_onnx_register?(): number;
+  _rac_backend_onnx_unregister?(): number;
 }
-
-interface SherpaFS {
-  mkdir: (path: string) => void;
-  writeFile: (path: string, data: Uint8Array | string) => void;
-  readFile: (path: string) => Uint8Array;
-  unlink: (path: string) => void;
-  analyzePath: (path: string) => { exists: boolean };
-}
-
-type SherpaCreateModule = (options: Record<string, unknown>) => SherpaONNXModule | Promise<SherpaONNXModule>;
-
-const BROWSER_PATH_FS_SHIM =
-  'var PATH_FS={resolve:(...paths)=>PATH.normalize([FS.cwd(),...paths].filter(Boolean).join("/")),relative:(from,to)=>{from=PATH.normalize(from||FS.cwd());to=PATH.normalize(to||FS.cwd());var f=from.split("/").filter(Boolean);var t=to.split("/").filter(Boolean);while(f.length&&t.length&&f[0]===t[0]){f.shift();t.shift()}return f.map(() => "..").concat(t).join("/")||"."}};';
-
-function patchSherpaGlueForBrowser(source: string): string {
-  let patched = source;
-
-  patched = patched.replace(/var ENVIRONMENT_IS_NODE=[^;]+;/, 'var ENVIRONMENT_IS_NODE=false;');
-  patched = patched.replace(
-    /var nodeTTY=require\(["']node:tty["']\);/g,
-    'var nodeTTY={isatty:function(){return false}};',
-  );
-  patched = patched.replace(
-    /var PATH_FS=\{resolve:\(\.\.\.paths\)=>\{paths\.unshift\(FS\.cwd\(\)\);return nodePath\.posix\.resolve\(\.\.\.paths\)\},relative:\(from,to\)=>nodePath\.posix\.relative\(from\|\|FS\.cwd\(\),to\|\|FS\.cwd\(\)\)\};/g,
-    BROWSER_PATH_FS_SHIM,
-  );
-  patched = patched.replace(
-    /var VFS=\{\.\.\.FS\};for\(const\[key,value\]of Object\.entries\(NODERAWFS\)\)\{FS\[key\]=_wrapNodeError\(value\)\}for\(const\[key,value\]of Object\.entries\(NODERAWFS_stream_funcs\)\)\{FS\[key\]=_wrapNodeStreamFunc\(value,FS\[key\]\)\}/g,
-    'var VFS={...FS};/* PATCHED: NODERAWFS FS patching skipped for browser (using MEMFS) */',
-  );
-  patched = patched.replace(
-    /var VFS=\{\.\.\.FS\};for\(var _key in NODERAWFS\)\{FS\[_key\]=_wrapNodeError\(NODERAWFS\[_key\]\)\}/g,
-    'var VFS={...FS};/* PATCHED: NODERAWFS FS patching skipped for browser (using MEMFS) */',
-  );
-
-  if (!/\bexport\s+default\s+Module\b/.test(patched)) {
-    patched += '\nexport default Module;\n';
-  }
-
-  return patched;
-}
-
-function coerceSherpaCreateModule(moduleNamespace: unknown): SherpaCreateModule {
-  if (typeof moduleNamespace === 'function') {
-    return moduleNamespace as SherpaCreateModule;
-  }
-
-  const namespace = moduleNamespace as Record<string, unknown>;
-  const candidate = namespace.default ?? namespace.Module;
-  if (typeof candidate !== 'function') {
-    throw new Error('sherpa-onnx-glue.js did not export a module factory');
-  }
-
-  return candidate as SherpaCreateModule;
-}
-
-async function importSherpaGlue(moduleUrl: string): Promise<SherpaCreateModule> {
-  const canPatchBrowserModule =
-    typeof window !== 'undefined' &&
-    typeof Blob !== 'undefined' &&
-    typeof URL !== 'undefined' &&
-    typeof fetch !== 'undefined';
-
-  if (!canPatchBrowserModule) {
-    const imported = await import(/* @vite-ignore */ moduleUrl);
-    return coerceSherpaCreateModule(imported);
-  }
-
-  const response = await fetch(moduleUrl);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch sherpa-onnx-glue.js: ${response.status} ${response.statusText}`);
-  }
-
-  const patchedSource = patchSherpaGlueForBrowser(await response.text());
-  const objectUrl = URL.createObjectURL(new Blob([patchedSource], { type: 'text/javascript' }));
-
-  try {
-    const imported = await import(/* @vite-ignore */ objectUrl);
-    return coerceSherpaCreateModule(imported);
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-}
-
-// ---------------------------------------------------------------------------
-// SherpaONNXBridge
-// ---------------------------------------------------------------------------
 
 /**
- * SherpaONNXBridge - Loads and manages the sherpa-onnx WASM module.
- *
- * Singleton that provides access to sherpa-onnx C API functions.
- * Lazy-loaded: only initializes when STT/TTS/VAD is first used.
+ * Module factory exposed by the `racommons-llamacpp.js` glue file. Emscripten
+ * builds it with `MODULARIZE=1` so the default export is a factory that
+ * returns a Promise of the module.
+ */
+type CommonsModuleFactory = (overrides?: Record<string, unknown>) => Promise<CommonsModule>;
+
+export interface SherpaONNXBridgeLoadOptions {
+  /**
+   * Override URL to the `racommons-llamacpp.js` glue file. When omitted,
+   * the bridge resolves it via `import.meta.url` so bundlers (Vite/webpack)
+   * can rewrite the asset path correctly.
+   */
+  wasmUrl?: string;
+}
+
+/**
+ * Singleton orchestrator for the ONNX backend. The TS surface is a thin
+ * shell — all real STT/TTS/VAD work happens in C++ via the proto-byte
+ * adapters in `@runanywhere/web` core.
  */
 export class SherpaONNXBridge {
   private static _instance: SherpaONNXBridge | null = null;
-  private _module: SherpaONNXModule | null = null;
+
+  private _module: CommonsModule | null = null;
+  private _backendRegistered = false;
   private _loaded = false;
   private _loading: Promise<void> | null = null;
 
-  /**
-   * Override the default URL to the sherpa-onnx-glue.js file.
-   * Set this before any STT/TTS/VAD model is loaded.
-   *
-   * In a Vite app, resolve it like:
-   * ```typescript
-   * SherpaONNXBridge.shared.wasmUrl = new URL(
-   *   '@runanywhere/web-onnx/wasm/sherpa/sherpa-onnx-glue.js',
-   *   import.meta.url,
-   * ).href;
-   * ```
-   */
+  /** Override URL to `racommons-llamacpp.js`. Set before `register()`. */
   wasmUrl: string | null = null;
-
-  /**
-   * Override the base URL for sherpa-onnx helper files (sherpa-onnx-asr.js,
-   * sherpa-onnx-tts.js, sherpa-onnx-vad.js).
-   *
-   * When `null` (default), this is auto-derived from `wasmUrl` after the
-   * glue JS loads successfully. Set explicitly only if helper files are
-   * served from a different location than the glue JS.
-   *
-   * Must end with a trailing `/`.
-   */
-  helperBaseUrl: string | null = null;
 
   static get shared(): SherpaONNXBridge {
     if (!SherpaONNXBridge._instance) {
@@ -225,36 +103,21 @@ export class SherpaONNXBridge {
   }
 
   get isLoaded(): boolean {
-    return this._loaded && this._module !== null;
+    return this._loaded;
   }
 
-  get module(): SherpaONNXModule {
-    if (!this._module) {
-      throw new SDKException(
-        SDKErrorCode.WASMNotLoaded,
-        'Sherpa-ONNX WASM not loaded. Call ensureLoaded() first.',
-      );
-    }
-    return this._module;
+  get isBackendRegistered(): boolean {
+    return this._backendRegistered;
   }
 
-  /**
-   * Ensure the sherpa-onnx WASM module is loaded.
-   * Safe to call multiple times -- will only load once.
-   *
-   * @param wasmUrl - URL/path to the sherpa-onnx glue JS file.
-   *                  Defaults to wasm/sherpa/sherpa-onnx-glue.js
-   */
-  async ensureLoaded(wasmUrl?: string): Promise<void> {
+  /** Acquire/load the commons module and register the ONNX backend vtable. */
+  async ensureLoaded(options?: SherpaONNXBridgeLoadOptions): Promise<void> {
     if (this._loaded) return;
-
-    // Prevent duplicate loading
     if (this._loading) {
       await this._loading;
       return;
     }
-
-    this._loading = this._doLoad(wasmUrl);
+    this._loading = this._doLoad(options);
     try {
       await this._loading;
     } finally {
@@ -262,346 +125,189 @@ export class SherpaONNXBridge {
     }
   }
 
-  private async _doLoad(wasmUrl?: string): Promise<void> {
-    logger.info('Loading Sherpa-ONNX WASM module...');
-
-    try {
-      const moduleUrl = wasmUrl ?? this.wasmUrl ?? new URL('../../wasm/sherpa/sherpa-onnx-glue.js', import.meta.url).href;
-      const createModule = await importSherpaGlue(moduleUrl);
-
-      // Derive the base URL for the .wasm binary
-      const baseUrl = moduleUrl.substring(0, moduleUrl.lastIndexOf('/') + 1);
-      const wasmBinaryUrl = baseUrl + 'sherpa-onnx.wasm';
-
-      // Pre-fetch the WASM binary to avoid Emscripten's sync XHR
-      // (the Node.js-targeted build uses sync browser loading that fails here).
-      logger.info(`Fetching sherpa-onnx WASM binary from ${wasmBinaryUrl}`);
-      // HTTP_FETCH_CARVE_OUTS.bootstrapOnly: the WASM binary is required before any Sherpa module exists.
-      const wasmResponse = await fetch(wasmBinaryUrl); // fetch() carve-out: bootstrap-only WASM binary.
-      if (!wasmResponse.ok) {
-        throw new Error(`Failed to fetch sherpa-onnx.wasm: ${wasmResponse.status} ${wasmResponse.statusText}`);
-      }
-      const wasmBinary = await wasmResponse.arrayBuffer();
-      logger.info(`Sherpa-ONNX WASM binary fetched: ${(wasmBinary.byteLength / 1_000_000).toFixed(1)} MB`);
-
-      // Use instantiateWasm for async compilation (Chrome blocks sync compile for >8MB).
-      //
-      // The sherpa-onnx glue JS was compiled with NODERAWFS but we patched it:
-      //   1. ENVIRONMENT_IS_NODE = false → forces browser code paths
-      //   2. NODERAWFS mounting skipped → FS uses MEMFS
-      //   3. receiveInstance patched → re-assigns Module exports after wasmExports is set
-      //
-      // We pass noFSInit: true to skip FS.init() (which creates /dev/stdin etc.).
-      // We don't need standard streams — only file operations for staging model files.
-      // This ensures initRuntime() succeeds and the ready promise resolves.
-      //
-      // We track a separate wasmReady promise so that if WebAssembly.instantiate
-      // itself fails, we get the actual error instead of a generic timeout.
-      let resolveWasm: () => void;
-      let rejectWasm: (err: Error) => void;
-      const wasmReady = new Promise<void>((resolve, reject) => {
-        resolveWasm = resolve;
-        rejectWasm = reject;
-      });
-
-       
-      const modOrPromise = createModule({
-        noFSInit: true,
-        print: (text: string) => logger.debug(text),
-        printErr: (text: string) => logger.warning(text),
-        wasmBinary,
-        locateFile: (path: string) => baseUrl + path,
-        instantiateWasm: (
-          imports: WebAssembly.Imports,
-          receiveInstance: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void,
-        ) => {
-          WebAssembly.instantiate(wasmBinary, imports)
-            .then((result) => {
-              try {
-                receiveInstance(result.instance, result.module);
-                resolveWasm();
-              } catch (err) {
-                // receiveInstance may throw if initRuntime fails (e.g. FS errors).
-                logger.warning(`receiveInstance completed with error: ${err}`);
-                resolveWasm();
-              }
-            })
-            .catch((err) => {
-              const error = err instanceof Error ? err : new Error(String(err));
-              logger.error(`WASM instantiation failed: ${error.message}`);
-              rejectWasm(error);
-            });
-          return {}; // Indicates async instantiation
-        },
-      });
-
-      // Wait for WASM instantiation + receiveInstance + initRuntime to complete.
-      // With Patch 6 applied, createModule returns a Promise (resolved after initRuntime).
-      // wasmReady resolves first (after receiveInstance), then initRuntime fires synchronously.
-      const timeoutPromise = new Promise<void>((_, reject) => {
-        setTimeout(() => reject(new Error('Sherpa-ONNX WASM module timed out after 30s')), 30_000);
-      });
-      await Promise.race([wasmReady, timeoutPromise]);
-
-      // Resolve the module: Emscripten returns a Promise<Module> when using async WASM init.
-      // Promise.resolve() is a no-op if modOrPromise is already the Module object.
-       
-      const mod = await Promise.resolve(modOrPromise) as SherpaONNXModule;
-      this._module = mod;
-
-      // Verify critical exports are available (set by our patched receiveInstance)
-      if (typeof mod._malloc !== 'function') {
-        const available = ['_malloc', '_free', '_SherpaOnnxCreateOfflineRecognizer']
-          .map(fn => `${fn}: ${typeof (mod as unknown as Record<string, unknown>)[fn]}`)
-          .join(', ');
-        throw new Error(`WASM exports not available after initialization. Available: ${available}`);
-      }
-
-      // Auto-derive helperBaseUrl so SherpaHelperLoader uses the same
-      // resolved base path (fixes fetch vs import asymmetry in Vite dev).
-      if (!this.helperBaseUrl) {
-        this.helperBaseUrl = baseUrl;
-      }
-
-      this._loaded = true;
-      logger.info('Sherpa-ONNX WASM module loaded successfully');
-    } catch (error) {
-      this._module = null;
+  /** Unregister the ONNX backend vtable. Idempotent. */
+  unregister(): void {
+    if (!this._module || !this._backendRegistered) {
       this._loaded = false;
-      const message = error instanceof Error ? error.message : String(error);
-      logger.error(`Failed to load Sherpa-ONNX WASM: ${message}`);
-      throw new SDKException(
-        SDKErrorCode.WASMLoadFailed,
-        `Failed to load Sherpa-ONNX WASM module: ${message}. ` +
-        'Build with: ./wasm/scripts/build-sherpa-onnx.sh',
+      return;
+    }
+    try {
+      const rc = this._module._rac_backend_onnx_unregister?.() ?? 0;
+      if (rc !== 0) {
+        logger.warning(`rac_backend_onnx_unregister returned ${rc}`);
+      }
+    } catch (err) {
+      logger.warning(
+        `rac_backend_onnx_unregister threw: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-  }
-
-  // -----------------------------------------------------------------------
-  // Filesystem Helpers
-  // -----------------------------------------------------------------------
-
-  /**
-   * Get the Emscripten FS object from the module.
-   * Handles both direct FS property and module-level helper functions.
-   */
-  private getFS(): SherpaFS {
-    const m = this.module;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mod = m as any;
-
-    // First try direct FS property
-    if (m.FS && typeof m.FS.mkdir === 'function') {
-      return m.FS;
-    }
-
-    // Fallback: construct FS-like interface from Emscripten module-level helpers
-    if (typeof mod.FS_createPath === 'function') {
-      return {
-        mkdir: (p: string) => {
-          const parent = p.substring(0, p.lastIndexOf('/')) || '/';
-          const name = p.substring(p.lastIndexOf('/') + 1);
-          mod.FS_createPath(parent, name, true, true);
-        },
-        writeFile: (p: string, data: Uint8Array | string) => {
-          const dir = p.substring(0, p.lastIndexOf('/')) || '/';
-          const name = p.substring(p.lastIndexOf('/') + 1);
-          try { mod.FS_unlink(p); } catch { /* file may not exist */ }
-          mod.FS_createDataFile(dir, name, data, true, true, true);
-        },
-        readFile: (p: string) => mod.FS_readFile(p),
-        unlink: (p: string) => mod.FS_unlink(p),
-        analyzePath: (p: string) => {
-          try {
-            mod.FS_readFile(p);
-            return { exists: true };
-          } catch {
-            return { exists: false };
-          }
-        },
-      };
-    }
-
-    throw new SDKException(SDKErrorCode.WASMNotLoaded, 'Sherpa-ONNX FS not available');
-  }
-
-  /**
-   * Ensure a directory exists in the sherpa-onnx Emscripten virtual FS.
-   */
-  ensureDir(path: string): void {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mod = this.module as any;
-
-    if (typeof mod.FS_createPath === 'function') {
-      // Use FS_createPath which creates all intermediate directories
-      mod.FS_createPath('/', path.replace(/^\//, ''), true, true);
-      return;
-    }
-
-    // Fallback to FS.mkdir
-    const fs = this.getFS();
-    const parts = path.split('/').filter(Boolean);
-    let current = '';
-    for (const part of parts) {
-      current += '/' + part;
-      if (!fs.analyzePath(current).exists) {
-        fs.mkdir(current);
-      }
-    }
-  }
-
-  /**
-   * Write a file into the sherpa-onnx Emscripten virtual FS.
-   * Used to stage model files before loading.
-   *
-   * Prefers FS_createDataFile over FS.writeFile for reliability —
-   * the module was compiled with NODERAWFS which can leave FS.writeFile
-   * in a broken state even after our browser patches.
-   */
-  writeFile(path: string, data: Uint8Array): void {
-    const dir = path.substring(0, path.lastIndexOf('/'));
-    if (dir) this.ensureDir(dir);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const mod = this.module as any;
-
-    // Prefer FS_createDataFile — it creates the file node and writes data
-    // in one shot, avoiding potential issues with FS.open / FS.write on
-    // NODERAWFS-patched modules.
-    if (typeof mod.FS_createDataFile === 'function') {
-      const parentDir = dir || '/';
-      const filename = path.substring(path.lastIndexOf('/') + 1);
-
-      // Remove existing file first (FS_createDataFile throws if it exists)
-      try {
-        if (typeof mod.FS_unlink === 'function') {
-          mod.FS_unlink(path);
-        }
-      } catch {
-        // File doesn't exist — that's fine
-      }
-
-      mod.FS_createDataFile(parentDir, filename, data, true, true, false);
-      logger.debug(`Wrote ${data.length} bytes to sherpa FS: ${path}`);
-      return;
-    }
-
-    // Fallback to FS.writeFile
-    const fs = this.getFS();
-    fs.writeFile(path, data);
-    logger.debug(`Wrote ${data.length} bytes to sherpa FS: ${path}`);
-  }
-
-  /**
-   * Download a file from a URL and write it to the sherpa-onnx FS.
-   *
-   * Transport selection (T3.13):
-   *   1. If any backend has registered an HTTPAdapter default module
-   *      (typically `@runanywhere/web-llamacpp`), stream through the
-   *      commons libcurl C ABI for parity with the other SDKs.
-   *   2. Otherwise fall back to browser fetch — unavoidable when
-   *      the consumer only uses `@runanywhere/web-onnx` and no other
-   *      backend has loaded. Sherpa's own WASM does NOT ship the
-   *      `rac_http_*` exports, so we can't route through its module.
-   */
-  async downloadAndWrite(
-    url: string,
-    fsPath: string,
-    onProgress?: (loaded: number, total: number) => void,
-  ): Promise<void> {
-    logger.info(`Downloading ${url} -> ${fsPath}`);
-
-    const http = HTTPAdapter.tryDefault();
-    if (http) {
-      const chunks: Uint8Array[] = [];
-      let loaded = 0;
-      let declaredTotal = 0;
-      await http.stream({ url }, (chunk, totalWritten, contentLength) => {
-        chunks.push(chunk);
-        loaded = totalWritten;
-        if (contentLength > 0) declaredTotal = contentLength;
-        onProgress?.(loaded, declaredTotal);
-      });
-      const combined = new Uint8Array(loaded);
-      let offset = 0;
-      for (const c of chunks) {
-        combined.set(c, offset);
-        offset += c.length;
-      }
-      this.writeFile(fsPath, combined);
-      return;
-    }
-
-    // HTTP_FETCH_CARVE_OUTS.noWasmModuleRegisteredFallback: ONNX-only consumers may not load a commons HTTP module.
-    const response = await fetch(url); // fetch() carve-out: fallback when no WASM module registered.
-    if (!response.ok) {
-      throw new SDKException(
-        SDKErrorCode.NetworkError,
-        `Failed to download ${url}: ${response.status} ${response.statusText}`,
-      );
-    }
-
-    const contentLength = Number(response.headers.get('content-length') ?? 0);
-    const reader = response.body?.getReader();
-
-    if (!reader) {
-      const buffer = await response.arrayBuffer();
-      this.writeFile(fsPath, new Uint8Array(buffer));
-      return;
-    }
-
-    const chunks: Uint8Array[] = [];
-    let loaded = 0;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      loaded += value.length;
-      onProgress?.(loaded, contentLength);
-    }
-
-    const combined = new Uint8Array(loaded);
-    let offset = 0;
-    for (const chunk of chunks) {
-      combined.set(chunk, offset);
-      offset += chunk.length;
-    }
-
-    this.writeFile(fsPath, combined);
-  }
-
-  // -----------------------------------------------------------------------
-  // String Helpers
-  // -----------------------------------------------------------------------
-
-  allocString(str: string): number {
-    const m = this.module;
-    const len = m.lengthBytesUTF8(str) + 1;
-    const ptr = m._malloc(len);
-    m.stringToUTF8(str, ptr, len);
-    return ptr;
-  }
-
-  readString(ptr: number): string {
-    if (ptr === 0) return '';
-    return this.module.UTF8ToString(ptr);
-  }
-
-  free(ptr: number): void {
-    if (ptr !== 0) this.module._free(ptr);
-  }
-
-  // -----------------------------------------------------------------------
-  // Cleanup
-  // -----------------------------------------------------------------------
-
-  shutdown(): void {
-    this._module = null;
+    this._backendRegistered = false;
     this._loaded = false;
-    this._loading = null;
-    SherpaONNXBridge._instance = null;
-    logger.info('Sherpa-ONNX bridge shut down');
+  }
+
+  // -------------------------------------------------------------------------
+  // Internals
+  // -------------------------------------------------------------------------
+
+  private async _doLoad(options?: SherpaONNXBridgeLoadOptions): Promise<void> {
+    logger.info('Loading ONNX backend (proto-byte commons C ABI)...');
+
+    // Phase 1: Acquire the commons WASM module.
+    const installed = tryRunanywhereModule() as CommonsModule | null;
+    if (installed) {
+      logger.info('Using already-installed RACommons module from sibling backend');
+      this._module = installed;
+    } else {
+      this._module = await this._loadCommonsModule(options);
+
+      // initialize commons + install the module in the singleton so the
+      // proto-byte adapters in core can reach it.
+      await this._initCommons(this._module);
+      setRunanywhereModule(this._module);
+    }
+
+    // Phase 2: Register the ONNX backend vtable.
+    if (typeof this._module._rac_backend_onnx_register !== 'function') {
+      throw SDKException.backendNotAvailable(
+        'ONNX.register',
+        'The loaded RACommons WASM module does not export `rac_backend_onnx_register`. ' +
+          'Rebuild the WASM with `./scripts/build-web.sh --build-wasm --llamacpp --onnx` ' +
+          'to include the sherpa-onnx STT/TTS/VAD backend.',
+      );
+    }
+
+    const rc = await this._callMaybeAsync(this._module, 'rac_backend_onnx_register');
+    if (rc !== 0) {
+      throw SDKException.backendNotAvailable(
+        'ONNX.register',
+        `rac_backend_onnx_register returned ${rc}.`,
+      );
+    }
+    this._backendRegistered = true;
+    this._loaded = true;
+    logger.info('ONNX backend registered (STT/TTS/VAD vtable installed)');
+  }
+
+  private async _loadCommonsModule(
+    options?: SherpaONNXBridgeLoadOptions,
+  ): Promise<CommonsModule> {
+    const moduleUrl =
+      options?.wasmUrl ??
+      this.wasmUrl ??
+      new URL('../../../llamacpp/wasm/racommons-llamacpp.js', import.meta.url).href;
+
+    this.wasmUrl = moduleUrl;
+    logger.info(`Loading RACommons WASM glue from ${moduleUrl}`);
+
+    const baseUrl = moduleUrl.substring(0, moduleUrl.lastIndexOf('/') + 1);
+
+    let factory: CommonsModuleFactory;
+    try {
+      const imported = (await import(/* @vite-ignore */ moduleUrl)) as {
+        default: CommonsModuleFactory;
+      };
+      factory = imported.default;
+    } catch (err) {
+      throw SDKException.backendNotAvailable(
+        'ONNX.register',
+        `Failed to import RACommons glue at ${moduleUrl}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+
+    let module: CommonsModule;
+    try {
+      module = await factory({
+        print: (text: string) => logger.info(text),
+        printErr: (text: string) => logger.error(text),
+        locateFile: (path: string) => baseUrl + path,
+      });
+    } catch (err) {
+      throw SDKException.backendNotAvailable(
+        'ONNX.register',
+        `Failed to instantiate RACommons WASM: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+
+    if (typeof module._rac_wasm_ping === 'function') {
+      const ping = module._rac_wasm_ping();
+      if (ping !== 42) {
+        throw SDKException.backendNotAvailable(
+          'ONNX.register',
+          `RACommons WASM ping check failed (expected 42, got ${ping})`,
+        );
+      }
+    }
+
+    return module;
+  }
+
+  /**
+   * Call `rac_init()` with a zero-initialised `rac_config_t`. We rely on the
+   * defaults — no platform adapter is registered from the ONNX package
+   * because those callbacks belong to whichever backend owns the module.
+   * Sibling backends (LlamaCPP) install richer adapters; until they re-land
+   * the ONNX-only path leaves all platform callbacks NULL, which the C++
+   * core handles gracefully (logging falls back to stderr, file ops fail
+   * with `RAC_ERROR_FEATURE_NOT_AVAILABLE`).
+   */
+  private async _initCommons(module: CommonsModule): Promise<void> {
+    if (typeof module._rac_init !== 'function' || typeof module._malloc !== 'function') {
+      throw SDKException.backendNotAvailable(
+        'ONNX.register',
+        'RACommons WASM module is missing _rac_init or _malloc.',
+      );
+    }
+
+    const sizeofConfig = module._rac_wasm_sizeof_config?.() ?? 0;
+    const configPtr = sizeofConfig > 0 ? module._malloc(sizeofConfig) : 0;
+    try {
+      if (configPtr && module.HEAPU8) {
+        module.HEAPU8.fill(0, configPtr, configPtr + sizeofConfig);
+      }
+      const rc = await this._callMaybeAsync(module, 'rac_init', ['number'], [configPtr]);
+      if (rc !== 0) {
+        throw SDKException.backendNotAvailable(
+          'ONNX.register',
+          `rac_init returned ${rc}.`,
+        );
+      }
+    } finally {
+      if (configPtr) module._free(configPtr);
+    }
+    logger.info('RACommons initialized (rac_init returned 0)');
+  }
+
+  /**
+   * Invoke an exported C function via `ccall`, awaiting a Promise when the
+   * module was built with ASYNCIFY/JSPI.
+   */
+  private async _callMaybeAsync(
+    module: CommonsModule,
+    name: string,
+    argTypes: string[] = [],
+    args: unknown[] = [],
+  ): Promise<number> {
+    const ccall = module.ccall;
+    if (typeof ccall !== 'function') {
+      const fn = (module as unknown as Record<string, unknown>)[`_${name}`] as
+        | ((...rest: number[]) => number)
+        | undefined;
+      if (typeof fn !== 'function') {
+        throw SDKException.backendNotAvailable(
+          'ONNX.register',
+          `RACommons WASM module is missing _${name}.`,
+        );
+      }
+      return fn(...(args as number[])) ?? 0;
+    }
+    const result = ccall(name, 'number', argTypes, args, { async: true });
+    if (result instanceof Promise) {
+      return (await result) as number;
+    }
+    return (result as number) ?? 0;
   }
 }

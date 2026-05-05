@@ -28,10 +28,8 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
   // Session state
   VoiceSessionState _sessionState = VoiceSessionState.disconnected;
 
-  // v3.1: proto-event subscription replaces the deprecated
-  // VoiceSessionHandle / VoiceSessionEvent consumption. The
-  // adapter is owned by the active stream subscription below;
-  // nothing else needs to reach it.
+  // Proto-event subscription owns the active stream; nothing else needs to
+  // reach the adapter.
   StreamSubscription<sdk.VoiceEvent>? _eventSubscription;
 
   // Conversation
@@ -323,6 +321,8 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
       case sdk.VoiceEvent_Payload.agentResponseStarted:
       case sdk.VoiceEvent_Payload.agentResponseCompleted:
       case sdk.VoiceEvent_Payload.turnLifecycle:
+      case sdk.VoiceEvent_Payload.audioLevel:
+      case sdk.VoiceEvent_Payload.componentProgress:
       case sdk.VoiceEvent_Payload.notSet:
         // No UX impact today.
         break;
@@ -339,6 +339,7 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
     // The adapter's Stream onCancel deregisters the C-side callback —
     // cancelling _eventSubscription above is sufficient cleanup.
 
+    if (!mounted) return;
     setState(() {
       _sessionState = VoiceSessionState.disconnected;
       _currentTranscript = '';
@@ -506,7 +507,8 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
               onChanged: (enabled) async {
                 if (enabled) {
                   try {
-                    await sdk.RunAnywhereSDK.instance.tts.loadVoice('system-tts');
+                    await sdk.RunAnywhereSDK.instance.tts
+                        .loadVoice('system-tts');
                     await _refreshComponentStates();
                   } catch (e) {
                     debugPrint('Failed to load system-tts: $e');

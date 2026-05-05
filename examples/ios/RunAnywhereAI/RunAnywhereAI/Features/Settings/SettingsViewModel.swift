@@ -36,7 +36,7 @@ class SettingsViewModel: ObservableObject {
     @Published var totalStorageSize: Int64 = 0
     @Published var availableSpace: Int64 = 0
     @Published var modelStorageSize: Int64 = 0
-    @Published var storedModels: [StoredModel] = []
+    @Published var storedModels: [RAStoredModel] = []
 
     // UI State
     @Published var showApiKeyEntry: Bool = false
@@ -113,12 +113,13 @@ class SettingsViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    private func handleSDKEvent(_ event: any SDKEvent) {
-        guard event.category == .llm else { return }
+    private func handleSDKEvent(_ event: RASDKEvent) {
+        guard event.category == .llm || event.component == .llm else { return }
 
-        switch event.type {
-        case "llm_model_load_completed":
-            let modelId = event.properties["model_id"] ?? ""
+        let modelId = event.model.modelID.isEmpty ? event.generation.modelID : event.model.modelID
+
+        switch (event.model.kind, event.generation.kind) {
+        case (.loadCompleted, _), (_, .modelLoaded):
             if let model = ModelListViewModel.shared.availableModels.first(where: { $0.id == modelId }) {
                 loadedModelSupportsThinking = model.supportsThinking
                 logger.info("LLM loaded (\(modelId)), supportsThinking: \(model.supportsThinking)")
@@ -126,7 +127,7 @@ class SettingsViewModel: ObservableObject {
                 loadedModelSupportsThinking = false
                 logger.warning("LLM loaded (\(modelId)), but it was not found in the registry")
             }
-        case "llm_model_unloaded":
+        case (.unloadCompleted, _), (_, .modelUnloaded):
             loadedModelSupportsThinking = false
             logger.info("LLM unloaded, thinking mode disabled")
         default:
@@ -390,19 +391,28 @@ class SettingsViewModel: ObservableObject {
         isLoadingStorage = true
         errorMessage = nil
 
-        do {
-            let storageInfo = await RunAnywhere.getStorageInfo()
+        var request = RAStorageInfoRequest()
+        request.includeDevice = true
+        request.includeApp = true
+        request.includeModels = true
+        request.includeCache = true
 
-            totalStorageSize = storageInfo.appStorage.totalSize
-            availableSpace = storageInfo.deviceStorage.freeSpace
-            modelStorageSize = storageInfo.totalModelsSize
-            storedModels = storageInfo.storedModels
-
-            print("Settings: Loaded storage data - Total: \(totalStorageSize), Available: \(availableSpace)")
-        } catch {
-            errorMessage = "Failed to load storage data: \(error.localizedDescription)"
+        let storageResult = await RunAnywhere.getStorageInfo(request)
+        guard storageResult.success else {
+            errorMessage = storageResult.errorMessage.isEmpty
+                ? "Failed to load storage data"
+                : storageResult.errorMessage
+            isLoadingStorage = false
+            return
         }
 
+        let storageInfo = storageResult.info
+        totalStorageSize = storageInfo.appStorage.totalSize
+        availableSpace = storageInfo.deviceStorage.freeSpace
+        modelStorageSize = storageInfo.totalModelsSize
+        storedModels = storageInfo.storedModels
+
+        print("Settings: Loaded storage data - Total: \(totalStorageSize), Available: \(availableSpace)")
         isLoadingStorage = false
     }
 
@@ -414,7 +424,7 @@ class SettingsViewModel: ObservableObject {
     /// Clear cache
     func clearCache() async {
         do {
-            try await RunAnywhere.clearCache()
+            try SimplifiedFileManager.shared.clearCache()
             await refreshStorageData()
             print("Settings: Cache cleared successfully")
         } catch {
@@ -425,7 +435,7 @@ class SettingsViewModel: ObservableObject {
     /// Clean temporary files
     func cleanTempFiles() async {
         do {
-            try await RunAnywhere.cleanTempFiles()
+            try SimplifiedFileManager.shared.cleanTempFiles()
             await refreshStorageData()
             print("Settings: Temporary files cleaned successfully")
         } catch {
@@ -434,14 +444,24 @@ class SettingsViewModel: ObservableObject {
     }
 
     /// Delete a stored model
-    func deleteModel(_ model: StoredModel) async {
-        do {
-            try await RunAnywhere.deleteModel(model.id)
-            await refreshStorageData()
-            print("Settings: Model \(model.name) deleted successfully")
-        } catch {
-            errorMessage = "Failed to delete model: \(error.localizedDescription)"
+    func deleteModel(_ model: RAStoredModel) async {
+        var request = RAStorageDeleteRequest()
+        request.modelIds = [model.id]
+        request.deleteFiles = true
+        request.clearRegistryPaths_p = true
+        request.unloadIfLoaded = true
+        request.allowPlatformDelete = true
+
+        let result = await RunAnywhere.deleteStorage(request)
+        guard result.success else {
+            errorMessage = result.errorMessage.isEmpty
+                ? "Failed to delete model"
+                : result.errorMessage
+            return
         }
+
+        await refreshStorageData()
+        print("Settings: Model \(model.name) deleted successfully")
     }
 
     // MARK: - Helper Methods

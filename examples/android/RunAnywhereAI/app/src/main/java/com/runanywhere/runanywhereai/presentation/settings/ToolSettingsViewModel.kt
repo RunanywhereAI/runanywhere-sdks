@@ -1,14 +1,19 @@
 package com.runanywhere.runanywhereai.presentation.settings
 
+import ai.runanywhere.proto.v1.ToolCall
+import ai.runanywhere.proto.v1.ToolDefinition
+import ai.runanywhere.proto.v1.ToolParameter
+import ai.runanywhere.proto.v1.ToolParameterType
+import ai.runanywhere.proto.v1.ToolResult
+import ai.runanywhere.proto.v1.ToolValue
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import ai.runanywhere.proto.v1.ToolDefinition
-import ai.runanywhere.proto.v1.ToolParameter
-import ai.runanywhere.proto.v1.ToolParameterType
-import ai.runanywhere.proto.v1.ToolValue
-import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
+import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.clearTools
+import com.runanywhere.sdk.public.extensions.getRegisteredTools
+import com.runanywhere.sdk.public.extensions.registerTool
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -18,6 +23,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.json.JSONObject
 import timber.log.Timber
 import java.net.HttpURLConnection
 import java.net.URL
@@ -85,7 +91,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
     }
 
     suspend fun refreshRegisteredTools() {
-        val tools = RunAnywhereToolCalling.getRegisteredTools()
+        val tools = RunAnywhere.getRegisteredTools()
         _uiState.update { it.copy(registeredTools = tools) }
     }
 
@@ -101,7 +107,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
 
             try {
                 // Weather Tool - Uses Open-Meteo API (free, no API key required)
-                RunAnywhereToolCalling.registerTool(
+                RunAnywhere.registerTool(
                     definition =
                         ToolDefinition(
                             name = "get_weather",
@@ -117,13 +123,16 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                                 ),
                             category = "Utility",
                         ),
-                    executor = { args: Map<String, ToolValue> ->
-                        fetchWeather(args["location"]?.string_value ?: "San Francisco")
+                    executor = { call: ToolCall ->
+                        toolResult(
+                            call,
+                            fetchWeather(call.stringArgument("location", "San Francisco")),
+                        )
                     },
                 )
 
                 // Time Tool - Real system time with timezone
-                RunAnywhereToolCalling.registerTool(
+                RunAnywhere.registerTool(
                     definition =
                         ToolDefinition(
                             name = "get_current_time",
@@ -131,7 +140,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                             parameters = emptyList(),
                             category = "Utility",
                         ),
-                    executor = { _: Map<String, ToolValue> ->
+                    executor = { call: ToolCall ->
                         val now = Date()
                         val dateFormatter = SimpleDateFormat("EEEE, MMMM d, yyyy 'at' h:mm:ss a", Locale.getDefault())
                         val timeFormatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
@@ -141,18 +150,21 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                             }
                         val tz = TimeZone.getDefault()
 
-                        mapOf(
-                            "datetime" to ToolValue(string_value = dateFormatter.format(now)),
-                            "time" to ToolValue(string_value = timeFormatter.format(now)),
-                            "timestamp" to ToolValue(string_value = isoFormatter.format(now)),
-                            "timezone" to ToolValue(string_value = tz.id),
-                            "utc_offset" to ToolValue(string_value = tz.getDisplayName(false, TimeZone.SHORT)),
+                        toolResult(
+                            call,
+                            mapOf(
+                                "datetime" to ToolValue(string_value = dateFormatter.format(now)),
+                                "time" to ToolValue(string_value = timeFormatter.format(now)),
+                                "timestamp" to ToolValue(string_value = isoFormatter.format(now)),
+                                "timezone" to ToolValue(string_value = tz.id),
+                                "utc_offset" to ToolValue(string_value = tz.getDisplayName(false, TimeZone.SHORT)),
+                            ),
                         )
                     },
                 )
 
                 // Calculator Tool - Math evaluation
-                RunAnywhereToolCalling.registerTool(
+                RunAnywhere.registerTool(
                     definition =
                         ToolDefinition(
                             name = "calculate",
@@ -168,19 +180,20 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                                 ),
                             category = "Utility",
                         ),
-                    executor = { args: Map<String, ToolValue> ->
+                    executor = { call: ToolCall ->
                         val expression =
-                            args["expression"]?.string_value
-                                ?: args["input"]?.string_value
-                                ?: "0"
-                        evaluateMathExpression(expression)
+                            call.stringArgument(
+                                name = "expression",
+                                defaultValue = call.stringArgument("input", "0"),
+                            )
+                        toolResult(call, evaluateMathExpression(expression))
                     },
                 )
 
                 // B-AK-7-001: emit a single, easy-to-grep observability log
                 // line so QA can confirm the demo tools landed without
                 // scraping individual register lines.
-                val tools = RunAnywhereToolCalling.getRegisteredTools()
+                val tools = RunAnywhere.getRegisteredTools()
                 android.util.Log.i("ToolRegistry", "Registered ${tools.size} demo tools")
                 Timber.i("✅ Demo tools registered (count=${tools.size})")
                 refreshRegisteredTools()
@@ -196,7 +209,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
             try {
-                RunAnywhereToolCalling.clearTools()
+                RunAnywhere.clearTools()
                 refreshRegisteredTools()
                 Timber.i("✅ All tools cleared")
             } catch (e: Exception) {
@@ -221,6 +234,41 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
     }
 
     // Tool Executor Implementations
+
+    private fun ToolCall.stringArgument(
+        name: String,
+        defaultValue: String,
+    ): String {
+        return runCatching {
+            JSONObject(arguments_json.ifBlank { "{}" }).optString(name, defaultValue)
+        }.getOrDefault(defaultValue)
+    }
+
+    private fun toolResult(
+        call: ToolCall,
+        values: Map<String, ToolValue>,
+    ): ToolResult {
+        val json =
+            JSONObject().apply {
+                values.forEach { (key, value) ->
+                    put(key, value.toJsonValue())
+                }
+            }
+        val callId = call.call_id ?: call.id
+        return ToolResult(
+            tool_call_id = callId,
+            name = call.name,
+            result_json = json.toString(),
+            success = values["error"]?.string_value == null,
+            call_id = callId,
+        )
+    }
+
+    private fun ToolValue.toJsonValue(): Any =
+        string_value
+            ?: number_value
+            ?: bool_value
+            ?: JSONObject.NULL
 
     /**
      * Fetch weather using Open-Meteo API (free, no API key required)

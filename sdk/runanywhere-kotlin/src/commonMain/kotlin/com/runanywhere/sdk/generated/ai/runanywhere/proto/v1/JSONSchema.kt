@@ -120,6 +120,13 @@ public class JSONSchema(
     schemaIndex = 14,
   )
   public val not_schema: JSONSchema? = null,
+  @field:WireField(
+    tag = 16,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "rawJson",
+    schemaIndex = 15,
+  )
+  public val raw_json: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<JSONSchema, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -205,6 +212,7 @@ public class JSONSchema(
     if (any_of != other.any_of) return false
     if (one_of != other.one_of) return false
     if (not_schema != other.not_schema) return false
+    if (raw_json != other.raw_json) return false
     return true
   }
 
@@ -227,6 +235,7 @@ public class JSONSchema(
       result = result * 37 + any_of.hashCode()
       result = result * 37 + one_of.hashCode()
       result = result * 37 + (not_schema?.hashCode() ?: 0)
+      result = result * 37 + (raw_json?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -249,6 +258,7 @@ public class JSONSchema(
     if (any_of.isNotEmpty()) result += """any_of=$any_of"""
     if (one_of.isNotEmpty()) result += """one_of=$one_of"""
     if (not_schema != null) result += """not_schema=$not_schema"""
+    if (raw_json != null) result += """raw_json=${sanitize(raw_json)}"""
     return result.joinToString(prefix = "JSONSchema{", separator = ", ", postfix = "}")
   }
 
@@ -268,9 +278,10 @@ public class JSONSchema(
     any_of: List<JSONSchema> = this.any_of,
     one_of: List<JSONSchema> = this.one_of,
     not_schema: JSONSchema? = this.not_schema,
+    raw_json: String? = this.raw_json,
     unknownFields: ByteString = this.unknownFields,
   ): JSONSchema = JSONSchema(type, properties, required, items, additional_properties, schema_uri,
-      id_uri, title, description, definitions, ref, all_of, any_of, one_of, not_schema,
+      id_uri, title, description, definitions, ref, all_of, any_of, one_of, not_schema, raw_json,
       unknownFields)
 
   public companion object {
@@ -307,6 +318,7 @@ public class JSONSchema(
         size += JSONSchema.ADAPTER.asRepeated().encodedSizeWithTag(13, value.any_of)
         size += JSONSchema.ADAPTER.asRepeated().encodedSizeWithTag(14, value.one_of)
         size += JSONSchema.ADAPTER.encodedSizeWithTag(15, value.not_schema)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(16, value.raw_json)
         return size
       }
 
@@ -327,11 +339,13 @@ public class JSONSchema(
         JSONSchema.ADAPTER.asRepeated().encodeWithTag(writer, 13, value.any_of)
         JSONSchema.ADAPTER.asRepeated().encodeWithTag(writer, 14, value.one_of)
         JSONSchema.ADAPTER.encodeWithTag(writer, 15, value.not_schema)
+        ProtoAdapter.STRING.encodeWithTag(writer, 16, value.raw_json)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: JSONSchema) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 16, value.raw_json)
         JSONSchema.ADAPTER.encodeWithTag(writer, 15, value.not_schema)
         JSONSchema.ADAPTER.asRepeated().encodeWithTag(writer, 14, value.one_of)
         JSONSchema.ADAPTER.asRepeated().encodeWithTag(writer, 13, value.any_of)
@@ -366,6 +380,7 @@ public class JSONSchema(
         val any_of = mutableListOf<JSONSchema>()
         val one_of = mutableListOf<JSONSchema>()
         var not_schema: JSONSchema? = null
+        var raw_json: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -387,6 +402,7 @@ public class JSONSchema(
             13 -> any_of.add(JSONSchema.ADAPTER.decode(reader))
             14 -> one_of.add(JSONSchema.ADAPTER.decode(reader))
             15 -> not_schema = JSONSchema.ADAPTER.decode(reader)
+            16 -> raw_json = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -406,6 +422,7 @@ public class JSONSchema(
           any_of = any_of,
           one_of = one_of,
           not_schema = not_schema,
+          raw_json = raw_json,
           unknownFields = unknownFields
         )
       }

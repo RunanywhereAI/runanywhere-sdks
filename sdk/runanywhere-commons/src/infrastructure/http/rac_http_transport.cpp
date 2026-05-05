@@ -4,8 +4,9 @@
  *
  * Holds a process-wide pointer to a platform-provided HTTP transport
  * vtable. The `rac_http_request_*` entry points consult this registry
- * before dispatching to libcurl — when an adapter is installed, calls
- * are routed through it; otherwise the libcurl default runs.
+ * before dispatching. When an adapter is installed, calls are routed
+ * through it; otherwise the public HTTP calls report
+ * `RAC_ERROR_FEATURE_NOT_AVAILABLE`.
  *
  * Thread-safety: every public entry point takes an internal mutex.
  * The accessor used by the router (`rac_internal::get_http_transport`)
@@ -64,7 +65,8 @@ extern "C" rac_result_t rac_http_transport_register(const rac_http_transport_ops
 
     // Registering NULL is the explicit "unregister" path.
     if (ops == nullptr) {
-        RAC_LOG_INFO(kTag, "Platform HTTP transport unregistered; falling back to libcurl");
+        RAC_LOG_INFO(kTag,
+                     "Platform HTTP transport unregistered; no HTTP fallback is installed");
         return RAC_SUCCESS;
     }
 
@@ -104,8 +106,8 @@ extern "C" rac_bool_t rac_http_transport_is_registered(void) {
 
 // =============================================================================
 // Internal accessor (not in the public header). Used by
-// rac_http_client_curl.cpp to decide whether to route through the
-// registered platform transport or fall through to libcurl.
+// rac_http_client_default.cpp to decide whether a platform transport is
+// available for the requested HTTP operation.
 // =============================================================================
 
 namespace rac_internal {

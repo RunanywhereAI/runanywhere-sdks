@@ -37,15 +37,12 @@ final class LLMViewModel {
 
     // MARK: - LoRA Adapter State
 
-    private(set) var loraAdapters: [LoRAAdapterInfo] = []
+    private(set) var loraAdapters: [RALoRAAdapterInfo] = []
     private(set) var isLoadingLoRA = false
 
     // MARK: - LoRA Adapter Catalog State
 
-    private(set) var availableAdapters: [LoraAdapterCatalogEntry] = []
-    private(set) var adapterDownloadProgress: [String: Double] = [:]
-    private(set) var downloadedAdapterPaths: [String: String] = [:]
-    private(set) var isDownloadingAdapter: [String: Bool] = [:]
+    private(set) var availableAdapters: [RALoraAdapterCatalogEntry] = []
 
     // MARK: - User Settings
 
@@ -266,16 +263,7 @@ final class LLMViewModel {
             // formatting via the model's embedded GGUF template. The system
             // prompt is passed separately in options so the C++ layer can
             // place it correctly.
-            let effectiveOptions = LLMGenerationOptions(
-                maxTokens: options.maxTokens,
-                temperature: options.temperature,
-                topP: options.topP,
-                stopSequences: options.stopSequences,
-                streamingEnabled: options.streamingEnabled,
-                preferredFramework: options.preferredFramework,
-                structuredOutput: options.structuredOutput,
-                systemPrompt: options.systemPrompt
-            )
+            let effectiveOptions = options
             try await performGeneration(prompt: prompt, options: effectiveOptions, messageIndex: messageIndex)
         } catch {
             await handleGenerationError(error, at: messageIndex)
@@ -321,7 +309,7 @@ final class LLMViewModel {
 
     private func performGeneration(
         prompt: String,
-        options: LLMGenerationOptions,
+        options: RALLMGenerationOptions,
         messageIndex: Int
     ) async throws {
         // Check if tool calling is enabled and we have registered tools
@@ -393,8 +381,16 @@ final class LLMViewModel {
         isLoadingLoRA = true
         error = nil
         do {
-            try await RunAnywhere.lora.load(LoRAAdapterConfig(path: path, scale: scale))
-            await refreshLoraAdapters()
+            var config = RALoRAAdapterConfig()
+            config.adapterPath = path
+            config.scale = scale
+            var request = RALoRAApplyRequest()
+            request.adapters = [config]
+            let result = try await RunAnywhere.lora.apply(request)
+            guard result.success else {
+                throw LLMError.custom(result.errorMessage)
+            }
+            loraAdapters = result.adapters
             logger.info("LoRA adapter loaded: \(path) (scale=\(scale))")
         } catch {
             logger.error("Failed to load LoRA adapter: \(error)")
@@ -405,8 +401,10 @@ final class LLMViewModel {
 
     func removeLoraAdapter(path: String) async {
         do {
-            try await RunAnywhere.lora.remove(path)
-            await refreshLoraAdapters()
+            var request = RALoRARemoveRequest()
+            request.adapterPaths = [path]
+            let state = try await RunAnywhere.lora.remove(request)
+            try handleLoraState(state)
         } catch {
             logger.error("Failed to remove LoRA adapter: \(error)")
             self.error = error
@@ -415,8 +413,10 @@ final class LLMViewModel {
 
     func clearLoraAdapters() async {
         do {
-            try await RunAnywhere.lora.clear()
-            loraAdapters = []
+            var request = RALoRARemoveRequest()
+            request.clearAll_p = true
+            let state = try await RunAnywhere.lora.remove(request)
+            try handleLoraState(state)
         } catch {
             logger.error("Failed to clear LoRA adapters: \(error)")
             self.error = error
@@ -425,136 +425,224 @@ final class LLMViewModel {
 
     func refreshLoraAdapters() async {
         do {
-            loraAdapters = try await RunAnywhere.lora.getLoaded()
+            let state = try await RunAnywhere.lora.list()
+            try handleLoraState(state)
         } catch {
             logger.error("Failed to refresh LoRA adapters: \(error)")
         }
     }
 
+    private func handleLoraState(_ state: RALoRAState) throws {
+        if state.hasErrorMessage, !state.errorMessage.isEmpty {
+            throw LLMError.custom(state.errorMessage)
+        }
+        loraAdapters = state.loadedAdapters
+    }
+
     // MARK: - LoRA Adapter Catalog & Download
 
     /// Refreshes the list of available adapters for the currently loaded model from the SDK registry.
-    ///
-    /// `adaptersForModel` returns `[LoRAAdapterInfo]` keyed by adapter path/id.
-    /// We cross-reference the app's local catalog (`LoRAAdapterCatalog.adapters`) to
-    /// reconstruct the full `LoraAdapterCatalogEntry` (which carries download URL, filename, etc.)
-    /// needed by the download/install flow.
     func refreshAvailableAdapters() async {
         guard let modelId = ModelListViewModel.shared.currentModel?.id else {
             availableAdapters = []
             return
         }
-        let registeredAdapters = await RunAnywhere.lora.adaptersForModel(modelId)
-        let registeredIds = Set(registeredAdapters.map(\.path))
-        // Return catalog entries whose id appears in the registered set, preserving catalog order.
-        availableAdapters = LoRAAdapterCatalog.adapters.filter { registeredIds.contains($0.id) }
-        // If the registry returned adapters that aren't in our local catalog, fall back to
-        // showing the full catalog so the user can still browse and download.
-        if availableAdapters.isEmpty && !registeredAdapters.isEmpty {
-            availableAdapters = LoRAAdapterCatalog.adapters.filter { entry in
-                LoRAAdapterCatalog.adapters.contains { $0.id == entry.id }
+        do {
+            var query = RALoraAdapterCatalogQuery()
+            query.modelID = modelId
+            let result = try await RunAnywhere.lora.queryCatalog(query)
+            guard result.success else {
+                throw LLMError.custom(
+                    result.errorMessage.isEmpty ? "LoRA catalog query failed" : result.errorMessage
+                )
             }
+            availableAdapters = result.entries
+        } catch {
+            logger.error("Failed to refresh LoRA catalog: \(error)")
+            self.error = error
+            availableAdapters = []
         }
-        syncDownloadedAdapterPaths()
     }
 
-    func isAdapterDownloaded(_ adapter: LoraAdapterCatalogEntry) -> Bool {
-        downloadedAdapterPaths[adapter.id] != nil
+    func isAdapterDownloaded(_ adapter: RALoraAdapterCatalogEntry) -> Bool {
+        localPath(for: adapter) != nil
     }
 
-    func localPath(for adapter: LoraAdapterCatalogEntry) -> String? {
-        downloadedAdapterPaths[adapter.id]
+    func localPath(for adapter: RALoraAdapterCatalogEntry) -> String? {
+        guard adapter.isDownloaded, adapter.hasLocalPath, !adapter.localPath.isEmpty else {
+            return nil
+        }
+        return FileManager.default.fileExists(atPath: adapter.localPath) ? adapter.localPath : nil
     }
 
-    /// Downloads a catalog adapter from its URL, then loads it.
-    func downloadAndLoadAdapter(_ adapter: LoraAdapterCatalogEntry, scale: Float) async {
-        guard isDownloadingAdapter[adapter.id] != true else { return }
-
-        isDownloadingAdapter[adapter.id] = true
-        adapterDownloadProgress[adapter.id] = 0.0
+    /// Downloads a catalog adapter with URLSession, reports completion through
+    /// commons, then applies the stable local path.
+    func downloadAndLoadAdapter(_ adapter: RALoraAdapterCatalogEntry, scale: Float) async {
+        isLoadingLoRA = true
         error = nil
 
         do {
-            let localPath: String
-            if let existing = downloadedAdapterPaths[adapter.id] {
-                localPath = existing
-            } else {
-                localPath = try await downloadAdapter(adapter)
+            let entry = try await ensureCatalogAdapterDownloaded(adapter)
+            updateAvailableAdapter(entry)
+            guard let localPath = localPath(for: entry) else {
+                throw LLMError.custom("LoRA adapter completion did not return a usable local path")
             }
+            isLoadingLoRA = false
             await loadLoraAdapter(path: localPath, scale: scale)
         } catch {
-            logger.error("Failed to download/load adapter \(adapter.id): \(error)")
+            logger.error("Failed to load adapter \(adapter.id): \(error)")
             self.error = error
+            isLoadingLoRA = false
         }
-
-        isDownloadingAdapter[adapter.id] = false
-        adapterDownloadProgress[adapter.id] = nil
     }
 
-    private func downloadAdapter(_ adapter: LoraAdapterCatalogEntry) async throws -> String {
-        let loraDir = Self.loraDownloadDirectory()
-        try FileManager.default.createDirectory(at: loraDir, withIntermediateDirectories: true)
-        let destinationURL = loraDir.appendingPathComponent(adapter.filename)
+    /// Copies a user-selected LoRA file into the sandbox before applying it. If
+    /// the file matches a catalog entry, the import completion is persisted
+    /// through the generated LoRA catalog ABI.
+    func importAndLoadLoraAdapter(url: URL, scale: Float) async {
+        isLoadingLoRA = true
+        error = nil
 
-        if FileManager.default.fileExists(atPath: destinationURL.path),
-           Self.isValidGGUF(at: destinationURL) {
-            downloadedAdapterPaths[adapter.id] = destinationURL.path
-            return destinationURL.path
-        }
-
-        // Remove any previously corrupted download
-        try? FileManager.default.removeItem(at: destinationURL)
-
-        let delegate = DownloadProgressDelegate { [weak self] progress in
-            Task { @MainActor in
-                self?.adapterDownloadProgress[adapter.id] = progress
+        let accessed = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessed {
+                url.stopAccessingSecurityScopedResource()
             }
         }
 
-        // SAMPLE_HTTP_CARVE_OUT: LoRA adapters are demo-owned external files,
-        // not SDK-managed model artifacts. Keep this local until the SDK
-        // exposes a public arbitrary-URL download helper.
-        let (tempURL, _) = try await URLSession.shared.download(from: adapter.downloadURL, delegate: delegate)
+        do {
+            let destination = try copyImportedAdapterToSandbox(from: url)
+            if let entry = availableAdapters.first(where: { catalogEntryMatches($0, fileURL: url) }) {
+                var request = RALoraAdapterDownloadCompletedRequest()
+                request.adapterID = entry.id
+                request.localPath = destination.path
+                request.imported = true
+                request.completedAtUnixMs = currentUnixMilliseconds()
+                request.statusMessage = "import completed"
+                if let fileSize = try fileSize(at: destination) {
+                    request.sizeBytes = fileSize
+                }
 
-        // Validate GGUF magic bytes before saving
-        guard Self.isValidGGUF(at: tempURL) else {
-            try? FileManager.default.removeItem(at: tempURL)
+                let result = try await RunAnywhere.lora.markImportCompleted(request)
+                guard result.success else {
+                    throw LLMError.custom(
+                        result.errorMessage.isEmpty
+                            ? "LoRA adapter import completion was not persisted"
+                            : result.errorMessage
+                    )
+                }
+                updateAvailableAdapter(result.entry)
+            }
+
+            isLoadingLoRA = false
+            await loadLoraAdapter(path: destination.path, scale: scale)
+        } catch {
+            logger.error("Failed to import LoRA adapter: \(error)")
+            self.error = error
+            isLoadingLoRA = false
+        }
+    }
+
+    private func ensureCatalogAdapterDownloaded(
+        _ adapter: RALoraAdapterCatalogEntry
+    ) async throws -> RALoraAdapterCatalogEntry {
+        if let localPath = localPath(for: adapter) {
+            var entry = adapter
+            entry.localPath = localPath
+            entry.isDownloaded = true
+            return entry
+        }
+
+        guard !adapter.id.isEmpty else {
+            throw LLMError.custom("LoRA catalog adapter id is required")
+        }
+        guard let sourceURL = URL(string: adapter.url), sourceURL.scheme != nil else {
+            throw LLMError.custom("LoRA catalog adapter has an invalid download URL")
+        }
+
+        let directory = Self.loraDownloadDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let destination = directory.appendingPathComponent(Self.loraFilename(for: adapter), isDirectory: false)
+
+        let (temporaryURL, response) = try await URLSession.shared.download(from: sourceURL)
+        if let httpResponse = response as? HTTPURLResponse,
+           !(200...299).contains(httpResponse.statusCode) {
+            throw LLMError.custom("LoRA adapter download failed with HTTP \(httpResponse.statusCode)")
+        }
+
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+        try FileManager.default.moveItem(at: temporaryURL, to: destination)
+
+        var request = RALoraAdapterDownloadCompletedRequest()
+        request.adapterID = adapter.id
+        request.localPath = destination.path
+        request.completedAtUnixMs = currentUnixMilliseconds()
+        request.imported = false
+        request.statusMessage = "download completed"
+        if let fileSize = try fileSize(at: destination) {
+            request.sizeBytes = fileSize
+        }
+
+        let result = try await RunAnywhere.lora.markDownloadCompleted(request)
+        guard result.success else {
             throw LLMError.custom(
-                "Downloaded file is not a valid GGUF adapter (server may have returned an error page)"
+                result.errorMessage.isEmpty
+                    ? "LoRA adapter download completion was not persisted"
+                    : result.errorMessage
             )
         }
-
-        if FileManager.default.fileExists(atPath: destinationURL.path) {
-            try FileManager.default.removeItem(at: destinationURL)
-        }
-        try FileManager.default.moveItem(at: tempURL, to: destinationURL)
-
-        downloadedAdapterPaths[adapter.id] = destinationURL.path
-        logger.info("Adapter downloaded to \(destinationURL.path)")
-        return destinationURL.path
+        return result.entry
     }
 
-    /// Checks that a file starts with the GGUF magic bytes (0x47475546 = "GGUF").
-    private static func isValidGGUF(at url: URL) -> Bool {
-        guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
-        defer { try? handle.close() }
-        guard let header = try? handle.read(upToCount: 4), header.count == 4 else { return false }
-        return header == Data([0x47, 0x47, 0x55, 0x46])  // "GGUF"
+    private func copyImportedAdapterToSandbox(from url: URL) throws -> URL {
+        let directory = Self.loraDownloadDirectory()
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let destination = directory.appendingPathComponent(url.lastPathComponent, isDirectory: false)
+
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+        try FileManager.default.copyItem(at: url, to: destination)
+        return destination
     }
 
-    private func syncDownloadedAdapterPaths() {
-        let loraDir = Self.loraDownloadDirectory()
-        for adapter in availableAdapters {
-            let path = loraDir.appendingPathComponent(adapter.filename).path
-            if FileManager.default.fileExists(atPath: path) {
-                downloadedAdapterPaths[adapter.id] = path
-            }
+    private func updateAvailableAdapter(_ entry: RALoraAdapterCatalogEntry) {
+        if let index = availableAdapters.firstIndex(where: { $0.id == entry.id }) {
+            availableAdapters[index] = entry
+        } else {
+            availableAdapters.append(entry)
         }
+    }
+
+    private func catalogEntryMatches(_ entry: RALoraAdapterCatalogEntry, fileURL: URL) -> Bool {
+        let filename = fileURL.lastPathComponent
+        return entry.filename == filename || entry.localPath == fileURL.path
+    }
+
+    private func fileSize(at url: URL) throws -> Int64? {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        return (attributes[.size] as? NSNumber)?.int64Value
+    }
+
+    private func currentUnixMilliseconds() -> Int64 {
+        Int64((Date().timeIntervalSince1970 * 1_000).rounded())
     }
 
     static func loraDownloadDirectory() -> URL {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
         return docs.appendingPathComponent("LoRA", isDirectory: true)
+    }
+
+    private static func loraFilename(for adapter: RALoraAdapterCatalogEntry) -> String {
+        if !adapter.filename.isEmpty {
+            return adapter.filename
+        }
+        if let filename = URL(string: adapter.url)?.lastPathComponent, !filename.isEmpty {
+            return filename
+        }
+        return "\(adapter.id).gguf"
     }
 
     // MARK: - Private Methods - Message Generation
@@ -565,7 +653,7 @@ final class LLMViewModel {
         }
     }
 
-    private func getGenerationOptions() -> LLMGenerationOptions {
+    private func getGenerationOptions() -> RALLMGenerationOptions {
         // Use object(forKey:) to distinguish an unset key (nil) from a value explicitly set to 0.0
         let savedTemperature = UserDefaults.standard.object(forKey: "defaultTemperature") as? Double
         let savedMaxTokens = UserDefaults.standard.integer(forKey: "defaultMaxTokens")
@@ -579,21 +667,23 @@ final class LLMViewModel {
 
         let effectiveSystemPrompt = (savedSystemPrompt?.isEmpty == false) ? savedSystemPrompt : nil
 
-    let systemPromptInfo: String = {
-        guard let prompt = effectiveSystemPrompt else { return "nil" }
-        return "set(\(prompt.count) chars)"
-    }()
+        let systemPromptInfo: String = {
+            guard let prompt = effectiveSystemPrompt else { return "nil" }
+            return "set(\(prompt.count) chars)"
+        }()
 
-    logger.info(
-        "[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), maxTokens=\(effectiveSettings.maxTokens), thinkingMode=\(thinkingModeEnabled), systemPrompt=\(systemPromptInfo)"
-    )
+        logger.info(
+            "[PARAMS] App getGenerationOptions: temperature=\(effectiveSettings.temperature), maxTokens=\(effectiveSettings.maxTokens), thinkingMode=\(thinkingModeEnabled), systemPrompt=\(systemPromptInfo)"
+        )
 
-    return LLMGenerationOptions(
-        maxTokens: effectiveSettings.maxTokens,
-        temperature: Float(effectiveSettings.temperature),
-        systemPrompt: effectiveSystemPrompt
-    )
-}
+        var options = RALLMGenerationOptions.defaults()
+        options.maxTokens = Int32(effectiveSettings.maxTokens)
+        options.temperature = Float(effectiveSettings.temperature)
+        if let effectiveSystemPrompt {
+            options.systemPrompt = effectiveSystemPrompt
+        }
+        return options
+    }
 
     // MARK: - Internal Methods - Helpers
 
@@ -622,7 +712,7 @@ final class LLMViewModel {
     @objc
     private func modelLoaded(_ notification: Notification) {
         Task {
-            if let model = notification.object as? ModelInfo {
+            if let model = notification.object as? RAModelInfo {
                 let supportsStreaming = await RunAnywhere.supportsLLMStreaming
 
                 await MainActor.run {

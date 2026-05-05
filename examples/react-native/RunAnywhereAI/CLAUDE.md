@@ -183,9 +183,11 @@ Defined in `tsconfig.json`:
 
 ## Key SDK API Imports
 
-From `@runanywhere/core`: `RunAnywhere`, `SDKEnvironment`, `ModelCategory`, `LLMFramework`, `ModelArtifactType`, `initializeNitroModulesGlobally`, `getChip`, `getNPUDownloadUrl`, `ragCreatePipeline`, `ragIngest`, `ragQuery`, `VoiceAgentStreamAdapter`, `FileSystem`, `Hardware`, `requireDeviceInfoModule`, `STTLanguage`, `VLMImageFormat`, `ToolParameterType`
+From `@runanywhere/core`: `RunAnywhere`, `SDKEnvironment`, generated `ModelCategory`, generated `InferenceFramework`, generated `ModelArtifactType`, `initializeNitroModulesGlobally`, current hardware helpers, RAG/VoiceAgent facades, `FileSystem`, `Hardware`, `STTLanguage`, `VLMImageFormat`, and `ToolParameterType`.
 
-From `@runanywhere/llamacpp`: `LlamaCPP.register()`, `processImageStream`, `loadVLMModel`, `isVLMModelLoaded`, `cancelVLMGeneration`
+Backend packages are optional registration adapters. Do not add new example code that imports deleted local framework/modality DTOs or backend-specific model-registration APIs. Register example models through `RunAnywhere.registerModel()` / `RunAnywhere.registerMultiFileModel()` using generated proto enum values.
+
+From `@runanywhere/llamacpp`: `LlamaCPP.register()` for optional backend registration.
 
 From `@runanywhere/onnx`: `ONNX.register()`
 

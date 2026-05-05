@@ -11,7 +11,9 @@ import com.squareup.wire.ProtoReader
 import com.squareup.wire.ProtoWriter
 import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
+import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -25,6 +27,21 @@ import kotlin.Suppress
 import okio.ByteString
 
 public class SessionStoppedEvent(
+  @field:WireField(
+    tag = 1,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "sessionId",
+    schemaIndex = 0,
+  )
+  public val session_id: String = "",
+  @field:WireField(
+    tag = 2,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 1,
+  )
+  public val reason: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<SessionStoppedEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -38,15 +55,34 @@ public class SessionStoppedEvent(
     if (other === this) return true
     if (other !is SessionStoppedEvent) return false
     if (unknownFields != other.unknownFields) return false
+    if (session_id != other.session_id) return false
+    if (reason != other.reason) return false
     return true
   }
 
-  override fun hashCode(): Int = unknownFields.hashCode()
+  override fun hashCode(): Int {
+    var result = super.hashCode
+    if (result == 0) {
+      result = unknownFields.hashCode()
+      result = result * 37 + session_id.hashCode()
+      result = result * 37 + reason.hashCode()
+      super.hashCode = result
+    }
+    return result
+  }
 
-  override fun toString(): String = "SessionStoppedEvent{}"
+  override fun toString(): String {
+    val result = mutableListOf<String>()
+    result += """session_id=${sanitize(session_id)}"""
+    result += """reason=${sanitize(reason)}"""
+    return result.joinToString(prefix = "SessionStoppedEvent{", separator = ", ", postfix = "}")
+  }
 
-  public fun copy(unknownFields: ByteString = this.unknownFields): SessionStoppedEvent =
-      SessionStoppedEvent(unknownFields)
+  public fun copy(
+    session_id: String = this.session_id,
+    reason: String = this.reason,
+    unknownFields: ByteString = this.unknownFields,
+  ): SessionStoppedEvent = SessionStoppedEvent(session_id, reason, unknownFields)
 
   public companion object {
     @JvmField
@@ -61,20 +97,37 @@ public class SessionStoppedEvent(
     ) {
       override fun encodedSize(`value`: SessionStoppedEvent): Int {
         var size = value.unknownFields.size
+        if (value.session_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1,
+            value.session_id)
+        if (value.reason != "") size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.reason)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: SessionStoppedEvent) {
+        if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.session_id)
+        if (value.reason != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.reason)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: SessionStoppedEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.reason != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.reason)
+        if (value.session_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.session_id)
       }
 
       override fun decode(reader: ProtoReader): SessionStoppedEvent {
-        val unknownFields = reader.forEachTag(reader::readUnknownField)
+        var session_id: String = ""
+        var reason: String = ""
+        val unknownFields = reader.forEachTag { tag ->
+          when (tag) {
+            1 -> session_id = ProtoAdapter.STRING.decode(reader)
+            2 -> reason = ProtoAdapter.STRING.decode(reader)
+            else -> reader.readUnknownField(tag)
+          }
+        }
         return SessionStoppedEvent(
+          session_id = session_id,
+          reason = reason,
           unknownFields = unknownFields
         )
       }

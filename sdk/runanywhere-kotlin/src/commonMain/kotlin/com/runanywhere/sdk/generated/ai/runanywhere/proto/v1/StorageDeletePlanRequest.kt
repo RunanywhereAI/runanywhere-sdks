@@ -54,6 +54,22 @@ public class StorageDeletePlanRequest(
     schemaIndex = 3,
   )
   public val oldest_first: Boolean = false,
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "allowLoadedModels",
+    schemaIndex = 4,
+  )
+  public val allow_loaded_models: Boolean = false,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "includeDownloadPartials",
+    schemaIndex = 5,
+  )
+  public val include_download_partials: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StorageDeletePlanRequest, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -80,6 +96,8 @@ public class StorageDeletePlanRequest(
     if (required_bytes != other.required_bytes) return false
     if (include_cache != other.include_cache) return false
     if (oldest_first != other.oldest_first) return false
+    if (allow_loaded_models != other.allow_loaded_models) return false
+    if (include_download_partials != other.include_download_partials) return false
     return true
   }
 
@@ -91,6 +109,8 @@ public class StorageDeletePlanRequest(
       result = result * 37 + required_bytes.hashCode()
       result = result * 37 + include_cache.hashCode()
       result = result * 37 + oldest_first.hashCode()
+      result = result * 37 + allow_loaded_models.hashCode()
+      result = result * 37 + include_download_partials.hashCode()
       super.hashCode = result
     }
     return result
@@ -102,6 +122,8 @@ public class StorageDeletePlanRequest(
     result += """required_bytes=$required_bytes"""
     result += """include_cache=$include_cache"""
     result += """oldest_first=$oldest_first"""
+    result += """allow_loaded_models=$allow_loaded_models"""
+    result += """include_download_partials=$include_download_partials"""
     return result.joinToString(prefix = "StorageDeletePlanRequest{", separator = ", ", postfix =
         "}")
   }
@@ -111,9 +133,11 @@ public class StorageDeletePlanRequest(
     required_bytes: Long = this.required_bytes,
     include_cache: Boolean = this.include_cache,
     oldest_first: Boolean = this.oldest_first,
+    allow_loaded_models: Boolean = this.allow_loaded_models,
+    include_download_partials: Boolean = this.include_download_partials,
     unknownFields: ByteString = this.unknownFields,
   ): StorageDeletePlanRequest = StorageDeletePlanRequest(model_ids, required_bytes, include_cache,
-      oldest_first, unknownFields)
+      oldest_first, allow_loaded_models, include_download_partials, unknownFields)
 
   public companion object {
     @JvmField
@@ -135,6 +159,10 @@ public class StorageDeletePlanRequest(
             value.include_cache)
         if (value.oldest_first != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(4,
             value.oldest_first)
+        if (value.allow_loaded_models != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5,
+            value.allow_loaded_models)
+        if (value.include_download_partials != false) size +=
+            ProtoAdapter.BOOL.encodedSizeWithTag(6, value.include_download_partials)
         return size
       }
 
@@ -146,11 +174,19 @@ public class StorageDeletePlanRequest(
             value.include_cache)
         if (value.oldest_first != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
             value.oldest_first)
+        if (value.allow_loaded_models != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
+            value.allow_loaded_models)
+        if (value.include_download_partials != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.include_download_partials)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StorageDeletePlanRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.include_download_partials != false) ProtoAdapter.BOOL.encodeWithTag(writer, 6,
+            value.include_download_partials)
+        if (value.allow_loaded_models != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
+            value.allow_loaded_models)
         if (value.oldest_first != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4,
             value.oldest_first)
         if (value.include_cache != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3,
@@ -165,12 +201,16 @@ public class StorageDeletePlanRequest(
         var required_bytes: Long = 0L
         var include_cache: Boolean = false
         var oldest_first: Boolean = false
+        var allow_loaded_models: Boolean = false
+        var include_download_partials: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_ids.add(ProtoAdapter.STRING.decode(reader))
             2 -> required_bytes = ProtoAdapter.INT64.decode(reader)
             3 -> include_cache = ProtoAdapter.BOOL.decode(reader)
             4 -> oldest_first = ProtoAdapter.BOOL.decode(reader)
+            5 -> allow_loaded_models = ProtoAdapter.BOOL.decode(reader)
+            6 -> include_download_partials = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -179,6 +219,8 @@ public class StorageDeletePlanRequest(
           required_bytes = required_bytes,
           include_cache = include_cache,
           oldest_first = oldest_first,
+          allow_loaded_models = allow_loaded_models,
+          include_download_partials = include_download_partials,
           unknownFields = unknownFields
         )
       }

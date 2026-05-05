@@ -41,6 +41,8 @@ rac_result_t SolutionRunner::start() {
     }
     root_input_  = executor_->root_input_edge();
     root_output_ = executor_->root_output_edge();
+    root_input_payload_type_  = executor_->root_input_payload_type();
+    root_output_payload_type_ = executor_->root_output_payload_type();
 
     scheduler_->start();
     started_ = true;
@@ -83,6 +85,8 @@ void SolutionRunner::wait() {
         exec     = std::move(executor_);
         in_edge  = std::move(root_input_);
         out_edge = std::move(root_output_);
+        root_input_payload_type_.clear();
+        root_output_payload_type_.clear();
         joined_  = true;
         started_ = false;
     }
@@ -109,13 +113,35 @@ bool SolutionRunner::running() const noexcept {
 rac_result_t SolutionRunner::feed(Item item) {
     std::shared_ptr<OperatorEdge>              input;
     std::shared_ptr<rac::graph::CancelToken>   token;
+    std::string                                expected_type;
     {
         std::lock_guard<std::mutex> lock(mu_);
         if (!started_ || !scheduler_) return RAC_ERROR_COMPONENT_NOT_READY;
-        input = root_input_;
-        token = scheduler_->root_cancel_token();
+        input         = root_input_;
+        token         = scheduler_->root_cancel_token();
+        expected_type = root_input_payload_type_;
     }
     if (!input) return RAC_ERROR_INVALID_STATE;
+    if (expected_type.empty()) {
+        rac_error_set_details(
+            "solution root input has no resolved payload type contract");
+        return RAC_ERROR_INVALID_CONFIGURATION;
+    }
+    std::string body_err;
+    if (!item.validate_body_contract(&body_err)) {
+        const std::string msg =
+            "solution feed payload body contract violation: " + body_err;
+        rac_error_set_details(msg.c_str());
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    if (item.type_id != expected_type) {
+        const std::string msg =
+            "solution feed payload type '" + item.type_id +
+            "' does not match root input payload type '" +
+            expected_type + "'";
+        rac_error_set_details(msg.c_str());
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
     const bool ok = input->push(std::move(item), token.get());
     return ok ? RAC_SUCCESS : RAC_ERROR_CANCELLED;
 }

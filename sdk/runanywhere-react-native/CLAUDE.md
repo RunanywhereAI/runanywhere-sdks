@@ -161,8 +161,8 @@ Each AI capability is a standalone module in `Public/Extensions/` (e.g., `RunAny
 ### Type System
 
 - **Proto-sourced types**: All modality types (STT, TTS, VAD, VLM, LoRA, RAG, VoiceAgent, StructuredOutput) come from `@runanywhere/proto-ts` and are re-exported from `types/index.ts`
-- **RN-local enums**: `ComponentState`, `FrameworkModality`, `LLMFramework`, etc. defined in `types/enums.ts`
-- **Core interfaces**: `ModelInfo` (23 fields), `SDKInitOptions`, `GenerationOptions` in `types/models.ts`
+- **RN-local enums**: Keep only RN/UI state that is not defined in proto. Public model/framework/category enums should come from `@runanywhere/proto-ts`.
+- **Core interfaces**: `ModelInfo` (23 fields), `SDKInitOptions` in `types/models.ts`; `LLMGenerationOptions` from `@runanywhere/proto-ts`
 - **Runtime events**: Discriminated unions keyed by `type` string in `Public/Events/SDKEventTypes.ts` — `AnySDKEvent` is the union of all 11 event categories
 - **Error type**: `SDKException` (extends `Error`, wraps `SDKErrorProto`) with static factories (`notInitialized`, `invalidInput`, `modelNotFound`, etc.)
 

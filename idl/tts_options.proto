@@ -178,6 +178,24 @@ message TTSOptions {
     // Output sample rate override in Hz. 0 = component/default sample rate.
     // Present in rac_tts_options_t and several SDK option structs.
     int32              sample_rate         = 8;
+
+    // Speaker index for multi-speaker voices. -1/0 = backend default
+    // depending on model convention.
+    int32              speaker_id          = 9;
+
+    // Web/ONNX ergonomic alias for speaking_rate. 0.0 = use speaking_rate.
+    float              speed               = 10;
+
+    // Optional style/emotion hint for voices that support style transfer.
+    optional string    style               = 11;
+}
+
+message TTSSynthesisRequest {
+    string request_id = 1;
+    string text = 2;
+    optional string ssml = 3;
+    optional TTSOptions options = 4;
+    map<string, string> metadata = 5;
 }
 
 // ---------------------------------------------------------------------------
@@ -261,6 +279,16 @@ message TTSOutput {
     // Wall-clock timestamp when the output was produced
     // (milliseconds since UNIX epoch). Mirrors C ABI `timestamp_ms`.
     int64                          timestamp_ms        = 7;
+
+    // Stream chunk metadata. For one-shot synthesis, chunk_index=0 and
+    // is_final=true when set by the producer.
+    int32                          chunk_index         = 8;
+    bool                           is_final            = 9;
+    int64                          audio_size_bytes    = 10;
+
+    // Terminal error details for result-envelope APIs.
+    optional string                error_message       = 11;
+    int32                          error_code          = 12;
 }
 
 // ---------------------------------------------------------------------------
@@ -291,6 +319,9 @@ message TTSSpeakResult {
 
     // Wall-clock timestamp when speech completed (ms since UNIX epoch).
     int64                          timestamp_ms        = 6;
+
+    optional string                 error_message       = 7;
+    int32                           error_code          = 8;
 }
 
 // ---------------------------------------------------------------------------
@@ -316,4 +347,61 @@ message TTSVoiceInfo {
 
     // Optional descriptive text (locale, age, style notes).
     string         description   = 5;
+
+    // Additional discovery fields surfaced by system and ONNX/Piper voices.
+    bool           is_neural     = 6;
+    bool           is_system     = 7;
+    int32          sample_rate   = 8;
+    repeated string supported_styles = 9;
+}
+
+enum TTSStreamEventKind {
+    TTS_STREAM_EVENT_KIND_UNSPECIFIED = 0;
+    TTS_STREAM_EVENT_KIND_STARTED = 1;
+    TTS_STREAM_EVENT_KIND_AUDIO_CHUNK = 2;
+    TTS_STREAM_EVENT_KIND_PHONEME = 3;
+    TTS_STREAM_EVENT_KIND_COMPLETED = 4;
+    TTS_STREAM_EVENT_KIND_ERROR = 5;
+    TTS_STREAM_EVENT_KIND_PROGRESS = 6;
+}
+
+message TTSStreamEvent {
+    uint64 seq = 1;
+    int64 timestamp_us = 2;
+    string request_id = 3;
+    TTSStreamEventKind kind = 4;
+    optional TTSOutput output = 5;
+    optional TTSPhonemeTimestamp phoneme = 6;
+    optional TTSSpeakResult speak_result = 7;
+    optional string error_message = 8;
+    int32 error_code = 9;
+
+    // Progress metadata for started/progress/audio_chunk/completed events.
+    // progress is 0.0..1.0 when known; total_chunks=0 means unknown.
+    float progress = 10;
+    int32 chunk_index = 11;
+    int32 total_chunks = 12;
+    int64 elapsed_ms = 13;
+    string status_message = 14;
+}
+
+message TTSServiceState {
+    bool is_ready = 1;
+    optional string current_voice = 2;
+    repeated TTSVoiceInfo voices = 3;
+    repeated string supported_language_codes = 4;
+    optional string error_message = 5;
+    int32 error_code = 6;
+}
+
+// Logical TTS service contract. Native playback, audio-session ownership,
+// device routing, and OS TTS sessions remain platform-owned; C++ consumes
+// only the serialized request/result/event messages defined above.
+service TTS {
+    // One-shot synthesis returning encoded audio bytes plus synthesis metadata.
+    rpc Synthesize(TTSSynthesisRequest) returns (TTSOutput);
+
+    // Server-streaming synthesis events: started, progress, audio chunks,
+    // phoneme timestamps, terminal completion, and errors.
+    rpc Stream(TTSSynthesisRequest) returns (stream TTSStreamEvent);
 }

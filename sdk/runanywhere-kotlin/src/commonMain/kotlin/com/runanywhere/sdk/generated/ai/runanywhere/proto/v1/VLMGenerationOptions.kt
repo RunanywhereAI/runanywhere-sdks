@@ -153,6 +153,40 @@ public class VLMGenerationOptions(
     schemaIndex = 13,
   )
   public val image_marker_override: String? = null,
+  /**
+   * Additional llama.cpp sampling knobs and result controls.
+   */
+  @field:WireField(
+    tag = 15,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 14,
+  )
+  public val seed: Long = 0L,
+  @field:WireField(
+    tag = 16,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "repetitionPenalty",
+    schemaIndex = 15,
+  )
+  public val repetition_penalty: Float = 0f,
+  @field:WireField(
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "minP",
+    schemaIndex = 16,
+  )
+  public val min_p: Float = 0f,
+  @field:WireField(
+    tag = 18,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "emitImageEmbeddings",
+    schemaIndex = 17,
+  )
+  public val emit_image_embeddings: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VLMGenerationOptions, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -192,6 +226,10 @@ public class VLMGenerationOptions(
     if (model_family != other.model_family) return false
     if (custom_chat_template != other.custom_chat_template) return false
     if (image_marker_override != other.image_marker_override) return false
+    if (seed != other.seed) return false
+    if (repetition_penalty != other.repetition_penalty) return false
+    if (min_p != other.min_p) return false
+    if (emit_image_embeddings != other.emit_image_embeddings) return false
     return true
   }
 
@@ -213,6 +251,10 @@ public class VLMGenerationOptions(
       result = result * 37 + model_family.hashCode()
       result = result * 37 + (custom_chat_template?.hashCode() ?: 0)
       result = result * 37 + (image_marker_override?.hashCode() ?: 0)
+      result = result * 37 + seed.hashCode()
+      result = result * 37 + repetition_penalty.hashCode()
+      result = result * 37 + min_p.hashCode()
+      result = result * 37 + emit_image_embeddings.hashCode()
       super.hashCode = result
     }
     return result
@@ -235,6 +277,10 @@ public class VLMGenerationOptions(
     if (custom_chat_template != null) result += """custom_chat_template=$custom_chat_template"""
     if (image_marker_override != null) result +=
         """image_marker_override=${sanitize(image_marker_override)}"""
+    result += """seed=$seed"""
+    result += """repetition_penalty=$repetition_penalty"""
+    result += """min_p=$min_p"""
+    result += """emit_image_embeddings=$emit_image_embeddings"""
     return result.joinToString(prefix = "VLMGenerationOptions{", separator = ", ", postfix = "}")
   }
 
@@ -253,10 +299,15 @@ public class VLMGenerationOptions(
     model_family: VLMModelFamily = this.model_family,
     custom_chat_template: VLMChatTemplate? = this.custom_chat_template,
     image_marker_override: String? = this.image_marker_override,
+    seed: Long = this.seed,
+    repetition_penalty: Float = this.repetition_penalty,
+    min_p: Float = this.min_p,
+    emit_image_embeddings: Boolean = this.emit_image_embeddings,
     unknownFields: ByteString = this.unknownFields,
   ): VLMGenerationOptions = VLMGenerationOptions(prompt, max_tokens, temperature, top_p, top_k,
       stop_sequences, streaming_enabled, system_prompt, max_image_size, n_threads, use_gpu,
-      model_family, custom_chat_template, image_marker_override, unknownFields)
+      model_family, custom_chat_template, image_marker_override, seed, repetition_penalty, min_p,
+      emit_image_embeddings, unknownFields)
 
   public companion object {
     @JvmField
@@ -290,6 +341,12 @@ public class VLMGenerationOptions(
             VLMModelFamily.ADAPTER.encodedSizeWithTag(12, value.model_family)
         size += VLMChatTemplate.ADAPTER.encodedSizeWithTag(13, value.custom_chat_template)
         size += ProtoAdapter.STRING.encodedSizeWithTag(14, value.image_marker_override)
+        if (value.seed != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(15, value.seed)
+        if (!value.repetition_penalty.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(16,
+            value.repetition_penalty)
+        if (!value.min_p.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(17, value.min_p)
+        if (value.emit_image_embeddings != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(18,
+            value.emit_image_embeddings)
         return size
       }
 
@@ -312,11 +369,23 @@ public class VLMGenerationOptions(
             VLMModelFamily.ADAPTER.encodeWithTag(writer, 12, value.model_family)
         VLMChatTemplate.ADAPTER.encodeWithTag(writer, 13, value.custom_chat_template)
         ProtoAdapter.STRING.encodeWithTag(writer, 14, value.image_marker_override)
+        if (value.seed != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 15, value.seed)
+        if (!value.repetition_penalty.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 16,
+            value.repetition_penalty)
+        if (!value.min_p.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 17, value.min_p)
+        if (value.emit_image_embeddings != false) ProtoAdapter.BOOL.encodeWithTag(writer, 18,
+            value.emit_image_embeddings)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VLMGenerationOptions) {
         writer.writeBytes(value.unknownFields)
+        if (value.emit_image_embeddings != false) ProtoAdapter.BOOL.encodeWithTag(writer, 18,
+            value.emit_image_embeddings)
+        if (!value.min_p.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 17, value.min_p)
+        if (!value.repetition_penalty.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 16,
+            value.repetition_penalty)
+        if (value.seed != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 15, value.seed)
         ProtoAdapter.STRING.encodeWithTag(writer, 14, value.image_marker_override)
         VLMChatTemplate.ADAPTER.encodeWithTag(writer, 13, value.custom_chat_template)
         if (value.model_family != VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED)
@@ -352,6 +421,10 @@ public class VLMGenerationOptions(
         var model_family: VLMModelFamily = VLMModelFamily.VLM_MODEL_FAMILY_UNSPECIFIED
         var custom_chat_template: VLMChatTemplate? = null
         var image_marker_override: String? = null
+        var seed: Long = 0L
+        var repetition_penalty: Float = 0f
+        var min_p: Float = 0f
+        var emit_image_embeddings: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> prompt = ProtoAdapter.STRING.decode(reader)
@@ -372,6 +445,10 @@ public class VLMGenerationOptions(
             }
             13 -> custom_chat_template = VLMChatTemplate.ADAPTER.decode(reader)
             14 -> image_marker_override = ProtoAdapter.STRING.decode(reader)
+            15 -> seed = ProtoAdapter.INT64.decode(reader)
+            16 -> repetition_penalty = ProtoAdapter.FLOAT.decode(reader)
+            17 -> min_p = ProtoAdapter.FLOAT.decode(reader)
+            18 -> emit_image_embeddings = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -390,6 +467,10 @@ public class VLMGenerationOptions(
           model_family = model_family,
           custom_chat_template = custom_chat_template,
           image_marker_override = image_marker_override,
+          seed = seed,
+          repetition_penalty = repetition_penalty,
+          min_p = min_p,
+          emit_image_embeddings = emit_image_embeddings,
           unknownFields = unknownFields
         )
       }

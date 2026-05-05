@@ -346,7 +346,7 @@ await RunAnywhere.initialize({
 ### Generation Options
 
 ```typescript
-const options: GenerationOptions = {
+const options: Partial<LLMGenerationOptions> = {
   maxTokens: 256,              // Maximum tokens to generate
   temperature: 0.7,            // Sampling temperature (0.0–2.0)
   topP: 0.95,                  // Top-p sampling parameter

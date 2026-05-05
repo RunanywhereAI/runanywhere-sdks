@@ -1218,6 +1218,12 @@ export interface ErrorContext_MetadataEntry {
  *   * `nested_message` — optional. Underlying-error message as captured at
  *     wrap time. Mirrors Swift's RunAnywhereError.underlyingError.localizedDesc
  *     and Kotlin's Throwable.cause.message.
+ *   * `retryable` — canonical retry hint. This is business-policy metadata
+ *     owned by the portable layer; the platform adapter still decides how to
+ *     schedule the retry through native/background APIs when appropriate.
+ *   * `correlation_id` — stable cross-event/request correlation key. SDKEvent
+ *     also carries this field so callers can join success/progress/failure
+ *     events without parsing free-form properties.
  * ---------------------------------------------------------------------------
  */
 export interface SDKError {
@@ -1247,6 +1253,9 @@ export interface SDKError {
   timestampMs: number;
   severity: ErrorSeverity;
   component: string;
+  retryable: boolean;
+  remediationHint: string;
+  correlationId: string;
 }
 
 function createBaseErrorContext(): ErrorContext {
@@ -1457,6 +1466,9 @@ function createBaseSDKError(): SDKError {
     timestampMs: 0,
     severity: 0,
     component: "",
+    retryable: false,
+    remediationHint: "",
+    correlationId: "",
   };
 }
 
@@ -1488,6 +1500,15 @@ export const SDKError = {
     }
     if (message.component !== "") {
       writer.uint32(74).string(message.component);
+    }
+    if (message.retryable !== false) {
+      writer.uint32(80).bool(message.retryable);
+    }
+    if (message.remediationHint !== "") {
+      writer.uint32(90).string(message.remediationHint);
+    }
+    if (message.correlationId !== "") {
+      writer.uint32(98).string(message.correlationId);
     }
     return writer;
   },
@@ -1562,6 +1583,27 @@ export const SDKError = {
 
           message.component = reader.string();
           continue;
+        case 10:
+          if (tag !== 80) {
+            break;
+          }
+
+          message.retryable = reader.bool();
+          continue;
+        case 11:
+          if (tag !== 90) {
+            break;
+          }
+
+          message.remediationHint = reader.string();
+          continue;
+        case 12:
+          if (tag !== 98) {
+            break;
+          }
+
+          message.correlationId = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1582,6 +1624,9 @@ export const SDKError = {
       timestampMs: isSet(object.timestampMs) ? globalThis.Number(object.timestampMs) : 0,
       severity: isSet(object.severity) ? errorSeverityFromJSON(object.severity) : 0,
       component: isSet(object.component) ? globalThis.String(object.component) : "",
+      retryable: isSet(object.retryable) ? globalThis.Boolean(object.retryable) : false,
+      remediationHint: isSet(object.remediationHint) ? globalThis.String(object.remediationHint) : "",
+      correlationId: isSet(object.correlationId) ? globalThis.String(object.correlationId) : "",
     };
   },
 
@@ -1614,6 +1659,15 @@ export const SDKError = {
     if (message.component !== "") {
       obj.component = message.component;
     }
+    if (message.retryable !== false) {
+      obj.retryable = message.retryable;
+    }
+    if (message.remediationHint !== "") {
+      obj.remediationHint = message.remediationHint;
+    }
+    if (message.correlationId !== "") {
+      obj.correlationId = message.correlationId;
+    }
     return obj;
   },
 
@@ -1633,6 +1687,9 @@ export const SDKError = {
     message.timestampMs = object.timestampMs ?? 0;
     message.severity = object.severity ?? 0;
     message.component = object.component ?? "";
+    message.retryable = object.retryable ?? false;
+    message.remediationHint = object.remediationHint ?? "";
+    message.correlationId = object.correlationId ?? "";
     return message;
   },
 };

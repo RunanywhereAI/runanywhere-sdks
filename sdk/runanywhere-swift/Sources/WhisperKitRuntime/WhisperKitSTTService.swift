@@ -81,7 +81,7 @@ public actor WhisperKitSTTService {
 
     // MARK: - Transcription
 
-    public func transcribe(_ audioData: Data, options: STTOptions) async throws -> STTOutput {
+    public func transcribe(_ audioData: Data, options: RASTTOptions) async throws -> RASTTOutput {
         guard let kit = whisperKit else {
             throw SDKException.stt(.notInitialized, "WhisperKit model not loaded")
         }
@@ -113,7 +113,10 @@ public actor WhisperKitSTTService {
         logger.info("Transcribing \(String(format: "%.2f", audioDurationSec))s audio, peak=\(String(format: "%.4f", peakAmplitude))")
 
         var decodeOptions = DecodingOptions()
-        decodeOptions.language = options.language
+        let languageCode = options.language.bcp47Code
+        if !languageCode.isEmpty, languageCode != "auto" {
+            decodeOptions.language = languageCode
+        }
 
         let results = try await kit.transcribe(
             audioArray: floatSamples,
@@ -125,16 +128,16 @@ public actor WhisperKitSTTService {
         let transcribedText = results.map(\.text).joined(separator: " ").trimmingCharacters(in: .whitespaces)
         let detectedLanguage = results.first?.language
 
-        let wordTimestamps: [WordTimestamp]? = results.first?.segments.flatMap { segment in
+        let wordTimestamps: [RAWordTimestamp] = results.first?.segments.flatMap { segment in
             (segment.words ?? []).map { word in
-                WordTimestamp(
+                RAWordTimestamp(
                     word: word.word,
                     startTime: Double(word.start),
                     endTime: Double(word.end),
                     confidence: word.probability
                 )
             }
-        }
+        } ?? []
 
         let confidence: Float = {
             let segments = results.flatMap(\.segments)
@@ -143,22 +146,28 @@ public actor WhisperKitSTTService {
             return 1.0 - avgNoSpeechProb
         }()
 
-        let metadata = TranscriptionMetadata(
-            modelId: modelId,
-            processingTime: processingTimeSec,
-            audioLength: audioDurationSec
-        )
-
         logger.info("Transcription complete (\(String(format: "%.2f", processingTimeSec))s): '\(transcribedText.prefix(80))'")
 
-        return STTOutput(
-            text: transcribedText,
-            confidence: confidence,
-            wordTimestamps: wordTimestamps,
-            detectedLanguage: detectedLanguage,
-            alternatives: nil,
-            metadata: metadata
-        )
+        var metadata = RATranscriptionMetadata()
+        metadata.modelID = modelId
+        metadata.processingTimeMs = Int64(processingTimeSec * 1000)
+        metadata.audioLengthMs = Int64(audioDurationSec * 1000)
+        metadata.realTimeFactor = audioDurationSec > 0 ? Float(processingTimeSec / audioDurationSec) : 0
+
+        var output = RASTTOutput()
+        output.text = transcribedText
+        output.confidence = confidence
+        output.words = wordTimestamps
+        output.metadata = metadata
+        output.durationMs = metadata.audioLengthMs
+        output.timestampMs = Int64(Date().timeIntervalSince1970 * 1000)
+        if let detectedLanguage {
+            output.language = RASTTLanguage.fromBcp47(detectedLanguage)
+            output.languageCode = detectedLanguage
+        } else {
+            output.language = options.language
+        }
+        return output
     }
 
     // MARK: - Unload

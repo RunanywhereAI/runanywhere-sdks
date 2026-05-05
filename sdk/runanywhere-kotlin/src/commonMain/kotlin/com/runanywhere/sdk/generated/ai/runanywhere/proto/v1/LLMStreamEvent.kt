@@ -158,6 +158,63 @@ public class LLMStreamEvent(
     schemaIndex = 10,
   )
   public val error_code: Int = 0,
+  /**
+   * Event classification distinct from token semantic kind.
+   */
+  @field:WireField(
+    tag = 12,
+    adapter = "ai.runanywhere.proto.v1.LLMStreamEventKind#ADAPTER",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "eventKind",
+    schemaIndex = 11,
+  )
+  public val event_kind: LLMStreamEventKind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_UNSPECIFIED,
+  /**
+   * Request/session correlation fields.
+   */
+  @field:WireField(
+    tag = 13,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "requestId",
+    schemaIndex = 12,
+  )
+  public val request_id: String = "",
+  @field:WireField(
+    tag = 14,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "conversationId",
+    schemaIndex = 13,
+  )
+  public val conversation_id: String = "",
+  /**
+   * Running counters for progress UIs.
+   */
+  @field:WireField(
+    tag = 15,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "promptTokensProcessed",
+    schemaIndex = 14,
+  )
+  public val prompt_tokens_processed: Int = 0,
+  @field:WireField(
+    tag = 16,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "completionTokensGenerated",
+    schemaIndex = 15,
+  )
+  public val completion_tokens_generated: Int = 0,
+  @field:WireField(
+    tag = 17,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "elapsedMs",
+    schemaIndex = 16,
+  )
+  public val elapsed_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<LLMStreamEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -182,6 +239,12 @@ public class LLMStreamEvent(
     if (error_message != other.error_message) return false
     if (result != other.result) return false
     if (error_code != other.error_code) return false
+    if (event_kind != other.event_kind) return false
+    if (request_id != other.request_id) return false
+    if (conversation_id != other.conversation_id) return false
+    if (prompt_tokens_processed != other.prompt_tokens_processed) return false
+    if (completion_tokens_generated != other.completion_tokens_generated) return false
+    if (elapsed_ms != other.elapsed_ms) return false
     return true
   }
 
@@ -200,6 +263,12 @@ public class LLMStreamEvent(
       result_ = result_ * 37 + error_message.hashCode()
       result_ = result_ * 37 + (result?.hashCode() ?: 0)
       result_ = result_ * 37 + error_code.hashCode()
+      result_ = result_ * 37 + event_kind.hashCode()
+      result_ = result_ * 37 + request_id.hashCode()
+      result_ = result_ * 37 + conversation_id.hashCode()
+      result_ = result_ * 37 + prompt_tokens_processed.hashCode()
+      result_ = result_ * 37 + completion_tokens_generated.hashCode()
+      result_ = result_ * 37 + elapsed_ms.hashCode()
       super.hashCode = result_
     }
     return result_
@@ -218,6 +287,12 @@ public class LLMStreamEvent(
     result_ += """error_message=${sanitize(error_message)}"""
     if (result != null) result_ += """result=$result"""
     result_ += """error_code=$error_code"""
+    result_ += """event_kind=$event_kind"""
+    result_ += """request_id=${sanitize(request_id)}"""
+    result_ += """conversation_id=${sanitize(conversation_id)}"""
+    result_ += """prompt_tokens_processed=$prompt_tokens_processed"""
+    result_ += """completion_tokens_generated=$completion_tokens_generated"""
+    result_ += """elapsed_ms=$elapsed_ms"""
     return result_.joinToString(prefix = "LLMStreamEvent{", separator = ", ", postfix = "}")
   }
 
@@ -233,9 +308,16 @@ public class LLMStreamEvent(
     error_message: String = this.error_message,
     result: LLMStreamFinalResult? = this.result,
     error_code: Int = this.error_code,
+    event_kind: LLMStreamEventKind = this.event_kind,
+    request_id: String = this.request_id,
+    conversation_id: String = this.conversation_id,
+    prompt_tokens_processed: Int = this.prompt_tokens_processed,
+    completion_tokens_generated: Int = this.completion_tokens_generated,
+    elapsed_ms: Long = this.elapsed_ms,
     unknownFields: ByteString = this.unknownFields,
   ): LLMStreamEvent = LLMStreamEvent(seq, timestamp_us, token, is_final, kind, token_id, logprob,
-      finish_reason, error_message, result, error_code, unknownFields)
+      finish_reason, error_message, result, error_code, event_kind, request_id, conversation_id,
+      prompt_tokens_processed, completion_tokens_generated, elapsed_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -266,6 +348,18 @@ public class LLMStreamEvent(
         size += LLMStreamFinalResult.ADAPTER.encodedSizeWithTag(10, value.result)
         if (value.error_code != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(11,
             value.error_code)
+        if (value.event_kind != LLMStreamEventKind.LLM_STREAM_EVENT_KIND_UNSPECIFIED) size +=
+            LLMStreamEventKind.ADAPTER.encodedSizeWithTag(12, value.event_kind)
+        if (value.request_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(13,
+            value.request_id)
+        if (value.conversation_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(14,
+            value.conversation_id)
+        if (value.prompt_tokens_processed != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(15,
+            value.prompt_tokens_processed)
+        if (value.completion_tokens_generated != 0) size +=
+            ProtoAdapter.INT32.encodedSizeWithTag(16, value.completion_tokens_generated)
+        if (value.elapsed_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(17,
+            value.elapsed_ms)
         return size
       }
 
@@ -285,11 +379,31 @@ public class LLMStreamEvent(
             value.error_message)
         LLMStreamFinalResult.ADAPTER.encodeWithTag(writer, 10, value.result)
         if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 11, value.error_code)
+        if (value.event_kind != LLMStreamEventKind.LLM_STREAM_EVENT_KIND_UNSPECIFIED)
+            LLMStreamEventKind.ADAPTER.encodeWithTag(writer, 12, value.event_kind)
+        if (value.request_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 13, value.request_id)
+        if (value.conversation_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 14,
+            value.conversation_id)
+        if (value.prompt_tokens_processed != 0) ProtoAdapter.INT32.encodeWithTag(writer, 15,
+            value.prompt_tokens_processed)
+        if (value.completion_tokens_generated != 0) ProtoAdapter.INT32.encodeWithTag(writer, 16,
+            value.completion_tokens_generated)
+        if (value.elapsed_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 17, value.elapsed_ms)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: LLMStreamEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.elapsed_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 17, value.elapsed_ms)
+        if (value.completion_tokens_generated != 0) ProtoAdapter.INT32.encodeWithTag(writer, 16,
+            value.completion_tokens_generated)
+        if (value.prompt_tokens_processed != 0) ProtoAdapter.INT32.encodeWithTag(writer, 15,
+            value.prompt_tokens_processed)
+        if (value.conversation_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 14,
+            value.conversation_id)
+        if (value.request_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 13, value.request_id)
+        if (value.event_kind != LLMStreamEventKind.LLM_STREAM_EVENT_KIND_UNSPECIFIED)
+            LLMStreamEventKind.ADAPTER.encodeWithTag(writer, 12, value.event_kind)
         if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 11, value.error_code)
         LLMStreamFinalResult.ADAPTER.encodeWithTag(writer, 10, value.result)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 9,
@@ -319,6 +433,12 @@ public class LLMStreamEvent(
         var error_message: String = ""
         var result: LLMStreamFinalResult? = null
         var error_code: Int = 0
+        var event_kind: LLMStreamEventKind = LLMStreamEventKind.LLM_STREAM_EVENT_KIND_UNSPECIFIED
+        var request_id: String = ""
+        var conversation_id: String = ""
+        var prompt_tokens_processed: Int = 0
+        var completion_tokens_generated: Int = 0
+        var elapsed_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> seq = ProtoAdapter.UINT64.decode(reader)
@@ -336,6 +456,16 @@ public class LLMStreamEvent(
             9 -> error_message = ProtoAdapter.STRING.decode(reader)
             10 -> result = LLMStreamFinalResult.ADAPTER.decode(reader)
             11 -> error_code = ProtoAdapter.INT32.decode(reader)
+            12 -> try {
+              event_kind = LLMStreamEventKind.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
+            13 -> request_id = ProtoAdapter.STRING.decode(reader)
+            14 -> conversation_id = ProtoAdapter.STRING.decode(reader)
+            15 -> prompt_tokens_processed = ProtoAdapter.INT32.decode(reader)
+            16 -> completion_tokens_generated = ProtoAdapter.INT32.decode(reader)
+            17 -> elapsed_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -351,6 +481,12 @@ public class LLMStreamEvent(
           error_message = error_message,
           result = result,
           error_code = error_code,
+          event_kind = event_kind,
+          request_id = request_id,
+          conversation_id = conversation_id,
+          prompt_tokens_processed = prompt_tokens_processed,
+          completion_tokens_generated = completion_tokens_generated,
+          elapsed_ms = elapsed_ms,
           unknownFields = unknownFields
         )
       }

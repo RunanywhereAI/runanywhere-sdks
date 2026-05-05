@@ -92,7 +92,6 @@ Pod::Spec.new do |s|
   s.source_files = [
     "../cpp/HybridRunAnywhereLlama.cpp",
     "../cpp/HybridRunAnywhereLlama.hpp",
-    "../cpp/bridges/**/*.{cpp,hpp}",
   ]
 
   # Build settings
@@ -100,7 +99,6 @@ Pod::Spec.new do |s|
     "CLANG_CXX_LANGUAGE_STANDARD" => "c++17",
     "HEADER_SEARCH_PATHS" => [
       "$(PODS_TARGET_SRCROOT)/../cpp",
-      "$(PODS_TARGET_SRCROOT)/../cpp/bridges",
       "$(PODS_TARGET_SRCROOT)/Frameworks/RABackendLLAMACPP.xcframework/ios-arm64/Headers",
       "$(PODS_TARGET_SRCROOT)/Frameworks/RABackendLLAMACPP.xcframework/ios-arm64_x86_64-simulator/Headers",
       "$(PODS_ROOT)/Headers/Public",

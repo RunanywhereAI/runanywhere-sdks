@@ -51,7 +51,8 @@ class DartBridgeDevice {
   static SharedPreferences? _prefs;
 
   /// SDK environment for HTTP calls
-  static SDKEnvironment _environment = SDKEnvironment.development;
+  static SDKEnvironment _environment =
+      SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
 
   /// Base URL for HTTP calls
   static String? _baseURL;
@@ -281,12 +282,13 @@ class DartBridgeDevice {
     // Build full URL: baseURL + endpoint path
     // Matches Kotlin: baseUrl.trimEnd('/') + finalEndpoint
     final baseURL = _baseURL ?? 'https://api.runanywhere.ai';
-    final trimmedBase =
-        baseURL.endsWith('/') ? baseURL.substring(0, baseURL.length - 1) : baseURL;
+    final trimmedBase = baseURL.endsWith('/')
+        ? baseURL.substring(0, baseURL.length - 1)
+        : baseURL;
 
     // For dev mode (Supabase), add ?on_conflict=device_id for UPSERT
     // Matches Swift/Kotlin behavior
-    final isDev = _environment == SDKEnvironment.development;
+    final isDev = _environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
     final finalEndpoint = isDev
         ? (endpoint.contains('?')
             ? '$endpoint&on_conflict=device_id'
@@ -330,8 +332,7 @@ class DartBridgeDevice {
         logger.debug('Device registration successful (status=$statusCode)');
       } else {
         // Read error body for logging
-        final responseBody =
-            await response.transform(utf8.decoder).join();
+        final responseBody = await response.transform(utf8.decoder).join();
         logger.warning(
           'Device registration failed (status=$statusCode): $responseBody',
         );
@@ -444,7 +445,7 @@ class DartBridgeDevice {
       return _cachedDeviceId!;
     } catch (e) {
       _logger.warning('Failed to get device ID from secure storage: $e');
-      
+
       // Fallback: try SharedPreferences (less secure, doesn't survive reinstalls)
       try {
         _prefs ??= await SharedPreferences.getInstance();
@@ -458,7 +459,7 @@ class DartBridgeDevice {
           } catch (_) {}
           return _cachedDeviceId!;
         }
-        
+
         final newUUID = _generateUUID();
         _cachedDeviceId = newUUID;
         await _prefs?.setString(_keyDeviceUUID, newUUID);
@@ -498,12 +499,14 @@ class DartBridgeDevice {
 
   static int _environmentToInt(SDKEnvironment env) {
     switch (env) {
-      case SDKEnvironment.development:
+      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
         return 0;
-      case SDKEnvironment.staging:
+      case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
         return 1;
-      case SDKEnvironment.production:
+      case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
         return 2;
+      default:
+        return 0;
     }
   }
 }

@@ -2,7 +2,7 @@
  * NativeRunAnywhereLlama.ts
  *
  * Exports the native RunAnywhereLlama Hybrid Object from Nitro Modules.
- * This module provides Llama-based text generation capabilities.
+ * This module provides LlamaCPP backend registration hooks.
  */
 
 import type { RunAnywhereLlama } from '../specs/RunAnywhereLlama.nitro';

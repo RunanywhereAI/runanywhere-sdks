@@ -6,10 +6,13 @@ import 'package:runanywhere/generated/model_types.pb.dart'
     show
         CurrentModelRequest,
         CurrentModelResult,
+        ModelFileDescriptor,
         ModelLoadRequest,
         ModelLoadResult,
         ModelUnloadRequest,
         ModelUnloadResult;
+import 'package:runanywhere/generated/model_types.pbenum.dart'
+    show ModelFileRole;
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
@@ -67,4 +70,88 @@ class RunAnywhereModelLifecycle {
 
   /// Reset commons lifecycle state. Primarily useful for tests.
   void reset() => DartBridge.modelLifecycle.reset();
+}
+
+/// Primary and companion paths selected by commons model path resolution.
+class ModelLifecycleResolvedArtifactPaths {
+  const ModelLifecycleResolvedArtifactPaths({
+    required this.primaryModelPath,
+    this.visionProjectorPath,
+  });
+
+  final String primaryModelPath;
+  final String? visionProjectorPath;
+}
+
+extension ModelLoadResultResolvedArtifacts on ModelLoadResult {
+  String? resolvedModelFilePath(ModelFileRole role) =>
+      resolvedArtifacts.resolvedModelFilePath(role);
+
+  String? get resolvedPrimaryModelPath => resolvedArtifacts.primaryModelPath;
+
+  String? get resolvedVisionProjectorPath =>
+      resolvedArtifacts.visionProjectorPath;
+
+  ModelLifecycleResolvedArtifactPaths requireResolvedArtifactPaths() =>
+      resolvedArtifacts.requireModelLifecycleResolvedArtifactPaths(
+        context: 'ModelLoadResult',
+      );
+}
+
+extension CurrentModelResultResolvedArtifacts on CurrentModelResult {
+  String? resolvedModelFilePath(ModelFileRole role) =>
+      resolvedArtifacts.resolvedModelFilePath(role);
+
+  String? get resolvedPrimaryModelPath => resolvedArtifacts.primaryModelPath;
+
+  String? get resolvedVisionProjectorPath =>
+      resolvedArtifacts.visionProjectorPath;
+
+  ModelLifecycleResolvedArtifactPaths requireResolvedArtifactPaths() =>
+      resolvedArtifacts.requireModelLifecycleResolvedArtifactPaths(
+        context: 'CurrentModelResult',
+      );
+}
+
+extension ModelFileDescriptorResolvedPath on ModelFileDescriptor {
+  String? get resolvedLocalPath {
+    final path = localPath.trim();
+    return path.isEmpty ? null : path;
+  }
+}
+
+extension ModelFileDescriptorRoleLookup on Iterable<ModelFileDescriptor> {
+  String? resolvedModelFilePath(ModelFileRole role) {
+    for (final artifact in this) {
+      if (artifact.role == role) {
+        return artifact.resolvedLocalPath;
+      }
+    }
+    return null;
+  }
+
+  String? get primaryModelPath => resolvedModelFilePath(
+        ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL,
+      );
+
+  String? get visionProjectorPath => resolvedModelFilePath(
+        ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR,
+      );
+
+  ModelLifecycleResolvedArtifactPaths
+      requireModelLifecycleResolvedArtifactPaths({
+    required String context,
+  }) {
+    final primary = primaryModelPath;
+    if (primary == null) {
+      throw StateError(
+        '$context did not include a resolved primary model artifact',
+      );
+    }
+
+    return ModelLifecycleResolvedArtifactPaths(
+      primaryModelPath: primary,
+      visionProjectorPath: visionProjectorPath,
+    );
+  }
 }

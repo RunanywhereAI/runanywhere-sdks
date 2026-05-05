@@ -216,6 +216,58 @@ TEST(stream_edge_block_producer_cancel) {
     CHECK(!push_result.load());  // cancel caused push to return false
 }
 
+TEST(stream_edge_close_unblocks_blocked_producer) {
+    StreamEdge<int> edge(1, OverflowPolicy::BlockProducer);
+    CHECK(edge.push(42));
+
+    std::atomic<bool> push_returned{false};
+    std::atomic<bool> push_result{true};
+    std::thread t([&] {
+        bool r = edge.push(99);
+        push_result.store(r);
+        push_returned.store(true);
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    const bool was_blocked = !push_returned.load();
+
+    const auto t0 = std::chrono::steady_clock::now();
+    edge.close();
+    t.join();
+    const auto elapsed = std::chrono::steady_clock::now() - t0;
+
+    CHECK(was_blocked);
+    CHECK(push_returned.load());
+    CHECK(!push_result.load());
+    CHECK(elapsed < std::chrono::milliseconds(500));
+}
+
+TEST(stream_edge_cancel_unblocks_consumer) {
+    StreamEdge<int> edge(4);
+    auto cancel = std::make_shared<CancelToken>();
+
+    std::atomic<bool> pop_returned{false};
+    std::atomic<bool> pop_had_value{true};
+    std::thread t([&] {
+        auto r = edge.pop(cancel.get());
+        pop_had_value.store(r.has_value());
+        pop_returned.store(true);
+    });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    const bool was_blocked = !pop_returned.load();
+
+    const auto t0 = std::chrono::steady_clock::now();
+    cancel->cancel();
+    t.join();
+    const auto elapsed = std::chrono::steady_clock::now() - t0;
+
+    CHECK(was_blocked);
+    CHECK(pop_returned.load());
+    CHECK(!pop_had_value.load());
+    CHECK(elapsed < std::chrono::milliseconds(500));
+}
+
 TEST(stream_edge_close_unblocks_consumer) {
     StreamEdge<int> edge(4);
     std::atomic<bool> popped{false};
@@ -268,6 +320,8 @@ int main() {
     run_test_stream_edge_drop_newest();
     run_test_stream_edge_drop_oldest();
     run_test_stream_edge_block_producer_cancel();
+    run_test_stream_edge_close_unblocks_blocked_producer();
+    run_test_stream_edge_cancel_unblocks_consumer();
     run_test_stream_edge_close_unblocks_consumer();
     run_test_stream_edge_producer_consumer_parallel();
 

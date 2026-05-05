@@ -17,8 +17,18 @@ import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.LLMGenerationResult
 import ai.runanywhere.proto.v1.LLMStreamEvent
 import ai.runanywhere.proto.v1.LoRAAdapterConfig
-import ai.runanywhere.proto.v1.LoRAAdapterInfo
+import ai.runanywhere.proto.v1.LoRAApplyRequest
+import ai.runanywhere.proto.v1.LoRAApplyResult
+import ai.runanywhere.proto.v1.LoRARemoveRequest
+import ai.runanywhere.proto.v1.LoRAState
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
+import ai.runanywhere.proto.v1.LoraAdapterCatalogGetRequest
+import ai.runanywhere.proto.v1.LoraAdapterCatalogGetResult
+import ai.runanywhere.proto.v1.LoraAdapterCatalogListRequest
+import ai.runanywhere.proto.v1.LoraAdapterCatalogListResult
+import ai.runanywhere.proto.v1.LoraAdapterCatalogQuery
+import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedRequest
+import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedResult
 import ai.runanywhere.proto.v1.LoraCompatibilityResult
 import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGDocument
@@ -29,6 +39,8 @@ import ai.runanywhere.proto.v1.SDKEvent
 import ai.runanywhere.proto.v1.STTOptions
 import ai.runanywhere.proto.v1.STTOutput
 import ai.runanywhere.proto.v1.STTPartialResult
+import ai.runanywhere.proto.v1.STTStreamEvent
+import ai.runanywhere.proto.v1.STTStreamEventKind
 import ai.runanywhere.proto.v1.TTSOptions
 import ai.runanywhere.proto.v1.TTSOutput
 import ai.runanywhere.proto.v1.TTSVoiceInfo
@@ -42,6 +54,7 @@ import ai.runanywhere.proto.v1.VLMResult
 import ai.runanywhere.proto.v1.VoiceAgentComponentStates
 import ai.runanywhere.proto.v1.VoiceAgentComposeConfig
 import ai.runanywhere.proto.v1.VoiceAgentResult
+import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -92,6 +105,60 @@ private fun LLMGenerationOptions?.toGenerateRequest(
 }
 
 object CppBridgeLLMProto {
+    @Volatile
+    private var handle: Long = 0L
+
+    private val lock = Any()
+
+    /**
+     * Get the current native handle, creating the component if needed.
+     */
+    @Throws(SDKException::class)
+    fun getHandle(): Long {
+        synchronized(lock) {
+            if (handle == 0L) create()
+            if (handle == 0L) {
+                throw SDKException.notInitialized("LLM component not created")
+            }
+            return handle
+        }
+    }
+
+    /**
+     * Idempotently create the LLM component. Returns 0 on success.
+     */
+    fun create(): Int {
+        synchronized(lock) {
+            if (handle != 0L) return 0
+            if (!CppBridge.isNativeLibraryLoaded) {
+                throw SDKException.notInitialized(
+                    "Native library not available. Please ensure the native libraries are bundled in your APK.",
+                )
+            }
+            val result = try {
+                RunAnywhereBridge.racLlmComponentCreate()
+            } catch (e: UnsatisfiedLinkError) {
+                throw SDKException.notInitialized(
+                    "LLM native library not available: ${e.message}",
+                )
+            }
+            if (result == 0L) return -1
+            handle = result
+            return 0
+        }
+    }
+
+    /**
+     * Destroy the native component and release the handle.
+     */
+    fun destroy() {
+        synchronized(lock) {
+            if (handle == 0L) return
+            RunAnywhereBridge.racLlmComponentDestroy(handle)
+            handle = 0L
+        }
+    }
+
     fun generate(prompt: String, options: LLMGenerationOptions?): LLMGenerationResult {
         val request = options.toGenerateRequest(prompt, streaming = false)
         return decodeOrThrow(
@@ -122,12 +189,59 @@ object CppBridgeLLMProto {
 }
 
 object CppBridgeSTTProto {
+    @Volatile
+    private var handle: Long = 0L
+
+    private val lock = Any()
+
+    @Throws(SDKException::class)
+    fun getHandle(): Long {
+        synchronized(lock) {
+            if (handle == 0L) create()
+            if (handle == 0L) {
+                throw SDKException.notInitialized("STT component not created")
+            }
+            return handle
+        }
+    }
+
+    fun create(): Int {
+        synchronized(lock) {
+            if (handle != 0L) return 0
+            if (!CppBridge.isNativeLibraryLoaded) {
+                throw SDKException.notInitialized(
+                    "Native library not available. Please ensure the native libraries are bundled in your APK.",
+                )
+            }
+            val result = try {
+                RunAnywhereBridge.racSttComponentCreate()
+            } catch (e: UnsatisfiedLinkError) {
+                throw SDKException.notInitialized(
+                    "STT native library not available: ${e.message}",
+                )
+            }
+            if (result == 0L) return -1
+            handle = result
+            return 0
+        }
+    }
+
+    fun destroy() {
+        synchronized(lock) {
+            if (handle == 0L) return
+            RunAnywhereBridge.racSttComponentDestroy(handle)
+            handle = 0L
+        }
+    }
+
+    private fun nowUs(): Long = System.currentTimeMillis() * 1000L
+
     fun transcribe(audioData: ByteArray, options: STTOptions): STTOutput {
-        CppBridgeSTT.create()
+        create()
         return decodeOrThrow(
             STTOutput.ADAPTER,
             RunAnywhereBridge.racSttComponentTranscribeProto(
-                CppBridgeSTT.getHandle(),
+                getHandle(),
                 audioData,
                 STTOptions.ADAPTER.encode(options),
             ),
@@ -138,29 +252,138 @@ object CppBridgeSTTProto {
     fun transcribeStream(
         audioData: ByteArray,
         options: STTOptions,
-        onPartial: (STTPartialResult) -> Boolean,
+        onEvent: (STTStreamEvent) -> Boolean,
     ) {
-        CppBridgeSTT.create()
+        create()
+        var sequence = 0L
+
+        fun nextSequence(): Long = ++sequence
+
+        fun eventFromPartial(partial: STTPartialResult): STTStreamEvent {
+            val kind =
+                if (partial.is_final || partial.final_output != null) {
+                    STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL
+                } else {
+                    STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL
+                }
+            return STTStreamEvent(
+                seq = nextSequence(),
+                timestamp_us = nowUs(),
+                request_id = partial.request_id,
+                kind = kind,
+                partial = partial,
+                final_output = partial.final_output,
+            )
+        }
+
+        fun eventFromPayload(bytes: ByteArray): STTStreamEvent =
+            try {
+                val event = STTStreamEvent.ADAPTER.decode(bytes)
+                if (
+                    event.kind != STTStreamEventKind.STT_STREAM_EVENT_KIND_UNSPECIFIED ||
+                    event.partial != null ||
+                    event.final_output != null ||
+                    event.error_message != null
+                ) {
+                    event.copy(
+                        seq = event.seq.takeIf { it != 0L } ?: nextSequence(),
+                        timestamp_us = event.timestamp_us.takeIf { it != 0L } ?: nowUs(),
+                    )
+                } else {
+                    eventFromPartial(STTPartialResult.ADAPTER.decode(bytes))
+                }
+            } catch (_: Exception) {
+                eventFromPartial(STTPartialResult.ADAPTER.decode(bytes))
+            }
+
+        if (
+            !onEvent(
+                STTStreamEvent(
+                    seq = nextSequence(),
+                    timestamp_us = nowUs(),
+                    kind = STTStreamEventKind.STT_STREAM_EVENT_KIND_STARTED,
+                ),
+            )
+        ) {
+            return
+        }
+
         val rc =
             RunAnywhereBridge.racSttComponentTranscribeStreamProto(
-                CppBridgeSTT.getHandle(),
+                getHandle(),
                 audioData,
                 STTOptions.ADAPTER.encode(options),
                 NativeProtoProgressListener { bytes ->
-                    onPartial(STTPartialResult.ADAPTER.decode(bytes))
+                    onEvent(eventFromPayload(bytes))
                 },
             )
+        if (rc != RunAnywhereBridge.RAC_SUCCESS) {
+            onEvent(
+                STTStreamEvent(
+                    seq = nextSequence(),
+                    timestamp_us = nowUs(),
+                    kind = STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR,
+                    error_message = "racSttComponentTranscribeStreamProto failed with rc=$rc",
+                    error_code = rc,
+                ),
+            )
+        }
         checkRc(rc, "racSttComponentTranscribeStreamProto")
     }
 }
 
 object CppBridgeTTSProto {
+    @Volatile
+    private var handle: Long = 0L
+
+    private val lock = Any()
+
+    @Throws(SDKException::class)
+    fun getHandle(): Long {
+        synchronized(lock) {
+            if (handle == 0L) create()
+            if (handle == 0L) {
+                throw SDKException.notInitialized("TTS component not created")
+            }
+            return handle
+        }
+    }
+
+    fun create(): Int {
+        synchronized(lock) {
+            if (handle != 0L) return 0
+            if (!CppBridge.isNativeLibraryLoaded) {
+                throw SDKException.notInitialized(
+                    "Native library not available. Please ensure the native libraries are bundled in your APK.",
+                )
+            }
+            val result = try {
+                RunAnywhereBridge.racTtsComponentCreate()
+            } catch (e: UnsatisfiedLinkError) {
+                throw SDKException.notInitialized(
+                    "TTS native library not available: ${e.message}",
+                )
+            }
+            if (result == 0L) return -1
+            handle = result
+            return 0
+        }
+    }
+
+    fun destroy() {
+        synchronized(lock) {
+            if (handle == 0L) return
+            RunAnywhereBridge.racTtsComponentDestroy(handle)
+            handle = 0L
+        }
+    }
+
     fun voices(): List<TTSVoiceInfo> {
-        CppBridgeTTS.create()
+        create()
         val voices = mutableListOf<TTSVoiceInfo>()
         val rc =
             RunAnywhereBridge.racTtsComponentListVoicesProto(
-                CppBridgeTTS.getHandle(),
+                getHandle(),
                 NativeProtoProgressListener { bytes ->
                     voices += TTSVoiceInfo.ADAPTER.decode(bytes)
                     true
@@ -171,11 +394,11 @@ object CppBridgeTTSProto {
     }
 
     fun synthesize(text: String, options: TTSOptions): TTSOutput {
-        CppBridgeTTS.create()
+        create()
         return decodeOrThrow(
             TTSOutput.ADAPTER,
             RunAnywhereBridge.racTtsComponentSynthesizeProto(
-                CppBridgeTTS.getHandle(),
+                getHandle(),
                 text,
                 TTSOptions.ADAPTER.encode(options),
             ),
@@ -188,10 +411,10 @@ object CppBridgeTTSProto {
         options: TTSOptions,
         onChunk: (TTSOutput) -> Boolean,
     ) {
-        CppBridgeTTS.create()
+        create()
         val rc =
             RunAnywhereBridge.racTtsComponentSynthesizeStreamProto(
-                CppBridgeTTS.getHandle(),
+                getHandle(),
                 text,
                 TTSOptions.ADAPTER.encode(options),
                 NativeProtoProgressListener { bytes ->
@@ -203,22 +426,96 @@ object CppBridgeTTSProto {
 }
 
 object CppBridgeVADProto {
+    @Volatile
+    private var handle: Long = 0L
+
+    private val lock = Any()
+
+    /**
+     * Whether the underlying native component has been created.
+     * Replaces the legacy isReady/isLoaded — readiness should be queried
+     * through `CppBridgeModelLifecycleProto.snapshot(SDK_COMPONENT_VAD)`.
+     */
+    val isReady: Boolean
+        get() = handle != 0L
+
+    @Throws(SDKException::class)
+    fun getHandle(): Long {
+        synchronized(lock) {
+            if (handle == 0L) create()
+            if (handle == 0L) {
+                throw SDKException.notInitialized("VAD component not created")
+            }
+            return handle
+        }
+    }
+
+    fun create(): Int {
+        synchronized(lock) {
+            if (handle != 0L) return 0
+            if (!CppBridge.isNativeLibraryLoaded) {
+                throw SDKException.notInitialized(
+                    "Native library not available. Please ensure the native libraries are bundled in your APK.",
+                )
+            }
+            val result = try {
+                RunAnywhereBridge.racVadComponentCreate()
+            } catch (e: UnsatisfiedLinkError) {
+                throw SDKException.notInitialized(
+                    "VAD native library not available: ${e.message}",
+                )
+            }
+            if (result == 0L) return -1
+            handle = result
+            return 0
+        }
+    }
+
+    /**
+     * Cancel the current detection. Native ABI is the source of truth;
+     * the previous Kotlin-side `isCancelled` flag was deleted.
+     */
+    fun cancel() {
+        synchronized(lock) {
+            if (handle == 0L) return
+            RunAnywhereBridge.racVadComponentCancel(handle)
+        }
+    }
+
+    /**
+     * Reset the VAD state for a new audio stream.
+     */
+    fun reset() {
+        synchronized(lock) {
+            if (handle == 0L) return
+            RunAnywhereBridge.racVadComponentReset(handle)
+        }
+    }
+
+    fun destroy() {
+        synchronized(lock) {
+            if (handle == 0L) return
+            RunAnywhereBridge.racVadComponentDestroy(handle)
+            handle = 0L
+        }
+    }
+
     fun configure(configuration: VADConfiguration) {
-        CppBridgeVAD.create()
+        create()
         val rc =
             RunAnywhereBridge.racVadComponentConfigureProto(
-                CppBridgeVAD.getHandle(),
+                getHandle(),
                 VADConfiguration.ADAPTER.encode(configuration),
             )
         checkRc(rc, "racVadComponentConfigureProto")
     }
 
     fun process(samples: FloatArray, options: VADOptions = VADOptions()): VADResult {
-        CppBridgeVAD.create()
+        create()
         return decodeOrThrow(
             VADResult.ADAPTER,
             RunAnywhereBridge.racVadComponentProcessProto(
-                CppBridgeVAD.getHandle(),
+                getHandle(),
                 samples,
                 VADOptions.ADAPTER.encode(options),
             ),
@@ -227,10 +524,10 @@ object CppBridgeVADProto {
     }
 
     fun statistics(): VADStatistics {
-        CppBridgeVAD.create()
+        create()
         return decodeOrThrow(
             VADStatistics.ADAPTER,
-            RunAnywhereBridge.racVadComponentGetStatisticsProto(CppBridgeVAD.getHandle()),
+            RunAnywhereBridge.racVadComponentGetStatisticsProto(getHandle()),
             "racVadComponentGetStatisticsProto",
         )
     }
@@ -238,43 +535,37 @@ object CppBridgeVADProto {
 
 object CppBridgeVLMProto {
     @Volatile private var handle: Long = 0L
-    @Volatile private var loadedModelId: String? = null
 
     @Synchronized
-    fun loadModel(modelPath: String, mmprojPath: String?, modelId: String): Int {
+    fun loadResolvedArtifacts(
+        modelId: String,
+        primaryModelPath: String,
+        visionProjectorPath: String,
+    ): Int {
         destroy()
-        val serviceHandle = RunAnywhereBridge.racVlmCreate(modelId.ifBlank { modelPath })
+        val serviceHandle = RunAnywhereBridge.racVlmCreate(modelId.ifBlank { primaryModelPath })
         if (serviceHandle == 0L) return RunAnywhereBridge.RAC_ERROR_OPERATION_FAILED
-        val rc = RunAnywhereBridge.racVlmInitialize(serviceHandle, modelPath, mmprojPath)
+        val rc =
+            RunAnywhereBridge.racVlmInitialize(
+                serviceHandle,
+                primaryModelPath,
+                visionProjectorPath,
+            )
         if (rc != RunAnywhereBridge.RAC_SUCCESS) {
             RunAnywhereBridge.racVlmDestroy(serviceHandle)
             return rc
         }
         handle = serviceHandle
-        loadedModelId = modelId
         return rc
-    }
-
-    @Synchronized
-    fun loadModelById(modelId: String): Int {
-        destroy()
-        val serviceHandle = RunAnywhereBridge.racVlmCreate(modelId)
-        if (serviceHandle == 0L) return RunAnywhereBridge.RAC_ERROR_OPERATION_FAILED
-        handle = serviceHandle
-        loadedModelId = modelId
-        return RunAnywhereBridge.RAC_SUCCESS
     }
 
     @Synchronized
     fun destroy() {
         if (handle != 0L) RunAnywhereBridge.racVlmDestroy(handle)
         handle = 0L
-        loadedModelId = null
     }
 
     fun isLoaded(): Boolean = handle != 0L
-
-    fun modelId(): String? = loadedModelId
 
     fun cancel() {
         if (handle != 0L) RunAnywhereBridge.racVlmCancelProto(handle)
@@ -394,6 +685,7 @@ object CppBridgeRAGProto {
 
 object CppBridgeDiffusionProto {
     @Volatile private var handle: Long = 0L
+
     @Volatile private var modelId: String? = null
 
     @Synchronized
@@ -471,58 +763,65 @@ object CppBridgeDiffusionProto {
 }
 
 object CppBridgeLoraProto {
-    private val loaded = ConcurrentHashMap<String, LoRAAdapterInfo>()
+    private fun nativeCatalogUnavailable(
+        operation: String,
+        cause: UnsatisfiedLinkError,
+    ): String = "$operation native JNI symbol is unavailable: ${cause.message.orEmpty()}"
 
-    fun load(config: LoRAAdapterConfig): LoRAAdapterInfo {
-        CppBridgeLLM.create()
-        val info =
-            decodeOrThrow(
-                LoRAAdapterInfo.ADAPTER,
-                RunAnywhereBridge.racLoraLoadProto(
-                    CppBridgeLLM.getHandle(),
-                    LoRAAdapterConfig.ADAPTER.encode(config),
-                ),
-                "racLoraLoadProto",
-            )
-        loaded[info.adapter_id.ifBlank { info.adapter_path }] = info
-        return info
+    fun apply(request: LoRAApplyRequest): LoRAApplyResult {
+        CppBridgeLLMProto.create()
+        return decodeOrThrow(
+            LoRAApplyResult.ADAPTER,
+            RunAnywhereBridge.racLoraApplyProto(
+                CppBridgeLLMProto.getHandle(),
+                LoRAApplyRequest.ADAPTER.encode(request),
+            ),
+            "racLoraApplyProto",
+        )
     }
 
-    fun remove(config: LoRAAdapterConfig): LoRAAdapterInfo {
-        CppBridgeLLM.create()
-        val info =
-            decodeOrThrow(
-                LoRAAdapterInfo.ADAPTER,
-                RunAnywhereBridge.racLoraRemoveProto(
-                    CppBridgeLLM.getHandle(),
-                    LoRAAdapterConfig.ADAPTER.encode(config),
-                ),
-                "racLoraRemoveProto",
-            )
-        loaded.remove(info.adapter_id.ifBlank { info.adapter_path })
-        return info
+    fun remove(request: LoRARemoveRequest): LoRAState {
+        CppBridgeLLMProto.create()
+        return decodeOrThrow(
+            LoRAState.ADAPTER,
+            RunAnywhereBridge.racLoraRemoveProto(
+                CppBridgeLLMProto.getHandle(),
+                LoRARemoveRequest.ADAPTER.encode(request),
+            ),
+            "racLoraRemoveProto",
+        )
     }
 
-    fun clear(): LoRAAdapterInfo {
-        CppBridgeLLM.create()
-        val info =
-            decodeOrThrow(
-                LoRAAdapterInfo.ADAPTER,
-                RunAnywhereBridge.racLoraClearProto(CppBridgeLLM.getHandle()),
-                "racLoraClearProto",
-            )
-        loaded.clear()
-        return info
+    fun list(request: LoRAState): LoRAState {
+        CppBridgeLLMProto.create()
+        return decodeOrThrow(
+            LoRAState.ADAPTER,
+            RunAnywhereBridge.racLoraListProto(
+                CppBridgeLLMProto.getHandle(),
+                LoRAState.ADAPTER.encode(request),
+            ),
+            "racLoraListProto",
+        )
     }
 
-    fun getLoaded(): List<LoRAAdapterInfo> = loaded.values.toList()
+    fun state(request: LoRAState): LoRAState {
+        CppBridgeLLMProto.create()
+        return decodeOrThrow(
+            LoRAState.ADAPTER,
+            RunAnywhereBridge.racLoraStateProto(
+                CppBridgeLLMProto.getHandle(),
+                LoRAState.ADAPTER.encode(request),
+            ),
+            "racLoraStateProto",
+        )
+    }
 
     fun compatibility(config: LoRAAdapterConfig): LoraCompatibilityResult {
-        CppBridgeLLM.create()
+        CppBridgeLLMProto.create()
         return decodeOrThrow(
             LoraCompatibilityResult.ADAPTER,
             RunAnywhereBridge.racLoraCompatibilityProto(
-                CppBridgeLLM.getHandle(),
+                CppBridgeLLMProto.getHandle(),
                 LoRAAdapterConfig.ADAPTER.encode(config),
             ),
             "racLoraCompatibilityProto",
@@ -535,6 +834,74 @@ object CppBridgeLoraProto {
             RunAnywhereBridge.racLoraRegisterProto(LoraAdapterCatalogEntry.ADAPTER.encode(entry)),
             "racLoraRegisterProto",
         )
+
+    fun listCatalog(request: LoraAdapterCatalogListRequest): LoraAdapterCatalogListResult =
+        try {
+            decodeOrThrow(
+                LoraAdapterCatalogListResult.ADAPTER,
+                RunAnywhereBridge.racLoraCatalogListProto(
+                    LoraAdapterCatalogListRequest.ADAPTER.encode(request),
+                ),
+                "racLoraCatalogListProto",
+            )
+        } catch (e: UnsatisfiedLinkError) {
+            LoraAdapterCatalogListResult(
+                success = false,
+                error_message = nativeCatalogUnavailable("racLoraCatalogListProto", e),
+            )
+        }
+
+    fun queryCatalog(query: LoraAdapterCatalogQuery): LoraAdapterCatalogListResult =
+        try {
+            decodeOrThrow(
+                LoraAdapterCatalogListResult.ADAPTER,
+                RunAnywhereBridge.racLoraCatalogQueryProto(
+                    LoraAdapterCatalogQuery.ADAPTER.encode(query),
+                ),
+                "racLoraCatalogQueryProto",
+            )
+        } catch (e: UnsatisfiedLinkError) {
+            LoraAdapterCatalogListResult(
+                success = false,
+                error_message = nativeCatalogUnavailable("racLoraCatalogQueryProto", e),
+            )
+        }
+
+    fun getCatalogEntry(request: LoraAdapterCatalogGetRequest): LoraAdapterCatalogGetResult =
+        try {
+            decodeOrThrow(
+                LoraAdapterCatalogGetResult.ADAPTER,
+                RunAnywhereBridge.racLoraCatalogGetProto(
+                    LoraAdapterCatalogGetRequest.ADAPTER.encode(request),
+                ),
+                "racLoraCatalogGetProto",
+            )
+        } catch (e: UnsatisfiedLinkError) {
+            LoraAdapterCatalogGetResult(
+                found = false,
+                error_message = nativeCatalogUnavailable("racLoraCatalogGetProto", e),
+            )
+        }
+
+    fun markDownloadCompleted(
+        request: LoraAdapterDownloadCompletedRequest,
+    ): LoraAdapterDownloadCompletedResult =
+        try {
+            decodeOrThrow(
+                LoraAdapterDownloadCompletedResult.ADAPTER,
+                RunAnywhereBridge.racLoraCatalogMarkDownloadCompletedProto(
+                    LoraAdapterDownloadCompletedRequest.ADAPTER.encode(request),
+                ),
+                "racLoraCatalogMarkDownloadCompletedProto",
+            )
+        } catch (e: UnsatisfiedLinkError) {
+            LoraAdapterDownloadCompletedResult(
+                success = false,
+                persisted = false,
+                error_message =
+                    nativeCatalogUnavailable("racLoraCatalogMarkDownloadCompletedProto", e),
+            )
+        }
 }
 
 object CppBridgeVoiceAgentProto {

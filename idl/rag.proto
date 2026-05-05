@@ -105,6 +105,12 @@ message RAGConfiguration {
 
     // Backend-specific config JSON passed to the LLM provider.
     optional string llm_config_json = 11;
+
+    // Index persistence and retrieval behavior. Empty path = in-memory index.
+    optional string index_path = 12;
+    bool persist_index = 13;
+    bool rerank_results = 14;
+    optional string reranker_model_path = 15;
 }
 
 // ---------------------------------------------------------------------------
@@ -121,6 +127,20 @@ message RAGDocument {
     optional string metadata_json = 3;
 
     // Typed metadata map for generated-proto callers.
+    map<string, string> metadata = 4;
+
+    // Adapter-normalized document source. Pickers, sandbox bookmarks, and
+    // platform file access remain SDK-owned.
+    optional string source_uri = 5;
+    optional string adapter_handle = 6;
+    optional string media_type = 7;
+    int64 size_bytes = 8;
+}
+
+message RAGIngestRequest {
+    string request_id = 1;
+    repeated RAGDocument documents = 2;
+    bool replace_existing = 3;
     map<string, string> metadata = 4;
 }
 
@@ -145,6 +165,17 @@ message RAGQueryOptions {
 
     // Top-k sampling parameter. 0 = disabled.
     int32  top_k                 = 6;
+
+    // Retrieval overrides. 0/unset = use RAGConfiguration defaults.
+    int32 retrieval_top_k        = 7;
+    float similarity_threshold   = 8;
+    bool  stream                 = 9;
+}
+
+message RAGQueryRequest {
+    string request_id = 1;
+    optional RAGQueryOptions options = 2;
+    map<string, string> metadata = 3;
 }
 
 // ---------------------------------------------------------------------------
@@ -172,6 +203,11 @@ message RAGSearchResult {
     // Legacy metadata JSON blob preserved for C ABI / SDK surfaces that still
     // pass metadata without parsing it.
     optional string metadata_json = 6;
+
+    int32 rank = 7;
+    int32 start_offset = 8;
+    int32 end_offset = 9;
+    int32 token_count = 10;
 }
 
 // ---------------------------------------------------------------------------
@@ -198,6 +234,13 @@ message RAGResult {
     // Total end-to-end query time (retrieval + generation + overhead),
     // in milliseconds.
     int64  total_time_ms         = 6;
+
+    int32 prompt_tokens          = 7;
+    int32 completion_tokens      = 8;
+    int32 total_tokens           = 9;
+    optional string error_message = 10;
+    int32 error_code             = 11;
+    string request_id            = 12;
 }
 
 // ---------------------------------------------------------------------------
@@ -229,4 +272,80 @@ message RAGStatistics {
 
     // Approximate vector-store footprint in bytes, when known.
     int64 vector_store_size_bytes = 7;
+
+    bool is_persistent = 8;
+    int64 last_query_ms = 9;
+    optional string error_message = 10;
+    int32 error_code = 11;
+}
+
+message RAGIngestResult {
+    string request_id = 1;
+    int64 documents_ingested = 2;
+    int64 chunks_ingested = 3;
+    optional RAGStatistics statistics = 4;
+    optional string error_message = 5;
+    int32 error_code = 6;
+}
+
+enum RAGStreamEventKind {
+    RAG_STREAM_EVENT_KIND_UNSPECIFIED = 0;
+    RAG_STREAM_EVENT_KIND_RETRIEVAL_STARTED = 1;
+    RAG_STREAM_EVENT_KIND_CHUNK_RETRIEVED = 2;
+    RAG_STREAM_EVENT_KIND_CONTEXT_READY = 3;
+    RAG_STREAM_EVENT_KIND_TOKEN = 4;
+    RAG_STREAM_EVENT_KIND_COMPLETED = 5;
+    RAG_STREAM_EVENT_KIND_ERROR = 6;
+}
+
+message RAGStreamEvent {
+    uint64 seq = 1;
+    int64 timestamp_us = 2;
+    string request_id = 3;
+    RAGStreamEventKind kind = 4;
+    optional RAGSearchResult chunk = 5;
+    string token = 6;
+    optional RAGResult result = 7;
+    optional string error_message = 8;
+    int32 error_code = 9;
+}
+
+message RAGServiceState {
+    bool is_ready = 1;
+    optional RAGStatistics statistics = 2;
+    bool is_indexing = 3;
+    bool is_querying = 4;
+    optional string active_request_id = 5;
+    optional string error_message = 6;
+    int32 error_code = 7;
+}
+
+// Logical RAG service contract. Native file pickers, sandbox handles, browser
+// File System Access handles, and backend execution remain adapter-owned; C++
+// consumes only serialized configuration/request/result/state/event messages.
+service RAG {
+    // Create or reconfigure the logical RAG session from resolved model paths
+    // and index settings.
+    rpc Create(RAGConfiguration) returns (RAGServiceState);
+
+    // Ingest caller-provided documents into the current logical index.
+    rpc Ingest(RAGIngestRequest) returns (RAGIngestResult);
+
+    // Retrieval-augmented generation returning grounded answer text, chunks,
+    // and timing/token metrics.
+    rpc Query(RAGQueryRequest) returns (RAGResult);
+
+    // Retrieval-only search. The returned RAGResult carries retrieved_chunks and
+    // request/timing fields; answer/context fields may be empty.
+    rpc Search(RAGQueryRequest) returns (RAGResult);
+
+    // Snapshot current index statistics from the logical service state.
+    rpc Stats(RAGServiceState) returns (RAGStatistics);
+
+    // Clear the current logical index and return the post-clear state.
+    rpc Clear(RAGServiceState) returns (RAGServiceState);
+
+    // Server-streaming query events: retrieval start, chunks, context readiness,
+    // token deltas, terminal completion, and errors.
+    rpc Stream(RAGQueryRequest) returns (stream RAGStreamEvent);
 }

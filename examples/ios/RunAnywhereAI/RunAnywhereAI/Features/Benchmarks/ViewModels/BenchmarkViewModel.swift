@@ -34,7 +34,7 @@ final class BenchmarkViewModel {
     var skippedCategoriesMessage: String?
 
     /// Available downloaded models grouped by category, for user selection
-    var availableModels: [BenchmarkCategory: [ModelInfo]] = [:]
+    var availableModels: [BenchmarkCategory: [RAModelInfo]] = [:]
 
     /// Which model IDs the user has selected for benchmarking.
     /// Empty means "all models" (backwards-compatible default).
@@ -55,23 +55,24 @@ final class BenchmarkViewModel {
 
     func refreshAvailableModels() {
         Task {
-            do {
-                let allModels = try await RunAnywhere.availableModels()
-                var grouped: [BenchmarkCategory: [ModelInfo]] = [:]
-                for category in BenchmarkCategory.allCases {
-                    let models = allModels.filter {
-                        $0.category == category.modelCategory && $0.isDownloaded && !$0.isBuiltIn
-                    }
-                    if !models.isEmpty {
-                        grouped[category] = models
-                    }
-                }
-                availableModels = grouped
-                if selectedModelIds.isEmpty {
-                    selectedModelIds = Set(grouped.values.flatMap { $0 }.map { $0.id })
-                }
-            } catch {
+            let listResult = await RunAnywhere.listModels()
+            guard listResult.success else {
                 availableModels = [:]
+                return
+            }
+            let allModels = listResult.models.models
+            var grouped: [BenchmarkCategory: [RAModelInfo]] = [:]
+            for category in BenchmarkCategory.allCases {
+                let models = allModels.filter {
+                    $0.category == category.modelCategory && $0.isDownloaded && !$0.isBuiltIn
+                }
+                if !models.isEmpty {
+                    grouped[category] = models
+                }
+            }
+            availableModels = grouped
+            if selectedModelIds.isEmpty {
+                selectedModelIds = Set(grouped.values.flatMap { $0 }.map { $0.id })
             }
         }
     }

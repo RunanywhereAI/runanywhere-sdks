@@ -1,13 +1,13 @@
 package com.runanywhere.runanywhereai.presentation.benchmarks.services
 
+import ai.runanywhere.proto.v1.ModelInfo
+import ai.runanywhere.proto.v1.STTOptions
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkCategory
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkDeviceInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkMetrics
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkScenario
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.Models.ModelInfo
-import ai.runanywhere.proto.v1.STTOptions
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.transcribeWithOptions
 import com.runanywhere.sdk.public.extensions.unloadSTTModel

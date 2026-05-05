@@ -13,7 +13,7 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.STTOptions
 import ai.runanywhere.proto.v1.STTOutput
-import ai.runanywhere.proto.v1.STTPartialResult
+import ai.runanywhere.proto.v1.STTStreamEvent
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.Flow
 
@@ -49,14 +49,6 @@ expect val RunAnywhere.isSTTModelLoaded: Boolean
  */
 expect val RunAnywhere.currentSTTModelId: String?
 
-/**
- * Check if an STT model is loaded (non-suspend version for quick checks).
- *
- * This accesses cached state and doesn't require suspension.
- * @deprecated Use isSTTModelLoaded directly.
- */
-expect val RunAnywhere.isSTTModelLoadedSync: Boolean
-
 // MARK: - Transcription with Options
 
 /**
@@ -82,31 +74,14 @@ suspend fun RunAnywhere.transcribe(
 /**
  * Stream transcription results from audio data.
  *
- * Returns a [Flow] that emits [STTPartialResult] for each partial
- * transcription chunk. The flow completes when transcription is done.
+ * Returns a [Flow] that emits generated [STTStreamEvent] envelopes for
+ * stream start, partial transcription chunks, final chunks, and errors.
  *
  * @param audioData Audio data to transcribe
  * @param options Transcription options
- * @return Flow of partial transcription results
+ * @return Flow of generated stream events
  */
 expect fun RunAnywhere.transcribeStream(
     audioData: ByteArray,
     options: STTOptions = STTOptions(),
-): Flow<STTPartialResult>
-
-/**
- * Whether a streaming STT session is currently active.
- */
-expect val RunAnywhere.isStreamingSTT: Boolean
-
-/**
- * Process audio samples for streaming transcription.
- *
- * @param samples Audio samples as raw bytes (PCM 16-bit little-endian)
- */
-expect suspend fun RunAnywhere.processStreamingAudio(samples: ByteArray)
-
-/**
- * Stop streaming transcription.
- */
-expect suspend fun RunAnywhere.stopStreamingTranscription()
+): Flow<STTStreamEvent>

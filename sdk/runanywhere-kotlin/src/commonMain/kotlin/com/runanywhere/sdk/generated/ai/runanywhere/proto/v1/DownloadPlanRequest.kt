@@ -76,6 +76,38 @@ public class DownloadPlanRequest(
     schemaIndex = 4,
   )
   public val allow_metered_network: Boolean = false,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "storageNamespace",
+    schemaIndex = 5,
+  )
+  public val storage_namespace: String = "",
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "validateExistingBytes",
+    schemaIndex = 6,
+  )
+  public val validate_existing_bytes: Boolean = false,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "verifyChecksums",
+    schemaIndex = 7,
+  )
+  public val verify_checksums: Boolean = false,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "requiredFreeBytesAfterDownload",
+    schemaIndex = 8,
+  )
+  public val required_free_bytes_after_download: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<DownloadPlanRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -94,6 +126,10 @@ public class DownloadPlanRequest(
     if (resume_existing != other.resume_existing) return false
     if (available_storage_bytes != other.available_storage_bytes) return false
     if (allow_metered_network != other.allow_metered_network) return false
+    if (storage_namespace != other.storage_namespace) return false
+    if (validate_existing_bytes != other.validate_existing_bytes) return false
+    if (verify_checksums != other.verify_checksums) return false
+    if (required_free_bytes_after_download != other.required_free_bytes_after_download) return false
     return true
   }
 
@@ -106,6 +142,10 @@ public class DownloadPlanRequest(
       result = result * 37 + resume_existing.hashCode()
       result = result * 37 + available_storage_bytes.hashCode()
       result = result * 37 + allow_metered_network.hashCode()
+      result = result * 37 + storage_namespace.hashCode()
+      result = result * 37 + validate_existing_bytes.hashCode()
+      result = result * 37 + verify_checksums.hashCode()
+      result = result * 37 + required_free_bytes_after_download.hashCode()
       super.hashCode = result
     }
     return result
@@ -118,6 +158,10 @@ public class DownloadPlanRequest(
     result += """resume_existing=$resume_existing"""
     result += """available_storage_bytes=$available_storage_bytes"""
     result += """allow_metered_network=$allow_metered_network"""
+    result += """storage_namespace=${sanitize(storage_namespace)}"""
+    result += """validate_existing_bytes=$validate_existing_bytes"""
+    result += """verify_checksums=$verify_checksums"""
+    result += """required_free_bytes_after_download=$required_free_bytes_after_download"""
     return result.joinToString(prefix = "DownloadPlanRequest{", separator = ", ", postfix = "}")
   }
 
@@ -127,9 +171,14 @@ public class DownloadPlanRequest(
     resume_existing: Boolean = this.resume_existing,
     available_storage_bytes: Long = this.available_storage_bytes,
     allow_metered_network: Boolean = this.allow_metered_network,
+    storage_namespace: String = this.storage_namespace,
+    validate_existing_bytes: Boolean = this.validate_existing_bytes,
+    verify_checksums: Boolean = this.verify_checksums,
+    required_free_bytes_after_download: Long = this.required_free_bytes_after_download,
     unknownFields: ByteString = this.unknownFields,
   ): DownloadPlanRequest = DownloadPlanRequest(model_id, model, resume_existing,
-      available_storage_bytes, allow_metered_network, unknownFields)
+      available_storage_bytes, allow_metered_network, storage_namespace, validate_existing_bytes,
+      verify_checksums, required_free_bytes_after_download, unknownFields)
 
   public companion object {
     @JvmField
@@ -152,6 +201,14 @@ public class DownloadPlanRequest(
             value.available_storage_bytes)
         if (value.allow_metered_network != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5,
             value.allow_metered_network)
+        if (value.storage_namespace != "") size += ProtoAdapter.STRING.encodedSizeWithTag(6,
+            value.storage_namespace)
+        if (value.validate_existing_bytes != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(7,
+            value.validate_existing_bytes)
+        if (value.verify_checksums != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(8,
+            value.verify_checksums)
+        if (value.required_free_bytes_after_download != 0L) size +=
+            ProtoAdapter.INT64.encodedSizeWithTag(9, value.required_free_bytes_after_download)
         return size
       }
 
@@ -164,11 +221,27 @@ public class DownloadPlanRequest(
             value.available_storage_bytes)
         if (value.allow_metered_network != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
             value.allow_metered_network)
+        if (value.storage_namespace != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
+            value.storage_namespace)
+        if (value.validate_existing_bytes != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.validate_existing_bytes)
+        if (value.verify_checksums != false) ProtoAdapter.BOOL.encodeWithTag(writer, 8,
+            value.verify_checksums)
+        if (value.required_free_bytes_after_download != 0L) ProtoAdapter.INT64.encodeWithTag(writer,
+            9, value.required_free_bytes_after_download)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: DownloadPlanRequest) {
         writer.writeBytes(value.unknownFields)
+        if (value.required_free_bytes_after_download != 0L) ProtoAdapter.INT64.encodeWithTag(writer,
+            9, value.required_free_bytes_after_download)
+        if (value.verify_checksums != false) ProtoAdapter.BOOL.encodeWithTag(writer, 8,
+            value.verify_checksums)
+        if (value.validate_existing_bytes != false) ProtoAdapter.BOOL.encodeWithTag(writer, 7,
+            value.validate_existing_bytes)
+        if (value.storage_namespace != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
+            value.storage_namespace)
         if (value.allow_metered_network != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5,
             value.allow_metered_network)
         if (value.available_storage_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 4,
@@ -185,6 +258,10 @@ public class DownloadPlanRequest(
         var resume_existing: Boolean = false
         var available_storage_bytes: Long = 0L
         var allow_metered_network: Boolean = false
+        var storage_namespace: String = ""
+        var validate_existing_bytes: Boolean = false
+        var verify_checksums: Boolean = false
+        var required_free_bytes_after_download: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
@@ -192,6 +269,10 @@ public class DownloadPlanRequest(
             3 -> resume_existing = ProtoAdapter.BOOL.decode(reader)
             4 -> available_storage_bytes = ProtoAdapter.INT64.decode(reader)
             5 -> allow_metered_network = ProtoAdapter.BOOL.decode(reader)
+            6 -> storage_namespace = ProtoAdapter.STRING.decode(reader)
+            7 -> validate_existing_bytes = ProtoAdapter.BOOL.decode(reader)
+            8 -> verify_checksums = ProtoAdapter.BOOL.decode(reader)
+            9 -> required_free_bytes_after_download = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -201,6 +282,10 @@ public class DownloadPlanRequest(
           resume_existing = resume_existing,
           available_storage_bytes = available_storage_bytes,
           allow_metered_network = allow_metered_network,
+          storage_namespace = storage_namespace,
+          validate_existing_bytes = validate_existing_bytes,
+          verify_checksums = verify_checksums,
+          required_free_bytes_after_download = required_free_bytes_after_download,
           unknownFields = unknownFields
         )
       }

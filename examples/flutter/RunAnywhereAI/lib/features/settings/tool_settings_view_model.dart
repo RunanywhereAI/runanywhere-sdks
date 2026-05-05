@@ -116,14 +116,14 @@ class ToolSettingsViewModel extends ChangeNotifier {
     Map<String, dynamic> args,
   ) async {
     final rawLocation = args['location'] as String?;
-    
+
     // Require location argument - no hardcoded defaults
     if (rawLocation == null || rawLocation.isEmpty) {
       return {
         'error': 'Missing required argument: location',
       };
     }
-    
+
     // Clean up location string - Open-Meteo works better with just city names
     // Remove common suffixes like ", CA", ", US", ", USA", etc.
     final location = _cleanLocationString(rawLocation);
@@ -242,7 +242,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
   /// Removes common suffixes like ", CA", ", US", state abbreviations, etc.
   String _cleanLocationString(String location) {
     var cleaned = location.trim();
-    
+
     // Common patterns to remove: ", CA", ", NY", ", US", ", USA", ", United States"
     // Also handle variations like "CA" at the end
     final patterns = [
@@ -250,11 +250,11 @@ class ToolSettingsViewModel extends ChangeNotifier {
       RegExp(r',\s*[A-Z]{2}$'), // State abbreviations like ", CA", ", NY"
       RegExp(r',\s*[A-Z]{2},\s*(US|USA)$', caseSensitive: false), // ", CA, US"
     ];
-    
+
     for (final pattern in patterns) {
       cleaned = cleaned.replaceAll(pattern, '');
     }
-    
+
     // Also handle "SF" -> "San Francisco" for common abbreviations
     final abbreviations = {
       'SF': 'San Francisco',
@@ -262,12 +262,12 @@ class ToolSettingsViewModel extends ChangeNotifier {
       'LA': 'Los Angeles',
       'DC': 'Washington DC',
     };
-    
+
     final upperCleaned = cleaned.toUpperCase();
     if (abbreviations.containsKey(upperCleaned)) {
       return abbreviations[upperCleaned]!;
     }
-    
+
     return cleaned;
   }
 
@@ -280,11 +280,11 @@ class ToolSettingsViewModel extends ChangeNotifier {
     return {
       'datetime': now.toString(),
       'time':
-        '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}',
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}',
       'timestamp': now.toIso8601String(),
       'timezone': now.timeZoneName,
       'utc_offset':
-        '${now.timeZoneOffset.isNegative ? '-' : '+'}${now.timeZoneOffset.inHours.abs().toString().padLeft(2, '0')}:${(now.timeZoneOffset.inMinutes.abs() % 60).toString().padLeft(2, '0')}',
+          '${now.timeZoneOffset.isNegative ? '-' : '+'}${now.timeZoneOffset.inHours.abs().toString().padLeft(2, '0')}:${(now.timeZoneOffset.inMinutes.abs() % 60).toString().padLeft(2, '0')}',
     };
   }
 
@@ -293,8 +293,9 @@ class ToolSettingsViewModel extends ChangeNotifier {
     Map<String, dynamic> args,
   ) async {
     // Try both 'expression' and 'input' keys - no hardcoded defaults
-    final expression = args['expression'] as String? ?? args['input'] as String?;
-    
+    final expression =
+        args['expression'] as String? ?? args['input'] as String?;
+
     if (expression == null || expression.isEmpty) {
       return {
         'error': 'Missing required argument: expression',
@@ -370,7 +371,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
 
     return double.parse(expr);
   }
-  
+
   double _pow(double base, double exponent) {
     return math.pow(base, exponent).toDouble();
   }

@@ -92,6 +92,30 @@ public class ModelRegistryRefreshResult(
     schemaIndex = 8,
   )
   public val error_message: String = "",
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "downloadedCount",
+    schemaIndex = 9,
+  )
+  public val downloaded_count: Int = 0,
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "availableCount",
+    schemaIndex = 10,
+  )
+  public val available_count: Int = 0,
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "errorCount",
+    schemaIndex = 11,
+  )
+  public val error_count: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelRegistryRefreshResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -122,6 +146,9 @@ public class ModelRegistryRefreshResult(
     if (refreshed_at_unix_ms != other.refreshed_at_unix_ms) return false
     if (warnings != other.warnings) return false
     if (error_message != other.error_message) return false
+    if (downloaded_count != other.downloaded_count) return false
+    if (available_count != other.available_count) return false
+    if (error_count != other.error_count) return false
     return true
   }
 
@@ -138,6 +165,9 @@ public class ModelRegistryRefreshResult(
       result = result * 37 + refreshed_at_unix_ms.hashCode()
       result = result * 37 + warnings.hashCode()
       result = result * 37 + error_message.hashCode()
+      result = result * 37 + downloaded_count.hashCode()
+      result = result * 37 + available_count.hashCode()
+      result = result * 37 + error_count.hashCode()
       super.hashCode = result
     }
     return result
@@ -154,6 +184,9 @@ public class ModelRegistryRefreshResult(
     result += """refreshed_at_unix_ms=$refreshed_at_unix_ms"""
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
     result += """error_message=${sanitize(error_message)}"""
+    result += """downloaded_count=$downloaded_count"""
+    result += """available_count=$available_count"""
+    result += """error_count=$error_count"""
     return result.joinToString(prefix = "ModelRegistryRefreshResult{", separator = ", ", postfix =
         "}")
   }
@@ -168,10 +201,13 @@ public class ModelRegistryRefreshResult(
     refreshed_at_unix_ms: Long = this.refreshed_at_unix_ms,
     warnings: List<String> = this.warnings,
     error_message: String = this.error_message,
+    downloaded_count: Int = this.downloaded_count,
+    available_count: Int = this.available_count,
+    error_count: Int = this.error_count,
     unknownFields: ByteString = this.unknownFields,
   ): ModelRegistryRefreshResult = ModelRegistryRefreshResult(success, models, registered_count,
       updated_count, discovered_count, pruned_count, refreshed_at_unix_ms, warnings, error_message,
-      unknownFields)
+      downloaded_count, available_count, error_count, unknownFields)
 
   public companion object {
     @JvmField
@@ -201,6 +237,12 @@ public class ModelRegistryRefreshResult(
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(8, value.warnings)
         if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(9,
             value.error_message)
+        if (value.downloaded_count != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(10,
+            value.downloaded_count)
+        if (value.available_count != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(11,
+            value.available_count)
+        if (value.error_count != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(12,
+            value.error_count)
         return size
       }
 
@@ -219,11 +261,21 @@ public class ModelRegistryRefreshResult(
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 9,
             value.error_message)
+        if (value.downloaded_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 10,
+            value.downloaded_count)
+        if (value.available_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 11,
+            value.available_count)
+        if (value.error_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 12, value.error_count)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelRegistryRefreshResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.error_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 12, value.error_count)
+        if (value.available_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 11,
+            value.available_count)
+        if (value.downloaded_count != 0) ProtoAdapter.INT32.encodeWithTag(writer, 10,
+            value.downloaded_count)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 9,
             value.error_message)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
@@ -250,6 +302,9 @@ public class ModelRegistryRefreshResult(
         var refreshed_at_unix_ms: Long = 0L
         val warnings = mutableListOf<String>()
         var error_message: String = ""
+        var downloaded_count: Int = 0
+        var available_count: Int = 0
+        var error_count: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> success = ProtoAdapter.BOOL.decode(reader)
@@ -261,6 +316,9 @@ public class ModelRegistryRefreshResult(
             7 -> refreshed_at_unix_ms = ProtoAdapter.INT64.decode(reader)
             8 -> warnings.add(ProtoAdapter.STRING.decode(reader))
             9 -> error_message = ProtoAdapter.STRING.decode(reader)
+            10 -> downloaded_count = ProtoAdapter.INT32.decode(reader)
+            11 -> available_count = ProtoAdapter.INT32.decode(reader)
+            12 -> error_count = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -274,6 +332,9 @@ public class ModelRegistryRefreshResult(
           refreshed_at_unix_ms = refreshed_at_unix_ms,
           warnings = warnings,
           error_message = error_message,
+          downloaded_count = downloaded_count,
+          available_count = available_count,
+          error_count = error_count,
           unknownFields = unknownFields
         )
       }

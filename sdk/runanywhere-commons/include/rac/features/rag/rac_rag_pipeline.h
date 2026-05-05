@@ -6,6 +6,19 @@
  * - Document chunking and embedding
  * - Vector search with USearch
  * - LLM generation with context
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
+ *   - Proto-byte session APIs (rac_rag_session_create_proto,
+ *     rac_rag_session_destroy_proto, rac_rag_ingest_proto,
+ *     rac_rag_query_proto, rac_rag_clear_proto, rac_rag_stats_proto):
+ *     `SDK-facing default` over runanywhere.v1.RAGConfiguration /
+ *     RAGDocument / RAGQueryOptions / RAGResult / RAGStatistics bytes.
+ *   - Legacy struct APIs (rac_document_chunk_t, rac_search_result_t,
+ *     rac_rag_pipeline_config_t, rac_rag_config_t, rac_rag_query_t,
+ *     rac_rag_result_t, rac_rag_pipeline_create_, add_document(s),
+ *     query, pipeline_query, clear_documents, get_document_count,
+ *     get_statistics, with the rac_rag_token_callback_fn):
+ *     `delete after SDK migration`.
  */
 
 #ifndef RAC_RAG_PIPELINE_H

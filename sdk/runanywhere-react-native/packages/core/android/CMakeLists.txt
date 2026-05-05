@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 
 # =============================================================================
 # nlohmann/json - Header-only JSON library for robust JSON parsing
-# Used by ToolCallingBridge for parsing tool call JSON from LLM output
+# Used by JSON-based bridge helpers such as RAGBridge.
 # =============================================================================
 include(FetchContent)
 FetchContent_Declare(
@@ -154,7 +154,7 @@ target_compile_definitions(${PACKAGE_NAME} PRIVATE HAS_RACOMMONS=1)
 # the bundled librac_commons.so always exports rac_http_transport_register.
 target_compile_definitions(${PACKAGE_NAME} PRIVATE RAC_HAS_HTTP_TRANSPORT=1)
 
-# Link nlohmann_json for ToolCallingBridge
+# Link nlohmann_json for JSON-based bridge helpers
 target_link_libraries(${PACKAGE_NAME} nlohmann_json::nlohmann_json)
 
 # 16KB page alignment - MUST be on target for Android 15+ compliance

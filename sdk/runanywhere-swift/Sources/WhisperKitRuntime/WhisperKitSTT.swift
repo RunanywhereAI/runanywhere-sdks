@@ -173,11 +173,9 @@ private func whisperKitCoreMLTranscribe(
     }
 
     let data = Data(bytes: audioData, count: audioSize)
-    let sttOptions: STTOptions
+    var sttOptions = RASTTOptions.defaults()
     if let opts = options, let langPtr = opts.pointee.language {
-        sttOptions = STTOptions(language: String(cString: langPtr))
-    } else {
-        sttOptions = STTOptions()
+        sttOptions.language = RASTTLanguage.fromBcp47(String(cString: langPtr))
     }
 
     var result: rac_result_t = RAC_ERROR_INTERNAL
@@ -190,10 +188,10 @@ private func whisperKitCoreMLTranscribe(
 
             outResult.pointee.text = output.text.isEmpty ? nil : strdup(output.text)
             outResult.pointee.confidence = output.confidence
-            outResult.pointee.processing_time_ms = Int64(output.metadata.processingTime * 1000)
+            outResult.pointee.processing_time_ms = output.metadata.processingTimeMs
 
-            if let lang = output.detectedLanguage {
-                outResult.pointee.detected_language = strdup(lang)
+            if output.hasLanguageCode {
+                outResult.pointee.detected_language = strdup(output.languageCode)
             }
 
             result = RAC_SUCCESS

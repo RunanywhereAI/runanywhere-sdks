@@ -19,6 +19,7 @@ import kotlin.AssertionError
 import kotlin.Boolean
 import kotlin.Deprecated
 import kotlin.DeprecationLevel
+import kotlin.Float
 import kotlin.Int
 import kotlin.Long
 import kotlin.Nothing
@@ -53,6 +54,29 @@ public class AssistantTokenEvent(
     schemaIndex = 2,
   )
   public val kind: TokenKind = TokenKind.TOKEN_KIND_UNSPECIFIED,
+  @field:WireField(
+    tag = 4,
+    adapter = "com.squareup.wire.ProtoAdapter#UINT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "tokenId",
+    schemaIndex = 3,
+  )
+  public val token_id: Int = 0,
+  @field:WireField(
+    tag = 5,
+    adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
+    label = WireField.Label.OMIT_IDENTITY,
+    schemaIndex = 4,
+  )
+  public val logprob: Float = 0f,
+  @field:WireField(
+    tag = 6,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "finishReason",
+    schemaIndex = 5,
+  )
+  public val finish_reason: String = "",
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<AssistantTokenEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -69,6 +93,9 @@ public class AssistantTokenEvent(
     if (text != other.text) return false
     if (is_final != other.is_final) return false
     if (kind != other.kind) return false
+    if (token_id != other.token_id) return false
+    if (logprob != other.logprob) return false
+    if (finish_reason != other.finish_reason) return false
     return true
   }
 
@@ -79,6 +106,9 @@ public class AssistantTokenEvent(
       result = result * 37 + text.hashCode()
       result = result * 37 + is_final.hashCode()
       result = result * 37 + kind.hashCode()
+      result = result * 37 + token_id.hashCode()
+      result = result * 37 + logprob.hashCode()
+      result = result * 37 + finish_reason.hashCode()
       super.hashCode = result
     }
     return result
@@ -89,6 +119,9 @@ public class AssistantTokenEvent(
     result += """text=${sanitize(text)}"""
     result += """is_final=$is_final"""
     result += """kind=$kind"""
+    result += """token_id=$token_id"""
+    result += """logprob=$logprob"""
+    result += """finish_reason=${sanitize(finish_reason)}"""
     return result.joinToString(prefix = "AssistantTokenEvent{", separator = ", ", postfix = "}")
   }
 
@@ -96,8 +129,12 @@ public class AssistantTokenEvent(
     text: String = this.text,
     is_final: Boolean = this.is_final,
     kind: TokenKind = this.kind,
+    token_id: Int = this.token_id,
+    logprob: Float = this.logprob,
+    finish_reason: String = this.finish_reason,
     unknownFields: ByteString = this.unknownFields,
-  ): AssistantTokenEvent = AssistantTokenEvent(text, is_final, kind, unknownFields)
+  ): AssistantTokenEvent = AssistantTokenEvent(text, is_final, kind, token_id, logprob,
+      finish_reason, unknownFields)
 
   public companion object {
     @JvmField
@@ -116,6 +153,11 @@ public class AssistantTokenEvent(
         if (value.is_final != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(2, value.is_final)
         if (value.kind != TokenKind.TOKEN_KIND_UNSPECIFIED) size +=
             TokenKind.ADAPTER.encodedSizeWithTag(3, value.kind)
+        if (value.token_id != 0) size += ProtoAdapter.UINT32.encodedSizeWithTag(4, value.token_id)
+        if (!value.logprob.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(5,
+            value.logprob)
+        if (value.finish_reason != "") size += ProtoAdapter.STRING.encodedSizeWithTag(6,
+            value.finish_reason)
         return size
       }
 
@@ -124,11 +166,19 @@ public class AssistantTokenEvent(
         if (value.is_final != false) ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.is_final)
         if (value.kind != TokenKind.TOKEN_KIND_UNSPECIFIED) TokenKind.ADAPTER.encodeWithTag(writer,
             3, value.kind)
+        if (value.token_id != 0) ProtoAdapter.UINT32.encodeWithTag(writer, 4, value.token_id)
+        if (!value.logprob.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.logprob)
+        if (value.finish_reason != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
+            value.finish_reason)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: AssistantTokenEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.finish_reason != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
+            value.finish_reason)
+        if (!value.logprob.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 5, value.logprob)
+        if (value.token_id != 0) ProtoAdapter.UINT32.encodeWithTag(writer, 4, value.token_id)
         if (value.kind != TokenKind.TOKEN_KIND_UNSPECIFIED) TokenKind.ADAPTER.encodeWithTag(writer,
             3, value.kind)
         if (value.is_final != false) ProtoAdapter.BOOL.encodeWithTag(writer, 2, value.is_final)
@@ -139,6 +189,9 @@ public class AssistantTokenEvent(
         var text: String = ""
         var is_final: Boolean = false
         var kind: TokenKind = TokenKind.TOKEN_KIND_UNSPECIFIED
+        var token_id: Int = 0
+        var logprob: Float = 0f
+        var finish_reason: String = ""
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> text = ProtoAdapter.STRING.decode(reader)
@@ -148,6 +201,9 @@ public class AssistantTokenEvent(
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
+            4 -> token_id = ProtoAdapter.UINT32.decode(reader)
+            5 -> logprob = ProtoAdapter.FLOAT.decode(reader)
+            6 -> finish_reason = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -155,6 +211,9 @@ public class AssistantTokenEvent(
           text = text,
           is_final = is_final,
           kind = kind,
+          token_id = token_id,
+          logprob = logprob,
+          finish_reason = finish_reason,
           unknownFields = unknownFields
         )
       }

@@ -241,6 +241,23 @@ public class VoiceAgentComposeConfig(
     schemaIndex = 20,
   )
   public val audio_pipeline_config: AudioPipelineConfig? = null,
+  /**
+   * Correlation and defaults for event streams and one-shot turn APIs.
+   */
+  @field:WireField(
+    tag = 22,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "sessionId",
+    schemaIndex = 21,
+  )
+  public val session_id: String? = null,
+  @field:WireField(
+    tag = 23,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "defaultLanguageCode",
+    schemaIndex = 22,
+  )
+  public val default_language_code: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<VoiceAgentComposeConfig, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -275,6 +292,8 @@ public class VoiceAgentComposeConfig(
     if (wakeword_vad_model_path != other.wakeword_vad_model_path) return false
     if (session_config != other.session_config) return false
     if (audio_pipeline_config != other.audio_pipeline_config) return false
+    if (session_id != other.session_id) return false
+    if (default_language_code != other.default_language_code) return false
     return true
   }
 
@@ -303,6 +322,8 @@ public class VoiceAgentComposeConfig(
       result = result * 37 + (wakeword_vad_model_path?.hashCode() ?: 0)
       result = result * 37 + (session_config?.hashCode() ?: 0)
       result = result * 37 + (audio_pipeline_config?.hashCode() ?: 0)
+      result = result * 37 + (session_id?.hashCode() ?: 0)
+      result = result * 37 + (default_language_code?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -334,6 +355,9 @@ public class VoiceAgentComposeConfig(
         """wakeword_vad_model_path=${sanitize(wakeword_vad_model_path)}"""
     if (session_config != null) result += """session_config=$session_config"""
     if (audio_pipeline_config != null) result += """audio_pipeline_config=$audio_pipeline_config"""
+    if (session_id != null) result += """session_id=${sanitize(session_id)}"""
+    if (default_language_code != null) result +=
+        """default_language_code=${sanitize(default_language_code)}"""
     return result.joinToString(prefix = "VoiceAgentComposeConfig{", separator = ", ", postfix = "}")
   }
 
@@ -359,13 +383,15 @@ public class VoiceAgentComposeConfig(
     wakeword_vad_model_path: String? = this.wakeword_vad_model_path,
     session_config: VoiceSessionConfig? = this.session_config,
     audio_pipeline_config: AudioPipelineConfig? = this.audio_pipeline_config,
+    session_id: String? = this.session_id,
+    default_language_code: String? = this.default_language_code,
     unknownFields: ByteString = this.unknownFields,
   ): VoiceAgentComposeConfig = VoiceAgentComposeConfig(stt_model_path, stt_model_id, stt_model_name,
       llm_model_path, llm_model_id, llm_model_name, tts_voice_path, tts_voice_id, tts_voice_name,
       vad_sample_rate, vad_frame_length, vad_energy_threshold, wakeword_enabled,
       wakeword_model_path, wakeword_model_id, wakeword_phrase, wakeword_threshold,
       wakeword_embedding_model_path, wakeword_vad_model_path, session_config, audio_pipeline_config,
-      unknownFields)
+      session_id, default_language_code, unknownFields)
 
   public companion object {
     @JvmField
@@ -406,6 +432,8 @@ public class VoiceAgentComposeConfig(
         size += ProtoAdapter.STRING.encodedSizeWithTag(19, value.wakeword_vad_model_path)
         size += VoiceSessionConfig.ADAPTER.encodedSizeWithTag(20, value.session_config)
         size += AudioPipelineConfig.ADAPTER.encodedSizeWithTag(21, value.audio_pipeline_config)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(22, value.session_id)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(23, value.default_language_code)
         return size
       }
 
@@ -436,11 +464,15 @@ public class VoiceAgentComposeConfig(
         ProtoAdapter.STRING.encodeWithTag(writer, 19, value.wakeword_vad_model_path)
         VoiceSessionConfig.ADAPTER.encodeWithTag(writer, 20, value.session_config)
         AudioPipelineConfig.ADAPTER.encodeWithTag(writer, 21, value.audio_pipeline_config)
+        ProtoAdapter.STRING.encodeWithTag(writer, 22, value.session_id)
+        ProtoAdapter.STRING.encodeWithTag(writer, 23, value.default_language_code)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: VoiceAgentComposeConfig) {
         writer.writeBytes(value.unknownFields)
+        ProtoAdapter.STRING.encodeWithTag(writer, 23, value.default_language_code)
+        ProtoAdapter.STRING.encodeWithTag(writer, 22, value.session_id)
         AudioPipelineConfig.ADAPTER.encodeWithTag(writer, 21, value.audio_pipeline_config)
         VoiceSessionConfig.ADAPTER.encodeWithTag(writer, 20, value.session_config)
         ProtoAdapter.STRING.encodeWithTag(writer, 19, value.wakeword_vad_model_path)
@@ -491,6 +523,8 @@ public class VoiceAgentComposeConfig(
         var wakeword_vad_model_path: String? = null
         var session_config: VoiceSessionConfig? = null
         var audio_pipeline_config: AudioPipelineConfig? = null
+        var session_id: String? = null
+        var default_language_code: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> stt_model_path = ProtoAdapter.STRING.decode(reader)
@@ -514,6 +548,8 @@ public class VoiceAgentComposeConfig(
             19 -> wakeword_vad_model_path = ProtoAdapter.STRING.decode(reader)
             20 -> session_config = VoiceSessionConfig.ADAPTER.decode(reader)
             21 -> audio_pipeline_config = AudioPipelineConfig.ADAPTER.decode(reader)
+            22 -> session_id = ProtoAdapter.STRING.decode(reader)
+            23 -> default_language_code = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -539,6 +575,8 @@ public class VoiceAgentComposeConfig(
           wakeword_vad_model_path = wakeword_vad_model_path,
           session_config = session_config,
           audio_pipeline_config = audio_pipeline_config,
+          session_id = session_id,
+          default_language_code = default_language_code,
           unknownFields = unknownFields
         )
       }

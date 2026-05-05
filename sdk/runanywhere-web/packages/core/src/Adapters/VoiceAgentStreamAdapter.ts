@@ -66,7 +66,14 @@ export class VoiceAgentStreamAdapter {
         : handleOrTransport;
   }
 
-  stream(req: VoiceAgentRequest = { eventFilter: '' }): AsyncIterable<VoiceEvent> {
+  stream(req: VoiceAgentRequest = {
+    eventFilter: '',
+    sessionId: '',
+    categories: [],
+    minSeverity: 0,
+    replayFromSeq: 0,
+    includeAudio: false,
+  }): AsyncIterable<VoiceEvent> {
     return streamVoiceAgent(this.transportImpl, req);
   }
 }

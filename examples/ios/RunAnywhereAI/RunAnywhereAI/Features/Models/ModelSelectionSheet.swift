@@ -75,24 +75,24 @@ struct ModelSelectionSheet: View {
     @Environment(\.dismiss)
     var dismiss
 
-    @State private var selectedModel: ModelInfo?
+    @State private var selectedModel: RAModelInfo?
     @State private var expandedFramework: InferenceFramework?
     @State private var availableFrameworks: [InferenceFramework] = []
     @State private var isLoadingModel = false
     @State private var loadingProgress: String = ""
 
     let context: ModelSelectionContext
-    let onModelSelected: (ModelInfo) async -> Void
+    let onModelSelected: (RAModelInfo) async -> Void
 
     init(
         context: ModelSelectionContext = .llm,
-        onModelSelected: @escaping (ModelInfo) async -> Void
+        onModelSelected: @escaping (RAModelInfo) async -> Void
     ) {
         self.context = context
         self.onModelSelected = onModelSelected
     }
 
-    private var availableModels: [ModelInfo] {
+    private var availableModels: [RAModelInfo] {
         viewModel.availableModels
             .filter { model in
                 guard context.relevantCategories.contains(model.category) else { return false }
@@ -116,12 +116,12 @@ struct ModelSelectionSheet: View {
             }
     }
 
-    private func modelPriority(_ model: ModelInfo) -> Int {
+    private func modelPriority(_ model: RAModelInfo) -> Int {
         if unavailableReason(for: model) != nil { return 3 }
-        return model.framework == .foundationModels ? 0 : (model.localPath != nil ? 1 : 2)
+        return model.framework == .foundationModels ? 0 : (model.localPathURL != nil ? 1 : 2)
     }
 
-    private func unavailableReason(for model: ModelInfo) -> String? {
+    private func unavailableReason(for model: RAModelInfo) -> String? {
         guard model.framework == .foundationModels else { return nil }
         return SystemFoundationModels.unavailableReason
     }
@@ -167,8 +167,8 @@ struct ModelSelectionSheet: View {
     private func loadAvailableFrameworks() async {
         let allFrameworks = await RunAnywhere.getRegisteredFrameworks()
         var filtered = allFrameworks.filter { shouldShowFramework($0) }
-        if context == .tts && !filtered.contains(.systemTTS) {
-            filtered.insert(.systemTTS, at: 0)
+        if context == .tts && !filtered.contains(.systemTts) {
+            filtered.insert(.systemTts, at: 0)
         }
         await MainActor.run { self.availableFrameworks = filtered }
     }
@@ -261,7 +261,7 @@ extension ModelSelectionSheet {
 // MARK: - Model Loading Actions
 
 extension ModelSelectionSheet {
-    private func selectAndLoadModel(_ model: ModelInfo) async {
+    private func selectAndLoadModel(_ model: RAModelInfo) async {
         if let reason = unavailableReason(for: model) {
             await MainActor.run {
                 viewModel.errorMessage = reason
@@ -271,7 +271,7 @@ extension ModelSelectionSheet {
         }
 
         if model.framework != .foundationModels {
-            guard model.localPath != nil else { return }
+            guard model.localPathURL != nil else { return }
         }
 
         // RAG model selection does not pre-load into memory; just select and dismiss.
@@ -306,7 +306,7 @@ extension ModelSelectionSheet {
         }
     }
 
-    private func loadModelForContext(_ model: ModelInfo) async throws {
+    private func loadModelForContext(_ model: RAModelInfo) async throws {
         switch context {
         case .llm: try await RunAnywhere.loadModel(model.id)
         case .stt: try await RunAnywhere.loadSTTModel(model.id)
@@ -321,7 +321,7 @@ extension ModelSelectionSheet {
         }
     }
 
-    private func loadModelForVoiceContext(_ model: ModelInfo) async throws {
+    private func loadModelForVoiceContext(_ model: RAModelInfo) async throws {
         switch model.category {
         case .speechRecognition: try await RunAnywhere.loadSTTModel(model.id)
         case .speechSynthesis: try await RunAnywhere.loadTTSModel(model.id)
@@ -329,7 +329,7 @@ extension ModelSelectionSheet {
         }
     }
 
-    private func handleModelLoadSuccess(_ model: ModelInfo) async {
+    private func handleModelLoadSuccess(_ model: RAModelInfo) async {
         let isLLM = context == .llm ||
             (context == .voice && [.language, .multimodal].contains(model.category))
 

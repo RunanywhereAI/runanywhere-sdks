@@ -4,8 +4,9 @@
  *        that needs HTTP (v2 close-out Phase H, Stage 2).
  *
  * Internal C++ facade. Always routes through the registered
- * `rac_http_transport_ops_t` adapter if present, else libcurl. Used by
- * all internal commons components that need HTTP (download
+ * `rac_http_transport_ops_t` adapter; when none is registered, the
+ * underlying public HTTP calls return `RAC_ERROR_FEATURE_NOT_AVAILABLE`.
+ * Used by all internal commons components that need HTTP (download
  * orchestrator, diffusion tokenizer, JNI bridges).
  *
  * Stage 2 of the HTTP refactor generalises the pre-existing
@@ -16,8 +17,8 @@
  * request/response) or `rac::http::execute_stream` (streaming
  * download with file I/O + progress + cancel + optional SHA-256).
  *
- * Stages 3-5 of the plan eventually delete libcurl; this stage
- * preserves it as the fallback path so behaviour is unchanged.
+ * There is no portable C++ HTTP fallback in this facade. Native and
+ * Web SDK adapters execute HTTP through their platform stacks.
  *
  * NOT part of the public C ABI. C++-only header, no `extern "C"` —
  * callers outside commons keep using the stable
@@ -43,7 +44,7 @@ namespace http {
  * `rac_http_client_destroy` triple. The send path already consults
  * the platform-transport registry (`rac_http_transport_ops_t`) so
  * this facade inherits that routing for free; when no adapter is
- * registered the libcurl default runs.
+ * registered the call returns `RAC_ERROR_FEATURE_NOT_AVAILABLE`.
  *
  * On RAC_SUCCESS the response body/headers/redirected_url are owned
  * by `out_resp` — the caller MUST release them via
@@ -69,8 +70,9 @@ rac_result_t execute(const rac_http_request_t& req, rac_http_response_t& out_res
  *   - Opens the destination file (append when resuming, truncate
  *     otherwise; creates parent directories as needed).
  *   - Streams via `rac_http_request_stream` / `rac_http_request_resume`
- *     — both of which route through the platform transport vtable
- *     when registered, else fall back to libcurl.
+ *     - both of which route through the platform transport vtable and
+ *       return `RAC_ERROR_FEATURE_NOT_AVAILABLE` when the required
+ *       adapter capability is not registered.
  *   - Hashes on the wire (no second pass over the file) when a
  *     checksum is supplied.
  *   - Maps transport / filesystem errors to the

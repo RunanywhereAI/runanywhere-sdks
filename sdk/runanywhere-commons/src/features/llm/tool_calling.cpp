@@ -15,16 +15,26 @@
  * - LFM2:     <|tool_call_start|>[func(arg="val")]<|tool_call_end|> (Liquid AI models)
  */
 
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <limits>
 #include <string>
 #include <vector>
 
+#include <nlohmann/json.hpp>
+
 #include "rac/core/rac_logger.h"
 #include "rac/features/llm/rac_tool_calling.h"
+
+#if defined(RAC_HAVE_PROTOBUF)
+#include "tool_calling.pb.h"
+#endif
+
+using nlohmann::json;
 
 // =============================================================================
 // CONSTANTS - Format-specific tags
@@ -669,6 +679,42 @@ static std::string escape_json_string(const char* str) {
     return result;
 }
 
+static char* dup_owned_string(const std::string& value) {
+    char* copy = static_cast<char*>(malloc(value.size() + 1));
+    if (!copy) {
+        return nullptr;
+    }
+    memcpy(copy, value.c_str(), value.size() + 1);
+    return copy;
+}
+
+static std::string lower_ascii(std::string value) {
+    for (char& ch : value) {
+        ch = static_cast<char>(tolower(static_cast<unsigned char>(ch)));
+    }
+    return value;
+}
+
+static bool parse_json_value(const char* text, json* out_value) {
+    if (!text || !out_value) {
+        return false;
+    }
+    json parsed = json::parse(text, nullptr, false);
+    if (parsed.is_discarded()) {
+        return false;
+    }
+    *out_value = std::move(parsed);
+    return true;
+}
+
+static std::string validation_errors_to_json(const std::vector<std::string>& errors) {
+    json arr = json::array();
+    for (const auto& error : errors) {
+        arr.push_back(error);
+    }
+    return arr.dump();
+}
+
 /**
  * @brief Classify a raw scalar token as a JSON literal (number, boolean, or null).
  *
@@ -1105,29 +1151,9 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
                         if (!first_arg) {
                             json_args += ",";
                         }
-                        // Check if value is numeric (handles edge cases)
-                        bool is_numeric = !current_value.empty();
-                        bool has_dot = false;
-                        bool has_minus = false;
-                        for (size_t i = 0; i < current_value.size() && is_numeric; i++) {
-                            char vc = current_value[i];
-                            if (vc == '-') {
-                                if (i != 0 || has_minus)
-                                    is_numeric = false;
-                                has_minus = true;
-                            } else if (vc == '.') {
-                                if (has_dot)
-                                    is_numeric = false;
-                                has_dot = true;
-                            } else if (!isdigit(vc)) {
-                                is_numeric = false;
-                            }
-                        }
-                        if (current_value == "-" || current_value == ".")
-                            is_numeric = false;
-                        // Escape key always; escape value only for non-numeric strings
+                        // Escape key always; emit JSON scalars verbatim.
                         std::string escaped_key = escape_json_string(current_key.c_str());
-                        if (is_numeric) {
+                        if (is_json_scalar_literal(current_value.c_str())) {
                             json_args += "\"" + escaped_key + "\":" + current_value;
                         } else {
                             std::string escaped_val = escape_json_string(current_value.c_str());
@@ -1153,29 +1179,9 @@ static bool parse_lfm2_format(const char* llm_output, char** out_tool_name, char
             if (!first_arg) {
                 json_args += ",";
             }
-            // Check if value is numeric (handles edge cases)
-            bool is_numeric = !current_value.empty();
-            bool has_dot = false;
-            bool has_minus = false;
-            for (size_t i = 0; i < current_value.size() && is_numeric; i++) {
-                char vc = current_value[i];
-                if (vc == '-') {
-                    if (i != 0 || has_minus)
-                        is_numeric = false;
-                    has_minus = true;
-                } else if (vc == '.') {
-                    if (has_dot)
-                        is_numeric = false;
-                    has_dot = true;
-                } else if (!isdigit(vc)) {
-                    is_numeric = false;
-                }
-            }
-            if (current_value == "-" || current_value == ".")
-                is_numeric = false;
-            // Escape key always; escape value only for non-numeric strings
+            // Escape key always; emit JSON scalars verbatim.
             std::string escaped_key = escape_json_string(current_key.c_str());
-            if (is_numeric) {
+            if (is_json_scalar_literal(current_value.c_str())) {
                 json_args += "\"" + escaped_key + "\":" + current_value;
             } else {
                 std::string escaped_val = escape_json_string(current_value.c_str());
@@ -1408,6 +1414,577 @@ extern "C" rac_result_t rac_tool_call_parse_with_format(const char* llm_output,
     return RAC_SUCCESS;
 }
 
+#if defined(RAC_HAVE_PROTOBUF)
+static std::string normalize_tool_format_hint(std::string value) {
+    value = lower_ascii(std::move(value));
+    if (value.empty() || value == "auto") {
+        return "default";
+    }
+    if (value == "lfm2" || value == "lfm" || value == "liquid" ||
+        value == "pythonic" || value == "hermes") {
+        return "lfm2";
+    }
+    return "default";
+}
+
+static std::string tool_format_hint_from_proto(runanywhere::v1::ToolCallFormatName format) {
+    switch (format) {
+        case runanywhere::v1::TOOL_CALL_FORMAT_NAME_PYTHONIC:
+        case runanywhere::v1::TOOL_CALL_FORMAT_NAME_HERMES:
+            return "lfm2";
+        case runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON:
+        case runanywhere::v1::TOOL_CALL_FORMAT_NAME_XML:
+        case runanywhere::v1::TOOL_CALL_FORMAT_NAME_NATIVE:
+        case runanywhere::v1::TOOL_CALL_FORMAT_NAME_OPENAI_FUNCTIONS:
+        case runanywhere::v1::TOOL_CALL_FORMAT_NAME_UNSPECIFIED:
+        default:
+            return "default";
+    }
+}
+
+static runanywhere::v1::ToolCallFormatName tool_format_proto_from_rac(
+    rac_tool_call_format_t format) {
+    switch (format) {
+        case RAC_TOOL_FORMAT_LFM2:
+            return runanywhere::v1::TOOL_CALL_FORMAT_NAME_PYTHONIC;
+        case RAC_TOOL_FORMAT_DEFAULT:
+        default:
+            return runanywhere::v1::TOOL_CALL_FORMAT_NAME_JSON;
+    }
+}
+
+static std::string tool_parameter_type_name_from_proto(runanywhere::v1::ToolParameterType type) {
+    switch (type) {
+        case runanywhere::v1::TOOL_PARAMETER_TYPE_NUMBER:
+            return "number";
+        case runanywhere::v1::TOOL_PARAMETER_TYPE_BOOLEAN:
+            return "boolean";
+        case runanywhere::v1::TOOL_PARAMETER_TYPE_OBJECT:
+            return "object";
+        case runanywhere::v1::TOOL_PARAMETER_TYPE_ARRAY:
+            return "array";
+        case runanywhere::v1::TOOL_PARAMETER_TYPE_STRING:
+        case runanywhere::v1::TOOL_PARAMETER_TYPE_UNSPECIFIED:
+        default:
+            return "string";
+    }
+}
+
+static json tool_definition_proto_to_json(const runanywhere::v1::ToolDefinition& tool) {
+    json object = json::object();
+    object["name"] = tool.name();
+    object["description"] = tool.description();
+    object["parameters"] = json::array();
+    for (const auto& param : tool.parameters()) {
+        json param_object = json::object();
+        param_object["name"] = param.name();
+        param_object["type"] = tool_parameter_type_name_from_proto(param.type());
+        param_object["description"] = param.description();
+        param_object["required"] = param.required();
+        if (param.enum_values_size() > 0) {
+            param_object["enum_values"] = json::array();
+            for (const auto& enum_value : param.enum_values()) {
+                param_object["enum_values"].push_back(enum_value);
+            }
+        }
+        if (param.has_json_schema()) {
+            param_object["json_schema"] = param.json_schema();
+        }
+        object["parameters"].push_back(std::move(param_object));
+    }
+    if (tool.has_category()) {
+        object["category"] = tool.category();
+    }
+    if (tool.has_json_schema()) {
+        object["json_schema"] = tool.json_schema();
+    }
+    return object;
+}
+
+static std::string tool_definitions_proto_to_json(
+    const runanywhere::v1::ToolCallingOptions& options) {
+    json tools = json::array();
+    for (const auto& tool : options.tools()) {
+        tools.push_back(tool_definition_proto_to_json(tool));
+    }
+    return tools.dump();
+}
+
+struct ProtoToolCallingOptions {
+    rac_tool_calling_options_t options = RAC_TOOL_CALLING_OPTIONS_DEFAULT;
+    std::string system_prompt;
+    std::string format_hint = "default";
+    std::string tools_json = "[]";
+};
+
+static void refresh_proto_tool_calling_options(ProtoToolCallingOptions* converted) {
+    if (!converted) {
+        return;
+    }
+    converted->format_hint = normalize_tool_format_hint(converted->format_hint);
+    converted->options.format = rac_tool_call_format_from_name(converted->format_hint.c_str());
+    converted->options.system_prompt =
+        converted->system_prompt.empty() ? nullptr : converted->system_prompt.c_str();
+}
+
+static ProtoToolCallingOptions tool_calling_options_from_proto(
+    const runanywhere::v1::ToolCallingOptions& proto) {
+    ProtoToolCallingOptions converted;
+    converted.tools_json = tool_definitions_proto_to_json(proto);
+
+    if (proto.max_iterations() > 0) {
+        converted.options.max_tool_calls = proto.max_iterations();
+    }
+    if (proto.auto_execute()) {
+        converted.options.auto_execute = RAC_TRUE;
+    }
+    if (proto.has_temperature()) {
+        converted.options.temperature = proto.temperature();
+    }
+    if (proto.has_max_tokens()) {
+        converted.options.max_tokens = proto.max_tokens();
+    }
+    if (proto.has_system_prompt()) {
+        converted.system_prompt = proto.system_prompt();
+    }
+    if (proto.replace_system_prompt()) {
+        converted.options.replace_system_prompt = RAC_TRUE;
+    }
+    if (proto.keep_tools_available()) {
+        converted.options.keep_tools_available = RAC_TRUE;
+    }
+    if (!proto.format_hint().empty()) {
+        converted.format_hint = proto.format_hint();
+    }
+    if (proto.has_format()) {
+        converted.format_hint = tool_format_hint_from_proto(proto.format());
+    }
+    if (proto.has_custom_system_prompt()) {
+        converted.system_prompt = proto.custom_system_prompt();
+        converted.options.replace_system_prompt = RAC_TRUE;
+    }
+    if (proto.has_max_tool_calls() && proto.max_tool_calls() > 0) {
+        converted.options.max_tool_calls = proto.max_tool_calls();
+    }
+
+    refresh_proto_tool_calling_options(&converted);
+    return converted;
+}
+
+template <typename ProtoMessage>
+static rac_result_t copy_serialized_proto(const ProtoMessage& message,
+                                          rac_proto_buffer_t* out_result,
+                                          const char* message_name) {
+    if (!out_result) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    const size_t size = message.ByteSizeLong();
+    if (size > static_cast<size_t>(std::numeric_limits<int>::max())) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_ENCODING_ERROR,
+                                          "serialized proto exceeds supported size");
+    }
+    std::vector<uint8_t> bytes(size);
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        std::string error = "failed to serialize ";
+        error += message_name;
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_ENCODING_ERROR,
+                                          error.c_str());
+    }
+    return rac_proto_buffer_copy(bytes.empty() ? nullptr : bytes.data(), bytes.size(),
+                                 out_result);
+}
+
+static rac_result_t set_tool_parse_proto_error(rac_proto_buffer_t* out_result,
+                                               const std::string& remaining_text,
+                                               const char* error_message,
+                                               rac_result_t error_code) {
+    runanywhere::v1::ToolParseResult result;
+    result.set_has_tool_call(false);
+    result.set_remaining_text(remaining_text);
+    if (error_message) {
+        result.set_error_message(error_message);
+    }
+    result.set_error_code(static_cast<int32_t>(error_code));
+    return copy_serialized_proto(result, out_result, "ToolParseResult");
+}
+
+static rac_result_t set_tool_prompt_format_proto_error(rac_proto_buffer_t* out_result,
+                                                       const std::string& format_hint,
+                                                       const char* error_message,
+                                                       rac_result_t error_code) {
+    runanywhere::v1::ToolPromptFormatResult result;
+    result.set_format(tool_format_proto_from_rac(
+        rac_tool_call_format_from_name(format_hint.c_str())));
+    result.set_format_hint(normalize_tool_format_hint(format_hint));
+    if (error_message) {
+        result.set_error_message(error_message);
+    }
+    result.set_error_code(static_cast<int32_t>(error_code));
+    return copy_serialized_proto(result, out_result, "ToolPromptFormatResult");
+}
+
+static const runanywhere::v1::ToolDefinition* find_tool_definition_proto(
+    const runanywhere::v1::ToolCallingOptions& options,
+    const std::string& tool_name) {
+    for (const auto& tool : options.tools()) {
+        if (tool.name() == tool_name) {
+            return &tool;
+        }
+    }
+    return nullptr;
+}
+
+static rac_result_t tool_call_proto_to_rac(
+    const runanywhere::v1::ToolCallValidationRequest& request,
+    rac_tool_call_t* out_call) {
+    if (!out_call) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+
+    *out_call = {};
+    out_call->format = RAC_TOOL_FORMAT_DEFAULT;
+    if (!request.has_tool_call()) {
+        out_call->has_tool_call = RAC_FALSE;
+        return RAC_SUCCESS;
+    }
+
+    const auto& proto_call = request.tool_call();
+    out_call->has_tool_call = RAC_TRUE;
+    out_call->call_id = proto_call.created_at_ms();
+
+    out_call->tool_name = dup_owned_string(proto_call.name());
+    out_call->arguments_json =
+        dup_owned_string(proto_call.arguments_json().empty() ? "{}"
+                                                             : proto_call.arguments_json());
+    if (!out_call->tool_name || !out_call->arguments_json) {
+        rac_tool_call_free(out_call);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    if (proto_call.has_raw_text()) {
+        out_call->clean_text = dup_owned_string(proto_call.raw_text());
+        if (!out_call->clean_text) {
+            rac_tool_call_free(out_call);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+    }
+
+    return RAC_SUCCESS;
+}
+
+static void add_tool_validation_errors_from_json(
+    const char* validation_errors_json,
+    runanywhere::v1::ToolCallValidationResult* result) {
+    if (!validation_errors_json || !result) {
+        return;
+    }
+
+    json errors;
+    if (!parse_json_value(validation_errors_json, &errors) || !errors.is_array()) {
+        return;
+    }
+
+    for (const auto& error : errors) {
+        if (error.is_string()) {
+            result->add_validation_errors(error.get<std::string>());
+        }
+    }
+}
+
+static std::vector<std::string> collect_proto_tool_validation_errors(
+    const runanywhere::v1::ToolCallValidationRequest& request) {
+    std::vector<std::string> errors;
+    if (!request.has_options() || !request.has_tool_call()) {
+        return errors;
+    }
+
+    const auto& options = request.options();
+    const auto& tool_call = request.tool_call();
+    if (options.has_forced_tool_name() && !options.forced_tool_name().empty() &&
+        tool_call.name() != options.forced_tool_name()) {
+        errors.push_back("Tool call must use forced tool: " + options.forced_tool_name());
+    }
+
+    if (options.require_json_arguments()) {
+        if (tool_call.arguments_json().empty()) {
+            errors.push_back("Tool arguments JSON is required");
+        } else {
+            json args;
+            if (!parse_json_value(tool_call.arguments_json().c_str(), &args) ||
+                !args.is_object()) {
+                errors.push_back("Tool arguments must be a JSON object");
+            }
+        }
+    }
+
+    return errors;
+}
+
+static rac_result_t set_tool_validation_proto_error(rac_proto_buffer_t* out_result,
+                                                    const char* error_message,
+                                                    rac_result_t error_code) {
+    runanywhere::v1::ToolCallValidationResult result;
+    result.set_is_valid(false);
+    if (error_message) {
+        result.set_error_message(error_message);
+        result.add_validation_errors(error_message);
+    }
+    result.set_error_code(static_cast<int32_t>(error_code));
+    return copy_serialized_proto(result, out_result, "ToolCallValidationResult");
+}
+#endif
+
+extern "C" rac_result_t rac_tool_call_parse_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
+#else
+    rac_result_t validation = rac_proto_bytes_validate(request_proto_bytes, request_proto_size);
+    if (validation != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "ToolParseRequest bytes are invalid");
+    }
+
+    runanywhere::v1::ToolParseRequest request;
+    if (!request.ParseFromArray(rac_proto_bytes_data_or_empty(request_proto_bytes,
+                                                              request_proto_size),
+                                static_cast<int>(request_proto_size))) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse ToolParseRequest");
+    }
+
+    std::string format_hint;
+    if (request.has_options()) {
+        ProtoToolCallingOptions options = tool_calling_options_from_proto(request.options());
+        refresh_proto_tool_calling_options(&options);
+        format_hint = options.format_hint;
+    }
+
+    rac_tool_call_t parsed{};
+    const bool use_explicit_format = !format_hint.empty() && format_hint != "auto";
+    const rac_result_t rc = use_explicit_format
+        ? rac_tool_call_parse_with_format(request.text().c_str(),
+                                          rac_tool_call_format_from_name(format_hint.c_str()),
+                                          &parsed)
+        : rac_tool_call_parse(request.text().c_str(), &parsed);
+    if (rc != RAC_SUCCESS) {
+        rac_tool_call_free(&parsed);
+        return set_tool_parse_proto_error(out_result, request.text(),
+                                          "tool-call parsing failed", rc);
+    }
+
+    runanywhere::v1::ToolParseResult result;
+    const bool has_tool_call = parsed.has_tool_call == RAC_TRUE;
+    result.set_has_tool_call(has_tool_call);
+    result.set_remaining_text(parsed.clean_text ? parsed.clean_text : request.text());
+    if (has_tool_call) {
+        const int64_t created_at_ms =
+            parsed.call_id != 0 ? parsed.call_id : static_cast<int64_t>(std::time(nullptr)) * 1000;
+        std::string call_id = "call_";
+        call_id += std::to_string(created_at_ms);
+        auto* tool_call = result.add_tool_calls();
+        tool_call->set_id(call_id);
+        tool_call->set_name(parsed.tool_name ? parsed.tool_name : "");
+        tool_call->set_arguments_json(parsed.arguments_json ? parsed.arguments_json : "{}");
+        tool_call->set_type("function");
+        tool_call->set_call_id(call_id);
+        tool_call->set_created_at_ms(created_at_ms);
+        tool_call->set_raw_text(request.text());
+    }
+    result.set_error_code(static_cast<int32_t>(RAC_SUCCESS));
+    rac_tool_call_free(&parsed);
+    return copy_serialized_proto(result, out_result, "ToolParseResult");
+#endif
+}
+
+extern "C" rac_result_t rac_tool_call_format_prompt_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
+#else
+    rac_result_t validation = rac_proto_bytes_validate(request_proto_bytes, request_proto_size);
+    if (validation != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "ToolPromptFormatRequest bytes are invalid");
+    }
+
+    runanywhere::v1::ToolPromptFormatRequest request;
+    if (!request.ParseFromArray(rac_proto_bytes_data_or_empty(request_proto_bytes,
+                                                              request_proto_size),
+                                static_cast<int>(request_proto_size))) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse ToolPromptFormatRequest");
+    }
+
+    ProtoToolCallingOptions converted;
+    if (request.has_options()) {
+        converted = tool_calling_options_from_proto(request.options());
+        refresh_proto_tool_calling_options(&converted);
+    }
+
+    char* prompt = nullptr;
+    rac_result_t rc = RAC_SUCCESS;
+
+    if (request.tool_results_size() == 0) {
+        if (request.user_prompt().empty()) {
+            rc = rac_tool_call_format_prompt_json_with_format_name(
+                converted.tools_json.c_str(), converted.format_hint.c_str(), &prompt);
+        } else {
+            rc = rac_tool_call_build_initial_prompt(request.user_prompt().c_str(),
+                                                    converted.tools_json.c_str(),
+                                                    &converted.options, &prompt);
+        }
+    } else {
+        const auto& tool_result = request.tool_results(0);
+        std::string tools_prompt;
+        char* tools_prompt_raw = nullptr;
+        if (converted.options.keep_tools_available == RAC_TRUE) {
+            const rac_result_t tools_rc = rac_tool_call_format_prompt_json_with_format_name(
+                converted.tools_json.c_str(), converted.format_hint.c_str(), &tools_prompt_raw);
+            if (tools_rc != RAC_SUCCESS) {
+                free(tools_prompt_raw);
+                return set_tool_prompt_format_proto_error(
+                    out_result, converted.format_hint,
+                    "tool prompt formatting failed", tools_rc);
+            }
+            if (tools_prompt_raw) {
+                tools_prompt = tools_prompt_raw;
+                free(tools_prompt_raw);
+            }
+        }
+
+        std::string result_json = tool_result.result_json();
+        if (result_json.empty() && tool_result.has_error() && !tool_result.error().empty()) {
+            json error = json::object();
+            error["error"] = tool_result.error();
+            result_json = error.dump();
+        }
+        if (result_json.empty()) {
+            result_json = "{}";
+        }
+
+        rc = rac_tool_call_build_followup_prompt(
+            request.user_prompt().c_str(),
+            tools_prompt.empty() ? nullptr : tools_prompt.c_str(),
+            tool_result.name().empty() ? tool_result.tool_call_id().c_str()
+                                       : tool_result.name().c_str(),
+            result_json.c_str(), converted.options.keep_tools_available, &prompt);
+    }
+
+    if (rc != RAC_SUCCESS) {
+        free(prompt);
+        return set_tool_prompt_format_proto_error(out_result, converted.format_hint,
+                                                  "tool prompt formatting failed", rc);
+    }
+
+    runanywhere::v1::ToolPromptFormatResult result;
+    result.set_formatted_prompt(prompt ? prompt : "");
+    result.set_format(tool_format_proto_from_rac(converted.options.format));
+    result.set_format_hint(converted.format_hint);
+    result.set_error_code(static_cast<int32_t>(RAC_SUCCESS));
+    free(prompt);
+    return copy_serialized_proto(result, out_result, "ToolPromptFormatResult");
+#endif
+}
+
+extern "C" rac_result_t rac_tool_call_validate_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result) {
+    if (!out_result) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return rac_proto_buffer_set_error(out_result, RAC_ERROR_FEATURE_NOT_AVAILABLE,
+                                      "protobuf support is not available");
+#else
+    rac_result_t validation = rac_proto_bytes_validate(request_proto_bytes, request_proto_size);
+    if (validation != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "ToolCallValidationRequest bytes are invalid");
+    }
+
+    runanywhere::v1::ToolCallValidationRequest request;
+    if (!request.ParseFromArray(rac_proto_bytes_data_or_empty(request_proto_bytes,
+                                                              request_proto_size),
+                                static_cast<int>(request_proto_size))) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse ToolCallValidationRequest");
+    }
+
+    rac_tool_call_t call{};
+    rac_result_t rc = tool_call_proto_to_rac(request, &call);
+    if (rc != RAC_SUCCESS) {
+        return set_tool_validation_proto_error(out_result,
+                                               "failed to convert ToolCall to validation input",
+                                               rc);
+    }
+
+    std::string tools_json = "[]";
+    const runanywhere::v1::ToolDefinition* matched_tool = nullptr;
+    if (request.has_options()) {
+        tools_json = tool_definitions_proto_to_json(request.options());
+        if (request.has_tool_call()) {
+            matched_tool = find_tool_definition_proto(request.options(),
+                                                      request.tool_call().name());
+        }
+    }
+
+    rac_tool_call_validation_t validated{};
+    rc = rac_tool_call_validate_json(&call, tools_json.c_str(), &validated);
+    rac_tool_call_free(&call);
+    if (rc != RAC_SUCCESS) {
+        rac_tool_call_validation_free(&validated);
+        return set_tool_validation_proto_error(out_result, "tool-call validation failed", rc);
+    }
+
+    const std::vector<std::string> proto_errors =
+        collect_proto_tool_validation_errors(request);
+
+    runanywhere::v1::ToolCallValidationResult result;
+    add_tool_validation_errors_from_json(validated.validation_errors_json, &result);
+    for (const auto& error : proto_errors) {
+        result.add_validation_errors(error);
+    }
+
+    const bool is_valid = validated.is_valid == RAC_TRUE && proto_errors.empty();
+    result.set_is_valid(is_valid);
+    result.set_error_code(static_cast<int32_t>(
+        is_valid ? RAC_SUCCESS : RAC_ERROR_VALIDATION_FAILED));
+
+    if (matched_tool) {
+        result.mutable_matched_tool()->CopyFrom(*matched_tool);
+    }
+    if (validated.normalized_arguments_json) {
+        result.set_normalized_arguments_json(validated.normalized_arguments_json);
+    }
+
+    if (validated.error_message && validated.error_message[0]) {
+        result.set_error_message(validated.error_message);
+    } else if (!proto_errors.empty()) {
+        result.set_error_message(proto_errors.front());
+    }
+
+    rac_tool_call_validation_free(&validated);
+    return copy_serialized_proto(result, out_result, "ToolCallValidationResult");
+#endif
+}
+
 extern "C" void rac_tool_call_free(rac_tool_call_t* result) {
     if (!result) {
         return;
@@ -1432,6 +2009,32 @@ extern "C" void rac_tool_call_free(rac_tool_call_t* result) {
     result->call_id = 0;
 }
 
+extern "C" void rac_tool_call_validation_free(rac_tool_call_validation_t* validation) {
+    if (!validation) {
+        return;
+    }
+
+    if (validation->validation_errors_json) {
+        free(validation->validation_errors_json);
+        validation->validation_errors_json = nullptr;
+    }
+    if (validation->matched_tool_json) {
+        free(validation->matched_tool_json);
+        validation->matched_tool_json = nullptr;
+    }
+    if (validation->normalized_arguments_json) {
+        free(validation->normalized_arguments_json);
+        validation->normalized_arguments_json = nullptr;
+    }
+    if (validation->error_message) {
+        free(validation->error_message);
+        validation->error_message = nullptr;
+    }
+
+    validation->is_valid = RAC_FALSE;
+    validation->error_code = RAC_SUCCESS;
+}
+
 // =============================================================================
 // PROMPT FORMATTING
 // =============================================================================
@@ -1454,6 +2057,412 @@ static const char* get_param_type_name(rac_tool_param_type_t type) {
         default:
             return "unknown";
     }
+}
+
+static void init_tool_validation(rac_tool_call_validation_t* out_validation) {
+    out_validation->is_valid = RAC_FALSE;
+    out_validation->validation_errors_json = nullptr;
+    out_validation->matched_tool_json = nullptr;
+    out_validation->normalized_arguments_json = nullptr;
+    out_validation->error_message = nullptr;
+    out_validation->error_code = RAC_SUCCESS;
+}
+
+static bool json_value_matches_param_type(const json& value, rac_tool_param_type_t type) {
+    switch (type) {
+        case RAC_TOOL_PARAM_STRING:
+            return value.is_string();
+        case RAC_TOOL_PARAM_NUMBER:
+            return value.is_number();
+        case RAC_TOOL_PARAM_BOOLEAN:
+            return value.is_boolean();
+        case RAC_TOOL_PARAM_OBJECT:
+            return value.is_object();
+        case RAC_TOOL_PARAM_ARRAY:
+            return value.is_array();
+        default:
+            return false;
+    }
+}
+
+static std::string tool_definition_to_json_object(const rac_tool_definition_t& tool) {
+    json obj = json::object();
+    obj["name"] = tool.name ? tool.name : "";
+    obj["description"] = tool.description ? tool.description : "";
+    obj["parameters"] = json::array();
+    obj["category"] = tool.category ? tool.category : "";
+
+    if (tool.parameters) {
+        for (size_t i = 0; i < tool.num_parameters; ++i) {
+            const rac_tool_parameter_t& param = tool.parameters[i];
+            json param_obj = json::object();
+            param_obj["name"] = param.name ? param.name : "";
+            param_obj["type"] = get_param_type_name(param.type);
+            param_obj["description"] = param.description ? param.description : "";
+            param_obj["required"] = param.required != 0;
+            if (param.enum_values && param.enum_values[0]) {
+                json enum_values;
+                if (parse_json_value(param.enum_values, &enum_values) && enum_values.is_array()) {
+                    param_obj["enum_values"] = std::move(enum_values);
+                } else {
+                    param_obj["enum_values"] = json::array();
+                }
+            }
+            obj["parameters"].push_back(std::move(param_obj));
+        }
+    }
+
+    return obj.dump();
+}
+
+static bool enum_allows_value(const char* enum_values_json,
+                              const json& value,
+                              std::string* out_error) {
+    if (!enum_values_json || enum_values_json[0] == '\0') {
+        return true;
+    }
+
+    json enum_values;
+    if (!parse_json_value(enum_values_json, &enum_values) || !enum_values.is_array()) {
+        if (out_error) {
+            *out_error = "enum_values must be a JSON array";
+        }
+        return false;
+    }
+
+    for (const auto& enum_value : enum_values) {
+        if (enum_value == value) {
+            return true;
+        }
+        if (enum_value.is_string() && value.is_string() &&
+            enum_value.get<std::string>() == value.get<std::string>()) {
+            return true;
+        }
+    }
+
+    if (out_error) {
+        *out_error = "value is not in enum_values";
+    }
+    return false;
+}
+
+static rac_result_t finalize_tool_validation(rac_tool_call_validation_t* out_validation,
+                                             const std::vector<std::string>& errors,
+                                             const json* normalized_args,
+                                             const std::string* matched_tool_json) {
+    out_validation->is_valid = errors.empty() ? RAC_TRUE : RAC_FALSE;
+    out_validation->error_code = errors.empty() ? RAC_SUCCESS : RAC_ERROR_VALIDATION_FAILED;
+
+    out_validation->validation_errors_json = dup_owned_string(validation_errors_to_json(errors));
+    if (!out_validation->validation_errors_json) {
+        rac_tool_call_validation_free(out_validation);
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+
+    if (!errors.empty()) {
+        out_validation->error_message = dup_owned_string(errors.front());
+        if (!out_validation->error_message) {
+            rac_tool_call_validation_free(out_validation);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+    }
+
+    if (normalized_args) {
+        out_validation->normalized_arguments_json = dup_owned_string(normalized_args->dump());
+        if (!out_validation->normalized_arguments_json) {
+            rac_tool_call_validation_free(out_validation);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+    }
+
+    if (matched_tool_json && !matched_tool_json->empty()) {
+        out_validation->matched_tool_json = dup_owned_string(*matched_tool_json);
+        if (!out_validation->matched_tool_json) {
+            rac_tool_call_validation_free(out_validation);
+            return RAC_ERROR_OUT_OF_MEMORY;
+        }
+    }
+
+    return RAC_SUCCESS;
+}
+
+static rac_result_t parse_tool_arguments(const rac_tool_call_t* call,
+                                         json* out_args,
+                                         std::vector<std::string>* errors) {
+    if (!call->arguments_json || call->arguments_json[0] == '\0') {
+        *out_args = json::object();
+        return RAC_SUCCESS;
+    }
+
+    json args;
+    if (!parse_json_value(call->arguments_json, &args)) {
+        errors->push_back("Tool arguments are not valid JSON");
+        *out_args = json::object();
+        return RAC_SUCCESS;
+    }
+
+    if (!args.is_object()) {
+        errors->push_back("Tool arguments must be a JSON object");
+        *out_args = json::object();
+        return RAC_SUCCESS;
+    }
+
+    *out_args = std::move(args);
+    return RAC_SUCCESS;
+}
+
+extern "C" rac_result_t rac_tool_call_validate(const rac_tool_call_t* call,
+                                               const rac_tool_definition_t* definitions,
+                                               size_t num_definitions,
+                                               rac_tool_call_validation_t* out_validation) {
+    if (!call || !out_validation) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    init_tool_validation(out_validation);
+
+    std::vector<std::string> errors;
+    json args = json::object();
+    std::string matched_tool_json;
+
+    if (call->has_tool_call == RAC_FALSE) {
+        errors.push_back("No tool call was parsed");
+        return finalize_tool_validation(out_validation, errors, &args, nullptr);
+    }
+
+    if (!call->tool_name || call->tool_name[0] == '\0') {
+        errors.push_back("Tool call is missing a tool name");
+        return finalize_tool_validation(out_validation, errors, &args, nullptr);
+    }
+
+    parse_tool_arguments(call, &args, &errors);
+
+    const rac_tool_definition_t* matched = nullptr;
+    if (definitions && num_definitions > 0) {
+        for (size_t i = 0; i < num_definitions; ++i) {
+            if (definitions[i].name && strcmp(definitions[i].name, call->tool_name) == 0) {
+                matched = &definitions[i];
+                break;
+            }
+        }
+    }
+
+    if (!matched) {
+        errors.push_back(std::string("Unknown tool: ") + call->tool_name);
+        return finalize_tool_validation(out_validation, errors, &args, nullptr);
+    }
+
+    matched_tool_json = tool_definition_to_json_object(*matched);
+
+    if (matched->parameters) {
+        for (size_t i = 0; i < matched->num_parameters; ++i) {
+            const rac_tool_parameter_t& param = matched->parameters[i];
+            const char* param_name = param.name ? param.name : "";
+            const bool has_value = !param_name[0] ? false : args.contains(param_name);
+
+            if (param.required && !has_value) {
+                errors.push_back(std::string("Missing required argument: ") + param_name);
+                continue;
+            }
+
+            if (!has_value) {
+                continue;
+            }
+
+            const json& value = args[param_name];
+            if (!json_value_matches_param_type(value, param.type)) {
+                errors.push_back(std::string("Argument '") + param_name + "' must be " +
+                                 get_param_type_name(param.type));
+                continue;
+            }
+
+            std::string enum_error;
+            if (!enum_allows_value(param.enum_values, value, &enum_error)) {
+                errors.push_back(std::string("Argument '") + param_name + "' " + enum_error);
+            }
+        }
+    }
+
+    return finalize_tool_validation(out_validation, errors, &args, &matched_tool_json);
+}
+
+static rac_tool_param_type_t tool_param_type_from_json(const json& value) {
+    if (value.is_number_integer()) {
+        const int type = value.get<int>();
+        switch (type) {
+            case 0:
+                return RAC_TOOL_PARAM_STRING;
+            case 1:
+                return RAC_TOOL_PARAM_STRING;
+            case 2:
+                return RAC_TOOL_PARAM_NUMBER;
+            case 3:
+                return RAC_TOOL_PARAM_BOOLEAN;
+            case 4:
+                return RAC_TOOL_PARAM_OBJECT;
+            case 5:
+                return RAC_TOOL_PARAM_ARRAY;
+            default:
+                return RAC_TOOL_PARAM_STRING;
+        }
+    }
+
+    if (!value.is_string()) {
+        return RAC_TOOL_PARAM_STRING;
+    }
+
+    const std::string type = lower_ascii(value.get<std::string>());
+    if (type == "number" || type == "integer" || type == "tool_parameter_type_number") {
+        return RAC_TOOL_PARAM_NUMBER;
+    }
+    if (type == "boolean" || type == "bool" || type == "tool_parameter_type_boolean") {
+        return RAC_TOOL_PARAM_BOOLEAN;
+    }
+    if (type == "object" || type == "tool_parameter_type_object") {
+        return RAC_TOOL_PARAM_OBJECT;
+    }
+    if (type == "array" || type == "tool_parameter_type_array") {
+        return RAC_TOOL_PARAM_ARRAY;
+    }
+    return RAC_TOOL_PARAM_STRING;
+}
+
+static bool json_enum_allows_value(const json& enum_values,
+                                   const json& value,
+                                   std::string* out_error) {
+    if (enum_values.is_null()) {
+        return true;
+    }
+
+    json values = enum_values;
+    if (enum_values.is_string()) {
+        json parsed = json::parse(enum_values.get<std::string>(), nullptr, false);
+        if (!parsed.is_discarded()) {
+            values = std::move(parsed);
+        }
+    }
+
+    if (!values.is_array()) {
+        if (out_error) {
+            *out_error = "enum_values must be a JSON array";
+        }
+        return false;
+    }
+
+    for (const auto& enum_value : values) {
+        if (enum_value == value) {
+            return true;
+        }
+    }
+
+    if (out_error) {
+        *out_error = "value is not in enum_values";
+    }
+    return false;
+}
+
+extern "C" rac_result_t rac_tool_call_validate_json(const rac_tool_call_t* call,
+                                                   const char* tools_json,
+                                                   rac_tool_call_validation_t* out_validation) {
+    if (!call || !out_validation) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+
+    init_tool_validation(out_validation);
+
+    std::vector<std::string> errors;
+    json args = json::object();
+    std::string matched_tool_json;
+
+    if (call->has_tool_call == RAC_FALSE) {
+        errors.push_back("No tool call was parsed");
+        return finalize_tool_validation(out_validation, errors, &args, nullptr);
+    }
+
+    if (!call->tool_name || call->tool_name[0] == '\0') {
+        errors.push_back("Tool call is missing a tool name");
+        return finalize_tool_validation(out_validation, errors, &args, nullptr);
+    }
+
+    parse_tool_arguments(call, &args, &errors);
+
+    json tools;
+    if (!tools_json || !parse_json_value(tools_json, &tools)) {
+        errors.push_back("Tool definitions JSON is invalid");
+        return finalize_tool_validation(out_validation, errors, &args, nullptr);
+    }
+
+    if (!tools.is_array()) {
+        errors.push_back("Tool definitions JSON must be an array");
+        return finalize_tool_validation(out_validation, errors, &args, nullptr);
+    }
+
+    const json* matched = nullptr;
+    for (const auto& tool : tools) {
+        if (!tool.is_object()) {
+            continue;
+        }
+        auto name_it = tool.find("name");
+        if (name_it != tool.end() && name_it->is_string() &&
+            name_it->get<std::string>() == call->tool_name) {
+            matched = &tool;
+            break;
+        }
+    }
+
+    if (!matched) {
+        errors.push_back(std::string("Unknown tool: ") + call->tool_name);
+        return finalize_tool_validation(out_validation, errors, &args, nullptr);
+    }
+
+    matched_tool_json = matched->dump();
+
+    auto params_it = matched->find("parameters");
+    if (params_it != matched->end() && params_it->is_array()) {
+        for (const auto& param : *params_it) {
+            if (!param.is_object()) {
+                continue;
+            }
+
+            const std::string param_name =
+                param.value("name", std::string());
+            if (param_name.empty()) {
+                continue;
+            }
+
+            const bool required = param.value("required", false);
+            const bool has_value = args.contains(param_name);
+
+            if (required && !has_value) {
+                errors.push_back("Missing required argument: " + param_name);
+                continue;
+            }
+
+            if (!has_value) {
+                continue;
+            }
+
+            const rac_tool_param_type_t type =
+                param.contains("type") ? tool_param_type_from_json(param["type"])
+                                       : RAC_TOOL_PARAM_STRING;
+            const json& value = args[param_name];
+
+            if (!json_value_matches_param_type(value, type)) {
+                errors.push_back("Argument '" + param_name + "' must be " +
+                                 get_param_type_name(type));
+                continue;
+            }
+
+            if (param.contains("enum_values")) {
+                std::string enum_error;
+                if (!json_enum_allows_value(param["enum_values"], value, &enum_error)) {
+                    errors.push_back("Argument '" + param_name + "' " + enum_error);
+                }
+            }
+        }
+    }
+
+    return finalize_tool_validation(out_validation, errors, &args, &matched_tool_json);
 }
 
 /**
@@ -1623,6 +2632,10 @@ rac_tool_call_format_prompt_with_format(const rac_tool_definition_t* definitions
                 }
                 prompt += "): ";
                 prompt += param.description ? param.description : "";
+                if (param.enum_values && param.enum_values[0]) {
+                    prompt += " Allowed values: ";
+                    prompt += param.enum_values;
+                }
                 prompt += "\n";
             }
         }
@@ -1884,6 +2897,16 @@ extern "C" rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definit
                 json += "\",";
                 json += "\"required\":";
                 json += param.required ? "true" : "false";
+                if (param.enum_values && param.enum_values[0]) {
+                    nlohmann::json enum_values;
+                    json += ",\"enum_values\":";
+                    if (parse_json_value(param.enum_values, &enum_values) &&
+                        enum_values.is_array()) {
+                        json += enum_values.dump();
+                    } else {
+                        json += "[]";
+                    }
+                }
                 json += "}";
             }
         }

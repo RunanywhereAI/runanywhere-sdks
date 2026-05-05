@@ -55,6 +55,31 @@ public class StorageDeleteResult(
     schemaIndex = 5,
   )
   public val error_message: String = "",
+  skipped_model_ids: List<String> = emptyList(),
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "dryRun",
+    schemaIndex = 7,
+  )
+  public val dry_run: Boolean = false,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "registryUpdated",
+    schemaIndex = 8,
+  )
+  public val registry_updated: Boolean = false,
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "filesDeleted",
+    schemaIndex = 9,
+  )
+  public val files_deleted: Boolean = false,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<StorageDeleteResult, Nothing>(ADAPTER, unknownFields) {
   @field:WireField(
@@ -84,6 +109,16 @@ public class StorageDeleteResult(
   )
   public val warnings: List<String> = immutableCopyOf("warnings", warnings)
 
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    jsonName = "skippedModelIds",
+    schemaIndex = 6,
+  )
+  public val skipped_model_ids: List<String> = immutableCopyOf("skipped_model_ids",
+      skipped_model_ids)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -101,6 +136,10 @@ public class StorageDeleteResult(
     if (failed_model_ids != other.failed_model_ids) return false
     if (warnings != other.warnings) return false
     if (error_message != other.error_message) return false
+    if (skipped_model_ids != other.skipped_model_ids) return false
+    if (dry_run != other.dry_run) return false
+    if (registry_updated != other.registry_updated) return false
+    if (files_deleted != other.files_deleted) return false
     return true
   }
 
@@ -114,6 +153,10 @@ public class StorageDeleteResult(
       result = result * 37 + failed_model_ids.hashCode()
       result = result * 37 + warnings.hashCode()
       result = result * 37 + error_message.hashCode()
+      result = result * 37 + skipped_model_ids.hashCode()
+      result = result * 37 + dry_run.hashCode()
+      result = result * 37 + registry_updated.hashCode()
+      result = result * 37 + files_deleted.hashCode()
       super.hashCode = result
     }
     return result
@@ -129,6 +172,11 @@ public class StorageDeleteResult(
         """failed_model_ids=${sanitize(failed_model_ids)}"""
     if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
     result += """error_message=${sanitize(error_message)}"""
+    if (skipped_model_ids.isNotEmpty()) result +=
+        """skipped_model_ids=${sanitize(skipped_model_ids)}"""
+    result += """dry_run=$dry_run"""
+    result += """registry_updated=$registry_updated"""
+    result += """files_deleted=$files_deleted"""
     return result.joinToString(prefix = "StorageDeleteResult{", separator = ", ", postfix = "}")
   }
 
@@ -139,9 +187,14 @@ public class StorageDeleteResult(
     failed_model_ids: List<String> = this.failed_model_ids,
     warnings: List<String> = this.warnings,
     error_message: String = this.error_message,
+    skipped_model_ids: List<String> = this.skipped_model_ids,
+    dry_run: Boolean = this.dry_run,
+    registry_updated: Boolean = this.registry_updated,
+    files_deleted: Boolean = this.files_deleted,
     unknownFields: ByteString = this.unknownFields,
   ): StorageDeleteResult = StorageDeleteResult(success, deleted_bytes, deleted_model_ids,
-      failed_model_ids, warnings, error_message, unknownFields)
+      failed_model_ids, warnings, error_message, skipped_model_ids, dry_run, registry_updated,
+      files_deleted, unknownFields)
 
   public companion object {
     @JvmField
@@ -164,6 +217,12 @@ public class StorageDeleteResult(
         size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(5, value.warnings)
         if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(6,
             value.error_message)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(7, value.skipped_model_ids)
+        if (value.dry_run != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(8, value.dry_run)
+        if (value.registry_updated != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(9,
+            value.registry_updated)
+        if (value.files_deleted != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(10,
+            value.files_deleted)
         return size
       }
 
@@ -176,11 +235,23 @@ public class StorageDeleteResult(
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.warnings)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
             value.error_message)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 7, value.skipped_model_ids)
+        if (value.dry_run != false) ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.dry_run)
+        if (value.registry_updated != false) ProtoAdapter.BOOL.encodeWithTag(writer, 9,
+            value.registry_updated)
+        if (value.files_deleted != false) ProtoAdapter.BOOL.encodeWithTag(writer, 10,
+            value.files_deleted)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: StorageDeleteResult) {
         writer.writeBytes(value.unknownFields)
+        if (value.files_deleted != false) ProtoAdapter.BOOL.encodeWithTag(writer, 10,
+            value.files_deleted)
+        if (value.registry_updated != false) ProtoAdapter.BOOL.encodeWithTag(writer, 9,
+            value.registry_updated)
+        if (value.dry_run != false) ProtoAdapter.BOOL.encodeWithTag(writer, 8, value.dry_run)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 7, value.skipped_model_ids)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 6,
             value.error_message)
         ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 5, value.warnings)
@@ -198,6 +269,10 @@ public class StorageDeleteResult(
         val failed_model_ids = mutableListOf<String>()
         val warnings = mutableListOf<String>()
         var error_message: String = ""
+        val skipped_model_ids = mutableListOf<String>()
+        var dry_run: Boolean = false
+        var registry_updated: Boolean = false
+        var files_deleted: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> success = ProtoAdapter.BOOL.decode(reader)
@@ -206,6 +281,10 @@ public class StorageDeleteResult(
             4 -> failed_model_ids.add(ProtoAdapter.STRING.decode(reader))
             5 -> warnings.add(ProtoAdapter.STRING.decode(reader))
             6 -> error_message = ProtoAdapter.STRING.decode(reader)
+            7 -> skipped_model_ids.add(ProtoAdapter.STRING.decode(reader))
+            8 -> dry_run = ProtoAdapter.BOOL.decode(reader)
+            9 -> registry_updated = ProtoAdapter.BOOL.decode(reader)
+            10 -> files_deleted = ProtoAdapter.BOOL.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -216,6 +295,10 @@ public class StorageDeleteResult(
           failed_model_ids = failed_model_ids,
           warnings = warnings,
           error_message = error_message,
+          skipped_model_ids = skipped_model_ids,
+          dry_run = dry_run,
+          registry_updated = registry_updated,
+          files_deleted = files_deleted,
           unknownFields = unknownFields
         )
       }

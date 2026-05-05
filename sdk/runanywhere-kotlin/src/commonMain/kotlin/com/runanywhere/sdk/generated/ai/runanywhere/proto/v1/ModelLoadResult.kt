@@ -13,6 +13,8 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
+import com.squareup.wire.`internal`.immutableCopyOf
+import com.squareup.wire.`internal`.redactElements
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -24,6 +26,7 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
+import kotlin.collections.List
 import okio.ByteString
 
 public class ModelLoadResult(
@@ -80,8 +83,41 @@ public class ModelLoadResult(
     schemaIndex = 6,
   )
   public val error_message: String = "",
+  warnings: List<String> = emptyList(),
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "alreadyLoaded",
+    schemaIndex = 8,
+  )
+  public val already_loaded: Boolean = false,
+  resolved_artifacts: List<ModelFileDescriptor> = emptyList(),
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelLoadResult, Nothing>(ADAPTER, unknownFields) {
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    label = WireField.Label.REPEATED,
+    schemaIndex = 7,
+  )
+  public val warnings: List<String> = immutableCopyOf("warnings", warnings)
+
+  /**
+   * Concrete artifacts selected by C++ model path resolution. The primary
+   * model entry mirrors resolved_path; companion entries carry explicit
+   * ModelFileRole values such as MODEL_FILE_ROLE_VISION_PROJECTOR.
+   */
+  @field:WireField(
+    tag = 10,
+    adapter = "ai.runanywhere.proto.v1.ModelFileDescriptor#ADAPTER",
+    label = WireField.Label.REPEATED,
+    jsonName = "resolvedArtifacts",
+    schemaIndex = 9,
+  )
+  public val resolved_artifacts: List<ModelFileDescriptor> = immutableCopyOf("resolved_artifacts",
+      resolved_artifacts)
+
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -100,6 +136,9 @@ public class ModelLoadResult(
     if (resolved_path != other.resolved_path) return false
     if (loaded_at_unix_ms != other.loaded_at_unix_ms) return false
     if (error_message != other.error_message) return false
+    if (warnings != other.warnings) return false
+    if (already_loaded != other.already_loaded) return false
+    if (resolved_artifacts != other.resolved_artifacts) return false
     return true
   }
 
@@ -114,6 +153,9 @@ public class ModelLoadResult(
       result = result * 37 + resolved_path.hashCode()
       result = result * 37 + loaded_at_unix_ms.hashCode()
       result = result * 37 + error_message.hashCode()
+      result = result * 37 + warnings.hashCode()
+      result = result * 37 + already_loaded.hashCode()
+      result = result * 37 + resolved_artifacts.hashCode()
       super.hashCode = result
     }
     return result
@@ -128,6 +170,9 @@ public class ModelLoadResult(
     result += """resolved_path=${sanitize(resolved_path)}"""
     result += """loaded_at_unix_ms=$loaded_at_unix_ms"""
     result += """error_message=${sanitize(error_message)}"""
+    if (warnings.isNotEmpty()) result += """warnings=${sanitize(warnings)}"""
+    result += """already_loaded=$already_loaded"""
+    if (resolved_artifacts.isNotEmpty()) result += """resolved_artifacts=$resolved_artifacts"""
     return result.joinToString(prefix = "ModelLoadResult{", separator = ", ", postfix = "}")
   }
 
@@ -139,9 +184,12 @@ public class ModelLoadResult(
     resolved_path: String = this.resolved_path,
     loaded_at_unix_ms: Long = this.loaded_at_unix_ms,
     error_message: String = this.error_message,
+    warnings: List<String> = this.warnings,
+    already_loaded: Boolean = this.already_loaded,
+    resolved_artifacts: List<ModelFileDescriptor> = this.resolved_artifacts,
     unknownFields: ByteString = this.unknownFields,
   ): ModelLoadResult = ModelLoadResult(success, model_id, category, framework, resolved_path,
-      loaded_at_unix_ms, error_message, unknownFields)
+      loaded_at_unix_ms, error_message, warnings, already_loaded, resolved_artifacts, unknownFields)
 
   public companion object {
     @JvmField
@@ -167,6 +215,11 @@ public class ModelLoadResult(
             value.loaded_at_unix_ms)
         if (value.error_message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(7,
             value.error_message)
+        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(8, value.warnings)
+        if (value.already_loaded != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(9,
+            value.already_loaded)
+        size += ModelFileDescriptor.ADAPTER.asRepeated().encodedSizeWithTag(10,
+            value.resolved_artifacts)
         return size
       }
 
@@ -183,11 +236,19 @@ public class ModelLoadResult(
             value.loaded_at_unix_ms)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 7,
             value.error_message)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
+        if (value.already_loaded != false) ProtoAdapter.BOOL.encodeWithTag(writer, 9,
+            value.already_loaded)
+        ModelFileDescriptor.ADAPTER.asRepeated().encodeWithTag(writer, 10, value.resolved_artifacts)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelLoadResult) {
         writer.writeBytes(value.unknownFields)
+        ModelFileDescriptor.ADAPTER.asRepeated().encodeWithTag(writer, 10, value.resolved_artifacts)
+        if (value.already_loaded != false) ProtoAdapter.BOOL.encodeWithTag(writer, 9,
+            value.already_loaded)
+        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 8, value.warnings)
         if (value.error_message != "") ProtoAdapter.STRING.encodeWithTag(writer, 7,
             value.error_message)
         if (value.loaded_at_unix_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 6,
@@ -210,6 +271,9 @@ public class ModelLoadResult(
         var resolved_path: String = ""
         var loaded_at_unix_ms: Long = 0L
         var error_message: String = ""
+        val warnings = mutableListOf<String>()
+        var already_loaded: Boolean = false
+        val resolved_artifacts = mutableListOf<ModelFileDescriptor>()
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> success = ProtoAdapter.BOOL.decode(reader)
@@ -227,6 +291,9 @@ public class ModelLoadResult(
             5 -> resolved_path = ProtoAdapter.STRING.decode(reader)
             6 -> loaded_at_unix_ms = ProtoAdapter.INT64.decode(reader)
             7 -> error_message = ProtoAdapter.STRING.decode(reader)
+            8 -> warnings.add(ProtoAdapter.STRING.decode(reader))
+            9 -> already_loaded = ProtoAdapter.BOOL.decode(reader)
+            10 -> resolved_artifacts.add(ModelFileDescriptor.ADAPTER.decode(reader))
             else -> reader.readUnknownField(tag)
           }
         }
@@ -238,11 +305,15 @@ public class ModelLoadResult(
           resolved_path = resolved_path,
           loaded_at_unix_ms = loaded_at_unix_ms,
           error_message = error_message,
+          warnings = warnings,
+          already_loaded = already_loaded,
+          resolved_artifacts = resolved_artifacts,
           unknownFields = unknownFields
         )
       }
 
       override fun redact(`value`: ModelLoadResult): ModelLoadResult = value.copy(
+        resolved_artifacts = value.resolved_artifacts.redactElements(ModelFileDescriptor.ADAPTER),
         unknownFields = ByteString.EMPTY
       )
     }

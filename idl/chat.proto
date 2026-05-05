@@ -16,6 +16,7 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "tool_calling.proto";
+import "llm_options.proto";
 
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
@@ -37,6 +38,31 @@ enum MessageRole {
     // Tool-result messages injected back into the conversation after a
     // tool call has been executed. Required for OpenAI-style tool flows.
     MESSAGE_ROLE_TOOL        = 4;
+    MESSAGE_ROLE_DEVELOPER   = 5;
+}
+
+enum ChatMessageStatus {
+    CHAT_MESSAGE_STATUS_UNSPECIFIED = 0;
+    CHAT_MESSAGE_STATUS_PENDING     = 1;
+    CHAT_MESSAGE_STATUS_STREAMING   = 2;
+    CHAT_MESSAGE_STATUS_COMPLETE    = 3;
+    CHAT_MESSAGE_STATUS_FAILED      = 4;
+    CHAT_MESSAGE_STATUS_CANCELLED   = 5;
+}
+
+message ChatAttachment {
+    string id = 1;
+    string media_type = 2;   // MIME type or SDK-known media class.
+
+    oneof source {
+        bytes  data = 3;
+        string uri = 4;
+        string adapter_handle = 5;
+    }
+
+    optional string name = 6;
+    int64 size_bytes = 7;
+    map<string, string> metadata = 8;
 }
 
 // ---------------------------------------------------------------------------
@@ -78,4 +104,66 @@ message ChatMessage {
 
     // Typed tool result carried by role == MESSAGE_ROLE_TOOL messages.
     optional ToolResult tool_result = 9;
+
+    // Optional threading and delivery metadata.
+    optional string parent_id = 10;
+    ChatMessageStatus status = 11;
+    optional string error_message = 12;
+    map<string, string> metadata = 13;
+
+    // Opaque attachments normalized by platform adapters. Capture, picker,
+    // and permission flows remain native/Web-owned.
+    repeated ChatAttachment attachments = 14;
+}
+
+message ChatGenerationRequest {
+    string request_id = 1;
+    string conversation_id = 2;
+    repeated ChatMessage messages = 3;
+    optional LLMGenerationOptions options = 4;
+    optional ToolCallingOptions tool_calling = 5;
+    map<string, string> metadata = 6;
+}
+
+message ChatGenerationResult {
+    string conversation_id = 1;
+    ChatMessage message = 2;
+    optional LLMGenerationResult generation = 3;
+    repeated ToolCall tool_calls = 4;
+    repeated ToolResult tool_results = 5;
+    optional string error_message = 6;
+    int32 error_code = 7;
+}
+
+enum ChatStreamEventKind {
+    CHAT_STREAM_EVENT_KIND_UNSPECIFIED = 0;
+    CHAT_STREAM_EVENT_KIND_MESSAGE_STARTED = 1;
+    CHAT_STREAM_EVENT_KIND_TOKEN = 2;
+    CHAT_STREAM_EVENT_KIND_TOOL_CALL = 3;
+    CHAT_STREAM_EVENT_KIND_TOOL_RESULT = 4;
+    CHAT_STREAM_EVENT_KIND_MESSAGE_COMPLETED = 5;
+    CHAT_STREAM_EVENT_KIND_ERROR = 6;
+}
+
+message ChatStreamEvent {
+    uint64 seq = 1;
+    int64 timestamp_us = 2;
+    string request_id = 3;
+    string conversation_id = 4;
+    ChatStreamEventKind kind = 5;
+    optional string token = 6;
+    optional ChatMessage message = 7;
+    optional ToolCall tool_call = 8;
+    optional ToolResult tool_result = 9;
+    optional LLMGenerationResult final_result = 10;
+    optional string error_message = 11;
+    int32 error_code = 12;
+}
+
+message ChatConversationState {
+    string conversation_id = 1;
+    repeated ChatMessage messages = 2;
+    int64 created_at_ms = 3;
+    int64 updated_at_ms = 4;
+    map<string, string> metadata = 5;
 }

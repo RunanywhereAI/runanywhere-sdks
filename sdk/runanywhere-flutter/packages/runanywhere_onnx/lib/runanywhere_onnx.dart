@@ -35,4 +35,3 @@
 library runanywhere_onnx;
 
 export 'onnx.dart';
-export 'onnx_download_strategy.dart';

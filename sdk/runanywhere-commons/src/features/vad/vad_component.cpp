@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
@@ -99,18 +100,20 @@ namespace {
 
 #if defined(RAC_HAVE_PROTOBUF)
 
-struct ProtoActivitySlot {
-    rac_vad_proto_activity_callback_fn callback{nullptr};
+struct ProtoStreamSlot {
+    rac_vad_proto_stream_event_callback_fn callback{nullptr};
     void* user_data{nullptr};
+    std::string request_id;
+    uint64_t next_seq{1};
 };
 
-std::mutex& proto_activity_mutex() {
+std::mutex& proto_stream_mutex() {
     static std::mutex mutex;
     return mutex;
 }
 
-std::unordered_map<rac_handle_t, ProtoActivitySlot>& proto_activity_slots() {
-    static std::unordered_map<rac_handle_t, ProtoActivitySlot> slots;
+std::unordered_map<rac_handle_t, ProtoStreamSlot>& proto_stream_slots() {
+    static std::unordered_map<rac_handle_t, ProtoStreamSlot> slots;
     return slots;
 }
 
@@ -163,6 +166,52 @@ runanywhere::v1::SpeechActivityKind speech_activity_kind(rac_speech_activity_t a
     }
 }
 
+int64_t current_time_us() {
+    return rac_get_current_time_ms() * 1000;
+}
+
+std::string make_vad_request_id(rac_handle_t handle) {
+    const auto handle_bits = reinterpret_cast<uintptr_t>(handle);
+    return "vad-" + std::to_string(handle_bits) + "-" + std::to_string(rac_get_current_time_ms());
+}
+
+bool validate_vad_stream_event(const runanywhere::v1::VADStreamEvent& event) {
+    if (event.seq() == 0 || event.timestamp_us() <= 0 || event.request_id().empty()) {
+        return false;
+    }
+
+    switch (event.kind()) {
+        case runanywhere::v1::VAD_STREAM_EVENT_KIND_STARTED:
+        case runanywhere::v1::VAD_STREAM_EVENT_KIND_STOPPED:
+            return true;
+        case runanywhere::v1::VAD_STREAM_EVENT_KIND_FRAME:
+            return event.has_result();
+        case runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY:
+            return event.has_activity();
+        case runanywhere::v1::VAD_STREAM_EVENT_KIND_STATISTICS:
+            return event.has_statistics();
+        case runanywhere::v1::VAD_STREAM_EVENT_KIND_ERROR:
+            return event.error_code() != RAC_SUCCESS || event.has_error_message();
+        default:
+            return false;
+    }
+}
+
+void emit_vad_stream_event(const runanywhere::v1::VADStreamEvent& event,
+                           rac_vad_proto_stream_event_callback_fn callback,
+                           void* user_data) {
+    if (!callback || !validate_vad_stream_event(event)) {
+        return;
+    }
+
+    const size_t size = event.ByteSizeLong();
+    std::vector<uint8_t> bytes(size);
+    if (size == 0 ||
+        event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+        callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), user_data);
+    }
+}
+
 void publish_vad_pipeline_event(bool is_speech,
                                 float confidence,
                                 float energy,
@@ -203,6 +252,8 @@ void publish_vad_pipeline_event(bool is_speech,
     sdk_event.set_severity(error_code == RAC_SUCCESS ? runanywhere::v1::EVENT_SEVERITY_INFO
                                                      : runanywhere::v1::EVENT_SEVERITY_ERROR);
     sdk_event.set_destination(runanywhere::v1::EVENT_DESTINATION_ALL);
+    sdk_event.set_source("cpp");
+    sdk_event.set_operation_id("vad.process");
     sdk_event.mutable_voice_pipeline()->CopyFrom(voice_event);
     const size_t size = sdk_event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
@@ -214,30 +265,32 @@ void publish_vad_pipeline_event(bool is_speech,
 
 void proto_activity_trampoline(rac_speech_activity_t activity, void* user_data) {
     const rac_handle_t handle = reinterpret_cast<rac_handle_t>(user_data);
-    ProtoActivitySlot slot;
+    ProtoStreamSlot slot;
+    uint64_t seq = 0;
     {
-        std::lock_guard<std::mutex> lock(proto_activity_mutex());
-        auto it = proto_activity_slots().find(handle);
-        if (it == proto_activity_slots().end() || !it->second.callback) {
+        std::lock_guard<std::mutex> lock(proto_stream_mutex());
+        auto it = proto_stream_slots().find(handle);
+        if (it == proto_stream_slots().end() || !it->second.callback) {
             return;
         }
         slot = it->second;
+        seq = it->second.next_seq++;
     }
 
-    runanywhere::v1::SpeechActivityEvent event;
-    event.set_event_type(speech_activity_kind(activity));
-    event.set_timestamp_ms(rac_get_current_time_ms());
-    const size_t size = event.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size == 0 ||
-        event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
-        slot.callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), slot.user_data);
-    }
+    runanywhere::v1::VADStreamEvent event;
+    event.set_seq(seq);
+    event.set_timestamp_us(current_time_us());
+    event.set_request_id(slot.request_id);
+    event.set_kind(runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY);
+    auto* payload = event.mutable_activity();
+    payload->set_event_type(speech_activity_kind(activity));
+    payload->set_timestamp_ms(rac_get_current_time_ms());
+    emit_vad_stream_event(event, slot.callback, slot.user_data);
 }
 
 void clear_proto_activity_slot(rac_handle_t handle) {
-    std::lock_guard<std::mutex> lock(proto_activity_mutex());
-    proto_activity_slots().erase(handle);
+    std::lock_guard<std::mutex> lock(proto_stream_mutex());
+    proto_stream_slots().erase(handle);
 }
 
 #endif  // RAC_HAVE_PROTOBUF
@@ -1038,7 +1091,7 @@ extern "C" rac_result_t rac_vad_component_get_statistics_proto(
 
 extern "C" rac_result_t rac_vad_component_set_activity_proto_callback(
     rac_handle_t handle,
-    rac_vad_proto_activity_callback_fn callback,
+    rac_vad_proto_stream_event_callback_fn callback,
     void* user_data) {
 #if !defined(RAC_HAVE_PROTOBUF)
     (void)handle;
@@ -1056,8 +1109,9 @@ extern "C" rac_result_t rac_vad_component_set_activity_proto_callback(
     }
 
     {
-        std::lock_guard<std::mutex> lock(proto_activity_mutex());
-        proto_activity_slots()[handle] = ProtoActivitySlot{callback, user_data};
+        std::lock_guard<std::mutex> lock(proto_stream_mutex());
+        proto_stream_slots()[handle] =
+            ProtoStreamSlot{callback, user_data, make_vad_request_id(handle), 1};
     }
     return rac_vad_component_set_activity_callback(handle, proto_activity_trampoline, handle);
 #endif

@@ -12,6 +12,11 @@
  * since audioLengthMs = 0 when audio is processed in chunks of unknown total length.
  *
  * Swift Source: Sources/RunAnywhere/Features/STT/Analytics/STTAnalyticsService.swift
+ *
+ * Classification (see docs/CPP_PROTO_OWNERSHIP.md): `internal`.
+ * Telemetry/analytics implementation owned by commons; SDK-facing
+ * STT progress crosses via runanywhere.v1.SDKEvent / STTStreamEvent
+ * bytes.
  */
 
 #ifndef RAC_STT_ANALYTICS_H

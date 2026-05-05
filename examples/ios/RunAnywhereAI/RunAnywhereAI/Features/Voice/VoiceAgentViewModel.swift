@@ -166,11 +166,9 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // MARK: - Private State
 
-    // v3.1: migrated off the deprecated VoiceSessionHandle to
-    // `RunAnywhere.streamVoiceAgent()` — the public proto-stream surface.
-    // The SDK wraps the raw C handle internally; we just consume
-    // `RAVoiceEvent`s and switch on `event.payload` in
-    // `handleProtoEvent(_:)` below.
+    // Voice uses `RunAnywhere.streamVoiceAgent()`, the public proto-stream
+    // surface. The SDK wraps the raw C handle internally; this view model
+    // consumes `RAVoiceEvent`s and switches on `event.payload`.
     private var eventTask: Task<Void, Never>?
 
     // MARK: - Initialization State (for idempotency)
@@ -271,34 +269,32 @@ final class VoiceAgentViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
-    private func handleSDKEvent(_ event: any SDKEvent) {
-        // Events now come from C++ via generic BridgedEvent
-        // Handle by event type string and category
-        switch event.category {
-        case .llm:
+    private func handleSDKEvent(_ event: RASDKEvent) {
+        switch (event.category, event.component) {
+        case (.llm, _), (_, .llm):
             handleLLMEvent(event)
-        case .stt:
+        case (.stt, _), (_, .stt):
             handleSTTEvent(event)
-        case .tts:
+        case (.tts, _), (_, .tts):
             handleTTSEvent(event)
         default:
             break
         }
     }
 
-    private func handleLLMEvent(_ event: any SDKEvent) {
-        let modelId = event.properties["model_id"] ?? ""
-        let errorMessage = event.properties["error_message"]
+    private func handleLLMEvent(_ event: RASDKEvent) {
+        let modelId = event.model.modelID.isEmpty ? event.generation.modelID : event.model.modelID
+        let errorMessage = event.model.error.isEmpty ? event.generation.error : event.model.error
 
-        switch event.type {
-        case "llm_model_load_started":
+        switch (event.model.kind, event.generation.kind) {
+        case (.loadStarted, _):
             llmModelState = .loading
-        case "llm_model_load_completed":
+        case (.loadCompleted, _), (_, .modelLoaded):
             llmModelState = .loaded
             updateModel(.llm, id: modelId)
-        case "llm_model_load_failed":
-            llmModelState = .error(errorMessage ?? "Unknown error")
-        case "llm_model_unloaded":
+        case (.loadFailed, _), (_, .failed):
+            llmModelState = .error(errorMessage.isEmpty ? "Unknown error" : errorMessage)
+        case (.unloadCompleted, _), (_, .modelUnloaded):
             llmModelState = .notLoaded
             llmModel = nil
         default:
@@ -306,19 +302,19 @@ final class VoiceAgentViewModel: ObservableObject {
         }
     }
 
-    private func handleSTTEvent(_ event: any SDKEvent) {
-        let modelId = event.properties["model_id"] ?? ""
-        let errorMessage = event.properties["error_message"]
+    private func handleSTTEvent(_ event: RASDKEvent) {
+        let modelId = event.model.modelID
+        let errorMessage = event.model.error
 
-        switch event.type {
-        case "stt_model_load_started":
+        switch event.model.kind {
+        case .loadStarted:
             sttModelState = .loading
-        case "stt_model_load_completed":
+        case .loadCompleted:
             sttModelState = .loaded
             updateModel(.stt, id: modelId)
-        case "stt_model_load_failed":
-            sttModelState = .error(errorMessage ?? "Unknown error")
-        case "stt_model_unloaded":
+        case .loadFailed:
+            sttModelState = .error(errorMessage.isEmpty ? "Unknown error" : errorMessage)
+        case .unloadCompleted:
             sttModelState = .notLoaded
             sttModel = nil
         default:
@@ -326,19 +322,19 @@ final class VoiceAgentViewModel: ObservableObject {
         }
     }
 
-    private func handleTTSEvent(_ event: any SDKEvent) {
-        let modelId = event.properties["model_id"] ?? ""
-        let errorMessage = event.properties["error_message"]
+    private func handleTTSEvent(_ event: RASDKEvent) {
+        let modelId = event.model.modelID
+        let errorMessage = event.model.error
 
-        switch event.type {
-        case "tts_voice_load_started":
+        switch event.model.kind {
+        case .loadStarted:
             ttsModelState = .loading
-        case "tts_voice_load_completed":
+        case .loadCompleted:
             ttsModelState = .loaded
             updateModel(.tts, id: modelId)
-        case "tts_voice_load_failed":
-            ttsModelState = .error(errorMessage ?? "Unknown error")
-        case "tts_voice_unloaded":
+        case .loadFailed:
+            ttsModelState = .error(errorMessage.isEmpty ? "Unknown error" : errorMessage)
+        case .unloadCompleted:
             ttsModelState = .notLoaded
             ttsModel = nil
         default:
@@ -349,7 +345,7 @@ final class VoiceAgentViewModel: ObservableObject {
     // MARK: - Model Selection
 
     /// Set the STT model
-    func setSTTModel(_ model: ModelInfo) {
+    func setSTTModel(_ model: RAModelInfo) {
         sttModel = SelectedModelInfo(framework: model.framework, name: model.name, id: model.id)
         Task {
             await syncModelStates()
@@ -357,7 +353,7 @@ final class VoiceAgentViewModel: ObservableObject {
     }
 
     /// Set the LLM model
-    func setLLMModel(_ model: ModelInfo) {
+    func setLLMModel(_ model: RAModelInfo) {
         llmModel = SelectedModelInfo(framework: model.framework, name: model.name, id: model.id)
         Task {
             await syncModelStates()
@@ -365,7 +361,7 @@ final class VoiceAgentViewModel: ObservableObject {
     }
 
     /// Set the TTS model
-    func setTTSModel(_ model: ModelInfo) {
+    func setTTSModel(_ model: RAModelInfo) {
         ttsModel = SelectedModelInfo(framework: model.framework, name: model.name, id: model.id)
         Task { await syncModelStates() }
     }
@@ -381,10 +377,8 @@ final class VoiceAgentViewModel: ObservableObject {
     ///   3. Drive UI state by switching on `event.payload` in
     ///      `handleProtoEvent(_:)`.
     ///
-    /// `RunAnywhere.startVoiceSession` and `VoiceSessionHandle` were
-    /// removed in the v2 close-out; the SDK now exposes the proto stream
-    /// directly so example apps no longer reach into `CppBridge` /
-    /// `CRACommons`.
+    /// The SDK exposes the proto stream directly so example apps no longer
+    /// reach into `CppBridge` / `CRACommons`.
     func startConversation() async {
         guard allModelsLoaded else {
             sessionState = .error("Models not ready")
@@ -541,6 +535,8 @@ final class VoiceAgentViewModel: ObservableObject {
         case .componentStateChanged, .sessionError, .sessionStarted,
              .sessionStopped, .agentResponseStarted, .agentResponseCompleted,
              .speechTurnDetection, .turnLifecycle:
+            break
+        default:
             break
         }
     }

@@ -336,6 +336,10 @@ public struct RAStorageAvailability: Sendable {
   /// Clears the value of `recommendation`. Subsequent reads from it will return its default value.
   public mutating func clearRecommendation() {self._recommendation = nil}
 
+  public var shortfallBytes: Int64 = 0
+
+  public var requiredToAvailableRatio: Float = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -394,6 +398,8 @@ public struct RAStorageInfoRequest: Sendable {
 
   public var includeModels: Bool = false
 
+  public var includeCache: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -417,6 +423,8 @@ public struct RAStorageInfoResult: Sendable {
 
   public var errorMessage: String = String()
 
+  public var warnings: [String] = []
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -437,36 +445,58 @@ public struct RAStorageAvailabilityRequest: Sendable {
 
   public var includeExistingModelBytes: Bool = false
 
+  public var includeDeletePlan: Bool = false
+
+  public var allowCacheReclamation: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 }
 
-public struct RAStorageAvailabilityResult: Sendable {
+public struct RAStorageAvailabilityResult: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var success: Bool = false
+  public var success: Bool {
+    get {_storage._success}
+    set {_uniqueStorage()._success = newValue}
+  }
 
   public var availability: RAStorageAvailability {
-    get {_availability ?? RAStorageAvailability()}
-    set {_availability = newValue}
+    get {_storage._availability ?? RAStorageAvailability()}
+    set {_uniqueStorage()._availability = newValue}
   }
   /// Returns true if `availability` has been explicitly set.
-  public var hasAvailability: Bool {self._availability != nil}
+  public var hasAvailability: Bool {_storage._availability != nil}
   /// Clears the value of `availability`. Subsequent reads from it will return its default value.
-  public mutating func clearAvailability() {self._availability = nil}
+  public mutating func clearAvailability() {_uniqueStorage()._availability = nil}
 
-  public var warnings: [String] = []
+  public var warnings: [String] {
+    get {_storage._warnings}
+    set {_uniqueStorage()._warnings = newValue}
+  }
 
-  public var errorMessage: String = String()
+  public var errorMessage: String {
+    get {_storage._errorMessage}
+    set {_uniqueStorage()._errorMessage = newValue}
+  }
+
+  public var deletePlan: RAStorageDeletePlan {
+    get {_storage._deletePlan ?? RAStorageDeletePlan()}
+    set {_uniqueStorage()._deletePlan = newValue}
+  }
+  /// Returns true if `deletePlan` has been explicitly set.
+  public var hasDeletePlan: Bool {_storage._deletePlan != nil}
+  /// Clears the value of `deletePlan`. Subsequent reads from it will return its default value.
+  public mutating func clearDeletePlan() {_uniqueStorage()._deletePlan = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
 
-  fileprivate var _availability: RAStorageAvailability? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 public struct RAStorageDeletePlanRequest: Sendable {
@@ -481,6 +511,10 @@ public struct RAStorageDeletePlanRequest: Sendable {
   public var includeCache: Bool = false
 
   public var oldestFirst: Bool = false
+
+  public var allowLoadedModels: Bool = false
+
+  public var includeDownloadPartials: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -509,6 +543,12 @@ public struct RAStorageDeleteCandidate: Sendable {
 
   public var localPath: String = String()
 
+  public var requiresUnload: Bool = false
+
+  public var requiresPlatformDelete: Bool = false
+
+  public var storageKey: String = String()
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -533,6 +573,12 @@ public struct RAStorageDeletePlan: Sendable {
 
   public var errorMessage: String = String()
 
+  public var requiresUnload: Bool = false
+
+  public var requiresPlatformDelete: Bool = false
+
+  public var candidateCount: Int32 = 0
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -553,9 +599,24 @@ public struct RAStorageDeleteRequest: Sendable {
 
   public var dryRun: Bool = false
 
+  public var plan: RAStorageDeletePlan {
+    get {_plan ?? RAStorageDeletePlan()}
+    set {_plan = newValue}
+  }
+  /// Returns true if `plan` has been explicitly set.
+  public var hasPlan: Bool {self._plan != nil}
+  /// Clears the value of `plan`. Subsequent reads from it will return its default value.
+  public mutating func clearPlan() {self._plan = nil}
+
+  public var requirePlanMatch: Bool = false
+
+  public var allowPlatformDelete: Bool = false
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
+
+  fileprivate var _plan: RAStorageDeletePlan? = nil
 }
 
 public struct RAStorageDeleteResult: Sendable {
@@ -574,6 +635,14 @@ public struct RAStorageDeleteResult: Sendable {
   public var warnings: [String] = []
 
   public var errorMessage: String = String()
+
+  public var skippedModelIds: [String] = []
+
+  public var dryRun: Bool = false
+
+  public var registryUpdated: Bool = false
+
+  public var filesDeleted: Bool = false
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -778,7 +847,7 @@ extension RAStorageInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
 
 extension RAStorageAvailability: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageAvailability"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_available\0\u{3}required_bytes\0\u{3}available_bytes\0\u{3}warning_message\0\u{1}recommendation\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_available\0\u{3}required_bytes\0\u{3}available_bytes\0\u{3}warning_message\0\u{1}recommendation\0\u{3}shortfall_bytes\0\u{3}required_to_available_ratio\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -791,6 +860,8 @@ extension RAStorageAvailability: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
       case 3: try { try decoder.decodeSingularInt64Field(value: &self.availableBytes) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._warningMessage) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self._recommendation) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self.shortfallBytes) }()
+      case 7: try { try decoder.decodeSingularFloatField(value: &self.requiredToAvailableRatio) }()
       default: break
       }
     }
@@ -816,6 +887,12 @@ extension RAStorageAvailability: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     try { if let v = self._recommendation {
       try visitor.visitSingularStringField(value: v, fieldNumber: 5)
     } }()
+    if self.shortfallBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.shortfallBytes, fieldNumber: 6)
+    }
+    if self.requiredToAvailableRatio.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.requiredToAvailableRatio, fieldNumber: 7)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -825,6 +902,8 @@ extension RAStorageAvailability: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     if lhs.availableBytes != rhs.availableBytes {return false}
     if lhs._warningMessage != rhs._warningMessage {return false}
     if lhs._recommendation != rhs._recommendation {return false}
+    if lhs.shortfallBytes != rhs.shortfallBytes {return false}
+    if lhs.requiredToAvailableRatio != rhs.requiredToAvailableRatio {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -886,7 +965,7 @@ extension RAStoredModel: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
 
 extension RAStorageInfoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageInfoRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}include_device\0\u{3}include_app\0\u{3}include_models\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}include_device\0\u{3}include_app\0\u{3}include_models\0\u{3}include_cache\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -897,6 +976,7 @@ extension RAStorageInfoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
       case 1: try { try decoder.decodeSingularBoolField(value: &self.includeDevice) }()
       case 2: try { try decoder.decodeSingularBoolField(value: &self.includeApp) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self.includeModels) }()
+      case 4: try { try decoder.decodeSingularBoolField(value: &self.includeCache) }()
       default: break
       }
     }
@@ -912,6 +992,9 @@ extension RAStorageInfoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     if self.includeModels != false {
       try visitor.visitSingularBoolField(value: self.includeModels, fieldNumber: 3)
     }
+    if self.includeCache != false {
+      try visitor.visitSingularBoolField(value: self.includeCache, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -919,6 +1002,7 @@ extension RAStorageInfoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
     if lhs.includeDevice != rhs.includeDevice {return false}
     if lhs.includeApp != rhs.includeApp {return false}
     if lhs.includeModels != rhs.includeModels {return false}
+    if lhs.includeCache != rhs.includeCache {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -926,7 +1010,7 @@ extension RAStorageInfoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
 
 extension RAStorageInfoResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageInfoResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}info\0\u{3}error_message\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}info\0\u{3}error_message\0\u{1}warnings\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -937,6 +1021,7 @@ extension RAStorageInfoResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
       case 1: try { try decoder.decodeSingularBoolField(value: &self.success) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._info) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
+      case 4: try { try decoder.decodeRepeatedStringField(value: &self.warnings) }()
       default: break
       }
     }
@@ -956,6 +1041,9 @@ extension RAStorageInfoResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     if !self.errorMessage.isEmpty {
       try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 3)
     }
+    if !self.warnings.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.warnings, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -963,6 +1051,7 @@ extension RAStorageInfoResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     if lhs.success != rhs.success {return false}
     if lhs._info != rhs._info {return false}
     if lhs.errorMessage != rhs.errorMessage {return false}
+    if lhs.warnings != rhs.warnings {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -970,7 +1059,7 @@ extension RAStorageInfoResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
 
 extension RAStorageAvailabilityRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageAvailabilityRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}required_bytes\0\u{3}safety_margin\0\u{3}include_existing_model_bytes\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}required_bytes\0\u{3}safety_margin\0\u{3}include_existing_model_bytes\0\u{3}include_delete_plan\0\u{3}allow_cache_reclamation\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -982,6 +1071,8 @@ extension RAStorageAvailabilityRequest: SwiftProtobuf.Message, SwiftProtobuf._Me
       case 2: try { try decoder.decodeSingularInt64Field(value: &self.requiredBytes) }()
       case 3: try { try decoder.decodeSingularDoubleField(value: &self.safetyMargin) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.includeExistingModelBytes) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.includeDeletePlan) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.allowCacheReclamation) }()
       default: break
       }
     }
@@ -1000,6 +1091,12 @@ extension RAStorageAvailabilityRequest: SwiftProtobuf.Message, SwiftProtobuf._Me
     if self.includeExistingModelBytes != false {
       try visitor.visitSingularBoolField(value: self.includeExistingModelBytes, fieldNumber: 4)
     }
+    if self.includeDeletePlan != false {
+      try visitor.visitSingularBoolField(value: self.includeDeletePlan, fieldNumber: 5)
+    }
+    if self.allowCacheReclamation != false {
+      try visitor.visitSingularBoolField(value: self.allowCacheReclamation, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1008,6 +1105,8 @@ extension RAStorageAvailabilityRequest: SwiftProtobuf.Message, SwiftProtobuf._Me
     if lhs.requiredBytes != rhs.requiredBytes {return false}
     if lhs.safetyMargin != rhs.safetyMargin {return false}
     if lhs.includeExistingModelBytes != rhs.includeExistingModelBytes {return false}
+    if lhs.includeDeletePlan != rhs.includeDeletePlan {return false}
+    if lhs.allowCacheReclamation != rhs.allowCacheReclamation {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1015,48 +1114,97 @@ extension RAStorageAvailabilityRequest: SwiftProtobuf.Message, SwiftProtobuf._Me
 
 extension RAStorageAvailabilityResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageAvailabilityResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}availability\0\u{1}warnings\0\u{3}error_message\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}availability\0\u{1}warnings\0\u{3}error_message\0\u{3}delete_plan\0")
+
+  fileprivate class _StorageClass {
+    var _success: Bool = false
+    var _availability: RAStorageAvailability? = nil
+    var _warnings: [String] = []
+    var _errorMessage: String = String()
+    var _deletePlan: RAStorageDeletePlan? = nil
+
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _success = source._success
+      _availability = source._availability
+      _warnings = source._warnings
+      _errorMessage = source._errorMessage
+      _deletePlan = source._deletePlan
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBoolField(value: &self.success) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._availability) }()
-      case 3: try { try decoder.decodeRepeatedStringField(value: &self.warnings) }()
-      case 4: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularBoolField(value: &_storage._success) }()
+        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._availability) }()
+        case 3: try { try decoder.decodeRepeatedStringField(value: &_storage._warnings) }()
+        case 4: try { try decoder.decodeSingularStringField(value: &_storage._errorMessage) }()
+        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._deletePlan) }()
+        default: break
+        }
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if self.success != false {
-      try visitor.visitSingularBoolField(value: self.success, fieldNumber: 1)
-    }
-    try { if let v = self._availability {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    if !self.warnings.isEmpty {
-      try visitor.visitRepeatedStringField(value: self.warnings, fieldNumber: 3)
-    }
-    if !self.errorMessage.isEmpty {
-      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 4)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if _storage._success != false {
+        try visitor.visitSingularBoolField(value: _storage._success, fieldNumber: 1)
+      }
+      try { if let v = _storage._availability {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      } }()
+      if !_storage._warnings.isEmpty {
+        try visitor.visitRepeatedStringField(value: _storage._warnings, fieldNumber: 3)
+      }
+      if !_storage._errorMessage.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._errorMessage, fieldNumber: 4)
+      }
+      try { if let v = _storage._deletePlan {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RAStorageAvailabilityResult, rhs: RAStorageAvailabilityResult) -> Bool {
-    if lhs.success != rhs.success {return false}
-    if lhs._availability != rhs._availability {return false}
-    if lhs.warnings != rhs.warnings {return false}
-    if lhs.errorMessage != rhs.errorMessage {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._success != rhs_storage._success {return false}
+        if _storage._availability != rhs_storage._availability {return false}
+        if _storage._warnings != rhs_storage._warnings {return false}
+        if _storage._errorMessage != rhs_storage._errorMessage {return false}
+        if _storage._deletePlan != rhs_storage._deletePlan {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1064,7 +1212,7 @@ extension RAStorageAvailabilityResult: SwiftProtobuf.Message, SwiftProtobuf._Mes
 
 extension RAStorageDeletePlanRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageDeletePlanRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_ids\0\u{3}required_bytes\0\u{3}include_cache\0\u{3}oldest_first\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_ids\0\u{3}required_bytes\0\u{3}include_cache\0\u{3}oldest_first\0\u{3}allow_loaded_models\0\u{3}include_download_partials\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1076,6 +1224,8 @@ extension RAStorageDeletePlanRequest: SwiftProtobuf.Message, SwiftProtobuf._Mess
       case 2: try { try decoder.decodeSingularInt64Field(value: &self.requiredBytes) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self.includeCache) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.oldestFirst) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.allowLoadedModels) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.includeDownloadPartials) }()
       default: break
       }
     }
@@ -1094,6 +1244,12 @@ extension RAStorageDeletePlanRequest: SwiftProtobuf.Message, SwiftProtobuf._Mess
     if self.oldestFirst != false {
       try visitor.visitSingularBoolField(value: self.oldestFirst, fieldNumber: 4)
     }
+    if self.allowLoadedModels != false {
+      try visitor.visitSingularBoolField(value: self.allowLoadedModels, fieldNumber: 5)
+    }
+    if self.includeDownloadPartials != false {
+      try visitor.visitSingularBoolField(value: self.includeDownloadPartials, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1102,6 +1258,8 @@ extension RAStorageDeletePlanRequest: SwiftProtobuf.Message, SwiftProtobuf._Mess
     if lhs.requiredBytes != rhs.requiredBytes {return false}
     if lhs.includeCache != rhs.includeCache {return false}
     if lhs.oldestFirst != rhs.oldestFirst {return false}
+    if lhs.allowLoadedModels != rhs.allowLoadedModels {return false}
+    if lhs.includeDownloadPartials != rhs.includeDownloadPartials {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1109,7 +1267,7 @@ extension RAStorageDeletePlanRequest: SwiftProtobuf.Message, SwiftProtobuf._Mess
 
 extension RAStorageDeleteCandidate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageDeleteCandidate"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}reclaimable_bytes\0\u{3}last_used_ms\0\u{3}is_loaded\0\u{3}local_path\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}reclaimable_bytes\0\u{3}last_used_ms\0\u{3}is_loaded\0\u{3}local_path\0\u{3}requires_unload\0\u{3}requires_platform_delete\0\u{3}storage_key\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1122,6 +1280,9 @@ extension RAStorageDeleteCandidate: SwiftProtobuf.Message, SwiftProtobuf._Messag
       case 3: try { try decoder.decodeSingularInt64Field(value: &self._lastUsedMs) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.isLoaded) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self.localPath) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.requiresUnload) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.requiresPlatformDelete) }()
+      case 8: try { try decoder.decodeSingularStringField(value: &self.storageKey) }()
       default: break
       }
     }
@@ -1147,6 +1308,15 @@ extension RAStorageDeleteCandidate: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if !self.localPath.isEmpty {
       try visitor.visitSingularStringField(value: self.localPath, fieldNumber: 5)
     }
+    if self.requiresUnload != false {
+      try visitor.visitSingularBoolField(value: self.requiresUnload, fieldNumber: 6)
+    }
+    if self.requiresPlatformDelete != false {
+      try visitor.visitSingularBoolField(value: self.requiresPlatformDelete, fieldNumber: 7)
+    }
+    if !self.storageKey.isEmpty {
+      try visitor.visitSingularStringField(value: self.storageKey, fieldNumber: 8)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1156,6 +1326,9 @@ extension RAStorageDeleteCandidate: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if lhs._lastUsedMs != rhs._lastUsedMs {return false}
     if lhs.isLoaded != rhs.isLoaded {return false}
     if lhs.localPath != rhs.localPath {return false}
+    if lhs.requiresUnload != rhs.requiresUnload {return false}
+    if lhs.requiresPlatformDelete != rhs.requiresPlatformDelete {return false}
+    if lhs.storageKey != rhs.storageKey {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1163,7 +1336,7 @@ extension RAStorageDeleteCandidate: SwiftProtobuf.Message, SwiftProtobuf._Messag
 
 extension RAStorageDeletePlan: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageDeletePlan"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}can_reclaim_required_bytes\0\u{3}required_bytes\0\u{3}reclaimable_bytes\0\u{1}candidates\0\u{1}warnings\0\u{3}error_message\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}can_reclaim_required_bytes\0\u{3}required_bytes\0\u{3}reclaimable_bytes\0\u{1}candidates\0\u{1}warnings\0\u{3}error_message\0\u{3}requires_unload\0\u{3}requires_platform_delete\0\u{3}candidate_count\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1177,6 +1350,9 @@ extension RAStorageDeletePlan: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
       case 4: try { try decoder.decodeRepeatedMessageField(value: &self.candidates) }()
       case 5: try { try decoder.decodeRepeatedStringField(value: &self.warnings) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.requiresUnload) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self.requiresPlatformDelete) }()
+      case 9: try { try decoder.decodeSingularInt32Field(value: &self.candidateCount) }()
       default: break
       }
     }
@@ -1201,6 +1377,15 @@ extension RAStorageDeletePlan: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     if !self.errorMessage.isEmpty {
       try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 6)
     }
+    if self.requiresUnload != false {
+      try visitor.visitSingularBoolField(value: self.requiresUnload, fieldNumber: 7)
+    }
+    if self.requiresPlatformDelete != false {
+      try visitor.visitSingularBoolField(value: self.requiresPlatformDelete, fieldNumber: 8)
+    }
+    if self.candidateCount != 0 {
+      try visitor.visitSingularInt32Field(value: self.candidateCount, fieldNumber: 9)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1211,6 +1396,9 @@ extension RAStorageDeletePlan: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     if lhs.candidates != rhs.candidates {return false}
     if lhs.warnings != rhs.warnings {return false}
     if lhs.errorMessage != rhs.errorMessage {return false}
+    if lhs.requiresUnload != rhs.requiresUnload {return false}
+    if lhs.requiresPlatformDelete != rhs.requiresPlatformDelete {return false}
+    if lhs.candidateCount != rhs.candidateCount {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1218,7 +1406,7 @@ extension RAStorageDeletePlan: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
 
 extension RAStorageDeleteRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageDeleteRequest"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_ids\0\u{3}delete_files\0\u{3}clear_registry_paths\0\u{3}unload_if_loaded\0\u{3}dry_run\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_ids\0\u{3}delete_files\0\u{3}clear_registry_paths\0\u{3}unload_if_loaded\0\u{3}dry_run\0\u{1}plan\0\u{3}require_plan_match\0\u{3}allow_platform_delete\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1231,12 +1419,19 @@ extension RAStorageDeleteRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
       case 3: try { try decoder.decodeSingularBoolField(value: &self.clearRegistryPaths_p) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.unloadIfLoaded) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.dryRun) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._plan) }()
+      case 7: try { try decoder.decodeSingularBoolField(value: &self.requirePlanMatch) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self.allowPlatformDelete) }()
       default: break
       }
     }
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.modelIds.isEmpty {
       try visitor.visitRepeatedStringField(value: self.modelIds, fieldNumber: 1)
     }
@@ -1252,6 +1447,15 @@ extension RAStorageDeleteRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if self.dryRun != false {
       try visitor.visitSingularBoolField(value: self.dryRun, fieldNumber: 5)
     }
+    try { if let v = self._plan {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
+    if self.requirePlanMatch != false {
+      try visitor.visitSingularBoolField(value: self.requirePlanMatch, fieldNumber: 7)
+    }
+    if self.allowPlatformDelete != false {
+      try visitor.visitSingularBoolField(value: self.allowPlatformDelete, fieldNumber: 8)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1261,6 +1465,9 @@ extension RAStorageDeleteRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
     if lhs.clearRegistryPaths_p != rhs.clearRegistryPaths_p {return false}
     if lhs.unloadIfLoaded != rhs.unloadIfLoaded {return false}
     if lhs.dryRun != rhs.dryRun {return false}
+    if lhs._plan != rhs._plan {return false}
+    if lhs.requirePlanMatch != rhs.requirePlanMatch {return false}
+    if lhs.allowPlatformDelete != rhs.allowPlatformDelete {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -1268,7 +1475,7 @@ extension RAStorageDeleteRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageI
 
 extension RAStorageDeleteResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".StorageDeleteResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{3}deleted_bytes\0\u{3}deleted_model_ids\0\u{3}failed_model_ids\0\u{1}warnings\0\u{3}error_message\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{3}deleted_bytes\0\u{3}deleted_model_ids\0\u{3}failed_model_ids\0\u{1}warnings\0\u{3}error_message\0\u{3}skipped_model_ids\0\u{3}dry_run\0\u{3}registry_updated\0\u{3}files_deleted\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1282,6 +1489,10 @@ extension RAStorageDeleteResult: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
       case 4: try { try decoder.decodeRepeatedStringField(value: &self.failedModelIds) }()
       case 5: try { try decoder.decodeRepeatedStringField(value: &self.warnings) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
+      case 7: try { try decoder.decodeRepeatedStringField(value: &self.skippedModelIds) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self.dryRun) }()
+      case 9: try { try decoder.decodeSingularBoolField(value: &self.registryUpdated) }()
+      case 10: try { try decoder.decodeSingularBoolField(value: &self.filesDeleted) }()
       default: break
       }
     }
@@ -1306,6 +1517,18 @@ extension RAStorageDeleteResult: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     if !self.errorMessage.isEmpty {
       try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 6)
     }
+    if !self.skippedModelIds.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.skippedModelIds, fieldNumber: 7)
+    }
+    if self.dryRun != false {
+      try visitor.visitSingularBoolField(value: self.dryRun, fieldNumber: 8)
+    }
+    if self.registryUpdated != false {
+      try visitor.visitSingularBoolField(value: self.registryUpdated, fieldNumber: 9)
+    }
+    if self.filesDeleted != false {
+      try visitor.visitSingularBoolField(value: self.filesDeleted, fieldNumber: 10)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -1316,6 +1539,10 @@ extension RAStorageDeleteResult: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     if lhs.failedModelIds != rhs.failedModelIds {return false}
     if lhs.warnings != rhs.warnings {return false}
     if lhs.errorMessage != rhs.errorMessage {return false}
+    if lhs.skippedModelIds != rhs.skippedModelIds {return false}
+    if lhs.dryRun != rhs.dryRun {return false}
+    if lhs.registryUpdated != rhs.registryUpdated {return false}
+    if lhs.filesDeleted != rhs.filesDeleted {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

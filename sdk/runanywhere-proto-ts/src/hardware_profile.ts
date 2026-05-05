@@ -81,6 +81,33 @@ export interface HardwareProfileResult {
   accelerators: AcceleratorInfo[];
 }
 
+/**
+ * Empty request for the cached hardware profile. The native probe is owned by
+ * platform adapters; this request carries no portable parameters today.
+ */
+export interface HardwareProfileRequest {
+}
+
+/**
+ * Empty request for the accelerator list. Mirrors HardwareProfileRequest:
+ * platform probes own all OS-level acceleration discovery.
+ */
+export interface HardwareAcceleratorsRequest {
+}
+
+/**
+ * Result-shaped response for SetAcceleratorPreference so the service contract
+ * stays consistent (every rpc returns a non-empty message).
+ */
+export interface HardwareAcceleratorPreferenceRequest {
+  preference: AcceleratorPreference;
+}
+
+export interface HardwareAcceleratorPreferenceResult {
+  success: boolean;
+  errorMessage: string;
+}
+
 function createBaseHardwareProfile(): HardwareProfile {
   return {
     chip: "",
@@ -433,6 +460,231 @@ export const HardwareProfileResult = {
       ? HardwareProfile.fromPartial(object.profile)
       : undefined;
     message.accelerators = object.accelerators?.map((e) => AcceleratorInfo.fromPartial(e)) || [];
+    return message;
+  },
+};
+
+function createBaseHardwareProfileRequest(): HardwareProfileRequest {
+  return {};
+}
+
+export const HardwareProfileRequest = {
+  encode(_: HardwareProfileRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): HardwareProfileRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseHardwareProfileRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): HardwareProfileRequest {
+    return {};
+  },
+
+  toJSON(_: HardwareProfileRequest): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<HardwareProfileRequest>, I>>(base?: I): HardwareProfileRequest {
+    return HardwareProfileRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<HardwareProfileRequest>, I>>(_: I): HardwareProfileRequest {
+    const message = createBaseHardwareProfileRequest();
+    return message;
+  },
+};
+
+function createBaseHardwareAcceleratorsRequest(): HardwareAcceleratorsRequest {
+  return {};
+}
+
+export const HardwareAcceleratorsRequest = {
+  encode(_: HardwareAcceleratorsRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): HardwareAcceleratorsRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseHardwareAcceleratorsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): HardwareAcceleratorsRequest {
+    return {};
+  },
+
+  toJSON(_: HardwareAcceleratorsRequest): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<HardwareAcceleratorsRequest>, I>>(base?: I): HardwareAcceleratorsRequest {
+    return HardwareAcceleratorsRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<HardwareAcceleratorsRequest>, I>>(_: I): HardwareAcceleratorsRequest {
+    const message = createBaseHardwareAcceleratorsRequest();
+    return message;
+  },
+};
+
+function createBaseHardwareAcceleratorPreferenceRequest(): HardwareAcceleratorPreferenceRequest {
+  return { preference: 0 };
+}
+
+export const HardwareAcceleratorPreferenceRequest = {
+  encode(message: HardwareAcceleratorPreferenceRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.preference !== 0) {
+      writer.uint32(8).int32(message.preference);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): HardwareAcceleratorPreferenceRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseHardwareAcceleratorPreferenceRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.preference = reader.int32() as any;
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): HardwareAcceleratorPreferenceRequest {
+    return { preference: isSet(object.preference) ? acceleratorPreferenceFromJSON(object.preference) : 0 };
+  },
+
+  toJSON(message: HardwareAcceleratorPreferenceRequest): unknown {
+    const obj: any = {};
+    if (message.preference !== 0) {
+      obj.preference = acceleratorPreferenceToJSON(message.preference);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<HardwareAcceleratorPreferenceRequest>, I>>(
+    base?: I,
+  ): HardwareAcceleratorPreferenceRequest {
+    return HardwareAcceleratorPreferenceRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<HardwareAcceleratorPreferenceRequest>, I>>(
+    object: I,
+  ): HardwareAcceleratorPreferenceRequest {
+    const message = createBaseHardwareAcceleratorPreferenceRequest();
+    message.preference = object.preference ?? 0;
+    return message;
+  },
+};
+
+function createBaseHardwareAcceleratorPreferenceResult(): HardwareAcceleratorPreferenceResult {
+  return { success: false, errorMessage: "" };
+}
+
+export const HardwareAcceleratorPreferenceResult = {
+  encode(message: HardwareAcceleratorPreferenceResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.success !== false) {
+      writer.uint32(8).bool(message.success);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(18).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): HardwareAcceleratorPreferenceResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseHardwareAcceleratorPreferenceResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): HardwareAcceleratorPreferenceResult {
+    return {
+      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: HardwareAcceleratorPreferenceResult): unknown {
+    const obj: any = {};
+    if (message.success !== false) {
+      obj.success = message.success;
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<HardwareAcceleratorPreferenceResult>, I>>(
+    base?: I,
+  ): HardwareAcceleratorPreferenceResult {
+    return HardwareAcceleratorPreferenceResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<HardwareAcceleratorPreferenceResult>, I>>(
+    object: I,
+  ): HardwareAcceleratorPreferenceResult {
+    const message = createBaseHardwareAcceleratorPreferenceResult();
+    message.success = object.success ?? false;
+    message.errorMessage = object.errorMessage ?? "";
     return message;
   },
 };

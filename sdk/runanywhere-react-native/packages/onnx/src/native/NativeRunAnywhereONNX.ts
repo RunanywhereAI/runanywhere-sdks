@@ -2,7 +2,7 @@
  * NativeRunAnywhereONNX.ts
  *
  * Exports the native RunAnywhereONNX Hybrid Object from Nitro Modules.
- * This module provides ONNX-based STT, TTS, and VAD capabilities.
+ * This module provides ONNX backend registration hooks.
  */
 
 import type { RunAnywhereONNX } from '../specs/RunAnywhereONNX.nitro';

@@ -121,6 +121,25 @@ rac_model_category_t rac_model_category_from_framework(rac_inference_framework_t
 // INFERENCE FRAMEWORK FUNCTIONS
 // =============================================================================
 
+static rac_result_t copy_supported_formats(const rac_model_format_t* formats,
+                                           size_t count,
+                                           rac_model_format_t** out_formats,
+                                           size_t* out_count) {
+    *out_count = count;
+    if (count == 0) {
+        *out_formats = nullptr;
+        return RAC_SUCCESS;
+    }
+
+    *out_formats = static_cast<rac_model_format_t*>(malloc(count * sizeof(rac_model_format_t)));
+    if (!*out_formats) {
+        *out_count = 0;
+        return RAC_ERROR_OUT_OF_MEMORY;
+    }
+    memcpy(*out_formats, formats, count * sizeof(rac_model_format_t));
+    return RAC_SUCCESS;
+}
+
 rac_result_t rac_framework_get_supported_formats(rac_inference_framework_t framework,
                                                  rac_model_format_t** out_formats,
                                                  size_t* out_count) {
@@ -128,46 +147,34 @@ rac_result_t rac_framework_get_supported_formats(rac_inference_framework_t frame
         return RAC_ERROR_INVALID_ARGUMENT;
     }
 
-    // Mirrors Swift's InferenceFramework.supportedFormats
+    static const rac_model_format_t onnx_formats[] = {RAC_MODEL_FORMAT_ONNX,
+                                                      RAC_MODEL_FORMAT_ORT};
+    static const rac_model_format_t llamacpp_formats[] = {RAC_MODEL_FORMAT_GGUF,
+                                                          RAC_MODEL_FORMAT_GGML};
+    static const rac_model_format_t fluid_audio_formats[] = {RAC_MODEL_FORMAT_BIN};
+    static const rac_model_format_t coreml_formats[] = {RAC_MODEL_FORMAT_COREML,
+                                                        RAC_MODEL_FORMAT_MLMODEL,
+                                                        RAC_MODEL_FORMAT_MLPACKAGE};
+    static const rac_model_format_t metalrt_formats[] = {RAC_MODEL_FORMAT_SAFETENSORS};
+    static const rac_model_format_t genie_formats[] = {RAC_MODEL_FORMAT_QNN_CONTEXT};
+
     switch (framework) {
         case RAC_FRAMEWORK_ONNX:
-        case RAC_FRAMEWORK_SHERPA: {
-            *out_count = 2;
-            *out_formats = (rac_model_format_t*)malloc(2 * sizeof(rac_model_format_t));
-            if (!*out_formats)
-                return RAC_ERROR_OUT_OF_MEMORY;
-            (*out_formats)[0] = RAC_MODEL_FORMAT_ONNX;
-            (*out_formats)[1] = RAC_MODEL_FORMAT_ORT;
-            return RAC_SUCCESS;
-        }
-        case RAC_FRAMEWORK_LLAMACPP: {
-            *out_count = 1;
-            *out_formats = (rac_model_format_t*)malloc(sizeof(rac_model_format_t));
-            if (!*out_formats)
-                return RAC_ERROR_OUT_OF_MEMORY;
-            (*out_formats)[0] = RAC_MODEL_FORMAT_GGUF;
-            return RAC_SUCCESS;
-        }
-        case RAC_FRAMEWORK_FLUID_AUDIO: {
-            *out_count = 1;
-            *out_formats = (rac_model_format_t*)malloc(sizeof(rac_model_format_t));
-            if (!*out_formats)
-                return RAC_ERROR_OUT_OF_MEMORY;
-            (*out_formats)[0] = RAC_MODEL_FORMAT_BIN;
-            return RAC_SUCCESS;
-        }
-        case RAC_FRAMEWORK_GENIE: {
-            *out_count = 1;
-            *out_formats = (rac_model_format_t*)malloc(sizeof(rac_model_format_t));
-            if (!*out_formats)
-                return RAC_ERROR_OUT_OF_MEMORY;
-            (*out_formats)[0] = RAC_MODEL_FORMAT_QNN_CONTEXT;
-            return RAC_SUCCESS;
-        }
+        case RAC_FRAMEWORK_SHERPA:
+            return copy_supported_formats(onnx_formats, 2, out_formats, out_count);
+        case RAC_FRAMEWORK_LLAMACPP:
+            return copy_supported_formats(llamacpp_formats, 2, out_formats, out_count);
+        case RAC_FRAMEWORK_FLUID_AUDIO:
+            return copy_supported_formats(fluid_audio_formats, 1, out_formats, out_count);
+        case RAC_FRAMEWORK_COREML:
+        case RAC_FRAMEWORK_WHISPERKIT_COREML:
+            return copy_supported_formats(coreml_formats, 3, out_formats, out_count);
+        case RAC_FRAMEWORK_METALRT:
+            return copy_supported_formats(metalrt_formats, 1, out_formats, out_count);
+        case RAC_FRAMEWORK_GENIE:
+            return copy_supported_formats(genie_formats, 1, out_formats, out_count);
         default:
-            *out_count = 0;
-            *out_formats = nullptr;
-            return RAC_SUCCESS;
+            return copy_supported_formats(nullptr, 0, out_formats, out_count);
     }
 }
 
@@ -180,11 +187,18 @@ rac_bool_t rac_framework_supports_format(rac_inference_framework_t framework,
             return (format == RAC_MODEL_FORMAT_ONNX || format == RAC_MODEL_FORMAT_ORT) ? RAC_TRUE
                                                                                        : RAC_FALSE;
         case RAC_FRAMEWORK_LLAMACPP:
-            return (format == RAC_MODEL_FORMAT_GGUF) ? RAC_TRUE : RAC_FALSE;
+            return (format == RAC_MODEL_FORMAT_GGUF || format == RAC_MODEL_FORMAT_GGML) ? RAC_TRUE
+                                                                                        : RAC_FALSE;
         case RAC_FRAMEWORK_GENIE:
             return (format == RAC_MODEL_FORMAT_QNN_CONTEXT) ? RAC_TRUE : RAC_FALSE;
         case RAC_FRAMEWORK_COREML:
-            return (format == RAC_MODEL_FORMAT_COREML) ? RAC_TRUE : RAC_FALSE;
+        case RAC_FRAMEWORK_WHISPERKIT_COREML:
+            return (format == RAC_MODEL_FORMAT_COREML || format == RAC_MODEL_FORMAT_MLMODEL ||
+                    format == RAC_MODEL_FORMAT_MLPACKAGE)
+                       ? RAC_TRUE
+                       : RAC_FALSE;
+        case RAC_FRAMEWORK_METALRT:
+            return (format == RAC_MODEL_FORMAT_SAFETENSORS) ? RAC_TRUE : RAC_FALSE;
         case RAC_FRAMEWORK_FLUID_AUDIO:
             return (format == RAC_MODEL_FORMAT_BIN) ? RAC_TRUE : RAC_FALSE;
         default:
@@ -392,8 +406,36 @@ rac_bool_t rac_model_detect_format_from_extension(const char* extension,
         *out_format = RAC_MODEL_FORMAT_GGUF;
         return RAC_TRUE;
     }
+    if (ext == "ggml") {
+        *out_format = RAC_MODEL_FORMAT_GGML;
+        return RAC_TRUE;
+    }
     if (ext == "bin") {
         *out_format = RAC_MODEL_FORMAT_BIN;
+        return RAC_TRUE;
+    }
+    if (ext == "mlmodelc") {
+        *out_format = RAC_MODEL_FORMAT_COREML;
+        return RAC_TRUE;
+    }
+    if (ext == "mlmodel") {
+        *out_format = RAC_MODEL_FORMAT_MLMODEL;
+        return RAC_TRUE;
+    }
+    if (ext == "mlpackage") {
+        *out_format = RAC_MODEL_FORMAT_MLPACKAGE;
+        return RAC_TRUE;
+    }
+    if (ext == "tflite") {
+        *out_format = RAC_MODEL_FORMAT_TFLITE;
+        return RAC_TRUE;
+    }
+    if (ext == "safetensors") {
+        *out_format = RAC_MODEL_FORMAT_SAFETENSORS;
+        return RAC_TRUE;
+    }
+    if (ext == "zip") {
+        *out_format = RAC_MODEL_FORMAT_ZIP;
         return RAC_TRUE;
     }
 
@@ -414,10 +456,22 @@ rac_bool_t rac_model_detect_framework_from_format(rac_model_format_t format,
             *out_framework = RAC_FRAMEWORK_ONNX;
             return RAC_TRUE;
         case RAC_MODEL_FORMAT_GGUF:
+        case RAC_MODEL_FORMAT_GGML:
             *out_framework = RAC_FRAMEWORK_LLAMACPP;
             return RAC_TRUE;
         case RAC_MODEL_FORMAT_BIN:
             *out_framework = RAC_FRAMEWORK_FLUID_AUDIO;
+            return RAC_TRUE;
+        case RAC_MODEL_FORMAT_COREML:
+        case RAC_MODEL_FORMAT_MLMODEL:
+        case RAC_MODEL_FORMAT_MLPACKAGE:
+            *out_framework = RAC_FRAMEWORK_COREML;
+            return RAC_TRUE;
+        case RAC_MODEL_FORMAT_SAFETENSORS:
+            *out_framework = RAC_FRAMEWORK_METALRT;
+            return RAC_TRUE;
+        case RAC_MODEL_FORMAT_QNN_CONTEXT:
+            *out_framework = RAC_FRAMEWORK_GENIE;
             return RAC_TRUE;
         default:
             return RAC_FALSE;
@@ -433,12 +487,24 @@ const char* rac_model_format_extension(rac_model_format_t format) {
             return "ort";
         case RAC_MODEL_FORMAT_GGUF:
             return "gguf";
+        case RAC_MODEL_FORMAT_GGML:
+            return "ggml";
         case RAC_MODEL_FORMAT_BIN:
             return "bin";
         case RAC_MODEL_FORMAT_COREML:
             return "mlmodelc";
+        case RAC_MODEL_FORMAT_MLMODEL:
+            return "mlmodel";
+        case RAC_MODEL_FORMAT_MLPACKAGE:
+            return "mlpackage";
+        case RAC_MODEL_FORMAT_TFLITE:
+            return "tflite";
+        case RAC_MODEL_FORMAT_SAFETENSORS:
+            return "safetensors";
         case RAC_MODEL_FORMAT_QNN_CONTEXT:
             return "bin";
+        case RAC_MODEL_FORMAT_ZIP:
+            return "zip";
         default:
             return nullptr;
     }
@@ -540,6 +606,10 @@ static bool contains_case_insensitive(const char* haystack, const char* needle) 
     return h.find(n) != std::string::npos;
 }
 
+static bool format_filter_is_any(rac_model_format_t format) {
+    return format == RAC_MODEL_FORMAT_UNSPECIFIED || format == RAC_MODEL_FORMAT_UNKNOWN;
+}
+
 rac_bool_t rac_model_matches_filter(const rac_model_info_t* model,
                                     const rac_model_filter_t* filter) {
     // Ported from Swift RegistryService.filterModels(by:) filter closure (lines 106-124)
@@ -558,7 +628,7 @@ rac_bool_t rac_model_matches_filter(const rac_model_info_t* model,
     }
 
     // Format filter (Swift lines 110-112)
-    if (filter->format != RAC_MODEL_FORMAT_UNKNOWN && model->format != filter->format) {
+    if (!format_filter_is_any(filter->format) && model->format != filter->format) {
         return RAC_FALSE;
     }
 

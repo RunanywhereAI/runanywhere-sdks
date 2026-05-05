@@ -22,7 +22,7 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
     // swiftlint:disable:next function_body_length
     func execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo
+        model: RAModelInfo
     ) async throws -> BenchmarkMetrics {
         let maxTokens = Int(scenario.parameters?["maxTokens"] ?? "") ?? 512
         var metrics = BenchmarkMetrics()
@@ -42,7 +42,9 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
             // AsyncStream<RALLMStreamEvent>; benchmark derives TTFT +
             // tokens/sec from the event sequence directly.
             let warmupStart = Date()
-            let warmupOptions = LLMGenerationOptions(maxTokens: 5, temperature: 0.0)
+            var warmupOptions = RALLMGenerationOptions.defaults()
+            warmupOptions.maxTokens = 5
+            warmupOptions.temperature = 0.0
             let warmupEvents = try await RunAnywhere.generateStream("Hello", options: warmupOptions)
             for await event in warmupEvents where event.isFinal { break }
             metrics.warmupTimeMs = Date().timeIntervalSince(warmupStart) * 1000
@@ -52,11 +54,10 @@ struct LLMBenchmarkProvider: BenchmarkScenarioProvider {
             let systemPrompt = "You are a helpful assistant. Always give extremely detailed, "
                 + "thorough responses. Never stop early. Use the full response length available "
                 + "to you. Elaborate on every point with examples and explanations."
-            let options = LLMGenerationOptions(
-                maxTokens: maxTokens,
-                temperature: 0.0,
-                systemPrompt: systemPrompt
-            )
+            var options = RALLMGenerationOptions.defaults()
+            options.maxTokens = Int32(maxTokens)
+            options.temperature = 0.0
+            options.systemPrompt = systemPrompt
             let prompt = "Write a very long and detailed explanation of how neural networks work, "
                 + "covering perceptrons, activation functions, backpropagation, gradient descent, "
                 + "loss functions, convolutional layers, recurrent layers, transformers, attention "

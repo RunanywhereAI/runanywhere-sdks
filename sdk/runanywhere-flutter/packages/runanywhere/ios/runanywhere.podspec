@@ -1,8 +1,7 @@
 #
 # RunAnywhere Core SDK - iOS
 #
-# Vendors the locally built RACommons.xcframework (plus the C++ RAG bridge
-# source that consumes RACommons' C API) into Flutter iOS apps.
+# Vendors the locally built RACommons.xcframework into Flutter iOS apps.
 #
 # The xcframework is staged into this plugin's ios/Frameworks/ directory by
 # scripts/build-core-xcframework.sh → sync_flutter_frameworks(). Run that
@@ -11,7 +10,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere'
-  s.version          = '0.16.0'
+  s.version          = '0.19.13'
   s.summary          = 'RunAnywhere: Privacy-first, on-device AI SDK for Flutter'
   s.description      = <<-DESC
 Privacy-first, on-device AI SDK for Flutter. This package provides the core
@@ -26,9 +25,7 @@ language models (LLM), voice activity detection (VAD), embeddings, and RAG.
   s.ios.deployment_target = '15.1'
   s.swift_version = '5.0'
 
-  # Source files: Swift plugin entry point + C++ RAG bridge. The bridge
-  # includes `third_party/nlohmann/json.hpp` from the package root (src/)
-  # via Classes/ symlinks — see HEADER_SEARCH_PATHS below.
+  # Source files: Swift plugin entry point + URLSession HTTP transport.
   s.source_files = 'Classes/**/*'
 
   s.dependency 'Flutter'
@@ -38,9 +35,9 @@ language models (LLM), voice activity detection (VAD), embeddings, and RAG.
   # =============================================================================
   s.vendored_frameworks = 'Frameworks/RACommons.xcframework'
 
-  # Keep the source tree that the RAG bridge includes and the xcframework
-  # next to the installed pod so downstream toolchains can resolve headers.
-  s.preserve_paths = ['Frameworks/**/*', '../src/**/*', 'Classes/third_party/**/*']
+  # Keep the xcframework next to the installed pod so downstream toolchains
+  # can resolve headers.
+  s.preserve_paths = ['Frameworks/**/*']
 
   # Required frameworks
   s.frameworks = [
@@ -68,24 +65,19 @@ language models (LLM), voice activity detection (VAD), embeddings, and RAG.
   #   pull a slice that isn't there.
   #
   # HEADER_SEARCH_PATHS
-  #   - Classes / ../src: nlohmann/json.hpp (vendored under third_party/)
-  #   - RACommons.xcframework/*/Headers: rac/** C API headers consumed by the
-  #     RAG bridge (surfaced by -headers on `xcodebuild -create-xcframework`).
+  #   - RACommons.xcframework/*/Headers: rac/** C API headers consumed by Dart
+  #     FFI (surfaced by -headers on `xcodebuild -create-xcframework`).
   # ---------------------------------------------------------------------------
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'x86_64',
     # -lz matches the Swift SDK (Package.swift linkerSettings) — libarchive
-    # + libcurl baked into RACommons both transitively need zlib.
+    # baked into RACommons transitively needs zlib.
     'OTHER_LDFLAGS' => '-lc++ -larchive -lbz2 -lz',
     'CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES' => 'YES',
     'ENABLE_BITCODE' => 'NO',
     'CLANG_CXX_LANGUAGE_STANDARD' => 'c++17',
     'HEADER_SEARCH_PATHS' => [
-      '"${PODS_TARGET_SRCROOT}/Classes"',
-      '"${PODS_TARGET_SRCROOT}/Classes/third_party"',
-      '"${PODS_TARGET_SRCROOT}/../src"',
-      '"${PODS_TARGET_SRCROOT}/../src/third_party"',
       '"${PODS_TARGET_SRCROOT}/Frameworks/RACommons.xcframework/ios-arm64/Headers"',
       '"${PODS_TARGET_SRCROOT}/Frameworks/RACommons.xcframework/ios-arm64-simulator/Headers"',
     ].join(' '),

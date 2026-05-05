@@ -268,22 +268,30 @@ private enum LoRAGeneratedProtoABI {
         Int,
         UnsafeMutablePointer<rac_proto_buffer_t>?
     ) -> rac_result_t
-    typealias Clear = @convention(c) (
-        rac_handle_t?,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
-    ) -> rac_result_t
-
     static let registerName = "rac_lora_register_proto"
+    static let catalogListName = "rac_lora_catalog_list_proto"
+    static let catalogQueryName = "rac_lora_catalog_query_proto"
+    static let catalogGetName = "rac_lora_catalog_get_proto"
+    static let catalogMarkDownloadCompletedName = "rac_lora_catalog_mark_download_completed_proto"
     static let compatibilityName = "rac_lora_compatibility_proto"
-    static let loadName = "rac_lora_load_proto"
+    static let applyName = "rac_lora_apply_proto"
     static let removeName = "rac_lora_remove_proto"
-    static let clearName = "rac_lora_clear_proto"
+    static let listName = "rac_lora_list_proto"
+    static let stateName = "rac_lora_state_proto"
 
     static let register = NativeProtoABI.load(registerName, as: RegistryRequest.self)
+    static let catalogList = NativeProtoABI.load(catalogListName, as: RegistryRequest.self)
+    static let catalogQuery = NativeProtoABI.load(catalogQueryName, as: RegistryRequest.self)
+    static let catalogGet = NativeProtoABI.load(catalogGetName, as: RegistryRequest.self)
+    static let catalogMarkDownloadCompleted = NativeProtoABI.load(
+        catalogMarkDownloadCompletedName,
+        as: RegistryRequest.self
+    )
     static let compatibility = NativeProtoABI.load(compatibilityName, as: LLMRequest.self)
-    static let load = NativeProtoABI.load(loadName, as: LLMRequest.self)
+    static let apply = NativeProtoABI.load(applyName, as: LLMRequest.self)
     static let remove = NativeProtoABI.load(removeName, as: LLMRequest.self)
-    static let clear = NativeProtoABI.load(clearName, as: Clear.self)
+    static let list = NativeProtoABI.load(listName, as: LLMRequest.self)
+    static let state = NativeProtoABI.load(stateName, as: LLMRequest.self)
 }
 
 private enum DiffusionGeneratedProtoABI {
@@ -979,40 +987,48 @@ extension CppBridge.RAG {
 // MARK: - LoRA
 
 extension CppBridge.LLM {
-    public func loadLoraAdapter(_ config: RALoRAAdapterConfig) throws -> RALoRAAdapterInfo {
+    public func applyLoraAdapters(_ request: RALoRAApplyRequest) throws -> RALoRAApplyResult {
         let handle = try getHandle()
         return try invokeLoRARequest(
             handle: handle,
-            request: config,
-            symbol: LoRAGeneratedProtoABI.load,
-            symbolName: LoRAGeneratedProtoABI.loadName,
-            responseType: RALoRAAdapterInfo.self
+            request: request,
+            symbol: LoRAGeneratedProtoABI.apply,
+            symbolName: LoRAGeneratedProtoABI.applyName,
+            responseType: RALoRAApplyResult.self
         )
     }
 
-    public func removeLoraAdapter(_ config: RALoRAAdapterConfig) throws -> RALoRAAdapterInfo {
+    public func removeLoraAdapters(_ request: RALoRARemoveRequest) throws -> RALoRAState {
         let handle = try getHandle()
         return try invokeLoRARequest(
             handle: handle,
-            request: config,
+            request: request,
             symbol: LoRAGeneratedProtoABI.remove,
             symbolName: LoRAGeneratedProtoABI.removeName,
-            responseType: RALoRAAdapterInfo.self
+            responseType: RALoRAState.self
         )
     }
 
-    public func clearLoraAdaptersProto() throws -> RALoRAAdapterInfo {
+    public func listLoraAdapters() throws -> RALoRAState {
         let handle = try getHandle()
-        let clear = try NativeProtoABI.require(
-            LoRAGeneratedProtoABI.clear,
-            named: LoRAGeneratedProtoABI.clearName
+        return try invokeLoRARequest(
+            handle: handle,
+            request: RALoRAState(),
+            symbol: LoRAGeneratedProtoABI.list,
+            symbolName: LoRAGeneratedProtoABI.listName,
+            responseType: RALoRAState.self
         )
-        return try decodeBuffer(
-            responseType: RALoRAAdapterInfo.self,
-            symbolName: LoRAGeneratedProtoABI.clearName
-        ) { outBuffer in
-            clear(handle, outBuffer)
-        }
+    }
+
+    public func getLoraState() throws -> RALoRAState {
+        let handle = try getHandle()
+        return try invokeLoRARequest(
+            handle: handle,
+            request: RALoRAState(),
+            symbol: LoRAGeneratedProtoABI.state,
+            symbolName: LoRAGeneratedProtoABI.stateName,
+            responseType: RALoRAState.self
+        )
     }
 
     public func checkLoraCompatibility(_ config: RALoRAAdapterConfig) throws -> RALoraCompatibilityResult {
@@ -1044,25 +1060,73 @@ extension CppBridge.LLM {
 
 extension CppBridge.LoraRegistry {
     public func register(_ entry: RALoraAdapterCatalogEntry) throws -> RALoraAdapterCatalogEntry {
-        guard let handle = getHandleForProtoRegistration() else {
-            throw SDKException.general(.initializationFailed, "LoRA registry not initialized")
-        }
-        let register = try NativeProtoABI.require(
-            LoRAGeneratedProtoABI.register,
-            named: LoRAGeneratedProtoABI.registerName
+        try invokeRegistryRequest(
+            request: entry,
+            symbol: LoRAGeneratedProtoABI.register,
+            symbolName: LoRAGeneratedProtoABI.registerName,
+            responseType: RALoraAdapterCatalogEntry.self
         )
-        return try decodeBuffer(
-            responseType: RALoraAdapterCatalogEntry.self,
-            symbolName: LoRAGeneratedProtoABI.registerName
-        ) { outBuffer in
-            try NativeProtoABI.withSerializedBytes(entry) { bytes, size in
-                register(handle, bytes, size, outBuffer)
-            }
-        }
     }
 
-    private func getHandleForProtoRegistration() -> rac_lora_registry_handle_t? {
-        rac_get_lora_registry()
+    public func listCatalog(
+        _ request: RALoraAdapterCatalogListRequest
+    ) throws -> RALoraAdapterCatalogListResult {
+        try invokeRegistryRequest(
+            request: request,
+            symbol: LoRAGeneratedProtoABI.catalogList,
+            symbolName: LoRAGeneratedProtoABI.catalogListName,
+            responseType: RALoraAdapterCatalogListResult.self
+        )
+    }
+
+    public func queryCatalog(
+        _ query: RALoraAdapterCatalogQuery
+    ) throws -> RALoraAdapterCatalogListResult {
+        try invokeRegistryRequest(
+            request: query,
+            symbol: LoRAGeneratedProtoABI.catalogQuery,
+            symbolName: LoRAGeneratedProtoABI.catalogQueryName,
+            responseType: RALoraAdapterCatalogListResult.self
+        )
+    }
+
+    public func getCatalogEntry(
+        _ request: RALoraAdapterCatalogGetRequest
+    ) throws -> RALoraAdapterCatalogGetResult {
+        try invokeRegistryRequest(
+            request: request,
+            symbol: LoRAGeneratedProtoABI.catalogGet,
+            symbolName: LoRAGeneratedProtoABI.catalogGetName,
+            responseType: RALoraAdapterCatalogGetResult.self
+        )
+    }
+
+    public func markDownloadCompleted(
+        _ request: RALoraAdapterDownloadCompletedRequest
+    ) throws -> RALoraAdapterDownloadCompletedResult {
+        try invokeRegistryRequest(
+            request: request,
+            symbol: LoRAGeneratedProtoABI.catalogMarkDownloadCompleted,
+            symbolName: LoRAGeneratedProtoABI.catalogMarkDownloadCompletedName,
+            responseType: RALoraAdapterDownloadCompletedResult.self
+        )
+    }
+
+    private func invokeRegistryRequest<Request: Message, Response: Message>(
+        request: Request,
+        symbol: LoRAGeneratedProtoABI.RegistryRequest?,
+        symbolName: String,
+        responseType: Response.Type
+    ) throws -> Response {
+        guard let handle = rac_get_lora_registry() else {
+            throw SDKException.general(.initializationFailed, "LoRA registry not initialized")
+        }
+        let symbol = try NativeProtoABI.require(symbol, named: symbolName)
+        return try decodeBuffer(responseType: responseType, symbolName: symbolName) { outBuffer in
+            try NativeProtoABI.withSerializedBytes(request) { bytes, size in
+                symbol(handle, bytes, size, outBuffer)
+            }
+        }
     }
 }
 

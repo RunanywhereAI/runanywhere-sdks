@@ -742,7 +742,7 @@ private struct ApiConfigurationSheet: View {
 // MARK: - Supporting Views
 
 private struct StoredModelRow: View {
-    let model: StoredModel
+    let model: RAStoredModel
     let onDelete: () async -> Void
     @State private var showingDetails = false
     @State private var showingDeleteConfirmation = false

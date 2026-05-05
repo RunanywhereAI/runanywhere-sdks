@@ -1,12 +1,11 @@
 /**
  * @file rac_http_client.h
- * @brief Native HTTP client C ABI (v2 close-out Phase H).
+ * @brief Platform-routed HTTP client C ABI (v2 close-out Phase H).
  *
- * Opaque handle around a libcurl easy handle (see
- * `src/infrastructure/http/rac_http_client_curl.cpp`). Replaces the
- * per-SDK hand-rolled HTTP transport (HttpURLConnection in Kotlin,
- * URLSession in Swift, fetch/axios in RN/Web, http in Flutter) with a
- * single canonical implementation shared via this C ABI.
+ * Canonical request/response structs and public entry points for HTTP
+ * operations needed by commons. The actual network execution belongs
+ * to the registered platform transport adapter (OkHttp, URLSession,
+ * fetch, dart:io, etc.) installed via `rac_http_transport_register`.
  *
  * Scope:
  *   - blocking request/response (`rac_http_request_send`)
@@ -18,8 +17,9 @@
  *   - cancellation via chunk-callback return value
  *
  * The older executor-plugin ABI under `infrastructure/network` has
- * been removed from the build. New code must use this curl-backed ABI
- * for request/response and streaming download transport.
+ * been removed from the build. New code should use this ABI for
+ * request semantics, response mapping, and streaming download routing,
+ * while platform SDKs provide the HTTP execution adapter.
  */
 
 #ifndef RAC_INFRASTRUCTURE_HTTP_RAC_HTTP_CLIENT_H
@@ -39,7 +39,7 @@ extern "C" {
 // =============================================================================
 
 /**
- * @brief Opaque handle. One handle == one libcurl easy handle.
+ * @brief Opaque handle preserving the create/destroy ABI.
  * Instances are NOT thread-safe; create one per worker thread.
  */
 typedef struct rac_http_client rac_http_client_t;
@@ -48,8 +48,8 @@ typedef struct rac_http_client rac_http_client_t;
  * @brief Single HTTP header (key + value, both NUL-terminated).
  *
  * The caller owns the strings for the lifetime of the request
- * struct; the implementation copies them into libcurl's slist before
- * firing the request.
+ * struct. Adapters must copy anything they need after the call
+ * returns.
  */
 typedef struct {
     const char* name;
@@ -70,7 +70,7 @@ typedef struct {
  * here so a single descriptor can travel end-to-end through the
  * download manager. NULL = no checksum check.
  *
- * `timeout_ms == 0` means "no timeout" (libcurl default).
+ * `timeout_ms == 0` means "no timeout".
  * `follow_redirects == RAC_TRUE` follows 3xx up to 10 hops.
  */
 typedef struct {
@@ -129,8 +129,8 @@ typedef struct {
  * delivered across all calls equals `total_written` on the final
  * invocation. `content_length` is the server-declared length (0 if
  * the server did not send `Content-Length`). Return `RAC_FALSE` to
- * cancel the transfer — libcurl aborts the connection and
- * `rac_http_request_stream` returns a non-zero status.
+ * cancel the transfer; adapters surface this as
+ * `RAC_ERROR_CANCELLED`.
  */
 typedef rac_bool_t (*rac_http_body_chunk_fn)(const uint8_t* chunk, size_t chunk_len,
                                              uint64_t total_written, uint64_t content_length,
@@ -141,8 +141,8 @@ typedef rac_bool_t (*rac_http_body_chunk_fn)(const uint8_t* chunk, size_t chunk_
 // =============================================================================
 
 /**
- * @brief Create a client instance. Each instance holds a single
- * libcurl easy handle; it is NOT thread-safe. Use one per worker.
+ * @brief Create a client instance. The handle preserves the stable ABI
+ * and routes requests through the registered transport adapter.
  *
  * @param out Handle out parameter (NULL on failure).
  * @return RAC_SUCCESS on success, RAC_ERROR_OUT_OF_MEMORY /
@@ -192,9 +192,9 @@ RAC_API rac_result_t rac_http_request_stream(rac_http_client_t* c, const rac_htt
  * `rac_http_request_stream`, except the caller must already have the
  * first `resume_from_byte` bytes on disk.
  *
- * The implementation sets `CURLOPT_RESUME_FROM_LARGE` which appends
- * a correctly-formed `Range` header. If the server returns 200
- * instead of 206, the caller can detect this via
+ * The registered adapter receives `resume_from_byte` and must attach a
+ * correctly-formed `Range: bytes=N-` request. If the server returns
+ * 200 instead of 206, the caller can detect this via
  * `out_resp_meta->status` and truncate its destination file before
  * writing the new bytes.
  */

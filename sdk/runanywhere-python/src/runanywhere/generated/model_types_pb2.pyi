@@ -91,6 +91,7 @@ class ModelSource(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     MODEL_SOURCE_UNSPECIFIED: _ClassVar[ModelSource]
     MODEL_SOURCE_REMOTE: _ClassVar[ModelSource]
     MODEL_SOURCE_LOCAL: _ClassVar[ModelSource]
+    MODEL_SOURCE_BUILT_IN: _ClassVar[ModelSource]
 
 class ArchiveType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -116,6 +117,11 @@ class ModelArtifactType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     MODEL_ARTIFACT_TYPE_DIRECTORY: _ClassVar[ModelArtifactType]
     MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE: _ClassVar[ModelArtifactType]
     MODEL_ARTIFACT_TYPE_CUSTOM: _ClassVar[ModelArtifactType]
+    MODEL_ARTIFACT_TYPE_ARCHIVE: _ClassVar[ModelArtifactType]
+    MODEL_ARTIFACT_TYPE_MULTI_FILE: _ClassVar[ModelArtifactType]
+    MODEL_ARTIFACT_TYPE_BUILT_IN: _ClassVar[ModelArtifactType]
+    MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE: _ClassVar[ModelArtifactType]
+    MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE: _ClassVar[ModelArtifactType]
 
 class ModelRegistryStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
@@ -241,6 +247,7 @@ SDK_ENVIRONMENT_PRODUCTION: SDKEnvironment
 MODEL_SOURCE_UNSPECIFIED: ModelSource
 MODEL_SOURCE_REMOTE: ModelSource
 MODEL_SOURCE_LOCAL: ModelSource
+MODEL_SOURCE_BUILT_IN: ModelSource
 ARCHIVE_TYPE_UNSPECIFIED: ArchiveType
 ARCHIVE_TYPE_ZIP: ArchiveType
 ARCHIVE_TYPE_TAR_BZ2: ArchiveType
@@ -257,6 +264,11 @@ MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE: ModelArtifactType
 MODEL_ARTIFACT_TYPE_DIRECTORY: ModelArtifactType
 MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE: ModelArtifactType
 MODEL_ARTIFACT_TYPE_CUSTOM: ModelArtifactType
+MODEL_ARTIFACT_TYPE_ARCHIVE: ModelArtifactType
+MODEL_ARTIFACT_TYPE_MULTI_FILE: ModelArtifactType
+MODEL_ARTIFACT_TYPE_BUILT_IN: ModelArtifactType
+MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE: ModelArtifactType
+MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE: ModelArtifactType
 MODEL_REGISTRY_STATUS_UNSPECIFIED: ModelRegistryStatus
 MODEL_REGISTRY_STATUS_REGISTERED: ModelRegistryStatus
 MODEL_REGISTRY_STATUS_DOWNLOADING: ModelRegistryStatus
@@ -413,27 +425,31 @@ class ModelInfoList(_message.Message):
     def __init__(self, models: _Optional[_Iterable[_Union[ModelInfo, _Mapping]]] = ...) -> None: ...
 
 class SingleFileArtifact(_message.Message):
-    __slots__ = ("required_patterns", "optional_patterns")
+    __slots__ = ("required_patterns", "optional_patterns", "expected_files")
     REQUIRED_PATTERNS_FIELD_NUMBER: _ClassVar[int]
     OPTIONAL_PATTERNS_FIELD_NUMBER: _ClassVar[int]
+    EXPECTED_FILES_FIELD_NUMBER: _ClassVar[int]
     required_patterns: _containers.RepeatedScalarFieldContainer[str]
     optional_patterns: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, required_patterns: _Optional[_Iterable[str]] = ..., optional_patterns: _Optional[_Iterable[str]] = ...) -> None: ...
+    expected_files: ExpectedModelFiles
+    def __init__(self, required_patterns: _Optional[_Iterable[str]] = ..., optional_patterns: _Optional[_Iterable[str]] = ..., expected_files: _Optional[_Union[ExpectedModelFiles, _Mapping]] = ...) -> None: ...
 
 class ArchiveArtifact(_message.Message):
-    __slots__ = ("type", "structure", "required_patterns", "optional_patterns")
+    __slots__ = ("type", "structure", "required_patterns", "optional_patterns", "expected_files")
     TYPE_FIELD_NUMBER: _ClassVar[int]
     STRUCTURE_FIELD_NUMBER: _ClassVar[int]
     REQUIRED_PATTERNS_FIELD_NUMBER: _ClassVar[int]
     OPTIONAL_PATTERNS_FIELD_NUMBER: _ClassVar[int]
+    EXPECTED_FILES_FIELD_NUMBER: _ClassVar[int]
     type: ArchiveType
     structure: ArchiveStructure
     required_patterns: _containers.RepeatedScalarFieldContainer[str]
     optional_patterns: _containers.RepeatedScalarFieldContainer[str]
-    def __init__(self, type: _Optional[_Union[ArchiveType, str]] = ..., structure: _Optional[_Union[ArchiveStructure, str]] = ..., required_patterns: _Optional[_Iterable[str]] = ..., optional_patterns: _Optional[_Iterable[str]] = ...) -> None: ...
+    expected_files: ExpectedModelFiles
+    def __init__(self, type: _Optional[_Union[ArchiveType, str]] = ..., structure: _Optional[_Union[ArchiveStructure, str]] = ..., required_patterns: _Optional[_Iterable[str]] = ..., optional_patterns: _Optional[_Iterable[str]] = ..., expected_files: _Optional[_Union[ExpectedModelFiles, _Mapping]] = ...) -> None: ...
 
 class ModelFileDescriptor(_message.Message):
-    __slots__ = ("url", "filename", "is_required", "size_bytes", "checksum", "relative_path", "destination_path", "role", "local_path")
+    __slots__ = ("url", "filename", "is_required", "size_bytes", "checksum", "relative_path", "destination_path", "role", "local_path", "checksum_sha256")
     URL_FIELD_NUMBER: _ClassVar[int]
     FILENAME_FIELD_NUMBER: _ClassVar[int]
     IS_REQUIRED_FIELD_NUMBER: _ClassVar[int]
@@ -443,6 +459,7 @@ class ModelFileDescriptor(_message.Message):
     DESTINATION_PATH_FIELD_NUMBER: _ClassVar[int]
     ROLE_FIELD_NUMBER: _ClassVar[int]
     LOCAL_PATH_FIELD_NUMBER: _ClassVar[int]
+    CHECKSUM_SHA256_FIELD_NUMBER: _ClassVar[int]
     url: str
     filename: str
     is_required: bool
@@ -452,7 +469,8 @@ class ModelFileDescriptor(_message.Message):
     destination_path: str
     role: ModelFileRole
     local_path: str
-    def __init__(self, url: _Optional[str] = ..., filename: _Optional[str] = ..., is_required: _Optional[bool] = ..., size_bytes: _Optional[int] = ..., checksum: _Optional[str] = ..., relative_path: _Optional[str] = ..., destination_path: _Optional[str] = ..., role: _Optional[_Union[ModelFileRole, str]] = ..., local_path: _Optional[str] = ...) -> None: ...
+    checksum_sha256: str
+    def __init__(self, url: _Optional[str] = ..., filename: _Optional[str] = ..., is_required: _Optional[bool] = ..., size_bytes: _Optional[int] = ..., checksum: _Optional[str] = ..., relative_path: _Optional[str] = ..., destination_path: _Optional[str] = ..., role: _Optional[_Union[ModelFileRole, str]] = ..., local_path: _Optional[str] = ..., checksum_sha256: _Optional[str] = ...) -> None: ...
 
 class MultiFileArtifact(_message.Message):
     __slots__ = ("files",)
@@ -475,7 +493,7 @@ class ExpectedModelFiles(_message.Message):
     def __init__(self, files: _Optional[_Iterable[_Union[ModelFileDescriptor, _Mapping]]] = ..., root_directory: _Optional[str] = ..., required_patterns: _Optional[_Iterable[str]] = ..., optional_patterns: _Optional[_Iterable[str]] = ..., description: _Optional[str] = ...) -> None: ...
 
 class ModelQuery(_message.Message):
-    __slots__ = ("framework", "category", "format", "downloaded_only", "available_only", "max_size_bytes", "search_query", "source", "sort_field", "sort_order")
+    __slots__ = ("framework", "category", "format", "downloaded_only", "available_only", "max_size_bytes", "search_query", "source", "sort_field", "sort_order", "registry_status")
     FRAMEWORK_FIELD_NUMBER: _ClassVar[int]
     CATEGORY_FIELD_NUMBER: _ClassVar[int]
     FORMAT_FIELD_NUMBER: _ClassVar[int]
@@ -486,6 +504,7 @@ class ModelQuery(_message.Message):
     SOURCE_FIELD_NUMBER: _ClassVar[int]
     SORT_FIELD_FIELD_NUMBER: _ClassVar[int]
     SORT_ORDER_FIELD_NUMBER: _ClassVar[int]
+    REGISTRY_STATUS_FIELD_NUMBER: _ClassVar[int]
     framework: InferenceFramework
     category: ModelCategory
     format: ModelFormat
@@ -496,7 +515,8 @@ class ModelQuery(_message.Message):
     source: ModelSource
     sort_field: ModelQuerySortField
     sort_order: ModelQuerySortOrder
-    def __init__(self, framework: _Optional[_Union[InferenceFramework, str]] = ..., category: _Optional[_Union[ModelCategory, str]] = ..., format: _Optional[_Union[ModelFormat, str]] = ..., downloaded_only: _Optional[bool] = ..., available_only: _Optional[bool] = ..., max_size_bytes: _Optional[int] = ..., search_query: _Optional[str] = ..., source: _Optional[_Union[ModelSource, str]] = ..., sort_field: _Optional[_Union[ModelQuerySortField, str]] = ..., sort_order: _Optional[_Union[ModelQuerySortOrder, str]] = ...) -> None: ...
+    registry_status: ModelRegistryStatus
+    def __init__(self, framework: _Optional[_Union[InferenceFramework, str]] = ..., category: _Optional[_Union[ModelCategory, str]] = ..., format: _Optional[_Union[ModelFormat, str]] = ..., downloaded_only: _Optional[bool] = ..., available_only: _Optional[bool] = ..., max_size_bytes: _Optional[int] = ..., search_query: _Optional[str] = ..., source: _Optional[_Union[ModelSource, str]] = ..., sort_field: _Optional[_Union[ModelQuerySortField, str]] = ..., sort_order: _Optional[_Union[ModelQuerySortOrder, str]] = ..., registry_status: _Optional[_Union[ModelRegistryStatus, str]] = ...) -> None: ...
 
 class ModelCompatibilityResult(_message.Message):
     __slots__ = ("is_compatible", "can_run", "can_fit", "required_memory_bytes", "available_memory_bytes", "required_storage_bytes", "available_storage_bytes", "reasons")
@@ -519,19 +539,25 @@ class ModelCompatibilityResult(_message.Message):
     def __init__(self, is_compatible: _Optional[bool] = ..., can_run: _Optional[bool] = ..., can_fit: _Optional[bool] = ..., required_memory_bytes: _Optional[int] = ..., available_memory_bytes: _Optional[int] = ..., required_storage_bytes: _Optional[int] = ..., available_storage_bytes: _Optional[int] = ..., reasons: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class ModelRegistryRefreshRequest(_message.Message):
-    __slots__ = ("include_remote_catalog", "rescan_local", "prune_orphans", "query")
+    __slots__ = ("include_remote_catalog", "rescan_local", "prune_orphans", "query", "catalog_uri", "force_refresh", "include_downloaded_state")
     INCLUDE_REMOTE_CATALOG_FIELD_NUMBER: _ClassVar[int]
     RESCAN_LOCAL_FIELD_NUMBER: _ClassVar[int]
     PRUNE_ORPHANS_FIELD_NUMBER: _ClassVar[int]
     QUERY_FIELD_NUMBER: _ClassVar[int]
+    CATALOG_URI_FIELD_NUMBER: _ClassVar[int]
+    FORCE_REFRESH_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_DOWNLOADED_STATE_FIELD_NUMBER: _ClassVar[int]
     include_remote_catalog: bool
     rescan_local: bool
     prune_orphans: bool
     query: ModelQuery
-    def __init__(self, include_remote_catalog: _Optional[bool] = ..., rescan_local: _Optional[bool] = ..., prune_orphans: _Optional[bool] = ..., query: _Optional[_Union[ModelQuery, _Mapping]] = ...) -> None: ...
+    catalog_uri: str
+    force_refresh: bool
+    include_downloaded_state: bool
+    def __init__(self, include_remote_catalog: _Optional[bool] = ..., rescan_local: _Optional[bool] = ..., prune_orphans: _Optional[bool] = ..., query: _Optional[_Union[ModelQuery, _Mapping]] = ..., catalog_uri: _Optional[str] = ..., force_refresh: _Optional[bool] = ..., include_downloaded_state: _Optional[bool] = ...) -> None: ...
 
 class ModelRegistryRefreshResult(_message.Message):
-    __slots__ = ("success", "models", "registered_count", "updated_count", "discovered_count", "pruned_count", "refreshed_at_unix_ms", "warnings", "error_message")
+    __slots__ = ("success", "models", "registered_count", "updated_count", "discovered_count", "pruned_count", "refreshed_at_unix_ms", "warnings", "error_message", "downloaded_count", "available_count", "error_count")
     SUCCESS_FIELD_NUMBER: _ClassVar[int]
     MODELS_FIELD_NUMBER: _ClassVar[int]
     REGISTERED_COUNT_FIELD_NUMBER: _ClassVar[int]
@@ -541,6 +567,9 @@ class ModelRegistryRefreshResult(_message.Message):
     REFRESHED_AT_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
     WARNINGS_FIELD_NUMBER: _ClassVar[int]
     ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    DOWNLOADED_COUNT_FIELD_NUMBER: _ClassVar[int]
+    AVAILABLE_COUNT_FIELD_NUMBER: _ClassVar[int]
+    ERROR_COUNT_FIELD_NUMBER: _ClassVar[int]
     success: bool
     models: ModelInfoList
     registered_count: int
@@ -550,23 +579,36 @@ class ModelRegistryRefreshResult(_message.Message):
     refreshed_at_unix_ms: int
     warnings: _containers.RepeatedScalarFieldContainer[str]
     error_message: str
-    def __init__(self, success: _Optional[bool] = ..., models: _Optional[_Union[ModelInfoList, _Mapping]] = ..., registered_count: _Optional[int] = ..., updated_count: _Optional[int] = ..., discovered_count: _Optional[int] = ..., pruned_count: _Optional[int] = ..., refreshed_at_unix_ms: _Optional[int] = ..., warnings: _Optional[_Iterable[str]] = ..., error_message: _Optional[str] = ...) -> None: ...
+    downloaded_count: int
+    available_count: int
+    error_count: int
+    def __init__(self, success: _Optional[bool] = ..., models: _Optional[_Union[ModelInfoList, _Mapping]] = ..., registered_count: _Optional[int] = ..., updated_count: _Optional[int] = ..., discovered_count: _Optional[int] = ..., pruned_count: _Optional[int] = ..., refreshed_at_unix_ms: _Optional[int] = ..., warnings: _Optional[_Iterable[str]] = ..., error_message: _Optional[str] = ..., downloaded_count: _Optional[int] = ..., available_count: _Optional[int] = ..., error_count: _Optional[int] = ...) -> None: ...
 
 class ModelListRequest(_message.Message):
-    __slots__ = ("query",)
+    __slots__ = ("query", "include_counts")
     QUERY_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_COUNTS_FIELD_NUMBER: _ClassVar[int]
     query: ModelQuery
-    def __init__(self, query: _Optional[_Union[ModelQuery, _Mapping]] = ...) -> None: ...
+    include_counts: bool
+    def __init__(self, query: _Optional[_Union[ModelQuery, _Mapping]] = ..., include_counts: _Optional[bool] = ...) -> None: ...
 
 class ModelListResult(_message.Message):
-    __slots__ = ("success", "models", "error_message")
+    __slots__ = ("success", "models", "error_message", "total_count", "downloaded_count", "available_count", "filtered_count")
     SUCCESS_FIELD_NUMBER: _ClassVar[int]
     MODELS_FIELD_NUMBER: _ClassVar[int]
     ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    TOTAL_COUNT_FIELD_NUMBER: _ClassVar[int]
+    DOWNLOADED_COUNT_FIELD_NUMBER: _ClassVar[int]
+    AVAILABLE_COUNT_FIELD_NUMBER: _ClassVar[int]
+    FILTERED_COUNT_FIELD_NUMBER: _ClassVar[int]
     success: bool
     models: ModelInfoList
     error_message: str
-    def __init__(self, success: _Optional[bool] = ..., models: _Optional[_Union[ModelInfoList, _Mapping]] = ..., error_message: _Optional[str] = ...) -> None: ...
+    total_count: int
+    downloaded_count: int
+    available_count: int
+    filtered_count: int
+    def __init__(self, success: _Optional[bool] = ..., models: _Optional[_Union[ModelInfoList, _Mapping]] = ..., error_message: _Optional[str] = ..., total_count: _Optional[int] = ..., downloaded_count: _Optional[int] = ..., available_count: _Optional[int] = ..., filtered_count: _Optional[int] = ...) -> None: ...
 
 class ModelGetRequest(_message.Message):
     __slots__ = ("model_id",)
@@ -585,48 +627,58 @@ class ModelGetResult(_message.Message):
     def __init__(self, found: _Optional[bool] = ..., model: _Optional[_Union[ModelInfo, _Mapping]] = ..., error_message: _Optional[str] = ...) -> None: ...
 
 class ModelImportRequest(_message.Message):
-    __slots__ = ("model", "source_path", "copy_into_managed_storage", "overwrite_existing", "files")
+    __slots__ = ("model", "source_path", "copy_into_managed_storage", "overwrite_existing", "files", "validate_before_register")
     MODEL_FIELD_NUMBER: _ClassVar[int]
     SOURCE_PATH_FIELD_NUMBER: _ClassVar[int]
     COPY_INTO_MANAGED_STORAGE_FIELD_NUMBER: _ClassVar[int]
     OVERWRITE_EXISTING_FIELD_NUMBER: _ClassVar[int]
     FILES_FIELD_NUMBER: _ClassVar[int]
+    VALIDATE_BEFORE_REGISTER_FIELD_NUMBER: _ClassVar[int]
     model: ModelInfo
     source_path: str
     copy_into_managed_storage: bool
     overwrite_existing: bool
     files: _containers.RepeatedCompositeFieldContainer[ModelFileDescriptor]
-    def __init__(self, model: _Optional[_Union[ModelInfo, _Mapping]] = ..., source_path: _Optional[str] = ..., copy_into_managed_storage: _Optional[bool] = ..., overwrite_existing: _Optional[bool] = ..., files: _Optional[_Iterable[_Union[ModelFileDescriptor, _Mapping]]] = ...) -> None: ...
+    validate_before_register: bool
+    def __init__(self, model: _Optional[_Union[ModelInfo, _Mapping]] = ..., source_path: _Optional[str] = ..., copy_into_managed_storage: _Optional[bool] = ..., overwrite_existing: _Optional[bool] = ..., files: _Optional[_Iterable[_Union[ModelFileDescriptor, _Mapping]]] = ..., validate_before_register: _Optional[bool] = ...) -> None: ...
 
 class ModelImportResult(_message.Message):
-    __slots__ = ("success", "model", "local_path", "imported_bytes", "warnings", "error_message")
+    __slots__ = ("success", "model", "local_path", "imported_bytes", "warnings", "error_message", "registered", "copied_into_managed_storage")
     SUCCESS_FIELD_NUMBER: _ClassVar[int]
     MODEL_FIELD_NUMBER: _ClassVar[int]
     LOCAL_PATH_FIELD_NUMBER: _ClassVar[int]
     IMPORTED_BYTES_FIELD_NUMBER: _ClassVar[int]
     WARNINGS_FIELD_NUMBER: _ClassVar[int]
     ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    REGISTERED_FIELD_NUMBER: _ClassVar[int]
+    COPIED_INTO_MANAGED_STORAGE_FIELD_NUMBER: _ClassVar[int]
     success: bool
     model: ModelInfo
     local_path: str
     imported_bytes: int
     warnings: _containers.RepeatedScalarFieldContainer[str]
     error_message: str
-    def __init__(self, success: _Optional[bool] = ..., model: _Optional[_Union[ModelInfo, _Mapping]] = ..., local_path: _Optional[str] = ..., imported_bytes: _Optional[int] = ..., warnings: _Optional[_Iterable[str]] = ..., error_message: _Optional[str] = ...) -> None: ...
+    registered: bool
+    copied_into_managed_storage: bool
+    def __init__(self, success: _Optional[bool] = ..., model: _Optional[_Union[ModelInfo, _Mapping]] = ..., local_path: _Optional[str] = ..., imported_bytes: _Optional[int] = ..., warnings: _Optional[_Iterable[str]] = ..., error_message: _Optional[str] = ..., registered: _Optional[bool] = ..., copied_into_managed_storage: _Optional[bool] = ...) -> None: ...
 
 class ModelDiscoveryRequest(_message.Message):
-    __slots__ = ("search_roots", "recursive", "link_downloaded", "purge_invalid", "query")
+    __slots__ = ("search_roots", "recursive", "link_downloaded", "purge_invalid", "query", "include_built_in", "include_user_imports")
     SEARCH_ROOTS_FIELD_NUMBER: _ClassVar[int]
     RECURSIVE_FIELD_NUMBER: _ClassVar[int]
     LINK_DOWNLOADED_FIELD_NUMBER: _ClassVar[int]
     PURGE_INVALID_FIELD_NUMBER: _ClassVar[int]
     QUERY_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_BUILT_IN_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_USER_IMPORTS_FIELD_NUMBER: _ClassVar[int]
     search_roots: _containers.RepeatedScalarFieldContainer[str]
     recursive: bool
     link_downloaded: bool
     purge_invalid: bool
     query: ModelQuery
-    def __init__(self, search_roots: _Optional[_Iterable[str]] = ..., recursive: _Optional[bool] = ..., link_downloaded: _Optional[bool] = ..., purge_invalid: _Optional[bool] = ..., query: _Optional[_Union[ModelQuery, _Mapping]] = ...) -> None: ...
+    include_built_in: bool
+    include_user_imports: bool
+    def __init__(self, search_roots: _Optional[_Iterable[str]] = ..., recursive: _Optional[bool] = ..., link_downloaded: _Optional[bool] = ..., purge_invalid: _Optional[bool] = ..., query: _Optional[_Union[ModelQuery, _Mapping]] = ..., include_built_in: _Optional[bool] = ..., include_user_imports: _Optional[bool] = ...) -> None: ...
 
 class DiscoveredModel(_message.Message):
     __slots__ = ("model_id", "local_path", "matched_registry", "model", "size_bytes", "warnings")
@@ -645,35 +697,41 @@ class DiscoveredModel(_message.Message):
     def __init__(self, model_id: _Optional[str] = ..., local_path: _Optional[str] = ..., matched_registry: _Optional[bool] = ..., model: _Optional[_Union[ModelInfo, _Mapping]] = ..., size_bytes: _Optional[int] = ..., warnings: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class ModelDiscoveryResult(_message.Message):
-    __slots__ = ("success", "discovered_models", "linked_count", "purged_count", "warnings", "error_message")
+    __slots__ = ("success", "discovered_models", "linked_count", "purged_count", "warnings", "error_message", "scanned_count", "imported_count")
     SUCCESS_FIELD_NUMBER: _ClassVar[int]
     DISCOVERED_MODELS_FIELD_NUMBER: _ClassVar[int]
     LINKED_COUNT_FIELD_NUMBER: _ClassVar[int]
     PURGED_COUNT_FIELD_NUMBER: _ClassVar[int]
     WARNINGS_FIELD_NUMBER: _ClassVar[int]
     ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    SCANNED_COUNT_FIELD_NUMBER: _ClassVar[int]
+    IMPORTED_COUNT_FIELD_NUMBER: _ClassVar[int]
     success: bool
     discovered_models: _containers.RepeatedCompositeFieldContainer[DiscoveredModel]
     linked_count: int
     purged_count: int
     warnings: _containers.RepeatedScalarFieldContainer[str]
     error_message: str
-    def __init__(self, success: _Optional[bool] = ..., discovered_models: _Optional[_Iterable[_Union[DiscoveredModel, _Mapping]]] = ..., linked_count: _Optional[int] = ..., purged_count: _Optional[int] = ..., warnings: _Optional[_Iterable[str]] = ..., error_message: _Optional[str] = ...) -> None: ...
+    scanned_count: int
+    imported_count: int
+    def __init__(self, success: _Optional[bool] = ..., discovered_models: _Optional[_Iterable[_Union[DiscoveredModel, _Mapping]]] = ..., linked_count: _Optional[int] = ..., purged_count: _Optional[int] = ..., warnings: _Optional[_Iterable[str]] = ..., error_message: _Optional[str] = ..., scanned_count: _Optional[int] = ..., imported_count: _Optional[int] = ...) -> None: ...
 
 class ModelLoadRequest(_message.Message):
-    __slots__ = ("model_id", "category", "framework", "force_reload")
+    __slots__ = ("model_id", "category", "framework", "force_reload", "validate_availability")
     MODEL_ID_FIELD_NUMBER: _ClassVar[int]
     CATEGORY_FIELD_NUMBER: _ClassVar[int]
     FRAMEWORK_FIELD_NUMBER: _ClassVar[int]
     FORCE_RELOAD_FIELD_NUMBER: _ClassVar[int]
+    VALIDATE_AVAILABILITY_FIELD_NUMBER: _ClassVar[int]
     model_id: str
     category: ModelCategory
     framework: InferenceFramework
     force_reload: bool
-    def __init__(self, model_id: _Optional[str] = ..., category: _Optional[_Union[ModelCategory, str]] = ..., framework: _Optional[_Union[InferenceFramework, str]] = ..., force_reload: _Optional[bool] = ...) -> None: ...
+    validate_availability: bool
+    def __init__(self, model_id: _Optional[str] = ..., category: _Optional[_Union[ModelCategory, str]] = ..., framework: _Optional[_Union[InferenceFramework, str]] = ..., force_reload: _Optional[bool] = ..., validate_availability: _Optional[bool] = ...) -> None: ...
 
 class ModelLoadResult(_message.Message):
-    __slots__ = ("success", "model_id", "category", "framework", "resolved_path", "loaded_at_unix_ms", "error_message")
+    __slots__ = ("success", "model_id", "category", "framework", "resolved_path", "loaded_at_unix_ms", "error_message", "warnings", "already_loaded", "resolved_artifacts")
     SUCCESS_FIELD_NUMBER: _ClassVar[int]
     MODEL_ID_FIELD_NUMBER: _ClassVar[int]
     CATEGORY_FIELD_NUMBER: _ClassVar[int]
@@ -681,6 +739,9 @@ class ModelLoadResult(_message.Message):
     RESOLVED_PATH_FIELD_NUMBER: _ClassVar[int]
     LOADED_AT_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
     ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    WARNINGS_FIELD_NUMBER: _ClassVar[int]
+    ALREADY_LOADED_FIELD_NUMBER: _ClassVar[int]
+    RESOLVED_ARTIFACTS_FIELD_NUMBER: _ClassVar[int]
     success: bool
     model_id: str
     category: ModelCategory
@@ -688,45 +749,68 @@ class ModelLoadResult(_message.Message):
     resolved_path: str
     loaded_at_unix_ms: int
     error_message: str
-    def __init__(self, success: _Optional[bool] = ..., model_id: _Optional[str] = ..., category: _Optional[_Union[ModelCategory, str]] = ..., framework: _Optional[_Union[InferenceFramework, str]] = ..., resolved_path: _Optional[str] = ..., loaded_at_unix_ms: _Optional[int] = ..., error_message: _Optional[str] = ...) -> None: ...
+    warnings: _containers.RepeatedScalarFieldContainer[str]
+    already_loaded: bool
+    resolved_artifacts: _containers.RepeatedCompositeFieldContainer[ModelFileDescriptor]
+    def __init__(self, success: _Optional[bool] = ..., model_id: _Optional[str] = ..., category: _Optional[_Union[ModelCategory, str]] = ..., framework: _Optional[_Union[InferenceFramework, str]] = ..., resolved_path: _Optional[str] = ..., loaded_at_unix_ms: _Optional[int] = ..., error_message: _Optional[str] = ..., warnings: _Optional[_Iterable[str]] = ..., already_loaded: _Optional[bool] = ..., resolved_artifacts: _Optional[_Iterable[_Union[ModelFileDescriptor, _Mapping]]] = ...) -> None: ...
 
 class ModelUnloadRequest(_message.Message):
-    __slots__ = ("model_id", "category", "unload_all")
+    __slots__ = ("model_id", "category", "unload_all", "framework")
     MODEL_ID_FIELD_NUMBER: _ClassVar[int]
     CATEGORY_FIELD_NUMBER: _ClassVar[int]
     UNLOAD_ALL_FIELD_NUMBER: _ClassVar[int]
+    FRAMEWORK_FIELD_NUMBER: _ClassVar[int]
     model_id: str
     category: ModelCategory
     unload_all: bool
-    def __init__(self, model_id: _Optional[str] = ..., category: _Optional[_Union[ModelCategory, str]] = ..., unload_all: _Optional[bool] = ...) -> None: ...
+    framework: InferenceFramework
+    def __init__(self, model_id: _Optional[str] = ..., category: _Optional[_Union[ModelCategory, str]] = ..., unload_all: _Optional[bool] = ..., framework: _Optional[_Union[InferenceFramework, str]] = ...) -> None: ...
 
 class ModelUnloadResult(_message.Message):
-    __slots__ = ("success", "unloaded_model_ids", "error_message")
+    __slots__ = ("success", "unloaded_model_ids", "error_message", "unloaded_at_unix_ms", "warnings")
     SUCCESS_FIELD_NUMBER: _ClassVar[int]
     UNLOADED_MODEL_IDS_FIELD_NUMBER: _ClassVar[int]
     ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    UNLOADED_AT_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
+    WARNINGS_FIELD_NUMBER: _ClassVar[int]
     success: bool
     unloaded_model_ids: _containers.RepeatedScalarFieldContainer[str]
     error_message: str
-    def __init__(self, success: _Optional[bool] = ..., unloaded_model_ids: _Optional[_Iterable[str]] = ..., error_message: _Optional[str] = ...) -> None: ...
+    unloaded_at_unix_ms: int
+    warnings: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, success: _Optional[bool] = ..., unloaded_model_ids: _Optional[_Iterable[str]] = ..., error_message: _Optional[str] = ..., unloaded_at_unix_ms: _Optional[int] = ..., warnings: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class CurrentModelRequest(_message.Message):
-    __slots__ = ("category", "framework")
+    __slots__ = ("category", "framework", "include_model_metadata")
     CATEGORY_FIELD_NUMBER: _ClassVar[int]
     FRAMEWORK_FIELD_NUMBER: _ClassVar[int]
+    INCLUDE_MODEL_METADATA_FIELD_NUMBER: _ClassVar[int]
     category: ModelCategory
     framework: InferenceFramework
-    def __init__(self, category: _Optional[_Union[ModelCategory, str]] = ..., framework: _Optional[_Union[InferenceFramework, str]] = ...) -> None: ...
+    include_model_metadata: bool
+    def __init__(self, category: _Optional[_Union[ModelCategory, str]] = ..., framework: _Optional[_Union[InferenceFramework, str]] = ..., include_model_metadata: _Optional[bool] = ...) -> None: ...
 
 class CurrentModelResult(_message.Message):
-    __slots__ = ("model_id", "model", "loaded_at_unix_ms")
+    __slots__ = ("model_id", "model", "loaded_at_unix_ms", "found", "error_message", "category", "framework", "resolved_path", "resolved_artifacts")
     MODEL_ID_FIELD_NUMBER: _ClassVar[int]
     MODEL_FIELD_NUMBER: _ClassVar[int]
     LOADED_AT_UNIX_MS_FIELD_NUMBER: _ClassVar[int]
+    FOUND_FIELD_NUMBER: _ClassVar[int]
+    ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    CATEGORY_FIELD_NUMBER: _ClassVar[int]
+    FRAMEWORK_FIELD_NUMBER: _ClassVar[int]
+    RESOLVED_PATH_FIELD_NUMBER: _ClassVar[int]
+    RESOLVED_ARTIFACTS_FIELD_NUMBER: _ClassVar[int]
     model_id: str
     model: ModelInfo
     loaded_at_unix_ms: int
-    def __init__(self, model_id: _Optional[str] = ..., model: _Optional[_Union[ModelInfo, _Mapping]] = ..., loaded_at_unix_ms: _Optional[int] = ...) -> None: ...
+    found: bool
+    error_message: str
+    category: ModelCategory
+    framework: InferenceFramework
+    resolved_path: str
+    resolved_artifacts: _containers.RepeatedCompositeFieldContainer[ModelFileDescriptor]
+    def __init__(self, model_id: _Optional[str] = ..., model: _Optional[_Union[ModelInfo, _Mapping]] = ..., loaded_at_unix_ms: _Optional[int] = ..., found: _Optional[bool] = ..., error_message: _Optional[str] = ..., category: _Optional[_Union[ModelCategory, str]] = ..., framework: _Optional[_Union[InferenceFramework, str]] = ..., resolved_path: _Optional[str] = ..., resolved_artifacts: _Optional[_Iterable[_Union[ModelFileDescriptor, _Mapping]]] = ...) -> None: ...
 
 class ModelDeleteRequest(_message.Message):
     __slots__ = ("model_id", "delete_files", "unregister", "unload_if_loaded")
@@ -741,7 +825,7 @@ class ModelDeleteRequest(_message.Message):
     def __init__(self, model_id: _Optional[str] = ..., delete_files: _Optional[bool] = ..., unregister: _Optional[bool] = ..., unload_if_loaded: _Optional[bool] = ...) -> None: ...
 
 class ModelDeleteResult(_message.Message):
-    __slots__ = ("success", "model_id", "deleted_bytes", "files_deleted", "registry_updated", "was_loaded", "error_message")
+    __slots__ = ("success", "model_id", "deleted_bytes", "files_deleted", "registry_updated", "was_loaded", "error_message", "warnings")
     SUCCESS_FIELD_NUMBER: _ClassVar[int]
     MODEL_ID_FIELD_NUMBER: _ClassVar[int]
     DELETED_BYTES_FIELD_NUMBER: _ClassVar[int]
@@ -749,6 +833,7 @@ class ModelDeleteResult(_message.Message):
     REGISTRY_UPDATED_FIELD_NUMBER: _ClassVar[int]
     WAS_LOADED_FIELD_NUMBER: _ClassVar[int]
     ERROR_MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    WARNINGS_FIELD_NUMBER: _ClassVar[int]
     success: bool
     model_id: str
     deleted_bytes: int
@@ -756,4 +841,5 @@ class ModelDeleteResult(_message.Message):
     registry_updated: bool
     was_loaded: bool
     error_message: str
-    def __init__(self, success: _Optional[bool] = ..., model_id: _Optional[str] = ..., deleted_bytes: _Optional[int] = ..., files_deleted: _Optional[bool] = ..., registry_updated: _Optional[bool] = ..., was_loaded: _Optional[bool] = ..., error_message: _Optional[str] = ...) -> None: ...
+    warnings: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, success: _Optional[bool] = ..., model_id: _Optional[str] = ..., deleted_bytes: _Optional[int] = ..., files_deleted: _Optional[bool] = ..., registry_updated: _Optional[bool] = ..., was_loaded: _Optional[bool] = ..., error_message: _Optional[str] = ..., warnings: _Optional[_Iterable[str]] = ...) -> None: ...

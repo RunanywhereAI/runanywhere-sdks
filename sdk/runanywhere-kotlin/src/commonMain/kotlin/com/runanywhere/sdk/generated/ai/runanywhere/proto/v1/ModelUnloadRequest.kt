@@ -49,6 +49,12 @@ public class ModelUnloadRequest(
     schemaIndex = 2,
   )
   public val unload_all: Boolean = false,
+  @field:WireField(
+    tag = 4,
+    adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
+    schemaIndex = 3,
+  )
+  public val framework: InferenceFramework? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ModelUnloadRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -65,6 +71,7 @@ public class ModelUnloadRequest(
     if (model_id != other.model_id) return false
     if (category != other.category) return false
     if (unload_all != other.unload_all) return false
+    if (framework != other.framework) return false
     return true
   }
 
@@ -75,6 +82,7 @@ public class ModelUnloadRequest(
       result = result * 37 + model_id.hashCode()
       result = result * 37 + (category?.hashCode() ?: 0)
       result = result * 37 + unload_all.hashCode()
+      result = result * 37 + (framework?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -85,6 +93,7 @@ public class ModelUnloadRequest(
     result += """model_id=${sanitize(model_id)}"""
     if (category != null) result += """category=$category"""
     result += """unload_all=$unload_all"""
+    if (framework != null) result += """framework=$framework"""
     return result.joinToString(prefix = "ModelUnloadRequest{", separator = ", ", postfix = "}")
   }
 
@@ -92,8 +101,10 @@ public class ModelUnloadRequest(
     model_id: String = this.model_id,
     category: ModelCategory? = this.category,
     unload_all: Boolean = this.unload_all,
+    framework: InferenceFramework? = this.framework,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelUnloadRequest = ModelUnloadRequest(model_id, category, unload_all, unknownFields)
+  ): ModelUnloadRequest = ModelUnloadRequest(model_id, category, unload_all, framework,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -112,6 +123,7 @@ public class ModelUnloadRequest(
         size += ModelCategory.ADAPTER.encodedSizeWithTag(2, value.category)
         if (value.unload_all != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(3,
             value.unload_all)
+        size += InferenceFramework.ADAPTER.encodedSizeWithTag(4, value.framework)
         return size
       }
 
@@ -119,11 +131,13 @@ public class ModelUnloadRequest(
         if (value.model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
         ModelCategory.ADAPTER.encodeWithTag(writer, 2, value.category)
         if (value.unload_all != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.unload_all)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 4, value.framework)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: ModelUnloadRequest) {
         writer.writeBytes(value.unknownFields)
+        InferenceFramework.ADAPTER.encodeWithTag(writer, 4, value.framework)
         if (value.unload_all != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.unload_all)
         ModelCategory.ADAPTER.encodeWithTag(writer, 2, value.category)
         if (value.model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.model_id)
@@ -133,6 +147,7 @@ public class ModelUnloadRequest(
         var model_id: String = ""
         var category: ModelCategory? = null
         var unload_all: Boolean = false
+        var framework: InferenceFramework? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> model_id = ProtoAdapter.STRING.decode(reader)
@@ -142,6 +157,11 @@ public class ModelUnloadRequest(
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }
             3 -> unload_all = ProtoAdapter.BOOL.decode(reader)
+            4 -> try {
+              framework = InferenceFramework.ADAPTER.decode(reader)
+            } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
+              reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
+            }
             else -> reader.readUnknownField(tag)
           }
         }
@@ -149,6 +169,7 @@ public class ModelUnloadRequest(
           model_id = model_id,
           category = category,
           unload_all = unload_all,
+          framework = framework,
           unknownFields = unknownFields
         )
       }

@@ -1,5 +1,9 @@
 package com.runanywhere.runanywhereai.presentation.models
 
+import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelFormat
+import ai.runanywhere.proto.v1.ModelInfo
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -58,12 +62,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.runanywhere.runanywhereai.R
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
-import com.runanywhere.sdk.core.types.InferenceFramework
 import com.runanywhere.sdk.models.DeviceInfo
-import com.runanywhere.sdk.public.extensions.Models.ModelCategory
-import com.runanywhere.sdk.public.extensions.Models.ModelFormat
-import com.runanywhere.sdk.public.extensions.Models.ModelInfo
 import com.runanywhere.sdk.public.extensions.Models.ModelSelectionContext
+import com.runanywhere.sdk.public.extensions.Models.displayName
+import com.runanywhere.sdk.public.extensions.Models.isDownloadedModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -181,7 +183,7 @@ fun ModelSelectionBottomSheet(
                         )
                     }
                 } else {
-                    if (context == ModelSelectionContext.TTS && uiState.frameworks.contains(InferenceFramework.SYSTEM_TTS)) {
+                    if (context == ModelSelectionContext.TTS && uiState.frameworks.contains(InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS)) {
                         SystemTTSRow(
                             isLoading = uiState.isLoadingModel,
                             onSelect = {
@@ -192,10 +194,11 @@ fun ModelSelectionBottomSheet(
                                             ModelInfo(
                                                 id = SYSTEM_TTS_MODEL_ID,
                                                 name = "System TTS",
-                                                downloadURL = null,
-                                                format = ModelFormat.UNKNOWN,
-                                                category = ModelCategory.SPEECH_SYNTHESIS,
-                                                framework = InferenceFramework.SYSTEM_TTS,
+                                                format = ModelFormat.MODEL_FORMAT_PROPRIETARY,
+                                                category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+                                                framework = InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS,
+                                                built_in = true,
+                                                is_downloaded = true,
                                             )
                                         onModelSelected(systemTTSModel)
                                         onDismiss()
@@ -211,9 +214,9 @@ fun ModelSelectionBottomSheet(
                     val sortedModels =
                         uiState.models.sortedWith(
                             compareBy<ModelInfo> {
-                                if (it.framework == InferenceFramework.FOUNDATION_MODELS) {
+                                if (it.framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS) {
                                     0
-                                } else if (it.isDownloaded) {
+                                } else if (it.isDownloadedModel) {
                                     1
                                 } else {
                                     2
@@ -223,9 +226,9 @@ fun ModelSelectionBottomSheet(
                         )
                     sortedModels.forEachIndexed { index, model ->
                         val isBuiltIn =
-                            model.framework == InferenceFramework.FOUNDATION_MODELS ||
-                                model.framework == InferenceFramework.SYSTEM_TTS
-                        val isReady = isBuiltIn || model.isDownloaded
+                            model.framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
+                                model.framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
+                        val isReady = isBuiltIn || model.isDownloadedModel
                         val isThisModelDownloading = uiState.isLoadingModel && uiState.selectedModelId == model.id
                         ModelCard(
                             model = toAIModel(model),
@@ -286,31 +289,31 @@ private fun toDeviceStatus(info: DeviceInfo): DeviceStatus =
     )
 
 private fun toAIModel(m: ModelInfo): AIModel {
-    val isGenie = m.framework == InferenceFramework.GENIE
+    val isGenie = m.framework == InferenceFramework.INFERENCE_FRAMEWORK_GENIE
     val formatStr =
         when (m.framework) {
-            InferenceFramework.LLAMA_CPP -> "Fast"
-            InferenceFramework.ONNX -> "ONNX"
-            InferenceFramework.FOUNDATION_MODELS -> "Apple"
-            InferenceFramework.SYSTEM_TTS -> "System"
-            InferenceFramework.GENIE -> "NPU"
+            InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP -> "Fast"
+            InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> "ONNX"
+            InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS -> "Apple"
+            InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> "System"
+            InferenceFramework.INFERENCE_FRAMEWORK_GENIE -> "NPU"
             else -> m.framework.displayName
         }
     val formatColor =
         when (m.framework) {
-            InferenceFramework.ONNX -> AppColors.primaryPurple
-            InferenceFramework.GENIE -> AppColors.primaryBlue
+            InferenceFramework.INFERENCE_FRAMEWORK_ONNX -> AppColors.primaryPurple
+            InferenceFramework.INFERENCE_FRAMEWORK_GENIE -> AppColors.primaryBlue
             else -> AppColors.primaryAccent
         }
-    val sizeStr = if (m.downloadSize != null && m.downloadSize!! > 0) formatBytes(m.downloadSize!!) else "—"
+    val sizeStr = if (m.download_size_bytes > 0) formatBytes(m.download_size_bytes) else "—"
     return AIModel(
         name = m.name,
         logoResId = getModelLogoResId(m),
         format = formatStr,
         formatColor = formatColor,
         size = sizeStr,
-        isDownloaded = m.isDownloaded || m.framework == InferenceFramework.FOUNDATION_MODELS || m.framework == InferenceFramework.SYSTEM_TTS,
-        supportsLora = m.supportsLora,
+        isDownloaded = m.isDownloadedModel || m.framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS || m.framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS,
+        supportsLora = m.supports_lora,
         isNpu = isGenie,
     )
 }
@@ -319,8 +322,8 @@ private fun toAIModel(m: ModelInfo): AIModel {
 private fun getModelLogoResId(model: ModelInfo): Int {
     val name = model.name.lowercase()
     return when {
-        model.framework == InferenceFramework.FOUNDATION_MODELS ||
-            model.framework == InferenceFramework.SYSTEM_TTS -> R.drawable.foundation_models_logo
+        model.framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
+            model.framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS -> R.drawable.foundation_models_logo
         name.contains("llama") -> R.drawable.llama_logo
         name.contains("mistral") -> R.drawable.mistral_logo
         name.contains("qwen") -> R.drawable.qwen_logo

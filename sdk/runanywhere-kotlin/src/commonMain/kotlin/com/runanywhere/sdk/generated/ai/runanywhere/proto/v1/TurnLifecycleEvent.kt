@@ -72,6 +72,22 @@ public class TurnLifecycleEvent(
     schemaIndex = 5,
   )
   public val error: String = "",
+  @field:WireField(
+    tag = 7,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "startedAtMs",
+    schemaIndex = 6,
+  )
+  public val started_at_ms: Long = 0L,
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "completedAtMs",
+    schemaIndex = 7,
+  )
+  public val completed_at_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TurnLifecycleEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -91,6 +107,8 @@ public class TurnLifecycleEvent(
     if (transcript != other.transcript) return false
     if (response != other.response) return false
     if (error != other.error) return false
+    if (started_at_ms != other.started_at_ms) return false
+    if (completed_at_ms != other.completed_at_ms) return false
     return true
   }
 
@@ -104,6 +122,8 @@ public class TurnLifecycleEvent(
       result = result * 37 + transcript.hashCode()
       result = result * 37 + response.hashCode()
       result = result * 37 + error.hashCode()
+      result = result * 37 + started_at_ms.hashCode()
+      result = result * 37 + completed_at_ms.hashCode()
       super.hashCode = result
     }
     return result
@@ -117,6 +137,8 @@ public class TurnLifecycleEvent(
     result += """transcript=${sanitize(transcript)}"""
     result += """response=${sanitize(response)}"""
     result += """error=${sanitize(error)}"""
+    result += """started_at_ms=$started_at_ms"""
+    result += """completed_at_ms=$completed_at_ms"""
     return result.joinToString(prefix = "TurnLifecycleEvent{", separator = ", ", postfix = "}")
   }
 
@@ -127,9 +149,11 @@ public class TurnLifecycleEvent(
     transcript: String = this.transcript,
     response: String = this.response,
     error: String = this.error,
+    started_at_ms: Long = this.started_at_ms,
+    completed_at_ms: Long = this.completed_at_ms,
     unknownFields: ByteString = this.unknownFields,
   ): TurnLifecycleEvent = TurnLifecycleEvent(kind, turn_id, session_id, transcript, response, error,
-      unknownFields)
+      started_at_ms, completed_at_ms, unknownFields)
 
   public companion object {
     @JvmField
@@ -153,6 +177,10 @@ public class TurnLifecycleEvent(
             value.transcript)
         if (value.response != "") size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.response)
         if (value.error != "") size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.error)
+        if (value.started_at_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(7,
+            value.started_at_ms)
+        if (value.completed_at_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(8,
+            value.completed_at_ms)
         return size
       }
 
@@ -164,11 +192,19 @@ public class TurnLifecycleEvent(
         if (value.transcript != "") ProtoAdapter.STRING.encodeWithTag(writer, 4, value.transcript)
         if (value.response != "") ProtoAdapter.STRING.encodeWithTag(writer, 5, value.response)
         if (value.error != "") ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error)
+        if (value.started_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
+            value.started_at_ms)
+        if (value.completed_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 8,
+            value.completed_at_ms)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TurnLifecycleEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.completed_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 8,
+            value.completed_at_ms)
+        if (value.started_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
+            value.started_at_ms)
         if (value.error != "") ProtoAdapter.STRING.encodeWithTag(writer, 6, value.error)
         if (value.response != "") ProtoAdapter.STRING.encodeWithTag(writer, 5, value.response)
         if (value.transcript != "") ProtoAdapter.STRING.encodeWithTag(writer, 4, value.transcript)
@@ -186,6 +222,8 @@ public class TurnLifecycleEvent(
         var transcript: String = ""
         var response: String = ""
         var error: String = ""
+        var started_at_ms: Long = 0L
+        var completed_at_ms: Long = 0L
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -198,6 +236,8 @@ public class TurnLifecycleEvent(
             4 -> transcript = ProtoAdapter.STRING.decode(reader)
             5 -> response = ProtoAdapter.STRING.decode(reader)
             6 -> error = ProtoAdapter.STRING.decode(reader)
+            7 -> started_at_ms = ProtoAdapter.INT64.decode(reader)
+            8 -> completed_at_ms = ProtoAdapter.INT64.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -208,6 +248,8 @@ public class TurnLifecycleEvent(
           transcript = transcript,
           response = response,
           error = error,
+          started_at_ms = started_at_ms,
+          completed_at_ms = completed_at_ms,
           unknownFields = unknownFields
         )
       }

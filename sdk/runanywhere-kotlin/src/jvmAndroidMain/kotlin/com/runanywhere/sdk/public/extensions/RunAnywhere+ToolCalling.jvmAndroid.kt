@@ -15,16 +15,17 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.LLMGenerationResult
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
+import ai.runanywhere.proto.v1.ToolCallingOptions
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeToolCalling
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
 import com.runanywhere.sdk.public.extensions.LLM.ToolCall
-import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOptions
-import com.runanywhere.sdk.public.extensions.LLM.ToolCallingResult
 import com.runanywhere.sdk.public.extensions.LLM.ToolDefinition
 import com.runanywhere.sdk.public.extensions.LLM.ToolExecutor
 import com.runanywhere.sdk.public.extensions.LLM.ToolResult
+import com.runanywhere.sdk.public.extensions.LLM.toLLMGenerationResult
+import com.runanywhere.sdk.public.extensions.LLM.toToolCallingOptions
 
 actual suspend fun RunAnywhere.registerTool(definition: ToolDefinition, executor: ToolExecutor) {
     RunAnywhereToolCalling.registerTool(definition, executor)
@@ -49,18 +50,9 @@ actual suspend fun RunAnywhere.generateWithTools(
     options: LLMGenerationOptions?,
 ): LLMGenerationResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    // Delegate through the existing tool-calling orchestration loop but wrap
-    // the result into the canonical LLMGenerationResult shape.
-    val toolOptions =
-        ToolCallingOptions(
-            max_iterations = 5,
-            auto_execute = true,
-        )
-    val tcResult: ToolCallingResult = RunAnywhereToolCalling.generateWithTools(prompt, toolOptions)
-    return LLMGenerationResult(
-        text = tcResult.text,
-        model_used = CppBridgeLLM.getLoadedModelId() ?: "unknown",
-    )
+    val toolOptions = options.toToolCallingOptions()
+    val toolResult = RunAnywhereToolCalling.generateWithTools(prompt, toolOptions)
+    return toolResult.toLLMGenerationResult()
 }
 
 actual suspend fun RunAnywhere.continueWithToolResult(
@@ -68,14 +60,29 @@ actual suspend fun RunAnywhere.continueWithToolResult(
     result: String,
 ): LLMGenerationResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    // Build a continuation prompt with the tool result and generate.
-    val continuationPrompt = "[Tool result for $toolCallId]: $result"
-    val config = CppBridgeLLM.GenerationConfig.DEFAULT
-    val cppResult = CppBridgeLLM.generate(continuationPrompt, config)
-    return LLMGenerationResult(
-        text = cppResult.text,
-        model_used = CppBridgeLLM.getLoadedModelId() ?: "unknown",
-        tokens_generated = cppResult.tokensGenerated,
-        tokens_per_second = cppResult.tokensPerSecond.toDouble(),
+    val continuationPrompt =
+        CppBridgeToolCalling.buildFollowupPrompt(
+            originalPrompt = "",
+            tools = emptyList(),
+            toolResult =
+                ToolResult(
+                    tool_call_id = toolCallId,
+                    name = toolCallId,
+                    result_json = result,
+                    success = true,
+                    call_id = toolCallId,
+                ),
+            options = ToolCallingOptions(),
+        )
+    return generate(
+        prompt = continuationPrompt,
+        options =
+            LLMGenerationOptions(
+                tool_calling =
+                    ToolCallingOptions(
+                        tools = emptyList(),
+                        auto_execute = false,
+                    ),
+            ),
     )
 }

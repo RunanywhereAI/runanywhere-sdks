@@ -4,8 +4,10 @@
  * Core SDK that includes:
  * - RACommons bindings via Nitrogen HybridObject
  * - Authentication, Device Registration
- * - Model Registry, Download Service
- * - Storage, Events, HTTP Client
+ * - Lifecycle-driven model loading (registry, download, paths owned by commons)
+ * - Storage proto bindings
+ * - Events / proto stream
+ * - HTTP transport adapters (URLSession iOS / OkHttp Android)
  *
  * NO LLM/STT/TTS/VAD functionality - use:
  * - @runanywhere/llamacpp for text generation
@@ -107,39 +109,6 @@ export { ServiceRegistry } from './Foundation/DependencyInjection/ServiceRegistr
 export { ServiceContainer } from './Foundation/DependencyInjection/ServiceContainer';
 
 // =============================================================================
-// Events
-// =============================================================================
-
-export { EventBus, NativeEventNames } from './Public/Events';
-export {
-  type SDKEvent,
-  EventDestination,
-  EventCategory,
-  createSDKEvent,
-  isSDKEvent,
-  EventPublisher,
-} from './Infrastructure/Events';
-
-// =============================================================================
-// Services (thin wrappers over native)
-// =============================================================================
-
-export {
-  ModelRegistry,
-  FileSystem,
-  MultiFileModelCache,
-  DownloadService,
-  DownloadState,
-  type ModelCriteria,
-  type AddModelFromURLOptions,
-  type ModelFileDescriptor,
-  type DownloadProgress,
-  type DownloadTask,
-  type DownloadConfiguration,
-  type ProgressCallback,
-} from './services';
-
-// =============================================================================
 // Network Layer — HTTP transport is owned by native C++ (rac_http_client_*).
 // These exports are for configuration / telemetry / endpoints only.
 // =============================================================================
@@ -166,16 +135,14 @@ export type {
   NetworkConfig,
   APIEndpointKey,
   APIEndpointValue,
+  ModelFileDescriptor,
 } from './services';
 
 // =============================================================================
 // Features
 // =============================================================================
 
-export {
-  AudioCaptureManager,
-  AudioPlaybackManager,
-} from './Features';
+export { AudioCaptureManager, AudioPlaybackManager } from './Features';
 export type {
   AudioDataCallback,
   AudioLevelCallback,
@@ -186,16 +153,13 @@ export type {
   PlaybackErrorCallback,
   PlaybackConfig,
 } from './Features';
-// v3.1: VoiceSessionHandle + DEFAULT_VOICE_SESSION_CONFIG +
-// VoiceSessionConfig/Event/EventType/EventCallback/State DELETED.
-
-// v3.1: proto-stream VoiceAgentStreamAdapter (canonical path).
+// Proto-stream VoiceAgentStreamAdapter is the canonical voice session path.
 export { VoiceAgentStreamAdapter } from './Adapters/VoiceAgentStreamAdapter';
 
 // Canonical public streaming method for voice agent (§10 spec).
 export { streamVoiceAgent } from './Public/Extensions/RunAnywhere+VoiceAgent';
 
-// G-A2: proto-stream LLMStreamAdapter (canonical path) — mirrors Web's adapter.
+// proto-stream LLMStreamAdapter (canonical path) — mirrors Web's adapter.
 export { LLMStreamAdapter } from './Adapters/LLMStreamAdapter';
 
 // =============================================================================
@@ -211,29 +175,15 @@ export {
   requireNativeModule,
   isNativeModuleAvailable,
   requireDeviceInfoModule,
-  requireFileSystemModule,
 } from './native/NativeRunAnywhereCore';
-export type { NativeRunAnywhereCoreModule, FileSystemModule } from './native/NativeRunAnywhereCore';
+export type {
+  NativeRunAnywhereCoreModule,
+} from './native/NativeRunAnywhereCore';
 
 // =============================================================================
 // Public Extensions (standalone function exports)
 // These are also available via RunAnywhere.* but exported here for direct import
 // =============================================================================
-
-export {
-  getMmprojPath,
-  getModelPath,
-  getAvailableModels,
-  getModelInfo,
-  isModelDownloaded,
-  downloadModel,
-  cancelDownload,
-  deleteModel,
-  deleteAllModels,
-  registerModel,
-  registerMultiFileModel,
-  refreshModelRegistry,
-} from './Public/Extensions/RunAnywhere+Models';
 
 export {
   checkStorageAvailability,
@@ -252,22 +202,11 @@ export {
 export {
   getComponentLifecycleSnapshot,
   getCurrentModel,
+  getLifecycleResolvedArtifactPath,
   loadModelLifecycle,
+  resolveVLMArtifactsFromLifecycleResult,
   unloadModelLifecycle,
 } from './Public/Extensions/RunAnywhere+Lifecycle';
-
-// =============================================================================
-// Device / NPU Chip Detection
-// =============================================================================
-
-export { getChip } from './Public/Extensions/RunAnywhere+Device';
-export type { NPUChip } from './types/NPUChip';
-export {
-  NPU_CHIPS,
-  NPU_BASE_URL,
-  getNPUDownloadUrl,
-  npuChipFromSocModel,
-} from './types/NPUChip';
 
 // =============================================================================
 // Hardware Profile (CANONICAL_API §14)
@@ -279,8 +218,40 @@ export {
   getHardwareChip,
   hardwareHasNeuralEngine,
   hardwareAccelerationMode,
+  getHardwareAccelerators,
+  setHardwareAcceleratorPreference,
+  getHardwareAcceleratorPreference,
+  AcceleratorPreference,
 } from './Public/Extensions';
-export type { HardwareProfileResult } from './Public/Extensions';
+export type { AcceleratorInfo, HardwareProfileResult } from './Public/Extensions';
+
+// =============================================================================
+// Model Management — Swift parity (registerModel / downloadModel / etc.)
+// =============================================================================
+
+export {
+  registerModel,
+  registerMultiFileModel,
+  getAvailableModels,
+  getDownloadedModels,
+  downloadModel,
+  cancelDownload,
+  deleteModel,
+  loadModel,
+} from './Public/Extensions/RunAnywhere+ModelManagement';
+export type {
+  RegisterModelInput,
+  RegisterMultiFileModelInput,
+} from './Public/Extensions/RunAnywhere+ModelManagement';
+
+// =============================================================================
+// Proto byte helpers (re-export from internal services/ProtoBytes.ts)
+// =============================================================================
+
+export {
+  bytesToArrayBuffer,
+  arrayBufferToBytes,
+} from './services/ProtoBytes';
 
 // =============================================================================
 // RAG Pipeline
@@ -323,44 +294,20 @@ export { lora } from './Public/Extensions/RunAnywhere+LoRA';
 export type {
   LoRAAdapterConfig,
   LoRAAdapterInfo,
+  LoRAApplyRequest,
+  LoRAApplyResult,
+  LoRARemoveRequest,
+  LoRAState,
   LoraAdapterCatalogEntry,
+  LoraAdapterCatalogGetRequest,
+  LoraAdapterCatalogGetResult,
+  LoraAdapterCatalogListRequest,
+  LoraAdapterCatalogListResult,
+  LoraAdapterCatalogQuery,
+  LoraAdapterDownloadCompletedRequest,
+  LoraAdapterDownloadCompletedResult,
   LoraCompatibilityResult,
 } from '@runanywhere/proto-ts/lora_options';
-
-// =============================================================================
-// Diffusion / Image Generation
-// =============================================================================
-
-export {
-  generateImage,
-  generateImageStream,
-  loadDiffusionModel,
-  unloadDiffusionModel,
-  isDiffusionModelLoaded,
-  currentDiffusionModelId,
-  currentDiffusionFramework,
-  cancelImageGeneration,
-  getDiffusionCapabilities,
-} from './Public/Extensions/RunAnywhere+Diffusion';
-
-export {
-  DiffusionModelVariant,
-  DiffusionScheduler,
-  DiffusionMode,
-  DiffusionTokenizerSourceKind,
-} from '@runanywhere/proto-ts/diffusion_options';
-
-export type {
-  DiffusionConfiguration,
-  DiffusionGenerationOptions,
-  DiffusionProgress,
-  DiffusionResult,
-  DiffusionCapabilities,
-  DiffusionTokenizerSource,
-} from '@runanywhere/proto-ts/diffusion_options';
-
-// Streaming wrapper (RN-local, AsyncIterable shape — no proto counterpart).
-export type { DiffusionStreamingResult } from './Public/Extensions/RunAnywhere+Diffusion';
 
 // =============================================================================
 // Live Transcription Session
@@ -379,42 +326,16 @@ export type { LiveTranscriptionListener } from './Public/Sessions/LiveTranscript
 
 export type { STTStreamingResult } from './Public/Extensions/RunAnywhere+STT';
 export type { TTSStreamingResult } from './Public/Extensions/RunAnywhere+TTS';
-export type { VLMStreamingResult } from './Public/Extensions/RunAnywhere+VisionLanguage';
+export type {
+  VLMBackendProvider,
+  VLMStreamingResult,
+} from './Public/Extensions/RunAnywhere+VisionLanguage';
 
 // =============================================================================
-// Phase D namespace extensions (new). Mirror Swift `+Frameworks`,
-// `+ModelAssignments`, `+ModelManagement`, `+PluginLoader`, `+VLMModels`.
+// VLM model overload (mirrors Swift +VLMModels)
 // =============================================================================
 
-export {
-  getRegisteredFrameworks,
-  getFrameworks,
-  getModelsForFramework as getModelsForFrameworkExt,
-} from './Public/Extensions/RunAnywhere+Frameworks';
-
-export {
-  fetchModelAssignments,
-  getModelsForFramework as getModelsForFrameworkAssignment,
-  getModelsForCategory,
-} from './Public/Extensions/RunAnywhere+ModelAssignments';
-
-export {
-  loadModelByCategory,
-  resolveModelFilePath,
-  ensureModelDownloaded,
-} from './Public/Extensions/RunAnywhere+ModelManagement';
-
-export {
-  pluginApiVersion,
-  loadPlugin,
-  unloadPlugin,
-  registeredPluginCount,
-  registeredPluginNames,
-} from './Public/Extensions/RunAnywhere+PluginLoader';
-
-export {
-  loadVLMModel as loadVLMModelByInfo,
-} from './Public/Extensions/RunAnywhere+VLMModels';
+export { loadVLMModel as loadVLMModelByInfo } from './Public/Extensions/RunAnywhere+VLMModels';
 
 // =============================================================================
 // Phase C-prime ergonomic helpers — proto factory defaults + predicates

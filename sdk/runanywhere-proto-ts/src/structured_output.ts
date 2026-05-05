@@ -5,6 +5,7 @@
 // source: structured_output.proto
 
 /* eslint-disable */
+import Long from "long";
 import _m0 from "protobufjs/minimal";
 
 export const protobufPackage = "runanywhere.v1";
@@ -149,6 +150,114 @@ export function sentimentToJSON(object: Sentiment): string {
   }
 }
 
+export enum StructuredOutputMode {
+  STRUCTURED_OUTPUT_MODE_UNSPECIFIED = 0,
+  STRUCTURED_OUTPUT_MODE_JSON_SCHEMA = 1,
+  STRUCTURED_OUTPUT_MODE_JSON_OBJECT = 2,
+  STRUCTURED_OUTPUT_MODE_REGEX = 3,
+  STRUCTURED_OUTPUT_MODE_GRAMMAR = 4,
+  UNRECOGNIZED = -1,
+}
+
+export function structuredOutputModeFromJSON(object: any): StructuredOutputMode {
+  switch (object) {
+    case 0:
+    case "STRUCTURED_OUTPUT_MODE_UNSPECIFIED":
+      return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED;
+    case 1:
+    case "STRUCTURED_OUTPUT_MODE_JSON_SCHEMA":
+      return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA;
+    case 2:
+    case "STRUCTURED_OUTPUT_MODE_JSON_OBJECT":
+      return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_OBJECT;
+    case 3:
+    case "STRUCTURED_OUTPUT_MODE_REGEX":
+      return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_REGEX;
+    case 4:
+    case "STRUCTURED_OUTPUT_MODE_GRAMMAR":
+      return StructuredOutputMode.STRUCTURED_OUTPUT_MODE_GRAMMAR;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return StructuredOutputMode.UNRECOGNIZED;
+  }
+}
+
+export function structuredOutputModeToJSON(object: StructuredOutputMode): string {
+  switch (object) {
+    case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_UNSPECIFIED:
+      return "STRUCTURED_OUTPUT_MODE_UNSPECIFIED";
+    case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA:
+      return "STRUCTURED_OUTPUT_MODE_JSON_SCHEMA";
+    case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_OBJECT:
+      return "STRUCTURED_OUTPUT_MODE_JSON_OBJECT";
+    case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_REGEX:
+      return "STRUCTURED_OUTPUT_MODE_REGEX";
+    case StructuredOutputMode.STRUCTURED_OUTPUT_MODE_GRAMMAR:
+      return "STRUCTURED_OUTPUT_MODE_GRAMMAR";
+    case StructuredOutputMode.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum StructuredOutputStreamEventKind {
+  STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED = 0,
+  STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN = 1,
+  STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON = 2,
+  STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION = 3,
+  STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED = 4,
+  STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR = 5,
+  UNRECOGNIZED = -1,
+}
+
+export function structuredOutputStreamEventKindFromJSON(object: any): StructuredOutputStreamEventKind {
+  switch (object) {
+    case 0:
+    case "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED":
+      return StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED;
+    case 1:
+    case "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN":
+      return StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN;
+    case 2:
+    case "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON":
+      return StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON;
+    case 3:
+    case "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION":
+      return StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION;
+    case 4:
+    case "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED":
+      return StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED;
+    case 5:
+    case "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR":
+      return StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return StructuredOutputStreamEventKind.UNRECOGNIZED;
+  }
+}
+
+export function structuredOutputStreamEventKindToJSON(object: StructuredOutputStreamEventKind): string {
+  switch (object) {
+    case StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED:
+      return "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_UNSPECIFIED";
+    case StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN:
+      return "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN";
+    case StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON:
+      return "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_PARTIAL_JSON";
+    case StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION:
+      return "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_VALIDATION";
+    case StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED:
+      return "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED";
+    case StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR:
+      return "STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR";
+    case StructuredOutputStreamEventKind.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 /**
  * ---------------------------------------------------------------------------
  * JSON Schema property — describes a single property within a schema.
@@ -190,7 +299,18 @@ export interface JSONSchemaProperty {
     | JSONSchema
     | undefined;
   /** Nested object schema when `type == JSON_SCHEMA_TYPE_OBJECT`. */
-  objectSchema?: JSONSchema | undefined;
+  objectSchema?:
+    | JSONSchema
+    | undefined;
+  /** Common validation constraints carried by RN/Web schema builders. */
+  minimum?: number | undefined;
+  maximum?: number | undefined;
+  minLength?: number | undefined;
+  maxLength?: number | undefined;
+  pattern?: string | undefined;
+  minItems?: number | undefined;
+  maxItems?: number | undefined;
+  defaultJson?: string | undefined;
 }
 
 /**
@@ -231,6 +351,7 @@ export interface JSONSchema {
   anyOf: JSONSchema[];
   oneOf: JSONSchema[];
   notSchema?: JSONSchema | undefined;
+  rawJson?: string | undefined;
 }
 
 export interface JSONSchema_PropertiesEntry {
@@ -275,6 +396,11 @@ export interface StructuredOutputOptions {
   /** Optional generated type/name hints used by Swift/Kotlin/Dart wrappers. */
   typeName?: string | undefined;
   name?: string | undefined;
+  mode: StructuredOutputMode;
+  regexPattern?: string | undefined;
+  grammar?: string | undefined;
+  repairJson: boolean;
+  maxRetries: number;
 }
 
 /**
@@ -304,6 +430,8 @@ export interface StructuredOutputValidation {
    * extractor found one.
    */
   extractedJson?: string | undefined;
+  validationErrors: string[];
+  validationTimeMs: number;
 }
 
 /**
@@ -327,6 +455,60 @@ export interface StructuredOutputResult {
     | undefined;
   /** Raw model text prior to parsing (optional, useful for retries). */
   rawText?: string | undefined;
+  errorMessage?: string | undefined;
+  errorCode: number;
+}
+
+export interface StructuredOutputParseRequest {
+  requestId: string;
+  text: string;
+  options?: StructuredOutputOptions | undefined;
+  metadata: { [key: string]: string };
+}
+
+export interface StructuredOutputParseRequest_MetadataEntry {
+  key: string;
+  value: string;
+}
+
+export interface StructuredOutputValidationRequest {
+  text: string;
+  options?: StructuredOutputOptions | undefined;
+}
+
+export interface StructuredOutputPromptResult {
+  preparedPrompt: string;
+  systemPrompt?: string | undefined;
+  jsonSchema?: string | undefined;
+  regexPattern?: string | undefined;
+  grammar?: string | undefined;
+  errorMessage?: string | undefined;
+  errorCode: number;
+}
+
+export interface StructuredOutputRequest {
+  requestId: string;
+  prompt: string;
+  options?: StructuredOutputOptions | undefined;
+  metadata: { [key: string]: string };
+}
+
+export interface StructuredOutputRequest_MetadataEntry {
+  key: string;
+  value: string;
+}
+
+export interface StructuredOutputStreamEvent {
+  seq: number;
+  timestampUs: number;
+  requestId: string;
+  kind: StructuredOutputStreamEventKind;
+  token: string;
+  partialJson?: string | undefined;
+  validation?: StructuredOutputValidation | undefined;
+  result?: StructuredOutputResult | undefined;
+  errorMessage?: string | undefined;
+  errorCode: number;
 }
 
 /**
@@ -432,6 +614,14 @@ function createBaseJSONSchemaProperty(): JSONSchemaProperty {
     format: undefined,
     itemsSchema: undefined,
     objectSchema: undefined,
+    minimum: undefined,
+    maximum: undefined,
+    minLength: undefined,
+    maxLength: undefined,
+    pattern: undefined,
+    minItems: undefined,
+    maxItems: undefined,
+    defaultJson: undefined,
   };
 }
 
@@ -454,6 +644,30 @@ export const JSONSchemaProperty = {
     }
     if (message.objectSchema !== undefined) {
       JSONSchema.encode(message.objectSchema, writer.uint32(50).fork()).ldelim();
+    }
+    if (message.minimum !== undefined) {
+      writer.uint32(57).double(message.minimum);
+    }
+    if (message.maximum !== undefined) {
+      writer.uint32(65).double(message.maximum);
+    }
+    if (message.minLength !== undefined) {
+      writer.uint32(72).int32(message.minLength);
+    }
+    if (message.maxLength !== undefined) {
+      writer.uint32(80).int32(message.maxLength);
+    }
+    if (message.pattern !== undefined) {
+      writer.uint32(90).string(message.pattern);
+    }
+    if (message.minItems !== undefined) {
+      writer.uint32(96).int32(message.minItems);
+    }
+    if (message.maxItems !== undefined) {
+      writer.uint32(104).int32(message.maxItems);
+    }
+    if (message.defaultJson !== undefined) {
+      writer.uint32(114).string(message.defaultJson);
     }
     return writer;
   },
@@ -507,6 +721,62 @@ export const JSONSchemaProperty = {
 
           message.objectSchema = JSONSchema.decode(reader, reader.uint32());
           continue;
+        case 7:
+          if (tag !== 57) {
+            break;
+          }
+
+          message.minimum = reader.double();
+          continue;
+        case 8:
+          if (tag !== 65) {
+            break;
+          }
+
+          message.maximum = reader.double();
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.minLength = reader.int32();
+          continue;
+        case 10:
+          if (tag !== 80) {
+            break;
+          }
+
+          message.maxLength = reader.int32();
+          continue;
+        case 11:
+          if (tag !== 90) {
+            break;
+          }
+
+          message.pattern = reader.string();
+          continue;
+        case 12:
+          if (tag !== 96) {
+            break;
+          }
+
+          message.minItems = reader.int32();
+          continue;
+        case 13:
+          if (tag !== 104) {
+            break;
+          }
+
+          message.maxItems = reader.int32();
+          continue;
+        case 14:
+          if (tag !== 114) {
+            break;
+          }
+
+          message.defaultJson = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -526,6 +796,14 @@ export const JSONSchemaProperty = {
       format: isSet(object.format) ? globalThis.String(object.format) : undefined,
       itemsSchema: isSet(object.itemsSchema) ? JSONSchema.fromJSON(object.itemsSchema) : undefined,
       objectSchema: isSet(object.objectSchema) ? JSONSchema.fromJSON(object.objectSchema) : undefined,
+      minimum: isSet(object.minimum) ? globalThis.Number(object.minimum) : undefined,
+      maximum: isSet(object.maximum) ? globalThis.Number(object.maximum) : undefined,
+      minLength: isSet(object.minLength) ? globalThis.Number(object.minLength) : undefined,
+      maxLength: isSet(object.maxLength) ? globalThis.Number(object.maxLength) : undefined,
+      pattern: isSet(object.pattern) ? globalThis.String(object.pattern) : undefined,
+      minItems: isSet(object.minItems) ? globalThis.Number(object.minItems) : undefined,
+      maxItems: isSet(object.maxItems) ? globalThis.Number(object.maxItems) : undefined,
+      defaultJson: isSet(object.defaultJson) ? globalThis.String(object.defaultJson) : undefined,
     };
   },
 
@@ -549,6 +827,30 @@ export const JSONSchemaProperty = {
     if (message.objectSchema !== undefined) {
       obj.objectSchema = JSONSchema.toJSON(message.objectSchema);
     }
+    if (message.minimum !== undefined) {
+      obj.minimum = message.minimum;
+    }
+    if (message.maximum !== undefined) {
+      obj.maximum = message.maximum;
+    }
+    if (message.minLength !== undefined) {
+      obj.minLength = Math.round(message.minLength);
+    }
+    if (message.maxLength !== undefined) {
+      obj.maxLength = Math.round(message.maxLength);
+    }
+    if (message.pattern !== undefined) {
+      obj.pattern = message.pattern;
+    }
+    if (message.minItems !== undefined) {
+      obj.minItems = Math.round(message.minItems);
+    }
+    if (message.maxItems !== undefined) {
+      obj.maxItems = Math.round(message.maxItems);
+    }
+    if (message.defaultJson !== undefined) {
+      obj.defaultJson = message.defaultJson;
+    }
     return obj;
   },
 
@@ -567,6 +869,14 @@ export const JSONSchemaProperty = {
     message.objectSchema = (object.objectSchema !== undefined && object.objectSchema !== null)
       ? JSONSchema.fromPartial(object.objectSchema)
       : undefined;
+    message.minimum = object.minimum ?? undefined;
+    message.maximum = object.maximum ?? undefined;
+    message.minLength = object.minLength ?? undefined;
+    message.maxLength = object.maxLength ?? undefined;
+    message.pattern = object.pattern ?? undefined;
+    message.minItems = object.minItems ?? undefined;
+    message.maxItems = object.maxItems ?? undefined;
+    message.defaultJson = object.defaultJson ?? undefined;
     return message;
   },
 };
@@ -588,6 +898,7 @@ function createBaseJSONSchema(): JSONSchema {
     anyOf: [],
     oneOf: [],
     notSchema: undefined,
+    rawJson: undefined,
   };
 }
 
@@ -637,6 +948,9 @@ export const JSONSchema = {
     }
     if (message.notSchema !== undefined) {
       JSONSchema.encode(message.notSchema, writer.uint32(122).fork()).ldelim();
+    }
+    if (message.rawJson !== undefined) {
+      writer.uint32(130).string(message.rawJson);
     }
     return writer;
   },
@@ -759,6 +1073,13 @@ export const JSONSchema = {
 
           message.notSchema = JSONSchema.decode(reader, reader.uint32());
           continue;
+        case 16:
+          if (tag !== 130) {
+            break;
+          }
+
+          message.rawJson = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -797,6 +1118,7 @@ export const JSONSchema = {
       anyOf: globalThis.Array.isArray(object?.anyOf) ? object.anyOf.map((e: any) => JSONSchema.fromJSON(e)) : [],
       oneOf: globalThis.Array.isArray(object?.oneOf) ? object.oneOf.map((e: any) => JSONSchema.fromJSON(e)) : [],
       notSchema: isSet(object.notSchema) ? JSONSchema.fromJSON(object.notSchema) : undefined,
+      rawJson: isSet(object.rawJson) ? globalThis.String(object.rawJson) : undefined,
     };
   },
 
@@ -859,6 +1181,9 @@ export const JSONSchema = {
     if (message.notSchema !== undefined) {
       obj.notSchema = JSONSchema.toJSON(message.notSchema);
     }
+    if (message.rawJson !== undefined) {
+      obj.rawJson = message.rawJson;
+    }
     return obj;
   },
 
@@ -902,6 +1227,7 @@ export const JSONSchema = {
     message.notSchema = (object.notSchema !== undefined && object.notSchema !== null)
       ? JSONSchema.fromPartial(object.notSchema)
       : undefined;
+    message.rawJson = object.rawJson ?? undefined;
     return message;
   },
 };
@@ -1066,6 +1392,11 @@ function createBaseStructuredOutputOptions(): StructuredOutputOptions {
     jsonSchema: undefined,
     typeName: undefined,
     name: undefined,
+    mode: 0,
+    regexPattern: undefined,
+    grammar: undefined,
+    repairJson: false,
+    maxRetries: 0,
   };
 }
 
@@ -1088,6 +1419,21 @@ export const StructuredOutputOptions = {
     }
     if (message.name !== undefined) {
       writer.uint32(50).string(message.name);
+    }
+    if (message.mode !== 0) {
+      writer.uint32(56).int32(message.mode);
+    }
+    if (message.regexPattern !== undefined) {
+      writer.uint32(66).string(message.regexPattern);
+    }
+    if (message.grammar !== undefined) {
+      writer.uint32(74).string(message.grammar);
+    }
+    if (message.repairJson !== false) {
+      writer.uint32(80).bool(message.repairJson);
+    }
+    if (message.maxRetries !== 0) {
+      writer.uint32(88).int32(message.maxRetries);
     }
     return writer;
   },
@@ -1141,6 +1487,41 @@ export const StructuredOutputOptions = {
 
           message.name = reader.string();
           continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.mode = reader.int32() as any;
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.regexPattern = reader.string();
+          continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.grammar = reader.string();
+          continue;
+        case 10:
+          if (tag !== 80) {
+            break;
+          }
+
+          message.repairJson = reader.bool();
+          continue;
+        case 11:
+          if (tag !== 88) {
+            break;
+          }
+
+          message.maxRetries = reader.int32();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1160,6 +1541,11 @@ export const StructuredOutputOptions = {
       jsonSchema: isSet(object.jsonSchema) ? globalThis.String(object.jsonSchema) : undefined,
       typeName: isSet(object.typeName) ? globalThis.String(object.typeName) : undefined,
       name: isSet(object.name) ? globalThis.String(object.name) : undefined,
+      mode: isSet(object.mode) ? structuredOutputModeFromJSON(object.mode) : 0,
+      regexPattern: isSet(object.regexPattern) ? globalThis.String(object.regexPattern) : undefined,
+      grammar: isSet(object.grammar) ? globalThis.String(object.grammar) : undefined,
+      repairJson: isSet(object.repairJson) ? globalThis.Boolean(object.repairJson) : false,
+      maxRetries: isSet(object.maxRetries) ? globalThis.Number(object.maxRetries) : 0,
     };
   },
 
@@ -1183,6 +1569,21 @@ export const StructuredOutputOptions = {
     if (message.name !== undefined) {
       obj.name = message.name;
     }
+    if (message.mode !== 0) {
+      obj.mode = structuredOutputModeToJSON(message.mode);
+    }
+    if (message.regexPattern !== undefined) {
+      obj.regexPattern = message.regexPattern;
+    }
+    if (message.grammar !== undefined) {
+      obj.grammar = message.grammar;
+    }
+    if (message.repairJson !== false) {
+      obj.repairJson = message.repairJson;
+    }
+    if (message.maxRetries !== 0) {
+      obj.maxRetries = Math.round(message.maxRetries);
+    }
     return obj;
   },
 
@@ -1199,6 +1600,11 @@ export const StructuredOutputOptions = {
     message.jsonSchema = object.jsonSchema ?? undefined;
     message.typeName = object.typeName ?? undefined;
     message.name = object.name ?? undefined;
+    message.mode = object.mode ?? 0;
+    message.regexPattern = object.regexPattern ?? undefined;
+    message.grammar = object.grammar ?? undefined;
+    message.repairJson = object.repairJson ?? false;
+    message.maxRetries = object.maxRetries ?? 0;
     return message;
   },
 };
@@ -1210,6 +1616,8 @@ function createBaseStructuredOutputValidation(): StructuredOutputValidation {
     errorMessage: undefined,
     rawOutput: undefined,
     extractedJson: undefined,
+    validationErrors: [],
+    validationTimeMs: 0,
   };
 }
 
@@ -1229,6 +1637,12 @@ export const StructuredOutputValidation = {
     }
     if (message.extractedJson !== undefined) {
       writer.uint32(42).string(message.extractedJson);
+    }
+    for (const v of message.validationErrors) {
+      writer.uint32(50).string(v!);
+    }
+    if (message.validationTimeMs !== 0) {
+      writer.uint32(56).int64(message.validationTimeMs);
     }
     return writer;
   },
@@ -1275,6 +1689,20 @@ export const StructuredOutputValidation = {
 
           message.extractedJson = reader.string();
           continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.validationErrors.push(reader.string());
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.validationTimeMs = longToNumber(reader.int64() as Long);
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1291,6 +1719,10 @@ export const StructuredOutputValidation = {
       errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
       rawOutput: isSet(object.rawOutput) ? globalThis.String(object.rawOutput) : undefined,
       extractedJson: isSet(object.extractedJson) ? globalThis.String(object.extractedJson) : undefined,
+      validationErrors: globalThis.Array.isArray(object?.validationErrors)
+        ? object.validationErrors.map((e: any) => globalThis.String(e))
+        : [],
+      validationTimeMs: isSet(object.validationTimeMs) ? globalThis.Number(object.validationTimeMs) : 0,
     };
   },
 
@@ -1311,6 +1743,12 @@ export const StructuredOutputValidation = {
     if (message.extractedJson !== undefined) {
       obj.extractedJson = message.extractedJson;
     }
+    if (message.validationErrors?.length) {
+      obj.validationErrors = message.validationErrors;
+    }
+    if (message.validationTimeMs !== 0) {
+      obj.validationTimeMs = Math.round(message.validationTimeMs);
+    }
     return obj;
   },
 
@@ -1324,12 +1762,20 @@ export const StructuredOutputValidation = {
     message.errorMessage = object.errorMessage ?? undefined;
     message.rawOutput = object.rawOutput ?? undefined;
     message.extractedJson = object.extractedJson ?? undefined;
+    message.validationErrors = object.validationErrors?.map((e) => e) || [];
+    message.validationTimeMs = object.validationTimeMs ?? 0;
     return message;
   },
 };
 
 function createBaseStructuredOutputResult(): StructuredOutputResult {
-  return { parsedJson: new Uint8Array(0), validation: undefined, rawText: undefined };
+  return {
+    parsedJson: new Uint8Array(0),
+    validation: undefined,
+    rawText: undefined,
+    errorMessage: undefined,
+    errorCode: 0,
+  };
 }
 
 export const StructuredOutputResult = {
@@ -1342,6 +1788,12 @@ export const StructuredOutputResult = {
     }
     if (message.rawText !== undefined) {
       writer.uint32(26).string(message.rawText);
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(34).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(40).int32(message.errorCode);
     }
     return writer;
   },
@@ -1374,6 +1826,20 @@ export const StructuredOutputResult = {
 
           message.rawText = reader.string();
           continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1388,6 +1854,8 @@ export const StructuredOutputResult = {
       parsedJson: isSet(object.parsedJson) ? bytesFromBase64(object.parsedJson) : new Uint8Array(0),
       validation: isSet(object.validation) ? StructuredOutputValidation.fromJSON(object.validation) : undefined,
       rawText: isSet(object.rawText) ? globalThis.String(object.rawText) : undefined,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
     };
   },
 
@@ -1402,6 +1870,12 @@ export const StructuredOutputResult = {
     if (message.rawText !== undefined) {
       obj.rawText = message.rawText;
     }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
     return obj;
   },
 
@@ -1415,6 +1889,860 @@ export const StructuredOutputResult = {
       ? StructuredOutputValidation.fromPartial(object.validation)
       : undefined;
     message.rawText = object.rawText ?? undefined;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
+    return message;
+  },
+};
+
+function createBaseStructuredOutputParseRequest(): StructuredOutputParseRequest {
+  return { requestId: "", text: "", options: undefined, metadata: {} };
+}
+
+export const StructuredOutputParseRequest = {
+  encode(message: StructuredOutputParseRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    if (message.text !== "") {
+      writer.uint32(18).string(message.text);
+    }
+    if (message.options !== undefined) {
+      StructuredOutputOptions.encode(message.options, writer.uint32(26).fork()).ldelim();
+    }
+    Object.entries(message.metadata).forEach(([key, value]) => {
+      StructuredOutputParseRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(34).fork()).ldelim();
+    });
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputParseRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStructuredOutputParseRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.text = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.options = StructuredOutputOptions.decode(reader, reader.uint32());
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          const entry4 = StructuredOutputParseRequest_MetadataEntry.decode(reader, reader.uint32());
+          if (entry4.value !== undefined) {
+            message.metadata[entry4.key] = entry4.value;
+          }
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StructuredOutputParseRequest {
+    return {
+      requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+      text: isSet(object.text) ? globalThis.String(object.text) : "",
+      options: isSet(object.options) ? StructuredOutputOptions.fromJSON(object.options) : undefined,
+      metadata: isObject(object.metadata)
+        ? Object.entries(object.metadata).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+        : {},
+    };
+  },
+
+  toJSON(message: StructuredOutputParseRequest): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.text !== "") {
+      obj.text = message.text;
+    }
+    if (message.options !== undefined) {
+      obj.options = StructuredOutputOptions.toJSON(message.options);
+    }
+    if (message.metadata) {
+      const entries = Object.entries(message.metadata);
+      if (entries.length > 0) {
+        obj.metadata = {};
+        entries.forEach(([k, v]) => {
+          obj.metadata[k] = v;
+        });
+      }
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<StructuredOutputParseRequest>, I>>(base?: I): StructuredOutputParseRequest {
+    return StructuredOutputParseRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<StructuredOutputParseRequest>, I>>(object: I): StructuredOutputParseRequest {
+    const message = createBaseStructuredOutputParseRequest();
+    message.requestId = object.requestId ?? "";
+    message.text = object.text ?? "";
+    message.options = (object.options !== undefined && object.options !== null)
+      ? StructuredOutputOptions.fromPartial(object.options)
+      : undefined;
+    message.metadata = Object.entries(object.metadata ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = globalThis.String(value);
+      }
+      return acc;
+    }, {});
+    return message;
+  },
+};
+
+function createBaseStructuredOutputParseRequest_MetadataEntry(): StructuredOutputParseRequest_MetadataEntry {
+  return { key: "", value: "" };
+}
+
+export const StructuredOutputParseRequest_MetadataEntry = {
+  encode(message: StructuredOutputParseRequest_MetadataEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputParseRequest_MetadataEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStructuredOutputParseRequest_MetadataEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StructuredOutputParseRequest_MetadataEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: StructuredOutputParseRequest_MetadataEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<StructuredOutputParseRequest_MetadataEntry>, I>>(
+    base?: I,
+  ): StructuredOutputParseRequest_MetadataEntry {
+    return StructuredOutputParseRequest_MetadataEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<StructuredOutputParseRequest_MetadataEntry>, I>>(
+    object: I,
+  ): StructuredOutputParseRequest_MetadataEntry {
+    const message = createBaseStructuredOutputParseRequest_MetadataEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
+function createBaseStructuredOutputValidationRequest(): StructuredOutputValidationRequest {
+  return { text: "", options: undefined };
+}
+
+export const StructuredOutputValidationRequest = {
+  encode(message: StructuredOutputValidationRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.text !== "") {
+      writer.uint32(10).string(message.text);
+    }
+    if (message.options !== undefined) {
+      StructuredOutputOptions.encode(message.options, writer.uint32(18).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputValidationRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStructuredOutputValidationRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.text = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.options = StructuredOutputOptions.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StructuredOutputValidationRequest {
+    return {
+      text: isSet(object.text) ? globalThis.String(object.text) : "",
+      options: isSet(object.options) ? StructuredOutputOptions.fromJSON(object.options) : undefined,
+    };
+  },
+
+  toJSON(message: StructuredOutputValidationRequest): unknown {
+    const obj: any = {};
+    if (message.text !== "") {
+      obj.text = message.text;
+    }
+    if (message.options !== undefined) {
+      obj.options = StructuredOutputOptions.toJSON(message.options);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<StructuredOutputValidationRequest>, I>>(
+    base?: I,
+  ): StructuredOutputValidationRequest {
+    return StructuredOutputValidationRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<StructuredOutputValidationRequest>, I>>(
+    object: I,
+  ): StructuredOutputValidationRequest {
+    const message = createBaseStructuredOutputValidationRequest();
+    message.text = object.text ?? "";
+    message.options = (object.options !== undefined && object.options !== null)
+      ? StructuredOutputOptions.fromPartial(object.options)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseStructuredOutputPromptResult(): StructuredOutputPromptResult {
+  return {
+    preparedPrompt: "",
+    systemPrompt: undefined,
+    jsonSchema: undefined,
+    regexPattern: undefined,
+    grammar: undefined,
+    errorMessage: undefined,
+    errorCode: 0,
+  };
+}
+
+export const StructuredOutputPromptResult = {
+  encode(message: StructuredOutputPromptResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.preparedPrompt !== "") {
+      writer.uint32(10).string(message.preparedPrompt);
+    }
+    if (message.systemPrompt !== undefined) {
+      writer.uint32(18).string(message.systemPrompt);
+    }
+    if (message.jsonSchema !== undefined) {
+      writer.uint32(26).string(message.jsonSchema);
+    }
+    if (message.regexPattern !== undefined) {
+      writer.uint32(34).string(message.regexPattern);
+    }
+    if (message.grammar !== undefined) {
+      writer.uint32(42).string(message.grammar);
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(50).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(56).int32(message.errorCode);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputPromptResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStructuredOutputPromptResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.preparedPrompt = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.systemPrompt = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.jsonSchema = reader.string();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.regexPattern = reader.string();
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.grammar = reader.string();
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StructuredOutputPromptResult {
+    return {
+      preparedPrompt: isSet(object.preparedPrompt) ? globalThis.String(object.preparedPrompt) : "",
+      systemPrompt: isSet(object.systemPrompt) ? globalThis.String(object.systemPrompt) : undefined,
+      jsonSchema: isSet(object.jsonSchema) ? globalThis.String(object.jsonSchema) : undefined,
+      regexPattern: isSet(object.regexPattern) ? globalThis.String(object.regexPattern) : undefined,
+      grammar: isSet(object.grammar) ? globalThis.String(object.grammar) : undefined,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+    };
+  },
+
+  toJSON(message: StructuredOutputPromptResult): unknown {
+    const obj: any = {};
+    if (message.preparedPrompt !== "") {
+      obj.preparedPrompt = message.preparedPrompt;
+    }
+    if (message.systemPrompt !== undefined) {
+      obj.systemPrompt = message.systemPrompt;
+    }
+    if (message.jsonSchema !== undefined) {
+      obj.jsonSchema = message.jsonSchema;
+    }
+    if (message.regexPattern !== undefined) {
+      obj.regexPattern = message.regexPattern;
+    }
+    if (message.grammar !== undefined) {
+      obj.grammar = message.grammar;
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<StructuredOutputPromptResult>, I>>(base?: I): StructuredOutputPromptResult {
+    return StructuredOutputPromptResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<StructuredOutputPromptResult>, I>>(object: I): StructuredOutputPromptResult {
+    const message = createBaseStructuredOutputPromptResult();
+    message.preparedPrompt = object.preparedPrompt ?? "";
+    message.systemPrompt = object.systemPrompt ?? undefined;
+    message.jsonSchema = object.jsonSchema ?? undefined;
+    message.regexPattern = object.regexPattern ?? undefined;
+    message.grammar = object.grammar ?? undefined;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
+    return message;
+  },
+};
+
+function createBaseStructuredOutputRequest(): StructuredOutputRequest {
+  return { requestId: "", prompt: "", options: undefined, metadata: {} };
+}
+
+export const StructuredOutputRequest = {
+  encode(message: StructuredOutputRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    if (message.prompt !== "") {
+      writer.uint32(18).string(message.prompt);
+    }
+    if (message.options !== undefined) {
+      StructuredOutputOptions.encode(message.options, writer.uint32(26).fork()).ldelim();
+    }
+    Object.entries(message.metadata).forEach(([key, value]) => {
+      StructuredOutputRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(34).fork()).ldelim();
+    });
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStructuredOutputRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.prompt = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.options = StructuredOutputOptions.decode(reader, reader.uint32());
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          const entry4 = StructuredOutputRequest_MetadataEntry.decode(reader, reader.uint32());
+          if (entry4.value !== undefined) {
+            message.metadata[entry4.key] = entry4.value;
+          }
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StructuredOutputRequest {
+    return {
+      requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+      prompt: isSet(object.prompt) ? globalThis.String(object.prompt) : "",
+      options: isSet(object.options) ? StructuredOutputOptions.fromJSON(object.options) : undefined,
+      metadata: isObject(object.metadata)
+        ? Object.entries(object.metadata).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+        : {},
+    };
+  },
+
+  toJSON(message: StructuredOutputRequest): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.prompt !== "") {
+      obj.prompt = message.prompt;
+    }
+    if (message.options !== undefined) {
+      obj.options = StructuredOutputOptions.toJSON(message.options);
+    }
+    if (message.metadata) {
+      const entries = Object.entries(message.metadata);
+      if (entries.length > 0) {
+        obj.metadata = {};
+        entries.forEach(([k, v]) => {
+          obj.metadata[k] = v;
+        });
+      }
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<StructuredOutputRequest>, I>>(base?: I): StructuredOutputRequest {
+    return StructuredOutputRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<StructuredOutputRequest>, I>>(object: I): StructuredOutputRequest {
+    const message = createBaseStructuredOutputRequest();
+    message.requestId = object.requestId ?? "";
+    message.prompt = object.prompt ?? "";
+    message.options = (object.options !== undefined && object.options !== null)
+      ? StructuredOutputOptions.fromPartial(object.options)
+      : undefined;
+    message.metadata = Object.entries(object.metadata ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = globalThis.String(value);
+      }
+      return acc;
+    }, {});
+    return message;
+  },
+};
+
+function createBaseStructuredOutputRequest_MetadataEntry(): StructuredOutputRequest_MetadataEntry {
+  return { key: "", value: "" };
+}
+
+export const StructuredOutputRequest_MetadataEntry = {
+  encode(message: StructuredOutputRequest_MetadataEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputRequest_MetadataEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStructuredOutputRequest_MetadataEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StructuredOutputRequest_MetadataEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: StructuredOutputRequest_MetadataEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<StructuredOutputRequest_MetadataEntry>, I>>(
+    base?: I,
+  ): StructuredOutputRequest_MetadataEntry {
+    return StructuredOutputRequest_MetadataEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<StructuredOutputRequest_MetadataEntry>, I>>(
+    object: I,
+  ): StructuredOutputRequest_MetadataEntry {
+    const message = createBaseStructuredOutputRequest_MetadataEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
+    return message;
+  },
+};
+
+function createBaseStructuredOutputStreamEvent(): StructuredOutputStreamEvent {
+  return {
+    seq: 0,
+    timestampUs: 0,
+    requestId: "",
+    kind: 0,
+    token: "",
+    partialJson: undefined,
+    validation: undefined,
+    result: undefined,
+    errorMessage: undefined,
+    errorCode: 0,
+  };
+}
+
+export const StructuredOutputStreamEvent = {
+  encode(message: StructuredOutputStreamEvent, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.seq !== 0) {
+      writer.uint32(8).uint64(message.seq);
+    }
+    if (message.timestampUs !== 0) {
+      writer.uint32(16).int64(message.timestampUs);
+    }
+    if (message.requestId !== "") {
+      writer.uint32(26).string(message.requestId);
+    }
+    if (message.kind !== 0) {
+      writer.uint32(32).int32(message.kind);
+    }
+    if (message.token !== "") {
+      writer.uint32(42).string(message.token);
+    }
+    if (message.partialJson !== undefined) {
+      writer.uint32(50).string(message.partialJson);
+    }
+    if (message.validation !== undefined) {
+      StructuredOutputValidation.encode(message.validation, writer.uint32(58).fork()).ldelim();
+    }
+    if (message.result !== undefined) {
+      StructuredOutputResult.encode(message.result, writer.uint32(66).fork()).ldelim();
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(74).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(80).int32(message.errorCode);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): StructuredOutputStreamEvent {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseStructuredOutputStreamEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.seq = longToNumber(reader.uint64() as Long);
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.timestampUs = longToNumber(reader.int64() as Long);
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.kind = reader.int32() as any;
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.token = reader.string();
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.partialJson = reader.string();
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.validation = StructuredOutputValidation.decode(reader, reader.uint32());
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.result = StructuredOutputResult.decode(reader, reader.uint32());
+          continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 10:
+          if (tag !== 80) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): StructuredOutputStreamEvent {
+    return {
+      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
+      timestampUs: isSet(object.timestampUs) ? globalThis.Number(object.timestampUs) : 0,
+      requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+      kind: isSet(object.kind) ? structuredOutputStreamEventKindFromJSON(object.kind) : 0,
+      token: isSet(object.token) ? globalThis.String(object.token) : "",
+      partialJson: isSet(object.partialJson) ? globalThis.String(object.partialJson) : undefined,
+      validation: isSet(object.validation) ? StructuredOutputValidation.fromJSON(object.validation) : undefined,
+      result: isSet(object.result) ? StructuredOutputResult.fromJSON(object.result) : undefined,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+    };
+  },
+
+  toJSON(message: StructuredOutputStreamEvent): unknown {
+    const obj: any = {};
+    if (message.seq !== 0) {
+      obj.seq = Math.round(message.seq);
+    }
+    if (message.timestampUs !== 0) {
+      obj.timestampUs = Math.round(message.timestampUs);
+    }
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.kind !== 0) {
+      obj.kind = structuredOutputStreamEventKindToJSON(message.kind);
+    }
+    if (message.token !== "") {
+      obj.token = message.token;
+    }
+    if (message.partialJson !== undefined) {
+      obj.partialJson = message.partialJson;
+    }
+    if (message.validation !== undefined) {
+      obj.validation = StructuredOutputValidation.toJSON(message.validation);
+    }
+    if (message.result !== undefined) {
+      obj.result = StructuredOutputResult.toJSON(message.result);
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<StructuredOutputStreamEvent>, I>>(base?: I): StructuredOutputStreamEvent {
+    return StructuredOutputStreamEvent.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<StructuredOutputStreamEvent>, I>>(object: I): StructuredOutputStreamEvent {
+    const message = createBaseStructuredOutputStreamEvent();
+    message.seq = object.seq ?? 0;
+    message.timestampUs = object.timestampUs ?? 0;
+    message.requestId = object.requestId ?? "";
+    message.kind = object.kind ?? 0;
+    message.token = object.token ?? "";
+    message.partialJson = object.partialJson ?? undefined;
+    message.validation = (object.validation !== undefined && object.validation !== null)
+      ? StructuredOutputValidation.fromPartial(object.validation)
+      : undefined;
+    message.result = (object.result !== undefined && object.result !== null)
+      ? StructuredOutputResult.fromPartial(object.result)
+      : undefined;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
     return message;
   },
 };
@@ -1972,6 +3300,21 @@ export type DeepPartial<T> = T extends Builtin ? T
 type KeysOfUnion<T> = T extends T ? keyof T : never;
 export type Exact<P, I extends P> = P extends Builtin ? P
   : P & { [K in keyof P]: Exact<P[K], I[K]> } & { [K in Exclude<keyof I, KeysOfUnion<P>>]: never };
+
+function longToNumber(long: Long): number {
+  if (long.gt(globalThis.Number.MAX_SAFE_INTEGER)) {
+    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+  }
+  if (long.lt(globalThis.Number.MIN_SAFE_INTEGER)) {
+    throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+  }
+  return long.toNumber();
+}
+
+if (_m0.util.Long !== Long) {
+  _m0.util.Long = Long as any;
+  _m0.configure();
+}
 
 function isObject(value: any): boolean {
   return typeof value === "object" && value !== null;

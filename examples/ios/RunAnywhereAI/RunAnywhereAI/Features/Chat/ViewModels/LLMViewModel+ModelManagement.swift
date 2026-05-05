@@ -12,7 +12,7 @@ import os.log
 extension LLMViewModel {
     // MARK: - Model Loading
 
-    func loadModel(_ modelInfo: ModelInfo) async {
+    func loadModel(_ modelInfo: RAModelInfo) async {
         do {
             try await RunAnywhere.loadModel(modelInfo.id)
 
@@ -51,7 +51,7 @@ extension LLMViewModel {
         }
     }
 
-    private func verifyModelLoaded(_ currentModel: ModelInfo) {
+    private func verifyModelLoaded(_ currentModel: RAModelInfo) {
         Task {
             do {
                 try await RunAnywhere.loadModel(currentModel.id)

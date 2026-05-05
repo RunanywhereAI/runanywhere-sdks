@@ -15,6 +15,7 @@ import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
 import com.squareup.wire.`internal`.immutableCopyOf
 import com.squareup.wire.`internal`.redactElements
+import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
 import kotlin.Boolean
@@ -108,6 +109,52 @@ public class TTSOutput(
     schemaIndex = 6,
   )
   public val timestamp_ms: Long = 0L,
+  /**
+   * Stream chunk metadata. For one-shot synthesis, chunk_index=0 and
+   * is_final=true when set by the producer.
+   */
+  @field:WireField(
+    tag = 8,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "chunkIndex",
+    schemaIndex = 7,
+  )
+  public val chunk_index: Int = 0,
+  @field:WireField(
+    tag = 9,
+    adapter = "com.squareup.wire.ProtoAdapter#BOOL",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "isFinal",
+    schemaIndex = 8,
+  )
+  public val is_final: Boolean = false,
+  @field:WireField(
+    tag = 10,
+    adapter = "com.squareup.wire.ProtoAdapter#INT64",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "audioSizeBytes",
+    schemaIndex = 9,
+  )
+  public val audio_size_bytes: Long = 0L,
+  /**
+   * Terminal error details for result-envelope APIs.
+   */
+  @field:WireField(
+    tag = 11,
+    adapter = "com.squareup.wire.ProtoAdapter#STRING",
+    jsonName = "errorMessage",
+    schemaIndex = 10,
+  )
+  public val error_message: String? = null,
+  @field:WireField(
+    tag = 12,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "errorCode",
+    schemaIndex = 11,
+  )
+  public val error_code: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<TTSOutput, Nothing>(ADAPTER, unknownFields) {
   /**
@@ -141,6 +188,11 @@ public class TTSOutput(
     if (phoneme_timestamps != other.phoneme_timestamps) return false
     if (metadata != other.metadata) return false
     if (timestamp_ms != other.timestamp_ms) return false
+    if (chunk_index != other.chunk_index) return false
+    if (is_final != other.is_final) return false
+    if (audio_size_bytes != other.audio_size_bytes) return false
+    if (error_message != other.error_message) return false
+    if (error_code != other.error_code) return false
     return true
   }
 
@@ -155,6 +207,11 @@ public class TTSOutput(
       result = result * 37 + phoneme_timestamps.hashCode()
       result = result * 37 + (metadata?.hashCode() ?: 0)
       result = result * 37 + timestamp_ms.hashCode()
+      result = result * 37 + chunk_index.hashCode()
+      result = result * 37 + is_final.hashCode()
+      result = result * 37 + audio_size_bytes.hashCode()
+      result = result * 37 + (error_message?.hashCode() ?: 0)
+      result = result * 37 + error_code.hashCode()
       super.hashCode = result
     }
     return result
@@ -169,6 +226,11 @@ public class TTSOutput(
     if (phoneme_timestamps.isNotEmpty()) result += """phoneme_timestamps=$phoneme_timestamps"""
     if (metadata != null) result += """metadata=$metadata"""
     result += """timestamp_ms=$timestamp_ms"""
+    result += """chunk_index=$chunk_index"""
+    result += """is_final=$is_final"""
+    result += """audio_size_bytes=$audio_size_bytes"""
+    if (error_message != null) result += """error_message=${sanitize(error_message)}"""
+    result += """error_code=$error_code"""
     return result.joinToString(prefix = "TTSOutput{", separator = ", ", postfix = "}")
   }
 
@@ -180,9 +242,15 @@ public class TTSOutput(
     phoneme_timestamps: List<TTSPhonemeTimestamp> = this.phoneme_timestamps,
     metadata: TTSSynthesisMetadata? = this.metadata,
     timestamp_ms: Long = this.timestamp_ms,
+    chunk_index: Int = this.chunk_index,
+    is_final: Boolean = this.is_final,
+    audio_size_bytes: Long = this.audio_size_bytes,
+    error_message: String? = this.error_message,
+    error_code: Int = this.error_code,
     unknownFields: ByteString = this.unknownFields,
   ): TTSOutput = TTSOutput(audio_data, audio_format, sample_rate, duration_ms, phoneme_timestamps,
-      metadata, timestamp_ms, unknownFields)
+      metadata, timestamp_ms, chunk_index, is_final, audio_size_bytes, error_message, error_code,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -210,6 +278,14 @@ public class TTSOutput(
             value.metadata)
         if (value.timestamp_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(7,
             value.timestamp_ms)
+        if (value.chunk_index != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(8,
+            value.chunk_index)
+        if (value.is_final != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(9, value.is_final)
+        if (value.audio_size_bytes != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(10,
+            value.audio_size_bytes)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(11, value.error_message)
+        if (value.error_code != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(12,
+            value.error_code)
         return size
       }
 
@@ -225,11 +301,23 @@ public class TTSOutput(
             value.metadata)
         if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
             value.timestamp_ms)
+        if (value.chunk_index != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8, value.chunk_index)
+        if (value.is_final != false) ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.is_final)
+        if (value.audio_size_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 10,
+            value.audio_size_bytes)
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.error_message)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 12, value.error_code)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: TTSOutput) {
         writer.writeBytes(value.unknownFields)
+        if (value.error_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 12, value.error_code)
+        ProtoAdapter.STRING.encodeWithTag(writer, 11, value.error_message)
+        if (value.audio_size_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 10,
+            value.audio_size_bytes)
+        if (value.is_final != false) ProtoAdapter.BOOL.encodeWithTag(writer, 9, value.is_final)
+        if (value.chunk_index != 0) ProtoAdapter.INT32.encodeWithTag(writer, 8, value.chunk_index)
         if (value.timestamp_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
             value.timestamp_ms)
         if (value.metadata != null) TTSSynthesisMetadata.ADAPTER.encodeWithTag(writer, 6,
@@ -251,6 +339,11 @@ public class TTSOutput(
         val phoneme_timestamps = mutableListOf<TTSPhonemeTimestamp>()
         var metadata: TTSSynthesisMetadata? = null
         var timestamp_ms: Long = 0L
+        var chunk_index: Int = 0
+        var is_final: Boolean = false
+        var audio_size_bytes: Long = 0L
+        var error_message: String? = null
+        var error_code: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> audio_data = ProtoAdapter.BYTES.decode(reader)
@@ -264,6 +357,11 @@ public class TTSOutput(
             5 -> phoneme_timestamps.add(TTSPhonemeTimestamp.ADAPTER.decode(reader))
             6 -> metadata = TTSSynthesisMetadata.ADAPTER.decode(reader)
             7 -> timestamp_ms = ProtoAdapter.INT64.decode(reader)
+            8 -> chunk_index = ProtoAdapter.INT32.decode(reader)
+            9 -> is_final = ProtoAdapter.BOOL.decode(reader)
+            10 -> audio_size_bytes = ProtoAdapter.INT64.decode(reader)
+            11 -> error_message = ProtoAdapter.STRING.decode(reader)
+            12 -> error_code = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -275,6 +373,11 @@ public class TTSOutput(
           phoneme_timestamps = phoneme_timestamps,
           metadata = metadata,
           timestamp_ms = timestamp_ms,
+          chunk_index = chunk_index,
+          is_final = is_final,
+          audio_size_bytes = audio_size_bytes,
+          error_message = error_message,
+          error_code = error_code,
           unknownFields = unknownFields
         )
       }

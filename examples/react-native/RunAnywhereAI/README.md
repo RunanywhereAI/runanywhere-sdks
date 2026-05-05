@@ -338,9 +338,15 @@ npx react-native run-android --mode release
 The SDK is initialized in `App.tsx` with a two-phase initialization pattern:
 
 ```typescript
-import { RunAnywhere, SDKEnvironment, ModelCategory } from '@runanywhere/core';
+import {
+  RunAnywhere,
+  SDKEnvironment,
+  ModelCategory,
+  InferenceFramework,
+  ModelArtifactType,
+} from '@runanywhere/core';
 import { LlamaCPP } from '@runanywhere/llamacpp';
-import { ONNX, ModelArtifactType } from '@runanywhere/onnx';
+import { ONNX } from '@runanywhere/onnx';
 
 // Phase 1: Initialize SDK
 await RunAnywhere.initialize({
@@ -349,22 +355,24 @@ await RunAnywhere.initialize({
   environment: SDKEnvironment.Development,
 });
 
-// Phase 2: Register backends and models
+// Phase 2: Register optional backends and proto-described models
 LlamaCPP.register();
-await LlamaCPP.addModel({
+await RunAnywhere.registerModel({
   id: 'smollm2-360m-q8_0',
   name: 'SmolLM2 360M Q8_0',
   url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/...',
+  framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
   memoryRequirement: 500_000_000,
 });
 
 ONNX.register();
-await ONNX.addModel({
+await RunAnywhere.registerModel({
   id: 'sherpa-onnx-whisper-tiny.en',
   name: 'Sherpa Whisper Tiny (ONNX)',
   url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/...',
-  modality: ModelCategory.SpeechRecognition,
-  artifactType: ModelArtifactType.TarGzArchive,
+  framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+  artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
   memoryRequirement: 75_000_000,
 });
 ```
@@ -495,8 +503,7 @@ console.log('Models:', storage.modelsSize);
 // Delete a model
 await RunAnywhere.deleteModel(modelId);
 
-// Clear cache
-await RunAnywhere.clearCache();
+// Clear temporary storage through the V2 storage-plan bridge when available
 await RunAnywhere.cleanTempFiles();
 ```
 
@@ -578,7 +585,7 @@ await RunAnywhere.cleanTempFiles();
 - `RunAnywhere.downloadModel()` — Download with progress
 - `RunAnywhere.deleteModel()` — Remove model
 - `RunAnywhere.getStorageInfo()` — Storage metrics
-- `RunAnywhere.clearCache()` — Clear temporary files
+- V2 storage-plan bridge — Temporary storage cleanup
 
 ---
 

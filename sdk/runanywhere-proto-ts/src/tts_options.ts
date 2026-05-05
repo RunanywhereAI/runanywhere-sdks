@@ -71,6 +71,69 @@ export function tTSVoiceGenderToJSON(object: TTSVoiceGender): string {
   }
 }
 
+export enum TTSStreamEventKind {
+  TTS_STREAM_EVENT_KIND_UNSPECIFIED = 0,
+  TTS_STREAM_EVENT_KIND_STARTED = 1,
+  TTS_STREAM_EVENT_KIND_AUDIO_CHUNK = 2,
+  TTS_STREAM_EVENT_KIND_PHONEME = 3,
+  TTS_STREAM_EVENT_KIND_COMPLETED = 4,
+  TTS_STREAM_EVENT_KIND_ERROR = 5,
+  TTS_STREAM_EVENT_KIND_PROGRESS = 6,
+  UNRECOGNIZED = -1,
+}
+
+export function tTSStreamEventKindFromJSON(object: any): TTSStreamEventKind {
+  switch (object) {
+    case 0:
+    case "TTS_STREAM_EVENT_KIND_UNSPECIFIED":
+      return TTSStreamEventKind.TTS_STREAM_EVENT_KIND_UNSPECIFIED;
+    case 1:
+    case "TTS_STREAM_EVENT_KIND_STARTED":
+      return TTSStreamEventKind.TTS_STREAM_EVENT_KIND_STARTED;
+    case 2:
+    case "TTS_STREAM_EVENT_KIND_AUDIO_CHUNK":
+      return TTSStreamEventKind.TTS_STREAM_EVENT_KIND_AUDIO_CHUNK;
+    case 3:
+    case "TTS_STREAM_EVENT_KIND_PHONEME":
+      return TTSStreamEventKind.TTS_STREAM_EVENT_KIND_PHONEME;
+    case 4:
+    case "TTS_STREAM_EVENT_KIND_COMPLETED":
+      return TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED;
+    case 5:
+    case "TTS_STREAM_EVENT_KIND_ERROR":
+      return TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR;
+    case 6:
+    case "TTS_STREAM_EVENT_KIND_PROGRESS":
+      return TTSStreamEventKind.TTS_STREAM_EVENT_KIND_PROGRESS;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return TTSStreamEventKind.UNRECOGNIZED;
+  }
+}
+
+export function tTSStreamEventKindToJSON(object: TTSStreamEventKind): string {
+  switch (object) {
+    case TTSStreamEventKind.TTS_STREAM_EVENT_KIND_UNSPECIFIED:
+      return "TTS_STREAM_EVENT_KIND_UNSPECIFIED";
+    case TTSStreamEventKind.TTS_STREAM_EVENT_KIND_STARTED:
+      return "TTS_STREAM_EVENT_KIND_STARTED";
+    case TTSStreamEventKind.TTS_STREAM_EVENT_KIND_AUDIO_CHUNK:
+      return "TTS_STREAM_EVENT_KIND_AUDIO_CHUNK";
+    case TTSStreamEventKind.TTS_STREAM_EVENT_KIND_PHONEME:
+      return "TTS_STREAM_EVENT_KIND_PHONEME";
+    case TTSStreamEventKind.TTS_STREAM_EVENT_KIND_COMPLETED:
+      return "TTS_STREAM_EVENT_KIND_COMPLETED";
+    case TTSStreamEventKind.TTS_STREAM_EVENT_KIND_ERROR:
+      return "TTS_STREAM_EVENT_KIND_ERROR";
+    case TTSStreamEventKind.TTS_STREAM_EVENT_KIND_PROGRESS:
+      return "TTS_STREAM_EVENT_KIND_PROGRESS";
+    case TTSStreamEventKind.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 /**
  * ---------------------------------------------------------------------------
  * Component-level TTS configuration.
@@ -170,6 +233,28 @@ export interface TTSOptions {
    * Present in rac_tts_options_t and several SDK option structs.
    */
   sampleRate: number;
+  /**
+   * Speaker index for multi-speaker voices. -1/0 = backend default
+   * depending on model convention.
+   */
+  speakerId: number;
+  /** Web/ONNX ergonomic alias for speaking_rate. 0.0 = use speaking_rate. */
+  speed: number;
+  /** Optional style/emotion hint for voices that support style transfer. */
+  style?: string | undefined;
+}
+
+export interface TTSSynthesisRequest {
+  requestId: string;
+  text: string;
+  ssml?: string | undefined;
+  options?: TTSOptions | undefined;
+  metadata: { [key: string]: string };
+}
+
+export interface TTSSynthesisRequest_MetadataEntry {
+  key: string;
+  value: string;
 }
 
 /**
@@ -258,6 +343,16 @@ export interface TTSOutput {
    * (milliseconds since UNIX epoch). Mirrors C ABI `timestamp_ms`.
    */
   timestampMs: number;
+  /**
+   * Stream chunk metadata. For one-shot synthesis, chunk_index=0 and
+   * is_final=true when set by the producer.
+   */
+  chunkIndex: number;
+  isFinal: boolean;
+  audioSizeBytes: number;
+  /** Terminal error details for result-envelope APIs. */
+  errorMessage?: string | undefined;
+  errorCode: number;
 }
 
 /**
@@ -289,6 +384,8 @@ export interface TTSSpeakResult {
     | undefined;
   /** Wall-clock timestamp when speech completed (ms since UNIX epoch). */
   timestampMs: number;
+  errorMessage?: string | undefined;
+  errorCode: number;
 }
 
 /**
@@ -314,6 +411,41 @@ export interface TTSVoiceInfo {
   gender: TTSVoiceGender;
   /** Optional descriptive text (locale, age, style notes). */
   description: string;
+  /** Additional discovery fields surfaced by system and ONNX/Piper voices. */
+  isNeural: boolean;
+  isSystem: boolean;
+  sampleRate: number;
+  supportedStyles: string[];
+}
+
+export interface TTSStreamEvent {
+  seq: number;
+  timestampUs: number;
+  requestId: string;
+  kind: TTSStreamEventKind;
+  output?: TTSOutput | undefined;
+  phoneme?: TTSPhonemeTimestamp | undefined;
+  speakResult?: TTSSpeakResult | undefined;
+  errorMessage?: string | undefined;
+  errorCode: number;
+  /**
+   * Progress metadata for started/progress/audio_chunk/completed events.
+   * progress is 0.0..1.0 when known; total_chunks=0 means unknown.
+   */
+  progress: number;
+  chunkIndex: number;
+  totalChunks: number;
+  elapsedMs: number;
+  statusMessage: string;
+}
+
+export interface TTSServiceState {
+  isReady: boolean;
+  currentVoice?: string | undefined;
+  voices: TTSVoiceInfo[];
+  supportedLanguageCodes: string[];
+  errorMessage?: string | undefined;
+  errorCode: number;
 }
 
 function createBaseTTSConfiguration(): TTSConfiguration {
@@ -549,6 +681,9 @@ function createBaseTTSOptions(): TTSOptions {
     enableSsml: false,
     audioFormat: 0,
     sampleRate: 0,
+    speakerId: 0,
+    speed: 0,
+    style: undefined,
   };
 }
 
@@ -577,6 +712,15 @@ export const TTSOptions = {
     }
     if (message.sampleRate !== 0) {
       writer.uint32(64).int32(message.sampleRate);
+    }
+    if (message.speakerId !== 0) {
+      writer.uint32(72).int32(message.speakerId);
+    }
+    if (message.speed !== 0) {
+      writer.uint32(85).float(message.speed);
+    }
+    if (message.style !== undefined) {
+      writer.uint32(90).string(message.style);
     }
     return writer;
   },
@@ -644,6 +788,27 @@ export const TTSOptions = {
 
           message.sampleRate = reader.int32();
           continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.speakerId = reader.int32();
+          continue;
+        case 10:
+          if (tag !== 85) {
+            break;
+          }
+
+          message.speed = reader.float();
+          continue;
+        case 11:
+          if (tag !== 90) {
+            break;
+          }
+
+          message.style = reader.string();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -663,6 +828,9 @@ export const TTSOptions = {
       enableSsml: isSet(object.enableSsml) ? globalThis.Boolean(object.enableSsml) : false,
       audioFormat: isSet(object.audioFormat) ? audioFormatFromJSON(object.audioFormat) : 0,
       sampleRate: isSet(object.sampleRate) ? globalThis.Number(object.sampleRate) : 0,
+      speakerId: isSet(object.speakerId) ? globalThis.Number(object.speakerId) : 0,
+      speed: isSet(object.speed) ? globalThis.Number(object.speed) : 0,
+      style: isSet(object.style) ? globalThis.String(object.style) : undefined,
     };
   },
 
@@ -692,6 +860,15 @@ export const TTSOptions = {
     if (message.sampleRate !== 0) {
       obj.sampleRate = Math.round(message.sampleRate);
     }
+    if (message.speakerId !== 0) {
+      obj.speakerId = Math.round(message.speakerId);
+    }
+    if (message.speed !== 0) {
+      obj.speed = message.speed;
+    }
+    if (message.style !== undefined) {
+      obj.style = message.style;
+    }
     return obj;
   },
 
@@ -708,6 +885,227 @@ export const TTSOptions = {
     message.enableSsml = object.enableSsml ?? false;
     message.audioFormat = object.audioFormat ?? 0;
     message.sampleRate = object.sampleRate ?? 0;
+    message.speakerId = object.speakerId ?? 0;
+    message.speed = object.speed ?? 0;
+    message.style = object.style ?? undefined;
+    return message;
+  },
+};
+
+function createBaseTTSSynthesisRequest(): TTSSynthesisRequest {
+  return { requestId: "", text: "", ssml: undefined, options: undefined, metadata: {} };
+}
+
+export const TTSSynthesisRequest = {
+  encode(message: TTSSynthesisRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.requestId !== "") {
+      writer.uint32(10).string(message.requestId);
+    }
+    if (message.text !== "") {
+      writer.uint32(18).string(message.text);
+    }
+    if (message.ssml !== undefined) {
+      writer.uint32(26).string(message.ssml);
+    }
+    if (message.options !== undefined) {
+      TTSOptions.encode(message.options, writer.uint32(34).fork()).ldelim();
+    }
+    Object.entries(message.metadata).forEach(([key, value]) => {
+      TTSSynthesisRequest_MetadataEntry.encode({ key: key as any, value }, writer.uint32(42).fork()).ldelim();
+    });
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): TTSSynthesisRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTTSSynthesisRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.text = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.ssml = reader.string();
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.options = TTSOptions.decode(reader, reader.uint32());
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          const entry5 = TTSSynthesisRequest_MetadataEntry.decode(reader, reader.uint32());
+          if (entry5.value !== undefined) {
+            message.metadata[entry5.key] = entry5.value;
+          }
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TTSSynthesisRequest {
+    return {
+      requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+      text: isSet(object.text) ? globalThis.String(object.text) : "",
+      ssml: isSet(object.ssml) ? globalThis.String(object.ssml) : undefined,
+      options: isSet(object.options) ? TTSOptions.fromJSON(object.options) : undefined,
+      metadata: isObject(object.metadata)
+        ? Object.entries(object.metadata).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+          acc[key] = String(value);
+          return acc;
+        }, {})
+        : {},
+    };
+  },
+
+  toJSON(message: TTSSynthesisRequest): unknown {
+    const obj: any = {};
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.text !== "") {
+      obj.text = message.text;
+    }
+    if (message.ssml !== undefined) {
+      obj.ssml = message.ssml;
+    }
+    if (message.options !== undefined) {
+      obj.options = TTSOptions.toJSON(message.options);
+    }
+    if (message.metadata) {
+      const entries = Object.entries(message.metadata);
+      if (entries.length > 0) {
+        obj.metadata = {};
+        entries.forEach(([k, v]) => {
+          obj.metadata[k] = v;
+        });
+      }
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<TTSSynthesisRequest>, I>>(base?: I): TTSSynthesisRequest {
+    return TTSSynthesisRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<TTSSynthesisRequest>, I>>(object: I): TTSSynthesisRequest {
+    const message = createBaseTTSSynthesisRequest();
+    message.requestId = object.requestId ?? "";
+    message.text = object.text ?? "";
+    message.ssml = object.ssml ?? undefined;
+    message.options = (object.options !== undefined && object.options !== null)
+      ? TTSOptions.fromPartial(object.options)
+      : undefined;
+    message.metadata = Object.entries(object.metadata ?? {}).reduce<{ [key: string]: string }>((acc, [key, value]) => {
+      if (value !== undefined) {
+        acc[key] = globalThis.String(value);
+      }
+      return acc;
+    }, {});
+    return message;
+  },
+};
+
+function createBaseTTSSynthesisRequest_MetadataEntry(): TTSSynthesisRequest_MetadataEntry {
+  return { key: "", value: "" };
+}
+
+export const TTSSynthesisRequest_MetadataEntry = {
+  encode(message: TTSSynthesisRequest_MetadataEntry, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.key !== "") {
+      writer.uint32(10).string(message.key);
+    }
+    if (message.value !== "") {
+      writer.uint32(18).string(message.value);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): TTSSynthesisRequest_MetadataEntry {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTTSSynthesisRequest_MetadataEntry();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.key = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.value = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TTSSynthesisRequest_MetadataEntry {
+    return {
+      key: isSet(object.key) ? globalThis.String(object.key) : "",
+      value: isSet(object.value) ? globalThis.String(object.value) : "",
+    };
+  },
+
+  toJSON(message: TTSSynthesisRequest_MetadataEntry): unknown {
+    const obj: any = {};
+    if (message.key !== "") {
+      obj.key = message.key;
+    }
+    if (message.value !== "") {
+      obj.value = message.value;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<TTSSynthesisRequest_MetadataEntry>, I>>(
+    base?: I,
+  ): TTSSynthesisRequest_MetadataEntry {
+    return TTSSynthesisRequest_MetadataEntry.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<TTSSynthesisRequest_MetadataEntry>, I>>(
+    object: I,
+  ): TTSSynthesisRequest_MetadataEntry {
+    const message = createBaseTTSSynthesisRequest_MetadataEntry();
+    message.key = object.key ?? "";
+    message.value = object.value ?? "";
     return message;
   },
 };
@@ -951,6 +1349,11 @@ function createBaseTTSOutput(): TTSOutput {
     phonemeTimestamps: [],
     metadata: undefined,
     timestampMs: 0,
+    chunkIndex: 0,
+    isFinal: false,
+    audioSizeBytes: 0,
+    errorMessage: undefined,
+    errorCode: 0,
   };
 }
 
@@ -976,6 +1379,21 @@ export const TTSOutput = {
     }
     if (message.timestampMs !== 0) {
       writer.uint32(56).int64(message.timestampMs);
+    }
+    if (message.chunkIndex !== 0) {
+      writer.uint32(64).int32(message.chunkIndex);
+    }
+    if (message.isFinal !== false) {
+      writer.uint32(72).bool(message.isFinal);
+    }
+    if (message.audioSizeBytes !== 0) {
+      writer.uint32(80).int64(message.audioSizeBytes);
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(90).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(96).int32(message.errorCode);
     }
     return writer;
   },
@@ -1036,6 +1454,41 @@ export const TTSOutput = {
 
           message.timestampMs = longToNumber(reader.int64() as Long);
           continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.chunkIndex = reader.int32();
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.isFinal = reader.bool();
+          continue;
+        case 10:
+          if (tag !== 80) {
+            break;
+          }
+
+          message.audioSizeBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 11:
+          if (tag !== 90) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 12:
+          if (tag !== 96) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1056,6 +1509,11 @@ export const TTSOutput = {
         : [],
       metadata: isSet(object.metadata) ? TTSSynthesisMetadata.fromJSON(object.metadata) : undefined,
       timestampMs: isSet(object.timestampMs) ? globalThis.Number(object.timestampMs) : 0,
+      chunkIndex: isSet(object.chunkIndex) ? globalThis.Number(object.chunkIndex) : 0,
+      isFinal: isSet(object.isFinal) ? globalThis.Boolean(object.isFinal) : false,
+      audioSizeBytes: isSet(object.audioSizeBytes) ? globalThis.Number(object.audioSizeBytes) : 0,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
     };
   },
 
@@ -1082,6 +1540,21 @@ export const TTSOutput = {
     if (message.timestampMs !== 0) {
       obj.timestampMs = Math.round(message.timestampMs);
     }
+    if (message.chunkIndex !== 0) {
+      obj.chunkIndex = Math.round(message.chunkIndex);
+    }
+    if (message.isFinal !== false) {
+      obj.isFinal = message.isFinal;
+    }
+    if (message.audioSizeBytes !== 0) {
+      obj.audioSizeBytes = Math.round(message.audioSizeBytes);
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
     return obj;
   },
 
@@ -1099,12 +1572,26 @@ export const TTSOutput = {
       ? TTSSynthesisMetadata.fromPartial(object.metadata)
       : undefined;
     message.timestampMs = object.timestampMs ?? 0;
+    message.chunkIndex = object.chunkIndex ?? 0;
+    message.isFinal = object.isFinal ?? false;
+    message.audioSizeBytes = object.audioSizeBytes ?? 0;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
     return message;
   },
 };
 
 function createBaseTTSSpeakResult(): TTSSpeakResult {
-  return { audioFormat: 0, sampleRate: 0, durationMs: 0, audioSizeBytes: 0, metadata: undefined, timestampMs: 0 };
+  return {
+    audioFormat: 0,
+    sampleRate: 0,
+    durationMs: 0,
+    audioSizeBytes: 0,
+    metadata: undefined,
+    timestampMs: 0,
+    errorMessage: undefined,
+    errorCode: 0,
+  };
 }
 
 export const TTSSpeakResult = {
@@ -1126,6 +1613,12 @@ export const TTSSpeakResult = {
     }
     if (message.timestampMs !== 0) {
       writer.uint32(48).int64(message.timestampMs);
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(58).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(64).int32(message.errorCode);
     }
     return writer;
   },
@@ -1179,6 +1672,20 @@ export const TTSSpeakResult = {
 
           message.timestampMs = longToNumber(reader.int64() as Long);
           continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1196,6 +1703,8 @@ export const TTSSpeakResult = {
       audioSizeBytes: isSet(object.audioSizeBytes) ? globalThis.Number(object.audioSizeBytes) : 0,
       metadata: isSet(object.metadata) ? TTSSynthesisMetadata.fromJSON(object.metadata) : undefined,
       timestampMs: isSet(object.timestampMs) ? globalThis.Number(object.timestampMs) : 0,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
     };
   },
 
@@ -1219,6 +1728,12 @@ export const TTSSpeakResult = {
     if (message.timestampMs !== 0) {
       obj.timestampMs = Math.round(message.timestampMs);
     }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
     return obj;
   },
 
@@ -1235,12 +1750,24 @@ export const TTSSpeakResult = {
       ? TTSSynthesisMetadata.fromPartial(object.metadata)
       : undefined;
     message.timestampMs = object.timestampMs ?? 0;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
     return message;
   },
 };
 
 function createBaseTTSVoiceInfo(): TTSVoiceInfo {
-  return { id: "", displayName: "", languageCode: "", gender: 0, description: "" };
+  return {
+    id: "",
+    displayName: "",
+    languageCode: "",
+    gender: 0,
+    description: "",
+    isNeural: false,
+    isSystem: false,
+    sampleRate: 0,
+    supportedStyles: [],
+  };
 }
 
 export const TTSVoiceInfo = {
@@ -1259,6 +1786,18 @@ export const TTSVoiceInfo = {
     }
     if (message.description !== "") {
       writer.uint32(42).string(message.description);
+    }
+    if (message.isNeural !== false) {
+      writer.uint32(48).bool(message.isNeural);
+    }
+    if (message.isSystem !== false) {
+      writer.uint32(56).bool(message.isSystem);
+    }
+    if (message.sampleRate !== 0) {
+      writer.uint32(64).int32(message.sampleRate);
+    }
+    for (const v of message.supportedStyles) {
+      writer.uint32(74).string(v!);
     }
     return writer;
   },
@@ -1305,6 +1844,34 @@ export const TTSVoiceInfo = {
 
           message.description = reader.string();
           continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.isNeural = reader.bool();
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.isSystem = reader.bool();
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.sampleRate = reader.int32();
+          continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.supportedStyles.push(reader.string());
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1321,6 +1888,12 @@ export const TTSVoiceInfo = {
       languageCode: isSet(object.languageCode) ? globalThis.String(object.languageCode) : "",
       gender: isSet(object.gender) ? tTSVoiceGenderFromJSON(object.gender) : 0,
       description: isSet(object.description) ? globalThis.String(object.description) : "",
+      isNeural: isSet(object.isNeural) ? globalThis.Boolean(object.isNeural) : false,
+      isSystem: isSet(object.isSystem) ? globalThis.Boolean(object.isSystem) : false,
+      sampleRate: isSet(object.sampleRate) ? globalThis.Number(object.sampleRate) : 0,
+      supportedStyles: globalThis.Array.isArray(object?.supportedStyles)
+        ? object.supportedStyles.map((e: any) => globalThis.String(e))
+        : [],
     };
   },
 
@@ -1341,6 +1914,18 @@ export const TTSVoiceInfo = {
     if (message.description !== "") {
       obj.description = message.description;
     }
+    if (message.isNeural !== false) {
+      obj.isNeural = message.isNeural;
+    }
+    if (message.isSystem !== false) {
+      obj.isSystem = message.isSystem;
+    }
+    if (message.sampleRate !== 0) {
+      obj.sampleRate = Math.round(message.sampleRate);
+    }
+    if (message.supportedStyles?.length) {
+      obj.supportedStyles = message.supportedStyles;
+    }
     return obj;
   },
 
@@ -1354,6 +1939,428 @@ export const TTSVoiceInfo = {
     message.languageCode = object.languageCode ?? "";
     message.gender = object.gender ?? 0;
     message.description = object.description ?? "";
+    message.isNeural = object.isNeural ?? false;
+    message.isSystem = object.isSystem ?? false;
+    message.sampleRate = object.sampleRate ?? 0;
+    message.supportedStyles = object.supportedStyles?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseTTSStreamEvent(): TTSStreamEvent {
+  return {
+    seq: 0,
+    timestampUs: 0,
+    requestId: "",
+    kind: 0,
+    output: undefined,
+    phoneme: undefined,
+    speakResult: undefined,
+    errorMessage: undefined,
+    errorCode: 0,
+    progress: 0,
+    chunkIndex: 0,
+    totalChunks: 0,
+    elapsedMs: 0,
+    statusMessage: "",
+  };
+}
+
+export const TTSStreamEvent = {
+  encode(message: TTSStreamEvent, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.seq !== 0) {
+      writer.uint32(8).uint64(message.seq);
+    }
+    if (message.timestampUs !== 0) {
+      writer.uint32(16).int64(message.timestampUs);
+    }
+    if (message.requestId !== "") {
+      writer.uint32(26).string(message.requestId);
+    }
+    if (message.kind !== 0) {
+      writer.uint32(32).int32(message.kind);
+    }
+    if (message.output !== undefined) {
+      TTSOutput.encode(message.output, writer.uint32(42).fork()).ldelim();
+    }
+    if (message.phoneme !== undefined) {
+      TTSPhonemeTimestamp.encode(message.phoneme, writer.uint32(50).fork()).ldelim();
+    }
+    if (message.speakResult !== undefined) {
+      TTSSpeakResult.encode(message.speakResult, writer.uint32(58).fork()).ldelim();
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(66).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(72).int32(message.errorCode);
+    }
+    if (message.progress !== 0) {
+      writer.uint32(85).float(message.progress);
+    }
+    if (message.chunkIndex !== 0) {
+      writer.uint32(88).int32(message.chunkIndex);
+    }
+    if (message.totalChunks !== 0) {
+      writer.uint32(96).int32(message.totalChunks);
+    }
+    if (message.elapsedMs !== 0) {
+      writer.uint32(104).int64(message.elapsedMs);
+    }
+    if (message.statusMessage !== "") {
+      writer.uint32(114).string(message.statusMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): TTSStreamEvent {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTTSStreamEvent();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.seq = longToNumber(reader.uint64() as Long);
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.timestampUs = longToNumber(reader.int64() as Long);
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.requestId = reader.string();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.kind = reader.int32() as any;
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.output = TTSOutput.decode(reader, reader.uint32());
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.phoneme = TTSPhonemeTimestamp.decode(reader, reader.uint32());
+          continue;
+        case 7:
+          if (tag !== 58) {
+            break;
+          }
+
+          message.speakResult = TTSSpeakResult.decode(reader, reader.uint32());
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 9:
+          if (tag !== 72) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+        case 10:
+          if (tag !== 85) {
+            break;
+          }
+
+          message.progress = reader.float();
+          continue;
+        case 11:
+          if (tag !== 88) {
+            break;
+          }
+
+          message.chunkIndex = reader.int32();
+          continue;
+        case 12:
+          if (tag !== 96) {
+            break;
+          }
+
+          message.totalChunks = reader.int32();
+          continue;
+        case 13:
+          if (tag !== 104) {
+            break;
+          }
+
+          message.elapsedMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 14:
+          if (tag !== 114) {
+            break;
+          }
+
+          message.statusMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TTSStreamEvent {
+    return {
+      seq: isSet(object.seq) ? globalThis.Number(object.seq) : 0,
+      timestampUs: isSet(object.timestampUs) ? globalThis.Number(object.timestampUs) : 0,
+      requestId: isSet(object.requestId) ? globalThis.String(object.requestId) : "",
+      kind: isSet(object.kind) ? tTSStreamEventKindFromJSON(object.kind) : 0,
+      output: isSet(object.output) ? TTSOutput.fromJSON(object.output) : undefined,
+      phoneme: isSet(object.phoneme) ? TTSPhonemeTimestamp.fromJSON(object.phoneme) : undefined,
+      speakResult: isSet(object.speakResult) ? TTSSpeakResult.fromJSON(object.speakResult) : undefined,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+      progress: isSet(object.progress) ? globalThis.Number(object.progress) : 0,
+      chunkIndex: isSet(object.chunkIndex) ? globalThis.Number(object.chunkIndex) : 0,
+      totalChunks: isSet(object.totalChunks) ? globalThis.Number(object.totalChunks) : 0,
+      elapsedMs: isSet(object.elapsedMs) ? globalThis.Number(object.elapsedMs) : 0,
+      statusMessage: isSet(object.statusMessage) ? globalThis.String(object.statusMessage) : "",
+    };
+  },
+
+  toJSON(message: TTSStreamEvent): unknown {
+    const obj: any = {};
+    if (message.seq !== 0) {
+      obj.seq = Math.round(message.seq);
+    }
+    if (message.timestampUs !== 0) {
+      obj.timestampUs = Math.round(message.timestampUs);
+    }
+    if (message.requestId !== "") {
+      obj.requestId = message.requestId;
+    }
+    if (message.kind !== 0) {
+      obj.kind = tTSStreamEventKindToJSON(message.kind);
+    }
+    if (message.output !== undefined) {
+      obj.output = TTSOutput.toJSON(message.output);
+    }
+    if (message.phoneme !== undefined) {
+      obj.phoneme = TTSPhonemeTimestamp.toJSON(message.phoneme);
+    }
+    if (message.speakResult !== undefined) {
+      obj.speakResult = TTSSpeakResult.toJSON(message.speakResult);
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    if (message.progress !== 0) {
+      obj.progress = message.progress;
+    }
+    if (message.chunkIndex !== 0) {
+      obj.chunkIndex = Math.round(message.chunkIndex);
+    }
+    if (message.totalChunks !== 0) {
+      obj.totalChunks = Math.round(message.totalChunks);
+    }
+    if (message.elapsedMs !== 0) {
+      obj.elapsedMs = Math.round(message.elapsedMs);
+    }
+    if (message.statusMessage !== "") {
+      obj.statusMessage = message.statusMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<TTSStreamEvent>, I>>(base?: I): TTSStreamEvent {
+    return TTSStreamEvent.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<TTSStreamEvent>, I>>(object: I): TTSStreamEvent {
+    const message = createBaseTTSStreamEvent();
+    message.seq = object.seq ?? 0;
+    message.timestampUs = object.timestampUs ?? 0;
+    message.requestId = object.requestId ?? "";
+    message.kind = object.kind ?? 0;
+    message.output = (object.output !== undefined && object.output !== null)
+      ? TTSOutput.fromPartial(object.output)
+      : undefined;
+    message.phoneme = (object.phoneme !== undefined && object.phoneme !== null)
+      ? TTSPhonemeTimestamp.fromPartial(object.phoneme)
+      : undefined;
+    message.speakResult = (object.speakResult !== undefined && object.speakResult !== null)
+      ? TTSSpeakResult.fromPartial(object.speakResult)
+      : undefined;
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
+    message.progress = object.progress ?? 0;
+    message.chunkIndex = object.chunkIndex ?? 0;
+    message.totalChunks = object.totalChunks ?? 0;
+    message.elapsedMs = object.elapsedMs ?? 0;
+    message.statusMessage = object.statusMessage ?? "";
+    return message;
+  },
+};
+
+function createBaseTTSServiceState(): TTSServiceState {
+  return {
+    isReady: false,
+    currentVoice: undefined,
+    voices: [],
+    supportedLanguageCodes: [],
+    errorMessage: undefined,
+    errorCode: 0,
+  };
+}
+
+export const TTSServiceState = {
+  encode(message: TTSServiceState, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.isReady !== false) {
+      writer.uint32(8).bool(message.isReady);
+    }
+    if (message.currentVoice !== undefined) {
+      writer.uint32(18).string(message.currentVoice);
+    }
+    for (const v of message.voices) {
+      TTSVoiceInfo.encode(v!, writer.uint32(26).fork()).ldelim();
+    }
+    for (const v of message.supportedLanguageCodes) {
+      writer.uint32(34).string(v!);
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(42).string(message.errorMessage);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(48).int32(message.errorCode);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): TTSServiceState {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTTSServiceState();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.isReady = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.currentVoice = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.voices.push(TTSVoiceInfo.decode(reader, reader.uint32()));
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.supportedLanguageCodes.push(reader.string());
+          continue;
+        case 5:
+          if (tag !== 42) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TTSServiceState {
+    return {
+      isReady: isSet(object.isReady) ? globalThis.Boolean(object.isReady) : false,
+      currentVoice: isSet(object.currentVoice) ? globalThis.String(object.currentVoice) : undefined,
+      voices: globalThis.Array.isArray(object?.voices) ? object.voices.map((e: any) => TTSVoiceInfo.fromJSON(e)) : [],
+      supportedLanguageCodes: globalThis.Array.isArray(object?.supportedLanguageCodes)
+        ? object.supportedLanguageCodes.map((e: any) => globalThis.String(e))
+        : [],
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+    };
+  },
+
+  toJSON(message: TTSServiceState): unknown {
+    const obj: any = {};
+    if (message.isReady !== false) {
+      obj.isReady = message.isReady;
+    }
+    if (message.currentVoice !== undefined) {
+      obj.currentVoice = message.currentVoice;
+    }
+    if (message.voices?.length) {
+      obj.voices = message.voices.map((e) => TTSVoiceInfo.toJSON(e));
+    }
+    if (message.supportedLanguageCodes?.length) {
+      obj.supportedLanguageCodes = message.supportedLanguageCodes;
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<TTSServiceState>, I>>(base?: I): TTSServiceState {
+    return TTSServiceState.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<TTSServiceState>, I>>(object: I): TTSServiceState {
+    const message = createBaseTTSServiceState();
+    message.isReady = object.isReady ?? false;
+    message.currentVoice = object.currentVoice ?? undefined;
+    message.voices = object.voices?.map((e) => TTSVoiceInfo.fromPartial(e)) || [];
+    message.supportedLanguageCodes = object.supportedLanguageCodes?.map((e) => e) || [];
+    message.errorMessage = object.errorMessage ?? undefined;
+    message.errorCode = object.errorCode ?? 0;
     return message;
   },
 };
@@ -1400,6 +2407,10 @@ function longToNumber(long: Long): number {
 if (_m0.util.Long !== Long) {
   _m0.util.Long = Long as any;
   _m0.configure();
+}
+
+function isObject(value: any): boolean {
+  return typeof value === "object" && value !== null;
 }
 
 function isSet(value: any): boolean {

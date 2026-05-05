@@ -10,6 +10,7 @@
  */
 
 #include "rac/plugin/rac_engine_vtable.h"
+#include "rac/plugin/rac_engine_manifest.h"
 #include "rac/plugin/rac_plugin_entry.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 
@@ -25,28 +26,38 @@ static const rac_runtime_id_t k_onnx_runtimes[] = {
 };
 
 static const uint32_t k_onnx_formats[] = {
-    3,  /* MODEL_FORMAT_ONNX */
-    4,  /* MODEL_FORMAT_ORT  */
+    RAC_MODEL_FORMAT_ID_ONNX,
+    RAC_MODEL_FORMAT_ID_ORT,
+};
+
+static const rac_primitive_t k_onnx_primitives[] = {
+    RAC_PRIMITIVE_EMBED,
+};
+
+// P0 regression fix (post FIX-AK17 autoregister): the onnx engine plugin
+// only owns the embeddings primitive on this build (stt/tts/vad ops are
+// nullptr and shipped by engines/sherpa). Keep priority below sherpa's 90.
+static const rac_engine_manifest_t k_onnx_manifest = {
+    .name             = "onnx",
+    .display_name     = "ONNX Runtime",
+    .version          = nullptr,
+    .package_owner    = "runanywhere",
+    .package_name     = "rac_backend_onnx",
+    .availability     = RAC_ENGINE_AVAILABILITY_PUBLIC,
+    .priority         = 50,
+    .capability_flags = 0,
+    .primitives       = k_onnx_primitives,
+    .primitives_count = sizeof(k_onnx_primitives) / sizeof(k_onnx_primitives[0]),
+    .runtimes         = k_onnx_runtimes,
+    .runtimes_count   = sizeof(k_onnx_runtimes) / sizeof(k_onnx_runtimes[0]),
+    .formats          = k_onnx_formats,
+    .formats_count    = sizeof(k_onnx_formats) / sizeof(k_onnx_formats[0]),
+    .reserved_0       = 0,
+    .reserved_1       = 0,
 };
 
 static const rac_engine_vtable_t g_onnx_engine_vtable = {
-    /* metadata */ {
-        .abi_version      = RAC_PLUGIN_API_VERSION,
-        .name             = "onnx",
-        .display_name     = "ONNX Runtime",
-        .engine_version   = nullptr,
-        // P0 regression fix (post FIX-AK17 autoregister): the onnx engine
-        // plugin only owns the embeddings primitive on this build (stt/tts/vad
-        // ops are nullptr and shipped by engines/sherpa). Drop priority well
-        // below sherpa's 90 so even a future accidental ops-slot addition can
-        // never out-rank the speech engine on score-based routing.
-        .priority         = 50,
-        .capability_flags = 0,
-        .runtimes         = k_onnx_runtimes,
-        .runtimes_count   = sizeof(k_onnx_runtimes) / sizeof(k_onnx_runtimes[0]),
-        .formats          = k_onnx_formats,
-        .formats_count    = sizeof(k_onnx_formats) / sizeof(k_onnx_formats[0]),
-    },
+    /* metadata */ RAC_ENGINE_METADATA_FROM_MANIFEST(k_onnx_manifest),
     /* capability_check */ nullptr,
     /* on_unload        */ nullptr,
 
@@ -65,7 +76,8 @@ static const rac_engine_vtable_t g_onnx_engine_vtable = {
 };
 
 RAC_PLUGIN_ENTRY_DEF(onnx) {
-    return &g_onnx_engine_vtable;
+    return rac_engine_entry_with_manifest(&k_onnx_manifest,
+                                          &g_onnx_engine_vtable);
 }
 
 }  // extern "C"

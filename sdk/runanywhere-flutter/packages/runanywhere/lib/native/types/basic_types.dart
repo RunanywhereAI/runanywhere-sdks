@@ -32,6 +32,10 @@ const int RAC_SUCCESS = 0;
 
 // =============================================================================
 // Result Codes (from rac_error.h)
+//
+// Manually mirrored from `sdk/runanywhere-commons/include/rac/core/rac_error.h`.
+// Until ffigen is wired in, every commons-side error-code change MUST be
+// reflected here. Audited 2026-05-04 against the current C header.
 // =============================================================================
 
 /// Error codes matching rac_error.h
@@ -76,6 +80,8 @@ abstract class RacResultCode {
   static const int errorHttpError = -157;
   static const int errorConnectionLost = -158;
   static const int errorPartialDownload = -159;
+  static const int errorHttpRequestFailed = -160;
+  static const int errorHttpNotSupported = -161;
 
   // Storage errors (-180 to -219)
   static const int errorInsufficientStorage = -180;
@@ -86,12 +92,20 @@ abstract class RacResultCode {
   static const int errorFileWriteFailed = -185;
   static const int errorPermissionDenied = -186;
   static const int errorDeleteFailed = -187;
+  // RAC_ERROR_FILE_DELETE_FAILED is an alias of -187 in the C header.
+  static const int errorFileDeleteFailed = -187;
   static const int errorMoveFailed = -188;
   static const int errorDirectoryCreationFailed = -189;
+  static const int errorDirectoryNotFound = -190;
+  static const int errorInvalidPath = -191;
+  static const int errorInvalidFileName = -192;
+  static const int errorTempFileCreationFailed = -193;
 
   // Hardware errors (-220 to -229)
   static const int errorHardwareUnsupported = -220;
   static const int errorInsufficientMemory = -221;
+  // RAC_ERROR_OUT_OF_MEMORY is an alias of -221 in the C header.
+  static const int errorOutOfMemory = -221;
 
   // Component state errors (-230 to -249)
   static const int errorComponentNotReady = -230;
@@ -107,18 +121,48 @@ abstract class RacResultCode {
   static const int errorInvalidInput = -251;
   static const int errorInvalidFormat = -252;
   static const int errorEmptyInput = -253;
+  static const int errorTextTooLong = -254;
+  static const int errorInvalidSsml = -255;
+  static const int errorInvalidSpeakingRate = -256;
+  static const int errorInvalidPitch = -257;
+  static const int errorInvalidVolume = -258;
+  static const int errorInvalidArgument = -259;
+  static const int errorNullPointer = -260;
+  static const int errorBufferTooSmall = -261;
 
   // Audio errors (-280 to -299)
   static const int errorAudioFormatNotSupported = -280;
   static const int errorAudioSessionFailed = -281;
   static const int errorMicrophonePermissionDenied = -282;
   static const int errorInsufficientAudioData = -283;
+  static const int errorEmptyAudioBuffer = -284;
+  static const int errorAudioSessionActivationFailed = -285;
 
   // Language/voice errors (-300 to -319)
   static const int errorLanguageNotSupported = -300;
   static const int errorVoiceNotAvailable = -301;
   static const int errorStreamingNotSupported = -302;
   static const int errorStreamCancelled = -303;
+
+  // Authentication errors (-320 to -329)
+  static const int errorAuthenticationFailed = -320;
+  static const int errorUnauthorized = -321;
+  static const int errorForbidden = -322;
+
+  // Security errors (-330 to -349)
+  static const int errorKeychainError = -330;
+  static const int errorEncodingError = -331;
+  static const int errorDecodingError = -332;
+  static const int errorSecureStorageFailed = -333;
+
+  // Extraction errors (-350 to -369)
+  static const int errorExtractionFailed = -350;
+  static const int errorChecksumMismatch = -351;
+  static const int errorUnsupportedArchive = -352;
+
+  // Calibration errors (-370 to -379)
+  static const int errorCalibrationFailed = -370;
+  static const int errorCalibrationTimeout = -371;
 
   // Cancellation (-380 to -389)
   static const int errorCancelled = -380;
@@ -144,7 +188,13 @@ abstract class RacResultCode {
   static const int errorBackendInitFailed = -602;
   static const int errorBackendBusy = -603;
   static const int errorBackendUnavailable = -604;
+  static const int errorRuntimeUnavailable = -605;
   static const int errorInvalidHandle = -610;
+
+  // Event errors (-700 to -799)
+  static const int errorEventInvalidCategory = -700;
+  static const int errorEventSubscriptionFailed = -701;
+  static const int errorEventPublishFailed = -702;
 
   // Other errors (-800 to -899)
   static const int errorNotImplemented = -800;
@@ -156,6 +206,8 @@ abstract class RacResultCode {
   static const int errorAbiVersionMismatch = -810;
   static const int errorCapabilityUnsupported = -811;
   static const int errorPluginDuplicate = -812;
+  static const int errorPluginLoadFailed = -820;
+  static const int errorPluginBusy = -821;
 
   /// Get human-readable message for an error code
   static String getMessage(int code) {
@@ -240,6 +292,8 @@ abstract class RacCapability {
   static const int tts = 4;
   static const int vad = 5;
   static const int diarization = 6;
+  static const int visionLanguage = 7;
+  static const int diffusion = 8;
 
   static String getName(int type) {
     switch (type) {
@@ -255,6 +309,10 @@ abstract class RacCapability {
         return 'Voice Activity Detection';
       case diarization:
         return 'Speaker Diarization';
+      case visionLanguage:
+        return 'Vision-Language Model';
+      case diffusion:
+        return 'Image Generation';
       default:
         return 'Unknown';
     }
@@ -320,7 +378,11 @@ abstract class RacAudioFormat {
 // Speech Activity (from rac_vad_types.h)
 // =============================================================================
 
-/// Speech activity event type (rac_speech_activity_t)
+/// Speech activity event type (rac_speech_activity_t).
+///
+/// Mirrors `enum rac_speech_activity` in
+/// `include/rac/features/vad/rac_vad_types.h`:
+/// `RAC_SPEECH_STARTED = 0`, `RAC_SPEECH_ENDED = 1`, `RAC_SPEECH_ONGOING = 2`.
 abstract class RacSpeechActivity {
   static const int started = 0;
   static const int ended = 1;

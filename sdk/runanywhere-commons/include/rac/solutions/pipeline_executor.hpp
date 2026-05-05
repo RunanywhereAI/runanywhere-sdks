@@ -7,7 +7,7 @@
 // v3.1 architecture). `PipelineExecutor` is a pure translation layer that
 // walks the spec, asks `OperatorRegistry` to materialize one
 // `PipelineNode` per operator, resolves `EdgeSpec` endpoints against the
-// operator names, and wires up a `GraphScheduler`.
+// registered operator port schemas, and wires up a `GraphScheduler`.
 //
 // The executor is deliberately narrow: it does NOT start the scheduler,
 // does NOT own engines, does NOT touch models. It hands back a live
@@ -20,8 +20,31 @@
 // `build()` returns `RAC_ERROR_INVALID_CONFIGURATION` and sets
 // `rac_error_set_details(...)` when:
 //   * any operator name appears twice
+//   * an operator or endpoint has an invalid name/port shape
 //   * an edge endpoint references an unknown operator
-//   * a factory is missing for a declared operator type
+//   * an edge endpoint names a port not declared by its operator type
+//   * an active endpoint uses empty or legacy opaque payload metadata
+//   * an edge appears twice
+//   * an operator factory does not expose a declared active port as an
+//     independent edge
+//   * an edge declares an invalid capacity or EdgePolicy enum value
+//   * a factory is missing for an arbitrary declared operator type
+//
+// Same-endpoint fan-out/fan-in is supported by inserting graph SplitNode /
+// MergeNode adapters. For example, two edges from `a.out` are duplicated
+// through a SplitNode, while two edges into `b.in` are combined through a
+// MergeNode. This keeps split/merge behavior explicit instead of overwriting
+// input/output slots. Every compiled solution edge also passes through a
+// payload type guard that rejects operator-emitted `Payload.type_id` values
+// that do not match the resolved port contract. Distinct named operator
+// ports are wired through the OperatorAdapter interface returned by
+// OperatorRegistry.
+//
+// Known engine-backed solution operator types from `SolutionConfig`
+// expansion are narrower: when their factories are absent, `build()`
+// returns `RAC_ERROR_FEATURE_NOT_AVAILABLE` so callers can distinguish
+// "this solution references a real primitive that has not been wired"
+// from a misspelled or unknown operator type.
 //
 // Strict validation (`options.strict_validation`) additionally rejects
 // pipelines with disconnected nodes.
@@ -72,10 +95,20 @@ public:
         return root_output_edge_;
     }
 
+    const std::string& root_input_payload_type() const noexcept {
+        return root_input_payload_type_;
+    }
+
+    const std::string& root_output_payload_type() const noexcept {
+        return root_output_payload_type_;
+    }
+
 private:
     runanywhere::v1::PipelineSpec                              spec_;
     std::shared_ptr<OperatorEdge>                              root_input_edge_;
     std::shared_ptr<OperatorEdge>                              root_output_edge_;
+    std::string                                                root_input_payload_type_;
+    std::string                                                root_output_payload_type_;
 };
 
 }  // namespace rac::solutions
