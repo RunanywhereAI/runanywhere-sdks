@@ -1,6 +1,6 @@
 # Runtimes (L1 Adapters) — Current Inconsistencies
 
-Updated: 2026-05-05 (pruned — Iteration I scope, CoreML/Metal deferred)
+Updated: 2026-05-05 (RT-CPU-01 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
 Branch: feat/v2-architecture @ 6217d9e67
 
 ## Scope
@@ -39,21 +39,6 @@ the intended consumers (DEC-01 deferred CoreML/Metal).
 ## Per-runtime gaps
 
 ### runtimes/cpu
-
-#### RT-CPU-01: Supported-primitives list gated to GENERATE_TEXT only
-
-`runtimes/cpu/rac_runtime_cpu.cpp:62-69` prunes `k_supported_primitives` to
-`RAC_PRIMITIVE_GENERATE_TEXT` with the other five primitives commented out
-awaiting a CPU provider registration. Consequence: even though
-`rac_cpu_runtime_register_provider` is the dynamic escape hatch, the static
-`capabilities()` slot (`rac_runtime_cpu.cpp:209-211`) publishes only
-GENERATE_TEXT, so any router that filters by capabilities before inspecting
-registered providers will refuse to route STT / TTS / VAD / EMBED / RERANK
-work to the CPU runtime regardless of which engines have registered
-providers. `primitive_is_supported` (`rac_runtime_cpu.cpp:98-103`) also
-rejects `rac_cpu_runtime_register_provider` calls for any primitive not in
-the static array — so an ONNX engine trying to register a CPU provider for
-`RAC_PRIMITIVE_TRANSCRIBE` will silently fail to register today.
 
 #### RT-CPU-02: V2 `run_session_v2` is a shim over the legacy vtable path
 

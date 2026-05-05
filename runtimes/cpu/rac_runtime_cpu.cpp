@@ -15,13 +15,19 @@
  *   destroy — no-op.
  *   device_info — synthesizes a descriptor from `HardwareProfile::cached()`
  *                 so the `device_id` reflects the actual host CPU.
- *   capabilities — static, advertises FP16 + quantised paths which every
- *                  modern CPU backend supports via NEON / AVX / VNNI.
+ *   capabilities — dynamic, advertises the union of primitives across all
+ *                  currently registered CPU providers. Flags (FP16 + quantised
+ *                  paths) are static because every modern CPU backend supports
+ *                  them via NEON / AVX / VNNI.
  *   sessions — delegated to registered rac_cpu_runtime_provider_t entries.
  *
- * NOTE: `k_supported_primitives` is pruned to the honest set
- * (RAC_PRIMITIVE_GENERATE_TEXT only) — additional primitives are restored as
- * engine providers register for them. See the array below.
+ * NOTE (RT-CPU-01): supported primitives are no longer a static, GENERATE_TEXT-
+ * only list. `capabilities()` rebuilds a snapshot of primitives from the live
+ * provider registry on every call, and `primitive_is_supported` /
+ * `rac_cpu_runtime_register_provider` validate against the full primitive-enum
+ * range so any engine that speaks a supported format can plug its own CPU
+ * provider in (STT, TTS, VAD, EMBED, RERANK, VLM, DIFFUSION) without the
+ * runtime rejecting the registration up front.
  */
 
 #include "rac_runtime_entry_cpu.h"
@@ -54,20 +60,13 @@ constexpr uint64_t kCpuBufferMagic = 0x5241434350554255ull;  /* "RACCPUBU" */
 
 const rac_device_class_t k_supported_devices[] = {RAC_DEVICE_CLASS_CPU};
 
-/* Supported primitives — pruned to the honest set of primitives that have a
- * working CPU provider registered in-tree today (only llamacpp registers a
- * GENERATE_TEXT provider). The other primitives below are commented out and
- * will be restored on a per-primitive basis as engine plugins start calling
- * `rac_cpu_runtime_register_provider` for them. Kept static to avoid a
- * separate data-segment allocation at register time. */
-const rac_primitive_t k_supported_primitives[] = {
-    RAC_PRIMITIVE_GENERATE_TEXT,
-    // RAC_PRIMITIVE_TRANSCRIBE,    // restore when an STT engine registers a CPU provider
-    // RAC_PRIMITIVE_SYNTHESIZE,    // restore when a TTS engine registers a CPU provider
-    // RAC_PRIMITIVE_DETECT_VOICE,  // restore when a VAD engine registers a CPU provider
-    // RAC_PRIMITIVE_EMBED,         // restore when an embedding engine registers a CPU provider
-    // RAC_PRIMITIVE_RERANK,        // restore when a reranker engine registers a CPU provider
-};
+/* Supported primitives are no longer a static list — see `capabilities_snapshot`
+ * below. The CPU runtime publishes whichever primitives have at least one
+ * `rac_cpu_runtime_provider_t` registered at the time `capabilities()` is
+ * invoked. This keeps the manifest honest as engines plug in additional
+ * providers (STT, TTS, VAD, EMBED, RERANK, VLM, DIFFUSION) without requiring
+ * a rebuild of the CPU runtime. See RT-CPU-01 in gaps/inconsistencies/
+ * runtimes.md (pre-fix audit). */
 
 struct CpuRuntimeSession {
     uint64_t magic = kCpuSessionMagic;
@@ -96,11 +95,14 @@ std::vector<rac_cpu_runtime_provider_t>& providers() {
     return entries;
 }
 
-bool primitive_is_supported(rac_primitive_t primitive) {
-    for (rac_primitive_t supported : k_supported_primitives) {
-        if (supported == primitive) return true;
-    }
-    return false;
+/* Validates a primitive against the declared enum range. Used as a light
+ * sanity check at register time and in `create_session` before routing to a
+ * specific provider — actual dispatch is still gated by `find_provider`
+ * looking up the provider registry, so unsupported primitives fall through
+ * to `RAC_ERROR_NOT_IMPLEMENTED` even if they pass this range check. */
+bool primitive_is_in_range(rac_primitive_t primitive) {
+    return primitive > RAC_PRIMITIVE_UNSPECIFIED &&
+           primitive <  RAC_PRIMITIVE_COUNT;
 }
 
 bool provider_supports_format(const rac_cpu_runtime_provider_t& provider,
@@ -193,6 +195,14 @@ rac_result_t cpu_device_info(rac_runtime_device_info_t* out) {
     return RAC_SUCCESS;
 }
 
+/* Snapshot storage for the dynamic primitive list published by
+ * `cpu_capabilities`. Thread-local so concurrent callers from different
+ * threads each get a stable snapshot whose lifetime extends until the next
+ * `cpu_capabilities` call on the same thread. Fixed-size array sized to the
+ * full primitive enum — no allocation on the capability hot path. */
+thread_local rac_primitive_t tl_primitive_snapshot[RAC_PRIMITIVE_COUNT];
+thread_local size_t          tl_primitive_snapshot_count = 0;
+
 rac_result_t cpu_capabilities(rac_runtime_capabilities_t* out) {
     if (out == nullptr) return RAC_ERROR_NULL_POINTER;
     *out = rac_runtime_capabilities_t{};
@@ -207,9 +217,30 @@ rac_result_t cpu_capabilities(rac_runtime_capabilities_t* out) {
         RAC_RUNTIME_CAP_OWNED_OUTPUTS;
     out->supported_formats       = nullptr;     /* format-agnostic */
     out->supported_formats_count = 0;
-    out->supported_primitives    = k_supported_primitives;
-    out->supported_primitives_count =
-        sizeof(k_supported_primitives) / sizeof(k_supported_primitives[0]);
+
+    /* Build a deduplicated snapshot of the primitives currently served by
+     * registered providers. Order is stable (primitive enum value ascending)
+     * so callers that cache the list see consistent results across calls. */
+    bool seen[RAC_PRIMITIVE_COUNT] = {false};
+    {
+        std::lock_guard<std::mutex> lock(provider_mutex());
+        for (const auto& provider : providers()) {
+            const auto p = provider.primitive;
+            if (p > RAC_PRIMITIVE_UNSPECIFIED && p < RAC_PRIMITIVE_COUNT) {
+                seen[static_cast<size_t>(p)] = true;
+            }
+        }
+    }
+    size_t count = 0;
+    for (size_t i = 1; i < RAC_PRIMITIVE_COUNT; ++i) {
+        if (seen[i]) {
+            tl_primitive_snapshot[count++] = static_cast<rac_primitive_t>(i);
+        }
+    }
+    tl_primitive_snapshot_count = count;
+    out->supported_primitives =
+        count > 0 ? tl_primitive_snapshot : nullptr;
+    out->supported_primitives_count = count;
     return RAC_SUCCESS;
 }
 
@@ -218,7 +249,7 @@ rac_result_t cpu_create_session(const rac_runtime_session_desc_t* desc,
     if (out == nullptr || desc == nullptr) return RAC_ERROR_NULL_POINTER;
     *out = nullptr;
 
-    if (!primitive_is_supported(desc->primitive)) {
+    if (!primitive_is_in_range(desc->primitive)) {
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
@@ -540,7 +571,7 @@ extern "C" RAC_API rac_result_t rac_cpu_runtime_register_provider(
         provider->destroy_session == nullptr) {
         return RAC_ERROR_INVALID_PARAMETER;
     }
-    if (!primitive_is_supported(provider->primitive)) {
+    if (!primitive_is_in_range(provider->primitive)) {
         return RAC_ERROR_NOT_SUPPORTED;
     }
 
