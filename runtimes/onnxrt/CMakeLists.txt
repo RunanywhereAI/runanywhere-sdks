@@ -2,8 +2,14 @@ set(_rac_runtime_onnxrt_default ON)
 if(DEFINED RAC_BACKEND_ONNX AND NOT RAC_BACKEND_ONNX)
     set(_rac_runtime_onnxrt_default OFF)
 endif()
+# EXISTS-gated disable under Emscripten: only force OFF when no vendored
+# ONNX Runtime WASM static archive is available. Mirrors engines/onnx gate.
 if(EMSCRIPTEN)
-    set(_rac_runtime_onnxrt_default OFF)
+    set(_rac_onnxrt_wasm_dir
+        "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/onnxruntime-wasm")
+    if(NOT EXISTS "${_rac_onnxrt_wasm_dir}/lib/libonnxruntime.a")
+        set(_rac_runtime_onnxrt_default OFF)
+    endif()
 endif()
 
 option(RAC_RUNTIME_ONNXRT "Build the ONNX Runtime L1 runtime adapter" ${_rac_runtime_onnxrt_default})

@@ -32,24 +32,43 @@ set(RAC_COMMONS_THIRD_PARTY_DIR "${CMAKE_CURRENT_LIST_DIR}/../third_party")
 
 if(EMSCRIPTEN)
     # ==========================================================================
-    # Emscripten/WASM: Create an interface-only ONNX Runtime target.
-    # When building for WASM, sherpa-onnx is built from source and bundles
-    # ONNX Runtime internally.  We still need the onnxruntime headers so the
-    # ONNX backend can compile.  If a local header copy exists in third_party,
-    # use it; otherwise create a bare INTERFACE target (headers come from
-    # sherpa-onnx's build tree).
+    # Emscripten/WASM: Prefer the vendored static archive if present.
+    # When sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a
+    # is staged (CPP-13 / WEB-01 unblock), create a STATIC IMPORTED target so
+    # engines/onnx and engines/sherpa link against it. Otherwise fall back to
+    # an INTERFACE-only target so builds that don't enable ONNX still work —
+    # sherpa-onnx's build tree has historically supplied the headers.
     # ==========================================================================
-    message(STATUS "ONNX Runtime: Creating INTERFACE target for Emscripten/WASM")
+    set(ONNX_WASM_ROOT "${RAC_COMMONS_THIRD_PARTY_DIR}/onnxruntime-wasm")
+    set(ONNX_WASM_LIB "${ONNX_WASM_ROOT}/lib/libonnxruntime.a")
+    set(ONNX_WASM_HEADERS "${ONNX_WASM_ROOT}/include")
 
-    add_library(onnxruntime INTERFACE)
+    if(EXISTS "${ONNX_WASM_LIB}")
+        message(STATUS "ONNX Runtime WASM: static archive at ${ONNX_WASM_LIB}")
 
-    set(ONNX_WASM_HEADERS "${RAC_COMMONS_THIRD_PARTY_DIR}/onnxruntime-wasm/include")
-    if(EXISTS "${ONNX_WASM_HEADERS}")
-        target_include_directories(onnxruntime INTERFACE "${ONNX_WASM_HEADERS}")
-        message(STATUS "ONNX Runtime WASM headers: ${ONNX_WASM_HEADERS}")
+        add_library(onnxruntime STATIC IMPORTED GLOBAL)
+        set_target_properties(onnxruntime PROPERTIES
+            IMPORTED_LOCATION "${ONNX_WASM_LIB}"
+        )
+        if(EXISTS "${ONNX_WASM_HEADERS}")
+            set_target_properties(onnxruntime PROPERTIES
+                INTERFACE_INCLUDE_DIRECTORIES "${ONNX_WASM_HEADERS}"
+            )
+            message(STATUS "ONNX Runtime WASM headers: ${ONNX_WASM_HEADERS}")
+        endif()
     else()
-        # Headers will come from sherpa-onnx build tree
-        message(STATUS "ONNX Runtime WASM: no local headers (expected from sherpa-onnx)")
+        message(STATUS "ONNX Runtime: Creating INTERFACE-only target for "
+                       "Emscripten/WASM (no vendored static archive)")
+
+        add_library(onnxruntime INTERFACE)
+
+        if(EXISTS "${ONNX_WASM_HEADERS}")
+            target_include_directories(onnxruntime INTERFACE "${ONNX_WASM_HEADERS}")
+            message(STATUS "ONNX Runtime WASM headers: ${ONNX_WASM_HEADERS}")
+        else()
+            # Headers will come from sherpa-onnx build tree
+            message(STATUS "ONNX Runtime WASM: no local headers (expected from sherpa-onnx)")
+        endif()
     endif()
 
 elseif(IOS OR CMAKE_SYSTEM_NAME STREQUAL "iOS")

@@ -180,7 +180,25 @@ if(RAC_WASM_WHISPERCPP AND NOT TARGET rac_backend_whispercpp)
     message(FATAL_ERROR "RAC_WASM_WHISPERCPP=ON requires rac_backend_whispercpp. Configure the root build with whisper.cpp enabled.")
 endif()
 if(RAC_WASM_ONNX AND NOT TARGET rac_backend_onnx)
-    message(FATAL_ERROR "RAC_WASM_ONNX=ON requires rac_backend_onnx. Configure the root build with ONNX enabled.")
+    message(FATAL_ERROR
+        "RAC_WASM_ONNX=ON requires rac_backend_onnx (embeddings + generic ORT services). "
+        "Configure the root build with ONNX enabled. "
+        "Note: under Emscripten, engines/onnx requires the vendored static archive at "
+        "sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/libonnxruntime.a. "
+        "See CPP-13 / WEB-01 and thoughts/shared/plans/wasm_onnx_unblock.md."
+    )
+endif()
+# Sherpa backend provides STT/TTS/VAD under the ONNX umbrella on WASM.
+# It's optional: the build continues when the vendored Sherpa archives
+# aren't present, but STT/TTS/VAD routing will return BackendNotAvailable
+# at runtime. See CPP-13 / WEB-01.
+if(RAC_WASM_ONNX AND NOT TARGET rac_backend_sherpa)
+    message(STATUS
+        "RAC_WASM_ONNX=ON: rac_backend_sherpa not available (no vendored "
+        "sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/ archives). "
+        "STT/TTS/VAD calls will return BackendNotAvailable. "
+        "See CPP-13 / WEB-01 and thoughts/shared/plans/wasm_onnx_unblock.md."
+    )
 endif()
 
 # =============================================================================
@@ -910,6 +928,16 @@ if(RAC_WASM_ONNX)
         "_rac_backend_onnx_register"
         "_rac_backend_onnx_unregister"
     )
+    # Sherpa backend (STT/TTS/VAD via Sherpa-ONNX C API) exports are added
+    # when the rac_backend_sherpa target was configured by the root build.
+    # See CPP-13 / WEB-01 — requires the vendored WASM static archives at
+    # sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/.
+    if(TARGET rac_backend_sherpa)
+        list(APPEND RAC_EXPORTED_FUNCTIONS
+            "_rac_backend_sherpa_register"
+            "_rac_backend_sherpa_unregister"
+        )
+    endif()
 endif()
 
 # Join into a comma-separated list for Emscripten
@@ -936,6 +964,12 @@ endif()
 
 if(RAC_WASM_ONNX)
     target_link_libraries(runanywhere_wasm PRIVATE rac_backend_onnx)
+    # Sherpa STT/TTS/VAD backend links in when its target was configured by
+    # the root build (requires vendored WASM static archives — see CPP-13 /
+    # WEB-01).
+    if(TARGET rac_backend_sherpa)
+        target_link_libraries(runanywhere_wasm PRIVATE rac_backend_sherpa)
+    endif()
 endif()
 
 target_include_directories(runanywhere_wasm PRIVATE

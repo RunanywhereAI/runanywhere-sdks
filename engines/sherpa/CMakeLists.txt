@@ -92,9 +92,23 @@
 # the vendored static archives above (mirroring the LINUX/MACOS branches).
 # =============================================================================
 option(RAC_BACKEND_SHERPA "Build Sherpa-ONNX backend (STT/TTS/VAD via Sherpa-ONNX)" ON)
+# EXISTS-gated disable under Emscripten: only force OFF when vendored
+# Sherpa-ONNX WASM static archives are missing. Drop
+# libsherpa-onnx-c-api.a + deps under
+# sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/lib/ to enable.
+# See CPP-13 / WEB-01.
 if(EMSCRIPTEN)
-    # WASM has no Sherpa-ONNX prebuilt. Force off.
-    set(RAC_BACKEND_SHERPA OFF CACHE BOOL "" FORCE)
+    set(RAC_SHERPA_WASM_RUNTIME_DIR
+        "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/sherpa-onnx-wasm")
+    if(NOT EXISTS "${RAC_SHERPA_WASM_RUNTIME_DIR}/lib/libsherpa-onnx-c-api.a")
+        message(STATUS "RAC_BACKEND_SHERPA: no WASM Sherpa archive at "
+                       "${RAC_SHERPA_WASM_RUNTIME_DIR}/lib/libsherpa-onnx-c-api.a; "
+                       "disabling Sherpa backend (see CPP-13 / WEB-01)")
+        set(RAC_BACKEND_SHERPA OFF CACHE BOOL "" FORCE)
+    else()
+        message(STATUS "RAC_BACKEND_SHERPA: found vendored WASM Sherpa archives; "
+                       "building Sherpa backend for Emscripten")
+    endif()
 endif()
 if(NOT RAC_BACKEND_SHERPA)
     return()
@@ -288,6 +302,49 @@ elseif(RAC_PLATFORM_WINDOWS)
         message(STATUS "Found Sherpa-ONNX Windows: ${SHERPA_LIB_PATH}")
     else()
         message(STATUS "Sherpa-ONNX not found for Windows at ${SHERPA_ONNX_ROOT}")
+    endif()
+
+elseif(EMSCRIPTEN)
+    # WASM / Emscripten: sherpa-onnx static archives vendored under
+    # sdk/runanywhere-commons/third_party/sherpa-onnx-wasm/ (see CPP-13 / WEB-01).
+    # Build recipe lives in the banner at the top of this file. The guard at the
+    # engine gate above short-circuits this engine when the archives are absent,
+    # so reaching here implies `libsherpa-onnx-c-api.a` exists.
+    set(SHERPA_ONNX_ROOT "${RUNANYWHERE_COMMONS_ROOT}/third_party/sherpa-onnx-wasm")
+
+    if(EXISTS "${SHERPA_ONNX_ROOT}/lib/libsherpa-onnx-c-api.a")
+        set(SHERPA_ONNX_AVAILABLE ON)
+        set(SHERPA_LIB_PATH "${SHERPA_ONNX_ROOT}/lib/libsherpa-onnx-c-api.a")
+        set(SHERPA_HEADER_PATH "${SHERPA_ONNX_ROOT}/include")
+
+        add_library(sherpa_onnx STATIC IMPORTED GLOBAL)
+        set_target_properties(sherpa_onnx PROPERTIES
+            IMPORTED_LOCATION "${SHERPA_LIB_PATH}"
+            INTERFACE_INCLUDE_DIRECTORIES "${SHERPA_HEADER_PATH}"
+        )
+
+        # STT-mandatory core. Piper/TTS deps (piper_phonemize, espeak-ng, ucd)
+        # are OPTIONAL for STT-only variants — skip silently if absent.
+        set(SHERPA_ONNX_DEPS
+            "sherpa-onnx-core" "sherpa-onnx-fst" "sherpa-onnx-fstfar"
+            "sherpa-onnx-kaldifst-core" "kaldi-decoder-core" "kaldi-native-fbank-core"
+            "kissfft-float"
+            # Optional TTS deps (may be absent):
+            "piper_phonemize" "espeak-ng" "ucd"
+        )
+
+        foreach(dep ${SHERPA_ONNX_DEPS})
+            if(EXISTS "${SHERPA_ONNX_ROOT}/lib/lib${dep}.a")
+                add_library(sherpa_${dep} STATIC IMPORTED GLOBAL)
+                set_target_properties(sherpa_${dep} PROPERTIES
+                    IMPORTED_LOCATION "${SHERPA_ONNX_ROOT}/lib/lib${dep}.a")
+                target_link_libraries(sherpa_onnx INTERFACE sherpa_${dep})
+            endif()
+        endforeach()
+
+        message(STATUS "Found Sherpa-ONNX WASM static archives: ${SHERPA_LIB_PATH}")
+    else()
+        message(STATUS "Sherpa-ONNX WASM archives not found at ${SHERPA_ONNX_ROOT}")
     endif()
 endif()
 

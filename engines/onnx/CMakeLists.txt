@@ -53,8 +53,22 @@
 # attach the static lib as IMPORTED when the archive is present.
 # =============================================================================
 option(RAC_BACKEND_ONNX "Build ONNX backend" ON)
+# EXISTS-gated disable under Emscripten: only force OFF when the vendored
+# ONNX Runtime WASM static archive is missing. When present, build normally.
+# See CPP-13 / WEB-01. Drop libonnxruntime.a under
+# sdk/runanywhere-commons/third_party/onnxruntime-wasm/lib/ to enable.
 if(EMSCRIPTEN)
-    set(RAC_BACKEND_ONNX OFF CACHE BOOL "" FORCE)
+    set(RAC_ONNX_WASM_RUNTIME_DIR
+        "${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/third_party/onnxruntime-wasm")
+    if(NOT EXISTS "${RAC_ONNX_WASM_RUNTIME_DIR}/lib/libonnxruntime.a")
+        message(STATUS "RAC_BACKEND_ONNX: no WASM ORT archive at "
+                       "${RAC_ONNX_WASM_RUNTIME_DIR}/lib/libonnxruntime.a; "
+                       "disabling ONNX backend (see CPP-13 / WEB-01)")
+        set(RAC_BACKEND_ONNX OFF CACHE BOOL "" FORCE)
+    else()
+        message(STATUS "RAC_BACKEND_ONNX: found vendored WASM ORT archive; "
+                       "building ONNX backend for Emscripten")
+    endif()
 endif()
 if(NOT RAC_BACKEND_ONNX)
     return()
