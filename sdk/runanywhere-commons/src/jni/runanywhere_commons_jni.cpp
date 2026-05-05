@@ -100,6 +100,8 @@
 #include "rac/solutions/rac_solution.h"
 // v2 close-out Phase G-2: proto-byte LLM stream ABI for Kotlin's LLMStreamAdapter.
 #include "rac/features/llm/rac_llm_stream.h"
+// Wave H-5: proto-byte VAD stream ABI for Kotlin's streamVAD Flow.
+#include "rac/features/vad/rac_vad_stream.h"
 // Round-1 CPP fix: hardware ABI, structured output, VAD statistics.
 #include "rac/features/llm/rac_llm_structured_output.h"
 #include "rac/plugin/rac_plugin_loader.h"

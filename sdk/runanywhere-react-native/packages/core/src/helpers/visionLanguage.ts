@@ -11,7 +11,6 @@ export {
   type VLMImage,
   type VLMResult,
   VLMImageFormat,
-  VLMErrorCode,
 } from '@runanywhere/proto-ts/vlm_options';
 
 /** Default `VLMConfiguration`. */

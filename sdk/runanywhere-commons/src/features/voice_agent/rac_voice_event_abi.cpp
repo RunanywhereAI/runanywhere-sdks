@@ -446,11 +446,15 @@ void encode_audio_frame(std::vector<uint8_t>& s,
 }
 
 void encode_vad(std::vector<uint8_t>& s, bool speech_active) {
-    /*  1: enum type
-     *     1 = VAD_EVENT_VOICE_START
-     *     2 = VAD_EVENT_VOICE_END_OF_UTTERANCE  */
-    wire_enum_field  (s, 1, speech_active ? 1 : 2);
+    /*  1: enum type  (VADStreamEventKind — IDL-18 canonical VAD event enum)
+     *     3 = VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY (start + end both ride this;
+     *         direction is carried in the companion `is_speech` bool field).  */
+    wire_enum_field  (s, 1, 3);
     /*  2: int64 frame_offset_us (default 0 → omitted) */
+    /*  4: bool  is_speech  (proto3 omits defaults; emit only when true)     */
+    if (speech_active) {
+        wire_enum_field(s, 4, 1);
+    }
 }
 
 void encode_state_change(std::vector<uint8_t>& s,

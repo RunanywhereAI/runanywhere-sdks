@@ -104,7 +104,6 @@ export type {
 } from '@runanywhere/proto-ts/vlm_options';
 export {
   VLMImageFormat,
-  VLMErrorCode,
   VLMModelFamily,
   VLMStreamEventKind,
 } from '@runanywhere/proto-ts/vlm_options';

@@ -24,6 +24,7 @@ import ai.runanywhere.proto.v1.DownloadState
 import ai.runanywhere.proto.v1.DownloadSubscribeRequest
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelInfoList
 import ai.runanywhere.proto.v1.ModelLoadRequest
@@ -37,6 +38,7 @@ import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.StorageDeleteRequest
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDownloadProto
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelFormat
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorageProto

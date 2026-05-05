@@ -3,6 +3,7 @@ package com.runanywhere.sdk.public.extensions.VoiceAgent
 import ai.runanywhere.proto.v1.AgentResponseStartedEvent
 import ai.runanywhere.proto.v1.AudioEncoding
 import ai.runanywhere.proto.v1.AudioLevelEvent
+import ai.runanywhere.proto.v1.ErrorCode
 import ai.runanywhere.proto.v1.PipelineState
 import ai.runanywhere.proto.v1.SessionStartedEvent
 import ai.runanywhere.proto.v1.StateChangeEvent
@@ -12,7 +13,6 @@ import ai.runanywhere.proto.v1.VoiceAgentTurnRequest
 import ai.runanywhere.proto.v1.VoiceEvent
 import ai.runanywhere.proto.v1.VoiceSessionConfig
 import ai.runanywhere.proto.v1.VoiceSessionError
-import ai.runanywhere.proto.v1.VoiceSessionErrorCode
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.processVoiceTurn
 import com.runanywhere.sdk.public.extensions.streamVoiceAgent
@@ -64,7 +64,7 @@ class VoiceAgentGeneratedSessionSurfaceTest {
             VoiceEvent(
                 session_error =
                     VoiceSessionError(
-                        code = VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_NOT_READY,
+                        code = ErrorCode.ERROR_CODE_COMPONENT_NOT_READY,
                         message = "native session feed unavailable",
                     ),
             )

@@ -187,7 +187,10 @@ int test_vad_arm() {
     ASSERT_TRUE(decoded.ParseFromArray(g_capture.bytes.data(),
                                        static_cast<int>(g_capture.bytes.size())));
     ASSERT_TRUE(decoded.has_vad());
-    ASSERT_EQ(decoded.vad().type(), runanywhere::v1::VAD_EVENT_VOICE_START);
+    // IDL-18: VADEvent.type is now VADStreamEventKind; speech-start/end ride
+    // SPEECH_ACTIVITY, with direction on the companion is_speech bool.
+    ASSERT_EQ(decoded.vad().type(), runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY);
+    ASSERT_TRUE(decoded.vad().is_speech());
 
     reset_capture();
     rac_voice_agent_event_t end_event = {};
@@ -198,7 +201,8 @@ int test_vad_arm() {
     decoded.Clear();
     ASSERT_TRUE(decoded.ParseFromArray(g_capture.bytes.data(),
                                        static_cast<int>(g_capture.bytes.size())));
-    ASSERT_EQ(decoded.vad().type(), runanywhere::v1::VAD_EVENT_VOICE_END_OF_UTTERANCE);
+    ASSERT_EQ(decoded.vad().type(), runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY);
+    ASSERT_FALSE(decoded.vad().is_speech());
 
     rac_voice_agent_set_proto_callback(fake_handle(), nullptr, nullptr);
     return 0;

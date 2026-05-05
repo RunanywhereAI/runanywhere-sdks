@@ -1472,6 +1472,17 @@ object RunAnywhereBridge {
 
     @JvmStatic external fun racStructuredOutputValidateProto(requestProto: ByteArray): ByteArray?
 
+    /**
+     * Stream structured generation. Emits serialized `StructuredOutputStreamEvent`
+     * payloads through [listener]. Returns `RAC_SUCCESS` when the generation
+     * transport completed successfully.
+     */
+    @JvmStatic
+    external fun racStructuredOutputGenerateStreamProto(
+        requestProto: ByteArray,
+        listener: NativeProtoProgressListener?,
+    ): Int
+
     // ========================================================================
     // HARDWARE PROFILE (rac/hardware/rac_hardware_profile.h) — Round 2
     // ========================================================================

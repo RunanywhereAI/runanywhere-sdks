@@ -356,8 +356,7 @@ export const VoiceAssistantScreen: React.FC = () => {
       try {
         // Path-first loading was removed in V2 — model ID is the canonical
         // handle and the native registry resolves the artifact path.
-        const ready = model.isDownloaded || !!model.localPath;
-        if (!ready) {
+        if (!model.isDownloaded) {
           Alert.alert(
             'Error',
             'Model has not been downloaded. Open the model picker to download it first.',

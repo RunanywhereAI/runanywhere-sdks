@@ -7,9 +7,6 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.ArchiveArtifact
-import ai.runanywhere.proto.v1.ArchiveStructure
-import ai.runanywhere.proto.v1.ArchiveType
 import ai.runanywhere.proto.v1.ComponentLifecycleSnapshot
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.CurrentModelResult
@@ -40,10 +37,8 @@ import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.ModelUnloadResult
 import ai.runanywhere.proto.v1.MultiFileArtifact
 import ai.runanywhere.proto.v1.SDKComponent
-import ai.runanywhere.proto.v1.SingleFileArtifact
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.Models.archiveTypeFromPath
 import com.runanywhere.sdk.public.extensions.Models.catalogKey
 import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.Models.rawValue
@@ -66,15 +61,13 @@ fun RunAnywhere.registerModel(
 ): ModelInfo {
     val logger = SDKLogger.models
     val modelId = id ?: generateModelIdFromUrl(url)
-    val format = detectFormatFromUrl(url)
-    val artifact = inferArtifactFields(url, artifactType)
+    val format = formatFromUrl(url)
     val now = getCurrentTimeMillis()
 
     logger.debug("Registering model: $modelId (name: $name)")
     logger.debug("Detected format: ${format.catalogKey} for model: $modelId")
-    logger.debug("Artifact type: ${artifact.artifactType.displayName} for model: $modelId")
 
-    val modelInfo =
+    val baseInfo =
         ModelInfo(
             id = modelId,
             name = name,
@@ -91,13 +84,11 @@ fun RunAnywhere.registerModel(
             source = ModelSource.MODEL_SOURCE_LOCAL,
             created_at_unix_ms = now,
             updated_at_unix_ms = now,
-            single_file = artifact.singleFile,
-            archive = artifact.archive,
-            multi_file = artifact.multiFile,
-            custom_strategy_id = artifact.customStrategyId,
-            built_in = artifact.builtIn,
-            artifact_type = artifact.artifactType,
+            artifact_type = artifactType ?: ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED,
         )
+
+    val modelInfo = applyInferredArtifact(baseInfo, url)
+    logger.debug("Artifact type: ${modelInfo.artifact_type.displayName} for model: $modelId")
 
     registerModelInternal(modelInfo)
 
@@ -146,6 +137,21 @@ fun RunAnywhere.registerMultiFileModel(
 
 internal expect fun registerModelInternal(modelInfo: ModelInfo)
 
+/**
+ * Platform-backed URL → ModelFormat inference. Delegates to the commons
+ * proto ABI (`rac_model_format_from_url_proto`) on JVM/Android; returns
+ * `MODEL_FORMAT_UNKNOWN` when the native ABI is unavailable.
+ */
+internal expect fun formatFromUrl(url: String): ModelFormat
+
+/**
+ * Platform-backed URL → ModelArtifactType inference. Populates the
+ * artifact-classification fields on [modelInfo] by delegating to the
+ * commons proto ABI (`rac_artifact_infer_from_url_proto`). Returns
+ * [modelInfo] unchanged when the native ABI is unavailable.
+ */
+internal expect fun applyInferredArtifact(modelInfo: ModelInfo, url: String): ModelInfo
+
 private fun generateModelIdFromUrl(url: String): String {
     var filename = url.substringAfterLast('/')
     val knownExtensions = listOf("gz", "bz2", "tar", "zip", "gguf", "onnx", "ort", "bin")
@@ -159,54 +165,6 @@ private fun generateModelIdFromUrl(url: String): String {
     }
     return filename
 }
-
-private fun detectFormatFromUrl(url: String): ModelFormat {
-    val ext = url.substringAfterLast('.').lowercase()
-    return when (ext) {
-        "onnx" -> ModelFormat.MODEL_FORMAT_ONNX
-        "ort" -> ModelFormat.MODEL_FORMAT_ORT
-        "gguf" -> ModelFormat.MODEL_FORMAT_GGUF
-        "bin" -> ModelFormat.MODEL_FORMAT_BIN
-        else -> ModelFormat.MODEL_FORMAT_UNKNOWN
-    }
-}
-
-private data class ModelArtifactFields(
-    val singleFile: SingleFileArtifact? = null,
-    val archive: ArchiveArtifact? = null,
-    val multiFile: MultiFileArtifact? = null,
-    val customStrategyId: String? = null,
-    val builtIn: Boolean? = null,
-    val artifactType: ModelArtifactType = ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
-)
-
-private fun inferArtifactFields(url: String, requestedType: ModelArtifactType?): ModelArtifactFields {
-    val archiveType = archiveTypeFromPath(url)
-    if (archiveType != null) {
-        return ModelArtifactFields(
-            archive =
-                ArchiveArtifact(
-                    type = archiveType,
-                    structure = ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY,
-                ),
-            artifactType = requestedType ?: archiveType.toArtifactType(),
-        )
-    }
-
-    return ModelArtifactFields(
-        singleFile = SingleFileArtifact(),
-        artifactType = requestedType ?: ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
-    )
-}
-
-private fun ArchiveType.toArtifactType(): ModelArtifactType =
-    when (this) {
-        ArchiveType.ARCHIVE_TYPE_ZIP -> ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE
-        ArchiveType.ARCHIVE_TYPE_TAR_BZ2 -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE
-        ArchiveType.ARCHIVE_TYPE_TAR_GZ -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE
-        ArchiveType.ARCHIVE_TYPE_TAR_XZ -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE
-        ArchiveType.ARCHIVE_TYPE_UNSPECIFIED -> ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE
-    }
 
 // MARK: - Model Discovery
 

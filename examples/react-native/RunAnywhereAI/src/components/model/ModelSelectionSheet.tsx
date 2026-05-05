@@ -451,7 +451,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
    * Handle model selection
    */
   const handleSelectModel = async (model: SDKModelInfo) => {
-    if (!model.isDownloaded && !model.localPath) {
+    if (!model.isDownloaded) {
       return;
     }
 

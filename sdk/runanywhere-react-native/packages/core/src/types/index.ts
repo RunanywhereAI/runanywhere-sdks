@@ -238,7 +238,6 @@ export type {
   VLMStreamEvent,
 } from '@runanywhere/proto-ts/vlm_options';
 export {
-  VLMErrorCode,
   VLMImageFormat,
   VLMModelFamily,
   VLMStreamEventKind,
@@ -384,7 +383,6 @@ export {
   ComponentLoadState,
   VoiceEventCategory,
   VoiceEventSeverity,
-  VoiceSessionErrorCode,
 } from '@runanywhere/proto-ts/voice_events';
 export type {
   VoiceAgentComposeConfig,

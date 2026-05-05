@@ -851,7 +851,8 @@ int test_voice_agent_d7_process_turn_proto_full_flow() {
             saw_state_idle = true;
         }
         if (event.has_vad() &&
-            event.vad().type() == runanywhere::v1::VAD_EVENT_VOICE_START) {
+            event.vad().type() == runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY &&
+            event.vad().is_speech()) {
             saw_vad_start = true;
         }
         if (event.has_user_said() && event.user_said().is_final()) {

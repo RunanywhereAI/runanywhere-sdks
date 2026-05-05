@@ -17,4 +17,3 @@ typealias VoiceAgentConfiguration = ai.runanywhere.proto.v1.VoiceAgentComposeCon
 typealias VoiceAgentResult = ai.runanywhere.proto.v1.VoiceAgentResult
 typealias VoiceSessionConfig = ai.runanywhere.proto.v1.VoiceSessionConfig
 typealias VoiceSessionError = ai.runanywhere.proto.v1.VoiceSessionError
-typealias VoiceSessionErrorCode = ai.runanywhere.proto.v1.VoiceSessionErrorCode
