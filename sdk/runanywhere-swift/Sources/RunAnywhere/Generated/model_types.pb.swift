@@ -952,71 +952,6 @@ public enum RAModelFileRole: SwiftProtobuf.Enum, Swift.CaseIterable {
 }
 
 /// ---------------------------------------------------------------------------
-/// Hardware acceleration preference for inference. Sources pre-IDL:
-///   Web    enums.ts:165   (Auto / WebGPU / CPU)
-///   Swift  extensions     (CPU / GPU / NPU / Metal)
-///   Kotlin enum           (CPU / GPU / NPU / Vulkan)
-/// Canonicalized union below.
-/// ---------------------------------------------------------------------------
-public enum RAAccelerationPreference: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case auto // = 1
-  case cpu // = 2
-  case gpu // = 3
-  case npu // = 4
-  case webgpu // = 5
-  case metal // = 6
-  case vulkan // = 7
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .auto
-    case 2: self = .cpu
-    case 3: self = .gpu
-    case 4: self = .npu
-    case 5: self = .webgpu
-    case 6: self = .metal
-    case 7: self = .vulkan
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .auto: return 1
-    case .cpu: return 2
-    case .gpu: return 3
-    case .npu: return 4
-    case .webgpu: return 5
-    case .metal: return 6
-    case .vulkan: return 7
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAAccelerationPreference] = [
-    .unspecified,
-    .auto,
-    .cpu,
-    .gpu,
-    .npu,
-    .webgpu,
-    .metal,
-    .vulkan,
-  ]
-
-}
-
-/// ---------------------------------------------------------------------------
 /// Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
 ///   Web    enums.ts (RoutingPolicy)
 ///          OnDevicePreferred / CloudPreferred / OnDeviceOnly / CloudOnly /
@@ -1073,23 +1008,6 @@ public enum RARoutingPolicy: SwiftProtobuf.Enum, Swift.CaseIterable {
     .manual,
   ]
 
-}
-
-/// Model-level thinking tag metadata. This intentionally uses a model-specific
-/// message name because llm_options.proto already owns the generation-options
-/// ThinkingTagPattern message in this proto package.
-public struct RAModelThinkingTagPattern: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  public var openTag: String = String()
-
-  public var closeTag: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
 }
 
 public struct RAModelInfoMetadata: Sendable {
@@ -1246,8 +1164,8 @@ public struct RAModelInfo: @unchecked Sendable {
 
   /// Thinking/reasoning metadata. `supports_thinking` remains the boolean
   /// capability flag; this optional pattern declares model-specific tags.
-  public var thinkingPattern: RAModelThinkingTagPattern {
-    get {_storage._thinkingPattern ?? RAModelThinkingTagPattern()}
+  public var thinkingPattern: RAThinkingTagPattern {
+    get {_storage._thinkingPattern ?? RAThinkingTagPattern()}
     set {_uniqueStorage()._thinkingPattern = newValue}
   }
   /// Returns true if `thinkingPattern` has been explicitly set.
@@ -1553,17 +1471,6 @@ public struct RAModelFileDescriptor: Sendable {
   /// Clears the value of `sizeBytes`. Subsequent reads from it will return its default value.
   public mutating func clearSizeBytes() {self._sizeBytes = nil}
 
-  /// Legacy checksum field kept for generated consumers that already use it.
-  /// Prefer checksum_sha256 for new manifests when the algorithm is known.
-  public var checksum: String {
-    get {_checksum ?? String()}
-    set {_checksum = newValue}
-  }
-  /// Returns true if `checksum` has been explicitly set.
-  public var hasChecksum: Bool {self._checksum != nil}
-  /// Clears the value of `checksum`. Subsequent reads from it will return its default value.
-  public mutating func clearChecksum() {self._checksum = nil}
-
   /// Path fields used by SDK-local wrappers/catalogs. `filename` is the
   /// storage name for simple cases; relative_path/destination_path preserve
   /// directory layouts for archive and multi-file artifacts.
@@ -1617,7 +1524,6 @@ public struct RAModelFileDescriptor: Sendable {
   public init() {}
 
   fileprivate var _sizeBytes: Int64? = nil
-  fileprivate var _checksum: String? = nil
   fileprivate var _relativePath: String? = nil
   fileprivate var _destinationPath: String? = nil
   fileprivate var _role: RAModelFileRole? = nil
@@ -2478,8 +2384,8 @@ public struct RAModelCompatibilityRequest: Sendable {
 
   /// Optional caller preferences (acceleration, framework). Reserved for
   /// future use; today's verdict is based on memory/storage alone.
-  public var acceleratorPreference: RAAcceleratorPreference {
-    get {_acceleratorPreference ?? .auto}
+  public var acceleratorPreference: RAAccelerationPreference {
+    get {_acceleratorPreference ?? .unspecified}
     set {_acceleratorPreference = newValue}
   }
   /// Returns true if `acceleratorPreference` has been explicitly set.
@@ -2501,7 +2407,7 @@ public struct RAModelCompatibilityRequest: Sendable {
   public init() {}
 
   fileprivate var _hardwareProfile: RAHardwareProfile? = nil
-  fileprivate var _acceleratorPreference: RAAcceleratorPreference? = nil
+  fileprivate var _acceleratorPreference: RAAccelerationPreference? = nil
   fileprivate var _preferredFramework: RAInferenceFramework? = nil
 }
 
@@ -2769,47 +2675,8 @@ extension RAModelFileRole: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0MODEL_FILE_ROLE_UNSPECIFIED\0\u{1}MODEL_FILE_ROLE_PRIMARY_MODEL\0\u{1}MODEL_FILE_ROLE_COMPANION\0\u{1}MODEL_FILE_ROLE_VISION_PROJECTOR\0\u{1}MODEL_FILE_ROLE_TOKENIZER\0\u{1}MODEL_FILE_ROLE_CONFIG\0\u{1}MODEL_FILE_ROLE_VOCABULARY\0\u{1}MODEL_FILE_ROLE_MERGES\0\u{1}MODEL_FILE_ROLE_LABELS\0")
 }
 
-extension RAAccelerationPreference: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ACCELERATION_PREFERENCE_UNSPECIFIED\0\u{1}ACCELERATION_PREFERENCE_AUTO\0\u{1}ACCELERATION_PREFERENCE_CPU\0\u{1}ACCELERATION_PREFERENCE_GPU\0\u{1}ACCELERATION_PREFERENCE_NPU\0\u{1}ACCELERATION_PREFERENCE_WEBGPU\0\u{1}ACCELERATION_PREFERENCE_METAL\0\u{1}ACCELERATION_PREFERENCE_VULKAN\0")
-}
-
 extension RARoutingPolicy: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ROUTING_POLICY_UNSPECIFIED\0\u{1}ROUTING_POLICY_PREFER_LOCAL\0\u{1}ROUTING_POLICY_PREFER_CLOUD\0\u{1}ROUTING_POLICY_COST_OPTIMIZED\0\u{1}ROUTING_POLICY_LATENCY_OPTIMIZED\0\u{1}ROUTING_POLICY_MANUAL\0")
-}
-
-extension RAModelThinkingTagPattern: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ModelThinkingTagPattern"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}open_tag\0\u{3}close_tag\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.openTag) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.closeTag) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.openTag.isEmpty {
-      try visitor.visitSingularStringField(value: self.openTag, fieldNumber: 1)
-    }
-    if !self.closeTag.isEmpty {
-      try visitor.visitSingularStringField(value: self.closeTag, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAModelThinkingTagPattern, rhs: RAModelThinkingTagPattern) -> Bool {
-    if lhs.openTag != rhs.openTag {return false}
-    if lhs.closeTag != rhs.closeTag {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
 }
 
 extension RAModelInfoMetadata: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -2919,7 +2786,7 @@ extension RAModelInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     var _updatedAtUnixMs: Int64 = 0
     var _memoryRequiredBytes: Int64? = nil
     var _checksumSha256: String? = nil
-    var _thinkingPattern: RAModelThinkingTagPattern? = nil
+    var _thinkingPattern: RAThinkingTagPattern? = nil
     var _metadata: RAModelInfoMetadata? = nil
     var _artifact: RAModelInfo.OneOf_Artifact?
     var _artifactType: RAModelArtifactType? = nil
@@ -3395,7 +3262,7 @@ extension RAArchiveArtifact: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
 
 extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ModelFileDescriptor"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}filename\0\u{3}is_required\0\u{3}size_bytes\0\u{1}checksum\0\u{3}relative_path\0\u{3}destination_path\0\u{1}role\0\u{3}local_path\0\u{3}checksum_sha256\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}filename\0\u{3}is_required\0\u{3}size_bytes\0\u{4}\u{2}relative_path\0\u{3}destination_path\0\u{1}role\0\u{3}local_path\0\u{3}checksum_sha256\0\u{b}checksum\0\u{c}\u{5}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -3407,7 +3274,6 @@ extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
       case 2: try { try decoder.decodeSingularStringField(value: &self.filename) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self.isRequired) }()
       case 4: try { try decoder.decodeSingularInt64Field(value: &self._sizeBytes) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self._checksum) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self._relativePath) }()
       case 7: try { try decoder.decodeSingularStringField(value: &self._destinationPath) }()
       case 8: try { try decoder.decodeSingularEnumField(value: &self._role) }()
@@ -3435,9 +3301,6 @@ extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     try { if let v = self._sizeBytes {
       try visitor.visitSingularInt64Field(value: v, fieldNumber: 4)
     } }()
-    try { if let v = self._checksum {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 5)
-    } }()
     try { if let v = self._relativePath {
       try visitor.visitSingularStringField(value: v, fieldNumber: 6)
     } }()
@@ -3461,7 +3324,6 @@ extension RAModelFileDescriptor: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
     if lhs.filename != rhs.filename {return false}
     if lhs.isRequired != rhs.isRequired {return false}
     if lhs._sizeBytes != rhs._sizeBytes {return false}
-    if lhs._checksum != rhs._checksum {return false}
     if lhs._relativePath != rhs._relativePath {return false}
     if lhs._destinationPath != rhs._destinationPath {return false}
     if lhs._role != rhs._role {return false}

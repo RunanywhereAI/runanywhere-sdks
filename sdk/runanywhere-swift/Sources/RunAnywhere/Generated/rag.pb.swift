@@ -244,16 +244,6 @@ public struct RARAGDocument: Sendable {
   /// Plain text content to chunk/embed.
   public var text: String = String()
 
-  /// Legacy metadata JSON blob.
-  public var metadataJson: String {
-    get {_metadataJson ?? String()}
-    set {_metadataJson = newValue}
-  }
-  /// Returns true if `metadataJson` has been explicitly set.
-  public var hasMetadataJson: Bool {self._metadataJson != nil}
-  /// Clears the value of `metadataJson`. Subsequent reads from it will return its default value.
-  public mutating func clearMetadataJson() {self._metadataJson = nil}
-
   /// Typed metadata map for generated-proto callers.
   public var metadata: Dictionary<String,String> = [:]
 
@@ -292,7 +282,6 @@ public struct RARAGDocument: Sendable {
 
   public init() {}
 
-  fileprivate var _metadataJson: String? = nil
   fileprivate var _sourceUri: String? = nil
   fileprivate var _adapterHandle: String? = nil
   fileprivate var _mediaType: String? = nil
@@ -421,17 +410,6 @@ public struct RARAGSearchResult: Sendable {
   /// canonicalized here as a typed map so consumers don't re-parse.
   public var metadata: Dictionary<String,String> = [:]
 
-  /// Legacy metadata JSON blob preserved for C ABI / SDK surfaces that still
-  /// pass metadata without parsing it.
-  public var metadataJson: String {
-    get {_metadataJson ?? String()}
-    set {_metadataJson = newValue}
-  }
-  /// Returns true if `metadataJson` has been explicitly set.
-  public var hasMetadataJson: Bool {self._metadataJson != nil}
-  /// Clears the value of `metadataJson`. Subsequent reads from it will return its default value.
-  public mutating func clearMetadataJson() {self._metadataJson = nil}
-
   public var rank: Int32 = 0
 
   public var startOffset: Int32 = 0
@@ -445,7 +423,6 @@ public struct RARAGSearchResult: Sendable {
   public init() {}
 
   fileprivate var _sourceDocument: String? = nil
-  fileprivate var _metadataJson: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -856,7 +833,7 @@ extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
 
 extension RARAGDocument: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGDocument"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}text\0\u{3}metadata_json\0\u{1}metadata\0\u{3}source_uri\0\u{3}adapter_handle\0\u{3}media_type\0\u{3}size_bytes\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}text\0\u{2}\u{2}metadata\0\u{3}source_uri\0\u{3}adapter_handle\0\u{3}media_type\0\u{3}size_bytes\0\u{b}metadata_json\0\u{c}\u{3}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -866,7 +843,6 @@ extension RARAGDocument: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularStringField(value: &self.id) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.text) }()
-      case 3: try { try decoder.decodeSingularStringField(value: &self._metadataJson) }()
       case 4: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self._sourceUri) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self._adapterHandle) }()
@@ -888,9 +864,6 @@ extension RARAGDocument: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     if !self.text.isEmpty {
       try visitor.visitSingularStringField(value: self.text, fieldNumber: 2)
     }
-    try { if let v = self._metadataJson {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
-    } }()
     if !self.metadata.isEmpty {
       try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 4)
     }
@@ -912,7 +885,6 @@ extension RARAGDocument: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   public static func ==(lhs: RARAGDocument, rhs: RARAGDocument) -> Bool {
     if lhs.id != rhs.id {return false}
     if lhs.text != rhs.text {return false}
-    if lhs._metadataJson != rhs._metadataJson {return false}
     if lhs.metadata != rhs.metadata {return false}
     if lhs._sourceUri != rhs._sourceUri {return false}
     if lhs._adapterHandle != rhs._adapterHandle {return false}
@@ -1088,7 +1060,7 @@ extension RARAGQueryRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
 
 extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGSearchResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}chunk_id\0\u{1}text\0\u{3}similarity_score\0\u{3}source_document\0\u{1}metadata\0\u{3}metadata_json\0\u{1}rank\0\u{3}start_offset\0\u{3}end_offset\0\u{3}token_count\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}chunk_id\0\u{1}text\0\u{3}similarity_score\0\u{3}source_document\0\u{1}metadata\0\u{2}\u{2}rank\0\u{3}start_offset\0\u{3}end_offset\0\u{3}token_count\0\u{b}metadata_json\0\u{c}\u{6}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1101,7 +1073,6 @@ extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       case 3: try { try decoder.decodeSingularFloatField(value: &self.similarityScore) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._sourceDocument) }()
       case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: &self.metadata) }()
-      case 6: try { try decoder.decodeSingularStringField(value: &self._metadataJson) }()
       case 7: try { try decoder.decodeSingularInt32Field(value: &self.rank) }()
       case 8: try { try decoder.decodeSingularInt32Field(value: &self.startOffset) }()
       case 9: try { try decoder.decodeSingularInt32Field(value: &self.endOffset) }()
@@ -1131,9 +1102,6 @@ extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if !self.metadata.isEmpty {
       try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMap<SwiftProtobuf.ProtobufString,SwiftProtobuf.ProtobufString>.self, value: self.metadata, fieldNumber: 5)
     }
-    try { if let v = self._metadataJson {
-      try visitor.visitSingularStringField(value: v, fieldNumber: 6)
-    } }()
     if self.rank != 0 {
       try visitor.visitSingularInt32Field(value: self.rank, fieldNumber: 7)
     }
@@ -1155,7 +1123,6 @@ extension RARAGSearchResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if lhs.similarityScore != rhs.similarityScore {return false}
     if lhs._sourceDocument != rhs._sourceDocument {return false}
     if lhs.metadata != rhs.metadata {return false}
-    if lhs._metadataJson != rhs._metadataJson {return false}
     if lhs.rank != rhs.rank {return false}
     if lhs.startOffset != rhs.startOffset {return false}
     if lhs.endOffset != rhs.endOffset {return false}

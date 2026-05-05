@@ -475,16 +475,16 @@ public struct RAToolCall: Sendable {
   public var name: String = String()
 
   /// JSON-encoded arguments. Empty object "{}" if no args.
+  ///
+  /// AUDIT (IDL-13): the C++ tokenizer / tool-prompt formatter
+  /// (sdk/runanywhere-commons/src/features/llm/tool_calling.cpp) reads
+  /// `arguments_json` directly when building LLM prompts. It is the
+  /// canonical wire shape for the prompt-formatting path.
   public var argumentsJson: String = String()
 
   /// Discriminator for OpenAI-compatible flows ("function" is the only
   /// value at the moment). Empty = unset.
   public var type: String = String()
-
-  /// Strongly-typed arguments map for SDKs that do not want to parse
-  /// arguments_json. Producers should keep arguments_json populated for C++
-  /// tokenizer compatibility.
-  public var arguments: Dictionary<String,RAToolValue> = [:]
 
   /// Alias for id used by pre-proto SDK surfaces.
   public var callID: String {
@@ -528,6 +528,12 @@ public struct RAToolResult: Sendable {
 
   public var name: String = String()
 
+  /// JSON-encoded tool execution result.
+  ///
+  /// AUDIT (IDL-13): the C++ tool-prompt formatter
+  /// (`sdk/runanywhere-commons/src/features/llm/tool_calling.cpp:1870-1885`)
+  /// reads `result_json` directly when building follow-up LLM prompts after
+  /// tool execution. It is the canonical wire shape.
   public var resultJson: String = String()
 
   public var error: String {
@@ -540,13 +546,8 @@ public struct RAToolResult: Sendable {
   public mutating func clearError() {self._error = nil}
 
   /// Whether execution succeeded. If unset/false and error is empty,
-  /// consumers should fall back to legacy result_json/error semantics.
+  /// consumers should fall back to result_json/error semantics.
   public var success: Bool = false
-
-  /// Strongly-typed result map for SDKs that do not want to parse
-  /// result_json. Producers should keep result_json populated for C++
-  /// tokenizer compatibility.
-  public var result: Dictionary<String,RAToolValue> = [:]
 
   /// Alias for tool_call_id used by pre-proto SDK surfaces.
   public var callID: String {
@@ -1502,7 +1503,7 @@ extension RAToolDefinition: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
 
 extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolCall"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}arguments_json\0\u{1}type\0\u{1}arguments\0\u{3}call_id\0\u{3}created_at_ms\0\u{3}raw_text\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}name\0\u{3}arguments_json\0\u{1}type\0\u{4}\u{2}call_id\0\u{3}created_at_ms\0\u{3}raw_text\0\u{b}arguments\0\u{c}\u{5}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1514,7 +1515,6 @@ extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
       case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
       case 3: try { try decoder.decodeSingularStringField(value: &self.argumentsJson) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self.type) }()
-      case 5: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,RAToolValue>.self, value: &self.arguments) }()
       case 6: try { try decoder.decodeSingularStringField(value: &self._callID) }()
       case 7: try { try decoder.decodeSingularInt64Field(value: &self.createdAtMs) }()
       case 8: try { try decoder.decodeSingularStringField(value: &self._rawText) }()
@@ -1540,9 +1540,6 @@ extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     if !self.type.isEmpty {
       try visitor.visitSingularStringField(value: self.type, fieldNumber: 4)
     }
-    if !self.arguments.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,RAToolValue>.self, value: self.arguments, fieldNumber: 5)
-    }
     try { if let v = self._callID {
       try visitor.visitSingularStringField(value: v, fieldNumber: 6)
     } }()
@@ -1560,7 +1557,6 @@ extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     if lhs.name != rhs.name {return false}
     if lhs.argumentsJson != rhs.argumentsJson {return false}
     if lhs.type != rhs.type {return false}
-    if lhs.arguments != rhs.arguments {return false}
     if lhs._callID != rhs._callID {return false}
     if lhs.createdAtMs != rhs.createdAtMs {return false}
     if lhs._rawText != rhs._rawText {return false}
@@ -1571,7 +1567,7 @@ extension RAToolCall: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
 
 extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ToolResult"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tool_call_id\0\u{1}name\0\u{3}result_json\0\u{1}error\0\u{1}success\0\u{1}result\0\u{3}call_id\0\u{3}started_at_ms\0\u{3}completed_at_ms\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}tool_call_id\0\u{1}name\0\u{3}result_json\0\u{1}error\0\u{1}success\0\u{4}\u{2}call_id\0\u{3}started_at_ms\0\u{3}completed_at_ms\0\u{b}result\0\u{c}\u{6}\u{1}")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -1584,7 +1580,6 @@ extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
       case 3: try { try decoder.decodeSingularStringField(value: &self.resultJson) }()
       case 4: try { try decoder.decodeSingularStringField(value: &self._error) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.success) }()
-      case 6: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,RAToolValue>.self, value: &self.result) }()
       case 7: try { try decoder.decodeSingularStringField(value: &self._callID) }()
       case 8: try { try decoder.decodeSingularInt64Field(value: &self.startedAtMs) }()
       case 9: try { try decoder.decodeSingularInt64Field(value: &self.completedAtMs) }()
@@ -1613,9 +1608,6 @@ extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     if self.success != false {
       try visitor.visitSingularBoolField(value: self.success, fieldNumber: 5)
     }
-    if !self.result.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,RAToolValue>.self, value: self.result, fieldNumber: 6)
-    }
     try { if let v = self._callID {
       try visitor.visitSingularStringField(value: v, fieldNumber: 7)
     } }()
@@ -1634,7 +1626,6 @@ extension RAToolResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     if lhs.resultJson != rhs.resultJson {return false}
     if lhs._error != rhs._error {return false}
     if lhs.success != rhs.success {return false}
-    if lhs.result != rhs.result {return false}
     if lhs._callID != rhs._callID {return false}
     if lhs.startedAtMs != rhs.startedAtMs {return false}
     if lhs.completedAtMs != rhs.completedAtMs {return false}

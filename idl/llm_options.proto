@@ -22,6 +22,7 @@ package runanywhere.v1;
 
 import "model_types.proto";
 import "structured_output.proto";
+import "thinking_tag_pattern.proto";
 import "tool_calling.proto";
 
 option cc_enable_arenas      = true;
@@ -289,17 +290,12 @@ message GenerationHints {
 }
 
 // ---------------------------------------------------------------------------
-// Pattern used to extract a model's "thinking" / reasoning block from its
-// raw output (Swift ThinkingTagPattern in LLMTypes.swift:344). Used by
-// Qwen3 and LFM2 family models that emit <think>...</think> wrappers.
+// ThinkingTagPattern moved to thinking_tag_pattern.proto (Wave H-2 / IDL-02).
+// The canonical message with `open_tag`/`close_tag` fields is shared between
+// llm_options.proto (per-call extraction) and model_types.proto (catalog
+// metadata). Messages in this file reference it via the existing
+// `import "thinking_tag_pattern.proto";` near the top.
 // ---------------------------------------------------------------------------
-message ThinkingTagPattern {
-    // Opening tag string. Default if empty: "<think>".
-    string opening_tag         = 1;
-
-    // Closing tag string. Default if empty: "</think>".
-    string closing_tag         = 2;
-}
 
 // ---------------------------------------------------------------------------
 // Single streamed token (Swift StreamToken in LLMTypes.swift:563). Emitted

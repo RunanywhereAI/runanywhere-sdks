@@ -303,60 +303,6 @@ public enum RAAudioEncoding: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RAVADEventType: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case vadEventUnspecified // = 0
-  case vadEventVoiceStart // = 1
-  case vadEventVoiceEndOfUtterance // = 2
-  case vadEventBargeIn // = 3
-  case vadEventSilence // = 4
-  case vadEventStatistics // = 5
-  case vadEventStateChanged // = 6
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .vadEventUnspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .vadEventUnspecified
-    case 1: self = .vadEventVoiceStart
-    case 2: self = .vadEventVoiceEndOfUtterance
-    case 3: self = .vadEventBargeIn
-    case 4: self = .vadEventSilence
-    case 5: self = .vadEventStatistics
-    case 6: self = .vadEventStateChanged
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .vadEventUnspecified: return 0
-    case .vadEventVoiceStart: return 1
-    case .vadEventVoiceEndOfUtterance: return 2
-    case .vadEventBargeIn: return 3
-    case .vadEventSilence: return 4
-    case .vadEventStatistics: return 5
-    case .vadEventStateChanged: return 6
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAVADEventType] = [
-    .vadEventUnspecified,
-    .vadEventVoiceStart,
-    .vadEventVoiceEndOfUtterance,
-    .vadEventBargeIn,
-    .vadEventSilence,
-    .vadEventStatistics,
-    .vadEventStateChanged,
-  ]
-
-}
-
 public enum RAInterruptReason: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -522,52 +468,6 @@ public enum RAComponentLoadState: SwiftProtobuf.Enum, Swift.CaseIterable {
     .loading,
     .loaded,
     .error,
-  ]
-
-}
-
-public enum RAVoiceSessionErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case microphonePermissionDenied // = 1
-  case notReady // = 2
-  case alreadyRunning // = 3
-  case componentFailure // = 4
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .microphonePermissionDenied
-    case 2: self = .notReady
-    case 3: self = .alreadyRunning
-    case 4: self = .componentFailure
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .microphonePermissionDenied: return 1
-    case .notReady: return 2
-    case .alreadyRunning: return 3
-    case .componentFailure: return 4
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAVoiceSessionErrorCode] = [
-    .unspecified,
-    .microphonePermissionDenied,
-    .notReady,
-    .alreadyRunning,
-    .componentFailure,
   ]
 
 }
@@ -1025,12 +925,14 @@ public struct RAAudioFrameEvent: Sendable {
 
 /// Voice Activity Detection output. Frontends usually do not need this —
 /// exposed for debugging and custom UIs (waveform highlighting, etc.).
+/// IDL-18: `type` uses the canonical VADStreamEventKind enum from
+/// vad_options.proto (the hand-rolled VADEventType was deleted).
 public struct RAVADEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var type: RAVADEventType = .vadEventUnspecified
+  public var type: RAVADStreamEventKind = .unspecified
 
   public var frameOffsetUs: Int64 = 0
 
@@ -1234,7 +1136,7 @@ public struct RAVoiceSessionError: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var code: RAVoiceSessionErrorCode = .unspecified
+  public var code: RAErrorCode = .unspecified
 
   public var message: String = String()
 
@@ -1406,10 +1308,6 @@ extension RAAudioEncoding: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0AUDIO_ENCODING_UNSPECIFIED\0\u{1}AUDIO_ENCODING_PCM_F32_LE\0\u{1}AUDIO_ENCODING_PCM_S16_LE\0")
 }
 
-extension RAVADEventType: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VAD_EVENT_UNSPECIFIED\0\u{1}VAD_EVENT_VOICE_START\0\u{1}VAD_EVENT_VOICE_END_OF_UTTERANCE\0\u{1}VAD_EVENT_BARGE_IN\0\u{1}VAD_EVENT_SILENCE\0\u{1}VAD_EVENT_STATISTICS\0\u{1}VAD_EVENT_STATE_CHANGED\0")
-}
-
 extension RAInterruptReason: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0INTERRUPT_REASON_UNSPECIFIED\0\u{1}INTERRUPT_REASON_USER_BARGE_IN\0\u{1}INTERRUPT_REASON_APP_STOP\0\u{1}INTERRUPT_REASON_AUDIO_ROUTE_CHANGE\0\u{1}INTERRUPT_REASON_TIMEOUT\0")
 }
@@ -1420,10 +1318,6 @@ extension RAPipelineState: SwiftProtobuf._ProtoNameProviding {
 
 extension RAComponentLoadState: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0COMPONENT_LOAD_STATE_UNSPECIFIED\0\u{1}COMPONENT_LOAD_STATE_NOT_LOADED\0\u{1}COMPONENT_LOAD_STATE_LOADING\0\u{1}COMPONENT_LOAD_STATE_LOADED\0\u{1}COMPONENT_LOAD_STATE_ERROR\0")
-}
-
-extension RAVoiceSessionErrorCode: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VOICE_SESSION_ERROR_CODE_UNSPECIFIED\0\u{1}VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED\0\u{1}VOICE_SESSION_ERROR_CODE_NOT_READY\0\u{1}VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING\0\u{1}VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE\0")
 }
 
 extension RASpeechTurnDetectionEventKind: SwiftProtobuf._ProtoNameProviding {
@@ -2087,7 +1981,7 @@ extension RAVADEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.type != .vadEventUnspecified {
+    if self.type != .unspecified {
       try visitor.visitSingularEnumField(value: self.type, fieldNumber: 1)
     }
     if self.frameOffsetUs != 0 {

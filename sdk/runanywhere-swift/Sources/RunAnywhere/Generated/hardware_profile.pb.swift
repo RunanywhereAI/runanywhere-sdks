@@ -20,44 +20,72 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
-public enum RAAcceleratorPreference: SwiftProtobuf.Enum, Swift.CaseIterable {
+/// ---------------------------------------------------------------------------
+/// Hardware acceleration preference for inference. Canonical single enum —
+/// previously duplicated as `AcceleratorPreference` (ANE/GPU/CPU/AUTO) in this
+/// file and `AccelerationPreference` in model_types.proto. Consolidated here
+/// (Wave H-2 / IDL-01) because it is a pure hardware concept and
+/// hardware_profile.proto has no imports (model_types.proto already imports
+/// this file — placing the enum here avoids a cyclic import). Sources pre-IDL:
+///   Web    enums.ts:165   (Auto / WebGPU / CPU)
+///   Swift  extensions     (CPU / GPU / NPU / Metal)
+///   Kotlin enum           (CPU / GPU / NPU / Vulkan)
+/// Canonicalized union below.
+/// ---------------------------------------------------------------------------
+public enum RAAccelerationPreference: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
-  case auto // = 0
-  case ane // = 1
-  case gpu // = 2
-  case cpu // = 3
+  case unspecified // = 0
+  case auto // = 1
+  case cpu // = 2
+  case gpu // = 3
+  case npu // = 4
+  case webgpu // = 5
+  case metal // = 6
+  case vulkan // = 7
   case UNRECOGNIZED(Int)
 
   public init() {
-    self = .auto
+    self = .unspecified
   }
 
   public init?(rawValue: Int) {
     switch rawValue {
-    case 0: self = .auto
-    case 1: self = .ane
-    case 2: self = .gpu
-    case 3: self = .cpu
+    case 0: self = .unspecified
+    case 1: self = .auto
+    case 2: self = .cpu
+    case 3: self = .gpu
+    case 4: self = .npu
+    case 5: self = .webgpu
+    case 6: self = .metal
+    case 7: self = .vulkan
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
 
   public var rawValue: Int {
     switch self {
-    case .auto: return 0
-    case .ane: return 1
-    case .gpu: return 2
-    case .cpu: return 3
+    case .unspecified: return 0
+    case .auto: return 1
+    case .cpu: return 2
+    case .gpu: return 3
+    case .npu: return 4
+    case .webgpu: return 5
+    case .metal: return 6
+    case .vulkan: return 7
     case .UNRECOGNIZED(let i): return i
     }
   }
 
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAAcceleratorPreference] = [
+  public static let allCases: [RAAccelerationPreference] = [
+    .unspecified,
     .auto,
-    .ane,
-    .gpu,
     .cpu,
+    .gpu,
+    .npu,
+    .webgpu,
+    .metal,
+    .vulkan,
   ]
 
 }
@@ -100,7 +128,7 @@ public struct RAAcceleratorInfo: Sendable {
 
   public var name: String = String()
 
-  public var type: RAAcceleratorPreference = .auto
+  public var type: RAAccelerationPreference = .unspecified
 
   public var available: Bool = false
 
@@ -163,7 +191,7 @@ public struct RAHardwareAcceleratorPreferenceRequest: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  public var preference: RAAcceleratorPreference = .auto
+  public var preference: RAAccelerationPreference = .unspecified
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -188,8 +216,8 @@ public struct RAHardwareAcceleratorPreferenceResult: Sendable {
 
 fileprivate let _protobuf_package = "runanywhere.v1"
 
-extension RAAcceleratorPreference: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ACCELERATOR_PREFERENCE_AUTO\0\u{1}ACCELERATOR_PREFERENCE_ANE\0\u{1}ACCELERATOR_PREFERENCE_GPU\0\u{1}ACCELERATOR_PREFERENCE_CPU\0")
+extension RAAccelerationPreference: SwiftProtobuf._ProtoNameProviding {
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0ACCELERATION_PREFERENCE_UNSPECIFIED\0\u{1}ACCELERATION_PREFERENCE_AUTO\0\u{1}ACCELERATION_PREFERENCE_CPU\0\u{1}ACCELERATION_PREFERENCE_GPU\0\u{1}ACCELERATION_PREFERENCE_NPU\0\u{1}ACCELERATION_PREFERENCE_WEBGPU\0\u{1}ACCELERATION_PREFERENCE_METAL\0\u{1}ACCELERATION_PREFERENCE_VULKAN\0")
 }
 
 extension RAHardwareProfile: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -284,7 +312,7 @@ extension RAAcceleratorInfo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if !self.name.isEmpty {
       try visitor.visitSingularStringField(value: self.name, fieldNumber: 1)
     }
-    if self.type != .auto {
+    if self.type != .unspecified {
       try visitor.visitSingularEnumField(value: self.type, fieldNumber: 2)
     }
     if self.available != false {
@@ -396,7 +424,7 @@ extension RAHardwareAcceleratorPreferenceRequest: SwiftProtobuf.Message, SwiftPr
   }
 
   public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.preference != .auto {
+    if self.preference != .unspecified {
       try visitor.visitSingularEnumField(value: self.preference, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)

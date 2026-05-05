@@ -138,6 +138,12 @@ public enum RAVADStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   case statistics // = 4
   case stopped // = 5
   case error // = 6
+
+  /// IDL-18 fold: pipeline-level barge-in signal previously carried by the
+  /// deleted VADEventType enum. Emitted when the VAD detects speech that
+  /// interrupts active assistant playback; downstream pipeline typically
+  /// routes this through InterruptedEvent/InterruptReason as well.
+  case bargeIn // = 7
   case UNRECOGNIZED(Int)
 
   public init() {
@@ -153,6 +159,7 @@ public enum RAVADStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
     case 4: self = .statistics
     case 5: self = .stopped
     case 6: self = .error
+    case 7: self = .bargeIn
     default: self = .UNRECOGNIZED(rawValue)
     }
   }
@@ -166,6 +173,7 @@ public enum RAVADStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
     case .statistics: return 4
     case .stopped: return 5
     case .error: return 6
+    case .bargeIn: return 7
     case .UNRECOGNIZED(let i): return i
     }
   }
@@ -179,6 +187,7 @@ public enum RAVADStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
     .statistics,
     .stopped,
     .error,
+    .bargeIn,
   ]
 
 }
@@ -735,7 +744,7 @@ extension RAVADAudioEncoding: SwiftProtobuf._ProtoNameProviding {
 }
 
 extension RAVADStreamEventKind: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VAD_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}VAD_STREAM_EVENT_KIND_STARTED\0\u{1}VAD_STREAM_EVENT_KIND_FRAME\0\u{1}VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY\0\u{1}VAD_STREAM_EVENT_KIND_STATISTICS\0\u{1}VAD_STREAM_EVENT_KIND_STOPPED\0\u{1}VAD_STREAM_EVENT_KIND_ERROR\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VAD_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}VAD_STREAM_EVENT_KIND_STARTED\0\u{1}VAD_STREAM_EVENT_KIND_FRAME\0\u{1}VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY\0\u{1}VAD_STREAM_EVENT_KIND_STATISTICS\0\u{1}VAD_STREAM_EVENT_KIND_STOPPED\0\u{1}VAD_STREAM_EVENT_KIND_ERROR\0\u{1}VAD_STREAM_EVENT_KIND_BARGE_IN\0")
 }
 
 extension RAVADConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {

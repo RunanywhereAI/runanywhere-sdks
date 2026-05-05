@@ -734,27 +734,6 @@ public struct RAGenerationHints: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
-/// Pattern used to extract a model's "thinking" / reasoning block from its
-/// raw output (Swift ThinkingTagPattern in LLMTypes.swift:344). Used by
-/// Qwen3 and LFM2 family models that emit <think>...</think> wrappers.
-/// ---------------------------------------------------------------------------
-public struct RAThinkingTagPattern: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  /// Opening tag string. Default if empty: "<think>".
-  public var openingTag: String = String()
-
-  /// Closing tag string. Default if empty: "</think>".
-  public var closingTag: String = String()
-
-  public var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  public init() {}
-}
-
-/// ---------------------------------------------------------------------------
 /// Single streamed token (Swift StreamToken in LLMTypes.swift:563). Emitted
 /// once per token in streaming mode.
 /// ---------------------------------------------------------------------------
@@ -1522,41 +1501,6 @@ extension RAGenerationHints: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if lhs.temperature != rhs.temperature {return false}
     if lhs.maxTokens != rhs.maxTokens {return false}
     if lhs._systemRole != rhs._systemRole {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension RAThinkingTagPattern: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  public static let protoMessageName: String = _protobuf_package + ".ThinkingTagPattern"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}opening_tag\0\u{3}closing_tag\0")
-
-  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.openingTag) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.closingTag) }()
-      default: break
-      }
-    }
-  }
-
-  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.openingTag.isEmpty {
-      try visitor.visitSingularStringField(value: self.openingTag, fieldNumber: 1)
-    }
-    if !self.closingTag.isEmpty {
-      try visitor.visitSingularStringField(value: self.closingTag, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  public static func ==(lhs: RAThinkingTagPattern, rhs: RAThinkingTagPattern) -> Bool {
-    if lhs.openingTag != rhs.openingTag {return false}
-    if lhs.closingTag != rhs.closingTag {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

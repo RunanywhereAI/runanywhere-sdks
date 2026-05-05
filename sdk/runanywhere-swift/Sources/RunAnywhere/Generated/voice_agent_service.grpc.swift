@@ -47,9 +47,65 @@ public enum RAVoiceAgent: Sendable {
                 type: .serverStreaming
             )
         }
+        /// Namespace for "ProcessTurn" metadata.
+        public enum ProcessTurn: Sendable {
+            /// Request type for "ProcessTurn".
+            public typealias Input = RAVoiceAgentTurnRequest
+            /// Response type for "ProcessTurn".
+            public typealias Output = RAVoiceAgentResult
+            /// Descriptor for "ProcessTurn".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "runanywhere.v1.VoiceAgent"),
+                method: "ProcessTurn",
+                type: .unary
+            )
+        }
+        /// Namespace for "Transcribe" metadata.
+        public enum Transcribe: Sendable {
+            /// Request type for "Transcribe".
+            public typealias Input = RAVoiceAgentTranscribeProtoRequest
+            /// Response type for "Transcribe".
+            public typealias Output = RASTTOutput
+            /// Descriptor for "Transcribe".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "runanywhere.v1.VoiceAgent"),
+                method: "Transcribe",
+                type: .unary
+            )
+        }
+        /// Namespace for "SynthesizeSpeech" metadata.
+        public enum SynthesizeSpeech: Sendable {
+            /// Request type for "SynthesizeSpeech".
+            public typealias Input = RAVoiceAgentSynthesizeSpeechProtoRequest
+            /// Response type for "SynthesizeSpeech".
+            public typealias Output = RATTSOutput
+            /// Descriptor for "SynthesizeSpeech".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "runanywhere.v1.VoiceAgent"),
+                method: "SynthesizeSpeech",
+                type: .unary
+            )
+        }
+        /// Namespace for "Configure" metadata.
+        public enum Configure: Sendable {
+            /// Request type for "Configure".
+            public typealias Input = RAVoiceAgentComposeConfig
+            /// Response type for "Configure".
+            public typealias Output = RAVoiceAgentResult
+            /// Descriptor for "Configure".
+            public static let descriptor = GRPCCore.MethodDescriptor(
+                service: GRPCCore.ServiceDescriptor(fullyQualifiedService: "runanywhere.v1.VoiceAgent"),
+                method: "Configure",
+                type: .unary
+            )
+        }
         /// Descriptors for all methods in the "runanywhere.v1.VoiceAgent" service.
         public static let descriptors: [GRPCCore.MethodDescriptor] = [
-            Stream.descriptor
+            Stream.descriptor,
+            ProcessTurn.descriptor,
+            Transcribe.descriptor,
+            SynthesizeSpeech.descriptor,
+            Configure.descriptor
         ]
     }
 }
@@ -93,6 +149,81 @@ extension RAVoiceAgent {
             request: GRPCCore.StreamingServerRequest<RAVoiceAgentRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<RAVoiceEvent>
+
+        /// Handle the "ProcessTurn" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > One-shot voice turn: audio blob in, transcription + assistant response
+        /// > + synthesized audio out. Mirrors `processVoiceTurn` ergonomic API.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `RAVoiceAgentTurnRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `RAVoiceAgentResult` messages.
+        func processTurn(
+            request: GRPCCore.StreamingServerRequest<RAVoiceAgentTurnRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<RAVoiceAgentResult>
+
+        /// Handle the "Transcribe" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Helper-level STT transcribe path used by voice-agent sub-components.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `RAVoiceAgentTranscribeProtoRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `RASTTOutput` messages.
+        func transcribe(
+            request: GRPCCore.StreamingServerRequest<RAVoiceAgentTranscribeProtoRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<RASTTOutput>
+
+        /// Handle the "SynthesizeSpeech" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Helper-level TTS synthesize-speech path used by voice-agent sub-components.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `RAVoiceAgentSynthesizeSpeechProtoRequest` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `RATTSOutput` messages.
+        func synthesizeSpeech(
+            request: GRPCCore.StreamingServerRequest<RAVoiceAgentSynthesizeSpeechProtoRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<RATTSOutput>
+
+        /// Handle the "Configure" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Configure / initialize the voice-agent sub-components (STT/LLM/TTS/VAD/
+        /// > wake-word). Returns an initial VoiceAgentResult capturing component
+        /// > readiness and any initialization errors.
+        ///
+        /// - Parameters:
+        ///   - request: A streaming request of `RAVoiceAgentComposeConfig` messages.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A streaming response of `RAVoiceAgentResult` messages.
+        func configure(
+            request: GRPCCore.StreamingServerRequest<RAVoiceAgentComposeConfig>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.StreamingServerResponse<RAVoiceAgentResult>
     }
 
     /// Service protocol for the "runanywhere.v1.VoiceAgent" service.
@@ -121,6 +252,81 @@ extension RAVoiceAgent {
             request: GRPCCore.ServerRequest<RAVoiceAgentRequest>,
             context: GRPCCore.ServerContext
         ) async throws -> GRPCCore.StreamingServerResponse<RAVoiceEvent>
+
+        /// Handle the "ProcessTurn" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > One-shot voice turn: audio blob in, transcription + assistant response
+        /// > + synthesized audio out. Mirrors `processVoiceTurn` ergonomic API.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RAVoiceAgentTurnRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `RAVoiceAgentResult` message.
+        func processTurn(
+            request: GRPCCore.ServerRequest<RAVoiceAgentTurnRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<RAVoiceAgentResult>
+
+        /// Handle the "Transcribe" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Helper-level STT transcribe path used by voice-agent sub-components.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RAVoiceAgentTranscribeProtoRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `RASTTOutput` message.
+        func transcribe(
+            request: GRPCCore.ServerRequest<RAVoiceAgentTranscribeProtoRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<RASTTOutput>
+
+        /// Handle the "SynthesizeSpeech" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Helper-level TTS synthesize-speech path used by voice-agent sub-components.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RAVoiceAgentSynthesizeSpeechProtoRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `RATTSOutput` message.
+        func synthesizeSpeech(
+            request: GRPCCore.ServerRequest<RAVoiceAgentSynthesizeSpeechProtoRequest>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<RATTSOutput>
+
+        /// Handle the "Configure" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Configure / initialize the voice-agent sub-components (STT/LLM/TTS/VAD/
+        /// > wake-word). Returns an initial VoiceAgentResult capturing component
+        /// > readiness and any initialization errors.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RAVoiceAgentComposeConfig` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A response containing a single `RAVoiceAgentResult` message.
+        func configure(
+            request: GRPCCore.ServerRequest<RAVoiceAgentComposeConfig>,
+            context: GRPCCore.ServerContext
+        ) async throws -> GRPCCore.ServerResponse<RAVoiceAgentResult>
     }
 
     /// Simple service protocol for the "runanywhere.v1.VoiceAgent" service.
@@ -148,6 +354,81 @@ extension RAVoiceAgent {
             response: GRPCCore.RPCWriter<RAVoiceEvent>,
             context: GRPCCore.ServerContext
         ) async throws
+
+        /// Handle the "ProcessTurn" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > One-shot voice turn: audio blob in, transcription + assistant response
+        /// > + synthesized audio out. Mirrors `processVoiceTurn` ergonomic API.
+        ///
+        /// - Parameters:
+        ///   - request: A `RAVoiceAgentTurnRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `RAVoiceAgentResult` to respond with.
+        func processTurn(
+            request: RAVoiceAgentTurnRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> RAVoiceAgentResult
+
+        /// Handle the "Transcribe" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Helper-level STT transcribe path used by voice-agent sub-components.
+        ///
+        /// - Parameters:
+        ///   - request: A `RAVoiceAgentTranscribeProtoRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `RASTTOutput` to respond with.
+        func transcribe(
+            request: RAVoiceAgentTranscribeProtoRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> RASTTOutput
+
+        /// Handle the "SynthesizeSpeech" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Helper-level TTS synthesize-speech path used by voice-agent sub-components.
+        ///
+        /// - Parameters:
+        ///   - request: A `RAVoiceAgentSynthesizeSpeechProtoRequest` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `RATTSOutput` to respond with.
+        func synthesizeSpeech(
+            request: RAVoiceAgentSynthesizeSpeechProtoRequest,
+            context: GRPCCore.ServerContext
+        ) async throws -> RATTSOutput
+
+        /// Handle the "Configure" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Configure / initialize the voice-agent sub-components (STT/LLM/TTS/VAD/
+        /// > wake-word). Returns an initial VoiceAgentResult capturing component
+        /// > readiness and any initialization errors.
+        ///
+        /// - Parameters:
+        ///   - request: A `RAVoiceAgentComposeConfig` message.
+        ///   - context: Context providing information about the RPC.
+        /// - Throws: Any error which occurred during the processing of the request. Thrown errors
+        ///     of type `RPCError` are mapped to appropriate statuses. All other errors are converted
+        ///     to an internal error.
+        /// - Returns: A `RAVoiceAgentResult` to respond with.
+        func configure(
+            request: RAVoiceAgentComposeConfig,
+            context: GRPCCore.ServerContext
+        ) async throws -> RAVoiceAgentResult
     }
 }
 
@@ -161,6 +442,50 @@ extension RAVoiceAgent.StreamingServiceProtocol {
             serializer: GRPCProtobuf.ProtobufSerializer<RAVoiceEvent>(),
             handler: { request, context in
                 try await self.stream(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: RAVoiceAgent.Method.ProcessTurn.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RAVoiceAgentTurnRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<RAVoiceAgentResult>(),
+            handler: { request, context in
+                try await self.processTurn(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: RAVoiceAgent.Method.Transcribe.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RAVoiceAgentTranscribeProtoRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<RASTTOutput>(),
+            handler: { request, context in
+                try await self.transcribe(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: RAVoiceAgent.Method.SynthesizeSpeech.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RAVoiceAgentSynthesizeSpeechProtoRequest>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<RATTSOutput>(),
+            handler: { request, context in
+                try await self.synthesizeSpeech(
+                    request: request,
+                    context: context
+                )
+            }
+        )
+        router.registerHandler(
+            forMethod: RAVoiceAgent.Method.Configure.descriptor,
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RAVoiceAgentComposeConfig>(),
+            serializer: GRPCProtobuf.ProtobufSerializer<RAVoiceAgentResult>(),
+            handler: { request, context in
+                try await self.configure(
                     request: request,
                     context: context
                 )
@@ -182,6 +507,50 @@ extension RAVoiceAgent.ServiceProtocol {
         )
         return response
     }
+
+    public func processTurn(
+        request: GRPCCore.StreamingServerRequest<RAVoiceAgentTurnRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<RAVoiceAgentResult> {
+        let response = try await self.processTurn(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func transcribe(
+        request: GRPCCore.StreamingServerRequest<RAVoiceAgentTranscribeProtoRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<RASTTOutput> {
+        let response = try await self.transcribe(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func synthesizeSpeech(
+        request: GRPCCore.StreamingServerRequest<RAVoiceAgentSynthesizeSpeechProtoRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<RATTSOutput> {
+        let response = try await self.synthesizeSpeech(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
+
+    public func configure(
+        request: GRPCCore.StreamingServerRequest<RAVoiceAgentComposeConfig>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.StreamingServerResponse<RAVoiceAgentResult> {
+        let response = try await self.configure(
+            request: GRPCCore.ServerRequest(stream: request),
+            context: context
+        )
+        return GRPCCore.StreamingServerResponse(single: response)
+    }
 }
 
 // Default implementation of methods from 'ServiceProtocol'.
@@ -201,6 +570,58 @@ extension RAVoiceAgent.SimpleServiceProtocol {
                 )
                 return [:]
             }
+        )
+    }
+
+    public func processTurn(
+        request: GRPCCore.ServerRequest<RAVoiceAgentTurnRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<RAVoiceAgentResult> {
+        return GRPCCore.ServerResponse<RAVoiceAgentResult>(
+            message: try await self.processTurn(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func transcribe(
+        request: GRPCCore.ServerRequest<RAVoiceAgentTranscribeProtoRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<RASTTOutput> {
+        return GRPCCore.ServerResponse<RASTTOutput>(
+            message: try await self.transcribe(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func synthesizeSpeech(
+        request: GRPCCore.ServerRequest<RAVoiceAgentSynthesizeSpeechProtoRequest>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<RATTSOutput> {
+        return GRPCCore.ServerResponse<RATTSOutput>(
+            message: try await self.synthesizeSpeech(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
+        )
+    }
+
+    public func configure(
+        request: GRPCCore.ServerRequest<RAVoiceAgentComposeConfig>,
+        context: GRPCCore.ServerContext
+    ) async throws -> GRPCCore.ServerResponse<RAVoiceAgentResult> {
+        return GRPCCore.ServerResponse<RAVoiceAgentResult>(
+            message: try await self.configure(
+                request: request.message,
+                context: context
+            ),
+            metadata: [:]
         )
     }
 }
@@ -236,6 +657,101 @@ extension RAVoiceAgent {
             deserializer: some GRPCCore.MessageDeserializer<RAVoiceEvent>,
             options: GRPCCore.CallOptions,
             onResponse handleResponse: @Sendable @escaping (GRPCCore.StreamingClientResponse<RAVoiceEvent>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "ProcessTurn" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > One-shot voice turn: audio blob in, transcription + assistant response
+        /// > + synthesized audio out. Mirrors `processVoiceTurn` ergonomic API.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RAVoiceAgentTurnRequest` message.
+        ///   - serializer: A serializer for `RAVoiceAgentTurnRequest` messages.
+        ///   - deserializer: A deserializer for `RAVoiceAgentResult` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func processTurn<Result>(
+            request: GRPCCore.ClientRequest<RAVoiceAgentTurnRequest>,
+            serializer: some GRPCCore.MessageSerializer<RAVoiceAgentTurnRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<RAVoiceAgentResult>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RAVoiceAgentResult>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "Transcribe" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Helper-level STT transcribe path used by voice-agent sub-components.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RAVoiceAgentTranscribeProtoRequest` message.
+        ///   - serializer: A serializer for `RAVoiceAgentTranscribeProtoRequest` messages.
+        ///   - deserializer: A deserializer for `RASTTOutput` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func transcribe<Result>(
+            request: GRPCCore.ClientRequest<RAVoiceAgentTranscribeProtoRequest>,
+            serializer: some GRPCCore.MessageSerializer<RAVoiceAgentTranscribeProtoRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<RASTTOutput>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RASTTOutput>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "SynthesizeSpeech" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Helper-level TTS synthesize-speech path used by voice-agent sub-components.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RAVoiceAgentSynthesizeSpeechProtoRequest` message.
+        ///   - serializer: A serializer for `RAVoiceAgentSynthesizeSpeechProtoRequest` messages.
+        ///   - deserializer: A deserializer for `RATTSOutput` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func synthesizeSpeech<Result>(
+            request: GRPCCore.ClientRequest<RAVoiceAgentSynthesizeSpeechProtoRequest>,
+            serializer: some GRPCCore.MessageSerializer<RAVoiceAgentSynthesizeSpeechProtoRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<RATTSOutput>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RATTSOutput>) async throws -> Result
+        ) async throws -> Result where Result: Sendable
+
+        /// Call the "Configure" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Configure / initialize the voice-agent sub-components (STT/LLM/TTS/VAD/
+        /// > wake-word). Returns an initial VoiceAgentResult capturing component
+        /// > readiness and any initialization errors.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RAVoiceAgentComposeConfig` message.
+        ///   - serializer: A serializer for `RAVoiceAgentComposeConfig` messages.
+        ///   - deserializer: A deserializer for `RAVoiceAgentResult` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        func configure<Result>(
+            request: GRPCCore.ClientRequest<RAVoiceAgentComposeConfig>,
+            serializer: some GRPCCore.MessageSerializer<RAVoiceAgentComposeConfig>,
+            deserializer: some GRPCCore.MessageDeserializer<RAVoiceAgentResult>,
+            options: GRPCCore.CallOptions,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RAVoiceAgentResult>) async throws -> Result
         ) async throws -> Result where Result: Sendable
     }
 
@@ -287,6 +803,145 @@ extension RAVoiceAgent {
                 onResponse: handleResponse
             )
         }
+
+        /// Call the "ProcessTurn" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > One-shot voice turn: audio blob in, transcription + assistant response
+        /// > + synthesized audio out. Mirrors `processVoiceTurn` ergonomic API.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RAVoiceAgentTurnRequest` message.
+        ///   - serializer: A serializer for `RAVoiceAgentTurnRequest` messages.
+        ///   - deserializer: A deserializer for `RAVoiceAgentResult` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func processTurn<Result>(
+            request: GRPCCore.ClientRequest<RAVoiceAgentTurnRequest>,
+            serializer: some GRPCCore.MessageSerializer<RAVoiceAgentTurnRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<RAVoiceAgentResult>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RAVoiceAgentResult>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: RAVoiceAgent.Method.ProcessTurn.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "Transcribe" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Helper-level STT transcribe path used by voice-agent sub-components.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RAVoiceAgentTranscribeProtoRequest` message.
+        ///   - serializer: A serializer for `RAVoiceAgentTranscribeProtoRequest` messages.
+        ///   - deserializer: A deserializer for `RASTTOutput` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func transcribe<Result>(
+            request: GRPCCore.ClientRequest<RAVoiceAgentTranscribeProtoRequest>,
+            serializer: some GRPCCore.MessageSerializer<RAVoiceAgentTranscribeProtoRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<RASTTOutput>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RASTTOutput>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: RAVoiceAgent.Method.Transcribe.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "SynthesizeSpeech" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Helper-level TTS synthesize-speech path used by voice-agent sub-components.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RAVoiceAgentSynthesizeSpeechProtoRequest` message.
+        ///   - serializer: A serializer for `RAVoiceAgentSynthesizeSpeechProtoRequest` messages.
+        ///   - deserializer: A deserializer for `RATTSOutput` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func synthesizeSpeech<Result>(
+            request: GRPCCore.ClientRequest<RAVoiceAgentSynthesizeSpeechProtoRequest>,
+            serializer: some GRPCCore.MessageSerializer<RAVoiceAgentSynthesizeSpeechProtoRequest>,
+            deserializer: some GRPCCore.MessageDeserializer<RATTSOutput>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RATTSOutput>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: RAVoiceAgent.Method.SynthesizeSpeech.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
+
+        /// Call the "Configure" method.
+        ///
+        /// > Source IDL Documentation:
+        /// >
+        /// > Configure / initialize the voice-agent sub-components (STT/LLM/TTS/VAD/
+        /// > wake-word). Returns an initial VoiceAgentResult capturing component
+        /// > readiness and any initialization errors.
+        ///
+        /// - Parameters:
+        ///   - request: A request containing a single `RAVoiceAgentComposeConfig` message.
+        ///   - serializer: A serializer for `RAVoiceAgentComposeConfig` messages.
+        ///   - deserializer: A deserializer for `RAVoiceAgentResult` messages.
+        ///   - options: Options to apply to this RPC.
+        ///   - handleResponse: A closure which handles the response, the result of which is
+        ///       returned to the caller. Returning from the closure will cancel the RPC if it
+        ///       hasn't already finished.
+        /// - Returns: The result of `handleResponse`.
+        public func configure<Result>(
+            request: GRPCCore.ClientRequest<RAVoiceAgentComposeConfig>,
+            serializer: some GRPCCore.MessageSerializer<RAVoiceAgentComposeConfig>,
+            deserializer: some GRPCCore.MessageDeserializer<RAVoiceAgentResult>,
+            options: GRPCCore.CallOptions = .defaults,
+            onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RAVoiceAgentResult>) async throws -> Result = { response in
+                try response.message
+            }
+        ) async throws -> Result where Result: Sendable {
+            try await self.client.unary(
+                request: request,
+                descriptor: RAVoiceAgent.Method.Configure.descriptor,
+                serializer: serializer,
+                deserializer: deserializer,
+                options: options,
+                onResponse: handleResponse
+            )
+        }
     }
 }
 
@@ -316,6 +971,125 @@ extension RAVoiceAgent.ClientProtocol {
             request: request,
             serializer: GRPCProtobuf.ProtobufSerializer<RAVoiceAgentRequest>(),
             deserializer: GRPCProtobuf.ProtobufDeserializer<RAVoiceEvent>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ProcessTurn" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > One-shot voice turn: audio blob in, transcription + assistant response
+    /// > + synthesized audio out. Mirrors `processVoiceTurn` ergonomic API.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `RAVoiceAgentTurnRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func processTurn<Result>(
+        request: GRPCCore.ClientRequest<RAVoiceAgentTurnRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RAVoiceAgentResult>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.processTurn(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<RAVoiceAgentTurnRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RAVoiceAgentResult>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "Transcribe" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Helper-level STT transcribe path used by voice-agent sub-components.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `RAVoiceAgentTranscribeProtoRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func transcribe<Result>(
+        request: GRPCCore.ClientRequest<RAVoiceAgentTranscribeProtoRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RASTTOutput>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.transcribe(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<RAVoiceAgentTranscribeProtoRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RASTTOutput>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "SynthesizeSpeech" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Helper-level TTS synthesize-speech path used by voice-agent sub-components.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `RAVoiceAgentSynthesizeSpeechProtoRequest` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func synthesizeSpeech<Result>(
+        request: GRPCCore.ClientRequest<RAVoiceAgentSynthesizeSpeechProtoRequest>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RATTSOutput>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.synthesizeSpeech(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<RAVoiceAgentSynthesizeSpeechProtoRequest>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RATTSOutput>(),
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "Configure" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Configure / initialize the voice-agent sub-components (STT/LLM/TTS/VAD/
+    /// > wake-word). Returns an initial VoiceAgentResult capturing component
+    /// > readiness and any initialization errors.
+    ///
+    /// - Parameters:
+    ///   - request: A request containing a single `RAVoiceAgentComposeConfig` message.
+    ///   - options: Options to apply to this RPC.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func configure<Result>(
+        request: GRPCCore.ClientRequest<RAVoiceAgentComposeConfig>,
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RAVoiceAgentResult>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        try await self.configure(
+            request: request,
+            serializer: GRPCProtobuf.ProtobufSerializer<RAVoiceAgentComposeConfig>(),
+            deserializer: GRPCProtobuf.ProtobufDeserializer<RAVoiceAgentResult>(),
             options: options,
             onResponse: handleResponse
         )
@@ -351,6 +1125,141 @@ extension RAVoiceAgent.ClientProtocol {
             metadata: metadata
         )
         return try await self.stream(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "ProcessTurn" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > One-shot voice turn: audio blob in, transcription + assistant response
+    /// > + synthesized audio out. Mirrors `processVoiceTurn` ergonomic API.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func processTurn<Result>(
+        _ message: RAVoiceAgentTurnRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RAVoiceAgentResult>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<RAVoiceAgentTurnRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.processTurn(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "Transcribe" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Helper-level STT transcribe path used by voice-agent sub-components.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func transcribe<Result>(
+        _ message: RAVoiceAgentTranscribeProtoRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RASTTOutput>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<RAVoiceAgentTranscribeProtoRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.transcribe(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "SynthesizeSpeech" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Helper-level TTS synthesize-speech path used by voice-agent sub-components.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func synthesizeSpeech<Result>(
+        _ message: RAVoiceAgentSynthesizeSpeechProtoRequest,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RATTSOutput>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<RAVoiceAgentSynthesizeSpeechProtoRequest>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.synthesizeSpeech(
+            request: request,
+            options: options,
+            onResponse: handleResponse
+        )
+    }
+
+    /// Call the "Configure" method.
+    ///
+    /// > Source IDL Documentation:
+    /// >
+    /// > Configure / initialize the voice-agent sub-components (STT/LLM/TTS/VAD/
+    /// > wake-word). Returns an initial VoiceAgentResult capturing component
+    /// > readiness and any initialization errors.
+    ///
+    /// - Parameters:
+    ///   - message: request message to send.
+    ///   - metadata: Additional metadata to send, defaults to empty.
+    ///   - options: Options to apply to this RPC, defaults to `.defaults`.
+    ///   - handleResponse: A closure which handles the response, the result of which is
+    ///       returned to the caller. Returning from the closure will cancel the RPC if it
+    ///       hasn't already finished.
+    /// - Returns: The result of `handleResponse`.
+    public func configure<Result>(
+        _ message: RAVoiceAgentComposeConfig,
+        metadata: GRPCCore.Metadata = [:],
+        options: GRPCCore.CallOptions = .defaults,
+        onResponse handleResponse: @Sendable @escaping (GRPCCore.ClientResponse<RAVoiceAgentResult>) async throws -> Result = { response in
+            try response.message
+        }
+    ) async throws -> Result where Result: Sendable {
+        let request = GRPCCore.ClientRequest<RAVoiceAgentComposeConfig>(
+            message: message,
+            metadata: metadata
+        )
+        return try await self.configure(
             request: request,
             options: options,
             onResponse: handleResponse

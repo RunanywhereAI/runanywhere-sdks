@@ -261,98 +261,6 @@ public enum RAVLMModelFamily: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-/// ---------------------------------------------------------------------------
-/// VLM error codes — canonical SDK-facing surface.
-/// Sources pre-IDL:
-///   Swift  CppBridge+VLM.swift:184  (notInitialized=1, modelLoadFailed=2,
-///                                    processingFailed=3, invalidImage=4,
-///                                    cancelled=5)
-///   Dart   vlm_types.dart:164       (notInitialized=1, modelLoadFailed=2,
-///                                    processingFailed=3, invalidImage=4,
-///                                    cancelled=5)
-///   RN     VLMTypes.ts:44           (NotInitialized=1, ModelLoadFailed=2,
-///                                    ProcessingFailed=3, InvalidImage=4,
-///                                    Cancelled=5)
-///   Kotlin / Web                    (no enum declared pre-IDL)
-///
-/// The canonicalized set below narrows the surface to image-specific failure
-/// modes that the C ABI can distinguish at the boundary; transport / lifecycle
-/// errors (notInitialized, modelLoadFailed, processingFailed, cancelled) are
-/// folded back into the shared rac_result_t error codes in rac_error.h and do
-/// not appear here.
-/// ---------------------------------------------------------------------------
-public enum RAVLMErrorCode: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-
-  /// Swift/Dart/RN invalidImage
-  case invalidImage // = 1
-
-  /// Swift/Dart/RN notInitialized +
-  case modelNotLoaded // = 2
-
-  /// modelLoadFailed
-  case unsupportedFormat // = 3
-
-  /// backend cannot decode
-  case imageTooLarge // = 4
-
-  /// VLMConfiguration.max_image_size_px
-  case notInitialized // = 5
-  case modelLoadFailed // = 6
-  case processingFailed // = 7
-  case cancelled // = 8
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .invalidImage
-    case 2: self = .modelNotLoaded
-    case 3: self = .unsupportedFormat
-    case 4: self = .imageTooLarge
-    case 5: self = .notInitialized
-    case 6: self = .modelLoadFailed
-    case 7: self = .processingFailed
-    case 8: self = .cancelled
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .invalidImage: return 1
-    case .modelNotLoaded: return 2
-    case .unsupportedFormat: return 3
-    case .imageTooLarge: return 4
-    case .notInitialized: return 5
-    case .modelLoadFailed: return 6
-    case .processingFailed: return 7
-    case .cancelled: return 8
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RAVLMErrorCode] = [
-    .unspecified,
-    .invalidImage,
-    .modelNotLoaded,
-    .unsupportedFormat,
-    .imageTooLarge,
-    .notInitialized,
-    .modelLoadFailed,
-    .processingFailed,
-    .cancelled,
-  ]
-
-}
-
 public enum RAVLMStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
   public typealias RawValue = Int
   case unspecified // = 0
@@ -1003,10 +911,6 @@ extension RAVLMImageFormat: SwiftProtobuf._ProtoNameProviding {
 
 extension RAVLMModelFamily: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VLM_MODEL_FAMILY_UNSPECIFIED\0\u{1}VLM_MODEL_FAMILY_AUTO\0\u{1}VLM_MODEL_FAMILY_QWEN2_VL\0\u{1}VLM_MODEL_FAMILY_SMOLVLM\0\u{1}VLM_MODEL_FAMILY_LLAVA\0\u{2}_\u{1}VLM_MODEL_FAMILY_CUSTOM\0")
-}
-
-extension RAVLMErrorCode: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0VLM_ERROR_CODE_UNSPECIFIED\0\u{1}VLM_ERROR_CODE_INVALID_IMAGE\0\u{1}VLM_ERROR_CODE_MODEL_NOT_LOADED\0\u{1}VLM_ERROR_CODE_UNSUPPORTED_FORMAT\0\u{1}VLM_ERROR_CODE_IMAGE_TOO_LARGE\0\u{1}VLM_ERROR_CODE_NOT_INITIALIZED\0\u{1}VLM_ERROR_CODE_MODEL_LOAD_FAILED\0\u{1}VLM_ERROR_CODE_PROCESSING_FAILED\0\u{1}VLM_ERROR_CODE_CANCELLED\0")
 }
 
 extension RAVLMStreamEventKind: SwiftProtobuf._ProtoNameProviding {

@@ -41,7 +41,8 @@ if command -v wire-compiler >/dev/null 2>&1; then
         vad_options.proto vlm_options.proto \
         hardware_profile.proto \
         lifecycle_service.proto \
-        thinking_tag_pattern.proto
+        thinking_tag_pattern.proto \
+        router.proto
 
     # v2 close-out: Wire 4.x emits gRPC service interfaces (`<Service>Client.kt`)
     # AND their Grpc client implementations (`Grpc<Service>Client.kt`). Both

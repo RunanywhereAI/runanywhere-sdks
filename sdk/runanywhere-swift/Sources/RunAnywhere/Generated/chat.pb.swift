@@ -307,14 +307,6 @@ public struct RAChatMessage: @unchecked Sendable {
   /// Clears the value of `name`. Subsequent reads from it will return its default value.
   public mutating func clearName() {_uniqueStorage()._name = nil}
 
-  /// Optional tool calls embedded in this assistant message. Each entry is
-  /// a JSON-encoded ToolCall (see tool_calling.proto) — kept as a string
-  /// here to avoid a circular import; consumers parse on demand.
-  public var toolCallsJson: [String] {
-    get {_storage._toolCallsJson}
-    set {_uniqueStorage()._toolCallsJson = newValue}
-  }
-
   /// Optional tool-call ID this message is responding to (only set when
   /// role == MESSAGE_ROLE_TOOL).
   public var toolCallID: String {
@@ -326,9 +318,7 @@ public struct RAChatMessage: @unchecked Sendable {
   /// Clears the value of `toolCallID`. Subsequent reads from it will return its default value.
   public mutating func clearToolCallID() {_uniqueStorage()._toolCallID = nil}
 
-  /// Typed tool calls embedded in this assistant message. Supersedes
-  /// tool_calls_json for generated-proto callers while keeping the legacy
-  /// JSON string list available.
+  /// Typed tool calls embedded in this assistant message.
   public var toolCalls: [RAToolCall] {
     get {_storage._toolCalls}
     set {_uniqueStorage()._toolCalls = newValue}
@@ -714,7 +704,7 @@ extension RAChatAttachment: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
 
 extension RAChatMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".ChatMessage"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}role\0\u{1}content\0\u{3}timestamp_us\0\u{1}name\0\u{3}tool_calls_json\0\u{3}tool_call_id\0\u{3}tool_calls\0\u{3}tool_result\0\u{3}parent_id\0\u{1}status\0\u{3}error_message\0\u{1}metadata\0\u{1}attachments\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}role\0\u{1}content\0\u{3}timestamp_us\0\u{1}name\0\u{4}\u{2}tool_call_id\0\u{3}tool_calls\0\u{3}tool_result\0\u{3}parent_id\0\u{1}status\0\u{3}error_message\0\u{1}metadata\0\u{1}attachments\0\u{b}tool_calls_json\0\u{c}\u{6}\u{1}")
 
   fileprivate class _StorageClass {
     var _id: String = String()
@@ -722,7 +712,6 @@ extension RAChatMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     var _content: String = String()
     var _timestampUs: Int64 = 0
     var _name: String? = nil
-    var _toolCallsJson: [String] = []
     var _toolCallID: String? = nil
     var _toolCalls: [RAToolCall] = []
     var _toolResult: RAToolResult? = nil
@@ -746,7 +735,6 @@ extension RAChatMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
       _content = source._content
       _timestampUs = source._timestampUs
       _name = source._name
-      _toolCallsJson = source._toolCallsJson
       _toolCallID = source._toolCallID
       _toolCalls = source._toolCalls
       _toolResult = source._toolResult
@@ -778,7 +766,6 @@ extension RAChatMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
         case 3: try { try decoder.decodeSingularStringField(value: &_storage._content) }()
         case 4: try { try decoder.decodeSingularInt64Field(value: &_storage._timestampUs) }()
         case 5: try { try decoder.decodeSingularStringField(value: &_storage._name) }()
-        case 6: try { try decoder.decodeRepeatedStringField(value: &_storage._toolCallsJson) }()
         case 7: try { try decoder.decodeSingularStringField(value: &_storage._toolCallID) }()
         case 8: try { try decoder.decodeRepeatedMessageField(value: &_storage._toolCalls) }()
         case 9: try { try decoder.decodeSingularMessageField(value: &_storage._toolResult) }()
@@ -814,9 +801,6 @@ extension RAChatMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
       try { if let v = _storage._name {
         try visitor.visitSingularStringField(value: v, fieldNumber: 5)
       } }()
-      if !_storage._toolCallsJson.isEmpty {
-        try visitor.visitRepeatedStringField(value: _storage._toolCallsJson, fieldNumber: 6)
-      }
       try { if let v = _storage._toolCallID {
         try visitor.visitSingularStringField(value: v, fieldNumber: 7)
       } }()
@@ -855,7 +839,6 @@ extension RAChatMessage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
         if _storage._content != rhs_storage._content {return false}
         if _storage._timestampUs != rhs_storage._timestampUs {return false}
         if _storage._name != rhs_storage._name {return false}
-        if _storage._toolCallsJson != rhs_storage._toolCallsJson {return false}
         if _storage._toolCallID != rhs_storage._toolCallID {return false}
         if _storage._toolCalls != rhs_storage._toolCalls {return false}
         if _storage._toolResult != rhs_storage._toolResult {return false}
