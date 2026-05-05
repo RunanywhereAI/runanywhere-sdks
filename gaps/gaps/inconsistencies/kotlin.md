@@ -21,11 +21,10 @@ directory, `AudioUtils`, `CppBridgeEnvironment`, `CommonsErrorMapping`, and
 `PlatformLogger` are all deleted. KOT-09 (structured output), KOT-10
 (ModelFormat URL heuristics), KOT-12 (router frameworks-for-capability),
 and KOT-STREAM-VAD are all wired to native commons APIs. What remains is
-(a) ~1,000 LOC of audio-capture + utility cruft still on disk as expect/
-actuals with zero callers, (b) KOT-05 legacy VLM trio (still calls
-`racVlmCreate`/`racVlmInitialize`/`racVlmDestroy` instead of a proto-backed
-`load`), (c) KOT-14 `currentDiffusionFramework` returning a `null` stub,
-and (d) KOT-HARDWARE-FALLBACK invoking `getprop ro.board.platform` via
+(a) KOT-05 legacy VLM trio (still calls `racVlmCreate`/`racVlmInitialize`/
+`racVlmDestroy` instead of a proto-backed `load`), (b) KOT-14
+`currentDiffusionFramework` returning a `null` stub, and (c)
+KOT-HARDWARE-FALLBACK invoking `getprop ro.board.platform` via
 `Runtime.exec` when `racHardwareProfileGet` is unavailable.
 
 ## Confirmed gaps
@@ -66,23 +65,6 @@ and (d) KOT-HARDWARE-FALLBACK invoking `getprop ro.board.platform` via
 - **Concrete steps**: Ensure `racHardwareProfileGet()` always returns a populated proto on Android;
   delete the `buildPlatformProfile()` fallback.
 - **Scope**: ~40 LOC Kotlin deletion.
-
-### KOT-DEAD-AUDIOCAPTURE: `AudioCaptureManager` + actuals + `PlatformTime` unused (priority: LOW)
-- **Symptom**: `AudioCaptureManager` interface + `AudioChunk` + `AudioCaptureError` +
-  `createAudioCaptureManager()` in `commonMain/.../features/stt/services/AudioCaptureManager.kt`
-  (131 LOC) + two platform actuals (`AndroidAudioCaptureManager.kt` 211 LOC,
-  `JvmAudioCaptureManager.kt` 177 LOC). Zero in-SDK callers; the example Android app uses its own
-  `AudioCaptureService.kt` with native `AudioRecord`. `commonMain/.../foundation/PlatformTime.kt` +
-  android/jvm actuals (`currentTimeMillis` / `currentTimeISO8601` expect fns) are only used by the
-  dead audio-capture code.
-- **Files to delete** (6):
-  - `sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/features/stt/services/AudioCaptureManager.kt`
-  - `sdk/runanywhere-kotlin/src/androidMain/kotlin/com/runanywhere/sdk/features/stt/AndroidAudioCaptureManager.kt`
-  - `sdk/runanywhere-kotlin/src/jvmMain/kotlin/com/runanywhere/sdk/features/stt/JvmAudioCaptureManager.kt`
-  - `sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/foundation/PlatformTime.kt`
-  - `sdk/runanywhere-kotlin/src/androidMain/kotlin/com/runanywhere/sdk/foundation/PlatformTime.kt`
-  - `sdk/runanywhere-kotlin/src/jvmMain/kotlin/com/runanywhere/sdk/foundation/PlatformTime.kt`
-- **Scope**: 6 files / ~550 LOC.
 
 ### KOT-DEAD-SDKCONSTANTS: dead subobjects on `SDKConstants` (priority: LOW)
 - **Symptom**: `commonMain/.../utils/SDKConstants.kt`.
