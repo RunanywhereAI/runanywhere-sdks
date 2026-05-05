@@ -27,7 +27,6 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../../theme/colors';
 import { Typography, FontWeight } from '../../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../../theme/spacing';
-import type { DeviceInfo } from '../../types/model';
 import {
   DEFAULT_INFERENCE_FRAMEWORK,
   getFrameworkColor,
@@ -49,9 +48,10 @@ import {
   ModelCategory,
   RunAnywhere,
   type ModelInfo as SDKModelInfo,
-  requireDeviceInfoModule,
+  Hardware,
 } from '@runanywhere/core';
 import { ModelFormat } from '@runanywhere/proto-ts/model_types';
+import type { HardwareProfile } from '@runanywhere/proto-ts/hardware_profile';
 
 // Canonical SDK methods (Swift / Kotlin / Flutter / Web parity).
 const downloadModelHelper = RunAnywhere.downloadModel;
@@ -233,7 +233,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
   const [downloadingModels, setDownloadingModels] = useState<
     Record<string, number>
   >({});
-  const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
+  const [deviceInfo, setDeviceInfo] = useState<HardwareProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   /**
@@ -325,53 +325,16 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
 
       setAvailableModels(filteredModels);
 
-      // Load real device info from native module
+      // Load canonical hardware profile via the SDK (proto-backed).
       try {
-        const deviceInfoModule = requireDeviceInfoModule();
-        const [
-          modelName,
-          chipName,
-          totalMemory,
-          availableMemory,
-          hasNeuralEngine,
-          osVersion,
-          hasGPU,
-          cpuCores,
-        ] = await Promise.all([
-          deviceInfoModule.getDeviceModel(),
-          deviceInfoModule.getChipName(),
-          deviceInfoModule.getTotalRAM(),
-          deviceInfoModule.getAvailableRAM(),
-          deviceInfoModule.hasNPU(),
-          deviceInfoModule.getOSVersion(),
-          deviceInfoModule.hasGPU(),
-          deviceInfoModule.getCPUCores(),
-        ]);
-
-        setDeviceInfo({
-          modelName,
-          chipName: chipName || 'Unknown',
-          totalMemory,
-          availableMemory,
-          hasNeuralEngine,
-          osVersion,
-          hasGPU,
-          cpuCores,
-        });
+        const result = await Hardware.getProfile();
+        setDeviceInfo(result.profile ?? null);
       } catch (error) {
         console.warn(
-          '[ModelSelectionSheet] Failed to load device info:',
+          '[ModelSelectionSheet] Failed to load hardware profile:',
           error
         );
-        // Fallback to basic info
-        setDeviceInfo({
-          modelName: 'Unknown Device',
-          chipName: 'Unknown',
-          totalMemory: 0,
-          availableMemory: 0,
-          hasNeuralEngine: false,
-          osVersion: 'Unknown',
-        });
+        setDeviceInfo(null);
       }
     } catch (error) {
       console.error('[ModelSelectionSheet] Error loading data:', error);
@@ -550,25 +513,13 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           <View style={styles.infoRow}>
             <View style={styles.infoLabel}>
               <Icon
-                name="phone-portrait-outline"
-                size={18}
-                color={Colors.textSecondary}
-              />
-              <Text style={styles.infoLabelText}>Model</Text>
-            </View>
-            <Text style={styles.infoValue}>{deviceInfo.modelName}</Text>
-          </View>
-
-          <View style={styles.infoRow}>
-            <View style={styles.infoLabel}>
-              <Icon
                 name="hardware-chip-outline"
                 size={18}
                 color={Colors.textSecondary}
               />
               <Text style={styles.infoLabelText}>Chip</Text>
             </View>
-            <Text style={styles.infoValue}>{deviceInfo.chipName}</Text>
+            <Text style={styles.infoValue}>{deviceInfo.chip || 'Unknown'}</Text>
           </View>
 
           <View style={styles.infoRow}>
@@ -581,11 +532,11 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
               <Text style={styles.infoLabelText}>Memory</Text>
             </View>
             <Text style={styles.infoValue}>
-              {formatBytes(deviceInfo.totalMemory)}
+              {formatBytes(deviceInfo.totalMemoryBytes)}
             </Text>
           </View>
 
-          {deviceInfo.cpuCores != null && deviceInfo.cpuCores > 0 && (
+          {deviceInfo.coreCount > 0 && (
             <View style={styles.infoRow}>
               <View style={styles.infoLabel}>
                 <Icon
@@ -595,25 +546,25 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
                 />
                 <Text style={styles.infoLabelText}>CPU Cores</Text>
               </View>
-              <Text style={styles.infoValue}>{deviceInfo.cpuCores}</Text>
+              <Text style={styles.infoValue}>{deviceInfo.coreCount}</Text>
             </View>
           )}
 
-          <View style={styles.infoRow}>
-            <View style={styles.infoLabel}>
-              <Icon
-                name="cube-outline"
-                size={18}
-                color={Colors.textSecondary}
-              />
-              <Text style={styles.infoLabelText}>GPU</Text>
+          {deviceInfo.accelerationMode !== '' && (
+            <View style={styles.infoRow}>
+              <View style={styles.infoLabel}>
+                <Icon
+                  name="flash-outline"
+                  size={18}
+                  color={Colors.textSecondary}
+                />
+                <Text style={styles.infoLabelText}>Acceleration</Text>
+              </View>
+              <Text style={styles.infoValue}>
+                {deviceInfo.accelerationMode.toUpperCase()}
+              </Text>
             </View>
-            <Icon
-              name={deviceInfo.hasGPU ? 'checkmark-circle' : 'close-circle'}
-              size={20}
-              color={deviceInfo.hasGPU ? Colors.statusGreen : Colors.statusRed}
-            />
-          </View>
+          )}
 
           <View style={styles.infoRow}>
             <View style={styles.infoLabel}>

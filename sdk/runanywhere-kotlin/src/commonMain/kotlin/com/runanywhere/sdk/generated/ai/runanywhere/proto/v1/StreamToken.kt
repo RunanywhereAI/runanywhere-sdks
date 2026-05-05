@@ -28,6 +28,13 @@ import okio.ByteString
 
 /**
  * ---------------------------------------------------------------------------
+ * ThinkingTagPattern moved to thinking_tag_pattern.proto (Wave H-2 / IDL-02).
+ * The canonical message with `open_tag`/`close_tag` fields is shared between
+ * llm_options.proto (per-call extraction) and model_types.proto (catalog
+ * metadata). Messages in this file reference it via the existing
+ * `import "thinking_tag_pattern.proto";` near the top.
+ * ---------------------------------------------------------------------------
+ * ---------------------------------------------------------------------------
  * Single streamed token (Swift StreamToken in LLMTypes.swift:563). Emitted
  * once per token in streaming mode.
  * ---------------------------------------------------------------------------

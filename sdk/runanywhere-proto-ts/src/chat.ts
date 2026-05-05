@@ -246,23 +246,13 @@ export interface ChatMessage {
     | string
     | undefined;
   /**
-   * Optional tool calls embedded in this assistant message. Each entry is
-   * a JSON-encoded ToolCall (see tool_calling.proto) — kept as a string
-   * here to avoid a circular import; consumers parse on demand.
-   */
-  toolCallsJson: string[];
-  /**
    * Optional tool-call ID this message is responding to (only set when
    * role == MESSAGE_ROLE_TOOL).
    */
   toolCallId?:
     | string
     | undefined;
-  /**
-   * Typed tool calls embedded in this assistant message. Supersedes
-   * tool_calls_json for generated-proto callers while keeping the legacy
-   * JSON string list available.
-   */
+  /** Typed tool calls embedded in this assistant message. */
   toolCalls: ToolCall[];
   /** Typed tool result carried by role == MESSAGE_ROLE_TOOL messages. */
   toolResult?:
@@ -610,7 +600,6 @@ function createBaseChatMessage(): ChatMessage {
     content: "",
     timestampUs: 0,
     name: undefined,
-    toolCallsJson: [],
     toolCallId: undefined,
     toolCalls: [],
     toolResult: undefined,
@@ -638,9 +627,6 @@ export const ChatMessage = {
     }
     if (message.name !== undefined) {
       writer.uint32(42).string(message.name);
-    }
-    for (const v of message.toolCallsJson) {
-      writer.uint32(50).string(v!);
     }
     if (message.toolCallId !== undefined) {
       writer.uint32(58).string(message.toolCallId);
@@ -710,13 +696,6 @@ export const ChatMessage = {
           }
 
           message.name = reader.string();
-          continue;
-        case 6:
-          if (tag !== 50) {
-            break;
-          }
-
-          message.toolCallsJson.push(reader.string());
           continue;
         case 7:
           if (tag !== 58) {
@@ -793,9 +772,6 @@ export const ChatMessage = {
       content: isSet(object.content) ? globalThis.String(object.content) : "",
       timestampUs: isSet(object.timestampUs) ? globalThis.Number(object.timestampUs) : 0,
       name: isSet(object.name) ? globalThis.String(object.name) : undefined,
-      toolCallsJson: globalThis.Array.isArray(object?.toolCallsJson)
-        ? object.toolCallsJson.map((e: any) => globalThis.String(e))
-        : [],
       toolCallId: isSet(object.toolCallId) ? globalThis.String(object.toolCallId) : undefined,
       toolCalls: globalThis.Array.isArray(object?.toolCalls)
         ? object.toolCalls.map((e: any) => ToolCall.fromJSON(e))
@@ -832,9 +808,6 @@ export const ChatMessage = {
     }
     if (message.name !== undefined) {
       obj.name = message.name;
-    }
-    if (message.toolCallsJson?.length) {
-      obj.toolCallsJson = message.toolCallsJson;
     }
     if (message.toolCallId !== undefined) {
       obj.toolCallId = message.toolCallId;
@@ -879,7 +852,6 @@ export const ChatMessage = {
     message.content = object.content ?? "";
     message.timestampUs = object.timestampUs ?? 0;
     message.name = object.name ?? undefined;
-    message.toolCallsJson = object.toolCallsJson?.map((e) => e) || [];
     message.toolCallId = object.toolCallId ?? undefined;
     message.toolCalls = object.toolCalls?.map((e) => ToolCall.fromPartial(e)) || [];
     message.toolResult = (object.toolResult !== undefined && object.toolResult !== null)

@@ -136,31 +136,6 @@ class AudioEncoding extends $pb.ProtobufEnum {
   const AudioEncoding._($core.int v, $core.String n) : super(v, n);
 }
 
-class VADEventType extends $pb.ProtobufEnum {
-  static const VADEventType VAD_EVENT_UNSPECIFIED = VADEventType._(0, _omitEnumNames ? '' : 'VAD_EVENT_UNSPECIFIED');
-  static const VADEventType VAD_EVENT_VOICE_START = VADEventType._(1, _omitEnumNames ? '' : 'VAD_EVENT_VOICE_START');
-  static const VADEventType VAD_EVENT_VOICE_END_OF_UTTERANCE = VADEventType._(2, _omitEnumNames ? '' : 'VAD_EVENT_VOICE_END_OF_UTTERANCE');
-  static const VADEventType VAD_EVENT_BARGE_IN = VADEventType._(3, _omitEnumNames ? '' : 'VAD_EVENT_BARGE_IN');
-  static const VADEventType VAD_EVENT_SILENCE = VADEventType._(4, _omitEnumNames ? '' : 'VAD_EVENT_SILENCE');
-  static const VADEventType VAD_EVENT_STATISTICS = VADEventType._(5, _omitEnumNames ? '' : 'VAD_EVENT_STATISTICS');
-  static const VADEventType VAD_EVENT_STATE_CHANGED = VADEventType._(6, _omitEnumNames ? '' : 'VAD_EVENT_STATE_CHANGED');
-
-  static const $core.List<VADEventType> values = <VADEventType> [
-    VAD_EVENT_UNSPECIFIED,
-    VAD_EVENT_VOICE_START,
-    VAD_EVENT_VOICE_END_OF_UTTERANCE,
-    VAD_EVENT_BARGE_IN,
-    VAD_EVENT_SILENCE,
-    VAD_EVENT_STATISTICS,
-    VAD_EVENT_STATE_CHANGED,
-  ];
-
-  static final $core.Map<$core.int, VADEventType> _byValue = $pb.ProtobufEnum.initByValue(values);
-  static VADEventType? valueOf($core.int value) => _byValue[value];
-
-  const VADEventType._($core.int v, $core.String n) : super(v, n);
-}
-
 class InterruptReason extends $pb.ProtobufEnum {
   static const InterruptReason INTERRUPT_REASON_UNSPECIFIED = InterruptReason._(0, _omitEnumNames ? '' : 'INTERRUPT_REASON_UNSPECIFIED');
   static const InterruptReason INTERRUPT_REASON_USER_BARGE_IN = InterruptReason._(1, _omitEnumNames ? '' : 'INTERRUPT_REASON_USER_BARGE_IN');
@@ -239,27 +214,6 @@ class ComponentLoadState extends $pb.ProtobufEnum {
   static ComponentLoadState? valueOf($core.int value) => _byValue[value];
 
   const ComponentLoadState._($core.int v, $core.String n) : super(v, n);
-}
-
-class VoiceSessionErrorCode extends $pb.ProtobufEnum {
-  static const VoiceSessionErrorCode VOICE_SESSION_ERROR_CODE_UNSPECIFIED = VoiceSessionErrorCode._(0, _omitEnumNames ? '' : 'VOICE_SESSION_ERROR_CODE_UNSPECIFIED');
-  static const VoiceSessionErrorCode VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED = VoiceSessionErrorCode._(1, _omitEnumNames ? '' : 'VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED');
-  static const VoiceSessionErrorCode VOICE_SESSION_ERROR_CODE_NOT_READY = VoiceSessionErrorCode._(2, _omitEnumNames ? '' : 'VOICE_SESSION_ERROR_CODE_NOT_READY');
-  static const VoiceSessionErrorCode VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING = VoiceSessionErrorCode._(3, _omitEnumNames ? '' : 'VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING');
-  static const VoiceSessionErrorCode VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE = VoiceSessionErrorCode._(4, _omitEnumNames ? '' : 'VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE');
-
-  static const $core.List<VoiceSessionErrorCode> values = <VoiceSessionErrorCode> [
-    VOICE_SESSION_ERROR_CODE_UNSPECIFIED,
-    VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED,
-    VOICE_SESSION_ERROR_CODE_NOT_READY,
-    VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING,
-    VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE,
-  ];
-
-  static final $core.Map<$core.int, VoiceSessionErrorCode> _byValue = $pb.ProtobufEnum.initByValue(values);
-  static VoiceSessionErrorCode? valueOf($core.int value) => _byValue[value];
-
-  const VoiceSessionErrorCode._($core.int v, $core.String n) : super(v, n);
 }
 
 class SpeechTurnDetectionEventKind extends $pb.ProtobufEnum {

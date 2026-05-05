@@ -203,19 +203,19 @@ public extension RAVoiceSessionConfig {
 // MARK: - Voice Session Errors
 
 public typealias VoiceSessionError = RAVoiceSessionError
-public typealias VoiceSessionErrorCode = RAVoiceSessionErrorCode
 
 extension RAVoiceSessionError: LocalizedError {
     public var errorDescription: String? {
         if !message.isEmpty { return message }
+        // IDL-08: VoiceSessionError.code is now the canonical RAErrorCode.
         switch code {
         case .microphonePermissionDenied:
             return "Microphone permission denied"
-        case .notReady:
+        case .componentNotReady:
             return "Voice agent not ready. Load VAD, STT, LLM, and TTS models first."
-        case .alreadyRunning:
+        case .serviceBusy:
             return "Voice session already running"
-        case .componentFailure:
+        case .processingFailed:
             return failedComponent.isEmpty
                 ? "Voice agent component failed"
                 : "Voice agent component failed: \(failedComponent)"

@@ -89,11 +89,11 @@ public class ModelCompatibilityRequest(
    */
   @field:WireField(
     tag = 5,
-    adapter = "ai.runanywhere.proto.v1.AcceleratorPreference#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.AccelerationPreference#ADAPTER",
     jsonName = "acceleratorPreference",
     schemaIndex = 4,
   )
-  public val accelerator_preference: AcceleratorPreference? = null,
+  public val accelerator_preference: AccelerationPreference? = null,
   @field:WireField(
     tag = 6,
     adapter = "ai.runanywhere.proto.v1.InferenceFramework#ADAPTER",
@@ -156,7 +156,7 @@ public class ModelCompatibilityRequest(
     hardware_profile: HardwareProfile? = this.hardware_profile,
     available_ram_bytes: Long = this.available_ram_bytes,
     available_storage_bytes: Long = this.available_storage_bytes,
-    accelerator_preference: AcceleratorPreference? = this.accelerator_preference,
+    accelerator_preference: AccelerationPreference? = this.accelerator_preference,
     preferred_framework: InferenceFramework? = this.preferred_framework,
     unknownFields: ByteString = this.unknownFields,
   ): ModelCompatibilityRequest = ModelCompatibilityRequest(model_id, hardware_profile,
@@ -182,7 +182,7 @@ public class ModelCompatibilityRequest(
             value.available_ram_bytes)
         if (value.available_storage_bytes != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(4,
             value.available_storage_bytes)
-        size += AcceleratorPreference.ADAPTER.encodedSizeWithTag(5, value.accelerator_preference)
+        size += AccelerationPreference.ADAPTER.encodedSizeWithTag(5, value.accelerator_preference)
         size += InferenceFramework.ADAPTER.encodedSizeWithTag(6, value.preferred_framework)
         return size
       }
@@ -194,7 +194,7 @@ public class ModelCompatibilityRequest(
             value.available_ram_bytes)
         if (value.available_storage_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 4,
             value.available_storage_bytes)
-        AcceleratorPreference.ADAPTER.encodeWithTag(writer, 5, value.accelerator_preference)
+        AccelerationPreference.ADAPTER.encodeWithTag(writer, 5, value.accelerator_preference)
         InferenceFramework.ADAPTER.encodeWithTag(writer, 6, value.preferred_framework)
         writer.writeBytes(value.unknownFields)
       }
@@ -202,7 +202,7 @@ public class ModelCompatibilityRequest(
       override fun encode(writer: ReverseProtoWriter, `value`: ModelCompatibilityRequest) {
         writer.writeBytes(value.unknownFields)
         InferenceFramework.ADAPTER.encodeWithTag(writer, 6, value.preferred_framework)
-        AcceleratorPreference.ADAPTER.encodeWithTag(writer, 5, value.accelerator_preference)
+        AccelerationPreference.ADAPTER.encodeWithTag(writer, 5, value.accelerator_preference)
         if (value.available_storage_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 4,
             value.available_storage_bytes)
         if (value.available_ram_bytes != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 3,
@@ -216,7 +216,7 @@ public class ModelCompatibilityRequest(
         var hardware_profile: HardwareProfile? = null
         var available_ram_bytes: Long = 0L
         var available_storage_bytes: Long = 0L
-        var accelerator_preference: AcceleratorPreference? = null
+        var accelerator_preference: AccelerationPreference? = null
         var preferred_framework: InferenceFramework? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
@@ -225,7 +225,7 @@ public class ModelCompatibilityRequest(
             3 -> available_ram_bytes = ProtoAdapter.INT64.decode(reader)
             4 -> available_storage_bytes = ProtoAdapter.INT64.decode(reader)
             5 -> try {
-              accelerator_preference = AcceleratorPreference.ADAPTER.decode(reader)
+              accelerator_preference = AccelerationPreference.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }

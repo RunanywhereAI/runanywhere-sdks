@@ -21,6 +21,7 @@ import com.runanywhere.sdk.foundation.logging.SentryDestination
 import com.runanywhere.sdk.foundation.logging.SentryManager
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.SDKEnvironment
+import com.runanywhere.sdk.public.cEnvironment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -42,24 +43,8 @@ object CppBridge {
     private const val TAG = "CppBridge"
     private val logger = SDKLogger(TAG)
 
-    /**
-     * SDK environment configuration.
-     */
-    enum class Environment {
-        DEVELOPMENT,
-        STAGING,
-        PRODUCTION,
-        ;
-
-        /**
-         * Get the C++ compatible environment value.
-         */
-        val cValue: Int
-            get() = ordinal
-    }
-
     @Volatile
-    private var _environment: Environment = Environment.DEVELOPMENT
+    private var _environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
 
     @Volatile
     private var _isInitialized: Boolean = false
@@ -81,7 +66,7 @@ object CppBridge {
     /**
      * Current SDK environment.
      */
-    val environment: Environment
+    val environment: SDKEnvironment
         get() = _environment
 
     /**
@@ -130,7 +115,7 @@ object CppBridge {
      * @param baseURL Backend API base URL (required for production/staging)
      */
     fun initialize(
-        environment: Environment = Environment.DEVELOPMENT,
+        environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
         apiKey: String? = null,
         baseURL: String? = null,
     ) {
@@ -170,7 +155,7 @@ object CppBridge {
             setupSentryHooks(environment)
 
             // Initialize Sentry if enabled for this environment (staging/production)
-            if (environment != Environment.DEVELOPMENT) {
+            if (environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
                 setupSentryLogging(environment)
             }
 
@@ -179,13 +164,13 @@ object CppBridge {
 
             // CRITICAL: Set environment early so CppBridgeDevice.isDeviceRegisteredCallback()
             // can determine correct behavior for production/staging modes
-            CppBridgeTelemetry.setEnvironment(environment.cValue)
+            CppBridgeTelemetry.setEnvironment(environment.cEnvironment)
 
             // Configure telemetry base URL and API key ONLY for production/staging mode
             // In development mode, we use Supabase URL from C++ dev config
             // NOTE: Authentication is deferred to Phase 2 (initializeServices) to avoid blocking
             // This matches Swift SDK where authentication is done in completeServicesInitialization()
-            if (environment != Environment.DEVELOPMENT) {
+            if (environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
                 if (!baseURL.isNullOrEmpty()) {
                     CppBridgeTelemetry.setBaseUrl(baseURL)
                     logger.debug("Telemetry base URL configured")
@@ -234,7 +219,7 @@ object CppBridge {
             // Emit SDK init completed event with duration
             val initDurationMs = System.currentTimeMillis() - initStartTime
             CppBridgeEvents.emitSDKInitCompleted(initDurationMs.toDouble())
-            logger.info("✅ Phase 1 complete in ${initDurationMs}ms (${environment.name})")
+            logger.info("✅ Phase 1 complete in ${initDurationMs}ms ($environment)")
         }
     }
 
@@ -245,7 +230,7 @@ object CppBridge {
      * Note: If device ID is unavailable (secure storage failure), telemetry is skipped
      * to avoid creating orphaned/duplicate device records. The app continues to function.
      */
-    private fun initializeTelemetryManager(environment: Environment) {
+    private fun initializeTelemetryManager(environment: SDKEnvironment) {
         try {
             // Get device ID (persistent UUID) - this may initialize it if not already done
             val deviceId = CppBridgeDevice.getDeviceIdCallback()
@@ -271,7 +256,7 @@ object CppBridge {
 
             // Initialize telemetry manager with C++ via JNI
             CppBridgeTelemetry.initialize(
-                environment = environment.cValue,
+                environment = environment.cEnvironment,
                 deviceId = deviceId,
                 deviceModel = deviceModel,
                 osVersion = osVersion,
@@ -296,13 +281,13 @@ object CppBridge {
      * @param apiKey API key for authentication (required for production/staging)
      * @param baseURL Backend API base URL (required for production/staging)
      */
-    private fun initializeSdkConfig(environment: Environment, apiKey: String?, baseURL: String?) {
+    private fun initializeSdkConfig(environment: SDKEnvironment, apiKey: String?, baseURL: String?) {
         try {
             val deviceId = CppBridgeDevice.getDeviceIdCallback()
             val platform = "android"
             val sdkVersion = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION
 
-            logger.info("Initializing SDK config: version=$sdkVersion, platform=$platform, env=${environment.name}")
+            logger.info("Initializing SDK config: version=$sdkVersion, platform=$platform, env=$environment")
             if (!apiKey.isNullOrEmpty()) {
                 logger.info("API key provided: ${apiKey.take(10)}...")
             }
@@ -312,7 +297,7 @@ object CppBridge {
 
             val result =
                 RunAnywhereBridge.racSdkInit(
-                    environment = environment.cValue,
+                    environment = environment.cEnvironment,
                     deviceId = deviceId.ifEmpty { null },
                     platform = platform,
                     sdkVersion = sdkVersion,
@@ -452,7 +437,7 @@ object CppBridge {
             // Step 1: Authenticate with backend for production/staging mode
             // This is done in Phase 2 (not Phase 1) to avoid blocking main thread
             // Mirrors Swift SDK's CppBridge.Auth.authenticate() in completeServicesInitialization()
-            if (_environment != Environment.DEVELOPMENT) {
+            if (_environment != SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
                 val baseUrl = CppBridgeTelemetry.getBaseUrl()
                 val apiKey = CppBridgeTelemetry.getApiKey()
 
@@ -510,7 +495,7 @@ object CppBridge {
                 // Get build token for development mode (mirrors Swift SDK)
                 // Swift: let buildTokenString = environment == .development ? CppBridge.DevConfig.buildToken : nil
                 val buildToken =
-                    if (_environment == Environment.DEVELOPMENT) {
+                    if (_environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
                         try {
                             val token = RunAnywhereBridge.racDevConfigGetBuildToken()
                             if (!token.isNullOrEmpty()) {
@@ -530,7 +515,7 @@ object CppBridge {
 
                 val success =
                     CppBridgeDevice.triggerRegistration(
-                        environment = _environment.cValue,
+                        environment = _environment.cEnvironment,
                         buildToken = buildToken,
                     )
                 if (success) {
@@ -627,7 +612,7 @@ object CppBridge {
      *
      * This allows runtime enabling/disabling of Sentry logging via Logging.setSentryLoggingEnabled()
      */
-    private fun setupSentryHooks(environment: Environment) {
+    private fun setupSentryHooks(environment: SDKEnvironment) {
         Logging.sentrySetupHook = {
             setupSentryLogging(environment)
         }
@@ -644,17 +629,10 @@ object CppBridge {
      *
      * @param environment SDK environment for tagging Sentry events
      */
-    private fun setupSentryLogging(environment: Environment) {
-        val sdkEnvironment =
-            when (environment) {
-                Environment.DEVELOPMENT -> SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
-                Environment.STAGING -> SDKEnvironment.SDK_ENVIRONMENT_STAGING
-                Environment.PRODUCTION -> SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
-            }
-
+    private fun setupSentryLogging(environment: SDKEnvironment) {
         try {
             // Initialize Sentry manager
-            SentryManager.initialize(environment = sdkEnvironment)
+            SentryManager.initialize(environment = environment)
 
             if (SentryManager.isInitialized) {
                 // Add Sentry destination to logging system

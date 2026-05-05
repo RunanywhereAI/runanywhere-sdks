@@ -2037,6 +2037,12 @@ class StructuredOutputApi {
   $async.Future<StructuredOutputResult> parse($pb.ClientContext? ctx, StructuredOutputParseRequest request) =>
     _client.invoke<StructuredOutputResult>(ctx, 'StructuredOutput', 'Parse', request, StructuredOutputResult())
   ;
+  $async.Future<StructuredOutputResult> generate($pb.ClientContext? ctx, StructuredOutputRequest request) =>
+    _client.invoke<StructuredOutputResult>(ctx, 'StructuredOutput', 'Generate', request, StructuredOutputResult())
+  ;
+  $async.Future<StructuredOutputStreamEvent> generateStream($pb.ClientContext? ctx, StructuredOutputRequest request) =>
+    _client.invoke<StructuredOutputStreamEvent>(ctx, 'StructuredOutput', 'GenerateStream', request, StructuredOutputStreamEvent())
+  ;
 }
 
 

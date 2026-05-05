@@ -1,6 +1,7 @@
 import _m0 from "protobufjs/minimal";
 import { InferenceFramework } from "./model_types";
 import { StructuredOutputOptions, StructuredOutputValidation } from "./structured_output";
+import { ThinkingTagPattern } from "./thinking_tag_pattern";
 import { ToolCall, ToolCallingOptions, ToolResult } from "./tool_calling";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum LLMGenerationState {
@@ -275,19 +276,6 @@ export interface GenerationHints {
 }
 /**
  * ---------------------------------------------------------------------------
- * Pattern used to extract a model's "thinking" / reasoning block from its
- * raw output (Swift ThinkingTagPattern in LLMTypes.swift:344). Used by
- * Qwen3 and LFM2 family models that emit <think>...</think> wrappers.
- * ---------------------------------------------------------------------------
- */
-export interface ThinkingTagPattern {
-    /** Opening tag string. Default if empty: "<think>". */
-    openingTag: string;
-    /** Closing tag string. Default if empty: "</think>". */
-    closingTag: string;
-}
-/**
- * ---------------------------------------------------------------------------
  * Single streamed token (Swift StreamToken in LLMTypes.swift:563). Emitted
  * once per token in streaming mode.
  * ---------------------------------------------------------------------------
@@ -374,14 +362,6 @@ export declare const GenerationHints: {
     toJSON(message: GenerationHints): unknown;
     create<I extends Exact<DeepPartial<GenerationHints>, I>>(base?: I): GenerationHints;
     fromPartial<I extends Exact<DeepPartial<GenerationHints>, I>>(object: I): GenerationHints;
-};
-export declare const ThinkingTagPattern: {
-    encode(message: ThinkingTagPattern, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ThinkingTagPattern;
-    fromJSON(object: any): ThinkingTagPattern;
-    toJSON(message: ThinkingTagPattern): unknown;
-    create<I extends Exact<DeepPartial<ThinkingTagPattern>, I>>(base?: I): ThinkingTagPattern;
-    fromPartial<I extends Exact<DeepPartial<ThinkingTagPattern>, I>>(object: I): ThinkingTagPattern;
 };
 export declare const StreamToken: {
     encode(message: StreamToken, writer?: _m0.Writer): _m0.Writer;

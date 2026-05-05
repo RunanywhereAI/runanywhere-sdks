@@ -53,5 +53,25 @@ class EdgePolicy extends $pb.ProtobufEnum {
   const EdgePolicy._($core.int v, $core.String n) : super(v, n);
 }
 
+/// ---------------------------------------------------------------------------
+/// Pipeline lifecycle status — shared by compile/start/stop results.
+/// ---------------------------------------------------------------------------
+class PipelineStatus extends $pb.ProtobufEnum {
+  static const PipelineStatus PIPELINE_STATUS_UNSPECIFIED = PipelineStatus._(0, _omitEnumNames ? '' : 'PIPELINE_STATUS_UNSPECIFIED');
+  static const PipelineStatus PIPELINE_STATUS_OK = PipelineStatus._(1, _omitEnumNames ? '' : 'PIPELINE_STATUS_OK');
+  static const PipelineStatus PIPELINE_STATUS_FAILED = PipelineStatus._(2, _omitEnumNames ? '' : 'PIPELINE_STATUS_FAILED');
+
+  static const $core.List<PipelineStatus> values = <PipelineStatus> [
+    PIPELINE_STATUS_UNSPECIFIED,
+    PIPELINE_STATUS_OK,
+    PIPELINE_STATUS_FAILED,
+  ];
+
+  static final $core.Map<$core.int, PipelineStatus> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static PipelineStatus? valueOf($core.int value) => _byValue[value];
+
+  const PipelineStatus._($core.int v, $core.String n) : super(v, n);
+}
+
 
 const _omitEnumNames = $core.bool.fromEnvironment('protobuf.omit_enum_names');

@@ -56,32 +56,6 @@ final $typed_data.Uint8List vLMModelFamilyDescriptor = $convert.base64Decode(
     'GFZMTV9NT0RFTF9GQU1JTFlfU01PTFZMTRADEhoKFlZMTV9NT0RFTF9GQU1JTFlfTExBVkEQBB'
     'IbChdWTE1fTU9ERUxfRkFNSUxZX0NVU1RPTRBj');
 
-@$core.Deprecated('Use vLMErrorCodeDescriptor instead')
-const VLMErrorCode$json = {
-  '1': 'VLMErrorCode',
-  '2': [
-    {'1': 'VLM_ERROR_CODE_UNSPECIFIED', '2': 0},
-    {'1': 'VLM_ERROR_CODE_INVALID_IMAGE', '2': 1},
-    {'1': 'VLM_ERROR_CODE_MODEL_NOT_LOADED', '2': 2},
-    {'1': 'VLM_ERROR_CODE_UNSUPPORTED_FORMAT', '2': 3},
-    {'1': 'VLM_ERROR_CODE_IMAGE_TOO_LARGE', '2': 4},
-    {'1': 'VLM_ERROR_CODE_NOT_INITIALIZED', '2': 5},
-    {'1': 'VLM_ERROR_CODE_MODEL_LOAD_FAILED', '2': 6},
-    {'1': 'VLM_ERROR_CODE_PROCESSING_FAILED', '2': 7},
-    {'1': 'VLM_ERROR_CODE_CANCELLED', '2': 8},
-  ],
-};
-
-/// Descriptor for `VLMErrorCode`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List vLMErrorCodeDescriptor = $convert.base64Decode(
-    'CgxWTE1FcnJvckNvZGUSHgoaVkxNX0VSUk9SX0NPREVfVU5TUEVDSUZJRUQQABIgChxWTE1fRV'
-    'JST1JfQ09ERV9JTlZBTElEX0lNQUdFEAESIwofVkxNX0VSUk9SX0NPREVfTU9ERUxfTk9UX0xP'
-    'QURFRBACEiUKIVZMTV9FUlJPUl9DT0RFX1VOU1VQUE9SVEVEX0ZPUk1BVBADEiIKHlZMTV9FUl'
-    'JPUl9DT0RFX0lNQUdFX1RPT19MQVJHRRAEEiIKHlZMTV9FUlJPUl9DT0RFX05PVF9JTklUSUFM'
-    'SVpFRBAFEiQKIFZMTV9FUlJPUl9DT0RFX01PREVMX0xPQURfRkFJTEVEEAYSJAogVkxNX0VSUk'
-    '9SX0NPREVfUFJPQ0VTU0lOR19GQUlMRUQQBxIcChhWTE1fRVJST1JfQ09ERV9DQU5DRUxMRUQQ'
-    'CA==');
-
 @$core.Deprecated('Use vLMStreamEventKindDescriptor instead')
 const VLMStreamEventKind$json = {
   '1': 'VLMStreamEventKind',

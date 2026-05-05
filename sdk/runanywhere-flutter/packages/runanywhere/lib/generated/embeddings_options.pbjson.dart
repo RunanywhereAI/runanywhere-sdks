@@ -234,6 +234,47 @@ final $typed_data.Uint8List embeddingsServiceStateDescriptor = $convert.base64De
     'NzYWdlGAUgASgJSAFSDGVycm9yTWVzc2FnZYgBARIdCgplcnJvcl9jb2RlGAYgASgFUgllcnJv'
     'ckNvZGVCEAoOX2N1cnJlbnRfbW9kZWxCEAoOX2Vycm9yX21lc3NhZ2U=');
 
+@$core.Deprecated('Use embeddingsCreateRequestDescriptor instead')
+const EmbeddingsCreateRequest$json = {
+  '1': 'EmbeddingsCreateRequest',
+  '2': [
+    {'1': 'model_id', '3': 1, '4': 1, '5': 9, '10': 'modelId'},
+    {'1': 'configuration', '3': 2, '4': 1, '5': 11, '6': '.runanywhere.v1.EmbeddingsConfiguration', '9': 0, '10': 'configuration', '17': true},
+    {'1': 'config_json', '3': 3, '4': 1, '5': 9, '9': 1, '10': 'configJson', '17': true},
+  ],
+  '8': [
+    {'1': '_configuration'},
+    {'1': '_config_json'},
+  ],
+};
+
+/// Descriptor for `EmbeddingsCreateRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List embeddingsCreateRequestDescriptor = $convert.base64Decode(
+    'ChdFbWJlZGRpbmdzQ3JlYXRlUmVxdWVzdBIZCghtb2RlbF9pZBgBIAEoCVIHbW9kZWxJZBJSCg'
+    '1jb25maWd1cmF0aW9uGAIgASgLMicucnVuYW55d2hlcmUudjEuRW1iZWRkaW5nc0NvbmZpZ3Vy'
+    'YXRpb25IAFINY29uZmlndXJhdGlvbogBARIkCgtjb25maWdfanNvbhgDIAEoCUgBUgpjb25maW'
+    'dKc29uiAEBQhAKDl9jb25maWd1cmF0aW9uQg4KDF9jb25maWdfanNvbg==');
+
+@$core.Deprecated('Use embeddingsCreateResultDescriptor instead')
+const EmbeddingsCreateResult$json = {
+  '1': 'EmbeddingsCreateResult',
+  '2': [
+    {'1': 'handle', '3': 1, '4': 1, '5': 4, '10': 'handle'},
+    {'1': 'model_id', '3': 2, '4': 1, '5': 9, '10': 'modelId'},
+    {'1': 'dimension', '3': 3, '4': 1, '5': 5, '10': 'dimension'},
+    {'1': 'max_tokens', '3': 4, '4': 1, '5': 5, '10': 'maxTokens'},
+    {'1': 'error_code', '3': 5, '4': 1, '5': 5, '10': 'errorCode'},
+    {'1': 'error_message', '3': 6, '4': 1, '5': 9, '10': 'errorMessage'},
+  ],
+};
+
+/// Descriptor for `EmbeddingsCreateResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List embeddingsCreateResultDescriptor = $convert.base64Decode(
+    'ChZFbWJlZGRpbmdzQ3JlYXRlUmVzdWx0EhYKBmhhbmRsZRgBIAEoBFIGaGFuZGxlEhkKCG1vZG'
+    'VsX2lkGAIgASgJUgdtb2RlbElkEhwKCWRpbWVuc2lvbhgDIAEoBVIJZGltZW5zaW9uEh0KCm1h'
+    'eF90b2tlbnMYBCABKAVSCW1heFRva2VucxIdCgplcnJvcl9jb2RlGAUgASgFUgllcnJvckNvZG'
+    'USIwoNZXJyb3JfbWVzc2FnZRgGIAEoCVIMZXJyb3JNZXNzYWdl');
+
 const $core.Map<$core.String, $core.dynamic> EmbeddingsServiceBase$json = {
   '1': 'Embeddings',
   '2': [

@@ -64,11 +64,12 @@ internal object CppBridgeModelFormat {
      */
     fun applyInferredArtifact(modelInfo: ModelInfo, url: String): ModelInfo {
         val result = artifactInferFromUrlProto(url, modelInfo.id)
+        val existingType = modelInfo.artifact_type ?: ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED
         if (result == null) {
             // Native ABI unavailable — preserve existing info, fall back to
             // a single-file artifact when nothing is set so the
             // registerModel path still produces a valid ModelInfo.
-            if (modelInfo.artifact_type == ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED &&
+            if (existingType == ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED &&
                 modelInfo.single_file == null &&
                 modelInfo.archive == null &&
                 modelInfo.multi_file == null
@@ -81,7 +82,6 @@ internal object CppBridgeModelFormat {
             return modelInfo
         }
 
-        val existingType = modelInfo.artifact_type
         val inferredType = result.artifact_type
         val effectiveType =
             if (existingType != ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED) {

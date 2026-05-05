@@ -1,28 +1,9 @@
 /**
- * Device info for model selection
+ * Model-related local types for the example app.
+ *
+ * Device hardware is represented by the canonical proto `HardwareProfile`
+ * from `@runanywhere/core` (see `Hardware.getProfile()`). This file keeps only
+ * example-local model types; do not add another `DeviceInfo` shape here.
  */
-export interface DeviceInfo {
-  /** Device model name */
-  modelName: string;
 
-  /** Chip name */
-  chipName: string;
-
-  /** Total memory in bytes */
-  totalMemory: number;
-
-  /** Available memory in bytes */
-  availableMemory: number;
-
-  /** Whether device has Neural Engine / NPU */
-  hasNeuralEngine: boolean;
-
-  /** OS version */
-  osVersion: string;
-
-  /** Whether device has GPU */
-  hasGPU?: boolean;
-
-  /** Number of CPU cores */
-  cpuCores?: number;
-}
+export {};

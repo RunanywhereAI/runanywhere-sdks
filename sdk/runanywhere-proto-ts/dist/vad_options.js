@@ -111,6 +111,13 @@ export var VADStreamEventKind;
     VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_STATISTICS"] = 4] = "VAD_STREAM_EVENT_KIND_STATISTICS";
     VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_STOPPED"] = 5] = "VAD_STREAM_EVENT_KIND_STOPPED";
     VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_ERROR"] = 6] = "VAD_STREAM_EVENT_KIND_ERROR";
+    /**
+     * VAD_STREAM_EVENT_KIND_BARGE_IN - IDL-18 fold: pipeline-level barge-in signal previously carried by the
+     * deleted VADEventType enum. Emitted when the VAD detects speech that
+     * interrupts active assistant playback; downstream pipeline typically
+     * routes this through InterruptedEvent/InterruptReason as well.
+     */
+    VADStreamEventKind[VADStreamEventKind["VAD_STREAM_EVENT_KIND_BARGE_IN"] = 7] = "VAD_STREAM_EVENT_KIND_BARGE_IN";
     VADStreamEventKind[VADStreamEventKind["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(VADStreamEventKind || (VADStreamEventKind = {}));
 export function vADStreamEventKindFromJSON(object) {
@@ -136,6 +143,9 @@ export function vADStreamEventKindFromJSON(object) {
         case 6:
         case "VAD_STREAM_EVENT_KIND_ERROR":
             return VADStreamEventKind.VAD_STREAM_EVENT_KIND_ERROR;
+        case 7:
+        case "VAD_STREAM_EVENT_KIND_BARGE_IN":
+            return VADStreamEventKind.VAD_STREAM_EVENT_KIND_BARGE_IN;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -158,6 +168,8 @@ export function vADStreamEventKindToJSON(object) {
             return "VAD_STREAM_EVENT_KIND_STOPPED";
         case VADStreamEventKind.VAD_STREAM_EVENT_KIND_ERROR:
             return "VAD_STREAM_EVENT_KIND_ERROR";
+        case VADStreamEventKind.VAD_STREAM_EVENT_KIND_BARGE_IN:
+            return "VAD_STREAM_EVENT_KIND_BARGE_IN";
         case VADStreamEventKind.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";

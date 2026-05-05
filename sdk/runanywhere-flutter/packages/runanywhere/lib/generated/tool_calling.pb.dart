@@ -517,7 +517,6 @@ class ToolCall extends $pb.GeneratedMessage {
     $core.String? name,
     $core.String? argumentsJson,
     $core.String? type,
-    $core.Map<$core.String, ToolValue>? arguments,
     $core.String? callId,
     $fixnum.Int64? createdAtMs,
     $core.String? rawText,
@@ -534,9 +533,6 @@ class ToolCall extends $pb.GeneratedMessage {
     }
     if (type != null) {
       $result.type = type;
-    }
-    if (arguments != null) {
-      $result.arguments.addAll(arguments);
     }
     if (callId != null) {
       $result.callId = callId;
@@ -558,7 +554,6 @@ class ToolCall extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'name')
     ..aOS(3, _omitFieldNames ? '' : 'argumentsJson')
     ..aOS(4, _omitFieldNames ? '' : 'type')
-    ..m<$core.String, ToolValue>(5, _omitFieldNames ? '' : 'arguments', entryClassName: 'ToolCall.ArgumentsEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OM, valueCreator: ToolValue.create, valueDefaultOrMaker: ToolValue.getDefault, packageName: const $pb.PackageName('runanywhere.v1'))
     ..aOS(6, _omitFieldNames ? '' : 'callId')
     ..aInt64(7, _omitFieldNames ? '' : 'createdAtMs')
     ..aOS(8, _omitFieldNames ? '' : 'rawText')
@@ -606,7 +601,12 @@ class ToolCall extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearName() => clearField(2);
 
-  /// JSON-encoded arguments. Empty object "{}" if no args.
+  ///  JSON-encoded arguments. Empty object "{}" if no args.
+  ///
+  ///  AUDIT (IDL-13): the C++ tokenizer / tool-prompt formatter
+  ///  (sdk/runanywhere-commons/src/features/llm/tool_calling.cpp) reads
+  ///  `arguments_json` directly when building LLM prompts. It is the
+  ///  canonical wire shape for the prompt-formatting path.
   @$pb.TagNumber(3)
   $core.String get argumentsJson => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -627,37 +627,31 @@ class ToolCall extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearType() => clearField(4);
 
-  /// Strongly-typed arguments map for SDKs that do not want to parse
-  /// arguments_json. Producers should keep arguments_json populated for C++
-  /// tokenizer compatibility.
-  @$pb.TagNumber(5)
-  $core.Map<$core.String, ToolValue> get arguments => $_getMap(4);
-
   /// Alias for id used by pre-proto SDK surfaces.
   @$pb.TagNumber(6)
-  $core.String get callId => $_getSZ(5);
+  $core.String get callId => $_getSZ(4);
   @$pb.TagNumber(6)
-  set callId($core.String v) { $_setString(5, v); }
+  set callId($core.String v) { $_setString(4, v); }
   @$pb.TagNumber(6)
-  $core.bool hasCallId() => $_has(5);
+  $core.bool hasCallId() => $_has(4);
   @$pb.TagNumber(6)
   void clearCallId() => clearField(6);
 
   @$pb.TagNumber(7)
-  $fixnum.Int64 get createdAtMs => $_getI64(6);
+  $fixnum.Int64 get createdAtMs => $_getI64(5);
   @$pb.TagNumber(7)
-  set createdAtMs($fixnum.Int64 v) { $_setInt64(6, v); }
+  set createdAtMs($fixnum.Int64 v) { $_setInt64(5, v); }
   @$pb.TagNumber(7)
-  $core.bool hasCreatedAtMs() => $_has(6);
+  $core.bool hasCreatedAtMs() => $_has(5);
   @$pb.TagNumber(7)
   void clearCreatedAtMs() => clearField(7);
 
   @$pb.TagNumber(8)
-  $core.String get rawText => $_getSZ(7);
+  $core.String get rawText => $_getSZ(6);
   @$pb.TagNumber(8)
-  set rawText($core.String v) { $_setString(7, v); }
+  set rawText($core.String v) { $_setString(6, v); }
   @$pb.TagNumber(8)
-  $core.bool hasRawText() => $_has(7);
+  $core.bool hasRawText() => $_has(6);
   @$pb.TagNumber(8)
   void clearRawText() => clearField(8);
 }
@@ -673,7 +667,6 @@ class ToolResult extends $pb.GeneratedMessage {
     $core.String? resultJson,
     $core.String? error,
     $core.bool? success,
-    $core.Map<$core.String, ToolValue>? result,
     $core.String? callId,
     $fixnum.Int64? startedAtMs,
     $fixnum.Int64? completedAtMs,
@@ -693,9 +686,6 @@ class ToolResult extends $pb.GeneratedMessage {
     }
     if (success != null) {
       $result.success = success;
-    }
-    if (result != null) {
-      $result.result.addAll(result);
     }
     if (callId != null) {
       $result.callId = callId;
@@ -718,7 +708,6 @@ class ToolResult extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'resultJson')
     ..aOS(4, _omitFieldNames ? '' : 'error')
     ..aOB(5, _omitFieldNames ? '' : 'success')
-    ..m<$core.String, ToolValue>(6, _omitFieldNames ? '' : 'result', entryClassName: 'ToolResult.ResultEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OM, valueCreator: ToolValue.create, valueDefaultOrMaker: ToolValue.getDefault, packageName: const $pb.PackageName('runanywhere.v1'))
     ..aOS(7, _omitFieldNames ? '' : 'callId')
     ..aInt64(8, _omitFieldNames ? '' : 'startedAtMs')
     ..aInt64(9, _omitFieldNames ? '' : 'completedAtMs')
@@ -764,6 +753,12 @@ class ToolResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearName() => clearField(2);
 
+  ///  JSON-encoded tool execution result.
+  ///
+  ///  AUDIT (IDL-13): the C++ tool-prompt formatter
+  ///  (`sdk/runanywhere-commons/src/features/llm/tool_calling.cpp:1870-1885`)
+  ///  reads `result_json` directly when building follow-up LLM prompts after
+  ///  tool execution. It is the canonical wire shape.
   @$pb.TagNumber(3)
   $core.String get resultJson => $_getSZ(2);
   @$pb.TagNumber(3)
@@ -783,7 +778,7 @@ class ToolResult extends $pb.GeneratedMessage {
   void clearError() => clearField(4);
 
   /// Whether execution succeeded. If unset/false and error is empty,
-  /// consumers should fall back to legacy result_json/error semantics.
+  /// consumers should fall back to result_json/error semantics.
   @$pb.TagNumber(5)
   $core.bool get success => $_getBF(4);
   @$pb.TagNumber(5)
@@ -793,37 +788,31 @@ class ToolResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearSuccess() => clearField(5);
 
-  /// Strongly-typed result map for SDKs that do not want to parse
-  /// result_json. Producers should keep result_json populated for C++
-  /// tokenizer compatibility.
-  @$pb.TagNumber(6)
-  $core.Map<$core.String, ToolValue> get result => $_getMap(5);
-
   /// Alias for tool_call_id used by pre-proto SDK surfaces.
   @$pb.TagNumber(7)
-  $core.String get callId => $_getSZ(6);
+  $core.String get callId => $_getSZ(5);
   @$pb.TagNumber(7)
-  set callId($core.String v) { $_setString(6, v); }
+  set callId($core.String v) { $_setString(5, v); }
   @$pb.TagNumber(7)
-  $core.bool hasCallId() => $_has(6);
+  $core.bool hasCallId() => $_has(5);
   @$pb.TagNumber(7)
   void clearCallId() => clearField(7);
 
   @$pb.TagNumber(8)
-  $fixnum.Int64 get startedAtMs => $_getI64(7);
+  $fixnum.Int64 get startedAtMs => $_getI64(6);
   @$pb.TagNumber(8)
-  set startedAtMs($fixnum.Int64 v) { $_setInt64(7, v); }
+  set startedAtMs($fixnum.Int64 v) { $_setInt64(6, v); }
   @$pb.TagNumber(8)
-  $core.bool hasStartedAtMs() => $_has(7);
+  $core.bool hasStartedAtMs() => $_has(6);
   @$pb.TagNumber(8)
   void clearStartedAtMs() => clearField(8);
 
   @$pb.TagNumber(9)
-  $fixnum.Int64 get completedAtMs => $_getI64(8);
+  $fixnum.Int64 get completedAtMs => $_getI64(7);
   @$pb.TagNumber(9)
-  set completedAtMs($fixnum.Int64 v) { $_setInt64(8, v); }
+  set completedAtMs($fixnum.Int64 v) { $_setInt64(7, v); }
   @$pb.TagNumber(9)
-  $core.bool hasCompletedAtMs() => $_has(8);
+  $core.bool hasCompletedAtMs() => $_has(7);
   @$pb.TagNumber(9)
   void clearCompletedAtMs() => clearField(9);
 }

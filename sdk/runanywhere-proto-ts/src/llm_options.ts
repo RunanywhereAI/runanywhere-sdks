@@ -9,6 +9,7 @@ import Long from "long";
 import _m0 from "protobufjs/minimal";
 import { InferenceFramework, inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
 import { StructuredOutputOptions, StructuredOutputValidation } from "./structured_output";
+import { ThinkingTagPattern } from "./thinking_tag_pattern";
 import { ToolCall, ToolCallingOptions, ToolResult } from "./tool_calling";
 
 export const protobufPackage = "runanywhere.v1";
@@ -412,20 +413,6 @@ export interface GenerationHints {
    * Empty = engine default ("system").
    */
   systemRole?: string | undefined;
-}
-
-/**
- * ---------------------------------------------------------------------------
- * Pattern used to extract a model's "thinking" / reasoning block from its
- * raw output (Swift ThinkingTagPattern in LLMTypes.swift:344). Used by
- * Qwen3 and LFM2 family models that emit <think>...</think> wrappers.
- * ---------------------------------------------------------------------------
- */
-export interface ThinkingTagPattern {
-  /** Opening tag string. Default if empty: "<think>". */
-  openingTag: string;
-  /** Closing tag string. Default if empty: "</think>". */
-  closingTag: string;
 }
 
 /**
@@ -2037,80 +2024,6 @@ export const GenerationHints = {
     message.temperature = object.temperature ?? 0;
     message.maxTokens = object.maxTokens ?? 0;
     message.systemRole = object.systemRole ?? undefined;
-    return message;
-  },
-};
-
-function createBaseThinkingTagPattern(): ThinkingTagPattern {
-  return { openingTag: "", closingTag: "" };
-}
-
-export const ThinkingTagPattern = {
-  encode(message: ThinkingTagPattern, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.openingTag !== "") {
-      writer.uint32(10).string(message.openingTag);
-    }
-    if (message.closingTag !== "") {
-      writer.uint32(18).string(message.closingTag);
-    }
-    return writer;
-  },
-
-  decode(input: _m0.Reader | Uint8Array, length?: number): ThinkingTagPattern {
-    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseThinkingTagPattern();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1:
-          if (tag !== 10) {
-            break;
-          }
-
-          message.openingTag = reader.string();
-          continue;
-        case 2:
-          if (tag !== 18) {
-            break;
-          }
-
-          message.closingTag = reader.string();
-          continue;
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skipType(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ThinkingTagPattern {
-    return {
-      openingTag: isSet(object.openingTag) ? globalThis.String(object.openingTag) : "",
-      closingTag: isSet(object.closingTag) ? globalThis.String(object.closingTag) : "",
-    };
-  },
-
-  toJSON(message: ThinkingTagPattern): unknown {
-    const obj: any = {};
-    if (message.openingTag !== "") {
-      obj.openingTag = message.openingTag;
-    }
-    if (message.closingTag !== "") {
-      obj.closingTag = message.closingTag;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ThinkingTagPattern>, I>>(base?: I): ThinkingTagPattern {
-    return ThinkingTagPattern.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ThinkingTagPattern>, I>>(object: I): ThinkingTagPattern {
-    const message = createBaseThinkingTagPattern();
-    message.openingTag = object.openingTag ?? "";
-    message.closingTag = object.closingTag ?? "";
     return message;
   },
 };

@@ -32,11 +32,12 @@ import okio.ByteString
 public class HardwareAcceleratorPreferenceRequest(
   @field:WireField(
     tag = 1,
-    adapter = "ai.runanywhere.proto.v1.AcceleratorPreference#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.AccelerationPreference#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 0,
   )
-  public val preference: AcceleratorPreference = AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO,
+  public val preference: AccelerationPreference =
+      AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<HardwareAcceleratorPreferenceRequest, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -71,7 +72,7 @@ public class HardwareAcceleratorPreferenceRequest(
         postfix = "}")
   }
 
-  public fun copy(preference: AcceleratorPreference = this.preference, unknownFields: ByteString =
+  public fun copy(preference: AccelerationPreference = this.preference, unknownFields: ByteString =
       this.unknownFields): HardwareAcceleratorPreferenceRequest =
       HardwareAcceleratorPreferenceRequest(preference, unknownFields)
 
@@ -88,30 +89,31 @@ public class HardwareAcceleratorPreferenceRequest(
     ) {
       override fun encodedSize(`value`: HardwareAcceleratorPreferenceRequest): Int {
         var size = value.unknownFields.size
-        if (value.preference != AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO) size +=
-            AcceleratorPreference.ADAPTER.encodedSizeWithTag(1, value.preference)
+        if (value.preference != AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED) size +=
+            AccelerationPreference.ADAPTER.encodedSizeWithTag(1, value.preference)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: HardwareAcceleratorPreferenceRequest) {
-        if (value.preference != AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO)
-            AcceleratorPreference.ADAPTER.encodeWithTag(writer, 1, value.preference)
+        if (value.preference != AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED)
+            AccelerationPreference.ADAPTER.encodeWithTag(writer, 1, value.preference)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter,
           `value`: HardwareAcceleratorPreferenceRequest) {
         writer.writeBytes(value.unknownFields)
-        if (value.preference != AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO)
-            AcceleratorPreference.ADAPTER.encodeWithTag(writer, 1, value.preference)
+        if (value.preference != AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED)
+            AccelerationPreference.ADAPTER.encodeWithTag(writer, 1, value.preference)
       }
 
       override fun decode(reader: ProtoReader): HardwareAcceleratorPreferenceRequest {
-        var preference: AcceleratorPreference = AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO
+        var preference: AccelerationPreference =
+            AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
-              preference = AcceleratorPreference.ADAPTER.decode(reader)
+              preference = AccelerationPreference.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }

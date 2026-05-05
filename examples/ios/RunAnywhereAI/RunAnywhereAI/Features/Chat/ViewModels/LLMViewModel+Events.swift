@@ -77,7 +77,7 @@ extension LLMViewModel {
             handleGenerationCompleted(
                 generationId: generationId,
                 modelId: modelId,
-                inputTokens: 0,
+                inputTokens: Int(event.generation.inputTokens),
                 outputTokens: outputTokens,
                 durationMs: durationMs,
                 tokensPerSecond: tps

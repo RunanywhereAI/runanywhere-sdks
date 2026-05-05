@@ -13,6 +13,8 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
+import 'thinking_tag_pattern.pbjson.dart' as $0;
+
 @$core.Deprecated('Use audioFormatDescriptor instead')
 const AudioFormat$json = {
   '1': 'AudioFormat',
@@ -336,30 +338,6 @@ final $typed_data.Uint8List modelFileRoleDescriptor = $convert.base64Decode(
     'SUxFX1JPTEVfVk9DQUJVTEFSWRAGEhoKFk1PREVMX0ZJTEVfUk9MRV9NRVJHRVMQBxIaChZNT0'
     'RFTF9GSUxFX1JPTEVfTEFCRUxTEAg=');
 
-@$core.Deprecated('Use accelerationPreferenceDescriptor instead')
-const AccelerationPreference$json = {
-  '1': 'AccelerationPreference',
-  '2': [
-    {'1': 'ACCELERATION_PREFERENCE_UNSPECIFIED', '2': 0},
-    {'1': 'ACCELERATION_PREFERENCE_AUTO', '2': 1},
-    {'1': 'ACCELERATION_PREFERENCE_CPU', '2': 2},
-    {'1': 'ACCELERATION_PREFERENCE_GPU', '2': 3},
-    {'1': 'ACCELERATION_PREFERENCE_NPU', '2': 4},
-    {'1': 'ACCELERATION_PREFERENCE_WEBGPU', '2': 5},
-    {'1': 'ACCELERATION_PREFERENCE_METAL', '2': 6},
-    {'1': 'ACCELERATION_PREFERENCE_VULKAN', '2': 7},
-  ],
-};
-
-/// Descriptor for `AccelerationPreference`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List accelerationPreferenceDescriptor = $convert.base64Decode(
-    'ChZBY2NlbGVyYXRpb25QcmVmZXJlbmNlEicKI0FDQ0VMRVJBVElPTl9QUkVGRVJFTkNFX1VOU1'
-    'BFQ0lGSUVEEAASIAocQUNDRUxFUkFUSU9OX1BSRUZFUkVOQ0VfQVVUTxABEh8KG0FDQ0VMRVJB'
-    'VElPTl9QUkVGRVJFTkNFX0NQVRACEh8KG0FDQ0VMRVJBVElPTl9QUkVGRVJFTkNFX0dQVRADEh'
-    '8KG0FDQ0VMRVJBVElPTl9QUkVGRVJFTkNFX05QVRAEEiIKHkFDQ0VMRVJBVElPTl9QUkVGRVJF'
-    'TkNFX1dFQkdQVRAFEiEKHUFDQ0VMRVJBVElPTl9QUkVGRVJFTkNFX01FVEFMEAYSIgoeQUNDRU'
-    'xFUkFUSU9OX1BSRUZFUkVOQ0VfVlVMS0FOEAc=');
-
 @$core.Deprecated('Use routingPolicyDescriptor instead')
 const RoutingPolicy$json = {
   '1': 'RoutingPolicy',
@@ -379,20 +357,6 @@ final $typed_data.Uint8List routingPolicyDescriptor = $convert.base64Decode(
     'lOR19QT0xJQ1lfUFJFRkVSX0xPQ0FMEAESHwobUk9VVElOR19QT0xJQ1lfUFJFRkVSX0NMT1VE'
     'EAISIQodUk9VVElOR19QT0xJQ1lfQ09TVF9PUFRJTUlaRUQQAxIkCiBST1VUSU5HX1BPTElDWV'
     '9MQVRFTkNZX09QVElNSVpFRBAEEhkKFVJPVVRJTkdfUE9MSUNZX01BTlVBTBAF');
-
-@$core.Deprecated('Use modelThinkingTagPatternDescriptor instead')
-const ModelThinkingTagPattern$json = {
-  '1': 'ModelThinkingTagPattern',
-  '2': [
-    {'1': 'open_tag', '3': 1, '4': 1, '5': 9, '10': 'openTag'},
-    {'1': 'close_tag', '3': 2, '4': 1, '5': 9, '10': 'closeTag'},
-  ],
-};
-
-/// Descriptor for `ModelThinkingTagPattern`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List modelThinkingTagPatternDescriptor = $convert.base64Decode(
-    'ChdNb2RlbFRoaW5raW5nVGFnUGF0dGVybhIZCghvcGVuX3RhZxgBIAEoCVIHb3BlblRhZxIbCg'
-    'ljbG9zZV90YWcYAiABKAlSCGNsb3NlVGFn');
 
 @$core.Deprecated('Use modelInfoMetadataDescriptor instead')
 const ModelInfoMetadata$json = {
@@ -449,7 +413,7 @@ const ModelInfo$json = {
     {'1': 'updated_at_unix_ms', '3': 15, '4': 1, '5': 3, '10': 'updatedAtUnixMs'},
     {'1': 'memory_required_bytes', '3': 16, '4': 1, '5': 3, '9': 1, '10': 'memoryRequiredBytes', '17': true},
     {'1': 'checksum_sha256', '3': 17, '4': 1, '5': 9, '9': 2, '10': 'checksumSha256', '17': true},
-    {'1': 'thinking_pattern', '3': 18, '4': 1, '5': 11, '6': '.runanywhere.v1.ModelThinkingTagPattern', '9': 3, '10': 'thinkingPattern', '17': true},
+    {'1': 'thinking_pattern', '3': 18, '4': 1, '5': 11, '6': '.runanywhere.v1.ThinkingTagPattern', '9': 3, '10': 'thinkingPattern', '17': true},
     {'1': 'metadata', '3': 19, '4': 1, '5': 11, '6': '.runanywhere.v1.ModelInfoMetadata', '9': 4, '10': 'metadata', '17': true},
     {'1': 'single_file', '3': 20, '4': 1, '5': 11, '6': '.runanywhere.v1.SingleFileArtifact', '9': 0, '10': 'singleFile'},
     {'1': 'archive', '3': 21, '4': 1, '5': 11, '6': '.runanywhere.v1.ArchiveArtifact', '9': 0, '10': 'archive'},
@@ -507,36 +471,36 @@ final $typed_data.Uint8List modelInfoDescriptor = $convert.base64Decode(
     'dGVkX2F0X3VuaXhfbXMYDiABKANSD2NyZWF0ZWRBdFVuaXhNcxIrChJ1cGRhdGVkX2F0X3VuaX'
     'hfbXMYDyABKANSD3VwZGF0ZWRBdFVuaXhNcxI3ChVtZW1vcnlfcmVxdWlyZWRfYnl0ZXMYECAB'
     'KANIAVITbWVtb3J5UmVxdWlyZWRCeXRlc4gBARIsCg9jaGVja3N1bV9zaGEyNTYYESABKAlIAl'
-    'IOY2hlY2tzdW1TaGEyNTaIAQESVwoQdGhpbmtpbmdfcGF0dGVybhgSIAEoCzInLnJ1bmFueXdo'
-    'ZXJlLnYxLk1vZGVsVGhpbmtpbmdUYWdQYXR0ZXJuSANSD3RoaW5raW5nUGF0dGVybogBARJCCg'
-    'htZXRhZGF0YRgTIAEoCzIhLnJ1bmFueXdoZXJlLnYxLk1vZGVsSW5mb01ldGFkYXRhSARSCG1l'
-    'dGFkYXRhiAEBEkUKC3NpbmdsZV9maWxlGBQgASgLMiIucnVuYW55d2hlcmUudjEuU2luZ2xlRm'
-    'lsZUFydGlmYWN0SABSCnNpbmdsZUZpbGUSOwoHYXJjaGl2ZRgVIAEoCzIfLnJ1bmFueXdoZXJl'
-    'LnYxLkFyY2hpdmVBcnRpZmFjdEgAUgdhcmNoaXZlEkIKCm11bHRpX2ZpbGUYFiABKAsyIS5ydW'
-    '5hbnl3aGVyZS52MS5NdWx0aUZpbGVBcnRpZmFjdEgAUgltdWx0aUZpbGUSLgoSY3VzdG9tX3N0'
-    'cmF0ZWd5X2lkGBcgASgJSABSEGN1c3RvbVN0cmF0ZWd5SWQSGwoIYnVpbHRfaW4YGCABKAhIAF'
-    'IHYnVpbHRJbhJLCg1hcnRpZmFjdF90eXBlGBkgASgOMiEucnVuYW55d2hlcmUudjEuTW9kZWxB'
-    'cnRpZmFjdFR5cGVIBVIMYXJ0aWZhY3RUeXBliAEBEk4KDmV4cGVjdGVkX2ZpbGVzGBogASgLMi'
-    'IucnVuYW55d2hlcmUudjEuRXhwZWN0ZWRNb2RlbEZpbGVzSAZSDWV4cGVjdGVkRmlsZXOIAQES'
-    'ZAoXYWNjZWxlcmF0aW9uX3ByZWZlcmVuY2UYGyABKA4yJi5ydW5hbnl3aGVyZS52MS5BY2NlbG'
-    'VyYXRpb25QcmVmZXJlbmNlSAdSFmFjY2VsZXJhdGlvblByZWZlcmVuY2WIAQESSQoOcm91dGlu'
-    'Z19wb2xpY3kYHCABKA4yHS5ydW5hbnl3aGVyZS52MS5Sb3V0aW5nUG9saWN5SAhSDXJvdXRpbm'
-    'dQb2xpY3mIAQESVAoNY29tcGF0aWJpbGl0eRgdIAEoCzIpLnJ1bmFueXdoZXJlLnYxLk1vZGVs'
-    'UnVudGltZUNvbXBhdGliaWxpdHlICVINY29tcGF0aWJpbGl0eYgBARJYChNwcmVmZXJyZWRfZn'
-    'JhbWV3b3JrGB4gASgOMiIucnVuYW55d2hlcmUudjEuSW5mZXJlbmNlRnJhbWV3b3JrSApSEnBy'
-    'ZWZlcnJlZEZyYW1ld29ya4gBARJRCg9yZWdpc3RyeV9zdGF0dXMYHyABKA4yIy5ydW5hbnl3aG'
-    'VyZS52MS5Nb2RlbFJlZ2lzdHJ5U3RhdHVzSAtSDnJlZ2lzdHJ5U3RhdHVziAEBEigKDWlzX2Rv'
-    'd25sb2FkZWQYICABKAhIDFIMaXNEb3dubG9hZGVkiAEBEiYKDGlzX2F2YWlsYWJsZRghIAEoCE'
-    'gNUgtpc0F2YWlsYWJsZYgBARIzChRsYXN0X3VzZWRfYXRfdW5peF9tcxgiIAEoA0gOUhBsYXN0'
-    'VXNlZEF0VW5peE1ziAEBEiQKC3VzYWdlX2NvdW50GCMgASgFSA9SCnVzYWdlQ291bnSIAQESJg'
-    'oMc3luY19wZW5kaW5nGCQgASgISBBSC3N5bmNQZW5kaW5niAEBEioKDnN0YXR1c19tZXNzYWdl'
-    'GCUgASgJSBFSDXN0YXR1c01lc3NhZ2WIAQFCCgoIYXJ0aWZhY3RCGAoWX21lbW9yeV9yZXF1aX'
-    'JlZF9ieXRlc0ISChBfY2hlY2tzdW1fc2hhMjU2QhMKEV90aGlua2luZ19wYXR0ZXJuQgsKCV9t'
-    'ZXRhZGF0YUIQCg5fYXJ0aWZhY3RfdHlwZUIRCg9fZXhwZWN0ZWRfZmlsZXNCGgoYX2FjY2VsZX'
-    'JhdGlvbl9wcmVmZXJlbmNlQhEKD19yb3V0aW5nX3BvbGljeUIQCg5fY29tcGF0aWJpbGl0eUIW'
-    'ChRfcHJlZmVycmVkX2ZyYW1ld29ya0ISChBfcmVnaXN0cnlfc3RhdHVzQhAKDl9pc19kb3dubG'
-    '9hZGVkQg8KDV9pc19hdmFpbGFibGVCFwoVX2xhc3RfdXNlZF9hdF91bml4X21zQg4KDF91c2Fn'
-    'ZV9jb3VudEIPCg1fc3luY19wZW5kaW5nQhEKD19zdGF0dXNfbWVzc2FnZQ==');
+    'IOY2hlY2tzdW1TaGEyNTaIAQESUgoQdGhpbmtpbmdfcGF0dGVybhgSIAEoCzIiLnJ1bmFueXdo'
+    'ZXJlLnYxLlRoaW5raW5nVGFnUGF0dGVybkgDUg90aGlua2luZ1BhdHRlcm6IAQESQgoIbWV0YW'
+    'RhdGEYEyABKAsyIS5ydW5hbnl3aGVyZS52MS5Nb2RlbEluZm9NZXRhZGF0YUgEUghtZXRhZGF0'
+    'YYgBARJFCgtzaW5nbGVfZmlsZRgUIAEoCzIiLnJ1bmFueXdoZXJlLnYxLlNpbmdsZUZpbGVBcn'
+    'RpZmFjdEgAUgpzaW5nbGVGaWxlEjsKB2FyY2hpdmUYFSABKAsyHy5ydW5hbnl3aGVyZS52MS5B'
+    'cmNoaXZlQXJ0aWZhY3RIAFIHYXJjaGl2ZRJCCgptdWx0aV9maWxlGBYgASgLMiEucnVuYW55d2'
+    'hlcmUudjEuTXVsdGlGaWxlQXJ0aWZhY3RIAFIJbXVsdGlGaWxlEi4KEmN1c3RvbV9zdHJhdGVn'
+    'eV9pZBgXIAEoCUgAUhBjdXN0b21TdHJhdGVneUlkEhsKCGJ1aWx0X2luGBggASgISABSB2J1aW'
+    'x0SW4SSwoNYXJ0aWZhY3RfdHlwZRgZIAEoDjIhLnJ1bmFueXdoZXJlLnYxLk1vZGVsQXJ0aWZh'
+    'Y3RUeXBlSAVSDGFydGlmYWN0VHlwZYgBARJOCg5leHBlY3RlZF9maWxlcxgaIAEoCzIiLnJ1bm'
+    'FueXdoZXJlLnYxLkV4cGVjdGVkTW9kZWxGaWxlc0gGUg1leHBlY3RlZEZpbGVziAEBEmQKF2Fj'
+    'Y2VsZXJhdGlvbl9wcmVmZXJlbmNlGBsgASgOMiYucnVuYW55d2hlcmUudjEuQWNjZWxlcmF0aW'
+    '9uUHJlZmVyZW5jZUgHUhZhY2NlbGVyYXRpb25QcmVmZXJlbmNliAEBEkkKDnJvdXRpbmdfcG9s'
+    'aWN5GBwgASgOMh0ucnVuYW55d2hlcmUudjEuUm91dGluZ1BvbGljeUgIUg1yb3V0aW5nUG9saW'
+    'N5iAEBElQKDWNvbXBhdGliaWxpdHkYHSABKAsyKS5ydW5hbnl3aGVyZS52MS5Nb2RlbFJ1bnRp'
+    'bWVDb21wYXRpYmlsaXR5SAlSDWNvbXBhdGliaWxpdHmIAQESWAoTcHJlZmVycmVkX2ZyYW1ld2'
+    '9yaxgeIAEoDjIiLnJ1bmFueXdoZXJlLnYxLkluZmVyZW5jZUZyYW1ld29ya0gKUhJwcmVmZXJy'
+    'ZWRGcmFtZXdvcmuIAQESUQoPcmVnaXN0cnlfc3RhdHVzGB8gASgOMiMucnVuYW55d2hlcmUudj'
+    'EuTW9kZWxSZWdpc3RyeVN0YXR1c0gLUg5yZWdpc3RyeVN0YXR1c4gBARIoCg1pc19kb3dubG9h'
+    'ZGVkGCAgASgISAxSDGlzRG93bmxvYWRlZIgBARImCgxpc19hdmFpbGFibGUYISABKAhIDVILaX'
+    'NBdmFpbGFibGWIAQESMwoUbGFzdF91c2VkX2F0X3VuaXhfbXMYIiABKANIDlIQbGFzdFVzZWRB'
+    'dFVuaXhNc4gBARIkCgt1c2FnZV9jb3VudBgjIAEoBUgPUgp1c2FnZUNvdW50iAEBEiYKDHN5bm'
+    'NfcGVuZGluZxgkIAEoCEgQUgtzeW5jUGVuZGluZ4gBARIqCg5zdGF0dXNfbWVzc2FnZRglIAEo'
+    'CUgRUg1zdGF0dXNNZXNzYWdliAEBQgoKCGFydGlmYWN0QhgKFl9tZW1vcnlfcmVxdWlyZWRfYn'
+    'l0ZXNCEgoQX2NoZWNrc3VtX3NoYTI1NkITChFfdGhpbmtpbmdfcGF0dGVybkILCglfbWV0YWRh'
+    'dGFCEAoOX2FydGlmYWN0X3R5cGVCEQoPX2V4cGVjdGVkX2ZpbGVzQhoKGF9hY2NlbGVyYXRpb2'
+    '5fcHJlZmVyZW5jZUIRCg9fcm91dGluZ19wb2xpY3lCEAoOX2NvbXBhdGliaWxpdHlCFgoUX3By'
+    'ZWZlcnJlZF9mcmFtZXdvcmtCEgoQX3JlZ2lzdHJ5X3N0YXR1c0IQCg5faXNfZG93bmxvYWRlZE'
+    'IPCg1faXNfYXZhaWxhYmxlQhcKFV9sYXN0X3VzZWRfYXRfdW5peF9tc0IOCgxfdXNhZ2VfY291'
+    'bnRCDwoNX3N5bmNfcGVuZGluZ0IRCg9fc3RhdHVzX21lc3NhZ2U=');
 
 @$core.Deprecated('Use modelInfoListDescriptor instead')
 const ModelInfoList$json = {
@@ -603,36 +567,37 @@ const ModelFileDescriptor$json = {
     {'1': 'filename', '3': 2, '4': 1, '5': 9, '10': 'filename'},
     {'1': 'is_required', '3': 3, '4': 1, '5': 8, '10': 'isRequired'},
     {'1': 'size_bytes', '3': 4, '4': 1, '5': 3, '9': 0, '10': 'sizeBytes', '17': true},
-    {'1': 'checksum', '3': 5, '4': 1, '5': 9, '9': 1, '10': 'checksum', '17': true},
-    {'1': 'relative_path', '3': 6, '4': 1, '5': 9, '9': 2, '10': 'relativePath', '17': true},
-    {'1': 'destination_path', '3': 7, '4': 1, '5': 9, '9': 3, '10': 'destinationPath', '17': true},
-    {'1': 'role', '3': 8, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelFileRole', '9': 4, '10': 'role', '17': true},
-    {'1': 'local_path', '3': 9, '4': 1, '5': 9, '9': 5, '10': 'localPath', '17': true},
-    {'1': 'checksum_sha256', '3': 10, '4': 1, '5': 9, '9': 6, '10': 'checksumSha256', '17': true},
+    {'1': 'relative_path', '3': 6, '4': 1, '5': 9, '9': 1, '10': 'relativePath', '17': true},
+    {'1': 'destination_path', '3': 7, '4': 1, '5': 9, '9': 2, '10': 'destinationPath', '17': true},
+    {'1': 'role', '3': 8, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelFileRole', '9': 3, '10': 'role', '17': true},
+    {'1': 'local_path', '3': 9, '4': 1, '5': 9, '9': 4, '10': 'localPath', '17': true},
+    {'1': 'checksum_sha256', '3': 10, '4': 1, '5': 9, '9': 5, '10': 'checksumSha256', '17': true},
   ],
   '8': [
     {'1': '_size_bytes'},
-    {'1': '_checksum'},
     {'1': '_relative_path'},
     {'1': '_destination_path'},
     {'1': '_role'},
     {'1': '_local_path'},
     {'1': '_checksum_sha256'},
   ],
+  '9': [
+    {'1': 5, '2': 6},
+  ],
+  '10': ['checksum'],
 };
 
 /// Descriptor for `ModelFileDescriptor`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List modelFileDescriptorDescriptor = $convert.base64Decode(
     'ChNNb2RlbEZpbGVEZXNjcmlwdG9yEhAKA3VybBgBIAEoCVIDdXJsEhoKCGZpbGVuYW1lGAIgAS'
     'gJUghmaWxlbmFtZRIfCgtpc19yZXF1aXJlZBgDIAEoCFIKaXNSZXF1aXJlZBIiCgpzaXplX2J5'
-    'dGVzGAQgASgDSABSCXNpemVCeXRlc4gBARIfCghjaGVja3N1bRgFIAEoCUgBUghjaGVja3N1bY'
-    'gBARIoCg1yZWxhdGl2ZV9wYXRoGAYgASgJSAJSDHJlbGF0aXZlUGF0aIgBARIuChBkZXN0aW5h'
-    'dGlvbl9wYXRoGAcgASgJSANSD2Rlc3RpbmF0aW9uUGF0aIgBARI2CgRyb2xlGAggASgOMh0ucn'
-    'VuYW55d2hlcmUudjEuTW9kZWxGaWxlUm9sZUgEUgRyb2xliAEBEiIKCmxvY2FsX3BhdGgYCSAB'
-    'KAlIBVIJbG9jYWxQYXRoiAEBEiwKD2NoZWNrc3VtX3NoYTI1NhgKIAEoCUgGUg5jaGVja3N1bV'
-    'NoYTI1NogBAUINCgtfc2l6ZV9ieXRlc0ILCglfY2hlY2tzdW1CEAoOX3JlbGF0aXZlX3BhdGhC'
-    'EwoRX2Rlc3RpbmF0aW9uX3BhdGhCBwoFX3JvbGVCDQoLX2xvY2FsX3BhdGhCEgoQX2NoZWNrc3'
-    'VtX3NoYTI1Ng==');
+    'dGVzGAQgASgDSABSCXNpemVCeXRlc4gBARIoCg1yZWxhdGl2ZV9wYXRoGAYgASgJSAFSDHJlbG'
+    'F0aXZlUGF0aIgBARIuChBkZXN0aW5hdGlvbl9wYXRoGAcgASgJSAJSD2Rlc3RpbmF0aW9uUGF0'
+    'aIgBARI2CgRyb2xlGAggASgOMh0ucnVuYW55d2hlcmUudjEuTW9kZWxGaWxlUm9sZUgDUgRyb2'
+    'xliAEBEiIKCmxvY2FsX3BhdGgYCSABKAlIBFIJbG9jYWxQYXRoiAEBEiwKD2NoZWNrc3VtX3No'
+    'YTI1NhgKIAEoCUgFUg5jaGVja3N1bVNoYTI1NogBAUINCgtfc2l6ZV9ieXRlc0IQCg5fcmVsYX'
+    'RpdmVfcGF0aEITChFfZGVzdGluYXRpb25fcGF0aEIHCgVfcm9sZUINCgtfbG9jYWxfcGF0aEIS'
+    'ChBfY2hlY2tzdW1fc2hhMjU2SgQIBRAGUghjaGVja3N1bQ==');
 
 @$core.Deprecated('Use multiFileArtifactDescriptor instead')
 const MultiFileArtifact$json = {
@@ -1193,7 +1158,7 @@ const ModelCompatibilityRequest$json = {
     {'1': 'hardware_profile', '3': 2, '4': 1, '5': 11, '6': '.runanywhere.v1.HardwareProfile', '9': 0, '10': 'hardwareProfile', '17': true},
     {'1': 'available_ram_bytes', '3': 3, '4': 1, '5': 3, '10': 'availableRamBytes'},
     {'1': 'available_storage_bytes', '3': 4, '4': 1, '5': 3, '10': 'availableStorageBytes'},
-    {'1': 'accelerator_preference', '3': 5, '4': 1, '5': 14, '6': '.runanywhere.v1.AcceleratorPreference', '9': 1, '10': 'acceleratorPreference', '17': true},
+    {'1': 'accelerator_preference', '3': 5, '4': 1, '5': 14, '6': '.runanywhere.v1.AccelerationPreference', '9': 1, '10': 'acceleratorPreference', '17': true},
     {'1': 'preferred_framework', '3': 6, '4': 1, '5': 14, '6': '.runanywhere.v1.InferenceFramework', '9': 2, '10': 'preferredFramework', '17': true},
   ],
   '8': [
@@ -1209,12 +1174,12 @@ final $typed_data.Uint8List modelCompatibilityRequestDescriptor = $convert.base6
     '8KEGhhcmR3YXJlX3Byb2ZpbGUYAiABKAsyHy5ydW5hbnl3aGVyZS52MS5IYXJkd2FyZVByb2Zp'
     'bGVIAFIPaGFyZHdhcmVQcm9maWxliAEBEi4KE2F2YWlsYWJsZV9yYW1fYnl0ZXMYAyABKANSEW'
     'F2YWlsYWJsZVJhbUJ5dGVzEjYKF2F2YWlsYWJsZV9zdG9yYWdlX2J5dGVzGAQgASgDUhVhdmFp'
-    'bGFibGVTdG9yYWdlQnl0ZXMSYQoWYWNjZWxlcmF0b3JfcHJlZmVyZW5jZRgFIAEoDjIlLnJ1bm'
-    'FueXdoZXJlLnYxLkFjY2VsZXJhdG9yUHJlZmVyZW5jZUgBUhVhY2NlbGVyYXRvclByZWZlcmVu'
-    'Y2WIAQESWAoTcHJlZmVycmVkX2ZyYW1ld29yaxgGIAEoDjIiLnJ1bmFueXdoZXJlLnYxLkluZm'
-    'VyZW5jZUZyYW1ld29ya0gCUhJwcmVmZXJyZWRGcmFtZXdvcmuIAQFCEwoRX2hhcmR3YXJlX3By'
-    'b2ZpbGVCGQoXX2FjY2VsZXJhdG9yX3ByZWZlcmVuY2VCFgoUX3ByZWZlcnJlZF9mcmFtZXdvcm'
-    's=');
+    'bGFibGVTdG9yYWdlQnl0ZXMSYgoWYWNjZWxlcmF0b3JfcHJlZmVyZW5jZRgFIAEoDjImLnJ1bm'
+    'FueXdoZXJlLnYxLkFjY2VsZXJhdGlvblByZWZlcmVuY2VIAVIVYWNjZWxlcmF0b3JQcmVmZXJl'
+    'bmNliAEBElgKE3ByZWZlcnJlZF9mcmFtZXdvcmsYBiABKA4yIi5ydW5hbnl3aGVyZS52MS5Jbm'
+    'ZlcmVuY2VGcmFtZXdvcmtIAlIScHJlZmVycmVkRnJhbWV3b3JriAEBQhMKEV9oYXJkd2FyZV9w'
+    'cm9maWxlQhkKF19hY2NlbGVyYXRvcl9wcmVmZXJlbmNlQhYKFF9wcmVmZXJyZWRfZnJhbWV3b3'
+    'Jr');
 
 @$core.Deprecated('Use modelCompatibilityCheckResultDescriptor instead')
 const ModelCompatibilityCheckResult$json = {
@@ -1369,7 +1334,7 @@ const $core.Map<$core.String, $core.dynamic> ModelRegistryServiceBase$json = {
 @$core.Deprecated('Use modelRegistryServiceDescriptor instead')
 const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> ModelRegistryServiceBase$messageJson = {
   '.runanywhere.v1.ModelInfo': ModelInfo$json,
-  '.runanywhere.v1.ModelThinkingTagPattern': ModelThinkingTagPattern$json,
+  '.runanywhere.v1.ThinkingTagPattern': $0.ThinkingTagPattern$json,
   '.runanywhere.v1.ModelInfoMetadata': ModelInfoMetadata$json,
   '.runanywhere.v1.SingleFileArtifact': SingleFileArtifact$json,
   '.runanywhere.v1.ExpectedModelFiles': ExpectedModelFiles$json,

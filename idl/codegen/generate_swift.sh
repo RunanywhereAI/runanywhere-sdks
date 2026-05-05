@@ -71,24 +71,17 @@ protoc \
 
 echo "✓ Swift proto codegen → ${OUT_DIR}"
 
-# GAP 09: server-streaming gRPC stubs (AsyncStream<T>). Optional — produces
-# *.grpc.swift files only when the grpc-swift plugin is installed; we don't
-# error out because the message-only path above is sufficient for non-streaming
-# consumers.
-if command -v protoc-gen-grpc-swift >/dev/null 2>&1; then
-    # grpc-swift 2.x dropped the v1 Server/Client/TestClient flags — it
-    # always emits both client + server. We just pass Visibility for the
-    # generated Swift access modifier so frontends can `import` the types.
-    protoc \
-        --proto_path="${PROTO_DIR}" \
-        --grpc-swift_out="Visibility=Public:${OUT_DIR}" \
-        "${PROTO_DIR}/voice_agent_service.proto" \
-        "${PROTO_DIR}/llm_service.proto" \
-        "${PROTO_DIR}/download_service.proto"
-    echo "✓ Swift gRPC stubs → ${OUT_DIR}/*.grpc.swift"
-else
-    echo "note: protoc-gen-grpc-swift not installed; skipping streaming stubs."
-    echo "      Install via 'brew install grpc-swift' to generate AsyncStream client wrappers."
-fi
+# SWF-grpc delete (Wave H-2): the three `*.grpc.swift` stubs (voice_agent_service,
+# llm_service, download_service) require GRPCCore / GRPCProtobuf and therefore
+# macOS 15 / iOS 18 — above our supported minimums (macOS 14 / iOS 17). Swift
+# consumes the same services through hand-written AsyncStream adapters
+# (VoiceAgentStreamAdapter, LLMStreamAdapter) wired to the in-process C
+# callback, so the gRPC stubs would only be dead code. We skip emitting them.
+#
+# Belt-and-braces: if an older toolchain or a developer invocation emits
+# the stubs anyway, strip them here so CI remains byte-deterministic.
+rm -f "${OUT_DIR}/voice_agent_service.grpc.swift" \
+      "${OUT_DIR}/llm_service.grpc.swift" \
+      "${OUT_DIR}/download_service.grpc.swift"
 
 ls -1 "${OUT_DIR}"

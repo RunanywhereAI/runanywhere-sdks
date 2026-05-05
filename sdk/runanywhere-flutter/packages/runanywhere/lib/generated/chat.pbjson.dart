@@ -13,6 +13,11 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
+import 'llm_options.pbjson.dart' as $4;
+import 'structured_output.pbjson.dart' as $2;
+import 'thinking_tag_pattern.pbjson.dart' as $1;
+import 'tool_calling.pbjson.dart' as $0;
+
 @$core.Deprecated('Use messageRoleDescriptor instead')
 const MessageRole$json = {
   '1': 'MessageRole',
@@ -126,7 +131,6 @@ const ChatMessage$json = {
     {'1': 'content', '3': 3, '4': 1, '5': 9, '10': 'content'},
     {'1': 'timestamp_us', '3': 4, '4': 1, '5': 3, '10': 'timestampUs'},
     {'1': 'name', '3': 5, '4': 1, '5': 9, '9': 0, '10': 'name', '17': true},
-    {'1': 'tool_calls_json', '3': 6, '4': 3, '5': 9, '10': 'toolCallsJson'},
     {'1': 'tool_call_id', '3': 7, '4': 1, '5': 9, '9': 1, '10': 'toolCallId', '17': true},
     {'1': 'tool_calls', '3': 8, '4': 3, '5': 11, '6': '.runanywhere.v1.ToolCall', '10': 'toolCalls'},
     {'1': 'tool_result', '3': 9, '4': 1, '5': 11, '6': '.runanywhere.v1.ToolResult', '9': 2, '10': 'toolResult', '17': true},
@@ -144,6 +148,10 @@ const ChatMessage$json = {
     {'1': '_parent_id'},
     {'1': '_error_message'},
   ],
+  '9': [
+    {'1': 6, '2': 7},
+  ],
+  '10': ['tool_calls_json'],
 };
 
 @$core.Deprecated('Use chatMessageDescriptor instead')
@@ -160,18 +168,18 @@ const ChatMessage_MetadataEntry$json = {
 final $typed_data.Uint8List chatMessageDescriptor = $convert.base64Decode(
     'CgtDaGF0TWVzc2FnZRIOCgJpZBgBIAEoCVICaWQSLwoEcm9sZRgCIAEoDjIbLnJ1bmFueXdoZX'
     'JlLnYxLk1lc3NhZ2VSb2xlUgRyb2xlEhgKB2NvbnRlbnQYAyABKAlSB2NvbnRlbnQSIQoMdGlt'
-    'ZXN0YW1wX3VzGAQgASgDUgt0aW1lc3RhbXBVcxIXCgRuYW1lGAUgASgJSABSBG5hbWWIAQESJg'
-    'oPdG9vbF9jYWxsc19qc29uGAYgAygJUg10b29sQ2FsbHNKc29uEiUKDHRvb2xfY2FsbF9pZBgH'
-    'IAEoCUgBUgp0b29sQ2FsbElkiAEBEjcKCnRvb2xfY2FsbHMYCCADKAsyGC5ydW5hbnl3aGVyZS'
-    '52MS5Ub29sQ2FsbFIJdG9vbENhbGxzEkAKC3Rvb2xfcmVzdWx0GAkgASgLMhoucnVuYW55d2hl'
-    'cmUudjEuVG9vbFJlc3VsdEgCUgp0b29sUmVzdWx0iAEBEiAKCXBhcmVudF9pZBgKIAEoCUgDUg'
-    'hwYXJlbnRJZIgBARI5CgZzdGF0dXMYCyABKA4yIS5ydW5hbnl3aGVyZS52MS5DaGF0TWVzc2Fn'
-    'ZVN0YXR1c1IGc3RhdHVzEigKDWVycm9yX21lc3NhZ2UYDCABKAlIBFIMZXJyb3JNZXNzYWdliA'
-    'EBEkUKCG1ldGFkYXRhGA0gAygLMikucnVuYW55d2hlcmUudjEuQ2hhdE1lc3NhZ2UuTWV0YWRh'
-    'dGFFbnRyeVIIbWV0YWRhdGESQAoLYXR0YWNobWVudHMYDiADKAsyHi5ydW5hbnl3aGVyZS52MS'
-    '5DaGF0QXR0YWNobWVudFILYXR0YWNobWVudHMaOwoNTWV0YWRhdGFFbnRyeRIQCgNrZXkYASAB'
-    'KAlSA2tleRIUCgV2YWx1ZRgCIAEoCVIFdmFsdWU6AjgBQgcKBV9uYW1lQg8KDV90b29sX2NhbG'
-    'xfaWRCDgoMX3Rvb2xfcmVzdWx0QgwKCl9wYXJlbnRfaWRCEAoOX2Vycm9yX21lc3NhZ2U=');
+    'ZXN0YW1wX3VzGAQgASgDUgt0aW1lc3RhbXBVcxIXCgRuYW1lGAUgASgJSABSBG5hbWWIAQESJQ'
+    'oMdG9vbF9jYWxsX2lkGAcgASgJSAFSCnRvb2xDYWxsSWSIAQESNwoKdG9vbF9jYWxscxgIIAMo'
+    'CzIYLnJ1bmFueXdoZXJlLnYxLlRvb2xDYWxsUgl0b29sQ2FsbHMSQAoLdG9vbF9yZXN1bHQYCS'
+    'ABKAsyGi5ydW5hbnl3aGVyZS52MS5Ub29sUmVzdWx0SAJSCnRvb2xSZXN1bHSIAQESIAoJcGFy'
+    'ZW50X2lkGAogASgJSANSCHBhcmVudElkiAEBEjkKBnN0YXR1cxgLIAEoDjIhLnJ1bmFueXdoZX'
+    'JlLnYxLkNoYXRNZXNzYWdlU3RhdHVzUgZzdGF0dXMSKAoNZXJyb3JfbWVzc2FnZRgMIAEoCUgE'
+    'UgxlcnJvck1lc3NhZ2WIAQESRQoIbWV0YWRhdGEYDSADKAsyKS5ydW5hbnl3aGVyZS52MS5DaG'
+    'F0TWVzc2FnZS5NZXRhZGF0YUVudHJ5UghtZXRhZGF0YRJACgthdHRhY2htZW50cxgOIAMoCzIe'
+    'LnJ1bmFueXdoZXJlLnYxLkNoYXRBdHRhY2htZW50UgthdHRhY2htZW50cxo7Cg1NZXRhZGF0YU'
+    'VudHJ5EhAKA2tleRgBIAEoCVIDa2V5EhQKBXZhbHVlGAIgASgJUgV2YWx1ZToCOAFCBwoFX25h'
+    'bWVCDwoNX3Rvb2xfY2FsbF9pZEIOCgxfdG9vbF9yZXN1bHRCDAoKX3BhcmVudF9pZEIQCg5fZX'
+    'Jyb3JfbWVzc2FnZUoECAYQB1IPdG9vbF9jYWxsc19qc29u');
 
 @$core.Deprecated('Use chatGenerationRequestDescriptor instead')
 const ChatGenerationRequest$json = {
@@ -316,4 +324,51 @@ final $typed_data.Uint8List chatConversationStateDescriptor = $convert.base64Dec
     'ZXJlLnYxLkNoYXRDb252ZXJzYXRpb25TdGF0ZS5NZXRhZGF0YUVudHJ5UghtZXRhZGF0YRo7Cg'
     '1NZXRhZGF0YUVudHJ5EhAKA2tleRgBIAEoCVIDa2V5EhQKBXZhbHVlGAIgASgJUgV2YWx1ZToC'
     'OAE=');
+
+const $core.Map<$core.String, $core.dynamic> ChatServiceBase$json = {
+  '1': 'Chat',
+  '2': [
+    {'1': 'Generate', '2': '.runanywhere.v1.ChatGenerationRequest', '3': '.runanywhere.v1.ChatGenerationResult'},
+    {'1': 'Stream', '2': '.runanywhere.v1.ChatGenerationRequest', '3': '.runanywhere.v1.ChatStreamEvent', '6': true},
+  ],
+};
+
+@$core.Deprecated('Use chatServiceDescriptor instead')
+const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> ChatServiceBase$messageJson = {
+  '.runanywhere.v1.ChatGenerationRequest': ChatGenerationRequest$json,
+  '.runanywhere.v1.ChatMessage': ChatMessage$json,
+  '.runanywhere.v1.ToolCall': $0.ToolCall$json,
+  '.runanywhere.v1.ToolResult': $0.ToolResult$json,
+  '.runanywhere.v1.ChatMessage.MetadataEntry': ChatMessage_MetadataEntry$json,
+  '.runanywhere.v1.ChatAttachment': ChatAttachment$json,
+  '.runanywhere.v1.ChatAttachment.MetadataEntry': ChatAttachment_MetadataEntry$json,
+  '.runanywhere.v1.LLMGenerationOptions': $4.LLMGenerationOptions$json,
+  '.runanywhere.v1.ThinkingTagPattern': $1.ThinkingTagPattern$json,
+  '.runanywhere.v1.StructuredOutputOptions': $2.StructuredOutputOptions$json,
+  '.runanywhere.v1.JSONSchema': $2.JSONSchema$json,
+  '.runanywhere.v1.JSONSchema.PropertiesEntry': $2.JSONSchema_PropertiesEntry$json,
+  '.runanywhere.v1.JSONSchemaProperty': $2.JSONSchemaProperty$json,
+  '.runanywhere.v1.JSONSchema.DefinitionsEntry': $2.JSONSchema_DefinitionsEntry$json,
+  '.runanywhere.v1.ToolCallingOptions': $0.ToolCallingOptions$json,
+  '.runanywhere.v1.ToolDefinition': $0.ToolDefinition$json,
+  '.runanywhere.v1.ToolParameter': $0.ToolParameter$json,
+  '.runanywhere.v1.ToolValue': $0.ToolValue$json,
+  '.runanywhere.v1.ToolValueArray': $0.ToolValueArray$json,
+  '.runanywhere.v1.ToolValueObject': $0.ToolValueObject$json,
+  '.runanywhere.v1.ToolValueObject.FieldsEntry': $0.ToolValueObject_FieldsEntry$json,
+  '.runanywhere.v1.ToolDefinition.MetadataEntry': $0.ToolDefinition_MetadataEntry$json,
+  '.runanywhere.v1.ChatGenerationRequest.MetadataEntry': ChatGenerationRequest_MetadataEntry$json,
+  '.runanywhere.v1.ChatGenerationResult': ChatGenerationResult$json,
+  '.runanywhere.v1.LLMGenerationResult': $4.LLMGenerationResult$json,
+  '.runanywhere.v1.PerformanceMetrics': $4.PerformanceMetrics$json,
+  '.runanywhere.v1.StructuredOutputValidation': $2.StructuredOutputValidation$json,
+  '.runanywhere.v1.ChatStreamEvent': ChatStreamEvent$json,
+};
+
+/// Descriptor for `Chat`. Decode as a `google.protobuf.ServiceDescriptorProto`.
+final $typed_data.Uint8List chatServiceDescriptor = $convert.base64Decode(
+    'CgRDaGF0ElcKCEdlbmVyYXRlEiUucnVuYW55d2hlcmUudjEuQ2hhdEdlbmVyYXRpb25SZXF1ZX'
+    'N0GiQucnVuYW55d2hlcmUudjEuQ2hhdEdlbmVyYXRpb25SZXN1bHQSUgoGU3RyZWFtEiUucnVu'
+    'YW55d2hlcmUudjEuQ2hhdEdlbmVyYXRpb25SZXF1ZXN0Gh8ucnVuYW55d2hlcmUudjEuQ2hhdF'
+    'N0cmVhbUV2ZW50MAE=');
 

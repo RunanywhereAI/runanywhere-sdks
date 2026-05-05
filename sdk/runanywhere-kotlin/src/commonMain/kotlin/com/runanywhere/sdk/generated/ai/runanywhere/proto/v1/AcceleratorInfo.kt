@@ -36,11 +36,12 @@ public class AcceleratorInfo(
   public val name: String = "",
   @field:WireField(
     tag = 2,
-    adapter = "ai.runanywhere.proto.v1.AcceleratorPreference#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.AccelerationPreference#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 1,
   )
-  public val type: AcceleratorPreference = AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO,
+  public val type: AccelerationPreference =
+      AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED,
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -89,7 +90,7 @@ public class AcceleratorInfo(
 
   public fun copy(
     name: String = this.name,
-    type: AcceleratorPreference = this.type,
+    type: AccelerationPreference = this.type,
     available: Boolean = this.available,
     unknownFields: ByteString = this.unknownFields,
   ): AcceleratorInfo = AcceleratorInfo(name, type, available, unknownFields)
@@ -107,8 +108,8 @@ public class AcceleratorInfo(
       override fun encodedSize(`value`: AcceleratorInfo): Int {
         var size = value.unknownFields.size
         if (value.name != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.name)
-        if (value.type != AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO) size +=
-            AcceleratorPreference.ADAPTER.encodedSizeWithTag(2, value.type)
+        if (value.type != AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED) size +=
+            AccelerationPreference.ADAPTER.encodedSizeWithTag(2, value.type)
         if (value.available != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(3,
             value.available)
         return size
@@ -116,8 +117,8 @@ public class AcceleratorInfo(
 
       override fun encode(writer: ProtoWriter, `value`: AcceleratorInfo) {
         if (value.name != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.name)
-        if (value.type != AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO)
-            AcceleratorPreference.ADAPTER.encodeWithTag(writer, 2, value.type)
+        if (value.type != AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED)
+            AccelerationPreference.ADAPTER.encodeWithTag(writer, 2, value.type)
         if (value.available != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.available)
         writer.writeBytes(value.unknownFields)
       }
@@ -125,20 +126,21 @@ public class AcceleratorInfo(
       override fun encode(writer: ReverseProtoWriter, `value`: AcceleratorInfo) {
         writer.writeBytes(value.unknownFields)
         if (value.available != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3, value.available)
-        if (value.type != AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO)
-            AcceleratorPreference.ADAPTER.encodeWithTag(writer, 2, value.type)
+        if (value.type != AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED)
+            AccelerationPreference.ADAPTER.encodeWithTag(writer, 2, value.type)
         if (value.name != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.name)
       }
 
       override fun decode(reader: ProtoReader): AcceleratorInfo {
         var name: String = ""
-        var type: AcceleratorPreference = AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO
+        var type: AccelerationPreference =
+            AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED
         var available: Boolean = false
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> name = ProtoAdapter.STRING.decode(reader)
             2 -> try {
-              type = AcceleratorPreference.ADAPTER.decode(reader)
+              type = AccelerationPreference.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }

@@ -11,9 +11,11 @@ import ai.runanywhere.proto.v1.StructuredOutputParseRequest
 import ai.runanywhere.proto.v1.StructuredOutputPromptResult
 import ai.runanywhere.proto.v1.StructuredOutputRequest
 import ai.runanywhere.proto.v1.StructuredOutputResult
+import ai.runanywhere.proto.v1.StructuredOutputStreamEvent
 import ai.runanywhere.proto.v1.StructuredOutputValidation
 import ai.runanywhere.proto.v1.StructuredOutputValidationRequest
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
@@ -45,6 +47,30 @@ object CppBridgeStructuredOutput {
             ),
             "racStructuredOutputParseProto",
         )
+
+    /**
+     * Stream native structured-output generation. Commons emits one typed
+     * [StructuredOutputStreamEvent] per callback invocation (TOKEN /
+     * PARTIAL_JSON / COMPLETED / ERROR). The Kotlin layer simply decodes and
+     * forwards — no StringBuilder accumulation, no JSON parsing.
+     */
+    fun generateStream(
+        request: StructuredOutputRequest,
+        onEvent: (StructuredOutputStreamEvent) -> Boolean,
+    ) {
+        val rc =
+            RunAnywhereBridge.racStructuredOutputGenerateStreamProto(
+                StructuredOutputRequest.ADAPTER.encode(request),
+                NativeProtoProgressListener { bytes ->
+                    onEvent(StructuredOutputStreamEvent.ADAPTER.decode(bytes))
+                },
+            )
+        if (rc != RunAnywhereBridge.RAC_SUCCESS) {
+            throw SDKException.operation(
+                "racStructuredOutputGenerateStreamProto failed with rc=$rc",
+            )
+        }
+    }
 
     private fun <M : Message<M, *>> decodeOrThrow(
         adapter: ProtoAdapter<M>,

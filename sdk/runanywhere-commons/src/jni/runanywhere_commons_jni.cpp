@@ -5669,125 +5669,6 @@ Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_00024JniBridge_nativeU
 }
 
 // =============================================================================
-// JNI FUNCTIONS - LLMStreamAdapter (rac_llm_set_stream_proto_callback)
-// =============================================================================
-//
-// v2 close-out Phase G-2. Same pattern as VaStreamCallbackCtx above — one
-// heap-allocated LlmStreamCallbackCtx per registration, Function1.invoke()
-// method ID cached, trampoline attaches the thread if needed.
-//
-// The C ABI has ONE callback slot per LLM component handle. Kotlin's
-// LLMStreamAdapter builds per-handle fan-out on top (same shape as
-// VoiceAgentStreamAdapter.HandleFanOut).
-
-namespace {
-
-struct LlmStreamCallbackCtx {
-    jobject   lambda_ref;
-    jclass    function1_cls;
-    jmethodID invoke_mid;
-};
-
-void llm_stream_trampoline(const uint8_t* event_bytes,
-                           size_t         event_size,
-                           void*          user_data) {
-    if (!user_data || !event_bytes || !g_jvm) return;
-
-    auto* ctx = static_cast<LlmStreamCallbackCtx*>(user_data);
-
-    JNIEnv* env          = nullptr;
-    bool    needs_detach = false;
-    jint    getEnvRc     = g_jvm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6);
-    if (getEnvRc == JNI_EDETACHED) {
-        if (g_jvm->AttachCurrentThread(RAC_JNI_ATTACH_ENVPP(&env), nullptr) != JNI_OK) {
-            return;
-        }
-        needs_detach = true;
-    } else if (getEnvRc != JNI_OK) {
-        return;
-    }
-
-    jbyteArray jbytes = env->NewByteArray(static_cast<jsize>(event_size));
-    if (jbytes) {
-        env->SetByteArrayRegion(
-            jbytes, 0, static_cast<jsize>(event_size),
-            reinterpret_cast<const jbyte*>(event_bytes));
-        env->CallObjectMethod(ctx->lambda_ref, ctx->invoke_mid, jbytes);
-        if (env->ExceptionCheck()) {
-            env->ExceptionDescribe();
-            env->ExceptionClear();
-        }
-        env->DeleteLocalRef(jbytes);
-    }
-
-    if (needs_detach) {
-        g_jvm->DetachCurrentThread();
-    }
-}
-
-}  // namespace
-
-extern "C" JNIEXPORT jlong JNICALL
-Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_00024JniBridge_nativeRegisterCallback(
-    JNIEnv* env, jclass /*cls*/, jlong handle, jobject kotlinCallback) {
-    if (!kotlinCallback || handle == 0) {
-        return 0;
-    }
-
-    jobject lambdaRef = env->NewGlobalRef(kotlinCallback);
-    if (!lambdaRef) return 0;
-
-    jclass localFunction1 = env->FindClass("kotlin/jvm/functions/Function1");
-    if (!localFunction1) {
-        env->DeleteGlobalRef(lambdaRef);
-        return 0;
-    }
-    jclass function1Cls = reinterpret_cast<jclass>(env->NewGlobalRef(localFunction1));
-    env->DeleteLocalRef(localFunction1);
-    jmethodID invokeMid =
-        env->GetMethodID(function1Cls, "invoke", "(Ljava/lang/Object;)Ljava/lang/Object;");
-    if (!invokeMid) {
-        env->DeleteGlobalRef(lambdaRef);
-        env->DeleteGlobalRef(function1Cls);
-        return 0;
-    }
-
-    auto* ctx           = new LlmStreamCallbackCtx{};
-    ctx->lambda_ref     = lambdaRef;
-    ctx->function1_cls  = function1Cls;
-    ctx->invoke_mid     = invokeMid;
-
-    rac_handle_t racHandle =
-        reinterpret_cast<rac_handle_t>(static_cast<uintptr_t>(handle));
-    rac_result_t rc =
-        rac_llm_set_stream_proto_callback(racHandle, &llm_stream_trampoline, ctx);
-    if (rc != RAC_SUCCESS) {
-        env->DeleteGlobalRef(ctx->lambda_ref);
-        env->DeleteGlobalRef(ctx->function1_cls);
-        delete ctx;
-        return 0;
-    }
-
-    return static_cast<jlong>(reinterpret_cast<uintptr_t>(ctx));
-}
-
-extern "C" JNIEXPORT void JNICALL
-Java_com_runanywhere_sdk_adapters_LLMStreamAdapter_00024JniBridge_nativeUnregisterCallback(
-    JNIEnv* env, jclass /*cls*/, jlong handle, jlong callbackId) {
-    if (callbackId == 0) return;
-
-    rac_handle_t racHandle =
-        reinterpret_cast<rac_handle_t>(static_cast<uintptr_t>(handle));
-    rac_llm_unset_stream_proto_callback(racHandle);
-
-    auto* ctx = reinterpret_cast<LlmStreamCallbackCtx*>(
-        static_cast<uintptr_t>(callbackId));
-    if (ctx->lambda_ref)    env->DeleteGlobalRef(ctx->lambda_ref);
-    if (ctx->function1_cls) env->DeleteGlobalRef(ctx->function1_cls);
-    delete ctx;
-}
-
-// =============================================================================
 // Generated-proto modality ABI thunks
 // =============================================================================
 
@@ -6002,6 +5883,100 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentSetActiv
     return static_cast<jint>(rac_vad_component_set_activity_proto_callback(
         handleFromJLong(handle), listener != nullptr ? vad_activity_proto_callback : nullptr,
         listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
+}
+
+// =============================================================================
+// VAD STREAM PROTO ABI (rac_vad_stream.h) — Wave H-5
+// =============================================================================
+
+static std::mutex g_vad_stream_listener_mutex;
+static std::unordered_map<uintptr_t, jobject> g_vad_stream_listeners;
+
+static void vad_stream_proto_callback(const uint8_t* proto_bytes, size_t proto_size,
+                                      void* user_data) {
+    uintptr_t key = reinterpret_cast<uintptr_t>(user_data);
+    JNIEnv* env = getJNIEnv();
+    if (env == nullptr) return;
+    jobject listener = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_vad_stream_listener_mutex);
+        auto it = g_vad_stream_listeners.find(key);
+        if (it != g_vad_stream_listeners.end() && it->second != nullptr) {
+            listener = env->NewLocalRef(it->second);
+        }
+    }
+    if (listener != nullptr) {
+        invokeProtoListener(env, listener, proto_bytes, proto_size, "vadStreamProtoCallback");
+        env->DeleteLocalRef(listener);
+    }
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadSetStreamProtoCallback(
+    JNIEnv* env, jclass clazz, jlong handle, jobject listener) {
+    (void)clazz;
+    if (handle == 0L) return RAC_ERROR_NULL_POINTER;
+    uintptr_t key = static_cast<uintptr_t>(handle);
+    {
+        std::lock_guard<std::mutex> lock(g_vad_stream_listener_mutex);
+        auto it = g_vad_stream_listeners.find(key);
+        if (it != g_vad_stream_listeners.end()) {
+            env->DeleteGlobalRef(it->second);
+            g_vad_stream_listeners.erase(it);
+        }
+        if (listener != nullptr) {
+            g_vad_stream_listeners[key] = env->NewGlobalRef(listener);
+        }
+    }
+    return static_cast<jint>(rac_vad_set_stream_proto_callback(
+        handleFromJLong(handle), listener != nullptr ? vad_stream_proto_callback : nullptr,
+        listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
+}
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadStreamStartProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray optionsProto) {
+    (void)clazz;
+    if (handle == 0L) return 0L;
+    JByteArrayView options(env, optionsProto, true);
+    if (!options.ok) return 0L;
+    uint64_t sessionId = 0;
+    rac_result_t rc = rac_vad_stream_start_proto(
+        handleFromJLong(handle), options.u8(), options.size(), &sessionId);
+    if (rc != RAC_SUCCESS) {
+        LOGe("racVadStreamStartProto: failed with code %d", rc);
+        return 0L;
+    }
+    return static_cast<jlong>(sessionId);
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadStreamFeedAudioProto(
+    JNIEnv* env, jclass clazz, jlong sessionId, jbyteArray audioBytes) {
+    (void)clazz;
+    if (sessionId == 0L) return RAC_ERROR_INVALID_ARGUMENT;
+    JByteArrayView audio(env, audioBytes, true);
+    if (!audio.ok) return RAC_ERROR_NULL_POINTER;
+    return static_cast<jint>(rac_vad_stream_feed_audio_proto(
+        static_cast<uint64_t>(sessionId), audio.u8(), audio.size()));
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadStreamStopProto(
+    JNIEnv* env, jclass clazz, jlong sessionId) {
+    (void)env;
+    (void)clazz;
+    if (sessionId == 0L) return RAC_ERROR_INVALID_ARGUMENT;
+    return static_cast<jint>(rac_vad_stream_stop_proto(static_cast<uint64_t>(sessionId)));
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadStreamCancelProto(
+    JNIEnv* env, jclass clazz, jlong sessionId) {
+    (void)env;
+    (void)clazz;
+    if (sessionId == 0L) return RAC_ERROR_INVALID_ARGUMENT;
+    return static_cast<jint>(rac_vad_stream_cancel_proto(static_cast<uint64_t>(sessionId)));
 }
 
 JNIEXPORT jlong JNICALL
@@ -7088,6 +7063,25 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputVali
     JNIEnv* env, jclass clazz, jbyteArray requestProto) {
     return callProtoBufferFn(env, requestProto, rac_structured_output_validate_proto,
                              "racStructuredOutputValidateProto");
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputGenerateStreamProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto, jobject listener) {
+    (void)clazz;
+    JByteArrayView request(env, requestProto);
+    if (!request.ok) return RAC_ERROR_NULL_POINTER;
+
+    jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
+    ProtoListenerUserData ctx{globalListener, "racStructuredOutputGenerateStreamProto"};
+    rac_result_t rc = rac_structured_output_generate_stream_proto(
+        request.u8(), request.size(),
+        globalListener != nullptr ? proto_void_callback : nullptr,
+        globalListener != nullptr ? &ctx : nullptr);
+    if (globalListener != nullptr) {
+        env->DeleteGlobalRef(globalListener);
+    }
+    return static_cast<jint>(rc);
 }
 
 JNIEXPORT jbyteArray JNICALL

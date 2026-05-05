@@ -68,6 +68,7 @@ class VADStreamEventKind extends $pb.ProtobufEnum {
   static const VADStreamEventKind VAD_STREAM_EVENT_KIND_STATISTICS = VADStreamEventKind._(4, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_STATISTICS');
   static const VADStreamEventKind VAD_STREAM_EVENT_KIND_STOPPED = VADStreamEventKind._(5, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_STOPPED');
   static const VADStreamEventKind VAD_STREAM_EVENT_KIND_ERROR = VADStreamEventKind._(6, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_ERROR');
+  static const VADStreamEventKind VAD_STREAM_EVENT_KIND_BARGE_IN = VADStreamEventKind._(7, _omitEnumNames ? '' : 'VAD_STREAM_EVENT_KIND_BARGE_IN');
 
   static const $core.List<VADStreamEventKind> values = <VADStreamEventKind> [
     VAD_STREAM_EVENT_KIND_UNSPECIFIED,
@@ -77,6 +78,7 @@ class VADStreamEventKind extends $pb.ProtobufEnum {
     VAD_STREAM_EVENT_KIND_STATISTICS,
     VAD_STREAM_EVENT_KIND_STOPPED,
     VAD_STREAM_EVENT_KIND_ERROR,
+    VAD_STREAM_EVENT_KIND_BARGE_IN,
   ];
 
   static final $core.Map<$core.int, VADStreamEventKind> _byValue = $pb.ProtobufEnum.initByValue(values);

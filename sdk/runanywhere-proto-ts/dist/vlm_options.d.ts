@@ -69,47 +69,6 @@ export declare enum VLMModelFamily {
 }
 export declare function vLMModelFamilyFromJSON(object: any): VLMModelFamily;
 export declare function vLMModelFamilyToJSON(object: VLMModelFamily): string;
-/**
- * ---------------------------------------------------------------------------
- * VLM error codes — canonical SDK-facing surface.
- * Sources pre-IDL:
- *   Swift  CppBridge+VLM.swift:184  (notInitialized=1, modelLoadFailed=2,
- *                                    processingFailed=3, invalidImage=4,
- *                                    cancelled=5)
- *   Dart   vlm_types.dart:164       (notInitialized=1, modelLoadFailed=2,
- *                                    processingFailed=3, invalidImage=4,
- *                                    cancelled=5)
- *   RN     VLMTypes.ts:44           (NotInitialized=1, ModelLoadFailed=2,
- *                                    ProcessingFailed=3, InvalidImage=4,
- *                                    Cancelled=5)
- *   Kotlin / Web                    (no enum declared pre-IDL)
- *
- * The canonicalized set below narrows the surface to image-specific failure
- * modes that the C ABI can distinguish at the boundary; transport / lifecycle
- * errors (notInitialized, modelLoadFailed, processingFailed, cancelled) are
- * folded back into the shared rac_result_t error codes in rac_error.h and do
- * not appear here.
- * ---------------------------------------------------------------------------
- */
-export declare enum VLMErrorCode {
-    VLM_ERROR_CODE_UNSPECIFIED = 0,
-    /** VLM_ERROR_CODE_INVALID_IMAGE - Swift/Dart/RN invalidImage */
-    VLM_ERROR_CODE_INVALID_IMAGE = 1,
-    /** VLM_ERROR_CODE_MODEL_NOT_LOADED - Swift/Dart/RN notInitialized + */
-    VLM_ERROR_CODE_MODEL_NOT_LOADED = 2,
-    /** VLM_ERROR_CODE_UNSUPPORTED_FORMAT - modelLoadFailed */
-    VLM_ERROR_CODE_UNSUPPORTED_FORMAT = 3,
-    /** VLM_ERROR_CODE_IMAGE_TOO_LARGE - backend cannot decode */
-    VLM_ERROR_CODE_IMAGE_TOO_LARGE = 4,
-    /** VLM_ERROR_CODE_NOT_INITIALIZED - VLMConfiguration.max_image_size_px */
-    VLM_ERROR_CODE_NOT_INITIALIZED = 5,
-    VLM_ERROR_CODE_MODEL_LOAD_FAILED = 6,
-    VLM_ERROR_CODE_PROCESSING_FAILED = 7,
-    VLM_ERROR_CODE_CANCELLED = 8,
-    UNRECOGNIZED = -1
-}
-export declare function vLMErrorCodeFromJSON(object: any): VLMErrorCode;
-export declare function vLMErrorCodeToJSON(object: VLMErrorCode): string;
 export declare enum VLMStreamEventKind {
     VLM_STREAM_EVENT_KIND_UNSPECIFIED = 0,
     VLM_STREAM_EVENT_KIND_STARTED = 1,

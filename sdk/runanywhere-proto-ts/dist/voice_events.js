@@ -6,6 +6,8 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
+import { errorCodeFromJSON, errorCodeToJSON } from "./errors";
+import { vADStreamEventKindFromJSON, vADStreamEventKindToJSON } from "./vad_options";
 export const protobufPackage = "runanywhere.v1";
 export var VoiceEventCategory;
 (function (VoiceEventCategory) {
@@ -309,67 +311,6 @@ export function audioEncodingToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
-export var VADEventType;
-(function (VADEventType) {
-    VADEventType[VADEventType["VAD_EVENT_UNSPECIFIED"] = 0] = "VAD_EVENT_UNSPECIFIED";
-    VADEventType[VADEventType["VAD_EVENT_VOICE_START"] = 1] = "VAD_EVENT_VOICE_START";
-    VADEventType[VADEventType["VAD_EVENT_VOICE_END_OF_UTTERANCE"] = 2] = "VAD_EVENT_VOICE_END_OF_UTTERANCE";
-    VADEventType[VADEventType["VAD_EVENT_BARGE_IN"] = 3] = "VAD_EVENT_BARGE_IN";
-    VADEventType[VADEventType["VAD_EVENT_SILENCE"] = 4] = "VAD_EVENT_SILENCE";
-    VADEventType[VADEventType["VAD_EVENT_STATISTICS"] = 5] = "VAD_EVENT_STATISTICS";
-    VADEventType[VADEventType["VAD_EVENT_STATE_CHANGED"] = 6] = "VAD_EVENT_STATE_CHANGED";
-    VADEventType[VADEventType["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(VADEventType || (VADEventType = {}));
-export function vADEventTypeFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "VAD_EVENT_UNSPECIFIED":
-            return VADEventType.VAD_EVENT_UNSPECIFIED;
-        case 1:
-        case "VAD_EVENT_VOICE_START":
-            return VADEventType.VAD_EVENT_VOICE_START;
-        case 2:
-        case "VAD_EVENT_VOICE_END_OF_UTTERANCE":
-            return VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE;
-        case 3:
-        case "VAD_EVENT_BARGE_IN":
-            return VADEventType.VAD_EVENT_BARGE_IN;
-        case 4:
-        case "VAD_EVENT_SILENCE":
-            return VADEventType.VAD_EVENT_SILENCE;
-        case 5:
-        case "VAD_EVENT_STATISTICS":
-            return VADEventType.VAD_EVENT_STATISTICS;
-        case 6:
-        case "VAD_EVENT_STATE_CHANGED":
-            return VADEventType.VAD_EVENT_STATE_CHANGED;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return VADEventType.UNRECOGNIZED;
-    }
-}
-export function vADEventTypeToJSON(object) {
-    switch (object) {
-        case VADEventType.VAD_EVENT_UNSPECIFIED:
-            return "VAD_EVENT_UNSPECIFIED";
-        case VADEventType.VAD_EVENT_VOICE_START:
-            return "VAD_EVENT_VOICE_START";
-        case VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE:
-            return "VAD_EVENT_VOICE_END_OF_UTTERANCE";
-        case VADEventType.VAD_EVENT_BARGE_IN:
-            return "VAD_EVENT_BARGE_IN";
-        case VADEventType.VAD_EVENT_SILENCE:
-            return "VAD_EVENT_SILENCE";
-        case VADEventType.VAD_EVENT_STATISTICS:
-            return "VAD_EVENT_STATISTICS";
-        case VADEventType.VAD_EVENT_STATE_CHANGED:
-            return "VAD_EVENT_STATE_CHANGED";
-        case VADEventType.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
 export var InterruptReason;
 (function (InterruptReason) {
     InterruptReason[InterruptReason["INTERRUPT_REASON_UNSPECIFIED"] = 0] = "INTERRUPT_REASON_UNSPECIFIED";
@@ -560,55 +501,6 @@ export function componentLoadStateToJSON(object) {
         case ComponentLoadState.COMPONENT_LOAD_STATE_ERROR:
             return "COMPONENT_LOAD_STATE_ERROR";
         case ComponentLoadState.UNRECOGNIZED:
-        default:
-            return "UNRECOGNIZED";
-    }
-}
-export var VoiceSessionErrorCode;
-(function (VoiceSessionErrorCode) {
-    VoiceSessionErrorCode[VoiceSessionErrorCode["VOICE_SESSION_ERROR_CODE_UNSPECIFIED"] = 0] = "VOICE_SESSION_ERROR_CODE_UNSPECIFIED";
-    VoiceSessionErrorCode[VoiceSessionErrorCode["VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED"] = 1] = "VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED";
-    VoiceSessionErrorCode[VoiceSessionErrorCode["VOICE_SESSION_ERROR_CODE_NOT_READY"] = 2] = "VOICE_SESSION_ERROR_CODE_NOT_READY";
-    VoiceSessionErrorCode[VoiceSessionErrorCode["VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING"] = 3] = "VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING";
-    VoiceSessionErrorCode[VoiceSessionErrorCode["VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE"] = 4] = "VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE";
-    VoiceSessionErrorCode[VoiceSessionErrorCode["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
-})(VoiceSessionErrorCode || (VoiceSessionErrorCode = {}));
-export function voiceSessionErrorCodeFromJSON(object) {
-    switch (object) {
-        case 0:
-        case "VOICE_SESSION_ERROR_CODE_UNSPECIFIED":
-            return VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_UNSPECIFIED;
-        case 1:
-        case "VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED":
-            return VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED;
-        case 2:
-        case "VOICE_SESSION_ERROR_CODE_NOT_READY":
-            return VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_NOT_READY;
-        case 3:
-        case "VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING":
-            return VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING;
-        case 4:
-        case "VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE":
-            return VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE;
-        case -1:
-        case "UNRECOGNIZED":
-        default:
-            return VoiceSessionErrorCode.UNRECOGNIZED;
-    }
-}
-export function voiceSessionErrorCodeToJSON(object) {
-    switch (object) {
-        case VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_UNSPECIFIED:
-            return "VOICE_SESSION_ERROR_CODE_UNSPECIFIED";
-        case VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED:
-            return "VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED";
-        case VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_NOT_READY:
-            return "VOICE_SESSION_ERROR_CODE_NOT_READY";
-        case VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING:
-            return "VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING";
-        case VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE:
-            return "VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE";
-        case VoiceSessionErrorCode.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";
     }
@@ -1832,7 +1724,7 @@ export const VADEvent = {
     },
     fromJSON(object) {
         return {
-            type: isSet(object.type) ? vADEventTypeFromJSON(object.type) : 0,
+            type: isSet(object.type) ? vADStreamEventKindFromJSON(object.type) : 0,
             frameOffsetUs: isSet(object.frameOffsetUs) ? globalThis.Number(object.frameOffsetUs) : 0,
             confidence: isSet(object.confidence) ? globalThis.Number(object.confidence) : 0,
             isSpeech: isSet(object.isSpeech) ? globalThis.Boolean(object.isSpeech) : false,
@@ -1844,7 +1736,7 @@ export const VADEvent = {
     toJSON(message) {
         const obj = {};
         if (message.type !== 0) {
-            obj.type = vADEventTypeToJSON(message.type);
+            obj.type = vADStreamEventKindToJSON(message.type);
         }
         if (message.frameOffsetUs !== 0) {
             obj.frameOffsetUs = Math.round(message.frameOffsetUs);
@@ -2770,7 +2662,7 @@ export const VoiceSessionError = {
     },
     fromJSON(object) {
         return {
-            code: isSet(object.code) ? voiceSessionErrorCodeFromJSON(object.code) : 0,
+            code: isSet(object.code) ? errorCodeFromJSON(object.code) : 0,
             message: isSet(object.message) ? globalThis.String(object.message) : "",
             failedComponent: isSet(object.failedComponent) ? globalThis.String(object.failedComponent) : undefined,
             cAbiCode: isSet(object.cAbiCode) ? globalThis.Number(object.cAbiCode) : 0,
@@ -2780,7 +2672,7 @@ export const VoiceSessionError = {
     toJSON(message) {
         const obj = {};
         if (message.code !== 0) {
-            obj.code = voiceSessionErrorCodeToJSON(message.code);
+            obj.code = errorCodeToJSON(message.code);
         }
         if (message.message !== "") {
             obj.message = message.message;

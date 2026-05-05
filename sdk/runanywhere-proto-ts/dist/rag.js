@@ -338,7 +338,6 @@ function createBaseRAGDocument() {
     return {
         id: "",
         text: "",
-        metadataJson: undefined,
         metadata: {},
         sourceUri: undefined,
         adapterHandle: undefined,
@@ -353,9 +352,6 @@ export const RAGDocument = {
         }
         if (message.text !== "") {
             writer.uint32(18).string(message.text);
-        }
-        if (message.metadataJson !== undefined) {
-            writer.uint32(26).string(message.metadataJson);
         }
         Object.entries(message.metadata).forEach(([key, value]) => {
             RAGDocument_MetadataEntry.encode({ key: key, value }, writer.uint32(34).fork()).ldelim();
@@ -392,12 +388,6 @@ export const RAGDocument = {
                         break;
                     }
                     message.text = reader.string();
-                    continue;
-                case 3:
-                    if (tag !== 26) {
-                        break;
-                    }
-                    message.metadataJson = reader.string();
                     continue;
                 case 4:
                     if (tag !== 34) {
@@ -444,7 +434,6 @@ export const RAGDocument = {
         return {
             id: isSet(object.id) ? globalThis.String(object.id) : "",
             text: isSet(object.text) ? globalThis.String(object.text) : "",
-            metadataJson: isSet(object.metadataJson) ? globalThis.String(object.metadataJson) : undefined,
             metadata: isObject(object.metadata)
                 ? Object.entries(object.metadata).reduce((acc, [key, value]) => {
                     acc[key] = String(value);
@@ -464,9 +453,6 @@ export const RAGDocument = {
         }
         if (message.text !== "") {
             obj.text = message.text;
-        }
-        if (message.metadataJson !== undefined) {
-            obj.metadataJson = message.metadataJson;
         }
         if (message.metadata) {
             const entries = Object.entries(message.metadata);
@@ -498,7 +484,6 @@ export const RAGDocument = {
         const message = createBaseRAGDocument();
         message.id = object.id ?? "";
         message.text = object.text ?? "";
-        message.metadataJson = object.metadataJson ?? undefined;
         message.metadata = Object.entries(object.metadata ?? {}).reduce((acc, [key, value]) => {
             if (value !== undefined) {
                 acc[key] = globalThis.String(value);
@@ -1107,7 +1092,6 @@ function createBaseRAGSearchResult() {
         similarityScore: 0,
         sourceDocument: undefined,
         metadata: {},
-        metadataJson: undefined,
         rank: 0,
         startOffset: 0,
         endOffset: 0,
@@ -1131,9 +1115,6 @@ export const RAGSearchResult = {
         Object.entries(message.metadata).forEach(([key, value]) => {
             RAGSearchResult_MetadataEntry.encode({ key: key, value }, writer.uint32(42).fork()).ldelim();
         });
-        if (message.metadataJson !== undefined) {
-            writer.uint32(50).string(message.metadataJson);
-        }
         if (message.rank !== 0) {
             writer.uint32(56).int32(message.rank);
         }
@@ -1188,12 +1169,6 @@ export const RAGSearchResult = {
                         message.metadata[entry5.key] = entry5.value;
                     }
                     continue;
-                case 6:
-                    if (tag !== 50) {
-                        break;
-                    }
-                    message.metadataJson = reader.string();
-                    continue;
                 case 7:
                     if (tag !== 56) {
                         break;
@@ -1238,7 +1213,6 @@ export const RAGSearchResult = {
                     return acc;
                 }, {})
                 : {},
-            metadataJson: isSet(object.metadataJson) ? globalThis.String(object.metadataJson) : undefined,
             rank: isSet(object.rank) ? globalThis.Number(object.rank) : 0,
             startOffset: isSet(object.startOffset) ? globalThis.Number(object.startOffset) : 0,
             endOffset: isSet(object.endOffset) ? globalThis.Number(object.endOffset) : 0,
@@ -1267,9 +1241,6 @@ export const RAGSearchResult = {
                     obj.metadata[k] = v;
                 });
             }
-        }
-        if (message.metadataJson !== undefined) {
-            obj.metadataJson = message.metadataJson;
         }
         if (message.rank !== 0) {
             obj.rank = Math.round(message.rank);
@@ -1300,7 +1271,6 @@ export const RAGSearchResult = {
             }
             return acc;
         }, {});
-        message.metadataJson = object.metadataJson ?? undefined;
         message.rank = object.rank ?? 0;
         message.startOffset = object.startOffset ?? 0;
         message.endOffset = object.endOffset ?? 0;

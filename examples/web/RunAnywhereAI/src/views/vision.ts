@@ -1,10 +1,8 @@
 /**
  * Vision Tab — placeholder.
  *
- * The vision view previously captured webcam frames through
- * `VideoCapture` (still present in core) and dispatched VLM inference
- * through `VLMWorkerBridge.shared.process(...)`. The worker bridge lived
- * in `@runanywhere/web-llamacpp` and was deleted in the V2 cleanup.
+ * VLM worker bridge is at `@runanywhere/web-llamacpp/vlm-worker`. This
+ * view is awaiting WEB-08 re-land — see gaps/gaps/inconsistencies/web.md.
  */
 
 import type { TabLifecycle } from '../app';

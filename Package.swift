@@ -185,15 +185,13 @@ let package = Package(
             path: "sdk/runanywhere-swift/Sources/RunAnywhere",
             exclude: [
                 "CRACommons",
-                // v3.1 audit fix: *.grpc.swift imports GRPCCore/GRPCProtobuf and
-                // requires macOS 15 / iOS 18; our minimum platforms are macOS 14 /
-                // iOS 17. The hand-written VoiceAgentStreamAdapter provides the
-                // idiomatic AsyncStream path these stubs were supposed to expose,
-                // so excluding them is safe. If network gRPC is ever needed, bump
-                // platforms + wire grpc-swift v2 in dependencies above.
-                "Generated/voice_agent_service.grpc.swift",
-                "Generated/llm_service.grpc.swift",
-                "Generated/download_service.grpc.swift",
+                // SWF-grpc delete (Wave H-2): the previously-excluded
+                // `Generated/{voice_agent_service,llm_service,download_service}.grpc.swift`
+                // files are no longer emitted by `idl/codegen/generate_swift.sh` and
+                // have been removed from the repo. Swift consumes the same services
+                // through the hand-written AsyncStream adapters (VoiceAgentStreamAdapter,
+                // LLMStreamAdapter) that wrap the in-process C callback, so the gRPC
+                // stubs would only be dead code on macOS 14 / iOS 17.
             ],
             swiftSettings: [
                 .define("SWIFT_PACKAGE")

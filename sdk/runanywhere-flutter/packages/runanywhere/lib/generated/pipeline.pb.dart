@@ -9,6 +9,7 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
@@ -412,6 +413,341 @@ class PipelineOptions extends $pb.GeneratedMessage {
   $core.bool hasStrictValidation() => $_has(2);
   @$pb.TagNumber(3)
   void clearStrictValidation() => clearField(3);
+}
+
+/// Result of compiling a PipelineSpec into a runnable graph.
+class PipelineCompileResult extends $pb.GeneratedMessage {
+  factory PipelineCompileResult({
+    $core.String? handleId,
+    PipelineStatus? status,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (handleId != null) {
+      $result.handleId = handleId;
+    }
+    if (status != null) {
+      $result.status = status;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  PipelineCompileResult._() : super();
+  factory PipelineCompileResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory PipelineCompileResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'PipelineCompileResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'handleId')
+    ..e<PipelineStatus>(2, _omitFieldNames ? '' : 'status', $pb.PbFieldType.OE, defaultOrMaker: PipelineStatus.PIPELINE_STATUS_UNSPECIFIED, valueOf: PipelineStatus.valueOf, enumValues: PipelineStatus.values)
+    ..aOS(3, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(4, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  PipelineCompileResult clone() => PipelineCompileResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  PipelineCompileResult copyWith(void Function(PipelineCompileResult) updates) => super.copyWith((message) => updates(message as PipelineCompileResult)) as PipelineCompileResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static PipelineCompileResult create() => PipelineCompileResult._();
+  PipelineCompileResult createEmptyInstance() => create();
+  static $pb.PbList<PipelineCompileResult> createRepeated() => $pb.PbList<PipelineCompileResult>();
+  @$core.pragma('dart2js:noInline')
+  static PipelineCompileResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PipelineCompileResult>(create);
+  static PipelineCompileResult? _defaultInstance;
+
+  /// Opaque compiled-graph identifier. Empty on failure.
+  @$pb.TagNumber(1)
+  $core.String get handleId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set handleId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasHandleId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHandleId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  PipelineStatus get status => $_getN(1);
+  @$pb.TagNumber(2)
+  set status(PipelineStatus v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasStatus() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearStatus() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get errorMessage => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set errorMessage($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasErrorMessage() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearErrorMessage() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get errorCode => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set errorCode($core.int v) { $_setSignedInt32(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasErrorCode() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearErrorCode() => clearField(4);
+}
+
+/// Request to start a previously compiled pipeline.
+class PipelineStartRequest extends $pb.GeneratedMessage {
+  factory PipelineStartRequest({
+    $core.String? handleId,
+  }) {
+    final $result = create();
+    if (handleId != null) {
+      $result.handleId = handleId;
+    }
+    return $result;
+  }
+  PipelineStartRequest._() : super();
+  factory PipelineStartRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory PipelineStartRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'PipelineStartRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'handleId')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  PipelineStartRequest clone() => PipelineStartRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  PipelineStartRequest copyWith(void Function(PipelineStartRequest) updates) => super.copyWith((message) => updates(message as PipelineStartRequest)) as PipelineStartRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static PipelineStartRequest create() => PipelineStartRequest._();
+  PipelineStartRequest createEmptyInstance() => create();
+  static $pb.PbList<PipelineStartRequest> createRepeated() => $pb.PbList<PipelineStartRequest>();
+  @$core.pragma('dart2js:noInline')
+  static PipelineStartRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PipelineStartRequest>(create);
+  static PipelineStartRequest? _defaultInstance;
+
+  /// Identifier returned by Compile. Required.
+  @$pb.TagNumber(1)
+  $core.String get handleId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set handleId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasHandleId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHandleId() => clearField(1);
+}
+
+/// Live pipeline instance handle.
+class PipelineHandle extends $pb.GeneratedMessage {
+  factory PipelineHandle({
+    $core.String? handleId,
+    PipelineStatus? status,
+    $core.String? state,
+  }) {
+    final $result = create();
+    if (handleId != null) {
+      $result.handleId = handleId;
+    }
+    if (status != null) {
+      $result.status = status;
+    }
+    if (state != null) {
+      $result.state = state;
+    }
+    return $result;
+  }
+  PipelineHandle._() : super();
+  factory PipelineHandle.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory PipelineHandle.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'PipelineHandle', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'handleId')
+    ..e<PipelineStatus>(2, _omitFieldNames ? '' : 'status', $pb.PbFieldType.OE, defaultOrMaker: PipelineStatus.PIPELINE_STATUS_UNSPECIFIED, valueOf: PipelineStatus.valueOf, enumValues: PipelineStatus.values)
+    ..aOS(3, _omitFieldNames ? '' : 'state')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  PipelineHandle clone() => PipelineHandle()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  PipelineHandle copyWith(void Function(PipelineHandle) updates) => super.copyWith((message) => updates(message as PipelineHandle)) as PipelineHandle;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static PipelineHandle create() => PipelineHandle._();
+  PipelineHandle createEmptyInstance() => create();
+  static $pb.PbList<PipelineHandle> createRepeated() => $pb.PbList<PipelineHandle>();
+  @$core.pragma('dart2js:noInline')
+  static PipelineHandle getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PipelineHandle>(create);
+  static PipelineHandle? _defaultInstance;
+
+  /// Stable identifier for the started pipeline instance.
+  @$pb.TagNumber(1)
+  $core.String get handleId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set handleId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasHandleId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHandleId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  PipelineStatus get status => $_getN(1);
+  @$pb.TagNumber(2)
+  set status(PipelineStatus v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasStatus() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearStatus() => clearField(2);
+
+  /// Optional engine-specific state string (e.g. "running", "stopped").
+  @$pb.TagNumber(3)
+  $core.String get state => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set state($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasState() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearState() => clearField(3);
+}
+
+/// Result of stopping a pipeline instance.
+class PipelineStopResult extends $pb.GeneratedMessage {
+  factory PipelineStopResult({
+    $core.String? handleId,
+    PipelineStatus? status,
+    $core.String? errorMessage,
+    $core.int? errorCode,
+  }) {
+    final $result = create();
+    if (handleId != null) {
+      $result.handleId = handleId;
+    }
+    if (status != null) {
+      $result.status = status;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    return $result;
+  }
+  PipelineStopResult._() : super();
+  factory PipelineStopResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory PipelineStopResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'PipelineStopResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'handleId')
+    ..e<PipelineStatus>(2, _omitFieldNames ? '' : 'status', $pb.PbFieldType.OE, defaultOrMaker: PipelineStatus.PIPELINE_STATUS_UNSPECIFIED, valueOf: PipelineStatus.valueOf, enumValues: PipelineStatus.values)
+    ..aOS(3, _omitFieldNames ? '' : 'errorMessage')
+    ..a<$core.int>(4, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  PipelineStopResult clone() => PipelineStopResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  PipelineStopResult copyWith(void Function(PipelineStopResult) updates) => super.copyWith((message) => updates(message as PipelineStopResult)) as PipelineStopResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static PipelineStopResult create() => PipelineStopResult._();
+  PipelineStopResult createEmptyInstance() => create();
+  static $pb.PbList<PipelineStopResult> createRepeated() => $pb.PbList<PipelineStopResult>();
+  @$core.pragma('dart2js:noInline')
+  static PipelineStopResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<PipelineStopResult>(create);
+  static PipelineStopResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get handleId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set handleId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasHandleId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHandleId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  PipelineStatus get status => $_getN(1);
+  @$pb.TagNumber(2)
+  set status(PipelineStatus v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasStatus() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearStatus() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get errorMessage => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set errorMessage($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasErrorMessage() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearErrorMessage() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get errorCode => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set errorCode($core.int v) { $_setSignedInt32(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasErrorCode() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearErrorCode() => clearField(4);
+}
+
+class PipelineApi {
+  $pb.RpcClient _client;
+  PipelineApi(this._client);
+
+  $async.Future<PipelineCompileResult> compile($pb.ClientContext? ctx, PipelineSpec request) =>
+    _client.invoke<PipelineCompileResult>(ctx, 'Pipeline', 'Compile', request, PipelineCompileResult())
+  ;
+  $async.Future<PipelineHandle> start($pb.ClientContext? ctx, PipelineStartRequest request) =>
+    _client.invoke<PipelineHandle>(ctx, 'Pipeline', 'Start', request, PipelineHandle())
+  ;
+  $async.Future<PipelineStopResult> stop($pb.ClientContext? ctx, PipelineHandle request) =>
+    _client.invoke<PipelineStopResult>(ctx, 'Pipeline', 'Stop', request, PipelineStopResult())
+  ;
 }
 
 

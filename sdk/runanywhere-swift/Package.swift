@@ -135,14 +135,12 @@ let package = Package(
                 // exclude from this target's source list to avoid a double
                 // compile.
                 "CRACommons",
-                // *.grpc.swift imports GRPCCore/GRPCProtobuf and requires
-                // macOS 15 / iOS 18. Our minimum platforms are macOS 14 /
-                // iOS 17, so exclude the generated gRPC client stubs. The
-                // hand-written VoiceAgentStreamAdapter exposes the same
-                // AsyncStream surface without requiring grpc-swift v2.
-                "Generated/voice_agent_service.grpc.swift",
-                "Generated/llm_service.grpc.swift",
-                "Generated/download_service.grpc.swift",
+                // SWF-grpc delete (Wave H-2): the previously-excluded
+                // `Generated/{voice_agent_service,llm_service,download_service}.grpc.swift`
+                // files are no longer emitted by `idl/codegen/generate_swift.sh` and
+                // have been removed from the repo. The hand-written VoiceAgentStreamAdapter /
+                // LLMStreamAdapter expose the same AsyncStream surface over the
+                // in-process C callback, so no compilation target needs them.
             ],
             swiftSettings: [
                 .define("SWIFT_PACKAGE"),

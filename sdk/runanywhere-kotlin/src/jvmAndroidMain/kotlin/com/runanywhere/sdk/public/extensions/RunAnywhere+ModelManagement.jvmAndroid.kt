@@ -66,6 +66,12 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
     }
 }
 
+internal actual fun formatFromUrl(url: String): ModelFormat =
+    CppBridgeModelFormat.formatFromUrl(url)
+
+internal actual fun applyInferredArtifact(modelInfo: ModelInfo, url: String): ModelInfo =
+    CppBridgeModelFormat.applyInferredArtifact(modelInfo, url)
+
 private fun requireInitialized(sdk: RunAnywhere) {
     if (!sdk.isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")

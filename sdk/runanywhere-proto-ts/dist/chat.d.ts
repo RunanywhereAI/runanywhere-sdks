@@ -91,21 +91,11 @@ export interface ChatMessage {
      */
     name?: string | undefined;
     /**
-     * Optional tool calls embedded in this assistant message. Each entry is
-     * a JSON-encoded ToolCall (see tool_calling.proto) — kept as a string
-     * here to avoid a circular import; consumers parse on demand.
-     */
-    toolCallsJson: string[];
-    /**
      * Optional tool-call ID this message is responding to (only set when
      * role == MESSAGE_ROLE_TOOL).
      */
     toolCallId?: string | undefined;
-    /**
-     * Typed tool calls embedded in this assistant message. Supersedes
-     * tool_calls_json for generated-proto callers while keeping the legacy
-     * JSON string list available.
-     */
+    /** Typed tool calls embedded in this assistant message. */
     toolCalls: ToolCall[];
     /** Typed tool result carried by role == MESSAGE_ROLE_TOOL messages. */
     toolResult?: ToolResult | undefined;

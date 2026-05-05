@@ -9,6 +9,7 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -183,7 +184,7 @@ class HardwareProfile extends $pb.GeneratedMessage {
 class AcceleratorInfo extends $pb.GeneratedMessage {
   factory AcceleratorInfo({
     $core.String? name,
-    AcceleratorPreference? type,
+    AccelerationPreference? type,
     $core.bool? available,
   }) {
     final $result = create();
@@ -204,7 +205,7 @@ class AcceleratorInfo extends $pb.GeneratedMessage {
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'AcceleratorInfo', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'name')
-    ..e<AcceleratorPreference>(2, _omitFieldNames ? '' : 'type', $pb.PbFieldType.OE, defaultOrMaker: AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO, valueOf: AcceleratorPreference.valueOf, enumValues: AcceleratorPreference.values)
+    ..e<AccelerationPreference>(2, _omitFieldNames ? '' : 'type', $pb.PbFieldType.OE, defaultOrMaker: AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED, valueOf: AccelerationPreference.valueOf, enumValues: AccelerationPreference.values)
     ..aOB(3, _omitFieldNames ? '' : 'available')
     ..hasRequiredFields = false
   ;
@@ -240,9 +241,9 @@ class AcceleratorInfo extends $pb.GeneratedMessage {
   void clearName() => clearField(1);
 
   @$pb.TagNumber(2)
-  AcceleratorPreference get type => $_getN(1);
+  AccelerationPreference get type => $_getN(1);
   @$pb.TagNumber(2)
-  set type(AcceleratorPreference v) { setField(2, v); }
+  set type(AccelerationPreference v) { setField(2, v); }
   @$pb.TagNumber(2)
   $core.bool hasType() => $_has(1);
   @$pb.TagNumber(2)
@@ -316,6 +317,205 @@ class HardwareProfileResult extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(2)
   $core.List<AcceleratorInfo> get accelerators => $_getList(1);
+}
+
+/// Empty request for the cached hardware profile. The native probe is owned by
+/// platform adapters; this request carries no portable parameters today.
+class HardwareProfileRequest extends $pb.GeneratedMessage {
+  factory HardwareProfileRequest() => create();
+  HardwareProfileRequest._() : super();
+  factory HardwareProfileRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory HardwareProfileRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'HardwareProfileRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  HardwareProfileRequest clone() => HardwareProfileRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  HardwareProfileRequest copyWith(void Function(HardwareProfileRequest) updates) => super.copyWith((message) => updates(message as HardwareProfileRequest)) as HardwareProfileRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static HardwareProfileRequest create() => HardwareProfileRequest._();
+  HardwareProfileRequest createEmptyInstance() => create();
+  static $pb.PbList<HardwareProfileRequest> createRepeated() => $pb.PbList<HardwareProfileRequest>();
+  @$core.pragma('dart2js:noInline')
+  static HardwareProfileRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<HardwareProfileRequest>(create);
+  static HardwareProfileRequest? _defaultInstance;
+}
+
+/// Empty request for the accelerator list. Mirrors HardwareProfileRequest:
+/// platform probes own all OS-level acceleration discovery.
+class HardwareAcceleratorsRequest extends $pb.GeneratedMessage {
+  factory HardwareAcceleratorsRequest() => create();
+  HardwareAcceleratorsRequest._() : super();
+  factory HardwareAcceleratorsRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory HardwareAcceleratorsRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'HardwareAcceleratorsRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  HardwareAcceleratorsRequest clone() => HardwareAcceleratorsRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  HardwareAcceleratorsRequest copyWith(void Function(HardwareAcceleratorsRequest) updates) => super.copyWith((message) => updates(message as HardwareAcceleratorsRequest)) as HardwareAcceleratorsRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static HardwareAcceleratorsRequest create() => HardwareAcceleratorsRequest._();
+  HardwareAcceleratorsRequest createEmptyInstance() => create();
+  static $pb.PbList<HardwareAcceleratorsRequest> createRepeated() => $pb.PbList<HardwareAcceleratorsRequest>();
+  @$core.pragma('dart2js:noInline')
+  static HardwareAcceleratorsRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<HardwareAcceleratorsRequest>(create);
+  static HardwareAcceleratorsRequest? _defaultInstance;
+}
+
+/// Result-shaped response for SetAcceleratorPreference so the service contract
+/// stays consistent (every rpc returns a non-empty message).
+class HardwareAcceleratorPreferenceRequest extends $pb.GeneratedMessage {
+  factory HardwareAcceleratorPreferenceRequest({
+    AccelerationPreference? preference,
+  }) {
+    final $result = create();
+    if (preference != null) {
+      $result.preference = preference;
+    }
+    return $result;
+  }
+  HardwareAcceleratorPreferenceRequest._() : super();
+  factory HardwareAcceleratorPreferenceRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory HardwareAcceleratorPreferenceRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'HardwareAcceleratorPreferenceRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..e<AccelerationPreference>(1, _omitFieldNames ? '' : 'preference', $pb.PbFieldType.OE, defaultOrMaker: AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED, valueOf: AccelerationPreference.valueOf, enumValues: AccelerationPreference.values)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  HardwareAcceleratorPreferenceRequest clone() => HardwareAcceleratorPreferenceRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  HardwareAcceleratorPreferenceRequest copyWith(void Function(HardwareAcceleratorPreferenceRequest) updates) => super.copyWith((message) => updates(message as HardwareAcceleratorPreferenceRequest)) as HardwareAcceleratorPreferenceRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static HardwareAcceleratorPreferenceRequest create() => HardwareAcceleratorPreferenceRequest._();
+  HardwareAcceleratorPreferenceRequest createEmptyInstance() => create();
+  static $pb.PbList<HardwareAcceleratorPreferenceRequest> createRepeated() => $pb.PbList<HardwareAcceleratorPreferenceRequest>();
+  @$core.pragma('dart2js:noInline')
+  static HardwareAcceleratorPreferenceRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<HardwareAcceleratorPreferenceRequest>(create);
+  static HardwareAcceleratorPreferenceRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  AccelerationPreference get preference => $_getN(0);
+  @$pb.TagNumber(1)
+  set preference(AccelerationPreference v) { setField(1, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasPreference() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearPreference() => clearField(1);
+}
+
+class HardwareAcceleratorPreferenceResult extends $pb.GeneratedMessage {
+  factory HardwareAcceleratorPreferenceResult({
+    $core.bool? success,
+    $core.String? errorMessage,
+  }) {
+    final $result = create();
+    if (success != null) {
+      $result.success = success;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    return $result;
+  }
+  HardwareAcceleratorPreferenceResult._() : super();
+  factory HardwareAcceleratorPreferenceResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory HardwareAcceleratorPreferenceResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'HardwareAcceleratorPreferenceResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..aOS(2, _omitFieldNames ? '' : 'errorMessage')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  HardwareAcceleratorPreferenceResult clone() => HardwareAcceleratorPreferenceResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  HardwareAcceleratorPreferenceResult copyWith(void Function(HardwareAcceleratorPreferenceResult) updates) => super.copyWith((message) => updates(message as HardwareAcceleratorPreferenceResult)) as HardwareAcceleratorPreferenceResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static HardwareAcceleratorPreferenceResult create() => HardwareAcceleratorPreferenceResult._();
+  HardwareAcceleratorPreferenceResult createEmptyInstance() => create();
+  static $pb.PbList<HardwareAcceleratorPreferenceResult> createRepeated() => $pb.PbList<HardwareAcceleratorPreferenceResult>();
+  @$core.pragma('dart2js:noInline')
+  static HardwareAcceleratorPreferenceResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<HardwareAcceleratorPreferenceResult>(create);
+  static HardwareAcceleratorPreferenceResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool v) { $_setBool(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get errorMessage => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set errorMessage($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasErrorMessage() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearErrorMessage() => clearField(2);
+}
+
+class HardwareApi {
+  $pb.RpcClient _client;
+  HardwareApi(this._client);
+
+  $async.Future<HardwareProfileResult> getProfile($pb.ClientContext? ctx, HardwareProfileRequest request) =>
+    _client.invoke<HardwareProfileResult>(ctx, 'Hardware', 'GetProfile', request, HardwareProfileResult())
+  ;
+  $async.Future<HardwareProfileResult> getAccelerators($pb.ClientContext? ctx, HardwareAcceleratorsRequest request) =>
+    _client.invoke<HardwareProfileResult>(ctx, 'Hardware', 'GetAccelerators', request, HardwareProfileResult())
+  ;
+  $async.Future<HardwareAcceleratorPreferenceResult> setAcceleratorPreference($pb.ClientContext? ctx, HardwareAcceleratorPreferenceRequest request) =>
+    _client.invoke<HardwareAcceleratorPreferenceResult>(ctx, 'Hardware', 'SetAcceleratorPreference', request, HardwareAcceleratorPreferenceResult())
+  ;
 }
 
 

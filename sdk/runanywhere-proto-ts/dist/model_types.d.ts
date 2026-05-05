@@ -1,5 +1,6 @@
 import _m0 from "protobufjs/minimal";
-import { AcceleratorPreference, HardwareProfile } from "./hardware_profile";
+import { AccelerationPreference, HardwareProfile } from "./hardware_profile";
+import { ThinkingTagPattern } from "./thinking_tag_pattern";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -304,28 +305,6 @@ export declare function modelFileRoleFromJSON(object: any): ModelFileRole;
 export declare function modelFileRoleToJSON(object: ModelFileRole): string;
 /**
  * ---------------------------------------------------------------------------
- * Hardware acceleration preference for inference. Sources pre-IDL:
- *   Web    enums.ts:165   (Auto / WebGPU / CPU)
- *   Swift  extensions     (CPU / GPU / NPU / Metal)
- *   Kotlin enum           (CPU / GPU / NPU / Vulkan)
- * Canonicalized union below.
- * ---------------------------------------------------------------------------
- */
-export declare enum AccelerationPreference {
-    ACCELERATION_PREFERENCE_UNSPECIFIED = 0,
-    ACCELERATION_PREFERENCE_AUTO = 1,
-    ACCELERATION_PREFERENCE_CPU = 2,
-    ACCELERATION_PREFERENCE_GPU = 3,
-    ACCELERATION_PREFERENCE_NPU = 4,
-    ACCELERATION_PREFERENCE_WEBGPU = 5,
-    ACCELERATION_PREFERENCE_METAL = 6,
-    ACCELERATION_PREFERENCE_VULKAN = 7,
-    UNRECOGNIZED = -1
-}
-export declare function accelerationPreferenceFromJSON(object: any): AccelerationPreference;
-export declare function accelerationPreferenceToJSON(object: AccelerationPreference): string;
-/**
- * ---------------------------------------------------------------------------
  * Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
  *   Web    enums.ts (RoutingPolicy)
  *          OnDevicePreferred / CloudPreferred / OnDeviceOnly / CloudOnly /
@@ -346,15 +325,6 @@ export declare enum RoutingPolicy {
 }
 export declare function routingPolicyFromJSON(object: any): RoutingPolicy;
 export declare function routingPolicyToJSON(object: RoutingPolicy): string;
-/**
- * Model-level thinking tag metadata. This intentionally uses a model-specific
- * message name because llm_options.proto already owns the generation-options
- * ThinkingTagPattern message in this proto package.
- */
-export interface ModelThinkingTagPattern {
-    openTag: string;
-    closeTag: string;
-}
 export interface ModelInfoMetadata {
     description: string;
     author: string;
@@ -418,7 +388,7 @@ export interface ModelInfo {
      * Thinking/reasoning metadata. `supports_thinking` remains the boolean
      * capability flag; this optional pattern declares model-specific tags.
      */
-    thinkingPattern?: ModelThinkingTagPattern | undefined;
+    thinkingPattern?: ThinkingTagPattern | undefined;
     /**
      * Structured public catalog metadata. `description` (field 12) is kept for
      * backward compatibility and should mirror metadata.description when both
@@ -500,11 +470,6 @@ export interface ModelFileDescriptor {
      * newer SDK sources maps onto it (default true, mirrored in Swift).
      */
     sizeBytes?: number | undefined;
-    /**
-     * Legacy checksum field kept for generated consumers that already use it.
-     * Prefer checksum_sha256 for new manifests when the algorithm is known.
-     */
-    checksum?: string | undefined;
     /**
      * Path fields used by SDK-local wrappers/catalogs. `filename` is the
      * storage name for simple cases; relative_path/destination_path preserve
@@ -777,7 +742,7 @@ export interface ModelCompatibilityRequest {
      * Optional caller preferences (acceleration, framework). Reserved for
      * future use; today's verdict is based on memory/storage alone.
      */
-    acceleratorPreference?: AcceleratorPreference | undefined;
+    acceleratorPreference?: AccelerationPreference | undefined;
     preferredFramework?: InferenceFramework | undefined;
 }
 export interface ModelCompatibilityCheckResult {
@@ -919,14 +884,6 @@ export interface ModelRegistryFetchAssignmentsResult {
     errorCode: number;
     errorMessage: string;
 }
-export declare const ModelThinkingTagPattern: {
-    encode(message: ModelThinkingTagPattern, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ModelThinkingTagPattern;
-    fromJSON(object: any): ModelThinkingTagPattern;
-    toJSON(message: ModelThinkingTagPattern): unknown;
-    create<I extends Exact<DeepPartial<ModelThinkingTagPattern>, I>>(base?: I): ModelThinkingTagPattern;
-    fromPartial<I extends Exact<DeepPartial<ModelThinkingTagPattern>, I>>(object: I): ModelThinkingTagPattern;
-};
 export declare const ModelInfoMetadata: {
     encode(message: ModelInfoMetadata, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): ModelInfoMetadata;

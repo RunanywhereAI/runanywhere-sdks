@@ -95,18 +95,11 @@ type WorkerModuleFactory = (opts: {
 // Incoming RPC messages (must mirror the bridge's VLMWorkerCommand shape)
 // ---------------------------------------------------------------------------
 
+import type { VLMLoadModelParams } from '../Types/VLMWorkerTypes';
+
 interface InitPayload {
   wasmJsUrl: string;
   useWebGPU: boolean;
-}
-
-interface LoadModelPayload {
-  modelFilename: string;
-  mmprojFilename: string;
-  modelId: string;
-  modelName: string;
-  modelData: ArrayBuffer;
-  mmprojData: ArrayBuffer;
 }
 
 interface ProcessPayload {
@@ -116,7 +109,7 @@ interface ProcessPayload {
 
 type WorkerCommand =
   | { type: 'init'; id: number; payload: InitPayload }
-  | { type: 'load-model'; id: number; payload: LoadModelPayload }
+  | { type: 'load-model'; id: number; payload: VLMLoadModelParams }
   | { type: 'process'; id: number; payload: ProcessPayload }
   | { type: 'cancel'; id: number }
   | { type: 'unload'; id: number };
@@ -482,7 +475,7 @@ async function initWASM(wasmJsUrl: string, useWebGPU: boolean): Promise<void> {
 // Model loading
 // ---------------------------------------------------------------------------
 
-async function loadModel(payload: LoadModelPayload): Promise<void> {
+async function loadModel(payload: VLMLoadModelParams): Promise<void> {
   if (!wasmModule) throw new Error('[VLMWorker] initWASM() has not run');
   const m = wasmModule;
 

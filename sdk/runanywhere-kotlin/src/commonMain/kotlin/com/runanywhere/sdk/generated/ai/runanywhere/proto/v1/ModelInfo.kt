@@ -191,11 +191,11 @@ public class ModelInfo(
    */
   @field:WireField(
     tag = 18,
-    adapter = "ai.runanywhere.proto.v1.ModelThinkingTagPattern#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.ThinkingTagPattern#ADAPTER",
     jsonName = "thinkingPattern",
     schemaIndex = 17,
   )
-  public val thinking_pattern: ModelThinkingTagPattern? = null,
+  public val thinking_pattern: ThinkingTagPattern? = null,
   /**
    * Structured public catalog metadata. `description` (field 12) is kept for
    * backward compatibility and should mirror metadata.description when both
@@ -525,7 +525,7 @@ public class ModelInfo(
     updated_at_unix_ms: Long = this.updated_at_unix_ms,
     memory_required_bytes: Long? = this.memory_required_bytes,
     checksum_sha256: String? = this.checksum_sha256,
-    thinking_pattern: ModelThinkingTagPattern? = this.thinking_pattern,
+    thinking_pattern: ThinkingTagPattern? = this.thinking_pattern,
     metadata: ModelInfoMetadata? = this.metadata,
     single_file: SingleFileArtifact? = this.single_file,
     archive: ArchiveArtifact? = this.archive,
@@ -596,7 +596,7 @@ public class ModelInfo(
             value.updated_at_unix_ms)
         size += ProtoAdapter.INT64.encodedSizeWithTag(16, value.memory_required_bytes)
         size += ProtoAdapter.STRING.encodedSizeWithTag(17, value.checksum_sha256)
-        size += ModelThinkingTagPattern.ADAPTER.encodedSizeWithTag(18, value.thinking_pattern)
+        size += ThinkingTagPattern.ADAPTER.encodedSizeWithTag(18, value.thinking_pattern)
         size += ModelInfoMetadata.ADAPTER.encodedSizeWithTag(19, value.metadata)
         size += SingleFileArtifact.ADAPTER.encodedSizeWithTag(20, value.single_file)
         size += ArchiveArtifact.ADAPTER.encodedSizeWithTag(21, value.archive)
@@ -649,7 +649,7 @@ public class ModelInfo(
             value.updated_at_unix_ms)
         ProtoAdapter.INT64.encodeWithTag(writer, 16, value.memory_required_bytes)
         ProtoAdapter.STRING.encodeWithTag(writer, 17, value.checksum_sha256)
-        ModelThinkingTagPattern.ADAPTER.encodeWithTag(writer, 18, value.thinking_pattern)
+        ThinkingTagPattern.ADAPTER.encodeWithTag(writer, 18, value.thinking_pattern)
         ModelInfoMetadata.ADAPTER.encodeWithTag(writer, 19, value.metadata)
         ModelArtifactType.ADAPTER.encodeWithTag(writer, 25, value.artifact_type)
         ExpectedModelFiles.ADAPTER.encodeWithTag(writer, 26, value.expected_files)
@@ -693,7 +693,7 @@ public class ModelInfo(
         ExpectedModelFiles.ADAPTER.encodeWithTag(writer, 26, value.expected_files)
         ModelArtifactType.ADAPTER.encodeWithTag(writer, 25, value.artifact_type)
         ModelInfoMetadata.ADAPTER.encodeWithTag(writer, 19, value.metadata)
-        ModelThinkingTagPattern.ADAPTER.encodeWithTag(writer, 18, value.thinking_pattern)
+        ThinkingTagPattern.ADAPTER.encodeWithTag(writer, 18, value.thinking_pattern)
         ProtoAdapter.STRING.encodeWithTag(writer, 17, value.checksum_sha256)
         ProtoAdapter.INT64.encodeWithTag(writer, 16, value.memory_required_bytes)
         if (value.updated_at_unix_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 15,
@@ -743,7 +743,7 @@ public class ModelInfo(
         var updated_at_unix_ms: Long = 0L
         var memory_required_bytes: Long? = null
         var checksum_sha256: String? = null
-        var thinking_pattern: ModelThinkingTagPattern? = null
+        var thinking_pattern: ThinkingTagPattern? = null
         var metadata: ModelInfoMetadata? = null
         var single_file: SingleFileArtifact? = null
         var archive: ArchiveArtifact? = null
@@ -798,7 +798,7 @@ public class ModelInfo(
             15 -> updated_at_unix_ms = ProtoAdapter.INT64.decode(reader)
             16 -> memory_required_bytes = ProtoAdapter.INT64.decode(reader)
             17 -> checksum_sha256 = ProtoAdapter.STRING.decode(reader)
-            18 -> thinking_pattern = ModelThinkingTagPattern.ADAPTER.decode(reader)
+            18 -> thinking_pattern = ThinkingTagPattern.ADAPTER.decode(reader)
             19 -> metadata = ModelInfoMetadata.ADAPTER.decode(reader)
             20 -> single_file = SingleFileArtifact.ADAPTER.decode(reader)
             21 -> archive = ArchiveArtifact.ADAPTER.decode(reader)
@@ -884,7 +884,7 @@ public class ModelInfo(
       }
 
       override fun redact(`value`: ModelInfo): ModelInfo = value.copy(
-        thinking_pattern = value.thinking_pattern?.let(ModelThinkingTagPattern.ADAPTER::redact),
+        thinking_pattern = value.thinking_pattern?.let(ThinkingTagPattern.ADAPTER::redact),
         metadata = value.metadata?.let(ModelInfoMetadata.ADAPTER::redact),
         single_file = value.single_file?.let(SingleFileArtifact.ADAPTER::redact),
         archive = value.archive?.let(ArchiveArtifact.ADAPTER::redact),

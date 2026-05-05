@@ -8,6 +8,7 @@ import Long from "long";
 import _m0 from "protobufjs/minimal";
 import { inferenceFrameworkFromJSON, inferenceFrameworkToJSON } from "./model_types";
 import { StructuredOutputOptions, StructuredOutputValidation } from "./structured_output";
+import { ThinkingTagPattern } from "./thinking_tag_pattern";
 import { ToolCall, ToolCallingOptions, ToolResult } from "./tool_calling";
 export const protobufPackage = "runanywhere.v1";
 export var LLMGenerationState;
@@ -1580,72 +1581,6 @@ export const GenerationHints = {
         message.temperature = object.temperature ?? 0;
         message.maxTokens = object.maxTokens ?? 0;
         message.systemRole = object.systemRole ?? undefined;
-        return message;
-    },
-};
-function createBaseThinkingTagPattern() {
-    return { openingTag: "", closingTag: "" };
-}
-export const ThinkingTagPattern = {
-    encode(message, writer = _m0.Writer.create()) {
-        if (message.openingTag !== "") {
-            writer.uint32(10).string(message.openingTag);
-        }
-        if (message.closingTag !== "") {
-            writer.uint32(18).string(message.closingTag);
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
-        let end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseThinkingTagPattern();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1:
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.openingTag = reader.string();
-                    continue;
-                case 2:
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.closingTag = reader.string();
-                    continue;
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skipType(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            openingTag: isSet(object.openingTag) ? globalThis.String(object.openingTag) : "",
-            closingTag: isSet(object.closingTag) ? globalThis.String(object.closingTag) : "",
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.openingTag !== "") {
-            obj.openingTag = message.openingTag;
-        }
-        if (message.closingTag !== "") {
-            obj.closingTag = message.closingTag;
-        }
-        return obj;
-    },
-    create(base) {
-        return ThinkingTagPattern.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseThinkingTagPattern();
-        message.openingTag = object.openingTag ?? "";
-        message.closingTag = object.closingTag ?? "";
         return message;
     },
 };

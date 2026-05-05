@@ -30,15 +30,17 @@ import okio.ByteString
 /**
  * Voice Activity Detection output. Frontends usually do not need this —
  * exposed for debugging and custom UIs (waveform highlighting, etc.).
+ * IDL-18: `type` uses the canonical VADStreamEventKind enum from
+ * vad_options.proto (the hand-rolled VADEventType was deleted).
  */
 public class VADEvent(
   @field:WireField(
     tag = 1,
-    adapter = "ai.runanywhere.proto.v1.VADEventType#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.VADStreamEventKind#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 0,
   )
-  public val type: VADEventType = VADEventType.VAD_EVENT_UNSPECIFIED,
+  public val type: VADStreamEventKind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED,
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
@@ -138,7 +140,7 @@ public class VADEvent(
   }
 
   public fun copy(
-    type: VADEventType = this.type,
+    type: VADStreamEventKind = this.type,
     frame_offset_us: Long = this.frame_offset_us,
     confidence: Float = this.confidence,
     is_speech: Boolean = this.is_speech,
@@ -161,8 +163,8 @@ public class VADEvent(
     ) {
       override fun encodedSize(`value`: VADEvent): Int {
         var size = value.unknownFields.size
-        if (value.type != VADEventType.VAD_EVENT_UNSPECIFIED) size +=
-            VADEventType.ADAPTER.encodedSizeWithTag(1, value.type)
+        if (value.type != VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED) size +=
+            VADStreamEventKind.ADAPTER.encodedSizeWithTag(1, value.type)
         if (value.frame_offset_us != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(2,
             value.frame_offset_us)
         if (!value.confidence.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(3,
@@ -179,8 +181,8 @@ public class VADEvent(
       }
 
       override fun encode(writer: ProtoWriter, `value`: VADEvent) {
-        if (value.type != VADEventType.VAD_EVENT_UNSPECIFIED)
-            VADEventType.ADAPTER.encodeWithTag(writer, 1, value.type)
+        if (value.type != VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED)
+            VADStreamEventKind.ADAPTER.encodeWithTag(writer, 1, value.type)
         if (value.frame_offset_us != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 2,
             value.frame_offset_us)
         if (!value.confidence.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 3,
@@ -208,12 +210,12 @@ public class VADEvent(
             value.confidence)
         if (value.frame_offset_us != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 2,
             value.frame_offset_us)
-        if (value.type != VADEventType.VAD_EVENT_UNSPECIFIED)
-            VADEventType.ADAPTER.encodeWithTag(writer, 1, value.type)
+        if (value.type != VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED)
+            VADStreamEventKind.ADAPTER.encodeWithTag(writer, 1, value.type)
       }
 
       override fun decode(reader: ProtoReader): VADEvent {
-        var type: VADEventType = VADEventType.VAD_EVENT_UNSPECIFIED
+        var type: VADStreamEventKind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED
         var frame_offset_us: Long = 0L
         var confidence: Float = 0f
         var is_speech: Boolean = false
@@ -223,7 +225,7 @@ public class VADEvent(
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
-              type = VADEventType.ADAPTER.decode(reader)
+              type = VADStreamEventKind.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }

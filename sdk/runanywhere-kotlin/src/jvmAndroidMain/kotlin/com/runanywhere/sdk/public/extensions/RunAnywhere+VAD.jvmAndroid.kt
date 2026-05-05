@@ -18,16 +18,17 @@ import ai.runanywhere.proto.v1.VADOptions
 import ai.runanywhere.proto.v1.VADResult
 import ai.runanywhere.proto.v1.VADStatistics
 import ai.runanywhere.proto.v1.VADStreamEvent
-import ai.runanywhere.proto.v1.VADStreamEventKind
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVADProto
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
-import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.flow
 import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 
 private val vadLogger = SDKLogger.vad
@@ -66,74 +67,69 @@ actual fun RunAnywhere.streamVAD(
     audioSamples: Flow<FloatArray>,
     options: VADOptions,
 ): Flow<VADStreamEvent> =
-    flow {
+    channelFlow {
         if (!isInitialized) {
             throw SDKException.notInitialized("SDK not initialized")
         }
 
-        var sequence = 0L
+        // Ensure the native VAD component exists; the stream callback is
+        // registered per-handle and C++ drives the event envelope (seq,
+        // timestamp_us, request_id, kind) via dispatch_vad_stream_event.
+        CppBridgeVADProto.create()
+        val handle = CppBridgeVADProto.getHandle()
 
-        fun nextSequence(): Long = ++sequence
+        val listener =
+            NativeProtoProgressListener { bytes ->
+                val event =
+                    try {
+                        VADStreamEvent.ADAPTER.decode(bytes)
+                    } catch (t: Throwable) {
+                        close(t)
+                        return@NativeProtoProgressListener false
+                    }
+                event.statistics?.let { vadStatisticsCallback?.invoke(it) }
+                    ?: event.result?.let {
+                        vadStatisticsCallback?.invoke(VADStatistics(current_energy = it.energy))
+                    }
+                trySendBlocking(event)
+                true
+            }
 
-        fun nowUs(): Long = System.currentTimeMillis() * 1000L
-        val requestId = "vad-stream-${nowUs()}"
+        val registerRc = RunAnywhereBridge.racVadSetStreamProtoCallback(handle, listener)
+        if (registerRc != RunAnywhereBridge.RAC_SUCCESS) {
+            throw SDKException.operation(
+                "racVadSetStreamProtoCallback failed with rc=$registerRc",
+            )
+        }
 
-        emit(
-            VADStreamEvent(
-                seq = nextSequence(),
-                timestamp_us = nowUs(),
-                request_id = requestId,
-                kind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_STARTED,
-            ),
-        )
+        val sessionId =
+            RunAnywhereBridge.racVadStreamStartProto(
+                handle,
+                VADOptions.ADAPTER.encode(options),
+            )
+        if (sessionId == 0L) {
+            RunAnywhereBridge.racVadSetStreamProtoCallback(handle, null)
+            throw SDKException.operation("racVadStreamStartProto returned 0")
+        }
 
         try {
             audioSamples.collect { samples ->
                 vadAudioBufferCallback?.invoke(samples)
-
-                val result = CppBridgeVADProto.process(samples, options)
-                val statistics =
-                    result.statistics ?: if (options.include_statistics) {
-                        CppBridgeVADProto.statistics()
-                    } else {
-                        null
-                    }
-                val callbackStatistics = statistics ?: VADStatistics(current_energy = result.energy)
-                vadStatisticsCallback?.invoke(callbackStatistics)
-
-                emit(
-                    VADStreamEvent(
-                        seq = nextSequence(),
-                        timestamp_us = nowUs(),
-                        request_id = requestId,
-                        kind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_FRAME,
-                        result = result,
-                        statistics = statistics,
-                    ),
-                )
+                val pcmBytes = samples.toPcm16LeBytes()
+                val feedRc =
+                    RunAnywhereBridge.racVadStreamFeedAudioProto(sessionId, pcmBytes)
+                if (feedRc != RunAnywhereBridge.RAC_SUCCESS) {
+                    throw SDKException.operation(
+                        "racVadStreamFeedAudioProto failed with rc=$feedRc",
+                    )
+                }
             }
-
-            emit(
-                VADStreamEvent(
-                    seq = nextSequence(),
-                    timestamp_us = nowUs(),
-                    request_id = requestId,
-                    kind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_STOPPED,
-                ),
-            )
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            emit(
-                VADStreamEvent(
-                    seq = nextSequence(),
-                    timestamp_us = nowUs(),
-                    request_id = requestId,
-                    kind = VADStreamEventKind.VAD_STREAM_EVENT_KIND_ERROR,
-                    error_message = e.message ?: "VAD stream failed",
-                ),
-            )
-            throw e
+            RunAnywhereBridge.racVadStreamStopProto(sessionId)
+        } finally {
+            // Ensure the session and listener are always torn down, whether
+            // the upstream flow completes normally, errors, or is cancelled.
+            RunAnywhereBridge.racVadStreamCancelProto(sessionId)
+            RunAnywhereBridge.racVadSetStreamProtoCallback(handle, null)
         }
     }
 
@@ -162,6 +158,24 @@ private fun ByteArray.toFloatArray(): FloatArray {
         byteIndex += 2
     }
     return samples
+}
+
+/**
+ * Convert normalized Float PCM samples in `[-1.0, 1.0]` to little-endian
+ * int16 PCM bytes for `rac_vad_stream_feed_audio_proto`, which expects the
+ * raw byte encoding used throughout the C ABI (`RAC_STT_BYTES_PER_SAMPLE`).
+ */
+private fun FloatArray.toPcm16LeBytes(): ByteArray {
+    val bytes = ByteArray(size * 2)
+    var byteIndex = 0
+    for (sample in this) {
+        val clamped = sample.coerceIn(-1f, 1f)
+        val pcm = (clamped * Short.MAX_VALUE.toFloat()).toInt()
+        bytes[byteIndex] = (pcm and 0xFF).toByte()
+        bytes[byteIndex + 1] = ((pcm shr 8) and 0xFF).toByte()
+        byteIndex += 2
+    }
+    return bytes
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

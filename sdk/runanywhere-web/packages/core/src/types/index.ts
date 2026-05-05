@@ -299,7 +299,5 @@ export type {
   StorageInfo,
   StoredModel,
 } from './models';
-export type {
-  ModelInfoMetadata,
-  ModelThinkingTagPattern,
-} from '@runanywhere/proto-ts/model_types';
+export type { ModelInfoMetadata } from '@runanywhere/proto-ts/model_types';
+export type { ThinkingTagPattern } from '@runanywhere/proto-ts/thinking_tag_pattern';

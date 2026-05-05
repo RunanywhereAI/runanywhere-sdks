@@ -1,4 +1,6 @@
 import _m0 from "protobufjs/minimal";
+import { ErrorCode } from "./errors";
+import { VADStreamEventKind } from "./vad_options";
 export declare const protobufPackage = "runanywhere.v1";
 export declare enum VoiceEventCategory {
     VOICE_EVENT_CATEGORY_UNSPECIFIED = 0,
@@ -62,18 +64,6 @@ export declare enum AudioEncoding {
 }
 export declare function audioEncodingFromJSON(object: any): AudioEncoding;
 export declare function audioEncodingToJSON(object: AudioEncoding): string;
-export declare enum VADEventType {
-    VAD_EVENT_UNSPECIFIED = 0,
-    VAD_EVENT_VOICE_START = 1,
-    VAD_EVENT_VOICE_END_OF_UTTERANCE = 2,
-    VAD_EVENT_BARGE_IN = 3,
-    VAD_EVENT_SILENCE = 4,
-    VAD_EVENT_STATISTICS = 5,
-    VAD_EVENT_STATE_CHANGED = 6,
-    UNRECOGNIZED = -1
-}
-export declare function vADEventTypeFromJSON(object: any): VADEventType;
-export declare function vADEventTypeToJSON(object: VADEventType): string;
 export declare enum InterruptReason {
     INTERRUPT_REASON_UNSPECIFIED = 0,
     INTERRUPT_REASON_USER_BARGE_IN = 1,
@@ -116,16 +106,6 @@ export declare enum ComponentLoadState {
 }
 export declare function componentLoadStateFromJSON(object: any): ComponentLoadState;
 export declare function componentLoadStateToJSON(object: ComponentLoadState): string;
-export declare enum VoiceSessionErrorCode {
-    VOICE_SESSION_ERROR_CODE_UNSPECIFIED = 0,
-    VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED = 1,
-    VOICE_SESSION_ERROR_CODE_NOT_READY = 2,
-    VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING = 3,
-    VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE = 4,
-    UNRECOGNIZED = -1
-}
-export declare function voiceSessionErrorCodeFromJSON(object: any): VoiceSessionErrorCode;
-export declare function voiceSessionErrorCodeToJSON(object: VoiceSessionErrorCode): string;
 export declare enum SpeechTurnDetectionEventKind {
     SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED = 0,
     SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED = 1,
@@ -252,9 +232,11 @@ export interface AudioFrameEvent {
 /**
  * Voice Activity Detection output. Frontends usually do not need this —
  * exposed for debugging and custom UIs (waveform highlighting, etc.).
+ * IDL-18: `type` uses the canonical VADStreamEventKind enum from
+ * vad_options.proto (the hand-rolled VADEventType was deleted).
  */
 export interface VADEvent {
-    type: VADEventType;
+    type: VADStreamEventKind;
     frameOffsetUs: number;
     confidence: number;
     isSpeech: boolean;
@@ -352,7 +334,7 @@ export interface VoiceAgentComponentStates {
     errorMessage?: string | undefined;
 }
 export interface VoiceSessionError {
-    code: VoiceSessionErrorCode;
+    code: ErrorCode;
     message: string;
     failedComponent?: string | undefined;
     cAbiCode: number;

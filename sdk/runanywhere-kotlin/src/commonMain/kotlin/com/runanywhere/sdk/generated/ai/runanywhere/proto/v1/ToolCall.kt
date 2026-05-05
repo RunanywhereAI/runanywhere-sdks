@@ -13,8 +13,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.immutableCopyOf
-import com.squareup.wire.`internal`.redactElements
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -26,8 +24,6 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
-import kotlin.collections.Map
-import kotlin.lazy
 import okio.ByteString
 
 /**
@@ -59,6 +55,11 @@ public class ToolCall(
   public val name: String = "",
   /**
    * JSON-encoded arguments. Empty object "{}" if no args.
+   *
+   * AUDIT (IDL-13): the C++ tokenizer / tool-prompt formatter
+   * (sdk/runanywhere-commons/src/features/llm/tool_calling.cpp) reads
+   * `arguments_json` directly when building LLM prompts. It is the
+   * canonical wire shape for the prompt-formatting path.
    */
   @field:WireField(
     tag = 3,
@@ -79,7 +80,6 @@ public class ToolCall(
     schemaIndex = 3,
   )
   public val type: String = "",
-  arguments: Map<String, ToolValue> = emptyMap(),
   /**
    * Alias for id used by pre-proto SDK surfaces.
    */
@@ -87,7 +87,7 @@ public class ToolCall(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "callId",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val call_id: String? = null,
   @field:WireField(
@@ -95,31 +95,18 @@ public class ToolCall(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "createdAtMs",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val created_at_ms: Long = 0L,
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "rawText",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val raw_text: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolCall, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Strongly-typed arguments map for SDKs that do not want to parse
-   * arguments_json. Producers should keep arguments_json populated for C++
-   * tokenizer compatibility.
-   */
-  @field:WireField(
-    tag = 5,
-    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
-    adapter = "ai.runanywhere.proto.v1.ToolValue#ADAPTER",
-    schemaIndex = 4,
-  )
-  public val arguments: Map<String, ToolValue> = immutableCopyOf("arguments", arguments)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -135,7 +122,6 @@ public class ToolCall(
     if (name != other.name) return false
     if (arguments_json != other.arguments_json) return false
     if (type != other.type) return false
-    if (arguments != other.arguments) return false
     if (call_id != other.call_id) return false
     if (created_at_ms != other.created_at_ms) return false
     if (raw_text != other.raw_text) return false
@@ -150,7 +136,6 @@ public class ToolCall(
       result = result * 37 + name.hashCode()
       result = result * 37 + arguments_json.hashCode()
       result = result * 37 + type.hashCode()
-      result = result * 37 + arguments.hashCode()
       result = result * 37 + (call_id?.hashCode() ?: 0)
       result = result * 37 + created_at_ms.hashCode()
       result = result * 37 + (raw_text?.hashCode() ?: 0)
@@ -165,7 +150,6 @@ public class ToolCall(
     result += """name=${sanitize(name)}"""
     result += """arguments_json=${sanitize(arguments_json)}"""
     result += """type=${sanitize(type)}"""
-    if (arguments.isNotEmpty()) result += """arguments=$arguments"""
     if (call_id != null) result += """call_id=${sanitize(call_id)}"""
     result += """created_at_ms=$created_at_ms"""
     if (raw_text != null) result += """raw_text=${sanitize(raw_text)}"""
@@ -177,13 +161,12 @@ public class ToolCall(
     name: String = this.name,
     arguments_json: String = this.arguments_json,
     type: String = this.type,
-    arguments: Map<String, ToolValue> = this.arguments,
     call_id: String? = this.call_id,
     created_at_ms: Long = this.created_at_ms,
     raw_text: String? = this.raw_text,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolCall = ToolCall(id, name, arguments_json, type, arguments, call_id, created_at_ms,
-      raw_text, unknownFields)
+  ): ToolCall = ToolCall(id, name, arguments_json, type, call_id, created_at_ms, raw_text,
+      unknownFields)
 
   public companion object {
     @JvmField
@@ -195,9 +178,6 @@ public class ToolCall(
       null, 
       "tool_calling.proto"
     ) {
-      private val argumentsAdapter: ProtoAdapter<Map<String, ToolValue>> by lazy {
-          ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ToolValue.ADAPTER) }
-
       override fun encodedSize(`value`: ToolCall): Int {
         var size = value.unknownFields.size
         if (value.id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.id)
@@ -205,7 +185,6 @@ public class ToolCall(
         if (value.arguments_json != "") size += ProtoAdapter.STRING.encodedSizeWithTag(3,
             value.arguments_json)
         if (value.type != "") size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.type)
-        size += argumentsAdapter.encodedSizeWithTag(5, value.arguments)
         size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.call_id)
         if (value.created_at_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(7,
             value.created_at_ms)
@@ -219,7 +198,6 @@ public class ToolCall(
         if (value.arguments_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 3,
             value.arguments_json)
         if (value.type != "") ProtoAdapter.STRING.encodeWithTag(writer, 4, value.type)
-        argumentsAdapter.encodeWithTag(writer, 5, value.arguments)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.call_id)
         if (value.created_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
             value.created_at_ms)
@@ -233,7 +211,6 @@ public class ToolCall(
         if (value.created_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 7,
             value.created_at_ms)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.call_id)
-        argumentsAdapter.encodeWithTag(writer, 5, value.arguments)
         if (value.type != "") ProtoAdapter.STRING.encodeWithTag(writer, 4, value.type)
         if (value.arguments_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 3,
             value.arguments_json)
@@ -246,7 +223,6 @@ public class ToolCall(
         var name: String = ""
         var arguments_json: String = ""
         var type: String = ""
-        val arguments = mutableMapOf<String, ToolValue>()
         var call_id: String? = null
         var created_at_ms: Long = 0L
         var raw_text: String? = null
@@ -256,7 +232,6 @@ public class ToolCall(
             2 -> name = ProtoAdapter.STRING.decode(reader)
             3 -> arguments_json = ProtoAdapter.STRING.decode(reader)
             4 -> type = ProtoAdapter.STRING.decode(reader)
-            5 -> arguments.putAll(argumentsAdapter.decode(reader))
             6 -> call_id = ProtoAdapter.STRING.decode(reader)
             7 -> created_at_ms = ProtoAdapter.INT64.decode(reader)
             8 -> raw_text = ProtoAdapter.STRING.decode(reader)
@@ -268,7 +243,6 @@ public class ToolCall(
           name = name,
           arguments_json = arguments_json,
           type = type,
-          arguments = arguments,
           call_id = call_id,
           created_at_ms = created_at_ms,
           raw_text = raw_text,
@@ -277,7 +251,6 @@ public class ToolCall(
       }
 
       override fun redact(`value`: ToolCall): ToolCall = value.copy(
-        arguments = value.arguments.redactElements(ToolValue.ADAPTER),
         unknownFields = ByteString.EMPTY
       )
     }

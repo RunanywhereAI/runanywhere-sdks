@@ -534,6 +534,8 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/router/rac_route.cpp
     # Round-1 CPP fix (G-C6): proto-serialised hardware profile C ABI for all 5 frontends.
     src/router/rac_hardware_abi.cpp
+    # Wave H-5 (KOT-12): proto-serialised SDKComponent → [InferenceFramework] query.
+    src/router/rac_router_capabilities.cpp
     src/infrastructure/download/download_manager.cpp
     src/infrastructure/download/download_orchestrator.cpp
     src/infrastructure/model_management/model_registry.cpp
@@ -938,6 +940,7 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/lora_options.pb.cc
     ${_RAC_PROTO_GEN_DIR}/voice_agent_service.pb.cc
     ${_RAC_PROTO_GEN_DIR}/errors.pb.cc
+    ${_RAC_PROTO_GEN_DIR}/router.pb.cc
 )
 set(RAC_PROTOBUF_COMPILE_OPTIONS "")
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")

@@ -273,7 +273,7 @@ public extension RAModelInfo {
         downloadSizeBytes: Int64? = nil,
         contextLength: Int? = nil,
         supportsThinking: Bool = false,
-        thinkingPattern: RAModelThinkingTagPattern? = nil,
+        thinkingPattern: RAThinkingTagPattern? = nil,
         description: String? = nil,
         source: ModelSource = .remote,
         createdAt: Date = Date(),

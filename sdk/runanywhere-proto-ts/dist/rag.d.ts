@@ -75,8 +75,6 @@ export interface RAGDocument {
     id: string;
     /** Plain text content to chunk/embed. */
     text: string;
-    /** Legacy metadata JSON blob. */
-    metadataJson?: string | undefined;
     /** Typed metadata map for generated-proto callers. */
     metadata: {
         [key: string]: string;
@@ -165,11 +163,6 @@ export interface RAGSearchResult {
     metadata: {
         [key: string]: string;
     };
-    /**
-     * Legacy metadata JSON blob preserved for C ABI / SDK surfaces that still
-     * pass metadata without parsing it.
-     */
-    metadataJson?: string | undefined;
     rank: number;
     startOffset: number;
     endOffset: number;

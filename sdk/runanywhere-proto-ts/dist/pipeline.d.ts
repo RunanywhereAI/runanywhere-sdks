@@ -24,6 +24,19 @@ export declare enum EdgePolicy {
 export declare function edgePolicyFromJSON(object: any): EdgePolicy;
 export declare function edgePolicyToJSON(object: EdgePolicy): string;
 /**
+ * ---------------------------------------------------------------------------
+ * Pipeline lifecycle status — shared by compile/start/stop results.
+ * ---------------------------------------------------------------------------
+ */
+export declare enum PipelineStatus {
+    PIPELINE_STATUS_UNSPECIFIED = 0,
+    PIPELINE_STATUS_OK = 1,
+    PIPELINE_STATUS_FAILED = 2,
+    UNRECOGNIZED = -1
+}
+export declare function pipelineStatusFromJSON(object: any): PipelineStatus;
+export declare function pipelineStatusToJSON(object: PipelineStatus): string;
+/**
  * A pipeline is a labelled DAG of operators connected by typed edges. There
  * are no cycles. Every input edge has a resolvable producer; every output
  * edge has at least one consumer.
@@ -108,6 +121,34 @@ export interface PipelineOptions {
      */
     strictValidation: boolean;
 }
+/** Result of compiling a PipelineSpec into a runnable graph. */
+export interface PipelineCompileResult {
+    /** Opaque compiled-graph identifier. Empty on failure. */
+    handleId: string;
+    status: PipelineStatus;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
+/** Request to start a previously compiled pipeline. */
+export interface PipelineStartRequest {
+    /** Identifier returned by Compile. Required. */
+    handleId: string;
+}
+/** Live pipeline instance handle. */
+export interface PipelineHandle {
+    /** Stable identifier for the started pipeline instance. */
+    handleId: string;
+    status: PipelineStatus;
+    /** Optional engine-specific state string (e.g. "running", "stopped"). */
+    state?: string | undefined;
+}
+/** Result of stopping a pipeline instance. */
+export interface PipelineStopResult {
+    handleId: string;
+    status: PipelineStatus;
+    errorMessage?: string | undefined;
+    errorCode: number;
+}
 export declare const PipelineSpec: {
     encode(message: PipelineSpec, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): PipelineSpec;
@@ -147,6 +188,38 @@ export declare const PipelineOptions: {
     toJSON(message: PipelineOptions): unknown;
     create<I extends Exact<DeepPartial<PipelineOptions>, I>>(base?: I): PipelineOptions;
     fromPartial<I extends Exact<DeepPartial<PipelineOptions>, I>>(object: I): PipelineOptions;
+};
+export declare const PipelineCompileResult: {
+    encode(message: PipelineCompileResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): PipelineCompileResult;
+    fromJSON(object: any): PipelineCompileResult;
+    toJSON(message: PipelineCompileResult): unknown;
+    create<I extends Exact<DeepPartial<PipelineCompileResult>, I>>(base?: I): PipelineCompileResult;
+    fromPartial<I extends Exact<DeepPartial<PipelineCompileResult>, I>>(object: I): PipelineCompileResult;
+};
+export declare const PipelineStartRequest: {
+    encode(message: PipelineStartRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): PipelineStartRequest;
+    fromJSON(object: any): PipelineStartRequest;
+    toJSON(message: PipelineStartRequest): unknown;
+    create<I extends Exact<DeepPartial<PipelineStartRequest>, I>>(base?: I): PipelineStartRequest;
+    fromPartial<I extends Exact<DeepPartial<PipelineStartRequest>, I>>(object: I): PipelineStartRequest;
+};
+export declare const PipelineHandle: {
+    encode(message: PipelineHandle, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): PipelineHandle;
+    fromJSON(object: any): PipelineHandle;
+    toJSON(message: PipelineHandle): unknown;
+    create<I extends Exact<DeepPartial<PipelineHandle>, I>>(base?: I): PipelineHandle;
+    fromPartial<I extends Exact<DeepPartial<PipelineHandle>, I>>(object: I): PipelineHandle;
+};
+export declare const PipelineStopResult: {
+    encode(message: PipelineStopResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): PipelineStopResult;
+    fromJSON(object: any): PipelineStopResult;
+    toJSON(message: PipelineStopResult): unknown;
+    create<I extends Exact<DeepPartial<PipelineStopResult>, I>>(base?: I): PipelineStopResult;
+    fromPartial<I extends Exact<DeepPartial<PipelineStopResult>, I>>(object: I): PipelineStopResult;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

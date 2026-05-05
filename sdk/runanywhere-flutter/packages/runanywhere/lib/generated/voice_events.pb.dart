@@ -14,6 +14,8 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'errors.pbenum.dart' as $4;
+import 'vad_options.pbenum.dart' as $3;
 import 'voice_events.pbenum.dart';
 
 export 'voice_events.pbenum.dart';
@@ -937,9 +939,11 @@ class AudioFrameEvent extends $pb.GeneratedMessage {
 
 /// Voice Activity Detection output. Frontends usually do not need this —
 /// exposed for debugging and custom UIs (waveform highlighting, etc.).
+/// IDL-18: `type` uses the canonical VADStreamEventKind enum from
+/// vad_options.proto (the hand-rolled VADEventType was deleted).
 class VADEvent extends $pb.GeneratedMessage {
   factory VADEvent({
-    VADEventType? type,
+    $3.VADStreamEventKind? type,
     $fixnum.Int64? frameOffsetUs,
     $core.double? confidence,
     $core.bool? isSpeech,
@@ -976,7 +980,7 @@ class VADEvent extends $pb.GeneratedMessage {
   factory VADEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VADEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..e<VADEventType>(1, _omitFieldNames ? '' : 'type', $pb.PbFieldType.OE, defaultOrMaker: VADEventType.VAD_EVENT_UNSPECIFIED, valueOf: VADEventType.valueOf, enumValues: VADEventType.values)
+    ..e<$3.VADStreamEventKind>(1, _omitFieldNames ? '' : 'type', $pb.PbFieldType.OE, defaultOrMaker: $3.VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED, valueOf: $3.VADStreamEventKind.valueOf, enumValues: $3.VADStreamEventKind.values)
     ..aInt64(2, _omitFieldNames ? '' : 'frameOffsetUs')
     ..a<$core.double>(3, _omitFieldNames ? '' : 'confidence', $pb.PbFieldType.OF)
     ..aOB(4, _omitFieldNames ? '' : 'isSpeech')
@@ -1008,9 +1012,9 @@ class VADEvent extends $pb.GeneratedMessage {
   static VADEvent? _defaultInstance;
 
   @$pb.TagNumber(1)
-  VADEventType get type => $_getN(0);
+  $3.VADStreamEventKind get type => $_getN(0);
   @$pb.TagNumber(1)
-  set type(VADEventType v) { setField(1, v); }
+  set type($3.VADStreamEventKind v) { setField(1, v); }
   @$pb.TagNumber(1)
   $core.bool hasType() => $_has(0);
   @$pb.TagNumber(1)
@@ -1880,7 +1884,7 @@ class VoiceAgentComponentStates extends $pb.GeneratedMessage {
 
 class VoiceSessionError extends $pb.GeneratedMessage {
   factory VoiceSessionError({
-    VoiceSessionErrorCode? code,
+    $4.ErrorCode? code,
     $core.String? message,
     $core.String? failedComponent,
     $core.int? cAbiCode,
@@ -1909,7 +1913,7 @@ class VoiceSessionError extends $pb.GeneratedMessage {
   factory VoiceSessionError.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceSessionError', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..e<VoiceSessionErrorCode>(1, _omitFieldNames ? '' : 'code', $pb.PbFieldType.OE, defaultOrMaker: VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_UNSPECIFIED, valueOf: VoiceSessionErrorCode.valueOf, enumValues: VoiceSessionErrorCode.values)
+    ..e<$4.ErrorCode>(1, _omitFieldNames ? '' : 'code', $pb.PbFieldType.OE, defaultOrMaker: $4.ErrorCode.ERROR_CODE_UNSPECIFIED, valueOf: $4.ErrorCode.valueOf, enumValues: $4.ErrorCode.values)
     ..aOS(2, _omitFieldNames ? '' : 'message')
     ..aOS(3, _omitFieldNames ? '' : 'failedComponent')
     ..a<$core.int>(4, _omitFieldNames ? '' : 'cAbiCode', $pb.PbFieldType.O3)
@@ -1939,9 +1943,9 @@ class VoiceSessionError extends $pb.GeneratedMessage {
   static VoiceSessionError? _defaultInstance;
 
   @$pb.TagNumber(1)
-  VoiceSessionErrorCode get code => $_getN(0);
+  $4.ErrorCode get code => $_getN(0);
   @$pb.TagNumber(1)
-  set code(VoiceSessionErrorCode v) { setField(1, v); }
+  set code($4.ErrorCode v) { setField(1, v); }
   @$pb.TagNumber(1)
   $core.bool hasCode() => $_has(0);
   @$pb.TagNumber(1)

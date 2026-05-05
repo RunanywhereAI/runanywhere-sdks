@@ -44,6 +44,7 @@ import {
   ragDestroyPipeline,
   ragIngest,
   ragQuery,
+  helpers,
 } from '@runanywhere/core';
 import { RAGConfiguration, RAGQueryOptions } from '@runanywhere/proto-ts/rag';
 
@@ -173,16 +174,9 @@ export const RAGScreen: React.FC = () => {
       // Build RAG configuration using model IDs. commons (via D-6) owns
       // id → path resolution inside rac_rag_session_create_proto.
       const config = RAGConfiguration.fromPartial({
+        ...helpers.ragHelpers.defaultRAGConfig(),
         embeddingModelId,
         llmModelId,
-        embeddingDimension: 384,
-        topK: 3,
-        similarityThreshold: 0.12,
-        chunkSize: 180,
-        chunkOverlap: 30,
-        maxContextTokens: 2048,
-        persistIndex: false,
-        rerankResults: false,
       });
 
       // Create pipeline and ingest document (same as iOS loadDocument)

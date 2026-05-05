@@ -88,7 +88,8 @@ fun RunAnywhere.registerModel(
         )
 
     val modelInfo = applyInferredArtifact(baseInfo, url)
-    logger.debug("Artifact type: ${modelInfo.artifact_type.displayName} for model: $modelId")
+    val artifactTypeLabel = modelInfo.artifact_type?.displayName ?: "unspecified"
+    logger.debug("Artifact type: $artifactTypeLabel for model: $modelId")
 
     registerModelInternal(modelInfo)
 

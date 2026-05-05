@@ -126,7 +126,7 @@ public extension RunAnywhere {
         }
 
         do {
-            let result = try await tool.executor(toolCall.arguments)
+            let result = try await tool.executor(RAToolValue.parseObjectJSON(toolCall.argumentsJson))
             return makeToolResult(
                 name: toolName,
                 success: true,

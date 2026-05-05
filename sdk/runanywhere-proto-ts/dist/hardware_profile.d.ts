@@ -1,14 +1,32 @@
 import _m0 from "protobufjs/minimal";
 export declare const protobufPackage = "runanywhere.v1";
-export declare enum AcceleratorPreference {
-    ACCELERATOR_PREFERENCE_AUTO = 0,
-    ACCELERATOR_PREFERENCE_ANE = 1,
-    ACCELERATOR_PREFERENCE_GPU = 2,
-    ACCELERATOR_PREFERENCE_CPU = 3,
+/**
+ * ---------------------------------------------------------------------------
+ * Hardware acceleration preference for inference. Canonical single enum —
+ * previously duplicated as `AcceleratorPreference` (ANE/GPU/CPU/AUTO) in this
+ * file and `AccelerationPreference` in model_types.proto. Consolidated here
+ * (Wave H-2 / IDL-01) because it is a pure hardware concept and
+ * hardware_profile.proto has no imports (model_types.proto already imports
+ * this file — placing the enum here avoids a cyclic import). Sources pre-IDL:
+ *   Web    enums.ts:165   (Auto / WebGPU / CPU)
+ *   Swift  extensions     (CPU / GPU / NPU / Metal)
+ *   Kotlin enum           (CPU / GPU / NPU / Vulkan)
+ * Canonicalized union below.
+ * ---------------------------------------------------------------------------
+ */
+export declare enum AccelerationPreference {
+    ACCELERATION_PREFERENCE_UNSPECIFIED = 0,
+    ACCELERATION_PREFERENCE_AUTO = 1,
+    ACCELERATION_PREFERENCE_CPU = 2,
+    ACCELERATION_PREFERENCE_GPU = 3,
+    ACCELERATION_PREFERENCE_NPU = 4,
+    ACCELERATION_PREFERENCE_WEBGPU = 5,
+    ACCELERATION_PREFERENCE_METAL = 6,
+    ACCELERATION_PREFERENCE_VULKAN = 7,
     UNRECOGNIZED = -1
 }
-export declare function acceleratorPreferenceFromJSON(object: any): AcceleratorPreference;
-export declare function acceleratorPreferenceToJSON(object: AcceleratorPreference): string;
+export declare function accelerationPreferenceFromJSON(object: any): AccelerationPreference;
+export declare function accelerationPreferenceToJSON(object: AccelerationPreference): string;
 export interface HardwareProfile {
     chip: string;
     hasNeuralEngine: boolean;
@@ -25,7 +43,7 @@ export interface HardwareProfile {
 }
 export interface AcceleratorInfo {
     name: string;
-    type: AcceleratorPreference;
+    type: AccelerationPreference;
     available: boolean;
 }
 export interface HardwareProfileResult {
@@ -49,7 +67,7 @@ export interface HardwareAcceleratorsRequest {
  * stays consistent (every rpc returns a non-empty message).
  */
 export interface HardwareAcceleratorPreferenceRequest {
-    preference: AcceleratorPreference;
+    preference: AccelerationPreference;
 }
 export interface HardwareAcceleratorPreferenceResult {
     success: boolean;

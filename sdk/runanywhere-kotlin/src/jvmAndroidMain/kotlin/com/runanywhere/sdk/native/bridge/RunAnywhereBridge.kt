@@ -267,6 +267,31 @@ object RunAnywhereBridge {
     ): Int
 
     // ========================================================================
+    // VAD STREAM PROTO ABI (rac_vad_stream.h) — Wave H-5
+    // Lifecycle-owned proto-byte VADStreamEvent session API. Register the
+    // per-handle listener, start a session to obtain a 64-bit session id, feed
+    // PCM int16 mono audio frames, and stop/cancel to tear down.
+    // ========================================================================
+
+    @JvmStatic
+    external fun racVadSetStreamProtoCallback(
+        handle: Long,
+        listener: NativeProtoProgressListener?,
+    ): Int
+
+    @JvmStatic
+    external fun racVadStreamStartProto(handle: Long, optionsProto: ByteArray?): Long
+
+    @JvmStatic
+    external fun racVadStreamFeedAudioProto(sessionId: Long, audioBytes: ByteArray?): Int
+
+    @JvmStatic
+    external fun racVadStreamStopProto(sessionId: Long): Int
+
+    @JvmStatic
+    external fun racVadStreamCancelProto(sessionId: Long): Int
+
+    // ========================================================================
     // VLM GENERATED-PROTO SERVICE ABI (rac_vlm_service.h)
     // ========================================================================
 
@@ -517,6 +542,28 @@ object RunAnywhereBridge {
      */
     @JvmStatic
     external fun racModelRegistryRefreshProto(requestProto: ByteArray): ByteArray?
+
+    /**
+     * Infer a ModelFormat from a portable URL/file-path string.
+     *
+     * The JNI implementation forwards to `rac_model_format_from_url_proto`.
+     * Input is serialized runanywhere.v1.ModelFormatFromUrlRequest bytes; output
+     * is serialized runanywhere.v1.ModelFormatFromUrlResult bytes, or null when
+     * the native proto ABI is unavailable.
+     */
+    @JvmStatic
+    external fun racModelFormatFromUrlProto(requestBytes: ByteArray): ByteArray?
+
+    /**
+     * Infer a ModelArtifactType from a portable URL/file-path string.
+     *
+     * The JNI implementation forwards to `rac_artifact_infer_from_url_proto`.
+     * Input is serialized runanywhere.v1.ArtifactInferFromUrlRequest bytes;
+     * output is serialized runanywhere.v1.ArtifactInferFromUrlResult bytes, or
+     * null when the native proto ABI is unavailable.
+     */
+    @JvmStatic
+    external fun racArtifactInferFromUrlProto(requestBytes: ByteArray): ByteArray?
 
     // ========================================================================
     // MODEL LIFECYCLE PROTO ABI (rac_model_lifecycle.h)
@@ -1047,36 +1094,6 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racDownloadProgressPollProto(requestProto: ByteArray): ByteArray?
-
-    // ========================================================================
-    // LLM THINKING (rac_llm_thinking.h)
-    // ========================================================================
-    //
-    // v3-readiness Phase A8 / GAP 08 #6. Cross-SDK parity with Swift's
-    // `CppBridge+LLMThinking.swift`. Previously missing from Kotlin per
-    // the 3-agent audit; this block closes that gap.
-
-    /** Split full text into (response, thinking) on the FIRST
-     *  `<think>...</think>` block. Returns String[2]:
-     *    [0] = response text (never null; empty when input is only a think block)
-     *    [1] = thinking text, or null when no <think> block was found
-     *  Returns null on error. */
-    @JvmStatic external fun racLlmExtractThinking(text: String): Array<String?>?
-
-    /** Remove ALL `<think>...</think>` blocks (plus trailing unclosed
-     *  `<think>`). Returns the stripped remainder, or null on error. */
-    @JvmStatic external fun racLlmStripThinking(text: String): String?
-
-    /** Apportion `totalCompletionTokens` between thinking and response
-     *  segments by character-length ratio. Returns int[2]:
-     *    [0] = thinking tokens
-     *    [1] = response tokens (0 + total when thinking is null/empty).
-     *  Returns null on error. */
-    @JvmStatic external fun racLlmSplitThinkingTokens(
-        totalCompletionTokens: Int,
-        responseText: String?,
-        thinkingText: String?,
-    ): IntArray?
 
     // ========================================================================
     // VOICE AGENT (rac_voice_agent.h)

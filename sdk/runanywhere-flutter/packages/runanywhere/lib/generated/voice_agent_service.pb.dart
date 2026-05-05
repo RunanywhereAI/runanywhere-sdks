@@ -15,6 +15,7 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'stt_options.pb.dart' as $2;
 import 'tts_options.pb.dart' as $1;
 import 'voice_events.pb.dart' as $0;
 import 'voice_events.pbenum.dart' as $0;
@@ -1453,6 +1454,18 @@ class VoiceAgentApi {
 
   $async.Future<$0.VoiceEvent> stream($pb.ClientContext? ctx, VoiceAgentRequest request) =>
     _client.invoke<$0.VoiceEvent>(ctx, 'VoiceAgent', 'Stream', request, $0.VoiceEvent())
+  ;
+  $async.Future<VoiceAgentResult> processTurn($pb.ClientContext? ctx, VoiceAgentTurnRequest request) =>
+    _client.invoke<VoiceAgentResult>(ctx, 'VoiceAgent', 'ProcessTurn', request, VoiceAgentResult())
+  ;
+  $async.Future<$2.STTOutput> transcribe($pb.ClientContext? ctx, VoiceAgentTranscribeProtoRequest request) =>
+    _client.invoke<$2.STTOutput>(ctx, 'VoiceAgent', 'Transcribe', request, $2.STTOutput())
+  ;
+  $async.Future<$1.TTSOutput> synthesizeSpeech($pb.ClientContext? ctx, VoiceAgentSynthesizeSpeechProtoRequest request) =>
+    _client.invoke<$1.TTSOutput>(ctx, 'VoiceAgent', 'SynthesizeSpeech', request, $1.TTSOutput())
+  ;
+  $async.Future<VoiceAgentResult> configure($pb.ClientContext? ctx, VoiceAgentComposeConfig request) =>
+    _client.invoke<VoiceAgentResult>(ctx, 'VoiceAgent', 'Configure', request, VoiceAgentResult())
   ;
 }
 

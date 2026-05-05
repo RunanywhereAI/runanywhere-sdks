@@ -15,27 +15,27 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'vlm_options.pb.dart' as $15;
+import 'vlm_options.pb.dart' as $16;
 import 'vlm_options.pbjson.dart';
 
 export 'vlm_options.pb.dart';
 
 abstract class VLMServiceBase extends $pb.GeneratedService {
-  $async.Future<$15.VLMResult> generate($pb.ServerContext ctx, $15.VLMGenerationRequest request);
-  $async.Future<$15.VLMStreamEvent> stream($pb.ServerContext ctx, $15.VLMGenerationRequest request);
+  $async.Future<$16.VLMResult> generate($pb.ServerContext ctx, $16.VLMGenerationRequest request);
+  $async.Future<$16.VLMStreamEvent> stream($pb.ServerContext ctx, $16.VLMGenerationRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
-      case 'Generate': return $15.VLMGenerationRequest();
-      case 'Stream': return $15.VLMGenerationRequest();
+      case 'Generate': return $16.VLMGenerationRequest();
+      case 'Stream': return $16.VLMGenerationRequest();
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }
 
   $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx, $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
-      case 'Generate': return this.generate(ctx, request as $15.VLMGenerationRequest);
-      case 'Stream': return this.stream(ctx, request as $15.VLMGenerationRequest);
+      case 'Generate': return this.generate(ctx, request as $16.VLMGenerationRequest);
+      case 'Stream': return this.stream(ctx, request as $16.VLMGenerationRequest);
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }

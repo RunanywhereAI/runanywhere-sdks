@@ -15,78 +15,12 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'hardware_profile.pb.dart' as $0;
-import 'hardware_profile.pbenum.dart' as $0;
+import 'hardware_profile.pb.dart' as $1;
+import 'hardware_profile.pbenum.dart' as $1;
 import 'model_types.pbenum.dart';
+import 'thinking_tag_pattern.pb.dart' as $0;
 
 export 'model_types.pbenum.dart';
-
-/// Model-level thinking tag metadata. This intentionally uses a model-specific
-/// message name because llm_options.proto already owns the generation-options
-/// ThinkingTagPattern message in this proto package.
-class ModelThinkingTagPattern extends $pb.GeneratedMessage {
-  factory ModelThinkingTagPattern({
-    $core.String? openTag,
-    $core.String? closeTag,
-  }) {
-    final $result = create();
-    if (openTag != null) {
-      $result.openTag = openTag;
-    }
-    if (closeTag != null) {
-      $result.closeTag = closeTag;
-    }
-    return $result;
-  }
-  ModelThinkingTagPattern._() : super();
-  factory ModelThinkingTagPattern.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
-  factory ModelThinkingTagPattern.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ModelThinkingTagPattern', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'openTag')
-    ..aOS(2, _omitFieldNames ? '' : 'closeTag')
-    ..hasRequiredFields = false
-  ;
-
-  @$core.Deprecated(
-  'Using this can add significant overhead to your binary. '
-  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
-  'Will be removed in next major version')
-  ModelThinkingTagPattern clone() => ModelThinkingTagPattern()..mergeFromMessage(this);
-  @$core.Deprecated(
-  'Using this can add significant overhead to your binary. '
-  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
-  'Will be removed in next major version')
-  ModelThinkingTagPattern copyWith(void Function(ModelThinkingTagPattern) updates) => super.copyWith((message) => updates(message as ModelThinkingTagPattern)) as ModelThinkingTagPattern;
-
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static ModelThinkingTagPattern create() => ModelThinkingTagPattern._();
-  ModelThinkingTagPattern createEmptyInstance() => create();
-  static $pb.PbList<ModelThinkingTagPattern> createRepeated() => $pb.PbList<ModelThinkingTagPattern>();
-  @$core.pragma('dart2js:noInline')
-  static ModelThinkingTagPattern getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ModelThinkingTagPattern>(create);
-  static ModelThinkingTagPattern? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.String get openTag => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set openTag($core.String v) { $_setString(0, v); }
-  @$pb.TagNumber(1)
-  $core.bool hasOpenTag() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearOpenTag() => clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.String get closeTag => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set closeTag($core.String v) { $_setString(1, v); }
-  @$pb.TagNumber(2)
-  $core.bool hasCloseTag() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearCloseTag() => clearField(2);
-}
 
 class ModelInfoMetadata extends $pb.GeneratedMessage {
   factory ModelInfoMetadata({
@@ -276,7 +210,7 @@ class ModelInfo extends $pb.GeneratedMessage {
     $fixnum.Int64? updatedAtUnixMs,
     $fixnum.Int64? memoryRequiredBytes,
     $core.String? checksumSha256,
-    ModelThinkingTagPattern? thinkingPattern,
+    $0.ThinkingTagPattern? thinkingPattern,
     ModelInfoMetadata? metadata,
     SingleFileArtifact? singleFile,
     ArchiveArtifact? archive,
@@ -285,7 +219,7 @@ class ModelInfo extends $pb.GeneratedMessage {
     $core.bool? builtIn,
     ModelArtifactType? artifactType,
     ExpectedModelFiles? expectedFiles,
-    AccelerationPreference? accelerationPreference,
+    $1.AccelerationPreference? accelerationPreference,
     RoutingPolicy? routingPolicy,
     ModelRuntimeCompatibility? compatibility,
     InferenceFramework? preferredFramework,
@@ -442,7 +376,7 @@ class ModelInfo extends $pb.GeneratedMessage {
     ..aInt64(15, _omitFieldNames ? '' : 'updatedAtUnixMs')
     ..aInt64(16, _omitFieldNames ? '' : 'memoryRequiredBytes')
     ..aOS(17, _omitFieldNames ? '' : 'checksumSha256')
-    ..aOM<ModelThinkingTagPattern>(18, _omitFieldNames ? '' : 'thinkingPattern', subBuilder: ModelThinkingTagPattern.create)
+    ..aOM<$0.ThinkingTagPattern>(18, _omitFieldNames ? '' : 'thinkingPattern', subBuilder: $0.ThinkingTagPattern.create)
     ..aOM<ModelInfoMetadata>(19, _omitFieldNames ? '' : 'metadata', subBuilder: ModelInfoMetadata.create)
     ..aOM<SingleFileArtifact>(20, _omitFieldNames ? '' : 'singleFile', subBuilder: SingleFileArtifact.create)
     ..aOM<ArchiveArtifact>(21, _omitFieldNames ? '' : 'archive', subBuilder: ArchiveArtifact.create)
@@ -451,7 +385,7 @@ class ModelInfo extends $pb.GeneratedMessage {
     ..aOB(24, _omitFieldNames ? '' : 'builtIn')
     ..e<ModelArtifactType>(25, _omitFieldNames ? '' : 'artifactType', $pb.PbFieldType.OE, defaultOrMaker: ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED, valueOf: ModelArtifactType.valueOf, enumValues: ModelArtifactType.values)
     ..aOM<ExpectedModelFiles>(26, _omitFieldNames ? '' : 'expectedFiles', subBuilder: ExpectedModelFiles.create)
-    ..e<AccelerationPreference>(27, _omitFieldNames ? '' : 'accelerationPreference', $pb.PbFieldType.OE, defaultOrMaker: AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED, valueOf: AccelerationPreference.valueOf, enumValues: AccelerationPreference.values)
+    ..e<$1.AccelerationPreference>(27, _omitFieldNames ? '' : 'accelerationPreference', $pb.PbFieldType.OE, defaultOrMaker: $1.AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED, valueOf: $1.AccelerationPreference.valueOf, enumValues: $1.AccelerationPreference.values)
     ..e<RoutingPolicy>(28, _omitFieldNames ? '' : 'routingPolicy', $pb.PbFieldType.OE, defaultOrMaker: RoutingPolicy.ROUTING_POLICY_UNSPECIFIED, valueOf: RoutingPolicy.valueOf, enumValues: RoutingPolicy.values)
     ..aOM<ModelRuntimeCompatibility>(29, _omitFieldNames ? '' : 'compatibility', subBuilder: ModelRuntimeCompatibility.create)
     ..e<InferenceFramework>(30, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: InferenceFramework.valueOf, enumValues: InferenceFramework.values)
@@ -657,15 +591,15 @@ class ModelInfo extends $pb.GeneratedMessage {
   /// Thinking/reasoning metadata. `supports_thinking` remains the boolean
   /// capability flag; this optional pattern declares model-specific tags.
   @$pb.TagNumber(18)
-  ModelThinkingTagPattern get thinkingPattern => $_getN(17);
+  $0.ThinkingTagPattern get thinkingPattern => $_getN(17);
   @$pb.TagNumber(18)
-  set thinkingPattern(ModelThinkingTagPattern v) { setField(18, v); }
+  set thinkingPattern($0.ThinkingTagPattern v) { setField(18, v); }
   @$pb.TagNumber(18)
   $core.bool hasThinkingPattern() => $_has(17);
   @$pb.TagNumber(18)
   void clearThinkingPattern() => clearField(18);
   @$pb.TagNumber(18)
-  ModelThinkingTagPattern ensureThinkingPattern() => $_ensure(17);
+  $0.ThinkingTagPattern ensureThinkingPattern() => $_ensure(17);
 
   /// Structured public catalog metadata. `description` (field 12) is kept for
   /// backward compatibility and should mirror metadata.description when both
@@ -758,9 +692,9 @@ class ModelInfo extends $pb.GeneratedMessage {
 
   /// Preferred hardware acceleration backend for this model.
   @$pb.TagNumber(27)
-  AccelerationPreference get accelerationPreference => $_getN(26);
+  $1.AccelerationPreference get accelerationPreference => $_getN(26);
   @$pb.TagNumber(27)
-  set accelerationPreference(AccelerationPreference v) { setField(27, v); }
+  set accelerationPreference($1.AccelerationPreference v) { setField(27, v); }
   @$pb.TagNumber(27)
   $core.bool hasAccelerationPreference() => $_has(26);
   @$pb.TagNumber(27)
@@ -1086,7 +1020,6 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
     $core.String? filename,
     $core.bool? isRequired,
     $fixnum.Int64? sizeBytes,
-    $core.String? checksum,
     $core.String? relativePath,
     $core.String? destinationPath,
     ModelFileRole? role,
@@ -1105,9 +1038,6 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
     }
     if (sizeBytes != null) {
       $result.sizeBytes = sizeBytes;
-    }
-    if (checksum != null) {
-      $result.checksum = checksum;
     }
     if (relativePath != null) {
       $result.relativePath = relativePath;
@@ -1135,7 +1065,6 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'filename')
     ..aOB(3, _omitFieldNames ? '' : 'isRequired')
     ..aInt64(4, _omitFieldNames ? '' : 'sizeBytes')
-    ..aOS(5, _omitFieldNames ? '' : 'checksum')
     ..aOS(6, _omitFieldNames ? '' : 'relativePath')
     ..aOS(7, _omitFieldNames ? '' : 'destinationPath')
     ..e<ModelFileRole>(8, _omitFieldNames ? '' : 'role', $pb.PbFieldType.OE, defaultOrMaker: ModelFileRole.MODEL_FILE_ROLE_UNSPECIFIED, valueOf: ModelFileRole.valueOf, enumValues: ModelFileRole.values)
@@ -1205,62 +1134,51 @@ class ModelFileDescriptor extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearSizeBytes() => clearField(4);
 
-  /// Legacy checksum field kept for generated consumers that already use it.
-  /// Prefer checksum_sha256 for new manifests when the algorithm is known.
-  @$pb.TagNumber(5)
-  $core.String get checksum => $_getSZ(4);
-  @$pb.TagNumber(5)
-  set checksum($core.String v) { $_setString(4, v); }
-  @$pb.TagNumber(5)
-  $core.bool hasChecksum() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearChecksum() => clearField(5);
-
   /// Path fields used by SDK-local wrappers/catalogs. `filename` is the
   /// storage name for simple cases; relative_path/destination_path preserve
   /// directory layouts for archive and multi-file artifacts.
   @$pb.TagNumber(6)
-  $core.String get relativePath => $_getSZ(5);
+  $core.String get relativePath => $_getSZ(4);
   @$pb.TagNumber(6)
-  set relativePath($core.String v) { $_setString(5, v); }
+  set relativePath($core.String v) { $_setString(4, v); }
   @$pb.TagNumber(6)
-  $core.bool hasRelativePath() => $_has(5);
+  $core.bool hasRelativePath() => $_has(4);
   @$pb.TagNumber(6)
   void clearRelativePath() => clearField(6);
 
   @$pb.TagNumber(7)
-  $core.String get destinationPath => $_getSZ(6);
+  $core.String get destinationPath => $_getSZ(5);
   @$pb.TagNumber(7)
-  set destinationPath($core.String v) { $_setString(6, v); }
+  set destinationPath($core.String v) { $_setString(5, v); }
   @$pb.TagNumber(7)
-  $core.bool hasDestinationPath() => $_has(6);
+  $core.bool hasDestinationPath() => $_has(5);
   @$pb.TagNumber(7)
   void clearDestinationPath() => clearField(7);
 
   @$pb.TagNumber(8)
-  ModelFileRole get role => $_getN(7);
+  ModelFileRole get role => $_getN(6);
   @$pb.TagNumber(8)
   set role(ModelFileRole v) { setField(8, v); }
   @$pb.TagNumber(8)
-  $core.bool hasRole() => $_has(7);
+  $core.bool hasRole() => $_has(6);
   @$pb.TagNumber(8)
   void clearRole() => clearField(8);
 
   @$pb.TagNumber(9)
-  $core.String get localPath => $_getSZ(8);
+  $core.String get localPath => $_getSZ(7);
   @$pb.TagNumber(9)
-  set localPath($core.String v) { $_setString(8, v); }
+  set localPath($core.String v) { $_setString(7, v); }
   @$pb.TagNumber(9)
-  $core.bool hasLocalPath() => $_has(8);
+  $core.bool hasLocalPath() => $_has(7);
   @$pb.TagNumber(9)
   void clearLocalPath() => clearField(9);
 
   @$pb.TagNumber(10)
-  $core.String get checksumSha256 => $_getSZ(9);
+  $core.String get checksumSha256 => $_getSZ(8);
   @$pb.TagNumber(10)
-  set checksumSha256($core.String v) { $_setString(9, v); }
+  set checksumSha256($core.String v) { $_setString(8, v); }
   @$pb.TagNumber(10)
-  $core.bool hasChecksumSha256() => $_has(9);
+  $core.bool hasChecksumSha256() => $_has(8);
   @$pb.TagNumber(10)
   void clearChecksumSha256() => clearField(10);
 }
@@ -4007,10 +3925,10 @@ class ModelDeleteResult extends $pb.GeneratedMessage {
 class ModelCompatibilityRequest extends $pb.GeneratedMessage {
   factory ModelCompatibilityRequest({
     $core.String? modelId,
-    $0.HardwareProfile? hardwareProfile,
+    $1.HardwareProfile? hardwareProfile,
     $fixnum.Int64? availableRamBytes,
     $fixnum.Int64? availableStorageBytes,
-    $0.AcceleratorPreference? acceleratorPreference,
+    $1.AccelerationPreference? acceleratorPreference,
     InferenceFramework? preferredFramework,
   }) {
     final $result = create();
@@ -4040,10 +3958,10 @@ class ModelCompatibilityRequest extends $pb.GeneratedMessage {
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ModelCompatibilityRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
-    ..aOM<$0.HardwareProfile>(2, _omitFieldNames ? '' : 'hardwareProfile', subBuilder: $0.HardwareProfile.create)
+    ..aOM<$1.HardwareProfile>(2, _omitFieldNames ? '' : 'hardwareProfile', subBuilder: $1.HardwareProfile.create)
     ..aInt64(3, _omitFieldNames ? '' : 'availableRamBytes')
     ..aInt64(4, _omitFieldNames ? '' : 'availableStorageBytes')
-    ..e<$0.AcceleratorPreference>(5, _omitFieldNames ? '' : 'acceleratorPreference', $pb.PbFieldType.OE, defaultOrMaker: $0.AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO, valueOf: $0.AcceleratorPreference.valueOf, enumValues: $0.AcceleratorPreference.values)
+    ..e<$1.AccelerationPreference>(5, _omitFieldNames ? '' : 'acceleratorPreference', $pb.PbFieldType.OE, defaultOrMaker: $1.AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED, valueOf: $1.AccelerationPreference.valueOf, enumValues: $1.AccelerationPreference.values)
     ..e<InferenceFramework>(6, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: InferenceFramework.valueOf, enumValues: InferenceFramework.values)
     ..hasRequiredFields = false
   ;
@@ -4083,15 +4001,15 @@ class ModelCompatibilityRequest extends $pb.GeneratedMessage {
   /// unset, commons will read whatever it has cached internally; the
   /// RAM/storage values below remain authoritative for the verdict.
   @$pb.TagNumber(2)
-  $0.HardwareProfile get hardwareProfile => $_getN(1);
+  $1.HardwareProfile get hardwareProfile => $_getN(1);
   @$pb.TagNumber(2)
-  set hardwareProfile($0.HardwareProfile v) { setField(2, v); }
+  set hardwareProfile($1.HardwareProfile v) { setField(2, v); }
   @$pb.TagNumber(2)
   $core.bool hasHardwareProfile() => $_has(1);
   @$pb.TagNumber(2)
   void clearHardwareProfile() => clearField(2);
   @$pb.TagNumber(2)
-  $0.HardwareProfile ensureHardwareProfile() => $_ensure(1);
+  $1.HardwareProfile ensureHardwareProfile() => $_ensure(1);
 
   /// Available RAM in bytes (from device probe). 0 = unknown — commons
   /// will treat the requirement as satisfied.
@@ -4117,9 +4035,9 @@ class ModelCompatibilityRequest extends $pb.GeneratedMessage {
   /// Optional caller preferences (acceleration, framework). Reserved for
   /// future use; today's verdict is based on memory/storage alone.
   @$pb.TagNumber(5)
-  $0.AcceleratorPreference get acceleratorPreference => $_getN(4);
+  $1.AccelerationPreference get acceleratorPreference => $_getN(4);
   @$pb.TagNumber(5)
-  set acceleratorPreference($0.AcceleratorPreference v) { setField(5, v); }
+  set acceleratorPreference($1.AccelerationPreference v) { setField(5, v); }
   @$pb.TagNumber(5)
   $core.bool hasAcceleratorPreference() => $_has(4);
   @$pb.TagNumber(5)

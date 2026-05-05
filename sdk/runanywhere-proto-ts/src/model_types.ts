@@ -8,11 +8,12 @@
 import Long from "long";
 import _m0 from "protobufjs/minimal";
 import {
-  AcceleratorPreference,
-  acceleratorPreferenceFromJSON,
-  acceleratorPreferenceToJSON,
+  AccelerationPreference,
+  accelerationPreferenceFromJSON,
+  accelerationPreferenceToJSON,
   HardwareProfile,
 } from "./hardware_profile";
+import { ThinkingTagPattern } from "./thinking_tag_pattern";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -1102,84 +1103,6 @@ export function modelFileRoleToJSON(object: ModelFileRole): string {
 
 /**
  * ---------------------------------------------------------------------------
- * Hardware acceleration preference for inference. Sources pre-IDL:
- *   Web    enums.ts:165   (Auto / WebGPU / CPU)
- *   Swift  extensions     (CPU / GPU / NPU / Metal)
- *   Kotlin enum           (CPU / GPU / NPU / Vulkan)
- * Canonicalized union below.
- * ---------------------------------------------------------------------------
- */
-export enum AccelerationPreference {
-  ACCELERATION_PREFERENCE_UNSPECIFIED = 0,
-  ACCELERATION_PREFERENCE_AUTO = 1,
-  ACCELERATION_PREFERENCE_CPU = 2,
-  ACCELERATION_PREFERENCE_GPU = 3,
-  ACCELERATION_PREFERENCE_NPU = 4,
-  ACCELERATION_PREFERENCE_WEBGPU = 5,
-  ACCELERATION_PREFERENCE_METAL = 6,
-  ACCELERATION_PREFERENCE_VULKAN = 7,
-  UNRECOGNIZED = -1,
-}
-
-export function accelerationPreferenceFromJSON(object: any): AccelerationPreference {
-  switch (object) {
-    case 0:
-    case "ACCELERATION_PREFERENCE_UNSPECIFIED":
-      return AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED;
-    case 1:
-    case "ACCELERATION_PREFERENCE_AUTO":
-      return AccelerationPreference.ACCELERATION_PREFERENCE_AUTO;
-    case 2:
-    case "ACCELERATION_PREFERENCE_CPU":
-      return AccelerationPreference.ACCELERATION_PREFERENCE_CPU;
-    case 3:
-    case "ACCELERATION_PREFERENCE_GPU":
-      return AccelerationPreference.ACCELERATION_PREFERENCE_GPU;
-    case 4:
-    case "ACCELERATION_PREFERENCE_NPU":
-      return AccelerationPreference.ACCELERATION_PREFERENCE_NPU;
-    case 5:
-    case "ACCELERATION_PREFERENCE_WEBGPU":
-      return AccelerationPreference.ACCELERATION_PREFERENCE_WEBGPU;
-    case 6:
-    case "ACCELERATION_PREFERENCE_METAL":
-      return AccelerationPreference.ACCELERATION_PREFERENCE_METAL;
-    case 7:
-    case "ACCELERATION_PREFERENCE_VULKAN":
-      return AccelerationPreference.ACCELERATION_PREFERENCE_VULKAN;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return AccelerationPreference.UNRECOGNIZED;
-  }
-}
-
-export function accelerationPreferenceToJSON(object: AccelerationPreference): string {
-  switch (object) {
-    case AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED:
-      return "ACCELERATION_PREFERENCE_UNSPECIFIED";
-    case AccelerationPreference.ACCELERATION_PREFERENCE_AUTO:
-      return "ACCELERATION_PREFERENCE_AUTO";
-    case AccelerationPreference.ACCELERATION_PREFERENCE_CPU:
-      return "ACCELERATION_PREFERENCE_CPU";
-    case AccelerationPreference.ACCELERATION_PREFERENCE_GPU:
-      return "ACCELERATION_PREFERENCE_GPU";
-    case AccelerationPreference.ACCELERATION_PREFERENCE_NPU:
-      return "ACCELERATION_PREFERENCE_NPU";
-    case AccelerationPreference.ACCELERATION_PREFERENCE_WEBGPU:
-      return "ACCELERATION_PREFERENCE_WEBGPU";
-    case AccelerationPreference.ACCELERATION_PREFERENCE_METAL:
-      return "ACCELERATION_PREFERENCE_METAL";
-    case AccelerationPreference.ACCELERATION_PREFERENCE_VULKAN:
-      return "ACCELERATION_PREFERENCE_VULKAN";
-    case AccelerationPreference.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-/**
- * ---------------------------------------------------------------------------
  * Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
  *   Web    enums.ts (RoutingPolicy)
  *          OnDevicePreferred / CloudPreferred / OnDeviceOnly / CloudOnly /
@@ -1244,16 +1167,6 @@ export function routingPolicyToJSON(object: RoutingPolicy): string {
     default:
       return "UNRECOGNIZED";
   }
-}
-
-/**
- * Model-level thinking tag metadata. This intentionally uses a model-specific
- * message name because llm_options.proto already owns the generation-options
- * ThinkingTagPattern message in this proto package.
- */
-export interface ModelThinkingTagPattern {
-  openTag: string;
-  closeTag: string;
 }
 
 export interface ModelInfoMetadata {
@@ -1326,7 +1239,7 @@ export interface ModelInfo {
    * capability flag; this optional pattern declares model-specific tags.
    */
   thinkingPattern?:
-    | ModelThinkingTagPattern
+    | ThinkingTagPattern
     | undefined;
   /**
    * Structured public catalog metadata. `description` (field 12) is kept for
@@ -1426,13 +1339,6 @@ export interface ModelFileDescriptor {
    */
   sizeBytes?:
     | number
-    | undefined;
-  /**
-   * Legacy checksum field kept for generated consumers that already use it.
-   * Prefer checksum_sha256 for new manifests when the algorithm is known.
-   */
-  checksum?:
-    | string
     | undefined;
   /**
    * Path fields used by SDK-local wrappers/catalogs. `filename` is the
@@ -1738,7 +1644,7 @@ export interface ModelCompatibilityRequest {
    * Optional caller preferences (acceleration, framework). Reserved for
    * future use; today's verdict is based on memory/storage alone.
    */
-  acceleratorPreference?: AcceleratorPreference | undefined;
+  acceleratorPreference?: AccelerationPreference | undefined;
   preferredFramework?: InferenceFramework | undefined;
 }
 
@@ -1889,80 +1795,6 @@ export interface ModelRegistryFetchAssignmentsResult {
   errorCode: number;
   errorMessage: string;
 }
-
-function createBaseModelThinkingTagPattern(): ModelThinkingTagPattern {
-  return { openTag: "", closeTag: "" };
-}
-
-export const ModelThinkingTagPattern = {
-  encode(message: ModelThinkingTagPattern, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.openTag !== "") {
-      writer.uint32(10).string(message.openTag);
-    }
-    if (message.closeTag !== "") {
-      writer.uint32(18).string(message.closeTag);
-    }
-    return writer;
-  },
-
-  decode(input: _m0.Reader | Uint8Array, length?: number): ModelThinkingTagPattern {
-    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseModelThinkingTagPattern();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1:
-          if (tag !== 10) {
-            break;
-          }
-
-          message.openTag = reader.string();
-          continue;
-        case 2:
-          if (tag !== 18) {
-            break;
-          }
-
-          message.closeTag = reader.string();
-          continue;
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skipType(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): ModelThinkingTagPattern {
-    return {
-      openTag: isSet(object.openTag) ? globalThis.String(object.openTag) : "",
-      closeTag: isSet(object.closeTag) ? globalThis.String(object.closeTag) : "",
-    };
-  },
-
-  toJSON(message: ModelThinkingTagPattern): unknown {
-    const obj: any = {};
-    if (message.openTag !== "") {
-      obj.openTag = message.openTag;
-    }
-    if (message.closeTag !== "") {
-      obj.closeTag = message.closeTag;
-    }
-    return obj;
-  },
-
-  create<I extends Exact<DeepPartial<ModelThinkingTagPattern>, I>>(base?: I): ModelThinkingTagPattern {
-    return ModelThinkingTagPattern.fromPartial(base ?? ({} as any));
-  },
-  fromPartial<I extends Exact<DeepPartial<ModelThinkingTagPattern>, I>>(object: I): ModelThinkingTagPattern {
-    const message = createBaseModelThinkingTagPattern();
-    message.openTag = object.openTag ?? "";
-    message.closeTag = object.closeTag ?? "";
-    return message;
-  },
-};
 
 function createBaseModelInfoMetadata(): ModelInfoMetadata {
   return { description: "", author: "", license: "", tags: [], version: "" };
@@ -2281,7 +2113,7 @@ export const ModelInfo = {
       writer.uint32(138).string(message.checksumSha256);
     }
     if (message.thinkingPattern !== undefined) {
-      ModelThinkingTagPattern.encode(message.thinkingPattern, writer.uint32(146).fork()).ldelim();
+      ThinkingTagPattern.encode(message.thinkingPattern, writer.uint32(146).fork()).ldelim();
     }
     if (message.metadata !== undefined) {
       ModelInfoMetadata.encode(message.metadata, writer.uint32(154).fork()).ldelim();
@@ -2474,7 +2306,7 @@ export const ModelInfo = {
             break;
           }
 
-          message.thinkingPattern = ModelThinkingTagPattern.decode(reader, reader.uint32());
+          message.thinkingPattern = ThinkingTagPattern.decode(reader, reader.uint32());
           continue;
         case 19:
           if (tag !== 154) {
@@ -2639,9 +2471,7 @@ export const ModelInfo = {
         ? globalThis.Number(object.memoryRequiredBytes)
         : undefined,
       checksumSha256: isSet(object.checksumSha256) ? globalThis.String(object.checksumSha256) : undefined,
-      thinkingPattern: isSet(object.thinkingPattern)
-        ? ModelThinkingTagPattern.fromJSON(object.thinkingPattern)
-        : undefined,
+      thinkingPattern: isSet(object.thinkingPattern) ? ThinkingTagPattern.fromJSON(object.thinkingPattern) : undefined,
       metadata: isSet(object.metadata) ? ModelInfoMetadata.fromJSON(object.metadata) : undefined,
       singleFile: isSet(object.singleFile) ? SingleFileArtifact.fromJSON(object.singleFile) : undefined,
       archive: isSet(object.archive) ? ArchiveArtifact.fromJSON(object.archive) : undefined,
@@ -2722,7 +2552,7 @@ export const ModelInfo = {
       obj.checksumSha256 = message.checksumSha256;
     }
     if (message.thinkingPattern !== undefined) {
-      obj.thinkingPattern = ModelThinkingTagPattern.toJSON(message.thinkingPattern);
+      obj.thinkingPattern = ThinkingTagPattern.toJSON(message.thinkingPattern);
     }
     if (message.metadata !== undefined) {
       obj.metadata = ModelInfoMetadata.toJSON(message.metadata);
@@ -2807,7 +2637,7 @@ export const ModelInfo = {
     message.memoryRequiredBytes = object.memoryRequiredBytes ?? undefined;
     message.checksumSha256 = object.checksumSha256 ?? undefined;
     message.thinkingPattern = (object.thinkingPattern !== undefined && object.thinkingPattern !== null)
-      ? ModelThinkingTagPattern.fromPartial(object.thinkingPattern)
+      ? ThinkingTagPattern.fromPartial(object.thinkingPattern)
       : undefined;
     message.metadata = (object.metadata !== undefined && object.metadata !== null)
       ? ModelInfoMetadata.fromPartial(object.metadata)
@@ -3129,7 +2959,6 @@ function createBaseModelFileDescriptor(): ModelFileDescriptor {
     filename: "",
     isRequired: false,
     sizeBytes: undefined,
-    checksum: undefined,
     relativePath: undefined,
     destinationPath: undefined,
     role: undefined,
@@ -3151,9 +2980,6 @@ export const ModelFileDescriptor = {
     }
     if (message.sizeBytes !== undefined) {
       writer.uint32(32).int64(message.sizeBytes);
-    }
-    if (message.checksum !== undefined) {
-      writer.uint32(42).string(message.checksum);
     }
     if (message.relativePath !== undefined) {
       writer.uint32(50).string(message.relativePath);
@@ -3208,13 +3034,6 @@ export const ModelFileDescriptor = {
 
           message.sizeBytes = longToNumber(reader.int64() as Long);
           continue;
-        case 5:
-          if (tag !== 42) {
-            break;
-          }
-
-          message.checksum = reader.string();
-          continue;
         case 6:
           if (tag !== 50) {
             break;
@@ -3265,7 +3084,6 @@ export const ModelFileDescriptor = {
       filename: isSet(object.filename) ? globalThis.String(object.filename) : "",
       isRequired: isSet(object.isRequired) ? globalThis.Boolean(object.isRequired) : false,
       sizeBytes: isSet(object.sizeBytes) ? globalThis.Number(object.sizeBytes) : undefined,
-      checksum: isSet(object.checksum) ? globalThis.String(object.checksum) : undefined,
       relativePath: isSet(object.relativePath) ? globalThis.String(object.relativePath) : undefined,
       destinationPath: isSet(object.destinationPath) ? globalThis.String(object.destinationPath) : undefined,
       role: isSet(object.role) ? modelFileRoleFromJSON(object.role) : undefined,
@@ -3287,9 +3105,6 @@ export const ModelFileDescriptor = {
     }
     if (message.sizeBytes !== undefined) {
       obj.sizeBytes = Math.round(message.sizeBytes);
-    }
-    if (message.checksum !== undefined) {
-      obj.checksum = message.checksum;
     }
     if (message.relativePath !== undefined) {
       obj.relativePath = message.relativePath;
@@ -3318,7 +3133,6 @@ export const ModelFileDescriptor = {
     message.filename = object.filename ?? "";
     message.isRequired = object.isRequired ?? false;
     message.sizeBytes = object.sizeBytes ?? undefined;
-    message.checksum = object.checksum ?? undefined;
     message.relativePath = object.relativePath ?? undefined;
     message.destinationPath = object.destinationPath ?? undefined;
     message.role = object.role ?? undefined;
@@ -6704,7 +6518,7 @@ export const ModelCompatibilityRequest = {
       availableRamBytes: isSet(object.availableRamBytes) ? globalThis.Number(object.availableRamBytes) : 0,
       availableStorageBytes: isSet(object.availableStorageBytes) ? globalThis.Number(object.availableStorageBytes) : 0,
       acceleratorPreference: isSet(object.acceleratorPreference)
-        ? acceleratorPreferenceFromJSON(object.acceleratorPreference)
+        ? accelerationPreferenceFromJSON(object.acceleratorPreference)
         : undefined,
       preferredFramework: isSet(object.preferredFramework)
         ? inferenceFrameworkFromJSON(object.preferredFramework)
@@ -6727,7 +6541,7 @@ export const ModelCompatibilityRequest = {
       obj.availableStorageBytes = Math.round(message.availableStorageBytes);
     }
     if (message.acceleratorPreference !== undefined) {
-      obj.acceleratorPreference = acceleratorPreferenceToJSON(message.acceleratorPreference);
+      obj.acceleratorPreference = accelerationPreferenceToJSON(message.acceleratorPreference);
     }
     if (message.preferredFramework !== undefined) {
       obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);

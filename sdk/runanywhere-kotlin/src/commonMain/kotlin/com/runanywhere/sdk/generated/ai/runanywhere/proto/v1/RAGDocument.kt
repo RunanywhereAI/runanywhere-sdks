@@ -55,16 +55,6 @@ public class RAGDocument(
     schemaIndex = 1,
   )
   public val text: String = "",
-  /**
-   * Legacy metadata JSON blob.
-   */
-  @field:WireField(
-    tag = 3,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "metadataJson",
-    schemaIndex = 2,
-  )
-  public val metadata_json: String? = null,
   metadata: Map<String, String> = emptyMap(),
   /**
    * Adapter-normalized document source. Pickers, sandbox bookmarks, and
@@ -74,21 +64,21 @@ public class RAGDocument(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "sourceUri",
-    schemaIndex = 4,
+    schemaIndex = 3,
   )
   public val source_uri: String? = null,
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "adapterHandle",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val adapter_handle: String? = null,
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "mediaType",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val media_type: String? = null,
   @field:WireField(
@@ -96,7 +86,7 @@ public class RAGDocument(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "sizeBytes",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val size_bytes: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -108,7 +98,7 @@ public class RAGDocument(
     tag = 4,
     keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 3,
+    schemaIndex = 2,
   )
   public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
 
@@ -125,7 +115,6 @@ public class RAGDocument(
     if (unknownFields != other.unknownFields) return false
     if (id != other.id) return false
     if (text != other.text) return false
-    if (metadata_json != other.metadata_json) return false
     if (metadata != other.metadata) return false
     if (source_uri != other.source_uri) return false
     if (adapter_handle != other.adapter_handle) return false
@@ -140,7 +129,6 @@ public class RAGDocument(
       result = unknownFields.hashCode()
       result = result * 37 + id.hashCode()
       result = result * 37 + text.hashCode()
-      result = result * 37 + (metadata_json?.hashCode() ?: 0)
       result = result * 37 + metadata.hashCode()
       result = result * 37 + (source_uri?.hashCode() ?: 0)
       result = result * 37 + (adapter_handle?.hashCode() ?: 0)
@@ -155,7 +143,6 @@ public class RAGDocument(
     val result = mutableListOf<String>()
     result += """id=${sanitize(id)}"""
     result += """text=${sanitize(text)}"""
-    if (metadata_json != null) result += """metadata_json=${sanitize(metadata_json)}"""
     if (metadata.isNotEmpty()) result += """metadata=$metadata"""
     if (source_uri != null) result += """source_uri=${sanitize(source_uri)}"""
     if (adapter_handle != null) result += """adapter_handle=${sanitize(adapter_handle)}"""
@@ -167,15 +154,14 @@ public class RAGDocument(
   public fun copy(
     id: String = this.id,
     text: String = this.text,
-    metadata_json: String? = this.metadata_json,
     metadata: Map<String, String> = this.metadata,
     source_uri: String? = this.source_uri,
     adapter_handle: String? = this.adapter_handle,
     media_type: String? = this.media_type,
     size_bytes: Long = this.size_bytes,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGDocument = RAGDocument(id, text, metadata_json, metadata, source_uri, adapter_handle,
-      media_type, size_bytes, unknownFields)
+  ): RAGDocument = RAGDocument(id, text, metadata, source_uri, adapter_handle, media_type,
+      size_bytes, unknownFields)
 
   public companion object {
     @JvmField
@@ -194,7 +180,6 @@ public class RAGDocument(
         var size = value.unknownFields.size
         if (value.id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1, value.id)
         if (value.text != "") size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.text)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.metadata_json)
         size += metadataAdapter.encodedSizeWithTag(4, value.metadata)
         size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.source_uri)
         size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.adapter_handle)
@@ -207,7 +192,6 @@ public class RAGDocument(
       override fun encode(writer: ProtoWriter, `value`: RAGDocument) {
         if (value.id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.id)
         if (value.text != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.text)
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.metadata_json)
         metadataAdapter.encodeWithTag(writer, 4, value.metadata)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.source_uri)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.adapter_handle)
@@ -223,7 +207,6 @@ public class RAGDocument(
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.adapter_handle)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.source_uri)
         metadataAdapter.encodeWithTag(writer, 4, value.metadata)
-        ProtoAdapter.STRING.encodeWithTag(writer, 3, value.metadata_json)
         if (value.text != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.text)
         if (value.id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1, value.id)
       }
@@ -231,7 +214,6 @@ public class RAGDocument(
       override fun decode(reader: ProtoReader): RAGDocument {
         var id: String = ""
         var text: String = ""
-        var metadata_json: String? = null
         val metadata = mutableMapOf<String, String>()
         var source_uri: String? = null
         var adapter_handle: String? = null
@@ -241,7 +223,6 @@ public class RAGDocument(
           when (tag) {
             1 -> id = ProtoAdapter.STRING.decode(reader)
             2 -> text = ProtoAdapter.STRING.decode(reader)
-            3 -> metadata_json = ProtoAdapter.STRING.decode(reader)
             4 -> metadata.putAll(metadataAdapter.decode(reader))
             5 -> source_uri = ProtoAdapter.STRING.decode(reader)
             6 -> adapter_handle = ProtoAdapter.STRING.decode(reader)
@@ -253,7 +234,6 @@ public class RAGDocument(
         return RAGDocument(
           id = id,
           text = text,
-          metadata_json = metadata_json,
           metadata = metadata,
           source_uri = source_uri,
           adapter_handle = adapter_handle,

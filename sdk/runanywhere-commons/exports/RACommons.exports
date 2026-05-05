@@ -330,6 +330,10 @@ _rac_registry_unload_plugin
 # to add the annotation. Keeping exported so commons built as dynamic lib works.
 _rac_plugin_route
 
+# Wave H-5 (KOT-12): SDKComponent → [InferenceFramework] query (proto ABI).
+_rac_router_frameworks_for_capability_proto
+_rac_router_frameworks_for_capability_proto_free
+
 # HTTP transport contract — platform SDK registers a URLSession/OkHttp vtable
 # here and the C ABI download executor dispatches through it.
 _rac_http_client_create

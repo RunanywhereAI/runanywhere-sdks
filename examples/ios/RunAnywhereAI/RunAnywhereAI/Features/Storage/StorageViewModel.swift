@@ -60,6 +60,7 @@ class StorageViewModel: ObservableObject {
 
     func clearCache() async {
         do {
+            // TODO: migrate to RunAnywhere.clearCache() after SWF-CROSS-02
             try SimplifiedFileManager.shared.clearCache()
             await refreshData()
         } catch {
@@ -69,6 +70,7 @@ class StorageViewModel: ObservableObject {
 
     func cleanTempFiles() async {
         do {
+            // TODO: migrate to RunAnywhere.cleanTempFiles() after SWF-CROSS-02
             try SimplifiedFileManager.shared.cleanTempFiles()
             await refreshData()
         } catch {

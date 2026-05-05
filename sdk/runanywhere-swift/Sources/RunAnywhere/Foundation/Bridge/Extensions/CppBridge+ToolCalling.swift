@@ -236,14 +236,8 @@ extension CppBridge {
         }
 
         private static func hydrateArguments(_ toolCall: RAToolCall) -> RAToolCall {
-            var hydrated = toolCall
-            if hydrated.arguments.isEmpty, !hydrated.argumentsJson.isEmpty {
-                hydrated.arguments = RAToolValue.parseObjectJSON(hydrated.argumentsJson)
-            }
-            if hydrated.argumentsJson.isEmpty, !hydrated.arguments.isEmpty {
-                hydrated.argumentsJson = RAToolValue.jsonString(from: hydrated.arguments)
-            }
-            return hydrated
+            // IDL-13: typed `arguments` map deleted; `argumentsJson` is canonical.
+            return toolCall
         }
 
         private static func protoFormatName(from formatName: String) -> RAToolCallFormatName {

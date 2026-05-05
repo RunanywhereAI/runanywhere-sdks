@@ -102,6 +102,48 @@ export function edgePolicyToJSON(object) {
             return "UNRECOGNIZED";
     }
 }
+/**
+ * ---------------------------------------------------------------------------
+ * Pipeline lifecycle status — shared by compile/start/stop results.
+ * ---------------------------------------------------------------------------
+ */
+export var PipelineStatus;
+(function (PipelineStatus) {
+    PipelineStatus[PipelineStatus["PIPELINE_STATUS_UNSPECIFIED"] = 0] = "PIPELINE_STATUS_UNSPECIFIED";
+    PipelineStatus[PipelineStatus["PIPELINE_STATUS_OK"] = 1] = "PIPELINE_STATUS_OK";
+    PipelineStatus[PipelineStatus["PIPELINE_STATUS_FAILED"] = 2] = "PIPELINE_STATUS_FAILED";
+    PipelineStatus[PipelineStatus["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
+})(PipelineStatus || (PipelineStatus = {}));
+export function pipelineStatusFromJSON(object) {
+    switch (object) {
+        case 0:
+        case "PIPELINE_STATUS_UNSPECIFIED":
+            return PipelineStatus.PIPELINE_STATUS_UNSPECIFIED;
+        case 1:
+        case "PIPELINE_STATUS_OK":
+            return PipelineStatus.PIPELINE_STATUS_OK;
+        case 2:
+        case "PIPELINE_STATUS_FAILED":
+            return PipelineStatus.PIPELINE_STATUS_FAILED;
+        case -1:
+        case "UNRECOGNIZED":
+        default:
+            return PipelineStatus.UNRECOGNIZED;
+    }
+}
+export function pipelineStatusToJSON(object) {
+    switch (object) {
+        case PipelineStatus.PIPELINE_STATUS_UNSPECIFIED:
+            return "PIPELINE_STATUS_UNSPECIFIED";
+        case PipelineStatus.PIPELINE_STATUS_OK:
+            return "PIPELINE_STATUS_OK";
+        case PipelineStatus.PIPELINE_STATUS_FAILED:
+            return "PIPELINE_STATUS_FAILED";
+        case PipelineStatus.UNRECOGNIZED:
+        default:
+            return "UNRECOGNIZED";
+    }
+}
 function createBasePipelineSpec() {
     return { name: "", operators: [], edges: [], options: undefined };
 }
@@ -578,6 +620,324 @@ export const PipelineOptions = {
         message.latencyBudgetMs = object.latencyBudgetMs ?? 0;
         message.emitMetrics = object.emitMetrics ?? false;
         message.strictValidation = object.strictValidation ?? false;
+        return message;
+    },
+};
+function createBasePipelineCompileResult() {
+    return { handleId: "", status: 0, errorMessage: undefined, errorCode: 0 };
+}
+export const PipelineCompileResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.handleId !== "") {
+            writer.uint32(10).string(message.handleId);
+        }
+        if (message.status !== 0) {
+            writer.uint32(16).int32(message.status);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(26).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(32).int32(message.errorCode);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBasePipelineCompileResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.handleId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.status = reader.int32();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            handleId: isSet(object.handleId) ? globalThis.String(object.handleId) : "",
+            status: isSet(object.status) ? pipelineStatusFromJSON(object.status) : 0,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.handleId !== "") {
+            obj.handleId = message.handleId;
+        }
+        if (message.status !== 0) {
+            obj.status = pipelineStatusToJSON(message.status);
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        return obj;
+    },
+    create(base) {
+        return PipelineCompileResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBasePipelineCompileResult();
+        message.handleId = object.handleId ?? "";
+        message.status = object.status ?? 0;
+        message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
+        return message;
+    },
+};
+function createBasePipelineStartRequest() {
+    return { handleId: "" };
+}
+export const PipelineStartRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.handleId !== "") {
+            writer.uint32(10).string(message.handleId);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBasePipelineStartRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.handleId = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return { handleId: isSet(object.handleId) ? globalThis.String(object.handleId) : "" };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.handleId !== "") {
+            obj.handleId = message.handleId;
+        }
+        return obj;
+    },
+    create(base) {
+        return PipelineStartRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBasePipelineStartRequest();
+        message.handleId = object.handleId ?? "";
+        return message;
+    },
+};
+function createBasePipelineHandle() {
+    return { handleId: "", status: 0, state: undefined };
+}
+export const PipelineHandle = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.handleId !== "") {
+            writer.uint32(10).string(message.handleId);
+        }
+        if (message.status !== 0) {
+            writer.uint32(16).int32(message.status);
+        }
+        if (message.state !== undefined) {
+            writer.uint32(26).string(message.state);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBasePipelineHandle();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.handleId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.status = reader.int32();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.state = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            handleId: isSet(object.handleId) ? globalThis.String(object.handleId) : "",
+            status: isSet(object.status) ? pipelineStatusFromJSON(object.status) : 0,
+            state: isSet(object.state) ? globalThis.String(object.state) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.handleId !== "") {
+            obj.handleId = message.handleId;
+        }
+        if (message.status !== 0) {
+            obj.status = pipelineStatusToJSON(message.status);
+        }
+        if (message.state !== undefined) {
+            obj.state = message.state;
+        }
+        return obj;
+    },
+    create(base) {
+        return PipelineHandle.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBasePipelineHandle();
+        message.handleId = object.handleId ?? "";
+        message.status = object.status ?? 0;
+        message.state = object.state ?? undefined;
+        return message;
+    },
+};
+function createBasePipelineStopResult() {
+    return { handleId: "", status: 0, errorMessage: undefined, errorCode: 0 };
+}
+export const PipelineStopResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.handleId !== "") {
+            writer.uint32(10).string(message.handleId);
+        }
+        if (message.status !== 0) {
+            writer.uint32(16).int32(message.status);
+        }
+        if (message.errorMessage !== undefined) {
+            writer.uint32(26).string(message.errorMessage);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(32).int32(message.errorCode);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBasePipelineStopResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.handleId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.status = reader.int32();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            handleId: isSet(object.handleId) ? globalThis.String(object.handleId) : "",
+            status: isSet(object.status) ? pipelineStatusFromJSON(object.status) : 0,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.handleId !== "") {
+            obj.handleId = message.handleId;
+        }
+        if (message.status !== 0) {
+            obj.status = pipelineStatusToJSON(message.status);
+        }
+        if (message.errorMessage !== undefined) {
+            obj.errorMessage = message.errorMessage;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        return obj;
+    },
+    create(base) {
+        return PipelineStopResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBasePipelineStopResult();
+        message.handleId = object.handleId ?? "";
+        message.status = object.status ?? 0;
+        message.errorMessage = object.errorMessage ?? undefined;
+        message.errorCode = object.errorCode ?? 0;
         return message;
     },
 };

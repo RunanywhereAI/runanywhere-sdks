@@ -407,7 +407,7 @@ export const ChatScreen: React.FC = () => {
         `[ChatScreen] Loading model: ${model.id} (registry will resolve path)`
       );
 
-      if (!model.isDownloaded && !model.localPath) {
+      if (!model.isDownloaded) {
         Alert.alert(
           'Error',
           'Model has not been downloaded. Open the model picker to download it first.'

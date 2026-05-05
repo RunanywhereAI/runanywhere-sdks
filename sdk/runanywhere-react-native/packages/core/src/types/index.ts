@@ -65,12 +65,12 @@ export type {
   ModelRegistryRefreshRequest,
   ModelRegistryRefreshResult,
   ModelRuntimeCompatibility,
-  ModelThinkingTagPattern,
   ModelUnloadRequest,
   ModelUnloadResult,
   MultiFileArtifact,
   SingleFileArtifact,
 } from '@runanywhere/proto-ts/model_types';
+export type { ThinkingTagPattern } from '@runanywhere/proto-ts/thinking_tag_pattern';
 export {
   ArchiveStructure,
   ArchiveType,
@@ -275,7 +275,6 @@ export type {
   LLMGenerationStatus,
   PerformanceMetrics,
   StreamToken,
-  ThinkingTagPattern,
 } from '@runanywhere/proto-ts/llm_options';
 export { LLMGenerationState } from '@runanywhere/proto-ts/llm_options';
 

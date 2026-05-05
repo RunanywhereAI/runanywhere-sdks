@@ -15,24 +15,24 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'llm_service.pb.dart' as $2;
+import 'llm_service.pb.dart' as $4;
 import 'llm_service.pbjson.dart';
 
 export 'llm_service.pb.dart';
 
 abstract class LLMServiceBase extends $pb.GeneratedService {
-  $async.Future<$2.LLMStreamEvent> generate($pb.ServerContext ctx, $2.LLMGenerateRequest request);
+  $async.Future<$4.LLMStreamEvent> generate($pb.ServerContext ctx, $4.LLMGenerateRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
-      case 'Generate': return $2.LLMGenerateRequest();
+      case 'Generate': return $4.LLMGenerateRequest();
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }
 
   $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx, $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
-      case 'Generate': return this.generate(ctx, request as $2.LLMGenerateRequest);
+      case 'Generate': return this.generate(ctx, request as $4.LLMGenerateRequest);
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }

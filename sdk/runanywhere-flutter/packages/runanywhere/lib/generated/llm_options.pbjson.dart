@@ -308,20 +308,6 @@ final $typed_data.Uint8List generationHintsDescriptor = $convert.base64Decode(
     '1heF90b2tlbnMYAiABKAVSCW1heFRva2VucxIkCgtzeXN0ZW1fcm9sZRgDIAEoCUgAUgpzeXN0'
     'ZW1Sb2xliAEBQg4KDF9zeXN0ZW1fcm9sZQ==');
 
-@$core.Deprecated('Use thinkingTagPatternDescriptor instead')
-const ThinkingTagPattern$json = {
-  '1': 'ThinkingTagPattern',
-  '2': [
-    {'1': 'opening_tag', '3': 1, '4': 1, '5': 9, '10': 'openingTag'},
-    {'1': 'closing_tag', '3': 2, '4': 1, '5': 9, '10': 'closingTag'},
-  ],
-};
-
-/// Descriptor for `ThinkingTagPattern`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List thinkingTagPatternDescriptor = $convert.base64Decode(
-    'ChJUaGlua2luZ1RhZ1BhdHRlcm4SHwoLb3BlbmluZ190YWcYASABKAlSCm9wZW5pbmdUYWcSHw'
-    'oLY2xvc2luZ190YWcYAiABKAlSCmNsb3NpbmdUYWc=');
-
 @$core.Deprecated('Use streamTokenDescriptor instead')
 const StreamToken$json = {
   '1': 'StreamToken',

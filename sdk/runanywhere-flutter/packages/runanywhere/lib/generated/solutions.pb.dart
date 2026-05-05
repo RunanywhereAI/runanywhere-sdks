@@ -9,6 +9,7 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
@@ -1194,6 +1195,24 @@ class TimeSeriesConfig extends $pb.GeneratedMessage {
   $core.bool hasTypeKind() => $_has(5);
   @$pb.TagNumber(6)
   void clearTypeKind() => clearField(6);
+}
+
+class SolutionsApi {
+  $pb.RpcClient _client;
+  SolutionsApi(this._client);
+
+  $async.Future<SolutionHandle> create_($pb.ClientContext? ctx, SolutionConfig request) =>
+    _client.invoke<SolutionHandle>(ctx, 'Solutions', 'Create', request, SolutionHandle())
+  ;
+  $async.Future<SolutionHandle> start($pb.ClientContext? ctx, SolutionHandle request) =>
+    _client.invoke<SolutionHandle>(ctx, 'Solutions', 'Start', request, SolutionHandle())
+  ;
+  $async.Future<SolutionHandle> stop($pb.ClientContext? ctx, SolutionHandle request) =>
+    _client.invoke<SolutionHandle>(ctx, 'Solutions', 'Stop', request, SolutionHandle())
+  ;
+  $async.Future<SolutionHandle> destroy($pb.ClientContext? ctx, SolutionHandle request) =>
+    _client.invoke<SolutionHandle>(ctx, 'Solutions', 'Destroy', request, SolutionHandle())
+  ;
 }
 
 

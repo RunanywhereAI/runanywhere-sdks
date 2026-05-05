@@ -13,12 +13,13 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
-import 'download_service.pbjson.dart' as $6;
-import 'errors.pbjson.dart' as $8;
-import 'hardware_profile.pbjson.dart' as $7;
+import 'download_service.pbjson.dart' as $7;
+import 'errors.pbjson.dart' as $9;
+import 'hardware_profile.pbjson.dart' as $8;
 import 'model_types.pbjson.dart' as $0;
 import 'storage_types.pbjson.dart' as $5;
-import 'voice_events.pbjson.dart' as $9;
+import 'thinking_tag_pattern.pbjson.dart' as $11;
+import 'voice_events.pbjson.dart' as $10;
 
 @$core.Deprecated('Use sDKComponentDescriptor instead')
 const SDKComponent$json = {
@@ -993,6 +994,7 @@ const GenerationEvent$json = {
     {'1': 'structured_schema_json', '3': 21, '4': 1, '5': 9, '10': 'structuredSchemaJson'},
     {'1': 'structured_output_json', '3': 22, '4': 1, '5': 9, '10': 'structuredOutputJson'},
     {'1': 'thinking_text', '3': 23, '4': 1, '5': 9, '10': 'thinkingText'},
+    {'1': 'input_tokens', '3': 24, '4': 1, '5': 5, '10': 'inputTokens'},
   ],
 };
 
@@ -1013,7 +1015,8 @@ final $typed_data.Uint8List generationEventDescriptor = $convert.base64Decode(
     'dG9vbE5hbWUSKgoRdG9vbF9wYXlsb2FkX2pzb24YFCABKAlSD3Rvb2xQYXlsb2FkSnNvbhI0Ch'
     'ZzdHJ1Y3R1cmVkX3NjaGVtYV9qc29uGBUgASgJUhRzdHJ1Y3R1cmVkU2NoZW1hSnNvbhI0ChZz'
     'dHJ1Y3R1cmVkX291dHB1dF9qc29uGBYgASgJUhRzdHJ1Y3R1cmVkT3V0cHV0SnNvbhIjCg10aG'
-    'lua2luZ190ZXh0GBcgASgJUgx0aGlua2luZ1RleHQ=');
+    'lua2luZ190ZXh0GBcgASgJUgx0aGlua2luZ1RleHQSIQoMaW5wdXRfdG9rZW5zGBggASgFUgtp'
+    'bnB1dFRva2Vucw==');
 
 @$core.Deprecated('Use modelEventDescriptor instead')
 const ModelEvent$json = {
@@ -1829,33 +1832,33 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> SDKEventsS
   '.runanywhere.v1.ComponentInitializationEvent': ComponentInitializationEvent$json,
   '.runanywhere.v1.SDKEvent.PropertiesEntry': SDKEvent_PropertiesEntry$json,
   '.runanywhere.v1.VoiceLifecycleEvent': VoiceLifecycleEvent$json,
-  '.runanywhere.v1.VoiceEvent': $9.VoiceEvent$json,
-  '.runanywhere.v1.UserSaidEvent': $9.UserSaidEvent$json,
-  '.runanywhere.v1.AssistantTokenEvent': $9.AssistantTokenEvent$json,
-  '.runanywhere.v1.AudioFrameEvent': $9.AudioFrameEvent$json,
-  '.runanywhere.v1.VADEvent': $9.VADEvent$json,
-  '.runanywhere.v1.InterruptedEvent': $9.InterruptedEvent$json,
-  '.runanywhere.v1.StateChangeEvent': $9.StateChangeEvent$json,
-  '.runanywhere.v1.ErrorEvent': $9.ErrorEvent$json,
-  '.runanywhere.v1.MetricsEvent': $9.MetricsEvent$json,
-  '.runanywhere.v1.VoiceAgentComponentStates': $9.VoiceAgentComponentStates$json,
-  '.runanywhere.v1.VoiceSessionError': $9.VoiceSessionError$json,
-  '.runanywhere.v1.SessionStartedEvent': $9.SessionStartedEvent$json,
-  '.runanywhere.v1.SessionStoppedEvent': $9.SessionStoppedEvent$json,
-  '.runanywhere.v1.AgentResponseStartedEvent': $9.AgentResponseStartedEvent$json,
-  '.runanywhere.v1.AgentResponseCompletedEvent': $9.AgentResponseCompletedEvent$json,
-  '.runanywhere.v1.SpeechTurnDetectionEvent': $9.SpeechTurnDetectionEvent$json,
-  '.runanywhere.v1.TurnLifecycleEvent': $9.TurnLifecycleEvent$json,
-  '.runanywhere.v1.WakeWordDetectedEvent': $9.WakeWordDetectedEvent$json,
-  '.runanywhere.v1.AudioLevelEvent': $9.AudioLevelEvent$json,
-  '.runanywhere.v1.ComponentProgressEvent': $9.ComponentProgressEvent$json,
-  '.runanywhere.v1.VoiceEvent.MetadataEntry': $9.VoiceEvent_MetadataEntry$json,
+  '.runanywhere.v1.VoiceEvent': $10.VoiceEvent$json,
+  '.runanywhere.v1.UserSaidEvent': $10.UserSaidEvent$json,
+  '.runanywhere.v1.AssistantTokenEvent': $10.AssistantTokenEvent$json,
+  '.runanywhere.v1.AudioFrameEvent': $10.AudioFrameEvent$json,
+  '.runanywhere.v1.VADEvent': $10.VADEvent$json,
+  '.runanywhere.v1.InterruptedEvent': $10.InterruptedEvent$json,
+  '.runanywhere.v1.StateChangeEvent': $10.StateChangeEvent$json,
+  '.runanywhere.v1.ErrorEvent': $10.ErrorEvent$json,
+  '.runanywhere.v1.MetricsEvent': $10.MetricsEvent$json,
+  '.runanywhere.v1.VoiceAgentComponentStates': $10.VoiceAgentComponentStates$json,
+  '.runanywhere.v1.VoiceSessionError': $10.VoiceSessionError$json,
+  '.runanywhere.v1.SessionStartedEvent': $10.SessionStartedEvent$json,
+  '.runanywhere.v1.SessionStoppedEvent': $10.SessionStoppedEvent$json,
+  '.runanywhere.v1.AgentResponseStartedEvent': $10.AgentResponseStartedEvent$json,
+  '.runanywhere.v1.AgentResponseCompletedEvent': $10.AgentResponseCompletedEvent$json,
+  '.runanywhere.v1.SpeechTurnDetectionEvent': $10.SpeechTurnDetectionEvent$json,
+  '.runanywhere.v1.TurnLifecycleEvent': $10.TurnLifecycleEvent$json,
+  '.runanywhere.v1.WakeWordDetectedEvent': $10.WakeWordDetectedEvent$json,
+  '.runanywhere.v1.AudioLevelEvent': $10.AudioLevelEvent$json,
+  '.runanywhere.v1.ComponentProgressEvent': $10.ComponentProgressEvent$json,
+  '.runanywhere.v1.VoiceEvent.MetadataEntry': $10.VoiceEvent_MetadataEntry$json,
   '.runanywhere.v1.ComponentLifecycleEvent': ComponentLifecycleEvent$json,
   '.runanywhere.v1.ModelLoadResult': $0.ModelLoadResult$json,
   '.runanywhere.v1.ModelFileDescriptor': $0.ModelFileDescriptor$json,
   '.runanywhere.v1.ModelUnloadResult': $0.ModelUnloadResult$json,
   '.runanywhere.v1.ModelDeleteResult': $0.ModelDeleteResult$json,
-  '.runanywhere.v1.DownloadProgress': $6.DownloadProgress$json,
+  '.runanywhere.v1.DownloadProgress': $7.DownloadProgress$json,
   '.runanywhere.v1.StorageAvailabilityResult': $5.StorageAvailabilityResult$json,
   '.runanywhere.v1.StorageAvailability': $5.StorageAvailability$json,
   '.runanywhere.v1.StorageDeletePlan': $5.StorageDeletePlan$json,
@@ -1863,7 +1866,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> SDKEventsS
   '.runanywhere.v1.StorageDeleteResult': $5.StorageDeleteResult$json,
   '.runanywhere.v1.ComponentLifecycleSnapshot': ComponentLifecycleSnapshot$json,
   '.runanywhere.v1.ModelInfo': $0.ModelInfo$json,
-  '.runanywhere.v1.ModelThinkingTagPattern': $0.ModelThinkingTagPattern$json,
+  '.runanywhere.v1.ThinkingTagPattern': $11.ThinkingTagPattern$json,
   '.runanywhere.v1.ModelInfoMetadata': $0.ModelInfoMetadata$json,
   '.runanywhere.v1.SingleFileArtifact': $0.SingleFileArtifact$json,
   '.runanywhere.v1.ExpectedModelFiles': $0.ExpectedModelFiles$json,
@@ -1871,9 +1874,9 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> SDKEventsS
   '.runanywhere.v1.MultiFileArtifact': $0.MultiFileArtifact$json,
   '.runanywhere.v1.ModelRuntimeCompatibility': $0.ModelRuntimeCompatibility$json,
   '.runanywhere.v1.ComponentLifecycleSnapshotResult': ComponentLifecycleSnapshotResult$json,
-  '.runanywhere.v1.SDKError': $8.SDKError$json,
-  '.runanywhere.v1.ErrorContext': $8.ErrorContext$json,
-  '.runanywhere.v1.ErrorContext.MetadataEntry': $8.ErrorContext_MetadataEntry$json,
+  '.runanywhere.v1.SDKError': $9.SDKError$json,
+  '.runanywhere.v1.ErrorContext': $9.ErrorContext$json,
+  '.runanywhere.v1.ErrorContext.MetadataEntry': $9.ErrorContext_MetadataEntry$json,
   '.runanywhere.v1.SessionEvent': SessionEvent$json,
   '.runanywhere.v1.AuthEvent': AuthEvent$json,
   '.runanywhere.v1.ModelRegistryEvent': ModelRegistryEvent$json,
@@ -1887,11 +1890,11 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> SDKEventsS
   '.runanywhere.v1.ModelCompatibilityResult': $0.ModelCompatibilityResult$json,
   '.runanywhere.v1.CurrentModelResult': $0.CurrentModelResult$json,
   '.runanywhere.v1.DownloadEvent': DownloadEvent$json,
-  '.runanywhere.v1.DownloadPlanResult': $6.DownloadPlanResult$json,
-  '.runanywhere.v1.DownloadFilePlan': $6.DownloadFilePlan$json,
-  '.runanywhere.v1.DownloadStartResult': $6.DownloadStartResult$json,
-  '.runanywhere.v1.DownloadCancelResult': $6.DownloadCancelResult$json,
-  '.runanywhere.v1.DownloadResumeResult': $6.DownloadResumeResult$json,
+  '.runanywhere.v1.DownloadPlanResult': $7.DownloadPlanResult$json,
+  '.runanywhere.v1.DownloadFilePlan': $7.DownloadFilePlan$json,
+  '.runanywhere.v1.DownloadStartResult': $7.DownloadStartResult$json,
+  '.runanywhere.v1.DownloadCancelResult': $7.DownloadCancelResult$json,
+  '.runanywhere.v1.DownloadResumeResult': $7.DownloadResumeResult$json,
   '.runanywhere.v1.StorageLifecycleEvent': StorageLifecycleEvent$json,
   '.runanywhere.v1.StorageInfoResult': $5.StorageInfoResult$json,
   '.runanywhere.v1.StorageInfo': $5.StorageInfo$json,
@@ -1899,9 +1902,9 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> SDKEventsS
   '.runanywhere.v1.DeviceStorageInfo': $5.DeviceStorageInfo$json,
   '.runanywhere.v1.ModelStorageMetrics': $5.ModelStorageMetrics$json,
   '.runanywhere.v1.HardwareRoutingEvent': HardwareRoutingEvent$json,
-  '.runanywhere.v1.HardwareProfileResult': $7.HardwareProfileResult$json,
-  '.runanywhere.v1.HardwareProfile': $7.HardwareProfile$json,
-  '.runanywhere.v1.AcceleratorInfo': $7.AcceleratorInfo$json,
+  '.runanywhere.v1.HardwareProfileResult': $8.HardwareProfileResult$json,
+  '.runanywhere.v1.HardwareProfile': $8.HardwareProfile$json,
+  '.runanywhere.v1.AcceleratorInfo': $8.AcceleratorInfo$json,
   '.runanywhere.v1.CapabilityOperationEvent': CapabilityOperationEvent$json,
   '.runanywhere.v1.TelemetryEvent': TelemetryEvent$json,
   '.runanywhere.v1.TelemetryEvent.AttributesEntry': TelemetryEvent_AttributesEntry$json,

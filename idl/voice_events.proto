@@ -18,6 +18,7 @@ option java_outer_classname      = "VoiceEventsProto";
 option objc_class_prefix         = "RAV1";
 option csharp_namespace          = "Runanywhere.V1";
 option swift_prefix              = "RA";
+option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
 enum VoiceEventCategory {
     VOICE_EVENT_CATEGORY_UNSPECIFIED   = 0;

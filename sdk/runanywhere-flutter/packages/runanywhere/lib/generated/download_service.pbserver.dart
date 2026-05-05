@@ -15,36 +15,36 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'download_service.pb.dart' as $4;
+import 'download_service.pb.dart' as $7;
 import 'download_service.pbjson.dart';
 
 export 'download_service.pb.dart';
 
 abstract class DownloadServiceBase extends $pb.GeneratedService {
-  $async.Future<$4.DownloadPlanResult> plan($pb.ServerContext ctx, $4.DownloadPlanRequest request);
-  $async.Future<$4.DownloadStartResult> start($pb.ServerContext ctx, $4.DownloadStartRequest request);
-  $async.Future<$4.DownloadProgress> subscribe($pb.ServerContext ctx, $4.DownloadSubscribeRequest request);
-  $async.Future<$4.DownloadCancelResult> cancel($pb.ServerContext ctx, $4.DownloadCancelRequest request);
-  $async.Future<$4.DownloadResumeResult> resume($pb.ServerContext ctx, $4.DownloadResumeRequest request);
+  $async.Future<$7.DownloadPlanResult> plan($pb.ServerContext ctx, $7.DownloadPlanRequest request);
+  $async.Future<$7.DownloadStartResult> start($pb.ServerContext ctx, $7.DownloadStartRequest request);
+  $async.Future<$7.DownloadProgress> subscribe($pb.ServerContext ctx, $7.DownloadSubscribeRequest request);
+  $async.Future<$7.DownloadCancelResult> cancel($pb.ServerContext ctx, $7.DownloadCancelRequest request);
+  $async.Future<$7.DownloadResumeResult> resume($pb.ServerContext ctx, $7.DownloadResumeRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
-      case 'Plan': return $4.DownloadPlanRequest();
-      case 'Start': return $4.DownloadStartRequest();
-      case 'Subscribe': return $4.DownloadSubscribeRequest();
-      case 'Cancel': return $4.DownloadCancelRequest();
-      case 'Resume': return $4.DownloadResumeRequest();
+      case 'Plan': return $7.DownloadPlanRequest();
+      case 'Start': return $7.DownloadStartRequest();
+      case 'Subscribe': return $7.DownloadSubscribeRequest();
+      case 'Cancel': return $7.DownloadCancelRequest();
+      case 'Resume': return $7.DownloadResumeRequest();
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }
 
   $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx, $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
-      case 'Plan': return this.plan(ctx, request as $4.DownloadPlanRequest);
-      case 'Start': return this.start(ctx, request as $4.DownloadStartRequest);
-      case 'Subscribe': return this.subscribe(ctx, request as $4.DownloadSubscribeRequest);
-      case 'Cancel': return this.cancel(ctx, request as $4.DownloadCancelRequest);
-      case 'Resume': return this.resume(ctx, request as $4.DownloadResumeRequest);
+      case 'Plan': return this.plan(ctx, request as $7.DownloadPlanRequest);
+      case 'Start': return this.start(ctx, request as $7.DownloadStartRequest);
+      case 'Subscribe': return this.subscribe(ctx, request as $7.DownloadSubscribeRequest);
+      case 'Cancel': return this.cancel(ctx, request as $7.DownloadCancelRequest);
+      case 'Resume': return this.resume(ctx, request as $7.DownloadResumeRequest);
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }

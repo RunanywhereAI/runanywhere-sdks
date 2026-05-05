@@ -15,8 +15,9 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'llm_options.pbenum.dart';
-import 'model_types.pbenum.dart' as $2;
-import 'structured_output.pb.dart' as $1;
+import 'model_types.pbenum.dart' as $3;
+import 'structured_output.pb.dart' as $2;
+import 'thinking_tag_pattern.pb.dart' as $1;
 import 'tool_calling.pb.dart' as $0;
 
 export 'llm_options.pbenum.dart';
@@ -37,12 +38,12 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     $core.double? repetitionPenalty,
     $core.Iterable<$core.String>? stopSequences,
     $core.bool? streamingEnabled,
-    $2.InferenceFramework? preferredFramework,
+    $3.InferenceFramework? preferredFramework,
     $core.String? systemPrompt,
     $core.String? jsonSchema,
-    ThinkingTagPattern? thinkingPattern,
+    $1.ThinkingTagPattern? thinkingPattern,
     ExecutionTarget? executionTarget,
-    $1.StructuredOutputOptions? structuredOutput,
+    $2.StructuredOutputOptions? structuredOutput,
     $core.bool? enableRealTimeTracking,
     $fixnum.Int64? seed,
     $core.double? frequencyPenalty,
@@ -142,12 +143,12 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     ..a<$core.double>(5, _omitFieldNames ? '' : 'repetitionPenalty', $pb.PbFieldType.OF)
     ..pPS(6, _omitFieldNames ? '' : 'stopSequences')
     ..aOB(7, _omitFieldNames ? '' : 'streamingEnabled')
-    ..e<$2.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $2.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $2.InferenceFramework.valueOf, enumValues: $2.InferenceFramework.values)
+    ..e<$3.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $3.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $3.InferenceFramework.valueOf, enumValues: $3.InferenceFramework.values)
     ..aOS(9, _omitFieldNames ? '' : 'systemPrompt')
     ..aOS(10, _omitFieldNames ? '' : 'jsonSchema')
-    ..aOM<ThinkingTagPattern>(11, _omitFieldNames ? '' : 'thinkingPattern', subBuilder: ThinkingTagPattern.create)
+    ..aOM<$1.ThinkingTagPattern>(11, _omitFieldNames ? '' : 'thinkingPattern', subBuilder: $1.ThinkingTagPattern.create)
     ..e<ExecutionTarget>(12, _omitFieldNames ? '' : 'executionTarget', $pb.PbFieldType.OE, defaultOrMaker: ExecutionTarget.EXECUTION_TARGET_UNSPECIFIED, valueOf: ExecutionTarget.valueOf, enumValues: ExecutionTarget.values)
-    ..aOM<$1.StructuredOutputOptions>(13, _omitFieldNames ? '' : 'structuredOutput', subBuilder: $1.StructuredOutputOptions.create)
+    ..aOM<$2.StructuredOutputOptions>(13, _omitFieldNames ? '' : 'structuredOutput', subBuilder: $2.StructuredOutputOptions.create)
     ..aOB(14, _omitFieldNames ? '' : 'enableRealTimeTracking')
     ..aInt64(15, _omitFieldNames ? '' : 'seed')
     ..a<$core.double>(16, _omitFieldNames ? '' : 'frequencyPenalty', $pb.PbFieldType.OF)
@@ -251,9 +252,9 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
 
   /// Preferred inference framework. UNSPECIFIED = pick automatically.
   @$pb.TagNumber(8)
-  $2.InferenceFramework get preferredFramework => $_getN(7);
+  $3.InferenceFramework get preferredFramework => $_getN(7);
   @$pb.TagNumber(8)
-  set preferredFramework($2.InferenceFramework v) { setField(8, v); }
+  set preferredFramework($3.InferenceFramework v) { setField(8, v); }
   @$pb.TagNumber(8)
   $core.bool hasPreferredFramework() => $_has(7);
   @$pb.TagNumber(8)
@@ -284,15 +285,15 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   /// Optional thinking-tag pattern for extracting reasoning content from
   /// models like Qwen3 / LFM2 that emit <think>...</think> blocks.
   @$pb.TagNumber(11)
-  ThinkingTagPattern get thinkingPattern => $_getN(10);
+  $1.ThinkingTagPattern get thinkingPattern => $_getN(10);
   @$pb.TagNumber(11)
-  set thinkingPattern(ThinkingTagPattern v) { setField(11, v); }
+  set thinkingPattern($1.ThinkingTagPattern v) { setField(11, v); }
   @$pb.TagNumber(11)
   $core.bool hasThinkingPattern() => $_has(10);
   @$pb.TagNumber(11)
   void clearThinkingPattern() => clearField(11);
   @$pb.TagNumber(11)
-  ThinkingTagPattern ensureThinkingPattern() => $_ensure(10);
+  $1.ThinkingTagPattern ensureThinkingPattern() => $_ensure(10);
 
   /// Routing hint: where this generation should run (on-device, cloud, or
   /// SDK-decided AUTO). Mirrors the Web SDK ExecutionTarget knob.
@@ -309,15 +310,15 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   /// structured_output.proto so the schema/format details aren't duplicated
   /// here. When set, supersedes the simpler `json_schema` string above.
   @$pb.TagNumber(13)
-  $1.StructuredOutputOptions get structuredOutput => $_getN(12);
+  $2.StructuredOutputOptions get structuredOutput => $_getN(12);
   @$pb.TagNumber(13)
-  set structuredOutput($1.StructuredOutputOptions v) { setField(13, v); }
+  set structuredOutput($2.StructuredOutputOptions v) { setField(13, v); }
   @$pb.TagNumber(13)
   $core.bool hasStructuredOutput() => $_has(12);
   @$pb.TagNumber(13)
   void clearStructuredOutput() => clearField(13);
   @$pb.TagNumber(13)
-  $1.StructuredOutputOptions ensureStructuredOutput() => $_ensure(12);
+  $2.StructuredOutputOptions ensureStructuredOutput() => $_ensure(12);
 
   /// Enable per-token/cost dashboard tracking for SDKs that surface live
   /// generation telemetry. No-op for backends without a telemetry sink.
@@ -455,7 +456,7 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     $core.String? jsonOutput,
     PerformanceMetrics? performance,
     ExecutionTarget? executedOn,
-    $1.StructuredOutputValidation? structuredOutputValidation,
+    $2.StructuredOutputValidation? structuredOutputValidation,
     $core.int? totalTokens,
     $core.String? errorMessage,
     $core.int? errorCode,
@@ -560,7 +561,7 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     ..aOS(13, _omitFieldNames ? '' : 'jsonOutput')
     ..aOM<PerformanceMetrics>(14, _omitFieldNames ? '' : 'performance', subBuilder: PerformanceMetrics.create)
     ..e<ExecutionTarget>(15, _omitFieldNames ? '' : 'executedOn', $pb.PbFieldType.OE, defaultOrMaker: ExecutionTarget.EXECUTION_TARGET_UNSPECIFIED, valueOf: ExecutionTarget.valueOf, enumValues: ExecutionTarget.values)
-    ..aOM<$1.StructuredOutputValidation>(16, _omitFieldNames ? '' : 'structuredOutputValidation', subBuilder: $1.StructuredOutputValidation.create)
+    ..aOM<$2.StructuredOutputValidation>(16, _omitFieldNames ? '' : 'structuredOutputValidation', subBuilder: $2.StructuredOutputValidation.create)
     ..a<$core.int>(17, _omitFieldNames ? '' : 'totalTokens', $pb.PbFieldType.O3)
     ..aOS(18, _omitFieldNames ? '' : 'errorMessage')
     ..a<$core.int>(19, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
@@ -754,15 +755,15 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   /// Structured-output validation details, when a structured-output request
   /// was used. Mirrors the Swift/RN validation payload.
   @$pb.TagNumber(16)
-  $1.StructuredOutputValidation get structuredOutputValidation => $_getN(15);
+  $2.StructuredOutputValidation get structuredOutputValidation => $_getN(15);
   @$pb.TagNumber(16)
-  set structuredOutputValidation($1.StructuredOutputValidation v) { setField(16, v); }
+  set structuredOutputValidation($2.StructuredOutputValidation v) { setField(16, v); }
   @$pb.TagNumber(16)
   $core.bool hasStructuredOutputValidation() => $_has(15);
   @$pb.TagNumber(16)
   void clearStructuredOutputValidation() => clearField(16);
   @$pb.TagNumber(16)
-  $1.StructuredOutputValidation ensureStructuredOutputValidation() => $_ensure(15);
+  $2.StructuredOutputValidation ensureStructuredOutputValidation() => $_ensure(15);
 
   /// Total tokens consumed (prompt + completion). Some C ABI paths expose
   /// this directly; consumers may also compute it from the per-field counts.
@@ -1134,7 +1135,7 @@ class LLMConfiguration extends $pb.GeneratedMessage {
     $core.String? systemPrompt,
     $core.bool? streaming,
     $core.String? modelId,
-    $2.InferenceFramework? preferredFramework,
+    $3.InferenceFramework? preferredFramework,
   }) {
     final $result = create();
     if (contextLength != null) {
@@ -1171,7 +1172,7 @@ class LLMConfiguration extends $pb.GeneratedMessage {
     ..aOS(4, _omitFieldNames ? '' : 'systemPrompt')
     ..aOB(5, _omitFieldNames ? '' : 'streaming')
     ..aOS(6, _omitFieldNames ? '' : 'modelId')
-    ..e<$2.InferenceFramework>(7, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $2.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $2.InferenceFramework.valueOf, enumValues: $2.InferenceFramework.values)
+    ..e<$3.InferenceFramework>(7, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $3.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $3.InferenceFramework.valueOf, enumValues: $3.InferenceFramework.values)
     ..hasRequiredFields = false
   ;
 
@@ -1260,9 +1261,9 @@ class LLMConfiguration extends $pb.GeneratedMessage {
   /// Preferred inference framework for this component. UNSPECIFIED / absent
   /// means "auto".
   @$pb.TagNumber(7)
-  $2.InferenceFramework get preferredFramework => $_getN(6);
+  $3.InferenceFramework get preferredFramework => $_getN(6);
   @$pb.TagNumber(7)
-  set preferredFramework($2.InferenceFramework v) { setField(7, v); }
+  set preferredFramework($3.InferenceFramework v) { setField(7, v); }
   @$pb.TagNumber(7)
   $core.bool hasPreferredFramework() => $_has(6);
   @$pb.TagNumber(7)
@@ -1354,77 +1355,6 @@ class GenerationHints extends $pb.GeneratedMessage {
   $core.bool hasSystemRole() => $_has(2);
   @$pb.TagNumber(3)
   void clearSystemRole() => clearField(3);
-}
-
-/// ---------------------------------------------------------------------------
-/// Pattern used to extract a model's "thinking" / reasoning block from its
-/// raw output (Swift ThinkingTagPattern in LLMTypes.swift:344). Used by
-/// Qwen3 and LFM2 family models that emit <think>...</think> wrappers.
-/// ---------------------------------------------------------------------------
-class ThinkingTagPattern extends $pb.GeneratedMessage {
-  factory ThinkingTagPattern({
-    $core.String? openingTag,
-    $core.String? closingTag,
-  }) {
-    final $result = create();
-    if (openingTag != null) {
-      $result.openingTag = openingTag;
-    }
-    if (closingTag != null) {
-      $result.closingTag = closingTag;
-    }
-    return $result;
-  }
-  ThinkingTagPattern._() : super();
-  factory ThinkingTagPattern.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
-  factory ThinkingTagPattern.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ThinkingTagPattern', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'openingTag')
-    ..aOS(2, _omitFieldNames ? '' : 'closingTag')
-    ..hasRequiredFields = false
-  ;
-
-  @$core.Deprecated(
-  'Using this can add significant overhead to your binary. '
-  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
-  'Will be removed in next major version')
-  ThinkingTagPattern clone() => ThinkingTagPattern()..mergeFromMessage(this);
-  @$core.Deprecated(
-  'Using this can add significant overhead to your binary. '
-  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
-  'Will be removed in next major version')
-  ThinkingTagPattern copyWith(void Function(ThinkingTagPattern) updates) => super.copyWith((message) => updates(message as ThinkingTagPattern)) as ThinkingTagPattern;
-
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static ThinkingTagPattern create() => ThinkingTagPattern._();
-  ThinkingTagPattern createEmptyInstance() => create();
-  static $pb.PbList<ThinkingTagPattern> createRepeated() => $pb.PbList<ThinkingTagPattern>();
-  @$core.pragma('dart2js:noInline')
-  static ThinkingTagPattern getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ThinkingTagPattern>(create);
-  static ThinkingTagPattern? _defaultInstance;
-
-  /// Opening tag string. Default if empty: "<think>".
-  @$pb.TagNumber(1)
-  $core.String get openingTag => $_getSZ(0);
-  @$pb.TagNumber(1)
-  set openingTag($core.String v) { $_setString(0, v); }
-  @$pb.TagNumber(1)
-  $core.bool hasOpeningTag() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearOpeningTag() => clearField(1);
-
-  /// Closing tag string. Default if empty: "</think>".
-  @$pb.TagNumber(2)
-  $core.String get closingTag => $_getSZ(1);
-  @$pb.TagNumber(2)
-  set closingTag($core.String v) { $_setString(1, v); }
-  @$pb.TagNumber(2)
-  $core.bool hasClosingTag() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearClosingTag() => clearField(2);
 }
 
 /// ---------------------------------------------------------------------------

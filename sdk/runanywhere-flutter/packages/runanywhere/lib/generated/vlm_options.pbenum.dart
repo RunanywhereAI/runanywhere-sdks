@@ -85,55 +85,6 @@ class VLMModelFamily extends $pb.ProtobufEnum {
   const VLMModelFamily._($core.int v, $core.String n) : super(v, n);
 }
 
-///  ---------------------------------------------------------------------------
-///  VLM error codes — canonical SDK-facing surface.
-///  Sources pre-IDL:
-///    Swift  CppBridge+VLM.swift:184  (notInitialized=1, modelLoadFailed=2,
-///                                     processingFailed=3, invalidImage=4,
-///                                     cancelled=5)
-///    Dart   vlm_types.dart:164       (notInitialized=1, modelLoadFailed=2,
-///                                     processingFailed=3, invalidImage=4,
-///                                     cancelled=5)
-///    RN     VLMTypes.ts:44           (NotInitialized=1, ModelLoadFailed=2,
-///                                     ProcessingFailed=3, InvalidImage=4,
-///                                     Cancelled=5)
-///    Kotlin / Web                    (no enum declared pre-IDL)
-///
-///  The canonicalized set below narrows the surface to image-specific failure
-///  modes that the C ABI can distinguish at the boundary; transport / lifecycle
-///  errors (notInitialized, modelLoadFailed, processingFailed, cancelled) are
-///  folded back into the shared rac_result_t error codes in rac_error.h and do
-///  not appear here.
-///  ---------------------------------------------------------------------------
-class VLMErrorCode extends $pb.ProtobufEnum {
-  static const VLMErrorCode VLM_ERROR_CODE_UNSPECIFIED = VLMErrorCode._(0, _omitEnumNames ? '' : 'VLM_ERROR_CODE_UNSPECIFIED');
-  static const VLMErrorCode VLM_ERROR_CODE_INVALID_IMAGE = VLMErrorCode._(1, _omitEnumNames ? '' : 'VLM_ERROR_CODE_INVALID_IMAGE');
-  static const VLMErrorCode VLM_ERROR_CODE_MODEL_NOT_LOADED = VLMErrorCode._(2, _omitEnumNames ? '' : 'VLM_ERROR_CODE_MODEL_NOT_LOADED');
-  static const VLMErrorCode VLM_ERROR_CODE_UNSUPPORTED_FORMAT = VLMErrorCode._(3, _omitEnumNames ? '' : 'VLM_ERROR_CODE_UNSUPPORTED_FORMAT');
-  static const VLMErrorCode VLM_ERROR_CODE_IMAGE_TOO_LARGE = VLMErrorCode._(4, _omitEnumNames ? '' : 'VLM_ERROR_CODE_IMAGE_TOO_LARGE');
-  static const VLMErrorCode VLM_ERROR_CODE_NOT_INITIALIZED = VLMErrorCode._(5, _omitEnumNames ? '' : 'VLM_ERROR_CODE_NOT_INITIALIZED');
-  static const VLMErrorCode VLM_ERROR_CODE_MODEL_LOAD_FAILED = VLMErrorCode._(6, _omitEnumNames ? '' : 'VLM_ERROR_CODE_MODEL_LOAD_FAILED');
-  static const VLMErrorCode VLM_ERROR_CODE_PROCESSING_FAILED = VLMErrorCode._(7, _omitEnumNames ? '' : 'VLM_ERROR_CODE_PROCESSING_FAILED');
-  static const VLMErrorCode VLM_ERROR_CODE_CANCELLED = VLMErrorCode._(8, _omitEnumNames ? '' : 'VLM_ERROR_CODE_CANCELLED');
-
-  static const $core.List<VLMErrorCode> values = <VLMErrorCode> [
-    VLM_ERROR_CODE_UNSPECIFIED,
-    VLM_ERROR_CODE_INVALID_IMAGE,
-    VLM_ERROR_CODE_MODEL_NOT_LOADED,
-    VLM_ERROR_CODE_UNSUPPORTED_FORMAT,
-    VLM_ERROR_CODE_IMAGE_TOO_LARGE,
-    VLM_ERROR_CODE_NOT_INITIALIZED,
-    VLM_ERROR_CODE_MODEL_LOAD_FAILED,
-    VLM_ERROR_CODE_PROCESSING_FAILED,
-    VLM_ERROR_CODE_CANCELLED,
-  ];
-
-  static final $core.Map<$core.int, VLMErrorCode> _byValue = $pb.ProtobufEnum.initByValue(values);
-  static VLMErrorCode? valueOf($core.int value) => _byValue[value];
-
-  const VLMErrorCode._($core.int v, $core.String n) : super(v, n);
-}
-
 class VLMStreamEventKind extends $pb.ProtobufEnum {
   static const VLMStreamEventKind VLM_STREAM_EVENT_KIND_UNSPECIFIED = VLMStreamEventKind._(0, _omitEnumNames ? '' : 'VLM_STREAM_EVENT_KIND_UNSPECIFIED');
   static const VLMStreamEventKind VLM_STREAM_EVENT_KIND_STARTED = VLMStreamEventKind._(1, _omitEnumNames ? '' : 'VLM_STREAM_EVENT_KIND_STARTED');

@@ -13,6 +13,8 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
+import 'stt_options.pbjson.dart' as $2;
+import 'tts_options.pbjson.dart' as $1;
 import 'voice_events.pbjson.dart' as $0;
 
 @$core.Deprecated('Use voiceAgentRequestDescriptor instead')
@@ -302,6 +304,10 @@ const $core.Map<$core.String, $core.dynamic> VoiceAgentServiceBase$json = {
   '1': 'VoiceAgent',
   '2': [
     {'1': 'Stream', '2': '.runanywhere.v1.VoiceAgentRequest', '3': '.runanywhere.v1.VoiceEvent', '6': true},
+    {'1': 'ProcessTurn', '2': '.runanywhere.v1.VoiceAgentTurnRequest', '3': '.runanywhere.v1.VoiceAgentResult'},
+    {'1': 'Transcribe', '2': '.runanywhere.v1.VoiceAgentTranscribeProtoRequest', '3': '.runanywhere.v1.STTOutput'},
+    {'1': 'SynthesizeSpeech', '2': '.runanywhere.v1.VoiceAgentSynthesizeSpeechProtoRequest', '3': '.runanywhere.v1.TTSOutput'},
+    {'1': 'Configure', '2': '.runanywhere.v1.VoiceAgentComposeConfig', '3': '.runanywhere.v1.VoiceAgentResult'},
   ],
 };
 
@@ -329,10 +335,33 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> VoiceAgent
   '.runanywhere.v1.AudioLevelEvent': $0.AudioLevelEvent$json,
   '.runanywhere.v1.ComponentProgressEvent': $0.ComponentProgressEvent$json,
   '.runanywhere.v1.VoiceEvent.MetadataEntry': $0.VoiceEvent_MetadataEntry$json,
+  '.runanywhere.v1.VoiceAgentTurnRequest': VoiceAgentTurnRequest$json,
+  '.runanywhere.v1.VoiceSessionConfig': VoiceSessionConfig$json,
+  '.runanywhere.v1.VoiceAgentTurnRequest.MetadataEntry': VoiceAgentTurnRequest_MetadataEntry$json,
+  '.runanywhere.v1.VoiceAgentResult': VoiceAgentResult$json,
+  '.runanywhere.v1.VoiceAgentTranscribeProtoRequest': VoiceAgentTranscribeProtoRequest$json,
+  '.runanywhere.v1.STTOutput': $2.STTOutput$json,
+  '.runanywhere.v1.WordTimestamp': $2.WordTimestamp$json,
+  '.runanywhere.v1.TranscriptionAlternative': $2.TranscriptionAlternative$json,
+  '.runanywhere.v1.TranscriptionMetadata': $2.TranscriptionMetadata$json,
+  '.runanywhere.v1.VoiceAgentSynthesizeSpeechProtoRequest': VoiceAgentSynthesizeSpeechProtoRequest$json,
+  '.runanywhere.v1.TTSOptions': $1.TTSOptions$json,
+  '.runanywhere.v1.TTSOutput': $1.TTSOutput$json,
+  '.runanywhere.v1.TTSPhonemeTimestamp': $1.TTSPhonemeTimestamp$json,
+  '.runanywhere.v1.TTSSynthesisMetadata': $1.TTSSynthesisMetadata$json,
+  '.runanywhere.v1.VoiceAgentComposeConfig': VoiceAgentComposeConfig$json,
+  '.runanywhere.v1.AudioPipelineConfig': AudioPipelineConfig$json,
 };
 
 /// Descriptor for `VoiceAgent`. Decode as a `google.protobuf.ServiceDescriptorProto`.
 final $typed_data.Uint8List voiceAgentServiceDescriptor = $convert.base64Decode(
     'CgpWb2ljZUFnZW50EkkKBlN0cmVhbRIhLnJ1bmFueXdoZXJlLnYxLlZvaWNlQWdlbnRSZXF1ZX'
-    'N0GhoucnVuYW55d2hlcmUudjEuVm9pY2VFdmVudDAB');
+    'N0GhoucnVuYW55d2hlcmUudjEuVm9pY2VFdmVudDABElYKC1Byb2Nlc3NUdXJuEiUucnVuYW55'
+    'd2hlcmUudjEuVm9pY2VBZ2VudFR1cm5SZXF1ZXN0GiAucnVuYW55d2hlcmUudjEuVm9pY2VBZ2'
+    'VudFJlc3VsdBJZCgpUcmFuc2NyaWJlEjAucnVuYW55d2hlcmUudjEuVm9pY2VBZ2VudFRyYW5z'
+    'Y3JpYmVQcm90b1JlcXVlc3QaGS5ydW5hbnl3aGVyZS52MS5TVFRPdXRwdXQSZQoQU3ludGhlc2'
+    'l6ZVNwZWVjaBI2LnJ1bmFueXdoZXJlLnYxLlZvaWNlQWdlbnRTeW50aGVzaXplU3BlZWNoUHJv'
+    'dG9SZXF1ZXN0GhkucnVuYW55d2hlcmUudjEuVFRTT3V0cHV0ElYKCUNvbmZpZ3VyZRInLnJ1bm'
+    'FueXdoZXJlLnYxLlZvaWNlQWdlbnRDb21wb3NlQ29uZmlnGiAucnVuYW55d2hlcmUudjEuVm9p'
+    'Y2VBZ2VudFJlc3VsdA==');
 

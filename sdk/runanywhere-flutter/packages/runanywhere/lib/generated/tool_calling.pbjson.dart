@@ -235,38 +235,27 @@ const ToolCall$json = {
     {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
     {'1': 'arguments_json', '3': 3, '4': 1, '5': 9, '10': 'argumentsJson'},
     {'1': 'type', '3': 4, '4': 1, '5': 9, '10': 'type'},
-    {'1': 'arguments', '3': 5, '4': 3, '5': 11, '6': '.runanywhere.v1.ToolCall.ArgumentsEntry', '10': 'arguments'},
     {'1': 'call_id', '3': 6, '4': 1, '5': 9, '9': 0, '10': 'callId', '17': true},
     {'1': 'created_at_ms', '3': 7, '4': 1, '5': 3, '10': 'createdAtMs'},
     {'1': 'raw_text', '3': 8, '4': 1, '5': 9, '9': 1, '10': 'rawText', '17': true},
   ],
-  '3': [ToolCall_ArgumentsEntry$json],
   '8': [
     {'1': '_call_id'},
     {'1': '_raw_text'},
   ],
-};
-
-@$core.Deprecated('Use toolCallDescriptor instead')
-const ToolCall_ArgumentsEntry$json = {
-  '1': 'ArgumentsEntry',
-  '2': [
-    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
-    {'1': 'value', '3': 2, '4': 1, '5': 11, '6': '.runanywhere.v1.ToolValue', '10': 'value'},
+  '9': [
+    {'1': 5, '2': 6},
   ],
-  '7': {'7': true},
+  '10': ['arguments'],
 };
 
 /// Descriptor for `ToolCall`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List toolCallDescriptor = $convert.base64Decode(
     'CghUb29sQ2FsbBIOCgJpZBgBIAEoCVICaWQSEgoEbmFtZRgCIAEoCVIEbmFtZRIlCg5hcmd1bW'
-    'VudHNfanNvbhgDIAEoCVINYXJndW1lbnRzSnNvbhISCgR0eXBlGAQgASgJUgR0eXBlEkUKCWFy'
-    'Z3VtZW50cxgFIAMoCzInLnJ1bmFueXdoZXJlLnYxLlRvb2xDYWxsLkFyZ3VtZW50c0VudHJ5Ug'
-    'lhcmd1bWVudHMSHAoHY2FsbF9pZBgGIAEoCUgAUgZjYWxsSWSIAQESIgoNY3JlYXRlZF9hdF9t'
-    'cxgHIAEoA1ILY3JlYXRlZEF0TXMSHgoIcmF3X3RleHQYCCABKAlIAVIHcmF3VGV4dIgBARpXCg'
-    '5Bcmd1bWVudHNFbnRyeRIQCgNrZXkYASABKAlSA2tleRIvCgV2YWx1ZRgCIAEoCzIZLnJ1bmFu'
-    'eXdoZXJlLnYxLlRvb2xWYWx1ZVIFdmFsdWU6AjgBQgoKCF9jYWxsX2lkQgsKCV9yYXdfdGV4dA'
-    '==');
+    'VudHNfanNvbhgDIAEoCVINYXJndW1lbnRzSnNvbhISCgR0eXBlGAQgASgJUgR0eXBlEhwKB2Nh'
+    'bGxfaWQYBiABKAlIAFIGY2FsbElkiAEBEiIKDWNyZWF0ZWRfYXRfbXMYByABKANSC2NyZWF0ZW'
+    'RBdE1zEh4KCHJhd190ZXh0GAggASgJSAFSB3Jhd1RleHSIAQFCCgoIX2NhbGxfaWRCCwoJX3Jh'
+    'd190ZXh0SgQIBRAGUglhcmd1bWVudHM=');
 
 @$core.Deprecated('Use toolResultDescriptor instead')
 const ToolResult$json = {
@@ -277,38 +266,28 @@ const ToolResult$json = {
     {'1': 'result_json', '3': 3, '4': 1, '5': 9, '10': 'resultJson'},
     {'1': 'error', '3': 4, '4': 1, '5': 9, '9': 0, '10': 'error', '17': true},
     {'1': 'success', '3': 5, '4': 1, '5': 8, '10': 'success'},
-    {'1': 'result', '3': 6, '4': 3, '5': 11, '6': '.runanywhere.v1.ToolResult.ResultEntry', '10': 'result'},
     {'1': 'call_id', '3': 7, '4': 1, '5': 9, '9': 1, '10': 'callId', '17': true},
     {'1': 'started_at_ms', '3': 8, '4': 1, '5': 3, '10': 'startedAtMs'},
     {'1': 'completed_at_ms', '3': 9, '4': 1, '5': 3, '10': 'completedAtMs'},
   ],
-  '3': [ToolResult_ResultEntry$json],
   '8': [
     {'1': '_error'},
     {'1': '_call_id'},
   ],
-};
-
-@$core.Deprecated('Use toolResultDescriptor instead')
-const ToolResult_ResultEntry$json = {
-  '1': 'ResultEntry',
-  '2': [
-    {'1': 'key', '3': 1, '4': 1, '5': 9, '10': 'key'},
-    {'1': 'value', '3': 2, '4': 1, '5': 11, '6': '.runanywhere.v1.ToolValue', '10': 'value'},
+  '9': [
+    {'1': 6, '2': 7},
   ],
-  '7': {'7': true},
+  '10': ['result'],
 };
 
 /// Descriptor for `ToolResult`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List toolResultDescriptor = $convert.base64Decode(
     'CgpUb29sUmVzdWx0EiAKDHRvb2xfY2FsbF9pZBgBIAEoCVIKdG9vbENhbGxJZBISCgRuYW1lGA'
     'IgASgJUgRuYW1lEh8KC3Jlc3VsdF9qc29uGAMgASgJUgpyZXN1bHRKc29uEhkKBWVycm9yGAQg'
-    'ASgJSABSBWVycm9yiAEBEhgKB3N1Y2Nlc3MYBSABKAhSB3N1Y2Nlc3MSPgoGcmVzdWx0GAYgAy'
-    'gLMiYucnVuYW55d2hlcmUudjEuVG9vbFJlc3VsdC5SZXN1bHRFbnRyeVIGcmVzdWx0EhwKB2Nh'
-    'bGxfaWQYByABKAlIAVIGY2FsbElkiAEBEiIKDXN0YXJ0ZWRfYXRfbXMYCCABKANSC3N0YXJ0ZW'
-    'RBdE1zEiYKD2NvbXBsZXRlZF9hdF9tcxgJIAEoA1INY29tcGxldGVkQXRNcxpUCgtSZXN1bHRF'
-    'bnRyeRIQCgNrZXkYASABKAlSA2tleRIvCgV2YWx1ZRgCIAEoCzIZLnJ1bmFueXdoZXJlLnYxLl'
-    'Rvb2xWYWx1ZVIFdmFsdWU6AjgBQggKBl9lcnJvckIKCghfY2FsbF9pZA==');
+    'ASgJSABSBWVycm9yiAEBEhgKB3N1Y2Nlc3MYBSABKAhSB3N1Y2Nlc3MSHAoHY2FsbF9pZBgHIA'
+    'EoCUgBUgZjYWxsSWSIAQESIgoNc3RhcnRlZF9hdF9tcxgIIAEoA1ILc3RhcnRlZEF0TXMSJgoP'
+    'Y29tcGxldGVkX2F0X21zGAkgASgDUg1jb21wbGV0ZWRBdE1zQggKBl9lcnJvckIKCghfY2FsbF'
+    '9pZEoECAYQB1IGcmVzdWx0');
 
 @$core.Deprecated('Use toolCallingOptionsDescriptor instead')
 const ToolCallingOptions$json = {
@@ -696,10 +675,8 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> ToolCallin
   '.runanywhere.v1.ToolDefinition.MetadataEntry': ToolDefinition_MetadataEntry$json,
   '.runanywhere.v1.ToolParseResult': ToolParseResult$json,
   '.runanywhere.v1.ToolCall': ToolCall$json,
-  '.runanywhere.v1.ToolCall.ArgumentsEntry': ToolCall_ArgumentsEntry$json,
   '.runanywhere.v1.ToolPromptFormatRequest': ToolPromptFormatRequest$json,
   '.runanywhere.v1.ToolResult': ToolResult$json,
-  '.runanywhere.v1.ToolResult.ResultEntry': ToolResult_ResultEntry$json,
   '.runanywhere.v1.ToolPromptFormatResult': ToolPromptFormatResult$json,
   '.runanywhere.v1.ToolCallValidationRequest': ToolCallValidationRequest$json,
   '.runanywhere.v1.ToolCallValidationResult': ToolCallValidationResult$json,

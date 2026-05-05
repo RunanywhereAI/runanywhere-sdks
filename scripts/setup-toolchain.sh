@@ -108,12 +108,24 @@ install_wire() {
 }
 
 install_dart_plugin() {
+    # IDL-16 / CPP-10: Dart codegen requires Dart 3.0+ AND protoc_plugin
+    # pinned at 21.1.2. Older Dart / plugin combos emit subtly different
+    # code that trips idl-drift-check on unrelated PRs. `generate_dart.sh`
+    # enforces both at runtime; this installer documents the intent.
     if have protoc-gen-dart; then
-        echo "• protoc-gen-dart already present."
+        echo "• protoc-gen-dart already present (required pin: ${PROTOC_PLUGIN_DART_EXPECTED})."
         return 0
     fi
     if ! have dart; then
-        echo "warning: dart not on PATH — install via flutter or dart.dev, then re-run." >&2
+        echo "warning: dart not on PATH — install Dart 3.0+ via flutter or dart.dev, then re-run." >&2
+        return 0
+    fi
+    # Verify the active Dart is 3.0+ before activating the plugin.
+    DART_VERSION=$(dart --version 2>&1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+    DART_MAJOR=$(echo "${DART_VERSION:-0.0.0}" | cut -d. -f1)
+    if [ "${DART_MAJOR}" -lt 3 ]; then
+        echo "warning: Dart ${DART_VERSION} < 3.0 — protoc_plugin 21.1.2 requires Dart 3.0+." >&2
+        echo "         Upgrade Dart before running idl/codegen/generate_dart.sh." >&2
         return 0
     fi
     dart pub global activate protoc_plugin "${PROTOC_PLUGIN_DART_EXPECTED}"

@@ -40,8 +40,8 @@ final $typed_data.Uint8List rAGStreamEventKindDescriptor = $convert.base64Decode
 const RAGConfiguration$json = {
   '1': 'RAGConfiguration',
   '2': [
-    {'1': 'embedding_model_path', '3': 1, '4': 1, '5': 9, '10': 'embeddingModelPath'},
-    {'1': 'llm_model_path', '3': 2, '4': 1, '5': 9, '10': 'llmModelPath'},
+    {'1': 'embedding_model_id', '3': 1, '4': 1, '5': 9, '10': 'embeddingModelId'},
+    {'1': 'llm_model_id', '3': 2, '4': 1, '5': 9, '10': 'llmModelId'},
     {'1': 'embedding_dimension', '3': 3, '4': 1, '5': 5, '10': 'embeddingDimension'},
     {'1': 'top_k', '3': 4, '4': 1, '5': 5, '10': 'topK'},
     {'1': 'similarity_threshold', '3': 5, '4': 1, '5': 2, '10': 'similarityThreshold'},
@@ -54,33 +54,33 @@ const RAGConfiguration$json = {
     {'1': 'index_path', '3': 12, '4': 1, '5': 9, '9': 3, '10': 'indexPath', '17': true},
     {'1': 'persist_index', '3': 13, '4': 1, '5': 8, '10': 'persistIndex'},
     {'1': 'rerank_results', '3': 14, '4': 1, '5': 8, '10': 'rerankResults'},
-    {'1': 'reranker_model_path', '3': 15, '4': 1, '5': 9, '9': 4, '10': 'rerankerModelPath', '17': true},
+    {'1': 'reranker_model_id', '3': 15, '4': 1, '5': 9, '9': 4, '10': 'rerankerModelId', '17': true},
   ],
   '8': [
     {'1': '_prompt_template'},
     {'1': '_embedding_config_json'},
     {'1': '_llm_config_json'},
     {'1': '_index_path'},
-    {'1': '_reranker_model_path'},
+    {'1': '_reranker_model_id'},
   ],
 };
 
 /// Descriptor for `RAGConfiguration`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List rAGConfigurationDescriptor = $convert.base64Decode(
-    'ChBSQUdDb25maWd1cmF0aW9uEjAKFGVtYmVkZGluZ19tb2RlbF9wYXRoGAEgASgJUhJlbWJlZG'
-    'RpbmdNb2RlbFBhdGgSJAoObGxtX21vZGVsX3BhdGgYAiABKAlSDGxsbU1vZGVsUGF0aBIvChNl'
-    'bWJlZGRpbmdfZGltZW5zaW9uGAMgASgFUhJlbWJlZGRpbmdEaW1lbnNpb24SEwoFdG9wX2sYBC'
-    'ABKAVSBHRvcEsSMQoUc2ltaWxhcml0eV90aHJlc2hvbGQYBSABKAJSE3NpbWlsYXJpdHlUaHJl'
-    'c2hvbGQSHQoKY2h1bmtfc2l6ZRgGIAEoBVIJY2h1bmtTaXplEiMKDWNodW5rX292ZXJsYXAYBy'
-    'ABKAVSDGNodW5rT3ZlcmxhcBIsChJtYXhfY29udGV4dF90b2tlbnMYCCABKAVSEG1heENvbnRl'
-    'eHRUb2tlbnMSLAoPcHJvbXB0X3RlbXBsYXRlGAkgASgJSABSDnByb21wdFRlbXBsYXRliAEBEj'
-    'cKFWVtYmVkZGluZ19jb25maWdfanNvbhgKIAEoCUgBUhNlbWJlZGRpbmdDb25maWdKc29uiAEB'
-    'EisKD2xsbV9jb25maWdfanNvbhgLIAEoCUgCUg1sbG1Db25maWdKc29uiAEBEiIKCmluZGV4X3'
-    'BhdGgYDCABKAlIA1IJaW5kZXhQYXRoiAEBEiMKDXBlcnNpc3RfaW5kZXgYDSABKAhSDHBlcnNp'
-    'c3RJbmRleBIlCg5yZXJhbmtfcmVzdWx0cxgOIAEoCFINcmVyYW5rUmVzdWx0cxIzChNyZXJhbm'
-    'tlcl9tb2RlbF9wYXRoGA8gASgJSARSEXJlcmFua2VyTW9kZWxQYXRoiAEBQhIKEF9wcm9tcHRf'
-    'dGVtcGxhdGVCGAoWX2VtYmVkZGluZ19jb25maWdfanNvbkISChBfbGxtX2NvbmZpZ19qc29uQg'
-    '0KC19pbmRleF9wYXRoQhYKFF9yZXJhbmtlcl9tb2RlbF9wYXRo');
+    'ChBSQUdDb25maWd1cmF0aW9uEiwKEmVtYmVkZGluZ19tb2RlbF9pZBgBIAEoCVIQZW1iZWRkaW'
+    '5nTW9kZWxJZBIgCgxsbG1fbW9kZWxfaWQYAiABKAlSCmxsbU1vZGVsSWQSLwoTZW1iZWRkaW5n'
+    'X2RpbWVuc2lvbhgDIAEoBVISZW1iZWRkaW5nRGltZW5zaW9uEhMKBXRvcF9rGAQgASgFUgR0b3'
+    'BLEjEKFHNpbWlsYXJpdHlfdGhyZXNob2xkGAUgASgCUhNzaW1pbGFyaXR5VGhyZXNob2xkEh0K'
+    'CmNodW5rX3NpemUYBiABKAVSCWNodW5rU2l6ZRIjCg1jaHVua19vdmVybGFwGAcgASgFUgxjaH'
+    'Vua092ZXJsYXASLAoSbWF4X2NvbnRleHRfdG9rZW5zGAggASgFUhBtYXhDb250ZXh0VG9rZW5z'
+    'EiwKD3Byb21wdF90ZW1wbGF0ZRgJIAEoCUgAUg5wcm9tcHRUZW1wbGF0ZYgBARI3ChVlbWJlZG'
+    'RpbmdfY29uZmlnX2pzb24YCiABKAlIAVITZW1iZWRkaW5nQ29uZmlnSnNvbogBARIrCg9sbG1f'
+    'Y29uZmlnX2pzb24YCyABKAlIAlINbGxtQ29uZmlnSnNvbogBARIiCgppbmRleF9wYXRoGAwgAS'
+    'gJSANSCWluZGV4UGF0aIgBARIjCg1wZXJzaXN0X2luZGV4GA0gASgIUgxwZXJzaXN0SW5kZXgS'
+    'JQoOcmVyYW5rX3Jlc3VsdHMYDiABKAhSDXJlcmFua1Jlc3VsdHMSLwoRcmVyYW5rZXJfbW9kZW'
+    'xfaWQYDyABKAlIBFIPcmVyYW5rZXJNb2RlbElkiAEBQhIKEF9wcm9tcHRfdGVtcGxhdGVCGAoW'
+    'X2VtYmVkZGluZ19jb25maWdfanNvbkISChBfbGxtX2NvbmZpZ19qc29uQg0KC19pbmRleF9wYX'
+    'RoQhQKEl9yZXJhbmtlcl9tb2RlbF9pZA==');
 
 @$core.Deprecated('Use rAGDocumentDescriptor instead')
 const RAGDocument$json = {
@@ -88,20 +88,22 @@ const RAGDocument$json = {
   '2': [
     {'1': 'id', '3': 1, '4': 1, '5': 9, '10': 'id'},
     {'1': 'text', '3': 2, '4': 1, '5': 9, '10': 'text'},
-    {'1': 'metadata_json', '3': 3, '4': 1, '5': 9, '9': 0, '10': 'metadataJson', '17': true},
     {'1': 'metadata', '3': 4, '4': 3, '5': 11, '6': '.runanywhere.v1.RAGDocument.MetadataEntry', '10': 'metadata'},
-    {'1': 'source_uri', '3': 5, '4': 1, '5': 9, '9': 1, '10': 'sourceUri', '17': true},
-    {'1': 'adapter_handle', '3': 6, '4': 1, '5': 9, '9': 2, '10': 'adapterHandle', '17': true},
-    {'1': 'media_type', '3': 7, '4': 1, '5': 9, '9': 3, '10': 'mediaType', '17': true},
+    {'1': 'source_uri', '3': 5, '4': 1, '5': 9, '9': 0, '10': 'sourceUri', '17': true},
+    {'1': 'adapter_handle', '3': 6, '4': 1, '5': 9, '9': 1, '10': 'adapterHandle', '17': true},
+    {'1': 'media_type', '3': 7, '4': 1, '5': 9, '9': 2, '10': 'mediaType', '17': true},
     {'1': 'size_bytes', '3': 8, '4': 1, '5': 3, '10': 'sizeBytes'},
   ],
   '3': [RAGDocument_MetadataEntry$json],
   '8': [
-    {'1': '_metadata_json'},
     {'1': '_source_uri'},
     {'1': '_adapter_handle'},
     {'1': '_media_type'},
   ],
+  '9': [
+    {'1': 3, '2': 4},
+  ],
+  '10': ['metadata_json'],
 };
 
 @$core.Deprecated('Use rAGDocumentDescriptor instead')
@@ -116,14 +118,14 @@ const RAGDocument_MetadataEntry$json = {
 
 /// Descriptor for `RAGDocument`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List rAGDocumentDescriptor = $convert.base64Decode(
-    'CgtSQUdEb2N1bWVudBIOCgJpZBgBIAEoCVICaWQSEgoEdGV4dBgCIAEoCVIEdGV4dBIoCg1tZX'
-    'RhZGF0YV9qc29uGAMgASgJSABSDG1ldGFkYXRhSnNvbogBARJFCghtZXRhZGF0YRgEIAMoCzIp'
-    'LnJ1bmFueXdoZXJlLnYxLlJBR0RvY3VtZW50Lk1ldGFkYXRhRW50cnlSCG1ldGFkYXRhEiIKCn'
-    'NvdXJjZV91cmkYBSABKAlIAVIJc291cmNlVXJpiAEBEioKDmFkYXB0ZXJfaGFuZGxlGAYgASgJ'
-    'SAJSDWFkYXB0ZXJIYW5kbGWIAQESIgoKbWVkaWFfdHlwZRgHIAEoCUgDUgltZWRpYVR5cGWIAQ'
-    'ESHQoKc2l6ZV9ieXRlcxgIIAEoA1IJc2l6ZUJ5dGVzGjsKDU1ldGFkYXRhRW50cnkSEAoDa2V5'
-    'GAEgASgJUgNrZXkSFAoFdmFsdWUYAiABKAlSBXZhbHVlOgI4AUIQCg5fbWV0YWRhdGFfanNvbk'
-    'INCgtfc291cmNlX3VyaUIRCg9fYWRhcHRlcl9oYW5kbGVCDQoLX21lZGlhX3R5cGU=');
+    'CgtSQUdEb2N1bWVudBIOCgJpZBgBIAEoCVICaWQSEgoEdGV4dBgCIAEoCVIEdGV4dBJFCghtZX'
+    'RhZGF0YRgEIAMoCzIpLnJ1bmFueXdoZXJlLnYxLlJBR0RvY3VtZW50Lk1ldGFkYXRhRW50cnlS'
+    'CG1ldGFkYXRhEiIKCnNvdXJjZV91cmkYBSABKAlIAFIJc291cmNlVXJpiAEBEioKDmFkYXB0ZX'
+    'JfaGFuZGxlGAYgASgJSAFSDWFkYXB0ZXJIYW5kbGWIAQESIgoKbWVkaWFfdHlwZRgHIAEoCUgC'
+    'UgltZWRpYVR5cGWIAQESHQoKc2l6ZV9ieXRlcxgIIAEoA1IJc2l6ZUJ5dGVzGjsKDU1ldGFkYX'
+    'RhRW50cnkSEAoDa2V5GAEgASgJUgNrZXkSFAoFdmFsdWUYAiABKAlSBXZhbHVlOgI4AUINCgtf'
+    'c291cmNlX3VyaUIRCg9fYWRhcHRlcl9oYW5kbGVCDQoLX21lZGlhX3R5cGVKBAgDEARSDW1ldG'
+    'FkYXRhX2pzb24=');
 
 @$core.Deprecated('Use rAGIngestRequestDescriptor instead')
 const RAGIngestRequest$json = {
@@ -225,7 +227,6 @@ const RAGSearchResult$json = {
     {'1': 'similarity_score', '3': 3, '4': 1, '5': 2, '10': 'similarityScore'},
     {'1': 'source_document', '3': 4, '4': 1, '5': 9, '9': 0, '10': 'sourceDocument', '17': true},
     {'1': 'metadata', '3': 5, '4': 3, '5': 11, '6': '.runanywhere.v1.RAGSearchResult.MetadataEntry', '10': 'metadata'},
-    {'1': 'metadata_json', '3': 6, '4': 1, '5': 9, '9': 1, '10': 'metadataJson', '17': true},
     {'1': 'rank', '3': 7, '4': 1, '5': 5, '10': 'rank'},
     {'1': 'start_offset', '3': 8, '4': 1, '5': 5, '10': 'startOffset'},
     {'1': 'end_offset', '3': 9, '4': 1, '5': 5, '10': 'endOffset'},
@@ -234,8 +235,11 @@ const RAGSearchResult$json = {
   '3': [RAGSearchResult_MetadataEntry$json],
   '8': [
     {'1': '_source_document'},
-    {'1': '_metadata_json'},
   ],
+  '9': [
+    {'1': 6, '2': 7},
+  ],
+  '10': ['metadata_json'],
 };
 
 @$core.Deprecated('Use rAGSearchResultDescriptor instead')
@@ -254,11 +258,11 @@ final $typed_data.Uint8List rAGSearchResultDescriptor = $convert.base64Decode(
     'EoCVIEdGV4dBIpChBzaW1pbGFyaXR5X3Njb3JlGAMgASgCUg9zaW1pbGFyaXR5U2NvcmUSLAoP'
     'c291cmNlX2RvY3VtZW50GAQgASgJSABSDnNvdXJjZURvY3VtZW50iAEBEkkKCG1ldGFkYXRhGA'
     'UgAygLMi0ucnVuYW55d2hlcmUudjEuUkFHU2VhcmNoUmVzdWx0Lk1ldGFkYXRhRW50cnlSCG1l'
-    'dGFkYXRhEigKDW1ldGFkYXRhX2pzb24YBiABKAlIAVIMbWV0YWRhdGFKc29uiAEBEhIKBHJhbm'
-    'sYByABKAVSBHJhbmsSIQoMc3RhcnRfb2Zmc2V0GAggASgFUgtzdGFydE9mZnNldBIdCgplbmRf'
-    'b2Zmc2V0GAkgASgFUgllbmRPZmZzZXQSHwoLdG9rZW5fY291bnQYCiABKAVSCnRva2VuQ291bn'
-    'QaOwoNTWV0YWRhdGFFbnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YWx1ZRgCIAEoCVIFdmFs'
-    'dWU6AjgBQhIKEF9zb3VyY2VfZG9jdW1lbnRCEAoOX21ldGFkYXRhX2pzb24=');
+    'dGFkYXRhEhIKBHJhbmsYByABKAVSBHJhbmsSIQoMc3RhcnRfb2Zmc2V0GAggASgFUgtzdGFydE'
+    '9mZnNldBIdCgplbmRfb2Zmc2V0GAkgASgFUgllbmRPZmZzZXQSHwoLdG9rZW5fY291bnQYCiAB'
+    'KAVSCnRva2VuQ291bnQaOwoNTWV0YWRhdGFFbnRyeRIQCgNrZXkYASABKAlSA2tleRIUCgV2YW'
+    'x1ZRgCIAEoCVIFdmFsdWU6AjgBQhIKEF9zb3VyY2VfZG9jdW1lbnRKBAgGEAdSDW1ldGFkYXRh'
+    'X2pzb24=');
 
 @$core.Deprecated('Use rAGResultDescriptor instead')
 const RAGResult$json = {

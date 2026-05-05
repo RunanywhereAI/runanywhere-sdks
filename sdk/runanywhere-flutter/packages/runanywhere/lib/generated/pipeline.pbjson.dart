@@ -48,6 +48,21 @@ final $typed_data.Uint8List edgePolicyDescriptor = $convert.base64Decode(
     'lfQkxPQ0sQARIbChdFREdFX1BPTElDWV9EUk9QX09MREVTVBACEhsKF0VER0VfUE9MSUNZX0RS'
     'T1BfTkVXRVNUEAM=');
 
+@$core.Deprecated('Use pipelineStatusDescriptor instead')
+const PipelineStatus$json = {
+  '1': 'PipelineStatus',
+  '2': [
+    {'1': 'PIPELINE_STATUS_UNSPECIFIED', '2': 0},
+    {'1': 'PIPELINE_STATUS_OK', '2': 1},
+    {'1': 'PIPELINE_STATUS_FAILED', '2': 2},
+  ],
+};
+
+/// Descriptor for `PipelineStatus`. Decode as a `google.protobuf.EnumDescriptorProto`.
+final $typed_data.Uint8List pipelineStatusDescriptor = $convert.base64Decode(
+    'Cg5QaXBlbGluZVN0YXR1cxIfChtQSVBFTElORV9TVEFUVVNfVU5TUEVDSUZJRUQQABIWChJQSV'
+    'BFTElORV9TVEFUVVNfT0sQARIaChZQSVBFTElORV9TVEFUVVNfRkFJTEVEEAI=');
+
 @$core.Deprecated('Use pipelineSpecDescriptor instead')
 const PipelineSpec$json = {
   '1': 'PipelineSpec',
@@ -131,4 +146,107 @@ final $typed_data.Uint8List pipelineOptionsDescriptor = $convert.base64Decode(
     'Cg9QaXBlbGluZU9wdGlvbnMSKgoRbGF0ZW5jeV9idWRnZXRfbXMYASABKAVSD2xhdGVuY3lCdW'
     'RnZXRNcxIhCgxlbWl0X21ldHJpY3MYAiABKAhSC2VtaXRNZXRyaWNzEisKEXN0cmljdF92YWxp'
     'ZGF0aW9uGAMgASgIUhBzdHJpY3RWYWxpZGF0aW9u');
+
+@$core.Deprecated('Use pipelineCompileResultDescriptor instead')
+const PipelineCompileResult$json = {
+  '1': 'PipelineCompileResult',
+  '2': [
+    {'1': 'handle_id', '3': 1, '4': 1, '5': 9, '10': 'handleId'},
+    {'1': 'status', '3': 2, '4': 1, '5': 14, '6': '.runanywhere.v1.PipelineStatus', '10': 'status'},
+    {'1': 'error_message', '3': 3, '4': 1, '5': 9, '9': 0, '10': 'errorMessage', '17': true},
+    {'1': 'error_code', '3': 4, '4': 1, '5': 5, '10': 'errorCode'},
+  ],
+  '8': [
+    {'1': '_error_message'},
+  ],
+};
+
+/// Descriptor for `PipelineCompileResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pipelineCompileResultDescriptor = $convert.base64Decode(
+    'ChVQaXBlbGluZUNvbXBpbGVSZXN1bHQSGwoJaGFuZGxlX2lkGAEgASgJUghoYW5kbGVJZBI2Cg'
+    'ZzdGF0dXMYAiABKA4yHi5ydW5hbnl3aGVyZS52MS5QaXBlbGluZVN0YXR1c1IGc3RhdHVzEigK'
+    'DWVycm9yX21lc3NhZ2UYAyABKAlIAFIMZXJyb3JNZXNzYWdliAEBEh0KCmVycm9yX2NvZGUYBC'
+    'ABKAVSCWVycm9yQ29kZUIQCg5fZXJyb3JfbWVzc2FnZQ==');
+
+@$core.Deprecated('Use pipelineStartRequestDescriptor instead')
+const PipelineStartRequest$json = {
+  '1': 'PipelineStartRequest',
+  '2': [
+    {'1': 'handle_id', '3': 1, '4': 1, '5': 9, '10': 'handleId'},
+  ],
+};
+
+/// Descriptor for `PipelineStartRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pipelineStartRequestDescriptor = $convert.base64Decode(
+    'ChRQaXBlbGluZVN0YXJ0UmVxdWVzdBIbCgloYW5kbGVfaWQYASABKAlSCGhhbmRsZUlk');
+
+@$core.Deprecated('Use pipelineHandleDescriptor instead')
+const PipelineHandle$json = {
+  '1': 'PipelineHandle',
+  '2': [
+    {'1': 'handle_id', '3': 1, '4': 1, '5': 9, '10': 'handleId'},
+    {'1': 'status', '3': 2, '4': 1, '5': 14, '6': '.runanywhere.v1.PipelineStatus', '10': 'status'},
+    {'1': 'state', '3': 3, '4': 1, '5': 9, '9': 0, '10': 'state', '17': true},
+  ],
+  '8': [
+    {'1': '_state'},
+  ],
+};
+
+/// Descriptor for `PipelineHandle`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pipelineHandleDescriptor = $convert.base64Decode(
+    'Cg5QaXBlbGluZUhhbmRsZRIbCgloYW5kbGVfaWQYASABKAlSCGhhbmRsZUlkEjYKBnN0YXR1cx'
+    'gCIAEoDjIeLnJ1bmFueXdoZXJlLnYxLlBpcGVsaW5lU3RhdHVzUgZzdGF0dXMSGQoFc3RhdGUY'
+    'AyABKAlIAFIFc3RhdGWIAQFCCAoGX3N0YXRl');
+
+@$core.Deprecated('Use pipelineStopResultDescriptor instead')
+const PipelineStopResult$json = {
+  '1': 'PipelineStopResult',
+  '2': [
+    {'1': 'handle_id', '3': 1, '4': 1, '5': 9, '10': 'handleId'},
+    {'1': 'status', '3': 2, '4': 1, '5': 14, '6': '.runanywhere.v1.PipelineStatus', '10': 'status'},
+    {'1': 'error_message', '3': 3, '4': 1, '5': 9, '9': 0, '10': 'errorMessage', '17': true},
+    {'1': 'error_code', '3': 4, '4': 1, '5': 5, '10': 'errorCode'},
+  ],
+  '8': [
+    {'1': '_error_message'},
+  ],
+};
+
+/// Descriptor for `PipelineStopResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List pipelineStopResultDescriptor = $convert.base64Decode(
+    'ChJQaXBlbGluZVN0b3BSZXN1bHQSGwoJaGFuZGxlX2lkGAEgASgJUghoYW5kbGVJZBI2CgZzdG'
+    'F0dXMYAiABKA4yHi5ydW5hbnl3aGVyZS52MS5QaXBlbGluZVN0YXR1c1IGc3RhdHVzEigKDWVy'
+    'cm9yX21lc3NhZ2UYAyABKAlIAFIMZXJyb3JNZXNzYWdliAEBEh0KCmVycm9yX2NvZGUYBCABKA'
+    'VSCWVycm9yQ29kZUIQCg5fZXJyb3JfbWVzc2FnZQ==');
+
+const $core.Map<$core.String, $core.dynamic> PipelineServiceBase$json = {
+  '1': 'Pipeline',
+  '2': [
+    {'1': 'Compile', '2': '.runanywhere.v1.PipelineSpec', '3': '.runanywhere.v1.PipelineCompileResult'},
+    {'1': 'Start', '2': '.runanywhere.v1.PipelineStartRequest', '3': '.runanywhere.v1.PipelineHandle'},
+    {'1': 'Stop', '2': '.runanywhere.v1.PipelineHandle', '3': '.runanywhere.v1.PipelineStopResult'},
+  ],
+};
+
+@$core.Deprecated('Use pipelineServiceDescriptor instead')
+const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> PipelineServiceBase$messageJson = {
+  '.runanywhere.v1.PipelineSpec': PipelineSpec$json,
+  '.runanywhere.v1.OperatorSpec': OperatorSpec$json,
+  '.runanywhere.v1.OperatorSpec.ParamsEntry': OperatorSpec_ParamsEntry$json,
+  '.runanywhere.v1.EdgeSpec': EdgeSpec$json,
+  '.runanywhere.v1.PipelineOptions': PipelineOptions$json,
+  '.runanywhere.v1.PipelineCompileResult': PipelineCompileResult$json,
+  '.runanywhere.v1.PipelineStartRequest': PipelineStartRequest$json,
+  '.runanywhere.v1.PipelineHandle': PipelineHandle$json,
+  '.runanywhere.v1.PipelineStopResult': PipelineStopResult$json,
+};
+
+/// Descriptor for `Pipeline`. Decode as a `google.protobuf.ServiceDescriptorProto`.
+final $typed_data.Uint8List pipelineServiceDescriptor = $convert.base64Decode(
+    'CghQaXBlbGluZRJOCgdDb21waWxlEhwucnVuYW55d2hlcmUudjEuUGlwZWxpbmVTcGVjGiUucn'
+    'VuYW55d2hlcmUudjEuUGlwZWxpbmVDb21waWxlUmVzdWx0Ek0KBVN0YXJ0EiQucnVuYW55d2hl'
+    'cmUudjEuUGlwZWxpbmVTdGFydFJlcXVlc3QaHi5ydW5hbnl3aGVyZS52MS5QaXBlbGluZUhhbm'
+    'RsZRJKCgRTdG9wEh4ucnVuYW55d2hlcmUudjEuUGlwZWxpbmVIYW5kbGUaIi5ydW5hbnl3aGVy'
+    'ZS52MS5QaXBlbGluZVN0b3BSZXN1bHQ=');
 

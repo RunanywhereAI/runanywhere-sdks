@@ -63,16 +63,6 @@ public class ModelFileDescriptor(
   )
   public val size_bytes: Long? = null,
   /**
-   * Legacy checksum field kept for generated consumers that already use it.
-   * Prefer checksum_sha256 for new manifests when the algorithm is known.
-   */
-  @field:WireField(
-    tag = 5,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 4,
-  )
-  public val checksum: String? = null,
-  /**
    * Path fields used by SDK-local wrappers/catalogs. `filename` is the
    * storage name for simple cases; relative_path/destination_path preserve
    * directory layouts for archive and multi-file artifacts.
@@ -81,34 +71,34 @@ public class ModelFileDescriptor(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "relativePath",
-    schemaIndex = 5,
+    schemaIndex = 4,
   )
   public val relative_path: String? = null,
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "destinationPath",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val destination_path: String? = null,
   @field:WireField(
     tag = 8,
     adapter = "ai.runanywhere.proto.v1.ModelFileRole#ADAPTER",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val role: ModelFileRole? = null,
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "localPath",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val local_path: String? = null,
   @field:WireField(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "checksumSha256",
-    schemaIndex = 9,
+    schemaIndex = 8,
   )
   public val checksum_sha256: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
@@ -128,7 +118,6 @@ public class ModelFileDescriptor(
     if (filename != other.filename) return false
     if (is_required != other.is_required) return false
     if (size_bytes != other.size_bytes) return false
-    if (checksum != other.checksum) return false
     if (relative_path != other.relative_path) return false
     if (destination_path != other.destination_path) return false
     if (role != other.role) return false
@@ -145,7 +134,6 @@ public class ModelFileDescriptor(
       result = result * 37 + filename.hashCode()
       result = result * 37 + is_required.hashCode()
       result = result * 37 + (size_bytes?.hashCode() ?: 0)
-      result = result * 37 + (checksum?.hashCode() ?: 0)
       result = result * 37 + (relative_path?.hashCode() ?: 0)
       result = result * 37 + (destination_path?.hashCode() ?: 0)
       result = result * 37 + (role?.hashCode() ?: 0)
@@ -162,7 +150,6 @@ public class ModelFileDescriptor(
     result += """filename=${sanitize(filename)}"""
     result += """is_required=$is_required"""
     if (size_bytes != null) result += """size_bytes=$size_bytes"""
-    if (checksum != null) result += """checksum=${sanitize(checksum)}"""
     if (relative_path != null) result += """relative_path=${sanitize(relative_path)}"""
     if (destination_path != null) result += """destination_path=${sanitize(destination_path)}"""
     if (role != null) result += """role=$role"""
@@ -176,14 +163,13 @@ public class ModelFileDescriptor(
     filename: String = this.filename,
     is_required: Boolean = this.is_required,
     size_bytes: Long? = this.size_bytes,
-    checksum: String? = this.checksum,
     relative_path: String? = this.relative_path,
     destination_path: String? = this.destination_path,
     role: ModelFileRole? = this.role,
     local_path: String? = this.local_path,
     checksum_sha256: String? = this.checksum_sha256,
     unknownFields: ByteString = this.unknownFields,
-  ): ModelFileDescriptor = ModelFileDescriptor(url, filename, is_required, size_bytes, checksum,
+  ): ModelFileDescriptor = ModelFileDescriptor(url, filename, is_required, size_bytes,
       relative_path, destination_path, role, local_path, checksum_sha256, unknownFields)
 
   public companion object {
@@ -204,7 +190,6 @@ public class ModelFileDescriptor(
         if (value.is_required != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(3,
             value.is_required)
         size += ProtoAdapter.INT64.encodedSizeWithTag(4, value.size_bytes)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.checksum)
         size += ProtoAdapter.STRING.encodedSizeWithTag(6, value.relative_path)
         size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.destination_path)
         size += ModelFileRole.ADAPTER.encodedSizeWithTag(8, value.role)
@@ -219,7 +204,6 @@ public class ModelFileDescriptor(
         if (value.is_required != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3,
             value.is_required)
         ProtoAdapter.INT64.encodeWithTag(writer, 4, value.size_bytes)
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.checksum)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.relative_path)
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.destination_path)
         ModelFileRole.ADAPTER.encodeWithTag(writer, 8, value.role)
@@ -235,7 +219,6 @@ public class ModelFileDescriptor(
         ModelFileRole.ADAPTER.encodeWithTag(writer, 8, value.role)
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.destination_path)
         ProtoAdapter.STRING.encodeWithTag(writer, 6, value.relative_path)
-        ProtoAdapter.STRING.encodeWithTag(writer, 5, value.checksum)
         ProtoAdapter.INT64.encodeWithTag(writer, 4, value.size_bytes)
         if (value.is_required != false) ProtoAdapter.BOOL.encodeWithTag(writer, 3,
             value.is_required)
@@ -248,7 +231,6 @@ public class ModelFileDescriptor(
         var filename: String = ""
         var is_required: Boolean = false
         var size_bytes: Long? = null
-        var checksum: String? = null
         var relative_path: String? = null
         var destination_path: String? = null
         var role: ModelFileRole? = null
@@ -260,7 +242,6 @@ public class ModelFileDescriptor(
             2 -> filename = ProtoAdapter.STRING.decode(reader)
             3 -> is_required = ProtoAdapter.BOOL.decode(reader)
             4 -> size_bytes = ProtoAdapter.INT64.decode(reader)
-            5 -> checksum = ProtoAdapter.STRING.decode(reader)
             6 -> relative_path = ProtoAdapter.STRING.decode(reader)
             7 -> destination_path = ProtoAdapter.STRING.decode(reader)
             8 -> try {
@@ -278,7 +259,6 @@ public class ModelFileDescriptor(
           filename = filename,
           is_required = is_required,
           size_bytes = size_bytes,
-          checksum = checksum,
           relative_path = relative_path,
           destination_path = destination_path,
           role = role,

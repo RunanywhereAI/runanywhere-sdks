@@ -274,3 +274,34 @@ final $typed_data.Uint8List timeSeriesConfigDescriptor = $convert.base64Decode(
     'VzaG9sZBgFIAEoAlIQYW5vbWFseVRocmVzaG9sZBI+Cgl0eXBlX2tpbmQYBiABKA4yHC5ydW5h'
     'bnl3aGVyZS52MS5Tb2x1dGlvblR5cGVIAFIIdHlwZUtpbmSIAQFCDAoKX3R5cGVfa2luZA==');
 
+const $core.Map<$core.String, $core.dynamic> SolutionsServiceBase$json = {
+  '1': 'Solutions',
+  '2': [
+    {'1': 'Create', '2': '.runanywhere.v1.SolutionConfig', '3': '.runanywhere.v1.SolutionHandle'},
+    {'1': 'Start', '2': '.runanywhere.v1.SolutionHandle', '3': '.runanywhere.v1.SolutionHandle'},
+    {'1': 'Stop', '2': '.runanywhere.v1.SolutionHandle', '3': '.runanywhere.v1.SolutionHandle'},
+    {'1': 'Destroy', '2': '.runanywhere.v1.SolutionHandle', '3': '.runanywhere.v1.SolutionHandle'},
+  ],
+};
+
+@$core.Deprecated('Use solutionsServiceDescriptor instead')
+const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> SolutionsServiceBase$messageJson = {
+  '.runanywhere.v1.SolutionConfig': SolutionConfig$json,
+  '.runanywhere.v1.VoiceAgentConfig': VoiceAgentConfig$json,
+  '.runanywhere.v1.RAGConfig': RAGConfig$json,
+  '.runanywhere.v1.WakeWordConfig': WakeWordConfig$json,
+  '.runanywhere.v1.AgentLoopConfig': AgentLoopConfig$json,
+  '.runanywhere.v1.ToolSpec': ToolSpec$json,
+  '.runanywhere.v1.TimeSeriesConfig': TimeSeriesConfig$json,
+  '.runanywhere.v1.SolutionHandle': SolutionHandle$json,
+};
+
+/// Descriptor for `Solutions`. Decode as a `google.protobuf.ServiceDescriptorProto`.
+final $typed_data.Uint8List solutionsServiceDescriptor = $convert.base64Decode(
+    'CglTb2x1dGlvbnMSSAoGQ3JlYXRlEh4ucnVuYW55d2hlcmUudjEuU29sdXRpb25Db25maWcaHi'
+    '5ydW5hbnl3aGVyZS52MS5Tb2x1dGlvbkhhbmRsZRJHCgVTdGFydBIeLnJ1bmFueXdoZXJlLnYx'
+    'LlNvbHV0aW9uSGFuZGxlGh4ucnVuYW55d2hlcmUudjEuU29sdXRpb25IYW5kbGUSRgoEU3RvcB'
+    'IeLnJ1bmFueXdoZXJlLnYxLlNvbHV0aW9uSGFuZGxlGh4ucnVuYW55d2hlcmUudjEuU29sdXRp'
+    'b25IYW5kbGUSSQoHRGVzdHJveRIeLnJ1bmFueXdoZXJlLnYxLlNvbHV0aW9uSGFuZGxlGh4ucn'
+    'VuYW55d2hlcmUudjEuU29sdXRpb25IYW5kbGU=');
+

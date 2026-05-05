@@ -9,13 +9,14 @@
 // ignore_for_file: non_constant_identifier_names, prefer_final_fields
 // ignore_for_file: unnecessary_import, unnecessary_this, unused_import
 
+import 'dart:async' as $async;
 import 'dart:core' as $core;
 
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'chat.pbenum.dart';
-import 'llm_options.pb.dart' as $3;
+import 'llm_options.pb.dart' as $4;
 import 'tool_calling.pb.dart' as $0;
 
 export 'chat.pbenum.dart';
@@ -189,7 +190,6 @@ class ChatMessage extends $pb.GeneratedMessage {
     $core.String? content,
     $fixnum.Int64? timestampUs,
     $core.String? name,
-    $core.Iterable<$core.String>? toolCallsJson,
     $core.String? toolCallId,
     $core.Iterable<$0.ToolCall>? toolCalls,
     $0.ToolResult? toolResult,
@@ -214,9 +214,6 @@ class ChatMessage extends $pb.GeneratedMessage {
     }
     if (name != null) {
       $result.name = name;
-    }
-    if (toolCallsJson != null) {
-      $result.toolCallsJson.addAll(toolCallsJson);
     }
     if (toolCallId != null) {
       $result.toolCallId = toolCallId;
@@ -254,7 +251,6 @@ class ChatMessage extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'content')
     ..aInt64(4, _omitFieldNames ? '' : 'timestampUs')
     ..aOS(5, _omitFieldNames ? '' : 'name')
-    ..pPS(6, _omitFieldNames ? '' : 'toolCallsJson')
     ..aOS(7, _omitFieldNames ? '' : 'toolCallId')
     ..pc<$0.ToolCall>(8, _omitFieldNames ? '' : 'toolCalls', $pb.PbFieldType.PM, subBuilder: $0.ToolCall.create)
     ..aOM<$0.ToolResult>(9, _omitFieldNames ? '' : 'toolResult', subBuilder: $0.ToolResult.create)
@@ -341,76 +337,68 @@ class ChatMessage extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   void clearName() => clearField(5);
 
-  /// Optional tool calls embedded in this assistant message. Each entry is
-  /// a JSON-encoded ToolCall (see tool_calling.proto) — kept as a string
-  /// here to avoid a circular import; consumers parse on demand.
-  @$pb.TagNumber(6)
-  $core.List<$core.String> get toolCallsJson => $_getList(5);
-
   /// Optional tool-call ID this message is responding to (only set when
   /// role == MESSAGE_ROLE_TOOL).
   @$pb.TagNumber(7)
-  $core.String get toolCallId => $_getSZ(6);
+  $core.String get toolCallId => $_getSZ(5);
   @$pb.TagNumber(7)
-  set toolCallId($core.String v) { $_setString(6, v); }
+  set toolCallId($core.String v) { $_setString(5, v); }
   @$pb.TagNumber(7)
-  $core.bool hasToolCallId() => $_has(6);
+  $core.bool hasToolCallId() => $_has(5);
   @$pb.TagNumber(7)
   void clearToolCallId() => clearField(7);
 
-  /// Typed tool calls embedded in this assistant message. Supersedes
-  /// tool_calls_json for generated-proto callers while keeping the legacy
-  /// JSON string list available.
+  /// Typed tool calls embedded in this assistant message.
   @$pb.TagNumber(8)
-  $core.List<$0.ToolCall> get toolCalls => $_getList(7);
+  $core.List<$0.ToolCall> get toolCalls => $_getList(6);
 
   /// Typed tool result carried by role == MESSAGE_ROLE_TOOL messages.
   @$pb.TagNumber(9)
-  $0.ToolResult get toolResult => $_getN(8);
+  $0.ToolResult get toolResult => $_getN(7);
   @$pb.TagNumber(9)
   set toolResult($0.ToolResult v) { setField(9, v); }
   @$pb.TagNumber(9)
-  $core.bool hasToolResult() => $_has(8);
+  $core.bool hasToolResult() => $_has(7);
   @$pb.TagNumber(9)
   void clearToolResult() => clearField(9);
   @$pb.TagNumber(9)
-  $0.ToolResult ensureToolResult() => $_ensure(8);
+  $0.ToolResult ensureToolResult() => $_ensure(7);
 
   /// Optional threading and delivery metadata.
   @$pb.TagNumber(10)
-  $core.String get parentId => $_getSZ(9);
+  $core.String get parentId => $_getSZ(8);
   @$pb.TagNumber(10)
-  set parentId($core.String v) { $_setString(9, v); }
+  set parentId($core.String v) { $_setString(8, v); }
   @$pb.TagNumber(10)
-  $core.bool hasParentId() => $_has(9);
+  $core.bool hasParentId() => $_has(8);
   @$pb.TagNumber(10)
   void clearParentId() => clearField(10);
 
   @$pb.TagNumber(11)
-  ChatMessageStatus get status => $_getN(10);
+  ChatMessageStatus get status => $_getN(9);
   @$pb.TagNumber(11)
   set status(ChatMessageStatus v) { setField(11, v); }
   @$pb.TagNumber(11)
-  $core.bool hasStatus() => $_has(10);
+  $core.bool hasStatus() => $_has(9);
   @$pb.TagNumber(11)
   void clearStatus() => clearField(11);
 
   @$pb.TagNumber(12)
-  $core.String get errorMessage => $_getSZ(11);
+  $core.String get errorMessage => $_getSZ(10);
   @$pb.TagNumber(12)
-  set errorMessage($core.String v) { $_setString(11, v); }
+  set errorMessage($core.String v) { $_setString(10, v); }
   @$pb.TagNumber(12)
-  $core.bool hasErrorMessage() => $_has(11);
+  $core.bool hasErrorMessage() => $_has(10);
   @$pb.TagNumber(12)
   void clearErrorMessage() => clearField(12);
 
   @$pb.TagNumber(13)
-  $core.Map<$core.String, $core.String> get metadata => $_getMap(12);
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(11);
 
   /// Opaque attachments normalized by platform adapters. Capture, picker,
   /// and permission flows remain native/Web-owned.
   @$pb.TagNumber(14)
-  $core.List<ChatAttachment> get attachments => $_getList(13);
+  $core.List<ChatAttachment> get attachments => $_getList(12);
 }
 
 class ChatGenerationRequest extends $pb.GeneratedMessage {
@@ -418,7 +406,7 @@ class ChatGenerationRequest extends $pb.GeneratedMessage {
     $core.String? requestId,
     $core.String? conversationId,
     $core.Iterable<ChatMessage>? messages,
-    $3.LLMGenerationOptions? options,
+    $4.LLMGenerationOptions? options,
     $0.ToolCallingOptions? toolCalling,
     $core.Map<$core.String, $core.String>? metadata,
   }) {
@@ -451,7 +439,7 @@ class ChatGenerationRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOS(2, _omitFieldNames ? '' : 'conversationId')
     ..pc<ChatMessage>(3, _omitFieldNames ? '' : 'messages', $pb.PbFieldType.PM, subBuilder: ChatMessage.create)
-    ..aOM<$3.LLMGenerationOptions>(4, _omitFieldNames ? '' : 'options', subBuilder: $3.LLMGenerationOptions.create)
+    ..aOM<$4.LLMGenerationOptions>(4, _omitFieldNames ? '' : 'options', subBuilder: $4.LLMGenerationOptions.create)
     ..aOM<$0.ToolCallingOptions>(5, _omitFieldNames ? '' : 'toolCalling', subBuilder: $0.ToolCallingOptions.create)
     ..m<$core.String, $core.String>(6, _omitFieldNames ? '' : 'metadata', entryClassName: 'ChatGenerationRequest.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
     ..hasRequiredFields = false
@@ -500,15 +488,15 @@ class ChatGenerationRequest extends $pb.GeneratedMessage {
   $core.List<ChatMessage> get messages => $_getList(2);
 
   @$pb.TagNumber(4)
-  $3.LLMGenerationOptions get options => $_getN(3);
+  $4.LLMGenerationOptions get options => $_getN(3);
   @$pb.TagNumber(4)
-  set options($3.LLMGenerationOptions v) { setField(4, v); }
+  set options($4.LLMGenerationOptions v) { setField(4, v); }
   @$pb.TagNumber(4)
   $core.bool hasOptions() => $_has(3);
   @$pb.TagNumber(4)
   void clearOptions() => clearField(4);
   @$pb.TagNumber(4)
-  $3.LLMGenerationOptions ensureOptions() => $_ensure(3);
+  $4.LLMGenerationOptions ensureOptions() => $_ensure(3);
 
   @$pb.TagNumber(5)
   $0.ToolCallingOptions get toolCalling => $_getN(4);
@@ -529,7 +517,7 @@ class ChatGenerationResult extends $pb.GeneratedMessage {
   factory ChatGenerationResult({
     $core.String? conversationId,
     ChatMessage? message,
-    $3.LLMGenerationResult? generation,
+    $4.LLMGenerationResult? generation,
     $core.Iterable<$0.ToolCall>? toolCalls,
     $core.Iterable<$0.ToolResult>? toolResults,
     $core.String? errorMessage,
@@ -566,7 +554,7 @@ class ChatGenerationResult extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ChatGenerationResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'conversationId')
     ..aOM<ChatMessage>(2, _omitFieldNames ? '' : 'message', subBuilder: ChatMessage.create)
-    ..aOM<$3.LLMGenerationResult>(3, _omitFieldNames ? '' : 'generation', subBuilder: $3.LLMGenerationResult.create)
+    ..aOM<$4.LLMGenerationResult>(3, _omitFieldNames ? '' : 'generation', subBuilder: $4.LLMGenerationResult.create)
     ..pc<$0.ToolCall>(4, _omitFieldNames ? '' : 'toolCalls', $pb.PbFieldType.PM, subBuilder: $0.ToolCall.create)
     ..pc<$0.ToolResult>(5, _omitFieldNames ? '' : 'toolResults', $pb.PbFieldType.PM, subBuilder: $0.ToolResult.create)
     ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
@@ -616,15 +604,15 @@ class ChatGenerationResult extends $pb.GeneratedMessage {
   ChatMessage ensureMessage() => $_ensure(1);
 
   @$pb.TagNumber(3)
-  $3.LLMGenerationResult get generation => $_getN(2);
+  $4.LLMGenerationResult get generation => $_getN(2);
   @$pb.TagNumber(3)
-  set generation($3.LLMGenerationResult v) { setField(3, v); }
+  set generation($4.LLMGenerationResult v) { setField(3, v); }
   @$pb.TagNumber(3)
   $core.bool hasGeneration() => $_has(2);
   @$pb.TagNumber(3)
   void clearGeneration() => clearField(3);
   @$pb.TagNumber(3)
-  $3.LLMGenerationResult ensureGeneration() => $_ensure(2);
+  $4.LLMGenerationResult ensureGeneration() => $_ensure(2);
 
   @$pb.TagNumber(4)
   $core.List<$0.ToolCall> get toolCalls => $_getList(3);
@@ -662,7 +650,7 @@ class ChatStreamEvent extends $pb.GeneratedMessage {
     ChatMessage? message,
     $0.ToolCall? toolCall,
     $0.ToolResult? toolResult,
-    $3.LLMGenerationResult? finalResult,
+    $4.LLMGenerationResult? finalResult,
     $core.String? errorMessage,
     $core.int? errorCode,
   }) {
@@ -719,7 +707,7 @@ class ChatStreamEvent extends $pb.GeneratedMessage {
     ..aOM<ChatMessage>(7, _omitFieldNames ? '' : 'message', subBuilder: ChatMessage.create)
     ..aOM<$0.ToolCall>(8, _omitFieldNames ? '' : 'toolCall', subBuilder: $0.ToolCall.create)
     ..aOM<$0.ToolResult>(9, _omitFieldNames ? '' : 'toolResult', subBuilder: $0.ToolResult.create)
-    ..aOM<$3.LLMGenerationResult>(10, _omitFieldNames ? '' : 'finalResult', subBuilder: $3.LLMGenerationResult.create)
+    ..aOM<$4.LLMGenerationResult>(10, _omitFieldNames ? '' : 'finalResult', subBuilder: $4.LLMGenerationResult.create)
     ..aOS(11, _omitFieldNames ? '' : 'errorMessage')
     ..a<$core.int>(12, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
@@ -834,15 +822,15 @@ class ChatStreamEvent extends $pb.GeneratedMessage {
   $0.ToolResult ensureToolResult() => $_ensure(8);
 
   @$pb.TagNumber(10)
-  $3.LLMGenerationResult get finalResult => $_getN(9);
+  $4.LLMGenerationResult get finalResult => $_getN(9);
   @$pb.TagNumber(10)
-  set finalResult($3.LLMGenerationResult v) { setField(10, v); }
+  set finalResult($4.LLMGenerationResult v) { setField(10, v); }
   @$pb.TagNumber(10)
   $core.bool hasFinalResult() => $_has(9);
   @$pb.TagNumber(10)
   void clearFinalResult() => clearField(10);
   @$pb.TagNumber(10)
-  $3.LLMGenerationResult ensureFinalResult() => $_ensure(9);
+  $4.LLMGenerationResult ensureFinalResult() => $_ensure(9);
 
   @$pb.TagNumber(11)
   $core.String get errorMessage => $_getSZ(10);
@@ -955,6 +943,18 @@ class ChatConversationState extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(5)
   $core.Map<$core.String, $core.String> get metadata => $_getMap(4);
+}
+
+class ChatApi {
+  $pb.RpcClient _client;
+  ChatApi(this._client);
+
+  $async.Future<ChatGenerationResult> generate($pb.ClientContext? ctx, ChatGenerationRequest request) =>
+    _client.invoke<ChatGenerationResult>(ctx, 'Chat', 'Generate', request, ChatGenerationResult())
+  ;
+  $async.Future<ChatStreamEvent> stream($pb.ClientContext? ctx, ChatGenerationRequest request) =>
+    _client.invoke<ChatStreamEvent>(ctx, 'Chat', 'Stream', request, ChatStreamEvent())
+  ;
 }
 
 

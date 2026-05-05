@@ -577,6 +577,8 @@ const $core.Map<$core.String, $core.dynamic> StructuredOutputServiceBase$json = 
     {'1': 'PreparePrompt', '2': '.runanywhere.v1.StructuredOutputRequest', '3': '.runanywhere.v1.StructuredOutputPromptResult'},
     {'1': 'Validate', '2': '.runanywhere.v1.StructuredOutputValidationRequest', '3': '.runanywhere.v1.StructuredOutputValidation'},
     {'1': 'Parse', '2': '.runanywhere.v1.StructuredOutputParseRequest', '3': '.runanywhere.v1.StructuredOutputResult'},
+    {'1': 'Generate', '2': '.runanywhere.v1.StructuredOutputRequest', '3': '.runanywhere.v1.StructuredOutputResult'},
+    {'1': 'GenerateStream', '2': '.runanywhere.v1.StructuredOutputRequest', '3': '.runanywhere.v1.StructuredOutputStreamEvent', '6': true},
   ],
 };
 
@@ -595,6 +597,7 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> Structured
   '.runanywhere.v1.StructuredOutputParseRequest': StructuredOutputParseRequest$json,
   '.runanywhere.v1.StructuredOutputParseRequest.MetadataEntry': StructuredOutputParseRequest_MetadataEntry$json,
   '.runanywhere.v1.StructuredOutputResult': StructuredOutputResult$json,
+  '.runanywhere.v1.StructuredOutputStreamEvent': StructuredOutputStreamEvent$json,
 };
 
 /// Descriptor for `StructuredOutput`. Decode as a `google.protobuf.ServiceDescriptorProto`.
@@ -604,5 +607,9 @@ final $typed_data.Uint8List structuredOutputServiceDescriptor = $convert.base64D
     'cm9tcHRSZXN1bHQSaQoIVmFsaWRhdGUSMS5ydW5hbnl3aGVyZS52MS5TdHJ1Y3R1cmVkT3V0cH'
     'V0VmFsaWRhdGlvblJlcXVlc3QaKi5ydW5hbnl3aGVyZS52MS5TdHJ1Y3R1cmVkT3V0cHV0VmFs'
     'aWRhdGlvbhJdCgVQYXJzZRIsLnJ1bmFueXdoZXJlLnYxLlN0cnVjdHVyZWRPdXRwdXRQYXJzZV'
-    'JlcXVlc3QaJi5ydW5hbnl3aGVyZS52MS5TdHJ1Y3R1cmVkT3V0cHV0UmVzdWx0');
+    'JlcXVlc3QaJi5ydW5hbnl3aGVyZS52MS5TdHJ1Y3R1cmVkT3V0cHV0UmVzdWx0ElsKCEdlbmVy'
+    'YXRlEicucnVuYW55d2hlcmUudjEuU3RydWN0dXJlZE91dHB1dFJlcXVlc3QaJi5ydW5hbnl3aG'
+    'VyZS52MS5TdHJ1Y3R1cmVkT3V0cHV0UmVzdWx0EmgKDkdlbmVyYXRlU3RyZWFtEicucnVuYW55'
+    'd2hlcmUudjEuU3RydWN0dXJlZE91dHB1dFJlcXVlc3QaKy5ydW5hbnl3aGVyZS52MS5TdHJ1Y3'
+    'R1cmVkT3V0cHV0U3RyZWFtRXZlbnQwAQ==');
 

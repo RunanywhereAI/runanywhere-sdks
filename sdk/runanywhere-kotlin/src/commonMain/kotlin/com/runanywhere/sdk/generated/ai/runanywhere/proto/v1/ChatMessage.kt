@@ -91,7 +91,6 @@ public class ChatMessage(
     schemaIndex = 4,
   )
   public val name: String? = null,
-  tool_calls_json: List<String> = emptyList(),
   /**
    * Optional tool-call ID this message is responding to (only set when
    * role == MESSAGE_ROLE_TOOL).
@@ -100,7 +99,7 @@ public class ChatMessage(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "toolCallId",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val tool_call_id: String? = null,
   tool_calls: List<ToolCall> = emptyList(),
@@ -111,7 +110,7 @@ public class ChatMessage(
     tag = 9,
     adapter = "ai.runanywhere.proto.v1.ToolResult#ADAPTER",
     jsonName = "toolResult",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val tool_result: ToolResult? = null,
   /**
@@ -121,21 +120,21 @@ public class ChatMessage(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "parentId",
-    schemaIndex = 9,
+    schemaIndex = 8,
   )
   public val parent_id: String? = null,
   @field:WireField(
     tag = 11,
     adapter = "ai.runanywhere.proto.v1.ChatMessageStatus#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
-    schemaIndex = 10,
+    schemaIndex = 9,
   )
   public val status: ChatMessageStatus = ChatMessageStatus.CHAT_MESSAGE_STATUS_UNSPECIFIED,
   @field:WireField(
     tag = 12,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "errorMessage",
-    schemaIndex = 11,
+    schemaIndex = 10,
   )
   public val error_message: String? = null,
   metadata: Map<String, String> = emptyMap(),
@@ -143,30 +142,14 @@ public class ChatMessage(
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ChatMessage, Nothing>(ADAPTER, unknownFields) {
   /**
-   * Optional tool calls embedded in this assistant message. Each entry is
-   * a JSON-encoded ToolCall (see tool_calling.proto) — kept as a string
-   * here to avoid a circular import; consumers parse on demand.
-   */
-  @field:WireField(
-    tag = 6,
-    adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    label = WireField.Label.REPEATED,
-    jsonName = "toolCallsJson",
-    schemaIndex = 5,
-  )
-  public val tool_calls_json: List<String> = immutableCopyOf("tool_calls_json", tool_calls_json)
-
-  /**
-   * Typed tool calls embedded in this assistant message. Supersedes
-   * tool_calls_json for generated-proto callers while keeping the legacy
-   * JSON string list available.
+   * Typed tool calls embedded in this assistant message.
    */
   @field:WireField(
     tag = 8,
     adapter = "ai.runanywhere.proto.v1.ToolCall#ADAPTER",
     label = WireField.Label.REPEATED,
     jsonName = "toolCalls",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val tool_calls: List<ToolCall> = immutableCopyOf("tool_calls", tool_calls)
 
@@ -174,7 +157,7 @@ public class ChatMessage(
     tag = 13,
     keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    schemaIndex = 12,
+    schemaIndex = 11,
   )
   public val metadata: Map<String, String> = immutableCopyOf("metadata", metadata)
 
@@ -186,7 +169,7 @@ public class ChatMessage(
     tag = 14,
     adapter = "ai.runanywhere.proto.v1.ChatAttachment#ADAPTER",
     label = WireField.Label.REPEATED,
-    schemaIndex = 13,
+    schemaIndex = 12,
   )
   public val attachments: List<ChatAttachment> = immutableCopyOf("attachments", attachments)
 
@@ -206,7 +189,6 @@ public class ChatMessage(
     if (content != other.content) return false
     if (timestamp_us != other.timestamp_us) return false
     if (name != other.name) return false
-    if (tool_calls_json != other.tool_calls_json) return false
     if (tool_call_id != other.tool_call_id) return false
     if (tool_calls != other.tool_calls) return false
     if (tool_result != other.tool_result) return false
@@ -227,7 +209,6 @@ public class ChatMessage(
       result = result * 37 + content.hashCode()
       result = result * 37 + timestamp_us.hashCode()
       result = result * 37 + (name?.hashCode() ?: 0)
-      result = result * 37 + tool_calls_json.hashCode()
       result = result * 37 + (tool_call_id?.hashCode() ?: 0)
       result = result * 37 + tool_calls.hashCode()
       result = result * 37 + (tool_result?.hashCode() ?: 0)
@@ -248,7 +229,6 @@ public class ChatMessage(
     result += """content=${sanitize(content)}"""
     result += """timestamp_us=$timestamp_us"""
     if (name != null) result += """name=${sanitize(name)}"""
-    if (tool_calls_json.isNotEmpty()) result += """tool_calls_json=${sanitize(tool_calls_json)}"""
     if (tool_call_id != null) result += """tool_call_id=${sanitize(tool_call_id)}"""
     if (tool_calls.isNotEmpty()) result += """tool_calls=$tool_calls"""
     if (tool_result != null) result += """tool_result=$tool_result"""
@@ -266,7 +246,6 @@ public class ChatMessage(
     content: String = this.content,
     timestamp_us: Long = this.timestamp_us,
     name: String? = this.name,
-    tool_calls_json: List<String> = this.tool_calls_json,
     tool_call_id: String? = this.tool_call_id,
     tool_calls: List<ToolCall> = this.tool_calls,
     tool_result: ToolResult? = this.tool_result,
@@ -276,9 +255,8 @@ public class ChatMessage(
     metadata: Map<String, String> = this.metadata,
     attachments: List<ChatAttachment> = this.attachments,
     unknownFields: ByteString = this.unknownFields,
-  ): ChatMessage = ChatMessage(id, role, content, timestamp_us, name, tool_calls_json, tool_call_id,
-      tool_calls, tool_result, parent_id, status, error_message, metadata, attachments,
-      unknownFields)
+  ): ChatMessage = ChatMessage(id, role, content, timestamp_us, name, tool_call_id, tool_calls,
+      tool_result, parent_id, status, error_message, metadata, attachments, unknownFields)
 
   public companion object {
     @JvmField
@@ -302,7 +280,6 @@ public class ChatMessage(
         if (value.timestamp_us != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(4,
             value.timestamp_us)
         size += ProtoAdapter.STRING.encodedSizeWithTag(5, value.name)
-        size += ProtoAdapter.STRING.asRepeated().encodedSizeWithTag(6, value.tool_calls_json)
         size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.tool_call_id)
         size += ToolCall.ADAPTER.asRepeated().encodedSizeWithTag(8, value.tool_calls)
         size += ToolResult.ADAPTER.encodedSizeWithTag(9, value.tool_result)
@@ -323,7 +300,6 @@ public class ChatMessage(
         if (value.timestamp_us != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 4,
             value.timestamp_us)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.name)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.tool_calls_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.tool_call_id)
         ToolCall.ADAPTER.asRepeated().encodeWithTag(writer, 8, value.tool_calls)
         ToolResult.ADAPTER.encodeWithTag(writer, 9, value.tool_result)
@@ -347,7 +323,6 @@ public class ChatMessage(
         ToolResult.ADAPTER.encodeWithTag(writer, 9, value.tool_result)
         ToolCall.ADAPTER.asRepeated().encodeWithTag(writer, 8, value.tool_calls)
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.tool_call_id)
-        ProtoAdapter.STRING.asRepeated().encodeWithTag(writer, 6, value.tool_calls_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 5, value.name)
         if (value.timestamp_us != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 4,
             value.timestamp_us)
@@ -363,7 +338,6 @@ public class ChatMessage(
         var content: String = ""
         var timestamp_us: Long = 0L
         var name: String? = null
-        val tool_calls_json = mutableListOf<String>()
         var tool_call_id: String? = null
         val tool_calls = mutableListOf<ToolCall>()
         var tool_result: ToolResult? = null
@@ -383,7 +357,6 @@ public class ChatMessage(
             3 -> content = ProtoAdapter.STRING.decode(reader)
             4 -> timestamp_us = ProtoAdapter.INT64.decode(reader)
             5 -> name = ProtoAdapter.STRING.decode(reader)
-            6 -> tool_calls_json.add(ProtoAdapter.STRING.decode(reader))
             7 -> tool_call_id = ProtoAdapter.STRING.decode(reader)
             8 -> tool_calls.add(ToolCall.ADAPTER.decode(reader))
             9 -> tool_result = ToolResult.ADAPTER.decode(reader)
@@ -405,7 +378,6 @@ public class ChatMessage(
           content = content,
           timestamp_us = timestamp_us,
           name = name,
-          tool_calls_json = tool_calls_json,
           tool_call_id = tool_call_id,
           tool_calls = tool_calls,
           tool_result = tool_result,

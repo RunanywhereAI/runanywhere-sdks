@@ -219,7 +219,7 @@ export 'generated/vlm_options.pb.dart'
         VLMImage,
         VLMResult;
 export 'generated/vlm_options.pbenum.dart'
-    show VLMErrorCode, VLMImageFormat, VLMModelFamily;
+    show VLMImageFormat, VLMModelFamily;
 export 'generated/voice_agent_service.pb.dart'
     show
         VoiceAgentComposeConfig,
@@ -235,7 +235,7 @@ export 'generated/voice_events.pb.dart'
         VoiceEvent_Payload,
         VoiceSessionError;
 export 'generated/voice_events.pbenum.dart'
-    show ComponentLoadState, PipelineState, VADEventType, VoiceSessionErrorCode;
+    show ComponentLoadState, PipelineState, VADEventType;
 export 'public/capabilities/runanywhere_diffusion.dart'
     show RunAnywhereDiffusion;
 export 'public/capabilities/runanywhere_downloads.dart'

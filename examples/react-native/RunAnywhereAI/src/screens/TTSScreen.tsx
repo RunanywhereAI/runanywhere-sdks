@@ -294,7 +294,7 @@ export const TTSScreen: React.FC = () => {
         stopSound();
 
         console.warn(
-          `[TTSScreen] Loading model: ${model.id} from ${model.localPath}`
+          `[TTSScreen] Loading model: ${model.id} (downloaded=${model.isDownloaded})`
         );
 
         // Handle System TTS specially - it's always available, no download needed
@@ -319,7 +319,7 @@ export const TTSScreen: React.FC = () => {
           return;
         }
 
-        if (!model.isDownloaded && !model.localPath) {
+        if (!model.isDownloaded) {
           Alert.alert(
             'Error',
             'Model has not been downloaded. Open the model picker to download it first.'

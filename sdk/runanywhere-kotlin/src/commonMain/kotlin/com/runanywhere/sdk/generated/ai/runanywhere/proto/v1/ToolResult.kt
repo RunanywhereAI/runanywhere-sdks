@@ -13,8 +13,6 @@ import com.squareup.wire.ReverseProtoWriter
 import com.squareup.wire.Syntax.PROTO_3
 import com.squareup.wire.WireField
 import com.squareup.wire.`internal`.JvmField
-import com.squareup.wire.`internal`.immutableCopyOf
-import com.squareup.wire.`internal`.redactElements
 import com.squareup.wire.`internal`.sanitize
 import kotlin.Any
 import kotlin.AssertionError
@@ -26,8 +24,6 @@ import kotlin.Long
 import kotlin.Nothing
 import kotlin.String
 import kotlin.Suppress
-import kotlin.collections.Map
-import kotlin.lazy
 import okio.ByteString
 
 /**
@@ -52,6 +48,14 @@ public class ToolResult(
     schemaIndex = 1,
   )
   public val name: String = "",
+  /**
+   * JSON-encoded tool execution result.
+   *
+   * AUDIT (IDL-13): the C++ tool-prompt formatter
+   * (`sdk/runanywhere-commons/src/features/llm/tool_calling.cpp:1870-1885`)
+   * reads `result_json` directly when building follow-up LLM prompts after
+   * tool execution. It is the canonical wire shape.
+   */
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -68,7 +72,7 @@ public class ToolResult(
   public val error: String? = null,
   /**
    * Whether execution succeeded. If unset/false and error is empty,
-   * consumers should fall back to legacy result_json/error semantics.
+   * consumers should fall back to result_json/error semantics.
    */
   @field:WireField(
     tag = 5,
@@ -77,7 +81,6 @@ public class ToolResult(
     schemaIndex = 4,
   )
   public val success: Boolean = false,
-  result: Map<String, ToolValue> = emptyMap(),
   /**
    * Alias for tool_call_id used by pre-proto SDK surfaces.
    */
@@ -85,7 +88,7 @@ public class ToolResult(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     jsonName = "callId",
-    schemaIndex = 6,
+    schemaIndex = 5,
   )
   public val call_id: String? = null,
   @field:WireField(
@@ -93,7 +96,7 @@ public class ToolResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "startedAtMs",
-    schemaIndex = 7,
+    schemaIndex = 6,
   )
   public val started_at_ms: Long = 0L,
   @field:WireField(
@@ -101,24 +104,11 @@ public class ToolResult(
     adapter = "com.squareup.wire.ProtoAdapter#INT64",
     label = WireField.Label.OMIT_IDENTITY,
     jsonName = "completedAtMs",
-    schemaIndex = 8,
+    schemaIndex = 7,
   )
   public val completed_at_ms: Long = 0L,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<ToolResult, Nothing>(ADAPTER, unknownFields) {
-  /**
-   * Strongly-typed result map for SDKs that do not want to parse
-   * result_json. Producers should keep result_json populated for C++
-   * tokenizer compatibility.
-   */
-  @field:WireField(
-    tag = 6,
-    keyAdapter = "com.squareup.wire.ProtoAdapter#STRING",
-    adapter = "ai.runanywhere.proto.v1.ToolValue#ADAPTER",
-    schemaIndex = 5,
-  )
-  public val result: Map<String, ToolValue> = immutableCopyOf("result", result)
-
   @Deprecated(
     message = "Shouldn't be used in Kotlin",
     level = DeprecationLevel.HIDDEN,
@@ -135,7 +125,6 @@ public class ToolResult(
     if (result_json != other.result_json) return false
     if (error != other.error) return false
     if (success != other.success) return false
-    if (result != other.result) return false
     if (call_id != other.call_id) return false
     if (started_at_ms != other.started_at_ms) return false
     if (completed_at_ms != other.completed_at_ms) return false
@@ -143,35 +132,33 @@ public class ToolResult(
   }
 
   override fun hashCode(): Int {
-    var result_ = super.hashCode
-    if (result_ == 0) {
-      result_ = unknownFields.hashCode()
-      result_ = result_ * 37 + tool_call_id.hashCode()
-      result_ = result_ * 37 + name.hashCode()
-      result_ = result_ * 37 + result_json.hashCode()
-      result_ = result_ * 37 + (error?.hashCode() ?: 0)
-      result_ = result_ * 37 + success.hashCode()
-      result_ = result_ * 37 + result.hashCode()
-      result_ = result_ * 37 + (call_id?.hashCode() ?: 0)
-      result_ = result_ * 37 + started_at_ms.hashCode()
-      result_ = result_ * 37 + completed_at_ms.hashCode()
-      super.hashCode = result_
+    var result = super.hashCode
+    if (result == 0) {
+      result = unknownFields.hashCode()
+      result = result * 37 + tool_call_id.hashCode()
+      result = result * 37 + name.hashCode()
+      result = result * 37 + result_json.hashCode()
+      result = result * 37 + (error?.hashCode() ?: 0)
+      result = result * 37 + success.hashCode()
+      result = result * 37 + (call_id?.hashCode() ?: 0)
+      result = result * 37 + started_at_ms.hashCode()
+      result = result * 37 + completed_at_ms.hashCode()
+      super.hashCode = result
     }
-    return result_
+    return result
   }
 
   override fun toString(): String {
-    val result_ = mutableListOf<String>()
-    result_ += """tool_call_id=${sanitize(tool_call_id)}"""
-    result_ += """name=${sanitize(name)}"""
-    result_ += """result_json=${sanitize(result_json)}"""
-    if (error != null) result_ += """error=${sanitize(error)}"""
-    result_ += """success=$success"""
-    if (result.isNotEmpty()) result_ += """result=$result"""
-    if (call_id != null) result_ += """call_id=${sanitize(call_id)}"""
-    result_ += """started_at_ms=$started_at_ms"""
-    result_ += """completed_at_ms=$completed_at_ms"""
-    return result_.joinToString(prefix = "ToolResult{", separator = ", ", postfix = "}")
+    val result = mutableListOf<String>()
+    result += """tool_call_id=${sanitize(tool_call_id)}"""
+    result += """name=${sanitize(name)}"""
+    result += """result_json=${sanitize(result_json)}"""
+    if (error != null) result += """error=${sanitize(error)}"""
+    result += """success=$success"""
+    if (call_id != null) result += """call_id=${sanitize(call_id)}"""
+    result += """started_at_ms=$started_at_ms"""
+    result += """completed_at_ms=$completed_at_ms"""
+    return result.joinToString(prefix = "ToolResult{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
@@ -180,12 +167,11 @@ public class ToolResult(
     result_json: String = this.result_json,
     error: String? = this.error,
     success: Boolean = this.success,
-    result: Map<String, ToolValue> = this.result,
     call_id: String? = this.call_id,
     started_at_ms: Long = this.started_at_ms,
     completed_at_ms: Long = this.completed_at_ms,
     unknownFields: ByteString = this.unknownFields,
-  ): ToolResult = ToolResult(tool_call_id, name, result_json, error, success, result, call_id,
+  ): ToolResult = ToolResult(tool_call_id, name, result_json, error, success, call_id,
       started_at_ms, completed_at_ms, unknownFields)
 
   public companion object {
@@ -198,9 +184,6 @@ public class ToolResult(
       null, 
       "tool_calling.proto"
     ) {
-      private val resultAdapter: ProtoAdapter<Map<String, ToolValue>> by lazy {
-          ProtoAdapter.newMapAdapter(ProtoAdapter.STRING, ToolValue.ADAPTER) }
-
       override fun encodedSize(`value`: ToolResult): Int {
         var size = value.unknownFields.size
         if (value.tool_call_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1,
@@ -210,7 +193,6 @@ public class ToolResult(
             value.result_json)
         size += ProtoAdapter.STRING.encodedSizeWithTag(4, value.error)
         if (value.success != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(5, value.success)
-        size += resultAdapter.encodedSizeWithTag(6, value.result)
         size += ProtoAdapter.STRING.encodedSizeWithTag(7, value.call_id)
         if (value.started_at_ms != 0L) size += ProtoAdapter.INT64.encodedSizeWithTag(8,
             value.started_at_ms)
@@ -226,7 +208,6 @@ public class ToolResult(
         if (value.result_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 3, value.result_json)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error)
         if (value.success != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.success)
-        resultAdapter.encodeWithTag(writer, 6, value.result)
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.call_id)
         if (value.started_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 8,
             value.started_at_ms)
@@ -242,7 +223,6 @@ public class ToolResult(
         if (value.started_at_ms != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 8,
             value.started_at_ms)
         ProtoAdapter.STRING.encodeWithTag(writer, 7, value.call_id)
-        resultAdapter.encodeWithTag(writer, 6, value.result)
         if (value.success != false) ProtoAdapter.BOOL.encodeWithTag(writer, 5, value.success)
         ProtoAdapter.STRING.encodeWithTag(writer, 4, value.error)
         if (value.result_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 3, value.result_json)
@@ -257,7 +237,6 @@ public class ToolResult(
         var result_json: String = ""
         var error: String? = null
         var success: Boolean = false
-        val result = mutableMapOf<String, ToolValue>()
         var call_id: String? = null
         var started_at_ms: Long = 0L
         var completed_at_ms: Long = 0L
@@ -268,7 +247,6 @@ public class ToolResult(
             3 -> result_json = ProtoAdapter.STRING.decode(reader)
             4 -> error = ProtoAdapter.STRING.decode(reader)
             5 -> success = ProtoAdapter.BOOL.decode(reader)
-            6 -> result.putAll(resultAdapter.decode(reader))
             7 -> call_id = ProtoAdapter.STRING.decode(reader)
             8 -> started_at_ms = ProtoAdapter.INT64.decode(reader)
             9 -> completed_at_ms = ProtoAdapter.INT64.decode(reader)
@@ -281,7 +259,6 @@ public class ToolResult(
           result_json = result_json,
           error = error,
           success = success,
-          result = result,
           call_id = call_id,
           started_at_ms = started_at_ms,
           completed_at_ms = completed_at_ms,
@@ -290,7 +267,6 @@ public class ToolResult(
       }
 
       override fun redact(`value`: ToolResult): ToolResult = value.copy(
-        result = value.result.redactElements(ToolValue.ADAPTER),
         unknownFields = ByteString.EMPTY
       )
     }

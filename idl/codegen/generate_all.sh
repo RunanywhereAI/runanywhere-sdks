@@ -3,9 +3,24 @@
 #
 # Run every codegen for every language. Called from CI (idl-drift-check.yml)
 # and from local workflows after edits to any *.proto file under idl/.
+#
+# Flags:
+#   --skip-dart   Skip Dart codegen (use when Dart 3.0+ is unavailable
+#                 locally; CI regenerates Dart bindings on the pinned toolchain).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+SKIP_DART=0
+for arg in "$@"; do
+    case "$arg" in
+        --skip-dart) SKIP_DART=1 ;;
+        -h|--help)
+            sed -n '1,15p' "$0" | sed 's/^#//'
+            exit 0
+            ;;
+    esac
+done
 
 # Fail fast on missing toolchain rather than running 80% and breaking late.
 # Each language script does its own lookup; this is just the base gate.
@@ -25,8 +40,12 @@ echo "▶ Swift proto codegen"
 echo "▶ Kotlin proto codegen"
 "${SCRIPT_DIR}/generate_kotlin.sh"
 
-echo "▶ Dart proto codegen"
-"${SCRIPT_DIR}/generate_dart.sh"
+if [ "${SKIP_DART}" -eq 1 ]; then
+    echo "▶ Dart proto codegen (skipped via --skip-dart)"
+else
+    echo "▶ Dart proto codegen"
+    "${SCRIPT_DIR}/generate_dart.sh"
+fi
 
 echo "▶ TypeScript proto codegen (RN + Web)"
 "${SCRIPT_DIR}/generate_ts.sh"

@@ -20,17 +20,18 @@ import 'rag.pbenum.dart';
 export 'rag.pbenum.dart';
 
 ///  ---------------------------------------------------------------------------
-///  RAGConfiguration — low-level pipeline config (pre-IDL hand-rolled).
+///  RAGConfiguration — low-level pipeline config.
 ///
-///  This is the runtime configuration consumed by the RAG pipeline directly,
-///  distinct from solutions.proto::RAGConfig (which is the high-level solution
-///  spec resolved through the model registry). RAGConfiguration takes raw model
-///  paths because the pipeline runs after model resolution has already happened.
+///  As of D-6 (Wave D) this message carries *model ids*, not filesystem paths.
+///  The commons RAG session ABI (rac_rag_session_create_proto) is responsible
+///  for resolving those ids to on-disk paths through the canonical model
+///  registry. SDK callers MUST register the embedding / LLM / reranker models
+///  first and pass only their ids here.
 ///  ---------------------------------------------------------------------------
 class RAGConfiguration extends $pb.GeneratedMessage {
   factory RAGConfiguration({
-    $core.String? embeddingModelPath,
-    $core.String? llmModelPath,
+    $core.String? embeddingModelId,
+    $core.String? llmModelId,
     $core.int? embeddingDimension,
     $core.int? topK,
     $core.double? similarityThreshold,
@@ -43,14 +44,14 @@ class RAGConfiguration extends $pb.GeneratedMessage {
     $core.String? indexPath,
     $core.bool? persistIndex,
     $core.bool? rerankResults,
-    $core.String? rerankerModelPath,
+    $core.String? rerankerModelId,
   }) {
     final $result = create();
-    if (embeddingModelPath != null) {
-      $result.embeddingModelPath = embeddingModelPath;
+    if (embeddingModelId != null) {
+      $result.embeddingModelId = embeddingModelId;
     }
-    if (llmModelPath != null) {
-      $result.llmModelPath = llmModelPath;
+    if (llmModelId != null) {
+      $result.llmModelId = llmModelId;
     }
     if (embeddingDimension != null) {
       $result.embeddingDimension = embeddingDimension;
@@ -88,8 +89,8 @@ class RAGConfiguration extends $pb.GeneratedMessage {
     if (rerankResults != null) {
       $result.rerankResults = rerankResults;
     }
-    if (rerankerModelPath != null) {
-      $result.rerankerModelPath = rerankerModelPath;
+    if (rerankerModelId != null) {
+      $result.rerankerModelId = rerankerModelId;
     }
     return $result;
   }
@@ -98,8 +99,8 @@ class RAGConfiguration extends $pb.GeneratedMessage {
   factory RAGConfiguration.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'RAGConfiguration', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOS(1, _omitFieldNames ? '' : 'embeddingModelPath')
-    ..aOS(2, _omitFieldNames ? '' : 'llmModelPath')
+    ..aOS(1, _omitFieldNames ? '' : 'embeddingModelId')
+    ..aOS(2, _omitFieldNames ? '' : 'llmModelId')
     ..a<$core.int>(3, _omitFieldNames ? '' : 'embeddingDimension', $pb.PbFieldType.O3)
     ..a<$core.int>(4, _omitFieldNames ? '' : 'topK', $pb.PbFieldType.O3)
     ..a<$core.double>(5, _omitFieldNames ? '' : 'similarityThreshold', $pb.PbFieldType.OF)
@@ -112,7 +113,7 @@ class RAGConfiguration extends $pb.GeneratedMessage {
     ..aOS(12, _omitFieldNames ? '' : 'indexPath')
     ..aOB(13, _omitFieldNames ? '' : 'persistIndex')
     ..aOB(14, _omitFieldNames ? '' : 'rerankResults')
-    ..aOS(15, _omitFieldNames ? '' : 'rerankerModelPath')
+    ..aOS(15, _omitFieldNames ? '' : 'rerankerModelId')
     ..hasRequiredFields = false
   ;
 
@@ -137,25 +138,27 @@ class RAGConfiguration extends $pb.GeneratedMessage {
   static RAGConfiguration getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RAGConfiguration>(create);
   static RAGConfiguration? _defaultInstance;
 
-  /// Filesystem path to the embedding model (typically ONNX).
+  /// Registered id of the embedding model (required, e.g. "bge-small-en-v1.5").
+  /// Commons resolves this to the primary artifact path via the model registry.
   @$pb.TagNumber(1)
-  $core.String get embeddingModelPath => $_getSZ(0);
+  $core.String get embeddingModelId => $_getSZ(0);
   @$pb.TagNumber(1)
-  set embeddingModelPath($core.String v) { $_setString(0, v); }
+  set embeddingModelId($core.String v) { $_setString(0, v); }
   @$pb.TagNumber(1)
-  $core.bool hasEmbeddingModelPath() => $_has(0);
+  $core.bool hasEmbeddingModelId() => $_has(0);
   @$pb.TagNumber(1)
-  void clearEmbeddingModelPath() => clearField(1);
+  void clearEmbeddingModelId() => clearField(1);
 
-  /// Filesystem path to the LLM model (typically GGUF).
+  /// Registered id of the LLM model (e.g. "qwen3-4b-q4_k_m"). Optional —
+  /// leave empty to create an embed-only / retrieval-only pipeline.
   @$pb.TagNumber(2)
-  $core.String get llmModelPath => $_getSZ(1);
+  $core.String get llmModelId => $_getSZ(1);
   @$pb.TagNumber(2)
-  set llmModelPath($core.String v) { $_setString(1, v); }
+  set llmModelId($core.String v) { $_setString(1, v); }
   @$pb.TagNumber(2)
-  $core.bool hasLlmModelPath() => $_has(1);
+  $core.bool hasLlmModelId() => $_has(1);
   @$pb.TagNumber(2)
-  void clearLlmModelPath() => clearField(2);
+  void clearLlmModelId() => clearField(2);
 
   /// Embedding vector dimension — must match the embedding model.
   /// Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
@@ -277,14 +280,15 @@ class RAGConfiguration extends $pb.GeneratedMessage {
   @$pb.TagNumber(14)
   void clearRerankResults() => clearField(14);
 
+  /// Registered id of the reranker model (optional).
   @$pb.TagNumber(15)
-  $core.String get rerankerModelPath => $_getSZ(14);
+  $core.String get rerankerModelId => $_getSZ(14);
   @$pb.TagNumber(15)
-  set rerankerModelPath($core.String v) { $_setString(14, v); }
+  set rerankerModelId($core.String v) { $_setString(14, v); }
   @$pb.TagNumber(15)
-  $core.bool hasRerankerModelPath() => $_has(14);
+  $core.bool hasRerankerModelId() => $_has(14);
   @$pb.TagNumber(15)
-  void clearRerankerModelPath() => clearField(15);
+  void clearRerankerModelId() => clearField(15);
 }
 
 /// ---------------------------------------------------------------------------
@@ -294,7 +298,6 @@ class RAGDocument extends $pb.GeneratedMessage {
   factory RAGDocument({
     $core.String? id,
     $core.String? text,
-    $core.String? metadataJson,
     $core.Map<$core.String, $core.String>? metadata,
     $core.String? sourceUri,
     $core.String? adapterHandle,
@@ -307,9 +310,6 @@ class RAGDocument extends $pb.GeneratedMessage {
     }
     if (text != null) {
       $result.text = text;
-    }
-    if (metadataJson != null) {
-      $result.metadataJson = metadataJson;
     }
     if (metadata != null) {
       $result.metadata.addAll(metadata);
@@ -335,7 +335,6 @@ class RAGDocument extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'RAGDocument', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'id')
     ..aOS(2, _omitFieldNames ? '' : 'text')
-    ..aOS(3, _omitFieldNames ? '' : 'metadataJson')
     ..m<$core.String, $core.String>(4, _omitFieldNames ? '' : 'metadata', entryClassName: 'RAGDocument.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
     ..aOS(5, _omitFieldNames ? '' : 'sourceUri')
     ..aOS(6, _omitFieldNames ? '' : 'adapterHandle')
@@ -385,55 +384,45 @@ class RAGDocument extends $pb.GeneratedMessage {
   @$pb.TagNumber(2)
   void clearText() => clearField(2);
 
-  /// Legacy metadata JSON blob.
-  @$pb.TagNumber(3)
-  $core.String get metadataJson => $_getSZ(2);
-  @$pb.TagNumber(3)
-  set metadataJson($core.String v) { $_setString(2, v); }
-  @$pb.TagNumber(3)
-  $core.bool hasMetadataJson() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearMetadataJson() => clearField(3);
-
   /// Typed metadata map for generated-proto callers.
   @$pb.TagNumber(4)
-  $core.Map<$core.String, $core.String> get metadata => $_getMap(3);
+  $core.Map<$core.String, $core.String> get metadata => $_getMap(2);
 
   /// Adapter-normalized document source. Pickers, sandbox bookmarks, and
   /// platform file access remain SDK-owned.
   @$pb.TagNumber(5)
-  $core.String get sourceUri => $_getSZ(4);
+  $core.String get sourceUri => $_getSZ(3);
   @$pb.TagNumber(5)
-  set sourceUri($core.String v) { $_setString(4, v); }
+  set sourceUri($core.String v) { $_setString(3, v); }
   @$pb.TagNumber(5)
-  $core.bool hasSourceUri() => $_has(4);
+  $core.bool hasSourceUri() => $_has(3);
   @$pb.TagNumber(5)
   void clearSourceUri() => clearField(5);
 
   @$pb.TagNumber(6)
-  $core.String get adapterHandle => $_getSZ(5);
+  $core.String get adapterHandle => $_getSZ(4);
   @$pb.TagNumber(6)
-  set adapterHandle($core.String v) { $_setString(5, v); }
+  set adapterHandle($core.String v) { $_setString(4, v); }
   @$pb.TagNumber(6)
-  $core.bool hasAdapterHandle() => $_has(5);
+  $core.bool hasAdapterHandle() => $_has(4);
   @$pb.TagNumber(6)
   void clearAdapterHandle() => clearField(6);
 
   @$pb.TagNumber(7)
-  $core.String get mediaType => $_getSZ(6);
+  $core.String get mediaType => $_getSZ(5);
   @$pb.TagNumber(7)
-  set mediaType($core.String v) { $_setString(6, v); }
+  set mediaType($core.String v) { $_setString(5, v); }
   @$pb.TagNumber(7)
-  $core.bool hasMediaType() => $_has(6);
+  $core.bool hasMediaType() => $_has(5);
   @$pb.TagNumber(7)
   void clearMediaType() => clearField(7);
 
   @$pb.TagNumber(8)
-  $fixnum.Int64 get sizeBytes => $_getI64(7);
+  $fixnum.Int64 get sizeBytes => $_getI64(6);
   @$pb.TagNumber(8)
-  set sizeBytes($fixnum.Int64 v) { $_setInt64(7, v); }
+  set sizeBytes($fixnum.Int64 v) { $_setInt64(6, v); }
   @$pb.TagNumber(8)
-  $core.bool hasSizeBytes() => $_has(7);
+  $core.bool hasSizeBytes() => $_has(6);
   @$pb.TagNumber(8)
   void clearSizeBytes() => clearField(8);
 }
@@ -774,7 +763,6 @@ class RAGSearchResult extends $pb.GeneratedMessage {
     $core.double? similarityScore,
     $core.String? sourceDocument,
     $core.Map<$core.String, $core.String>? metadata,
-    $core.String? metadataJson,
     $core.int? rank,
     $core.int? startOffset,
     $core.int? endOffset,
@@ -795,9 +783,6 @@ class RAGSearchResult extends $pb.GeneratedMessage {
     }
     if (metadata != null) {
       $result.metadata.addAll(metadata);
-    }
-    if (metadataJson != null) {
-      $result.metadataJson = metadataJson;
     }
     if (rank != null) {
       $result.rank = rank;
@@ -823,7 +808,6 @@ class RAGSearchResult extends $pb.GeneratedMessage {
     ..a<$core.double>(3, _omitFieldNames ? '' : 'similarityScore', $pb.PbFieldType.OF)
     ..aOS(4, _omitFieldNames ? '' : 'sourceDocument')
     ..m<$core.String, $core.String>(5, _omitFieldNames ? '' : 'metadata', entryClassName: 'RAGSearchResult.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
-    ..aOS(6, _omitFieldNames ? '' : 'metadataJson')
     ..a<$core.int>(7, _omitFieldNames ? '' : 'rank', $pb.PbFieldType.O3)
     ..a<$core.int>(8, _omitFieldNames ? '' : 'startOffset', $pb.PbFieldType.O3)
     ..a<$core.int>(9, _omitFieldNames ? '' : 'endOffset', $pb.PbFieldType.O3)
@@ -899,50 +883,39 @@ class RAGSearchResult extends $pb.GeneratedMessage {
   @$pb.TagNumber(5)
   $core.Map<$core.String, $core.String> get metadata => $_getMap(4);
 
-  /// Legacy metadata JSON blob preserved for C ABI / SDK surfaces that still
-  /// pass metadata without parsing it.
-  @$pb.TagNumber(6)
-  $core.String get metadataJson => $_getSZ(5);
-  @$pb.TagNumber(6)
-  set metadataJson($core.String v) { $_setString(5, v); }
-  @$pb.TagNumber(6)
-  $core.bool hasMetadataJson() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearMetadataJson() => clearField(6);
-
   @$pb.TagNumber(7)
-  $core.int get rank => $_getIZ(6);
+  $core.int get rank => $_getIZ(5);
   @$pb.TagNumber(7)
-  set rank($core.int v) { $_setSignedInt32(6, v); }
+  set rank($core.int v) { $_setSignedInt32(5, v); }
   @$pb.TagNumber(7)
-  $core.bool hasRank() => $_has(6);
+  $core.bool hasRank() => $_has(5);
   @$pb.TagNumber(7)
   void clearRank() => clearField(7);
 
   @$pb.TagNumber(8)
-  $core.int get startOffset => $_getIZ(7);
+  $core.int get startOffset => $_getIZ(6);
   @$pb.TagNumber(8)
-  set startOffset($core.int v) { $_setSignedInt32(7, v); }
+  set startOffset($core.int v) { $_setSignedInt32(6, v); }
   @$pb.TagNumber(8)
-  $core.bool hasStartOffset() => $_has(7);
+  $core.bool hasStartOffset() => $_has(6);
   @$pb.TagNumber(8)
   void clearStartOffset() => clearField(8);
 
   @$pb.TagNumber(9)
-  $core.int get endOffset => $_getIZ(8);
+  $core.int get endOffset => $_getIZ(7);
   @$pb.TagNumber(9)
-  set endOffset($core.int v) { $_setSignedInt32(8, v); }
+  set endOffset($core.int v) { $_setSignedInt32(7, v); }
   @$pb.TagNumber(9)
-  $core.bool hasEndOffset() => $_has(8);
+  $core.bool hasEndOffset() => $_has(7);
   @$pb.TagNumber(9)
   void clearEndOffset() => clearField(9);
 
   @$pb.TagNumber(10)
-  $core.int get tokenCount => $_getIZ(9);
+  $core.int get tokenCount => $_getIZ(8);
   @$pb.TagNumber(10)
-  set tokenCount($core.int v) { $_setSignedInt32(9, v); }
+  set tokenCount($core.int v) { $_setSignedInt32(8, v); }
   @$pb.TagNumber(10)
-  $core.bool hasTokenCount() => $_has(9);
+  $core.bool hasTokenCount() => $_has(8);
   @$pb.TagNumber(10)
   void clearTokenCount() => clearField(10);
 }

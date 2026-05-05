@@ -23,6 +23,13 @@ public enum class VADStreamEventKind(
   VAD_STREAM_EVENT_KIND_STATISTICS(4),
   VAD_STREAM_EVENT_KIND_STOPPED(5),
   VAD_STREAM_EVENT_KIND_ERROR(6),
+  /**
+   * IDL-18 fold: pipeline-level barge-in signal previously carried by the
+   * deleted VADEventType enum. Emitted when the VAD detects speech that
+   * interrupts active assistant playback; downstream pipeline typically
+   * routes this through InterruptedEvent/InterruptReason as well.
+   */
+  VAD_STREAM_EVENT_KIND_BARGE_IN(7),
   ;
 
   public companion object {
@@ -45,6 +52,7 @@ public enum class VADStreamEventKind(
       4 -> VAD_STREAM_EVENT_KIND_STATISTICS
       5 -> VAD_STREAM_EVENT_KIND_STOPPED
       6 -> VAD_STREAM_EVENT_KIND_ERROR
+      7 -> VAD_STREAM_EVENT_KIND_BARGE_IN
       else -> null
     }
   }

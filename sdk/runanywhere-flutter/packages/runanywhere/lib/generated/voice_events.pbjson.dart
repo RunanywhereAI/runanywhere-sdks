@@ -121,27 +121,6 @@ final $typed_data.Uint8List audioEncodingDescriptor = $convert.base64Decode(
     'Cg1BdWRpb0VuY29kaW5nEh4KGkFVRElPX0VOQ09ESU5HX1VOU1BFQ0lGSUVEEAASHQoZQVVESU'
     '9fRU5DT0RJTkdfUENNX0YzMl9MRRABEh0KGUFVRElPX0VOQ09ESU5HX1BDTV9TMTZfTEUQAg==');
 
-@$core.Deprecated('Use vADEventTypeDescriptor instead')
-const VADEventType$json = {
-  '1': 'VADEventType',
-  '2': [
-    {'1': 'VAD_EVENT_UNSPECIFIED', '2': 0},
-    {'1': 'VAD_EVENT_VOICE_START', '2': 1},
-    {'1': 'VAD_EVENT_VOICE_END_OF_UTTERANCE', '2': 2},
-    {'1': 'VAD_EVENT_BARGE_IN', '2': 3},
-    {'1': 'VAD_EVENT_SILENCE', '2': 4},
-    {'1': 'VAD_EVENT_STATISTICS', '2': 5},
-    {'1': 'VAD_EVENT_STATE_CHANGED', '2': 6},
-  ],
-};
-
-/// Descriptor for `VADEventType`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List vADEventTypeDescriptor = $convert.base64Decode(
-    'CgxWQURFdmVudFR5cGUSGQoVVkFEX0VWRU5UX1VOU1BFQ0lGSUVEEAASGQoVVkFEX0VWRU5UX1'
-    'ZPSUNFX1NUQVJUEAESJAogVkFEX0VWRU5UX1ZPSUNFX0VORF9PRl9VVFRFUkFOQ0UQAhIWChJW'
-    'QURfRVZFTlRfQkFSR0VfSU4QAxIVChFWQURfRVZFTlRfU0lMRU5DRRAEEhgKFFZBRF9FVkVOVF'
-    '9TVEFUSVNUSUNTEAUSGwoXVkFEX0VWRU5UX1NUQVRFX0NIQU5HRUQQBg==');
-
 @$core.Deprecated('Use interruptReasonDescriptor instead')
 const InterruptReason$json = {
   '1': 'InterruptReason',
@@ -209,26 +188,6 @@ final $typed_data.Uint8List componentLoadStateDescriptor = $convert.base64Decode
     'QQABIjCh9DT01QT05FTlRfTE9BRF9TVEFURV9OT1RfTE9BREVEEAESIAocQ09NUE9ORU5UX0xP'
     'QURfU1RBVEVfTE9BRElORxACEh8KG0NPTVBPTkVOVF9MT0FEX1NUQVRFX0xPQURFRBADEh4KGk'
     'NPTVBPTkVOVF9MT0FEX1NUQVRFX0VSUk9SEAQ=');
-
-@$core.Deprecated('Use voiceSessionErrorCodeDescriptor instead')
-const VoiceSessionErrorCode$json = {
-  '1': 'VoiceSessionErrorCode',
-  '2': [
-    {'1': 'VOICE_SESSION_ERROR_CODE_UNSPECIFIED', '2': 0},
-    {'1': 'VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED', '2': 1},
-    {'1': 'VOICE_SESSION_ERROR_CODE_NOT_READY', '2': 2},
-    {'1': 'VOICE_SESSION_ERROR_CODE_ALREADY_RUNNING', '2': 3},
-    {'1': 'VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE', '2': 4},
-  ],
-};
-
-/// Descriptor for `VoiceSessionErrorCode`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List voiceSessionErrorCodeDescriptor = $convert.base64Decode(
-    'ChVWb2ljZVNlc3Npb25FcnJvckNvZGUSKAokVk9JQ0VfU0VTU0lPTl9FUlJPUl9DT0RFX1VOU1'
-    'BFQ0lGSUVEEAASOQo1Vk9JQ0VfU0VTU0lPTl9FUlJPUl9DT0RFX01JQ1JPUEhPTkVfUEVSTUlT'
-    'U0lPTl9ERU5JRUQQARImCiJWT0lDRV9TRVNTSU9OX0VSUk9SX0NPREVfTk9UX1JFQURZEAISLA'
-    'ooVk9JQ0VfU0VTU0lPTl9FUlJPUl9DT0RFX0FMUkVBRFlfUlVOTklORxADEi4KKlZPSUNFX1NF'
-    'U1NJT05fRVJST1JfQ09ERV9DT01QT05FTlRfRkFJTFVSRRAE');
 
 @$core.Deprecated('Use speechTurnDetectionEventKindDescriptor instead')
 const SpeechTurnDetectionEventKind$json = {
@@ -435,7 +394,7 @@ final $typed_data.Uint8List audioFrameEventDescriptor = $convert.base64Decode(
 const VADEvent$json = {
   '1': 'VADEvent',
   '2': [
-    {'1': 'type', '3': 1, '4': 1, '5': 14, '6': '.runanywhere.v1.VADEventType', '10': 'type'},
+    {'1': 'type', '3': 1, '4': 1, '5': 14, '6': '.runanywhere.v1.VADStreamEventKind', '10': 'type'},
     {'1': 'frame_offset_us', '3': 2, '4': 1, '5': 3, '10': 'frameOffsetUs'},
     {'1': 'confidence', '3': 3, '4': 1, '5': 2, '10': 'confidence'},
     {'1': 'is_speech', '3': 4, '4': 1, '5': 8, '10': 'isSpeech'},
@@ -447,12 +406,12 @@ const VADEvent$json = {
 
 /// Descriptor for `VADEvent`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List vADEventDescriptor = $convert.base64Decode(
-    'CghWQURFdmVudBIwCgR0eXBlGAEgASgOMhwucnVuYW55d2hlcmUudjEuVkFERXZlbnRUeXBlUg'
-    'R0eXBlEiYKD2ZyYW1lX29mZnNldF91cxgCIAEoA1INZnJhbWVPZmZzZXRVcxIeCgpjb25maWRl'
-    'bmNlGAMgASgCUgpjb25maWRlbmNlEhsKCWlzX3NwZWVjaBgEIAEoCFIIaXNTcGVlY2gSLAoSc3'
-    'BlZWNoX2R1cmF0aW9uX21zGAUgASgBUhBzcGVlY2hEdXJhdGlvbk1zEi4KE3NpbGVuY2VfZHVy'
-    'YXRpb25fbXMYBiABKAFSEXNpbGVuY2VEdXJhdGlvbk1zEiQKDm5vaXNlX2Zsb29yX2RiGAcgAS'
-    'gBUgxub2lzZUZsb29yRGI=');
+    'CghWQURFdmVudBI2CgR0eXBlGAEgASgOMiIucnVuYW55d2hlcmUudjEuVkFEU3RyZWFtRXZlbn'
+    'RLaW5kUgR0eXBlEiYKD2ZyYW1lX29mZnNldF91cxgCIAEoA1INZnJhbWVPZmZzZXRVcxIeCgpj'
+    'b25maWRlbmNlGAMgASgCUgpjb25maWRlbmNlEhsKCWlzX3NwZWVjaBgEIAEoCFIIaXNTcGVlY2'
+    'gSLAoSc3BlZWNoX2R1cmF0aW9uX21zGAUgASgBUhBzcGVlY2hEdXJhdGlvbk1zEi4KE3NpbGVu'
+    'Y2VfZHVyYXRpb25fbXMYBiABKAFSEXNpbGVuY2VEdXJhdGlvbk1zEiQKDm5vaXNlX2Zsb29yX2'
+    'RiGAcgASgBUgxub2lzZUZsb29yRGI=');
 
 @$core.Deprecated('Use interruptedEventDescriptor instead')
 const InterruptedEvent$json = {
@@ -604,7 +563,7 @@ final $typed_data.Uint8List voiceAgentComponentStatesDescriptor = $convert.base6
 const VoiceSessionError$json = {
   '1': 'VoiceSessionError',
   '2': [
-    {'1': 'code', '3': 1, '4': 1, '5': 14, '6': '.runanywhere.v1.VoiceSessionErrorCode', '10': 'code'},
+    {'1': 'code', '3': 1, '4': 1, '5': 14, '6': '.runanywhere.v1.ErrorCode', '10': 'code'},
     {'1': 'message', '3': 2, '4': 1, '5': 9, '10': 'message'},
     {'1': 'failed_component', '3': 3, '4': 1, '5': 9, '9': 0, '10': 'failedComponent', '17': true},
     {'1': 'c_abi_code', '3': 4, '4': 1, '5': 5, '10': 'cAbiCode'},
@@ -617,11 +576,11 @@ const VoiceSessionError$json = {
 
 /// Descriptor for `VoiceSessionError`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List voiceSessionErrorDescriptor = $convert.base64Decode(
-    'ChFWb2ljZVNlc3Npb25FcnJvchI5CgRjb2RlGAEgASgOMiUucnVuYW55d2hlcmUudjEuVm9pY2'
-    'VTZXNzaW9uRXJyb3JDb2RlUgRjb2RlEhgKB21lc3NhZ2UYAiABKAlSB21lc3NhZ2USLgoQZmFp'
-    'bGVkX2NvbXBvbmVudBgDIAEoCUgAUg9mYWlsZWRDb21wb25lbnSIAQESHAoKY19hYmlfY29kZR'
-    'gEIAEoBVIIY0FiaUNvZGUSIAoLcmVjb3ZlcmFibGUYBSABKAhSC3JlY292ZXJhYmxlQhMKEV9m'
-    'YWlsZWRfY29tcG9uZW50');
+    'ChFWb2ljZVNlc3Npb25FcnJvchItCgRjb2RlGAEgASgOMhkucnVuYW55d2hlcmUudjEuRXJyb3'
+    'JDb2RlUgRjb2RlEhgKB21lc3NhZ2UYAiABKAlSB21lc3NhZ2USLgoQZmFpbGVkX2NvbXBvbmVu'
+    'dBgDIAEoCUgAUg9mYWlsZWRDb21wb25lbnSIAQESHAoKY19hYmlfY29kZRgEIAEoBVIIY0FiaU'
+    'NvZGUSIAoLcmVjb3ZlcmFibGUYBSABKAhSC3JlY292ZXJhYmxlQhMKEV9mYWlsZWRfY29tcG9u'
+    'ZW50');
 
 @$core.Deprecated('Use sessionStartedEventDescriptor instead')
 const SessionStartedEvent$json = {

@@ -23,9 +23,11 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStructuredOutpu
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.UUID
 
@@ -55,73 +57,43 @@ actual fun RunAnywhere.generateStructuredStream(
 ): Flow<StructuredOutputStreamEvent> {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
 
-    return flow {
+    // Commons owns the full streaming pipeline: it drives the LLM, emits
+    // TOKEN / PARTIAL_JSON events as complete JSON values become available,
+    // and a single terminal COMPLETED / ERROR event with the parsed result.
+    // Kotlin simply decodes and forwards — no client-side accumulation.
+    return callbackFlow {
         val requestId = UUID.randomUUID().toString()
-        var sequence = 0L
-        val accumulated = StringBuilder()
-
-        fun event(kind: StructuredOutputStreamEventKind): StructuredOutputStreamEvent =
-            StructuredOutputStreamEvent(
-                seq = sequence++,
-                timestamp_us = System.currentTimeMillis() * 1000L,
-                request_id = requestId,
-                kind = kind,
-            )
-
-        try {
-            val (generationPrompt, structuredOptions, effectiveOptions) =
-                prepareGeneration(prompt, schema, options, streaming = true, requestId = requestId)
-
-            generateStream(generationPrompt, effectiveOptions).collect { llmEvent ->
-                if (llmEvent.error_message.isNotBlank()) {
-                    emit(
-                        event(StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR)
-                            .copy(
-                                error_message = llmEvent.error_message,
-                                error_code = llmEvent.error_code,
-                            ),
+        val driver =
+            launch(Dispatchers.IO) {
+                val structuredOptions =
+                    StructuredOutputOptions(
+                        schema = schema,
+                        include_schema_in_prompt = true,
+                        mode = StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
                     )
-                    return@collect
-                }
-
-                if (llmEvent.token.isNotEmpty()) {
-                    accumulated.append(llmEvent.token)
-                    emit(
-                        event(StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_TOKEN)
-                            .copy(
-                                token = llmEvent.token,
-                                partial_json = accumulated.toString(),
-                            ),
-                    )
-                }
-
-                if (llmEvent.is_final) {
-                    val result =
-                        parseStructuredOutput(
-                            StructuredOutputParseRequest(
-                                request_id = requestId,
-                                text = accumulated.toString(),
-                                options = structuredOptions,
-                            ),
-                        )
-                    emit(
-                        event(StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED)
-                            .copy(
-                                result = result,
-                                validation = result.validation,
-                                error_message = result.error_message,
-                                error_code = result.error_code,
-                            ),
-                    )
+                try {
+                    CppBridgeStructuredOutput.generateStream(
+                        StructuredOutputRequest(
+                            request_id = requestId,
+                            prompt = prompt,
+                            options = structuredOptions,
+                        ),
+                    ) { event ->
+                        trySend(event)
+                        val terminal =
+                            event.kind == StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_COMPLETED ||
+                                event.kind == StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR
+                        !terminal
+                    }
+                    close()
+                } catch (e: Exception) {
+                    close(e)
                 }
             }
-        } catch (e: Exception) {
-            emit(
-                event(StructuredOutputStreamEventKind.STRUCTURED_OUTPUT_STREAM_EVENT_KIND_ERROR)
-                    .copy(error_message = e.message ?: "Structured output stream failed"),
-            )
+        awaitClose {
+            driver.cancel()
         }
-    }
+    }.flowOn(Dispatchers.IO)
 }
 
 actual suspend fun RunAnywhere.prepareStructuredOutputPrompt(

@@ -832,6 +832,227 @@ class EmbeddingsServiceState extends $pb.GeneratedMessage {
   void clearErrorCode() => clearField(6);
 }
 
+/// ---------------------------------------------------------------------------
+/// Session/handle creation request envelope. Mirrors the public SDK
+/// `embeddingsCreate(modelId, configJson?)` calls in RN/Web/Kotlin which
+/// previously dropped down to the non-proto `rac_embeddings_create*` C ABI.
+/// The result carries an opaque uint64 handle the SDK uses for subsequent
+/// embed / embed_batch invocations.
+/// ---------------------------------------------------------------------------
+class EmbeddingsCreateRequest extends $pb.GeneratedMessage {
+  factory EmbeddingsCreateRequest({
+    $core.String? modelId,
+    EmbeddingsConfiguration? configuration,
+    $core.String? configJson,
+  }) {
+    final $result = create();
+    if (modelId != null) {
+      $result.modelId = modelId;
+    }
+    if (configuration != null) {
+      $result.configuration = configuration;
+    }
+    if (configJson != null) {
+      $result.configJson = configJson;
+    }
+    return $result;
+  }
+  EmbeddingsCreateRequest._() : super();
+  factory EmbeddingsCreateRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory EmbeddingsCreateRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'EmbeddingsCreateRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'modelId')
+    ..aOM<EmbeddingsConfiguration>(2, _omitFieldNames ? '' : 'configuration', subBuilder: EmbeddingsConfiguration.create)
+    ..aOS(3, _omitFieldNames ? '' : 'configJson')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  EmbeddingsCreateRequest clone() => EmbeddingsCreateRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  EmbeddingsCreateRequest copyWith(void Function(EmbeddingsCreateRequest) updates) => super.copyWith((message) => updates(message as EmbeddingsCreateRequest)) as EmbeddingsCreateRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EmbeddingsCreateRequest create() => EmbeddingsCreateRequest._();
+  EmbeddingsCreateRequest createEmptyInstance() => create();
+  static $pb.PbList<EmbeddingsCreateRequest> createRepeated() => $pb.PbList<EmbeddingsCreateRequest>();
+  @$core.pragma('dart2js:noInline')
+  static EmbeddingsCreateRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<EmbeddingsCreateRequest>(create);
+  static EmbeddingsCreateRequest? _defaultInstance;
+
+  /// Required. Model identifier (registry id) or absolute model path.
+  @$pb.TagNumber(1)
+  $core.String get modelId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set modelId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasModelId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearModelId() => clearField(1);
+
+  /// Optional component configuration. When unset, commons applies its
+  /// defaults (RAC_EMBEDDINGS_*); when set, the named fields override
+  /// the per-component defaults at create time.
+  @$pb.TagNumber(2)
+  EmbeddingsConfiguration get configuration => $_getN(1);
+  @$pb.TagNumber(2)
+  set configuration(EmbeddingsConfiguration v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasConfiguration() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearConfiguration() => clearField(2);
+  @$pb.TagNumber(2)
+  EmbeddingsConfiguration ensureConfiguration() => $_ensure(1);
+
+  /// Provider-specific JSON config. Mirrors the legacy
+  /// rac_embeddings_create_with_config(config_json) parameter for backends
+  /// that need companion file paths (e.g. {"vocab_path":"..."}).
+  @$pb.TagNumber(3)
+  $core.String get configJson => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set configJson($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasConfigJson() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearConfigJson() => clearField(3);
+}
+
+class EmbeddingsCreateResult extends $pb.GeneratedMessage {
+  factory EmbeddingsCreateResult({
+    $fixnum.Int64? handle,
+    $core.String? modelId,
+    $core.int? dimension,
+    $core.int? maxTokens,
+    $core.int? errorCode,
+    $core.String? errorMessage,
+  }) {
+    final $result = create();
+    if (handle != null) {
+      $result.handle = handle;
+    }
+    if (modelId != null) {
+      $result.modelId = modelId;
+    }
+    if (dimension != null) {
+      $result.dimension = dimension;
+    }
+    if (maxTokens != null) {
+      $result.maxTokens = maxTokens;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    return $result;
+  }
+  EmbeddingsCreateResult._() : super();
+  factory EmbeddingsCreateResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory EmbeddingsCreateResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'EmbeddingsCreateResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'handle', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
+    ..aOS(2, _omitFieldNames ? '' : 'modelId')
+    ..a<$core.int>(3, _omitFieldNames ? '' : 'dimension', $pb.PbFieldType.O3)
+    ..a<$core.int>(4, _omitFieldNames ? '' : 'maxTokens', $pb.PbFieldType.O3)
+    ..a<$core.int>(5, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  EmbeddingsCreateResult clone() => EmbeddingsCreateResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  EmbeddingsCreateResult copyWith(void Function(EmbeddingsCreateResult) updates) => super.copyWith((message) => updates(message as EmbeddingsCreateResult)) as EmbeddingsCreateResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static EmbeddingsCreateResult create() => EmbeddingsCreateResult._();
+  EmbeddingsCreateResult createEmptyInstance() => create();
+  static $pb.PbList<EmbeddingsCreateResult> createRepeated() => $pb.PbList<EmbeddingsCreateResult>();
+  @$core.pragma('dart2js:noInline')
+  static EmbeddingsCreateResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<EmbeddingsCreateResult>(create);
+  static EmbeddingsCreateResult? _defaultInstance;
+
+  /// Opaque handle (rac_handle_t cast to u64). Zero on failure.
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get handle => $_getI64(0);
+  @$pb.TagNumber(1)
+  set handle($fixnum.Int64 v) { $_setInt64(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasHandle() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHandle() => clearField(1);
+
+  /// Echo of the model id the caller requested — so JS/Swift/Kotlin can
+  /// store it next to the handle without re-parsing the request.
+  @$pb.TagNumber(2)
+  $core.String get modelId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set modelId($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasModelId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearModelId() => clearField(2);
+
+  /// Backend-resolved dimension/max_tokens after load. 0 = unknown until
+  /// the first embed call.
+  @$pb.TagNumber(3)
+  $core.int get dimension => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set dimension($core.int v) { $_setSignedInt32(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasDimension() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearDimension() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.int get maxTokens => $_getIZ(3);
+  @$pb.TagNumber(4)
+  set maxTokens($core.int v) { $_setSignedInt32(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasMaxTokens() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearMaxTokens() => clearField(4);
+
+  /// Negative on failure; mirrors rac_result_t. Empty error_message on
+  /// success.
+  @$pb.TagNumber(5)
+  $core.int get errorCode => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set errorCode($core.int v) { $_setSignedInt32(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasErrorCode() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearErrorCode() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get errorMessage => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set errorMessage($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasErrorMessage() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearErrorMessage() => clearField(6);
+}
+
 class EmbeddingsApi {
   $pb.RpcClient _client;
   EmbeddingsApi(this._client);

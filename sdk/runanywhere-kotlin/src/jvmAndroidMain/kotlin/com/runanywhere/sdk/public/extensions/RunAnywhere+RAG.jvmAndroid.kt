@@ -18,14 +18,44 @@ import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
 import ai.runanywhere.proto.v1.RAGStatistics
+import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeRAGProto
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
+
+// RAG native library loading (relocated from the deleted RAGBridge.kt).
+//
+// `librac_backend_rag_jni.so` is loaded once on first RAG entry so its JNI
+// symbols (if any remain) are resolved before `CppBridgeRAGProto` dispatches.
+// The main SDK's `librunanywhere_jni.so` must already be loaded (it hosts the
+// canonical `racRag*Proto` thunks). `librac_backend_onnx.so` is loaded too so
+// its ELF `__attribute__((constructor))` auto-registers the ONNX engine plugin
+// (which provides embedding_ops, required for RAG pipeline creation). Loads
+// are try/catch-wrapped so apps without those modules aren't blocked.
+private val ragNativeLibsLoaded = AtomicBoolean(false)
+
+private fun ensureRagNativeLibsLoaded() {
+    if (!ragNativeLibsLoaded.compareAndSet(false, true)) return
+    val logger = SDKLogger.rag
+    try {
+        System.loadLibrary("rac_backend_rag_jni")
+    } catch (e: UnsatisfiedLinkError) {
+        logger.warning("rac_backend_rag_jni not present: ${e.message}")
+    }
+    try {
+        System.loadLibrary("rac_backend_onnx")
+        logger.info("rac_backend_onnx loaded; embedding_ops available for RAG")
+    } catch (e: UnsatisfiedLinkError) {
+        logger.warning("rac_backend_onnx not present: ${e.message}")
+    }
+}
 
 actual suspend fun RunAnywhere.ragCreatePipeline(config: RAGConfiguration) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    ensureRagNativeLibsLoaded()
     withContext(Dispatchers.IO) {
         CppBridgeRAGProto.create(config)
     }

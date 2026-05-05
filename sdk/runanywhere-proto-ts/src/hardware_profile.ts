@@ -10,46 +10,84 @@ import _m0 from "protobufjs/minimal";
 
 export const protobufPackage = "runanywhere.v1";
 
-export enum AcceleratorPreference {
-  ACCELERATOR_PREFERENCE_AUTO = 0,
-  ACCELERATOR_PREFERENCE_ANE = 1,
-  ACCELERATOR_PREFERENCE_GPU = 2,
-  ACCELERATOR_PREFERENCE_CPU = 3,
+/**
+ * ---------------------------------------------------------------------------
+ * Hardware acceleration preference for inference. Canonical single enum —
+ * previously duplicated as `AcceleratorPreference` (ANE/GPU/CPU/AUTO) in this
+ * file and `AccelerationPreference` in model_types.proto. Consolidated here
+ * (Wave H-2 / IDL-01) because it is a pure hardware concept and
+ * hardware_profile.proto has no imports (model_types.proto already imports
+ * this file — placing the enum here avoids a cyclic import). Sources pre-IDL:
+ *   Web    enums.ts:165   (Auto / WebGPU / CPU)
+ *   Swift  extensions     (CPU / GPU / NPU / Metal)
+ *   Kotlin enum           (CPU / GPU / NPU / Vulkan)
+ * Canonicalized union below.
+ * ---------------------------------------------------------------------------
+ */
+export enum AccelerationPreference {
+  ACCELERATION_PREFERENCE_UNSPECIFIED = 0,
+  ACCELERATION_PREFERENCE_AUTO = 1,
+  ACCELERATION_PREFERENCE_CPU = 2,
+  ACCELERATION_PREFERENCE_GPU = 3,
+  ACCELERATION_PREFERENCE_NPU = 4,
+  ACCELERATION_PREFERENCE_WEBGPU = 5,
+  ACCELERATION_PREFERENCE_METAL = 6,
+  ACCELERATION_PREFERENCE_VULKAN = 7,
   UNRECOGNIZED = -1,
 }
 
-export function acceleratorPreferenceFromJSON(object: any): AcceleratorPreference {
+export function accelerationPreferenceFromJSON(object: any): AccelerationPreference {
   switch (object) {
     case 0:
-    case "ACCELERATOR_PREFERENCE_AUTO":
-      return AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO;
+    case "ACCELERATION_PREFERENCE_UNSPECIFIED":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED;
     case 1:
-    case "ACCELERATOR_PREFERENCE_ANE":
-      return AcceleratorPreference.ACCELERATOR_PREFERENCE_ANE;
+    case "ACCELERATION_PREFERENCE_AUTO":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_AUTO;
     case 2:
-    case "ACCELERATOR_PREFERENCE_GPU":
-      return AcceleratorPreference.ACCELERATOR_PREFERENCE_GPU;
+    case "ACCELERATION_PREFERENCE_CPU":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_CPU;
     case 3:
-    case "ACCELERATOR_PREFERENCE_CPU":
-      return AcceleratorPreference.ACCELERATOR_PREFERENCE_CPU;
+    case "ACCELERATION_PREFERENCE_GPU":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_GPU;
+    case 4:
+    case "ACCELERATION_PREFERENCE_NPU":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_NPU;
+    case 5:
+    case "ACCELERATION_PREFERENCE_WEBGPU":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_WEBGPU;
+    case 6:
+    case "ACCELERATION_PREFERENCE_METAL":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_METAL;
+    case 7:
+    case "ACCELERATION_PREFERENCE_VULKAN":
+      return AccelerationPreference.ACCELERATION_PREFERENCE_VULKAN;
     case -1:
     case "UNRECOGNIZED":
     default:
-      return AcceleratorPreference.UNRECOGNIZED;
+      return AccelerationPreference.UNRECOGNIZED;
   }
 }
 
-export function acceleratorPreferenceToJSON(object: AcceleratorPreference): string {
+export function accelerationPreferenceToJSON(object: AccelerationPreference): string {
   switch (object) {
-    case AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO:
-      return "ACCELERATOR_PREFERENCE_AUTO";
-    case AcceleratorPreference.ACCELERATOR_PREFERENCE_ANE:
-      return "ACCELERATOR_PREFERENCE_ANE";
-    case AcceleratorPreference.ACCELERATOR_PREFERENCE_GPU:
-      return "ACCELERATOR_PREFERENCE_GPU";
-    case AcceleratorPreference.ACCELERATOR_PREFERENCE_CPU:
-      return "ACCELERATOR_PREFERENCE_CPU";
-    case AcceleratorPreference.UNRECOGNIZED:
+    case AccelerationPreference.ACCELERATION_PREFERENCE_UNSPECIFIED:
+      return "ACCELERATION_PREFERENCE_UNSPECIFIED";
+    case AccelerationPreference.ACCELERATION_PREFERENCE_AUTO:
+      return "ACCELERATION_PREFERENCE_AUTO";
+    case AccelerationPreference.ACCELERATION_PREFERENCE_CPU:
+      return "ACCELERATION_PREFERENCE_CPU";
+    case AccelerationPreference.ACCELERATION_PREFERENCE_GPU:
+      return "ACCELERATION_PREFERENCE_GPU";
+    case AccelerationPreference.ACCELERATION_PREFERENCE_NPU:
+      return "ACCELERATION_PREFERENCE_NPU";
+    case AccelerationPreference.ACCELERATION_PREFERENCE_WEBGPU:
+      return "ACCELERATION_PREFERENCE_WEBGPU";
+    case AccelerationPreference.ACCELERATION_PREFERENCE_METAL:
+      return "ACCELERATION_PREFERENCE_METAL";
+    case AccelerationPreference.ACCELERATION_PREFERENCE_VULKAN:
+      return "ACCELERATION_PREFERENCE_VULKAN";
+    case AccelerationPreference.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
@@ -72,7 +110,7 @@ export interface HardwareProfile {
 
 export interface AcceleratorInfo {
   name: string;
-  type: AcceleratorPreference;
+  type: AccelerationPreference;
   available: boolean;
 }
 
@@ -100,7 +138,7 @@ export interface HardwareAcceleratorsRequest {
  * stays consistent (every rpc returns a non-empty message).
  */
 export interface HardwareAcceleratorPreferenceRequest {
-  preference: AcceleratorPreference;
+  preference: AccelerationPreference;
 }
 
 export interface HardwareAcceleratorPreferenceResult {
@@ -355,7 +393,7 @@ export const AcceleratorInfo = {
   fromJSON(object: any): AcceleratorInfo {
     return {
       name: isSet(object.name) ? globalThis.String(object.name) : "",
-      type: isSet(object.type) ? acceleratorPreferenceFromJSON(object.type) : 0,
+      type: isSet(object.type) ? accelerationPreferenceFromJSON(object.type) : 0,
       available: isSet(object.available) ? globalThis.Boolean(object.available) : false,
     };
   },
@@ -366,7 +404,7 @@ export const AcceleratorInfo = {
       obj.name = message.name;
     }
     if (message.type !== 0) {
-      obj.type = acceleratorPreferenceToJSON(message.type);
+      obj.type = accelerationPreferenceToJSON(message.type);
     }
     if (message.available !== false) {
       obj.available = message.available;
@@ -586,13 +624,13 @@ export const HardwareAcceleratorPreferenceRequest = {
   },
 
   fromJSON(object: any): HardwareAcceleratorPreferenceRequest {
-    return { preference: isSet(object.preference) ? acceleratorPreferenceFromJSON(object.preference) : 0 };
+    return { preference: isSet(object.preference) ? accelerationPreferenceFromJSON(object.preference) : 0 };
   },
 
   toJSON(message: HardwareAcceleratorPreferenceRequest): unknown {
     const obj: any = {};
     if (message.preference !== 0) {
-      obj.preference = acceleratorPreferenceToJSON(message.preference);
+      obj.preference = accelerationPreferenceToJSON(message.preference);
     }
     return obj;
   },

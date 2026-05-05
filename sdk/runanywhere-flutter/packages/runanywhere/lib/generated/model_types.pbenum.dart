@@ -463,40 +463,6 @@ class ModelFileRole extends $pb.ProtobufEnum {
 }
 
 /// ---------------------------------------------------------------------------
-/// Hardware acceleration preference for inference. Sources pre-IDL:
-///   Web    enums.ts:165   (Auto / WebGPU / CPU)
-///   Swift  extensions     (CPU / GPU / NPU / Metal)
-///   Kotlin enum           (CPU / GPU / NPU / Vulkan)
-/// Canonicalized union below.
-/// ---------------------------------------------------------------------------
-class AccelerationPreference extends $pb.ProtobufEnum {
-  static const AccelerationPreference ACCELERATION_PREFERENCE_UNSPECIFIED = AccelerationPreference._(0, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_UNSPECIFIED');
-  static const AccelerationPreference ACCELERATION_PREFERENCE_AUTO = AccelerationPreference._(1, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_AUTO');
-  static const AccelerationPreference ACCELERATION_PREFERENCE_CPU = AccelerationPreference._(2, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_CPU');
-  static const AccelerationPreference ACCELERATION_PREFERENCE_GPU = AccelerationPreference._(3, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_GPU');
-  static const AccelerationPreference ACCELERATION_PREFERENCE_NPU = AccelerationPreference._(4, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_NPU');
-  static const AccelerationPreference ACCELERATION_PREFERENCE_WEBGPU = AccelerationPreference._(5, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_WEBGPU');
-  static const AccelerationPreference ACCELERATION_PREFERENCE_METAL = AccelerationPreference._(6, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_METAL');
-  static const AccelerationPreference ACCELERATION_PREFERENCE_VULKAN = AccelerationPreference._(7, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_VULKAN');
-
-  static const $core.List<AccelerationPreference> values = <AccelerationPreference> [
-    ACCELERATION_PREFERENCE_UNSPECIFIED,
-    ACCELERATION_PREFERENCE_AUTO,
-    ACCELERATION_PREFERENCE_CPU,
-    ACCELERATION_PREFERENCE_GPU,
-    ACCELERATION_PREFERENCE_NPU,
-    ACCELERATION_PREFERENCE_WEBGPU,
-    ACCELERATION_PREFERENCE_METAL,
-    ACCELERATION_PREFERENCE_VULKAN,
-  ];
-
-  static final $core.Map<$core.int, AccelerationPreference> _byValue = $pb.ProtobufEnum.initByValue(values);
-  static AccelerationPreference? valueOf($core.int value) => _byValue[value];
-
-  const AccelerationPreference._($core.int v, $core.String n) : super(v, n);
-}
-
-/// ---------------------------------------------------------------------------
 /// Routing policy for hybrid (on-device vs cloud) inference. Sources pre-IDL:
 ///   Web    enums.ts (RoutingPolicy)
 ///          OnDevicePreferred / CloudPreferred / OnDeviceOnly / CloudOnly /

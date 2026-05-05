@@ -13,23 +13,43 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-class AcceleratorPreference extends $pb.ProtobufEnum {
-  static const AcceleratorPreference ACCELERATOR_PREFERENCE_AUTO = AcceleratorPreference._(0, _omitEnumNames ? '' : 'ACCELERATOR_PREFERENCE_AUTO');
-  static const AcceleratorPreference ACCELERATOR_PREFERENCE_ANE = AcceleratorPreference._(1, _omitEnumNames ? '' : 'ACCELERATOR_PREFERENCE_ANE');
-  static const AcceleratorPreference ACCELERATOR_PREFERENCE_GPU = AcceleratorPreference._(2, _omitEnumNames ? '' : 'ACCELERATOR_PREFERENCE_GPU');
-  static const AcceleratorPreference ACCELERATOR_PREFERENCE_CPU = AcceleratorPreference._(3, _omitEnumNames ? '' : 'ACCELERATOR_PREFERENCE_CPU');
+/// ---------------------------------------------------------------------------
+/// Hardware acceleration preference for inference. Canonical single enum —
+/// previously duplicated as `AcceleratorPreference` (ANE/GPU/CPU/AUTO) in this
+/// file and `AccelerationPreference` in model_types.proto. Consolidated here
+/// (Wave H-2 / IDL-01) because it is a pure hardware concept and
+/// hardware_profile.proto has no imports (model_types.proto already imports
+/// this file — placing the enum here avoids a cyclic import). Sources pre-IDL:
+///   Web    enums.ts:165   (Auto / WebGPU / CPU)
+///   Swift  extensions     (CPU / GPU / NPU / Metal)
+///   Kotlin enum           (CPU / GPU / NPU / Vulkan)
+/// Canonicalized union below.
+/// ---------------------------------------------------------------------------
+class AccelerationPreference extends $pb.ProtobufEnum {
+  static const AccelerationPreference ACCELERATION_PREFERENCE_UNSPECIFIED = AccelerationPreference._(0, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_UNSPECIFIED');
+  static const AccelerationPreference ACCELERATION_PREFERENCE_AUTO = AccelerationPreference._(1, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_AUTO');
+  static const AccelerationPreference ACCELERATION_PREFERENCE_CPU = AccelerationPreference._(2, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_CPU');
+  static const AccelerationPreference ACCELERATION_PREFERENCE_GPU = AccelerationPreference._(3, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_GPU');
+  static const AccelerationPreference ACCELERATION_PREFERENCE_NPU = AccelerationPreference._(4, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_NPU');
+  static const AccelerationPreference ACCELERATION_PREFERENCE_WEBGPU = AccelerationPreference._(5, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_WEBGPU');
+  static const AccelerationPreference ACCELERATION_PREFERENCE_METAL = AccelerationPreference._(6, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_METAL');
+  static const AccelerationPreference ACCELERATION_PREFERENCE_VULKAN = AccelerationPreference._(7, _omitEnumNames ? '' : 'ACCELERATION_PREFERENCE_VULKAN');
 
-  static const $core.List<AcceleratorPreference> values = <AcceleratorPreference> [
-    ACCELERATOR_PREFERENCE_AUTO,
-    ACCELERATOR_PREFERENCE_ANE,
-    ACCELERATOR_PREFERENCE_GPU,
-    ACCELERATOR_PREFERENCE_CPU,
+  static const $core.List<AccelerationPreference> values = <AccelerationPreference> [
+    ACCELERATION_PREFERENCE_UNSPECIFIED,
+    ACCELERATION_PREFERENCE_AUTO,
+    ACCELERATION_PREFERENCE_CPU,
+    ACCELERATION_PREFERENCE_GPU,
+    ACCELERATION_PREFERENCE_NPU,
+    ACCELERATION_PREFERENCE_WEBGPU,
+    ACCELERATION_PREFERENCE_METAL,
+    ACCELERATION_PREFERENCE_VULKAN,
   ];
 
-  static final $core.Map<$core.int, AcceleratorPreference> _byValue = $pb.ProtobufEnum.initByValue(values);
-  static AcceleratorPreference? valueOf($core.int value) => _byValue[value];
+  static final $core.Map<$core.int, AccelerationPreference> _byValue = $pb.ProtobufEnum.initByValue(values);
+  static AccelerationPreference? valueOf($core.int value) => _byValue[value];
 
-  const AcceleratorPreference._($core.int v, $core.String n) : super(v, n);
+  const AccelerationPreference._($core.int v, $core.String n) : super(v, n);
 }
 
 

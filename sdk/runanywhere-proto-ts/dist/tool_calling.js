@@ -938,16 +938,7 @@ export const ToolDefinition_MetadataEntry = {
     },
 };
 function createBaseToolCall() {
-    return {
-        id: "",
-        name: "",
-        argumentsJson: "",
-        type: "",
-        arguments: {},
-        callId: undefined,
-        createdAtMs: 0,
-        rawText: undefined,
-    };
+    return { id: "", name: "", argumentsJson: "", type: "", callId: undefined, createdAtMs: 0, rawText: undefined };
 }
 export const ToolCall = {
     encode(message, writer = _m0.Writer.create()) {
@@ -963,9 +954,6 @@ export const ToolCall = {
         if (message.type !== "") {
             writer.uint32(34).string(message.type);
         }
-        Object.entries(message.arguments).forEach(([key, value]) => {
-            ToolCall_ArgumentsEntry.encode({ key: key, value }, writer.uint32(42).fork()).ldelim();
-        });
         if (message.callId !== undefined) {
             writer.uint32(50).string(message.callId);
         }
@@ -1008,15 +996,6 @@ export const ToolCall = {
                     }
                     message.type = reader.string();
                     continue;
-                case 5:
-                    if (tag !== 42) {
-                        break;
-                    }
-                    const entry5 = ToolCall_ArgumentsEntry.decode(reader, reader.uint32());
-                    if (entry5.value !== undefined) {
-                        message.arguments[entry5.key] = entry5.value;
-                    }
-                    continue;
                 case 6:
                     if (tag !== 50) {
                         break;
@@ -1049,12 +1028,6 @@ export const ToolCall = {
             name: isSet(object.name) ? globalThis.String(object.name) : "",
             argumentsJson: isSet(object.argumentsJson) ? globalThis.String(object.argumentsJson) : "",
             type: isSet(object.type) ? globalThis.String(object.type) : "",
-            arguments: isObject(object.arguments)
-                ? Object.entries(object.arguments).reduce((acc, [key, value]) => {
-                    acc[key] = ToolValue.fromJSON(value);
-                    return acc;
-                }, {})
-                : {},
             callId: isSet(object.callId) ? globalThis.String(object.callId) : undefined,
             createdAtMs: isSet(object.createdAtMs) ? globalThis.Number(object.createdAtMs) : 0,
             rawText: isSet(object.rawText) ? globalThis.String(object.rawText) : undefined,
@@ -1073,15 +1046,6 @@ export const ToolCall = {
         }
         if (message.type !== "") {
             obj.type = message.type;
-        }
-        if (message.arguments) {
-            const entries = Object.entries(message.arguments);
-            if (entries.length > 0) {
-                obj.arguments = {};
-                entries.forEach(([k, v]) => {
-                    obj.arguments[k] = ToolValue.toJSON(v);
-                });
-            }
         }
         if (message.callId !== undefined) {
             obj.callId = message.callId;
@@ -1103,83 +1067,9 @@ export const ToolCall = {
         message.name = object.name ?? "";
         message.argumentsJson = object.argumentsJson ?? "";
         message.type = object.type ?? "";
-        message.arguments = Object.entries(object.arguments ?? {}).reduce((acc, [key, value]) => {
-            if (value !== undefined) {
-                acc[key] = ToolValue.fromPartial(value);
-            }
-            return acc;
-        }, {});
         message.callId = object.callId ?? undefined;
         message.createdAtMs = object.createdAtMs ?? 0;
         message.rawText = object.rawText ?? undefined;
-        return message;
-    },
-};
-function createBaseToolCall_ArgumentsEntry() {
-    return { key: "", value: undefined };
-}
-export const ToolCall_ArgumentsEntry = {
-    encode(message, writer = _m0.Writer.create()) {
-        if (message.key !== "") {
-            writer.uint32(10).string(message.key);
-        }
-        if (message.value !== undefined) {
-            ToolValue.encode(message.value, writer.uint32(18).fork()).ldelim();
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
-        let end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseToolCall_ArgumentsEntry();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1:
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.key = reader.string();
-                    continue;
-                case 2:
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.value = ToolValue.decode(reader, reader.uint32());
-                    continue;
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skipType(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            key: isSet(object.key) ? globalThis.String(object.key) : "",
-            value: isSet(object.value) ? ToolValue.fromJSON(object.value) : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.key !== "") {
-            obj.key = message.key;
-        }
-        if (message.value !== undefined) {
-            obj.value = ToolValue.toJSON(message.value);
-        }
-        return obj;
-    },
-    create(base) {
-        return ToolCall_ArgumentsEntry.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseToolCall_ArgumentsEntry();
-        message.key = object.key ?? "";
-        message.value = (object.value !== undefined && object.value !== null)
-            ? ToolValue.fromPartial(object.value)
-            : undefined;
         return message;
     },
 };
@@ -1190,7 +1080,6 @@ function createBaseToolResult() {
         resultJson: "",
         error: undefined,
         success: false,
-        result: {},
         callId: undefined,
         startedAtMs: 0,
         completedAtMs: 0,
@@ -1213,9 +1102,6 @@ export const ToolResult = {
         if (message.success !== false) {
             writer.uint32(40).bool(message.success);
         }
-        Object.entries(message.result).forEach(([key, value]) => {
-            ToolResult_ResultEntry.encode({ key: key, value }, writer.uint32(50).fork()).ldelim();
-        });
         if (message.callId !== undefined) {
             writer.uint32(58).string(message.callId);
         }
@@ -1264,15 +1150,6 @@ export const ToolResult = {
                     }
                     message.success = reader.bool();
                     continue;
-                case 6:
-                    if (tag !== 50) {
-                        break;
-                    }
-                    const entry6 = ToolResult_ResultEntry.decode(reader, reader.uint32());
-                    if (entry6.value !== undefined) {
-                        message.result[entry6.key] = entry6.value;
-                    }
-                    continue;
                 case 7:
                     if (tag !== 58) {
                         break;
@@ -1306,12 +1183,6 @@ export const ToolResult = {
             resultJson: isSet(object.resultJson) ? globalThis.String(object.resultJson) : "",
             error: isSet(object.error) ? globalThis.String(object.error) : undefined,
             success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
-            result: isObject(object.result)
-                ? Object.entries(object.result).reduce((acc, [key, value]) => {
-                    acc[key] = ToolValue.fromJSON(value);
-                    return acc;
-                }, {})
-                : {},
             callId: isSet(object.callId) ? globalThis.String(object.callId) : undefined,
             startedAtMs: isSet(object.startedAtMs) ? globalThis.Number(object.startedAtMs) : 0,
             completedAtMs: isSet(object.completedAtMs) ? globalThis.Number(object.completedAtMs) : 0,
@@ -1334,15 +1205,6 @@ export const ToolResult = {
         if (message.success !== false) {
             obj.success = message.success;
         }
-        if (message.result) {
-            const entries = Object.entries(message.result);
-            if (entries.length > 0) {
-                obj.result = {};
-                entries.forEach(([k, v]) => {
-                    obj.result[k] = ToolValue.toJSON(v);
-                });
-            }
-        }
         if (message.callId !== undefined) {
             obj.callId = message.callId;
         }
@@ -1364,83 +1226,9 @@ export const ToolResult = {
         message.resultJson = object.resultJson ?? "";
         message.error = object.error ?? undefined;
         message.success = object.success ?? false;
-        message.result = Object.entries(object.result ?? {}).reduce((acc, [key, value]) => {
-            if (value !== undefined) {
-                acc[key] = ToolValue.fromPartial(value);
-            }
-            return acc;
-        }, {});
         message.callId = object.callId ?? undefined;
         message.startedAtMs = object.startedAtMs ?? 0;
         message.completedAtMs = object.completedAtMs ?? 0;
-        return message;
-    },
-};
-function createBaseToolResult_ResultEntry() {
-    return { key: "", value: undefined };
-}
-export const ToolResult_ResultEntry = {
-    encode(message, writer = _m0.Writer.create()) {
-        if (message.key !== "") {
-            writer.uint32(10).string(message.key);
-        }
-        if (message.value !== undefined) {
-            ToolValue.encode(message.value, writer.uint32(18).fork()).ldelim();
-        }
-        return writer;
-    },
-    decode(input, length) {
-        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
-        let end = length === undefined ? reader.len : reader.pos + length;
-        const message = createBaseToolResult_ResultEntry();
-        while (reader.pos < end) {
-            const tag = reader.uint32();
-            switch (tag >>> 3) {
-                case 1:
-                    if (tag !== 10) {
-                        break;
-                    }
-                    message.key = reader.string();
-                    continue;
-                case 2:
-                    if (tag !== 18) {
-                        break;
-                    }
-                    message.value = ToolValue.decode(reader, reader.uint32());
-                    continue;
-            }
-            if ((tag & 7) === 4 || tag === 0) {
-                break;
-            }
-            reader.skipType(tag & 7);
-        }
-        return message;
-    },
-    fromJSON(object) {
-        return {
-            key: isSet(object.key) ? globalThis.String(object.key) : "",
-            value: isSet(object.value) ? ToolValue.fromJSON(object.value) : undefined,
-        };
-    },
-    toJSON(message) {
-        const obj = {};
-        if (message.key !== "") {
-            obj.key = message.key;
-        }
-        if (message.value !== undefined) {
-            obj.value = ToolValue.toJSON(message.value);
-        }
-        return obj;
-    },
-    create(base) {
-        return ToolResult_ResultEntry.fromPartial(base ?? {});
-    },
-    fromPartial(object) {
-        const message = createBaseToolResult_ResultEntry();
-        message.key = object.key ?? "";
-        message.value = (object.value !== undefined && object.value !== null)
-            ? ToolValue.fromPartial(object.value)
-            : undefined;
         return message;
     },
 };

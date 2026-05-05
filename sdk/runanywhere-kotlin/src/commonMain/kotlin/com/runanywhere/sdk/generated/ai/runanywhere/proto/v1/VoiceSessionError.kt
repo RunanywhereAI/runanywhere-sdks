@@ -26,15 +26,31 @@ import kotlin.String
 import kotlin.Suppress
 import okio.ByteString
 
+/**
+ * ---------------------------------------------------------------------------
+ * v3.2: Voice session error taxonomy.
+ *
+ * Mirrors Swift `VoiceSessionError`, Kotlin `VoiceSessionError`. The
+ * `failed_component` field is populated only for component-failure mappings —
+ * naming the sub-component that produced the underlying error ("stt", "llm",
+ * "tts", "vad", "wakeword").
+ *
+ * IDL-08: The private `VoiceSessionErrorCode` enum was removed in favour of
+ * the canonical `ErrorCode` from `errors.proto`. Mapping from legacy cases:
+ *   - MICROPHONE_PERMISSION_DENIED -> ERROR_CODE_MICROPHONE_PERMISSION_DENIED = 282
+ *   - NOT_READY                    -> ERROR_CODE_COMPONENT_NOT_READY          = 230
+ *   - ALREADY_RUNNING              -> ERROR_CODE_SERVICE_BUSY                 = 233
+ *   - COMPONENT_FAILURE            -> ERROR_CODE_PROCESSING_FAILED            = 234
+ * ---------------------------------------------------------------------------
+ */
 public class VoiceSessionError(
   @field:WireField(
     tag = 1,
-    adapter = "ai.runanywhere.proto.v1.VoiceSessionErrorCode#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.ErrorCode#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 0,
   )
-  public val code: VoiceSessionErrorCode =
-      VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_UNSPECIFIED,
+  public val code: ErrorCode = ErrorCode.ERROR_CODE_UNSPECIFIED,
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -110,7 +126,7 @@ public class VoiceSessionError(
   }
 
   public fun copy(
-    code: VoiceSessionErrorCode = this.code,
+    code: ErrorCode = this.code,
     message: String = this.message,
     failed_component: String? = this.failed_component,
     c_abi_code: Int = this.c_abi_code,
@@ -131,8 +147,8 @@ public class VoiceSessionError(
     ) {
       override fun encodedSize(`value`: VoiceSessionError): Int {
         var size = value.unknownFields.size
-        if (value.code != VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_UNSPECIFIED) size +=
-            VoiceSessionErrorCode.ADAPTER.encodedSizeWithTag(1, value.code)
+        if (value.code != ErrorCode.ERROR_CODE_UNSPECIFIED) size +=
+            ErrorCode.ADAPTER.encodedSizeWithTag(1, value.code)
         if (value.message != "") size += ProtoAdapter.STRING.encodedSizeWithTag(2, value.message)
         size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.failed_component)
         if (value.c_abi_code != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(4,
@@ -143,8 +159,8 @@ public class VoiceSessionError(
       }
 
       override fun encode(writer: ProtoWriter, `value`: VoiceSessionError) {
-        if (value.code != VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_UNSPECIFIED)
-            VoiceSessionErrorCode.ADAPTER.encodeWithTag(writer, 1, value.code)
+        if (value.code != ErrorCode.ERROR_CODE_UNSPECIFIED) ErrorCode.ADAPTER.encodeWithTag(writer,
+            1, value.code)
         if (value.message != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.message)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.failed_component)
         if (value.c_abi_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4, value.c_abi_code)
@@ -160,12 +176,12 @@ public class VoiceSessionError(
         if (value.c_abi_code != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4, value.c_abi_code)
         ProtoAdapter.STRING.encodeWithTag(writer, 3, value.failed_component)
         if (value.message != "") ProtoAdapter.STRING.encodeWithTag(writer, 2, value.message)
-        if (value.code != VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_UNSPECIFIED)
-            VoiceSessionErrorCode.ADAPTER.encodeWithTag(writer, 1, value.code)
+        if (value.code != ErrorCode.ERROR_CODE_UNSPECIFIED) ErrorCode.ADAPTER.encodeWithTag(writer,
+            1, value.code)
       }
 
       override fun decode(reader: ProtoReader): VoiceSessionError {
-        var code: VoiceSessionErrorCode = VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_UNSPECIFIED
+        var code: ErrorCode = ErrorCode.ERROR_CODE_UNSPECIFIED
         var message: String = ""
         var failed_component: String? = null
         var c_abi_code: Int = 0
@@ -173,7 +189,7 @@ public class VoiceSessionError(
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
-              code = VoiceSessionErrorCode.ADAPTER.decode(reader)
+              code = ErrorCode.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }

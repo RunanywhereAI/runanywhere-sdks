@@ -144,29 +144,24 @@ export interface ToolCall {
     id: string;
     /** Tool name (matches ToolDefinition.name). */
     name: string;
-    /** JSON-encoded arguments. Empty object "{}" if no args. */
+    /**
+     * JSON-encoded arguments. Empty object "{}" if no args.
+     *
+     * AUDIT (IDL-13): the C++ tokenizer / tool-prompt formatter
+     * (sdk/runanywhere-commons/src/features/llm/tool_calling.cpp) reads
+     * `arguments_json` directly when building LLM prompts. It is the
+     * canonical wire shape for the prompt-formatting path.
+     */
     argumentsJson: string;
     /**
      * Discriminator for OpenAI-compatible flows ("function" is the only
      * value at the moment). Empty = unset.
      */
     type: string;
-    /**
-     * Strongly-typed arguments map for SDKs that do not want to parse
-     * arguments_json. Producers should keep arguments_json populated for C++
-     * tokenizer compatibility.
-     */
-    arguments: {
-        [key: string]: ToolValue;
-    };
     /** Alias for id used by pre-proto SDK surfaces. */
     callId?: string | undefined;
     createdAtMs: number;
     rawText?: string | undefined;
-}
-export interface ToolCall_ArgumentsEntry {
-    key: string;
-    value?: ToolValue | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -177,29 +172,25 @@ export interface ToolCall_ArgumentsEntry {
 export interface ToolResult {
     toolCallId: string;
     name: string;
+    /**
+     * JSON-encoded tool execution result.
+     *
+     * AUDIT (IDL-13): the C++ tool-prompt formatter
+     * (`sdk/runanywhere-commons/src/features/llm/tool_calling.cpp:1870-1885`)
+     * reads `result_json` directly when building follow-up LLM prompts after
+     * tool execution. It is the canonical wire shape.
+     */
     resultJson: string;
     error?: string | undefined;
     /**
      * Whether execution succeeded. If unset/false and error is empty,
-     * consumers should fall back to legacy result_json/error semantics.
+     * consumers should fall back to result_json/error semantics.
      */
     success: boolean;
-    /**
-     * Strongly-typed result map for SDKs that do not want to parse
-     * result_json. Producers should keep result_json populated for C++
-     * tokenizer compatibility.
-     */
-    result: {
-        [key: string]: ToolValue;
-    };
     /** Alias for tool_call_id used by pre-proto SDK surfaces. */
     callId?: string | undefined;
     startedAtMs: number;
     completedAtMs: number;
-}
-export interface ToolResult_ResultEntry {
-    key: string;
-    value?: ToolValue | undefined;
 }
 /**
  * ---------------------------------------------------------------------------
@@ -449,14 +440,6 @@ export declare const ToolCall: {
     create<I extends Exact<DeepPartial<ToolCall>, I>>(base?: I): ToolCall;
     fromPartial<I extends Exact<DeepPartial<ToolCall>, I>>(object: I): ToolCall;
 };
-export declare const ToolCall_ArgumentsEntry: {
-    encode(message: ToolCall_ArgumentsEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCall_ArgumentsEntry;
-    fromJSON(object: any): ToolCall_ArgumentsEntry;
-    toJSON(message: ToolCall_ArgumentsEntry): unknown;
-    create<I extends Exact<DeepPartial<ToolCall_ArgumentsEntry>, I>>(base?: I): ToolCall_ArgumentsEntry;
-    fromPartial<I extends Exact<DeepPartial<ToolCall_ArgumentsEntry>, I>>(object: I): ToolCall_ArgumentsEntry;
-};
 export declare const ToolResult: {
     encode(message: ToolResult, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): ToolResult;
@@ -464,14 +447,6 @@ export declare const ToolResult: {
     toJSON(message: ToolResult): unknown;
     create<I extends Exact<DeepPartial<ToolResult>, I>>(base?: I): ToolResult;
     fromPartial<I extends Exact<DeepPartial<ToolResult>, I>>(object: I): ToolResult;
-};
-export declare const ToolResult_ResultEntry: {
-    encode(message: ToolResult_ResultEntry, writer?: _m0.Writer): _m0.Writer;
-    decode(input: _m0.Reader | Uint8Array, length?: number): ToolResult_ResultEntry;
-    fromJSON(object: any): ToolResult_ResultEntry;
-    toJSON(message: ToolResult_ResultEntry): unknown;
-    create<I extends Exact<DeepPartial<ToolResult_ResultEntry>, I>>(base?: I): ToolResult_ResultEntry;
-    fromPartial<I extends Exact<DeepPartial<ToolResult_ResultEntry>, I>>(object: I): ToolResult_ResultEntry;
 };
 export declare const ToolCallingOptions: {
     encode(message: ToolCallingOptions, writer?: _m0.Writer): _m0.Writer;

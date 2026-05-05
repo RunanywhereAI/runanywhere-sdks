@@ -11,15 +11,15 @@ import type {
   AccelerationPreference,
   ModelInfo as ProtoModelInfo,
   ModelInfoMetadata as ProtoModelInfoMetadata,
-  ModelThinkingTagPattern as ProtoModelThinkingTagPattern,
   SDKEnvironment,
 } from '@runanywhere/proto-ts/model_types';
 import type {
   StorageInfo as ProtoStorageInfo,
   StoredModel as ProtoStoredModel,
 } from '@runanywhere/proto-ts/storage_types';
+import type { ThinkingTagPattern as ProtoThinkingTagPattern } from '@runanywhere/proto-ts/thinking_tag_pattern';
 
-export type ThinkingTagPattern = ProtoModelThinkingTagPattern;
+export type ThinkingTagPattern = ProtoThinkingTagPattern;
 export type ModelInfoMetadata = ProtoModelInfoMetadata;
 
 export type ModelInfo = ProtoModelInfo;

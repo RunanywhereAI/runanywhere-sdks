@@ -386,9 +386,9 @@ public extension RAInferenceFramework {
     static var mediaPipe: RAInferenceFramework        { .mediapipe }
 }
 
-extension RAModelThinkingTagPattern: Codable {
-    public static var defaultPattern: RAModelThinkingTagPattern {
-        var pattern = RAModelThinkingTagPattern()
+extension RAThinkingTagPattern: Codable {
+    public static var defaultPattern: RAThinkingTagPattern {
+        var pattern = RAThinkingTagPattern()
         pattern.openTag = "<think>"
         pattern.closeTag = "</think>"
         return pattern
