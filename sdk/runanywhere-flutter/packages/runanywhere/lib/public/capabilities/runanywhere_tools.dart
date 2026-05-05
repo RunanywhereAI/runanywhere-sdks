@@ -2,34 +2,33 @@
 //
 // runanywhere_tools.dart — v4 Tools capability (LLM function calling).
 //
-// §15 type-discipline: hand-rolled tool-calling types deleted; the
-// proto-generated `ToolDefinition` / `ToolCall` / `ToolResult` /
-// `ToolCallingOptions` / `ToolCallingResult` from
-// `generated/tool_calling.pb.dart` are the canonical types.
-//
-// Owns tool registration, manual tool execution, and the
-// tool-enabled generation loop (prompt tools into system prompt,
-// parse tool calls out of LLM output, execute, loop).
+// §15 type-discipline: tool-calling types come from
+// `generated/tool_calling.pb.dart`; orchestration runs inside commons
+// via the Wave D-4 tool-calling session state machine
+// (`rac_tool_calling_session_*_proto`). Dart is a thin executor adapter
+// that runs registered closures when commons requests them.
 //
 // Mirrors Swift `RunAnywhere+ToolCalling.swift`.
 
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:fixnum/fixnum.dart' show Int64;
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/generated/llm_options.pb.dart'
-    show LLMGenerationOptions;
 import 'package:runanywhere/generated/tool_calling.pb.dart'
     show
         ToolCall,
         ToolCallingOptions,
         ToolCallingResult,
+        ToolCallingSessionCreateRequest,
+        ToolCallingSessionEvent,
+        ToolCallingSessionEvent_Kind,
+        ToolCallingSessionStepWithResultRequest,
         ToolDefinition,
-        ToolParameter,
+        ToolParseRequest,
+        ToolPromptFormatRequest,
         ToolResult;
-import 'package:runanywhere/generated/tool_calling.pbenum.dart'
-    show ToolCallFormatName, ToolParameterType;
 import 'package:runanywhere/native/dart_bridge_tool_calling.dart';
-import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
 
 /// Executor signature for a tool call.
 ///
@@ -39,69 +38,6 @@ import 'package:runanywhere/public/capabilities/runanywhere_llm.dart';
 /// `ToolResult.resultJson`.
 typedef ToolExecutor = Future<Map<String, dynamic>> Function(
     Map<String, dynamic> args);
-
-/// Format-name string constants for `ToolCallingOptions.formatHint`.
-///
-/// The actual format logic is handled in C++ commons (single source
-/// of truth). Mirrors Swift SDK's `ToolCallFormatName` enum.
-abstract class _ToolFormatHints {
-  /// JSON format: `<tool_call>{"tool":"name","arguments":{...}}</tool_call>`
-  /// Use for most general-purpose models (Llama, Qwen, Mistral, etc.)
-  static const String defaultFormat = 'default';
-
-  /// Liquid AI format: `<|tool_call_start|>[func(args)]<|tool_call_end|>`
-  /// Use for LFM2-Tool models
-  static const String lfm2 = 'lfm2';
-}
-
-String _formatHint(ToolCallingOptions opts) {
-  if (opts.formatHint.isNotEmpty) return opts.formatHint;
-  // The proto enum surfaces high-level format families
-  // (JSON / XML / NATIVE / PYTHONIC / OPENAI_FUNCTIONS / HERMES); the
-  // C++ commons format name registry is keyed by string values like
-  // "default" and "lfm2". We map the proto enum onto the string keys
-  // via `formatHint`. PYTHONIC ↔ "lfm2", everything else ↔ "default".
-  if (opts.format == ToolCallFormatName.TOOL_CALL_FORMAT_NAME_PYTHONIC) {
-    return _ToolFormatHints.lfm2;
-  }
-  return _ToolFormatHints.defaultFormat;
-}
-
-String _toolDefinitionsToJson(List<ToolDefinition> tools) {
-  return jsonEncode(tools.map(_toolDefinitionToMap).toList());
-}
-
-Map<String, dynamic> _toolDefinitionToMap(ToolDefinition def) => {
-      'name': def.name,
-      'description': def.description,
-      'parameters': def.parameters.map(_toolParameterToMap).toList(),
-      if (def.category.isNotEmpty) 'category': def.category,
-    };
-
-Map<String, dynamic> _toolParameterToMap(ToolParameter param) => {
-      'name': param.name,
-      'type': _toolParameterTypeToJson(param.type),
-      'description': param.description,
-      'required': param.required,
-      if (param.enumValues.isNotEmpty) 'enumValues': param.enumValues,
-    };
-
-String _toolParameterTypeToJson(ToolParameterType type) {
-  switch (type) {
-    case ToolParameterType.TOOL_PARAMETER_TYPE_NUMBER:
-      return 'number';
-    case ToolParameterType.TOOL_PARAMETER_TYPE_BOOLEAN:
-      return 'boolean';
-    case ToolParameterType.TOOL_PARAMETER_TYPE_OBJECT:
-      return 'object';
-    case ToolParameterType.TOOL_PARAMETER_TYPE_ARRAY:
-      return 'array';
-    case ToolParameterType.TOOL_PARAMETER_TYPE_STRING:
-    case ToolParameterType.TOOL_PARAMETER_TYPE_UNSPECIFIED:
-    default:
-      return 'string';
-  }
-}
 
 /// Tools (function calling) capability surface.
 ///
@@ -189,189 +125,159 @@ class RunAnywhereTools {
 
   // -- tool-enabled generation ---------------------------------------------
 
-  /// Generate text with tool calling support. Drives the full loop:
-  /// format tools into the system prompt, stream LLM output, parse
-  /// tool calls, execute, continue until no more tool calls (or
-  /// `maxIterations` is reached).
+  /// Generate text with tool calling support. Delegates the full
+  /// parse-execute-loop to commons via
+  /// `rac_tool_calling_session_create_proto`; Dart only runs registered
+  /// executors when commons emits a `tool_call` event.
   Future<ToolCallingResult> generateWithTools(
     String prompt, {
     ToolCallingOptions? options,
   }) async {
     final opts = options ?? ToolCallingOptions();
     final tools = opts.tools.isNotEmpty ? opts.tools : registeredTools();
-    final formatName = _formatHint(opts);
+    final autoExecute = opts.hasAutoExecute() ? opts.autoExecute : true;
 
-    if (tools.isEmpty) {
-      final result = await RunAnywhereLLM.shared.generate(prompt);
-      return ToolCallingResult(
-        text: result.text,
-        toolCalls: const [],
-        toolResults: const [],
-        isComplete: true,
-      );
-    }
-
-    final toolsJson = _toolDefinitionsToJson(tools);
-    _logger.debug('Tools JSON: $toolsJson');
-    _logger.debug('Using tool call format: $formatName');
-
-    final formattedPrompt = DartBridgeToolCalling.shared.buildInitialPrompt(
-      prompt,
-      toolsJson,
-      formatName: formatName,
+    final request = ToolCallingSessionCreateRequest(
+      prompt: prompt,
+      tools: tools,
+      formatHint: opts.formatHint,
+      maxIterations: opts.hasMaxIterations() ? opts.maxIterations : 5,
+      keepToolsAvailable:
+          opts.hasKeepToolsAvailable() ? opts.keepToolsAvailable : false,
+      validateCalls: true,
+      maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 1024,
+      temperature: opts.hasTemperature() ? opts.temperature : 0.3,
     );
-    _logger.debug(
-        'Formatted prompt: ${formattedPrompt.substring(0, formattedPrompt.length.clamp(0, 200))}...');
 
-    final allToolCalls = <ToolCall>[];
-    final allToolResults = <ToolResult>[];
+    final session = DartBridgeToolCalling.shared.createSession(request);
+    final collectedCalls = <ToolCall>[];
+    final collectedResults = <ToolResult>[];
+    final completer = Completer<ToolCallingResult>();
 
-    var currentPrompt = formattedPrompt;
-    var iterations = 0;
-    final maxIterations = opts.hasMaxIterations() ? opts.maxIterations : 5;
-
-    while (iterations < maxIterations) {
-      iterations++;
-
-      final genOptions = LLMGenerationOptions(
-        maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 1024,
-        temperature: opts.hasTemperature() ? opts.temperature : 0.3,
-      );
-
-      // v2 close-out Phase G-2: generateStream returns
-      // Stream<LLMStreamEvent>; accumulate token text off each event.
-      final eventStream =
-          RunAnywhereLLM.shared.generateStream(currentPrompt, genOptions);
-      final buffer = StringBuffer();
-      await for (final event in eventStream) {
-        if (event.isFinal) {
-          if (event.errorMessage.isNotEmpty) {
-            throw Exception(event.errorMessage);
-          }
-          break;
+    late final StreamSubscription<ToolCallingSessionEvent> sub;
+    sub = session.events.listen(
+      (event) async {
+        switch (event.whichKind()) {
+          case ToolCallingSessionEvent_Kind.toolCall:
+            final call = event.toolCall;
+            collectedCalls.add(call);
+            _logger.info('Tool call detected: ${call.name}');
+            if (!autoExecute) {
+              if (!completer.isCompleted) {
+                completer.complete(
+                  ToolCallingResult(
+                    text: '',
+                    toolCalls: collectedCalls,
+                    toolResults: collectedResults,
+                    isComplete: false,
+                  ),
+                );
+              }
+              await sub.cancel();
+              return;
+            }
+            try {
+              final result = await execute(call);
+              collectedResults.add(result);
+              DartBridgeToolCalling.shared.sessionStepWithResult(
+                ToolCallingSessionStepWithResultRequest(
+                  sessionHandle: _toFixnum(session.sessionHandle),
+                  toolCallId: call.id,
+                  resultJson: result.resultJson,
+                  error: result.error,
+                ),
+              );
+            } catch (e) {
+              _logger.error('Tool executor threw: $e');
+              DartBridgeToolCalling.shared.sessionStepWithResult(
+                ToolCallingSessionStepWithResultRequest(
+                  sessionHandle: _toFixnum(session.sessionHandle),
+                  toolCallId: call.id,
+                  resultJson: '',
+                  error: e.toString(),
+                ),
+              );
+            }
+            break;
+          case ToolCallingSessionEvent_Kind.finalResult:
+            if (!completer.isCompleted) {
+              completer.complete(event.finalResult);
+            }
+            await sub.cancel();
+            break;
+          case ToolCallingSessionEvent_Kind.errorBytes:
+            if (!completer.isCompleted) {
+              completer.completeError(
+                StateError('Tool calling session error bytes received'),
+              );
+            }
+            await sub.cancel();
+            break;
+          case ToolCallingSessionEvent_Kind.llmStreamEventBytes:
+          case ToolCallingSessionEvent_Kind.notSet:
+            break;
         }
-        if (event.token.isNotEmpty) buffer.write(event.token);
-      }
-      final responseText = buffer.toString();
-
-      _logger.debug(
-          'LLM output (iter $iterations): ${responseText.substring(0, responseText.length.clamp(0, 200))}...');
-
-      final parseResult =
-          DartBridgeToolCalling.shared.parseToolCall(responseText);
-
-      if (!parseResult.hasToolCall || parseResult.toolName == null) {
-        return ToolCallingResult(
-          text: parseResult.cleanText,
-          toolCalls: allToolCalls,
-          toolResults: allToolResults,
-          isComplete: true,
-          iterationsUsed: iterations,
-        );
-      }
-
-      final toolCall = ToolCall(
-        id: parseResult.callId.toString(),
-        name: parseResult.toolName!,
-        argumentsJson: parseResult.arguments != null
-            ? jsonEncode(parseResult.arguments)
-            : '',
-      );
-      allToolCalls.add(toolCall);
-
-      _logger.info('Tool call detected: ${toolCall.name}');
-
-      final autoExecute = opts.hasAutoExecute() ? opts.autoExecute : true;
-      if (!autoExecute) {
-        return ToolCallingResult(
-          text: parseResult.cleanText,
-          toolCalls: allToolCalls,
-          toolResults: allToolResults,
-          isComplete: false,
-          iterationsUsed: iterations,
-        );
-      }
-
-      final toolResult = await execute(toolCall);
-      allToolResults.add(toolResult);
-
-      final resultJson = toolResult.resultJson.isNotEmpty
-          ? toolResult.resultJson
-          : '{"error": "${toolResult.error.isNotEmpty ? toolResult.error : 'Unknown error'}"}';
-
-      currentPrompt = DartBridgeToolCalling.shared.buildFollowupPrompt(
-        originalPrompt: prompt,
-        toolsPrompt: opts.keepToolsAvailable
-            ? DartBridgeToolCalling.shared.formatToolsPrompt(toolsJson)
-            : null,
-        toolName: toolCall.name,
-        toolResultJson: resultJson,
-        keepToolsAvailable: opts.keepToolsAvailable,
-      );
-
-      _logger.debug(
-          'Follow-up prompt: ${currentPrompt.substring(0, currentPrompt.length.clamp(0, 200))}...');
-    }
-
-    _logger.warning('Max tool call iterations ($maxIterations) reached');
-    return ToolCallingResult(
-      text: '',
-      toolCalls: allToolCalls,
-      toolResults: allToolResults,
-      isComplete: true,
-      iterationsUsed: iterations,
+      },
+      onError: (Object error, StackTrace stackTrace) async {
+        if (!completer.isCompleted) {
+          completer.completeError(error, stackTrace);
+        }
+        await sub.cancel();
+      },
     );
+
+    try {
+      return await completer.future;
+    } finally {
+      await session.close();
+    }
   }
 
   /// Continue generation after manual tool execution (used when
-  /// `autoExecute: false`).
+  /// `autoExecute: false`). The previous turn's session is already closed;
+  /// we let commons orchestrate a fresh session for the continuation.
   Future<ToolCallingResult> continueWithToolResult(
     String originalPrompt,
     ToolResult toolResult, {
     ToolCallingOptions? options,
   }) async {
     final opts = options ?? ToolCallingOptions();
-    final tools = opts.tools.isNotEmpty ? opts.tools : registeredTools();
-    final toolsJson = _toolDefinitionsToJson(tools);
-
-    final resultJson = toolResult.resultJson.isNotEmpty
-        ? toolResult.resultJson
-        : '{"error": "${toolResult.error.isNotEmpty ? toolResult.error : 'Unknown error'}"}';
-
-    final followupPrompt = DartBridgeToolCalling.shared.buildFollowupPrompt(
-      originalPrompt: originalPrompt,
-      toolsPrompt: opts.keepToolsAvailable
-          ? DartBridgeToolCalling.shared.formatToolsPrompt(toolsJson)
-          : null,
-      toolName: toolResult.name,
-      toolResultJson: resultJson,
-      keepToolsAvailable: opts.keepToolsAvailable,
+    final followup = DartBridgeToolCalling.shared.formatPrompt(
+      ToolPromptFormatRequest(
+        userPrompt: originalPrompt,
+        options: opts,
+        toolResults: [toolResult],
+      ),
     );
-
-    return generateWithTools(followupPrompt, options: opts);
+    return generateWithTools(
+      followup.formattedPrompt.isNotEmpty
+          ? followup.formattedPrompt
+          : originalPrompt,
+      options: opts,
+    );
   }
 
   // -- helpers --------------------------------------------------------------
 
-  /// Format the registered tools into a system-prompt snippet.
+  /// Format the registered tools into a system-prompt snippet using commons.
   String formatToolsForPrompt([List<ToolDefinition>? tools]) {
     final toolList = tools ?? registeredTools();
     if (toolList.isEmpty) return '';
-    final toolsJson = _toolDefinitionsToJson(toolList);
-    return DartBridgeToolCalling.shared.formatToolsPrompt(toolsJson);
+    final result = DartBridgeToolCalling.shared.formatPrompt(
+      ToolPromptFormatRequest(
+        options: ToolCallingOptions(tools: toolList),
+      ),
+    );
+    return result.formattedPrompt;
   }
 
-  /// Parse a tool call out of raw LLM output (no auto-execution).
+  /// Parse a single tool call out of raw LLM output (no auto-execution).
   ToolCall? parseToolCall(String llmOutput) {
-    final result = DartBridgeToolCalling.shared.parseToolCall(llmOutput);
-    if (!result.hasToolCall || result.toolName == null) {
-      return null;
-    }
-    return ToolCall(
-      id: result.callId.toString(),
-      name: result.toolName!,
-      argumentsJson:
-          result.arguments != null ? jsonEncode(result.arguments) : '',
-    );
+    final result = DartBridgeToolCalling.shared
+        .parse(ToolParseRequest(text: llmOutput));
+    if (!result.hasToolCall || result.toolCalls.isEmpty) return null;
+    return result.toolCalls.first;
   }
 }
+
+Int64 _toFixnum(int value) => Int64(value);

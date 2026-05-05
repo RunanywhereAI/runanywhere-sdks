@@ -15,6 +15,7 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'tts_options.pb.dart' as $1;
 import 'voice_events.pb.dart' as $0;
 import 'voice_events.pbenum.dart' as $0;
 
@@ -1243,6 +1244,207 @@ class VoiceAgentComposeConfig extends $pb.GeneratedMessage {
   $core.bool hasDefaultLanguageCode() => $_has(22);
   @$pb.TagNumber(23)
   void clearDefaultLanguageCode() => clearField(23);
+}
+
+/// Wave D-7 helper-level proto requests for voice-agent sub-components.
+class VoiceAgentTranscribeProtoRequest extends $pb.GeneratedMessage {
+  factory VoiceAgentTranscribeProtoRequest({
+    $core.List<$core.int>? audioData,
+    $core.String? sessionId,
+    $core.int? sampleRate,
+    $core.String? languageHint,
+    $core.int? channels,
+    $0.AudioEncoding? encoding,
+  }) {
+    final $result = create();
+    if (audioData != null) {
+      $result.audioData = audioData;
+    }
+    if (sessionId != null) {
+      $result.sessionId = sessionId;
+    }
+    if (sampleRate != null) {
+      $result.sampleRate = sampleRate;
+    }
+    if (languageHint != null) {
+      $result.languageHint = languageHint;
+    }
+    if (channels != null) {
+      $result.channels = channels;
+    }
+    if (encoding != null) {
+      $result.encoding = encoding;
+    }
+    return $result;
+  }
+  VoiceAgentTranscribeProtoRequest._() : super();
+  factory VoiceAgentTranscribeProtoRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory VoiceAgentTranscribeProtoRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceAgentTranscribeProtoRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$core.List<$core.int>>(1, _omitFieldNames ? '' : 'audioData', $pb.PbFieldType.OY)
+    ..aOS(2, _omitFieldNames ? '' : 'sessionId')
+    ..a<$core.int>(3, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
+    ..aOS(4, _omitFieldNames ? '' : 'languageHint')
+    ..a<$core.int>(5, _omitFieldNames ? '' : 'channels', $pb.PbFieldType.O3)
+    ..e<$0.AudioEncoding>(6, _omitFieldNames ? '' : 'encoding', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED, valueOf: $0.AudioEncoding.valueOf, enumValues: $0.AudioEncoding.values)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  VoiceAgentTranscribeProtoRequest clone() => VoiceAgentTranscribeProtoRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  VoiceAgentTranscribeProtoRequest copyWith(void Function(VoiceAgentTranscribeProtoRequest) updates) => super.copyWith((message) => updates(message as VoiceAgentTranscribeProtoRequest)) as VoiceAgentTranscribeProtoRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VoiceAgentTranscribeProtoRequest create() => VoiceAgentTranscribeProtoRequest._();
+  VoiceAgentTranscribeProtoRequest createEmptyInstance() => create();
+  static $pb.PbList<VoiceAgentTranscribeProtoRequest> createRepeated() => $pb.PbList<VoiceAgentTranscribeProtoRequest>();
+  @$core.pragma('dart2js:noInline')
+  static VoiceAgentTranscribeProtoRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VoiceAgentTranscribeProtoRequest>(create);
+  static VoiceAgentTranscribeProtoRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<$core.int> get audioData => $_getN(0);
+  @$pb.TagNumber(1)
+  set audioData($core.List<$core.int> v) { $_setBytes(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasAudioData() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearAudioData() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get sessionId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set sessionId($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasSessionId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSessionId() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.int get sampleRate => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set sampleRate($core.int v) { $_setSignedInt32(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasSampleRate() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearSampleRate() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $core.String get languageHint => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set languageHint($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasLanguageHint() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearLanguageHint() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get channels => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set channels($core.int v) { $_setSignedInt32(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasChannels() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearChannels() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $0.AudioEncoding get encoding => $_getN(5);
+  @$pb.TagNumber(6)
+  set encoding($0.AudioEncoding v) { setField(6, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasEncoding() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearEncoding() => clearField(6);
+}
+
+class VoiceAgentSynthesizeSpeechProtoRequest extends $pb.GeneratedMessage {
+  factory VoiceAgentSynthesizeSpeechProtoRequest({
+    $core.String? text,
+    $core.String? sessionId,
+    $1.TTSOptions? options,
+  }) {
+    final $result = create();
+    if (text != null) {
+      $result.text = text;
+    }
+    if (sessionId != null) {
+      $result.sessionId = sessionId;
+    }
+    if (options != null) {
+      $result.options = options;
+    }
+    return $result;
+  }
+  VoiceAgentSynthesizeSpeechProtoRequest._() : super();
+  factory VoiceAgentSynthesizeSpeechProtoRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory VoiceAgentSynthesizeSpeechProtoRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceAgentSynthesizeSpeechProtoRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'text')
+    ..aOS(2, _omitFieldNames ? '' : 'sessionId')
+    ..aOM<$1.TTSOptions>(3, _omitFieldNames ? '' : 'options', subBuilder: $1.TTSOptions.create)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  VoiceAgentSynthesizeSpeechProtoRequest clone() => VoiceAgentSynthesizeSpeechProtoRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  VoiceAgentSynthesizeSpeechProtoRequest copyWith(void Function(VoiceAgentSynthesizeSpeechProtoRequest) updates) => super.copyWith((message) => updates(message as VoiceAgentSynthesizeSpeechProtoRequest)) as VoiceAgentSynthesizeSpeechProtoRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VoiceAgentSynthesizeSpeechProtoRequest create() => VoiceAgentSynthesizeSpeechProtoRequest._();
+  VoiceAgentSynthesizeSpeechProtoRequest createEmptyInstance() => create();
+  static $pb.PbList<VoiceAgentSynthesizeSpeechProtoRequest> createRepeated() => $pb.PbList<VoiceAgentSynthesizeSpeechProtoRequest>();
+  @$core.pragma('dart2js:noInline')
+  static VoiceAgentSynthesizeSpeechProtoRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VoiceAgentSynthesizeSpeechProtoRequest>(create);
+  static VoiceAgentSynthesizeSpeechProtoRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get text => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set text($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasText() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearText() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get sessionId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set sessionId($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasSessionId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearSessionId() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $1.TTSOptions get options => $_getN(2);
+  @$pb.TagNumber(3)
+  set options($1.TTSOptions v) { setField(3, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasOptions() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearOptions() => clearField(3);
+  @$pb.TagNumber(3)
+  $1.TTSOptions ensureOptions() => $_ensure(2);
 }
 
 class VoiceAgentApi {

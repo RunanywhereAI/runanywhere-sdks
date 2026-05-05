@@ -23,7 +23,6 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.ComponentLifecycleState
-import ai.runanywhere.proto.v1.ComponentLoadState
 import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.STTOptions
@@ -160,17 +159,79 @@ actual suspend fun RunAnywhere.processVoiceTurn(
         throw SDKException.invalidArgument("VoiceAgentTurnRequest.audio_data is required")
     }
 
-    val unsupportedFields = request.unsupportedAndroidAudioOnlyFields()
-    if (unsupportedFields.isNotEmpty()) {
-        throw SDKException.notImplemented(
-            "Native generated VoiceAgentTurnRequest ABI unavailable for fields: " +
-                unsupportedFields.joinToString(", "),
+    // Wave D-7 / KOT-11: forward the full VoiceAgentTurnRequest bytes to the
+    // native session ABI. Commons emits a canonical VoiceEvent stream
+    // (state=LISTENING → vad=start → user_said → assistant_token(final) →
+    // audio(final) → state=IDLE). We aggregate those events into a
+    // VoiceAgentResult to preserve the one-shot return contract.
+    val handle = CppBridgeVoiceAgent.getRawHandle()
+    val requestBytes = VoiceAgentTurnRequest.ADAPTER.encode(request)
+
+    val transcriptionBuilder = StringBuilder()
+    var assistantText = ""
+    val audioChunks = mutableListOf<okio.ByteString>()
+    var audioSampleRate = 0
+    var audioChannels = 0
+    var audioEncoding = ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED
+    var errorMessage: String? = null
+    var errorCode = 0
+
+    val rc =
+        com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racVoiceAgentProcessTurnProto(
+            handle,
+            requestBytes,
+            com.runanywhere.sdk.native.bridge.NativeProtoProgressListener { bytes ->
+                val event =
+                    ai.runanywhere.proto.v1.VoiceEvent.ADAPTER
+                        .decode(bytes)
+                event.user_said?.let { transcriptionBuilder.append(it.text) }
+                event.assistant_token?.let { token ->
+                    if (token.is_final) assistantText = token.text
+                }
+                event.audio?.let { frame ->
+                    audioChunks += frame.pcm
+                    if (frame.sample_rate_hz > 0) audioSampleRate = frame.sample_rate_hz
+                    if (frame.channels > 0) audioChannels = frame.channels
+                    if (frame.encoding != ai.runanywhere.proto.v1.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED) {
+                        audioEncoding = frame.encoding
+                    }
+                }
+                event.error?.let { err ->
+                    errorMessage = err.message
+                    errorCode = err.code
+                }
+                true
+            },
         )
+    if (rc != com.runanywhere.sdk.native.bridge.RunAnywhereBridge.RAC_SUCCESS &&
+        errorMessage == null
+    ) {
+        errorMessage = "racVoiceAgentProcessTurnProto failed with rc=$rc"
+        errorCode = rc
     }
 
-    return CppBridgeVoiceAgentProto.processVoiceTurn(
-        CppBridgeVoiceAgent.getRawHandle(),
-        request.audio_data.toByteArray(),
+    val combinedAudio =
+        if (audioChunks.isEmpty()) {
+            null
+        } else {
+            var total = 0
+            for (chunk in audioChunks) total += chunk.size
+            val buffer = okio.Buffer()
+            for (chunk in audioChunks) buffer.write(chunk)
+            buffer.readByteString(total.toLong())
+        }
+
+    return VoiceAgentResult(
+        speech_detected = transcriptionBuilder.isNotEmpty(),
+        transcription = transcriptionBuilder.toString().takeIf { it.isNotEmpty() },
+        assistant_response = assistantText.takeIf { it.isNotEmpty() },
+        synthesized_audio = combinedAudio,
+        synthesized_audio_sample_rate_hz = audioSampleRate,
+        synthesized_audio_channels = audioChannels,
+        synthesized_audio_encoding = audioEncoding,
+        session_id = request.session_id,
+        error_message = errorMessage,
+        error_code = errorCode,
     )
 }
 

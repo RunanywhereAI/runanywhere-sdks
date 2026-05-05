@@ -70,6 +70,8 @@ import { SDKEventStreamAdapter } from '../Adapters/SDKEventStreamAdapter';
 import { StorageAdapter } from '../Adapters/StorageAdapter';
 import { HTTPAdapter } from '../Adapters/HTTPAdapter';
 import { LlmThinking } from '../Features/LLM/LlmThinking';
+import { SDK_VERSION } from '../Foundation/Version';
+import { tryRunanywhereModule } from '../runtime/EmscriptenModule';
 
 /**
  * Persistent storage backend active for the current SDK session.
@@ -159,7 +161,7 @@ export const RunAnywhere = {
   },
 
   get version(): string {
-    return '0.1.0';
+    return SDK_VERSION;
   },
 
   get environment(): SDKEnvironment | null {
@@ -178,9 +180,32 @@ export const RunAnywhere = {
     return ensureDeviceId();
   },
 
-  /** Authentication hook — Web has no backend auth yet, so always false. */
+  /**
+   * Returns true if the SDK currently holds a non-expired access token.
+   *
+   * Delegates to commons `rac_auth_is_authenticated()` via the WASM module
+   * once a backend has installed it. Before any backend registers, no WASM
+   * module exists and the SDK cannot be authenticated — this returns false.
+   *
+   * NOTE: the Web SDK does not yet call `rac_auth_init` + the
+   * authenticate/refresh flow from the browser (no UI surface registers
+   * credentials), so this will typically return false until a future auth
+   * flow lands. The implementation here is the canonical bridge, so once
+   * auth wiring arrives, this call will reflect the real state without
+   * further changes.
+   */
   isAuthenticated(): boolean {
-    return false;
+    const mod = tryRunanywhereModule();
+    if (!mod) return false;
+    const fn = (mod as unknown as {
+      _rac_auth_is_authenticated?: () => number;
+    })._rac_auth_is_authenticated;
+    if (typeof fn !== 'function') return false;
+    try {
+      return fn() !== 0;
+    } catch {
+      return false;
+    }
   },
 
   /** Runtime configuration surface (acceleration mode etc.). */

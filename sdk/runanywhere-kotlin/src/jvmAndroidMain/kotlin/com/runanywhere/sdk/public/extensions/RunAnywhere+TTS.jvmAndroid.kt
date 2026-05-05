@@ -8,7 +8,6 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.AudioFormat
 import ai.runanywhere.proto.v1.ComponentLifecycleState
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.ModelLoadRequest
@@ -18,7 +17,6 @@ import ai.runanywhere.proto.v1.TTSOptions
 import ai.runanywhere.proto.v1.TTSOutput
 import ai.runanywhere.proto.v1.TTSSpeakResult
 import ai.runanywhere.proto.v1.TTSVoiceInfo
-import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 import com.runanywhere.sdk.features.tts.TtsAudioPlayback
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
@@ -29,14 +27,17 @@ import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 
 private val ttsLogger = SDKLogger.tts
 private val ttsAudioPlayback = TtsAudioPlayback
 
 private fun currentTtsVoiceIdFromLifecycle(): String? =
-    CppBridgeModelLifecycleProto.currentModel(
-        CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS),
-    )?.model_id?.takeIf { it.isNotEmpty() }
+    CppBridgeModelLifecycleProto
+        .currentModel(
+            CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS),
+        )?.model_id
+        ?.takeIf { it.isNotEmpty() }
 
 actual suspend fun RunAnywhere.loadTTSModel(modelId: String) {
     if (!isInitialized) {
@@ -113,7 +114,8 @@ actual suspend fun RunAnywhere.unloadTTSVoice() {
 
 actual val RunAnywhere.isTTSVoiceLoaded: Boolean
     get() =
-        CppBridgeModelLifecycleProto.snapshot(SDKComponent.SDK_COMPONENT_TTS)
+        CppBridgeModelLifecycleProto
+            .snapshot(SDKComponent.SDK_COMPONENT_TTS)
             ?.let {
                 it.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
                     it.model_id.isNotEmpty()

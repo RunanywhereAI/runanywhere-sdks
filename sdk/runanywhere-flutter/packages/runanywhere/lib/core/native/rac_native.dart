@@ -488,6 +488,163 @@ typedef RacEmbeddingsInitializeDart = int Function(
 );
 
 // ============================================================================
+// Tool-calling proto APIs (Wave D-4 / FLT-07)
+// ============================================================================
+
+typedef RacToolCallProtoRequestNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<RacProtoBuffer>,
+);
+typedef RacToolCallProtoRequestDart = int Function(
+  ffi.Pointer<ffi.Uint8>,
+  int,
+  ffi.Pointer<RacProtoBuffer>,
+);
+
+/// `void (*)(const uint8_t*, size_t, void*)` matching
+/// `rac_tool_calling_session_event_callback_fn`.
+typedef RacToolCallingSessionEventCallbackNative = ffi.Void Function(
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<ffi.Void>,
+);
+
+typedef RacToolCallingSessionCreateProtoNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<
+      ffi.NativeFunction<RacToolCallingSessionEventCallbackNative>>,
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<ffi.Uint64>,
+);
+typedef RacToolCallingSessionCreateProtoDart = int Function(
+  ffi.Pointer<ffi.Uint8>,
+  int,
+  ffi.Pointer<
+      ffi.NativeFunction<RacToolCallingSessionEventCallbackNative>>,
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<ffi.Uint64>,
+);
+
+typedef RacToolCallingSessionStepWithResultProtoNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+);
+typedef RacToolCallingSessionStepWithResultProtoDart = int Function(
+  ffi.Pointer<ffi.Uint8>,
+  int,
+);
+
+typedef RacToolCallingSessionDestroyProtoNative = ffi.Int32 Function(
+  ffi.Uint64,
+);
+typedef RacToolCallingSessionDestroyProtoDart = int Function(int);
+
+// ============================================================================
+// Model format + artifact inference proto APIs (Wave D-3 / FLT-MODELS-REGISTER-INFER)
+// ============================================================================
+
+typedef RacModelFormatFromUrlProtoNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<RacProtoBuffer>,
+);
+typedef RacModelFormatFromUrlProtoDart = int Function(
+  ffi.Pointer<ffi.Uint8>,
+  int,
+  ffi.Pointer<RacProtoBuffer>,
+);
+
+typedef RacArtifactInferFromUrlProtoNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<RacProtoBuffer>,
+);
+typedef RacArtifactInferFromUrlProtoDart = int Function(
+  ffi.Pointer<ffi.Uint8>,
+  int,
+  ffi.Pointer<RacProtoBuffer>,
+);
+
+// ============================================================================
+// STT stream lifecycle proto API (Wave D-5 / FLT-LIFECYCLE-OP-APIS)
+// ============================================================================
+
+/// `void (*)(const uint8_t*, size_t, void*)` matching
+/// `rac_stt_stream_event_callback_fn`.
+typedef RacSttStreamEventCallbackNative = ffi.Void Function(
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<ffi.Void>,
+);
+
+typedef RacSttTranscribeStreamLifecycleProtoNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
+  ffi.Pointer<ffi.Void>,
+);
+typedef RacSttTranscribeStreamLifecycleProtoDart = int Function(
+  ffi.Pointer<ffi.Uint8>,
+  int,
+  ffi.Pointer<ffi.NativeFunction<RacSttStreamEventCallbackNative>>,
+  ffi.Pointer<ffi.Void>,
+);
+
+// ============================================================================
+// Voice agent Wave D-7 proto APIs (session + helpers + lifecycle-owned handle)
+// ============================================================================
+
+typedef RacVoiceAgentProcessTurnProto2Native = ffi.Int32 Function(
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<
+      ffi.NativeFunction<RacVoiceAgentProtoEventCallbackNative>>,
+  ffi.Pointer<ffi.Void>,
+);
+typedef RacVoiceAgentProcessTurnProto2Dart = int Function(
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<ffi.Uint8>,
+  int,
+  ffi.Pointer<
+      ffi.NativeFunction<RacVoiceAgentProtoEventCallbackNative>>,
+  ffi.Pointer<ffi.Void>,
+);
+
+typedef RacVoiceAgentHelperProtoNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<RacProtoBuffer>,
+);
+typedef RacVoiceAgentHelperProtoDart = int Function(
+  ffi.Pointer<ffi.Void>,
+  ffi.Pointer<ffi.Uint8>,
+  int,
+  ffi.Pointer<RacProtoBuffer>,
+);
+
+typedef RacVoiceAgentComponentCreateProtoNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<ffi.Pointer<ffi.Void>>,
+);
+typedef RacVoiceAgentComponentCreateProtoDart = int Function(
+  ffi.Pointer<ffi.Uint8>,
+  int,
+  ffi.Pointer<ffi.Pointer<ffi.Void>>,
+);
+
+typedef RacVoiceAgentComponentDestroyProtoNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Void>,
+);
+typedef RacVoiceAgentComponentDestroyProtoDart = int Function(
+  ffi.Pointer<ffi.Void>,
+);
+
+// ============================================================================
 // Phase H HTTP client (rac_http_client.h)
 // ============================================================================
 
@@ -1482,6 +1639,99 @@ class RacBindings {
               RacSdkEventPublishFailureDart>(
             'rac_sdk_event_publish_failure',
           ),
+        ),
+        rac_tool_call_parse_proto =
+            _lookupOptional<RacToolCallProtoRequestDart>(
+          () => lib.lookupFunction<RacToolCallProtoRequestNative,
+              RacToolCallProtoRequestDart>('rac_tool_call_parse_proto'),
+        ),
+        rac_tool_call_format_prompt_proto =
+            _lookupOptional<RacToolCallProtoRequestDart>(
+          () => lib.lookupFunction<RacToolCallProtoRequestNative,
+              RacToolCallProtoRequestDart>('rac_tool_call_format_prompt_proto'),
+        ),
+        rac_tool_call_validate_proto =
+            _lookupOptional<RacToolCallProtoRequestDart>(
+          () => lib.lookupFunction<RacToolCallProtoRequestNative,
+              RacToolCallProtoRequestDart>('rac_tool_call_validate_proto'),
+        ),
+        rac_tool_calling_session_create_proto =
+            _lookupOptional<RacToolCallingSessionCreateProtoDart>(
+          () => lib.lookupFunction<RacToolCallingSessionCreateProtoNative,
+              RacToolCallingSessionCreateProtoDart>(
+            'rac_tool_calling_session_create_proto',
+          ),
+        ),
+        rac_tool_calling_session_step_with_result_proto =
+            _lookupOptional<RacToolCallingSessionStepWithResultProtoDart>(
+          () => lib.lookupFunction<
+              RacToolCallingSessionStepWithResultProtoNative,
+              RacToolCallingSessionStepWithResultProtoDart>(
+            'rac_tool_calling_session_step_with_result_proto',
+          ),
+        ),
+        rac_tool_calling_session_destroy_proto =
+            _lookupOptional<RacToolCallingSessionDestroyProtoDart>(
+          () => lib.lookupFunction<RacToolCallingSessionDestroyProtoNative,
+              RacToolCallingSessionDestroyProtoDart>(
+            'rac_tool_calling_session_destroy_proto',
+          ),
+        ),
+        rac_model_format_from_url_proto =
+            _lookupOptional<RacModelFormatFromUrlProtoDart>(
+          () => lib.lookupFunction<RacModelFormatFromUrlProtoNative,
+              RacModelFormatFromUrlProtoDart>(
+            'rac_model_format_from_url_proto',
+          ),
+        ),
+        rac_artifact_infer_from_url_proto =
+            _lookupOptional<RacArtifactInferFromUrlProtoDart>(
+          () => lib.lookupFunction<RacArtifactInferFromUrlProtoNative,
+              RacArtifactInferFromUrlProtoDart>(
+            'rac_artifact_infer_from_url_proto',
+          ),
+        ),
+        rac_stt_transcribe_stream_lifecycle_proto =
+            _lookupOptional<RacSttTranscribeStreamLifecycleProtoDart>(
+          () => lib.lookupFunction<RacSttTranscribeStreamLifecycleProtoNative,
+              RacSttTranscribeStreamLifecycleProtoDart>(
+            'rac_stt_transcribe_stream_lifecycle_proto',
+          ),
+        ),
+        rac_voice_agent_process_turn_proto =
+            _lookupOptional<RacVoiceAgentProcessTurnProto2Dart>(
+          () => lib.lookupFunction<RacVoiceAgentProcessTurnProto2Native,
+              RacVoiceAgentProcessTurnProto2Dart>(
+            'rac_voice_agent_process_turn_proto',
+          ),
+        ),
+        rac_voice_agent_transcribe_proto =
+            _lookupOptional<RacVoiceAgentHelperProtoDart>(
+          () => lib.lookupFunction<RacVoiceAgentHelperProtoNative,
+              RacVoiceAgentHelperProtoDart>(
+            'rac_voice_agent_transcribe_proto',
+          ),
+        ),
+        rac_voice_agent_synthesize_speech_proto =
+            _lookupOptional<RacVoiceAgentHelperProtoDart>(
+          () => lib.lookupFunction<RacVoiceAgentHelperProtoNative,
+              RacVoiceAgentHelperProtoDart>(
+            'rac_voice_agent_synthesize_speech_proto',
+          ),
+        ),
+        rac_voice_agent_component_create_proto =
+            _lookupOptional<RacVoiceAgentComponentCreateProtoDart>(
+          () => lib.lookupFunction<RacVoiceAgentComponentCreateProtoNative,
+              RacVoiceAgentComponentCreateProtoDart>(
+            'rac_voice_agent_component_create_proto',
+          ),
+        ),
+        rac_voice_agent_component_destroy_proto =
+            _lookupOptional<RacVoiceAgentComponentDestroyProtoDart>(
+          () => lib.lookupFunction<RacVoiceAgentComponentDestroyProtoNative,
+              RacVoiceAgentComponentDestroyProtoDart>(
+            'rac_voice_agent_component_destroy_proto',
+          ),
         );
 
   // Shared proto buffers -----------------------------------------------------
@@ -1710,6 +1960,48 @@ class RacBindings {
   final RacSdkEventPollDart? rac_sdk_event_poll;
 
   final RacSdkEventPublishFailureDart? rac_sdk_event_publish_failure;
+
+  // Tool-calling proto APIs (Wave D-4 / FLT-07) --------------------------
+
+  final RacToolCallProtoRequestDart? rac_tool_call_parse_proto;
+
+  final RacToolCallProtoRequestDart? rac_tool_call_format_prompt_proto;
+
+  final RacToolCallProtoRequestDart? rac_tool_call_validate_proto;
+
+  final RacToolCallingSessionCreateProtoDart?
+      rac_tool_calling_session_create_proto;
+
+  final RacToolCallingSessionStepWithResultProtoDart?
+      rac_tool_calling_session_step_with_result_proto;
+
+  final RacToolCallingSessionDestroyProtoDart?
+      rac_tool_calling_session_destroy_proto;
+
+  // Model format + artifact inference proto APIs (Wave D-3) -----------------
+
+  final RacModelFormatFromUrlProtoDart? rac_model_format_from_url_proto;
+
+  final RacArtifactInferFromUrlProtoDart? rac_artifact_infer_from_url_proto;
+
+  // STT stream lifecycle proto API (Wave D-5) -------------------------------
+
+  final RacSttTranscribeStreamLifecycleProtoDart?
+      rac_stt_transcribe_stream_lifecycle_proto;
+
+  // Voice agent Wave D-7 proto APIs -----------------------------------------
+
+  final RacVoiceAgentProcessTurnProto2Dart? rac_voice_agent_process_turn_proto;
+
+  final RacVoiceAgentHelperProtoDart? rac_voice_agent_transcribe_proto;
+
+  final RacVoiceAgentHelperProtoDart? rac_voice_agent_synthesize_speech_proto;
+
+  final RacVoiceAgentComponentCreateProtoDart?
+      rac_voice_agent_component_create_proto;
+
+  final RacVoiceAgentComponentDestroyProtoDart?
+      rac_voice_agent_component_destroy_proto;
 }
 
 /// Entry point for the typed commons FFI bindings.

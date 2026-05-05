@@ -2289,6 +2289,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/llamacpp@workspace:sdk/runanywhere-react-native/packages/llamacpp"
   dependencies:
+    "@runanywhere/proto-ts": "workspace:*"
     nitrogen: ^0.33.9
     react-native-nitro-modules: ^0.33.9
     typescript: ~5.9.2
@@ -2304,6 +2305,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@runanywhere/onnx@workspace:sdk/runanywhere-react-native/packages/onnx"
   dependencies:
+    "@runanywhere/proto-ts": "workspace:*"
     nitrogen: ^0.33.9
     react-native-nitro-modules: ^0.33.9
     typescript: ~5.9.2

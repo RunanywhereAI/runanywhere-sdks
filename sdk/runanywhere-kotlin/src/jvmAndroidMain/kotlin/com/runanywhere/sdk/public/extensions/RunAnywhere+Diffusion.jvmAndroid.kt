@@ -59,7 +59,7 @@ actual fun RunAnywhere.generateImageStream(
         // Drive generation on the calling thread; the JNI thunk blocks until
         // the final progress event has been emitted.
         try {
-            CppBridgeDiffusionProto.generateWithProgress(prompt, options) progress@ { progress ->
+            CppBridgeDiffusionProto.generateWithProgress(prompt, options) progress@{ progress ->
                 if (cancelled) return@progress false
                 trySend(progress)
                 true
@@ -102,9 +102,7 @@ actual suspend fun RunAnywhere.currentDiffusionModelId(): String? =
     }
 
 actual suspend fun RunAnywhere.currentDiffusionFramework(): InferenceFramework? {
-    // No dedicated C ABI getter exists yet; the framework is implied by the
-    // loaded model and surfaced via getDiffusionCapabilities. Return null
-    // until the C++ track exposes it.
+    // TODO: wire rac_diffusion_current_framework_proto once commons exposes it.
     return null
 }
 

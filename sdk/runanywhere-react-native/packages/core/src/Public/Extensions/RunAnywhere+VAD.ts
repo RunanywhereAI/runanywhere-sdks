@@ -12,6 +12,7 @@
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
 import {
   type VADOptions,
   type VADResult,
@@ -168,7 +169,7 @@ export async function streamVADActivity(
   callback: (kind: SpeechActivityKind) => void
 ): Promise<() => Promise<void>> {
   if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+    throw SDKException.nativeModuleUnavailable();
   }
   const native = requireNativeModule();
   const ok = await native.vadSetActivityCallbackProto((activityBytes: ArrayBuffer) => {
@@ -189,7 +190,7 @@ export async function streamVADActivity(
     }
   });
   if (!ok) {
-    throw new Error('VAD activity subscription failed');
+    throw SDKException.generationFailedWith('VAD activity subscription failed');
   }
   return async () => {
     // Native side accepts a no-op callback to clear; emulate by setting a noop.

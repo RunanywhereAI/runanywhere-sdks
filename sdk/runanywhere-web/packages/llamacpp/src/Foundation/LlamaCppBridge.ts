@@ -298,17 +298,26 @@ export class LlamaCppBridge {
         m.setValue(configPtr + i, 0, 'i8');
       }
 
-      // platform_adapter is the first field (offset 0). Use the runtime
-      // offset helper if it's exported so we don't bake the layout in.
-      const adapterOffset = typeof m._rac_wasm_offsetof_config_platform_adapter === 'function'
-        ? m._rac_wasm_offsetof_config_platform_adapter()
-        : 0;
+      // platform_adapter offset — MUST come from the runtime helper; we do
+      // not hard-code struct layouts. A missing export means the WASM build
+      // is out of date; fail fast.
+      if (typeof m._rac_wasm_offsetof_config_platform_adapter !== 'function') {
+        throw new Error(
+          'WASM module missing _rac_wasm_offsetof_config_platform_adapter export; ' +
+          'rebuild racommons-llamacpp.wasm from wasm/src/wasm_exports.cpp.',
+        );
+      }
+      const adapterOffset = m._rac_wasm_offsetof_config_platform_adapter();
       m.setValue(configPtr + adapterOffset, adapterPtr, '*');
 
-      // log_level — INFO (2). Same fallback approach.
-      const logLevelOffset = typeof m._rac_wasm_offsetof_config_log_level === 'function'
-        ? m._rac_wasm_offsetof_config_log_level()
-        : 4; // pointer (4) on wasm32
+      // log_level — INFO (2). Same runtime-helper contract.
+      if (typeof m._rac_wasm_offsetof_config_log_level !== 'function') {
+        throw new Error(
+          'WASM module missing _rac_wasm_offsetof_config_log_level export; ' +
+          'rebuild racommons-llamacpp.wasm from wasm/src/wasm_exports.cpp.',
+        );
+      }
+      const logLevelOffset = m._rac_wasm_offsetof_config_log_level();
       m.setValue(configPtr + logLevelOffset, 2, 'i32');
 
       const result = (await m.ccall(

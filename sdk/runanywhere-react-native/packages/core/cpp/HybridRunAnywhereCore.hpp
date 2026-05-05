@@ -350,8 +350,10 @@ public:
   std::shared_ptr<Promise<bool>> initializeVoiceAgentWithLoadedModels() override;
   std::shared_ptr<Promise<double>> getVoiceAgentHandle() override;
   std::shared_ptr<Promise<bool>> isVoiceAgentReady() override;
-  std::shared_ptr<Promise<std::string>> voiceAgentTranscribe(const std::string& audioBase64) override;
-  std::shared_ptr<Promise<std::string>> voiceAgentSynthesizeSpeech(const std::string& text) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentTranscribeProto(
+    const std::shared_ptr<ArrayBuffer>& audioBytes) override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentSynthesizeSpeechProto(
+    const std::string& text) override;
   std::shared_ptr<Promise<void>> cleanupVoiceAgent() override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentInitializeProto(
     const std::shared_ptr<ArrayBuffer>& configBytes) override;
@@ -428,7 +430,8 @@ public:
   // conversion helpers).
   // ============================================================================
 
-  std::shared_ptr<Promise<double>> solutionCreateFromProto(const std::string& configBytesBase64) override;
+  std::shared_ptr<Promise<double>> solutionCreateFromProto(
+    const std::shared_ptr<ArrayBuffer>& configBytes) override;
   std::shared_ptr<Promise<double>> solutionCreateFromYaml(const std::string& yamlText) override;
   std::shared_ptr<Promise<bool>> solutionStart(double handle) override;
   std::shared_ptr<Promise<bool>> solutionStop(double handle) override;

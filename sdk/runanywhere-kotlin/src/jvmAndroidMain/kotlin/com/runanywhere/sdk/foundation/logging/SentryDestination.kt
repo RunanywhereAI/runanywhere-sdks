@@ -10,7 +10,7 @@ package com.runanywhere.sdk.foundation.logging
 
 import com.runanywhere.sdk.foundation.LogDestination
 import com.runanywhere.sdk.foundation.LogEntry
-import com.runanywhere.sdk.foundation.LogLevel
+import com.runanywhere.sdk.public.extensions.LogLevel
 import io.sentry.Breadcrumb
 import io.sentry.Sentry
 import io.sentry.SentryEvent
@@ -55,15 +55,21 @@ class SentryDestination : LogDestination {
      * @param entry The log entry to write
      */
     override fun write(entry: LogEntry) {
-        if (!isAvailable || entry.level < minSentryLevel) {
+        // Public LogLevel: smaller value = more severe (NONE=0, ERROR=1,
+        // WARNING=2, …). Send to Sentry iff entry severity is at or above
+        // the min Sentry level.
+        if (!isAvailable ||
+            entry.level == LogLevel.NONE ||
+            entry.level.value > minSentryLevel.value
+        ) {
             return
         }
 
         // Add as breadcrumb for context trail
         addBreadcrumb(entry)
 
-        // For error and fault levels, capture as Sentry event
-        if (entry.level >= LogLevel.ERROR) {
+        // For ERROR level (most severe in the consolidated enum), capture as Sentry event
+        if (entry.level.value <= LogLevel.ERROR.value) {
             captureEvent(entry)
         }
     }
@@ -139,12 +145,12 @@ class SentryDestination : LogDestination {
      */
     private fun convertToSentryLevel(level: LogLevel): SentryLevel {
         return when (level) {
-            LogLevel.TRACE -> SentryLevel.DEBUG
+            LogLevel.NONE -> SentryLevel.DEBUG
+            LogLevel.VERBOSE -> SentryLevel.DEBUG
             LogLevel.DEBUG -> SentryLevel.DEBUG
             LogLevel.INFO -> SentryLevel.INFO
             LogLevel.WARNING -> SentryLevel.WARNING
             LogLevel.ERROR -> SentryLevel.ERROR
-            LogLevel.FAULT -> SentryLevel.FATAL
         }
     }
 }

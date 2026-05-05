@@ -11,6 +11,7 @@
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
 import { AudioPlaybackManager } from '../../Features/VoiceSession/AudioPlaybackManager';
 import {
   type TTSOptions,
@@ -72,7 +73,7 @@ function encodeTTSOptions(options?: Partial<TTSOptions>): ArrayBuffer {
 function decodeTTSOutput(buffer: ArrayBuffer): TTSOutput {
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
-    throw new Error('TTS proto synthesis returned an empty result');
+    throw SDKException.protoDecodeFailed('ttsSynthesizeProto');
   }
   return TTSOutputMessage.decode(bytes);
 }
@@ -139,7 +140,7 @@ export async function synthesize(
   options?: Partial<TTSOptions>
 ): Promise<TTSOutput> {
   if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+    throw SDKException.nativeModuleUnavailable();
   }
   const native = requireNativeModule();
   return decodeTTSOutput(await native.ttsSynthesizeProto(text, encodeTTSOptions(options)));
@@ -165,7 +166,7 @@ export async function synthesizeStream(
   onAudioChunk: (chunk: ArrayBuffer) => void
 ): Promise<TTSOutput> {
   if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+    throw SDKException.nativeModuleUnavailable();
   }
   const native = requireNativeModule();
   let lastOutput: TTSOutput | null = null;
@@ -287,7 +288,7 @@ export async function speak(
   options?: Partial<TTSOptions>
 ): Promise<TTSSpeakResult> {
   if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+    throw SDKException.nativeModuleUnavailable();
   }
   logger.info(`Speaking: "${text.substring(0, 50)}..."`);
 

@@ -51,7 +51,8 @@ object OkHttpTransport {
 
     /** Default OkHttp client. Lazily built on first use. */
     private val defaultClient: OkHttpClient by lazy {
-        OkHttpClient.Builder()
+        OkHttpClient
+            .Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(120, TimeUnit.SECONDS)
             .writeTimeout(60, TimeUnit.SECONDS)
@@ -189,13 +190,14 @@ object OkHttpTransport {
             val call = clientForCall.newCall(request)
             call.execute().use { resp ->
                 val headerPairs = flattenHeaders(resp.headers)
-                val body = resp.body
-                    ?: return StreamResponse(
-                        statusCode = resp.code,
-                        headers = headerPairs,
-                        errorMessage = null,
-                        cancelled = false,
-                    )
+                val body =
+                    resp.body
+                        ?: return StreamResponse(
+                            statusCode = resp.code,
+                            headers = headerPairs,
+                            errorMessage = null,
+                            cancelled = false,
+                        )
 
                 val contentLength = if (body.contentLength() >= 0) body.contentLength() else 0L
                 val buffer = ByteArray(STREAM_CHUNK_SIZE)
@@ -204,29 +206,35 @@ object OkHttpTransport {
 
                 body.byteStream().use { input ->
                     while (true) {
-                        val n = try {
-                            input.read(buffer)
-                        } catch (io: IOException) {
-                            // If the caller cancelled, OkHttp surfaces the
-                            // abort as an IOException — treat that as a
-                            // clean cancellation rather than a transport
-                            // failure.
-                            if (call.isCanceled()) {
-                                cancelled = true
-                                break
+                        val n =
+                            try {
+                                input.read(buffer)
+                            } catch (io: IOException) {
+                                // If the caller cancelled, OkHttp surfaces the
+                                // abort as an IOException — treat that as a
+                                // clean cancellation rather than a transport
+                                // failure.
+                                if (call.isCanceled()) {
+                                    cancelled = true
+                                    break
+                                }
+                                throw io
                             }
-                            throw io
-                        }
                         if (n < 0) break
                         if (n == 0) continue
 
                         totalRead += n
                         // Trim buffer to actual bytes read before handing off.
                         val chunk = if (n == buffer.size) buffer else buffer.copyOf(n)
-                        val keepGoing = deliverChunkNative(
-                            nativeCallback, nativeUserData,
-                            chunk, n, totalRead, contentLength,
-                        )
+                        val keepGoing =
+                            deliverChunkNative(
+                                nativeCallback,
+                                nativeUserData,
+                                chunk,
+                                n,
+                                totalRead,
+                                contentLength,
+                            )
                         if (!keepGoing) {
                             cancelled = true
                             call.cancel()
@@ -313,7 +321,8 @@ object OkHttpTransport {
     private fun resolveClient(timeoutMs: Long): OkHttpClient {
         val base = activeClient()
         return if (timeoutMs > 0) {
-            base.newBuilder()
+            base
+                .newBuilder()
                 .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
                 .build()
         } else {

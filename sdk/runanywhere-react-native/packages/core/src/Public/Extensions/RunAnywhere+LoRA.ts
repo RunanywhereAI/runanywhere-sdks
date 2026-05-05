@@ -15,6 +15,7 @@
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
 import type {
   LoRAAdapterConfig,
   LoRAApplyRequest,
@@ -56,7 +57,7 @@ const logger = new SDKLogger('RunAnywhere.LoRA');
 
 function ensureNative() {
   if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+    throw SDKException.nativeModuleUnavailable();
   }
   return requireNativeModule();
 }
@@ -68,7 +69,7 @@ function decodeRequired<T>(
 ): T {
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
-    throw new Error(`${operation} returned an empty LoRA proto result`);
+    throw SDKException.protoDecodeFailed(operation);
   }
   return decode(bytes);
 }

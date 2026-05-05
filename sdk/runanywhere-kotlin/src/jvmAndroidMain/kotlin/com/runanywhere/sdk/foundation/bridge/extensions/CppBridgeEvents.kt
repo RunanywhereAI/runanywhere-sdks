@@ -89,10 +89,11 @@ object CppBridgeEvents {
                 properties = properties,
                 operation_id = operationId,
                 source = "kotlin",
-                initialization = InitializationEvent(
-                    stage = stage,
-                    version = SDKConstants.VERSION,
-                ),
+                initialization =
+                    InitializationEvent(
+                        stage = stage,
+                        version = SDKConstants.VERSION,
+                    ),
             ),
         )
     }
@@ -114,11 +115,12 @@ object CppBridgeEvents {
                 destination = EventDestination.EVENT_DESTINATION_ALL,
                 operation_id = operationId,
                 source = "kotlin",
-                device = DeviceEvent(
-                    kind = kind,
-                    device_id = deviceId,
-                    error = error,
-                ),
+                device =
+                    DeviceEvent(
+                        kind = kind,
+                        device_id = deviceId,
+                        error = error,
+                    ),
             ),
         )
     }

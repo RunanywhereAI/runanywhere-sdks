@@ -42,12 +42,12 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorageProto
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
-import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
 
 private val activeDownloadIdsByModel = ConcurrentHashMap<String, String>()
 private val modelsLogger = SDKLogger.models
@@ -408,7 +408,8 @@ actual suspend fun RunAnywhere.unloadLLMModel() {
 
 actual val RunAnywhere.isLLMModelLoaded: Boolean
     get() =
-        CppBridgeModelLifecycleProto.snapshot(SDKComponent.SDK_COMPONENT_LLM)
+        CppBridgeModelLifecycleProto
+            .snapshot(SDKComponent.SDK_COMPONENT_LLM)
             ?.let {
                 it.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
                     it.model_id.isNotEmpty()

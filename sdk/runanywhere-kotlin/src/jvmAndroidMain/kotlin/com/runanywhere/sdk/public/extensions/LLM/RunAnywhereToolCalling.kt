@@ -5,25 +5,30 @@
  * JVM/Android implementation for tool calling (function calling) with LLMs.
  * Allows LLMs to request external actions (API calls, device functions, etc.)
  *
- * ARCHITECTURE:
- * - CppBridgeToolCalling: C++ bridge for parsing <tool_call> tags (SINGLE SOURCE OF TRUTH)
- * - This file: Tool registration, executor storage, orchestration
- * - Orchestration: generate → parse (C++) → execute → loop
+ * Wave E / KOT-08: All orchestration — generate, parse, validate, execute loop,
+ * follow-up prompt construction — lives in commons via
+ * rac_tool_calling_session_{create,step_with_result,destroy}_proto. Kotlin
+ * keeps only the tool registry + a platform executor callback pipe.
  *
- * *** ALL PARSING LOGIC IS IN C++ (rac_tool_calling.h) - NO KOTLIN FALLBACKS ***
- *
- * Mirrors Swift SDK's RunAnywhere+ToolCalling.swift
+ * Mirrors Swift SDK's RunAnywhere+ToolCalling.swift public surface.
  */
 
 package com.runanywhere.sdk.public.extensions.LLM
 
-import ai.runanywhere.proto.v1.LLMGenerationOptions
+import ai.runanywhere.proto.v1.SDKError
+import ai.runanywhere.proto.v1.ToolCallingSessionCreateRequest
+import ai.runanywhere.proto.v1.ToolCallingSessionEvent
+import ai.runanywhere.proto.v1.ToolCallingSessionStepWithResultRequest
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeToolCalling
+import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.generate
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 /**
  * Thread-safe tool registry for tool registration and lookup.
@@ -60,6 +65,7 @@ private object ToolRegistry {
 
 /**
  * Tool calling implementation behind the public RunAnywhere extension surface.
+ * Kotlin side is a thin wrapper over the native session orchestration.
  */
 internal object RunAnywhereToolCalling {
     private const val TAG = "ToolCalling"
@@ -69,45 +75,18 @@ internal object RunAnywhereToolCalling {
     // TOOL REGISTRATION
     // ========================================================================
 
-    /**
-     * Register a tool that the LLM can use.
-     *
-     * Tools are stored in-memory and available for all subsequent generateWithTools calls.
-     * Executors run in Kotlin and have full access to Kotlin/Android APIs.
-     *
-     * @param definition Tool definition (name, description, parameters)
-     * @param executor Suspend function that executes the tool
-     */
-    suspend fun registerTool(
-        definition: ToolDefinition,
-        executor: ToolExecutor,
-    ) {
+    suspend fun registerTool(definition: ToolDefinition, executor: ToolExecutor) {
         ToolRegistry.register(definition, executor)
         logger.info("Registered tool: ${definition.name}")
     }
 
-    /**
-     * Unregister a tool by name.
-     *
-     * @param toolName The name of the tool to remove
-     */
     suspend fun unregisterTool(toolName: String) {
         ToolRegistry.unregister(toolName)
         logger.info("Unregistered tool: $toolName")
     }
 
-    /**
-     * Get all registered tool definitions.
-     *
-     * @return List of registered tool definitions
-     */
-    suspend fun getRegisteredTools(): List<ToolDefinition> {
-        return ToolRegistry.getAll()
-    }
+    suspend fun getRegisteredTools(): List<ToolDefinition> = ToolRegistry.getAll()
 
-    /**
-     * Clear all registered tools.
-     */
     suspend fun clearTools() {
         ToolRegistry.clear()
         logger.info("Cleared all registered tools")
@@ -118,19 +97,14 @@ internal object RunAnywhereToolCalling {
     // ========================================================================
 
     /**
-     * Execute a tool call.
-     *
-     * Looks up the tool in the registry and invokes its executor with the provided arguments.
-     * Returns a ToolResult with success/failure status.
-     *
-     * @param toolCall The tool call to execute
-     * @return Result of the tool execution
+     * Execute a tool call through its registered executor. Used by the
+     * public `executeTool` API for callers that handle tool calls manually
+     * outside the native session loop.
      */
     suspend fun executeTool(toolCall: ToolCall): ToolResult {
         val tool = ToolRegistry.get(toolCall.name)
-        val startedAtMs = System.currentTimeMillis()
         val callId = toolCall.call_id ?: toolCall.id
-
+        val startedAtMs = System.currentTimeMillis()
         if (tool == null) {
             return ToolResult(
                 tool_call_id = callId,
@@ -142,7 +116,6 @@ internal object RunAnywhereToolCalling {
                 completed_at_ms = System.currentTimeMillis(),
             )
         }
-
         return try {
             val result = tool.executor(toolCall)
             result.copy(
@@ -151,9 +124,7 @@ internal object RunAnywhereToolCalling {
                 success = result.error.isNullOrBlank(),
                 call_id = result.call_id ?: callId,
                 started_at_ms = result.started_at_ms.takeIf { it > 0 } ?: startedAtMs,
-                completed_at_ms =
-                    result.completed_at_ms.takeIf { it > 0 }
-                        ?: System.currentTimeMillis(),
+                completed_at_ms = result.completed_at_ms.takeIf { it > 0 } ?: System.currentTimeMillis(),
             )
         } catch (e: Exception) {
             logger.error("Tool execution failed: ${e.message}")
@@ -174,223 +145,160 @@ internal object RunAnywhereToolCalling {
     // ========================================================================
 
     /**
-     * Generates a response with tool calling support.
-     *
-     * Orchestrates a generate → parse → execute → loop cycle:
-     * 1. Builds a system prompt describing available tools (C++)
-     * 2. Generates LLM response
-     * 3. Parses output for `<tool_call>` tags (C++ - SINGLE SOURCE OF TRUTH)
-     * 4. If a tool call is found and auto_execute is true, executes and continues
-     * 5. Repeats until no more tool calls or max_iterations is reached
-     *
-     * @param prompt The user's prompt
-     * @param options Tool calling options
-     * @return Result containing final text, all tool calls made, and their results
+     * Generates a response with tool calling support. The entire generate →
+     * parse → validate → execute → loop cycle lives in commons; Kotlin only
+     * forwards tool executions and awaits the final result.
      */
     suspend fun generateWithTools(
         prompt: String,
         options: ToolCallingOptions? = null,
     ): ToolCallingResult {
-        // Ensure SDK is initialized
         require(RunAnywhere.isInitialized) { "SDK not initialized" }
 
-        val opts =
-            options ?: ToolCallingOptions(
-                max_iterations = 5,
-                auto_execute = true,
-                format_hint = "default",
-            )
+        val opts = options ?: ToolCallingOptions()
         val registeredTools = ToolRegistry.getAll()
         val tools = opts.tools.ifEmpty { registeredTools }
-        val executionOptions = opts.copy(tools = tools)
+        val effectiveOpts = opts.copy(tools = tools)
 
-        var fullPrompt =
-            CppBridgeToolCalling.buildInitialPrompt(
-                userPrompt = prompt,
+        val request =
+            ToolCallingSessionCreateRequest(
+                prompt = prompt,
+                max_tokens = effectiveOpts.max_tokens ?: 0,
+                temperature = effectiveOpts.temperature ?: 0f,
+                top_p = 0f,
+                system_prompt = effectiveOpts.system_prompt ?: "",
+                format_hint = effectiveOpts.effectiveToolFormatHint(),
+                max_iterations = effectiveOpts.effectiveMaxIterations(),
+                keep_tools_available = effectiveOpts.keep_tools_available ?: false,
+                validate_calls = true,
                 tools = tools,
-                options = executionOptions,
             )
 
-        val allToolCalls = mutableListOf<ToolCall>()
-        val allToolResults = mutableListOf<ToolResult>()
-        var finalText = ""
+        val completion = CompletableDeferred<ToolCallingResult>()
+        var sessionHandle = 0L
 
-        val maxIterations = executionOptions.effectiveMaxIterations()
-        repeat(maxIterations) { iteration ->
-            logger.debug("Tool calling iteration $iteration")
-
-            // Generate response
-            val responseText =
-                generateAndCollect(
-                    fullPrompt,
-                    executionOptions.temperature,
-                    executionOptions.max_tokens,
-                    executionOptions,
-                )
-
-            // Parse for tool calls using C++ (SINGLE SOURCE OF TRUTH - NO FALLBACK)
-            val (cleanText, toolCall) =
-                CppBridgeToolCalling.parseToolCallToObject(responseText, executionOptions)
-            finalText = cleanText
-
-            if (toolCall == null) {
-                logger.debug("No tool call found, generation complete")
-                return ToolCallingResult(
-                    text = finalText,
-                    tool_calls = allToolCalls,
-                    tool_results = allToolResults,
-                    is_complete = true,
-                    iterations_used = iteration + 1,
-                )
-            }
-
-            allToolCalls.add(toolCall)
-            logger.info("Found tool call: ${toolCall.name}")
-
-            if (!executionOptions.auto_execute) {
-                return ToolCallingResult(
-                    text = finalText,
-                    tool_calls = allToolCalls,
-                    tool_results = emptyList(),
-                    is_complete = false,
-                    iterations_used = iteration + 1,
-                )
-            }
-
-            val validation =
-                CppBridgeToolCalling.validateToolCall(
-                    toolCall = toolCall,
-                    tools = tools,
-                    options = executionOptions,
-                )
-            if (!validation.is_valid) {
-                val validationError =
-                    validation.error_message
-                        ?: validation.validation_errors
-                            .joinToString("; ")
-                            .ifBlank { "Tool call validation failed" }
-                val failedResult =
-                    ToolResult(
-                        tool_call_id = toolCall.call_id ?: toolCall.id,
-                        name = toolCall.name,
-                        error = validationError,
-                        success = false,
-                        call_id = toolCall.call_id ?: toolCall.id,
-                    )
-                allToolResults.add(failedResult)
-                return ToolCallingResult(
-                    text = finalText,
-                    tool_calls = allToolCalls,
-                    tool_results = allToolResults,
-                    is_complete = false,
-                    iterations_used = iteration + 1,
-                    error_message = validationError,
-                    error_code = validation.error_code,
-                )
-            }
-
-            // Execute tool
-            val executableToolCall =
-                if (validation.normalized_arguments_json.isNotBlank()) {
-                    toolCall.copy(arguments_json = validation.normalized_arguments_json)
-                } else {
-                    toolCall
+        val listener =
+            NativeProtoProgressListener { bytes ->
+                val event = ToolCallingSessionEvent.ADAPTER.decode(bytes)
+                when {
+                    event.final_result != null -> {
+                        if (!completion.isCompleted) completion.complete(event.final_result)
+                    }
+                    event.tool_call != null -> {
+                        // Execute the tool on a non-JNI thread; feed result
+                        // back via step_with_result_proto. Run blocking on
+                        // IO so the native callback thread stays unblocked
+                        // only for the quick enqueue path.
+                        val toolCall = event.tool_call
+                        val handle = sessionHandle
+                        runBlocking {
+                            val tool = ToolRegistry.get(toolCall.name)
+                            val stepRequest = buildStepRequest(handle, toolCall, tool)
+                            val rc =
+                                RunAnywhereBridge.racToolCallingSessionStepWithResultProto(
+                                    ToolCallingSessionStepWithResultRequest.ADAPTER.encode(
+                                        stepRequest,
+                                    ),
+                                )
+                            if (rc != RunAnywhereBridge.RAC_SUCCESS &&
+                                !completion.isCompleted
+                            ) {
+                                completion.complete(
+                                    ToolCallingResult(
+                                        text = "",
+                                        is_complete = false,
+                                        error_message =
+                                            "racToolCallingSessionStepWithResultProto failed with rc=$rc",
+                                        error_code = rc,
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                    event.error_bytes != null -> {
+                        val sdkError =
+                            try {
+                                SDKError.ADAPTER.decode(event.error_bytes.toByteArray())
+                            } catch (_: Exception) {
+                                null
+                            }
+                        if (!completion.isCompleted) {
+                            completion.complete(
+                                ToolCallingResult(
+                                    text = "",
+                                    is_complete = false,
+                                    error_message = sdkError?.message ?: "Tool calling session error",
+                                    error_code = sdkError?.c_abi_code ?: -1,
+                                ),
+                            )
+                        }
+                    }
                 }
-            val result = executeTool(executableToolCall)
-            allToolResults.add(result)
-            val status = if (result.error.isNullOrBlank()) "success" else "failed"
-            logger.info("Tool ${toolCall.name} executed: $status")
+                true
+            }
 
-            // Build follow-up prompt using C++ (SINGLE SOURCE OF TRUTH)
-            fullPrompt =
-                CppBridgeToolCalling.buildFollowupPrompt(
-                    originalPrompt = prompt,
-                    tools = tools,
-                    toolResult = result,
-                    options = executionOptions,
+        sessionHandle =
+            withContext(Dispatchers.IO) {
+                RunAnywhereBridge.racToolCallingSessionCreateProto(
+                    ToolCallingSessionCreateRequest.ADAPTER.encode(request),
+                    listener,
                 )
+            }
+        if (sessionHandle == 0L) {
+            return ToolCallingResult(
+                text = "",
+                is_complete = false,
+                error_message = "racToolCallingSessionCreateProto returned 0",
+                error_code = -1,
+            )
         }
 
-        return ToolCallingResult(
-            text = finalText,
-            tool_calls = allToolCalls,
-            tool_results = allToolResults,
-            is_complete = true,
-            iterations_used = maxIterations,
-        )
+        try {
+            return completion.await()
+        } finally {
+            withContext(Dispatchers.IO) {
+                RunAnywhereBridge.racToolCallingSessionDestroyProto(sessionHandle)
+            }
+        }
     }
 
-    /**
-     * Continue generation after manual tool execution.
-     *
-     * Use this when auto_execute is false. After receiving a ToolCallingResult
-     * with is_complete = false, execute the tool yourself, then call this to continue.
-     *
-     * @param previousPrompt The original user prompt
-     * @param toolCall The tool call that was executed
-     * @param toolResult The result of executing the tool
-     * @param options Tool calling options for the continuation
-     * @return Result of the continued generation
-     */
-    suspend fun continueWithToolResult(
-        previousPrompt: String,
+    private suspend fun buildStepRequest(
+        sessionHandle: Long,
         toolCall: ToolCall,
-        toolResult: ToolResult,
-        options: ToolCallingOptions? = null,
-    ): ToolCallingResult {
-        // Build follow-up prompt using C++ (SINGLE SOURCE OF TRUTH)
-        val tools = options?.tools?.ifEmpty { ToolRegistry.getAll() } ?: ToolRegistry.getAll()
-        val effectiveOptions = options ?: ToolCallingOptions()
-
-        val continuedPrompt =
-            CppBridgeToolCalling.buildFollowupPrompt(
-                originalPrompt = previousPrompt,
-                tools = tools,
-                toolResult =
-                    toolResult.copy(
-                        tool_call_id = toolResult.tool_call_id.ifBlank { toolCall.call_id ?: toolCall.id },
-                        name = toolResult.name.ifBlank { toolCall.name },
-                        call_id = toolResult.call_id ?: toolCall.call_id ?: toolCall.id,
-                    ),
-                options = effectiveOptions.copy(tools = tools),
+        tool: RegisteredTool?,
+    ): ToolCallingSessionStepWithResultRequest {
+        val toolCallId = toolCall.call_id ?: toolCall.id
+        if (tool == null) {
+            return ToolCallingSessionStepWithResultRequest(
+                session_handle = sessionHandle,
+                tool_call_id = toolCallId,
+                error = "Unknown tool: ${toolCall.name}",
             )
-
-        val continuationOptions =
-            ToolCallingOptions(
-                tools = options?.tools ?: emptyList(),
-                max_iterations =
-                    maxOf(
-                        0,
-                        (options?.effectiveMaxIterations() ?: DEFAULT_TOOL_CALL_MAX_ITERATIONS) - 1,
-                    ),
-                auto_execute = options?.auto_execute ?: true,
-                temperature = options?.temperature,
-                max_tokens = options?.max_tokens,
-                system_prompt = options?.system_prompt,
-                replace_system_prompt = options?.replace_system_prompt ?: false,
-                keep_tools_available = options?.keep_tools_available ?: false,
-                format_hint = options?.effectiveToolFormatHint() ?: "default",
+        }
+        return try {
+            val result = tool.executor(toolCall)
+            val resultJson = result.result_json.ifBlank { "{}" }
+            val error = result.error
+            if (!error.isNullOrBlank()) {
+                ToolCallingSessionStepWithResultRequest(
+                    session_handle = sessionHandle,
+                    tool_call_id = toolCallId,
+                    error = error,
+                )
+            } else {
+                ToolCallingSessionStepWithResultRequest(
+                    session_handle = sessionHandle,
+                    tool_call_id = toolCallId,
+                    result_json = resultJson,
+                )
+            }
+        } catch (e: Exception) {
+            logger.error("Tool execution failed: ${e.message}")
+            ToolCallingSessionStepWithResultRequest(
+                session_handle = sessionHandle,
+                tool_call_id = toolCallId,
+                error = e.message ?: "Unknown error",
             )
-
-        return generateWithTools(continuedPrompt, continuationOptions)
-    }
-
-    /**
-     * Generate text through the generated proto LLM path.
-     */
-    private suspend fun generateAndCollect(
-        prompt: String,
-        temperature: Float?,
-        maxTokens: Int?,
-        toolOptions: ToolCallingOptions,
-    ): String {
-        val genOptions =
-            LLMGenerationOptions(
-                max_tokens = maxTokens ?: 1024,
-                temperature = temperature ?: 0.7f,
-                tool_calling = toolOptions,
-            )
-
-        return RunAnywhere.generate(prompt, genOptions).text
+        }
     }
 }

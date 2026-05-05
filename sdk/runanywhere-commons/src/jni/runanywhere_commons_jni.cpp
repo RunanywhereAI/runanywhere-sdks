@@ -6452,6 +6452,139 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentProcessVoi
     return makeProtoCallResult(env, rc, &result, "racVoiceAgentProcessVoiceTurnProto");
 }
 
+// Wave D-7 / KOT-11: full-session voice-agent turn ABI. Accepts the full
+// VoiceAgentTurnRequest bytes (request_id, session_id, session_config,
+// metadata, audio_data + encoding) and emits a canonical VoiceEvent stream
+// via the registered listener.
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentProcessTurnProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray requestBytes, jobject listener) {
+    (void)clazz;
+    JByteArrayView request(env, requestBytes);
+    if (handle == 0L || !request.ok || listener == nullptr) return RAC_ERROR_NULL_POINTER;
+
+    jobject globalListener = env->NewGlobalRef(listener);
+    ProtoListenerUserData ctx{globalListener, "racVoiceAgentProcessTurnProto"};
+    rac_result_t rc = rac_voice_agent_process_turn_proto(
+        reinterpret_cast<rac_voice_agent_handle_t>(handle), request.u8(), request.size(),
+        reinterpret_cast<rac_voice_agent_turn_event_callback_fn>(proto_void_callback),
+        &ctx);
+    env->DeleteGlobalRef(globalListener);
+    return static_cast<jint>(rc);
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentTranscribeProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray requestBytes) {
+    (void)clazz;
+    JByteArrayView request(env, requestBytes);
+    if (handle == 0L || !request.ok) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_voice_agent_transcribe_proto(
+        reinterpret_cast<rac_voice_agent_handle_t>(handle), request.u8(), request.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racVoiceAgentTranscribeProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentSynthesizeSpeechProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray requestBytes) {
+    (void)clazz;
+    JByteArrayView request(env, requestBytes);
+    if (handle == 0L || !request.ok) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_voice_agent_synthesize_speech_proto(
+        reinterpret_cast<rac_voice_agent_handle_t>(handle), request.u8(), request.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racVoiceAgentSynthesizeSpeechProto");
+}
+
+// =============================================================================
+// Wave D-4 / KOT-08: Tool-calling session ABI (native orchestration loop).
+// =============================================================================
+//
+// Commons owns the full generate → parse → validate → execute → loop
+// cycle. Kotlin keeps only the tool registry + executor callback pipe.
+
+namespace {
+std::mutex& toolCallingCtxMutex() {
+    static std::mutex mu;
+    return mu;
+}
+std::unordered_map<uint64_t, ProtoListenerUserData*>& toolCallingCtxMap() {
+    static std::unordered_map<uint64_t, ProtoListenerUserData*> m;
+    return m;
+}
+}  // namespace
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingSessionCreateProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestBytes, jobject listener) {
+    (void)clazz;
+    JByteArrayView request(env, requestBytes);
+    if (!request.ok || listener == nullptr) return 0L;
+
+    // The listener lives for the entire session lifetime. Kotlin side is
+    // responsible for calling racToolCallingSessionDestroyProto to release
+    // this global ref — see below.
+    jobject globalListener = env->NewGlobalRef(listener);
+    auto* ctx = new ProtoListenerUserData{globalListener, "racToolCallingSessionCreateProto"};
+
+    uint64_t sessionHandle = 0;
+    rac_result_t rc = rac_tool_calling_session_create_proto(
+        request.u8(), request.size(),
+        reinterpret_cast<rac_tool_calling_session_event_callback_fn>(proto_void_callback),
+        ctx,
+        &sessionHandle);
+    if (rc != RAC_SUCCESS || sessionHandle == 0) {
+        env->DeleteGlobalRef(globalListener);
+        delete ctx;
+        return 0L;
+    }
+    {
+        std::lock_guard<std::mutex> lg(toolCallingCtxMutex());
+        toolCallingCtxMap()[sessionHandle] = ctx;
+    }
+    return static_cast<jlong>(sessionHandle);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingSessionStepWithResultProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestBytes) {
+    (void)clazz;
+    JByteArrayView request(env, requestBytes);
+    if (!request.ok) return RAC_ERROR_NULL_POINTER;
+    rac_result_t rc =
+        rac_tool_calling_session_step_with_result_proto(request.u8(), request.size());
+    return static_cast<jint>(rc);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallingSessionDestroyProto(
+    JNIEnv* env, jclass clazz, jlong sessionHandle) {
+    (void)clazz;
+    if (sessionHandle == 0L) return RAC_SUCCESS;
+    rac_result_t rc =
+        rac_tool_calling_session_destroy_proto(static_cast<uint64_t>(sessionHandle));
+    ProtoListenerUserData* ctx = nullptr;
+    {
+        std::lock_guard<std::mutex> lg(toolCallingCtxMutex());
+        auto& map = toolCallingCtxMap();
+        auto it = map.find(static_cast<uint64_t>(sessionHandle));
+        if (it != map.end()) {
+            ctx = it->second;
+            map.erase(it);
+        }
+    }
+    if (ctx != nullptr) {
+        if (ctx->listener != nullptr) {
+            env->DeleteGlobalRef(ctx->listener);
+        }
+        delete ctx;
+    }
+    return static_cast<jint>(rc);
+}
+
 // =============================================================================
 // JNI FUNCTIONS - Solutions (rac/solutions/rac_solution.h)
 // =============================================================================

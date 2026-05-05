@@ -672,7 +672,8 @@ object CppBridgeDevice {
         // Fallback: parse /proc/meminfo, then Runtime.maxMemory() as last resort.
         // G-DV20: Never trust Runtime.maxMemory() alone on Android — it returns
         // the JVM heap cap (~512 MB), not physical RAM.
-        return com.runanywhere.sdk.foundation.device.PhysicalMemoryProbe.totalPhysicalMemoryBytes()
+        return com.runanywhere.sdk.foundation.device.PhysicalMemoryProbe
+            .totalPhysicalMemoryBytes()
     }
 
     /**

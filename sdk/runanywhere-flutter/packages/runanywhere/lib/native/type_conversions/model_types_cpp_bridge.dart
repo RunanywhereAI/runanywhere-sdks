@@ -10,8 +10,10 @@ import 'dart:io';
 
 import 'package:fixnum/fixnum.dart' as fixnum;
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pbenum.dart' as pb;
+import 'package:runanywhere/native/dart_bridge_model_format.dart';
 
 // =============================================================================
 // C++ Constants (from rac_model_types.h)
@@ -409,17 +411,21 @@ model_pb.ModelInfo protoModelInfoFromCFields({
   );
 }
 
+/// Commons-backed URL → ModelFormat inference. Delegates to
+/// `rac_model_format_from_url_proto` (Wave D-3). No Dart-side heuristics.
 pb.ModelFormat protoModelFormatFromPath(String path) {
-  final lower = path.toLowerCase();
-  if (lower.endsWith('.gguf')) return pb.ModelFormat.MODEL_FORMAT_GGUF;
-  if (lower.endsWith('.ggml')) return pb.ModelFormat.MODEL_FORMAT_GGML;
-  if (lower.endsWith('.onnx')) return pb.ModelFormat.MODEL_FORMAT_ONNX;
-  if (lower.endsWith('.ort')) return pb.ModelFormat.MODEL_FORMAT_ORT;
-  if (lower.endsWith('.bin')) return pb.ModelFormat.MODEL_FORMAT_BIN;
-  if (lower.endsWith('.tflite')) return pb.ModelFormat.MODEL_FORMAT_TFLITE;
-  return pb.ModelFormat.MODEL_FORMAT_UNKNOWN;
+  try {
+    return DartBridgeModelFormat.shared.formatFromUrl(path);
+  } catch (e) {
+    SDKLogger('ModelTypes.CppBridge').warning(
+      'rac_model_format_from_url_proto unavailable; returning UNKNOWN: $e',
+    );
+    return pb.ModelFormat.MODEL_FORMAT_UNKNOWN;
+  }
 }
 
+/// Commons-backed URL → ModelArtifactType inference. Delegates to
+/// `rac_artifact_infer_from_url_proto` (Wave D-3).
 model_pb.ModelInfo withInferredArtifact(model_pb.ModelInfo model) {
   if (model.hasArtifactType() ||
       model.hasSingleFile() ||
@@ -436,27 +442,17 @@ model_pb.ModelInfo withInferredArtifact(model_pb.ModelInfo model) {
       ..builtIn = true;
   }
 
-  final url = model.downloadUrl.toLowerCase();
-  if (url.endsWith('.tar.gz') || url.endsWith('.tgz')) {
+  try {
+    return DartBridgeModelFormat.shared
+        .applyInferredArtifact(model, model.downloadUrl);
+  } catch (e) {
+    SDKLogger('ModelTypes.CppBridge').warning(
+      'rac_artifact_infer_from_url_proto unavailable; defaulting to SINGLE_FILE: $e',
+    );
     return model.deepCopy()
-      ..artifactType = pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE
-      ..archive = model_pb.ArchiveArtifact(
-        type: pb.ArchiveType.ARCHIVE_TYPE_TAR_GZ,
-        structure: pb.ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN,
-      );
+      ..artifactType = pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE
+      ..singleFile = model_pb.SingleFileArtifact();
   }
-  if (url.endsWith('.zip')) {
-    return model.deepCopy()
-      ..artifactType = pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE
-      ..archive = model_pb.ArchiveArtifact(
-        type: pb.ArchiveType.ARCHIVE_TYPE_ZIP,
-        structure: pb.ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN,
-      );
-  }
-
-  return model.deepCopy()
-    ..artifactType = pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE
-    ..singleFile = model_pb.SingleFileArtifact();
 }
 
 pb.ModelSource _sourceProtoFromC(int cSource) {

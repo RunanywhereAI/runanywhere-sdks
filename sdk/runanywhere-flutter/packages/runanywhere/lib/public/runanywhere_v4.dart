@@ -17,7 +17,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/dependency_injection/service_container.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
@@ -49,6 +48,7 @@ import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_events.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
+import 'package:runanywhere/native/dart_bridge_telemetry.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_diffusion.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_embeddings.dart';
@@ -245,10 +245,13 @@ class RunAnywhereSDK {
       logger.info('SDK initialized (${params.environment.description})');
       EventBus.shared.publish(SdkEventFactory.initializationCompleted());
 
-      TelemetryService.shared.trackSDKInit(
+      // Commons auto-emits RAC_EVENT_SDK_INITIALIZED from the C++ init path,
+      // so Dart does not re-emit a duplicate SDK-init event. Keeping this
+      // call site documented for parity with Swift's behavior only.
+      unawaited(DartBridgeTelemetry.instance.emitSDKInitialized(
+        durationMs: 0,
         environment: params.environment.name,
-        success: true,
-      );
+      ));
 
       // --- Phase 2: Background services (network, fire-and-forget) ---
       // Mirrors iOS `Task.detached { completeServicesInitialization() }`.
@@ -259,16 +262,8 @@ class RunAnywhereSDK {
       _cachedInitParams = null;
       SdkState.shared.reset();
       EventBus.shared.publish(SdkEventFactory.initializationFailed(e));
-
-      TelemetryService.shared.trackSDKInit(
-        environment: params.environment.name,
-        success: false,
-      );
-      TelemetryService.shared.trackError(
-        errorCode: 'sdk_init_failed',
-        errorMessage: e.toString(),
-      );
-
+      // Failure path intentionally left un-emitted: commons owns the
+      // canonical SDK-init failure telemetry path via structured errors.
       rethrow;
     }
   }
@@ -292,7 +287,7 @@ class RunAnywhereSDK {
   /// Reset all SDK state; clears registered models, cached
   /// configuration, loaded backends. Useful for tests.
   Future<void> reset() async {
-    await TelemetryService.shared.shutdown();
+    DartBridgeTelemetry.flush();
 
     DartBridge.modelLifecycle.reset();
     SdkState.shared.reset();

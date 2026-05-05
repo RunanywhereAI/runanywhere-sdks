@@ -9,6 +9,7 @@ import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import { SDKEvent } from '@runanywhere/proto-ts/sdk_events';
 import type { SDKEvent as SDKEventMessage } from '@runanywhere/proto-ts/sdk_events';
 import { arrayBufferToBytes, bytesToArrayBuffer } from '../../services/ProtoBytes';
+import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
 
 export type { SDKEvent as ProtoSDKEvent } from '@runanywhere/proto-ts/sdk_events';
 
@@ -28,7 +29,7 @@ export async function subscribeSDKEvents(
   callback: (event: SDKEventMessage) => void
 ): Promise<() => Promise<void>> {
   if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+    throw SDKException.nativeModuleUnavailable();
   }
 
   const native = requireNativeModule();
@@ -42,7 +43,7 @@ export async function subscribeSDKEvents(
   );
 
   if (!subscriptionId) {
-    throw new Error('Native SDKEvent subscription failed');
+    throw SDKException.generationFailedWith('Native SDKEvent subscription failed');
   }
 
   return async () => {

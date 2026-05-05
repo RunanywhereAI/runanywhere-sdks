@@ -18,27 +18,14 @@
  */
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import { SolutionConfig } from '@runanywhere/proto-ts/solutions';
+import { bytesToArrayBuffer } from '../../services/ProtoBytes';
+import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
 
 function ensureNative() {
   if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+    throw SDKException.nativeModuleUnavailable();
   }
   return requireNativeModule();
-}
-
-function toBase64(bytes: Uint8Array): string {
-  if (typeof globalThis.btoa === 'function') {
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
-      binary += String.fromCharCode(bytes[i]!);
-    }
-    return globalThis.btoa(binary);
-  }
-  const g = globalThis as { Buffer?: { from(b: Uint8Array): { toString(enc: string): string } } };
-  if (g.Buffer) {
-    return g.Buffer.from(bytes).toString('base64');
-  }
-  throw new Error('No base64 encoder available in this runtime');
 }
 
 /**
@@ -55,7 +42,9 @@ export class SolutionHandle {
 
   /** @internal */ constructor(handle: number) {
     if (!handle) {
-      throw new Error('Cannot construct SolutionHandle from null native handle');
+      throw SDKException.invalidInput(
+        'Cannot construct SolutionHandle from null native handle'
+      );
     }
     this.handle = handle;
   }
@@ -69,35 +58,35 @@ export class SolutionHandle {
   async start(): Promise<void> {
     this.requireAlive();
     const ok = await ensureNative().solutionStart(this.handle);
-    if (!ok) throw new Error('rac_solution_start failed');
+    if (!ok) throw SDKException.generationFailedWith('rac_solution_start failed');
   }
 
   /** Request a graceful shutdown. Non-blocking. */
   async stop(): Promise<void> {
     this.requireAlive();
     const ok = await ensureNative().solutionStop(this.handle);
-    if (!ok) throw new Error('rac_solution_stop failed');
+    if (!ok) throw SDKException.generationFailedWith('rac_solution_stop failed');
   }
 
   /** Force-cancel the graph; returns once workers observe cancellation. */
   async cancel(): Promise<void> {
     this.requireAlive();
     const ok = await ensureNative().solutionCancel(this.handle);
-    if (!ok) throw new Error('rac_solution_cancel failed');
+    if (!ok) throw SDKException.generationFailedWith('rac_solution_cancel failed');
   }
 
   /** Feed one UTF-8 item into the root input edge. */
   async feed(item: string): Promise<void> {
     this.requireAlive();
     const ok = await ensureNative().solutionFeed(this.handle, item);
-    if (!ok) throw new Error('rac_solution_feed failed');
+    if (!ok) throw SDKException.generationFailedWith('rac_solution_feed failed');
   }
 
   /** Signal end-of-stream on the root input edge. */
   async closeInput(): Promise<void> {
     this.requireAlive();
     const ok = await ensureNative().solutionCloseInput(this.handle);
-    if (!ok) throw new Error('rac_solution_close_input failed');
+    if (!ok) throw SDKException.generationFailedWith('rac_solution_close_input failed');
   }
 
   /** Cancel, join, and release native resources. Idempotent. */
@@ -110,7 +99,9 @@ export class SolutionHandle {
 
   private requireAlive(): void {
     if (!this.alive) {
-      throw new Error('SolutionHandle has already been destroyed');
+      throw SDKException.invalidInput(
+        'SolutionHandle has already been destroyed'
+      );
     }
   }
 }
@@ -134,7 +125,7 @@ async function run(args: SolutionRunArgs): Promise<SolutionHandle> {
     (v) => v !== undefined
   ).length;
   if (supplied !== 1) {
-    throw new Error(
+    throw SDKException.invalidInput(
       `RunAnywhere.solutions.run requires exactly one of config / configBytes / yaml (got ${supplied})`
     );
   }
@@ -143,21 +134,28 @@ async function run(args: SolutionRunArgs): Promise<SolutionHandle> {
 
   if (args.yaml !== undefined) {
     const h = await native.solutionCreateFromYaml(args.yaml);
-    if (!h) throw new Error('rac_solution_create_from_yaml failed');
+    if (!h) {
+      throw SDKException.generationFailedWith(
+        'rac_solution_create_from_yaml failed'
+      );
+    }
     return new SolutionHandle(h);
   }
 
   const bytes =
     args.configBytes ?? SolutionConfig.encode(args.config!).finish();
   if (bytes.length === 0) {
-    throw new Error(
+    throw SDKException.invalidInput(
       'Solution config bytes are empty — refusing to call rac_solution_create_from_proto'
     );
   }
 
-  const base64 = toBase64(bytes);
-  const h = await native.solutionCreateFromProto(base64);
-  if (!h) throw new Error('rac_solution_create_from_proto failed');
+  const h = await native.solutionCreateFromProto(bytesToArrayBuffer(bytes));
+  if (!h) {
+    throw SDKException.generationFailedWith(
+      'rac_solution_create_from_proto failed'
+    );
+  }
   return new SolutionHandle(h);
 }
 

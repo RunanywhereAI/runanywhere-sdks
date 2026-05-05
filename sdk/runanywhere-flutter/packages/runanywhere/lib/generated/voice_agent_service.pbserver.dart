@@ -15,25 +15,25 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'voice_agent_service.pb.dart' as $1;
+import 'voice_agent_service.pb.dart' as $2;
 import 'voice_agent_service.pbjson.dart';
 import 'voice_events.pb.dart' as $0;
 
 export 'voice_agent_service.pb.dart';
 
 abstract class VoiceAgentServiceBase extends $pb.GeneratedService {
-  $async.Future<$0.VoiceEvent> stream($pb.ServerContext ctx, $1.VoiceAgentRequest request);
+  $async.Future<$0.VoiceEvent> stream($pb.ServerContext ctx, $2.VoiceAgentRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
-      case 'Stream': return $1.VoiceAgentRequest();
+      case 'Stream': return $2.VoiceAgentRequest();
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }
 
   $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx, $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
-      case 'Stream': return this.stream(ctx, request as $1.VoiceAgentRequest);
+      case 'Stream': return this.stream(ctx, request as $2.VoiceAgentRequest);
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }

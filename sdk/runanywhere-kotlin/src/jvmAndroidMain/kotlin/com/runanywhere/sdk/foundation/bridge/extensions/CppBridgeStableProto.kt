@@ -5,6 +5,9 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import ai.runanywhere.proto.v1.ComponentLifecycleSnapshot
+import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.CurrentModelResult
 import ai.runanywhere.proto.v1.DownloadCancelRequest
 import ai.runanywhere.proto.v1.DownloadCancelResult
 import ai.runanywhere.proto.v1.DownloadPlanRequest
@@ -14,13 +17,11 @@ import ai.runanywhere.proto.v1.DownloadResumeRequest
 import ai.runanywhere.proto.v1.DownloadResumeResult
 import ai.runanywhere.proto.v1.DownloadStartRequest
 import ai.runanywhere.proto.v1.DownloadStartResult
-import ai.runanywhere.proto.v1.ComponentLifecycleSnapshot
-import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.CurrentModelResult
 import ai.runanywhere.proto.v1.ModelLoadRequest
 import ai.runanywhere.proto.v1.ModelLoadResult
 import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.ModelUnloadResult
+import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.SDKEvent
 import ai.runanywhere.proto.v1.StorageAvailabilityRequest
 import ai.runanywhere.proto.v1.StorageAvailabilityResult
@@ -30,7 +31,6 @@ import ai.runanywhere.proto.v1.StorageDeleteRequest
 import ai.runanywhere.proto.v1.StorageDeleteResult
 import ai.runanywhere.proto.v1.StorageInfoRequest
 import ai.runanywhere.proto.v1.StorageInfoResult
-import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.squareup.wire.Message
@@ -197,7 +197,8 @@ object CppBridgeDownloadProto {
         decodeOrNull(
             DownloadProgress.ADAPTER,
             RunAnywhereBridge.racDownloadProgressPollProto(
-                ai.runanywhere.proto.v1.DownloadSubscribeRequest.ADAPTER.encode(request),
+                ai.runanywhere.proto.v1.DownloadSubscribeRequest.ADAPTER
+                    .encode(request),
             ),
             "downloadProgressPoll",
         )

@@ -576,6 +576,104 @@ final $typed_data.Uint8List toolRegistrySnapshotDescriptor = $convert.base64Deco
     'Rvb2xEZWZpbml0aW9uUgV0b29scxIiCg11cGRhdGVkX2F0X21zGAIgASgDUgt1cGRhdGVkQXRN'
     'cw==');
 
+@$core.Deprecated('Use toolCallingSessionCreateRequestDescriptor instead')
+const ToolCallingSessionCreateRequest$json = {
+  '1': 'ToolCallingSessionCreateRequest',
+  '2': [
+    {'1': 'prompt', '3': 1, '4': 1, '5': 9, '10': 'prompt'},
+    {'1': 'max_tokens', '3': 11, '4': 1, '5': 5, '10': 'maxTokens'},
+    {'1': 'temperature', '3': 12, '4': 1, '5': 2, '10': 'temperature'},
+    {'1': 'top_p', '3': 13, '4': 1, '5': 2, '10': 'topP'},
+    {'1': 'system_prompt', '3': 14, '4': 1, '5': 9, '10': 'systemPrompt'},
+    {'1': 'tools', '3': 2, '4': 3, '5': 11, '6': '.runanywhere.v1.ToolDefinition', '10': 'tools'},
+    {'1': 'format_hint', '3': 3, '4': 1, '5': 9, '10': 'formatHint'},
+    {'1': 'max_iterations', '3': 4, '4': 1, '5': 13, '10': 'maxIterations'},
+    {'1': 'keep_tools_available', '3': 5, '4': 1, '5': 8, '10': 'keepToolsAvailable'},
+    {'1': 'validate_calls', '3': 6, '4': 1, '5': 8, '10': 'validateCalls'},
+  ],
+};
+
+/// Descriptor for `ToolCallingSessionCreateRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List toolCallingSessionCreateRequestDescriptor = $convert.base64Decode(
+    'Ch9Ub29sQ2FsbGluZ1Nlc3Npb25DcmVhdGVSZXF1ZXN0EhYKBnByb21wdBgBIAEoCVIGcHJvbX'
+    'B0Eh0KCm1heF90b2tlbnMYCyABKAVSCW1heFRva2VucxIgCgt0ZW1wZXJhdHVyZRgMIAEoAlIL'
+    'dGVtcGVyYXR1cmUSEwoFdG9wX3AYDSABKAJSBHRvcFASIwoNc3lzdGVtX3Byb21wdBgOIAEoCV'
+    'IMc3lzdGVtUHJvbXB0EjQKBXRvb2xzGAIgAygLMh4ucnVuYW55d2hlcmUudjEuVG9vbERlZmlu'
+    'aXRpb25SBXRvb2xzEh8KC2Zvcm1hdF9oaW50GAMgASgJUgpmb3JtYXRIaW50EiUKDm1heF9pdG'
+    'VyYXRpb25zGAQgASgNUg1tYXhJdGVyYXRpb25zEjAKFGtlZXBfdG9vbHNfYXZhaWxhYmxlGAUg'
+    'ASgIUhJrZWVwVG9vbHNBdmFpbGFibGUSJQoOdmFsaWRhdGVfY2FsbHMYBiABKAhSDXZhbGlkYX'
+    'RlQ2FsbHM=');
+
+@$core.Deprecated('Use toolCallingSessionCreateResultDescriptor instead')
+const ToolCallingSessionCreateResult$json = {
+  '1': 'ToolCallingSessionCreateResult',
+  '2': [
+    {'1': 'session_handle', '3': 1, '4': 1, '5': 4, '10': 'sessionHandle'},
+  ],
+};
+
+/// Descriptor for `ToolCallingSessionCreateResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List toolCallingSessionCreateResultDescriptor = $convert.base64Decode(
+    'Ch5Ub29sQ2FsbGluZ1Nlc3Npb25DcmVhdGVSZXN1bHQSJQoOc2Vzc2lvbl9oYW5kbGUYASABKA'
+    'RSDXNlc3Npb25IYW5kbGU=');
+
+@$core.Deprecated('Use toolCallingSessionEventDescriptor instead')
+const ToolCallingSessionEvent$json = {
+  '1': 'ToolCallingSessionEvent',
+  '2': [
+    {'1': 'llm_stream_event_bytes', '3': 1, '4': 1, '5': 12, '9': 0, '10': 'llmStreamEventBytes'},
+    {'1': 'tool_call', '3': 2, '4': 1, '5': 11, '6': '.runanywhere.v1.ToolCall', '9': 0, '10': 'toolCall'},
+    {'1': 'final_result', '3': 3, '4': 1, '5': 11, '6': '.runanywhere.v1.ToolCallingResult', '9': 0, '10': 'finalResult'},
+    {'1': 'error_bytes', '3': 4, '4': 1, '5': 12, '9': 0, '10': 'errorBytes'},
+    {'1': 'seq', '3': 5, '4': 1, '5': 4, '10': 'seq'},
+  ],
+  '8': [
+    {'1': 'kind'},
+  ],
+};
+
+/// Descriptor for `ToolCallingSessionEvent`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List toolCallingSessionEventDescriptor = $convert.base64Decode(
+    'ChdUb29sQ2FsbGluZ1Nlc3Npb25FdmVudBI1ChZsbG1fc3RyZWFtX2V2ZW50X2J5dGVzGAEgAS'
+    'gMSABSE2xsbVN0cmVhbUV2ZW50Qnl0ZXMSNwoJdG9vbF9jYWxsGAIgASgLMhgucnVuYW55d2hl'
+    'cmUudjEuVG9vbENhbGxIAFIIdG9vbENhbGwSRgoMZmluYWxfcmVzdWx0GAMgASgLMiEucnVuYW'
+    '55d2hlcmUudjEuVG9vbENhbGxpbmdSZXN1bHRIAFILZmluYWxSZXN1bHQSIQoLZXJyb3JfYnl0'
+    'ZXMYBCABKAxIAFIKZXJyb3JCeXRlcxIQCgNzZXEYBSABKARSA3NlcUIGCgRraW5k');
+
+@$core.Deprecated('Use toolCallingSessionStepWithResultRequestDescriptor instead')
+const ToolCallingSessionStepWithResultRequest$json = {
+  '1': 'ToolCallingSessionStepWithResultRequest',
+  '2': [
+    {'1': 'session_handle', '3': 1, '4': 1, '5': 4, '10': 'sessionHandle'},
+    {'1': 'tool_call_id', '3': 2, '4': 1, '5': 9, '10': 'toolCallId'},
+    {'1': 'result_json', '3': 3, '4': 1, '5': 9, '10': 'resultJson'},
+    {'1': 'error', '3': 4, '4': 1, '5': 9, '9': 0, '10': 'error', '17': true},
+  ],
+  '8': [
+    {'1': '_error'},
+  ],
+};
+
+/// Descriptor for `ToolCallingSessionStepWithResultRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List toolCallingSessionStepWithResultRequestDescriptor = $convert.base64Decode(
+    'CidUb29sQ2FsbGluZ1Nlc3Npb25TdGVwV2l0aFJlc3VsdFJlcXVlc3QSJQoOc2Vzc2lvbl9oYW'
+    '5kbGUYASABKARSDXNlc3Npb25IYW5kbGUSIAoMdG9vbF9jYWxsX2lkGAIgASgJUgp0b29sQ2Fs'
+    'bElkEh8KC3Jlc3VsdF9qc29uGAMgASgJUgpyZXN1bHRKc29uEhkKBWVycm9yGAQgASgJSABSBW'
+    'Vycm9yiAEBQggKBl9lcnJvcg==');
+
+@$core.Deprecated('Use toolCallingSessionDestroyRequestDescriptor instead')
+const ToolCallingSessionDestroyRequest$json = {
+  '1': 'ToolCallingSessionDestroyRequest',
+  '2': [
+    {'1': 'session_handle', '3': 1, '4': 1, '5': 4, '10': 'sessionHandle'},
+  ],
+};
+
+/// Descriptor for `ToolCallingSessionDestroyRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List toolCallingSessionDestroyRequestDescriptor = $convert.base64Decode(
+    'CiBUb29sQ2FsbGluZ1Nlc3Npb25EZXN0cm95UmVxdWVzdBIlCg5zZXNzaW9uX2hhbmRsZRgBIA'
+    'EoBFINc2Vzc2lvbkhhbmRsZQ==');
+
 const $core.Map<$core.String, $core.dynamic> ToolCallingServiceBase$json = {
   '1': 'ToolCalling',
   '2': [

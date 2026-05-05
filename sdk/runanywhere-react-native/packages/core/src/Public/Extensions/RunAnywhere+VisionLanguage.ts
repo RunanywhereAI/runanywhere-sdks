@@ -11,6 +11,7 @@
  */
 
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
 import {
   requireNativeModule,
   isNativeModuleAvailable,
@@ -67,7 +68,7 @@ export interface VLMBackendProvider {
 
 function ensureNative() {
   if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+    throw SDKException.nativeModuleUnavailable();
   }
   return requireNativeModule();
 }
@@ -121,7 +122,7 @@ function encodeVLMOptions(
 function decodeVLMResult(buffer: ArrayBuffer, operation: string): VLMResult {
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
-    throw new Error(`${operation} returned an empty proto result`);
+    throw SDKException.protoDecodeFailed(operation);
   }
   return VLMResultMessage.decode(bytes);
 }

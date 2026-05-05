@@ -34,8 +34,16 @@ interface AppReadinessSnapshot extends AppShellProbe {
 declare global {
   interface Window {
     __RUNANYWHERE_AI_READY__?: AppReadinessSnapshot;
+    // Exposed for browser-harness tests (Playwright E2E). Safe to probe
+    // from outside the example because it only exposes the singleton
+    // public API surface — not any internal state. Not used by the app.
+    __RUNANYWHERE_SDK__?: typeof RunAnywhere;
   }
 }
+
+// Expose the SDK singleton for E2E tests. This is a reference to the
+// already-imported module; no additional code is pulled in.
+window.__RUNANYWHERE_SDK__ = RunAnywhere;
 
 let sdkReadinessState: SDKReadinessState = 'initializing';
 let sdkInitializationError: string | undefined;

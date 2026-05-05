@@ -298,6 +298,18 @@ using VoiceAgentProcessTurnProtoFn = rac_result_t (*)(
     size_t,
     rac_proto_buffer_t*);
 
+// D-7 helper-level proto wrappers for the voice-agent sub-components.
+using VoiceAgentTranscribeProtoFn = rac_result_t (*)(
+    void*,
+    const uint8_t*,
+    size_t,
+    rac_proto_buffer_t*);
+using VoiceAgentSynthesizeSpeechProtoFn = rac_result_t (*)(
+    void*,
+    const uint8_t*,
+    size_t,
+    rac_proto_buffer_t*);
+
 using RAGSessionCreateProtoFn = rac_result_t (*)(
     const uint8_t*,
     size_t,

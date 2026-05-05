@@ -258,6 +258,46 @@ final $typed_data.Uint8List voiceAgentComposeConfigDescriptor = $convert.base64D
     'd29yZF92YWRfbW9kZWxfcGF0aEIRCg9fc2Vzc2lvbl9jb25maWdCGAoWX2F1ZGlvX3BpcGVsaW'
     '5lX2NvbmZpZ0INCgtfc2Vzc2lvbl9pZEIYChZfZGVmYXVsdF9sYW5ndWFnZV9jb2Rl');
 
+@$core.Deprecated('Use voiceAgentTranscribeProtoRequestDescriptor instead')
+const VoiceAgentTranscribeProtoRequest$json = {
+  '1': 'VoiceAgentTranscribeProtoRequest',
+  '2': [
+    {'1': 'audio_data', '3': 1, '4': 1, '5': 12, '10': 'audioData'},
+    {'1': 'session_id', '3': 2, '4': 1, '5': 9, '10': 'sessionId'},
+    {'1': 'sample_rate', '3': 3, '4': 1, '5': 5, '10': 'sampleRate'},
+    {'1': 'language_hint', '3': 4, '4': 1, '5': 9, '10': 'languageHint'},
+    {'1': 'channels', '3': 5, '4': 1, '5': 5, '10': 'channels'},
+    {'1': 'encoding', '3': 6, '4': 1, '5': 14, '6': '.runanywhere.v1.AudioEncoding', '10': 'encoding'},
+  ],
+};
+
+/// Descriptor for `VoiceAgentTranscribeProtoRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List voiceAgentTranscribeProtoRequestDescriptor = $convert.base64Decode(
+    'CiBWb2ljZUFnZW50VHJhbnNjcmliZVByb3RvUmVxdWVzdBIdCgphdWRpb19kYXRhGAEgASgMUg'
+    'lhdWRpb0RhdGESHQoKc2Vzc2lvbl9pZBgCIAEoCVIJc2Vzc2lvbklkEh8KC3NhbXBsZV9yYXRl'
+    'GAMgASgFUgpzYW1wbGVSYXRlEiMKDWxhbmd1YWdlX2hpbnQYBCABKAlSDGxhbmd1YWdlSGludB'
+    'IaCghjaGFubmVscxgFIAEoBVIIY2hhbm5lbHMSOQoIZW5jb2RpbmcYBiABKA4yHS5ydW5hbnl3'
+    'aGVyZS52MS5BdWRpb0VuY29kaW5nUghlbmNvZGluZw==');
+
+@$core.Deprecated('Use voiceAgentSynthesizeSpeechProtoRequestDescriptor instead')
+const VoiceAgentSynthesizeSpeechProtoRequest$json = {
+  '1': 'VoiceAgentSynthesizeSpeechProtoRequest',
+  '2': [
+    {'1': 'text', '3': 1, '4': 1, '5': 9, '10': 'text'},
+    {'1': 'session_id', '3': 2, '4': 1, '5': 9, '10': 'sessionId'},
+    {'1': 'options', '3': 3, '4': 1, '5': 11, '6': '.runanywhere.v1.TTSOptions', '9': 0, '10': 'options', '17': true},
+  ],
+  '8': [
+    {'1': '_options'},
+  ],
+};
+
+/// Descriptor for `VoiceAgentSynthesizeSpeechProtoRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List voiceAgentSynthesizeSpeechProtoRequestDescriptor = $convert.base64Decode(
+    'CiZWb2ljZUFnZW50U3ludGhlc2l6ZVNwZWVjaFByb3RvUmVxdWVzdBISCgR0ZXh0GAEgASgJUg'
+    'R0ZXh0Eh0KCnNlc3Npb25faWQYAiABKAlSCXNlc3Npb25JZBI5CgdvcHRpb25zGAMgASgLMhou'
+    'cnVuYW55d2hlcmUudjEuVFRTT3B0aW9uc0gAUgdvcHRpb25ziAEBQgoKCF9vcHRpb25z');
+
 const $core.Map<$core.String, $core.dynamic> VoiceAgentServiceBase$json = {
   '1': 'VoiceAgent',
   '2': [

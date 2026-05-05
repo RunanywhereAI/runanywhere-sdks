@@ -4,9 +4,12 @@
 // generated-proto transcription.
 
 import 'dart:async';
+import 'dart:ffi';
 import 'dart:typed_data';
 
+import 'package:ffi/ffi.dart' show calloc;
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
@@ -19,6 +22,7 @@ import 'package:runanywhere/generated/stt_options.pb.dart';
 import 'package:runanywhere/generated/stt_options_helpers.dart';
 import 'package:runanywhere/internal/sdk_event_factories.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/dart_bridge_stt.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/events/event_bus.dart';
@@ -161,21 +165,101 @@ class RunAnywhereSTT {
     );
   }
 
-  /// Streaming transcription.
+  /// Streaming transcription — Wave D-5 lifecycle-owned proto.
+  ///
+  /// Invokes `rac_stt_transcribe_stream_lifecycle_proto` with the canonical
+  /// `STTTranscriptionRequest` and streams decoded `STTPartialResult`s from the
+  /// `STTStreamEvent` envelope returned by commons.
   Stream<STTPartialResult> transcribeStream(
     Uint8List audio, {
     STTOptions? options,
-  }) async* {
+  }) {
     if (!DartBridge.isInitialized) {
-      throw SDKException.notInitialized();
+      return Stream.error(SDKException.notInitialized());
     }
-    await _requireLoadedModelId();
-    _effectiveOptions(options ?? STTOptions());
-    throw SDKException.featureNotAvailable(
-      'Lifecycle-owned STT streaming is unavailable in Flutter. '
-      'Use transcribe() for one-shot STT until commons exposes '
-      'rac_stt_transcribe_stream_lifecycle_proto.',
-    );
+    final controller = StreamController<STTPartialResult>();
+    _isStreaming = true;
+
+    NativeCallable<RacSttStreamEventCallbackNative>? nativeCb;
+
+    controller
+      ..onListen = () async {
+        try {
+          final modelId = await _requireLoadedModelId();
+          final opts = _effectiveOptions(options ?? STTOptions());
+          final sourceEncoding = _encodingForOptions(opts);
+          final request = STTTranscriptionRequest(
+            audio: STTAudioSource(
+              audioData: audio,
+              encoding: sourceEncoding,
+              audioFormat: opts.audioFormat,
+              sampleRate: opts.sampleRate,
+              channels: 1,
+              bitsPerSample: _bitsPerSample(sourceEncoding),
+            ),
+            options: opts,
+            metadata: {'model_id': modelId},
+          );
+
+          final fn =
+              RacNative.bindings.rac_stt_transcribe_stream_lifecycle_proto;
+          if (fn == null) {
+            controller.addError(SDKException.featureNotAvailable(
+                'rac_stt_transcribe_stream_lifecycle_proto is unavailable'));
+            unawaited(controller.close());
+            return;
+          }
+
+          nativeCb = NativeCallable<RacSttStreamEventCallbackNative>.listener((
+            Pointer<Uint8> bytesPtr,
+            int bytesLen,
+            Pointer<Void> _,
+          ) {
+            if (bytesLen <= 0 || bytesPtr == nullptr) return;
+            final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+            try {
+              final event = STTStreamEvent.fromBuffer(copy);
+              final partial = event.hasPartial()
+                  ? event.partial
+                  : STTPartialResult(
+                      isFinal: event.kind == STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL,
+                    );
+              controller.add(partial);
+            } catch (e, st) {
+              controller.addError(e, st);
+            }
+          });
+
+          final bytes = request.writeToBuffer();
+          final reqPtr = DartBridgeProtoUtils.copyBytes(bytes);
+          try {
+            final code = fn(
+              reqPtr,
+              bytes.length,
+              nativeCb!.nativeFunction,
+              nullptr,
+            );
+            if (code != 0) {
+              controller.addError(StateError(
+                'rac_stt_transcribe_stream_lifecycle_proto failed: code=$code',
+              ));
+            }
+          } finally {
+            calloc.free(reqPtr);
+          }
+        } catch (e, st) {
+          controller.addError(e, st);
+        } finally {
+          _isStreaming = false;
+          unawaited(controller.close());
+        }
+      }
+      ..onCancel = () {
+        _isStreaming = false;
+        nativeCb?.close();
+      };
+
+    return controller.stream;
   }
 
   /// Symmetric with Swift's `processStreamingAudio`. Float32 PCM samples

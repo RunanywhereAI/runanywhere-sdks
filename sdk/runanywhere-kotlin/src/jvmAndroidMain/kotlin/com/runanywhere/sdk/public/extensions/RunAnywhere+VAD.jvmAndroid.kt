@@ -19,7 +19,6 @@ import ai.runanywhere.proto.v1.VADResult
 import ai.runanywhere.proto.v1.VADStatistics
 import ai.runanywhere.proto.v1.VADStreamEvent
 import ai.runanywhere.proto.v1.VADStreamEventKind
-import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVADProto
@@ -29,6 +28,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
+import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 
 private val vadLogger = SDKLogger.vad
 
@@ -72,7 +72,9 @@ actual fun RunAnywhere.streamVAD(
         }
 
         var sequence = 0L
+
         fun nextSequence(): Long = ++sequence
+
         fun nowUs(): Long = System.currentTimeMillis() * 1000L
         val requestId = "vad-stream-${nowUs()}"
 
@@ -248,7 +250,8 @@ actual suspend fun RunAnywhere.unloadVADModel() {
 
 actual val RunAnywhere.isVADModelLoaded: Boolean
     get() =
-        CppBridgeModelLifecycleProto.snapshot(SDKComponent.SDK_COMPONENT_VAD)
+        CppBridgeModelLifecycleProto
+            .snapshot(SDKComponent.SDK_COMPONENT_VAD)
             ?.let {
                 it.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
                     it.model_id.isNotEmpty()

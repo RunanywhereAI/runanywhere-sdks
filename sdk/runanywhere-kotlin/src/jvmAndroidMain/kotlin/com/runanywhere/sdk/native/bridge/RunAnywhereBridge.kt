@@ -1112,6 +1112,68 @@ object RunAnywhereBridge {
     /** Process one voice turn and return serialized VoiceAgentResult bytes. */
     @JvmStatic external fun racVoiceAgentProcessVoiceTurnProto(handle: Long, audioData: ByteArray): ByteArray?
 
+    /**
+     * Wave D-7 / KOT-11: Full-session voice-agent turn. Accepts serialized
+     * VoiceAgentTurnRequest bytes (request_id, session_id, session_config,
+     * metadata, audio_data + encoding) and emits a canonical VoiceEvent
+     * stream through the listener. Returns rac_result_t.
+     */
+    @JvmStatic
+    external fun racVoiceAgentProcessTurnProto(
+        handle: Long,
+        requestBytes: ByteArray,
+        listener: NativeProtoProgressListener,
+    ): Int
+
+    /**
+     * Wave D-7 / KOT-11: Transcribe via the voice-agent's STT component.
+     * Accepts serialized VoiceAgentTranscribeRequest; returns VoiceAgentTranscribeResult bytes.
+     */
+    @JvmStatic
+    external fun racVoiceAgentTranscribeProto(handle: Long, requestBytes: ByteArray): ByteArray?
+
+    /**
+     * Wave D-7 / KOT-11: Synthesize via the voice-agent's TTS component.
+     * Accepts serialized VoiceAgentSynthesizeSpeechRequest; returns VoiceAgentSynthesizeSpeechResult bytes.
+     */
+    @JvmStatic
+    external fun racVoiceAgentSynthesizeSpeechProto(handle: Long, requestBytes: ByteArray): ByteArray?
+
+    // ========================================================================
+    // TOOL-CALLING SESSION (rac_tool_calling.h — Wave D-4 / KOT-08)
+    // ========================================================================
+    //
+    // Native-owned state machine for generate → parse → execute → loop. The
+    // session emits ToolCallingSessionEvent bytes on each step. Kotlin only
+    // supplies the tool registry + executor callback.
+
+    /**
+     * Create a tool-calling session. Accepts serialized
+     * ToolCallingSessionCreateRequest bytes. Events are delivered on the
+     * listener as ToolCallingSessionEvent bytes. Returns the session handle
+     * (0 on failure).
+     */
+    @JvmStatic
+    external fun racToolCallingSessionCreateProto(
+        requestBytes: ByteArray,
+        listener: NativeProtoProgressListener,
+    ): Long
+
+    /**
+     * Feed a tool result into an in-flight tool-calling session. Accepts
+     * serialized ToolCallingSessionStepWithResultRequest bytes (which
+     * include the session handle). Returns rac_result_t.
+     */
+    @JvmStatic
+    external fun racToolCallingSessionStepWithResultProto(requestBytes: ByteArray): Int
+
+    /**
+     * Destroy a tool-calling session. Releases the global listener ref.
+     * Idempotent for handle=0.
+     */
+    @JvmStatic
+    external fun racToolCallingSessionDestroyProto(sessionHandle: Long): Int
+
     // ========================================================================
     // SOLUTIONS (rac/solutions/rac_solution.h) — T4.7/T4.8
     // ========================================================================

@@ -141,6 +141,11 @@ for pkg in \
     "${REPO_ROOT}/sdk/runanywhere-web/packages/onnx/package.json"; do
     bump_json_version "$pkg"
 done
+# Web SDK public `RunAnywhere.version` surface — keeps the TS constant in
+# sync with the commons VERSION file and the package.json versions above.
+bump_line "${REPO_ROOT}/sdk/runanywhere-web/packages/core/src/Foundation/Version.ts" \
+    "export const SDK_VERSION = '[^']+'" \
+    "export const SDK_VERSION = '${NEW_VERSION}'"
 
 # 5. React Native SDK packages
 echo ""

@@ -89,6 +89,45 @@ export class SDKException extends Error {
     return SDKException.of(ErrorCodeProto.ERROR_CODE_NOT_INITIALIZED, message);
   }
 
+  /**
+   * Raised when the NitroModules native module (HybridRunAnywhereCore)
+   * cannot be accessed. Matches Kotlin's `SDKException.notInitialized`
+   * semantics for the bridge layer.
+   */
+  static nativeModuleUnavailable(details?: string): SDKException {
+    const message = details
+      ? `Native module not available: ${details}`
+      : 'Native module not available';
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_NOT_INITIALIZED,
+      message
+    );
+  }
+
+  /**
+   * Raised when a proto-byte response from the native bridge is empty
+   * or fails to decode into the expected message shape.
+   */
+  static protoDecodeFailed(operation: string, cause?: Error): SDKException {
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_INTERNAL,
+      `${operation} returned an empty or invalid proto result`,
+      { nestedMessage: cause?.message }
+    );
+  }
+
+  /**
+   * Raised when a component (LLM, STT, TTS, VAD, VoiceAgent) is not yet
+   * ready for the requested operation. Matches Swift/Kotlin pattern.
+   */
+  static generationFailedWith(details: string, cause?: Error): SDKException {
+    return SDKException.of(
+      ErrorCodeProto.ERROR_CODE_GENERATION_FAILED,
+      details,
+      { nestedMessage: cause?.message }
+    );
+  }
+
   static alreadyInitialized(component?: string): SDKException {
     const message = component
       ? `${component} already initialized`

@@ -33,12 +33,27 @@ inline rac_solution_handle_t solutionHandleFromDouble(double handle) {
         static_cast<uintptr_t>(static_cast<uint64_t>(handle)));
 }
 
+std::vector<uint8_t> copySolutionArrayBufferBytes(
+    const std::shared_ptr<ArrayBuffer>& buffer) {
+    std::vector<uint8_t> bytes;
+    if (!buffer) {
+        return bytes;
+    }
+    uint8_t* data = buffer->data();
+    size_t size = buffer->size();
+    if (!data || size == 0) {
+        return bytes;
+    }
+    bytes.assign(data, data + size);
+    return bytes;
+}
+
 } // namespace
 
 std::shared_ptr<Promise<double>> HybridRunAnywhereCore::solutionCreateFromProto(
-    const std::string& configBytesBase64) {
-    return Promise<double>::async([configBytesBase64]() -> double {
-        const auto bytes = base64Decode(configBytesBase64);
+    const std::shared_ptr<ArrayBuffer>& configBytes) {
+    auto bytes = copySolutionArrayBufferBytes(configBytes);
+    return Promise<double>::async([bytes = std::move(bytes)]() -> double {
         if (bytes.empty()) {
             return 0.0;
         }

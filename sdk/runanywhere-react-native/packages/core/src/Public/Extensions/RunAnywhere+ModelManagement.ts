@@ -21,6 +21,7 @@
  */
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
+import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
 import {
   ModelArtifactType,
   ModelCategory,
@@ -196,7 +197,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
       [Symbol.asyncIterator](): AsyncIterator<DownloadProgress> {
         return {
           async next(): Promise<IteratorResult<DownloadProgress>> {
-            throw new Error('Native module not available');
+            throw SDKException.nativeModuleUnavailable();
           },
         };
       },

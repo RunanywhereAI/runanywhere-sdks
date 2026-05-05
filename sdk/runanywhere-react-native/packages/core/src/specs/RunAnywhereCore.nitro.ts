@@ -767,18 +767,21 @@ export interface RunAnywhereCore extends HybridObject<{
   isVoiceAgentReady(): Promise<boolean>;
 
   /**
-   * Transcribe audio using voice agent
-   * @param audioBase64 Base64 encoded audio data
-   * @returns Transcription text
+   * Transcribe audio using the voice-agent STT component via the commons
+   * `rac_voice_agent_transcribe_proto` ABI. Input is a serialized
+   * `runanywhere.v1.VoiceAgentTranscribeProtoRequest`; the output is a
+   * serialized `runanywhere.v1.STTOutput`.
    */
-  voiceAgentTranscribe(audioBase64: string): Promise<string>;
+  voiceAgentTranscribeProto(
+    audioBytes: ArrayBuffer
+  ): Promise<ArrayBuffer>;
 
   /**
-   * Synthesize speech using voice agent
-   * @param text Text to synthesize
-   * @returns Synthesized audio as base64
+   * Synthesize speech using the voice-agent TTS component via the commons
+   * `rac_voice_agent_synthesize_speech_proto` ABI. Input is a UTF-8 text
+   * string; the output is a serialized `runanywhere.v1.TTSOutput`.
    */
-  voiceAgentSynthesizeSpeech(text: string): Promise<string>;
+  voiceAgentSynthesizeSpeechProto(text: string): Promise<ArrayBuffer>;
 
   /**
    * Cleanup voice agent resources
@@ -951,13 +954,10 @@ export interface RunAnywhereCore extends HybridObject<{
    * (or PipelineSpec) protobuf. The handle is returned in the **created**
    * state — call `solutionStart(handle)` to launch worker threads.
    *
-   * @param configBytesBase64 Base64-encoded SolutionConfig / PipelineSpec
-   *        proto bytes. Base64 is used because Nitro does not yet bridge
-   *        `Uint8Array` cleanly on every platform; the native side decodes
-   *        before calling `rac_solution_create_from_proto`.
+   * @param configBytes Serialized SolutionConfig / PipelineSpec proto bytes.
    * @returns Native solution handle as a double (0 on failure).
    */
-  solutionCreateFromProto(configBytesBase64: string): Promise<number>;
+  solutionCreateFromProto(configBytes: ArrayBuffer): Promise<number>;
 
   /**
    * Construct a solution from a YAML document (SolutionConfig-shape or

@@ -33,3 +33,7 @@ Thumbs.db
 
 # v2 close-out: test build output
 packages/core/dist-test/
+
+# Playwright browser E2E (Wave E G-11)
+test-results/
+playwright-report/

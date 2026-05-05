@@ -1363,66 +1363,72 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isVoiceAgentReady() {
     });
 }
 
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::voiceAgentTranscribe(
-    const std::string& audioBase64) {
-    return Promise<std::string>::async([this, audioBase64]() -> std::string {
-        LOGI("Voice agent transcribing...");
-
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::voiceAgentTranscribeProto(
+    const std::shared_ptr<ArrayBuffer>& audioBytes) {
+    auto bytes = copyVoiceArrayBufferBytes(audioBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
         rac_voice_agent_handle_t handle = getGlobalVoiceAgentHandle();
-        if (!handle) {
-            throw std::runtime_error("Voice agent not available");
+        auto fn = proto_compat::symbol<proto_compat::VoiceAgentTranscribeProtoFn>(
+            "rac_voice_agent_transcribe_proto");
+        if (!handle || !fn) {
+            LOGE("voiceAgentTranscribeProto: handle or proto ABI unavailable");
+            return emptyVoiceProtoBuffer();
         }
-
-        // Decode base64 audio
-        std::vector<uint8_t> audioData = base64Decode(audioBase64);
-        if (audioData.empty()) {
-            throw std::runtime_error("Failed to decode audio data");
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
+        rac_result_t rc = fn(static_cast<void*>(handle), data, bytes.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("voiceAgentTranscribeProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
         }
-
-        char* transcription = nullptr;
-        rac_result_t status = rac_voice_agent_transcribe(
-            handle, audioData.data(), audioData.size(), &transcription);
-
-        if (status != RAC_SUCCESS) {
-            throw std::runtime_error("Transcription failed: " + std::to_string(status));
-        }
-
-        std::string result = transcription ? transcription : "";
-        if (transcription) {
-            free(transcription);
-        }
-
-        return result;
+        return copyVoiceProtoBuffer(out, "voiceAgentTranscribeProto");
     });
 }
 
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::voiceAgentSynthesizeSpeech(
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::voiceAgentSynthesizeSpeechProto(
     const std::string& text) {
-    return Promise<std::string>::async([this, text]() -> std::string {
-        LOGI("Voice agent synthesizing speech...");
-
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([text]() {
         rac_voice_agent_handle_t handle = getGlobalVoiceAgentHandle();
-        if (!handle) {
-            throw std::runtime_error("Voice agent not available");
+        auto fn = proto_compat::symbol<proto_compat::VoiceAgentSynthesizeSpeechProtoFn>(
+            "rac_voice_agent_synthesize_speech_proto");
+        if (!handle || !fn) {
+            LOGE("voiceAgentSynthesizeSpeechProto: handle or proto ABI unavailable");
+            return emptyVoiceProtoBuffer();
         }
-
-        void* audioData = nullptr;
-        size_t audioSize = 0;
-        rac_result_t status = rac_voice_agent_synthesize_speech(
-            handle, text.c_str(), &audioData, &audioSize);
-
-        if (status != RAC_SUCCESS) {
-            throw std::runtime_error("Speech synthesis failed: " + std::to_string(status));
+        // Encode a minimal VoiceAgentSynthesizeSpeechProtoRequest on the fly.
+        // Proto structure at idl/voice_agent_service.proto:
+        //   message VoiceAgentSynthesizeSpeechProtoRequest {
+        //     string text = 1;
+        //     string session_id = 2;
+        //     TTSOptions options = 3;
+        //   }
+        // Field 1 (text) wire-tag = (1<<3)|2 = 0x0A.
+        std::vector<uint8_t> requestBytes;
+        if (!text.empty()) {
+            requestBytes.push_back(0x0A); // tag=1, wire=length-delimited
+            // Varint-encode the length.
+            uint32_t len = static_cast<uint32_t>(text.size());
+            while (len >= 0x80) {
+                requestBytes.push_back(static_cast<uint8_t>((len & 0x7F) | 0x80));
+                len >>= 7;
+            }
+            requestBytes.push_back(static_cast<uint8_t>(len & 0x7F));
+            requestBytes.insert(requestBytes.end(), text.begin(), text.end());
         }
-
-        // Encode audio to base64
-        std::string audioBase64 = base64Encode(static_cast<uint8_t*>(audioData), audioSize);
-
-        if (audioData) {
-            free(audioData);
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        const uint8_t* data = requestBytes.empty() ? nullptr : requestBytes.data();
+        rac_result_t rc = fn(static_cast<void*>(handle), data, requestBytes.size(), &out);
+        if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
+            LOGE("voiceAgentSynthesizeSpeechProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyVoiceProtoBuffer();
         }
-
-        return audioBase64;
+        return copyVoiceProtoBuffer(out, "voiceAgentSynthesizeSpeechProto");
     });
 }
 

@@ -22,12 +22,12 @@ import ai.runanywhere.proto.v1.StructuredOutputValidationRequest
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStructuredOutput
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
-import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.withContext
+import java.util.UUID
 
 actual suspend fun RunAnywhere.generateStructured(
     prompt: String,

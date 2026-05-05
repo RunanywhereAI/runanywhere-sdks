@@ -6,16 +6,12 @@
  * implementations via Emscripten's `addFunction()`, then writes the resulting
  * function-table indices into the struct in WASM memory.
  *
- * Field order is the same as the deleted V1 PlatformAdapter and matches
- * `rac_platform_adapter.h`:
- *
- *   file_exists, file_read, file_write, file_delete,
- *   secure_get, secure_set, secure_delete,
- *   log, track_error, now_ms, get_memory_info,
- *   http_download, http_download_cancel, extract_archive,
- *   user_data
- *
- * Pointer width on wasm32 is 4 bytes.
+ * IMPORTANT: every field offset comes from a runtime
+ * `_rac_wasm_offsetof_platform_adapter_<field>()` helper compiled into
+ * `wasm/src/wasm_exports.cpp`. We do NOT hard-code `PTR_SIZE = 4` or a
+ * sequential accumulator — the struct layout depends on alignment/padding
+ * and would silently corrupt memory on any reorder/add if TypeScript baked
+ * it in.
  */
 
 import { SDKLogger } from '@runanywhere/web';
@@ -84,29 +80,43 @@ export class PlatformAdapter {
       getMemoryInfo: this.registerGetMemoryInfo(),
     };
 
-    const PTR_SIZE = 4;
-    let offset = 0;
-    m.setValue(this.adapterPtr + offset, this.callbacks.fileExists, '*'); offset += PTR_SIZE;
-    m.setValue(this.adapterPtr + offset, this.callbacks.fileRead, '*'); offset += PTR_SIZE;
-    m.setValue(this.adapterPtr + offset, this.callbacks.fileWrite, '*'); offset += PTR_SIZE;
-    m.setValue(this.adapterPtr + offset, this.callbacks.fileDelete, '*'); offset += PTR_SIZE;
-    m.setValue(this.adapterPtr + offset, this.callbacks.secureGet, '*'); offset += PTR_SIZE;
-    m.setValue(this.adapterPtr + offset, this.callbacks.secureSet, '*'); offset += PTR_SIZE;
-    m.setValue(this.adapterPtr + offset, this.callbacks.secureDelete, '*'); offset += PTR_SIZE;
-    m.setValue(this.adapterPtr + offset, this.callbacks.log, '*'); offset += PTR_SIZE;
-    // track_error (optional) → null
-    m.setValue(this.adapterPtr + offset, 0, '*'); offset += PTR_SIZE;
-    m.setValue(this.adapterPtr + offset, this.callbacks.nowMs, '*'); offset += PTR_SIZE;
-    m.setValue(this.adapterPtr + offset, this.callbacks.getMemoryInfo, '*'); offset += PTR_SIZE;
+    // Runtime struct offsets — each helper must be exported by
+    // wasm/src/wasm_exports.cpp. If any is missing, fail loudly rather than
+    // silently corrupting memory with a bad fallback.
+    const getOffset = (name: string): number => {
+      const fn = (m as unknown as Record<string, unknown>)[
+        `_rac_wasm_offsetof_platform_adapter_${name}`
+      ];
+      if (typeof fn !== 'function') {
+        throw new Error(
+          `WASM module missing _rac_wasm_offsetof_platform_adapter_${name} export; ` +
+          `rebuild racommons-llamacpp.wasm from wasm/src/wasm_exports.cpp.`,
+        );
+      }
+      return (fn as () => number)();
+    };
+
+    m.setValue(this.adapterPtr + getOffset('file_exists'), this.callbacks.fileExists, '*');
+    m.setValue(this.adapterPtr + getOffset('file_read'), this.callbacks.fileRead, '*');
+    m.setValue(this.adapterPtr + getOffset('file_write'), this.callbacks.fileWrite, '*');
+    m.setValue(this.adapterPtr + getOffset('file_delete'), this.callbacks.fileDelete, '*');
+    m.setValue(this.adapterPtr + getOffset('secure_get'), this.callbacks.secureGet, '*');
+    m.setValue(this.adapterPtr + getOffset('secure_set'), this.callbacks.secureSet, '*');
+    m.setValue(this.adapterPtr + getOffset('secure_delete'), this.callbacks.secureDelete, '*');
+    m.setValue(this.adapterPtr + getOffset('log'), this.callbacks.log, '*');
+    // track_error (optional) → null. Web does not forward platform errors
+    // into Sentry today; leaving NULL preserves the commons null-check path.
+    m.setValue(this.adapterPtr + getOffset('track_error'), 0, '*');
+    m.setValue(this.adapterPtr + getOffset('now_ms'), this.callbacks.nowMs, '*');
+    m.setValue(this.adapterPtr + getOffset('get_memory_info'), this.callbacks.getMemoryInfo, '*');
     // http_download (optional) → null. The HTTPAdapter / FetchHttpTransport
     // path takes over once setRunanywhereModule installs the module.
-    m.setValue(this.adapterPtr + offset, 0, '*'); offset += PTR_SIZE;
-    // http_download_cancel
-    m.setValue(this.adapterPtr + offset, 0, '*'); offset += PTR_SIZE;
-    // extract_archive — native libarchive is compiled into WASM
-    m.setValue(this.adapterPtr + offset, 0, '*'); offset += PTR_SIZE;
+    m.setValue(this.adapterPtr + getOffset('http_download'), 0, '*');
+    m.setValue(this.adapterPtr + getOffset('http_download_cancel'), 0, '*');
+    // extract_archive — native libarchive is compiled into WASM.
+    m.setValue(this.adapterPtr + getOffset('extract_archive'), 0, '*');
     // user_data
-    m.setValue(this.adapterPtr + offset, 0, '*');
+    m.setValue(this.adapterPtr + getOffset('user_data'), 0, '*');
 
     const result = setPlatformAdapter(this.adapterPtr);
     if (result !== 0) {

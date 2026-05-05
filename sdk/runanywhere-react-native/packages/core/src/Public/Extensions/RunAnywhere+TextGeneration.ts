@@ -14,6 +14,7 @@ import {
   isNativeModuleAvailable,
 } from '../../native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
 import type {
   LLMGenerationOptions,
   LLMGenerationResult,
@@ -81,7 +82,7 @@ function encodeLLMGenerateRequest(request: ReturnType<typeof buildLLMGenerateReq
 function decodeLLMGenerationResult(buffer: ArrayBuffer): LLMGenerationResult {
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
-    throw new Error('LLM proto generation returned an empty result');
+    throw SDKException.protoDecodeFailed('llmGenerateProto');
   }
   return LLMGenerationResultMessage.decode(bytes);
 }
@@ -136,7 +137,7 @@ export async function generate(
   options?: LLMGenerationOptions
 ): Promise<LLMGenerationResult> {
   if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+    throw SDKException.nativeModuleUnavailable();
   }
   const native = requireNativeModule();
   const requestBytes = encodeLLMGenerateRequest(
@@ -170,7 +171,7 @@ export function generateStream(
   options?: LLMGenerationOptions,
 ): AsyncIterable<LLMStreamEventType> {
   if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+    throw SDKException.nativeModuleUnavailable();
   }
 
   const native = requireNativeModule();

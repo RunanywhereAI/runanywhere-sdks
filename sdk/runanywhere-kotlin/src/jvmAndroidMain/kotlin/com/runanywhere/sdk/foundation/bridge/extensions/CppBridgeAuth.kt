@@ -67,7 +67,8 @@ object CppBridgeAuth {
         synchronized(this) {
             if (initialized) return
             RunAnywhereBridge.racAuthInit()
-            com.runanywhere.sdk.foundation.SDKLogger(TAG)
+            com.runanywhere.sdk.foundation
+                .SDKLogger(TAG)
                 .info("Native auth manager initialized with secure storage vtable")
             initialized = true
         }

@@ -150,8 +150,8 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> initializeVoiceAgentWithLoadedModels() = 0;
       virtual std::shared_ptr<Promise<double>> getVoiceAgentHandle() = 0;
       virtual std::shared_ptr<Promise<bool>> isVoiceAgentReady() = 0;
-      virtual std::shared_ptr<Promise<std::string>> voiceAgentTranscribe(const std::string& audioBase64) = 0;
-      virtual std::shared_ptr<Promise<std::string>> voiceAgentSynthesizeSpeech(const std::string& text) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentTranscribeProto(const std::shared_ptr<ArrayBuffer>& audioBytes) = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentSynthesizeSpeechProto(const std::string& text) = 0;
       virtual std::shared_ptr<Promise<void>> cleanupVoiceAgent() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentInitializeProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentComponentStatesProto() = 0;
@@ -181,7 +181,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogQueryProto(const std::shared_ptr<ArrayBuffer>& queryBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogGetProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> loraCatalogMarkDownloadCompletedProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
-      virtual std::shared_ptr<Promise<double>> solutionCreateFromProto(const std::string& configBytesBase64) = 0;
+      virtual std::shared_ptr<Promise<double>> solutionCreateFromProto(const std::shared_ptr<ArrayBuffer>& configBytes) = 0;
       virtual std::shared_ptr<Promise<double>> solutionCreateFromYaml(const std::string& yamlText) = 0;
       virtual std::shared_ptr<Promise<bool>> solutionStart(double handle) = 0;
       virtual std::shared_ptr<Promise<bool>> solutionStop(double handle) = 0;

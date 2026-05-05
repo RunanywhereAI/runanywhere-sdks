@@ -155,15 +155,6 @@ fun ByteArray.toVoiceAgentTurnRequest(
         encoding = encoding,
     )
 
-internal fun VoiceAgentTurnRequest.unsupportedAndroidAudioOnlyFields(): List<String> {
-    val unsupported = mutableListOf<String>()
-    if (request_id.isNotBlank()) unsupported += "request_id"
-    if (session_id.isNotBlank()) unsupported += "session_id"
-    if (session_config != null) unsupported += "session_config"
-    if (metadata.isNotEmpty()) unsupported += "metadata"
-    return unsupported
-}
-
 /**
  * Transcribe audio using the voice-agent's STT component.
  *

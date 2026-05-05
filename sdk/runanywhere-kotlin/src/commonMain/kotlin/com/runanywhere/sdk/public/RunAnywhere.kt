@@ -10,9 +10,9 @@
 
 package com.runanywhere.sdk.public
 
-import com.runanywhere.sdk.foundation.LogLevel
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.public.events.EventBus
+import com.runanywhere.sdk.public.extensions.LogLevel
 import com.runanywhere.sdk.utils.SDKConstants
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock

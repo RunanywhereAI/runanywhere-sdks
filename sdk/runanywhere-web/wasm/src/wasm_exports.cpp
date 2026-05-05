@@ -33,6 +33,7 @@
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
 #include "rac/infrastructure/storage/rac_storage_analyzer.h"
+#include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
 #include "rac/infrastructure/network/rac_environment.h"
 #include "rac/infrastructure/http/rac_http_client.h"
@@ -298,6 +299,62 @@ int rac_wasm_ping(void) {
 // ---- rac_config_t ----
 EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_config_log_level(void) {
     return (int)offsetof(rac_config_t, log_level);
+}
+
+// ---- rac_platform_adapter_t ----
+// The JS layer (sdk/runanywhere-web/packages/llamacpp/src/Foundation/PlatformAdapter.ts)
+// packs function-pointer fields into this struct. Every field offset is
+// exposed here so the TypeScript side never hard-codes `PTR_SIZE = 4` or
+// a sequential accumulator — same rule as the HTTP struct helpers below.
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_file_exists(void) {
+    return (int)offsetof(rac_platform_adapter_t, file_exists);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_file_read(void) {
+    return (int)offsetof(rac_platform_adapter_t, file_read);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_file_write(void) {
+    return (int)offsetof(rac_platform_adapter_t, file_write);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_file_delete(void) {
+    return (int)offsetof(rac_platform_adapter_t, file_delete);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_secure_get(void) {
+    return (int)offsetof(rac_platform_adapter_t, secure_get);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_secure_set(void) {
+    return (int)offsetof(rac_platform_adapter_t, secure_set);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_secure_delete(void) {
+    return (int)offsetof(rac_platform_adapter_t, secure_delete);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_log(void) {
+    return (int)offsetof(rac_platform_adapter_t, log);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_track_error(void) {
+    return (int)offsetof(rac_platform_adapter_t, track_error);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_now_ms(void) {
+    return (int)offsetof(rac_platform_adapter_t, now_ms);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_get_memory_info(void) {
+    return (int)offsetof(rac_platform_adapter_t, get_memory_info);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_http_download(void) {
+    return (int)offsetof(rac_platform_adapter_t, http_download);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_http_download_cancel(void) {
+    return (int)offsetof(rac_platform_adapter_t, http_download_cancel);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_extract_archive(void) {
+    return (int)offsetof(rac_platform_adapter_t, extract_archive);
+}
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_platform_adapter_user_data(void) {
+    return (int)offsetof(rac_platform_adapter_t, user_data);
+}
+
+// ---- rac_config_t (platform_adapter field) ----
+EMSCRIPTEN_KEEPALIVE int rac_wasm_offsetof_config_platform_adapter(void) {
+    return (int)offsetof(rac_config_t, platform_adapter);
 }
 
 // ---- rac_llm_options_t ----

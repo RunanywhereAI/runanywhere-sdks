@@ -19,7 +19,7 @@ const logger = new SDKLogger('AudioPlaybackManager');
 function safePublish(eventType: string, event: Record<string, unknown>): void {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { EventBus } = require('../../Public/Events');
+    const { EventBus } = require('../../Internal/Events');
     if (EventBus?.publish) {
       EventBus.publish(eventType, event);
     }

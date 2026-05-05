@@ -17,12 +17,11 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.processVoiceTurn
 import com.runanywhere.sdk.public.extensions.streamVoiceAgent
 import com.runanywhere.sdk.public.extensions.toVoiceAgentTurnRequest
-import com.runanywhere.sdk.public.extensions.unsupportedAndroidAudioOnlyFields
 import kotlinx.coroutines.flow.Flow
+import okio.ByteString.Companion.toByteString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
-import okio.ByteString.Companion.toByteString
 
 class VoiceAgentGeneratedSessionSurfaceTest {
     @Test
@@ -81,7 +80,7 @@ class VoiceAgentGeneratedSessionSurfaceTest {
     }
 
     @Test
-    fun `audio-only voice turn request leaves unsupported native request fields empty`() {
+    fun `audio-only voice turn request preserves audio fields`() {
         val request =
             byteArrayOf(1, 2, 3).toVoiceAgentTurnRequest(
                 sampleRateHz = 16000,
@@ -90,11 +89,13 @@ class VoiceAgentGeneratedSessionSurfaceTest {
             )
 
         assertEquals(byteArrayOf(1, 2, 3).toByteString(), request.audio_data)
-        assertEquals(emptyList(), request.unsupportedAndroidAudioOnlyFields())
+        assertEquals(16000, request.sample_rate_hz)
+        assertEquals(1, request.channels)
+        assertEquals(AudioEncoding.AUDIO_ENCODING_PCM_S16_LE, request.encoding)
     }
 
     @Test
-    fun `session config is flagged until native generated turn request ABI exists`() {
+    fun `voice agent turn request accepts full session fields`() {
         val request =
             VoiceAgentTurnRequest(
                 audio_data = byteArrayOf(1).toByteString(),
@@ -102,7 +103,9 @@ class VoiceAgentGeneratedSessionSurfaceTest {
                 metadata = mapOf("source" to "test"),
             )
 
-        assertEquals(listOf("session_config", "metadata"), request.unsupportedAndroidAudioOnlyFields())
+        // Wave D-7 / KOT-11: Kotlin forwards the full VoiceAgentTurnRequest
+        // bytes to the native session ABI — no field rejection.
+        assertEquals("test", request.metadata["source"])
     }
 }
 

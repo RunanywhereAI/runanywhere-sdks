@@ -38,9 +38,7 @@ import ai.runanywhere.proto.v1.RAGStatistics
 import ai.runanywhere.proto.v1.SDKEvent
 import ai.runanywhere.proto.v1.STTOptions
 import ai.runanywhere.proto.v1.STTOutput
-import ai.runanywhere.proto.v1.STTPartialResult
 import ai.runanywhere.proto.v1.STTStreamEvent
-import ai.runanywhere.proto.v1.STTStreamEventKind
 import ai.runanywhere.proto.v1.TTSOptions
 import ai.runanywhere.proto.v1.TTSOutput
 import ai.runanywhere.proto.v1.TTSVoiceInfo
@@ -53,7 +51,6 @@ import ai.runanywhere.proto.v1.VLMImage
 import ai.runanywhere.proto.v1.VLMResult
 import ai.runanywhere.proto.v1.VoiceAgentComponentStates
 import ai.runanywhere.proto.v1.VoiceAgentComposeConfig
-import ai.runanywhere.proto.v1.VoiceAgentResult
 import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
@@ -135,13 +132,14 @@ object CppBridgeLLMProto {
                     "Native library not available. Please ensure the native libraries are bundled in your APK.",
                 )
             }
-            val result = try {
-                RunAnywhereBridge.racLlmComponentCreate()
-            } catch (e: UnsatisfiedLinkError) {
-                throw SDKException.notInitialized(
-                    "LLM native library not available: ${e.message}",
-                )
-            }
+            val result =
+                try {
+                    RunAnywhereBridge.racLlmComponentCreate()
+                } catch (e: UnsatisfiedLinkError) {
+                    throw SDKException.notInitialized(
+                        "LLM native library not available: ${e.message}",
+                    )
+                }
             if (result == 0L) return -1
             handle = result
             return 0
@@ -213,13 +211,14 @@ object CppBridgeSTTProto {
                     "Native library not available. Please ensure the native libraries are bundled in your APK.",
                 )
             }
-            val result = try {
-                RunAnywhereBridge.racSttComponentCreate()
-            } catch (e: UnsatisfiedLinkError) {
-                throw SDKException.notInitialized(
-                    "STT native library not available: ${e.message}",
-                )
-            }
+            val result =
+                try {
+                    RunAnywhereBridge.racSttComponentCreate()
+                } catch (e: UnsatisfiedLinkError) {
+                    throw SDKException.notInitialized(
+                        "STT native library not available: ${e.message}",
+                    )
+                }
             if (result == 0L) return -1
             handle = result
             return 0
@@ -233,8 +232,6 @@ object CppBridgeSTTProto {
             handle = 0L
         }
     }
-
-    private fun nowUs(): Long = System.currentTimeMillis() * 1000L
 
     fun transcribe(audioData: ByteArray, options: STTOptions): STTOutput {
         create()
@@ -255,79 +252,18 @@ object CppBridgeSTTProto {
         onEvent: (STTStreamEvent) -> Boolean,
     ) {
         create()
-        var sequence = 0L
-
-        fun nextSequence(): Long = ++sequence
-
-        fun eventFromPartial(partial: STTPartialResult): STTStreamEvent {
-            val kind =
-                if (partial.is_final || partial.final_output != null) {
-                    STTStreamEventKind.STT_STREAM_EVENT_KIND_FINAL
-                } else {
-                    STTStreamEventKind.STT_STREAM_EVENT_KIND_PARTIAL
-                }
-            return STTStreamEvent(
-                seq = nextSequence(),
-                timestamp_us = nowUs(),
-                request_id = partial.request_id,
-                kind = kind,
-                partial = partial,
-                final_output = partial.final_output,
-            )
-        }
-
-        fun eventFromPayload(bytes: ByteArray): STTStreamEvent =
-            try {
-                val event = STTStreamEvent.ADAPTER.decode(bytes)
-                if (
-                    event.kind != STTStreamEventKind.STT_STREAM_EVENT_KIND_UNSPECIFIED ||
-                    event.partial != null ||
-                    event.final_output != null ||
-                    event.error_message != null
-                ) {
-                    event.copy(
-                        seq = event.seq.takeIf { it != 0L } ?: nextSequence(),
-                        timestamp_us = event.timestamp_us.takeIf { it != 0L } ?: nowUs(),
-                    )
-                } else {
-                    eventFromPartial(STTPartialResult.ADAPTER.decode(bytes))
-                }
-            } catch (_: Exception) {
-                eventFromPartial(STTPartialResult.ADAPTER.decode(bytes))
-            }
-
-        if (
-            !onEvent(
-                STTStreamEvent(
-                    seq = nextSequence(),
-                    timestamp_us = nowUs(),
-                    kind = STTStreamEventKind.STT_STREAM_EVENT_KIND_STARTED,
-                ),
-            )
-        ) {
-            return
-        }
-
+        // Native emits canonical STTStreamEvent envelopes (STARTED / PARTIAL /
+        // FINAL / ERROR with monotonically-increasing seq and timestamp_us).
+        // Kotlin simply decodes and forwards.
         val rc =
             RunAnywhereBridge.racSttComponentTranscribeStreamProto(
                 getHandle(),
                 audioData,
                 STTOptions.ADAPTER.encode(options),
                 NativeProtoProgressListener { bytes ->
-                    onEvent(eventFromPayload(bytes))
+                    onEvent(STTStreamEvent.ADAPTER.decode(bytes))
                 },
             )
-        if (rc != RunAnywhereBridge.RAC_SUCCESS) {
-            onEvent(
-                STTStreamEvent(
-                    seq = nextSequence(),
-                    timestamp_us = nowUs(),
-                    kind = STTStreamEventKind.STT_STREAM_EVENT_KIND_ERROR,
-                    error_message = "racSttComponentTranscribeStreamProto failed with rc=$rc",
-                    error_code = rc,
-                ),
-            )
-        }
         checkRc(rc, "racSttComponentTranscribeStreamProto")
     }
 }
@@ -357,13 +293,14 @@ object CppBridgeTTSProto {
                     "Native library not available. Please ensure the native libraries are bundled in your APK.",
                 )
             }
-            val result = try {
-                RunAnywhereBridge.racTtsComponentCreate()
-            } catch (e: UnsatisfiedLinkError) {
-                throw SDKException.notInitialized(
-                    "TTS native library not available: ${e.message}",
-                )
-            }
+            val result =
+                try {
+                    RunAnywhereBridge.racTtsComponentCreate()
+                } catch (e: UnsatisfiedLinkError) {
+                    throw SDKException.notInitialized(
+                        "TTS native library not available: ${e.message}",
+                    )
+                }
             if (result == 0L) return -1
             handle = result
             return 0
@@ -458,13 +395,14 @@ object CppBridgeVADProto {
                     "Native library not available. Please ensure the native libraries are bundled in your APK.",
                 )
             }
-            val result = try {
-                RunAnywhereBridge.racVadComponentCreate()
-            } catch (e: UnsatisfiedLinkError) {
-                throw SDKException.notInitialized(
-                    "VAD native library not available: ${e.message}",
-                )
-            }
+            val result =
+                try {
+                    RunAnywhereBridge.racVadComponentCreate()
+                } catch (e: UnsatisfiedLinkError) {
+                    throw SDKException.notInitialized(
+                        "VAD native library not available: ${e.message}",
+                    )
+                }
             if (result == 0L) return -1
             handle = result
             return 0
@@ -920,12 +858,5 @@ object CppBridgeVoiceAgentProto {
             VoiceAgentComponentStates.ADAPTER,
             RunAnywhereBridge.racVoiceAgentComponentStatesProto(handle),
             "racVoiceAgentComponentStatesProto",
-        )
-
-    fun processVoiceTurn(handle: Long, audioData: ByteArray): VoiceAgentResult =
-        decodeOrThrow(
-            VoiceAgentResult.ADAPTER,
-            RunAnywhereBridge.racVoiceAgentProcessVoiceTurnProto(handle, audioData),
-            "racVoiceAgentProcessVoiceTurnProto",
         )
 }

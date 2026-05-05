@@ -750,6 +750,11 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_sdk_is_initialized"
     "_rac_sdk_reset"
 
+    # Auth manager (read-only state query — used by RunAnywhere.isAuthenticated).
+    # Future auth flows (authenticate/refresh) will need additional exports
+    # paired with HTTP transport + secure storage wiring.
+    "_rac_auth_is_authenticated"
+
     # Telemetry
     "_rac_telemetry_manager_create"
     "_rac_telemetry_manager_destroy"
@@ -787,7 +792,26 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_wasm_get_version_minor"
     "_rac_wasm_get_version_patch"
     "_rac_wasm_sizeof_platform_adapter"
+    # Per-field offsetof helpers for rac_platform_adapter_t — required so the
+    # TS PlatformAdapter never hard-codes PTR_SIZE or sequential offsets.
+    "_rac_wasm_offsetof_platform_adapter_file_exists"
+    "_rac_wasm_offsetof_platform_adapter_file_read"
+    "_rac_wasm_offsetof_platform_adapter_file_write"
+    "_rac_wasm_offsetof_platform_adapter_file_delete"
+    "_rac_wasm_offsetof_platform_adapter_secure_get"
+    "_rac_wasm_offsetof_platform_adapter_secure_set"
+    "_rac_wasm_offsetof_platform_adapter_secure_delete"
+    "_rac_wasm_offsetof_platform_adapter_log"
+    "_rac_wasm_offsetof_platform_adapter_track_error"
+    "_rac_wasm_offsetof_platform_adapter_now_ms"
+    "_rac_wasm_offsetof_platform_adapter_get_memory_info"
+    "_rac_wasm_offsetof_platform_adapter_http_download"
+    "_rac_wasm_offsetof_platform_adapter_http_download_cancel"
+    "_rac_wasm_offsetof_platform_adapter_extract_archive"
+    "_rac_wasm_offsetof_platform_adapter_user_data"
     "_rac_wasm_sizeof_config"
+    "_rac_wasm_offsetof_config_platform_adapter"
+    "_rac_wasm_offsetof_config_log_level"
     "_rac_wasm_sizeof_llm_options"
     "_rac_wasm_sizeof_llm_result"
     "_rac_wasm_create_llm_options_default"

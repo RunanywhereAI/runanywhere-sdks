@@ -13,12 +13,12 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import ai.runanywhere.proto.v1.ModelInfo as ProtoModelInfo
 import ai.runanywhere.proto.v1.ModelInfoList as ProtoModelInfoList
 import ai.runanywhere.proto.v1.ModelQuery as ProtoModelQuery
 import ai.runanywhere.proto.v1.ModelRegistryRefreshRequest as ProtoModelRegistryRefreshRequest
 import ai.runanywhere.proto.v1.ModelRegistryRefreshResult as ProtoModelRegistryRefreshResult
-import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 /**
  * Model registry bridge that provides direct access to the C++ model registry.
@@ -126,8 +126,9 @@ object CppBridgeModelRegistry {
     fun save(model: ProtoModelInfo) {
         log(LogLevel.DEBUG, "Saving model to C++ registry: ${model.id} (framework=${model.framework})")
 
-        val result = registerProto(model)
-            ?: throw RuntimeException("Native model registry proto ABI unavailable")
+        val result =
+            registerProto(model)
+                ?: throw RuntimeException("Native model registry proto ABI unavailable")
 
         if (result != RunAnywhereBridge.RAC_SUCCESS) {
             log(LogLevel.ERROR, "Failed to save model: ${model.id}, error=$result")

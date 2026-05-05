@@ -1,43 +1,20 @@
 package com.runanywhere.sdk.foundation
 
 import com.runanywhere.sdk.public.SDKEnvironment
+import com.runanywhere.sdk.public.extensions.LogLevel
 import com.runanywhere.sdk.utils.SimpleInstant
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 // =============================================================================
-// LOG LEVEL
+// LOG LEVEL (consolidated — see com.runanywhere.sdk.public.extensions.LogLevel)
 // =============================================================================
-
-/**
- * Log severity levels matching runanywhere-commons and Swift SDK.
- * Ordered from least to most severe.
- */
-enum class LogLevel(
-    val value: Int,
-) : Comparable<LogLevel> {
-    TRACE(0),
-    DEBUG(1),
-    INFO(2),
-    WARNING(3),
-    ERROR(4),
-    FAULT(5),
-    ;
-
-    override fun toString(): String =
-        when (this) {
-            TRACE -> "trace"
-            DEBUG -> "debug"
-            INFO -> "info"
-            WARNING -> "warning"
-            ERROR -> "error"
-            FAULT -> "fault"
-        }
-
-    companion object {
-        fun fromValue(value: Int): LogLevel = entries.find { it.value == value } ?: INFO
-    }
-}
+//
+// The canonical LogLevel is the public API enum defined in
+// RunAnywhere+Logging.kt. Values: NONE(0), ERROR(1), WARNING(2), INFO(3),
+// DEBUG(4), VERBOSE(5). Ordered from "no logs" to "all logs", i.e. higher
+// value = more verbose. Filtering semantics: log iff `level.value <=
+// minLogLevel.value` AND minLogLevel != NONE.
 
 // =============================================================================
 // LOG ENTRY
@@ -296,8 +273,12 @@ object Logging {
     ) {
         val config = _configuration
 
-        // Check if level meets minimum threshold
-        if (level < config.minLogLevel) return
+        // Check if level meets minimum threshold. Public LogLevel values are
+        // inverse to severity: NONE(0) = no logs, VERBOSE(5) = all logs.
+        // A log is emitted iff its value is <= the configured threshold,
+        // and the threshold is not NONE.
+        if (config.minLogLevel == LogLevel.NONE) return
+        if (level.value > config.minLogLevel.value) return
 
         // Check if any logging is enabled
         if (!config.enableLocalLogging && !config.enableRemoteLogging && _destinations.isEmpty()) return
@@ -390,12 +371,12 @@ object Logging {
     private fun printToConsole(entry: LogEntry) {
         val levelIndicator =
             when (entry.level) {
-                LogLevel.TRACE -> "[TRACE]"
+                LogLevel.NONE -> return
+                LogLevel.VERBOSE -> "[VERBOSE]"
                 LogLevel.DEBUG -> "[DEBUG]"
                 LogLevel.INFO -> "[INFO]"
                 LogLevel.WARNING -> "[WARN]"
                 LogLevel.ERROR -> "[ERROR]"
-                LogLevel.FAULT -> "[FAULT]"
             }
 
         val output =
@@ -497,14 +478,14 @@ class SDKLogger(
     // =============================================================================
 
     /**
-     * Log a trace-level message.
+     * Log a trace-level message (routed to VERBOSE in the public enum).
      */
     fun trace(
         message: String,
         metadata: Map<String, Any?>? = null,
     ) {
         Logging.log(
-            level = LogLevel.TRACE,
+            level = LogLevel.VERBOSE,
             category = category,
             message = message,
             metadata = metadata,
@@ -592,7 +573,8 @@ class SDKLogger(
     }
 
     /**
-     * Log a fault-level message (critical system errors).
+     * Log a fault-level message (critical system errors). Routed to ERROR
+     * in the consolidated public enum — FAULT has no distinct level.
      */
     fun fault(
         message: String,
@@ -611,7 +593,7 @@ class SDKLogger(
             }
 
         Logging.log(
-            level = LogLevel.FAULT,
+            level = LogLevel.ERROR,
             category = category,
             message = message,
             metadata = faultMetadata,

@@ -2,16 +2,16 @@
 ///
 /// Dependency injection container for SDK services. Most services now
 /// live behind the commons C ABI via FFI; this container only wires up
-/// the shared HTTP client and telemetry service plus a few config
-/// bookkeeping fields.
+/// the shared HTTP client and a few config bookkeeping fields. Telemetry
+/// is fully commons-owned — Flutter no longer ships a Dart-side facade.
 library service_container;
 
 import 'dart:async';
 
 import 'package:runanywhere/adapters/http_client_adapter.dart';
-import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
+import 'package:runanywhere/native/dart_bridge_telemetry.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 class ServiceContainer {
@@ -26,9 +26,6 @@ class ServiceContainer {
 
   /// Global HTTP client (commons-backed, FFI).
   HTTPClientAdapter get httpClient => HTTPClientAdapter.shared;
-
-  /// Telemetry service.
-  TelemetryService get telemetryService => TelemetryService.shared;
 
   /// Access the stored init params (if any).
   SDKInitParams? get initParams => _initParams;
@@ -50,7 +47,7 @@ class ServiceContainer {
       environment: environment,
     );
 
-    await _configureTelemetryService(environment: environment);
+    await _configureTelemetry(environment: environment);
   }
 
   void _configureHTTPClient({
@@ -75,31 +72,26 @@ class ServiceContainer {
     }
   }
 
-  Future<void> _configureTelemetryService({
+  Future<void> _configureTelemetry({
     required SDKEnvironment environment,
   }) async {
+    // Commons-owned telemetry manager handles its own init lifecycle. The
+    // SDK only needs to ensure the HTTP transport is configured (above) and
+    // perform the Phase 2 initialization that wires device info.
     final deviceId = await DartBridgeDevice.instance.getDeviceId();
-    TelemetryService.shared.configure(
-      deviceId: deviceId,
+    DartBridgeTelemetry.initializeSync(environment: environment);
+    await DartBridgeTelemetry.initialize(
       environment: environment,
+      deviceId: deviceId,
+      baseURL: HTTPClientAdapter.shared.isConfigured
+          ? _initParams?.baseURL.toString()
+          : null,
     );
-
-    final shouldEnable =
-        environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT ||
-            environment == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
-    final hasHttpTarget = HTTPClientAdapter.shared.isConfigured;
-    if (shouldEnable && !hasHttpTarget) {
-      logger.debug(
-        'Telemetry disabled: no usable HTTP target configured for ${environment.name}',
-      );
-    }
-    TelemetryService.shared.setEnabled(shouldEnable && hasHttpTarget);
   }
 
   void reset() {
     _logger = null;
     _initParams = null;
     HTTPClientAdapter.shared.resetForTesting();
-    TelemetryService.resetForTesting();
   }
 }

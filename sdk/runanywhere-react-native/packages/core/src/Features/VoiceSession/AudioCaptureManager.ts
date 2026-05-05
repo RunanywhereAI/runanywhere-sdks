@@ -20,7 +20,7 @@ function getEventBus() {
   if (!_eventBus) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      _eventBus = require('../../Public/Events').EventBus;
+      _eventBus = require('../../Internal/Events').EventBus;
     } catch {
       logger.warning('EventBus not available');
     }

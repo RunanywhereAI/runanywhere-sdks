@@ -11,6 +11,7 @@
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
 import type {
   VoiceAgentResult,
   VoiceSessionConfig,
@@ -18,6 +19,7 @@ import type {
 import {
   VoiceAgentComposeConfig,
   VoiceAgentResult as VoiceAgentResultMessage,
+  VoiceAgentTranscribeProtoRequest,
 } from '@runanywhere/proto-ts/voice_agent_service';
 import type { VoiceAgentComponentStates } from '@runanywhere/proto-ts/voice_events';
 import {
@@ -25,12 +27,10 @@ import {
 } from '@runanywhere/proto-ts/voice_events';
 import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 import {
-  STTLanguage,
   STTOutput as STTOutputMessage,
   type STTOutput as STTOutputType,
 } from '@runanywhere/proto-ts/stt_options';
 import { TTSOutput } from '@runanywhere/proto-ts/tts_options';
-import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 import { VoiceAgentStreamAdapter } from '../../Adapters/VoiceAgentStreamAdapter';
 import {
   arrayBufferToBytes,
@@ -39,18 +39,16 @@ import {
 
 const logger = new SDKLogger('RunAnywhere.VoiceAgent');
 
-/** Decode a base64 string to a `Uint8Array`. */
-function base64ToBytes(b64: string): Uint8Array {
-  if (!b64) return new Uint8Array(0);
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
+function ensureNative() {
+  if (!isNativeModuleAvailable()) {
+    throw SDKException.nativeModuleUnavailable();
+  }
+  return requireNativeModule();
 }
 
-function audioToArrayBuffer(audioData: ArrayBuffer | string): ArrayBuffer {
-  if (typeof audioData === 'string') {
-    return bytesToArrayBuffer(base64ToBytes(audioData));
+function audioToArrayBuffer(audioData: ArrayBuffer | Uint8Array): ArrayBuffer {
+  if (audioData instanceof Uint8Array) {
+    return bytesToArrayBuffer(audioData);
   }
   return audioData;
 }
@@ -74,10 +72,7 @@ function buildVoiceAgentComposeConfig(
  * Matches Swift: `RunAnywhere.getVoiceAgentComponentStates()`.
  */
 export async function getVoiceAgentComponentStates(): Promise<VoiceAgentComponentStates> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
-  }
-  const native = requireNativeModule();
+  const native = ensureNative();
   try {
     const bytes = await native.voiceAgentComponentStatesProto();
     return VoiceAgentComponentStatesMessage.decode(arrayBufferToBytes(bytes));
@@ -98,10 +93,7 @@ export async function areAllVoiceComponentsReady(): Promise<boolean> {
 export async function initializeVoiceAgent(
   config: VoiceSessionConfig
 ): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
-  }
-  const native = requireNativeModule();
+  const native = ensureNative();
   try {
     logger.info('Initializing voice agent...');
     const bytes = await native.voiceAgentInitializeProto(
@@ -125,10 +117,7 @@ export async function initializeVoiceAgent(
  * Initialize voice agent using already-loaded models.
  */
 export async function initializeVoiceAgentWithLoadedModels(): Promise<boolean> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
-  }
-  const native = requireNativeModule();
+  const native = ensureNative();
   try {
     logger.info('Initializing voice agent with loaded models...');
     const result = await native.initializeVoiceAgentWithLoadedModels();
@@ -156,19 +145,16 @@ export async function isVoiceAgentReady(): Promise<boolean> {
  * Matches Swift: `RunAnywhere.processVoiceTurn(_:)`.
  */
 export async function processVoiceTurn(
-  audioData: ArrayBuffer | string
+  audioData: ArrayBuffer | Uint8Array
 ): Promise<VoiceAgentResult> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
-  }
-  const native = requireNativeModule();
+  const native = ensureNative();
   try {
     const resultBytes = await native.voiceAgentProcessTurnProto(
       audioToArrayBuffer(audioData)
     );
     const bytes = arrayBufferToBytes(resultBytes);
     if (bytes.byteLength === 0) {
-      throw new Error('Voice agent proto turn returned an empty result');
+      throw SDKException.protoDecodeFailed('voiceAgentProcessTurnProto');
     }
     return VoiceAgentResultMessage.decode(bytes);
   } catch (error) {
@@ -179,114 +165,52 @@ export async function processVoiceTurn(
 }
 
 /**
- * Transcribe audio using the voice agent's STT component.
- *
- * Returns a `STTOutput` proto object.
+ * Transcribe audio using the voice agent's STT component via the native
+ * `rac_voice_agent_transcribe_proto` ABI (Wave D-7).
  *
  * Matches Swift SDK: `RunAnywhere.voiceAgentTranscribe(_:) → STTOutput` (§10).
  */
 export async function voiceAgentTranscribe(
-  audioData: ArrayBuffer | string
+  audioData: ArrayBuffer | Uint8Array
 ): Promise<STTOutputType> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+  const native = ensureNative();
+  const audioBytes =
+    audioData instanceof Uint8Array ? audioData : new Uint8Array(audioData);
+  const request = VoiceAgentTranscribeProtoRequest.create({
+    audioData: audioBytes,
+    sessionId: '',
+    sampleRate: 16000,
+    languageHint: '',
+    channels: 1,
+    encoding: 0,
+  });
+  const requestBytes = VoiceAgentTranscribeProtoRequest.encode(request).finish();
+  const resultBytes = await native.voiceAgentTranscribeProto(
+    bytesToArrayBuffer(requestBytes)
+  );
+  const bytes = arrayBufferToBytes(resultBytes);
+  if (bytes.byteLength === 0) {
+    throw SDKException.protoDecodeFailed('voiceAgentTranscribeProto');
   }
-  const native = requireNativeModule();
-  let base64Audio: string;
-  if (audioData instanceof ArrayBuffer) {
-    const bytes = new Uint8Array(audioData);
-    base64Audio = btoa(String.fromCharCode(...bytes));
-  } else {
-    base64Audio = audioData;
-  }
-  const raw = await native.voiceAgentTranscribe(base64Audio);
-  // The native call may return a plain string (the transcript text) or a
-  // JSON-encoded STTOutput. Normalise to STTOutput shape.
-  try {
-    const parsed = JSON.parse(raw) as Partial<STTOutputType>;
-    return STTOutputMessage.fromPartial({
-      text: parsed.text ?? raw,
-      language: parsed.language ?? STTLanguage.STT_LANGUAGE_UNSPECIFIED,
-      confidence: parsed.confidence ?? 1.0,
-      words: parsed.words ?? [],
-      alternatives: parsed.alternatives ?? [],
-      metadata: parsed.metadata,
-      timestampMs: parsed.timestampMs ?? Date.now(),
-      durationMs: parsed.durationMs ?? 0,
-    });
-  } catch {
-    // Native returned a plain text string — wrap it.
-    return STTOutputMessage.fromPartial({
-      text: raw,
-      language: STTLanguage.STT_LANGUAGE_UNSPECIFIED,
-      confidence: 1.0,
-      words: [],
-      alternatives: [],
-      timestampMs: Date.now(),
-      durationMs: 0,
-    });
-  }
+  return STTOutputMessage.decode(bytes);
 }
 
 /**
- * Synthesize speech using the voice-agent TTS component.
- *
- * Returns a `TTSOutput` proto object.
+ * Synthesize speech using the voice-agent TTS component via the native
+ * `rac_voice_agent_synthesize_speech_proto` ABI (Wave D-7).
  *
  * Matches Swift SDK: `RunAnywhere.voiceAgentSynthesizeSpeech(_:) → TTSOutput` (§10).
  */
 export async function voiceAgentSynthesizeSpeech(
   text: string
 ): Promise<TTSOutput> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+  const native = ensureNative();
+  const resultBytes = await native.voiceAgentSynthesizeSpeechProto(text);
+  const bytes = arrayBufferToBytes(resultBytes);
+  if (bytes.byteLength === 0) {
+    throw SDKException.protoDecodeFailed('voiceAgentSynthesizeSpeechProto');
   }
-  const native = requireNativeModule();
-  const raw = await native.voiceAgentSynthesizeSpeech(text);
-  // The native call may return a base64 audio string or a JSON-encoded TTSOutput.
-  try {
-    const parsed = JSON.parse(raw) as Partial<{
-      audioData: string | Uint8Array;
-      audio_data: string;
-      audioFormat: number;
-      audio_format: number;
-      sampleRate: number;
-      sample_rate: number;
-      durationMs: number;
-      duration_ms: number;
-      phonemeTimestamps: unknown[];
-      timestampMs: number;
-    }>;
-    // audio_data may arrive as a base64 string from the native bridge.
-    let audioData: Uint8Array;
-    const rawAudio = parsed.audioData ?? parsed.audio_data;
-    if (typeof rawAudio === 'string') {
-      audioData = base64ToBytes(rawAudio);
-    } else if (rawAudio instanceof Uint8Array) {
-      audioData = rawAudio;
-    } else {
-      audioData = new Uint8Array(0);
-    }
-    return TTSOutput.fromPartial({
-      audioData,
-      audioFormat: (parsed.audioFormat ?? parsed.audio_format ?? AudioFormat.AUDIO_FORMAT_PCM) as AudioFormat,
-      sampleRate: parsed.sampleRate ?? parsed.sample_rate ?? 22050,
-      durationMs: parsed.durationMs ?? parsed.duration_ms ?? 0,
-      phonemeTimestamps: [],
-      timestampMs: parsed.timestampMs ?? Date.now(),
-    });
-  } catch {
-    // Native returned a base64 audio string directly.
-    const audioData = raw ? base64ToBytes(raw) : new Uint8Array(0);
-    return TTSOutput.fromPartial({
-      audioData,
-      audioFormat: AudioFormat.AUDIO_FORMAT_PCM,
-      sampleRate: 22050,
-      durationMs: 0,
-      phonemeTimestamps: [],
-      timestampMs: Date.now(),
-    });
-  }
+  return TTSOutput.decode(bytes);
 }
 
 /**
@@ -295,10 +219,7 @@ export async function voiceAgentSynthesizeSpeech(
  * Matches Swift: `RunAnywhere.voiceAgentHandle()`.
  */
 export async function getVoiceAgentHandle(): Promise<number> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
-  }
-  const native = requireNativeModule();
+  const native = ensureNative();
   return native.getVoiceAgentHandle();
 }
 

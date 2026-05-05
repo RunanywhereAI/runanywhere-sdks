@@ -15,6 +15,8 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
+import 'hardware_profile.pb.dart' as $0;
+import 'hardware_profile.pbenum.dart' as $0;
 import 'model_types.pbenum.dart';
 
 export 'model_types.pbenum.dart';
@@ -3992,6 +3994,879 @@ class ModelDeleteResult extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(8)
   $core.List<$core.String> get warnings => $_getList(7);
+}
+
+/// ---------------------------------------------------------------------------
+/// Compatibility check request/result. Mirrors the public SDK
+/// `checkCompatibility(modelId)` calls (RN CompatibilityBridge,
+/// Kotlin compat path, Web ModelManager). The platform adapter supplies
+/// available_ram_bytes / available_storage_bytes; commons looks up the
+/// registry entry, computes the compatibility verdict (canRun / canFit),
+/// and returns reasons / suggested alternative model ids.
+/// ---------------------------------------------------------------------------
+class ModelCompatibilityRequest extends $pb.GeneratedMessage {
+  factory ModelCompatibilityRequest({
+    $core.String? modelId,
+    $0.HardwareProfile? hardwareProfile,
+    $fixnum.Int64? availableRamBytes,
+    $fixnum.Int64? availableStorageBytes,
+    $0.AcceleratorPreference? acceleratorPreference,
+    InferenceFramework? preferredFramework,
+  }) {
+    final $result = create();
+    if (modelId != null) {
+      $result.modelId = modelId;
+    }
+    if (hardwareProfile != null) {
+      $result.hardwareProfile = hardwareProfile;
+    }
+    if (availableRamBytes != null) {
+      $result.availableRamBytes = availableRamBytes;
+    }
+    if (availableStorageBytes != null) {
+      $result.availableStorageBytes = availableStorageBytes;
+    }
+    if (acceleratorPreference != null) {
+      $result.acceleratorPreference = acceleratorPreference;
+    }
+    if (preferredFramework != null) {
+      $result.preferredFramework = preferredFramework;
+    }
+    return $result;
+  }
+  ModelCompatibilityRequest._() : super();
+  factory ModelCompatibilityRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ModelCompatibilityRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ModelCompatibilityRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'modelId')
+    ..aOM<$0.HardwareProfile>(2, _omitFieldNames ? '' : 'hardwareProfile', subBuilder: $0.HardwareProfile.create)
+    ..aInt64(3, _omitFieldNames ? '' : 'availableRamBytes')
+    ..aInt64(4, _omitFieldNames ? '' : 'availableStorageBytes')
+    ..e<$0.AcceleratorPreference>(5, _omitFieldNames ? '' : 'acceleratorPreference', $pb.PbFieldType.OE, defaultOrMaker: $0.AcceleratorPreference.ACCELERATOR_PREFERENCE_AUTO, valueOf: $0.AcceleratorPreference.valueOf, enumValues: $0.AcceleratorPreference.values)
+    ..e<InferenceFramework>(6, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: InferenceFramework.valueOf, enumValues: InferenceFramework.values)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ModelCompatibilityRequest clone() => ModelCompatibilityRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ModelCompatibilityRequest copyWith(void Function(ModelCompatibilityRequest) updates) => super.copyWith((message) => updates(message as ModelCompatibilityRequest)) as ModelCompatibilityRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ModelCompatibilityRequest create() => ModelCompatibilityRequest._();
+  ModelCompatibilityRequest createEmptyInstance() => create();
+  static $pb.PbList<ModelCompatibilityRequest> createRepeated() => $pb.PbList<ModelCompatibilityRequest>();
+  @$core.pragma('dart2js:noInline')
+  static ModelCompatibilityRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ModelCompatibilityRequest>(create);
+  static ModelCompatibilityRequest? _defaultInstance;
+
+  /// Required. Model identifier to evaluate.
+  @$pb.TagNumber(1)
+  $core.String get modelId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set modelId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasModelId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearModelId() => clearField(1);
+
+  /// Optional cached hardware profile from the platform adapter. If
+  /// unset, commons will read whatever it has cached internally; the
+  /// RAM/storage values below remain authoritative for the verdict.
+  @$pb.TagNumber(2)
+  $0.HardwareProfile get hardwareProfile => $_getN(1);
+  @$pb.TagNumber(2)
+  set hardwareProfile($0.HardwareProfile v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasHardwareProfile() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearHardwareProfile() => clearField(2);
+  @$pb.TagNumber(2)
+  $0.HardwareProfile ensureHardwareProfile() => $_ensure(1);
+
+  /// Available RAM in bytes (from device probe). 0 = unknown — commons
+  /// will treat the requirement as satisfied.
+  @$pb.TagNumber(3)
+  $fixnum.Int64 get availableRamBytes => $_getI64(2);
+  @$pb.TagNumber(3)
+  set availableRamBytes($fixnum.Int64 v) { $_setInt64(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasAvailableRamBytes() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearAvailableRamBytes() => clearField(3);
+
+  /// Available storage in bytes (from filesystem probe). 0 = unknown.
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get availableStorageBytes => $_getI64(3);
+  @$pb.TagNumber(4)
+  set availableStorageBytes($fixnum.Int64 v) { $_setInt64(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasAvailableStorageBytes() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearAvailableStorageBytes() => clearField(4);
+
+  /// Optional caller preferences (acceleration, framework). Reserved for
+  /// future use; today's verdict is based on memory/storage alone.
+  @$pb.TagNumber(5)
+  $0.AcceleratorPreference get acceleratorPreference => $_getN(4);
+  @$pb.TagNumber(5)
+  set acceleratorPreference($0.AcceleratorPreference v) { setField(5, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasAcceleratorPreference() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearAcceleratorPreference() => clearField(5);
+
+  @$pb.TagNumber(6)
+  InferenceFramework get preferredFramework => $_getN(5);
+  @$pb.TagNumber(6)
+  set preferredFramework(InferenceFramework v) { setField(6, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasPreferredFramework() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearPreferredFramework() => clearField(6);
+}
+
+class ModelCompatibilityCheckResult extends $pb.GeneratedMessage {
+  factory ModelCompatibilityCheckResult({
+    $core.bool? isCompatible,
+    $core.bool? canRun,
+    $core.bool? canFit,
+    $fixnum.Int64? requiredMemoryBytes,
+    $fixnum.Int64? availableMemoryBytes,
+    $fixnum.Int64? requiredStorageBytes,
+    $fixnum.Int64? availableStorageBytes,
+    $core.Iterable<$core.String>? reasons,
+    $core.Iterable<$core.String>? suggestedAlternatives,
+    $core.String? modelId,
+    $core.int? errorCode,
+    $core.String? errorMessage,
+  }) {
+    final $result = create();
+    if (isCompatible != null) {
+      $result.isCompatible = isCompatible;
+    }
+    if (canRun != null) {
+      $result.canRun = canRun;
+    }
+    if (canFit != null) {
+      $result.canFit = canFit;
+    }
+    if (requiredMemoryBytes != null) {
+      $result.requiredMemoryBytes = requiredMemoryBytes;
+    }
+    if (availableMemoryBytes != null) {
+      $result.availableMemoryBytes = availableMemoryBytes;
+    }
+    if (requiredStorageBytes != null) {
+      $result.requiredStorageBytes = requiredStorageBytes;
+    }
+    if (availableStorageBytes != null) {
+      $result.availableStorageBytes = availableStorageBytes;
+    }
+    if (reasons != null) {
+      $result.reasons.addAll(reasons);
+    }
+    if (suggestedAlternatives != null) {
+      $result.suggestedAlternatives.addAll(suggestedAlternatives);
+    }
+    if (modelId != null) {
+      $result.modelId = modelId;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    return $result;
+  }
+  ModelCompatibilityCheckResult._() : super();
+  factory ModelCompatibilityCheckResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ModelCompatibilityCheckResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ModelCompatibilityCheckResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'isCompatible')
+    ..aOB(2, _omitFieldNames ? '' : 'canRun')
+    ..aOB(3, _omitFieldNames ? '' : 'canFit')
+    ..aInt64(4, _omitFieldNames ? '' : 'requiredMemoryBytes')
+    ..aInt64(5, _omitFieldNames ? '' : 'availableMemoryBytes')
+    ..aInt64(6, _omitFieldNames ? '' : 'requiredStorageBytes')
+    ..aInt64(7, _omitFieldNames ? '' : 'availableStorageBytes')
+    ..pPS(8, _omitFieldNames ? '' : 'reasons')
+    ..pPS(9, _omitFieldNames ? '' : 'suggestedAlternatives')
+    ..aOS(10, _omitFieldNames ? '' : 'modelId')
+    ..a<$core.int>(11, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..aOS(12, _omitFieldNames ? '' : 'errorMessage')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ModelCompatibilityCheckResult clone() => ModelCompatibilityCheckResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ModelCompatibilityCheckResult copyWith(void Function(ModelCompatibilityCheckResult) updates) => super.copyWith((message) => updates(message as ModelCompatibilityCheckResult)) as ModelCompatibilityCheckResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ModelCompatibilityCheckResult create() => ModelCompatibilityCheckResult._();
+  ModelCompatibilityCheckResult createEmptyInstance() => create();
+  static $pb.PbList<ModelCompatibilityCheckResult> createRepeated() => $pb.PbList<ModelCompatibilityCheckResult>();
+  @$core.pragma('dart2js:noInline')
+  static ModelCompatibilityCheckResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ModelCompatibilityCheckResult>(create);
+  static ModelCompatibilityCheckResult? _defaultInstance;
+
+  /// Mirrors the existing struct fields so SDKs can keep using the same
+  /// field names; populated from rac_model_compatibility_result_t.
+  @$pb.TagNumber(1)
+  $core.bool get isCompatible => $_getBF(0);
+  @$pb.TagNumber(1)
+  set isCompatible($core.bool v) { $_setBool(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasIsCompatible() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearIsCompatible() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.bool get canRun => $_getBF(1);
+  @$pb.TagNumber(2)
+  set canRun($core.bool v) { $_setBool(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasCanRun() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearCanRun() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.bool get canFit => $_getBF(2);
+  @$pb.TagNumber(3)
+  set canFit($core.bool v) { $_setBool(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasCanFit() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearCanFit() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get requiredMemoryBytes => $_getI64(3);
+  @$pb.TagNumber(4)
+  set requiredMemoryBytes($fixnum.Int64 v) { $_setInt64(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasRequiredMemoryBytes() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearRequiredMemoryBytes() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $fixnum.Int64 get availableMemoryBytes => $_getI64(4);
+  @$pb.TagNumber(5)
+  set availableMemoryBytes($fixnum.Int64 v) { $_setInt64(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasAvailableMemoryBytes() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearAvailableMemoryBytes() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $fixnum.Int64 get requiredStorageBytes => $_getI64(5);
+  @$pb.TagNumber(6)
+  set requiredStorageBytes($fixnum.Int64 v) { $_setInt64(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasRequiredStorageBytes() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearRequiredStorageBytes() => clearField(6);
+
+  @$pb.TagNumber(7)
+  $fixnum.Int64 get availableStorageBytes => $_getI64(6);
+  @$pb.TagNumber(7)
+  set availableStorageBytes($fixnum.Int64 v) { $_setInt64(6, v); }
+  @$pb.TagNumber(7)
+  $core.bool hasAvailableStorageBytes() => $_has(6);
+  @$pb.TagNumber(7)
+  void clearAvailableStorageBytes() => clearField(7);
+
+  /// Human-readable reasons populated when the verdict is negative
+  /// (e.g. "insufficient RAM: requires X, available Y").
+  @$pb.TagNumber(8)
+  $core.List<$core.String> get reasons => $_getList(7);
+
+  /// Optional suggested alternative model ids that *would* be compatible.
+  /// The current implementation leaves this empty; reserved for future
+  /// compatibility-aware suggestions.
+  @$pb.TagNumber(9)
+  $core.List<$core.String> get suggestedAlternatives => $_getList(8);
+
+  /// Echo of the looked-up model id so callers can correlate batched
+  /// checks with their request id.
+  @$pb.TagNumber(10)
+  $core.String get modelId => $_getSZ(9);
+  @$pb.TagNumber(10)
+  set modelId($core.String v) { $_setString(9, v); }
+  @$pb.TagNumber(10)
+  $core.bool hasModelId() => $_has(9);
+  @$pb.TagNumber(10)
+  void clearModelId() => clearField(10);
+
+  /// Negative on failure; mirrors rac_result_t. Empty error_message on
+  /// success.
+  @$pb.TagNumber(11)
+  $core.int get errorCode => $_getIZ(10);
+  @$pb.TagNumber(11)
+  set errorCode($core.int v) { $_setSignedInt32(10, v); }
+  @$pb.TagNumber(11)
+  $core.bool hasErrorCode() => $_has(10);
+  @$pb.TagNumber(11)
+  void clearErrorCode() => clearField(11);
+
+  @$pb.TagNumber(12)
+  $core.String get errorMessage => $_getSZ(11);
+  @$pb.TagNumber(12)
+  set errorMessage($core.String v) { $_setString(11, v); }
+  @$pb.TagNumber(12)
+  $core.bool hasErrorMessage() => $_has(11);
+  @$pb.TagNumber(12)
+  void clearErrorMessage() => clearField(12);
+}
+
+/// ---------------------------------------------------------------------------
+/// URL → ModelFormat inference request/result. Moves the Dart/Kotlin-side
+/// URL-suffix heuristic (".gguf" → GGUF, ".onnx" → ONNX, ".tar.gz" wrapping an
+/// inner format, ...) into commons so every SDK uses one implementation.
+/// ---------------------------------------------------------------------------
+class ModelFormatFromUrlRequest extends $pb.GeneratedMessage {
+  factory ModelFormatFromUrlRequest({
+    $core.String? url,
+  }) {
+    final $result = create();
+    if (url != null) {
+      $result.url = url;
+    }
+    return $result;
+  }
+  ModelFormatFromUrlRequest._() : super();
+  factory ModelFormatFromUrlRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ModelFormatFromUrlRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ModelFormatFromUrlRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'url')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ModelFormatFromUrlRequest clone() => ModelFormatFromUrlRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ModelFormatFromUrlRequest copyWith(void Function(ModelFormatFromUrlRequest) updates) => super.copyWith((message) => updates(message as ModelFormatFromUrlRequest)) as ModelFormatFromUrlRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ModelFormatFromUrlRequest create() => ModelFormatFromUrlRequest._();
+  ModelFormatFromUrlRequest createEmptyInstance() => create();
+  static $pb.PbList<ModelFormatFromUrlRequest> createRepeated() => $pb.PbList<ModelFormatFromUrlRequest>();
+  @$core.pragma('dart2js:noInline')
+  static ModelFormatFromUrlRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ModelFormatFromUrlRequest>(create);
+  static ModelFormatFromUrlRequest? _defaultInstance;
+
+  /// Portable URL or file path string. Only the trailing file-extension
+  /// suffix is inspected; query strings and fragments are ignored.
+  @$pb.TagNumber(1)
+  $core.String get url => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set url($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasUrl() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUrl() => clearField(1);
+}
+
+class ModelFormatFromUrlResult extends $pb.GeneratedMessage {
+  factory ModelFormatFromUrlResult({
+    ModelFormat? format,
+    ModelFormat? innerFormat,
+  }) {
+    final $result = create();
+    if (format != null) {
+      $result.format = format;
+    }
+    if (innerFormat != null) {
+      $result.innerFormat = innerFormat;
+    }
+    return $result;
+  }
+  ModelFormatFromUrlResult._() : super();
+  factory ModelFormatFromUrlResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ModelFormatFromUrlResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ModelFormatFromUrlResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..e<ModelFormat>(1, _omitFieldNames ? '' : 'format', $pb.PbFieldType.OE, defaultOrMaker: ModelFormat.MODEL_FORMAT_UNSPECIFIED, valueOf: ModelFormat.valueOf, enumValues: ModelFormat.values)
+    ..e<ModelFormat>(2, _omitFieldNames ? '' : 'innerFormat', $pb.PbFieldType.OE, defaultOrMaker: ModelFormat.MODEL_FORMAT_UNSPECIFIED, valueOf: ModelFormat.valueOf, enumValues: ModelFormat.values)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ModelFormatFromUrlResult clone() => ModelFormatFromUrlResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ModelFormatFromUrlResult copyWith(void Function(ModelFormatFromUrlResult) updates) => super.copyWith((message) => updates(message as ModelFormatFromUrlResult)) as ModelFormatFromUrlResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ModelFormatFromUrlResult create() => ModelFormatFromUrlResult._();
+  ModelFormatFromUrlResult createEmptyInstance() => create();
+  static $pb.PbList<ModelFormatFromUrlResult> createRepeated() => $pb.PbList<ModelFormatFromUrlResult>();
+  @$core.pragma('dart2js:noInline')
+  static ModelFormatFromUrlResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ModelFormatFromUrlResult>(create);
+  static ModelFormatFromUrlResult? _defaultInstance;
+
+  /// Primary detected format. For archive URLs this is the archive-wrapper
+  /// format (for example MODEL_FORMAT_ZIP); the extracted model format is
+  /// in inner_format below.
+  @$pb.TagNumber(1)
+  ModelFormat get format => $_getN(0);
+  @$pb.TagNumber(1)
+  set format(ModelFormat v) { setField(1, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasFormat() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearFormat() => clearField(1);
+
+  /// For archive URLs, the format of the primary file inside the archive
+  /// when it can be inferred from the URL (for example
+  /// "whisper-base.en.tar.gz" → inner_format = MODEL_FORMAT_ONNX). When the
+  /// archive content is unknown this is MODEL_FORMAT_UNSPECIFIED.
+  @$pb.TagNumber(2)
+  ModelFormat get innerFormat => $_getN(1);
+  @$pb.TagNumber(2)
+  set innerFormat(ModelFormat v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasInnerFormat() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearInnerFormat() => clearField(2);
+}
+
+/// ---------------------------------------------------------------------------
+/// URL → ModelArtifactType inference request/result. Replaces Dart
+/// withInferredArtifact and Kotlin inferArtifactFields with a single commons
+/// call.
+/// ---------------------------------------------------------------------------
+class ArtifactInferFromUrlRequest extends $pb.GeneratedMessage {
+  factory ArtifactInferFromUrlRequest({
+    $core.String? url,
+    $core.String? modelId,
+  }) {
+    final $result = create();
+    if (url != null) {
+      $result.url = url;
+    }
+    if (modelId != null) {
+      $result.modelId = modelId;
+    }
+    return $result;
+  }
+  ArtifactInferFromUrlRequest._() : super();
+  factory ArtifactInferFromUrlRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ArtifactInferFromUrlRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ArtifactInferFromUrlRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'url')
+    ..aOS(2, _omitFieldNames ? '' : 'modelId')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ArtifactInferFromUrlRequest clone() => ArtifactInferFromUrlRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ArtifactInferFromUrlRequest copyWith(void Function(ArtifactInferFromUrlRequest) updates) => super.copyWith((message) => updates(message as ArtifactInferFromUrlRequest)) as ArtifactInferFromUrlRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ArtifactInferFromUrlRequest create() => ArtifactInferFromUrlRequest._();
+  ArtifactInferFromUrlRequest createEmptyInstance() => create();
+  static $pb.PbList<ArtifactInferFromUrlRequest> createRepeated() => $pb.PbList<ArtifactInferFromUrlRequest>();
+  @$core.pragma('dart2js:noInline')
+  static ArtifactInferFromUrlRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ArtifactInferFromUrlRequest>(create);
+  static ArtifactInferFromUrlRequest? _defaultInstance;
+
+  /// Portable URL or file path string.
+  @$pb.TagNumber(1)
+  $core.String get url => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set url($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasUrl() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUrl() => clearField(1);
+
+  /// Optional model identifier. Commons does not consult the registry with
+  /// this value today; it is carried for logging and telemetry only.
+  @$pb.TagNumber(2)
+  $core.String get modelId => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set modelId($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasModelId() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearModelId() => clearField(2);
+}
+
+class ArtifactInferFromUrlResult extends $pb.GeneratedMessage {
+  factory ArtifactInferFromUrlResult({
+    ModelArtifactType? artifactType,
+    ArchiveType? archiveType,
+    ArchiveStructure? archiveStructure,
+    $core.String? primaryRelpath,
+    ModelFormat? innerFormat,
+  }) {
+    final $result = create();
+    if (artifactType != null) {
+      $result.artifactType = artifactType;
+    }
+    if (archiveType != null) {
+      $result.archiveType = archiveType;
+    }
+    if (archiveStructure != null) {
+      $result.archiveStructure = archiveStructure;
+    }
+    if (primaryRelpath != null) {
+      $result.primaryRelpath = primaryRelpath;
+    }
+    if (innerFormat != null) {
+      $result.innerFormat = innerFormat;
+    }
+    return $result;
+  }
+  ArtifactInferFromUrlResult._() : super();
+  factory ArtifactInferFromUrlResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ArtifactInferFromUrlResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ArtifactInferFromUrlResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..e<ModelArtifactType>(1, _omitFieldNames ? '' : 'artifactType', $pb.PbFieldType.OE, defaultOrMaker: ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED, valueOf: ModelArtifactType.valueOf, enumValues: ModelArtifactType.values)
+    ..e<ArchiveType>(2, _omitFieldNames ? '' : 'archiveType', $pb.PbFieldType.OE, defaultOrMaker: ArchiveType.ARCHIVE_TYPE_UNSPECIFIED, valueOf: ArchiveType.valueOf, enumValues: ArchiveType.values)
+    ..e<ArchiveStructure>(3, _omitFieldNames ? '' : 'archiveStructure', $pb.PbFieldType.OE, defaultOrMaker: ArchiveStructure.ARCHIVE_STRUCTURE_UNSPECIFIED, valueOf: ArchiveStructure.valueOf, enumValues: ArchiveStructure.values)
+    ..aOS(4, _omitFieldNames ? '' : 'primaryRelpath')
+    ..e<ModelFormat>(5, _omitFieldNames ? '' : 'innerFormat', $pb.PbFieldType.OE, defaultOrMaker: ModelFormat.MODEL_FORMAT_UNSPECIFIED, valueOf: ModelFormat.valueOf, enumValues: ModelFormat.values)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ArtifactInferFromUrlResult clone() => ArtifactInferFromUrlResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ArtifactInferFromUrlResult copyWith(void Function(ArtifactInferFromUrlResult) updates) => super.copyWith((message) => updates(message as ArtifactInferFromUrlResult)) as ArtifactInferFromUrlResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ArtifactInferFromUrlResult create() => ArtifactInferFromUrlResult._();
+  ArtifactInferFromUrlResult createEmptyInstance() => create();
+  static $pb.PbList<ArtifactInferFromUrlResult> createRepeated() => $pb.PbList<ArtifactInferFromUrlResult>();
+  @$core.pragma('dart2js:noInline')
+  static ArtifactInferFromUrlResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ArtifactInferFromUrlResult>(create);
+  static ArtifactInferFromUrlResult? _defaultInstance;
+
+  /// Inferred artifact-type classification.
+  @$pb.TagNumber(1)
+  ModelArtifactType get artifactType => $_getN(0);
+  @$pb.TagNumber(1)
+  set artifactType(ModelArtifactType v) { setField(1, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasArtifactType() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearArtifactType() => clearField(1);
+
+  /// For archive artifacts, the concrete archive format (ZIP, TAR_GZ, ...).
+  /// For single-file or directory artifacts this is
+  /// ARCHIVE_TYPE_UNSPECIFIED.
+  @$pb.TagNumber(2)
+  ArchiveType get archiveType => $_getN(1);
+  @$pb.TagNumber(2)
+  set archiveType(ArchiveType v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasArchiveType() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearArchiveType() => clearField(2);
+
+  /// For archive artifacts the known or inferred internal structure after
+  /// extraction. Defaults to ARCHIVE_STRUCTURE_UNKNOWN.
+  @$pb.TagNumber(3)
+  ArchiveStructure get archiveStructure => $_getN(2);
+  @$pb.TagNumber(3)
+  set archiveStructure(ArchiveStructure v) { setField(3, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasArchiveStructure() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearArchiveStructure() => clearField(3);
+
+  /// When the URL suggests an archive wrapping a known primary file (for
+  /// example a Whisper model bundle containing encoder.onnx), this field
+  /// carries the relative path inside the archive when it can be inferred.
+  /// Empty otherwise.
+  @$pb.TagNumber(4)
+  $core.String get primaryRelpath => $_getSZ(3);
+  @$pb.TagNumber(4)
+  set primaryRelpath($core.String v) { $_setString(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasPrimaryRelpath() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearPrimaryRelpath() => clearField(4);
+
+  /// Inner file format for archive artifacts. MODEL_FORMAT_UNSPECIFIED when
+  /// the archive contents are unknown.
+  @$pb.TagNumber(5)
+  ModelFormat get innerFormat => $_getN(4);
+  @$pb.TagNumber(5)
+  set innerFormat(ModelFormat v) { setField(5, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasInnerFormat() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearInnerFormat() => clearField(5);
+}
+
+/// ---------------------------------------------------------------------------
+/// FetchAssignments request/result. Replaces the JSON shim
+/// racModelRegistryFetchAssignments and the Web SDK's offline-friendly
+/// fetchModelAssignments() entry point. The platform adapter owns HTTP
+/// transport; commons consumes the cached / fetched entries and returns a
+/// canonical proto byte payload.
+/// ---------------------------------------------------------------------------
+class ModelRegistryFetchAssignmentsRequest extends $pb.GeneratedMessage {
+  factory ModelRegistryFetchAssignmentsRequest({
+    $core.String? deviceId,
+    SDKEnvironment? environment,
+    $core.bool? forceRefresh,
+  }) {
+    final $result = create();
+    if (deviceId != null) {
+      $result.deviceId = deviceId;
+    }
+    if (environment != null) {
+      $result.environment = environment;
+    }
+    if (forceRefresh != null) {
+      $result.forceRefresh = forceRefresh;
+    }
+    return $result;
+  }
+  ModelRegistryFetchAssignmentsRequest._() : super();
+  factory ModelRegistryFetchAssignmentsRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ModelRegistryFetchAssignmentsRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ModelRegistryFetchAssignmentsRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'deviceId')
+    ..e<SDKEnvironment>(2, _omitFieldNames ? '' : 'environment', $pb.PbFieldType.OE, defaultOrMaker: SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED, valueOf: SDKEnvironment.valueOf, enumValues: SDKEnvironment.values)
+    ..aOB(3, _omitFieldNames ? '' : 'forceRefresh')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ModelRegistryFetchAssignmentsRequest clone() => ModelRegistryFetchAssignmentsRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ModelRegistryFetchAssignmentsRequest copyWith(void Function(ModelRegistryFetchAssignmentsRequest) updates) => super.copyWith((message) => updates(message as ModelRegistryFetchAssignmentsRequest)) as ModelRegistryFetchAssignmentsRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ModelRegistryFetchAssignmentsRequest create() => ModelRegistryFetchAssignmentsRequest._();
+  ModelRegistryFetchAssignmentsRequest createEmptyInstance() => create();
+  static $pb.PbList<ModelRegistryFetchAssignmentsRequest> createRepeated() => $pb.PbList<ModelRegistryFetchAssignmentsRequest>();
+  @$core.pragma('dart2js:noInline')
+  static ModelRegistryFetchAssignmentsRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ModelRegistryFetchAssignmentsRequest>(create);
+  static ModelRegistryFetchAssignmentsRequest? _defaultInstance;
+
+  /// Optional device identifier (forwarded to the platform adapter for
+  /// any auth headers it needs). May be empty when callers rely on
+  /// adapter-side auth state alone.
+  @$pb.TagNumber(1)
+  $core.String get deviceId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set deviceId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasDeviceId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearDeviceId() => clearField(1);
+
+  /// Optional environment selector; commons does not branch on this
+  /// value today, but it is preserved for adapter routing and telemetry.
+  @$pb.TagNumber(2)
+  SDKEnvironment get environment => $_getN(1);
+  @$pb.TagNumber(2)
+  set environment(SDKEnvironment v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasEnvironment() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearEnvironment() => clearField(2);
+
+  /// Bypass the assignment cache and force a fresh fetch.
+  @$pb.TagNumber(3)
+  $core.bool get forceRefresh => $_getBF(2);
+  @$pb.TagNumber(3)
+  set forceRefresh($core.bool v) { $_setBool(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasForceRefresh() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearForceRefresh() => clearField(3);
+}
+
+class ModelRegistryFetchAssignmentsResult extends $pb.GeneratedMessage {
+  factory ModelRegistryFetchAssignmentsResult({
+    $core.bool? success,
+    ModelInfoList? models,
+    $core.int? modelCount,
+    $fixnum.Int64? fetchedAtUnixMs,
+    $core.int? errorCode,
+    $core.String? errorMessage,
+  }) {
+    final $result = create();
+    if (success != null) {
+      $result.success = success;
+    }
+    if (models != null) {
+      $result.models = models;
+    }
+    if (modelCount != null) {
+      $result.modelCount = modelCount;
+    }
+    if (fetchedAtUnixMs != null) {
+      $result.fetchedAtUnixMs = fetchedAtUnixMs;
+    }
+    if (errorCode != null) {
+      $result.errorCode = errorCode;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    return $result;
+  }
+  ModelRegistryFetchAssignmentsResult._() : super();
+  factory ModelRegistryFetchAssignmentsResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ModelRegistryFetchAssignmentsResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ModelRegistryFetchAssignmentsResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOB(1, _omitFieldNames ? '' : 'success')
+    ..aOM<ModelInfoList>(2, _omitFieldNames ? '' : 'models', subBuilder: ModelInfoList.create)
+    ..a<$core.int>(3, _omitFieldNames ? '' : 'modelCount', $pb.PbFieldType.O3)
+    ..aInt64(4, _omitFieldNames ? '' : 'fetchedAtUnixMs')
+    ..a<$core.int>(5, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
+    ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ModelRegistryFetchAssignmentsResult clone() => ModelRegistryFetchAssignmentsResult()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ModelRegistryFetchAssignmentsResult copyWith(void Function(ModelRegistryFetchAssignmentsResult) updates) => super.copyWith((message) => updates(message as ModelRegistryFetchAssignmentsResult)) as ModelRegistryFetchAssignmentsResult;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ModelRegistryFetchAssignmentsResult create() => ModelRegistryFetchAssignmentsResult._();
+  ModelRegistryFetchAssignmentsResult createEmptyInstance() => create();
+  static $pb.PbList<ModelRegistryFetchAssignmentsResult> createRepeated() => $pb.PbList<ModelRegistryFetchAssignmentsResult>();
+  @$core.pragma('dart2js:noInline')
+  static ModelRegistryFetchAssignmentsResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ModelRegistryFetchAssignmentsResult>(create);
+  static ModelRegistryFetchAssignmentsResult? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.bool get success => $_getBF(0);
+  @$pb.TagNumber(1)
+  set success($core.bool v) { $_setBool(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasSuccess() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearSuccess() => clearField(1);
+
+  @$pb.TagNumber(2)
+  ModelInfoList get models => $_getN(1);
+  @$pb.TagNumber(2)
+  set models(ModelInfoList v) { setField(2, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasModels() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearModels() => clearField(2);
+  @$pb.TagNumber(2)
+  ModelInfoList ensureModels() => $_ensure(1);
+
+  @$pb.TagNumber(3)
+  $core.int get modelCount => $_getIZ(2);
+  @$pb.TagNumber(3)
+  set modelCount($core.int v) { $_setSignedInt32(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasModelCount() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearModelCount() => clearField(3);
+
+  @$pb.TagNumber(4)
+  $fixnum.Int64 get fetchedAtUnixMs => $_getI64(3);
+  @$pb.TagNumber(4)
+  set fetchedAtUnixMs($fixnum.Int64 v) { $_setInt64(3, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasFetchedAtUnixMs() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearFetchedAtUnixMs() => clearField(4);
+
+  @$pb.TagNumber(5)
+  $core.int get errorCode => $_getIZ(4);
+  @$pb.TagNumber(5)
+  set errorCode($core.int v) { $_setSignedInt32(4, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasErrorCode() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearErrorCode() => clearField(5);
+
+  @$pb.TagNumber(6)
+  $core.String get errorMessage => $_getSZ(5);
+  @$pb.TagNumber(6)
+  set errorMessage($core.String v) { $_setString(5, v); }
+  @$pb.TagNumber(6)
+  $core.bool hasErrorMessage() => $_has(5);
+  @$pb.TagNumber(6)
+  void clearErrorMessage() => clearField(6);
 }
 
 class ModelRegistryApi {

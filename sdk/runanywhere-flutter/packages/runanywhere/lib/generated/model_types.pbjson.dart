@@ -1185,6 +1185,173 @@ final $typed_data.Uint8List modelDeleteResultDescriptor = $convert.base64Decode(
     'Cg1lcnJvcl9tZXNzYWdlGAcgASgJUgxlcnJvck1lc3NhZ2USGgoId2FybmluZ3MYCCADKAlSCH'
     'dhcm5pbmdz');
 
+@$core.Deprecated('Use modelCompatibilityRequestDescriptor instead')
+const ModelCompatibilityRequest$json = {
+  '1': 'ModelCompatibilityRequest',
+  '2': [
+    {'1': 'model_id', '3': 1, '4': 1, '5': 9, '10': 'modelId'},
+    {'1': 'hardware_profile', '3': 2, '4': 1, '5': 11, '6': '.runanywhere.v1.HardwareProfile', '9': 0, '10': 'hardwareProfile', '17': true},
+    {'1': 'available_ram_bytes', '3': 3, '4': 1, '5': 3, '10': 'availableRamBytes'},
+    {'1': 'available_storage_bytes', '3': 4, '4': 1, '5': 3, '10': 'availableStorageBytes'},
+    {'1': 'accelerator_preference', '3': 5, '4': 1, '5': 14, '6': '.runanywhere.v1.AcceleratorPreference', '9': 1, '10': 'acceleratorPreference', '17': true},
+    {'1': 'preferred_framework', '3': 6, '4': 1, '5': 14, '6': '.runanywhere.v1.InferenceFramework', '9': 2, '10': 'preferredFramework', '17': true},
+  ],
+  '8': [
+    {'1': '_hardware_profile'},
+    {'1': '_accelerator_preference'},
+    {'1': '_preferred_framework'},
+  ],
+};
+
+/// Descriptor for `ModelCompatibilityRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List modelCompatibilityRequestDescriptor = $convert.base64Decode(
+    'ChlNb2RlbENvbXBhdGliaWxpdHlSZXF1ZXN0EhkKCG1vZGVsX2lkGAEgASgJUgdtb2RlbElkEk'
+    '8KEGhhcmR3YXJlX3Byb2ZpbGUYAiABKAsyHy5ydW5hbnl3aGVyZS52MS5IYXJkd2FyZVByb2Zp'
+    'bGVIAFIPaGFyZHdhcmVQcm9maWxliAEBEi4KE2F2YWlsYWJsZV9yYW1fYnl0ZXMYAyABKANSEW'
+    'F2YWlsYWJsZVJhbUJ5dGVzEjYKF2F2YWlsYWJsZV9zdG9yYWdlX2J5dGVzGAQgASgDUhVhdmFp'
+    'bGFibGVTdG9yYWdlQnl0ZXMSYQoWYWNjZWxlcmF0b3JfcHJlZmVyZW5jZRgFIAEoDjIlLnJ1bm'
+    'FueXdoZXJlLnYxLkFjY2VsZXJhdG9yUHJlZmVyZW5jZUgBUhVhY2NlbGVyYXRvclByZWZlcmVu'
+    'Y2WIAQESWAoTcHJlZmVycmVkX2ZyYW1ld29yaxgGIAEoDjIiLnJ1bmFueXdoZXJlLnYxLkluZm'
+    'VyZW5jZUZyYW1ld29ya0gCUhJwcmVmZXJyZWRGcmFtZXdvcmuIAQFCEwoRX2hhcmR3YXJlX3By'
+    'b2ZpbGVCGQoXX2FjY2VsZXJhdG9yX3ByZWZlcmVuY2VCFgoUX3ByZWZlcnJlZF9mcmFtZXdvcm'
+    's=');
+
+@$core.Deprecated('Use modelCompatibilityCheckResultDescriptor instead')
+const ModelCompatibilityCheckResult$json = {
+  '1': 'ModelCompatibilityCheckResult',
+  '2': [
+    {'1': 'is_compatible', '3': 1, '4': 1, '5': 8, '10': 'isCompatible'},
+    {'1': 'can_run', '3': 2, '4': 1, '5': 8, '10': 'canRun'},
+    {'1': 'can_fit', '3': 3, '4': 1, '5': 8, '10': 'canFit'},
+    {'1': 'required_memory_bytes', '3': 4, '4': 1, '5': 3, '10': 'requiredMemoryBytes'},
+    {'1': 'available_memory_bytes', '3': 5, '4': 1, '5': 3, '10': 'availableMemoryBytes'},
+    {'1': 'required_storage_bytes', '3': 6, '4': 1, '5': 3, '10': 'requiredStorageBytes'},
+    {'1': 'available_storage_bytes', '3': 7, '4': 1, '5': 3, '10': 'availableStorageBytes'},
+    {'1': 'reasons', '3': 8, '4': 3, '5': 9, '10': 'reasons'},
+    {'1': 'suggested_alternatives', '3': 9, '4': 3, '5': 9, '10': 'suggestedAlternatives'},
+    {'1': 'model_id', '3': 10, '4': 1, '5': 9, '10': 'modelId'},
+    {'1': 'error_code', '3': 11, '4': 1, '5': 5, '10': 'errorCode'},
+    {'1': 'error_message', '3': 12, '4': 1, '5': 9, '10': 'errorMessage'},
+  ],
+};
+
+/// Descriptor for `ModelCompatibilityCheckResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List modelCompatibilityCheckResultDescriptor = $convert.base64Decode(
+    'Ch1Nb2RlbENvbXBhdGliaWxpdHlDaGVja1Jlc3VsdBIjCg1pc19jb21wYXRpYmxlGAEgASgIUg'
+    'xpc0NvbXBhdGlibGUSFwoHY2FuX3J1bhgCIAEoCFIGY2FuUnVuEhcKB2Nhbl9maXQYAyABKAhS'
+    'BmNhbkZpdBIyChVyZXF1aXJlZF9tZW1vcnlfYnl0ZXMYBCABKANSE3JlcXVpcmVkTWVtb3J5Qn'
+    'l0ZXMSNAoWYXZhaWxhYmxlX21lbW9yeV9ieXRlcxgFIAEoA1IUYXZhaWxhYmxlTWVtb3J5Qnl0'
+    'ZXMSNAoWcmVxdWlyZWRfc3RvcmFnZV9ieXRlcxgGIAEoA1IUcmVxdWlyZWRTdG9yYWdlQnl0ZX'
+    'MSNgoXYXZhaWxhYmxlX3N0b3JhZ2VfYnl0ZXMYByABKANSFWF2YWlsYWJsZVN0b3JhZ2VCeXRl'
+    'cxIYCgdyZWFzb25zGAggAygJUgdyZWFzb25zEjUKFnN1Z2dlc3RlZF9hbHRlcm5hdGl2ZXMYCS'
+    'ADKAlSFXN1Z2dlc3RlZEFsdGVybmF0aXZlcxIZCghtb2RlbF9pZBgKIAEoCVIHbW9kZWxJZBId'
+    'CgplcnJvcl9jb2RlGAsgASgFUgllcnJvckNvZGUSIwoNZXJyb3JfbWVzc2FnZRgMIAEoCVIMZX'
+    'Jyb3JNZXNzYWdl');
+
+@$core.Deprecated('Use modelFormatFromUrlRequestDescriptor instead')
+const ModelFormatFromUrlRequest$json = {
+  '1': 'ModelFormatFromUrlRequest',
+  '2': [
+    {'1': 'url', '3': 1, '4': 1, '5': 9, '10': 'url'},
+  ],
+};
+
+/// Descriptor for `ModelFormatFromUrlRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List modelFormatFromUrlRequestDescriptor = $convert.base64Decode(
+    'ChlNb2RlbEZvcm1hdEZyb21VcmxSZXF1ZXN0EhAKA3VybBgBIAEoCVIDdXJs');
+
+@$core.Deprecated('Use modelFormatFromUrlResultDescriptor instead')
+const ModelFormatFromUrlResult$json = {
+  '1': 'ModelFormatFromUrlResult',
+  '2': [
+    {'1': 'format', '3': 1, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelFormat', '10': 'format'},
+    {'1': 'inner_format', '3': 2, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelFormat', '10': 'innerFormat'},
+  ],
+};
+
+/// Descriptor for `ModelFormatFromUrlResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List modelFormatFromUrlResultDescriptor = $convert.base64Decode(
+    'ChhNb2RlbEZvcm1hdEZyb21VcmxSZXN1bHQSMwoGZm9ybWF0GAEgASgOMhsucnVuYW55d2hlcm'
+    'UudjEuTW9kZWxGb3JtYXRSBmZvcm1hdBI+Cgxpbm5lcl9mb3JtYXQYAiABKA4yGy5ydW5hbnl3'
+    'aGVyZS52MS5Nb2RlbEZvcm1hdFILaW5uZXJGb3JtYXQ=');
+
+@$core.Deprecated('Use artifactInferFromUrlRequestDescriptor instead')
+const ArtifactInferFromUrlRequest$json = {
+  '1': 'ArtifactInferFromUrlRequest',
+  '2': [
+    {'1': 'url', '3': 1, '4': 1, '5': 9, '10': 'url'},
+    {'1': 'model_id', '3': 2, '4': 1, '5': 9, '10': 'modelId'},
+  ],
+};
+
+/// Descriptor for `ArtifactInferFromUrlRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List artifactInferFromUrlRequestDescriptor = $convert.base64Decode(
+    'ChtBcnRpZmFjdEluZmVyRnJvbVVybFJlcXVlc3QSEAoDdXJsGAEgASgJUgN1cmwSGQoIbW9kZW'
+    'xfaWQYAiABKAlSB21vZGVsSWQ=');
+
+@$core.Deprecated('Use artifactInferFromUrlResultDescriptor instead')
+const ArtifactInferFromUrlResult$json = {
+  '1': 'ArtifactInferFromUrlResult',
+  '2': [
+    {'1': 'artifact_type', '3': 1, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelArtifactType', '10': 'artifactType'},
+    {'1': 'archive_type', '3': 2, '4': 1, '5': 14, '6': '.runanywhere.v1.ArchiveType', '10': 'archiveType'},
+    {'1': 'archive_structure', '3': 3, '4': 1, '5': 14, '6': '.runanywhere.v1.ArchiveStructure', '10': 'archiveStructure'},
+    {'1': 'primary_relpath', '3': 4, '4': 1, '5': 9, '10': 'primaryRelpath'},
+    {'1': 'inner_format', '3': 5, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelFormat', '10': 'innerFormat'},
+  ],
+};
+
+/// Descriptor for `ArtifactInferFromUrlResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List artifactInferFromUrlResultDescriptor = $convert.base64Decode(
+    'ChpBcnRpZmFjdEluZmVyRnJvbVVybFJlc3VsdBJGCg1hcnRpZmFjdF90eXBlGAEgASgOMiEucn'
+    'VuYW55d2hlcmUudjEuTW9kZWxBcnRpZmFjdFR5cGVSDGFydGlmYWN0VHlwZRI+CgxhcmNoaXZl'
+    'X3R5cGUYAiABKA4yGy5ydW5hbnl3aGVyZS52MS5BcmNoaXZlVHlwZVILYXJjaGl2ZVR5cGUSTQ'
+    'oRYXJjaGl2ZV9zdHJ1Y3R1cmUYAyABKA4yIC5ydW5hbnl3aGVyZS52MS5BcmNoaXZlU3RydWN0'
+    'dXJlUhBhcmNoaXZlU3RydWN0dXJlEicKD3ByaW1hcnlfcmVscGF0aBgEIAEoCVIOcHJpbWFyeV'
+    'JlbHBhdGgSPgoMaW5uZXJfZm9ybWF0GAUgASgOMhsucnVuYW55d2hlcmUudjEuTW9kZWxGb3Jt'
+    'YXRSC2lubmVyRm9ybWF0');
+
+@$core.Deprecated('Use modelRegistryFetchAssignmentsRequestDescriptor instead')
+const ModelRegistryFetchAssignmentsRequest$json = {
+  '1': 'ModelRegistryFetchAssignmentsRequest',
+  '2': [
+    {'1': 'device_id', '3': 1, '4': 1, '5': 9, '10': 'deviceId'},
+    {'1': 'environment', '3': 2, '4': 1, '5': 14, '6': '.runanywhere.v1.SDKEnvironment', '9': 0, '10': 'environment', '17': true},
+    {'1': 'force_refresh', '3': 3, '4': 1, '5': 8, '10': 'forceRefresh'},
+  ],
+  '8': [
+    {'1': '_environment'},
+  ],
+};
+
+/// Descriptor for `ModelRegistryFetchAssignmentsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List modelRegistryFetchAssignmentsRequestDescriptor = $convert.base64Decode(
+    'CiRNb2RlbFJlZ2lzdHJ5RmV0Y2hBc3NpZ25tZW50c1JlcXVlc3QSGwoJZGV2aWNlX2lkGAEgAS'
+    'gJUghkZXZpY2VJZBJFCgtlbnZpcm9ubWVudBgCIAEoDjIeLnJ1bmFueXdoZXJlLnYxLlNES0Vu'
+    'dmlyb25tZW50SABSC2Vudmlyb25tZW50iAEBEiMKDWZvcmNlX3JlZnJlc2gYAyABKAhSDGZvcm'
+    'NlUmVmcmVzaEIOCgxfZW52aXJvbm1lbnQ=');
+
+@$core.Deprecated('Use modelRegistryFetchAssignmentsResultDescriptor instead')
+const ModelRegistryFetchAssignmentsResult$json = {
+  '1': 'ModelRegistryFetchAssignmentsResult',
+  '2': [
+    {'1': 'success', '3': 1, '4': 1, '5': 8, '10': 'success'},
+    {'1': 'models', '3': 2, '4': 1, '5': 11, '6': '.runanywhere.v1.ModelInfoList', '10': 'models'},
+    {'1': 'model_count', '3': 3, '4': 1, '5': 5, '10': 'modelCount'},
+    {'1': 'fetched_at_unix_ms', '3': 4, '4': 1, '5': 3, '10': 'fetchedAtUnixMs'},
+    {'1': 'error_code', '3': 5, '4': 1, '5': 5, '10': 'errorCode'},
+    {'1': 'error_message', '3': 6, '4': 1, '5': 9, '10': 'errorMessage'},
+  ],
+};
+
+/// Descriptor for `ModelRegistryFetchAssignmentsResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List modelRegistryFetchAssignmentsResultDescriptor = $convert.base64Decode(
+    'CiNNb2RlbFJlZ2lzdHJ5RmV0Y2hBc3NpZ25tZW50c1Jlc3VsdBIYCgdzdWNjZXNzGAEgASgIUg'
+    'dzdWNjZXNzEjUKBm1vZGVscxgCIAEoCzIdLnJ1bmFueXdoZXJlLnYxLk1vZGVsSW5mb0xpc3RS'
+    'Bm1vZGVscxIfCgttb2RlbF9jb3VudBgDIAEoBVIKbW9kZWxDb3VudBIrChJmZXRjaGVkX2F0X3'
+    'VuaXhfbXMYBCABKANSD2ZldGNoZWRBdFVuaXhNcxIdCgplcnJvcl9jb2RlGAUgASgFUgllcnJv'
+    'ckNvZGUSIwoNZXJyb3JfbWVzc2FnZRgGIAEoCVIMZXJyb3JNZXNzYWdl');
+
 const $core.Map<$core.String, $core.dynamic> ModelRegistryServiceBase$json = {
   '1': 'ModelRegistry',
   '2': [

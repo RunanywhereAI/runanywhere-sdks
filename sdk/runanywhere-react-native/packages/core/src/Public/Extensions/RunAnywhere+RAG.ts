@@ -9,6 +9,7 @@
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
 import type {
   RAGConfiguration,
   RAGQueryOptions,
@@ -36,14 +37,14 @@ function decodeRequired<T>(
 ): T {
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
-    throw new Error(`${operation} returned an empty proto result`);
+    throw SDKException.protoDecodeFailed(operation);
   }
   return decode(bytes);
 }
 
 function ensureNative() {
   if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+    throw SDKException.nativeModuleUnavailable();
   }
   return requireNativeModule();
 }
@@ -70,7 +71,7 @@ export async function ragCreatePipeline(
     bytesToArrayBuffer(RAGConfigurationMessage.encode(configWithDefaults).finish())
   );
   if (!success) {
-    throw new Error('Failed to create RAG pipeline');
+    throw SDKException.generationFailedWith('Failed to create RAG pipeline');
   }
   logger.info('RAG pipeline created');
 }

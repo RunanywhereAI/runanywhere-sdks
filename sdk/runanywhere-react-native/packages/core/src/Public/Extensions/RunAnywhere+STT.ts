@@ -13,6 +13,7 @@
 
 import { requireNativeModule, isNativeModuleAvailable } from '../../native';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
 import {
   STTLanguage,
   type STTOptions,
@@ -113,7 +114,7 @@ function buildSTTOptions(options?: Partial<STTOptions>): STTOptions {
 function decodeSTTOutput(buffer: ArrayBuffer): STTOutput {
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) {
-    throw new Error('STT proto transcription returned an empty result');
+    throw SDKException.protoDecodeFailed('sttTranscribeProto');
   }
   return STTOutputMessage.decode(bytes);
 }
@@ -131,7 +132,7 @@ export async function transcribe(
   options?: Partial<STTOptions>
 ): Promise<STTOutput> {
   if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+    throw SDKException.nativeModuleUnavailable();
   }
   const native = requireNativeModule();
   const audioBytes = audioToArrayBuffer(audio);
@@ -163,7 +164,7 @@ export async function transcribeBuffer(
   options?: Partial<STTOptions>
 ): Promise<STTOutput> {
   if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+    throw SDKException.nativeModuleUnavailable();
   }
   return transcribe(samples.buffer as ArrayBuffer, options);
 }
@@ -180,7 +181,7 @@ export function transcribeStream(
   options: Partial<STTOptions> = {}
 ): AsyncIterable<STTPartialResult> {
   if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+    throw SDKException.nativeModuleUnavailable();
   }
 
   const native = requireNativeModule();
@@ -270,7 +271,7 @@ export async function transcribeFile(
   options?: Partial<STTOptions>
 ): Promise<STTOutput> {
   if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
+    throw SDKException.nativeModuleUnavailable();
   }
   const native = requireNativeModule();
   const language = sttLanguageToCode(options?.language);
@@ -281,7 +282,7 @@ export async function transcribeFile(
 
   try {
     const parsed = JSON.parse(resultJson);
-    if (parsed.error) throw new Error(parsed.error);
+    if (parsed.error) throw SDKException.generationFailedWith(parsed.error);
 
     const audioLengthMs =
       typeof parsed.duration === 'number' ? parsed.duration * 1000 : 0;
@@ -303,7 +304,7 @@ export async function transcribeFile(
     });
   } catch (err) {
     if (err instanceof Error) throw err;
-    throw new Error(`Transcription failed: ${resultJson}`);
+    throw SDKException.generationFailedWith(`Transcription failed: ${resultJson}`);
   }
 }
 
