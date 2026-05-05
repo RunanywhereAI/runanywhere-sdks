@@ -12,11 +12,12 @@ export {
   type RAGStatistics,
 } from '@runanywhere/proto-ts/rag';
 
-/** Default `RAGConfiguration` mirroring Swift `RAGConfiguration()` defaults. */
+/** Default `RAGConfiguration` mirroring Swift `RAGConfiguration()` defaults.
+ * D-6: fields are model ids resolved by commons, not filesystem paths. */
 export function defaultRAGConfig(): RAGConfiguration {
   return RAGConfiguration.create({
-    embeddingModelPath: '',
-    llmModelPath: '',
+    embeddingModelId: '',
+    llmModelId: '',
     embeddingDimension: 384,
     topK: 5,
     similarityThreshold: 0.0,

@@ -247,6 +247,19 @@ public class GenerationEvent(
     schemaIndex = 22,
   )
   public val thinking_text: String = "",
+  /**
+   * For COMPLETED — prompt-token count (mirrors RALLMGenerationResult.inputTokens).
+   * Added Wave D-9: enables totalTokens = input_tokens + tokens_used analytics
+   * from the event stream alone.
+   */
+  @field:WireField(
+    tag = 24,
+    adapter = "com.squareup.wire.ProtoAdapter#INT32",
+    label = WireField.Label.OMIT_IDENTITY,
+    jsonName = "inputTokens",
+    schemaIndex = 23,
+  )
+  public val input_tokens: Int = 0,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<GenerationEvent, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -283,6 +296,7 @@ public class GenerationEvent(
     if (structured_schema_json != other.structured_schema_json) return false
     if (structured_output_json != other.structured_output_json) return false
     if (thinking_text != other.thinking_text) return false
+    if (input_tokens != other.input_tokens) return false
     return true
   }
 
@@ -313,6 +327,7 @@ public class GenerationEvent(
       result = result * 37 + structured_schema_json.hashCode()
       result = result * 37 + structured_output_json.hashCode()
       result = result * 37 + thinking_text.hashCode()
+      result = result * 37 + input_tokens.hashCode()
       super.hashCode = result
     }
     return result
@@ -343,6 +358,7 @@ public class GenerationEvent(
     result += """structured_schema_json=${sanitize(structured_schema_json)}"""
     result += """structured_output_json=${sanitize(structured_output_json)}"""
     result += """thinking_text=${sanitize(thinking_text)}"""
+    result += """input_tokens=$input_tokens"""
     return result.joinToString(prefix = "GenerationEvent{", separator = ", ", postfix = "}")
   }
 
@@ -370,12 +386,13 @@ public class GenerationEvent(
     structured_schema_json: String = this.structured_schema_json,
     structured_output_json: String = this.structured_output_json,
     thinking_text: String = this.thinking_text,
+    input_tokens: Int = this.input_tokens,
     unknownFields: ByteString = this.unknownFields,
   ): GenerationEvent = GenerationEvent(kind, session_id, prompt, token, streaming_text,
       tokens_count, response, tokens_used, latency_ms, first_token_latency_ms, error, model_id,
       cost_amount, cost_saved_amount, routing_target, routing_reason, cancel_reason, tool_call_id,
       tool_name, tool_payload_json, structured_schema_json, structured_output_json, thinking_text,
-      unknownFields)
+      input_tokens, unknownFields)
 
   public companion object {
     @JvmField
@@ -430,6 +447,8 @@ public class GenerationEvent(
             value.structured_output_json)
         if (value.thinking_text != "") size += ProtoAdapter.STRING.encodedSizeWithTag(23,
             value.thinking_text)
+        if (value.input_tokens != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(24,
+            value.input_tokens)
         return size
       }
 
@@ -470,11 +489,15 @@ public class GenerationEvent(
             value.structured_output_json)
         if (value.thinking_text != "") ProtoAdapter.STRING.encodeWithTag(writer, 23,
             value.thinking_text)
+        if (value.input_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 24,
+            value.input_tokens)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: GenerationEvent) {
         writer.writeBytes(value.unknownFields)
+        if (value.input_tokens != 0) ProtoAdapter.INT32.encodeWithTag(writer, 24,
+            value.input_tokens)
         if (value.thinking_text != "") ProtoAdapter.STRING.encodeWithTag(writer, 23,
             value.thinking_text)
         if (value.structured_output_json != "") ProtoAdapter.STRING.encodeWithTag(writer, 22,
@@ -537,6 +560,7 @@ public class GenerationEvent(
         var structured_schema_json: String = ""
         var structured_output_json: String = ""
         var thinking_text: String = ""
+        var input_tokens: Int = 0
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
             1 -> try {
@@ -566,6 +590,7 @@ public class GenerationEvent(
             21 -> structured_schema_json = ProtoAdapter.STRING.decode(reader)
             22 -> structured_output_json = ProtoAdapter.STRING.decode(reader)
             23 -> thinking_text = ProtoAdapter.STRING.decode(reader)
+            24 -> input_tokens = ProtoAdapter.INT32.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
@@ -593,6 +618,7 @@ public class GenerationEvent(
           structured_schema_json = structured_schema_json,
           structured_output_json = structured_output_json,
           thinking_text = thinking_text,
+          input_tokens = input_tokens,
           unknownFields = unknownFields
         )
       }

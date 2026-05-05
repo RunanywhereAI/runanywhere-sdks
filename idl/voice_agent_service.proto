@@ -17,6 +17,7 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "voice_events.proto";
+import "tts_options.proto";
 
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
@@ -24,6 +25,7 @@ option java_package          = "ai.runanywhere.proto.v1";
 option java_outer_classname  = "VoiceAgentServiceProto";
 option objc_class_prefix     = "RAV1";
 option swift_prefix          = "RA";
+option go_package            = "github.com/runanywhere/runanywhere-sdks/idl/v1;runanywherev1";
 
 // Empty request type — the voice agent already has its config set via
 // `rac_voice_agent_init()` at handle creation time. The Stream rpc just
@@ -225,4 +227,20 @@ message VoiceAgentComposeConfig {
     // Correlation and defaults for event streams and one-shot turn APIs.
     optional string session_id = 22;
     optional string default_language_code = 23;
+}
+
+// Wave D-7 helper-level proto requests for voice-agent sub-components.
+message VoiceAgentTranscribeProtoRequest {
+    bytes  audio_data    = 1;
+    string session_id    = 2;
+    int32  sample_rate   = 3;
+    string language_hint = 4;
+    int32  channels      = 5;
+    AudioEncoding encoding = 6;
+}
+
+message VoiceAgentSynthesizeSpeechProtoRequest {
+    string     text       = 1;
+    string     session_id = 2;
+    optional TTSOptions options = 3;
 }

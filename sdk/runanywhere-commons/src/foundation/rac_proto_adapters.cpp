@@ -1294,12 +1294,19 @@ bool rac_lora_info_from_proto(const ::runanywhere::v1::LoRAAdapterInfo& in,
 // RAG
 // ===========================================================================
 
+// D-6: RAGConfiguration carries *model ids*, not filesystem paths. These
+// adapters round-trip the id strings into/out of the legacy
+// rac_rag_config_t.embedding_model_path / llm_model_path slots. Actual
+// filesystem-path resolution happens inside the RAG session create entry
+// point (see rac_rag_proto_abi.cpp::rac_rag_session_create_proto), which
+// looks the id up in the global model registry and substitutes the canonical
+// local_path before constructing the pipeline.
 bool rac_rag_config_to_proto(const rac_rag_config_t* in,
                              ::runanywhere::v1::RAGConfiguration* out) {
     if (!in || !out) return false;
     out->Clear();
-    if (in->embedding_model_path) out->set_embedding_model_path(in->embedding_model_path);
-    if (in->llm_model_path) out->set_llm_model_path(in->llm_model_path);
+    if (in->embedding_model_path) out->set_embedding_model_id(in->embedding_model_path);
+    if (in->llm_model_path) out->set_llm_model_id(in->llm_model_path);
     out->set_embedding_dimension(static_cast<int32_t>(in->embedding_dimension));
     out->set_top_k(static_cast<int32_t>(in->top_k));
     out->set_similarity_threshold(in->similarity_threshold);
@@ -1312,8 +1319,11 @@ bool rac_rag_config_from_proto(const ::runanywhere::v1::RAGConfiguration& in,
                                rac_rag_config_t* out) {
     if (!out) return false;
     *out = rac_rag_config_default();
-    out->embedding_model_path = copy_string(in.embedding_model_path());
-    out->llm_model_path = copy_string(in.llm_model_path());
+    // NOTE: the id values land in the legacy path slots. The RAG session
+    // create entry point resolves them via rac_model_registry_get() before
+    // forwarding to rac_rag_pipeline_create_standalone.
+    out->embedding_model_path = copy_string(in.embedding_model_id());
+    out->llm_model_path = copy_string(in.llm_model_id());
     if (in.embedding_dimension() > 0)
         out->embedding_dimension = static_cast<size_t>(in.embedding_dimension());
     if (in.top_k() > 0) out->top_k = static_cast<size_t>(in.top_k());
@@ -1322,6 +1332,14 @@ bool rac_rag_config_from_proto(const ::runanywhere::v1::RAGConfiguration& in,
     if (in.chunk_size() > 0) out->chunk_size = static_cast<size_t>(in.chunk_size());
     if (in.chunk_overlap() >= 0)
         out->chunk_overlap = static_cast<size_t>(in.chunk_overlap());
+    if (in.max_context_tokens() > 0)
+        out->max_context_tokens = static_cast<size_t>(in.max_context_tokens());
+    if (in.has_prompt_template())
+        out->prompt_template = copy_string(in.prompt_template());
+    if (in.has_embedding_config_json())
+        out->embedding_config_json = copy_string(in.embedding_config_json());
+    if (in.has_llm_config_json())
+        out->llm_config_json = copy_string(in.llm_config_json());
     return true;
 }
 

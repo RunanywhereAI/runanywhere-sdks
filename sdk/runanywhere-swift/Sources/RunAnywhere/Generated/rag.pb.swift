@@ -13,7 +13,7 @@
 // Companion to solutions.proto::RAGConfig (which is the *solution-spec* sugar
 // fed into PipelineSpec). This file holds the *runtime* types — the inputs
 // and outputs that flow through the RAG pipeline at query time:
-//   - RAGConfiguration   (low-level pipeline config, pre-IDL hand-rolled)
+//   - RAGConfiguration   (low-level pipeline config, carries model ids)
 //   - RAGQueryOptions    (per-query sampling options)
 //   - RAGSearchResult    (a single retrieved chunk)
 //   - RAGResult          (full query result: answer + chunks + timings)
@@ -124,23 +124,26 @@ public enum RARAGStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 }
 
 /// ---------------------------------------------------------------------------
-/// RAGConfiguration — low-level pipeline config (pre-IDL hand-rolled).
+/// RAGConfiguration — low-level pipeline config.
 ///
-/// This is the runtime configuration consumed by the RAG pipeline directly,
-/// distinct from solutions.proto::RAGConfig (which is the high-level solution
-/// spec resolved through the model registry). RAGConfiguration takes raw model
-/// paths because the pipeline runs after model resolution has already happened.
+/// As of D-6 (Wave D) this message carries *model ids*, not filesystem paths.
+/// The commons RAG session ABI (rac_rag_session_create_proto) is responsible
+/// for resolving those ids to on-disk paths through the canonical model
+/// registry. SDK callers MUST register the embedding / LLM / reranker models
+/// first and pass only their ids here.
 /// ---------------------------------------------------------------------------
 public struct RARAGConfiguration: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  /// Filesystem path to the embedding model (typically ONNX).
-  public var embeddingModelPath: String = String()
+  /// Registered id of the embedding model (required, e.g. "bge-small-en-v1.5").
+  /// Commons resolves this to the primary artifact path via the model registry.
+  public var embeddingModelID: String = String()
 
-  /// Filesystem path to the LLM model (typically GGUF).
-  public var llmModelPath: String = String()
+  /// Registered id of the LLM model (e.g. "qwen3-4b-q4_k_m"). Optional —
+  /// leave empty to create an embed-only / retrieval-only pipeline.
+  public var llmModelID: String = String()
 
   /// Embedding vector dimension — must match the embedding model.
   /// Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
@@ -206,14 +209,15 @@ public struct RARAGConfiguration: Sendable {
 
   public var rerankResults: Bool = false
 
-  public var rerankerModelPath: String {
-    get {_rerankerModelPath ?? String()}
-    set {_rerankerModelPath = newValue}
+  /// Registered id of the reranker model (optional).
+  public var rerankerModelID: String {
+    get {_rerankerModelID ?? String()}
+    set {_rerankerModelID = newValue}
   }
-  /// Returns true if `rerankerModelPath` has been explicitly set.
-  public var hasRerankerModelPath: Bool {self._rerankerModelPath != nil}
-  /// Clears the value of `rerankerModelPath`. Subsequent reads from it will return its default value.
-  public mutating func clearRerankerModelPath() {self._rerankerModelPath = nil}
+  /// Returns true if `rerankerModelID` has been explicitly set.
+  public var hasRerankerModelID: Bool {self._rerankerModelID != nil}
+  /// Clears the value of `rerankerModelID`. Subsequent reads from it will return its default value.
+  public mutating func clearRerankerModelID() {self._rerankerModelID = nil}
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -223,7 +227,7 @@ public struct RARAGConfiguration: Sendable {
   fileprivate var _embeddingConfigJson: String? = nil
   fileprivate var _llmConfigJson: String? = nil
   fileprivate var _indexPath: String? = nil
-  fileprivate var _rerankerModelPath: String? = nil
+  fileprivate var _rerankerModelID: String? = nil
 }
 
 /// ---------------------------------------------------------------------------
@@ -748,7 +752,7 @@ extension RARAGStreamEventKind: SwiftProtobuf._ProtoNameProviding {
 
 extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".RAGConfiguration"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}embedding_model_path\0\u{3}llm_model_path\0\u{3}embedding_dimension\0\u{3}top_k\0\u{3}similarity_threshold\0\u{3}chunk_size\0\u{3}chunk_overlap\0\u{3}max_context_tokens\0\u{3}prompt_template\0\u{3}embedding_config_json\0\u{3}llm_config_json\0\u{3}index_path\0\u{3}persist_index\0\u{3}rerank_results\0\u{3}reranker_model_path\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}embedding_model_id\0\u{3}llm_model_id\0\u{3}embedding_dimension\0\u{3}top_k\0\u{3}similarity_threshold\0\u{3}chunk_size\0\u{3}chunk_overlap\0\u{3}max_context_tokens\0\u{3}prompt_template\0\u{3}embedding_config_json\0\u{3}llm_config_json\0\u{3}index_path\0\u{3}persist_index\0\u{3}rerank_results\0\u{3}reranker_model_id\0")
 
   public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -756,8 +760,8 @@ extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularStringField(value: &self.embeddingModelPath) }()
-      case 2: try { try decoder.decodeSingularStringField(value: &self.llmModelPath) }()
+      case 1: try { try decoder.decodeSingularStringField(value: &self.embeddingModelID) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.llmModelID) }()
       case 3: try { try decoder.decodeSingularInt32Field(value: &self.embeddingDimension) }()
       case 4: try { try decoder.decodeSingularInt32Field(value: &self.topK) }()
       case 5: try { try decoder.decodeSingularFloatField(value: &self.similarityThreshold) }()
@@ -770,7 +774,7 @@ extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
       case 12: try { try decoder.decodeSingularStringField(value: &self._indexPath) }()
       case 13: try { try decoder.decodeSingularBoolField(value: &self.persistIndex) }()
       case 14: try { try decoder.decodeSingularBoolField(value: &self.rerankResults) }()
-      case 15: try { try decoder.decodeSingularStringField(value: &self._rerankerModelPath) }()
+      case 15: try { try decoder.decodeSingularStringField(value: &self._rerankerModelID) }()
       default: break
       }
     }
@@ -781,11 +785,11 @@ extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.embeddingModelPath.isEmpty {
-      try visitor.visitSingularStringField(value: self.embeddingModelPath, fieldNumber: 1)
+    if !self.embeddingModelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.embeddingModelID, fieldNumber: 1)
     }
-    if !self.llmModelPath.isEmpty {
-      try visitor.visitSingularStringField(value: self.llmModelPath, fieldNumber: 2)
+    if !self.llmModelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.llmModelID, fieldNumber: 2)
     }
     if self.embeddingDimension != 0 {
       try visitor.visitSingularInt32Field(value: self.embeddingDimension, fieldNumber: 3)
@@ -823,15 +827,15 @@ extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if self.rerankResults != false {
       try visitor.visitSingularBoolField(value: self.rerankResults, fieldNumber: 14)
     }
-    try { if let v = self._rerankerModelPath {
+    try { if let v = self._rerankerModelID {
       try visitor.visitSingularStringField(value: v, fieldNumber: 15)
     } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   public static func ==(lhs: RARAGConfiguration, rhs: RARAGConfiguration) -> Bool {
-    if lhs.embeddingModelPath != rhs.embeddingModelPath {return false}
-    if lhs.llmModelPath != rhs.llmModelPath {return false}
+    if lhs.embeddingModelID != rhs.embeddingModelID {return false}
+    if lhs.llmModelID != rhs.llmModelID {return false}
     if lhs.embeddingDimension != rhs.embeddingDimension {return false}
     if lhs.topK != rhs.topK {return false}
     if lhs.similarityThreshold != rhs.similarityThreshold {return false}
@@ -844,7 +848,7 @@ extension RARAGConfiguration: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
     if lhs._indexPath != rhs._indexPath {return false}
     if lhs.persistIndex != rhs.persistIndex {return false}
     if lhs.rerankResults != rhs.rerankResults {return false}
-    if lhs._rerankerModelPath != rhs._rerankerModelPath {return false}
+    if lhs._rerankerModelID != rhs._rerankerModelID {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -580,9 +580,41 @@ int test_rag_ingest_query_mocked_path() {
     CHECK(rac_plugin_register(&onnx) == RAC_SUCCESS, "RAG embeddings plugin registers");
     CHECK(rac_plugin_register(&llamacpp) == RAC_SUCCESS, "RAG LLM plugin registers");
 
+    // D-6: RAGConfiguration carries model ids. Register mock embedding / LLM
+    // models in the global model registry so the commons RAG session create
+    // ABI can resolve the ids to filesystem paths.
+    auto root = temp_root("rag");
+    auto embedding_path = root / "mock-embeddings.onnx";
+    auto llm_path = root / "mock-llm.gguf";
+    write_file(embedding_path, "ONNXembed");
+    write_file(llm_path, "GGUFllm");
+
+    std::string embedding_path_str = embedding_path.string();
+    std::string llm_path_str = llm_path.string();
+
+    rac_model_info_t embedding_model{};
+    embedding_model.id = const_cast<char*>("rag.embedding.mock");
+    embedding_model.name = const_cast<char*>("RAG Mock Embedding");
+    embedding_model.category = RAC_MODEL_CATEGORY_EMBEDDING;
+    embedding_model.format = RAC_MODEL_FORMAT_ONNX;
+    embedding_model.framework = RAC_FRAMEWORK_ONNX;
+    embedding_model.local_path = const_cast<char*>(embedding_path_str.c_str());
+    CHECK(rac_register_model(&embedding_model) == RAC_SUCCESS,
+          "RAG embedding model registers globally");
+
+    rac_model_info_t llm_model{};
+    llm_model.id = const_cast<char*>("rag.llm.mock");
+    llm_model.name = const_cast<char*>("RAG Mock LLM");
+    llm_model.category = RAC_MODEL_CATEGORY_LANGUAGE;
+    llm_model.format = RAC_MODEL_FORMAT_GGUF;
+    llm_model.framework = RAC_FRAMEWORK_LLAMACPP;
+    llm_model.local_path = const_cast<char*>(llm_path_str.c_str());
+    CHECK(rac_register_model(&llm_model) == RAC_SUCCESS,
+          "RAG LLM model registers globally");
+
     runanywhere::v1::RAGConfiguration config;
-    config.set_embedding_model_path("/tmp/mock-embeddings.onnx");
-    config.set_llm_model_path("/tmp/mock-llm.gguf");
+    config.set_embedding_model_id("rag.embedding.mock");
+    config.set_llm_model_id("rag.llm.mock");
     config.set_embedding_dimension(3);
     config.set_top_k(1);
     config.set_similarity_threshold(0.0f);
@@ -654,6 +686,44 @@ int test_rag_ingest_query_mocked_path() {
     rac_rag_session_destroy_proto(session);
     (void)rac_plugin_unregister("onnx");
     (void)rac_plugin_unregister("llamacpp");
+    return 0;
+}
+
+// D-6: RAGConfiguration.embedding_model_id that references an unknown model
+// must fail with RAC_ERROR_MODEL_NOT_FOUND (commons resolves ids through the
+// global registry; unknown ids must not silently fall through).
+int test_rag_unknown_embedding_model_id_fails() {
+    runanywhere::v1::RAGConfiguration config;
+    config.set_embedding_model_id("rag.embedding.does-not-exist");
+    config.set_embedding_dimension(3);
+    config.set_top_k(1);
+    config.set_chunk_size(64);
+    config.set_chunk_overlap(0);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(config, &bytes), "unknown-id RAGConfiguration serializes");
+
+    rac_handle_t session = nullptr;
+    rac_result_t rc = rac_rag_session_create_proto(bytes.data(), bytes.size(), &session);
+    CHECK(rc == RAC_ERROR_MODEL_NOT_FOUND,
+          "RAG session create with unknown embedding id returns RAC_ERROR_MODEL_NOT_FOUND");
+    CHECK(session == nullptr, "session handle is null on model-not-found failure");
+    return 0;
+}
+
+// D-6: RAGConfiguration.embedding_model_id is required. Omitting it must
+// fail with RAC_ERROR_INVALID_ARGUMENT (before any registry lookup).
+int test_rag_missing_embedding_model_id_fails() {
+    runanywhere::v1::RAGConfiguration config;
+    config.set_embedding_dimension(3);
+    config.set_top_k(1);
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(config, &bytes), "empty-id RAGConfiguration serializes");
+
+    rac_handle_t session = nullptr;
+    rac_result_t rc = rac_rag_session_create_proto(bytes.data(), bytes.size(), &session);
+    CHECK(rc == RAC_ERROR_INVALID_ARGUMENT,
+          "RAG session create without embedding_model_id returns INVALID_ARGUMENT");
+    CHECK(session == nullptr, "session handle is null on missing-id failure");
     return 0;
 }
 
@@ -781,6 +851,8 @@ int main() {
     test_embeddings_mocked_result();
     test_diffusion_progress_cancel_and_unsupported();
     test_rag_ingest_query_mocked_path();
+    test_rag_unknown_embedding_model_id_fails();
+    test_rag_missing_embedding_model_id_fails();
     test_lora_register_compat_apply_remove_clear();
 
     std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);

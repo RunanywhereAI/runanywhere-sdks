@@ -1780,6 +1780,82 @@ export interface ModelCompatibilityCheckResult {
 
 /**
  * ---------------------------------------------------------------------------
+ * URL → ModelFormat inference request/result. Moves the Dart/Kotlin-side
+ * URL-suffix heuristic (".gguf" → GGUF, ".onnx" → ONNX, ".tar.gz" wrapping an
+ * inner format, ...) into commons so every SDK uses one implementation.
+ * ---------------------------------------------------------------------------
+ */
+export interface ModelFormatFromUrlRequest {
+  /**
+   * Portable URL or file path string. Only the trailing file-extension
+   * suffix is inspected; query strings and fragments are ignored.
+   */
+  url: string;
+}
+
+export interface ModelFormatFromUrlResult {
+  /**
+   * Primary detected format. For archive URLs this is the archive-wrapper
+   * format (for example MODEL_FORMAT_ZIP); the extracted model format is
+   * in inner_format below.
+   */
+  format: ModelFormat;
+  /**
+   * For archive URLs, the format of the primary file inside the archive
+   * when it can be inferred from the URL (for example
+   * "whisper-base.en.tar.gz" → inner_format = MODEL_FORMAT_ONNX). When the
+   * archive content is unknown this is MODEL_FORMAT_UNSPECIFIED.
+   */
+  innerFormat: ModelFormat;
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * URL → ModelArtifactType inference request/result. Replaces Dart
+ * withInferredArtifact and Kotlin inferArtifactFields with a single commons
+ * call.
+ * ---------------------------------------------------------------------------
+ */
+export interface ArtifactInferFromUrlRequest {
+  /** Portable URL or file path string. */
+  url: string;
+  /**
+   * Optional model identifier. Commons does not consult the registry with
+   * this value today; it is carried for logging and telemetry only.
+   */
+  modelId: string;
+}
+
+export interface ArtifactInferFromUrlResult {
+  /** Inferred artifact-type classification. */
+  artifactType: ModelArtifactType;
+  /**
+   * For archive artifacts, the concrete archive format (ZIP, TAR_GZ, ...).
+   * For single-file or directory artifacts this is
+   * ARCHIVE_TYPE_UNSPECIFIED.
+   */
+  archiveType: ArchiveType;
+  /**
+   * For archive artifacts the known or inferred internal structure after
+   * extraction. Defaults to ARCHIVE_STRUCTURE_UNKNOWN.
+   */
+  archiveStructure: ArchiveStructure;
+  /**
+   * When the URL suggests an archive wrapping a known primary file (for
+   * example a Whisper model bundle containing encoder.onnx), this field
+   * carries the relative path inside the archive when it can be inferred.
+   * Empty otherwise.
+   */
+  primaryRelpath: string;
+  /**
+   * Inner file format for archive artifacts. MODEL_FORMAT_UNSPECIFIED when
+   * the archive contents are unknown.
+   */
+  innerFormat: ModelFormat;
+}
+
+/**
+ * ---------------------------------------------------------------------------
  * FetchAssignments request/result. Replaces the JSON shim
  * racModelRegistryFetchAssignments and the Web SDK's offline-friendly
  * fetchModelAssignments() entry point. The platform adapter owns HTTP
@@ -6913,6 +6989,330 @@ export const ModelCompatibilityCheckResult = {
     message.modelId = object.modelId ?? "";
     message.errorCode = object.errorCode ?? 0;
     message.errorMessage = object.errorMessage ?? "";
+    return message;
+  },
+};
+
+function createBaseModelFormatFromUrlRequest(): ModelFormatFromUrlRequest {
+  return { url: "" };
+}
+
+export const ModelFormatFromUrlRequest = {
+  encode(message: ModelFormatFromUrlRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.url !== "") {
+      writer.uint32(10).string(message.url);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelFormatFromUrlRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelFormatFromUrlRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.url = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelFormatFromUrlRequest {
+    return { url: isSet(object.url) ? globalThis.String(object.url) : "" };
+  },
+
+  toJSON(message: ModelFormatFromUrlRequest): unknown {
+    const obj: any = {};
+    if (message.url !== "") {
+      obj.url = message.url;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelFormatFromUrlRequest>, I>>(base?: I): ModelFormatFromUrlRequest {
+    return ModelFormatFromUrlRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelFormatFromUrlRequest>, I>>(object: I): ModelFormatFromUrlRequest {
+    const message = createBaseModelFormatFromUrlRequest();
+    message.url = object.url ?? "";
+    return message;
+  },
+};
+
+function createBaseModelFormatFromUrlResult(): ModelFormatFromUrlResult {
+  return { format: 0, innerFormat: 0 };
+}
+
+export const ModelFormatFromUrlResult = {
+  encode(message: ModelFormatFromUrlResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.format !== 0) {
+      writer.uint32(8).int32(message.format);
+    }
+    if (message.innerFormat !== 0) {
+      writer.uint32(16).int32(message.innerFormat);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelFormatFromUrlResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelFormatFromUrlResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.format = reader.int32() as any;
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.innerFormat = reader.int32() as any;
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelFormatFromUrlResult {
+    return {
+      format: isSet(object.format) ? modelFormatFromJSON(object.format) : 0,
+      innerFormat: isSet(object.innerFormat) ? modelFormatFromJSON(object.innerFormat) : 0,
+    };
+  },
+
+  toJSON(message: ModelFormatFromUrlResult): unknown {
+    const obj: any = {};
+    if (message.format !== 0) {
+      obj.format = modelFormatToJSON(message.format);
+    }
+    if (message.innerFormat !== 0) {
+      obj.innerFormat = modelFormatToJSON(message.innerFormat);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelFormatFromUrlResult>, I>>(base?: I): ModelFormatFromUrlResult {
+    return ModelFormatFromUrlResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelFormatFromUrlResult>, I>>(object: I): ModelFormatFromUrlResult {
+    const message = createBaseModelFormatFromUrlResult();
+    message.format = object.format ?? 0;
+    message.innerFormat = object.innerFormat ?? 0;
+    return message;
+  },
+};
+
+function createBaseArtifactInferFromUrlRequest(): ArtifactInferFromUrlRequest {
+  return { url: "", modelId: "" };
+}
+
+export const ArtifactInferFromUrlRequest = {
+  encode(message: ArtifactInferFromUrlRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.url !== "") {
+      writer.uint32(10).string(message.url);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(18).string(message.modelId);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ArtifactInferFromUrlRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseArtifactInferFromUrlRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.url = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ArtifactInferFromUrlRequest {
+    return {
+      url: isSet(object.url) ? globalThis.String(object.url) : "",
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+    };
+  },
+
+  toJSON(message: ArtifactInferFromUrlRequest): unknown {
+    const obj: any = {};
+    if (message.url !== "") {
+      obj.url = message.url;
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ArtifactInferFromUrlRequest>, I>>(base?: I): ArtifactInferFromUrlRequest {
+    return ArtifactInferFromUrlRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ArtifactInferFromUrlRequest>, I>>(object: I): ArtifactInferFromUrlRequest {
+    const message = createBaseArtifactInferFromUrlRequest();
+    message.url = object.url ?? "";
+    message.modelId = object.modelId ?? "";
+    return message;
+  },
+};
+
+function createBaseArtifactInferFromUrlResult(): ArtifactInferFromUrlResult {
+  return { artifactType: 0, archiveType: 0, archiveStructure: 0, primaryRelpath: "", innerFormat: 0 };
+}
+
+export const ArtifactInferFromUrlResult = {
+  encode(message: ArtifactInferFromUrlResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.artifactType !== 0) {
+      writer.uint32(8).int32(message.artifactType);
+    }
+    if (message.archiveType !== 0) {
+      writer.uint32(16).int32(message.archiveType);
+    }
+    if (message.archiveStructure !== 0) {
+      writer.uint32(24).int32(message.archiveStructure);
+    }
+    if (message.primaryRelpath !== "") {
+      writer.uint32(34).string(message.primaryRelpath);
+    }
+    if (message.innerFormat !== 0) {
+      writer.uint32(40).int32(message.innerFormat);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ArtifactInferFromUrlResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseArtifactInferFromUrlResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.artifactType = reader.int32() as any;
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.archiveType = reader.int32() as any;
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.archiveStructure = reader.int32() as any;
+          continue;
+        case 4:
+          if (tag !== 34) {
+            break;
+          }
+
+          message.primaryRelpath = reader.string();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.innerFormat = reader.int32() as any;
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ArtifactInferFromUrlResult {
+    return {
+      artifactType: isSet(object.artifactType) ? modelArtifactTypeFromJSON(object.artifactType) : 0,
+      archiveType: isSet(object.archiveType) ? archiveTypeFromJSON(object.archiveType) : 0,
+      archiveStructure: isSet(object.archiveStructure) ? archiveStructureFromJSON(object.archiveStructure) : 0,
+      primaryRelpath: isSet(object.primaryRelpath) ? globalThis.String(object.primaryRelpath) : "",
+      innerFormat: isSet(object.innerFormat) ? modelFormatFromJSON(object.innerFormat) : 0,
+    };
+  },
+
+  toJSON(message: ArtifactInferFromUrlResult): unknown {
+    const obj: any = {};
+    if (message.artifactType !== 0) {
+      obj.artifactType = modelArtifactTypeToJSON(message.artifactType);
+    }
+    if (message.archiveType !== 0) {
+      obj.archiveType = archiveTypeToJSON(message.archiveType);
+    }
+    if (message.archiveStructure !== 0) {
+      obj.archiveStructure = archiveStructureToJSON(message.archiveStructure);
+    }
+    if (message.primaryRelpath !== "") {
+      obj.primaryRelpath = message.primaryRelpath;
+    }
+    if (message.innerFormat !== 0) {
+      obj.innerFormat = modelFormatToJSON(message.innerFormat);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ArtifactInferFromUrlResult>, I>>(base?: I): ArtifactInferFromUrlResult {
+    return ArtifactInferFromUrlResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ArtifactInferFromUrlResult>, I>>(object: I): ArtifactInferFromUrlResult {
+    const message = createBaseArtifactInferFromUrlResult();
+    message.artifactType = object.artifactType ?? 0;
+    message.archiveType = object.archiveType ?? 0;
+    message.archiveStructure = object.archiveStructure ?? 0;
+    message.primaryRelpath = object.primaryRelpath ?? "";
+    message.innerFormat = object.innerFormat ?? 0;
     return message;
   },
 };

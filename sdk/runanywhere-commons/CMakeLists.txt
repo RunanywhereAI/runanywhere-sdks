@@ -545,6 +545,7 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/model_management/model_compatibility.cpp
     src/infrastructure/model_management/model_compatibility_proto.cpp
     src/infrastructure/model_management/model_registry_fetch_assignments_proto.cpp
+    src/infrastructure/model_management/model_format_infer_proto.cpp
     src/infrastructure/storage/storage_analyzer.cpp
     src/infrastructure/file_management/file_manager.cpp
     src/infrastructure/network/environment.cpp
@@ -615,6 +616,9 @@ set(RAC_FEATURES_SOURCES
     # ThinkingContentParser; rac_llm_split_thinking_tokens C ABI)
     src/features/llm/rac_llm_thinking.cpp
     src/features/llm/tool_calling.cpp
+    # Wave D-4: tool-calling session state machine (collapses per-SDK
+    # 200-400 LOC orchestration loop into one native session).
+    src/features/llm/tool_calling_session.cpp
     # v2 close-out Phase G-2: proto-byte LLM stream ABI (mirrors
     # voice_agent/rac_voice_event_abi.cpp; replaces per-SDK hand-rolled
     # AsyncThrowingStream / callbackFlow / tokenQueue shims).

@@ -374,6 +374,196 @@ export const HardwareProfileResult = {
         return message;
     },
 };
+function createBaseHardwareProfileRequest() {
+    return {};
+}
+export const HardwareProfileRequest = {
+    encode(_, writer = _m0.Writer.create()) {
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseHardwareProfileRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(_) {
+        return {};
+    },
+    toJSON(_) {
+        const obj = {};
+        return obj;
+    },
+    create(base) {
+        return HardwareProfileRequest.fromPartial(base ?? {});
+    },
+    fromPartial(_) {
+        const message = createBaseHardwareProfileRequest();
+        return message;
+    },
+};
+function createBaseHardwareAcceleratorsRequest() {
+    return {};
+}
+export const HardwareAcceleratorsRequest = {
+    encode(_, writer = _m0.Writer.create()) {
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseHardwareAcceleratorsRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(_) {
+        return {};
+    },
+    toJSON(_) {
+        const obj = {};
+        return obj;
+    },
+    create(base) {
+        return HardwareAcceleratorsRequest.fromPartial(base ?? {});
+    },
+    fromPartial(_) {
+        const message = createBaseHardwareAcceleratorsRequest();
+        return message;
+    },
+};
+function createBaseHardwareAcceleratorPreferenceRequest() {
+    return { preference: 0 };
+}
+export const HardwareAcceleratorPreferenceRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.preference !== 0) {
+            writer.uint32(8).int32(message.preference);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseHardwareAcceleratorPreferenceRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.preference = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return { preference: isSet(object.preference) ? acceleratorPreferenceFromJSON(object.preference) : 0 };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.preference !== 0) {
+            obj.preference = acceleratorPreferenceToJSON(message.preference);
+        }
+        return obj;
+    },
+    create(base) {
+        return HardwareAcceleratorPreferenceRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseHardwareAcceleratorPreferenceRequest();
+        message.preference = object.preference ?? 0;
+        return message;
+    },
+};
+function createBaseHardwareAcceleratorPreferenceResult() {
+    return { success: false, errorMessage: "" };
+}
+export const HardwareAcceleratorPreferenceResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.success !== false) {
+            writer.uint32(8).bool(message.success);
+        }
+        if (message.errorMessage !== "") {
+            writer.uint32(18).string(message.errorMessage);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseHardwareAcceleratorPreferenceResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.success = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.success !== false) {
+            obj.success = message.success;
+        }
+        if (message.errorMessage !== "") {
+            obj.errorMessage = message.errorMessage;
+        }
+        return obj;
+    },
+    create(base) {
+        return HardwareAcceleratorPreferenceResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseHardwareAcceleratorPreferenceResult();
+        message.success = object.success ?? false;
+        message.errorMessage = object.errorMessage ?? "";
+        return message;
+    },
+};
 function longToNumber(long) {
     if (long.gt(globalThis.Number.MAX_SAFE_INTEGER)) {
         throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");

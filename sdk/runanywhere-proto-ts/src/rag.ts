@@ -75,19 +75,26 @@ export function rAGStreamEventKindToJSON(object: RAGStreamEventKind): string {
 
 /**
  * ---------------------------------------------------------------------------
- * RAGConfiguration — low-level pipeline config (pre-IDL hand-rolled).
+ * RAGConfiguration — low-level pipeline config.
  *
- * This is the runtime configuration consumed by the RAG pipeline directly,
- * distinct from solutions.proto::RAGConfig (which is the high-level solution
- * spec resolved through the model registry). RAGConfiguration takes raw model
- * paths because the pipeline runs after model resolution has already happened.
+ * As of D-6 (Wave D) this message carries *model ids*, not filesystem paths.
+ * The commons RAG session ABI (rac_rag_session_create_proto) is responsible
+ * for resolving those ids to on-disk paths through the canonical model
+ * registry. SDK callers MUST register the embedding / LLM / reranker models
+ * first and pass only their ids here.
  * ---------------------------------------------------------------------------
  */
 export interface RAGConfiguration {
-  /** Filesystem path to the embedding model (typically ONNX). */
-  embeddingModelPath: string;
-  /** Filesystem path to the LLM model (typically GGUF). */
-  llmModelPath: string;
+  /**
+   * Registered id of the embedding model (required, e.g. "bge-small-en-v1.5").
+   * Commons resolves this to the primary artifact path via the model registry.
+   */
+  embeddingModelId: string;
+  /**
+   * Registered id of the LLM model (e.g. "qwen3-4b-q4_k_m"). Optional —
+   * leave empty to create an embed-only / retrieval-only pipeline.
+   */
+  llmModelId: string;
   /**
    * Embedding vector dimension — must match the embedding model.
    * Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
@@ -122,7 +129,8 @@ export interface RAGConfiguration {
   indexPath?: string | undefined;
   persistIndex: boolean;
   rerankResults: boolean;
-  rerankerModelPath?: string | undefined;
+  /** Registered id of the reranker model (optional). */
+  rerankerModelId?: string | undefined;
 }
 
 /**
@@ -355,8 +363,8 @@ export interface RAGServiceState {
 
 function createBaseRAGConfiguration(): RAGConfiguration {
   return {
-    embeddingModelPath: "",
-    llmModelPath: "",
+    embeddingModelId: "",
+    llmModelId: "",
     embeddingDimension: 0,
     topK: 0,
     similarityThreshold: 0,
@@ -369,17 +377,17 @@ function createBaseRAGConfiguration(): RAGConfiguration {
     indexPath: undefined,
     persistIndex: false,
     rerankResults: false,
-    rerankerModelPath: undefined,
+    rerankerModelId: undefined,
   };
 }
 
 export const RAGConfiguration = {
   encode(message: RAGConfiguration, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.embeddingModelPath !== "") {
-      writer.uint32(10).string(message.embeddingModelPath);
+    if (message.embeddingModelId !== "") {
+      writer.uint32(10).string(message.embeddingModelId);
     }
-    if (message.llmModelPath !== "") {
-      writer.uint32(18).string(message.llmModelPath);
+    if (message.llmModelId !== "") {
+      writer.uint32(18).string(message.llmModelId);
     }
     if (message.embeddingDimension !== 0) {
       writer.uint32(24).int32(message.embeddingDimension);
@@ -417,8 +425,8 @@ export const RAGConfiguration = {
     if (message.rerankResults !== false) {
       writer.uint32(112).bool(message.rerankResults);
     }
-    if (message.rerankerModelPath !== undefined) {
-      writer.uint32(122).string(message.rerankerModelPath);
+    if (message.rerankerModelId !== undefined) {
+      writer.uint32(122).string(message.rerankerModelId);
     }
     return writer;
   },
@@ -435,14 +443,14 @@ export const RAGConfiguration = {
             break;
           }
 
-          message.embeddingModelPath = reader.string();
+          message.embeddingModelId = reader.string();
           continue;
         case 2:
           if (tag !== 18) {
             break;
           }
 
-          message.llmModelPath = reader.string();
+          message.llmModelId = reader.string();
           continue;
         case 3:
           if (tag !== 24) {
@@ -533,7 +541,7 @@ export const RAGConfiguration = {
             break;
           }
 
-          message.rerankerModelPath = reader.string();
+          message.rerankerModelId = reader.string();
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -546,8 +554,8 @@ export const RAGConfiguration = {
 
   fromJSON(object: any): RAGConfiguration {
     return {
-      embeddingModelPath: isSet(object.embeddingModelPath) ? globalThis.String(object.embeddingModelPath) : "",
-      llmModelPath: isSet(object.llmModelPath) ? globalThis.String(object.llmModelPath) : "",
+      embeddingModelId: isSet(object.embeddingModelId) ? globalThis.String(object.embeddingModelId) : "",
+      llmModelId: isSet(object.llmModelId) ? globalThis.String(object.llmModelId) : "",
       embeddingDimension: isSet(object.embeddingDimension) ? globalThis.Number(object.embeddingDimension) : 0,
       topK: isSet(object.topK) ? globalThis.Number(object.topK) : 0,
       similarityThreshold: isSet(object.similarityThreshold) ? globalThis.Number(object.similarityThreshold) : 0,
@@ -562,17 +570,17 @@ export const RAGConfiguration = {
       indexPath: isSet(object.indexPath) ? globalThis.String(object.indexPath) : undefined,
       persistIndex: isSet(object.persistIndex) ? globalThis.Boolean(object.persistIndex) : false,
       rerankResults: isSet(object.rerankResults) ? globalThis.Boolean(object.rerankResults) : false,
-      rerankerModelPath: isSet(object.rerankerModelPath) ? globalThis.String(object.rerankerModelPath) : undefined,
+      rerankerModelId: isSet(object.rerankerModelId) ? globalThis.String(object.rerankerModelId) : undefined,
     };
   },
 
   toJSON(message: RAGConfiguration): unknown {
     const obj: any = {};
-    if (message.embeddingModelPath !== "") {
-      obj.embeddingModelPath = message.embeddingModelPath;
+    if (message.embeddingModelId !== "") {
+      obj.embeddingModelId = message.embeddingModelId;
     }
-    if (message.llmModelPath !== "") {
-      obj.llmModelPath = message.llmModelPath;
+    if (message.llmModelId !== "") {
+      obj.llmModelId = message.llmModelId;
     }
     if (message.embeddingDimension !== 0) {
       obj.embeddingDimension = Math.round(message.embeddingDimension);
@@ -610,8 +618,8 @@ export const RAGConfiguration = {
     if (message.rerankResults !== false) {
       obj.rerankResults = message.rerankResults;
     }
-    if (message.rerankerModelPath !== undefined) {
-      obj.rerankerModelPath = message.rerankerModelPath;
+    if (message.rerankerModelId !== undefined) {
+      obj.rerankerModelId = message.rerankerModelId;
     }
     return obj;
   },
@@ -621,8 +629,8 @@ export const RAGConfiguration = {
   },
   fromPartial<I extends Exact<DeepPartial<RAGConfiguration>, I>>(object: I): RAGConfiguration {
     const message = createBaseRAGConfiguration();
-    message.embeddingModelPath = object.embeddingModelPath ?? "";
-    message.llmModelPath = object.llmModelPath ?? "";
+    message.embeddingModelId = object.embeddingModelId ?? "";
+    message.llmModelId = object.llmModelId ?? "";
     message.embeddingDimension = object.embeddingDimension ?? 0;
     message.topK = object.topK ?? 0;
     message.similarityThreshold = object.similarityThreshold ?? 0;
@@ -635,7 +643,7 @@ export const RAGConfiguration = {
     message.indexPath = object.indexPath ?? undefined;
     message.persistIndex = object.persistIndex ?? false;
     message.rerankResults = object.rerankResults ?? false;
-    message.rerankerModelPath = object.rerankerModelPath ?? undefined;
+    message.rerankerModelId = object.rerankerModelId ?? undefined;
     return message;
   },
 };

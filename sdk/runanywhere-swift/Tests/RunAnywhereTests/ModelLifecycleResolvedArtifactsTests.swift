@@ -50,7 +50,11 @@ final class ModelLifecycleResolvedArtifactsTests: XCTestCase {
         XCTAssertEqual(result.lifecyclePrimaryArtifactPath, "/models/diffusion/model.mlpackage")
     }
 
-    func testRAGConfigurationUsesLifecycleArtifactRoles() throws {
+    /// D-6: RAGConfiguration carries model ids and the path resolution is
+    /// owned by commons. `resolvingLifecycleArtifacts` now only stamps the
+    /// resolved-model ids onto the configuration; filesystem paths never
+    /// appear on the Swift-side proto message.
+    func testRAGConfigurationUsesLifecycleModelIds() throws {
         let embedding = makeLoadResult(
             modelId: "minilm",
             category: .embedding,
@@ -70,11 +74,8 @@ final class ModelLifecycleResolvedArtifactsTests: XCTestCase {
         let config = try RARAGConfiguration.defaults()
             .resolvingLifecycleArtifacts(embedding: embedding, llm: llm)
 
-        XCTAssertEqual(config.embeddingModelPath, "/models/minilm/model.onnx")
-        XCTAssertEqual(config.llmModelPath, "/models/tinyllama/model.gguf")
-        let data = try XCTUnwrap(config.embeddingConfigJson.data(using: .utf8))
-        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        XCTAssertEqual(json["vocab_path"] as? String, "/models/minilm/vocab.txt")
+        XCTAssertEqual(config.embeddingModelID, "minilm")
+        XCTAssertEqual(config.llmModelID, "tinyllama")
     }
 
     private func makeLoadResult(

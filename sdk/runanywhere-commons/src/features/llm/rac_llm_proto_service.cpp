@@ -126,7 +126,8 @@ void publish_generation_event(GenerationEventKind kind,
                               const char* error,
                               const char* model_id,
                               int32_t token_count,
-                              int64_t latency_ms) {
+                              int64_t latency_ms,
+                              int32_t input_tokens = 0) {
     SDKEvent event;
     const bool failed = kind == runanywhere::v1::GENERATION_EVENT_KIND_FAILED;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_LLM,
@@ -156,6 +157,9 @@ void publish_generation_event(GenerationEventKind kind,
     }
     if (latency_ms > 0) {
         generation->set_latency_ms(latency_ms);
+    }
+    if (input_tokens > 0) {
+        generation->set_input_tokens(input_tokens);
     }
     (void)publish_sdk_event(event);
 }
@@ -584,7 +588,8 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes,
     publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED,
                              request.prompt().c_str(), nullptr, response, nullptr,
                              ref.model_id, raw.completion_tokens,
-                             raw.total_time_ms > 0 ? raw.total_time_ms : elapsed);
+                             raw.total_time_ms > 0 ? raw.total_time_ms : elapsed,
+                             raw.prompt_tokens);
 
     rac_llm_result_free(&raw);
     rac::llm::release_lifecycle_llm(&ref);

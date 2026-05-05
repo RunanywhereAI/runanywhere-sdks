@@ -717,4 +717,44 @@ RAC_API rac_result_t rac_voice_agent_process_voice_turn_proto(
 }
 #endif
 
+// Wave D-7: full-session voice-agent ABI + per-helper proto wrappers.
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef void (*rac_voice_agent_turn_event_callback_fn)(const uint8_t* event_bytes,
+                                                       size_t event_size,
+                                                       void* user_data);
+
+RAC_API rac_result_t rac_voice_agent_process_turn_proto(
+    rac_voice_agent_handle_t handle,
+    const uint8_t* request_bytes,
+    size_t request_size,
+    rac_voice_agent_turn_event_callback_fn event_callback,
+    void* user_data);
+
+RAC_API rac_result_t rac_voice_agent_transcribe_proto(
+    rac_voice_agent_handle_t handle,
+    const uint8_t* request_bytes,
+    size_t request_size,
+    rac_proto_buffer_t* out_result);
+
+RAC_API rac_result_t rac_voice_agent_synthesize_speech_proto(
+    rac_voice_agent_handle_t handle,
+    const uint8_t* request_bytes,
+    size_t request_size,
+    rac_proto_buffer_t* out_result);
+
+RAC_API rac_result_t rac_voice_agent_component_create_proto(
+    const uint8_t* config_bytes,
+    size_t config_size,
+    rac_voice_agent_handle_t* out_handle);
+
+RAC_API rac_result_t rac_voice_agent_component_destroy_proto(
+    rac_voice_agent_handle_t handle);
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* RAC_VOICE_AGENT_H */

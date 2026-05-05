@@ -77,6 +77,24 @@ int test_rag_generated_service_contract() {
               "Stream is server-streaming");
     }
 
+    // D-6: RAGConfiguration carries *model ids*, not filesystem paths. Guard
+    // against an accidental schema regression by asserting the id fields
+    // exist and the old path fields are gone.
+    const google::protobuf::Descriptor* rag_config =
+        runanywhere::v1::RAGConfiguration::descriptor();
+    CHECK(rag_config->FindFieldByName("embedding_model_id") != nullptr,
+          "RAGConfiguration has embedding_model_id");
+    CHECK(rag_config->FindFieldByName("llm_model_id") != nullptr,
+          "RAGConfiguration has llm_model_id");
+    CHECK(rag_config->FindFieldByName("reranker_model_id") != nullptr,
+          "RAGConfiguration has reranker_model_id");
+    CHECK(rag_config->FindFieldByName("embedding_model_path") == nullptr,
+          "RAGConfiguration no longer carries embedding_model_path");
+    CHECK(rag_config->FindFieldByName("llm_model_path") == nullptr,
+          "RAGConfiguration no longer carries llm_model_path");
+    CHECK(rag_config->FindFieldByName("reranker_model_path") == nullptr,
+          "RAGConfiguration no longer carries reranker_model_path");
+
     const google::protobuf::Descriptor* result = runanywhere::v1::RAGResult::descriptor();
     const google::protobuf::FieldDescriptor* retrieved_chunks =
         result->FindFieldByName("retrieved_chunks");

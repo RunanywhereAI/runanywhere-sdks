@@ -1129,13 +1129,13 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
 
   // accessors -------------------------------------------------------
   enum : int {
-    kEmbeddingModelPathFieldNumber = 1,
-    kLlmModelPathFieldNumber = 2,
+    kEmbeddingModelIdFieldNumber = 1,
+    kLlmModelIdFieldNumber = 2,
     kPromptTemplateFieldNumber = 9,
     kEmbeddingConfigJsonFieldNumber = 10,
     kLlmConfigJsonFieldNumber = 11,
     kIndexPathFieldNumber = 12,
-    kRerankerModelPathFieldNumber = 15,
+    kRerankerModelIdFieldNumber = 15,
     kEmbeddingDimensionFieldNumber = 3,
     kTopKFieldNumber = 4,
     kSimilarityThresholdFieldNumber = 5,
@@ -1145,34 +1145,34 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
     kPersistIndexFieldNumber = 13,
     kRerankResultsFieldNumber = 14,
   };
-  // string embedding_model_path = 1;
-  void clear_embedding_model_path() ;
-  [[nodiscard]] const ::std::string& embedding_model_path() const;
+  // string embedding_model_id = 1;
+  void clear_embedding_model_id() ;
+  [[nodiscard]] const ::std::string& embedding_model_id() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_embedding_model_path(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_embedding_model_path();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_embedding_model_path();
-  void set_allocated_embedding_model_path(::std::string* PROTOBUF_NULLABLE value);
+  void set_embedding_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_embedding_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_embedding_model_id();
+  void set_allocated_embedding_model_id(::std::string* PROTOBUF_NULLABLE value);
 
   private:
-  const ::std::string& _internal_embedding_model_path() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_embedding_model_path(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_embedding_model_path();
+  const ::std::string& _internal_embedding_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_embedding_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_embedding_model_id();
 
   public:
-  // string llm_model_path = 2;
-  void clear_llm_model_path() ;
-  [[nodiscard]] const ::std::string& llm_model_path() const;
+  // string llm_model_id = 2;
+  void clear_llm_model_id() ;
+  [[nodiscard]] const ::std::string& llm_model_id() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_llm_model_path(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_llm_model_path();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_llm_model_path();
-  void set_allocated_llm_model_path(::std::string* PROTOBUF_NULLABLE value);
+  void set_llm_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_llm_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_llm_model_id();
+  void set_allocated_llm_model_id(::std::string* PROTOBUF_NULLABLE value);
 
   private:
-  const ::std::string& _internal_llm_model_path() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_llm_model_path(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_llm_model_path();
+  const ::std::string& _internal_llm_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_llm_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_llm_model_id();
 
   public:
   // optional string prompt_template = 9;
@@ -1243,21 +1243,21 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   ::std::string* PROTOBUF_NONNULL _internal_mutable_index_path();
 
   public:
-  // optional string reranker_model_path = 15;
-  [[nodiscard]] bool has_reranker_model_path()
+  // optional string reranker_model_id = 15;
+  [[nodiscard]] bool has_reranker_model_id()
       const;
-  void clear_reranker_model_path() ;
-  [[nodiscard]] const ::std::string& reranker_model_path() const;
+  void clear_reranker_model_id() ;
+  [[nodiscard]] const ::std::string& reranker_model_id() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
-  void set_reranker_model_path(Arg_&& arg, Args_... args);
-  ::std::string* PROTOBUF_NONNULL mutable_reranker_model_path();
-  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_reranker_model_path();
-  void set_allocated_reranker_model_path(::std::string* PROTOBUF_NULLABLE value);
+  void set_reranker_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_reranker_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_reranker_model_id();
+  void set_allocated_reranker_model_id(::std::string* PROTOBUF_NULLABLE value);
 
   private:
-  const ::std::string& _internal_reranker_model_path() const;
-  PROTOBUF_ALWAYS_INLINE void _internal_set_reranker_model_path(const ::std::string& value);
-  ::std::string* PROTOBUF_NONNULL _internal_mutable_reranker_model_path();
+  const ::std::string& _internal_reranker_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_reranker_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_reranker_model_id();
 
   public:
   // int32 embedding_dimension = 3;
@@ -1345,7 +1345,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
   static const ::google::protobuf::internal::TcParseTable<4, 15,
-                                   0, 162,
+                                   0, 156,
                                    2>
       _table_;
 
@@ -1368,13 +1368,13 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
         const RAGConfiguration& from_msg);
     ::google::protobuf::internal::HasBits<1> _has_bits_;
     ::google::protobuf::internal::CachedSize _cached_size_;
-    ::google::protobuf::internal::ArenaStringPtr embedding_model_path_;
-    ::google::protobuf::internal::ArenaStringPtr llm_model_path_;
+    ::google::protobuf::internal::ArenaStringPtr embedding_model_id_;
+    ::google::protobuf::internal::ArenaStringPtr llm_model_id_;
     ::google::protobuf::internal::ArenaStringPtr prompt_template_;
     ::google::protobuf::internal::ArenaStringPtr embedding_config_json_;
     ::google::protobuf::internal::ArenaStringPtr llm_config_json_;
     ::google::protobuf::internal::ArenaStringPtr index_path_;
-    ::google::protobuf::internal::ArenaStringPtr reranker_model_path_;
+    ::google::protobuf::internal::ArenaStringPtr reranker_model_id_;
     ::int32_t embedding_dimension_;
     ::int32_t top_k_;
     float similarity_threshold_;
@@ -3798,134 +3798,134 @@ extern const ::google::protobuf::internal::ClassDataFull RAGStreamEvent_class_da
 
 // RAGConfiguration
 
-// string embedding_model_path = 1;
-inline void RAGConfiguration::clear_embedding_model_path() {
+// string embedding_model_id = 1;
+inline void RAGConfiguration::clear_embedding_model_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.embedding_model_path_.ClearToEmpty();
+  _impl_.embedding_model_id_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000001U);
 }
-inline const ::std::string& RAGConfiguration::embedding_model_path() const
+inline const ::std::string& RAGConfiguration::embedding_model_id() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGConfiguration.embedding_model_path)
-  return _internal_embedding_model_path();
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGConfiguration.embedding_model_id)
+  return _internal_embedding_model_id();
 }
 template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void RAGConfiguration::set_embedding_model_path(Arg_&& arg, Args_... args) {
+PROTOBUF_ALWAYS_INLINE void RAGConfiguration::set_embedding_model_id(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  _impl_.embedding_model_path_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGConfiguration.embedding_model_path)
+  _impl_.embedding_model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGConfiguration.embedding_model_id)
 }
-inline ::std::string* PROTOBUF_NONNULL RAGConfiguration::mutable_embedding_model_path()
+inline ::std::string* PROTOBUF_NONNULL RAGConfiguration::mutable_embedding_model_id()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   SetHasBit(_impl_._has_bits_[0], 0x00000001U);
-  ::std::string* _s = _internal_mutable_embedding_model_path();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RAGConfiguration.embedding_model_path)
+  ::std::string* _s = _internal_mutable_embedding_model_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RAGConfiguration.embedding_model_id)
   return _s;
 }
-inline const ::std::string& RAGConfiguration::_internal_embedding_model_path() const {
+inline const ::std::string& RAGConfiguration::_internal_embedding_model_id() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.embedding_model_path_.Get();
+  return _impl_.embedding_model_id_.Get();
 }
-inline void RAGConfiguration::_internal_set_embedding_model_path(const ::std::string& value) {
+inline void RAGConfiguration::_internal_set_embedding_model_id(const ::std::string& value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.embedding_model_path_.Set(value, GetArena());
+  _impl_.embedding_model_id_.Set(value, GetArena());
 }
-inline ::std::string* PROTOBUF_NONNULL RAGConfiguration::_internal_mutable_embedding_model_path() {
+inline ::std::string* PROTOBUF_NONNULL RAGConfiguration::_internal_mutable_embedding_model_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.embedding_model_path_.Mutable( GetArena());
+  return _impl_.embedding_model_id_.Mutable( GetArena());
 }
-inline ::std::string* PROTOBUF_NULLABLE RAGConfiguration::release_embedding_model_path() {
+inline ::std::string* PROTOBUF_NULLABLE RAGConfiguration::release_embedding_model_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.RAGConfiguration.embedding_model_path)
+  // @@protoc_insertion_point(field_release:runanywhere.v1.RAGConfiguration.embedding_model_id)
   if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
-  auto* released = _impl_.embedding_model_path_.Release();
+  auto* released = _impl_.embedding_model_id_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.embedding_model_path_.Set("", GetArena());
+    _impl_.embedding_model_id_.Set("", GetArena());
   }
   return released;
 }
-inline void RAGConfiguration::set_allocated_embedding_model_path(::std::string* PROTOBUF_NULLABLE value) {
+inline void RAGConfiguration::set_allocated_embedding_model_id(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
     SetHasBit(_impl_._has_bits_[0], 0x00000001U);
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
   }
-  _impl_.embedding_model_path_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.embedding_model_path_.IsDefault()) {
-    _impl_.embedding_model_path_.Set("", GetArena());
+  _impl_.embedding_model_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.embedding_model_id_.IsDefault()) {
+    _impl_.embedding_model_id_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGConfiguration.embedding_model_path)
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGConfiguration.embedding_model_id)
 }
 
-// string llm_model_path = 2;
-inline void RAGConfiguration::clear_llm_model_path() {
+// string llm_model_id = 2;
+inline void RAGConfiguration::clear_llm_model_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.llm_model_path_.ClearToEmpty();
+  _impl_.llm_model_id_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000002U);
 }
-inline const ::std::string& RAGConfiguration::llm_model_path() const
+inline const ::std::string& RAGConfiguration::llm_model_id() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGConfiguration.llm_model_path)
-  return _internal_llm_model_path();
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGConfiguration.llm_model_id)
+  return _internal_llm_model_id();
 }
 template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void RAGConfiguration::set_llm_model_path(Arg_&& arg, Args_... args) {
+PROTOBUF_ALWAYS_INLINE void RAGConfiguration::set_llm_model_id(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  _impl_.llm_model_path_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGConfiguration.llm_model_path)
+  _impl_.llm_model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGConfiguration.llm_model_id)
 }
-inline ::std::string* PROTOBUF_NONNULL RAGConfiguration::mutable_llm_model_path()
+inline ::std::string* PROTOBUF_NONNULL RAGConfiguration::mutable_llm_model_id()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   SetHasBit(_impl_._has_bits_[0], 0x00000002U);
-  ::std::string* _s = _internal_mutable_llm_model_path();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RAGConfiguration.llm_model_path)
+  ::std::string* _s = _internal_mutable_llm_model_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RAGConfiguration.llm_model_id)
   return _s;
 }
-inline const ::std::string& RAGConfiguration::_internal_llm_model_path() const {
+inline const ::std::string& RAGConfiguration::_internal_llm_model_id() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.llm_model_path_.Get();
+  return _impl_.llm_model_id_.Get();
 }
-inline void RAGConfiguration::_internal_set_llm_model_path(const ::std::string& value) {
+inline void RAGConfiguration::_internal_set_llm_model_id(const ::std::string& value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.llm_model_path_.Set(value, GetArena());
+  _impl_.llm_model_id_.Set(value, GetArena());
 }
-inline ::std::string* PROTOBUF_NONNULL RAGConfiguration::_internal_mutable_llm_model_path() {
+inline ::std::string* PROTOBUF_NONNULL RAGConfiguration::_internal_mutable_llm_model_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.llm_model_path_.Mutable( GetArena());
+  return _impl_.llm_model_id_.Mutable( GetArena());
 }
-inline ::std::string* PROTOBUF_NULLABLE RAGConfiguration::release_llm_model_path() {
+inline ::std::string* PROTOBUF_NULLABLE RAGConfiguration::release_llm_model_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.RAGConfiguration.llm_model_path)
+  // @@protoc_insertion_point(field_release:runanywhere.v1.RAGConfiguration.llm_model_id)
   if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
-  auto* released = _impl_.llm_model_path_.Release();
+  auto* released = _impl_.llm_model_id_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.llm_model_path_.Set("", GetArena());
+    _impl_.llm_model_id_.Set("", GetArena());
   }
   return released;
 }
-inline void RAGConfiguration::set_allocated_llm_model_path(::std::string* PROTOBUF_NULLABLE value) {
+inline void RAGConfiguration::set_allocated_llm_model_id(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
     SetHasBit(_impl_._has_bits_[0], 0x00000002U);
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
   }
-  _impl_.llm_model_path_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.llm_model_path_.IsDefault()) {
-    _impl_.llm_model_path_.Set("", GetArena());
+  _impl_.llm_model_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.llm_model_id_.IsDefault()) {
+    _impl_.llm_model_id_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGConfiguration.llm_model_path)
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGConfiguration.llm_model_id)
 }
 
 // int32 embedding_dimension = 3;
@@ -4404,73 +4404,73 @@ inline void RAGConfiguration::_internal_set_rerank_results(bool value) {
   _impl_.rerank_results_ = value;
 }
 
-// optional string reranker_model_path = 15;
-inline bool RAGConfiguration::has_reranker_model_path() const {
+// optional string reranker_model_id = 15;
+inline bool RAGConfiguration::has_reranker_model_id() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000040U);
   return value;
 }
-inline void RAGConfiguration::clear_reranker_model_path() {
+inline void RAGConfiguration::clear_reranker_model_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.reranker_model_path_.ClearToEmpty();
+  _impl_.reranker_model_id_.ClearToEmpty();
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000040U);
 }
-inline const ::std::string& RAGConfiguration::reranker_model_path() const
+inline const ::std::string& RAGConfiguration::reranker_model_id() const
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
-  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGConfiguration.reranker_model_path)
-  return _internal_reranker_model_path();
+  // @@protoc_insertion_point(field_get:runanywhere.v1.RAGConfiguration.reranker_model_id)
+  return _internal_reranker_model_id();
 }
 template <typename Arg_, typename... Args_>
-PROTOBUF_ALWAYS_INLINE void RAGConfiguration::set_reranker_model_path(Arg_&& arg, Args_... args) {
+PROTOBUF_ALWAYS_INLINE void RAGConfiguration::set_reranker_model_id(Arg_&& arg, Args_... args) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   SetHasBit(_impl_._has_bits_[0], 0x00000040U);
-  _impl_.reranker_model_path_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
-  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGConfiguration.reranker_model_path)
+  _impl_.reranker_model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.RAGConfiguration.reranker_model_id)
 }
-inline ::std::string* PROTOBUF_NONNULL RAGConfiguration::mutable_reranker_model_path()
+inline ::std::string* PROTOBUF_NONNULL RAGConfiguration::mutable_reranker_model_id()
     ABSL_ATTRIBUTE_LIFETIME_BOUND {
   SetHasBit(_impl_._has_bits_[0], 0x00000040U);
-  ::std::string* _s = _internal_mutable_reranker_model_path();
-  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RAGConfiguration.reranker_model_path)
+  ::std::string* _s = _internal_mutable_reranker_model_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.RAGConfiguration.reranker_model_id)
   return _s;
 }
-inline const ::std::string& RAGConfiguration::_internal_reranker_model_path() const {
+inline const ::std::string& RAGConfiguration::_internal_reranker_model_id() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return _impl_.reranker_model_path_.Get();
+  return _impl_.reranker_model_id_.Get();
 }
-inline void RAGConfiguration::_internal_set_reranker_model_path(const ::std::string& value) {
+inline void RAGConfiguration::_internal_set_reranker_model_id(const ::std::string& value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  _impl_.reranker_model_path_.Set(value, GetArena());
+  _impl_.reranker_model_id_.Set(value, GetArena());
 }
-inline ::std::string* PROTOBUF_NONNULL RAGConfiguration::_internal_mutable_reranker_model_path() {
+inline ::std::string* PROTOBUF_NONNULL RAGConfiguration::_internal_mutable_reranker_model_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  return _impl_.reranker_model_path_.Mutable( GetArena());
+  return _impl_.reranker_model_id_.Mutable( GetArena());
 }
-inline ::std::string* PROTOBUF_NULLABLE RAGConfiguration::release_reranker_model_path() {
+inline ::std::string* PROTOBUF_NULLABLE RAGConfiguration::release_reranker_model_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
-  // @@protoc_insertion_point(field_release:runanywhere.v1.RAGConfiguration.reranker_model_path)
+  // @@protoc_insertion_point(field_release:runanywhere.v1.RAGConfiguration.reranker_model_id)
   if (!CheckHasBit(_impl_._has_bits_[0], 0x00000040U)) {
     return nullptr;
   }
   ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
-  auto* released = _impl_.reranker_model_path_.Release();
+  auto* released = _impl_.reranker_model_id_.Release();
   if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
-    _impl_.reranker_model_path_.Set("", GetArena());
+    _impl_.reranker_model_id_.Set("", GetArena());
   }
   return released;
 }
-inline void RAGConfiguration::set_allocated_reranker_model_path(::std::string* PROTOBUF_NULLABLE value) {
+inline void RAGConfiguration::set_allocated_reranker_model_id(::std::string* PROTOBUF_NULLABLE value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   if (value != nullptr) {
     SetHasBit(_impl_._has_bits_[0], 0x00000040U);
   } else {
     ClearHasBit(_impl_._has_bits_[0], 0x00000040U);
   }
-  _impl_.reranker_model_path_.SetAllocated(value, GetArena());
-  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.reranker_model_path_.IsDefault()) {
-    _impl_.reranker_model_path_.Set("", GetArena());
+  _impl_.reranker_model_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.reranker_model_id_.IsDefault()) {
+    _impl_.reranker_model_id_.Set("", GetArena());
   }
-  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGConfiguration.reranker_model_path)
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGConfiguration.reranker_model_id)
 }
 
 // -------------------------------------------------------------------

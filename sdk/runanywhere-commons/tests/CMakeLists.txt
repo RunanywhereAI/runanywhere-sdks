@@ -194,6 +194,19 @@ target_compile_features(test_tool_calling PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_calling)
 add_test(NAME tool_calling_tests COMMAND test_tool_calling)
 
+# --- Wave D-4: tool-calling session state machine ---------------------------
+add_executable(test_tool_calling_session_proto test_tool_calling_session_proto.cpp)
+target_include_directories(test_tool_calling_session_proto PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
+)
+target_link_libraries(test_tool_calling_session_proto PRIVATE rac_commons)
+rac_link_archive_deps(test_tool_calling_session_proto)
+target_compile_features(test_tool_calling_session_proto PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_tool_calling_session_proto)
+add_test(NAME tool_calling_session_proto_tests COMMAND test_tool_calling_session_proto)
+
 # --- CPP-09A: structured-output helper tests --------------------------------
 add_executable(test_structured_output test_structured_output.cpp)
 target_include_directories(test_structured_output PRIVATE
@@ -429,6 +442,20 @@ rac_link_archive_deps(test_model_assignment_proto)
 target_compile_features(test_model_assignment_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_model_assignment_proto)
 add_test(NAME model_assignment_proto_tests COMMAND test_model_assignment_proto)
+
+# --- Model format/artifact inference proto ABI tests -------------------------
+# Exercises URL → ModelFormat / ArtifactType inference via serialized generated
+# proto bytes. Replaces the per-SDK Dart/Kotlin helpers in Wave D-3.
+add_executable(test_model_format_infer_proto test_model_format_infer_proto.cpp)
+target_include_directories(test_model_format_infer_proto PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_model_format_infer_proto PRIVATE rac_commons)
+rac_link_archive_deps(test_model_format_infer_proto)
+target_compile_features(test_model_format_infer_proto PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_model_format_infer_proto)
+add_test(NAME model_format_infer_proto_tests COMMAND test_model_format_infer_proto)
 
 # --- Model lifecycle proto-byte ABI tests ------------------------------------
 # Exercises ModelLoad/Unload/CurrentModel and ComponentLifecycleSnapshot over

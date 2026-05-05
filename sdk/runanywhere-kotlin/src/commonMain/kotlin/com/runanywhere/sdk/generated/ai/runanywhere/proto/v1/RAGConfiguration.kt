@@ -29,37 +29,40 @@ import okio.ByteString
 
 /**
  * ---------------------------------------------------------------------------
- * RAGConfiguration — low-level pipeline config (pre-IDL hand-rolled).
+ * RAGConfiguration — low-level pipeline config.
  *
- * This is the runtime configuration consumed by the RAG pipeline directly,
- * distinct from solutions.proto::RAGConfig (which is the high-level solution
- * spec resolved through the model registry). RAGConfiguration takes raw model
- * paths because the pipeline runs after model resolution has already happened.
+ * As of D-6 (Wave D) this message carries *model ids*, not filesystem paths.
+ * The commons RAG session ABI (rac_rag_session_create_proto) is responsible
+ * for resolving those ids to on-disk paths through the canonical model
+ * registry. SDK callers MUST register the embedding / LLM / reranker models
+ * first and pass only their ids here.
  * ---------------------------------------------------------------------------
  */
 public class RAGConfiguration(
   /**
-   * Filesystem path to the embedding model (typically ONNX).
+   * Registered id of the embedding model (required, e.g. "bge-small-en-v1.5").
+   * Commons resolves this to the primary artifact path via the model registry.
    */
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "embeddingModelPath",
+    jsonName = "embeddingModelId",
     schemaIndex = 0,
   )
-  public val embedding_model_path: String = "",
+  public val embedding_model_id: String = "",
   /**
-   * Filesystem path to the LLM model (typically GGUF).
+   * Registered id of the LLM model (e.g. "qwen3-4b-q4_k_m"). Optional —
+   * leave empty to create an embed-only / retrieval-only pipeline.
    */
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
     label = WireField.Label.OMIT_IDENTITY,
-    jsonName = "llmModelPath",
+    jsonName = "llmModelId",
     schemaIndex = 1,
   )
-  public val llm_model_path: String = "",
+  public val llm_model_id: String = "",
   /**
    * Embedding vector dimension — must match the embedding model.
    * Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
@@ -184,13 +187,16 @@ public class RAGConfiguration(
     schemaIndex = 13,
   )
   public val rerank_results: Boolean = false,
+  /**
+   * Registered id of the reranker model (optional).
+   */
   @field:WireField(
     tag = 15,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
-    jsonName = "rerankerModelPath",
+    jsonName = "rerankerModelId",
     schemaIndex = 14,
   )
-  public val reranker_model_path: String? = null,
+  public val reranker_model_id: String? = null,
   unknownFields: ByteString = ByteString.EMPTY,
 ) : Message<RAGConfiguration, Nothing>(ADAPTER, unknownFields) {
   @Deprecated(
@@ -204,8 +210,8 @@ public class RAGConfiguration(
     if (other === this) return true
     if (other !is RAGConfiguration) return false
     if (unknownFields != other.unknownFields) return false
-    if (embedding_model_path != other.embedding_model_path) return false
-    if (llm_model_path != other.llm_model_path) return false
+    if (embedding_model_id != other.embedding_model_id) return false
+    if (llm_model_id != other.llm_model_id) return false
     if (embedding_dimension != other.embedding_dimension) return false
     if (top_k != other.top_k) return false
     if (similarity_threshold != other.similarity_threshold) return false
@@ -218,7 +224,7 @@ public class RAGConfiguration(
     if (index_path != other.index_path) return false
     if (persist_index != other.persist_index) return false
     if (rerank_results != other.rerank_results) return false
-    if (reranker_model_path != other.reranker_model_path) return false
+    if (reranker_model_id != other.reranker_model_id) return false
     return true
   }
 
@@ -226,8 +232,8 @@ public class RAGConfiguration(
     var result = super.hashCode
     if (result == 0) {
       result = unknownFields.hashCode()
-      result = result * 37 + embedding_model_path.hashCode()
-      result = result * 37 + llm_model_path.hashCode()
+      result = result * 37 + embedding_model_id.hashCode()
+      result = result * 37 + llm_model_id.hashCode()
       result = result * 37 + embedding_dimension.hashCode()
       result = result * 37 + top_k.hashCode()
       result = result * 37 + similarity_threshold.hashCode()
@@ -240,7 +246,7 @@ public class RAGConfiguration(
       result = result * 37 + (index_path?.hashCode() ?: 0)
       result = result * 37 + persist_index.hashCode()
       result = result * 37 + rerank_results.hashCode()
-      result = result * 37 + (reranker_model_path?.hashCode() ?: 0)
+      result = result * 37 + (reranker_model_id?.hashCode() ?: 0)
       super.hashCode = result
     }
     return result
@@ -248,8 +254,8 @@ public class RAGConfiguration(
 
   override fun toString(): String {
     val result = mutableListOf<String>()
-    result += """embedding_model_path=${sanitize(embedding_model_path)}"""
-    result += """llm_model_path=${sanitize(llm_model_path)}"""
+    result += """embedding_model_id=${sanitize(embedding_model_id)}"""
+    result += """llm_model_id=${sanitize(llm_model_id)}"""
     result += """embedding_dimension=$embedding_dimension"""
     result += """top_k=$top_k"""
     result += """similarity_threshold=$similarity_threshold"""
@@ -263,14 +269,13 @@ public class RAGConfiguration(
     if (index_path != null) result += """index_path=${sanitize(index_path)}"""
     result += """persist_index=$persist_index"""
     result += """rerank_results=$rerank_results"""
-    if (reranker_model_path != null) result +=
-        """reranker_model_path=${sanitize(reranker_model_path)}"""
+    if (reranker_model_id != null) result += """reranker_model_id=${sanitize(reranker_model_id)}"""
     return result.joinToString(prefix = "RAGConfiguration{", separator = ", ", postfix = "}")
   }
 
   public fun copy(
-    embedding_model_path: String = this.embedding_model_path,
-    llm_model_path: String = this.llm_model_path,
+    embedding_model_id: String = this.embedding_model_id,
+    llm_model_id: String = this.llm_model_id,
     embedding_dimension: Int = this.embedding_dimension,
     top_k: Int = this.top_k,
     similarity_threshold: Float = this.similarity_threshold,
@@ -283,12 +288,12 @@ public class RAGConfiguration(
     index_path: String? = this.index_path,
     persist_index: Boolean = this.persist_index,
     rerank_results: Boolean = this.rerank_results,
-    reranker_model_path: String? = this.reranker_model_path,
+    reranker_model_id: String? = this.reranker_model_id,
     unknownFields: ByteString = this.unknownFields,
-  ): RAGConfiguration = RAGConfiguration(embedding_model_path, llm_model_path, embedding_dimension,
+  ): RAGConfiguration = RAGConfiguration(embedding_model_id, llm_model_id, embedding_dimension,
       top_k, similarity_threshold, chunk_size, chunk_overlap, max_context_tokens, prompt_template,
       embedding_config_json, llm_config_json, index_path, persist_index, rerank_results,
-      reranker_model_path, unknownFields)
+      reranker_model_id, unknownFields)
 
   public companion object {
     @JvmField
@@ -302,10 +307,10 @@ public class RAGConfiguration(
     ) {
       override fun encodedSize(`value`: RAGConfiguration): Int {
         var size = value.unknownFields.size
-        if (value.embedding_model_path != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1,
-            value.embedding_model_path)
-        if (value.llm_model_path != "") size += ProtoAdapter.STRING.encodedSizeWithTag(2,
-            value.llm_model_path)
+        if (value.embedding_model_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(1,
+            value.embedding_model_id)
+        if (value.llm_model_id != "") size += ProtoAdapter.STRING.encodedSizeWithTag(2,
+            value.llm_model_id)
         if (value.embedding_dimension != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(3,
             value.embedding_dimension)
         if (value.top_k != 0) size += ProtoAdapter.INT32.encodedSizeWithTag(4, value.top_k)
@@ -325,15 +330,15 @@ public class RAGConfiguration(
             value.persist_index)
         if (value.rerank_results != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(14,
             value.rerank_results)
-        size += ProtoAdapter.STRING.encodedSizeWithTag(15, value.reranker_model_path)
+        size += ProtoAdapter.STRING.encodedSizeWithTag(15, value.reranker_model_id)
         return size
       }
 
       override fun encode(writer: ProtoWriter, `value`: RAGConfiguration) {
-        if (value.embedding_model_path != "") ProtoAdapter.STRING.encodeWithTag(writer, 1,
-            value.embedding_model_path)
-        if (value.llm_model_path != "") ProtoAdapter.STRING.encodeWithTag(writer, 2,
-            value.llm_model_path)
+        if (value.embedding_model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1,
+            value.embedding_model_id)
+        if (value.llm_model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 2,
+            value.llm_model_id)
         if (value.embedding_dimension != 0) ProtoAdapter.INT32.encodeWithTag(writer, 3,
             value.embedding_dimension)
         if (value.top_k != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4, value.top_k)
@@ -352,13 +357,13 @@ public class RAGConfiguration(
             value.persist_index)
         if (value.rerank_results != false) ProtoAdapter.BOOL.encodeWithTag(writer, 14,
             value.rerank_results)
-        ProtoAdapter.STRING.encodeWithTag(writer, 15, value.reranker_model_path)
+        ProtoAdapter.STRING.encodeWithTag(writer, 15, value.reranker_model_id)
         writer.writeBytes(value.unknownFields)
       }
 
       override fun encode(writer: ReverseProtoWriter, `value`: RAGConfiguration) {
         writer.writeBytes(value.unknownFields)
-        ProtoAdapter.STRING.encodeWithTag(writer, 15, value.reranker_model_path)
+        ProtoAdapter.STRING.encodeWithTag(writer, 15, value.reranker_model_id)
         if (value.rerank_results != false) ProtoAdapter.BOOL.encodeWithTag(writer, 14,
             value.rerank_results)
         if (value.persist_index != false) ProtoAdapter.BOOL.encodeWithTag(writer, 13,
@@ -377,15 +382,15 @@ public class RAGConfiguration(
         if (value.top_k != 0) ProtoAdapter.INT32.encodeWithTag(writer, 4, value.top_k)
         if (value.embedding_dimension != 0) ProtoAdapter.INT32.encodeWithTag(writer, 3,
             value.embedding_dimension)
-        if (value.llm_model_path != "") ProtoAdapter.STRING.encodeWithTag(writer, 2,
-            value.llm_model_path)
-        if (value.embedding_model_path != "") ProtoAdapter.STRING.encodeWithTag(writer, 1,
-            value.embedding_model_path)
+        if (value.llm_model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 2,
+            value.llm_model_id)
+        if (value.embedding_model_id != "") ProtoAdapter.STRING.encodeWithTag(writer, 1,
+            value.embedding_model_id)
       }
 
       override fun decode(reader: ProtoReader): RAGConfiguration {
-        var embedding_model_path: String = ""
-        var llm_model_path: String = ""
+        var embedding_model_id: String = ""
+        var llm_model_id: String = ""
         var embedding_dimension: Int = 0
         var top_k: Int = 0
         var similarity_threshold: Float = 0f
@@ -398,11 +403,11 @@ public class RAGConfiguration(
         var index_path: String? = null
         var persist_index: Boolean = false
         var rerank_results: Boolean = false
-        var reranker_model_path: String? = null
+        var reranker_model_id: String? = null
         val unknownFields = reader.forEachTag { tag ->
           when (tag) {
-            1 -> embedding_model_path = ProtoAdapter.STRING.decode(reader)
-            2 -> llm_model_path = ProtoAdapter.STRING.decode(reader)
+            1 -> embedding_model_id = ProtoAdapter.STRING.decode(reader)
+            2 -> llm_model_id = ProtoAdapter.STRING.decode(reader)
             3 -> embedding_dimension = ProtoAdapter.INT32.decode(reader)
             4 -> top_k = ProtoAdapter.INT32.decode(reader)
             5 -> similarity_threshold = ProtoAdapter.FLOAT.decode(reader)
@@ -415,13 +420,13 @@ public class RAGConfiguration(
             12 -> index_path = ProtoAdapter.STRING.decode(reader)
             13 -> persist_index = ProtoAdapter.BOOL.decode(reader)
             14 -> rerank_results = ProtoAdapter.BOOL.decode(reader)
-            15 -> reranker_model_path = ProtoAdapter.STRING.decode(reader)
+            15 -> reranker_model_id = ProtoAdapter.STRING.decode(reader)
             else -> reader.readUnknownField(tag)
           }
         }
         return RAGConfiguration(
-          embedding_model_path = embedding_model_path,
-          llm_model_path = llm_model_path,
+          embedding_model_id = embedding_model_id,
+          llm_model_id = llm_model_id,
           embedding_dimension = embedding_dimension,
           top_k = top_k,
           similarity_threshold = similarity_threshold,
@@ -434,7 +439,7 @@ public class RAGConfiguration(
           index_path = index_path,
           persist_index = persist_index,
           rerank_results = rerank_results,
-          reranker_model_path = reranker_model_path,
+          reranker_model_id = reranker_model_id,
           unknownFields = unknownFields
         )
       }

@@ -28,6 +28,11 @@
 //   2. The C++ commons layer already canonicalizes tool-call payloads as
 //      JSON for the LLM tokenizer, so JSON-as-string aligns with the wire.
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 import SwiftProtobuf
 
 // If the compiler emits an error on this type, it is because this file
@@ -1031,6 +1036,146 @@ public struct RAToolRegistrySnapshot: Sendable {
   public var tools: [RAToolDefinition] = []
 
   public var updatedAtMs: Int64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAToolCallingSessionCreateRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Prompt + LLM generation options inline (avoids cross-proto import cycle).
+  public var prompt: String = String()
+
+  public var maxTokens: Int32 = 0
+
+  public var temperature: Float = 0
+
+  public var topP: Float = 0
+
+  public var systemPrompt: String = String()
+
+  public var tools: [RAToolDefinition] = []
+
+  public var formatHint: String = String()
+
+  public var maxIterations: UInt32 = 0
+
+  public var keepToolsAvailable: Bool = false
+
+  public var validateCalls: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAToolCallingSessionCreateResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var sessionHandle: UInt64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAToolCallingSessionEvent: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var kind: RAToolCallingSessionEvent.OneOf_Kind? = nil
+
+  /// serialized LLMStreamEvent proto
+  public var llmStreamEventBytes: Data {
+    get {
+      if case .llmStreamEventBytes(let v)? = kind {return v}
+      return Data()
+    }
+    set {kind = .llmStreamEventBytes(newValue)}
+  }
+
+  public var toolCall: RAToolCall {
+    get {
+      if case .toolCall(let v)? = kind {return v}
+      return RAToolCall()
+    }
+    set {kind = .toolCall(newValue)}
+  }
+
+  public var finalResult: RAToolCallingResult {
+    get {
+      if case .finalResult(let v)? = kind {return v}
+      return RAToolCallingResult()
+    }
+    set {kind = .finalResult(newValue)}
+  }
+
+  /// serialized SDKError proto
+  public var errorBytes: Data {
+    get {
+      if case .errorBytes(let v)? = kind {return v}
+      return Data()
+    }
+    set {kind = .errorBytes(newValue)}
+  }
+
+  public var seq: UInt64 = 0
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public enum OneOf_Kind: Equatable, Sendable {
+    /// serialized LLMStreamEvent proto
+    case llmStreamEventBytes(Data)
+    case toolCall(RAToolCall)
+    case finalResult(RAToolCallingResult)
+    /// serialized SDKError proto
+    case errorBytes(Data)
+
+  }
+
+  public init() {}
+}
+
+public struct RAToolCallingSessionStepWithResultRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var sessionHandle: UInt64 = 0
+
+  public var toolCallID: String = String()
+
+  public var resultJson: String = String()
+
+  public var error: String {
+    get {_error ?? String()}
+    set {_error = newValue}
+  }
+  /// Returns true if `error` has been explicitly set.
+  public var hasError: Bool {self._error != nil}
+  /// Clears the value of `error`. Subsequent reads from it will return its default value.
+  public mutating func clearError() {self._error = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _error: String? = nil
+}
+
+public struct RAToolCallingSessionDestroyRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var sessionHandle: UInt64 = 0
 
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -2256,6 +2401,286 @@ extension RAToolRegistrySnapshot: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   public static func ==(lhs: RAToolRegistrySnapshot, rhs: RAToolRegistrySnapshot) -> Bool {
     if lhs.tools != rhs.tools {return false}
     if lhs.updatedAtMs != rhs.updatedAtMs {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAToolCallingSessionCreateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionCreateRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}prompt\0\u{1}tools\0\u{3}format_hint\0\u{3}max_iterations\0\u{3}keep_tools_available\0\u{3}validate_calls\0\u{4}\u{5}max_tokens\0\u{1}temperature\0\u{3}top_p\0\u{3}system_prompt\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.prompt) }()
+      case 2: try { try decoder.decodeRepeatedMessageField(value: &self.tools) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.formatHint) }()
+      case 4: try { try decoder.decodeSingularUInt32Field(value: &self.maxIterations) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.keepToolsAvailable) }()
+      case 6: try { try decoder.decodeSingularBoolField(value: &self.validateCalls) }()
+      case 11: try { try decoder.decodeSingularInt32Field(value: &self.maxTokens) }()
+      case 12: try { try decoder.decodeSingularFloatField(value: &self.temperature) }()
+      case 13: try { try decoder.decodeSingularFloatField(value: &self.topP) }()
+      case 14: try { try decoder.decodeSingularStringField(value: &self.systemPrompt) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.prompt.isEmpty {
+      try visitor.visitSingularStringField(value: self.prompt, fieldNumber: 1)
+    }
+    if !self.tools.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.tools, fieldNumber: 2)
+    }
+    if !self.formatHint.isEmpty {
+      try visitor.visitSingularStringField(value: self.formatHint, fieldNumber: 3)
+    }
+    if self.maxIterations != 0 {
+      try visitor.visitSingularUInt32Field(value: self.maxIterations, fieldNumber: 4)
+    }
+    if self.keepToolsAvailable != false {
+      try visitor.visitSingularBoolField(value: self.keepToolsAvailable, fieldNumber: 5)
+    }
+    if self.validateCalls != false {
+      try visitor.visitSingularBoolField(value: self.validateCalls, fieldNumber: 6)
+    }
+    if self.maxTokens != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxTokens, fieldNumber: 11)
+    }
+    if self.temperature.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.temperature, fieldNumber: 12)
+    }
+    if self.topP.bitPattern != 0 {
+      try visitor.visitSingularFloatField(value: self.topP, fieldNumber: 13)
+    }
+    if !self.systemPrompt.isEmpty {
+      try visitor.visitSingularStringField(value: self.systemPrompt, fieldNumber: 14)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAToolCallingSessionCreateRequest, rhs: RAToolCallingSessionCreateRequest) -> Bool {
+    if lhs.prompt != rhs.prompt {return false}
+    if lhs.maxTokens != rhs.maxTokens {return false}
+    if lhs.temperature != rhs.temperature {return false}
+    if lhs.topP != rhs.topP {return false}
+    if lhs.systemPrompt != rhs.systemPrompt {return false}
+    if lhs.tools != rhs.tools {return false}
+    if lhs.formatHint != rhs.formatHint {return false}
+    if lhs.maxIterations != rhs.maxIterations {return false}
+    if lhs.keepToolsAvailable != rhs.keepToolsAvailable {return false}
+    if lhs.validateCalls != rhs.validateCalls {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAToolCallingSessionCreateResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionCreateResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_handle\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt64Field(value: &self.sessionHandle) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.sessionHandle != 0 {
+      try visitor.visitSingularUInt64Field(value: self.sessionHandle, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAToolCallingSessionCreateResult, rhs: RAToolCallingSessionCreateResult) -> Bool {
+    if lhs.sessionHandle != rhs.sessionHandle {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAToolCallingSessionEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionEvent"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}llm_stream_event_bytes\0\u{3}tool_call\0\u{3}final_result\0\u{3}error_bytes\0\u{1}seq\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try {
+        var v: Data?
+        try decoder.decodeSingularBytesField(value: &v)
+        if let v = v {
+          if self.kind != nil {try decoder.handleConflictingOneOf()}
+          self.kind = .llmStreamEventBytes(v)
+        }
+      }()
+      case 2: try {
+        var v: RAToolCall?
+        var hadOneofValue = false
+        if let current = self.kind {
+          hadOneofValue = true
+          if case .toolCall(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.kind = .toolCall(v)
+        }
+      }()
+      case 3: try {
+        var v: RAToolCallingResult?
+        var hadOneofValue = false
+        if let current = self.kind {
+          hadOneofValue = true
+          if case .finalResult(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.kind = .finalResult(v)
+        }
+      }()
+      case 4: try {
+        var v: Data?
+        try decoder.decodeSingularBytesField(value: &v)
+        if let v = v {
+          if self.kind != nil {try decoder.handleConflictingOneOf()}
+          self.kind = .errorBytes(v)
+        }
+      }()
+      case 5: try { try decoder.decodeSingularUInt64Field(value: &self.seq) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    switch self.kind {
+    case .llmStreamEventBytes?: try {
+      guard case .llmStreamEventBytes(let v)? = self.kind else { preconditionFailure() }
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 1)
+    }()
+    case .toolCall?: try {
+      guard case .toolCall(let v)? = self.kind else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    }()
+    case .finalResult?: try {
+      guard case .finalResult(let v)? = self.kind else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    }()
+    case .errorBytes?: try {
+      guard case .errorBytes(let v)? = self.kind else { preconditionFailure() }
+      try visitor.visitSingularBytesField(value: v, fieldNumber: 4)
+    }()
+    case nil: break
+    }
+    if self.seq != 0 {
+      try visitor.visitSingularUInt64Field(value: self.seq, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAToolCallingSessionEvent, rhs: RAToolCallingSessionEvent) -> Bool {
+    if lhs.kind != rhs.kind {return false}
+    if lhs.seq != rhs.seq {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAToolCallingSessionStepWithResultRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionStepWithResultRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_handle\0\u{3}tool_call_id\0\u{3}result_json\0\u{1}error\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt64Field(value: &self.sessionHandle) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.toolCallID) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self.resultJson) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self._error) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.sessionHandle != 0 {
+      try visitor.visitSingularUInt64Field(value: self.sessionHandle, fieldNumber: 1)
+    }
+    if !self.toolCallID.isEmpty {
+      try visitor.visitSingularStringField(value: self.toolCallID, fieldNumber: 2)
+    }
+    if !self.resultJson.isEmpty {
+      try visitor.visitSingularStringField(value: self.resultJson, fieldNumber: 3)
+    }
+    try { if let v = self._error {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 4)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAToolCallingSessionStepWithResultRequest, rhs: RAToolCallingSessionStepWithResultRequest) -> Bool {
+    if lhs.sessionHandle != rhs.sessionHandle {return false}
+    if lhs.toolCallID != rhs.toolCallID {return false}
+    if lhs.resultJson != rhs.resultJson {return false}
+    if lhs._error != rhs._error {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAToolCallingSessionDestroyRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ToolCallingSessionDestroyRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}session_handle\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt64Field(value: &self.sessionHandle) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.sessionHandle != 0 {
+      try visitor.visitSingularUInt64Field(value: self.sessionHandle, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAToolCallingSessionDestroyRequest, rhs: RAToolCallingSessionDestroyRequest) -> Bool {
+    if lhs.sessionHandle != rhs.sessionHandle {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -14,19 +14,26 @@ export declare function rAGStreamEventKindFromJSON(object: any): RAGStreamEventK
 export declare function rAGStreamEventKindToJSON(object: RAGStreamEventKind): string;
 /**
  * ---------------------------------------------------------------------------
- * RAGConfiguration — low-level pipeline config (pre-IDL hand-rolled).
+ * RAGConfiguration — low-level pipeline config.
  *
- * This is the runtime configuration consumed by the RAG pipeline directly,
- * distinct from solutions.proto::RAGConfig (which is the high-level solution
- * spec resolved through the model registry). RAGConfiguration takes raw model
- * paths because the pipeline runs after model resolution has already happened.
+ * As of D-6 (Wave D) this message carries *model ids*, not filesystem paths.
+ * The commons RAG session ABI (rac_rag_session_create_proto) is responsible
+ * for resolving those ids to on-disk paths through the canonical model
+ * registry. SDK callers MUST register the embedding / LLM / reranker models
+ * first and pass only their ids here.
  * ---------------------------------------------------------------------------
  */
 export interface RAGConfiguration {
-    /** Filesystem path to the embedding model (typically ONNX). */
-    embeddingModelPath: string;
-    /** Filesystem path to the LLM model (typically GGUF). */
-    llmModelPath: string;
+    /**
+     * Registered id of the embedding model (required, e.g. "bge-small-en-v1.5").
+     * Commons resolves this to the primary artifact path via the model registry.
+     */
+    embeddingModelId: string;
+    /**
+     * Registered id of the LLM model (e.g. "qwen3-4b-q4_k_m"). Optional —
+     * leave empty to create an embed-only / retrieval-only pipeline.
+     */
+    llmModelId: string;
     /**
      * Embedding vector dimension — must match the embedding model.
      * Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
@@ -55,7 +62,8 @@ export interface RAGConfiguration {
     indexPath?: string | undefined;
     persistIndex: boolean;
     rerankResults: boolean;
-    rerankerModelPath?: string | undefined;
+    /** Registered id of the reranker model (optional). */
+    rerankerModelId?: string | undefined;
 }
 /**
  * ---------------------------------------------------------------------------

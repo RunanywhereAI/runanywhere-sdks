@@ -70,8 +70,8 @@ export function rAGStreamEventKindToJSON(object) {
 }
 function createBaseRAGConfiguration() {
     return {
-        embeddingModelPath: "",
-        llmModelPath: "",
+        embeddingModelId: "",
+        llmModelId: "",
         embeddingDimension: 0,
         topK: 0,
         similarityThreshold: 0,
@@ -84,16 +84,16 @@ function createBaseRAGConfiguration() {
         indexPath: undefined,
         persistIndex: false,
         rerankResults: false,
-        rerankerModelPath: undefined,
+        rerankerModelId: undefined,
     };
 }
 export const RAGConfiguration = {
     encode(message, writer = _m0.Writer.create()) {
-        if (message.embeddingModelPath !== "") {
-            writer.uint32(10).string(message.embeddingModelPath);
+        if (message.embeddingModelId !== "") {
+            writer.uint32(10).string(message.embeddingModelId);
         }
-        if (message.llmModelPath !== "") {
-            writer.uint32(18).string(message.llmModelPath);
+        if (message.llmModelId !== "") {
+            writer.uint32(18).string(message.llmModelId);
         }
         if (message.embeddingDimension !== 0) {
             writer.uint32(24).int32(message.embeddingDimension);
@@ -131,8 +131,8 @@ export const RAGConfiguration = {
         if (message.rerankResults !== false) {
             writer.uint32(112).bool(message.rerankResults);
         }
-        if (message.rerankerModelPath !== undefined) {
-            writer.uint32(122).string(message.rerankerModelPath);
+        if (message.rerankerModelId !== undefined) {
+            writer.uint32(122).string(message.rerankerModelId);
         }
         return writer;
     },
@@ -147,13 +147,13 @@ export const RAGConfiguration = {
                     if (tag !== 10) {
                         break;
                     }
-                    message.embeddingModelPath = reader.string();
+                    message.embeddingModelId = reader.string();
                     continue;
                 case 2:
                     if (tag !== 18) {
                         break;
                     }
-                    message.llmModelPath = reader.string();
+                    message.llmModelId = reader.string();
                     continue;
                 case 3:
                     if (tag !== 24) {
@@ -231,7 +231,7 @@ export const RAGConfiguration = {
                     if (tag !== 122) {
                         break;
                     }
-                    message.rerankerModelPath = reader.string();
+                    message.rerankerModelId = reader.string();
                     continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
@@ -243,8 +243,8 @@ export const RAGConfiguration = {
     },
     fromJSON(object) {
         return {
-            embeddingModelPath: isSet(object.embeddingModelPath) ? globalThis.String(object.embeddingModelPath) : "",
-            llmModelPath: isSet(object.llmModelPath) ? globalThis.String(object.llmModelPath) : "",
+            embeddingModelId: isSet(object.embeddingModelId) ? globalThis.String(object.embeddingModelId) : "",
+            llmModelId: isSet(object.llmModelId) ? globalThis.String(object.llmModelId) : "",
             embeddingDimension: isSet(object.embeddingDimension) ? globalThis.Number(object.embeddingDimension) : 0,
             topK: isSet(object.topK) ? globalThis.Number(object.topK) : 0,
             similarityThreshold: isSet(object.similarityThreshold) ? globalThis.Number(object.similarityThreshold) : 0,
@@ -259,16 +259,16 @@ export const RAGConfiguration = {
             indexPath: isSet(object.indexPath) ? globalThis.String(object.indexPath) : undefined,
             persistIndex: isSet(object.persistIndex) ? globalThis.Boolean(object.persistIndex) : false,
             rerankResults: isSet(object.rerankResults) ? globalThis.Boolean(object.rerankResults) : false,
-            rerankerModelPath: isSet(object.rerankerModelPath) ? globalThis.String(object.rerankerModelPath) : undefined,
+            rerankerModelId: isSet(object.rerankerModelId) ? globalThis.String(object.rerankerModelId) : undefined,
         };
     },
     toJSON(message) {
         const obj = {};
-        if (message.embeddingModelPath !== "") {
-            obj.embeddingModelPath = message.embeddingModelPath;
+        if (message.embeddingModelId !== "") {
+            obj.embeddingModelId = message.embeddingModelId;
         }
-        if (message.llmModelPath !== "") {
-            obj.llmModelPath = message.llmModelPath;
+        if (message.llmModelId !== "") {
+            obj.llmModelId = message.llmModelId;
         }
         if (message.embeddingDimension !== 0) {
             obj.embeddingDimension = Math.round(message.embeddingDimension);
@@ -306,8 +306,8 @@ export const RAGConfiguration = {
         if (message.rerankResults !== false) {
             obj.rerankResults = message.rerankResults;
         }
-        if (message.rerankerModelPath !== undefined) {
-            obj.rerankerModelPath = message.rerankerModelPath;
+        if (message.rerankerModelId !== undefined) {
+            obj.rerankerModelId = message.rerankerModelId;
         }
         return obj;
     },
@@ -316,8 +316,8 @@ export const RAGConfiguration = {
     },
     fromPartial(object) {
         const message = createBaseRAGConfiguration();
-        message.embeddingModelPath = object.embeddingModelPath ?? "";
-        message.llmModelPath = object.llmModelPath ?? "";
+        message.embeddingModelId = object.embeddingModelId ?? "";
+        message.llmModelId = object.llmModelId ?? "";
         message.embeddingDimension = object.embeddingDimension ?? 0;
         message.topK = object.topK ?? 0;
         message.similarityThreshold = object.similarityThreshold ?? 0;
@@ -330,7 +330,7 @@ export const RAGConfiguration = {
         message.indexPath = object.indexPath ?? undefined;
         message.persistIndex = object.persistIndex ?? false;
         message.rerankResults = object.rerankResults ?? false;
-        message.rerankerModelPath = object.rerankerModelPath ?? undefined;
+        message.rerankerModelId = object.rerankerModelId ?? undefined;
         return message;
     },
 };

@@ -4348,6 +4348,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GenerationEvent final : public ::go
     kCostAmountFieldNumber = 13,
     kCostSavedAmountFieldNumber = 14,
     kTokensUsedFieldNumber = 8,
+    kInputTokensFieldNumber = 24,
   };
   // string session_id = 2;
   void clear_session_id() ;
@@ -4659,12 +4660,22 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GenerationEvent final : public ::go
   void _internal_set_tokens_used(::int32_t value);
 
   public:
+  // int32 input_tokens = 24;
+  void clear_input_tokens() ;
+  [[nodiscard]] ::int32_t input_tokens() const;
+  void set_input_tokens(::int32_t value);
+
+  private:
+  ::int32_t _internal_input_tokens() const;
+  void _internal_set_input_tokens(::int32_t value);
+
+  public:
   // @@protoc_insertion_point(class_scope:runanywhere.v1.GenerationEvent)
  private:
   class _Internal;
   friend class ::google::protobuf::internal::TcParser;
-  static const ::google::protobuf::internal::TcParseTable<5, 23,
-                                   0, 247,
+  static const ::google::protobuf::internal::TcParseTable<5, 24,
+                                   0, 255,
                                    2>
       _table_;
 
@@ -4710,6 +4721,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED GenerationEvent final : public ::go
     double cost_amount_;
     double cost_saved_amount_;
     ::int32_t tokens_used_;
+    ::int32_t input_tokens_;
     PROTOBUF_TSAN_DECLARE_MEMBER
   };
   union { Impl_ _impl_; };
@@ -13987,6 +13999,31 @@ inline void GenerationEvent::set_allocated_thinking_text(::std::string* PROTOBUF
     _impl_.thinking_text_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.GenerationEvent.thinking_text)
+}
+
+// int32 input_tokens = 24;
+inline void GenerationEvent::clear_input_tokens() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.input_tokens_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00800000U);
+}
+inline ::int32_t GenerationEvent::input_tokens() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.GenerationEvent.input_tokens)
+  return _internal_input_tokens();
+}
+inline void GenerationEvent::set_input_tokens(::int32_t value) {
+  _internal_set_input_tokens(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00800000U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.GenerationEvent.input_tokens)
+}
+inline ::int32_t GenerationEvent::_internal_input_tokens() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.input_tokens_;
+}
+inline void GenerationEvent::_internal_set_input_tokens(::int32_t value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.input_tokens_ = value;
 }
 
 // -------------------------------------------------------------------

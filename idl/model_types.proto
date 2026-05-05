@@ -777,6 +777,68 @@ message ModelCompatibilityCheckResult {
 }
 
 // ---------------------------------------------------------------------------
+// URL → ModelFormat inference request/result. Moves the Dart/Kotlin-side
+// URL-suffix heuristic (".gguf" → GGUF, ".onnx" → ONNX, ".tar.gz" wrapping an
+// inner format, ...) into commons so every SDK uses one implementation.
+// ---------------------------------------------------------------------------
+message ModelFormatFromUrlRequest {
+    // Portable URL or file path string. Only the trailing file-extension
+    // suffix is inspected; query strings and fragments are ignored.
+    string url = 1;
+}
+
+message ModelFormatFromUrlResult {
+    // Primary detected format. For archive URLs this is the archive-wrapper
+    // format (for example MODEL_FORMAT_ZIP); the extracted model format is
+    // in inner_format below.
+    ModelFormat format = 1;
+
+    // For archive URLs, the format of the primary file inside the archive
+    // when it can be inferred from the URL (for example
+    // "whisper-base.en.tar.gz" → inner_format = MODEL_FORMAT_ONNX). When the
+    // archive content is unknown this is MODEL_FORMAT_UNSPECIFIED.
+    ModelFormat inner_format = 2;
+}
+
+// ---------------------------------------------------------------------------
+// URL → ModelArtifactType inference request/result. Replaces Dart
+// withInferredArtifact and Kotlin inferArtifactFields with a single commons
+// call.
+// ---------------------------------------------------------------------------
+message ArtifactInferFromUrlRequest {
+    // Portable URL or file path string.
+    string url = 1;
+
+    // Optional model identifier. Commons does not consult the registry with
+    // this value today; it is carried for logging and telemetry only.
+    string model_id = 2;
+}
+
+message ArtifactInferFromUrlResult {
+    // Inferred artifact-type classification.
+    ModelArtifactType artifact_type = 1;
+
+    // For archive artifacts, the concrete archive format (ZIP, TAR_GZ, ...).
+    // For single-file or directory artifacts this is
+    // ARCHIVE_TYPE_UNSPECIFIED.
+    ArchiveType archive_type = 2;
+
+    // For archive artifacts the known or inferred internal structure after
+    // extraction. Defaults to ARCHIVE_STRUCTURE_UNKNOWN.
+    ArchiveStructure archive_structure = 3;
+
+    // When the URL suggests an archive wrapping a known primary file (for
+    // example a Whisper model bundle containing encoder.onnx), this field
+    // carries the relative path inside the archive when it can be inferred.
+    // Empty otherwise.
+    string primary_relpath = 4;
+
+    // Inner file format for archive artifacts. MODEL_FORMAT_UNSPECIFIED when
+    // the archive contents are unknown.
+    ModelFormat inner_format = 5;
+}
+
+// ---------------------------------------------------------------------------
 // FetchAssignments request/result. Replaces the JSON shim
 // racModelRegistryFetchAssignments and the Web SDK's offline-friendly
 // fetchModelAssignments() entry point. The platform adapter owns HTTP

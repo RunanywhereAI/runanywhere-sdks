@@ -91,6 +91,14 @@ class ArchiveArtifact;
 struct ArchiveArtifactDefaultTypeInternal;
 extern ArchiveArtifactDefaultTypeInternal _ArchiveArtifact_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull ArchiveArtifact_class_data_;
+class ArtifactInferFromUrlRequest;
+struct ArtifactInferFromUrlRequestDefaultTypeInternal;
+extern ArtifactInferFromUrlRequestDefaultTypeInternal _ArtifactInferFromUrlRequest_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull ArtifactInferFromUrlRequest_class_data_;
+class ArtifactInferFromUrlResult;
+struct ArtifactInferFromUrlResultDefaultTypeInternal;
+extern ArtifactInferFromUrlResultDefaultTypeInternal _ArtifactInferFromUrlResult_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull ArtifactInferFromUrlResult_class_data_;
 class CurrentModelRequest;
 struct CurrentModelRequestDefaultTypeInternal;
 extern CurrentModelRequestDefaultTypeInternal _CurrentModelRequest_default_instance_;
@@ -139,6 +147,14 @@ class ModelFileDescriptor;
 struct ModelFileDescriptorDefaultTypeInternal;
 extern ModelFileDescriptorDefaultTypeInternal _ModelFileDescriptor_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull ModelFileDescriptor_class_data_;
+class ModelFormatFromUrlRequest;
+struct ModelFormatFromUrlRequestDefaultTypeInternal;
+extern ModelFormatFromUrlRequestDefaultTypeInternal _ModelFormatFromUrlRequest_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull ModelFormatFromUrlRequest_class_data_;
+class ModelFormatFromUrlResult;
+struct ModelFormatFromUrlResultDefaultTypeInternal;
+extern ModelFormatFromUrlResultDefaultTypeInternal _ModelFormatFromUrlResult_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull ModelFormatFromUrlResult_class_data_;
 class ModelGetRequest;
 struct ModelGetRequestDefaultTypeInternal;
 extern ModelGetRequestDefaultTypeInternal _ModelGetRequest_default_instance_;
@@ -2010,7 +2026,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelRegistryFetchAssignmentsReques
     return *reinterpret_cast<const ModelRegistryFetchAssignmentsRequest*>(
         &_ModelRegistryFetchAssignmentsRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 33;
+  static constexpr int kIndexInFileMessages = 37;
   friend void swap(ModelRegistryFetchAssignmentsRequest& a, ModelRegistryFetchAssignmentsRequest& b) { a.Swap(&b); }
   inline void Swap(ModelRegistryFetchAssignmentsRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3253,6 +3269,415 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelGetRequest final : public ::go
 };
 
 extern const ::google::protobuf::internal::ClassDataFull ModelGetRequest_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelFormatFromUrlResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.ModelFormatFromUrlResult) */ {
+ public:
+  inline ModelFormatFromUrlResult() : ModelFormatFromUrlResult(nullptr) {}
+  ~ModelFormatFromUrlResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(ModelFormatFromUrlResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(ModelFormatFromUrlResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr ModelFormatFromUrlResult(::google::protobuf::internal::ConstantInitialized);
+
+  inline ModelFormatFromUrlResult(const ModelFormatFromUrlResult& from) : ModelFormatFromUrlResult(nullptr, from) {}
+  inline ModelFormatFromUrlResult(ModelFormatFromUrlResult&& from) noexcept
+      : ModelFormatFromUrlResult(nullptr, ::std::move(from)) {}
+  inline ModelFormatFromUrlResult& operator=(const ModelFormatFromUrlResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ModelFormatFromUrlResult& operator=(ModelFormatFromUrlResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const ModelFormatFromUrlResult& default_instance() {
+    return *reinterpret_cast<const ModelFormatFromUrlResult*>(
+        &_ModelFormatFromUrlResult_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 34;
+  friend void swap(ModelFormatFromUrlResult& a, ModelFormatFromUrlResult& b) { a.Swap(&b); }
+  inline void Swap(ModelFormatFromUrlResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ModelFormatFromUrlResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] ModelFormatFromUrlResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<ModelFormatFromUrlResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const ModelFormatFromUrlResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const ModelFormatFromUrlResult& from) { ModelFormatFromUrlResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(ModelFormatFromUrlResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ModelFormatFromUrlResult"; }
+
+  explicit ModelFormatFromUrlResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  ModelFormatFromUrlResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ModelFormatFromUrlResult& from);
+  ModelFormatFromUrlResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ModelFormatFromUrlResult&& from) noexcept
+      : ModelFormatFromUrlResult(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kFormatFieldNumber = 1,
+    kInnerFormatFieldNumber = 2,
+  };
+  // .runanywhere.v1.ModelFormat format = 1;
+  void clear_format() ;
+  [[nodiscard]] ::runanywhere::v1::ModelFormat format() const;
+  void set_format(::runanywhere::v1::ModelFormat value);
+
+  private:
+  ::runanywhere::v1::ModelFormat _internal_format() const;
+  void _internal_set_format(::runanywhere::v1::ModelFormat value);
+
+  public:
+  // .runanywhere.v1.ModelFormat inner_format = 2;
+  void clear_inner_format() ;
+  [[nodiscard]] ::runanywhere::v1::ModelFormat inner_format() const;
+  void set_inner_format(::runanywhere::v1::ModelFormat value);
+
+  private:
+  ::runanywhere::v1::ModelFormat _internal_inner_format() const;
+  void _internal_set_inner_format(::runanywhere::v1::ModelFormat value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.ModelFormatFromUrlResult)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<1, 2,
+                                   0, 0,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const ModelFormatFromUrlResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    int format_;
+    int inner_format_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_model_5ftypes_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull ModelFormatFromUrlResult_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelFormatFromUrlRequest final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.ModelFormatFromUrlRequest) */ {
+ public:
+  inline ModelFormatFromUrlRequest() : ModelFormatFromUrlRequest(nullptr) {}
+  ~ModelFormatFromUrlRequest() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(ModelFormatFromUrlRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(ModelFormatFromUrlRequest));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr ModelFormatFromUrlRequest(::google::protobuf::internal::ConstantInitialized);
+
+  inline ModelFormatFromUrlRequest(const ModelFormatFromUrlRequest& from) : ModelFormatFromUrlRequest(nullptr, from) {}
+  inline ModelFormatFromUrlRequest(ModelFormatFromUrlRequest&& from) noexcept
+      : ModelFormatFromUrlRequest(nullptr, ::std::move(from)) {}
+  inline ModelFormatFromUrlRequest& operator=(const ModelFormatFromUrlRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ModelFormatFromUrlRequest& operator=(ModelFormatFromUrlRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const ModelFormatFromUrlRequest& default_instance() {
+    return *reinterpret_cast<const ModelFormatFromUrlRequest*>(
+        &_ModelFormatFromUrlRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 33;
+  friend void swap(ModelFormatFromUrlRequest& a, ModelFormatFromUrlRequest& b) { a.Swap(&b); }
+  inline void Swap(ModelFormatFromUrlRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ModelFormatFromUrlRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] ModelFormatFromUrlRequest* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<ModelFormatFromUrlRequest>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const ModelFormatFromUrlRequest& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const ModelFormatFromUrlRequest& from) { ModelFormatFromUrlRequest::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(ModelFormatFromUrlRequest* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ModelFormatFromUrlRequest"; }
+
+  explicit ModelFormatFromUrlRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  ModelFormatFromUrlRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ModelFormatFromUrlRequest& from);
+  ModelFormatFromUrlRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ModelFormatFromUrlRequest&& from) noexcept
+      : ModelFormatFromUrlRequest(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kUrlFieldNumber = 1,
+  };
+  // string url = 1;
+  void clear_url() ;
+  [[nodiscard]] const ::std::string& url() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_url(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_url();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_url();
+  void set_allocated_url(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_url() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_url(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_url();
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.ModelFormatFromUrlRequest)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<0, 1,
+                                   0, 52,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const ModelFormatFromUrlRequest& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr url_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_model_5ftypes_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull ModelFormatFromUrlRequest_class_data_;
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelFileDescriptor final : public ::google::protobuf::Message
@@ -5035,6 +5460,473 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED CurrentModelRequest final : public 
 };
 
 extern const ::google::protobuf::internal::ClassDataFull CurrentModelRequest_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ArtifactInferFromUrlResult final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.ArtifactInferFromUrlResult) */ {
+ public:
+  inline ArtifactInferFromUrlResult() : ArtifactInferFromUrlResult(nullptr) {}
+  ~ArtifactInferFromUrlResult() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(ArtifactInferFromUrlResult* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(ArtifactInferFromUrlResult));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr ArtifactInferFromUrlResult(::google::protobuf::internal::ConstantInitialized);
+
+  inline ArtifactInferFromUrlResult(const ArtifactInferFromUrlResult& from) : ArtifactInferFromUrlResult(nullptr, from) {}
+  inline ArtifactInferFromUrlResult(ArtifactInferFromUrlResult&& from) noexcept
+      : ArtifactInferFromUrlResult(nullptr, ::std::move(from)) {}
+  inline ArtifactInferFromUrlResult& operator=(const ArtifactInferFromUrlResult& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ArtifactInferFromUrlResult& operator=(ArtifactInferFromUrlResult&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const ArtifactInferFromUrlResult& default_instance() {
+    return *reinterpret_cast<const ArtifactInferFromUrlResult*>(
+        &_ArtifactInferFromUrlResult_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 36;
+  friend void swap(ArtifactInferFromUrlResult& a, ArtifactInferFromUrlResult& b) { a.Swap(&b); }
+  inline void Swap(ArtifactInferFromUrlResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ArtifactInferFromUrlResult* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] ArtifactInferFromUrlResult* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<ArtifactInferFromUrlResult>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const ArtifactInferFromUrlResult& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const ArtifactInferFromUrlResult& from) { ArtifactInferFromUrlResult::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(ArtifactInferFromUrlResult* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ArtifactInferFromUrlResult"; }
+
+  explicit ArtifactInferFromUrlResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  ArtifactInferFromUrlResult(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ArtifactInferFromUrlResult& from);
+  ArtifactInferFromUrlResult(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ArtifactInferFromUrlResult&& from) noexcept
+      : ArtifactInferFromUrlResult(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kPrimaryRelpathFieldNumber = 4,
+    kArtifactTypeFieldNumber = 1,
+    kArchiveTypeFieldNumber = 2,
+    kArchiveStructureFieldNumber = 3,
+    kInnerFormatFieldNumber = 5,
+  };
+  // string primary_relpath = 4;
+  void clear_primary_relpath() ;
+  [[nodiscard]] const ::std::string& primary_relpath() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_primary_relpath(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_primary_relpath();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_primary_relpath();
+  void set_allocated_primary_relpath(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_primary_relpath() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_primary_relpath(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_primary_relpath();
+
+  public:
+  // .runanywhere.v1.ModelArtifactType artifact_type = 1;
+  void clear_artifact_type() ;
+  [[nodiscard]] ::runanywhere::v1::ModelArtifactType artifact_type() const;
+  void set_artifact_type(::runanywhere::v1::ModelArtifactType value);
+
+  private:
+  ::runanywhere::v1::ModelArtifactType _internal_artifact_type() const;
+  void _internal_set_artifact_type(::runanywhere::v1::ModelArtifactType value);
+
+  public:
+  // .runanywhere.v1.ArchiveType archive_type = 2;
+  void clear_archive_type() ;
+  [[nodiscard]] ::runanywhere::v1::ArchiveType archive_type() const;
+  void set_archive_type(::runanywhere::v1::ArchiveType value);
+
+  private:
+  ::runanywhere::v1::ArchiveType _internal_archive_type() const;
+  void _internal_set_archive_type(::runanywhere::v1::ArchiveType value);
+
+  public:
+  // .runanywhere.v1.ArchiveStructure archive_structure = 3;
+  void clear_archive_structure() ;
+  [[nodiscard]] ::runanywhere::v1::ArchiveStructure archive_structure() const;
+  void set_archive_structure(::runanywhere::v1::ArchiveStructure value);
+
+  private:
+  ::runanywhere::v1::ArchiveStructure _internal_archive_structure() const;
+  void _internal_set_archive_structure(::runanywhere::v1::ArchiveStructure value);
+
+  public:
+  // .runanywhere.v1.ModelFormat inner_format = 5;
+  void clear_inner_format() ;
+  [[nodiscard]] ::runanywhere::v1::ModelFormat inner_format() const;
+  void set_inner_format(::runanywhere::v1::ModelFormat value);
+
+  private:
+  ::runanywhere::v1::ModelFormat _internal_inner_format() const;
+  void _internal_set_inner_format(::runanywhere::v1::ModelFormat value);
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.ArtifactInferFromUrlResult)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<3, 5,
+                                   0, 65,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const ArtifactInferFromUrlResult& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr primary_relpath_;
+    int artifact_type_;
+    int archive_type_;
+    int archive_structure_;
+    int inner_format_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_model_5ftypes_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull ArtifactInferFromUrlResult_class_data_;
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ArtifactInferFromUrlRequest final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.ArtifactInferFromUrlRequest) */ {
+ public:
+  inline ArtifactInferFromUrlRequest() : ArtifactInferFromUrlRequest(nullptr) {}
+  ~ArtifactInferFromUrlRequest() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(ArtifactInferFromUrlRequest* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(ArtifactInferFromUrlRequest));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr ArtifactInferFromUrlRequest(::google::protobuf::internal::ConstantInitialized);
+
+  inline ArtifactInferFromUrlRequest(const ArtifactInferFromUrlRequest& from) : ArtifactInferFromUrlRequest(nullptr, from) {}
+  inline ArtifactInferFromUrlRequest(ArtifactInferFromUrlRequest&& from) noexcept
+      : ArtifactInferFromUrlRequest(nullptr, ::std::move(from)) {}
+  inline ArtifactInferFromUrlRequest& operator=(const ArtifactInferFromUrlRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ArtifactInferFromUrlRequest& operator=(ArtifactInferFromUrlRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const ArtifactInferFromUrlRequest& default_instance() {
+    return *reinterpret_cast<const ArtifactInferFromUrlRequest*>(
+        &_ArtifactInferFromUrlRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 35;
+  friend void swap(ArtifactInferFromUrlRequest& a, ArtifactInferFromUrlRequest& b) { a.Swap(&b); }
+  inline void Swap(ArtifactInferFromUrlRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ArtifactInferFromUrlRequest* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] ArtifactInferFromUrlRequest* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<ArtifactInferFromUrlRequest>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const ArtifactInferFromUrlRequest& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const ArtifactInferFromUrlRequest& from) { ArtifactInferFromUrlRequest::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(ArtifactInferFromUrlRequest* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ArtifactInferFromUrlRequest"; }
+
+  explicit ArtifactInferFromUrlRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  ArtifactInferFromUrlRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ArtifactInferFromUrlRequest& from);
+  ArtifactInferFromUrlRequest(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ArtifactInferFromUrlRequest&& from) noexcept
+      : ArtifactInferFromUrlRequest(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kUrlFieldNumber = 1,
+    kModelIdFieldNumber = 2,
+  };
+  // string url = 1;
+  void clear_url() ;
+  [[nodiscard]] const ::std::string& url() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_url(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_url();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_url();
+  void set_allocated_url(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_url() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_url(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_url();
+
+  public:
+  // string model_id = 2;
+  void clear_model_id() ;
+  [[nodiscard]] const ::std::string& model_id() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_model_id(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_model_id();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_model_id();
+  void set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_model_id() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_model_id(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_model_id();
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.ArtifactInferFromUrlRequest)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<1, 2,
+                                   0, 62,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const ArtifactInferFromUrlRequest& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr url_;
+    ::google::protobuf::internal::ArenaStringPtr model_id_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_model_5ftypes_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull ArtifactInferFromUrlRequest_class_data_;
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED MultiFileArtifact final : public ::google::protobuf::Message
@@ -10293,7 +11185,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ModelRegistryFetchAssignmentsResult
     return *reinterpret_cast<const ModelRegistryFetchAssignmentsResult*>(
         &_ModelRegistryFetchAssignmentsResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 34;
+  static constexpr int kIndexInFileMessages = 38;
   friend void swap(ModelRegistryFetchAssignmentsResult& a, ModelRegistryFetchAssignmentsResult& b) { a.Swap(&b); }
   inline void Swap(ModelRegistryFetchAssignmentsResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -21585,6 +22477,432 @@ inline void ModelCompatibilityCheckResult::set_allocated_error_message(::std::st
     _impl_.error_message_.Set("", GetArena());
   }
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ModelCompatibilityCheckResult.error_message)
+}
+
+// -------------------------------------------------------------------
+
+// ModelFormatFromUrlRequest
+
+// string url = 1;
+inline void ModelFormatFromUrlRequest::clear_url() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.url_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& ModelFormatFromUrlRequest::url() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelFormatFromUrlRequest.url)
+  return _internal_url();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void ModelFormatFromUrlRequest::set_url(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.url_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelFormatFromUrlRequest.url)
+}
+inline ::std::string* PROTOBUF_NONNULL ModelFormatFromUrlRequest::mutable_url()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_url();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ModelFormatFromUrlRequest.url)
+  return _s;
+}
+inline const ::std::string& ModelFormatFromUrlRequest::_internal_url() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.url_.Get();
+}
+inline void ModelFormatFromUrlRequest::_internal_set_url(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.url_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL ModelFormatFromUrlRequest::_internal_mutable_url() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.url_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE ModelFormatFromUrlRequest::release_url() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ModelFormatFromUrlRequest.url)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.url_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.url_.Set("", GetArena());
+  }
+  return released;
+}
+inline void ModelFormatFromUrlRequest::set_allocated_url(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.url_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.url_.IsDefault()) {
+    _impl_.url_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ModelFormatFromUrlRequest.url)
+}
+
+// -------------------------------------------------------------------
+
+// ModelFormatFromUrlResult
+
+// .runanywhere.v1.ModelFormat format = 1;
+inline void ModelFormatFromUrlResult::clear_format() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.format_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline ::runanywhere::v1::ModelFormat ModelFormatFromUrlResult::format() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelFormatFromUrlResult.format)
+  return _internal_format();
+}
+inline void ModelFormatFromUrlResult::set_format(::runanywhere::v1::ModelFormat value) {
+  _internal_set_format(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelFormatFromUrlResult.format)
+}
+inline ::runanywhere::v1::ModelFormat ModelFormatFromUrlResult::_internal_format() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::ModelFormat>(_impl_.format_);
+}
+inline void ModelFormatFromUrlResult::_internal_set_format(::runanywhere::v1::ModelFormat value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.format_ = value;
+}
+
+// .runanywhere.v1.ModelFormat inner_format = 2;
+inline void ModelFormatFromUrlResult::clear_inner_format() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.inner_format_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline ::runanywhere::v1::ModelFormat ModelFormatFromUrlResult::inner_format() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ModelFormatFromUrlResult.inner_format)
+  return _internal_inner_format();
+}
+inline void ModelFormatFromUrlResult::set_inner_format(::runanywhere::v1::ModelFormat value) {
+  _internal_set_inner_format(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ModelFormatFromUrlResult.inner_format)
+}
+inline ::runanywhere::v1::ModelFormat ModelFormatFromUrlResult::_internal_inner_format() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::ModelFormat>(_impl_.inner_format_);
+}
+inline void ModelFormatFromUrlResult::_internal_set_inner_format(::runanywhere::v1::ModelFormat value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.inner_format_ = value;
+}
+
+// -------------------------------------------------------------------
+
+// ArtifactInferFromUrlRequest
+
+// string url = 1;
+inline void ArtifactInferFromUrlRequest::clear_url() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.url_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& ArtifactInferFromUrlRequest::url() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ArtifactInferFromUrlRequest.url)
+  return _internal_url();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void ArtifactInferFromUrlRequest::set_url(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.url_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ArtifactInferFromUrlRequest.url)
+}
+inline ::std::string* PROTOBUF_NONNULL ArtifactInferFromUrlRequest::mutable_url()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_url();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ArtifactInferFromUrlRequest.url)
+  return _s;
+}
+inline const ::std::string& ArtifactInferFromUrlRequest::_internal_url() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.url_.Get();
+}
+inline void ArtifactInferFromUrlRequest::_internal_set_url(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.url_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL ArtifactInferFromUrlRequest::_internal_mutable_url() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.url_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE ArtifactInferFromUrlRequest::release_url() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ArtifactInferFromUrlRequest.url)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.url_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.url_.Set("", GetArena());
+  }
+  return released;
+}
+inline void ArtifactInferFromUrlRequest::set_allocated_url(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.url_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.url_.IsDefault()) {
+    _impl_.url_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ArtifactInferFromUrlRequest.url)
+}
+
+// string model_id = 2;
+inline void ArtifactInferFromUrlRequest::clear_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline const ::std::string& ArtifactInferFromUrlRequest::model_id() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ArtifactInferFromUrlRequest.model_id)
+  return _internal_model_id();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void ArtifactInferFromUrlRequest::set_model_id(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  _impl_.model_id_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ArtifactInferFromUrlRequest.model_id)
+}
+inline ::std::string* PROTOBUF_NONNULL ArtifactInferFromUrlRequest::mutable_model_id()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  ::std::string* _s = _internal_mutable_model_id();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ArtifactInferFromUrlRequest.model_id)
+  return _s;
+}
+inline const ::std::string& ArtifactInferFromUrlRequest::_internal_model_id() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.model_id_.Get();
+}
+inline void ArtifactInferFromUrlRequest::_internal_set_model_id(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.model_id_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL ArtifactInferFromUrlRequest::_internal_mutable_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.model_id_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE ArtifactInferFromUrlRequest::release_model_id() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ArtifactInferFromUrlRequest.model_id)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000002U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  auto* released = _impl_.model_id_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  return released;
+}
+inline void ArtifactInferFromUrlRequest::set_allocated_model_id(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000002U);
+  }
+  _impl_.model_id_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.model_id_.IsDefault()) {
+    _impl_.model_id_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ArtifactInferFromUrlRequest.model_id)
+}
+
+// -------------------------------------------------------------------
+
+// ArtifactInferFromUrlResult
+
+// .runanywhere.v1.ModelArtifactType artifact_type = 1;
+inline void ArtifactInferFromUrlResult::clear_artifact_type() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.artifact_type_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000002U);
+}
+inline ::runanywhere::v1::ModelArtifactType ArtifactInferFromUrlResult::artifact_type() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ArtifactInferFromUrlResult.artifact_type)
+  return _internal_artifact_type();
+}
+inline void ArtifactInferFromUrlResult::set_artifact_type(::runanywhere::v1::ModelArtifactType value) {
+  _internal_set_artifact_type(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000002U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ArtifactInferFromUrlResult.artifact_type)
+}
+inline ::runanywhere::v1::ModelArtifactType ArtifactInferFromUrlResult::_internal_artifact_type() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::ModelArtifactType>(_impl_.artifact_type_);
+}
+inline void ArtifactInferFromUrlResult::_internal_set_artifact_type(::runanywhere::v1::ModelArtifactType value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.artifact_type_ = value;
+}
+
+// .runanywhere.v1.ArchiveType archive_type = 2;
+inline void ArtifactInferFromUrlResult::clear_archive_type() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.archive_type_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000004U);
+}
+inline ::runanywhere::v1::ArchiveType ArtifactInferFromUrlResult::archive_type() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ArtifactInferFromUrlResult.archive_type)
+  return _internal_archive_type();
+}
+inline void ArtifactInferFromUrlResult::set_archive_type(::runanywhere::v1::ArchiveType value) {
+  _internal_set_archive_type(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000004U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ArtifactInferFromUrlResult.archive_type)
+}
+inline ::runanywhere::v1::ArchiveType ArtifactInferFromUrlResult::_internal_archive_type() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::ArchiveType>(_impl_.archive_type_);
+}
+inline void ArtifactInferFromUrlResult::_internal_set_archive_type(::runanywhere::v1::ArchiveType value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.archive_type_ = value;
+}
+
+// .runanywhere.v1.ArchiveStructure archive_structure = 3;
+inline void ArtifactInferFromUrlResult::clear_archive_structure() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.archive_structure_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000008U);
+}
+inline ::runanywhere::v1::ArchiveStructure ArtifactInferFromUrlResult::archive_structure() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ArtifactInferFromUrlResult.archive_structure)
+  return _internal_archive_structure();
+}
+inline void ArtifactInferFromUrlResult::set_archive_structure(::runanywhere::v1::ArchiveStructure value) {
+  _internal_set_archive_structure(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000008U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ArtifactInferFromUrlResult.archive_structure)
+}
+inline ::runanywhere::v1::ArchiveStructure ArtifactInferFromUrlResult::_internal_archive_structure() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::ArchiveStructure>(_impl_.archive_structure_);
+}
+inline void ArtifactInferFromUrlResult::_internal_set_archive_structure(::runanywhere::v1::ArchiveStructure value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.archive_structure_ = value;
+}
+
+// string primary_relpath = 4;
+inline void ArtifactInferFromUrlResult::clear_primary_relpath() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.primary_relpath_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& ArtifactInferFromUrlResult::primary_relpath() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ArtifactInferFromUrlResult.primary_relpath)
+  return _internal_primary_relpath();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void ArtifactInferFromUrlResult::set_primary_relpath(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.primary_relpath_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ArtifactInferFromUrlResult.primary_relpath)
+}
+inline ::std::string* PROTOBUF_NONNULL ArtifactInferFromUrlResult::mutable_primary_relpath()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_primary_relpath();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ArtifactInferFromUrlResult.primary_relpath)
+  return _s;
+}
+inline const ::std::string& ArtifactInferFromUrlResult::_internal_primary_relpath() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.primary_relpath_.Get();
+}
+inline void ArtifactInferFromUrlResult::_internal_set_primary_relpath(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.primary_relpath_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL ArtifactInferFromUrlResult::_internal_mutable_primary_relpath() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.primary_relpath_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE ArtifactInferFromUrlResult::release_primary_relpath() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ArtifactInferFromUrlResult.primary_relpath)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.primary_relpath_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.primary_relpath_.Set("", GetArena());
+  }
+  return released;
+}
+inline void ArtifactInferFromUrlResult::set_allocated_primary_relpath(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.primary_relpath_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.primary_relpath_.IsDefault()) {
+    _impl_.primary_relpath_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ArtifactInferFromUrlResult.primary_relpath)
+}
+
+// .runanywhere.v1.ModelFormat inner_format = 5;
+inline void ArtifactInferFromUrlResult::clear_inner_format() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.inner_format_ = 0;
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000010U);
+}
+inline ::runanywhere::v1::ModelFormat ArtifactInferFromUrlResult::inner_format() const {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ArtifactInferFromUrlResult.inner_format)
+  return _internal_inner_format();
+}
+inline void ArtifactInferFromUrlResult::set_inner_format(::runanywhere::v1::ModelFormat value) {
+  _internal_set_inner_format(value);
+  SetHasBit(_impl_._has_bits_[0], 0x00000010U);
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ArtifactInferFromUrlResult.inner_format)
+}
+inline ::runanywhere::v1::ModelFormat ArtifactInferFromUrlResult::_internal_inner_format() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return static_cast<::runanywhere::v1::ModelFormat>(_impl_.inner_format_);
+}
+inline void ArtifactInferFromUrlResult::_internal_set_inner_format(::runanywhere::v1::ModelFormat value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.inner_format_ = value;
 }
 
 // -------------------------------------------------------------------

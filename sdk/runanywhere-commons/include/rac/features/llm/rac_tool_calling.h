@@ -510,6 +510,25 @@ rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_bool_t succ
                                          const char* result_json,
                                          const char* error_message, char** out_json);
 
+// =============================================================================
+// TOOL CALLING SESSION (Wave D-4) - Native orchestration state machine
+// =============================================================================
+
+typedef void (*rac_tool_calling_session_event_callback_fn)(const uint8_t* event_bytes,
+                                                            size_t         event_size,
+                                                            void*          user_data);
+
+RAC_API rac_result_t rac_tool_calling_session_create_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_tool_calling_session_event_callback_fn callback,
+    void* user_data,
+    uint64_t* out_session_handle);
+
+RAC_API rac_result_t rac_tool_calling_session_step_with_result_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size);
+
+RAC_API rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_handle);
+
 #ifdef __cplusplus
 }
 #endif

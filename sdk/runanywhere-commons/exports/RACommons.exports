@@ -164,6 +164,12 @@ _rac_tool_call_parse_proto
 _rac_tool_call_validate_proto
 _rac_tool_call_format_prompt_proto
 
+# Wave D-4: Tool-calling session state machine (collapses per-SDK
+# 200-400 LOC orchestration loop into one native session).
+_rac_tool_calling_session_create_proto
+_rac_tool_calling_session_step_with_result_proto
+_rac_tool_calling_session_destroy_proto
+
 # VLM / Diffusion components — non-proto APIs are internal helpers used
 # by JNI during migration. SDK-facing surface is the proto-byte ABI
 # (rac_vlm_*_proto / rac_diffusion_*_proto) below. Helper enums
@@ -224,6 +230,8 @@ _rac_model_registry_discover_proto
 _rac_model_registry_refresh_proto
 _rac_model_registry_proto_free
 _rac_model_registry_fetch_assignments_proto
+_rac_model_format_from_url_proto
+_rac_artifact_infer_from_url_proto
 _rac_model_compatibility_check_proto
 _rac_model_lifecycle_load_proto
 _rac_model_lifecycle_unload_proto
@@ -267,6 +275,12 @@ _rac_vad_component_set_activity_proto_callback
 _rac_voice_agent_initialize_proto
 _rac_voice_agent_component_states_proto
 _rac_voice_agent_process_voice_turn_proto
+# D-7: Full-session voice-agent ABI + per-helper proto wrappers.
+_rac_voice_agent_process_turn_proto
+_rac_voice_agent_transcribe_proto
+_rac_voice_agent_synthesize_speech_proto
+_rac_voice_agent_component_create_proto
+_rac_voice_agent_component_destroy_proto
 
 # Advanced modality generated-proto ABI
 _rac_vlm_process_proto

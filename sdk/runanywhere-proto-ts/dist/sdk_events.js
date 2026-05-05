@@ -3031,6 +3031,7 @@ function createBaseGenerationEvent() {
         structuredSchemaJson: "",
         structuredOutputJson: "",
         thinkingText: "",
+        inputTokens: 0,
     };
 }
 export const GenerationEvent = {
@@ -3103,6 +3104,9 @@ export const GenerationEvent = {
         }
         if (message.thinkingText !== "") {
             writer.uint32(186).string(message.thinkingText);
+        }
+        if (message.inputTokens !== 0) {
+            writer.uint32(192).int32(message.inputTokens);
         }
         return writer;
     },
@@ -3251,6 +3255,12 @@ export const GenerationEvent = {
                     }
                     message.thinkingText = reader.string();
                     continue;
+                case 24:
+                    if (tag !== 192) {
+                        break;
+                    }
+                    message.inputTokens = reader.int32();
+                    continue;
             }
             if ((tag & 7) === 4 || tag === 0) {
                 break;
@@ -3284,6 +3294,7 @@ export const GenerationEvent = {
             structuredSchemaJson: isSet(object.structuredSchemaJson) ? globalThis.String(object.structuredSchemaJson) : "",
             structuredOutputJson: isSet(object.structuredOutputJson) ? globalThis.String(object.structuredOutputJson) : "",
             thinkingText: isSet(object.thinkingText) ? globalThis.String(object.thinkingText) : "",
+            inputTokens: isSet(object.inputTokens) ? globalThis.Number(object.inputTokens) : 0,
         };
     },
     toJSON(message) {
@@ -3357,6 +3368,9 @@ export const GenerationEvent = {
         if (message.thinkingText !== "") {
             obj.thinkingText = message.thinkingText;
         }
+        if (message.inputTokens !== 0) {
+            obj.inputTokens = Math.round(message.inputTokens);
+        }
         return obj;
     },
     create(base) {
@@ -3387,6 +3401,7 @@ export const GenerationEvent = {
         message.structuredSchemaJson = object.structuredSchemaJson ?? "";
         message.structuredOutputJson = object.structuredOutputJson ?? "";
         message.thinkingText = object.thinkingText ?? "";
+        message.inputTokens = object.inputTokens ?? 0;
         return message;
     },
 };

@@ -232,10 +232,10 @@ class NativeRAGSessionProvider implements RAGProvider {
     options: RAGQueryOverrides = {},
   ): Promise<RAGResult> {
     const session = await this.ensureSession();
-    if (!this.config.llmModelPath.trim()) {
+    if (!this.config.llmModelId.trim()) {
       return unavailableRAGResult(
         question,
-        'Native Web RAG query requires RAGConfiguration.llmModelPath. A session without an LLM path can ingest but cannot generate answers.',
+        'Native Web RAG query requires RAGConfiguration.llmModelId. A session without an LLM model id can ingest but cannot generate answers.',
       );
     }
     const result = this.adapter.query(session, makeRAGQuery(question, this.config, options));
@@ -310,10 +310,10 @@ function validateNativeRAGConfiguration(config: RAGConfiguration, feature: strin
       NATIVE_RAG_PERSISTENCE_UNAVAILABLE,
     );
   }
-  if (!config.embeddingModelPath.trim()) {
+  if (!config.embeddingModelId.trim()) {
     throw SDKException.backendNotAvailable(
       feature,
-      'Native Web RAG session creation requires RAGConfiguration.embeddingModelPath or an explicit RAG.setSessionHandle(...).',
+      'Native Web RAG session creation requires RAGConfiguration.embeddingModelId or an explicit RAG.setSessionHandle(...).',
     );
   }
 }
@@ -322,8 +322,8 @@ export function createDefaultRAGConfiguration(
   overrides: Partial<RAGConfiguration> = {},
 ): RAGConfiguration {
   return {
-    embeddingModelPath: '',
-    llmModelPath: '',
+    embeddingModelId: '',
+    llmModelId: '',
     embeddingDimension: 0,
     topK: 3,
     similarityThreshold: 0,
@@ -336,7 +336,7 @@ export function createDefaultRAGConfiguration(
     indexPath: undefined,
     persistIndex: false,
     rerankResults: false,
-    rerankerModelPath: undefined,
+    rerankerModelId: undefined,
     ...overrides,
   };
 }

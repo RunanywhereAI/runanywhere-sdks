@@ -2551,6 +2551,100 @@ public struct RAModelCompatibilityCheckResult: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
+/// URL → ModelFormat inference request/result. Moves the Dart/Kotlin-side
+/// URL-suffix heuristic (".gguf" → GGUF, ".onnx" → ONNX, ".tar.gz" wrapping an
+/// inner format, ...) into commons so every SDK uses one implementation.
+/// ---------------------------------------------------------------------------
+public struct RAModelFormatFromUrlRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Portable URL or file path string. Only the trailing file-extension
+  /// suffix is inspected; query strings and fragments are ignored.
+  public var url: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAModelFormatFromUrlResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Primary detected format. For archive URLs this is the archive-wrapper
+  /// format (for example MODEL_FORMAT_ZIP); the extracted model format is
+  /// in inner_format below.
+  public var format: RAModelFormat = .unspecified
+
+  /// For archive URLs, the format of the primary file inside the archive
+  /// when it can be inferred from the URL (for example
+  /// "whisper-base.en.tar.gz" → inner_format = MODEL_FORMAT_ONNX). When the
+  /// archive content is unknown this is MODEL_FORMAT_UNSPECIFIED.
+  public var innerFormat: RAModelFormat = .unspecified
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// ---------------------------------------------------------------------------
+/// URL → ModelArtifactType inference request/result. Replaces Dart
+/// withInferredArtifact and Kotlin inferArtifactFields with a single commons
+/// call.
+/// ---------------------------------------------------------------------------
+public struct RAArtifactInferFromUrlRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Portable URL or file path string.
+  public var url: String = String()
+
+  /// Optional model identifier. Commons does not consult the registry with
+  /// this value today; it is carried for logging and telemetry only.
+  public var modelID: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAArtifactInferFromUrlResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Inferred artifact-type classification.
+  public var artifactType: RAModelArtifactType = .unspecified
+
+  /// For archive artifacts, the concrete archive format (ZIP, TAR_GZ, ...).
+  /// For single-file or directory artifacts this is
+  /// ARCHIVE_TYPE_UNSPECIFIED.
+  public var archiveType: RAArchiveType = .unspecified
+
+  /// For archive artifacts the known or inferred internal structure after
+  /// extraction. Defaults to ARCHIVE_STRUCTURE_UNKNOWN.
+  public var archiveStructure: RAArchiveStructure = .unspecified
+
+  /// When the URL suggests an archive wrapping a known primary file (for
+  /// example a Whisper model bundle containing encoder.onnx), this field
+  /// carries the relative path inside the archive when it can be inferred.
+  /// Empty otherwise.
+  public var primaryRelpath: String = String()
+
+  /// Inner file format for archive artifacts. MODEL_FORMAT_UNSPECIFIED when
+  /// the archive contents are unknown.
+  public var innerFormat: RAModelFormat = .unspecified
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// ---------------------------------------------------------------------------
 /// FetchAssignments request/result. Replaces the JSON shim
 /// racModelRegistryFetchAssignments and the Web SDK's offline-friendly
 /// fetchModelAssignments() entry point. The platform adapter owns HTTP
@@ -4948,6 +5042,156 @@ extension RAModelCompatibilityCheckResult: SwiftProtobuf.Message, SwiftProtobuf.
     if lhs.modelID != rhs.modelID {return false}
     if lhs.errorCode != rhs.errorCode {return false}
     if lhs.errorMessage != rhs.errorMessage {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAModelFormatFromUrlRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ModelFormatFromUrlRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.url) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.url.isEmpty {
+      try visitor.visitSingularStringField(value: self.url, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAModelFormatFromUrlRequest, rhs: RAModelFormatFromUrlRequest) -> Bool {
+    if lhs.url != rhs.url {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAModelFormatFromUrlResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ModelFormatFromUrlResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}format\0\u{3}inner_format\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.format) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self.innerFormat) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.format != .unspecified {
+      try visitor.visitSingularEnumField(value: self.format, fieldNumber: 1)
+    }
+    if self.innerFormat != .unspecified {
+      try visitor.visitSingularEnumField(value: self.innerFormat, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAModelFormatFromUrlResult, rhs: RAModelFormatFromUrlResult) -> Bool {
+    if lhs.format != rhs.format {return false}
+    if lhs.innerFormat != rhs.innerFormat {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAArtifactInferFromUrlRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ArtifactInferFromUrlRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{3}model_id\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.url) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.url.isEmpty {
+      try visitor.visitSingularStringField(value: self.url, fieldNumber: 1)
+    }
+    if !self.modelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAArtifactInferFromUrlRequest, rhs: RAArtifactInferFromUrlRequest) -> Bool {
+    if lhs.url != rhs.url {return false}
+    if lhs.modelID != rhs.modelID {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAArtifactInferFromUrlResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ArtifactInferFromUrlResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}artifact_type\0\u{3}archive_type\0\u{3}archive_structure\0\u{3}primary_relpath\0\u{3}inner_format\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularEnumField(value: &self.artifactType) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self.archiveType) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.archiveStructure) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.primaryRelpath) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self.innerFormat) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.artifactType != .unspecified {
+      try visitor.visitSingularEnumField(value: self.artifactType, fieldNumber: 1)
+    }
+    if self.archiveType != .unspecified {
+      try visitor.visitSingularEnumField(value: self.archiveType, fieldNumber: 2)
+    }
+    if self.archiveStructure != .unspecified {
+      try visitor.visitSingularEnumField(value: self.archiveStructure, fieldNumber: 3)
+    }
+    if !self.primaryRelpath.isEmpty {
+      try visitor.visitSingularStringField(value: self.primaryRelpath, fieldNumber: 4)
+    }
+    if self.innerFormat != .unspecified {
+      try visitor.visitSingularEnumField(value: self.innerFormat, fieldNumber: 5)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAArtifactInferFromUrlResult, rhs: RAArtifactInferFromUrlResult) -> Bool {
+    if lhs.artifactType != rhs.artifactType {return false}
+    if lhs.archiveType != rhs.archiveType {return false}
+    if lhs.archiveStructure != rhs.archiveStructure {return false}
+    if lhs.primaryRelpath != rhs.primaryRelpath {return false}
+    if lhs.innerFormat != rhs.innerFormat {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

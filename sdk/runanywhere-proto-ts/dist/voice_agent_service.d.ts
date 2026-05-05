@@ -1,4 +1,5 @@
 import _m0 from "protobufjs/minimal";
+import { TTSOptions } from "./tts_options";
 import { AudioEncoding, VoiceAgentComponentStates, VoiceEventCategory, VoiceEventSeverity } from "./voice_events";
 export declare const protobufPackage = "runanywhere.v1";
 /**
@@ -221,6 +222,20 @@ export interface VoiceAgentComposeConfig {
     sessionId?: string | undefined;
     defaultLanguageCode?: string | undefined;
 }
+/** Wave D-7 helper-level proto requests for voice-agent sub-components. */
+export interface VoiceAgentTranscribeProtoRequest {
+    audioData: Uint8Array;
+    sessionId: string;
+    sampleRate: number;
+    languageHint: string;
+    channels: number;
+    encoding: AudioEncoding;
+}
+export interface VoiceAgentSynthesizeSpeechProtoRequest {
+    text: string;
+    sessionId: string;
+    options?: TTSOptions | undefined;
+}
 export declare const VoiceAgentRequest: {
     encode(message: VoiceAgentRequest, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentRequest;
@@ -276,6 +291,22 @@ export declare const VoiceAgentComposeConfig: {
     toJSON(message: VoiceAgentComposeConfig): unknown;
     create<I extends Exact<DeepPartial<VoiceAgentComposeConfig>, I>>(base?: I): VoiceAgentComposeConfig;
     fromPartial<I extends Exact<DeepPartial<VoiceAgentComposeConfig>, I>>(object: I): VoiceAgentComposeConfig;
+};
+export declare const VoiceAgentTranscribeProtoRequest: {
+    encode(message: VoiceAgentTranscribeProtoRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentTranscribeProtoRequest;
+    fromJSON(object: any): VoiceAgentTranscribeProtoRequest;
+    toJSON(message: VoiceAgentTranscribeProtoRequest): unknown;
+    create<I extends Exact<DeepPartial<VoiceAgentTranscribeProtoRequest>, I>>(base?: I): VoiceAgentTranscribeProtoRequest;
+    fromPartial<I extends Exact<DeepPartial<VoiceAgentTranscribeProtoRequest>, I>>(object: I): VoiceAgentTranscribeProtoRequest;
+};
+export declare const VoiceAgentSynthesizeSpeechProtoRequest: {
+    encode(message: VoiceAgentSynthesizeSpeechProtoRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): VoiceAgentSynthesizeSpeechProtoRequest;
+    fromJSON(object: any): VoiceAgentSynthesizeSpeechProtoRequest;
+    toJSON(message: VoiceAgentSynthesizeSpeechProtoRequest): unknown;
+    create<I extends Exact<DeepPartial<VoiceAgentSynthesizeSpeechProtoRequest>, I>>(base?: I): VoiceAgentSynthesizeSpeechProtoRequest;
+    fromPartial<I extends Exact<DeepPartial<VoiceAgentSynthesizeSpeechProtoRequest>, I>>(object: I): VoiceAgentSynthesizeSpeechProtoRequest;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

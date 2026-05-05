@@ -6,6 +6,7 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
+import { acceleratorPreferenceFromJSON, acceleratorPreferenceToJSON, HardwareProfile, } from "./hardware_profile";
 export const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -5522,6 +5523,856 @@ export const ModelDeleteResult = {
         message.wasLoaded = object.wasLoaded ?? false;
         message.errorMessage = object.errorMessage ?? "";
         message.warnings = object.warnings?.map((e) => e) || [];
+        return message;
+    },
+};
+function createBaseModelCompatibilityRequest() {
+    return {
+        modelId: "",
+        hardwareProfile: undefined,
+        availableRamBytes: 0,
+        availableStorageBytes: 0,
+        acceleratorPreference: undefined,
+        preferredFramework: undefined,
+    };
+}
+export const ModelCompatibilityRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.modelId !== "") {
+            writer.uint32(10).string(message.modelId);
+        }
+        if (message.hardwareProfile !== undefined) {
+            HardwareProfile.encode(message.hardwareProfile, writer.uint32(18).fork()).ldelim();
+        }
+        if (message.availableRamBytes !== 0) {
+            writer.uint32(24).int64(message.availableRamBytes);
+        }
+        if (message.availableStorageBytes !== 0) {
+            writer.uint32(32).int64(message.availableStorageBytes);
+        }
+        if (message.acceleratorPreference !== undefined) {
+            writer.uint32(40).int32(message.acceleratorPreference);
+        }
+        if (message.preferredFramework !== undefined) {
+            writer.uint32(48).int32(message.preferredFramework);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseModelCompatibilityRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.hardwareProfile = HardwareProfile.decode(reader, reader.uint32());
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.availableRamBytes = longToNumber(reader.int64());
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.availableStorageBytes = longToNumber(reader.int64());
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.acceleratorPreference = reader.int32();
+                    continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.preferredFramework = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+            hardwareProfile: isSet(object.hardwareProfile) ? HardwareProfile.fromJSON(object.hardwareProfile) : undefined,
+            availableRamBytes: isSet(object.availableRamBytes) ? globalThis.Number(object.availableRamBytes) : 0,
+            availableStorageBytes: isSet(object.availableStorageBytes) ? globalThis.Number(object.availableStorageBytes) : 0,
+            acceleratorPreference: isSet(object.acceleratorPreference)
+                ? acceleratorPreferenceFromJSON(object.acceleratorPreference)
+                : undefined,
+            preferredFramework: isSet(object.preferredFramework)
+                ? inferenceFrameworkFromJSON(object.preferredFramework)
+                : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.hardwareProfile !== undefined) {
+            obj.hardwareProfile = HardwareProfile.toJSON(message.hardwareProfile);
+        }
+        if (message.availableRamBytes !== 0) {
+            obj.availableRamBytes = Math.round(message.availableRamBytes);
+        }
+        if (message.availableStorageBytes !== 0) {
+            obj.availableStorageBytes = Math.round(message.availableStorageBytes);
+        }
+        if (message.acceleratorPreference !== undefined) {
+            obj.acceleratorPreference = acceleratorPreferenceToJSON(message.acceleratorPreference);
+        }
+        if (message.preferredFramework !== undefined) {
+            obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
+        }
+        return obj;
+    },
+    create(base) {
+        return ModelCompatibilityRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseModelCompatibilityRequest();
+        message.modelId = object.modelId ?? "";
+        message.hardwareProfile = (object.hardwareProfile !== undefined && object.hardwareProfile !== null)
+            ? HardwareProfile.fromPartial(object.hardwareProfile)
+            : undefined;
+        message.availableRamBytes = object.availableRamBytes ?? 0;
+        message.availableStorageBytes = object.availableStorageBytes ?? 0;
+        message.acceleratorPreference = object.acceleratorPreference ?? undefined;
+        message.preferredFramework = object.preferredFramework ?? undefined;
+        return message;
+    },
+};
+function createBaseModelCompatibilityCheckResult() {
+    return {
+        isCompatible: false,
+        canRun: false,
+        canFit: false,
+        requiredMemoryBytes: 0,
+        availableMemoryBytes: 0,
+        requiredStorageBytes: 0,
+        availableStorageBytes: 0,
+        reasons: [],
+        suggestedAlternatives: [],
+        modelId: "",
+        errorCode: 0,
+        errorMessage: "",
+    };
+}
+export const ModelCompatibilityCheckResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.isCompatible !== false) {
+            writer.uint32(8).bool(message.isCompatible);
+        }
+        if (message.canRun !== false) {
+            writer.uint32(16).bool(message.canRun);
+        }
+        if (message.canFit !== false) {
+            writer.uint32(24).bool(message.canFit);
+        }
+        if (message.requiredMemoryBytes !== 0) {
+            writer.uint32(32).int64(message.requiredMemoryBytes);
+        }
+        if (message.availableMemoryBytes !== 0) {
+            writer.uint32(40).int64(message.availableMemoryBytes);
+        }
+        if (message.requiredStorageBytes !== 0) {
+            writer.uint32(48).int64(message.requiredStorageBytes);
+        }
+        if (message.availableStorageBytes !== 0) {
+            writer.uint32(56).int64(message.availableStorageBytes);
+        }
+        for (const v of message.reasons) {
+            writer.uint32(66).string(v);
+        }
+        for (const v of message.suggestedAlternatives) {
+            writer.uint32(74).string(v);
+        }
+        if (message.modelId !== "") {
+            writer.uint32(82).string(message.modelId);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(88).int32(message.errorCode);
+        }
+        if (message.errorMessage !== "") {
+            writer.uint32(98).string(message.errorMessage);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseModelCompatibilityCheckResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.isCompatible = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.canRun = reader.bool();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.canFit = reader.bool();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.requiredMemoryBytes = longToNumber(reader.int64());
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.availableMemoryBytes = longToNumber(reader.int64());
+                    continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.requiredStorageBytes = longToNumber(reader.int64());
+                    continue;
+                case 7:
+                    if (tag !== 56) {
+                        break;
+                    }
+                    message.availableStorageBytes = longToNumber(reader.int64());
+                    continue;
+                case 8:
+                    if (tag !== 66) {
+                        break;
+                    }
+                    message.reasons.push(reader.string());
+                    continue;
+                case 9:
+                    if (tag !== 74) {
+                        break;
+                    }
+                    message.suggestedAlternatives.push(reader.string());
+                    continue;
+                case 10:
+                    if (tag !== 82) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+                case 11:
+                    if (tag !== 88) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+                case 12:
+                    if (tag !== 98) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            isCompatible: isSet(object.isCompatible) ? globalThis.Boolean(object.isCompatible) : false,
+            canRun: isSet(object.canRun) ? globalThis.Boolean(object.canRun) : false,
+            canFit: isSet(object.canFit) ? globalThis.Boolean(object.canFit) : false,
+            requiredMemoryBytes: isSet(object.requiredMemoryBytes) ? globalThis.Number(object.requiredMemoryBytes) : 0,
+            availableMemoryBytes: isSet(object.availableMemoryBytes) ? globalThis.Number(object.availableMemoryBytes) : 0,
+            requiredStorageBytes: isSet(object.requiredStorageBytes) ? globalThis.Number(object.requiredStorageBytes) : 0,
+            availableStorageBytes: isSet(object.availableStorageBytes) ? globalThis.Number(object.availableStorageBytes) : 0,
+            reasons: globalThis.Array.isArray(object?.reasons) ? object.reasons.map((e) => globalThis.String(e)) : [],
+            suggestedAlternatives: globalThis.Array.isArray(object?.suggestedAlternatives)
+                ? object.suggestedAlternatives.map((e) => globalThis.String(e))
+                : [],
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.isCompatible !== false) {
+            obj.isCompatible = message.isCompatible;
+        }
+        if (message.canRun !== false) {
+            obj.canRun = message.canRun;
+        }
+        if (message.canFit !== false) {
+            obj.canFit = message.canFit;
+        }
+        if (message.requiredMemoryBytes !== 0) {
+            obj.requiredMemoryBytes = Math.round(message.requiredMemoryBytes);
+        }
+        if (message.availableMemoryBytes !== 0) {
+            obj.availableMemoryBytes = Math.round(message.availableMemoryBytes);
+        }
+        if (message.requiredStorageBytes !== 0) {
+            obj.requiredStorageBytes = Math.round(message.requiredStorageBytes);
+        }
+        if (message.availableStorageBytes !== 0) {
+            obj.availableStorageBytes = Math.round(message.availableStorageBytes);
+        }
+        if (message.reasons?.length) {
+            obj.reasons = message.reasons;
+        }
+        if (message.suggestedAlternatives?.length) {
+            obj.suggestedAlternatives = message.suggestedAlternatives;
+        }
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        if (message.errorMessage !== "") {
+            obj.errorMessage = message.errorMessage;
+        }
+        return obj;
+    },
+    create(base) {
+        return ModelCompatibilityCheckResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseModelCompatibilityCheckResult();
+        message.isCompatible = object.isCompatible ?? false;
+        message.canRun = object.canRun ?? false;
+        message.canFit = object.canFit ?? false;
+        message.requiredMemoryBytes = object.requiredMemoryBytes ?? 0;
+        message.availableMemoryBytes = object.availableMemoryBytes ?? 0;
+        message.requiredStorageBytes = object.requiredStorageBytes ?? 0;
+        message.availableStorageBytes = object.availableStorageBytes ?? 0;
+        message.reasons = object.reasons?.map((e) => e) || [];
+        message.suggestedAlternatives = object.suggestedAlternatives?.map((e) => e) || [];
+        message.modelId = object.modelId ?? "";
+        message.errorCode = object.errorCode ?? 0;
+        message.errorMessage = object.errorMessage ?? "";
+        return message;
+    },
+};
+function createBaseModelFormatFromUrlRequest() {
+    return { url: "" };
+}
+export const ModelFormatFromUrlRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.url !== "") {
+            writer.uint32(10).string(message.url);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseModelFormatFromUrlRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.url = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return { url: isSet(object.url) ? globalThis.String(object.url) : "" };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.url !== "") {
+            obj.url = message.url;
+        }
+        return obj;
+    },
+    create(base) {
+        return ModelFormatFromUrlRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseModelFormatFromUrlRequest();
+        message.url = object.url ?? "";
+        return message;
+    },
+};
+function createBaseModelFormatFromUrlResult() {
+    return { format: 0, innerFormat: 0 };
+}
+export const ModelFormatFromUrlResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.format !== 0) {
+            writer.uint32(8).int32(message.format);
+        }
+        if (message.innerFormat !== 0) {
+            writer.uint32(16).int32(message.innerFormat);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseModelFormatFromUrlResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.format = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.innerFormat = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            format: isSet(object.format) ? modelFormatFromJSON(object.format) : 0,
+            innerFormat: isSet(object.innerFormat) ? modelFormatFromJSON(object.innerFormat) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.format !== 0) {
+            obj.format = modelFormatToJSON(message.format);
+        }
+        if (message.innerFormat !== 0) {
+            obj.innerFormat = modelFormatToJSON(message.innerFormat);
+        }
+        return obj;
+    },
+    create(base) {
+        return ModelFormatFromUrlResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseModelFormatFromUrlResult();
+        message.format = object.format ?? 0;
+        message.innerFormat = object.innerFormat ?? 0;
+        return message;
+    },
+};
+function createBaseArtifactInferFromUrlRequest() {
+    return { url: "", modelId: "" };
+}
+export const ArtifactInferFromUrlRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.url !== "") {
+            writer.uint32(10).string(message.url);
+        }
+        if (message.modelId !== "") {
+            writer.uint32(18).string(message.modelId);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseArtifactInferFromUrlRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.url = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.modelId = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            url: isSet(object.url) ? globalThis.String(object.url) : "",
+            modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.url !== "") {
+            obj.url = message.url;
+        }
+        if (message.modelId !== "") {
+            obj.modelId = message.modelId;
+        }
+        return obj;
+    },
+    create(base) {
+        return ArtifactInferFromUrlRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseArtifactInferFromUrlRequest();
+        message.url = object.url ?? "";
+        message.modelId = object.modelId ?? "";
+        return message;
+    },
+};
+function createBaseArtifactInferFromUrlResult() {
+    return { artifactType: 0, archiveType: 0, archiveStructure: 0, primaryRelpath: "", innerFormat: 0 };
+}
+export const ArtifactInferFromUrlResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.artifactType !== 0) {
+            writer.uint32(8).int32(message.artifactType);
+        }
+        if (message.archiveType !== 0) {
+            writer.uint32(16).int32(message.archiveType);
+        }
+        if (message.archiveStructure !== 0) {
+            writer.uint32(24).int32(message.archiveStructure);
+        }
+        if (message.primaryRelpath !== "") {
+            writer.uint32(34).string(message.primaryRelpath);
+        }
+        if (message.innerFormat !== 0) {
+            writer.uint32(40).int32(message.innerFormat);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseArtifactInferFromUrlResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.artifactType = reader.int32();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.archiveType = reader.int32();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.archiveStructure = reader.int32();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.primaryRelpath = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.innerFormat = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            artifactType: isSet(object.artifactType) ? modelArtifactTypeFromJSON(object.artifactType) : 0,
+            archiveType: isSet(object.archiveType) ? archiveTypeFromJSON(object.archiveType) : 0,
+            archiveStructure: isSet(object.archiveStructure) ? archiveStructureFromJSON(object.archiveStructure) : 0,
+            primaryRelpath: isSet(object.primaryRelpath) ? globalThis.String(object.primaryRelpath) : "",
+            innerFormat: isSet(object.innerFormat) ? modelFormatFromJSON(object.innerFormat) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.artifactType !== 0) {
+            obj.artifactType = modelArtifactTypeToJSON(message.artifactType);
+        }
+        if (message.archiveType !== 0) {
+            obj.archiveType = archiveTypeToJSON(message.archiveType);
+        }
+        if (message.archiveStructure !== 0) {
+            obj.archiveStructure = archiveStructureToJSON(message.archiveStructure);
+        }
+        if (message.primaryRelpath !== "") {
+            obj.primaryRelpath = message.primaryRelpath;
+        }
+        if (message.innerFormat !== 0) {
+            obj.innerFormat = modelFormatToJSON(message.innerFormat);
+        }
+        return obj;
+    },
+    create(base) {
+        return ArtifactInferFromUrlResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseArtifactInferFromUrlResult();
+        message.artifactType = object.artifactType ?? 0;
+        message.archiveType = object.archiveType ?? 0;
+        message.archiveStructure = object.archiveStructure ?? 0;
+        message.primaryRelpath = object.primaryRelpath ?? "";
+        message.innerFormat = object.innerFormat ?? 0;
+        return message;
+    },
+};
+function createBaseModelRegistryFetchAssignmentsRequest() {
+    return { deviceId: "", environment: undefined, forceRefresh: false };
+}
+export const ModelRegistryFetchAssignmentsRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.deviceId !== "") {
+            writer.uint32(10).string(message.deviceId);
+        }
+        if (message.environment !== undefined) {
+            writer.uint32(16).int32(message.environment);
+        }
+        if (message.forceRefresh !== false) {
+            writer.uint32(24).bool(message.forceRefresh);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseModelRegistryFetchAssignmentsRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.deviceId = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 16) {
+                        break;
+                    }
+                    message.environment = reader.int32();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.forceRefresh = reader.bool();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            deviceId: isSet(object.deviceId) ? globalThis.String(object.deviceId) : "",
+            environment: isSet(object.environment) ? sDKEnvironmentFromJSON(object.environment) : undefined,
+            forceRefresh: isSet(object.forceRefresh) ? globalThis.Boolean(object.forceRefresh) : false,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.deviceId !== "") {
+            obj.deviceId = message.deviceId;
+        }
+        if (message.environment !== undefined) {
+            obj.environment = sDKEnvironmentToJSON(message.environment);
+        }
+        if (message.forceRefresh !== false) {
+            obj.forceRefresh = message.forceRefresh;
+        }
+        return obj;
+    },
+    create(base) {
+        return ModelRegistryFetchAssignmentsRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseModelRegistryFetchAssignmentsRequest();
+        message.deviceId = object.deviceId ?? "";
+        message.environment = object.environment ?? undefined;
+        message.forceRefresh = object.forceRefresh ?? false;
+        return message;
+    },
+};
+function createBaseModelRegistryFetchAssignmentsResult() {
+    return { success: false, models: undefined, modelCount: 0, fetchedAtUnixMs: 0, errorCode: 0, errorMessage: "" };
+}
+export const ModelRegistryFetchAssignmentsResult = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.success !== false) {
+            writer.uint32(8).bool(message.success);
+        }
+        if (message.models !== undefined) {
+            ModelInfoList.encode(message.models, writer.uint32(18).fork()).ldelim();
+        }
+        if (message.modelCount !== 0) {
+            writer.uint32(24).int32(message.modelCount);
+        }
+        if (message.fetchedAtUnixMs !== 0) {
+            writer.uint32(32).int64(message.fetchedAtUnixMs);
+        }
+        if (message.errorCode !== 0) {
+            writer.uint32(40).int32(message.errorCode);
+        }
+        if (message.errorMessage !== "") {
+            writer.uint32(50).string(message.errorMessage);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseModelRegistryFetchAssignmentsResult();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 8) {
+                        break;
+                    }
+                    message.success = reader.bool();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.models = ModelInfoList.decode(reader, reader.uint32());
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.modelCount = reader.int32();
+                    continue;
+                case 4:
+                    if (tag !== 32) {
+                        break;
+                    }
+                    message.fetchedAtUnixMs = longToNumber(reader.int64());
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.errorCode = reader.int32();
+                    continue;
+                case 6:
+                    if (tag !== 50) {
+                        break;
+                    }
+                    message.errorMessage = reader.string();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+            models: isSet(object.models) ? ModelInfoList.fromJSON(object.models) : undefined,
+            modelCount: isSet(object.modelCount) ? globalThis.Number(object.modelCount) : 0,
+            fetchedAtUnixMs: isSet(object.fetchedAtUnixMs) ? globalThis.Number(object.fetchedAtUnixMs) : 0,
+            errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+            errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.success !== false) {
+            obj.success = message.success;
+        }
+        if (message.models !== undefined) {
+            obj.models = ModelInfoList.toJSON(message.models);
+        }
+        if (message.modelCount !== 0) {
+            obj.modelCount = Math.round(message.modelCount);
+        }
+        if (message.fetchedAtUnixMs !== 0) {
+            obj.fetchedAtUnixMs = Math.round(message.fetchedAtUnixMs);
+        }
+        if (message.errorCode !== 0) {
+            obj.errorCode = Math.round(message.errorCode);
+        }
+        if (message.errorMessage !== "") {
+            obj.errorMessage = message.errorMessage;
+        }
+        return obj;
+    },
+    create(base) {
+        return ModelRegistryFetchAssignmentsResult.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseModelRegistryFetchAssignmentsResult();
+        message.success = object.success ?? false;
+        message.models = (object.models !== undefined && object.models !== null)
+            ? ModelInfoList.fromPartial(object.models)
+            : undefined;
+        message.modelCount = object.modelCount ?? 0;
+        message.fetchedAtUnixMs = object.fetchedAtUnixMs ?? 0;
+        message.errorCode = object.errorCode ?? 0;
+        message.errorMessage = object.errorMessage ?? "";
         return message;
     },
 };

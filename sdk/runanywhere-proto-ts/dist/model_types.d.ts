@@ -1,4 +1,5 @@
 import _m0 from "protobufjs/minimal";
+import { AcceleratorPreference, HardwareProfile } from "./hardware_profile";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * ---------------------------------------------------------------------------
@@ -746,6 +747,178 @@ export interface ModelDeleteResult {
     errorMessage: string;
     warnings: string[];
 }
+/**
+ * ---------------------------------------------------------------------------
+ * Compatibility check request/result. Mirrors the public SDK
+ * `checkCompatibility(modelId)` calls (RN CompatibilityBridge,
+ * Kotlin compat path, Web ModelManager). The platform adapter supplies
+ * available_ram_bytes / available_storage_bytes; commons looks up the
+ * registry entry, computes the compatibility verdict (canRun / canFit),
+ * and returns reasons / suggested alternative model ids.
+ * ---------------------------------------------------------------------------
+ */
+export interface ModelCompatibilityRequest {
+    /** Required. Model identifier to evaluate. */
+    modelId: string;
+    /**
+     * Optional cached hardware profile from the platform adapter. If
+     * unset, commons will read whatever it has cached internally; the
+     * RAM/storage values below remain authoritative for the verdict.
+     */
+    hardwareProfile?: HardwareProfile | undefined;
+    /**
+     * Available RAM in bytes (from device probe). 0 = unknown — commons
+     * will treat the requirement as satisfied.
+     */
+    availableRamBytes: number;
+    /** Available storage in bytes (from filesystem probe). 0 = unknown. */
+    availableStorageBytes: number;
+    /**
+     * Optional caller preferences (acceleration, framework). Reserved for
+     * future use; today's verdict is based on memory/storage alone.
+     */
+    acceleratorPreference?: AcceleratorPreference | undefined;
+    preferredFramework?: InferenceFramework | undefined;
+}
+export interface ModelCompatibilityCheckResult {
+    /**
+     * Mirrors the existing struct fields so SDKs can keep using the same
+     * field names; populated from rac_model_compatibility_result_t.
+     */
+    isCompatible: boolean;
+    canRun: boolean;
+    canFit: boolean;
+    requiredMemoryBytes: number;
+    availableMemoryBytes: number;
+    requiredStorageBytes: number;
+    availableStorageBytes: number;
+    /**
+     * Human-readable reasons populated when the verdict is negative
+     * (e.g. "insufficient RAM: requires X, available Y").
+     */
+    reasons: string[];
+    /**
+     * Optional suggested alternative model ids that *would* be compatible.
+     * The current implementation leaves this empty; reserved for future
+     * compatibility-aware suggestions.
+     */
+    suggestedAlternatives: string[];
+    /**
+     * Echo of the looked-up model id so callers can correlate batched
+     * checks with their request id.
+     */
+    modelId: string;
+    /**
+     * Negative on failure; mirrors rac_result_t. Empty error_message on
+     * success.
+     */
+    errorCode: number;
+    errorMessage: string;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * URL → ModelFormat inference request/result. Moves the Dart/Kotlin-side
+ * URL-suffix heuristic (".gguf" → GGUF, ".onnx" → ONNX, ".tar.gz" wrapping an
+ * inner format, ...) into commons so every SDK uses one implementation.
+ * ---------------------------------------------------------------------------
+ */
+export interface ModelFormatFromUrlRequest {
+    /**
+     * Portable URL or file path string. Only the trailing file-extension
+     * suffix is inspected; query strings and fragments are ignored.
+     */
+    url: string;
+}
+export interface ModelFormatFromUrlResult {
+    /**
+     * Primary detected format. For archive URLs this is the archive-wrapper
+     * format (for example MODEL_FORMAT_ZIP); the extracted model format is
+     * in inner_format below.
+     */
+    format: ModelFormat;
+    /**
+     * For archive URLs, the format of the primary file inside the archive
+     * when it can be inferred from the URL (for example
+     * "whisper-base.en.tar.gz" → inner_format = MODEL_FORMAT_ONNX). When the
+     * archive content is unknown this is MODEL_FORMAT_UNSPECIFIED.
+     */
+    innerFormat: ModelFormat;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * URL → ModelArtifactType inference request/result. Replaces Dart
+ * withInferredArtifact and Kotlin inferArtifactFields with a single commons
+ * call.
+ * ---------------------------------------------------------------------------
+ */
+export interface ArtifactInferFromUrlRequest {
+    /** Portable URL or file path string. */
+    url: string;
+    /**
+     * Optional model identifier. Commons does not consult the registry with
+     * this value today; it is carried for logging and telemetry only.
+     */
+    modelId: string;
+}
+export interface ArtifactInferFromUrlResult {
+    /** Inferred artifact-type classification. */
+    artifactType: ModelArtifactType;
+    /**
+     * For archive artifacts, the concrete archive format (ZIP, TAR_GZ, ...).
+     * For single-file or directory artifacts this is
+     * ARCHIVE_TYPE_UNSPECIFIED.
+     */
+    archiveType: ArchiveType;
+    /**
+     * For archive artifacts the known or inferred internal structure after
+     * extraction. Defaults to ARCHIVE_STRUCTURE_UNKNOWN.
+     */
+    archiveStructure: ArchiveStructure;
+    /**
+     * When the URL suggests an archive wrapping a known primary file (for
+     * example a Whisper model bundle containing encoder.onnx), this field
+     * carries the relative path inside the archive when it can be inferred.
+     * Empty otherwise.
+     */
+    primaryRelpath: string;
+    /**
+     * Inner file format for archive artifacts. MODEL_FORMAT_UNSPECIFIED when
+     * the archive contents are unknown.
+     */
+    innerFormat: ModelFormat;
+}
+/**
+ * ---------------------------------------------------------------------------
+ * FetchAssignments request/result. Replaces the JSON shim
+ * racModelRegistryFetchAssignments and the Web SDK's offline-friendly
+ * fetchModelAssignments() entry point. The platform adapter owns HTTP
+ * transport; commons consumes the cached / fetched entries and returns a
+ * canonical proto byte payload.
+ * ---------------------------------------------------------------------------
+ */
+export interface ModelRegistryFetchAssignmentsRequest {
+    /**
+     * Optional device identifier (forwarded to the platform adapter for
+     * any auth headers it needs). May be empty when callers rely on
+     * adapter-side auth state alone.
+     */
+    deviceId: string;
+    /**
+     * Optional environment selector; commons does not branch on this
+     * value today, but it is preserved for adapter routing and telemetry.
+     */
+    environment?: SDKEnvironment | undefined;
+    /** Bypass the assignment cache and force a fresh fetch. */
+    forceRefresh: boolean;
+}
+export interface ModelRegistryFetchAssignmentsResult {
+    success: boolean;
+    models?: ModelInfoList | undefined;
+    modelCount: number;
+    fetchedAtUnixMs: number;
+    errorCode: number;
+    errorMessage: string;
+}
 export declare const ModelThinkingTagPattern: {
     encode(message: ModelThinkingTagPattern, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): ModelThinkingTagPattern;
@@ -993,6 +1166,70 @@ export declare const ModelDeleteResult: {
     toJSON(message: ModelDeleteResult): unknown;
     create<I extends Exact<DeepPartial<ModelDeleteResult>, I>>(base?: I): ModelDeleteResult;
     fromPartial<I extends Exact<DeepPartial<ModelDeleteResult>, I>>(object: I): ModelDeleteResult;
+};
+export declare const ModelCompatibilityRequest: {
+    encode(message: ModelCompatibilityRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelCompatibilityRequest;
+    fromJSON(object: any): ModelCompatibilityRequest;
+    toJSON(message: ModelCompatibilityRequest): unknown;
+    create<I extends Exact<DeepPartial<ModelCompatibilityRequest>, I>>(base?: I): ModelCompatibilityRequest;
+    fromPartial<I extends Exact<DeepPartial<ModelCompatibilityRequest>, I>>(object: I): ModelCompatibilityRequest;
+};
+export declare const ModelCompatibilityCheckResult: {
+    encode(message: ModelCompatibilityCheckResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelCompatibilityCheckResult;
+    fromJSON(object: any): ModelCompatibilityCheckResult;
+    toJSON(message: ModelCompatibilityCheckResult): unknown;
+    create<I extends Exact<DeepPartial<ModelCompatibilityCheckResult>, I>>(base?: I): ModelCompatibilityCheckResult;
+    fromPartial<I extends Exact<DeepPartial<ModelCompatibilityCheckResult>, I>>(object: I): ModelCompatibilityCheckResult;
+};
+export declare const ModelFormatFromUrlRequest: {
+    encode(message: ModelFormatFromUrlRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelFormatFromUrlRequest;
+    fromJSON(object: any): ModelFormatFromUrlRequest;
+    toJSON(message: ModelFormatFromUrlRequest): unknown;
+    create<I extends Exact<DeepPartial<ModelFormatFromUrlRequest>, I>>(base?: I): ModelFormatFromUrlRequest;
+    fromPartial<I extends Exact<DeepPartial<ModelFormatFromUrlRequest>, I>>(object: I): ModelFormatFromUrlRequest;
+};
+export declare const ModelFormatFromUrlResult: {
+    encode(message: ModelFormatFromUrlResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelFormatFromUrlResult;
+    fromJSON(object: any): ModelFormatFromUrlResult;
+    toJSON(message: ModelFormatFromUrlResult): unknown;
+    create<I extends Exact<DeepPartial<ModelFormatFromUrlResult>, I>>(base?: I): ModelFormatFromUrlResult;
+    fromPartial<I extends Exact<DeepPartial<ModelFormatFromUrlResult>, I>>(object: I): ModelFormatFromUrlResult;
+};
+export declare const ArtifactInferFromUrlRequest: {
+    encode(message: ArtifactInferFromUrlRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ArtifactInferFromUrlRequest;
+    fromJSON(object: any): ArtifactInferFromUrlRequest;
+    toJSON(message: ArtifactInferFromUrlRequest): unknown;
+    create<I extends Exact<DeepPartial<ArtifactInferFromUrlRequest>, I>>(base?: I): ArtifactInferFromUrlRequest;
+    fromPartial<I extends Exact<DeepPartial<ArtifactInferFromUrlRequest>, I>>(object: I): ArtifactInferFromUrlRequest;
+};
+export declare const ArtifactInferFromUrlResult: {
+    encode(message: ArtifactInferFromUrlResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ArtifactInferFromUrlResult;
+    fromJSON(object: any): ArtifactInferFromUrlResult;
+    toJSON(message: ArtifactInferFromUrlResult): unknown;
+    create<I extends Exact<DeepPartial<ArtifactInferFromUrlResult>, I>>(base?: I): ArtifactInferFromUrlResult;
+    fromPartial<I extends Exact<DeepPartial<ArtifactInferFromUrlResult>, I>>(object: I): ArtifactInferFromUrlResult;
+};
+export declare const ModelRegistryFetchAssignmentsRequest: {
+    encode(message: ModelRegistryFetchAssignmentsRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelRegistryFetchAssignmentsRequest;
+    fromJSON(object: any): ModelRegistryFetchAssignmentsRequest;
+    toJSON(message: ModelRegistryFetchAssignmentsRequest): unknown;
+    create<I extends Exact<DeepPartial<ModelRegistryFetchAssignmentsRequest>, I>>(base?: I): ModelRegistryFetchAssignmentsRequest;
+    fromPartial<I extends Exact<DeepPartial<ModelRegistryFetchAssignmentsRequest>, I>>(object: I): ModelRegistryFetchAssignmentsRequest;
+};
+export declare const ModelRegistryFetchAssignmentsResult: {
+    encode(message: ModelRegistryFetchAssignmentsResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ModelRegistryFetchAssignmentsResult;
+    fromJSON(object: any): ModelRegistryFetchAssignmentsResult;
+    toJSON(message: ModelRegistryFetchAssignmentsResult): unknown;
+    create<I extends Exact<DeepPartial<ModelRegistryFetchAssignmentsResult>, I>>(base?: I): ModelRegistryFetchAssignmentsResult;
+    fromPartial<I extends Exact<DeepPartial<ModelRegistryFetchAssignmentsResult>, I>>(object: I): ModelRegistryFetchAssignmentsResult;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

@@ -32,6 +32,29 @@ export interface HardwareProfileResult {
     profile?: HardwareProfile | undefined;
     accelerators: AcceleratorInfo[];
 }
+/**
+ * Empty request for the cached hardware profile. The native probe is owned by
+ * platform adapters; this request carries no portable parameters today.
+ */
+export interface HardwareProfileRequest {
+}
+/**
+ * Empty request for the accelerator list. Mirrors HardwareProfileRequest:
+ * platform probes own all OS-level acceleration discovery.
+ */
+export interface HardwareAcceleratorsRequest {
+}
+/**
+ * Result-shaped response for SetAcceleratorPreference so the service contract
+ * stays consistent (every rpc returns a non-empty message).
+ */
+export interface HardwareAcceleratorPreferenceRequest {
+    preference: AcceleratorPreference;
+}
+export interface HardwareAcceleratorPreferenceResult {
+    success: boolean;
+    errorMessage: string;
+}
 export declare const HardwareProfile: {
     encode(message: HardwareProfile, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): HardwareProfile;
@@ -55,6 +78,38 @@ export declare const HardwareProfileResult: {
     toJSON(message: HardwareProfileResult): unknown;
     create<I extends Exact<DeepPartial<HardwareProfileResult>, I>>(base?: I): HardwareProfileResult;
     fromPartial<I extends Exact<DeepPartial<HardwareProfileResult>, I>>(object: I): HardwareProfileResult;
+};
+export declare const HardwareProfileRequest: {
+    encode(_: HardwareProfileRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): HardwareProfileRequest;
+    fromJSON(_: any): HardwareProfileRequest;
+    toJSON(_: HardwareProfileRequest): unknown;
+    create<I extends Exact<DeepPartial<HardwareProfileRequest>, I>>(base?: I): HardwareProfileRequest;
+    fromPartial<I extends Exact<DeepPartial<HardwareProfileRequest>, I>>(_: I): HardwareProfileRequest;
+};
+export declare const HardwareAcceleratorsRequest: {
+    encode(_: HardwareAcceleratorsRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): HardwareAcceleratorsRequest;
+    fromJSON(_: any): HardwareAcceleratorsRequest;
+    toJSON(_: HardwareAcceleratorsRequest): unknown;
+    create<I extends Exact<DeepPartial<HardwareAcceleratorsRequest>, I>>(base?: I): HardwareAcceleratorsRequest;
+    fromPartial<I extends Exact<DeepPartial<HardwareAcceleratorsRequest>, I>>(_: I): HardwareAcceleratorsRequest;
+};
+export declare const HardwareAcceleratorPreferenceRequest: {
+    encode(message: HardwareAcceleratorPreferenceRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): HardwareAcceleratorPreferenceRequest;
+    fromJSON(object: any): HardwareAcceleratorPreferenceRequest;
+    toJSON(message: HardwareAcceleratorPreferenceRequest): unknown;
+    create<I extends Exact<DeepPartial<HardwareAcceleratorPreferenceRequest>, I>>(base?: I): HardwareAcceleratorPreferenceRequest;
+    fromPartial<I extends Exact<DeepPartial<HardwareAcceleratorPreferenceRequest>, I>>(object: I): HardwareAcceleratorPreferenceRequest;
+};
+export declare const HardwareAcceleratorPreferenceResult: {
+    encode(message: HardwareAcceleratorPreferenceResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): HardwareAcceleratorPreferenceResult;
+    fromJSON(object: any): HardwareAcceleratorPreferenceResult;
+    toJSON(message: HardwareAcceleratorPreferenceResult): unknown;
+    create<I extends Exact<DeepPartial<HardwareAcceleratorPreferenceResult>, I>>(base?: I): HardwareAcceleratorPreferenceResult;
+    fromPartial<I extends Exact<DeepPartial<HardwareAcceleratorPreferenceResult>, I>>(object: I): HardwareAcceleratorPreferenceResult;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

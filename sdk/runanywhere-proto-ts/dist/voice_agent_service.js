@@ -6,6 +6,7 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
+import { TTSOptions } from "./tts_options";
 import { audioEncodingFromJSON, audioEncodingToJSON, VoiceAgentComponentStates, voiceEventCategoryFromJSON, voiceEventCategoryToJSON, voiceEventSeverityFromJSON, voiceEventSeverityToJSON, } from "./voice_events";
 export const protobufPackage = "runanywhere.v1";
 function createBaseVoiceAgentRequest() {
@@ -1338,6 +1339,210 @@ export const VoiceAgentComposeConfig = {
             : undefined;
         message.sessionId = object.sessionId ?? undefined;
         message.defaultLanguageCode = object.defaultLanguageCode ?? undefined;
+        return message;
+    },
+};
+function createBaseVoiceAgentTranscribeProtoRequest() {
+    return { audioData: new Uint8Array(0), sessionId: "", sampleRate: 0, languageHint: "", channels: 0, encoding: 0 };
+}
+export const VoiceAgentTranscribeProtoRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.audioData.length !== 0) {
+            writer.uint32(10).bytes(message.audioData);
+        }
+        if (message.sessionId !== "") {
+            writer.uint32(18).string(message.sessionId);
+        }
+        if (message.sampleRate !== 0) {
+            writer.uint32(24).int32(message.sampleRate);
+        }
+        if (message.languageHint !== "") {
+            writer.uint32(34).string(message.languageHint);
+        }
+        if (message.channels !== 0) {
+            writer.uint32(40).int32(message.channels);
+        }
+        if (message.encoding !== 0) {
+            writer.uint32(48).int32(message.encoding);
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseVoiceAgentTranscribeProtoRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.audioData = reader.bytes();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.sessionId = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 24) {
+                        break;
+                    }
+                    message.sampleRate = reader.int32();
+                    continue;
+                case 4:
+                    if (tag !== 34) {
+                        break;
+                    }
+                    message.languageHint = reader.string();
+                    continue;
+                case 5:
+                    if (tag !== 40) {
+                        break;
+                    }
+                    message.channels = reader.int32();
+                    continue;
+                case 6:
+                    if (tag !== 48) {
+                        break;
+                    }
+                    message.encoding = reader.int32();
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            audioData: isSet(object.audioData) ? bytesFromBase64(object.audioData) : new Uint8Array(0),
+            sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
+            sampleRate: isSet(object.sampleRate) ? globalThis.Number(object.sampleRate) : 0,
+            languageHint: isSet(object.languageHint) ? globalThis.String(object.languageHint) : "",
+            channels: isSet(object.channels) ? globalThis.Number(object.channels) : 0,
+            encoding: isSet(object.encoding) ? audioEncodingFromJSON(object.encoding) : 0,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.audioData.length !== 0) {
+            obj.audioData = base64FromBytes(message.audioData);
+        }
+        if (message.sessionId !== "") {
+            obj.sessionId = message.sessionId;
+        }
+        if (message.sampleRate !== 0) {
+            obj.sampleRate = Math.round(message.sampleRate);
+        }
+        if (message.languageHint !== "") {
+            obj.languageHint = message.languageHint;
+        }
+        if (message.channels !== 0) {
+            obj.channels = Math.round(message.channels);
+        }
+        if (message.encoding !== 0) {
+            obj.encoding = audioEncodingToJSON(message.encoding);
+        }
+        return obj;
+    },
+    create(base) {
+        return VoiceAgentTranscribeProtoRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseVoiceAgentTranscribeProtoRequest();
+        message.audioData = object.audioData ?? new Uint8Array(0);
+        message.sessionId = object.sessionId ?? "";
+        message.sampleRate = object.sampleRate ?? 0;
+        message.languageHint = object.languageHint ?? "";
+        message.channels = object.channels ?? 0;
+        message.encoding = object.encoding ?? 0;
+        return message;
+    },
+};
+function createBaseVoiceAgentSynthesizeSpeechProtoRequest() {
+    return { text: "", sessionId: "", options: undefined };
+}
+export const VoiceAgentSynthesizeSpeechProtoRequest = {
+    encode(message, writer = _m0.Writer.create()) {
+        if (message.text !== "") {
+            writer.uint32(10).string(message.text);
+        }
+        if (message.sessionId !== "") {
+            writer.uint32(18).string(message.sessionId);
+        }
+        if (message.options !== undefined) {
+            TTSOptions.encode(message.options, writer.uint32(26).fork()).ldelim();
+        }
+        return writer;
+    },
+    decode(input, length) {
+        const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+        let end = length === undefined ? reader.len : reader.pos + length;
+        const message = createBaseVoiceAgentSynthesizeSpeechProtoRequest();
+        while (reader.pos < end) {
+            const tag = reader.uint32();
+            switch (tag >>> 3) {
+                case 1:
+                    if (tag !== 10) {
+                        break;
+                    }
+                    message.text = reader.string();
+                    continue;
+                case 2:
+                    if (tag !== 18) {
+                        break;
+                    }
+                    message.sessionId = reader.string();
+                    continue;
+                case 3:
+                    if (tag !== 26) {
+                        break;
+                    }
+                    message.options = TTSOptions.decode(reader, reader.uint32());
+                    continue;
+            }
+            if ((tag & 7) === 4 || tag === 0) {
+                break;
+            }
+            reader.skipType(tag & 7);
+        }
+        return message;
+    },
+    fromJSON(object) {
+        return {
+            text: isSet(object.text) ? globalThis.String(object.text) : "",
+            sessionId: isSet(object.sessionId) ? globalThis.String(object.sessionId) : "",
+            options: isSet(object.options) ? TTSOptions.fromJSON(object.options) : undefined,
+        };
+    },
+    toJSON(message) {
+        const obj = {};
+        if (message.text !== "") {
+            obj.text = message.text;
+        }
+        if (message.sessionId !== "") {
+            obj.sessionId = message.sessionId;
+        }
+        if (message.options !== undefined) {
+            obj.options = TTSOptions.toJSON(message.options);
+        }
+        return obj;
+    },
+    create(base) {
+        return VoiceAgentSynthesizeSpeechProtoRequest.fromPartial(base ?? {});
+    },
+    fromPartial(object) {
+        const message = createBaseVoiceAgentSynthesizeSpeechProtoRequest();
+        message.text = object.text ?? "";
+        message.sessionId = object.sessionId ?? "";
+        message.options = (object.options !== undefined && object.options !== null)
+            ? TTSOptions.fromPartial(object.options)
+            : undefined;
         return message;
     },
 };

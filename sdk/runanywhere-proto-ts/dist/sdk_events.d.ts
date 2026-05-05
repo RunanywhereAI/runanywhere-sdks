@@ -652,6 +652,12 @@ export interface GenerationEvent {
     structuredSchemaJson: string;
     structuredOutputJson: string;
     thinkingText: string;
+    /**
+     * For COMPLETED — prompt-token count (mirrors RALLMGenerationResult.inputTokens).
+     * Added Wave D-9: enables totalTokens = input_tokens + tokens_used analytics
+     * from the event stream alone.
+     */
+    inputTokens: number;
 }
 /**
  * ---------------------------------------------------------------------------

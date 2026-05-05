@@ -351,6 +351,40 @@ export interface ToolRegistrySnapshot {
     tools: ToolDefinition[];
     updatedAtMs: number;
 }
+export interface ToolCallingSessionCreateRequest {
+    /** Prompt + LLM generation options inline (avoids cross-proto import cycle). */
+    prompt: string;
+    maxTokens: number;
+    temperature: number;
+    topP: number;
+    systemPrompt: string;
+    tools: ToolDefinition[];
+    formatHint: string;
+    maxIterations: number;
+    keepToolsAvailable: boolean;
+    validateCalls: boolean;
+}
+export interface ToolCallingSessionCreateResult {
+    sessionHandle: number;
+}
+export interface ToolCallingSessionEvent {
+    /** serialized LLMStreamEvent proto */
+    llmStreamEventBytes?: Uint8Array | undefined;
+    toolCall?: ToolCall | undefined;
+    finalResult?: ToolCallingResult | undefined;
+    /** serialized SDKError proto */
+    errorBytes?: Uint8Array | undefined;
+    seq: number;
+}
+export interface ToolCallingSessionStepWithResultRequest {
+    sessionHandle: number;
+    toolCallId: string;
+    resultJson: string;
+    error?: string | undefined;
+}
+export interface ToolCallingSessionDestroyRequest {
+    sessionHandle: number;
+}
 export declare const ToolValue: {
     encode(message: ToolValue, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): ToolValue;
@@ -518,6 +552,46 @@ export declare const ToolRegistrySnapshot: {
     toJSON(message: ToolRegistrySnapshot): unknown;
     create<I extends Exact<DeepPartial<ToolRegistrySnapshot>, I>>(base?: I): ToolRegistrySnapshot;
     fromPartial<I extends Exact<DeepPartial<ToolRegistrySnapshot>, I>>(object: I): ToolRegistrySnapshot;
+};
+export declare const ToolCallingSessionCreateRequest: {
+    encode(message: ToolCallingSessionCreateRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingSessionCreateRequest;
+    fromJSON(object: any): ToolCallingSessionCreateRequest;
+    toJSON(message: ToolCallingSessionCreateRequest): unknown;
+    create<I extends Exact<DeepPartial<ToolCallingSessionCreateRequest>, I>>(base?: I): ToolCallingSessionCreateRequest;
+    fromPartial<I extends Exact<DeepPartial<ToolCallingSessionCreateRequest>, I>>(object: I): ToolCallingSessionCreateRequest;
+};
+export declare const ToolCallingSessionCreateResult: {
+    encode(message: ToolCallingSessionCreateResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingSessionCreateResult;
+    fromJSON(object: any): ToolCallingSessionCreateResult;
+    toJSON(message: ToolCallingSessionCreateResult): unknown;
+    create<I extends Exact<DeepPartial<ToolCallingSessionCreateResult>, I>>(base?: I): ToolCallingSessionCreateResult;
+    fromPartial<I extends Exact<DeepPartial<ToolCallingSessionCreateResult>, I>>(object: I): ToolCallingSessionCreateResult;
+};
+export declare const ToolCallingSessionEvent: {
+    encode(message: ToolCallingSessionEvent, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingSessionEvent;
+    fromJSON(object: any): ToolCallingSessionEvent;
+    toJSON(message: ToolCallingSessionEvent): unknown;
+    create<I extends Exact<DeepPartial<ToolCallingSessionEvent>, I>>(base?: I): ToolCallingSessionEvent;
+    fromPartial<I extends Exact<DeepPartial<ToolCallingSessionEvent>, I>>(object: I): ToolCallingSessionEvent;
+};
+export declare const ToolCallingSessionStepWithResultRequest: {
+    encode(message: ToolCallingSessionStepWithResultRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingSessionStepWithResultRequest;
+    fromJSON(object: any): ToolCallingSessionStepWithResultRequest;
+    toJSON(message: ToolCallingSessionStepWithResultRequest): unknown;
+    create<I extends Exact<DeepPartial<ToolCallingSessionStepWithResultRequest>, I>>(base?: I): ToolCallingSessionStepWithResultRequest;
+    fromPartial<I extends Exact<DeepPartial<ToolCallingSessionStepWithResultRequest>, I>>(object: I): ToolCallingSessionStepWithResultRequest;
+};
+export declare const ToolCallingSessionDestroyRequest: {
+    encode(message: ToolCallingSessionDestroyRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): ToolCallingSessionDestroyRequest;
+    fromJSON(object: any): ToolCallingSessionDestroyRequest;
+    toJSON(message: ToolCallingSessionDestroyRequest): unknown;
+    create<I extends Exact<DeepPartial<ToolCallingSessionDestroyRequest>, I>>(base?: I): ToolCallingSessionDestroyRequest;
+    fromPartial<I extends Exact<DeepPartial<ToolCallingSessionDestroyRequest>, I>>(object: I): ToolCallingSessionDestroyRequest;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

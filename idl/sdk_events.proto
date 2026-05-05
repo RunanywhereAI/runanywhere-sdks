@@ -304,6 +304,11 @@ message GenerationEvent {
     string              structured_schema_json = 21;
     string              structured_output_json = 22;
     string              thinking_text     = 23;
+
+    // For COMPLETED — prompt-token count (mirrors RALLMGenerationResult.inputTokens).
+    // Added Wave D-9: enables totalTokens = input_tokens + tokens_used analytics
+    // from the event stream alone.
+    int32               input_tokens     = 24;
 }
 
 enum GenerationEventKind {

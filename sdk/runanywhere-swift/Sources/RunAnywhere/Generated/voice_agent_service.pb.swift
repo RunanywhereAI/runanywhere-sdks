@@ -571,6 +571,54 @@ public struct RAVoiceAgentComposeConfig: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
+/// Wave D-7 helper-level proto requests for voice-agent sub-components.
+public struct RAVoiceAgentTranscribeProtoRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var audioData: Data = Data()
+
+  public var sessionID: String = String()
+
+  public var sampleRate: Int32 = 0
+
+  public var languageHint: String = String()
+
+  public var channels: Int32 = 0
+
+  public var encoding: RAAudioEncoding = .unspecified
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+public struct RAVoiceAgentSynthesizeSpeechProtoRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var text: String = String()
+
+  public var sessionID: String = String()
+
+  public var options: RATTSOptions {
+    get {_options ?? RATTSOptions()}
+    set {_options = newValue}
+  }
+  /// Returns true if `options` has been explicitly set.
+  public var hasOptions: Bool {self._options != nil}
+  /// Clears the value of `options`. Subsequent reads from it will return its default value.
+  public mutating func clearOptions() {self._options = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _options: RATTSOptions? = nil
+}
+
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate let _protobuf_package = "runanywhere.v1"
@@ -1214,6 +1262,105 @@ extension RAVoiceAgentComposeConfig: SwiftProtobuf.Message, SwiftProtobuf._Messa
       }
       if !storagesAreEqual {return false}
     }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAVoiceAgentTranscribeProtoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VoiceAgentTranscribeProtoRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}audio_data\0\u{3}session_id\0\u{3}sample_rate\0\u{3}language_hint\0\u{1}channels\0\u{1}encoding\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBytesField(value: &self.audioData) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.sampleRate) }()
+      case 4: try { try decoder.decodeSingularStringField(value: &self.languageHint) }()
+      case 5: try { try decoder.decodeSingularInt32Field(value: &self.channels) }()
+      case 6: try { try decoder.decodeSingularEnumField(value: &self.encoding) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.audioData.isEmpty {
+      try visitor.visitSingularBytesField(value: self.audioData, fieldNumber: 1)
+    }
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 2)
+    }
+    if self.sampleRate != 0 {
+      try visitor.visitSingularInt32Field(value: self.sampleRate, fieldNumber: 3)
+    }
+    if !self.languageHint.isEmpty {
+      try visitor.visitSingularStringField(value: self.languageHint, fieldNumber: 4)
+    }
+    if self.channels != 0 {
+      try visitor.visitSingularInt32Field(value: self.channels, fieldNumber: 5)
+    }
+    if self.encoding != .unspecified {
+      try visitor.visitSingularEnumField(value: self.encoding, fieldNumber: 6)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAVoiceAgentTranscribeProtoRequest, rhs: RAVoiceAgentTranscribeProtoRequest) -> Bool {
+    if lhs.audioData != rhs.audioData {return false}
+    if lhs.sessionID != rhs.sessionID {return false}
+    if lhs.sampleRate != rhs.sampleRate {return false}
+    if lhs.languageHint != rhs.languageHint {return false}
+    if lhs.channels != rhs.channels {return false}
+    if lhs.encoding != rhs.encoding {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAVoiceAgentSynthesizeSpeechProtoRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".VoiceAgentSynthesizeSpeechProtoRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}text\0\u{3}session_id\0\u{1}options\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.text) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.sessionID) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._options) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.text.isEmpty {
+      try visitor.visitSingularStringField(value: self.text, fieldNumber: 1)
+    }
+    if !self.sessionID.isEmpty {
+      try visitor.visitSingularStringField(value: self.sessionID, fieldNumber: 2)
+    }
+    try { if let v = self._options {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAVoiceAgentSynthesizeSpeechProtoRequest, rhs: RAVoiceAgentSynthesizeSpeechProtoRequest) -> Bool {
+    if lhs.text != rhs.text {return false}
+    if lhs.sessionID != rhs.sessionID {return false}
+    if lhs._options != rhs._options {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

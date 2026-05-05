@@ -191,6 +191,52 @@ export interface EmbeddingsServiceState {
     errorMessage?: string | undefined;
     errorCode: number;
 }
+/**
+ * ---------------------------------------------------------------------------
+ * Session/handle creation request envelope. Mirrors the public SDK
+ * `embeddingsCreate(modelId, configJson?)` calls in RN/Web/Kotlin which
+ * previously dropped down to the non-proto `rac_embeddings_create*` C ABI.
+ * The result carries an opaque uint64 handle the SDK uses for subsequent
+ * embed / embed_batch invocations.
+ * ---------------------------------------------------------------------------
+ */
+export interface EmbeddingsCreateRequest {
+    /** Required. Model identifier (registry id) or absolute model path. */
+    modelId: string;
+    /**
+     * Optional component configuration. When unset, commons applies its
+     * defaults (RAC_EMBEDDINGS_*); when set, the named fields override
+     * the per-component defaults at create time.
+     */
+    configuration?: EmbeddingsConfiguration | undefined;
+    /**
+     * Provider-specific JSON config. Mirrors the legacy
+     * rac_embeddings_create_with_config(config_json) parameter for backends
+     * that need companion file paths (e.g. {"vocab_path":"..."}).
+     */
+    configJson?: string | undefined;
+}
+export interface EmbeddingsCreateResult {
+    /** Opaque handle (rac_handle_t cast to u64). Zero on failure. */
+    handle: number;
+    /**
+     * Echo of the model id the caller requested — so JS/Swift/Kotlin can
+     * store it next to the handle without re-parsing the request.
+     */
+    modelId: string;
+    /**
+     * Backend-resolved dimension/max_tokens after load. 0 = unknown until
+     * the first embed call.
+     */
+    dimension: number;
+    maxTokens: number;
+    /**
+     * Negative on failure; mirrors rac_result_t. Empty error_message on
+     * success.
+     */
+    errorCode: number;
+    errorMessage: string;
+}
 export declare const EmbeddingsConfiguration: {
     encode(message: EmbeddingsConfiguration, writer?: _m0.Writer): _m0.Writer;
     decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsConfiguration;
@@ -254,6 +300,22 @@ export declare const EmbeddingsServiceState: {
     toJSON(message: EmbeddingsServiceState): unknown;
     create<I extends Exact<DeepPartial<EmbeddingsServiceState>, I>>(base?: I): EmbeddingsServiceState;
     fromPartial<I extends Exact<DeepPartial<EmbeddingsServiceState>, I>>(object: I): EmbeddingsServiceState;
+};
+export declare const EmbeddingsCreateRequest: {
+    encode(message: EmbeddingsCreateRequest, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsCreateRequest;
+    fromJSON(object: any): EmbeddingsCreateRequest;
+    toJSON(message: EmbeddingsCreateRequest): unknown;
+    create<I extends Exact<DeepPartial<EmbeddingsCreateRequest>, I>>(base?: I): EmbeddingsCreateRequest;
+    fromPartial<I extends Exact<DeepPartial<EmbeddingsCreateRequest>, I>>(object: I): EmbeddingsCreateRequest;
+};
+export declare const EmbeddingsCreateResult: {
+    encode(message: EmbeddingsCreateResult, writer?: _m0.Writer): _m0.Writer;
+    decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsCreateResult;
+    fromJSON(object: any): EmbeddingsCreateResult;
+    toJSON(message: EmbeddingsCreateResult): unknown;
+    create<I extends Exact<DeepPartial<EmbeddingsCreateResult>, I>>(base?: I): EmbeddingsCreateResult;
+    fromPartial<I extends Exact<DeepPartial<EmbeddingsCreateResult>, I>>(object: I): EmbeddingsCreateResult;
 };
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;
 export type DeepPartial<T> = T extends Builtin ? T : T extends globalThis.Array<infer U> ? globalThis.Array<DeepPartial<U>> : T extends ReadonlyArray<infer U> ? ReadonlyArray<DeepPartial<U>> : T extends {} ? {

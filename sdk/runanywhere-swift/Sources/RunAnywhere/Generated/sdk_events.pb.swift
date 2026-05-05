@@ -2435,6 +2435,14 @@ public struct RAGenerationEvent: @unchecked Sendable {
     set {_uniqueStorage()._thinkingText = newValue}
   }
 
+  /// For COMPLETED — prompt-token count (mirrors RALLMGenerationResult.inputTokens).
+  /// Added Wave D-9: enables totalTokens = input_tokens + tokens_used analytics
+  /// from the event stream alone.
+  public var inputTokens: Int32 {
+    get {_storage._inputTokens}
+    set {_uniqueStorage()._inputTokens = newValue}
+  }
+
   public var unknownFields = SwiftProtobuf.UnknownStorage()
 
   public init() {}
@@ -4150,7 +4158,7 @@ extension RAConfigurationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
 
 extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   public static let protoMessageName: String = _protobuf_package + ".GenerationEvent"
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}session_id\0\u{1}prompt\0\u{1}token\0\u{3}streaming_text\0\u{3}tokens_count\0\u{1}response\0\u{3}tokens_used\0\u{3}latency_ms\0\u{3}first_token_latency_ms\0\u{1}error\0\u{3}model_id\0\u{3}cost_amount\0\u{3}cost_saved_amount\0\u{3}routing_target\0\u{3}routing_reason\0\u{3}cancel_reason\0\u{3}tool_call_id\0\u{3}tool_name\0\u{3}tool_payload_json\0\u{3}structured_schema_json\0\u{3}structured_output_json\0\u{3}thinking_text\0")
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}kind\0\u{3}session_id\0\u{1}prompt\0\u{1}token\0\u{3}streaming_text\0\u{3}tokens_count\0\u{1}response\0\u{3}tokens_used\0\u{3}latency_ms\0\u{3}first_token_latency_ms\0\u{1}error\0\u{3}model_id\0\u{3}cost_amount\0\u{3}cost_saved_amount\0\u{3}routing_target\0\u{3}routing_reason\0\u{3}cancel_reason\0\u{3}tool_call_id\0\u{3}tool_name\0\u{3}tool_payload_json\0\u{3}structured_schema_json\0\u{3}structured_output_json\0\u{3}thinking_text\0\u{3}input_tokens\0")
 
   fileprivate class _StorageClass {
     var _kind: RAGenerationEventKind = .unspecified
@@ -4176,6 +4184,7 @@ extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     var _structuredSchemaJson: String = String()
     var _structuredOutputJson: String = String()
     var _thinkingText: String = String()
+    var _inputTokens: Int32 = 0
 
       // This property is used as the initial default value for new instances of the type.
       // The type itself is protecting the reference to its storage via CoW semantics.
@@ -4209,6 +4218,7 @@ extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       _structuredSchemaJson = source._structuredSchemaJson
       _structuredOutputJson = source._structuredOutputJson
       _thinkingText = source._thinkingText
+      _inputTokens = source._inputTokens
     }
   }
 
@@ -4250,6 +4260,7 @@ extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
         case 21: try { try decoder.decodeSingularStringField(value: &_storage._structuredSchemaJson) }()
         case 22: try { try decoder.decodeSingularStringField(value: &_storage._structuredOutputJson) }()
         case 23: try { try decoder.decodeSingularStringField(value: &_storage._thinkingText) }()
+        case 24: try { try decoder.decodeSingularInt32Field(value: &_storage._inputTokens) }()
         default: break
         }
       }
@@ -4327,6 +4338,9 @@ extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       if !_storage._thinkingText.isEmpty {
         try visitor.visitSingularStringField(value: _storage._thinkingText, fieldNumber: 23)
       }
+      if _storage._inputTokens != 0 {
+        try visitor.visitSingularInt32Field(value: _storage._inputTokens, fieldNumber: 24)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -4359,6 +4373,7 @@ extension RAGenerationEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
         if _storage._structuredSchemaJson != rhs_storage._structuredSchemaJson {return false}
         if _storage._structuredOutputJson != rhs_storage._structuredOutputJson {return false}
         if _storage._thinkingText != rhs_storage._thinkingText {return false}
+        if _storage._inputTokens != rhs_storage._inputTokens {return false}
         return true
       }
       if !storagesAreEqual {return false}

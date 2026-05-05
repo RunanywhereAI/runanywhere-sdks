@@ -11,12 +11,12 @@ import Foundation
 
 extension RARAGConfiguration {
     public static func defaults(
-        embeddingModelPath: String = "",
-        llmModelPath: String = ""
+        embeddingModelID: String = "",
+        llmModelID: String = ""
     ) -> RARAGConfiguration {
         var c = RARAGConfiguration()
-        c.embeddingModelPath = embeddingModelPath
-        c.llmModelPath = llmModelPath
+        c.embeddingModelID = embeddingModelID
+        c.llmModelID = llmModelID
         c.embeddingDimension = 384
         c.topK = 5
         c.similarityThreshold = 0.7
@@ -44,32 +44,18 @@ extension RARAGConfiguration {
         }
     }
 
+    /// D-6: Since commons owns model-id → path resolution, this helper now
+    /// only stamps the resolved model ids onto the configuration and defers
+    /// path resolution to the native RAG session-create ABI. Callers still
+    /// pass ``RAModelLoadResult`` so the lifecycle has been invoked (which
+    /// ensures the models are registered) before the native create runs.
     public func resolvingLifecycleArtifacts(
         embedding: RAModelLoadResult,
         llm: RAModelLoadResult
     ) throws -> RARAGConfiguration {
-        guard let embeddingPath = embedding.lifecyclePrimaryArtifactPath else {
-            throw SDKException.rag(
-                .modelLoadFailed,
-                "Embedding model '\(embedding.modelID)' did not return a lifecycle-resolved primary artifact"
-            )
-        }
-        guard let llmPath = llm.lifecyclePrimaryArtifactPath else {
-            throw SDKException.rag(
-                .modelLoadFailed,
-                "LLM model '\(llm.modelID)' did not return a lifecycle-resolved primary artifact"
-            )
-        }
-
         var resolved = self
-        resolved.embeddingModelPath = embeddingPath
-        resolved.llmModelPath = llmPath
-        if let vocabularyPath = embedding.resolvedVocabularyPath {
-            resolved.embeddingConfigJson = try resolved.embeddingConfigJson.mergingRAGConfig(
-                key: "vocab_path",
-                value: vocabularyPath
-            )
-        }
+        resolved.embeddingModelID = embedding.modelID
+        resolved.llmModelID = llm.modelID
         return resolved
     }
 }
@@ -117,21 +103,7 @@ extension RARAGStatistics {
     }
 }
 
-private extension String {
-    func mergingRAGConfig(key: String, value: String) throws -> String {
-        var object: [String: Any] = [:]
-        if !isEmpty {
-            let existing = try JSONSerialization.jsonObject(with: Data(self.utf8)) as? [String: Any]
-            guard let existing else {
-                throw SDKException.rag(
-                    .invalidConfiguration,
-                    "RAG embeddingConfigJson must be a JSON object to merge lifecycle artifact metadata"
-                )
-            }
-            object = existing
-        }
-        object[key] = value
-        let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
-        return String(decoding: data, as: UTF8.self)
-    }
-}
+// D-6: `mergingRAGConfig` and its JSONSerialization-backed embedding config
+// merger are deleted — commons now resolves vocabulary paths itself from the
+// registered model descriptor, so Swift no longer assembles
+// `embeddingConfigJson` on the SDK side.

@@ -730,6 +730,49 @@ RAC_API rac_result_t rac_model_registry_fetch_assignments_proto(const uint8_t* r
                                                                 size_t request_size,
                                                                 rac_proto_buffer_t* out_result);
 
+// =============================================================================
+// URL → ModelFormat / ArtifactType INFERENCE (proto-byte ABI)
+//
+// Canonical commons-owned heuristic shared by every SDK. Replaces the
+// per-SDK Dart `protoModelFormatFromPath` / `withInferredArtifact` and
+// Kotlin `detectFormatFromUrl` / `inferArtifactFields` helpers.
+// =============================================================================
+
+/**
+ * @brief Infer a ModelFormat from a portable URL/file-path string.
+ *
+ * Consumes serialized runanywhere.v1.ModelFormatFromUrlRequest bytes and
+ * returns serialized runanywhere.v1.ModelFormatFromUrlResult bytes. Only
+ * the trailing file-suffix is inspected; no network or filesystem access.
+ *
+ * @param request_bytes Serialized ModelFormatFromUrlRequest (may be empty).
+ * @param request_size  Byte count.
+ * @param out_result    Receives serialized ModelFormatFromUrlResult bytes.
+ * @return RAC_SUCCESS on success (including unknown-format), or a
+ *         negative rac_result_t on encode/decode failure.
+ */
+RAC_API rac_result_t rac_model_format_from_url_proto(const uint8_t* request_bytes,
+                                                     size_t request_size,
+                                                     rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Infer a ModelArtifactType from a portable URL/file-path string.
+ *
+ * Consumes serialized runanywhere.v1.ArtifactInferFromUrlRequest bytes and
+ * returns serialized runanywhere.v1.ArtifactInferFromUrlResult bytes.
+ * Recognizes the ".tar.gz" / ".tgz" / ".tar.bz2" / ".tbz2" / ".tar.xz" /
+ * ".txz" / ".zip" archive suffixes and defaults to SINGLE_FILE otherwise.
+ *
+ * @param request_bytes Serialized ArtifactInferFromUrlRequest (may be empty).
+ * @param request_size  Byte count.
+ * @param out_result    Receives serialized ArtifactInferFromUrlResult bytes.
+ * @return RAC_SUCCESS on success, or a negative rac_result_t on
+ *         encode/decode failure.
+ */
+RAC_API rac_result_t rac_artifact_infer_from_url_proto(const uint8_t* request_bytes,
+                                                       size_t request_size,
+                                                       rac_proto_buffer_t* out_result);
+
 #ifdef __cplusplus
 }
 #endif

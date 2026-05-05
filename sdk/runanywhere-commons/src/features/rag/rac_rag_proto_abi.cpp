@@ -15,10 +15,12 @@
 
 #include <nlohmann/json.hpp>
 
+#include "rac/core/rac_core.h"
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/foundation/rac_proto_adapters.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
+#include "rac/infrastructure/model_management/rac_model_registry.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "rag.pb.h"
@@ -117,6 +119,50 @@ void free_rag_config(rac_rag_config_t* config) {
     *config = rac_rag_config_default();
 }
 
+// Helper: copy a std::string into a freshly allocated C string using
+// rac_strdup so downstream free_rag_config can release it with rac_free.
+char* rag_copy_string(const std::string& s) {
+    if (s.empty()) return nullptr;
+    return rac_strdup(s.c_str());
+}
+
+// ---------------------------------------------------------------------------
+// D-6: model-id -> filesystem-path resolution for the RAG proto ABI.
+//
+// Given a registered model id, looks up the model in the global registry and
+// returns the canonical on-disk path (rac_model_info_t.local_path) as a
+// heap-allocated copy the caller must rac_free. If the model isn't registered
+// or has no local_path set (never downloaded), *out_err_message is populated
+// and the function returns nullptr.
+// ---------------------------------------------------------------------------
+char* resolve_rag_model_id_to_path(const std::string& model_id,
+                                   std::string* out_err_message) {
+    if (model_id.empty()) {
+        if (out_err_message) *out_err_message = "model id is required";
+        return nullptr;
+    }
+    rac_model_info_t* info = nullptr;
+    rac_result_t rc = rac_get_model(model_id.c_str(), &info);
+    if (rc != RAC_SUCCESS || !info) {
+        if (out_err_message) {
+            *out_err_message = "RAG model id '" + model_id + "' is not registered";
+        }
+        if (info) rac_model_info_free(info);
+        return nullptr;
+    }
+    if (!info->local_path || info->local_path[0] == '\0') {
+        if (out_err_message) {
+            *out_err_message = "RAG model '" + model_id +
+                               "' is registered but has no local_path (not downloaded)";
+        }
+        rac_model_info_free(info);
+        return nullptr;
+    }
+    char* path = rac_strdup(info->local_path);
+    rac_model_info_free(info);
+    return path;
+}
+
 void free_rag_query(rac_rag_query_t* query) {
     if (!query) return;
     rac_free(const_cast<char*>(query->question));
@@ -193,15 +239,80 @@ rac_result_t rac_rag_session_create_proto(const uint8_t* config_proto_bytes,
         return RAC_ERROR_DECODING_ERROR;
     }
 
-    rac_rag_config_t config = rac_rag_config_default();
-    if (!rac::foundation::rac_rag_config_from_proto(proto, &config) ||
-        !config.embedding_model_path ||
-        config.embedding_model_path[0] == '\0') {
-        free_rag_config(&config);
+    // D-6: RAGConfiguration carries model ids. embedding_model_id is required;
+    // llm_model_id is optional (embed-only pipelines are legal). Commons
+    // resolves each id to a filesystem path via rac_get_model() before
+    // forwarding to rac_rag_pipeline_create_standalone.
+    const std::string embedding_model_id = proto.embedding_model_id();
+    const std::string llm_model_id = proto.llm_model_id();
+    const std::string reranker_model_id =
+        proto.has_reranker_model_id() ? proto.reranker_model_id() : std::string();
+
+    if (embedding_model_id.empty()) {
         publish_failure(RAC_ERROR_INVALID_ARGUMENT, "rag.sessionCreate",
-                        "RAGConfiguration.embedding_model_path is required");
+                        "RAGConfiguration.embedding_model_id is required");
         return RAC_ERROR_INVALID_ARGUMENT;
     }
+
+    std::string err_message;
+    char* embedding_path = resolve_rag_model_id_to_path(embedding_model_id, &err_message);
+    if (!embedding_path) {
+        publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate",
+                        err_message.c_str());
+        return RAC_ERROR_MODEL_NOT_FOUND;
+    }
+
+    char* llm_path = nullptr;
+    if (!llm_model_id.empty()) {
+        llm_path = resolve_rag_model_id_to_path(llm_model_id, &err_message);
+        if (!llm_path) {
+            rac_free(embedding_path);
+            publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate",
+                            err_message.c_str());
+            return RAC_ERROR_MODEL_NOT_FOUND;
+        }
+    }
+
+    // Reranker is optional. When set but not resolvable, we fail the same way
+    // as missing LLM/embedding ids. The internal rac_rag_config_t doesn't
+    // carry reranker yet, so we release the resolved path after validation
+    // (reranker wiring through to the pipeline is tracked separately).
+    if (!reranker_model_id.empty()) {
+        char* reranker_path = resolve_rag_model_id_to_path(reranker_model_id, &err_message);
+        if (!reranker_path) {
+            rac_free(embedding_path);
+            rac_free(llm_path);
+            publish_failure(RAC_ERROR_MODEL_NOT_FOUND, "rag.sessionCreate",
+                            err_message.c_str());
+            return RAC_ERROR_MODEL_NOT_FOUND;
+        }
+        rac_free(reranker_path);
+    }
+
+    // Populate the remaining (non-model-id) config fields directly from the
+    // proto. We deliberately don't use rac::foundation::rac_rag_config_from_proto
+    // here because that adapter copies the ids into the path slots - we
+    // already resolved them ourselves above.
+    rac_rag_config_t config = rac_rag_config_default();
+    config.embedding_model_path = embedding_path;
+    config.llm_model_path = llm_path;
+    if (proto.embedding_dimension() > 0)
+        config.embedding_dimension = static_cast<size_t>(proto.embedding_dimension());
+    if (proto.top_k() > 0) config.top_k = static_cast<size_t>(proto.top_k());
+    if (proto.similarity_threshold() > 0.0f)
+        config.similarity_threshold = proto.similarity_threshold();
+    if (proto.chunk_size() > 0)
+        config.chunk_size = static_cast<size_t>(proto.chunk_size());
+    if (proto.chunk_overlap() >= 0)
+        config.chunk_overlap = static_cast<size_t>(proto.chunk_overlap());
+    if (proto.max_context_tokens() > 0)
+        config.max_context_tokens = static_cast<size_t>(proto.max_context_tokens());
+    if (proto.has_prompt_template())
+        config.prompt_template = rag_copy_string(proto.prompt_template());
+    if (proto.has_embedding_config_json())
+        config.embedding_config_json = rag_copy_string(proto.embedding_config_json());
+    if (proto.has_llm_config_json())
+        config.llm_config_json = rag_copy_string(proto.llm_config_json());
 
     rac_rag_pipeline_t* pipeline = nullptr;
     rac_result_t rc = rac_rag_pipeline_create_standalone(&config, &pipeline);

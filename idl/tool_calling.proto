@@ -22,6 +22,7 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
 option java_package          = "ai.runanywhere.proto.v1";
@@ -352,4 +353,48 @@ service ToolCalling {
     rpc Parse(ToolParseRequest) returns (ToolParseResult);
     rpc FormatPrompt(ToolPromptFormatRequest) returns (ToolPromptFormatResult);
     rpc ValidateCall(ToolCallValidationRequest) returns (ToolCallValidationResult);
+}
+
+
+// ---------------------------------------------------------------------------
+// Tool-calling session state machine (Wave D-4).
+// ---------------------------------------------------------------------------
+
+message ToolCallingSessionCreateRequest {
+    // Prompt + LLM generation options inline (avoids cross-proto import cycle).
+    string prompt = 1;
+    int32 max_tokens = 11;
+    float temperature = 12;
+    float top_p = 13;
+    string system_prompt = 14;
+    repeated ToolDefinition tools = 2;
+    string format_hint = 3;
+    uint32 max_iterations = 4;
+    bool keep_tools_available = 5;
+    bool validate_calls = 6;
+}
+
+message ToolCallingSessionCreateResult {
+    uint64 session_handle = 1;
+}
+
+message ToolCallingSessionEvent {
+    oneof kind {
+        bytes llm_stream_event_bytes = 1;  // serialized LLMStreamEvent proto
+        ToolCall tool_call = 2;
+        ToolCallingResult final_result = 3;
+        bytes error_bytes = 4;  // serialized SDKError proto
+    }
+    uint64 seq = 5;
+}
+
+message ToolCallingSessionStepWithResultRequest {
+    uint64 session_handle = 1;
+    string tool_call_id = 2;
+    string result_json = 3;
+    optional string error = 4;
+}
+
+message ToolCallingSessionDestroyRequest {
+    uint64 session_handle = 1;
 }

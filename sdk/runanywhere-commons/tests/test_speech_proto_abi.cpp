@@ -778,6 +778,176 @@ int test_voice_agent_proto_sequence_and_component_failure() {
     return 0;
 }
 
+// -----------------------------------------------------------------------------
+// Wave D-7 — full-session voice-agent ABI coverage.
+// -----------------------------------------------------------------------------
+
+int test_voice_agent_d7_process_turn_proto_full_flow() {
+    rac_voice_agent_handle_t agent = nullptr;
+    CHECK(rac_voice_agent_create_standalone(&agent) == RAC_SUCCESS,
+          "D-7 voice agent creates");
+    CHECK(rac_voice_agent_load_stt_model(agent, "mock-stt", "mock-stt", "Mock STT") ==
+              RAC_SUCCESS,
+          "D-7 STT loads");
+    CHECK(rac_voice_agent_load_llm_model(agent, "mock-llm", "mock-llm", "Mock LLM") ==
+              RAC_SUCCESS,
+          "D-7 LLM loads");
+    CHECK(rac_voice_agent_load_tts_voice(agent, "mock-tts", "mock-voice", "Mock Voice") ==
+              RAC_SUCCESS,
+          "D-7 TTS loads");
+    CHECK(rac_voice_agent_initialize_with_loaded_models(agent) == RAC_SUCCESS,
+          "D-7 voice agent initializes");
+
+    runanywhere::v1::VoiceAgentTurnRequest request;
+    request.set_request_id("req-d7-1");
+    request.set_session_id("session-d7-1");
+    request.set_sample_rate_hz(16000);
+    request.set_channels(1);
+    request.set_encoding(runanywhere::v1::AUDIO_ENCODING_PCM_F32_LE);
+    const int16_t audio[] = {0, 1, 2, 3};
+    request.set_audio_data(audio, sizeof(audio));
+    auto* session_config = request.mutable_session_config();
+    session_config->set_language_code("en-US");
+    (*request.mutable_metadata())["source"] = "unit-test";
+
+    std::vector<uint8_t> request_bytes;
+    CHECK(serialize(request, &request_bytes),
+          "D-7 VoiceAgentTurnRequest serializes");
+
+    struct TurnCapture {
+        std::vector<runanywhere::v1::VoiceEvent> events;
+    } capture;
+
+    auto cb = [](const uint8_t* data, size_t size, void* user_data) {
+        auto* c = static_cast<TurnCapture*>(user_data);
+        runanywhere::v1::VoiceEvent event;
+        if (event.ParseFromArray(data, static_cast<int>(size))) {
+            c->events.push_back(event);
+        }
+    };
+
+    rac_result_t rc = rac_voice_agent_process_turn_proto(
+        agent, request_bytes.data(), request_bytes.size(), cb, &capture);
+    CHECK(rc == RAC_SUCCESS, "D-7 process_turn_proto returns success");
+    CHECK(capture.events.size() >= 6,
+          "D-7 emits at least 6 events on happy path");
+
+    bool saw_state_listening = false;
+    bool saw_state_idle = false;
+    bool saw_vad_start = false;
+    bool saw_user_said = false;
+    bool saw_assistant_token = false;
+    bool saw_audio = false;
+    bool envelope_valid = true;
+    for (const auto& event : capture.events) {
+        envelope_valid = envelope_valid && event.session_id() == "session-d7-1" &&
+                         event.request_id() == "req-d7-1";
+        if (event.has_state() &&
+            event.state().current() == runanywhere::v1::PIPELINE_STATE_LISTENING) {
+            saw_state_listening = true;
+        }
+        if (event.has_state() &&
+            event.state().current() == runanywhere::v1::PIPELINE_STATE_IDLE) {
+            saw_state_idle = true;
+        }
+        if (event.has_vad() &&
+            event.vad().type() == runanywhere::v1::VAD_EVENT_VOICE_START) {
+            saw_vad_start = true;
+        }
+        if (event.has_user_said() && event.user_said().is_final()) {
+            saw_user_said = true;
+        }
+        if (event.has_assistant_token() && event.assistant_token().is_final()) {
+            saw_assistant_token = true;
+        }
+        if (event.has_audio() && event.audio().is_final()) {
+            saw_audio = true;
+        }
+    }
+    CHECK(envelope_valid, "D-7 every event carries session_id + request_id");
+    CHECK(saw_state_listening, "D-7 emits state=LISTENING");
+    CHECK(saw_state_idle, "D-7 emits state=IDLE at end");
+    CHECK(saw_vad_start, "D-7 emits VAD speech-start");
+    CHECK(saw_user_said, "D-7 emits userSaid");
+    CHECK(saw_assistant_token, "D-7 emits assistant_token");
+    CHECK(saw_audio, "D-7 emits audio frame with is_final");
+
+    rac_voice_agent_destroy(agent);
+    return 0;
+}
+
+int test_voice_agent_d7_transcribe_proto() {
+    rac_voice_agent_handle_t agent = nullptr;
+    CHECK(rac_voice_agent_create_standalone(&agent) == RAC_SUCCESS,
+          "D-7 transcribe agent creates");
+    CHECK(rac_voice_agent_load_stt_model(agent, "mock-stt", "mock-stt", "Mock STT") ==
+              RAC_SUCCESS,
+          "D-7 transcribe STT loads");
+
+    runanywhere::v1::VoiceAgentTranscribeProtoRequest request;
+    const int16_t audio[] = {0, 1, 2, 3};
+    request.set_audio_data(audio, sizeof(audio));
+    request.set_sample_rate(16000);
+    request.set_channels(1);
+    request.set_language_hint("en-US");
+
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes),
+          "D-7 VoiceAgentTranscribeProtoRequest serializes");
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc = rac_voice_agent_transcribe_proto(agent, bytes.data(), bytes.size(), &out);
+    runanywhere::v1::STTOutput result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
+          "D-7 transcribe_proto returns STTOutput");
+    CHECK(result.text() == "hello mock", "D-7 transcribe text matches mock");
+    rac_proto_buffer_free(&out);
+    rac_voice_agent_destroy(agent);
+    return 0;
+}
+
+int test_voice_agent_d7_synthesize_speech_proto() {
+    rac_voice_agent_handle_t agent = nullptr;
+    CHECK(rac_voice_agent_create_standalone(&agent) == RAC_SUCCESS,
+          "D-7 synthesize agent creates");
+    CHECK(rac_voice_agent_load_tts_voice(agent, "mock-tts", "mock-voice", "Mock Voice") ==
+              RAC_SUCCESS,
+          "D-7 synthesize TTS loads");
+
+    runanywhere::v1::VoiceAgentSynthesizeSpeechProtoRequest request;
+    request.set_text("hello world");
+
+    std::vector<uint8_t> bytes;
+    CHECK(serialize(request, &bytes),
+          "D-7 VoiceAgentSynthesizeSpeechProtoRequest serializes");
+
+    rac_proto_buffer_t out;
+    rac_proto_buffer_init(&out);
+    rac_result_t rc = rac_voice_agent_synthesize_speech_proto(agent, bytes.data(), bytes.size(),
+                                                              &out);
+    runanywhere::v1::TTSOutput result;
+    CHECK(rc == RAC_SUCCESS && parse_buffer(out, &result),
+          "D-7 synthesize_speech_proto returns TTSOutput");
+    CHECK(result.audio_data().size() > 0, "D-7 TTSOutput carries audio bytes");
+    CHECK(result.is_final(), "D-7 TTSOutput is_final=true");
+    rac_proto_buffer_free(&out);
+    rac_voice_agent_destroy(agent);
+    return 0;
+}
+
+int test_voice_agent_d7_component_create_destroy_proto() {
+    rac_voice_agent_handle_t handle = nullptr;
+    rac_result_t rc = rac_voice_agent_component_create_proto(nullptr, 0, &handle);
+    CHECK(rc == RAC_SUCCESS && handle != nullptr,
+          "D-7 component_create_proto with empty config succeeds");
+    CHECK(rac_voice_agent_component_destroy_proto(handle) == RAC_SUCCESS,
+          "D-7 component_destroy_proto accepts handle");
+    CHECK(rac_voice_agent_component_destroy_proto(nullptr) == RAC_SUCCESS,
+          "D-7 component_destroy_proto is null-safe");
+    return 0;
+}
+
 #endif
 
 }  // namespace
@@ -797,6 +967,10 @@ int main() {
     test_mocked_tts();
     test_mocked_vad_and_activity();
     test_voice_agent_proto_sequence_and_component_failure();
+    test_voice_agent_d7_process_turn_proto_full_flow();
+    test_voice_agent_d7_transcribe_proto();
+    test_voice_agent_d7_synthesize_speech_proto();
+    test_voice_agent_d7_component_create_destroy_proto();
     rac_plugin_unregister("llamacpp");
     rac_plugin_unregister("onnx");
     std::fprintf(stdout, "  %d checks, %d failures\n", test_count, fail_count);
