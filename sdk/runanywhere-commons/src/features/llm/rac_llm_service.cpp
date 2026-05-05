@@ -23,6 +23,7 @@
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
+#include "rac/infrastructure/events/rac_events.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_primitive.h"
@@ -158,6 +159,18 @@ rac_result_t rac_llm_create(const char* model_id, rac_handle_t* out_handle) {
     service->impl = impl;
     service->model_id = strdup(model_id);
     *out_handle = service;
+
+    // DUP-06: single source of truth for the "*.backend.created" telemetry
+    // event. Previously each backend fired this from its own *_create path;
+    // now it fires once from the commons service layer so future backends
+    // inherit the emit for free (and can't silently drop it).
+    {
+        const char* backend_name = vt->metadata.name ? vt->metadata.name : "unknown";
+        char props[128];
+        snprintf(props, sizeof(props), R"({"backend":"%s"})", backend_name);
+        rac_event_track("llm.backend.created", RAC_EVENT_CATEGORY_LLM,
+                        RAC_EVENT_DESTINATION_ALL, props);
+    }
 
     ALOGD("LLM service created successfully");
     RAC_LOG_INFO(LOG_CAT, "LLM service created");

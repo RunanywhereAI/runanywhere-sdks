@@ -75,8 +75,9 @@ rac_result_t rac_vad_sherpa_create(const char* model_path, const rac_vad_sherpa_
 
     *out_handle = static_cast<rac_handle_t>(handle);
 
-    rac_event_track("vad.backend.created", RAC_EVENT_CATEGORY_VOICE, RAC_EVENT_DESTINATION_ALL,
-                    R"({"backend":"sherpa"})");
+    // DUP-06: "vad.backend.created" now emitted once by the commons VAD
+    // component load path (sdk/runanywhere-commons/src/features/vad/vad_component.cpp
+    // in rac_vad_component_load_model) so future backends inherit the emit.
 
     return RAC_SUCCESS;
 }

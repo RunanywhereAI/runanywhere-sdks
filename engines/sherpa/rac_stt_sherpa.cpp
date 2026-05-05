@@ -94,8 +94,9 @@ rac_result_t rac_stt_sherpa_create(const char* model_path, const rac_stt_sherpa_
 
     *out_handle = static_cast<rac_handle_t>(handle);
 
-    rac_event_track("stt.backend.created", RAC_EVENT_CATEGORY_STT, RAC_EVENT_DESTINATION_ALL,
-                    R"({"backend":"sherpa"})");
+    // DUP-06: "stt.backend.created" now emitted once by the commons STT
+    // service layer (sdk/runanywhere-commons/src/features/stt/rac_stt_service.cpp)
+    // so future backends inherit the emit without duplicating it per plugin.
 
     return RAC_SUCCESS;
 }

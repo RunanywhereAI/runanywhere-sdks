@@ -110,9 +110,9 @@ rac_result_t rac_llm_llamacpp_create(const char* model_path,
 
     *out_handle = static_cast<rac_handle_t>(handle);
 
-    // Publish event
-    rac_event_track("llm.backend.created", RAC_EVENT_CATEGORY_LLM, RAC_EVENT_DESTINATION_ALL,
-                    R"({"backend":"llamacpp"})");
+    // DUP-06: "llm.backend.created" now emitted once by the commons LLM
+    // service layer (sdk/runanywhere-commons/src/features/llm/rac_llm_service.cpp)
+    // so future backends inherit the emit without duplicating it per plugin.
 
     return RAC_SUCCESS;
 }

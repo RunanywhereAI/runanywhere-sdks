@@ -36,14 +36,7 @@ Backend health: llamacpp (healthy, 5 gaps already resolved — 01/02/05/06/07), 
 
 (DUP-05 resolved in Wave 2a: shared template `rac::plugin::StreamAdapter<CallbackT>` landed at `sdk/runanywhere-commons/include/rac/plugin/rac_stream_adapter.h`. Both llamacpp TUs now `using StreamAdapter = rac::plugin::StreamAdapter<rac_llm_stream_callback_fn>;` / `using VLMStreamAdapter = rac::plugin::StreamAdapter<rac_vlm_stream_callback_fn>;`. Duplicate struct definitions deleted from `engines/llamacpp/rac_backend_llamacpp_register.cpp` and `engines/llamacpp/rac_backend_llamacpp_vlm_register.cpp`. Both TUs recompile clean under `cmake --build build/macos-debug --target rac_backend_llamacpp`; the pre-existing ggml-metal link errors are unrelated. The per-primitive C trampoline (`stream_adapter_callback` / `vlm_stream_adapter_callback`) was intentionally NOT collapsed since each still needs to discard its own `is_final` arg and cast to its specialization — the win is the removed struct body, not the 6-line trampoline.)
 
-### DUP-06: `rac_event_track("*.backend.created", ...)` sprinkled inconsistently
-- llamacpp: emitted in `rac_llm_llamacpp_create` (`rac_llm_llamacpp.cpp:114`)
-- sherpa STT: emitted in `rac_stt_sherpa_create` (`rac_stt_sherpa.cpp:97`)
-- sherpa TTS: emitted in `rac_tts_sherpa_create` (`rac_tts_sherpa.cpp:74`)
-- sherpa VAD: emitted in `rac_vad_sherpa_create` (`rac_vad_sherpa.cpp:78`)
-- onnx: not applicable (no per-handle create flow — embeddings ops are stateless)
-
-Active backends are consistent; lift the call pattern into the commons service layer so future backends inherit it by default (and Iteration-I backends can't silently drop it).
+(DUP-06 resolved in Wave 2a: lifted `rac_event_track("*.backend.created", ...)` into the commons service layer. LLM emit fires from `sdk/runanywhere-commons/src/features/llm/rac_llm_service.cpp` at the end of `rac_llm_create` after a successful `vt->llm_ops->create`; STT from `rac_stt_service.cpp` in `rac_stt_create`; TTS from `rac_tts_service.cpp` in `rac_tts_create`; VAD from `src/features/vad/vad_component.cpp` in `rac_vad_component_load_model` after a successful `vad_ops->create` + start. All four commons emits read the backend name from `vt->metadata.name` so the payload is correct regardless of which plugin the router picks — future backends inherit the emit for free. Deleted the per-backend firings in `engines/llamacpp/rac_llm_llamacpp.cpp` (was line 114), `engines/sherpa/rac_stt_sherpa.cpp` (was line 97), `engines/sherpa/rac_tts_sherpa.cpp` (was line 74), `engines/sherpa/rac_vad_sherpa.cpp` (was line 78). `rac_commons` + `rac_backend_sherpa` targets recompile clean under `cmake --build build/macos-debug`. Note: deferred `engines/whispercpp/rac_stt_whispercpp.cpp:90` still fires its own `stt.backend.created` — will double-fire if whispercpp comes off Iteration-I hold without cleanup; accepted since whispercpp is not currently built by any active host.)
 
 ## Items to DELETE
 

@@ -8,11 +8,13 @@
 
 #include "rac/features/stt/rac_stt_service.h"
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
+#include "rac/infrastructure/events/rac_events.h"
 #include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_primitive.h"
@@ -122,6 +124,18 @@ rac_result_t rac_stt_create(const char* model_path, rac_handle_t* out_handle) {
     service->impl = impl;
     service->model_id = model_path ? strdup(model_path) : nullptr;
     *out_handle = service;
+
+    // DUP-06: single source of truth for the "*.backend.created" telemetry
+    // event. Previously each backend fired this from its own *_create path;
+    // now it fires once from the commons service layer so future backends
+    // inherit the emit for free (and can't silently drop it).
+    {
+        const char* backend_name = vt->metadata.name ? vt->metadata.name : "unknown";
+        char props[128];
+        snprintf(props, sizeof(props), R"({"backend":"%s"})", backend_name);
+        rac_event_track("stt.backend.created", RAC_EVENT_CATEGORY_STT,
+                        RAC_EVENT_DESTINATION_ALL, props);
+    }
 
     RAC_LOG_INFO(LOG_CAT, "STT service created");
     return RAC_SUCCESS;

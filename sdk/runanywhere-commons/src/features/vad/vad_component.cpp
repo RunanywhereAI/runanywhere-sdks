@@ -14,6 +14,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
@@ -31,6 +32,7 @@
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vad/rac_vad_energy.h"
 #include "rac/features/vad/rac_vad_service.h"
+#include "rac/infrastructure/events/rac_events.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
 #include "rac/plugin/rac_engine_vtable.h"
 #include "rac/plugin/rac_primitive.h"
@@ -704,6 +706,18 @@ extern "C" rac_result_t rac_vad_component_load_model(rac_handle_t handle, const 
     }
 
     RAC_LOG_INFO("VAD.Component", "VAD model loaded: %s", model_id ? model_id : "unknown");
+
+    // DUP-06: single source of truth for the "*.backend.created" telemetry
+    // event. Previously each backend fired this from its own *_create path;
+    // now it fires once from the commons service layer so future backends
+    // inherit the emit for free (and can't silently drop it).
+    {
+        const char* backend_name = vt->metadata.name ? vt->metadata.name : "unknown";
+        char props[128];
+        snprintf(props, sizeof(props), R"({"backend":"%s"})", backend_name);
+        rac_event_track("vad.backend.created", RAC_EVENT_CATEGORY_VOICE,
+                        RAC_EVENT_DESTINATION_ALL, props);
+    }
 
     return RAC_SUCCESS;
 }
