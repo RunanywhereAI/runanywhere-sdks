@@ -27,12 +27,12 @@ private val logger = SDKLogger(TAG)
 internal actual fun initializePlatformBridge(environment: SDKEnvironment, apiKey: String?, baseURL: String?) {
     logger.info("Initializing CppBridge for environment: $environment")
 
-    val cppEnvironment =
-        when (environment) {
-            SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> CppBridge.Environment.DEVELOPMENT
-            SDKEnvironment.SDK_ENVIRONMENT_STAGING -> CppBridge.Environment.STAGING
-            SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> CppBridge.Environment.PRODUCTION
-            SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> CppBridge.Environment.DEVELOPMENT
+    // Normalize UNSPECIFIED -> DEVELOPMENT so the downstream C-ABI call gets a valid value.
+    val resolvedEnvironment =
+        if (environment == SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED) {
+            SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+        } else {
+            environment
         }
 
     // Configure telemetry base URL if provided
@@ -41,7 +41,7 @@ internal actual fun initializePlatformBridge(environment: SDKEnvironment, apiKey
         logger.info("Telemetry base URL configured: $baseURL")
     }
 
-    CppBridge.initialize(cppEnvironment, apiKey, baseURL)
+    CppBridge.initialize(resolvedEnvironment, apiKey, baseURL)
 
     // Wire the public EventBus to the canonical native SDKEvent stream
     // so consumers see lifecycle/error/model events emitted by C++.
