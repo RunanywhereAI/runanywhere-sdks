@@ -104,18 +104,6 @@ and (d) KOT-HARDWARE-FALLBACK invoking `getprop ro.board.platform` via
   `sync-versions.sh` rewrite it, or read via Gradle resource).
 - **Scope**: 1 file, ~135 LOC.
 
-### KOT-DEAD-BUILDCONFIG: `BuildConfig` expect/actuals unused (priority: LOW)
-- **Symptom**: `utils/BuildConfig.kt` (commonMain expect) + actuals in `androidMain` + `jvmMain` just
-  read `SharedBuildConfig.VERSION_NAME` + `SharedBuildConfig.APPLICATION_ID`. Zero callers outside
-  the declarations themselves. `SharedBuildConfig` hardcodes `VERSION_NAME = "1.0.0"`,
-  `APPLICATION_ID = "com.runanywhere.sdk"` which no code reads.
-- **Files to delete** (4):
-  - `sdk/runanywhere-kotlin/src/commonMain/kotlin/com/runanywhere/sdk/utils/BuildConfig.kt`
-  - `sdk/runanywhere-kotlin/src/androidMain/kotlin/com/runanywhere/sdk/utils/BuildConfig.kt`
-  - `sdk/runanywhere-kotlin/src/jvmMain/kotlin/com/runanywhere/sdk/utils/BuildConfig.kt`
-  - `sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/utils/SharedBuildConfig.kt`
-- **Scope**: 4 files / ~30 LOC.
-
 ### KOT-DEAD-PLATFORMUTILS: `PlatformUtils` expect/actuals unused (priority: LOW)
 - **Symptom**: `getDeviceId/getPlatformName/getDeviceInfo/getOSVersion/getDeviceModel/getAppVersion`
   (`commonMain/.../utils/PlatformUtils.kt` + android/jvm actuals). Only `getPlatformName()` is called
@@ -126,14 +114,6 @@ and (d) KOT-HARDWARE-FALLBACK invoking `getprop ro.board.platform` via
   - `sdk/runanywhere-kotlin/src/androidMain/kotlin/com/runanywhere/sdk/utils/PlatformUtils.kt`
   - `sdk/runanywhere-kotlin/src/jvmMain/kotlin/com/runanywhere/sdk/utils/PlatformUtils.kt`
 - **Scope**: 3 files / ~220 LOC.
-
-### KOT-DEAD-SIMPLEINSTANT: `SimpleInstant` / `toSimpleInstant()` helper not needed (priority: LOW)
-- **Symptom**: `utils/SimpleInstant.kt` is used only in `SDKLogger.kt:28` (LogEntry.timestamp default).
-  `Long.toSimpleInstant()` extension has zero callers. Replacing `SimpleInstant` with `Long` (millis)
-  in `LogEntry` removes the whole data class.
-- **Concrete steps**: Replace `timestamp: SimpleInstant = SimpleInstant.now()` with
-  `timestamp: Long = System.currentTimeMillis()` in `SDKLogger.kt:28`, delete `SimpleInstant.kt`.
-- **Scope**: 1 file / 23 LOC.
 
 ### KOT-JNI-ORPHAN: 20 `external fun` declarations in `RunAnywhereBridge.kt` have no matching C thunk (priority: HIGH)
 - **Symptom**: Surfaced by Wave 1 CPP-06 JNI audit. 20 `external fun` entries in
