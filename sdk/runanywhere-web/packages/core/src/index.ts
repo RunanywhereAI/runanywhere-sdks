@@ -337,7 +337,3 @@ export type { WebCapabilities } from './Infrastructure/DeviceCapabilities';
 export { OPFSStorage } from './Infrastructure/OPFSStorage';
 export type { StoredModelInfo, MetadataMap, ModelMetadata } from './Infrastructure/OPFSStorage';
 export { LocalFileStorage } from './Infrastructure/LocalFileStorage';
-
-// Services
-export { AnalyticsEmitter } from './services/AnalyticsEmitter';
-export type { AnalyticsEmitterBackend } from './services/AnalyticsEmitter';
