@@ -70,7 +70,6 @@ interface WorkerWasmModule {
   // Core helpers
   _rac_wasm_sizeof_platform_adapter(): number;
   _rac_wasm_sizeof_config(): number;
-  _rac_wasm_offsetof_config_log_level?(): number;
   _rac_set_platform_adapter?(adapterPtr: number): number;
 
   // Proto buffer helpers
@@ -251,45 +250,58 @@ async function initWASM(wasmJsUrl: string, useWebGPU: boolean): Promise<void> {
   });
 
   const m = wasmModule;
-  const PTR_SIZE = 4;
 
   // ---- Build minimal rac_platform_adapter_t ----
   // Signatures match the main-thread PlatformAdapter.ts — Emscripten's
   // indirect-call table traps on any mismatch.
+  //
+  // IMPORTANT: every field offset comes from a runtime
+  // `_rac_wasm_offsetof_platform_adapter_<field>()` helper compiled into
+  // `wasm/src/wasm_exports.cpp`. We do NOT hard-code `PTR_SIZE = 4` or a
+  // sequential accumulator — the struct layout depends on alignment/padding
+  // and would silently corrupt memory on any reorder/add if TypeScript baked
+  // it in.
   const adapterSize = m._rac_wasm_sizeof_platform_adapter();
   const adapterPtr = m._malloc(adapterSize);
   for (let i = 0; i < adapterSize; i++) m.setValue(adapterPtr + i, 0, 'i8');
 
-  let offset = 0;
+  const getAdapterOffset = (name: string): number => {
+    const fn = (m as unknown as Record<string, unknown>)[
+      `_rac_wasm_offsetof_platform_adapter_${name}`
+    ];
+    if (typeof fn !== 'function') {
+      throw new Error(
+        `WASM module missing _rac_wasm_offsetof_platform_adapter_${name} export; ` +
+        `rebuild racommons-llamacpp.wasm from wasm/src/wasm_exports.cpp.`,
+      );
+    }
+    return (fn as () => number)();
+  };
 
   // file_exists: rac_bool_t (*)(const char* path, void* user_data)
   const fileExistsCb = m.addFunction((_pathPtr: number, _ud: number) => 0, 'iii');
-  m.setValue(adapterPtr + offset, fileExistsCb, '*');
-  offset += PTR_SIZE;
+  m.setValue(adapterPtr + getAdapterOffset('file_exists'), fileExistsCb, '*');
 
   // file_read: rac_result_t (*)(const char* path, void** out_data, size_t* out_size, void* user_data)
   const fileReadCb = m.addFunction(
     (_pathPtr: number, _outData: number, _outSize: number, _ud: number) => -180,
     'iiiii',
   );
-  m.setValue(adapterPtr + offset, fileReadCb, '*');
-  offset += PTR_SIZE;
+  m.setValue(adapterPtr + getAdapterOffset('file_read'), fileReadCb, '*');
 
   // file_write: rac_result_t (*)(const char* path, const void* data, size_t size, void* user_data)
   const fileWriteCb = m.addFunction(
     (_pathPtr: number, _data: number, _size: number, _ud: number) => -180,
     'iiiii',
   );
-  m.setValue(adapterPtr + offset, fileWriteCb, '*');
-  offset += PTR_SIZE;
+  m.setValue(adapterPtr + getAdapterOffset('file_write'), fileWriteCb, '*');
 
   // file_delete: rac_result_t (*)(const char* path, void* user_data)
   const fileDeleteCb = m.addFunction(
     (_pathPtr: number, _ud: number) => -180,
     'iii',
   );
-  m.setValue(adapterPtr + offset, fileDeleteCb, '*');
-  offset += PTR_SIZE;
+  m.setValue(adapterPtr + getAdapterOffset('file_delete'), fileDeleteCb, '*');
 
   // secure_get: rac_result_t (*)(const char* key, char** out_value, void* user_data)
   const secureGetCb = m.addFunction(
@@ -299,24 +311,21 @@ async function initWASM(wasmJsUrl: string, useWebGPU: boolean): Promise<void> {
     },
     'iiii',
   );
-  m.setValue(adapterPtr + offset, secureGetCb, '*');
-  offset += PTR_SIZE;
+  m.setValue(adapterPtr + getAdapterOffset('secure_get'), secureGetCb, '*');
 
   // secure_set: rac_result_t (*)(const char* key, const char* value, void* user_data)
   const secureSetCb = m.addFunction(
     (_keyPtr: number, _valPtr: number, _ud: number) => 0,
     'iiii',
   );
-  m.setValue(adapterPtr + offset, secureSetCb, '*');
-  offset += PTR_SIZE;
+  m.setValue(adapterPtr + getAdapterOffset('secure_set'), secureSetCb, '*');
 
   // secure_delete: rac_result_t (*)(const char* key, void* user_data)
   const secureDeleteCb = m.addFunction(
     (_keyPtr: number, _ud: number) => 0,
     'iii',
   );
-  m.setValue(adapterPtr + offset, secureDeleteCb, '*');
-  offset += PTR_SIZE;
+  m.setValue(adapterPtr + getAdapterOffset('secure_delete'), secureDeleteCb, '*');
 
   // log: void (*)(rac_log_level_t level, const char* category, const char* message, void* user_data)
   const logCb = m.addFunction(
@@ -331,17 +340,14 @@ async function initWASM(wasmJsUrl: string, useWebGPU: boolean): Promise<void> {
     },
     'viiii',
   );
-  m.setValue(adapterPtr + offset, logCb, '*');
-  offset += PTR_SIZE;
+  m.setValue(adapterPtr + getAdapterOffset('log'), logCb, '*');
 
   // track_error (null)
-  m.setValue(adapterPtr + offset, 0, '*');
-  offset += PTR_SIZE;
+  m.setValue(adapterPtr + getAdapterOffset('track_error'), 0, '*');
 
   // now_ms: int64_t (*)(void* user_data)
   const nowMsCb = m.addFunction((_ud: number) => Date.now(), 'ii');
-  m.setValue(adapterPtr + offset, nowMsCb, '*');
-  offset += PTR_SIZE;
+  m.setValue(adapterPtr + getAdapterOffset('now_ms'), nowMsCb, '*');
 
   // get_memory_info: rac_result_t (*)(rac_memory_info_t* out_info, void* user_data)
   const memInfoCb = m.addFunction((outPtr: number, _ud: number) => {
@@ -358,20 +364,16 @@ async function initWASM(wasmJsUrl: string, useWebGPU: boolean): Promise<void> {
     m.setValue(outPtr + 20, 0, 'i32'); // used high
     return 0;
   }, 'iii');
-  m.setValue(adapterPtr + offset, memInfoCb, '*');
-  offset += PTR_SIZE;
+  m.setValue(adapterPtr + getAdapterOffset('get_memory_info'), memInfoCb, '*');
 
   // http_download (null)
-  m.setValue(adapterPtr + offset, 0, '*');
-  offset += PTR_SIZE;
+  m.setValue(adapterPtr + getAdapterOffset('http_download'), 0, '*');
   // http_download_cancel (null)
-  m.setValue(adapterPtr + offset, 0, '*');
-  offset += PTR_SIZE;
+  m.setValue(adapterPtr + getAdapterOffset('http_download_cancel'), 0, '*');
   // extract_archive (null)
-  m.setValue(adapterPtr + offset, 0, '*');
-  offset += PTR_SIZE;
+  m.setValue(adapterPtr + getAdapterOffset('extract_archive'), 0, '*');
   // user_data (null)
-  m.setValue(adapterPtr + offset, 0, '*');
+  m.setValue(adapterPtr + getAdapterOffset('user_data'), 0, '*');
 
   // ---- Register the adapter ----
   logInfo('Step 1: Registering platform adapter...');
@@ -388,11 +390,31 @@ async function initWASM(wasmJsUrl: string, useWebGPU: boolean): Promise<void> {
   const configSize = m._rac_wasm_sizeof_config();
   const configPtr = m._malloc(configSize);
   for (let i = 0; i < configSize; i++) m.setValue(configPtr + i, 0, 'i8');
-  m.setValue(configPtr, adapterPtr, '*'); // platform_adapter (offset 0)
-  const logLevelOffset =
-    typeof m._rac_wasm_offsetof_config_log_level === 'function'
-      ? m._rac_wasm_offsetof_config_log_level()
-      : 4;
+
+  // rac_config_t field offsets — same rule as rac_platform_adapter_t above:
+  // fail loudly if the helper is missing rather than silently corrupting
+  // memory with a hard-coded offset that could break on any struct reorder.
+  const configPlatformAdapterOffsetFn = (
+    m as unknown as Record<string, unknown>
+  )['_rac_wasm_offsetof_config_platform_adapter'];
+  if (typeof configPlatformAdapterOffsetFn !== 'function') {
+    throw new Error(
+      'WASM module missing _rac_wasm_offsetof_config_platform_adapter export; ' +
+      'rebuild racommons-llamacpp.wasm from wasm/src/wasm_exports.cpp.',
+    );
+  }
+  const configLogLevelOffsetFn = (
+    m as unknown as Record<string, unknown>
+  )['_rac_wasm_offsetof_config_log_level'];
+  if (typeof configLogLevelOffsetFn !== 'function') {
+    throw new Error(
+      'WASM module missing _rac_wasm_offsetof_config_log_level export; ' +
+      'rebuild racommons-llamacpp.wasm from wasm/src/wasm_exports.cpp.',
+    );
+  }
+  const platformAdapterOffset = (configPlatformAdapterOffsetFn as () => number)();
+  const logLevelOffset = (configLogLevelOffsetFn as () => number)();
+  m.setValue(configPtr + platformAdapterOffset, adapterPtr, '*');
   m.setValue(configPtr + logLevelOffset, 2, 'i32'); // INFO
 
   try {
