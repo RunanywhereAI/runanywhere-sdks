@@ -1,6 +1,6 @@
 # Runtimes (L1 Adapters) — Current Inconsistencies
 
-Updated: 2026-05-05 (RT-CPU-01 + RT-CPU-02 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
+Updated: 2026-05-05 (RT-CPU-01 + RT-CPU-02 + RT-ONNX-03 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
 Branch: feat/v2-architecture @ 6217d9e67
 
 ## Scope
@@ -81,17 +81,6 @@ f16, u8, or bf16 will silently produce garbage bytes. The public
 `Int64` — even that subset is lossy on the output side. This is a
 correctness/truncation bug masked as a "works for text-embedding models"
 behavior.
-
-#### RT-ONNX-03: Output allocation ignores caller-provided capacity
-
-`onnxrt_run_session` (`rac_runtime_onnxrt.cpp:375-381`) memcpys model outputs
-into `outputs[i].data` only if `outputs[i].data_bytes >= bytes`; otherwise the
-output is silently dropped. There's no signaling back to the caller that
-"output was too big for your buffer" — no distinct error code, no partial-copy
-result. A caller allocating a best-effort buffer will receive stale
-`data_bytes` (unchanged) with no way to distinguish "I got zero bytes because
-the model produced zero bytes" from "your buffer was too small so I dropped
-the entire output".
 
 #### RT-ONNX-04: Advertises CPU-only `RAC_DEVICE_CLASS_CPU` while ORT supports EPs
 

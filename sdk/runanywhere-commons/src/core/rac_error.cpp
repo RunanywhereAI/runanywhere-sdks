@@ -191,6 +191,9 @@ const char* rac_error_message(rac_result_t error_code) {
             return "Null pointer";
         case RAC_ERROR_BUFFER_TOO_SMALL:
             return "Buffer too small";
+        case RAC_ERROR_OUTPUT_TRUNCATED:
+            return "Output truncated: caller buffer is too small; required byte "
+                   "count written to output size field";
 
         // =================================================================
         // AUDIO ERRORS (-280 to -299)

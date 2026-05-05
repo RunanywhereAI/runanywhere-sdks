@@ -232,6 +232,11 @@ extern "C" {
 #define RAC_ERROR_NULL_POINTER ((rac_result_t) - 260)
 /** Buffer too small */
 #define RAC_ERROR_BUFFER_TOO_SMALL ((rac_result_t) - 261)
+/** Output was truncated: caller-provided output capacity is insufficient to
+ *  hold the produced bytes. The runtime populates the output size field with
+ *  the required byte count so the caller can re-allocate and retry; no partial
+ *  data is written to the caller's buffer. */
+#define RAC_ERROR_OUTPUT_TRUNCATED ((rac_result_t) - 262)
 
 // =============================================================================
 // AUDIO ERRORS (-280 to -299)

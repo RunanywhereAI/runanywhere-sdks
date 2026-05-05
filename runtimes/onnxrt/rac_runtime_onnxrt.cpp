@@ -382,9 +382,26 @@ rac_result_t onnxrt_run_session(rac_runtime_session_t* session,
         RAC_LOG_ERROR("Runtime.ONNXRT", "run_session failed: %s", error.c_str());
         return rc;
     }
+    /* First pass: detect any capacity shortfall and publish the required byte
+     * count on every affected output so the caller can reallocate and retry.
+     * We report truncation without copying any partial data, so the caller can
+     * cleanly distinguish "legitimate zero-byte output" from "buffer too small,
+     * output dropped" (RT-ONNX-03). */
+    bool truncated = false;
+    for (size_t i = 0; i < output_count && i < runtime_outputs.size(); ++i) {
+        const size_t required = runtime_outputs[i].data.size() * sizeof(float);
+        if (outputs[i].data != nullptr && outputs[i].data_bytes < required) {
+            outputs[i].data_bytes = required;
+            truncated = true;
+        }
+    }
+    if (truncated) {
+        return RAC_ERROR_OUTPUT_TRUNCATED;
+    }
+    /* Second pass: all outputs fit — commit the copies and record actual sizes. */
     for (size_t i = 0; i < output_count && i < runtime_outputs.size(); ++i) {
         const size_t bytes = runtime_outputs[i].data.size() * sizeof(float);
-        if (outputs[i].data && outputs[i].data_bytes >= bytes) {
+        if (outputs[i].data != nullptr) {
             std::memcpy(outputs[i].data, runtime_outputs[i].data.data(), bytes);
             outputs[i].data_bytes = bytes;
         }
