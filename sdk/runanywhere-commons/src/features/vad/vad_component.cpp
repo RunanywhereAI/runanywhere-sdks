@@ -228,8 +228,9 @@ void publish_vad_pipeline_event(bool is_speech,
     voice_event.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_VAD);
     if (error_code == RAC_SUCCESS) {
         auto* vad = voice_event.mutable_vad();
-        vad->set_type(is_speech ? runanywhere::v1::VAD_EVENT_VOICE_START
-                                : runanywhere::v1::VAD_EVENT_SILENCE);
+        // IDL-18: VADEvent.type uses VADStreamEventKind; the speech/silence
+        // direction is carried in the companion is_speech field below.
+        vad->set_type(runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY);
         vad->set_confidence(confidence);
         vad->set_is_speech(is_speech);
         vad->set_speech_duration_ms(is_speech ? duration_ms : 0);

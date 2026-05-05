@@ -227,15 +227,15 @@ class _VoiceAssistantViewState extends State<VoiceAssistantView>
 
       case sdk.VoiceEvent_Payload.vad:
         final vad = event.vad;
-        if (vad.type == sdk.VADEventType.VAD_EVENT_VOICE_START) {
+        // IDL-18: VADEvent.type is VADStreamEventKind; start/end ride
+        // SPEECH_ACTIVITY with direction on the is_speech bool.
+        if (vad.type ==
+            sdk.VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY) {
           setState(() {
-            _isSpeechDetected = true;
-          });
-        } else if (vad.type ==
-            sdk.VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE) {
-          setState(() {
-            _isSpeechDetected = false;
-            _sessionState = VoiceSessionState.processing;
+            _isSpeechDetected = vad.isSpeech;
+            if (!vad.isSpeech) {
+              _sessionState = VoiceSessionState.processing;
+            }
           });
         }
         break;

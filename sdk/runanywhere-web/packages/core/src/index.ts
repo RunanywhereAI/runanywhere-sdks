@@ -250,10 +250,12 @@ export {
   MetricsEvent,
   TokenKind,
   AudioEncoding,
-  VADEventType,
   InterruptReason,
   PipelineState as VoiceEventPipelineState,
 } from '@runanywhere/proto-ts/voice_events';
+// IDL-18: VADStreamEventKind is the canonical VAD event enum (absorbed the
+// deleted VADEventType from voice_events.proto).
+export { VADStreamEventKind } from '@runanywhere/proto-ts/vad_options';
 export {
   clearRunanywhereModule,
   setRunanywhereModule,

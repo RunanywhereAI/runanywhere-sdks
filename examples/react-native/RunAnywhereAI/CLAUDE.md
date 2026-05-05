@@ -193,7 +193,7 @@ From `@runanywhere/onnx`: `ONNX.register()`
 
 From `@runanywhere/genie`: `Genie.register()` (optional, Android/Snapdragon only)
 
-From `@runanywhere/proto-ts`: `AudioFormat`, `PipelineState`, `VADEventType`, `VoiceEvent`
+From `@runanywhere/proto-ts`: `AudioFormat`, `PipelineState`, `VADStreamEventKind`, `VoiceEvent`
 
 ## Platform-Specific Behavior
 

@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:fixnum/fixnum.dart';
+import 'package:runanywhere/generated/vad_options.pb.dart' as vad_pb;
 import 'package:runanywhere/generated/voice_events.pb.dart' as pb;
 
 const int perfBenchMagic = 0x42504152; // 'RAPB'
@@ -33,12 +34,14 @@ class CancelParityFixtureResult {
 List<pb.VoiceEvent> voiceParityEvents() => <pb.VoiceEvent>[
       pb.VoiceEvent(
         vad: pb.VADEvent(
-          type: pb.VADEventType.VAD_EVENT_VOICE_START,
+          type: vad_pb.VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
+          isSpeech: true,
         ),
       ),
       pb.VoiceEvent(
         vad: pb.VADEvent(
-          type: pb.VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE,
+          type: vad_pb.VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY,
+          isSpeech: false,
         ),
       ),
       pb.VoiceEvent(

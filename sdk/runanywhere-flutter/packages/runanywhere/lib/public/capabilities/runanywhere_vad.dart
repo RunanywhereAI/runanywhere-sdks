@@ -25,7 +25,7 @@ import 'package:runanywhere/generated/vad_options.pb.dart'
         VADResult,
         VADStatistics;
 import 'package:runanywhere/generated/voice_events.pbenum.dart'
-    show VADEventType;
+    show VADStreamEventKind;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_vad.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
@@ -42,7 +42,7 @@ class RunAnywhereVAD {
   static RunAnywhereVAD get shared => _instance;
 
   final _logger = SDKLogger('RunAnywhere.VAD');
-  final _activityController = StreamController<VADEventType>.broadcast();
+  final _activityController = StreamController<VADStreamEventKind>.broadcast();
 
   /// Initialize VAD with a generated configuration.
   Future<void> initializeVAD([VADConfiguration? config]) async {
@@ -135,11 +135,11 @@ class RunAnywhereVAD {
   }
 
   /// Stream of speech activity transitions.
-  Stream<VADEventType> get activityStream => _activityController.stream;
+  Stream<VADStreamEventKind> get activityStream => _activityController.stream;
 
   /// Register a single callback for speech activity events.
   void setSpeechActivityCallback(
-    void Function(VADEventType event)? callback,
+    void Function(VADStreamEventKind event)? callback,
   ) {}
 
   /// Register a single callback for raw audio buffers.

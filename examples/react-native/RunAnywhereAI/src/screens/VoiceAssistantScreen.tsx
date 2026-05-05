@@ -43,10 +43,8 @@ import {
   type ModelInfo as SDKModelInfo,
   VoiceAgentStreamAdapter,
 } from '@runanywhere/core';
-import {
-  PipelineState as VoiceEventPipelineState,
-  VADEventType,
-} from '@runanywhere/proto-ts/voice_events';
+import { PipelineState as VoiceEventPipelineState } from '@runanywhere/proto-ts/voice_events';
+import { VADStreamEventKind } from '@runanywhere/proto-ts/vad_options';
 import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 
 // Canonical SDK methods (Swift / Kotlin / Flutter / Web parity).
@@ -184,13 +182,17 @@ export const VoiceAssistantScreen: React.FC = () => {
     }
 
     if (event.vad) {
-      if (event.vad.type === VADEventType.VAD_EVENT_VOICE_START) {
-        console.warn('[VoiceAssistant] 🎙️ Speech started');
-      } else if (
-        event.vad.type === VADEventType.VAD_EVENT_VOICE_END_OF_UTTERANCE
+      // IDL-18: VADEvent.type is VADStreamEventKind; start/end ride
+      // SPEECH_ACTIVITY with direction on the is_speech bool.
+      if (
+        event.vad.type === VADStreamEventKind.VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY
       ) {
-        console.warn('[VoiceAssistant] 🔇 Speech ended — processing');
-        setStatus(VoicePipelineStatus.Processing);
+        if (event.vad.isSpeech) {
+          console.warn('[VoiceAssistant] Speech started');
+        } else {
+          console.warn('[VoiceAssistant] Speech ended — processing');
+          setStatus(VoicePipelineStatus.Processing);
+        }
       }
       return;
     }

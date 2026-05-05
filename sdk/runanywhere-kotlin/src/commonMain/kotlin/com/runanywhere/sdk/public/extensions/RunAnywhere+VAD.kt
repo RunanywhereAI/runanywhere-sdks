@@ -12,11 +12,11 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.VADConfiguration
-import ai.runanywhere.proto.v1.VADEventType
 import ai.runanywhere.proto.v1.VADOptions
 import ai.runanywhere.proto.v1.VADResult
 import ai.runanywhere.proto.v1.VADStatistics
 import ai.runanywhere.proto.v1.VADStreamEvent
+import ai.runanywhere.proto.v1.VADStreamEventKind
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.Flow
 
@@ -125,7 +125,7 @@ expect suspend fun RunAnywhere.stopVAD()
  *
  * Idiomatic Kotlin alternative: collect [streamVAD] for a Flow.
  */
-expect suspend fun RunAnywhere.setVADSpeechActivityCallback(callback: (VADEventType) -> Unit)
+expect suspend fun RunAnywhere.setVADSpeechActivityCallback(callback: (VADStreamEventKind) -> Unit)
 
 /**
  * Set the audio-buffer callback that fires for each processed VAD frame.
