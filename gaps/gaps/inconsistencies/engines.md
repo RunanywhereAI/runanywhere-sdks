@@ -32,11 +32,6 @@ Backend health: llamacpp (healthy, 5 gaps already resolved — 01/02/05/06/07), 
 
 ## Cross-backend duplication
 
-### DUP-01: Int16→Float32 audio conversion is duplicated across active STT backends
-- `engines/sherpa/rac_backend_sherpa_register.cpp:40-50` `convert_int16_to_float32`
-
-Currently only active in sherpa. Consolidate into a shared commons helper `rac_audio_pcm16_to_float32()` so the Iteration-I STT backends (whispercpp, metalrt) can reuse one implementation when they come back online.
-
 ### DUP-03: Backend-create scaffolding is structurally identical across active backends
 Each backend's `<primitive>_create_impl` function in `rac_backend_<name>_register.cpp` follows the exact same shape:
 ```c++
@@ -97,6 +92,6 @@ All gaps under the following backends are parked. Do not audit, fix, or referenc
 - `engines/diffusion-coreml/` — ENG-DIFFUSION-01, ENG-DIFFUSION-02, ENG-DIFFUSION-03, ENG-DIFFUSION-04 *(Iteration I — deferred)*
 - `engines/whisperkit_coreml/` — ENG-WKC-01, ENG-WKC-02, ENG-WKC-03 *(Iteration I — deferred)*
 
-Cross-backend items that originally pulled in deferred backends (DUP-01 metalrt / whispercpp slices, DUP-03 whispercpp / metalrt slices, DUP-05 metalrt slices, DUP-06 metalrt / diffusion-coreml / whisperkit_coreml slices, DUP-07 whispercpp / genie slices) are stripped to their active-backend portions above.
+Cross-backend items that originally pulled in deferred backends (DUP-03 whispercpp / metalrt slices, DUP-05 metalrt slices, DUP-06 metalrt / diffusion-coreml / whisperkit_coreml slices, DUP-07 whispercpp / genie slices) are stripped to their active-backend portions above. DUP-01 (pcm16→f32) was resolved in Wave 2a: sherpa now routes through the shared commons helper `rac::audio::rac_audio_pcm16_to_float32` in `sdk/runanywhere-commons/include/rac/audio/rac_audio_convert.h`.
 
 Previously-tracked llamacpp wins — ENG-LLAMA-01, ENG-LLAMA-02, ENG-LLAMA-04 (DeviceType dedup — shared header at `engines/common/rac_engine_device_type.h`), ENG-LLAMA-05, ENG-LLAMA-06, ENG-LLAMA-07 — were closed and are not re-listed here.
