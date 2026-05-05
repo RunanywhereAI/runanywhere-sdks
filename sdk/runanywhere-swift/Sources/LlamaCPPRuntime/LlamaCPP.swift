@@ -31,15 +31,23 @@ import RunAnywhere
 /// ## Usage
 ///
 /// LLM services are accessed through the main SDK APIs - the C++ backend handles
-/// service creation and lifecycle internally:
+/// service creation and lifecycle internally. Use the canonical proto-request
+/// entry points:
 ///
 /// ```swift
 /// // Generate text via public API
-/// let response = try await RunAnywhere.chat("Hello!")
+/// var req = RALLMGenerateRequest()
+/// req.prompt = "Hello!"
+/// let result = try await RunAnywhere.generate(req)
+/// print(result.text)
 ///
 /// // Stream text via public API
-/// for try await token in try await RunAnywhere.streamChat("Tell me a story") {
-///     print(token, terminator: "")
+/// var streamReq = RALLMGenerateRequest()
+/// streamReq.prompt = "Tell me a story"
+/// for try await event in try await RunAnywhere.generateStream(streamReq) {
+///     if event.eventKind == .token {
+///         print(event.token, terminator: "")
+///     }
 /// }
 /// ```
 public enum LlamaCPP: RunAnywhereModule {

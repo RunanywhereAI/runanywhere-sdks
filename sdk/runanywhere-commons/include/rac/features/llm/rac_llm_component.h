@@ -298,17 +298,6 @@ RAC_API rac_result_t rac_llm_component_remove_lora(rac_handle_t handle, const ch
 RAC_API rac_result_t rac_llm_component_clear_lora(rac_handle_t handle);
 
 /**
- * @brief Get loaded LoRA adapters info as JSON
- *
- * Returns JSON array: [{"path":"...", "scale":1.0, "applied":true}, ...]
- *
- * @param handle Component handle
- * @param out_json Output: JSON string (caller must free with rac_free)
- * @return RAC_SUCCESS or error code
- */
-RAC_API rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle, char** out_json);
-
-/**
  * @brief Check if the current backend supports LoRA adapters
  *
  * Verifies that a model is loaded and the active backend exposes LoRA operations.
@@ -319,10 +308,14 @@ RAC_API rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle, char**
  * @param out_error Output: error message if incompatible (caller must free with rac_free), NULL if
  * compatible
  * @return RAC_SUCCESS if the backend supports LoRA, error code otherwise
+ *
+ * @internal Classification: `delete after SDK migration`. Commons-internal
+ *           safety net used by `rac_lora_apply_proto` at load time. SDKs
+ *           consume LoRA compatibility through the `rac_lora_*_proto` API.
  */
-RAC_API rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
-                                                         const char* adapter_path,
-                                                         char** out_error);
+rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
+                                                 const char* adapter_path,
+                                                 char** out_error);
 
 // =============================================================================
 // DESTRUCTION

@@ -61,7 +61,7 @@ public enum RunAnywhere {
     /// Internal init params storage
     internal static var initParams: SDKInitParams?
     internal static var currentEnvironment: SDKEnvironment?
-    internal static var _isInitialized = false
+    internal static var isInitializedFlag = false
 
     /// Track if services initialization is complete (makes API calls O(1) after first use)
     internal static var hasCompletedServicesInit = false
@@ -80,7 +80,7 @@ public enum RunAnywhere {
     /// Check if SDK is initialized (Phase 1 complete).
     /// Canonical name per CANONICAL_API §2.
     public static var isInitialized: Bool {
-        _isInitialized
+        isInitializedFlag
     }
 
     /// Check if services are fully ready (Phase 2 complete)
@@ -90,7 +90,7 @@ public enum RunAnywhere {
 
     /// Check if SDK is active and ready for use
     public static var isActive: Bool {
-        _isInitialized && initParams != nil
+        isInitializedFlag && initParams != nil
     }
 
     /// Current SDK version
@@ -148,7 +148,7 @@ public enum RunAnywhere {
         let logger = SDKLogger(category: "RunAnywhere.Reset")
         logger.info("Resetting SDK state...")
 
-        _isInitialized = false
+        isInitializedFlag = false
         hasCompletedServicesInit = false
         hasCompletedHTTPSetup = false
         initParams = nil
@@ -253,7 +253,7 @@ public enum RunAnywhere {
     ///   - startBackgroundServices: If true, starts Phase 2 in background task
     private static func performCoreInit(with params: SDKInitParams, startBackgroundServices: Bool) throws {
         // Return early if already initialized
-        guard !_isInitialized else { return }
+        guard !isInitializedFlag else { return }
 
         let initStartTime = CFAbsoluteTimeGetCurrent()
 
@@ -281,7 +281,7 @@ public enum RunAnywhere {
             }
 
             // Mark Phase 1 complete
-            _isInitialized = true
+            isInitializedFlag = true
 
             let initDurationMs = (CFAbsoluteTimeGetCurrent() - initStartTime) * 1000
             logger.info("✅ Phase 1 complete in \(String(format: "%.1f", initDurationMs))ms (\(params.environment.description))")
@@ -305,7 +305,7 @@ public enum RunAnywhere {
         } catch {
             logger.error("❌ Initialization failed: \(error.localizedDescription)")
             initParams = nil
-            _isInitialized = false
+            isInitializedFlag = false
             CppBridge.Events.emitSDKInitFailed(error: SDKException.from(error))
             throw error
         }

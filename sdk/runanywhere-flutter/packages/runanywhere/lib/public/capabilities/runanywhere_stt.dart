@@ -7,7 +7,6 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
-import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
@@ -87,7 +86,6 @@ class RunAnywhereSTT {
 
     final logger = SDKLogger('RunAnywhere.LoadSTTModel');
     logger.info('Loading STT model: $modelId');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
 
     EventBus.shared.publish(SdkEventFactory.modelLoadStarted(modelId));
 
@@ -109,28 +107,10 @@ class RunAnywhereSTT {
         );
       }
 
-      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'stt',
-        success: true,
-        loadTimeMs: loadTimeMs,
-      );
-
       EventBus.shared.publish(SdkEventFactory.modelLoadCompleted(modelId));
       logger.info('STT model loaded: $modelId');
     } catch (e) {
       logger.error('Failed to load STT model: $e');
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'stt',
-        success: false,
-      );
-      TelemetryService.shared.trackError(
-        errorCode: 'stt_model_load_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
       EventBus.shared.publish(SdkEventFactory.modelLoadFailed(modelId, e));
       rethrow;
     }

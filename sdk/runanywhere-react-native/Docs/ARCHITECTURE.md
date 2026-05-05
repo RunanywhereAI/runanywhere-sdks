@@ -625,10 +625,12 @@ packages/core/src/
 │       ├── RunAnywhere+STT.ts
 │       ├── RunAnywhere+TTS.ts
 │       ├── RunAnywhere+VAD.ts
-│       ├── RunAnywhere+Models.ts
+│       ├── RunAnywhere+ModelManagement.ts
 │       ├── RunAnywhere+Storage.ts
 │       ├── RunAnywhere+VoiceAgent.ts
-│       ├── RunAnywhere+VoiceSession.ts
+│       ├── RunAnywhere+VisionLanguage.ts
+│       ├── RunAnywhere+RAG.ts
+│       ├── RunAnywhere+Solutions.ts
 │       ├── RunAnywhere+StructuredOutput.ts
 │       └── RunAnywhere+Logging.ts
 ├── Foundation/

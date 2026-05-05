@@ -31,7 +31,7 @@ The ONNXRuntime module is included in the RunAnywhere SDK. Add it to your target
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.16.0")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.19.13")
 ],
 targets: [
     .target(
@@ -85,53 +85,60 @@ struct MyApp: App {
 #### Loading a Model
 
 ```swift
-try await RunAnywhere.loadSTTModel("whisper-base-onnx")
-
-let isLoaded = await RunAnywhere.isSTTModelLoaded
+var req = RAModelLoadRequest()
+req.modelID = "whisper-base-onnx"
+req.category = .speechRecognition
+req.framework = .onnx
+let result = await RunAnywhere.loadModel(req)
+print("Loaded: \(result.resolvedPath)")
 ```
 
 #### Simple Transcription
 
 ```swift
 let audioData: Data = // your audio data (16kHz, mono, Float32)
-let text = try await RunAnywhere.transcribe(audioData)
-print("Transcribed: \(text)")
+let output = try await RunAnywhere.transcribe(audio: audioData)
+print("Transcribed: \(output.text)")
 ```
 
 #### Transcription with Options
 
 ```swift
-let options = STTOptions(
-    language: "en-US",
-    sampleRate: 16000,
-    enableWordTimestamps: true
-)
+var options = RASTTOptions.defaults()
+options.language = .en
+options.sampleRate = 16000
+options.enableWordTimestamps = true
 
-let result = try await RunAnywhere.transcribeWithOptions(audioData, options: options)
-print("Text: \(result.text)")
-print("Confidence: \(result.confidence ?? 0)")
-if let language = result.detectedLanguage {
-    print("Detected language: \(language)")
+let output = try await RunAnywhere.transcribe(audio: audioData, options: options)
+print("Text: \(output.text)")
+print("Confidence: \(output.confidence)")
+if output.hasLanguageCode {
+    print("Detected language: \(output.languageCode)")
 }
 ```
 
 #### Streaming Transcription
 
 ```swift
-let output = try await RunAnywhere.transcribeStream(
-    audioData: audioData,
-    options: STTOptions(language: "en")
-) { partialResult in
-    print("Partial: \(partialResult.transcript)")
-}
+var options = RASTTOptions.defaults()
+options.language = .en
 
-print("Final: \(output.text)")
+for await partial in RunAnywhere.transcribeStream(audio: audioStream, options: options) {
+    if partial.isFinal {
+        print("Final: \(partial.text)")
+    } else {
+        print("Partial: \(partial.text)")
+    }
+}
 ```
 
 #### Unloading
 
 ```swift
-try await RunAnywhere.unloadSTTModel()
+var unload = RAModelUnloadRequest()
+unload.modelID = "whisper-base-onnx"
+unload.category = .speechRecognition
+_ = await RunAnywhere.unloadModel(unload)
 ```
 
 ### Text-to-Speech (TTS)
@@ -139,55 +146,50 @@ try await RunAnywhere.unloadSTTModel()
 #### Loading a Voice
 
 ```swift
-try await RunAnywhere.loadTTSVoice("piper-en-us-amy")
-
-let isLoaded = await RunAnywhere.isTTSVoiceLoaded
+var req = RAModelLoadRequest()
+req.modelID = "piper-en-us-amy"
+req.category = .speechSynthesis
+req.framework = .onnx
+_ = await RunAnywhere.loadModel(req)
 ```
 
 #### Simple Synthesis
 
 ```swift
+var options = RATTSOptions.defaults()
+options.rate = 1.0
+options.pitch = 1.0
+options.volume = 0.8
+
 let output = try await RunAnywhere.synthesize(
     "Hello! Welcome to RunAnywhere.",
-    options: TTSOptions(rate: 1.0, pitch: 1.0, volume: 0.8)
+    options: options
 )
 
 // output.audioData contains the synthesized audio
-// output.duration contains the audio length in seconds
+// output.durationMs contains the audio length in ms
 ```
 
 #### Speak with Automatic Playback
 
 ```swift
 // Synthesize and play through device speakers
-try await RunAnywhere.speak("Hello world")
+let result = try await RunAnywhere.speak("Hello world")
 
 // With options
-let result = try await RunAnywhere.speak(
-    "Hello",
-    options: TTSOptions(rate: 1.2, pitch: 1.0)
-)
-print("Duration: \(result.duration)s")
+var options = RATTSOptions.defaults()
+options.rate = 1.2
+options.pitch = 1.0
+let result = try await RunAnywhere.speak("Hello", options: options)
+print("Duration: \(result.output.durationMs) ms")
 ```
 
 #### Streaming Synthesis
 
 ```swift
-let output = try await RunAnywhere.synthesizeStream(
-    "Long text to synthesize...",
-    options: TTSOptions()
-) { chunk in
-    // Process audio chunk as it's generated
-    playAudioChunk(chunk)
-}
-```
-
-#### Available Voices
-
-```swift
-let voices = await RunAnywhere.availableTTSVoices
-for voice in voices {
-    print("Voice: \(voice)")
+for await chunk in RunAnywhere.synthesizeStream("Long text to synthesize...") {
+    // Process audio chunk as it is generated
+    playAudioChunk(chunk.audioData)
 }
 ```
 
@@ -200,57 +202,34 @@ await RunAnywhere.stopSpeaking()
 
 ### Voice Activity Detection (VAD)
 
-#### Initialization
-
-```swift
-// Default configuration
-try await RunAnywhere.initializeVAD()
-
-// Custom configuration
-try await RunAnywhere.initializeVAD(VADConfiguration(
-    sampleRate: 16000,
-    frameLength: 0.032,
-    energyThreshold: 0.5
-))
-```
-
 #### Detection
 
 ```swift
-// From audio samples
-let samples: [Float] = // your audio samples
-let speechDetected = try await RunAnywhere.detectSpeech(in: samples)
+// Single buffer
+var opts = RAVADOptions()
+opts.sampleRate = 16000
+opts.energyThreshold = 0.5
 
-// From AVAudioPCMBuffer
-let buffer: AVAudioPCMBuffer = // your audio buffer
-let speechDetected = try await RunAnywhere.detectSpeech(in: buffer)
-```
-
-#### Callbacks
-
-```swift
-// Speech activity callback
-await RunAnywhere.setVADSpeechActivityCallback { event in
-    switch event {
-    case .started:
-        print("Speech started")
-    case .ended:
-        print("Speech ended")
-    }
-}
-
-// Audio buffer callback
-await RunAnywhere.setVADAudioBufferCallback { samples in
-    // Process audio samples
+let samples: Data = // Float32 PCM at 16 kHz mono
+let result = try await RunAnywhere.detectVoiceActivity(samples, options: opts)
+if result.isSpeech {
+    print("Speech detected (confidence: \(result.confidence))")
 }
 ```
 
-#### Control
+#### Streaming Detection
 
 ```swift
-try await RunAnywhere.startVAD()
-try await RunAnywhere.stopVAD()
-await RunAnywhere.cleanupVAD()
+// Stream VAD over a chunked AsyncStream<Data>
+for await vadResult in RunAnywhere.streamVAD(audio: audioStream) {
+    if vadResult.isSpeech { handleSpeechFrame(vadResult) }
+}
+```
+
+#### Reset
+
+```swift
+try await RunAnywhere.resetVAD()
 ```
 
 ## API Reference

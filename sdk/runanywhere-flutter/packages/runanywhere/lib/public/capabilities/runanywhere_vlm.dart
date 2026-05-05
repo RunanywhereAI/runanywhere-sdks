@@ -5,7 +5,6 @@
 import 'dart:async';
 
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
-import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
@@ -56,7 +55,6 @@ class RunAnywhereVLM {
 
     final logger = SDKLogger('RunAnywhere.LoadVLMModel');
     logger.info('Loading VLM model: $modelId');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
 
     EventBus.shared.publish(SdkEventFactory.modelLoadStarted(modelId));
 
@@ -76,29 +74,11 @@ class RunAnywhereVLM {
         );
       }
 
-      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
       logger.info('VLM model loaded successfully: $modelId');
-
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'vlm',
-        success: true,
-        loadTimeMs: loadTimeMs,
-      );
 
       EventBus.shared.publish(SdkEventFactory.modelLoadCompleted(modelId));
     } catch (e) {
       logger.error('Failed to load VLM model: $e');
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'vlm',
-        success: false,
-      );
-      TelemetryService.shared.trackError(
-        errorCode: 'vlm_model_load_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
       EventBus.shared.publish(SdkEventFactory.modelLoadFailed(modelId, e));
       rethrow;
     }
@@ -181,26 +161,9 @@ class RunAnywhereVLM {
         '${result.tokensPerSecond.toStringAsFixed(1)} tok/s',
       );
 
-      TelemetryService.shared.trackGeneration(
-        modelId: modelId,
-        modelName: modelId,
-        promptTokens: result.promptTokens,
-        completionTokens: result.completionTokens,
-        latencyMs: result.processingTimeMs.toInt(),
-        temperature: opts.hasTemperature() ? opts.temperature : 0.7,
-        maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 2048,
-        tokensPerSecond: result.tokensPerSecond,
-        isStreaming: false,
-      );
-
       return result;
     } catch (e) {
       logger.error('VLM processing failed: $e');
-      TelemetryService.shared.trackError(
-        errorCode: 'vlm_processing_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
       rethrow;
     }
   }

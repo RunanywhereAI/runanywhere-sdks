@@ -71,9 +71,13 @@ typedef struct rac_structured_output_parse_result {
  * @param out_json Output: Allocated JSON string (caller must free with rac_free)
  * @param out_length Output: Length of extracted JSON string (can be NULL)
  * @return RAC_SUCCESS if JSON found and extracted, error code otherwise
+ *
+ * @internal Classification: `delete after SDK migration`. Commons-internal
+ *           parser helper used by `rac_structured_output_parse_proto`;
+ *           SDKs receive extracted JSON via proto bytes.
  */
-RAC_API rac_result_t rac_structured_output_extract_json(const char* text, char** out_json,
-                                                        size_t* out_length);
+rac_result_t rac_structured_output_extract_json(const char* text, char** out_json,
+                                                size_t* out_length);
 
 /**
  * @brief Extract, parse, canonicalize, and validate structured output JSON
@@ -149,9 +153,13 @@ RAC_API rac_result_t rac_structured_output_generate_stream_proto(
  * @param out_start Output: Start position of JSON (0-indexed)
  * @param out_end Output: End position of JSON (exclusive)
  * @return RAC_TRUE if complete JSON found, RAC_FALSE otherwise
+ *
+ * @internal Classification: `delete after SDK migration`. Commons-internal
+ *           scanner used by streaming structured-output; SDKs should not
+ *           call it directly.
  */
-RAC_API rac_bool_t rac_structured_output_find_complete_json(const char* text, size_t* out_start,
-                                                            size_t* out_end);
+rac_bool_t rac_structured_output_find_complete_json(const char* text, size_t* out_start,
+                                                    size_t* out_end);
 
 /**
  * @brief Find matching closing brace for an opening brace
@@ -219,9 +227,13 @@ RAC_API rac_result_t rac_structured_output_prepare_prompt_proto(
  * @param json_schema JSON schema describing expected output structure
  * @param out_prompt Output: Allocated system prompt (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
+ *
+ * @internal Classification: `delete after SDK migration`. Commons-internal
+ *           helper used by `rac_structured_output_prepare_prompt_proto`;
+ *           SDKs should call the proto API.
  */
-RAC_API rac_result_t rac_structured_output_get_system_prompt(const char* json_schema,
-                                                             char** out_prompt);
+rac_result_t rac_structured_output_get_system_prompt(const char* json_schema,
+                                                     char** out_prompt);
 
 /**
  * @brief Validate that text contains valid structured output

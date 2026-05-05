@@ -1262,27 +1262,6 @@ extern "C" rac_result_t rac_llm_component_clear_lora(rac_handle_t handle) {
     return llm_service->ops->clear_lora(llm_service->impl);
 }
 
-extern "C" rac_result_t rac_llm_component_get_lora_info(rac_handle_t handle, char** out_json) {
-    if (!handle)
-        return RAC_ERROR_INVALID_HANDLE;
-    if (!out_json)
-        return RAC_ERROR_INVALID_ARGUMENT;
-
-    auto* component = reinterpret_cast<rac_llm_component*>(handle);
-    std::lock_guard<std::mutex> lock(component->mtx);
-
-    rac_handle_t service = rac_lifecycle_get_service(component->lifecycle);
-    if (!service) {
-        log_error("LLM.Component", "Cannot get LoRA info: no model loaded");
-        return RAC_ERROR_COMPONENT_NOT_READY;
-    }
-
-    auto* llm_service = reinterpret_cast<rac_llm_service_t*>(service);
-    if (!llm_service->ops || !llm_service->ops->get_lora_info)
-        return RAC_ERROR_NOT_SUPPORTED;
-    return llm_service->ops->get_lora_info(llm_service->impl, out_json);
-}
-
 extern "C" rac_result_t rac_llm_component_check_lora_compat(rac_handle_t handle,
                                                             const char* adapter_path,
                                                             char** out_error) {

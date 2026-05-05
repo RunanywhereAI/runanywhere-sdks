@@ -9,7 +9,6 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
-import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart'
@@ -78,7 +77,6 @@ class RunAnywhereLLM {
 
     final logger = SDKLogger('RunAnywhere.LoadModel');
     logger.info('Loading model: $modelId');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
 
     EventBus.shared.publish(SdkEventFactory.modelLoadStarted(modelId));
 
@@ -100,29 +98,11 @@ class RunAnywhereLLM {
         );
       }
 
-      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
       logger.info('Model loaded successfully: $modelId');
-
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'llm',
-        success: true,
-        loadTimeMs: loadTimeMs,
-      );
 
       EventBus.shared.publish(SdkEventFactory.modelLoadCompleted(modelId));
     } catch (e) {
       logger.error('Failed to load model: $e');
-      TelemetryService.shared.trackModelLoad(
-        modelId: modelId,
-        modelType: 'llm',
-        success: false,
-      );
-      TelemetryService.shared.trackError(
-        errorCode: 'model_load_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
       EventBus.shared.publish(SdkEventFactory.modelLoadFailed(modelId, e));
       rethrow;
     }
@@ -181,15 +161,6 @@ class RunAnywhereLLM {
       );
     }
 
-    final current = await RunAnywhereModelLifecycle.shared.current(
-      model_pb.CurrentModelRequest(
-        category: model_pb.ModelCategory.MODEL_CATEGORY_LANGUAGE,
-        includeModelMetadata: true,
-      ),
-    );
-    final modelInfo = current.hasModel() ? current.model : null;
-    final modelName = modelInfo?.name;
-
     try {
       final request = _toGenerateRequest(prompt, opts);
       final result = _generateProto(request);
@@ -203,26 +174,8 @@ class RunAnywhereLLM {
         result.generationTimeMs = latencyMs;
       }
 
-      TelemetryService.shared.trackGeneration(
-        modelId: modelId,
-        modelName: modelName,
-        promptTokens: result.inputTokens,
-        completionTokens: result.tokensGenerated,
-        latencyMs: latencyMs.round(),
-        temperature: opts.hasTemperature() ? opts.temperature : 0.8,
-        maxTokens: opts.hasMaxTokens() ? opts.maxTokens : 100,
-        contextLength: modelInfo?.contextLength,
-        tokensPerSecond: result.tokensPerSecond,
-        isStreaming: false,
-      );
-
       return result;
     } catch (e) {
-      TelemetryService.shared.trackError(
-        errorCode: 'generation_failed',
-        errorMessage: e.toString(),
-        context: {'model_id': modelId},
-      );
       throw SDKException.generationFailed('$e');
     }
   }

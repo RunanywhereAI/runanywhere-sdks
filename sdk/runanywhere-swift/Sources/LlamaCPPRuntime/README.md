@@ -29,7 +29,7 @@ The LlamaCPPRuntime module is included in the RunAnywhere SDK. Add it to your ta
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.16.0")
+    .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.19.13")
 ],
 targets: [
     .target(
@@ -81,52 +81,49 @@ struct MyApp: App {
 ### Loading a Model
 
 ```swift
-// Load a GGUF model by ID
-try await RunAnywhere.loadModel("llama-3.2-1b-instruct-q4")
-
-// Check if model is loaded
-let isLoaded = await RunAnywhere.isModelLoaded
+// Load a GGUF model via the canonical proto request
+var req = RAModelLoadRequest()
+req.modelID = "llama-3.2-1b-instruct-q4"
+req.category = .language
+req.framework = .llamaCpp
+let loaded = await RunAnywhere.loadModel(req)
+print("Loaded: \(loaded.resolvedPath)")
 ```
 
 ### Text Generation
 
 ```swift
-// Simple chat
-let response = try await RunAnywhere.chat("What is the capital of France?")
-print(response)
+// Simple generation
+var req = RALLMGenerateRequest()
+req.prompt = "What is the capital of France?"
+let result = try await RunAnywhere.generate(req)
+print(result.text)
 
 // Generation with options and metrics
-let result = try await RunAnywhere.generate(
-    "Explain quantum computing in simple terms",
-    options: LLMGenerationOptions(
-        maxTokens: 200,
-        temperature: 0.7,
-        systemPrompt: "You are a helpful assistant."
-    )
-)
+var detailed = RALLMGenerateRequest()
+detailed.prompt = "Explain quantum computing in simple terms"
+detailed.options.maxTokens = 200
+detailed.options.temperature = 0.7
+detailed.options.systemPrompt = "You are a helpful assistant."
 
-print("Response: \(result.text)")
-print("Tokens used: \(result.tokensUsed)")
-print("Speed: \(result.tokensPerSecond) tok/s")
+let output = try await RunAnywhere.generate(detailed)
+print("Response: \(output.text)")
+print("Tokens used: \(output.outputTokens)")
+print("Speed: \(output.tokensPerSecond) tok/s")
 ```
 
 ### Streaming Generation
 
 ```swift
-let result = try await RunAnywhere.generateStream(
-    "Write a short poem about technology",
-    options: LLMGenerationOptions(maxTokens: 150)
-)
+var req = RALLMGenerateRequest()
+req.prompt = "Write a short poem about technology"
+req.options.maxTokens = 150
 
-// Display tokens in real-time
-for try await token in result.stream {
-    print(token, terminator: "")
+for try await event in try await RunAnywhere.generateStream(req) {
+    if event.eventKind == .token {
+        print(event.token, terminator: "")
+    }
 }
-
-// Get complete metrics after streaming finishes
-let metrics = try await result.result.value
-print("\nSpeed: \(metrics.tokensPerSecond) tok/s")
-print("Total tokens: \(metrics.tokensUsed)")
 ```
 
 ### Structured Output
@@ -161,7 +158,10 @@ let quiz: QuizQuestion = try await RunAnywhere.generateStructured(
 ### Unloading
 
 ```swift
-try await RunAnywhere.unloadModel()
+var unload = RAModelUnloadRequest()
+unload.modelID = "llama-3.2-1b-instruct-q4"
+unload.category = .language
+_ = await RunAnywhere.unloadModel(unload)
 ```
 
 ## API Reference

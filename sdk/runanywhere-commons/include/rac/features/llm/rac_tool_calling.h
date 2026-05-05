@@ -360,8 +360,13 @@ RAC_API rac_result_t rac_tool_call_format_prompt_with_format(
  * @param tools_json JSON array of tool definitions
  * @param out_prompt Output: Allocated prompt string (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
+ *
+ * @internal Classification: `delete after SDK migration` (see
+ *           docs/CPP_PROTO_OWNERSHIP.md). Kept for commons-internal use by
+ *           `rac_tool_call_format_prompt_proto` and the RAG pipeline. SDKs
+ *           must call `rac_tool_call_format_prompt_proto` instead.
  */
-RAC_API rac_result_t rac_tool_call_format_prompt_json(const char* tools_json, char** out_prompt);
+rac_result_t rac_tool_call_format_prompt_json(const char* tools_json, char** out_prompt);
 
 /**
  * @brief Format tools from JSON array string with specified format
@@ -370,15 +375,16 @@ RAC_API rac_result_t rac_tool_call_format_prompt_json(const char* tools_json, ch
  * @param format Tool calling format to use for instructions
  * @param out_prompt Output: Allocated prompt string (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
+ *
+ * @internal Classification: `delete after SDK migration`. Commons-internal
+ *           only. SDKs must call `rac_tool_call_format_prompt_proto`.
  */
-RAC_API rac_result_t rac_tool_call_format_prompt_json_with_format(const char* tools_json,
-                                                                  rac_tool_call_format_t format,
-                                                                  char** out_prompt);
+rac_result_t rac_tool_call_format_prompt_json_with_format(const char* tools_json,
+                                                         rac_tool_call_format_t format,
+                                                         char** out_prompt);
 
 /**
  * @brief Format tools from JSON array string with format specified by name
- *
- * *** PREFERRED API FOR SDKS - Uses string format name ***
  *
  * Valid format names (case-insensitive): "default", "lfm2"
  * Unknown names default to "default" format.
@@ -387,10 +393,13 @@ RAC_API rac_result_t rac_tool_call_format_prompt_json_with_format(const char* to
  * @param format_name Format name string (e.g., "lfm2", "default")
  * @param out_prompt Output: Allocated prompt string (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
+ *
+ * @internal Classification: `delete after SDK migration`. Commons-internal
+ *           only. SDKs must call `rac_tool_call_format_prompt_proto`.
  */
-RAC_API rac_result_t rac_tool_call_format_prompt_json_with_format_name(const char* tools_json,
-                                                                       const char* format_name,
-                                                                       char** out_prompt);
+rac_result_t rac_tool_call_format_prompt_json_with_format_name(const char* tools_json,
+                                                              const char* format_name,
+                                                              char** out_prompt);
 
 /**
  * @brief Build the initial prompt with tools and user query
@@ -402,11 +411,15 @@ RAC_API rac_result_t rac_tool_call_format_prompt_json_with_format_name(const cha
  * @param options Tool calling options (can be NULL for defaults)
  * @param out_prompt Output: Complete formatted prompt (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
+ *
+ * @internal Classification: `delete after SDK migration`. Commons-internal
+ *           only. SDKs should compose the prompt through
+ *           `rac_tool_call_format_prompt_proto`.
  */
-RAC_API rac_result_t rac_tool_call_build_initial_prompt(const char* user_prompt,
-                                                        const char* tools_json,
-                                                        const rac_tool_calling_options_t* options,
-                                                        char** out_prompt);
+rac_result_t rac_tool_call_build_initial_prompt(const char* user_prompt,
+                                                const char* tools_json,
+                                                const rac_tool_calling_options_t* options,
+                                                char** out_prompt);
 
 /**
  * @brief Build follow-up prompt after tool execution
@@ -421,8 +434,12 @@ RAC_API rac_result_t rac_tool_call_build_initial_prompt(const char* user_prompt,
  * @param keep_tools_available Whether to include tool definitions in follow-up
  * @param out_prompt Output: Follow-up prompt (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
+ *
+ * @internal Classification: `delete after SDK migration`. Commons-internal
+ *           only. SDKs should maintain tool-calling sessions through
+ *           `rac_tool_call_*_proto`.
  */
-RAC_API rac_result_t rac_tool_call_build_followup_prompt(
+rac_result_t rac_tool_call_build_followup_prompt(
     const char* original_user_prompt, const char* tools_prompt, const char* tool_name,
     const char* tool_result_json, rac_bool_t keep_tools_available, char** out_prompt);
 
@@ -455,8 +472,12 @@ RAC_API rac_result_t rac_tool_call_format_prompt_proto(
  * @param json_str Input JSON string
  * @param out_normalized Output: Normalized JSON (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
+ *
+ * @internal Classification: `delete after SDK migration`. Commons-internal
+ *           helper used by `rac_tool_call_parse`; SDKs consume normalized
+ *           arguments via the `_proto` family.
  */
-RAC_API rac_result_t rac_tool_call_normalize_json(const char* json_str, char** out_normalized);
+rac_result_t rac_tool_call_normalize_json(const char* json_str, char** out_normalized);
 
 /**
  * @brief Serialize tool definitions to JSON array
@@ -465,9 +486,12 @@ RAC_API rac_result_t rac_tool_call_normalize_json(const char* json_str, char** o
  * @param num_definitions Number of definitions
  * @param out_json Output: JSON array string (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
+ *
+ * @internal Classification: `delete after SDK migration`. Commons-internal
+ *           helper; SDKs should use generated proto messages.
  */
-RAC_API rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definition_t* definitions,
-                                                       size_t num_definitions, char** out_json);
+rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definition_t* definitions,
+                                              size_t num_definitions, char** out_json);
 
 /**
  * @brief Serialize a tool result to JSON
@@ -478,10 +502,13 @@ RAC_API rac_result_t rac_tool_call_definitions_to_json(const rac_tool_definition
  * @param error_message Error message if failed (can be NULL)
  * @param out_json Output: JSON string (caller must free with rac_free)
  * @return RAC_SUCCESS on success, error code otherwise
+ *
+ * @internal Classification: `delete after SDK migration`. Commons-internal
+ *           helper; SDKs should use generated proto messages.
  */
-RAC_API rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_bool_t success,
-                                                  const char* result_json,
-                                                  const char* error_message, char** out_json);
+rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_bool_t success,
+                                         const char* result_json,
+                                         const char* error_message, char** out_json);
 
 #ifdef __cplusplus
 }

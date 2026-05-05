@@ -97,11 +97,21 @@ echo "  bumped: sdk/runanywhere-commons/VERSION"
 bump_line "${REPO_ROOT}/sdk/runanywhere-commons/VERSIONS" \
     '^PROJECT_VERSION=.*' "PROJECT_VERSION=${NEW_VERSION}"
 
-# 2. Swift Package.swift (root)
+# 2. Swift Package.swift (root) + per-SDK VERSION + SDKConstants.version
 echo ""
 echo ">> Swift SDK:"
 bump_line "${REPO_ROOT}/Package.swift" \
     'let sdkVersion = "[^"]+"' "let sdkVersion = \"${NEW_VERSION}\""
+# Swift SDK VERSION file (read by release tooling)
+SWIFT_VERSION_FILE="${REPO_ROOT}/sdk/runanywhere-swift/VERSION"
+if [ -f "$SWIFT_VERSION_FILE" ]; then
+    echo "$NEW_VERSION" > "$SWIFT_VERSION_FILE"
+    echo "  bumped: sdk/runanywhere-swift/VERSION"
+fi
+# SDKConstants.swift — public API `RunAnywhere.version` surface
+bump_line "${REPO_ROOT}/sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Constants/SDKConstants.swift" \
+    'public static let version = "[^"]+"' \
+    "public static let version = \"${NEW_VERSION}\""
 
 # 3. Kotlin gradle.properties
 echo ""

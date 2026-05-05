@@ -9,32 +9,38 @@ import Foundation
 // This is the SINGLE Package.swift for both local development and SPM consumption.
 //
 // FOR EXTERNAL USERS (consuming via GitHub):
-//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.17.0")
+//   .package(url: "https://github.com/RunanywhereAI/runanywhere-sdks", from: "0.19.13")
+//   Keep `useLocalNatives = false` so SPM downloads signed XCFrameworks from
+//   the GitHub release.
 //
 // FOR LOCAL DEVELOPMENT:
-//   1. Run: cd sdk/runanywhere-swift && ./scripts/build-swift.sh --setup
-//   2. Open the example app in Xcode
-//   3. The app references this package via relative path
+//   1. Build native XCFrameworks from the repo root:
+//          ./scripts/build-core-xcframework.sh
+//      This writes RACommons.xcframework, RABackendLLAMACPP.xcframework,
+//      RABackendONNX.xcframework, and (on Apple) RABackendMetalRT.xcframework
+//      into sdk/runanywhere-swift/Binaries/.
+//   2. Ensure `useLocalNatives = true` below so the package resolves to
+//      those on-disk XCFrameworks instead of the remote release URLs.
+//   3. Open the example app (examples/ios/RunAnywhereAI) in Xcode — it
+//      depends on this package via a relative path.
 //
 // =============================================================================
-
-// Combined ONNX Runtime xcframework (local dev) is created by:
-//   cd sdk/runanywhere-swift && ./scripts/create-onnxruntime-xcframework.sh
 
 // =============================================================================
 // BINARY TARGET CONFIGURATION
 // =============================================================================
 //
 // useLocalNatives = true  → Use local XCFrameworks from sdk/runanywhere-swift/Binaries/
-//                           For local development. Run first-time setup:
-//                             cd sdk/runanywhere-swift && ./scripts/build-swift.sh --setup
+//                           For local development. Generate them with
+//                           `./scripts/build-core-xcframework.sh` at the repo
+//                           root before building the SDK.
 //
-// useLocalNatives = false → Download XCFrameworks from GitHub releases (PRODUCTION)
-//                           For external users via SPM. No setup needed.
+// useLocalNatives = false → Download XCFrameworks from GitHub releases (PRODUCTION).
+//                           For external users via SPM. No local build needed.
 //
-// To toggle this value, use:
-//   ./scripts/build-swift.sh --set-local   (sets useLocalNatives = true)
-//   ./scripts/build-swift.sh --set-remote  (sets useLocalNatives = false)
+// Toggling: this is a hand-edited flag. Release tooling sets it to `false`
+// before tagging a release; local devs flip it back to `true` and run
+// `./scripts/build-core-xcframework.sh` to regenerate the on-disk binaries.
 //
 // Historical name: this used to be called `useLocalBinaries`. The concept is
 // the same — it's been renamed to `useLocalNatives` for consistency with the
@@ -53,11 +59,11 @@ let useLocalNatives = true //  Toggle: true for local dev, false for release
 let sdkVersion = "0.19.13"
 
 // MetalRT is currently only shipped as a local xcframework (built via
-// `./scripts/build-swift.sh --setup`). There is no published remote binary
-// target yet — when one exists, add a `.binaryTarget(... url: ..., checksum:
-// ...)` entry for `RABackendMetalRTBinary` in the remote branch of
-// `binaryTargets()` below and flip `includeMetalRT` to also be true when
-// `useLocalNatives == false`.
+// `./scripts/build-core-xcframework.sh` at the repo root). There is no
+// published remote binary target yet — when one exists, add a
+// `.binaryTarget(... url: ..., checksum: ...)` entry for
+// `RABackendMetalRTBinary` in the remote branch of `binaryTargets()` below
+// and flip `includeMetalRT` to also be true when `useLocalNatives == false`.
 let includeMetalRT = useLocalNatives
 
 let package = Package(
@@ -368,11 +374,10 @@ func binaryTargets() -> [Target] {
     if useLocalNatives {
         // =====================================================================
         // LOCAL DEVELOPMENT MODE
-        // Use XCFrameworks from sdk/runanywhere-swift/Binaries/
-        // Run: cd sdk/runanywhere-swift && ./scripts/build-swift.sh --setup
-        //
-        // For macOS support, build with --include-macos:
-        //   ./scripts/build-swift.sh --setup --include-macos
+        // Use XCFrameworks from sdk/runanywhere-swift/Binaries/.
+        // Regenerate them via: `./scripts/build-core-xcframework.sh` at the
+        // repo root (builds iOS device + simulator + macOS slices into each
+        // of the RACommons / RABackend* xcframeworks).
         // =====================================================================
         // ONNX Runtime is statically linked into RABackendONNX — no separate
         // local xcframework targets needed (v0.19.0+).

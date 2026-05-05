@@ -8,9 +8,10 @@ import Foundation
 /// - LifecycleConstants (Lifecycle capability)
 /// - RegistryConstants (Registry capability)
 public enum SDKConstants {
-    /// SDK version - must match the VERSION file in the repository root
-    /// Update this when bumping the SDK version
-    public static let version = "0.16.0"
+    /// SDK version - must match `sdk/runanywhere-commons/VERSION` and
+    /// `sdk/runanywhere-swift/VERSION`. Updated by `scripts/sync-versions.sh`
+    /// (see SDK_CONSTANTS_SWIFT bump in that script).
+    public static let version = "0.19.13"
 
     /// SDK name
     public static let name = "RunAnywhere SDK"

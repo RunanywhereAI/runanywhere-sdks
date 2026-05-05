@@ -281,7 +281,7 @@ interface LLMGenerationOptions {
   preferredExecutionTarget?: ExecutionTarget;
 
   /** Preferred framework for generation */
-  preferredFramework?: LLMFramework;
+  preferredFramework?: InferenceFramework;
 }
 ```
 
@@ -308,7 +308,7 @@ interface GenerationResult {
   executionTarget: ExecutionTarget;
 
   /** Framework used for generation */
-  framework?: LLMFramework;
+  framework?: InferenceFramework;
 
   /** Hardware acceleration used */
   hardwareUsed: HardwareAcceleration;
@@ -1389,7 +1389,7 @@ enum ExecutionTarget {
   Hybrid = 'hybrid',
 }
 
-enum LLMFramework {
+enum InferenceFramework {
   CoreML = 'CoreML',
   TensorFlowLite = 'TFLite',
   MLX = 'MLX',
@@ -1447,8 +1447,8 @@ interface ModelInfo {
   localPath?: string;
   downloadSize?: number;
   memoryRequired?: number;
-  compatibleFrameworks: LLMFramework[];
-  preferredFramework?: LLMFramework;
+  compatibleFrameworks: InferenceFramework[];
+  preferredFramework?: InferenceFramework;
   supportsThinking: boolean;
   isDownloaded: boolean;
   isAvailable: boolean;
@@ -1461,7 +1461,7 @@ interface GenerationResult {
   modelUsed: string;
   latencyMs: number;
   executionTarget: ExecutionTarget;
-  framework?: LLMFramework;
+  framework?: InferenceFramework;
   hardwareUsed: HardwareAcceleration;
   memoryUsed: number;
   performanceMetrics: PerformanceMetrics;

@@ -226,7 +226,7 @@ public actor HTTPClientAdapter: NetworkService {
             guard var urlComponents = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
                 return base.appendingPathComponent(path)
             }
-            urlComponents.path = urlComponents.path + pathPart
+            urlComponents.path += pathPart
             urlComponents.query = queryPart
             return urlComponents.url ?? base.appendingPathComponent(path)
         }

@@ -74,7 +74,6 @@ export {
   areAllVoiceComponentsReady,
   processVoiceTurn,
   voiceAgentTranscribe,
-  voiceAgentGenerateResponse,
   voiceAgentSynthesizeSpeech,
   cleanupVoiceAgent,
 } from './RunAnywhere+VoiceAgent';

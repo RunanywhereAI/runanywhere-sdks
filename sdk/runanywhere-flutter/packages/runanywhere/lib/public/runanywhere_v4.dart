@@ -29,6 +29,7 @@ import 'package:runanywhere/generated/model_types.pb.dart'
     show
         CurrentModelRequest,
         CurrentModelResult,
+        ModelInfo,
         ModelLoadRequest,
         ModelLoadResult,
         ModelUnloadRequest,
@@ -450,7 +451,8 @@ class RunAnywhereSDK {
   bool get isLLMModelLoaded => RunAnywhereLLM.shared.isLoaded;
 
   /// Currently-loaded LLM model info, or null.
-  Future<dynamic> get currentLLMModel => RunAnywhereLLM.shared.currentModel();
+  Future<ModelInfo?> get currentLLMModel =>
+      RunAnywhereLLM.shared.currentModel();
 
   /// True when an STT model is currently loaded.
   bool get isSTTModelLoaded => RunAnywhereSTT.shared.isLoaded;

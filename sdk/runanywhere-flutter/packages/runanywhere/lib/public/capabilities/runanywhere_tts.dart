@@ -7,7 +7,6 @@ import 'dart:async';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
-import 'package:runanywhere/data/network/telemetry_service.dart';
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
@@ -79,7 +78,6 @@ class RunAnywhereTTS {
 
     final logger = SDKLogger('RunAnywhere.LoadTTSVoice');
     logger.info('Loading TTS voice: $voiceId');
-    final startTime = DateTime.now().millisecondsSinceEpoch;
 
     EventBus.shared.publish(SdkEventFactory.modelLoadStarted(voiceId));
 
@@ -101,28 +99,10 @@ class RunAnywhereTTS {
         );
       }
 
-      final loadTimeMs = DateTime.now().millisecondsSinceEpoch - startTime;
-      TelemetryService.shared.trackModelLoad(
-        modelId: voiceId,
-        modelType: 'tts',
-        success: true,
-        loadTimeMs: loadTimeMs,
-      );
-
       EventBus.shared.publish(SdkEventFactory.modelLoadCompleted(voiceId));
       logger.info('TTS voice loaded: $voiceId');
     } catch (e) {
       logger.error('Failed to load TTS voice: $e');
-      TelemetryService.shared.trackModelLoad(
-        modelId: voiceId,
-        modelType: 'tts',
-        success: false,
-      );
-      TelemetryService.shared.trackError(
-        errorCode: 'tts_voice_load_failed',
-        errorMessage: e.toString(),
-        context: {'voice_id': voiceId},
-      );
       EventBus.shared.publish(SdkEventFactory.modelLoadFailed(voiceId, e));
       rethrow;
     }

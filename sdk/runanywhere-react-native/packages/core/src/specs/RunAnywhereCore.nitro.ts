@@ -91,14 +91,6 @@ export interface RunAnywhereCore extends HybridObject<{
    */
   getOrganizationId(): Promise<string>;
 
-  /**
-   * Set authentication tokens directly (after JS-side authentication)
-   * This stores the tokens in C++ AuthBridge for use by telemetry/device registration
-   * @param authResponseJson JSON string with access_token, refresh_token, expires_in, etc.
-   * @returns true if tokens were set successfully
-   */
-  setAuthTokens(authResponseJson: string): Promise<boolean>;
-
   // ============================================================================
   // Device Registration
   // Matches Swift: CppBridge+Device.swift
@@ -454,14 +446,6 @@ export interface RunAnywhereCore extends HybridObject<{
   // ============================================================================
 
   /**
-   * Load a text generation model
-   * @param modelPath Path to the model file
-   * @param configJson Optional configuration JSON
-   * @returns true if model loaded successfully
-   */
-  loadTextModel(modelPath: string, configJson?: string): Promise<boolean>;
-
-  /**
    * Check if a text model is loaded
    */
   isTextModelLoaded(): Promise<boolean>;
@@ -470,27 +454,6 @@ export interface RunAnywhereCore extends HybridObject<{
    * Unload the current text model
    */
   unloadTextModel(): Promise<boolean>;
-
-  /**
-   * Generate text from a prompt
-   * @param prompt Input prompt
-   * @param optionsJson Generation options JSON
-   * @returns Generated text result as JSON
-   */
-  generate(prompt: string, optionsJson?: string): Promise<string>;
-
-  /**
-   * Generate text with streaming (callback-based)
-   * @param prompt Input prompt
-   * @param optionsJson Generation options JSON
-   * @param callback Token callback (token: string, isComplete: boolean) => void
-   * @returns Final result as JSON
-   */
-  generateStream(
-    prompt: string,
-    optionsJson: string,
-    callback: (token: string, isComplete: boolean) => void
-  ): Promise<string>;
 
   /**
    * Get the native LLM-component handle as a JS number. Pass to
@@ -506,19 +469,6 @@ export interface RunAnywhereCore extends HybridObject<{
    * Cancel ongoing text generation
    */
   cancelGeneration(): Promise<boolean>;
-
-  /**
-   * Generate structured output (JSON) from a prompt
-   * @param prompt Input prompt
-   * @param schema JSON schema for output
-   * @param optionsJson Generation options JSON
-   * @returns Structured output as JSON
-   */
-  generateStructured(
-    prompt: string,
-    schema: string,
-    optionsJson?: string
-  ): Promise<string>;
 
   llmGenerateProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
   llmGenerateStreamProto(
@@ -578,19 +528,6 @@ export interface RunAnywhereCore extends HybridObject<{
   // ============================================================================
 
   /**
-   * Load a speech-to-text model
-   * @param modelPath Path to the model file
-   * @param modelType Model type identifier
-   * @param configJson Optional configuration JSON
-   * @returns true if model loaded successfully
-   */
-  loadSTTModel(
-    modelPath: string,
-    modelType: string,
-    configJson?: string
-  ): Promise<boolean>;
-
-  /**
    * Check if an STT model is loaded
    */
   isSTTModelLoaded(): Promise<boolean>;
@@ -599,19 +536,6 @@ export interface RunAnywhereCore extends HybridObject<{
    * Unload the current STT model
    */
   unloadSTTModel(): Promise<boolean>;
-
-  /**
-   * Transcribe audio data
-   * @param audioBase64 Base64 encoded audio data
-   * @param sampleRate Audio sample rate
-   * @param language Language code (optional)
-   * @returns Transcription result as JSON
-   */
-  transcribe(
-    audioBase64: string,
-    sampleRate: number,
-    language?: string
-  ): Promise<string>;
 
   /**
    * Transcribe an audio file
@@ -638,19 +562,6 @@ export interface RunAnywhereCore extends HybridObject<{
   // ============================================================================
 
   /**
-   * Load a text-to-speech model/voice
-   * @param modelPath Path to the model file
-   * @param modelType Model type identifier
-   * @param configJson Optional configuration JSON
-   * @returns true if model loaded successfully
-   */
-  loadTTSModel(
-    modelPath: string,
-    modelType: string,
-    configJson?: string
-  ): Promise<boolean>;
-
-  /**
    * Check if a TTS model is loaded
    */
   isTTSModelLoaded(): Promise<boolean>;
@@ -659,32 +570,6 @@ export interface RunAnywhereCore extends HybridObject<{
    * Unload the current TTS model
    */
   unloadTTSModel(): Promise<boolean>;
-
-  /**
-   * Synthesize speech from text
-   * @param text Text to synthesize
-   * @param voiceId Voice ID to use
-   * @param speedRate Speech speed rate (1.0 = normal)
-   * @param pitchShift Pitch shift (-1.0 to 1.0)
-   * @returns Synthesized audio as base64 encoded JSON
-   */
-  synthesize(
-    text: string,
-    voiceId: string,
-    speedRate: number,
-    pitchShift: number
-  ): Promise<string>;
-
-  /**
-   * Get available TTS voices
-   * @returns JSON array of voice info
-   */
-  getTTSVoices(): Promise<string>;
-
-  /**
-   * Cancel ongoing TTS synthesis
-   */
-  cancelTTS(): Promise<boolean>;
 
   ttsListVoicesProto(
     onVoiceBytes: (voiceBytes: ArrayBuffer) => void
@@ -706,14 +591,6 @@ export interface RunAnywhereCore extends HybridObject<{
   // ============================================================================
 
   /**
-   * Load a voice activity detection model
-   * @param modelPath Path to the model file
-   * @param configJson Optional configuration JSON
-   * @returns true if model loaded successfully
-   */
-  loadVADModel(modelPath: string, configJson?: string): Promise<boolean>;
-
-  /**
    * Check if a VAD model is loaded
    */
   isVADModelLoaded(): Promise<boolean>;
@@ -722,14 +599,6 @@ export interface RunAnywhereCore extends HybridObject<{
    * Unload the current VAD model
    */
   unloadVADModel(): Promise<boolean>;
-
-  /**
-   * Process audio for voice activity detection
-   * @param audioBase64 Base64 encoded audio data
-   * @param optionsJson VAD options JSON
-   * @returns VAD result as JSON
-   */
-  processVAD(audioBase64: string, optionsJson?: string): Promise<string>;
 
   /**
    * Reset VAD state
@@ -877,13 +746,6 @@ export interface RunAnywhereCore extends HybridObject<{
   // ============================================================================
 
   /**
-   * Initialize voice agent with configuration
-   * @param configJson Configuration JSON
-   * @returns true if initialized successfully
-   */
-  initializeVoiceAgent(configJson: string): Promise<boolean>;
-
-  /**
    * Initialize voice agent using already loaded models
    * @returns true if initialized successfully
    */
@@ -905,31 +767,11 @@ export interface RunAnywhereCore extends HybridObject<{
   isVoiceAgentReady(): Promise<boolean>;
 
   /**
-   * Get voice agent component states
-   * @returns JSON with component states
-   */
-  getVoiceAgentComponentStates(): Promise<string>;
-
-  /**
-   * Process a voice turn (STT -> LLM -> TTS)
-   * @param audioBase64 Base64 encoded audio input
-   * @returns Voice agent result as JSON
-   */
-  processVoiceTurn(audioBase64: string): Promise<string>;
-
-  /**
    * Transcribe audio using voice agent
    * @param audioBase64 Base64 encoded audio data
    * @returns Transcription text
    */
   voiceAgentTranscribe(audioBase64: string): Promise<string>;
-
-  /**
-   * Generate response using voice agent
-   * @param prompt Text prompt
-   * @returns Generated response text
-   */
-  voiceAgentGenerateResponse(prompt: string): Promise<string>;
 
   /**
    * Synthesize speech using voice agent
@@ -1026,47 +868,6 @@ export interface RunAnywhereCore extends HybridObject<{
   // ===========================================================================
   // RAG Pipeline (Retrieval-Augmented Generation)
   // ===========================================================================
-
-  /**
-   * Create a RAG pipeline with the given configuration.
-   * @param configJson JSON with: embeddingModelPath, llmModelPath, embeddingDimension, topK, similarityThreshold, maxContextTokens, chunkSize, chunkOverlap, promptTemplate
-   */
-  ragCreatePipeline(configJson: string): Promise<boolean>;
-
-  /** Destroy the RAG pipeline and release resources. */
-  ragDestroyPipeline(): Promise<boolean>;
-
-  /**
-   * Add a document to the RAG pipeline for chunking, embedding, and indexing.
-   * @param text Document text
-   * @param metadataJson Optional JSON metadata
-   */
-  ragAddDocument(text: string, metadataJson: string): Promise<boolean>;
-
-  /**
-   * Add multiple documents in batch.
-   * @param documentsJson JSON array of {text, metadataJson} objects
-   */
-  ragAddDocumentsBatch(documentsJson: string): Promise<boolean>;
-
-  /**
-   * Query the RAG pipeline.
-   * @param queryJson JSON with: question, systemPrompt, maxTokens, temperature, topP, topK
-   * @returns JSON with: answer, retrievedChunks[], contextUsed, retrievalTimeMs, generationTimeMs, totalTimeMs
-   */
-  ragQuery(queryJson: string): Promise<string>;
-
-  /** Clear all documents from the pipeline. */
-  ragClearDocuments(): Promise<boolean>;
-
-  /** Get the number of indexed document chunks. */
-  ragGetDocumentCount(): Promise<number>;
-
-  /**
-   * Get pipeline statistics.
-   * @returns JSON with stats
-   */
-  ragGetStatistics(): Promise<string>;
 
   ragCreatePipelineProto(configBytes: ArrayBuffer): Promise<boolean>;
   ragDestroyPipelineProto(): Promise<boolean>;

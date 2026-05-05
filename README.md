@@ -98,13 +98,18 @@ import LlamaCPPRuntime
 LlamaCPP.register()
 try RunAnywhere.initialize()
 
-// 2. Load a model
-try await RunAnywhere.downloadModel("smollm2-360m")
-try await RunAnywhere.loadModel("smollm2-360m")
+// 2. Load a model (canonical proto request)
+var load = RAModelLoadRequest()
+load.modelID = "smollm2-360m"
+load.category = .language
+load.framework = .llamaCpp
+_ = await RunAnywhere.loadModel(load)
 
 // 3. Generate
-let response = try await RunAnywhere.chat("What is the capital of France?")
-print(response) // "Paris is the capital of France."
+var req = RALLMGenerateRequest()
+req.prompt = "What is the capital of France?"
+let result = try await RunAnywhere.generate(req)
+print(result.text) // "Paris is the capital of France."
 ```
 
 **Install via Swift Package Manager:**
@@ -387,13 +392,17 @@ We welcome contributions. See our [Contributing Guide](CONTRIBUTING.md) for deta
 ```bash
 # Clone the repo
 git clone https://github.com/RunanywhereAI/runanywhere-sdks.git
+cd runanywhere-sdks
 
-# Set up a specific SDK (example: Swift)
-cd runanywhere-sdks/sdk/runanywhere-swift
-./scripts/build-swift.sh --setup
+# Build the native XCFrameworks (generates RACommons + RABackend* xcframeworks
+# into sdk/runanywhere-swift/Binaries/). Required for local Swift development.
+./scripts/build-core-xcframework.sh
 
-# Run the sample app
-cd ../../examples/ios/RunAnywhereAI
+# Verify `let useLocalNatives = true` in Package.swift so SPM resolves
+# against the on-disk XCFrameworks instead of the remote release URLs.
+
+# Run the iOS sample app
+cd examples/ios/RunAnywhereAI
 open RunAnywhereAI.xcodeproj
 ```
 

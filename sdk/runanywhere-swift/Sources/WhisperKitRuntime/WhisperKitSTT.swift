@@ -28,12 +28,18 @@ import RunAnywhere
 ///
 /// ## Usage
 ///
-/// After registration, load a WhisperKit model and transcribe through the
-/// standard RunAnywhere API:
+/// After registration, load a WhisperKit model via a canonical
+/// `RAModelLoadRequest`, then call the canonical transcribe API:
 ///
 /// ```swift
-/// try await RunAnywhere.loadSTTModel("whisperkit-tiny.en")
-/// let text = try await RunAnywhere.transcribe(audioData)
+/// var req = RAModelLoadRequest()
+/// req.modelID = "whisperkit-tiny.en"
+/// req.category = .speechRecognition
+/// req.framework = .whisperkitCoreml
+/// _ = await RunAnywhere.loadModel(req)
+///
+/// let result = try await RunAnywhere.transcribe(audio: audioData)
+/// print(result.text)
 /// ```
 public enum WhisperKitSTT: RunAnywhereModule {
     private static let logger = SDKLogger(category: "WhisperKitCoreML")

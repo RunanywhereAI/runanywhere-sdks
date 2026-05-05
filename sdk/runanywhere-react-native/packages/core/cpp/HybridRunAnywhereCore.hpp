@@ -72,7 +72,6 @@ public:
   std::shared_ptr<Promise<bool>> isAuthenticated() override;
   std::shared_ptr<Promise<std::string>> getUserId() override;
   std::shared_ptr<Promise<std::string>> getOrganizationId() override;
-  std::shared_ptr<Promise<bool>> setAuthTokens(const std::string& authResponseJson) override;
 
   // Native auth round-trip (request build + rac_http_client_* transport +
   // AuthBridge state update). Mirrors HTTPClientAdapter on Swift / CppBridgeAuth
@@ -217,24 +216,10 @@ public:
   // Delegates to rac_llm_component_* APIs via LLMBridge
   // ============================================================================
 
-  std::shared_ptr<Promise<bool>> loadTextModel(
-    const std::string& modelPath,
-    const std::optional<std::string>& configJson) override;
   std::shared_ptr<Promise<bool>> isTextModelLoaded() override;
   std::shared_ptr<Promise<bool>> unloadTextModel() override;
-  std::shared_ptr<Promise<std::string>> generate(
-    const std::string& prompt,
-    const std::optional<std::string>& optionsJson) override;
-  std::shared_ptr<Promise<std::string>> generateStream(
-    const std::string& prompt,
-    const std::string& optionsJson,
-    const std::function<void(const std::string&, bool)>& callback) override;
   std::shared_ptr<Promise<double>> getLLMHandle() override;
   std::shared_ptr<Promise<bool>> cancelGeneration() override;
-  std::shared_ptr<Promise<std::string>> generateStructured(
-    const std::string& prompt,
-    const std::string& schema,
-    const std::optional<std::string>& optionsJson) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> llmGenerateProto(
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<void>> llmGenerateStreamProto(
@@ -259,16 +244,8 @@ public:
   // Delegates to rac_stt_component_* APIs via STTBridge
   // ============================================================================
 
-  std::shared_ptr<Promise<bool>> loadSTTModel(
-    const std::string& modelPath,
-    const std::string& modelType,
-    const std::optional<std::string>& configJson) override;
   std::shared_ptr<Promise<bool>> isSTTModelLoaded() override;
   std::shared_ptr<Promise<bool>> unloadSTTModel() override;
-  std::shared_ptr<Promise<std::string>> transcribe(
-    const std::string& audioBase64,
-    double sampleRate,
-    const std::optional<std::string>& language) override;
   std::shared_ptr<Promise<std::string>> transcribeFile(
     const std::string& filePath,
     const std::optional<std::string>& language) override;
@@ -285,19 +262,8 @@ public:
   // Delegates to rac_tts_component_* APIs via TTSBridge
   // ============================================================================
 
-  std::shared_ptr<Promise<bool>> loadTTSModel(
-    const std::string& modelPath,
-    const std::string& modelType,
-    const std::optional<std::string>& configJson) override;
   std::shared_ptr<Promise<bool>> isTTSModelLoaded() override;
   std::shared_ptr<Promise<bool>> unloadTTSModel() override;
-  std::shared_ptr<Promise<std::string>> synthesize(
-    const std::string& text,
-    const std::string& voiceId,
-    double speedRate,
-    double pitchShift) override;
-  std::shared_ptr<Promise<std::string>> getTTSVoices() override;
-  std::shared_ptr<Promise<bool>> cancelTTS() override;
   std::shared_ptr<Promise<bool>> ttsListVoicesProto(
     const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onVoiceBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> ttsSynthesizeProto(
@@ -313,14 +279,8 @@ public:
   // Delegates to rac_vad_component_* APIs via VADBridge
   // ============================================================================
 
-  std::shared_ptr<Promise<bool>> loadVADModel(
-    const std::string& modelPath,
-    const std::optional<std::string>& configJson) override;
   std::shared_ptr<Promise<bool>> isVADModelLoaded() override;
   std::shared_ptr<Promise<bool>> unloadVADModel() override;
-  std::shared_ptr<Promise<std::string>> processVAD(
-    const std::string& audioBase64,
-    const std::optional<std::string>& optionsJson) override;
   std::shared_ptr<Promise<void>> resetVAD() override;
   std::shared_ptr<Promise<bool>> vadConfigureProto(
     const std::shared_ptr<ArrayBuffer>& configBytes) override;
@@ -387,14 +347,10 @@ public:
   // Delegates to rac_voice_agent_* APIs via VoiceAgentBridge
   // ============================================================================
 
-  std::shared_ptr<Promise<bool>> initializeVoiceAgent(const std::string& configJson) override;
   std::shared_ptr<Promise<bool>> initializeVoiceAgentWithLoadedModels() override;
   std::shared_ptr<Promise<double>> getVoiceAgentHandle() override;
   std::shared_ptr<Promise<bool>> isVoiceAgentReady() override;
-  std::shared_ptr<Promise<std::string>> getVoiceAgentComponentStates() override;
-  std::shared_ptr<Promise<std::string>> processVoiceTurn(const std::string& audioBase64) override;
   std::shared_ptr<Promise<std::string>> voiceAgentTranscribe(const std::string& audioBase64) override;
-  std::shared_ptr<Promise<std::string>> voiceAgentGenerateResponse(const std::string& prompt) override;
   std::shared_ptr<Promise<std::string>> voiceAgentSynthesizeSpeech(const std::string& text) override;
   std::shared_ptr<Promise<void>> cleanupVoiceAgent() override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> voiceAgentInitializeProto(
@@ -426,14 +382,6 @@ public:
   // RAG Pipeline - Delegates to RAGBridge
   // ============================================================================
 
-  std::shared_ptr<Promise<bool>> ragCreatePipeline(const std::string& configJson) override;
-  std::shared_ptr<Promise<bool>> ragDestroyPipeline() override;
-  std::shared_ptr<Promise<bool>> ragAddDocument(const std::string& text, const std::string& metadataJson) override;
-  std::shared_ptr<Promise<bool>> ragAddDocumentsBatch(const std::string& documentsJson) override;
-  std::shared_ptr<Promise<std::string>> ragQuery(const std::string& queryJson) override;
-  std::shared_ptr<Promise<bool>> ragClearDocuments() override;
-  std::shared_ptr<Promise<double>> ragGetDocumentCount() override;
-  std::shared_ptr<Promise<std::string>> ragGetStatistics() override;
   std::shared_ptr<Promise<bool>> ragCreatePipelineProto(
     const std::shared_ptr<ArrayBuffer>& configBytes) override;
   std::shared_ptr<Promise<bool>> ragDestroyPipelineProto() override;

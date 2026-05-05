@@ -233,17 +233,6 @@ if (result.toolCalls.length > 0) {
 }
 ```
 
-#### Parse Tool Calls from Output
-
-```typescript
-// Parse LLM output for tool call tags
-const parsed = await RunAnywhere.parseToolCall(llmOutput);
-if (parsed.hasToolCall) {
-  console.log('Tool:', parsed.toolName);
-  console.log('Args:', parsed.argumentsJson);
-}
-```
-
 #### Tool Calling Types
 
 ```typescript
@@ -500,7 +489,7 @@ logger.error('Error message', new Error('...'));
 import {
   SDKEnvironment,
   ExecutionTarget,
-  LLMFramework,
+  InferenceFramework,
   ModelCategory,
   ModelFormat,
   HardwareAcceleration,

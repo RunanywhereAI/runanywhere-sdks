@@ -11,13 +11,6 @@
  *     ragCreatePipelineProto, ragDestroyPipelineProto, ragIngestProto,
  *     ragQueryProto, ragClearProto, ragStatsProto,
  *     embeddingsEmbedBatchProto.
- *   - Needs migration (delete after RN TS migration to *Proto siblings):
- *     ragCreatePipeline, ragDestroyPipeline, ragAddDocument,
- *     ragAddDocumentsBatch, ragQuery, ragClearDocuments,
- *     ragGetDocumentCount, ragGetStatistics — these wrap the non-proto
- *     `rac_rag_pipeline_*` struct ABI through RAGBridge. The proto
- *     siblings already exist on the Nitro spec; remove these once TS
- *     callers move.
  *   - Bridge limitation tracked on commons backlog: embeddingsCreateProto
  *     still calls `rac_embeddings_create` / `rac_embeddings_initialize`
  *     because no `rac_embeddings_create_proto` lifecycle ABI exists yet.
@@ -253,54 +246,6 @@ HybridRunAnywhereCore::structuredOutputValidateProto(
 // =============================================================================
 // RAG Pipeline
 // =============================================================================
-
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragCreatePipeline(const std::string& configJson) {
-    return Promise<bool>::async([configJson]() {
-        return ::runanywhere::bridges::RAGBridge::shared().createPipeline(configJson);
-    });
-}
-
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragDestroyPipeline() {
-    return Promise<bool>::async([]() {
-        return ::runanywhere::bridges::RAGBridge::shared().destroyPipeline();
-    });
-}
-
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragAddDocument(const std::string& text, const std::string& metadataJson) {
-    return Promise<bool>::async([text, metadataJson]() {
-        return ::runanywhere::bridges::RAGBridge::shared().addDocument(text, metadataJson);
-    });
-}
-
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragAddDocumentsBatch(const std::string& documentsJson) {
-    return Promise<bool>::async([documentsJson]() {
-        return ::runanywhere::bridges::RAGBridge::shared().addDocumentsBatch(documentsJson);
-    });
-}
-
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::ragQuery(const std::string& queryJson) {
-    return Promise<std::string>::async([queryJson]() {
-        return ::runanywhere::bridges::RAGBridge::shared().query(queryJson);
-    });
-}
-
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragClearDocuments() {
-    return Promise<bool>::async([]() {
-        return ::runanywhere::bridges::RAGBridge::shared().clearDocuments();
-    });
-}
-
-std::shared_ptr<Promise<double>> HybridRunAnywhereCore::ragGetDocumentCount() {
-    return Promise<double>::async([]() {
-        return ::runanywhere::bridges::RAGBridge::shared().getDocumentCount();
-    });
-}
-
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::ragGetStatistics() {
-    return Promise<std::string>::async([]() {
-        return ::runanywhere::bridges::RAGBridge::shared().getStatistics();
-    });
-}
 
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ragCreatePipelineProto(
     const std::shared_ptr<ArrayBuffer>& configBytes) {

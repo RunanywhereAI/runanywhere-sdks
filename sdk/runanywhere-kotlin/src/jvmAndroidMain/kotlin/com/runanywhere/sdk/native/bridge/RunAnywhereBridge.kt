@@ -139,82 +139,7 @@ object RunAnywhereBridge {
     external fun racLlmComponentDestroy(handle: Long)
 
     @JvmStatic
-    external fun racLlmComponentConfigure(handle: Long, configJson: String): Int
-
-    @JvmStatic
-    external fun racLlmComponentIsLoaded(handle: Long): Boolean
-
-    @JvmStatic
-    external fun racLlmComponentGetModelId(handle: Long): String?
-
-    /**
-     * Load a model. Takes model path (or ID) and optional config JSON.
-     */
-    @JvmStatic
-    external fun racLlmComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String?): Int
-
-    @JvmStatic
-    external fun racLlmComponentUnload(handle: Long): Int
-
-    @JvmStatic
-    external fun racLlmComponentCleanup(handle: Long): Int
-
-    @JvmStatic
     external fun racLlmComponentCancel(handle: Long): Int
-
-    /**
-     * Generate text (non-streaming).
-     * @return JSON result string or null on error
-     */
-    @JvmStatic
-    external fun racLlmComponentGenerate(handle: Long, prompt: String, optionsJson: String?): String?
-
-    /**
-     * Generate text with streaming - simplified version that returns result JSON.
-     * Streaming is handled internally, result returned on completion.
-     */
-    @JvmStatic
-    external fun racLlmComponentGenerateStream(handle: Long, prompt: String, optionsJson: String?): String?
-
-    /**
-     * Token callback interface for streaming generation.
-     */
-    fun interface TokenCallback {
-        fun onToken(token: ByteArray): Boolean
-    }
-
-    /**
-     * Generate text with true streaming - calls tokenCallback for each token.
-     * This provides real-time token-by-token streaming.
-     *
-     * @param handle LLM component handle
-     * @param prompt The prompt to generate from
-     * @param optionsJson Options as JSON string
-     * @param tokenCallback Callback invoked for each generated token
-     * @return JSON result string with final metrics, or null on error
-     */
-    @JvmStatic
-    external fun racLlmComponentGenerateStreamWithCallback(
-        handle: Long,
-        prompt: String,
-        optionsJson: String?,
-        tokenCallback: TokenCallback,
-    ): String?
-
-    @JvmStatic
-    external fun racLlmComponentSupportsStreaming(handle: Long): Boolean
-
-    @JvmStatic
-    external fun racLlmComponentGetState(handle: Long): Int
-
-    @JvmStatic
-    external fun racLlmComponentGetMetrics(handle: Long): String?
-
-    @JvmStatic
-    external fun racLlmComponentGetContextSize(handle: Long): Int
-
-    @JvmStatic
-    external fun racLlmComponentTokenize(handle: Long, text: String): Int
 
     // ========================================================================
     // LLM GENERATED-PROTO ABI (rac_llm_service.h)
@@ -243,34 +168,7 @@ object RunAnywhereBridge {
     external fun racSttComponentDestroy(handle: Long)
 
     @JvmStatic
-    external fun racSttComponentIsLoaded(handle: Long): Boolean
-
-    @JvmStatic
-    external fun racSttComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String?): Int
-
-    @JvmStatic
-    external fun racSttComponentUnload(handle: Long): Int
-
-    @JvmStatic
     external fun racSttComponentCancel(handle: Long): Int
-
-    @JvmStatic
-    external fun racSttComponentTranscribe(handle: Long, audioData: ByteArray, optionsJson: String?): String?
-
-    @JvmStatic
-    external fun racSttComponentTranscribeFile(handle: Long, audioPath: String, optionsJson: String?): String?
-
-    @JvmStatic
-    external fun racSttComponentSupportsStreaming(handle: Long): Boolean
-
-    @JvmStatic
-    external fun racSttComponentGetState(handle: Long): Int
-
-    @JvmStatic
-    external fun racSttComponentGetLanguages(handle: Long): String?
-
-    @JvmStatic
-    external fun racSttComponentDetectLanguage(handle: Long, audioData: ByteArray): String?
 
     // ========================================================================
     // STT GENERATED-PROTO ABI (rac_stt_component.h)
@@ -302,34 +200,7 @@ object RunAnywhereBridge {
     external fun racTtsComponentDestroy(handle: Long)
 
     @JvmStatic
-    external fun racTtsComponentIsLoaded(handle: Long): Boolean
-
-    @JvmStatic
-    external fun racTtsComponentLoadModel(handle: Long, modelPath: String, modelId: String, modelName: String?): Int
-
-    @JvmStatic
-    external fun racTtsComponentUnload(handle: Long): Int
-
-    @JvmStatic
     external fun racTtsComponentCancel(handle: Long): Int
-
-    @JvmStatic
-    external fun racTtsComponentSynthesize(handle: Long, text: String, optionsJson: String?): ByteArray?
-
-    @JvmStatic
-    external fun racTtsComponentSynthesizeToFile(handle: Long, text: String, outputPath: String, optionsJson: String?): Long
-
-    @JvmStatic
-    external fun racTtsComponentGetVoices(handle: Long): String?
-
-    @JvmStatic
-    external fun racTtsComponentSetVoice(handle: Long, voiceId: String): Int
-
-    @JvmStatic
-    external fun racTtsComponentGetState(handle: Long): Int
-
-    @JvmStatic
-    external fun racTtsComponentGetLanguages(handle: Long): String?
 
     // ========================================================================
     // TTS GENERATED-PROTO ABI (rac_tts_component.h)
@@ -367,40 +238,10 @@ object RunAnywhereBridge {
     external fun racVadComponentDestroy(handle: Long)
 
     @JvmStatic
-    external fun racVadComponentIsLoaded(handle: Long): Boolean
-
-    @JvmStatic
-    external fun racVadComponentLoadModel(handle: Long, modelId: String?, configJson: String?): Int
-
-    @JvmStatic
-    external fun racVadComponentUnload(handle: Long): Int
-
-    @JvmStatic
-    external fun racVadComponentProcess(handle: Long, samples: ByteArray, optionsJson: String?): String?
-
-    @JvmStatic
-    external fun racVadComponentProcessStream(handle: Long, samples: ByteArray, optionsJson: String?): String?
-
-    @JvmStatic
-    external fun racVadComponentProcessFrame(handle: Long, samples: ByteArray, optionsJson: String?): String?
-
-    @JvmStatic
     external fun racVadComponentReset(handle: Long): Int
 
     @JvmStatic
     external fun racVadComponentCancel(handle: Long): Int
-
-    @JvmStatic
-    external fun racVadComponentSetThreshold(handle: Long, threshold: Float): Int
-
-    @JvmStatic
-    external fun racVadComponentGetState(handle: Long): Int
-
-    @JvmStatic
-    external fun racVadComponentGetMinFrameSize(handle: Long): Int
-
-    @JvmStatic
-    external fun racVadComponentGetSampleRates(handle: Long): String?
 
     // ========================================================================
     // VAD GENERATED-PROTO ABI (rac_vad_component.h)

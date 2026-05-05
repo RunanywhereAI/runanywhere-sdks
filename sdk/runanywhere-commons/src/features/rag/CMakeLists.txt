@@ -169,32 +169,11 @@ message(STATUS "  Architecture: Pipeline (calls LLM + Embeddings via vtables)")
 message(STATUS "  Platform: ${RAC_PLATFORM_NAME}")
 
 # =============================================================================
-# JNI Bridge for Android
+# JNI Bridge for Android (DELETED — legacy non-proto RAG pipeline JNI)
+#
+# The previous rac_backend_rag_jni target and `jni/rac_rag_jni.cpp` exposed
+# the struct/JSON `rac_rag_pipeline_*` path to Kotlin. All SDK callers
+# moved to the proto-byte `rac_rag_*_proto` surface (served by the main
+# `librunanywhere_jni.so` via `racRag*Proto` methods in
+# `runanywhere_commons_jni.cpp`). The dedicated JNI library is gone.
 # =============================================================================
-
-if(RAC_PLATFORM_ANDROID AND RAC_BUILD_SHARED)
-    if(ANDROID)
-        message(STATUS "Building RAG JNI bridge for Android")
-
-        get_filename_component(RAC_COMMONS_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
-
-        add_library(rac_backend_rag_jni SHARED jni/rac_rag_jni.cpp)
-
-        target_include_directories(rac_backend_rag_jni PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}
-            ${RAC_COMMONS_ROOT_DIR}/include
-        )
-
-        # RAG symbols live in rac_commons (the OBJECT lib was folded in)
-        target_link_libraries(rac_backend_rag_jni PRIVATE
-            rac_commons
-            log
-        )
-
-        target_compile_options(rac_backend_rag_jni PRIVATE -O3 -fvisibility=hidden -ffunction-sections -fdata-sections)
-        target_link_options(rac_backend_rag_jni PRIVATE
-            -Wl,--gc-sections
-            -Wl,-z,max-page-size=16384
-            -Wl,-z,common-page-size=16384)
-    endif()
-endif()

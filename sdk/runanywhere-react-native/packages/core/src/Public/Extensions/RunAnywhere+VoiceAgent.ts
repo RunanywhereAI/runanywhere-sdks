@@ -228,17 +228,6 @@ export async function voiceAgentTranscribe(
   }
 }
 
-/** Generate a response using the voice-agent LLM. */
-export async function voiceAgentGenerateResponse(
-  prompt: string
-): Promise<string> {
-  if (!isNativeModuleAvailable()) {
-    throw new Error('Native module not available');
-  }
-  const native = requireNativeModule();
-  return native.voiceAgentGenerateResponse(prompt);
-}
-
 /**
  * Synthesize speech using the voice-agent TTS component.
  *

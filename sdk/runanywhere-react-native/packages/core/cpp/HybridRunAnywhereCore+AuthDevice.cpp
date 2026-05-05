@@ -73,31 +73,6 @@ std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::getOrganizationId()
     });
 }
 
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::setAuthTokens(
-    const std::string& authResponseJson) {
-    return Promise<bool>::async([this, authResponseJson]() -> bool {
-        LOGI("Setting auth tokens from JS authentication response...");
-
-        // Parse the auth response
-        AuthResponse response = AuthBridge::shared().handleAuthResponse(authResponseJson);
-
-        if (response.success) {
-            // IMPORTANT: Actually store the tokens in AuthBridge!
-            // handleAuthResponse only parses, setAuth stores them
-            AuthBridge::shared().setAuth(response);
-
-            LOGI("Auth tokens set successfully. Token expires in %lld seconds",
-                 static_cast<long long>(response.expiresIn));
-            LOGD("Access token stored (length=%zu)", response.accessToken.length());
-            return true;
-        } else {
-            LOGE("Failed to set auth tokens: %s", response.error.c_str());
-            setLastError("Failed to set auth tokens: " + response.error);
-            return false;
-        }
-    });
-}
-
 namespace {
 
 // Shared helper: POST a JSON payload to `baseURL + endpoint` using the

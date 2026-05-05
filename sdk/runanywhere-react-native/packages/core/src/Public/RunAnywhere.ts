@@ -690,7 +690,6 @@ export const RunAnywhere = {
   areAllVoiceComponentsReady: VoiceAgent.areAllVoiceComponentsReady,
   processVoiceTurn: VoiceAgent.processVoiceTurn,
   voiceAgentTranscribe: VoiceAgent.voiceAgentTranscribe,
-  voiceAgentGenerateResponse: VoiceAgent.voiceAgentGenerateResponse,
   voiceAgentSynthesizeSpeech: VoiceAgent.voiceAgentSynthesizeSpeech,
   // Phase 1 / B4 fix: forwarder for the v3.1 Nitro `getVoiceAgentHandle()`
   // method. The sample VoiceAssistantScreen calls `RunAnywhere.getVoiceAgentHandle()`

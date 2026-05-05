@@ -1,41 +1,10 @@
 package com.runanywhere.sdk.utils
 
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.Json
-
 /**
  * SDK Constants Management
  * Single source of truth for all SDK constants, URLs, and configuration
- * Environment-specific values loaded from external config files
  */
 object SDKConstants {
-    // Configuration holder - will be populated from external config
-    private var config: SDKConfig = SDKConfig()
-
-    // JSON parser for config files
-    private val json =
-        Json {
-            ignoreUnknownKeys = true
-            isLenient = true
-        }
-
-    /**
-     * Initialize constants from configuration string
-     * This should be called during SDK initialization with the appropriate config
-     */
-    fun loadConfiguration(configJson: String) {
-        config = json.decodeFromString(configJson)
-    }
-
-    /**
-     * Initialize with default development configuration
-     * Used when no config is provided
-     */
-    fun loadDefaultConfiguration() {
-        config = SDKConfig() // Uses default empty values
-    }
-
     // MARK: - SDK Information
     const val VERSION = "0.1.0"
 
@@ -53,23 +22,6 @@ object SDKConstants {
         DEVELOPMENT,
         STAGING,
         PRODUCTION,
-    }
-
-    val ENVIRONMENT: Environment get() = config.environment
-
-    // MARK: - Base URLs (loaded from config)
-    val BASE_URL: String get() = config.apiBaseUrl
-    val CDN_BASE_URL: String get() = config.cdnBaseUrl
-    val TELEMETRY_URL: String get() = config.telemetryUrl
-    val ANALYTICS_URL: String get() = config.analyticsUrl
-
-    // MARK: - API Keys (loaded from config)
-    val DEFAULT_API_KEY: String get() = config.defaultApiKey
-
-    // MARK: - Model Download URLs (loaded from config)
-    object ModelUrls {
-        // Default Speech Model - Whisper Base only
-        val WHISPER_BASE: String get() = config.modelUrls.whisperBase
     }
 
     // MARK: - API Endpoints
@@ -180,33 +132,6 @@ object SDKConstants {
         const val USER_PREFERENCES_KEY = "user_preferences"
     }
 
-    // MARK: - Development Mode
-    object Development {
-        val MOCK_DELAY_MS: Long get() = if (config.environment == Environment.DEVELOPMENT) 500L else 0L
-        val ENABLE_VERBOSE_LOGGING: Boolean get() = config.enableVerboseLogging
-        val ENABLE_MOCK_SERVICES: Boolean get() = config.enableMockServices
-        val USE_COMPREHENSIVE_MOCKS: Boolean get() = config.enableMockServices
-
-        const val MOCK_DEVICE_ID_PREFIX = "dev-device-"
-        const val MOCK_SESSION_ID_PREFIX = "dev-session-"
-        const val MOCK_USER_ID_PREFIX = "dev-user-"
-    }
-
-    // MARK: - Feature Flags
-    object Features {
-        val ENABLE_ON_DEVICE_INFERENCE: Boolean get() = config.features.onDeviceInference
-        val ENABLE_CLOUD_FALLBACK: Boolean get() = config.features.cloudFallback
-        val ENABLE_TELEMETRY: Boolean get() = config.features.telemetry
-        val ENABLE_ANALYTICS: Boolean get() = config.features.analytics
-        val ENABLE_DEBUG_LOGGING: Boolean get() = config.features.debugLogging
-        val ENABLE_PERFORMANCE_MONITORING: Boolean get() = config.features.performanceMonitoring
-        val ENABLE_CRASH_REPORTING: Boolean get() = config.features.crashReporting
-        val ENABLE_VAD: Boolean get() = config.features.vad
-        val ENABLE_STT_ANALYTICS: Boolean get() = config.features.sttAnalytics
-        val ENABLE_REAL_TIME_STT: Boolean get() = config.features.realTimeStt
-        val ENABLE_STT_CONFIDENCE_SCORING: Boolean get() = config.features.sttConfidenceScoring
-    }
-
     // MARK: - Error Codes
     object ErrorCodes {
         const val NETWORK_UNAVAILABLE = 1001
@@ -230,42 +155,3 @@ object SDKConstants {
         const val STORAGE_UNAVAILABLE = 5004
     }
 }
-
-/**
- * SDK Configuration Model
- * This data class represents the complete configuration for the SDK
- */
-@Serializable
-data class SDKConfig(
-    val environment: SDKConstants.Environment = SDKConstants.Environment.DEVELOPMENT,
-    val apiBaseUrl: String = "",
-    val cdnBaseUrl: String = "",
-    val telemetryUrl: String = "",
-    val analyticsUrl: String = "",
-    val defaultApiKey: String = "",
-    val enableVerboseLogging: Boolean = false,
-    val enableMockServices: Boolean = false,
-    val modelUrls: ModelUrlConfig = ModelUrlConfig(),
-    val features: FeatureConfig = FeatureConfig(),
-)
-
-@Serializable
-data class ModelUrlConfig(
-    // Default Speech Model - Whisper Base only
-    val whisperBase: String = "",
-)
-
-@Serializable
-data class FeatureConfig(
-    val onDeviceInference: Boolean = true,
-    val cloudFallback: Boolean = true,
-    val telemetry: Boolean = true,
-    val analytics: Boolean = true,
-    val debugLogging: Boolean = false,
-    val performanceMonitoring: Boolean = true,
-    val crashReporting: Boolean = false,
-    val vad: Boolean = true,
-    val sttAnalytics: Boolean = true,
-    val realTimeStt: Boolean = true,
-    val sttConfidenceScoring: Boolean = true,
-)
