@@ -2,13 +2,9 @@
 //  SDKException.swift
 //  RunAnywhere
 //
-//  Wave 2: Canonical Swift error type. Wraps the generated proto `RASDKError`
+//  Canonical Swift error type. Wraps the generated proto `RASDKError`
 //  (Sources/RunAnywhere/Generated/errors.pb.swift) so Swift `throws` works
 //  while keeping the wire-canonical proto as the source of truth.
-//
-//  Replaces the legacy `SDKError` struct, `ErrorCode` String enum, and
-//  `ErrorCategory` String enum. There is NO `typealias SDKError = SDKException`.
-//  Every reference to the legacy types has been rewritten to use this one.
 //
 //  Usage:
 //      throw SDKException.modelNotFound("whisper-base")
