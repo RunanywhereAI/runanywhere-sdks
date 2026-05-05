@@ -36,62 +36,11 @@ object CppBridgeModelRegistry {
     private const val TAG = "CppBridge/CppBridgeModelRegistry"
 
     /**
-     * Model category constants matching C++ RAC_MODEL_CATEGORY_* values.
-     */
-    object ModelCategory {
-        const val LANGUAGE = 0 // RAC_MODEL_CATEGORY_LANGUAGE
-        const val SPEECH_RECOGNITION = 1 // RAC_MODEL_CATEGORY_SPEECH_RECOGNITION
-        const val SPEECH_SYNTHESIS = 2 // RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS
-        const val VISION = 3 // RAC_MODEL_CATEGORY_VISION
-        const val IMAGE_GENERATION = 4 // RAC_MODEL_CATEGORY_IMAGE_GENERATION
-        const val MULTIMODAL = 5 // RAC_MODEL_CATEGORY_MULTIMODAL
-        const val AUDIO = 6 // RAC_MODEL_CATEGORY_AUDIO
-        const val EMBEDDING = 7 // RAC_MODEL_CATEGORY_EMBEDDING
-        const val VOICE_ACTIVITY_DETECTION = 8 // RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
-        const val UNKNOWN = 99 // RAC_MODEL_CATEGORY_UNKNOWN
-    }
-
-    /**
-     * Model type constants (alias for category for backwards compatibility).
-     */
-    object ModelType {
-        const val LLM = ModelCategory.LANGUAGE
-        const val STT = ModelCategory.SPEECH_RECOGNITION
-        const val TTS = ModelCategory.SPEECH_SYNTHESIS
-        const val VAD = ModelCategory.VOICE_ACTIVITY_DETECTION
-        const val EMBEDDING = ModelCategory.EMBEDDING
-        const val UNKNOWN = ModelCategory.UNKNOWN
-
-        /**
-         * Get display name for a model type.
-         */
-        fun getName(type: Int): String =
-            when (type) {
-                LLM -> "LLM"
-                STT -> "STT"
-                TTS -> "TTS"
-                VAD -> "VAD"
-                EMBEDDING -> "EMBEDDING"
-                else -> "UNKNOWN"
-            }
-    }
-
-    /**
-     * Model format constants matching C++ RAC_MODEL_FORMAT_* values.
-     */
-    object ModelFormat {
-        const val ONNX = 0 // RAC_MODEL_FORMAT_ONNX
-        const val ORT = 1 // RAC_MODEL_FORMAT_ORT
-        const val GGUF = 2 // RAC_MODEL_FORMAT_GGUF
-        const val BIN = 3 // RAC_MODEL_FORMAT_BIN
-        const val COREML = 4 // RAC_MODEL_FORMAT_COREML
-        const val QNN_CONTEXT = 5 // RAC_MODEL_FORMAT_QNN_CONTEXT
-        const val UNKNOWN = 99 // RAC_MODEL_FORMAT_UNKNOWN
-    }
-
-    /**
      * Inference framework constants matching C++ RAC_FRAMEWORK_* values.
      * IMPORTANT: Must match rac_model_types.h exactly!
+     *
+     * Used by [CppBridgeModelPaths] for the JVM-only fallback path when the
+     * native `rac_framework_raw_value` is unavailable.
      */
     object Framework {
         const val ONNX = 0 // RAC_FRAMEWORK_ONNX

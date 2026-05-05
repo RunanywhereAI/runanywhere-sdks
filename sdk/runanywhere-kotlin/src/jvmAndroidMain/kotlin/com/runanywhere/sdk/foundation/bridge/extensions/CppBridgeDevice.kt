@@ -30,34 +30,20 @@ import java.util.UUID
  * - All callbacks are thread-safe
  */
 object CppBridgeDevice {
-    /**
-     * Device platform type constants matching C++ RAC_PLATFORM_* values.
-     */
-    object PlatformType {
-        const val UNKNOWN = 0
-        const val IOS = 1
-        const val ANDROID = 2
-        const val JVM = 3
-        const val LINUX = 4
-        const val MACOS = 5
-        const val WINDOWS = 6
-    }
-
-    /**
-     * Device registration status constants.
-     */
-    object RegistrationStatus {
-        const val NOT_REGISTERED = 0
-        const val REGISTERING = 1
-        const val REGISTERED = 2
-        const val FAILED = 3
-    }
+    // Registration status int values (previously in RegistrationStatus nested
+    // object; inlined after KOT-DEAD-DEVICECONSTANTS). These are a local-only
+    // status shared across the device registration callbacks and are not
+    // part of a cross-platform proto enum.
+    private const val REG_STATUS_NOT_REGISTERED = 0
+    private const val REG_STATUS_REGISTERING = 1
+    private const val REG_STATUS_REGISTERED = 2
+    private const val REG_STATUS_FAILED = 3
 
     @Volatile
     private var isRegistered: Boolean = false
 
     @Volatile
-    private var registrationStatus: Int = RegistrationStatus.NOT_REGISTERED
+    private var registrationStatus: Int = REG_STATUS_NOT_REGISTERED
 
     @Volatile
     private var deviceId: String? = null
@@ -292,7 +278,7 @@ object CppBridgeDevice {
                     @Suppress("unused")
                     fun setRegistered(registered: Boolean) {
                         setRegistrationStatusCallback(
-                            if (registered) RegistrationStatus.REGISTERED else RegistrationStatus.NOT_REGISTERED,
+                            if (registered) REG_STATUS_REGISTERED else REG_STATUS_NOT_REGISTERED,
                             null,
                         )
                     }
@@ -512,7 +498,6 @@ object CppBridgeDevice {
         val provider = deviceInfoProvider
 
         val platform = "android" // String platform for backend
-        // Note: detectPlatform() available for future use if needed
         val deviceModel = provider?.getDeviceModel() ?: getDefaultDeviceModel()
         val deviceName = provider?.getDeviceName() ?: deviceModel
         val manufacturer = provider?.getDeviceManufacturer() ?: getDefaultManufacturer()
@@ -820,7 +805,7 @@ object CppBridgeDevice {
         // For PRODUCTION/STAGING mode (env != 0): Return persisted status
         // - First launch: NOT_REGISTERED → returns false → registers once
         // - Subsequent launches: REGISTERED → returns true → skips registration
-        val isRegistered = registrationStatus == RegistrationStatus.REGISTERED
+        val isRegistered = registrationStatus == REG_STATUS_REGISTERED
         CppBridgePlatformAdapter.logCallback(
             CppBridgePlatformAdapter.LogLevel.DEBUG,
             TAG,
@@ -834,8 +819,8 @@ object CppBridgeDevice {
      *
      * Called by C++ core when device registration status changes.
      *
-     * @param status The new registration status (see [RegistrationStatus])
-     * @param errorMessage Optional error message if status is FAILED
+     * @param status The new registration status (REG_STATUS_* constants)
+     * @param errorMessage Optional error message if status is REG_STATUS_FAILED
      *
      * NOTE: This function is called from JNI. Do not capture any state.
      */
@@ -853,22 +838,22 @@ object CppBridgeDevice {
         )
 
         // Persist registration status so we don't re-register on every app restart
-        if (status == RegistrationStatus.REGISTERED) {
+        if (status == REG_STATUS_REGISTERED) {
             persistRegistrationStatus(true)
-        } else if (status == RegistrationStatus.NOT_REGISTERED) {
+        } else if (status == REG_STATUS_NOT_REGISTERED) {
             persistRegistrationStatus(false)
         }
 
         // Notify listener
         try {
             when (status) {
-                RegistrationStatus.REGISTERING -> {
+                REG_STATUS_REGISTERING -> {
                     deviceListener?.onRegistrationStarted(deviceIdValue)
                 }
-                RegistrationStatus.REGISTERED -> {
+                REG_STATUS_REGISTERED -> {
                     deviceListener?.onRegistrationCompleted(deviceIdValue)
                 }
-                RegistrationStatus.FAILED -> {
+                REG_STATUS_FAILED -> {
                     deviceListener?.onRegistrationFailed(
                         deviceIdValue,
                         errorMessage ?: "Unknown error",
@@ -944,7 +929,7 @@ object CppBridgeDevice {
             // This is handled by the JNI layer
 
             deviceListener = null
-            registrationStatus = RegistrationStatus.NOT_REGISTERED
+            registrationStatus = REG_STATUS_NOT_REGISTERED
             isRegistered = false
 
             CppBridgePlatformAdapter.logCallback(
@@ -1013,7 +998,7 @@ object CppBridgeDevice {
                 // For development mode, we trust the persisted status
                 // For production/staging, we'll let the C++ layer decide
                 // but we still load the status for informational purposes
-                registrationStatus = RegistrationStatus.REGISTERED
+                registrationStatus = REG_STATUS_REGISTERED
                 CppBridgePlatformAdapter.logCallback(
                     CppBridgePlatformAdapter.LogLevel.INFO,
                     TAG,
@@ -1113,7 +1098,7 @@ object CppBridgeDevice {
         // - The C++ code uses UPSERT to always update (track active devices)
         // - We still call every time to update last_seen_at
 
-        if (registrationStatus == RegistrationStatus.REGISTERING) {
+        if (registrationStatus == REG_STATUS_REGISTERING) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
@@ -1166,7 +1151,7 @@ object CppBridgeDevice {
     fun clearRegistration() {
         com.runanywhere.sdk.native.bridge.RunAnywhereBridge
             .racDeviceManagerClearRegistration()
-        registrationStatus = RegistrationStatus.NOT_REGISTERED
+        registrationStatus = REG_STATUS_NOT_REGISTERED
     }
 
     /**
@@ -1175,31 +1160,6 @@ object CppBridgeDevice {
     fun getNativeDeviceId(): String? {
         return com.runanywhere.sdk.native.bridge.RunAnywhereBridge
             .racDeviceManagerGetDeviceId()
-    }
-
-    /**
-     * Detect the current platform type.
-     * Reserved for future platform-specific handling.
-     */
-    @Suppress("unused")
-    private fun detectPlatform(): Int {
-        val osName = System.getProperty("os.name")?.lowercase() ?: ""
-        val javaVendor = System.getProperty("java.vendor")?.lowercase() ?: ""
-        val vmName = System.getProperty("java.vm.name")?.lowercase() ?: ""
-
-        return when {
-            // Check for Android runtime
-            vmName.contains("dalvik") || vmName.contains("art") -> PlatformType.ANDROID
-            javaVendor.contains("android") -> PlatformType.ANDROID
-
-            // Check OS
-            osName.contains("mac") || osName.contains("darwin") -> PlatformType.MACOS
-            osName.contains("linux") -> PlatformType.LINUX
-            osName.contains("win") -> PlatformType.WINDOWS
-
-            // Default to JVM
-            else -> PlatformType.JVM
-        }
     }
 
     /**
