@@ -18,7 +18,6 @@ on:
       - 'sdk/runanywhere-web/packages/core/src/generated/**'
       - 'sdk/runanywhere-proto-ts/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
-      - 'sdk/runanywhere-python/src/runanywhere/generated/**'
       - 'scripts/setup-toolchain.sh'
       - '.github/workflows/idl-drift-check.yml'
   push:
@@ -35,7 +34,6 @@ on:
       - 'sdk/runanywhere-web/packages/core/src/generated/**'
       - 'sdk/runanywhere-proto-ts/**'
       - 'sdk/runanywhere-commons/src/generated/proto/**'
-      - 'sdk/runanywhere-python/src/runanywhere/generated/**'
       - 'scripts/setup-toolchain.sh'
       - '.github/workflows/idl-drift-check.yml'
 
@@ -87,10 +85,6 @@ jobs:
         run: |
           npm install -g ts-proto@1.181.1 protobufjs
 
-      - name: Install Python protobuf
-        run: |
-          python3 -m pip install --upgrade "protobuf>=4.25,<5" grpcio-tools
-
       - name: Dump toolchain versions (debug)
         run: |
           echo "protoc: $(protoc --version)"
@@ -98,7 +92,6 @@ jobs:
           echo "wire-compiler: $(wire-compiler --version 2>/dev/null || echo 'not present')"
           echo "protoc-gen-dart: $(protoc-gen-dart --version 2>/dev/null || echo 'present or skipped')"
           echo "node: $(node --version)"
-          echo "python3: $(python3 --version)"
 
       - name: Regenerate all bindings
         run: ./idl/codegen/generate_all.sh

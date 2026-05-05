@@ -31,9 +31,6 @@ echo "▶ Dart proto codegen"
 echo "▶ TypeScript proto codegen (RN + Web)"
 "${SCRIPT_DIR}/generate_ts.sh"
 
-echo "▶ Python proto codegen"
-"${SCRIPT_DIR}/generate_python.sh"
-
 echo "▶ C++ proto codegen"
 "${SCRIPT_DIR}/generate_cpp.sh"
 
