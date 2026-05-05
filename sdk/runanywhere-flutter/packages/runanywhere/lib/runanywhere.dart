@@ -207,6 +207,7 @@ export 'generated/tts_options.pb.dart'
         TTSVoiceInfo;
 export 'generated/vad_options.pb.dart'
     show VADConfiguration, VADOptions, VADResult, VADStatistics;
+export 'generated/vad_options.pbenum.dart' show VADStreamEventKind;
 export 'generated/vlm_options.pb.dart'
     show
         VLMChatTemplate,
@@ -222,7 +223,6 @@ export 'generated/voice_agent_service.pb.dart'
         VoiceAgentRequest,
         VoiceAgentResult,
         VoiceSessionConfig;
-export 'generated/vad_options.pbenum.dart' show VADStreamEventKind;
 export 'generated/voice_events.pb.dart'
     show
         StateChangeEvent,

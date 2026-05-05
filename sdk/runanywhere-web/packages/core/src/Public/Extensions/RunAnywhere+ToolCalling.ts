@@ -245,7 +245,6 @@ function toolResultWithDefaults(
     ...result,
     toolCallId: result.toolCallId || toolCall.callId || toolCall.id,
     name: result.name || toolCall.name,
-    result: result.result ?? {},
     startedAtMs: result.startedAtMs || startedAtMs,
     completedAtMs: result.completedAtMs || Date.now(),
   });
@@ -287,7 +286,6 @@ export const ToolCalling = {
         name: toolCall.name,
         resultJson: '',
         success: false,
-        result: {},
         error: `Unknown tool: ${toolCall.name}`,
         callId: toolCall.callId || toolCall.id,
         startedAtMs,
@@ -307,7 +305,6 @@ export const ToolCalling = {
         name: toolCall.name,
         resultJson: '',
         success: false,
-        result: {},
         error: error instanceof Error ? error.message : String(error),
         callId: toolCall.callId || toolCall.id,
         startedAtMs,

@@ -15,13 +15,17 @@ import {
   ModelFormat as ProtoModelFormat,
   ModelCategory as ProtoModelCategory,
   InferenceFramework as ProtoInferenceFramework,
-  AccelerationPreference as ProtoAccelerationPreference,
   RoutingPolicy as ProtoRoutingPolicy,
   SDKEnvironment as ProtoSDKEnvironment,
   AudioFormat as ProtoAudioFormat,
 } from '@runanywhere/proto-ts/model_types';
 import {
+  AccelerationPreference as ProtoAccelerationPreference,
+} from '@runanywhere/proto-ts/hardware_profile';
+import {
   EventCategory as ProtoEventCategory,
+} from '@runanywhere/proto-ts/component_types';
+import {
   SDKComponent as ProtoSDKComponent,
 } from '@runanywhere/proto-ts/sdk_events';
 

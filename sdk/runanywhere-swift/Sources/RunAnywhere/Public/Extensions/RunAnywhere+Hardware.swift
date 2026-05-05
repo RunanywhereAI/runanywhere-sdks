@@ -45,7 +45,7 @@ public extension RunAnywhere {
         }
 
         /// Set the preferred accelerator for subsequent routing/inference calls.
-        public func setAcceleratorPreference(_ preference: RAAcceleratorPreference) throws {
+        public func setAcceleratorPreference(_ preference: RAAccelerationPreference) throws {
             try CppBridge.Hardware.setAcceleratorPreference(preference)
         }
     }

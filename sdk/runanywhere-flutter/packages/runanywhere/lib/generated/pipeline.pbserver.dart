@@ -15,30 +15,30 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'pipeline.pb.dart' as $5;
+import 'pipeline.pb.dart' as $6;
 import 'pipeline.pbjson.dart';
 
 export 'pipeline.pb.dart';
 
 abstract class PipelineServiceBase extends $pb.GeneratedService {
-  $async.Future<$5.PipelineCompileResult> compile($pb.ServerContext ctx, $5.PipelineSpec request);
-  $async.Future<$5.PipelineHandle> start($pb.ServerContext ctx, $5.PipelineStartRequest request);
-  $async.Future<$5.PipelineStopResult> stop($pb.ServerContext ctx, $5.PipelineHandle request);
+  $async.Future<$6.PipelineCompileResult> compile($pb.ServerContext ctx, $6.PipelineSpec request);
+  $async.Future<$6.PipelineHandle> start($pb.ServerContext ctx, $6.PipelineStartRequest request);
+  $async.Future<$6.PipelineStopResult> stop($pb.ServerContext ctx, $6.PipelineHandle request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
-      case 'Compile': return $5.PipelineSpec();
-      case 'Start': return $5.PipelineStartRequest();
-      case 'Stop': return $5.PipelineHandle();
+      case 'Compile': return $6.PipelineSpec();
+      case 'Start': return $6.PipelineStartRequest();
+      case 'Stop': return $6.PipelineHandle();
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }
 
   $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx, $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
-      case 'Compile': return this.compile(ctx, request as $5.PipelineSpec);
-      case 'Start': return this.start(ctx, request as $5.PipelineStartRequest);
-      case 'Stop': return this.stop(ctx, request as $5.PipelineHandle);
+      case 'Compile': return this.compile(ctx, request as $6.PipelineSpec);
+      case 'Start': return this.start(ctx, request as $6.PipelineStartRequest);
+      case 'Stop': return this.stop(ctx, request as $6.PipelineHandle);
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }

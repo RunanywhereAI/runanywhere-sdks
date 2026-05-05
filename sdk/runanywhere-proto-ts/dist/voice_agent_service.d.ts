@@ -1,6 +1,8 @@
 import _m0 from "protobufjs/minimal";
+import { EventCategory } from "./component_types";
+import { ErrorSeverity } from "./errors";
 import { TTSOptions } from "./tts_options";
-import { AudioEncoding, VoiceAgentComponentStates, VoiceEventCategory, VoiceEventSeverity } from "./voice_events";
+import { AudioEncoding, VoiceAgentComponentStates } from "./voice_events";
 export declare const protobufPackage = "runanywhere.v1";
 /**
  * Empty request type — the voice agent already has its config set via
@@ -14,8 +16,8 @@ export interface VoiceAgentRequest {
      */
     eventFilter: string;
     sessionId: string;
-    categories: VoiceEventCategory[];
-    minSeverity: VoiceEventSeverity;
+    categories: EventCategory[];
+    minSeverity: ErrorSeverity;
     replayFromSeq: number;
     includeAudio: boolean;
 }

@@ -56,7 +56,7 @@ class DartBridgeHardware {
   }
 
   /// Set the commons accelerator preference for subsequent routing decisions.
-  static bool setAcceleratorPreference(AcceleratorPreference preference) {
+  static bool setAccelerationPreference(AccelerationPreference preference) {
     try {
       final lib = PlatformLoader.loadCommons();
       final setPreference =

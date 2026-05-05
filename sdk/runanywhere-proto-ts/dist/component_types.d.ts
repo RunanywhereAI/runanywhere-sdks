@@ -67,6 +67,14 @@ export declare enum EventCategory {
     EVENT_CATEGORY_FAILURE = 33,
     EVENT_CATEGORY_NETWORK = 34,
     EVENT_CATEGORY_ERROR = 35,
+    /**
+     * EVENT_CATEGORY_AUDIO - IDL-07: absorbed from former VoiceEventCategory (voice_events.proto).
+     * AUDIO and METRICS had no EventCategory counterpart; WAKEWORD was
+     * previously only on the voice-pipeline side.
+     */
+    EVENT_CATEGORY_AUDIO = 36,
+    EVENT_CATEGORY_METRICS = 37,
+    EVENT_CATEGORY_WAKEWORD = 38,
     UNRECOGNIZED = -1
 }
 export declare function eventCategoryFromJSON(object: any): EventCategory;

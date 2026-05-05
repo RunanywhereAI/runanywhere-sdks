@@ -262,7 +262,6 @@ export * from '@runanywhere/proto-ts/tool_calling';
 // `ModelCategory.Language`, etc.) are intentionally not re-exported here.
 // ---------------------------------------------------------------------------
 export {
-  AccelerationPreference,
   AudioFormat,
   InferenceFramework,
   ModelCategory,
@@ -286,7 +285,7 @@ export {
 } from '@runanywhere/proto-ts/sdk_events';
 export { ErrorSeverity } from '@runanywhere/proto-ts/errors';
 export { DownloadStage, DownloadState } from '@runanywhere/proto-ts/download_service';
-export { AcceleratorPreference } from '@runanywhere/proto-ts/hardware_profile';
+export { AccelerationPreference } from '@runanywhere/proto-ts/hardware_profile';
 
 // Web-only enums (browser UI/runtime state with no generated proto contract).
 export {

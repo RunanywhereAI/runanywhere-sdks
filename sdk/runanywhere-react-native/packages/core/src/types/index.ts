@@ -168,7 +168,6 @@ export type {
   HardwareProfile,
   HardwareProfileResult,
 } from '@runanywhere/proto-ts/hardware_profile';
-export { AcceleratorPreference } from '@runanywhere/proto-ts/hardware_profile';
 
 // =========================================================================
 // STT / TTS / VAD / VLM / Diffusion — proto-canonical

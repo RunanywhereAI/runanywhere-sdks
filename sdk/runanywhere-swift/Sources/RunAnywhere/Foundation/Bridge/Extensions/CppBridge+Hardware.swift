@@ -51,7 +51,7 @@ extension CppBridge {
             return result.accelerators
         }
 
-        public static func setAcceleratorPreference(_ preference: RAAcceleratorPreference) throws {
+        public static func setAcceleratorPreference(_ preference: RAAccelerationPreference) throws {
             guard let setPreference = HardwareProtoABI.setPreference else {
                 throw SDKException.general(
                     .notSupported,

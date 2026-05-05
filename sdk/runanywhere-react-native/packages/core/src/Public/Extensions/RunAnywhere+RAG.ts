@@ -89,13 +89,31 @@ export async function ragIngest(
   metadataJson?: string
 ): Promise<void> {
   const native = ensureNative();
+  // IDL-13: `metadata_json` proto field was deleted. Best-effort parse
+  // of the legacy JSON into the typed `metadata` map.
+  const metadata = parseMetadata(metadataJson);
   const document = RAGDocument.create({
     id: '',
     text,
-    metadataJson,
-    metadata: {},
+    metadata,
   });
   await native.ragIngestProto(bytesToArrayBuffer(RAGDocument.encode(document).finish()));
+}
+
+function parseMetadata(json?: string): Record<string, string> {
+  if (!json) return {};
+  const trimmed = json.trim();
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return {};
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed)) {
+      out[k] = typeof v === 'string' ? v : String(v);
+    }
+    return out;
+  } catch {
+    return {};
+  }
 }
 
 /** Add multiple documents in batch. */

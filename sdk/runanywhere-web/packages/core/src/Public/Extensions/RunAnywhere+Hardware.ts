@@ -18,7 +18,7 @@
 import { Runtime, type RuntimeAccelerationMode } from '../../Foundation/RuntimeConfig';
 import { HardwareAdapter } from '../../Adapters/HardwareAdapter';
 import {
-  AcceleratorPreference,
+  AccelerationPreference,
   type HardwareProfileResult,
 } from '@runanywhere/proto-ts/hardware_profile';
 
@@ -88,8 +88,8 @@ function browserHardwareProfileResult(): HardwareProfileResult {
       {
         name: webgpuAvailable ? 'webgpu' : accelerationMode,
         type: webgpuAvailable
-          ? AcceleratorPreference.ACCELERATOR_PREFERENCE_GPU
-          : AcceleratorPreference.ACCELERATOR_PREFERENCE_CPU,
+          ? AccelerationPreference.ACCELERATION_PREFERENCE_GPU
+          : AccelerationPreference.ACCELERATION_PREFERENCE_CPU,
         available: true,
       },
     ],
@@ -165,7 +165,7 @@ export const Hardware = {
     };
   },
 
-  setAcceleratorPreference(preference: AcceleratorPreference): boolean {
-    return HardwareAdapter.tryDefault()?.setAcceleratorPreference(preference) ?? false;
+  setAccelerationPreference(preference: AccelerationPreference): boolean {
+    return HardwareAdapter.tryDefault()?.setAccelerationPreference(preference) ?? false;
   },
 };

@@ -1,34 +1,8 @@
 import _m0 from "protobufjs/minimal";
-import { ErrorCode } from "./errors";
+import { ComponentLifecycleState, EventCategory } from "./component_types";
+import { ErrorCode, ErrorSeverity } from "./errors";
 import { VADStreamEventKind } from "./vad_options";
 export declare const protobufPackage = "runanywhere.v1";
-export declare enum VoiceEventCategory {
-    VOICE_EVENT_CATEGORY_UNSPECIFIED = 0,
-    VOICE_EVENT_CATEGORY_VOICE_AGENT = 1,
-    VOICE_EVENT_CATEGORY_STT = 2,
-    VOICE_EVENT_CATEGORY_ASR = 3,
-    VOICE_EVENT_CATEGORY_TTS = 4,
-    VOICE_EVENT_CATEGORY_VAD = 5,
-    VOICE_EVENT_CATEGORY_STD = 6,
-    VOICE_EVENT_CATEGORY_LLM = 7,
-    VOICE_EVENT_CATEGORY_AUDIO = 8,
-    VOICE_EVENT_CATEGORY_METRICS = 9,
-    VOICE_EVENT_CATEGORY_ERROR = 10,
-    VOICE_EVENT_CATEGORY_WAKEWORD = 11,
-    UNRECOGNIZED = -1
-}
-export declare function voiceEventCategoryFromJSON(object: any): VoiceEventCategory;
-export declare function voiceEventCategoryToJSON(object: VoiceEventCategory): string;
-export declare enum VoiceEventSeverity {
-    VOICE_EVENT_SEVERITY_DEBUG = 0,
-    VOICE_EVENT_SEVERITY_INFO = 1,
-    VOICE_EVENT_SEVERITY_WARNING = 2,
-    VOICE_EVENT_SEVERITY_ERROR = 3,
-    VOICE_EVENT_SEVERITY_CRITICAL = 4,
-    UNRECOGNIZED = -1
-}
-export declare function voiceEventSeverityFromJSON(object: any): VoiceEventSeverity;
-export declare function voiceEventSeverityToJSON(object: VoiceEventSeverity): string;
 export declare enum VoicePipelineComponent {
     VOICE_PIPELINE_COMPONENT_UNSPECIFIED = 0,
     VOICE_PIPELINE_COMPONENT_AGENT = 1,
@@ -91,21 +65,6 @@ export declare enum PipelineState {
 }
 export declare function pipelineStateFromJSON(object: any): PipelineState;
 export declare function pipelineStateToJSON(object: PipelineState): string;
-/**
- * Loading state of a single voice-agent component (STT, LLM, TTS, VAD).
- * UNSPECIFIED preserves proto3 zero-value semantics — frontends MUST treat it
- * the same as NOT_LOADED for forward-compatibility.
- */
-export declare enum ComponentLoadState {
-    COMPONENT_LOAD_STATE_UNSPECIFIED = 0,
-    COMPONENT_LOAD_STATE_NOT_LOADED = 1,
-    COMPONENT_LOAD_STATE_LOADING = 2,
-    COMPONENT_LOAD_STATE_LOADED = 3,
-    COMPONENT_LOAD_STATE_ERROR = 4,
-    UNRECOGNIZED = -1
-}
-export declare function componentLoadStateFromJSON(object: any): ComponentLoadState;
-export declare function componentLoadStateToJSON(object: ComponentLoadState): string;
 export declare enum SpeechTurnDetectionEventKind {
     SPEECH_TURN_DETECTION_EVENT_KIND_UNSPECIFIED = 0,
     SPEECH_TURN_DETECTION_EVENT_KIND_TURN_STARTED = 1,
@@ -147,8 +106,8 @@ export interface VoiceEvent {
      * Unix epoch. Frontends may re-timestamp for UI display.
      */
     timestampUs: number;
-    category: VoiceEventCategory;
-    severity: VoiceEventSeverity;
+    category: EventCategory;
+    severity: ErrorSeverity;
     component: VoicePipelineComponent;
     userSaid?: UserSaidEvent | undefined;
     assistantToken?: AssistantTokenEvent | undefined;
@@ -316,21 +275,30 @@ export interface ComponentProgressEvent {
  * `VoiceAgentComponentStates`, Kotlin `VoiceAgentComponentStates`, RN
  * `VoiceAgentComponentStates`, Web `VoiceAgentComponentStates`, and Flutter
  * `VoiceAgentComponentStates`.
+ *
+ * IDL-04: The former `ComponentLoadState` enum was consolidated into the
+ * canonical richer `ComponentLifecycleState` (component_types.proto). Where
+ * the old enum's `COMPONENT_LOAD_STATE_LOADED` value was used to mean "this
+ * component is ready to use", callers now use
+ * `COMPONENT_LIFECYCLE_STATE_READY`.
  */
 export interface VoiceAgentComponentStates {
-    sttState: ComponentLoadState;
-    llmState: ComponentLoadState;
-    ttsState: ComponentLoadState;
-    vadState: ComponentLoadState;
+    sttState: ComponentLifecycleState;
+    llmState: ComponentLifecycleState;
+    ttsState: ComponentLifecycleState;
+    vadState: ComponentLifecycleState;
     /**
      * Computed: true when stt_state, llm_state, tts_state, vad_state are all
-     * COMPONENT_LOAD_STATE_LOADED. Producer sets this; consumers must NOT
+     * COMPONENT_LIFECYCLE_STATE_READY. Producer sets this; consumers must NOT
      * recompute.
      */
     ready: boolean;
-    /** Computed: true when any of the four states is COMPONENT_LOAD_STATE_LOADING. */
+    /**
+     * Computed: true when any of the four states is
+     * COMPONENT_LIFECYCLE_STATE_LOADING.
+     */
     anyLoading: boolean;
-    wakewordState: ComponentLoadState;
+    wakewordState: ComponentLifecycleState;
     errorMessage?: string | undefined;
 }
 export interface VoiceSessionError {

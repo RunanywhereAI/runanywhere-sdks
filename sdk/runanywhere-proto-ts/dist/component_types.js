@@ -143,6 +143,14 @@ export var EventCategory;
     EventCategory[EventCategory["EVENT_CATEGORY_FAILURE"] = 33] = "EVENT_CATEGORY_FAILURE";
     EventCategory[EventCategory["EVENT_CATEGORY_NETWORK"] = 34] = "EVENT_CATEGORY_NETWORK";
     EventCategory[EventCategory["EVENT_CATEGORY_ERROR"] = 35] = "EVENT_CATEGORY_ERROR";
+    /**
+     * EVENT_CATEGORY_AUDIO - IDL-07: absorbed from former VoiceEventCategory (voice_events.proto).
+     * AUDIO and METRICS had no EventCategory counterpart; WAKEWORD was
+     * previously only on the voice-pipeline side.
+     */
+    EventCategory[EventCategory["EVENT_CATEGORY_AUDIO"] = 36] = "EVENT_CATEGORY_AUDIO";
+    EventCategory[EventCategory["EVENT_CATEGORY_METRICS"] = 37] = "EVENT_CATEGORY_METRICS";
+    EventCategory[EventCategory["EVENT_CATEGORY_WAKEWORD"] = 38] = "EVENT_CATEGORY_WAKEWORD";
     EventCategory[EventCategory["UNRECOGNIZED"] = -1] = "UNRECOGNIZED";
 })(EventCategory || (EventCategory = {}));
 export function eventCategoryFromJSON(object) {
@@ -255,6 +263,15 @@ export function eventCategoryFromJSON(object) {
         case 35:
         case "EVENT_CATEGORY_ERROR":
             return EventCategory.EVENT_CATEGORY_ERROR;
+        case 36:
+        case "EVENT_CATEGORY_AUDIO":
+            return EventCategory.EVENT_CATEGORY_AUDIO;
+        case 37:
+        case "EVENT_CATEGORY_METRICS":
+            return EventCategory.EVENT_CATEGORY_METRICS;
+        case 38:
+        case "EVENT_CATEGORY_WAKEWORD":
+            return EventCategory.EVENT_CATEGORY_WAKEWORD;
         case -1:
         case "UNRECOGNIZED":
         default:
@@ -335,6 +352,12 @@ export function eventCategoryToJSON(object) {
             return "EVENT_CATEGORY_NETWORK";
         case EventCategory.EVENT_CATEGORY_ERROR:
             return "EVENT_CATEGORY_ERROR";
+        case EventCategory.EVENT_CATEGORY_AUDIO:
+            return "EVENT_CATEGORY_AUDIO";
+        case EventCategory.EVENT_CATEGORY_METRICS:
+            return "EVENT_CATEGORY_METRICS";
+        case EventCategory.EVENT_CATEGORY_WAKEWORD:
+            return "EVENT_CATEGORY_WAKEWORD";
         case EventCategory.UNRECOGNIZED:
         default:
             return "UNRECOGNIZED";

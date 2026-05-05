@@ -3,18 +3,25 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * JVM/Android actuals for framework discovery + queries.
- * Backed by CppBridgeModelRegistry (the canonical model store).
+ *
+ * Wave H-5 (KOT-12): getFrameworksForCapability delegates to the commons
+ * engine-router via rac_router_frameworks_for_capability_proto. The previous
+ * SDKComponent -> ModelCategory -> framework mapping lived in Kotlin and
+ * was deleted; commons now owns the canonical capability -> framework
+ * resolution for every SDK.
  */
 
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.InferenceFramework
-import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.displayName
+import ai.runanywhere.proto.v1.FrameworksForCapabilityRequest as ProtoFrameworksForCapabilityRequest
+import ai.runanywhere.proto.v1.FrameworksForCapabilityResponse as ProtoFrameworksForCapabilityResponse
 
 actual suspend fun RunAnywhere.getRegisteredFrameworks(): List<InferenceFramework> {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
@@ -28,32 +35,27 @@ actual suspend fun RunAnywhere.getRegisteredFrameworks(): List<InferenceFramewor
 actual suspend fun RunAnywhere.getFrameworksForCapability(capability: SDKComponent): List<InferenceFramework> {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
 
-    val relevantCategories: Set<ModelCategory> =
-        when (capability) {
-            SDKComponent.SDK_COMPONENT_LLM -> setOf(ModelCategory.MODEL_CATEGORY_LANGUAGE)
-            SDKComponent.SDK_COMPONENT_VLM ->
-                setOf(ModelCategory.MODEL_CATEGORY_MULTIMODAL, ModelCategory.MODEL_CATEGORY_VISION)
-            SDKComponent.SDK_COMPONENT_STT -> setOf(ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION)
-            SDKComponent.SDK_COMPONENT_TTS -> setOf(ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS)
-            SDKComponent.SDK_COMPONENT_VAD -> setOf(ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION)
-            SDKComponent.SDK_COMPONENT_VOICE_AGENT ->
-                setOf(
-                    ModelCategory.MODEL_CATEGORY_LANGUAGE,
-                    ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-                    ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-                    ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
-                )
-            SDKComponent.SDK_COMPONENT_EMBEDDINGS -> setOf(ModelCategory.MODEL_CATEGORY_EMBEDDING)
-            SDKComponent.SDK_COMPONENT_RAG -> setOf(ModelCategory.MODEL_CATEGORY_LANGUAGE)
-            else -> emptySet()
-        }
+    val request = ProtoFrameworksForCapabilityRequest(component = capability)
+    val responseBytes =
+        try {
+            RunAnywhereBridge.racRouterFrameworksForCapabilityProto(
+                ProtoFrameworksForCapabilityRequest.ADAPTER.encode(request),
+            )
+        } catch (e: UnsatisfiedLinkError) {
+            throw SDKException.notInitialized(
+                "rac_router_frameworks_for_capability_proto unavailable: ${e.message}",
+            )
+        } ?: return emptyList()
 
-    val all = CppBridgeModelRegistry.getAll()
-    return all
-        .filter { it.category in relevantCategories }
-        .map { it.framework }
-        .distinct()
-        .sortedBy { it.displayName }
+    val response =
+        try {
+            ProtoFrameworksForCapabilityResponse.ADAPTER.decode(responseBytes)
+        } catch (e: Exception) {
+            throw SDKException.notInitialized(
+                "Failed to decode FrameworksForCapabilityResponse: ${e.message}",
+            )
+        }
+    return response.frameworks.sortedBy { it.displayName }
 }
 
 actual suspend fun RunAnywhere.flushPendingRegistrations() {

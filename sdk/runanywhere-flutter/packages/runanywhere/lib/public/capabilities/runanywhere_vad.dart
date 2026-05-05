@@ -9,12 +9,12 @@ import 'dart:typed_data';
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
+import 'package:runanywhere/generated/component_types.pbenum.dart' show ComponentLifecycleState;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
-import 'package:runanywhere/generated/sdk_events.pbenum.dart'
-    show ComponentLifecycleState, SDKComponent;
+import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/vad_options.pb.dart'
     show
         VADAudioEncoding,
@@ -24,7 +24,7 @@ import 'package:runanywhere/generated/vad_options.pb.dart'
         VADProcessRequest,
         VADResult,
         VADStatistics;
-import 'package:runanywhere/generated/voice_events.pbenum.dart'
+import 'package:runanywhere/generated/vad_options.pbenum.dart'
     show VADStreamEventKind;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_vad.dart';

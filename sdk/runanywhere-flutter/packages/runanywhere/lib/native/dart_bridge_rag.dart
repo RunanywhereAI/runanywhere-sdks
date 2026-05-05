@@ -114,7 +114,9 @@ class DartBridgeRAG {
     String text, {
     String? metadataJson,
   }) async {
-    return ingestDocument(RAGDocument(text: text, metadataJson: metadataJson));
+    // IDL-13: `metadata_json` proto field was deleted. Best-effort parse of
+    // the legacy JSON into the typed `metadata` map before ingestion.
+    return ingestDocument(RAGDocument(text: text, metadata: _parseMetadata(metadataJson)));
   }
 
   Future<RAGStatistics> addDocumentsBatchAsync(
@@ -124,10 +126,28 @@ class DartBridgeRAG {
     for (final doc in documents) {
       stats = ingestDocument(RAGDocument(
         text: doc['text'] ?? '',
-        metadataJson: doc['metadataJson'],
+        metadata: _parseMetadata(doc['metadataJson']),
       ));
     }
     return stats;
+  }
+
+  Map<String, String> _parseMetadata(String? json) {
+    if (json == null || json.isEmpty) return const <String, String>{};
+    final trimmed = json.trim();
+    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+      return const <String, String>{};
+    }
+    final inner = trimmed.substring(1, trimmed.length - 1);
+    final result = <String, String>{};
+    for (final pair in inner.split(',')) {
+      final parts = pair.split(':');
+      if (parts.length != 2) continue;
+      final k = parts[0].trim().replaceAll('"', '');
+      final v = parts[1].trim().replaceAll('"', '');
+      if (k.isNotEmpty) result[k] = v;
+    }
+    return result;
   }
 
   RAGStatistics clearDocuments() {

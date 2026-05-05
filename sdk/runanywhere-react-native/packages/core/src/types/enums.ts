@@ -14,11 +14,24 @@
 export {
   // sdk_events.proto
   SDKComponent,
-  ErrorSeverity,
   EventDestination,
-  EventCategory,
-  ComponentLifecycleState,
 } from '@runanywhere/proto-ts/sdk_events';
+
+export {
+  // component_types.proto — shared lifecycle + categorization
+  ComponentLifecycleState,
+  EventCategory,
+} from '@runanywhere/proto-ts/component_types';
+
+export {
+  // errors.proto — severity taxonomy
+  ErrorSeverity,
+} from '@runanywhere/proto-ts/errors';
+
+export {
+  // hardware_profile.proto — acceleration preference
+  AccelerationPreference,
+} from '@runanywhere/proto-ts/hardware_profile';
 
 export {
   // llm_options.proto
@@ -27,7 +40,6 @@ export {
 
 export {
   // model_types.proto — the canonical option/format/category enums.
-  AccelerationPreference,
   AudioFormat,
   InferenceFramework,
   ModelArtifactType,

@@ -27,6 +27,6 @@ class RunAnywhereHardware {
   ///
   /// Returns false when the bundled native library does not expose the hardware
   /// ABI yet.
-  bool setAcceleratorPreference(AcceleratorPreference preference) =>
-      DartBridgeHardware.setAcceleratorPreference(preference);
+  bool setAcceleratorPreference(AccelerationPreference preference) =>
+      DartBridgeHardware.setAccelerationPreference(preference);
 }

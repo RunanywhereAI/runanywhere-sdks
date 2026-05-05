@@ -999,9 +999,10 @@ class VADStatistics extends $pb.GeneratedMessage {
 ///    C ABI  rac_vad_types.h:107 (rac_speech_activity_t)
 ///                                            (RAC_SPEECH_STARTED/ENDED/ONGOING)
 ///
-///  Distinct from voice_events.proto's `VADEvent`/`VADEventType`, which carry
-///  the broader pipeline-level taxonomy (BARGE_IN, END_OF_UTTERANCE, etc).
-///  `SpeechActivityEvent` here is the narrow component-level transition.
+///  Distinct from voice_events.proto's `VADEvent`, which carries the broader
+///  pipeline-level taxonomy (BARGE_IN, END_OF_UTTERANCE, etc) via
+///  `VADStreamEventKind`. `SpeechActivityEvent` here is the narrow
+///  component-level transition.
 ///  ---------------------------------------------------------------------------
 class SpeechActivityEvent extends $pb.GeneratedMessage {
   factory SpeechActivityEvent({

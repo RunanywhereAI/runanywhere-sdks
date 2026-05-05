@@ -321,7 +321,6 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       resultJson: '',
       error: `Unknown tool: ${toolCall.name}`,
       success: false,
-      result: {},
       startedAtMs,
       completedAtMs: Date.now(),
     });
@@ -341,7 +340,6 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       resultJson: '',
       error: `Failed to parse tool arguments: ${errorMessage}`,
       success: false,
-      result: {},
       startedAtMs,
       completedAtMs: Date.now(),
     });
@@ -356,7 +354,6 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       name: toolCall.name,
       resultJson: JSON.stringify(result),
       success: true,
-      result: {},
       startedAtMs,
       completedAtMs: Date.now(),
     });
@@ -370,7 +367,6 @@ export async function executeTool(toolCall: ToolCall): Promise<ToolResult> {
       resultJson: '',
       error: errorMessage,
       success: false,
-      result: {},
       startedAtMs,
       completedAtMs: Date.now(),
     });

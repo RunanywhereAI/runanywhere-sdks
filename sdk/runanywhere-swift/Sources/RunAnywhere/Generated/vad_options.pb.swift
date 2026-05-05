@@ -16,8 +16,10 @@
 // what motivated this schema. Every SDK consumes generated output; nothing
 // is hand-written.
 //
-// Note: this file does NOT redefine VADEventType / VADEvent — those already
-// live in voice_events.proto and are imported here when needed.
+// Note: this file does NOT redefine VADEvent — that lives in
+// voice_events.proto and is imported here when needed. VADStreamEventKind
+// below is the canonical VAD event enum (IDL-18 absorbed the deleted
+// VADEventType from voice_events.proto).
 
 #if canImport(FoundationEssentials)
 import FoundationEssentials
@@ -566,9 +568,10 @@ public struct RAVADStatistics: Sendable {
 ///   C ABI  rac_vad_types.h:107 (rac_speech_activity_t)
 ///                                           (RAC_SPEECH_STARTED/ENDED/ONGOING)
 ///
-/// Distinct from voice_events.proto's `VADEvent`/`VADEventType`, which carry
-/// the broader pipeline-level taxonomy (BARGE_IN, END_OF_UTTERANCE, etc).
-/// `SpeechActivityEvent` here is the narrow component-level transition.
+/// Distinct from voice_events.proto's `VADEvent`, which carries the broader
+/// pipeline-level taxonomy (BARGE_IN, END_OF_UTTERANCE, etc) via
+/// `VADStreamEventKind`. `SpeechActivityEvent` here is the narrow
+/// component-level transition.
 /// ---------------------------------------------------------------------------
 public struct RASpeechActivityEvent: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the

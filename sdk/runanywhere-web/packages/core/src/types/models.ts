@@ -8,11 +8,11 @@
  */
 
 import type {
-  AccelerationPreference,
   ModelInfo as ProtoModelInfo,
   ModelInfoMetadata as ProtoModelInfoMetadata,
   SDKEnvironment,
 } from '@runanywhere/proto-ts/model_types';
+import type { AccelerationPreference } from '@runanywhere/proto-ts/hardware_profile';
 import type {
   StorageInfo as ProtoStorageInfo,
   StoredModel as ProtoStoredModel,

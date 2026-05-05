@@ -35,13 +35,13 @@ import {
 } from '../Foundation/Initialization';
 import type { SDKInitOptions } from '../types';
 import {
-  EventCategory,
   EventDestination,
-  ErrorSeverity,
   InitializationStage,
   SDKComponent,
   SDKEvent as SDKEventCodec,
 } from '@runanywhere/proto-ts/sdk_events';
+import { EventCategory } from '@runanywhere/proto-ts/component_types';
+import { ErrorSeverity } from '@runanywhere/proto-ts/errors';
 
 // Import extensions
 import * as TextGeneration from './Extensions/RunAnywhere+TextGeneration';

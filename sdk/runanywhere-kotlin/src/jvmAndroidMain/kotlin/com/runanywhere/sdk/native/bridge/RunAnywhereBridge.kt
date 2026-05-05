@@ -1513,6 +1513,21 @@ object RunAnywhereBridge {
     @JvmStatic external fun racHardwareProfileGet(): ByteArray?
 
     // ========================================================================
+    // ENGINE ROUTER — CAPABILITY QUERIES (Wave H-5 / KOT-12)
+    // ========================================================================
+    //
+    // `rac_router_frameworks_for_capability_proto` consumes a serialized
+    // `runanywhere.v1.FrameworksForCapabilityRequest` and returns a serialized
+    // `runanywhere.v1.FrameworksForCapabilityResponse`. Replaces the local
+    // SDKComponent → ModelCategory → framework mapping that used to live in
+    // Kotlin.
+
+    /** Resolve the ordered list of frameworks that can serve a given SDKComponent.
+     *  Input: serialized FrameworksForCapabilityRequest.
+     *  Output: serialized FrameworksForCapabilityResponse, or null on failure. */
+    @JvmStatic external fun racRouterFrameworksForCapabilityProto(requestProto: ByteArray): ByteArray?
+
+    // ========================================================================
     // CONSTANTS
     // ========================================================================
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:runanywhere/generated/component_types.pbenum.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart';
 
 /// Central event bus for generated SDKEvent proto distribution.

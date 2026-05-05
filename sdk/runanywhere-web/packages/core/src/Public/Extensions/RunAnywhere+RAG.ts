@@ -364,7 +364,6 @@ function makeRAGDocument(text: string, metadataJson?: string): RAGDocument {
   return {
     id: parsed.docId,
     text,
-    metadataJson,
     metadata: parsed.metadata,
     sourceUri: parsed.sourceUri,
     adapterHandle: undefined,

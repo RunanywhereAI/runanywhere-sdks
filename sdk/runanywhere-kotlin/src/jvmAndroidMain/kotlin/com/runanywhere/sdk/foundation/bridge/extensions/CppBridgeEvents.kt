@@ -9,9 +9,9 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.DeviceEvent
 import ai.runanywhere.proto.v1.DeviceEventKind
+import ai.runanywhere.proto.v1.ErrorSeverity
 import ai.runanywhere.proto.v1.EventCategory
 import ai.runanywhere.proto.v1.EventDestination
-import ai.runanywhere.proto.v1.EventSeverity
 import ai.runanywhere.proto.v1.InitializationEvent
 import ai.runanywhere.proto.v1.InitializationStage
 import ai.runanywhere.proto.v1.SDKComponent
@@ -40,7 +40,7 @@ object CppBridgeEvents {
     fun emitSDKInitStarted() {
         publishInitialization(
             stage = InitializationStage.INITIALIZATION_STAGE_STARTED,
-            severity = EventSeverity.EVENT_SEVERITY_INFO,
+            severity = ErrorSeverity.ERROR_SEVERITY_INFO,
             operationId = "sdk.init",
         )
     }
@@ -48,7 +48,7 @@ object CppBridgeEvents {
     fun emitSDKInitCompleted(durationMs: Double) {
         publishInitialization(
             stage = InitializationStage.INITIALIZATION_STAGE_COMPLETED,
-            severity = EventSeverity.EVENT_SEVERITY_INFO,
+            severity = ErrorSeverity.ERROR_SEVERITY_INFO,
             operationId = "sdk.init",
             properties = mapOf("duration_ms" to durationMs.toString()),
         )
@@ -57,7 +57,7 @@ object CppBridgeEvents {
     fun emitDeviceRegistered(deviceId: String) {
         publishDevice(
             kind = DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_REGISTERED,
-            severity = EventSeverity.EVENT_SEVERITY_INFO,
+            severity = ErrorSeverity.ERROR_SEVERITY_INFO,
             deviceId = deviceId,
             operationId = "device.register",
         )
@@ -66,7 +66,7 @@ object CppBridgeEvents {
     fun emitDeviceRegistrationFailed(errorMessage: String) {
         publishDevice(
             kind = DeviceEventKind.DEVICE_EVENT_KIND_DEVICE_REGISTRATION_FAILED,
-            severity = EventSeverity.EVENT_SEVERITY_ERROR,
+            severity = ErrorSeverity.ERROR_SEVERITY_ERROR,
             error = errorMessage,
             operationId = "device.register",
         )
@@ -74,7 +74,7 @@ object CppBridgeEvents {
 
     private fun publishInitialization(
         stage: InitializationStage,
-        severity: EventSeverity,
+        severity: ErrorSeverity,
         operationId: String,
         properties: Map<String, String> = emptyMap(),
     ) {
@@ -100,7 +100,7 @@ object CppBridgeEvents {
 
     private fun publishDevice(
         kind: DeviceEventKind,
-        severity: EventSeverity,
+        severity: ErrorSeverity,
         operationId: String,
         deviceId: String = "",
         error: String = "",

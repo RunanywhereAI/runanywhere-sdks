@@ -1,6 +1,6 @@
 import {
   HardwareProfileResult,
-  type AcceleratorPreference,
+  type AccelerationPreference,
   type HardwareProfileResult as ProtoHardwareProfileResult,
 } from '@runanywhere/proto-ts/hardware_profile';
 import { SDKLogger } from '../Foundation/SDKLogger';
@@ -61,8 +61,8 @@ export class HardwareAdapter {
     return bytes ? HardwareProfileResult.decode(bytes) : null;
   }
 
-  setAcceleratorPreference(preference: AcceleratorPreference): boolean {
-    if (!this.ensureExports('setAcceleratorPreference', [
+  setAccelerationPreference(preference: AccelerationPreference): boolean {
+    if (!this.ensureExports('setAccelerationPreference', [
       '_rac_hardware_set_accelerator_preference',
     ])) {
       return false;

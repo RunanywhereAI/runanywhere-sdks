@@ -15,27 +15,27 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'tts_options.pb.dart' as $15;
+import 'tts_options.pb.dart' as $16;
 import 'tts_options.pbjson.dart';
 
 export 'tts_options.pb.dart';
 
 abstract class TTSServiceBase extends $pb.GeneratedService {
-  $async.Future<$15.TTSOutput> synthesize($pb.ServerContext ctx, $15.TTSSynthesisRequest request);
-  $async.Future<$15.TTSStreamEvent> stream($pb.ServerContext ctx, $15.TTSSynthesisRequest request);
+  $async.Future<$16.TTSOutput> synthesize($pb.ServerContext ctx, $16.TTSSynthesisRequest request);
+  $async.Future<$16.TTSStreamEvent> stream($pb.ServerContext ctx, $16.TTSSynthesisRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
-      case 'Synthesize': return $15.TTSSynthesisRequest();
-      case 'Stream': return $15.TTSSynthesisRequest();
+      case 'Synthesize': return $16.TTSSynthesisRequest();
+      case 'Stream': return $16.TTSSynthesisRequest();
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }
 
   $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx, $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
-      case 'Synthesize': return this.synthesize(ctx, request as $15.TTSSynthesisRequest);
-      case 'Stream': return this.stream(ctx, request as $15.TTSSynthesisRequest);
+      case 'Synthesize': return this.synthesize(ctx, request as $16.TTSSynthesisRequest);
+      case 'Stream': return this.stream(ctx, request as $16.TTSSynthesisRequest);
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }

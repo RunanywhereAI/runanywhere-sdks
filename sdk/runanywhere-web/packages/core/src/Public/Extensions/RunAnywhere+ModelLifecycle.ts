@@ -10,7 +10,7 @@ import type {
   ComponentLifecycleSnapshot,
   SDKComponent,
 } from '@runanywhere/proto-ts/sdk_events';
-import { ComponentLifecycleState } from '@runanywhere/proto-ts/sdk_events';
+import { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 import { ModelLifecycleAdapter } from '../../Adapters/ModelLifecycleAdapter';
 
 export type {
@@ -26,7 +26,7 @@ export type {
   ComponentLifecycleSnapshot,
   SDKComponent,
 } from '@runanywhere/proto-ts/sdk_events';
-export { ComponentLifecycleState } from '@runanywhere/proto-ts/sdk_events';
+export { ComponentLifecycleState } from '@runanywhere/proto-ts/component_types';
 
 function requireAdapter(): ModelLifecycleAdapter {
   const adapter = ModelLifecycleAdapter.tryDefault();
