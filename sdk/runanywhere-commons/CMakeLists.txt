@@ -979,11 +979,23 @@ if(RAC_ENABLE_PROTOBUF)
         set(protobuf_ABSL_PROVIDER         "module" CACHE STRING "" FORCE)
         set(protobuf_FORCE_FETCH_DEPENDENCIES ON CACHE BOOL "" FORCE)
         set(ABSL_PROPAGATE_CXX_STD         ON CACHE BOOL "" FORCE)
+        # CPP-11: FIND_PACKAGE_ARGS (CMake 3.24+) lets FetchContent try a
+        # system Protobuf+absl first and only fall through to the git clone
+        # when neither is present. Homebrew Protobuf 34.x reports
+        # PACKAGE_FIND_VERSION_MAJOR=7 and is rejected by the upstream
+        # version check, which is exactly when we WANT the fall-through —
+        # explicit NAMES keeps the guard narrow and avoids silent captures
+        # of mismatched absl dylibs that happen under `FetchContent` alone.
+        set(_rac_fetch_protobuf_find_args "")
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.24")
+            set(_rac_fetch_protobuf_find_args FIND_PACKAGE_ARGS 34.1 EXACT NAMES Protobuf)
+        endif()
         FetchContent_Declare(
             protobuf_fetched
             GIT_REPOSITORY https://github.com/protocolbuffers/protobuf.git
             GIT_TAG        v34.1
             GIT_SHALLOW    TRUE
+            ${_rac_fetch_protobuf_find_args}
         )
         FetchContent_MakeAvailable(protobuf_fetched)
         if(TARGET libprotobuf AND NOT TARGET protobuf::libprotobuf)
