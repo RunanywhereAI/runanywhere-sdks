@@ -115,7 +115,7 @@ inline constexpr LLMStreamEvent::Impl_::Impl_(
         seq_{::uint64_t{0u}},
         timestamp_us_{::int64_t{0}},
         is_final_{false},
-        kind_{static_cast< ::runanywhere::v1::LLMTokenKind >(0)},
+        kind_{static_cast< ::runanywhere::v1::TokenKind >(0)},
         token_id_{0u},
         logprob_{0},
         error_code_{0},
@@ -232,7 +232,7 @@ PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
 }  // namespace v1
 }  // namespace runanywhere
 static const ::_pb::EnumDescriptor* PROTOBUF_NONNULL
-    file_level_enum_descriptors_llm_5fservice_2eproto[2];
+    file_level_enum_descriptors_llm_5fservice_2eproto[1];
 static constexpr const ::_pb::ServiceDescriptor* PROTOBUF_NONNULL* PROTOBUF_NULLABLE
     file_level_service_descriptors_llm_5fservice_2eproto = nullptr;
 const ::uint32_t
@@ -381,73 +381,74 @@ static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
 };
 const char descriptor_table_protodef_llm_5fservice_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
-    "\n\021llm_service.proto\022\016runanywhere.v1\"\214\005\n\022"
-    "LLMGenerateRequest\022\016\n\006prompt\030\001 \001(\t\022\022\n\nma"
-    "x_tokens\030\002 \001(\005\022\023\n\013temperature\030\003 \001(\002\022\r\n\005t"
-    "op_p\030\004 \001(\002\022\r\n\005top_k\030\005 \001(\005\022\025\n\rsystem_prom"
-    "pt\030\006 \001(\t\022\025\n\remit_thoughts\030\007 \001(\010\022\032\n\022repet"
-    "ition_penalty\030\010 \001(\002\022\026\n\016stop_sequences\030\t "
-    "\003(\t\022\031\n\021streaming_enabled\030\n \001(\010\022\033\n\023prefer"
-    "red_framework\030\013 \001(\t\022\023\n\013json_schema\030\014 \001(\t"
-    "\022\030\n\020execution_target\030\r \001(\t\022\022\n\nrequest_id"
-    "\030\016 \001(\t\022\020\n\010model_id\030\017 \001(\t\022\027\n\017conversation"
-    "_id\030\020 \001(\t\022\014\n\004seed\030\021 \001(\003\022\031\n\021frequency_pen"
-    "alty\030\022 \001(\002\022\030\n\020presence_penalty\030\023 \001(\002\022\r\n\005"
-    "min_p\030\024 \001(\002\022\017\n\007grammar\030\025 \001(\t\022\027\n\017response"
-    "_format\030\026 \001(\t\022\023\n\013echo_prompt\030\027 \001(\010\022\021\n\tn_"
-    "threads\030\030 \001(\005\022B\n\010metadata\030\031 \003(\01320.runany"
-    "where.v1.LLMGenerateRequest.MetadataEntr"
-    "y\032/\n\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value"
-    "\030\002 \001(\t:\0028\001\"\351\002\n\024LLMStreamFinalResult\022\014\n\004t"
-    "ext\030\001 \001(\t\022\035\n\020thinking_content\030\002 \001(\tH\000\210\001\001"
-    "\022\025\n\rprompt_tokens\030\003 \001(\005\022\031\n\021completion_to"
-    "kens\030\004 \001(\005\022\024\n\014total_tokens\030\005 \001(\005\022\025\n\rtota"
-    "l_time_ms\030\006 \001(\003\022\036\n\026time_to_first_token_m"
-    "s\030\007 \001(\003\022\031\n\021tokens_per_second\030\010 \001(\002\022\025\n\rfi"
-    "nish_reason\030\t \001(\t\022\022\n\nerror_code\030\n \001(\005\022\025\n"
-    "\rerror_message\030\013 \001(\t\022\033\n\023prompt_eval_time"
-    "_ms\030\014 \001(\003\022\026\n\016decode_time_ms\030\r \001(\003B\023\n\021_th"
-    "inking_content\"\352\003\n\016LLMStreamEvent\022\013\n\003seq"
-    "\030\001 \001(\004\022\024\n\014timestamp_us\030\002 \001(\003\022\r\n\005token\030\003 "
-    "\001(\t\022\020\n\010is_final\030\004 \001(\010\022*\n\004kind\030\005 \001(\0162\034.ru"
-    "nanywhere.v1.LLMTokenKind\022\020\n\010token_id\030\006 "
-    "\001(\r\022\017\n\007logprob\030\007 \001(\002\022\025\n\rfinish_reason\030\010 "
-    "\001(\t\022\025\n\rerror_message\030\t \001(\t\0229\n\006result\030\n \001"
-    "(\0132$.runanywhere.v1.LLMStreamFinalResult"
-    "H\000\210\001\001\022\022\n\nerror_code\030\013 \001(\005\0226\n\nevent_kind\030"
-    "\014 \001(\0162\".runanywhere.v1.LLMStreamEventKin"
-    "d\022\022\n\nrequest_id\030\r \001(\t\022\027\n\017conversation_id"
-    "\030\016 \001(\t\022\037\n\027prompt_tokens_processed\030\017 \001(\005\022"
-    "#\n\033completion_tokens_generated\030\020 \001(\005\022\022\n\n"
-    "elapsed_ms\030\021 \001(\003B\t\n\007_result*\262\002\n\022LLMStrea"
-    "mEventKind\022%\n!LLM_STREAM_EVENT_KIND_UNSP"
-    "ECIFIED\020\000\022!\n\035LLM_STREAM_EVENT_KIND_START"
-    "ED\020\001\022\037\n\033LLM_STREAM_EVENT_KIND_TOKEN\020\002\022\"\n"
-    "\036LLM_STREAM_EVENT_KIND_THINKING\020\003\022#\n\037LLM"
-    "_STREAM_EVENT_KIND_TOOL_CALL\020\004\022\"\n\036LLM_ST"
-    "REAM_EVENT_KIND_PROGRESS\020\005\022#\n\037LLM_STREAM"
-    "_EVENT_KIND_COMPLETED\020\006\022\037\n\033LLM_STREAM_EV"
-    "ENT_KIND_ERROR\020\007*\203\001\n\014LLMTokenKind\022\036\n\032LLM"
-    "_TOKEN_KIND_UNSPECIFIED\020\000\022\031\n\025LLM_TOKEN_K"
-    "IND_ANSWER\020\001\022\032\n\026LLM_TOKEN_KIND_THOUGHT\020\002"
-    "\022\034\n\030LLM_TOKEN_KIND_TOOL_CALL\020\0032W\n\003LLM\022P\n"
-    "\010Generate\022\".runanywhere.v1.LLMGenerateRe"
-    "quest\032\036.runanywhere.v1.LLMStreamEvent0\001B"
-    "\212\001\n\027ai.runanywhere.proto.v1B\017LLMServiceP"
-    "rotoP\001Z<github.com/runanywhere/runanywhe"
-    "re-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002"
-    "\016Runanywhere.V1\272\002\002RAb\006proto3"
+    "\n\021llm_service.proto\022\016runanywhere.v1\032\022voi"
+    "ce_events.proto\"\214\005\n\022LLMGenerateRequest\022\016"
+    "\n\006prompt\030\001 \001(\t\022\022\n\nmax_tokens\030\002 \001(\005\022\023\n\013te"
+    "mperature\030\003 \001(\002\022\r\n\005top_p\030\004 \001(\002\022\r\n\005top_k\030"
+    "\005 \001(\005\022\025\n\rsystem_prompt\030\006 \001(\t\022\025\n\remit_tho"
+    "ughts\030\007 \001(\010\022\032\n\022repetition_penalty\030\010 \001(\002\022"
+    "\026\n\016stop_sequences\030\t \003(\t\022\031\n\021streaming_ena"
+    "bled\030\n \001(\010\022\033\n\023preferred_framework\030\013 \001(\t\022"
+    "\023\n\013json_schema\030\014 \001(\t\022\030\n\020execution_target"
+    "\030\r \001(\t\022\022\n\nrequest_id\030\016 \001(\t\022\020\n\010model_id\030\017"
+    " \001(\t\022\027\n\017conversation_id\030\020 \001(\t\022\014\n\004seed\030\021 "
+    "\001(\003\022\031\n\021frequency_penalty\030\022 \001(\002\022\030\n\020presen"
+    "ce_penalty\030\023 \001(\002\022\r\n\005min_p\030\024 \001(\002\022\017\n\007gramm"
+    "ar\030\025 \001(\t\022\027\n\017response_format\030\026 \001(\t\022\023\n\013ech"
+    "o_prompt\030\027 \001(\010\022\021\n\tn_threads\030\030 \001(\005\022B\n\010met"
+    "adata\030\031 \003(\01320.runanywhere.v1.LLMGenerate"
+    "Request.MetadataEntry\032/\n\rMetadataEntry\022\013"
+    "\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\351\002\n\024LLMSt"
+    "reamFinalResult\022\014\n\004text\030\001 \001(\t\022\035\n\020thinkin"
+    "g_content\030\002 \001(\tH\000\210\001\001\022\025\n\rprompt_tokens\030\003 "
+    "\001(\005\022\031\n\021completion_tokens\030\004 \001(\005\022\024\n\014total_"
+    "tokens\030\005 \001(\005\022\025\n\rtotal_time_ms\030\006 \001(\003\022\036\n\026t"
+    "ime_to_first_token_ms\030\007 \001(\003\022\031\n\021tokens_pe"
+    "r_second\030\010 \001(\002\022\025\n\rfinish_reason\030\t \001(\t\022\022\n"
+    "\nerror_code\030\n \001(\005\022\025\n\rerror_message\030\013 \001(\t"
+    "\022\033\n\023prompt_eval_time_ms\030\014 \001(\003\022\026\n\016decode_"
+    "time_ms\030\r \001(\003B\023\n\021_thinking_content\"\347\003\n\016L"
+    "LMStreamEvent\022\013\n\003seq\030\001 \001(\004\022\024\n\014timestamp_"
+    "us\030\002 \001(\003\022\r\n\005token\030\003 \001(\t\022\020\n\010is_final\030\004 \001("
+    "\010\022\'\n\004kind\030\005 \001(\0162\031.runanywhere.v1.TokenKi"
+    "nd\022\020\n\010token_id\030\006 \001(\r\022\017\n\007logprob\030\007 \001(\002\022\025\n"
+    "\rfinish_reason\030\010 \001(\t\022\025\n\rerror_message\030\t "
+    "\001(\t\0229\n\006result\030\n \001(\0132$.runanywhere.v1.LLM"
+    "StreamFinalResultH\000\210\001\001\022\022\n\nerror_code\030\013 \001"
+    "(\005\0226\n\nevent_kind\030\014 \001(\0162\".runanywhere.v1."
+    "LLMStreamEventKind\022\022\n\nrequest_id\030\r \001(\t\022\027"
+    "\n\017conversation_id\030\016 \001(\t\022\037\n\027prompt_tokens"
+    "_processed\030\017 \001(\005\022#\n\033completion_tokens_ge"
+    "nerated\030\020 \001(\005\022\022\n\nelapsed_ms\030\021 \001(\003B\t\n\007_re"
+    "sult*\262\002\n\022LLMStreamEventKind\022%\n!LLM_STREA"
+    "M_EVENT_KIND_UNSPECIFIED\020\000\022!\n\035LLM_STREAM"
+    "_EVENT_KIND_STARTED\020\001\022\037\n\033LLM_STREAM_EVEN"
+    "T_KIND_TOKEN\020\002\022\"\n\036LLM_STREAM_EVENT_KIND_"
+    "THINKING\020\003\022#\n\037LLM_STREAM_EVENT_KIND_TOOL"
+    "_CALL\020\004\022\"\n\036LLM_STREAM_EVENT_KIND_PROGRES"
+    "S\020\005\022#\n\037LLM_STREAM_EVENT_KIND_COMPLETED\020\006"
+    "\022\037\n\033LLM_STREAM_EVENT_KIND_ERROR\020\0072W\n\003LLM"
+    "\022P\n\010Generate\022\".runanywhere.v1.LLMGenerat"
+    "eRequest\032\036.runanywhere.v1.LLMStreamEvent"
+    "0\001B\212\001\n\027ai.runanywhere.proto.v1B\017LLMServi"
+    "ceProtoP\001Z<github.com/runanywhere/runany"
+    "where-sdks/idl/v1;runanywherev1\370\001\001\242\002\004RAV"
+    "1\252\002\016Runanywhere.V1\272\002\002RAb\006proto3"
+};
+static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
+    descriptor_table_llm_5fservice_2eproto_deps[1] = {
+        &::descriptor_table_voice_5fevents_2eproto,
 };
 static ::absl::once_flag descriptor_table_llm_5fservice_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_llm_5fservice_2eproto = {
     false,
     false,
-    2228,
+    2111,
     descriptor_table_protodef_llm_5fservice_2eproto,
     "llm_service.proto",
     &descriptor_table_llm_5fservice_2eproto_once,
-    nullptr,
-    0,
+    descriptor_table_llm_5fservice_2eproto_deps,
+    1,
     4,
     schemas,
     file_default_instances,
@@ -464,13 +465,6 @@ LLMStreamEventKind_descriptor() {
 }
 PROTOBUF_CONSTINIT const uint32_t LLMStreamEventKind_internal_data_[] = {
     524288u, 0u, };
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-LLMTokenKind_descriptor() {
-  ::google::protobuf::internal::AssignDescriptors(&descriptor_table_llm_5fservice_2eproto);
-  return file_level_enum_descriptors_llm_5fservice_2eproto[1];
-}
-PROTOBUF_CONSTINIT const uint32_t LLMTokenKind_internal_data_[] = {
-    262144u, 0u, };
 // ===================================================================
 
 #if defined(PROTOBUF_CUSTOM_VTABLE)
@@ -2593,7 +2587,7 @@ LLMStreamEvent::_table_ = {
     {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(LLMStreamEvent, _impl_.is_final_), 8>(),
      {32, 8, 0,
       PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.is_final_)}},
-    // .runanywhere.v1.LLMTokenKind kind = 5;
+    // .runanywhere.v1.TokenKind kind = 5;
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(LLMStreamEvent, _impl_.kind_), 9>(),
      {40, 9, 0,
       PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.kind_)}},
@@ -2670,7 +2664,7 @@ LLMStreamEvent::_table_ = {
     {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.token_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
     // bool is_final = 4;
     {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.is_final_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
-    // .runanywhere.v1.LLMTokenKind kind = 5;
+    // .runanywhere.v1.TokenKind kind = 5;
     {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.kind_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
     // uint32 token_id = 6;
     {PROTOBUF_FIELD_OFFSET(LLMStreamEvent, _impl_.token_id_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kUInt32)},
@@ -2810,7 +2804,7 @@ PROTOBUF_NOINLINE void LLMStreamEvent::Clear() {
     }
   }
 
-  // .runanywhere.v1.LLMTokenKind kind = 5;
+  // .runanywhere.v1.TokenKind kind = 5;
   if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     if (this_._internal_kind() != 0) {
       target = stream->EnsureSpace(target);
@@ -3017,7 +3011,7 @@ PROTOBUF_NOINLINE void LLMStreamEvent::Clear() {
         total_size += 2;
       }
     }
-    // .runanywhere.v1.LLMTokenKind kind = 5;
+    // .runanywhere.v1.TokenKind kind = 5;
     if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (this_._internal_kind() != 0) {
         total_size += 1 +

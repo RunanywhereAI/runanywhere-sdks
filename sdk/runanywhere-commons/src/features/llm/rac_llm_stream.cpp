@@ -106,16 +106,17 @@ namespace rac::llm {
 
 /**
  * @brief Map a RAC_LLM_* token kind (internal / engine-specific) to the
- *        proto `LLMTokenKind`. Today llm_component.cpp emits only ANSWER
- *        tokens; THOUGHT / TOOL_CALL arms are reserved for the pending
- *        thinking-parser + tool-calling integration.
+ *        canonical proto `TokenKind` (voice_events.proto). Today
+ *        llm_component.cpp emits only ANSWER tokens; THOUGHT / TOOL_CALL
+ *        arms are reserved for the pending thinking-parser +
+ *        tool-calling integration.
  */
-runanywhere::v1::LLMTokenKind to_proto_kind(int internal_kind) {
+runanywhere::v1::TokenKind to_proto_kind(int internal_kind) {
     switch (internal_kind) {
-        case 1: return runanywhere::v1::LLM_TOKEN_KIND_ANSWER;
-        case 2: return runanywhere::v1::LLM_TOKEN_KIND_THOUGHT;
-        case 3: return runanywhere::v1::LLM_TOKEN_KIND_TOOL_CALL;
-        default: return runanywhere::v1::LLM_TOKEN_KIND_UNSPECIFIED;
+        case 1: return runanywhere::v1::TOKEN_KIND_ANSWER;
+        case 2: return runanywhere::v1::TOKEN_KIND_THOUGHT;
+        case 3: return runanywhere::v1::TOKEN_KIND_TOOL_CALL;
+        default: return runanywhere::v1::TOKEN_KIND_UNSPECIFIED;
     }
 }
 

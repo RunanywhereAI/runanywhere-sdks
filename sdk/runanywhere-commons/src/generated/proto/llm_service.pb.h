@@ -35,6 +35,7 @@
 #include "google/protobuf/map_field.h"
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
+#include "voice_events.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -62,8 +63,6 @@ namespace runanywhere {
 namespace v1 {
 enum LLMStreamEventKind : int;
 extern const uint32_t LLMStreamEventKind_internal_data_[];
-enum LLMTokenKind : int;
-extern const uint32_t LLMTokenKind_internal_data_[];
 class LLMGenerateRequest;
 struct LLMGenerateRequestDefaultTypeInternal;
 extern LLMGenerateRequestDefaultTypeInternal _LLMGenerateRequest_default_instance_;
@@ -87,9 +86,6 @@ namespace protobuf {
 template <>
 internal::EnumTraitsT<::runanywhere::v1::LLMStreamEventKind_internal_data_>
     internal::EnumTraitsImpl::value<::runanywhere::v1::LLMStreamEventKind>;
-template <>
-internal::EnumTraitsT<::runanywhere::v1::LLMTokenKind_internal_data_>
-    internal::EnumTraitsImpl::value<::runanywhere::v1::LLMTokenKind>;
 }  // namespace protobuf
 }  // namespace google
 
@@ -139,48 +135,6 @@ template <>
 [[nodiscard]] inline bool LLMStreamEventKind_Parse(
     ::absl::string_view name, LLMStreamEventKind* PROTOBUF_NONNULL value) {
   return ::google::protobuf::internal::ParseNamedEnum<LLMStreamEventKind>(LLMStreamEventKind_descriptor(), name,
-                                           value);
-}
-enum LLMTokenKind : int {
-  LLM_TOKEN_KIND_UNSPECIFIED = 0,
-  LLM_TOKEN_KIND_ANSWER = 1,
-  LLM_TOKEN_KIND_THOUGHT = 2,
-  LLM_TOKEN_KIND_TOOL_CALL = 3,
-  LLMTokenKind_INT_MIN_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::min(),
-  LLMTokenKind_INT_MAX_SENTINEL_DO_NOT_USE_ =
-      ::std::numeric_limits<::int32_t>::max(),
-};
-
-extern const uint32_t LLMTokenKind_internal_data_[];
-inline constexpr LLMTokenKind LLMTokenKind_MIN =
-    static_cast<LLMTokenKind>(0);
-inline constexpr LLMTokenKind LLMTokenKind_MAX =
-    static_cast<LLMTokenKind>(3);
-[[nodiscard]] inline bool LLMTokenKind_IsValid(int value) {
-  return 0 <= value && value <= 3;
-}
-inline constexpr int LLMTokenKind_ARRAYSIZE = 3 + 1;
-[[nodiscard]] const ::google::protobuf::EnumDescriptor* PROTOBUF_NONNULL
-LLMTokenKind_descriptor();
-[[nodiscard]] inline auto ProtobufInternalGetEnumDescriptor(LLMTokenKind) {
-  return LLMTokenKind_descriptor();
-}
-template <typename T>
-[[nodiscard]] const ::std::string& LLMTokenKind_Name(T value) {
-  static_assert(::std::is_same<T, LLMTokenKind>::value ||
-                    ::std::is_integral<T>::value,
-                "Incorrect type passed to LLMTokenKind_Name().");
-  return LLMTokenKind_Name(static_cast<LLMTokenKind>(value));
-}
-template <>
-[[nodiscard]] inline const ::std::string& LLMTokenKind_Name(LLMTokenKind value) {
-  return ::google::protobuf::internal::NameOfDenseEnum<LLMTokenKind_descriptor, 0, 3>(
-      static_cast<int>(value));
-}
-[[nodiscard]] inline bool LLMTokenKind_Parse(
-    ::absl::string_view name, LLMTokenKind* PROTOBUF_NONNULL value) {
-  return ::google::protobuf::internal::ParseNamedEnum<LLMTokenKind>(LLMTokenKind_descriptor(), name,
                                            value);
 }
 
@@ -875,14 +829,14 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED LLMStreamEvent final : public ::goo
   void _internal_set_is_final(bool value);
 
   public:
-  // .runanywhere.v1.LLMTokenKind kind = 5;
+  // .runanywhere.v1.TokenKind kind = 5;
   void clear_kind() ;
-  [[nodiscard]] ::runanywhere::v1::LLMTokenKind kind() const;
-  void set_kind(::runanywhere::v1::LLMTokenKind value);
+  [[nodiscard]] ::runanywhere::v1::TokenKind kind() const;
+  void set_kind(::runanywhere::v1::TokenKind value);
 
   private:
-  ::runanywhere::v1::LLMTokenKind _internal_kind() const;
-  void _internal_set_kind(::runanywhere::v1::LLMTokenKind value);
+  ::runanywhere::v1::TokenKind _internal_kind() const;
+  void _internal_set_kind(::runanywhere::v1::TokenKind value);
 
   public:
   // uint32 token_id = 6;
@@ -3297,27 +3251,27 @@ inline void LLMStreamEvent::_internal_set_is_final(bool value) {
   _impl_.is_final_ = value;
 }
 
-// .runanywhere.v1.LLMTokenKind kind = 5;
+// .runanywhere.v1.TokenKind kind = 5;
 inline void LLMStreamEvent::clear_kind() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.kind_ = 0;
   ClearHasBit(_impl_._has_bits_[0],
                   0x00000200U);
 }
-inline ::runanywhere::v1::LLMTokenKind LLMStreamEvent::kind() const {
+inline ::runanywhere::v1::TokenKind LLMStreamEvent::kind() const {
   // @@protoc_insertion_point(field_get:runanywhere.v1.LLMStreamEvent.kind)
   return _internal_kind();
 }
-inline void LLMStreamEvent::set_kind(::runanywhere::v1::LLMTokenKind value) {
+inline void LLMStreamEvent::set_kind(::runanywhere::v1::TokenKind value) {
   _internal_set_kind(value);
   SetHasBit(_impl_._has_bits_[0], 0x00000200U);
   // @@protoc_insertion_point(field_set:runanywhere.v1.LLMStreamEvent.kind)
 }
-inline ::runanywhere::v1::LLMTokenKind LLMStreamEvent::_internal_kind() const {
+inline ::runanywhere::v1::TokenKind LLMStreamEvent::_internal_kind() const {
   ::google::protobuf::internal::TSanRead(&_impl_);
-  return static_cast<::runanywhere::v1::LLMTokenKind>(_impl_.kind_);
+  return static_cast<::runanywhere::v1::TokenKind>(_impl_.kind_);
 }
-inline void LLMStreamEvent::_internal_set_kind(::runanywhere::v1::LLMTokenKind value) {
+inline void LLMStreamEvent::_internal_set_kind(::runanywhere::v1::TokenKind value) {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.kind_ = value;
 }
@@ -3873,12 +3827,6 @@ struct is_proto_enum<::runanywhere::v1::LLMStreamEventKind> : std::true_type {};
 template <>
 inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::LLMStreamEventKind>() {
   return ::runanywhere::v1::LLMStreamEventKind_descriptor();
-}
-template <>
-struct is_proto_enum<::runanywhere::v1::LLMTokenKind> : std::true_type {};
-template <>
-inline const EnumDescriptor* PROTOBUF_NONNULL GetEnumDescriptor<::runanywhere::v1::LLMTokenKind>() {
-  return ::runanywhere::v1::LLMTokenKind_descriptor();
 }
 
 }  // namespace protobuf

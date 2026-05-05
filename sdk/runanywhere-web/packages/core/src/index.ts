@@ -211,7 +211,9 @@ export type { VoiceAgentRequest } from '@runanywhere/proto-ts/voice_agent_servic
 export { LLMStreamAdapter } from './Adapters/LLMStreamAdapter';
 export type { LLMStreamTransport } from '@runanywhere/proto-ts/streams/llm_service_stream';
 export type { LLMGenerateRequest, LLMStreamEvent } from '@runanywhere/proto-ts/llm_service';
-export { LLMTokenKind } from '@runanywhere/proto-ts/llm_service';
+// IDL-06: The former `LLMTokenKind` re-export has been removed — the canonical
+// `TokenKind` (from voice_events.proto) is re-exported below alongside the
+// VoiceEvent types.
 export {
   DiffusionProtoAdapter,
   EmbeddingsProtoAdapter,

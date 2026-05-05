@@ -9,6 +9,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "voice_events.proto";
+
 option cc_enable_arenas      = true;
 option java_multiple_files   = true;
 option java_package          = "ai.runanywhere.proto.v1";
@@ -101,8 +103,9 @@ message LLMStreamEvent {
     // True on the last event of a generation.
     bool   is_final        = 4;
 
-    // Token semantic category (answer / thought / tool-call).
-    LLMTokenKind kind      = 5;
+    // Token semantic category (answer / thought / tool-call). IDL-06:
+    // canonical TokenKind from voice_events.proto.
+    TokenKind kind         = 5;
 
     // Backend-provided token id when the engine exposes it; 0 = unset
     // (proto3 scalar default).
@@ -138,13 +141,6 @@ message LLMStreamEvent {
     int32 prompt_tokens_processed = 15;
     int32 completion_tokens_generated = 16;
     int64 elapsed_ms = 17;
-}
-
-enum LLMTokenKind {
-    LLM_TOKEN_KIND_UNSPECIFIED = 0;
-    LLM_TOKEN_KIND_ANSWER      = 1;
-    LLM_TOKEN_KIND_THOUGHT     = 2;
-    LLM_TOKEN_KIND_TOOL_CALL   = 3;
 }
 
 service LLM {

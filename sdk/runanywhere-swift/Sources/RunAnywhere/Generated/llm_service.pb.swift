@@ -85,48 +85,6 @@ public enum RALLMStreamEventKind: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-public enum RALLMTokenKind: SwiftProtobuf.Enum, Swift.CaseIterable {
-  public typealias RawValue = Int
-  case unspecified // = 0
-  case answer // = 1
-  case thought // = 2
-  case toolCall // = 3
-  case UNRECOGNIZED(Int)
-
-  public init() {
-    self = .unspecified
-  }
-
-  public init?(rawValue: Int) {
-    switch rawValue {
-    case 0: self = .unspecified
-    case 1: self = .answer
-    case 2: self = .thought
-    case 3: self = .toolCall
-    default: self = .UNRECOGNIZED(rawValue)
-    }
-  }
-
-  public var rawValue: Int {
-    switch self {
-    case .unspecified: return 0
-    case .answer: return 1
-    case .thought: return 2
-    case .toolCall: return 3
-    case .UNRECOGNIZED(let i): return i
-    }
-  }
-
-  // The compiler won't synthesize support with the UNRECOGNIZED case.
-  public static let allCases: [RALLMTokenKind] = [
-    .unspecified,
-    .answer,
-    .thought,
-    .toolCall,
-  ]
-
-}
-
 public struct RALLMGenerateRequest: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -353,8 +311,9 @@ public struct RALLMStreamEvent: @unchecked Sendable {
     set {_uniqueStorage()._isFinal = newValue}
   }
 
-  /// Token semantic category (answer / thought / tool-call).
-  public var kind: RALLMTokenKind {
+  /// Token semantic category (answer / thought / tool-call). IDL-06:
+  /// canonical TokenKind from voice_events.proto.
+  public var kind: RATokenKind {
     get {_storage._kind}
     set {_uniqueStorage()._kind = newValue}
   }
@@ -450,10 +409,6 @@ fileprivate let _protobuf_package = "runanywhere.v1"
 
 extension RALLMStreamEventKind: SwiftProtobuf._ProtoNameProviding {
   public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0LLM_STREAM_EVENT_KIND_UNSPECIFIED\0\u{1}LLM_STREAM_EVENT_KIND_STARTED\0\u{1}LLM_STREAM_EVENT_KIND_TOKEN\0\u{1}LLM_STREAM_EVENT_KIND_THINKING\0\u{1}LLM_STREAM_EVENT_KIND_TOOL_CALL\0\u{1}LLM_STREAM_EVENT_KIND_PROGRESS\0\u{1}LLM_STREAM_EVENT_KIND_COMPLETED\0\u{1}LLM_STREAM_EVENT_KIND_ERROR\0")
-}
-
-extension RALLMTokenKind: SwiftProtobuf._ProtoNameProviding {
-  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0LLM_TOKEN_KIND_UNSPECIFIED\0\u{1}LLM_TOKEN_KIND_ANSWER\0\u{1}LLM_TOKEN_KIND_THOUGHT\0\u{1}LLM_TOKEN_KIND_TOOL_CALL\0")
 }
 
 extension RALLMGenerateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
@@ -793,7 +748,7 @@ extension RALLMStreamEvent: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     var _timestampUs: Int64 = 0
     var _token: String = String()
     var _isFinal: Bool = false
-    var _kind: RALLMTokenKind = .unspecified
+    var _kind: RATokenKind = .unspecified
     var _tokenID: UInt32 = 0
     var _logprob: Float = 0
     var _finishReason: String = String()

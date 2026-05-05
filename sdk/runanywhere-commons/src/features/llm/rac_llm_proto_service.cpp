@@ -44,9 +44,9 @@ using runanywhere::v1::LLMGenerationResult;
 using runanywhere::v1::LLMStreamEvent;
 using runanywhere::v1::LLMStreamEventKind;
 using runanywhere::v1::LLMStreamFinalResult;
-using runanywhere::v1::LLMTokenKind;
 using runanywhere::v1::SDKComponent;
 using runanywhere::v1::SDKEvent;
+using runanywhere::v1::TokenKind;
 
 int64_t now_ms() {
     using namespace std::chrono;
@@ -312,14 +312,14 @@ size_t find_earliest_tag(const std::string& text,
     return best;
 }
 
-LLMStreamEventKind event_kind_for_token(LLMTokenKind kind, bool is_final,
+LLMStreamEventKind event_kind_for_token(TokenKind kind, bool is_final,
                                         const char* error_message) {
     if (is_final) {
         return error_message && error_message[0]
                    ? runanywhere::v1::LLM_STREAM_EVENT_KIND_ERROR
                    : runanywhere::v1::LLM_STREAM_EVENT_KIND_COMPLETED;
     }
-    return kind == runanywhere::v1::LLM_TOKEN_KIND_THOUGHT
+    return kind == runanywhere::v1::TOKEN_KIND_THOUGHT
                ? runanywhere::v1::LLM_STREAM_EVENT_KIND_THINKING
                : runanywhere::v1::LLM_STREAM_EVENT_KIND_TOKEN;
 }
@@ -327,7 +327,7 @@ LLMStreamEventKind event_kind_for_token(LLMTokenKind kind, bool is_final,
 void dispatch_stream_event(ProtoStreamContext* ctx,
                            const char* token,
                            bool is_final,
-                           LLMTokenKind kind,
+                           TokenKind kind,
                            const char* finish_reason,
                            const char* error_message,
                            const LLMStreamFinalResult* result = nullptr) {
@@ -371,12 +371,12 @@ void dispatch_stream_event(ProtoStreamContext* ctx,
     ctx->callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), ctx->user_data);
 }
 
-void emit_stream_segment(ProtoStreamContext* ctx, const std::string& token, LLMTokenKind kind) {
+void emit_stream_segment(ProtoStreamContext* ctx, const std::string& token, TokenKind kind) {
     if (!ctx || token.empty()) {
         return;
     }
 
-    if (kind == runanywhere::v1::LLM_TOKEN_KIND_THOUGHT) {
+    if (kind == runanywhere::v1::TOKEN_KIND_THOUGHT) {
         ctx->thinking_text += token;
         if (!ctx->emit_thoughts) {
             return;
@@ -415,7 +415,7 @@ void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
                 &close_tag);
             if (close_pos != std::string::npos) {
                 emit_stream_segment(ctx, ctx->pending_text.substr(0, close_pos),
-                                    runanywhere::v1::LLM_TOKEN_KIND_THOUGHT);
+                                    runanywhere::v1::TOKEN_KIND_THOUGHT);
                 ctx->pending_text.erase(0, close_pos + std::strlen(close_tag));
                 ctx->inside_thinking = false;
                 continue;
@@ -428,7 +428,7 @@ void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
                 break;
             }
             emit_stream_segment(ctx, ctx->pending_text.substr(0, emit_len),
-                                runanywhere::v1::LLM_TOKEN_KIND_THOUGHT);
+                                runanywhere::v1::TOKEN_KIND_THOUGHT);
             ctx->pending_text.erase(0, emit_len);
             continue;
         }
@@ -439,7 +439,7 @@ void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
             &open_tag);
         if (open_pos != std::string::npos) {
             emit_stream_segment(ctx, ctx->pending_text.substr(0, open_pos),
-                                runanywhere::v1::LLM_TOKEN_KIND_ANSWER);
+                                runanywhere::v1::TOKEN_KIND_ANSWER);
             ctx->pending_text.erase(0, open_pos + std::strlen(open_tag));
             ctx->inside_thinking = true;
             continue;
@@ -452,7 +452,7 @@ void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
             break;
         }
         emit_stream_segment(ctx, ctx->pending_text.substr(0, emit_len),
-                            runanywhere::v1::LLM_TOKEN_KIND_ANSWER);
+                            runanywhere::v1::TOKEN_KIND_ANSWER);
         ctx->pending_text.erase(0, emit_len);
     }
 }
@@ -462,8 +462,8 @@ void flush_pending_stream_text(ProtoStreamContext* ctx) {
         return;
     }
     emit_stream_segment(ctx, ctx->pending_text,
-                        ctx->inside_thinking ? runanywhere::v1::LLM_TOKEN_KIND_THOUGHT
-                                             : runanywhere::v1::LLM_TOKEN_KIND_ANSWER);
+                        ctx->inside_thinking ? runanywhere::v1::TOKEN_KIND_THOUGHT
+                                             : runanywhere::v1::TOKEN_KIND_ANSWER);
     ctx->pending_text.clear();
 }
 
@@ -489,7 +489,7 @@ void dispatch_terminal_once(ProtoStreamContext* ctx,
         final_result.set_error_message(error_message);
     }
 
-    dispatch_stream_event(ctx, "", true, runanywhere::v1::LLM_TOKEN_KIND_ANSWER,
+    dispatch_stream_event(ctx, "", true, runanywhere::v1::TOKEN_KIND_ANSWER,
                           finish_reason, error_message, &final_result);
 }
 

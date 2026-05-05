@@ -81,15 +81,16 @@ public class LLMStreamEvent(
   )
   public val is_final: Boolean = false,
   /**
-   * Token semantic category (answer / thought / tool-call).
+   * Token semantic category (answer / thought / tool-call). IDL-06:
+   * canonical TokenKind from voice_events.proto.
    */
   @field:WireField(
     tag = 5,
-    adapter = "ai.runanywhere.proto.v1.LLMTokenKind#ADAPTER",
+    adapter = "ai.runanywhere.proto.v1.TokenKind#ADAPTER",
     label = WireField.Label.OMIT_IDENTITY,
     schemaIndex = 4,
   )
-  public val kind: LLMTokenKind = LLMTokenKind.LLM_TOKEN_KIND_UNSPECIFIED,
+  public val kind: TokenKind = TokenKind.TOKEN_KIND_UNSPECIFIED,
   /**
    * Backend-provided token id when the engine exposes it; 0 = unset
    * (proto3 scalar default).
@@ -301,7 +302,7 @@ public class LLMStreamEvent(
     timestamp_us: Long = this.timestamp_us,
     token: String = this.token,
     is_final: Boolean = this.is_final,
-    kind: LLMTokenKind = this.kind,
+    kind: TokenKind = this.kind,
     token_id: Int = this.token_id,
     logprob: Float = this.logprob,
     finish_reason: String = this.finish_reason,
@@ -336,8 +337,8 @@ public class LLMStreamEvent(
             value.timestamp_us)
         if (value.token != "") size += ProtoAdapter.STRING.encodedSizeWithTag(3, value.token)
         if (value.is_final != false) size += ProtoAdapter.BOOL.encodedSizeWithTag(4, value.is_final)
-        if (value.kind != LLMTokenKind.LLM_TOKEN_KIND_UNSPECIFIED) size +=
-            LLMTokenKind.ADAPTER.encodedSizeWithTag(5, value.kind)
+        if (value.kind != TokenKind.TOKEN_KIND_UNSPECIFIED) size +=
+            TokenKind.ADAPTER.encodedSizeWithTag(5, value.kind)
         if (value.token_id != 0) size += ProtoAdapter.UINT32.encodedSizeWithTag(6, value.token_id)
         if (!value.logprob.equals(0f)) size += ProtoAdapter.FLOAT.encodedSizeWithTag(7,
             value.logprob)
@@ -369,8 +370,8 @@ public class LLMStreamEvent(
             value.timestamp_us)
         if (value.token != "") ProtoAdapter.STRING.encodeWithTag(writer, 3, value.token)
         if (value.is_final != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.is_final)
-        if (value.kind != LLMTokenKind.LLM_TOKEN_KIND_UNSPECIFIED)
-            LLMTokenKind.ADAPTER.encodeWithTag(writer, 5, value.kind)
+        if (value.kind != TokenKind.TOKEN_KIND_UNSPECIFIED) TokenKind.ADAPTER.encodeWithTag(writer,
+            5, value.kind)
         if (value.token_id != 0) ProtoAdapter.UINT32.encodeWithTag(writer, 6, value.token_id)
         if (!value.logprob.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 7, value.logprob)
         if (value.finish_reason != "") ProtoAdapter.STRING.encodeWithTag(writer, 8,
@@ -412,8 +413,8 @@ public class LLMStreamEvent(
             value.finish_reason)
         if (!value.logprob.equals(0f)) ProtoAdapter.FLOAT.encodeWithTag(writer, 7, value.logprob)
         if (value.token_id != 0) ProtoAdapter.UINT32.encodeWithTag(writer, 6, value.token_id)
-        if (value.kind != LLMTokenKind.LLM_TOKEN_KIND_UNSPECIFIED)
-            LLMTokenKind.ADAPTER.encodeWithTag(writer, 5, value.kind)
+        if (value.kind != TokenKind.TOKEN_KIND_UNSPECIFIED) TokenKind.ADAPTER.encodeWithTag(writer,
+            5, value.kind)
         if (value.is_final != false) ProtoAdapter.BOOL.encodeWithTag(writer, 4, value.is_final)
         if (value.token != "") ProtoAdapter.STRING.encodeWithTag(writer, 3, value.token)
         if (value.timestamp_us != 0L) ProtoAdapter.INT64.encodeWithTag(writer, 2,
@@ -426,7 +427,7 @@ public class LLMStreamEvent(
         var timestamp_us: Long = 0L
         var token: String = ""
         var is_final: Boolean = false
-        var kind: LLMTokenKind = LLMTokenKind.LLM_TOKEN_KIND_UNSPECIFIED
+        var kind: TokenKind = TokenKind.TOKEN_KIND_UNSPECIFIED
         var token_id: Int = 0
         var logprob: Float = 0f
         var finish_reason: String = ""
@@ -446,7 +447,7 @@ public class LLMStreamEvent(
             3 -> token = ProtoAdapter.STRING.decode(reader)
             4 -> is_final = ProtoAdapter.BOOL.decode(reader)
             5 -> try {
-              kind = LLMTokenKind.ADAPTER.decode(reader)
+              kind = TokenKind.ADAPTER.decode(reader)
             } catch (e: ProtoAdapter.EnumConstantNotFoundException) {
               reader.addUnknownField(tag, FieldEncoding.VARINT, e.value.toLong())
             }

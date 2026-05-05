@@ -171,7 +171,7 @@ void emit_llm_chunk(ToolCallingSession& session, const std::string& text,
     stream.set_timestamp_us(now_us());
     stream.set_token(text);
     stream.set_is_final(is_final);
-    stream.set_kind(runanywhere::v1::LLM_TOKEN_KIND_ANSWER);
+    stream.set_kind(runanywhere::v1::TOKEN_KIND_ANSWER);
     if (is_final) {
         stream.set_event_kind(runanywhere::v1::LLM_STREAM_EVENT_KIND_COMPLETED);
         stream.set_finish_reason(finish_reason);
