@@ -128,9 +128,11 @@ void translate(const rac_voice_agent_event_t& src, runanywhere::v1::VoiceEvent& 
             dst.set_category(runanywhere::v1::VOICE_EVENT_CATEGORY_VAD);
             dst.set_component(runanywhere::v1::VOICE_PIPELINE_COMPONENT_VAD);
             auto* v = dst.mutable_vad();
-            v->set_type(src.data.vad_speech_active == RAC_TRUE
-                            ? runanywhere::v1::VAD_EVENT_VOICE_START
-                            : runanywhere::v1::VAD_EVENT_VOICE_END_OF_UTTERANCE);
+            // IDL-18: VADEvent.type now uses VADStreamEventKind. Speech-
+            // start/end both ride SPEECH_ACTIVITY; direction is communicated
+            // via the companion `is_speech` bool on VADEvent.
+            v->set_type(runanywhere::v1::VAD_STREAM_EVENT_KIND_SPEECH_ACTIVITY);
+            v->set_is_speech(src.data.vad_speech_active == RAC_TRUE);
             v->set_frame_offset_us(0);
             break;
         }
