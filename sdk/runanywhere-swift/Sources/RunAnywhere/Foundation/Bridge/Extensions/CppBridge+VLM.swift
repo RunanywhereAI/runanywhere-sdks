@@ -209,21 +209,3 @@ extension CppBridge {
     }
 }
 
-// MARK: - SDKException VLM Extension
-
-extension SDKException {
-
-    /// VLM-specific error codes
-    public enum VLMErrorCode: Int, Sendable {
-        case notInitialized = 1
-        case modelLoadFailed = 2
-        case processingFailed = 3
-        case invalidImage = 4
-        case cancelled = 5
-    }
-
-    /// Create a VLM error
-    public static func vlm(_ code: VLMErrorCode, _ message: String) -> SDKException {
-        return SDKException.general(.unknown, "VLM[\(code.rawValue)]: \(message)")
-    }
-}
