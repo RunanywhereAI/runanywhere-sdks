@@ -363,7 +363,7 @@ public:
         registry.register_factory("embed", make_forward_factory(),
                                   make_text_schema({"in"}, {"vec"}));
         registry.register_factory("retrieve", make_forward_factory(),
-                                  make_text_schema({"in"}, {"out"}));
+                                  make_text_schema({"in"}, {"results"}));
     }
 
     ~ScopedSolutionStandins() { cleanup_solution_standins(); }
@@ -1136,6 +1136,9 @@ TEST(voice_agent_solution_compiles) {
 
 // ---------------------------------------------------------------------------
 // 10. SolutionConfig (RAG) expands + compiles with explicit stand-ins.
+//     Topology: query (source) → retrieve → context → llm. The retrieve
+//     operator owns the embedding lookup via the host-supplied RAG
+//     session handle, so the L5 graph carries 4 operators + 3 edges.
 // ---------------------------------------------------------------------------
 TEST(rag_solution_compiles) {
     ScopedSolutionStandins standins;
@@ -1149,8 +1152,8 @@ TEST(rag_solution_compiles) {
     SolutionRunner runner(cfg);
     CHECK(runner.start() == RAC_SUCCESS);
     const auto& spec = runner.spec();
-    CHECK(spec.operators_size() == 5);
-    CHECK(spec.edges_size() == 4);
+    CHECK(spec.operators_size() == 4);
+    CHECK(spec.edges_size() == 3);
     runner.close_input();
     runner.wait();
 }
@@ -1230,6 +1233,75 @@ TEST(c_abi_yaml_pipeline_lifecycle) {
 }
 
 // ---------------------------------------------------------------------------
+// 13.5. Engine-backed retrieve operator: verifies the schema contract
+//       (text.utf8 in → text.utf8 out on port "results") and the
+//       honest-failure path when the host did not stamp `session_handle_id`
+//       into OperatorSpec.params. The operator must refuse to run rather
+//       than silently emit mock context.
+// ---------------------------------------------------------------------------
+TEST(retrieve_without_session_handle_fails_honestly) {
+    using rac::solutions::OperatorRegistry;
+
+    auto& registry = OperatorRegistry::instance();
+    // Snapshot the current `retrieve` factory (the built-in tagged stand-in)
+    // so the test does not bleed real engine-backed wiring into siblings.
+    const bool had_retrieve_before = registry.has_factory("retrieve");
+    CHECK(had_retrieve_before);  // Built-in stand-in is always present.
+
+    const std::size_t registered =
+        rac::solutions::register_engine_backed_operators(registry);
+    // generate_text + transcribe + synthesize + detect_voice + embed +
+    // retrieve = 6 factories.
+    CHECK(registered == 6);
+
+    // Schema contract: text.utf8 in → text.utf8 out, output port "results".
+    const auto& in_ports = registry.input_ports("retrieve");
+    const auto& out_ports = registry.output_ports("retrieve");
+    CHECK(in_ports.size() == 1);
+    CHECK(in_ports[0] == "in");
+    CHECK(out_ports.size() == 1);
+    CHECK(out_ports[0] == "results");
+    CHECK(registry.input_port_type("retrieve", "in") ==
+          rac::solutions::kPayloadTextUtf8);
+    CHECK(registry.output_port_type("retrieve", "results") ==
+          rac::solutions::kPayloadTextUtf8);
+
+    // Build a pipeline that drives retrieve without a session handle. The
+    // operator must cancel on the first input — never silently produce a
+    // mock answer.
+    PipelineSpec spec;
+    spec.set_name("retrieve_missing_handle");
+    auto* src = spec.add_operators();
+    src->set_name("query");
+    src->set_type("source");
+    auto* retrieve = spec.add_operators();
+    retrieve->set_name("retrieve");
+    retrieve->set_type("retrieve");
+    auto* sink = spec.add_operators();
+    sink->set_name("ctx");
+    sink->set_type("sink");
+    auto* e1 = spec.add_edges();
+    e1->set_from("query.out");
+    e1->set_to("retrieve.in");
+    auto* e2 = spec.add_edges();
+    e2->set_from("retrieve.results");
+    e2->set_to("ctx.in");
+
+    SolutionRunner runner(spec);
+    CHECK(runner.start() == RAC_SUCCESS);
+    CHECK(runner.feed(Item::text("why is the sky blue?")) == RAC_SUCCESS);
+    runner.wait();
+    const char* details = rac_error_get_details();
+    CHECK(details != nullptr);
+    CHECK(std::string(details).find("session_handle_id") != std::string::npos);
+
+    // Restore the built-in stand-in factory so subsequent tests are not
+    // affected by the engine-backed override.
+    registry.unregister_factory("retrieve");
+    rac::solutions::register_builtin_operators(registry);
+}
+
+// ---------------------------------------------------------------------------
 // 14. Null / invalid handle paths.
 // ---------------------------------------------------------------------------
 TEST(null_handle_paths) {
@@ -1273,6 +1345,7 @@ int main() {
     run_test_c_abi_proto_bytes_lifecycle();
     run_test_c_abi_yaml_solution_lifecycle();
     run_test_c_abi_yaml_pipeline_lifecycle();
+    run_test_retrieve_without_session_handle_fails_honestly();
     run_test_null_handle_paths();
 
     std::fprintf(stderr, "\n%d passed / %d failed\n", g_passed, g_failed);

@@ -284,6 +284,56 @@ export interface EmbeddingsServiceState {
   errorCode: number;
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * Session/handle creation request envelope. Mirrors the public SDK
+ * `embeddingsCreate(modelId, configJson?)` calls in RN/Web/Kotlin which
+ * previously dropped down to the non-proto `rac_embeddings_create*` C ABI.
+ * The result carries an opaque uint64 handle the SDK uses for subsequent
+ * embed / embed_batch invocations.
+ * ---------------------------------------------------------------------------
+ */
+export interface EmbeddingsCreateRequest {
+  /** Required. Model identifier (registry id) or absolute model path. */
+  modelId: string;
+  /**
+   * Optional component configuration. When unset, commons applies its
+   * defaults (RAC_EMBEDDINGS_*); when set, the named fields override
+   * the per-component defaults at create time.
+   */
+  configuration?:
+    | EmbeddingsConfiguration
+    | undefined;
+  /**
+   * Provider-specific JSON config. Mirrors the legacy
+   * rac_embeddings_create_with_config(config_json) parameter for backends
+   * that need companion file paths (e.g. {"vocab_path":"..."}).
+   */
+  configJson?: string | undefined;
+}
+
+export interface EmbeddingsCreateResult {
+  /** Opaque handle (rac_handle_t cast to u64). Zero on failure. */
+  handle: number;
+  /**
+   * Echo of the model id the caller requested — so JS/Swift/Kotlin can
+   * store it next to the handle without re-parsing the request.
+   */
+  modelId: string;
+  /**
+   * Backend-resolved dimension/max_tokens after load. 0 = unknown until
+   * the first embed call.
+   */
+  dimension: number;
+  maxTokens: number;
+  /**
+   * Negative on failure; mirrors rac_result_t. Empty error_message on
+   * success.
+   */
+  errorCode: number;
+  errorMessage: string;
+}
+
 function createBaseEmbeddingsConfiguration(): EmbeddingsConfiguration {
   return {
     modelId: "",
@@ -1371,6 +1421,231 @@ export const EmbeddingsServiceState = {
     message.maxTokens = object.maxTokens ?? 0;
     message.errorMessage = object.errorMessage ?? undefined;
     message.errorCode = object.errorCode ?? 0;
+    return message;
+  },
+};
+
+function createBaseEmbeddingsCreateRequest(): EmbeddingsCreateRequest {
+  return { modelId: "", configuration: undefined, configJson: undefined };
+}
+
+export const EmbeddingsCreateRequest = {
+  encode(message: EmbeddingsCreateRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.modelId !== "") {
+      writer.uint32(10).string(message.modelId);
+    }
+    if (message.configuration !== undefined) {
+      EmbeddingsConfiguration.encode(message.configuration, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.configJson !== undefined) {
+      writer.uint32(26).string(message.configJson);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsCreateRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseEmbeddingsCreateRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.configuration = EmbeddingsConfiguration.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.configJson = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): EmbeddingsCreateRequest {
+    return {
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      configuration: isSet(object.configuration) ? EmbeddingsConfiguration.fromJSON(object.configuration) : undefined,
+      configJson: isSet(object.configJson) ? globalThis.String(object.configJson) : undefined,
+    };
+  },
+
+  toJSON(message: EmbeddingsCreateRequest): unknown {
+    const obj: any = {};
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.configuration !== undefined) {
+      obj.configuration = EmbeddingsConfiguration.toJSON(message.configuration);
+    }
+    if (message.configJson !== undefined) {
+      obj.configJson = message.configJson;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<EmbeddingsCreateRequest>, I>>(base?: I): EmbeddingsCreateRequest {
+    return EmbeddingsCreateRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<EmbeddingsCreateRequest>, I>>(object: I): EmbeddingsCreateRequest {
+    const message = createBaseEmbeddingsCreateRequest();
+    message.modelId = object.modelId ?? "";
+    message.configuration = (object.configuration !== undefined && object.configuration !== null)
+      ? EmbeddingsConfiguration.fromPartial(object.configuration)
+      : undefined;
+    message.configJson = object.configJson ?? undefined;
+    return message;
+  },
+};
+
+function createBaseEmbeddingsCreateResult(): EmbeddingsCreateResult {
+  return { handle: 0, modelId: "", dimension: 0, maxTokens: 0, errorCode: 0, errorMessage: "" };
+}
+
+export const EmbeddingsCreateResult = {
+  encode(message: EmbeddingsCreateResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.handle !== 0) {
+      writer.uint32(8).uint64(message.handle);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(18).string(message.modelId);
+    }
+    if (message.dimension !== 0) {
+      writer.uint32(24).int32(message.dimension);
+    }
+    if (message.maxTokens !== 0) {
+      writer.uint32(32).int32(message.maxTokens);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(40).int32(message.errorCode);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(50).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): EmbeddingsCreateResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseEmbeddingsCreateResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.handle = longToNumber(reader.uint64() as Long);
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.dimension = reader.int32();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.maxTokens = reader.int32();
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): EmbeddingsCreateResult {
+    return {
+      handle: isSet(object.handle) ? globalThis.Number(object.handle) : 0,
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      dimension: isSet(object.dimension) ? globalThis.Number(object.dimension) : 0,
+      maxTokens: isSet(object.maxTokens) ? globalThis.Number(object.maxTokens) : 0,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: EmbeddingsCreateResult): unknown {
+    const obj: any = {};
+    if (message.handle !== 0) {
+      obj.handle = Math.round(message.handle);
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.dimension !== 0) {
+      obj.dimension = Math.round(message.dimension);
+    }
+    if (message.maxTokens !== 0) {
+      obj.maxTokens = Math.round(message.maxTokens);
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<EmbeddingsCreateResult>, I>>(base?: I): EmbeddingsCreateResult {
+    return EmbeddingsCreateResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<EmbeddingsCreateResult>, I>>(object: I): EmbeddingsCreateResult {
+    const message = createBaseEmbeddingsCreateResult();
+    message.handle = object.handle ?? 0;
+    message.modelId = object.modelId ?? "";
+    message.dimension = object.dimension ?? 0;
+    message.maxTokens = object.maxTokens ?? 0;
+    message.errorCode = object.errorCode ?? 0;
+    message.errorMessage = object.errorMessage ?? "";
     return message;
   },
 };

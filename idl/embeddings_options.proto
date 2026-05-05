@@ -225,3 +225,44 @@ service Embeddings {
     // Batch embedding for multiple input texts carried in request order.
     rpc EmbedBatch(EmbeddingsRequest) returns (EmbeddingsResult);
 }
+
+// ---------------------------------------------------------------------------
+// Session/handle creation request envelope. Mirrors the public SDK
+// `embeddingsCreate(modelId, configJson?)` calls in RN/Web/Kotlin which
+// previously dropped down to the non-proto `rac_embeddings_create*` C ABI.
+// The result carries an opaque uint64 handle the SDK uses for subsequent
+// embed / embed_batch invocations.
+// ---------------------------------------------------------------------------
+message EmbeddingsCreateRequest {
+    // Required. Model identifier (registry id) or absolute model path.
+    string model_id = 1;
+
+    // Optional component configuration. When unset, commons applies its
+    // defaults (RAC_EMBEDDINGS_*); when set, the named fields override
+    // the per-component defaults at create time.
+    optional EmbeddingsConfiguration configuration = 2;
+
+    // Provider-specific JSON config. Mirrors the legacy
+    // rac_embeddings_create_with_config(config_json) parameter for backends
+    // that need companion file paths (e.g. {"vocab_path":"..."}).
+    optional string config_json = 3;
+}
+
+message EmbeddingsCreateResult {
+    // Opaque handle (rac_handle_t cast to u64). Zero on failure.
+    uint64 handle = 1;
+
+    // Echo of the model id the caller requested — so JS/Swift/Kotlin can
+    // store it next to the handle without re-parsing the request.
+    string model_id = 2;
+
+    // Backend-resolved dimension/max_tokens after load. 0 = unknown until
+    // the first embed call.
+    int32  dimension = 3;
+    int32  max_tokens = 4;
+
+    // Negative on failure; mirrors rac_result_t. Empty error_message on
+    // success.
+    int32  error_code = 5;
+    string error_message = 6;
+}

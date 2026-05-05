@@ -7,6 +7,12 @@
 /* eslint-disable */
 import Long from "long";
 import _m0 from "protobufjs/minimal";
+import {
+  AcceleratorPreference,
+  acceleratorPreferenceFromJSON,
+  acceleratorPreferenceToJSON,
+  HardwareProfile,
+} from "./hardware_profile";
 
 export const protobufPackage = "runanywhere.v1";
 
@@ -1698,6 +1704,114 @@ export interface ModelDeleteResult {
   wasLoaded: boolean;
   errorMessage: string;
   warnings: string[];
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Compatibility check request/result. Mirrors the public SDK
+ * `checkCompatibility(modelId)` calls (RN CompatibilityBridge,
+ * Kotlin compat path, Web ModelManager). The platform adapter supplies
+ * available_ram_bytes / available_storage_bytes; commons looks up the
+ * registry entry, computes the compatibility verdict (canRun / canFit),
+ * and returns reasons / suggested alternative model ids.
+ * ---------------------------------------------------------------------------
+ */
+export interface ModelCompatibilityRequest {
+  /** Required. Model identifier to evaluate. */
+  modelId: string;
+  /**
+   * Optional cached hardware profile from the platform adapter. If
+   * unset, commons will read whatever it has cached internally; the
+   * RAM/storage values below remain authoritative for the verdict.
+   */
+  hardwareProfile?:
+    | HardwareProfile
+    | undefined;
+  /**
+   * Available RAM in bytes (from device probe). 0 = unknown — commons
+   * will treat the requirement as satisfied.
+   */
+  availableRamBytes: number;
+  /** Available storage in bytes (from filesystem probe). 0 = unknown. */
+  availableStorageBytes: number;
+  /**
+   * Optional caller preferences (acceleration, framework). Reserved for
+   * future use; today's verdict is based on memory/storage alone.
+   */
+  acceleratorPreference?: AcceleratorPreference | undefined;
+  preferredFramework?: InferenceFramework | undefined;
+}
+
+export interface ModelCompatibilityCheckResult {
+  /**
+   * Mirrors the existing struct fields so SDKs can keep using the same
+   * field names; populated from rac_model_compatibility_result_t.
+   */
+  isCompatible: boolean;
+  canRun: boolean;
+  canFit: boolean;
+  requiredMemoryBytes: number;
+  availableMemoryBytes: number;
+  requiredStorageBytes: number;
+  availableStorageBytes: number;
+  /**
+   * Human-readable reasons populated when the verdict is negative
+   * (e.g. "insufficient RAM: requires X, available Y").
+   */
+  reasons: string[];
+  /**
+   * Optional suggested alternative model ids that *would* be compatible.
+   * The current implementation leaves this empty; reserved for future
+   * compatibility-aware suggestions.
+   */
+  suggestedAlternatives: string[];
+  /**
+   * Echo of the looked-up model id so callers can correlate batched
+   * checks with their request id.
+   */
+  modelId: string;
+  /**
+   * Negative on failure; mirrors rac_result_t. Empty error_message on
+   * success.
+   */
+  errorCode: number;
+  errorMessage: string;
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * FetchAssignments request/result. Replaces the JSON shim
+ * racModelRegistryFetchAssignments and the Web SDK's offline-friendly
+ * fetchModelAssignments() entry point. The platform adapter owns HTTP
+ * transport; commons consumes the cached / fetched entries and returns a
+ * canonical proto byte payload.
+ * ---------------------------------------------------------------------------
+ */
+export interface ModelRegistryFetchAssignmentsRequest {
+  /**
+   * Optional device identifier (forwarded to the platform adapter for
+   * any auth headers it needs). May be empty when callers rely on
+   * adapter-side auth state alone.
+   */
+  deviceId: string;
+  /**
+   * Optional environment selector; commons does not branch on this
+   * value today, but it is preserved for adapter routing and telemetry.
+   */
+  environment?:
+    | SDKEnvironment
+    | undefined;
+  /** Bypass the assignment cache and force a fresh fetch. */
+  forceRefresh: boolean;
+}
+
+export interface ModelRegistryFetchAssignmentsResult {
+  success: boolean;
+  models?: ModelInfoList | undefined;
+  modelCount: number;
+  fetchedAtUnixMs: number;
+  errorCode: number;
+  errorMessage: string;
 }
 
 function createBaseModelThinkingTagPattern(): ModelThinkingTagPattern {
@@ -6411,6 +6525,627 @@ export const ModelDeleteResult = {
     message.wasLoaded = object.wasLoaded ?? false;
     message.errorMessage = object.errorMessage ?? "";
     message.warnings = object.warnings?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseModelCompatibilityRequest(): ModelCompatibilityRequest {
+  return {
+    modelId: "",
+    hardwareProfile: undefined,
+    availableRamBytes: 0,
+    availableStorageBytes: 0,
+    acceleratorPreference: undefined,
+    preferredFramework: undefined,
+  };
+}
+
+export const ModelCompatibilityRequest = {
+  encode(message: ModelCompatibilityRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.modelId !== "") {
+      writer.uint32(10).string(message.modelId);
+    }
+    if (message.hardwareProfile !== undefined) {
+      HardwareProfile.encode(message.hardwareProfile, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.availableRamBytes !== 0) {
+      writer.uint32(24).int64(message.availableRamBytes);
+    }
+    if (message.availableStorageBytes !== 0) {
+      writer.uint32(32).int64(message.availableStorageBytes);
+    }
+    if (message.acceleratorPreference !== undefined) {
+      writer.uint32(40).int32(message.acceleratorPreference);
+    }
+    if (message.preferredFramework !== undefined) {
+      writer.uint32(48).int32(message.preferredFramework);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelCompatibilityRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelCompatibilityRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.hardwareProfile = HardwareProfile.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.availableRamBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.availableStorageBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.acceleratorPreference = reader.int32() as any;
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.preferredFramework = reader.int32() as any;
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelCompatibilityRequest {
+    return {
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      hardwareProfile: isSet(object.hardwareProfile) ? HardwareProfile.fromJSON(object.hardwareProfile) : undefined,
+      availableRamBytes: isSet(object.availableRamBytes) ? globalThis.Number(object.availableRamBytes) : 0,
+      availableStorageBytes: isSet(object.availableStorageBytes) ? globalThis.Number(object.availableStorageBytes) : 0,
+      acceleratorPreference: isSet(object.acceleratorPreference)
+        ? acceleratorPreferenceFromJSON(object.acceleratorPreference)
+        : undefined,
+      preferredFramework: isSet(object.preferredFramework)
+        ? inferenceFrameworkFromJSON(object.preferredFramework)
+        : undefined,
+    };
+  },
+
+  toJSON(message: ModelCompatibilityRequest): unknown {
+    const obj: any = {};
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.hardwareProfile !== undefined) {
+      obj.hardwareProfile = HardwareProfile.toJSON(message.hardwareProfile);
+    }
+    if (message.availableRamBytes !== 0) {
+      obj.availableRamBytes = Math.round(message.availableRamBytes);
+    }
+    if (message.availableStorageBytes !== 0) {
+      obj.availableStorageBytes = Math.round(message.availableStorageBytes);
+    }
+    if (message.acceleratorPreference !== undefined) {
+      obj.acceleratorPreference = acceleratorPreferenceToJSON(message.acceleratorPreference);
+    }
+    if (message.preferredFramework !== undefined) {
+      obj.preferredFramework = inferenceFrameworkToJSON(message.preferredFramework);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelCompatibilityRequest>, I>>(base?: I): ModelCompatibilityRequest {
+    return ModelCompatibilityRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelCompatibilityRequest>, I>>(object: I): ModelCompatibilityRequest {
+    const message = createBaseModelCompatibilityRequest();
+    message.modelId = object.modelId ?? "";
+    message.hardwareProfile = (object.hardwareProfile !== undefined && object.hardwareProfile !== null)
+      ? HardwareProfile.fromPartial(object.hardwareProfile)
+      : undefined;
+    message.availableRamBytes = object.availableRamBytes ?? 0;
+    message.availableStorageBytes = object.availableStorageBytes ?? 0;
+    message.acceleratorPreference = object.acceleratorPreference ?? undefined;
+    message.preferredFramework = object.preferredFramework ?? undefined;
+    return message;
+  },
+};
+
+function createBaseModelCompatibilityCheckResult(): ModelCompatibilityCheckResult {
+  return {
+    isCompatible: false,
+    canRun: false,
+    canFit: false,
+    requiredMemoryBytes: 0,
+    availableMemoryBytes: 0,
+    requiredStorageBytes: 0,
+    availableStorageBytes: 0,
+    reasons: [],
+    suggestedAlternatives: [],
+    modelId: "",
+    errorCode: 0,
+    errorMessage: "",
+  };
+}
+
+export const ModelCompatibilityCheckResult = {
+  encode(message: ModelCompatibilityCheckResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.isCompatible !== false) {
+      writer.uint32(8).bool(message.isCompatible);
+    }
+    if (message.canRun !== false) {
+      writer.uint32(16).bool(message.canRun);
+    }
+    if (message.canFit !== false) {
+      writer.uint32(24).bool(message.canFit);
+    }
+    if (message.requiredMemoryBytes !== 0) {
+      writer.uint32(32).int64(message.requiredMemoryBytes);
+    }
+    if (message.availableMemoryBytes !== 0) {
+      writer.uint32(40).int64(message.availableMemoryBytes);
+    }
+    if (message.requiredStorageBytes !== 0) {
+      writer.uint32(48).int64(message.requiredStorageBytes);
+    }
+    if (message.availableStorageBytes !== 0) {
+      writer.uint32(56).int64(message.availableStorageBytes);
+    }
+    for (const v of message.reasons) {
+      writer.uint32(66).string(v!);
+    }
+    for (const v of message.suggestedAlternatives) {
+      writer.uint32(74).string(v!);
+    }
+    if (message.modelId !== "") {
+      writer.uint32(82).string(message.modelId);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(88).int32(message.errorCode);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(98).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelCompatibilityCheckResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelCompatibilityCheckResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.isCompatible = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.canRun = reader.bool();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.canFit = reader.bool();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.requiredMemoryBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.availableMemoryBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 6:
+          if (tag !== 48) {
+            break;
+          }
+
+          message.requiredStorageBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.availableStorageBytes = longToNumber(reader.int64() as Long);
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.reasons.push(reader.string());
+          continue;
+        case 9:
+          if (tag !== 74) {
+            break;
+          }
+
+          message.suggestedAlternatives.push(reader.string());
+          continue;
+        case 10:
+          if (tag !== 82) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 11:
+          if (tag !== 88) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+        case 12:
+          if (tag !== 98) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelCompatibilityCheckResult {
+    return {
+      isCompatible: isSet(object.isCompatible) ? globalThis.Boolean(object.isCompatible) : false,
+      canRun: isSet(object.canRun) ? globalThis.Boolean(object.canRun) : false,
+      canFit: isSet(object.canFit) ? globalThis.Boolean(object.canFit) : false,
+      requiredMemoryBytes: isSet(object.requiredMemoryBytes) ? globalThis.Number(object.requiredMemoryBytes) : 0,
+      availableMemoryBytes: isSet(object.availableMemoryBytes) ? globalThis.Number(object.availableMemoryBytes) : 0,
+      requiredStorageBytes: isSet(object.requiredStorageBytes) ? globalThis.Number(object.requiredStorageBytes) : 0,
+      availableStorageBytes: isSet(object.availableStorageBytes) ? globalThis.Number(object.availableStorageBytes) : 0,
+      reasons: globalThis.Array.isArray(object?.reasons) ? object.reasons.map((e: any) => globalThis.String(e)) : [],
+      suggestedAlternatives: globalThis.Array.isArray(object?.suggestedAlternatives)
+        ? object.suggestedAlternatives.map((e: any) => globalThis.String(e))
+        : [],
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: ModelCompatibilityCheckResult): unknown {
+    const obj: any = {};
+    if (message.isCompatible !== false) {
+      obj.isCompatible = message.isCompatible;
+    }
+    if (message.canRun !== false) {
+      obj.canRun = message.canRun;
+    }
+    if (message.canFit !== false) {
+      obj.canFit = message.canFit;
+    }
+    if (message.requiredMemoryBytes !== 0) {
+      obj.requiredMemoryBytes = Math.round(message.requiredMemoryBytes);
+    }
+    if (message.availableMemoryBytes !== 0) {
+      obj.availableMemoryBytes = Math.round(message.availableMemoryBytes);
+    }
+    if (message.requiredStorageBytes !== 0) {
+      obj.requiredStorageBytes = Math.round(message.requiredStorageBytes);
+    }
+    if (message.availableStorageBytes !== 0) {
+      obj.availableStorageBytes = Math.round(message.availableStorageBytes);
+    }
+    if (message.reasons?.length) {
+      obj.reasons = message.reasons;
+    }
+    if (message.suggestedAlternatives?.length) {
+      obj.suggestedAlternatives = message.suggestedAlternatives;
+    }
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelCompatibilityCheckResult>, I>>(base?: I): ModelCompatibilityCheckResult {
+    return ModelCompatibilityCheckResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelCompatibilityCheckResult>, I>>(
+    object: I,
+  ): ModelCompatibilityCheckResult {
+    const message = createBaseModelCompatibilityCheckResult();
+    message.isCompatible = object.isCompatible ?? false;
+    message.canRun = object.canRun ?? false;
+    message.canFit = object.canFit ?? false;
+    message.requiredMemoryBytes = object.requiredMemoryBytes ?? 0;
+    message.availableMemoryBytes = object.availableMemoryBytes ?? 0;
+    message.requiredStorageBytes = object.requiredStorageBytes ?? 0;
+    message.availableStorageBytes = object.availableStorageBytes ?? 0;
+    message.reasons = object.reasons?.map((e) => e) || [];
+    message.suggestedAlternatives = object.suggestedAlternatives?.map((e) => e) || [];
+    message.modelId = object.modelId ?? "";
+    message.errorCode = object.errorCode ?? 0;
+    message.errorMessage = object.errorMessage ?? "";
+    return message;
+  },
+};
+
+function createBaseModelRegistryFetchAssignmentsRequest(): ModelRegistryFetchAssignmentsRequest {
+  return { deviceId: "", environment: undefined, forceRefresh: false };
+}
+
+export const ModelRegistryFetchAssignmentsRequest = {
+  encode(message: ModelRegistryFetchAssignmentsRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.deviceId !== "") {
+      writer.uint32(10).string(message.deviceId);
+    }
+    if (message.environment !== undefined) {
+      writer.uint32(16).int32(message.environment);
+    }
+    if (message.forceRefresh !== false) {
+      writer.uint32(24).bool(message.forceRefresh);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelRegistryFetchAssignmentsRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelRegistryFetchAssignmentsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.deviceId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.environment = reader.int32() as any;
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.forceRefresh = reader.bool();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelRegistryFetchAssignmentsRequest {
+    return {
+      deviceId: isSet(object.deviceId) ? globalThis.String(object.deviceId) : "",
+      environment: isSet(object.environment) ? sDKEnvironmentFromJSON(object.environment) : undefined,
+      forceRefresh: isSet(object.forceRefresh) ? globalThis.Boolean(object.forceRefresh) : false,
+    };
+  },
+
+  toJSON(message: ModelRegistryFetchAssignmentsRequest): unknown {
+    const obj: any = {};
+    if (message.deviceId !== "") {
+      obj.deviceId = message.deviceId;
+    }
+    if (message.environment !== undefined) {
+      obj.environment = sDKEnvironmentToJSON(message.environment);
+    }
+    if (message.forceRefresh !== false) {
+      obj.forceRefresh = message.forceRefresh;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelRegistryFetchAssignmentsRequest>, I>>(
+    base?: I,
+  ): ModelRegistryFetchAssignmentsRequest {
+    return ModelRegistryFetchAssignmentsRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelRegistryFetchAssignmentsRequest>, I>>(
+    object: I,
+  ): ModelRegistryFetchAssignmentsRequest {
+    const message = createBaseModelRegistryFetchAssignmentsRequest();
+    message.deviceId = object.deviceId ?? "";
+    message.environment = object.environment ?? undefined;
+    message.forceRefresh = object.forceRefresh ?? false;
+    return message;
+  },
+};
+
+function createBaseModelRegistryFetchAssignmentsResult(): ModelRegistryFetchAssignmentsResult {
+  return { success: false, models: undefined, modelCount: 0, fetchedAtUnixMs: 0, errorCode: 0, errorMessage: "" };
+}
+
+export const ModelRegistryFetchAssignmentsResult = {
+  encode(message: ModelRegistryFetchAssignmentsResult, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.success !== false) {
+      writer.uint32(8).bool(message.success);
+    }
+    if (message.models !== undefined) {
+      ModelInfoList.encode(message.models, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.modelCount !== 0) {
+      writer.uint32(24).int32(message.modelCount);
+    }
+    if (message.fetchedAtUnixMs !== 0) {
+      writer.uint32(32).int64(message.fetchedAtUnixMs);
+    }
+    if (message.errorCode !== 0) {
+      writer.uint32(40).int32(message.errorCode);
+    }
+    if (message.errorMessage !== "") {
+      writer.uint32(50).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelRegistryFetchAssignmentsResult {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelRegistryFetchAssignmentsResult();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.success = reader.bool();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.models = ModelInfoList.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.modelCount = reader.int32();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.fetchedAtUnixMs = longToNumber(reader.int64() as Long);
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.errorCode = reader.int32();
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelRegistryFetchAssignmentsResult {
+    return {
+      success: isSet(object.success) ? globalThis.Boolean(object.success) : false,
+      models: isSet(object.models) ? ModelInfoList.fromJSON(object.models) : undefined,
+      modelCount: isSet(object.modelCount) ? globalThis.Number(object.modelCount) : 0,
+      fetchedAtUnixMs: isSet(object.fetchedAtUnixMs) ? globalThis.Number(object.fetchedAtUnixMs) : 0,
+      errorCode: isSet(object.errorCode) ? globalThis.Number(object.errorCode) : 0,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : "",
+    };
+  },
+
+  toJSON(message: ModelRegistryFetchAssignmentsResult): unknown {
+    const obj: any = {};
+    if (message.success !== false) {
+      obj.success = message.success;
+    }
+    if (message.models !== undefined) {
+      obj.models = ModelInfoList.toJSON(message.models);
+    }
+    if (message.modelCount !== 0) {
+      obj.modelCount = Math.round(message.modelCount);
+    }
+    if (message.fetchedAtUnixMs !== 0) {
+      obj.fetchedAtUnixMs = Math.round(message.fetchedAtUnixMs);
+    }
+    if (message.errorCode !== 0) {
+      obj.errorCode = Math.round(message.errorCode);
+    }
+    if (message.errorMessage !== "") {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelRegistryFetchAssignmentsResult>, I>>(
+    base?: I,
+  ): ModelRegistryFetchAssignmentsResult {
+    return ModelRegistryFetchAssignmentsResult.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelRegistryFetchAssignmentsResult>, I>>(
+    object: I,
+  ): ModelRegistryFetchAssignmentsResult {
+    const message = createBaseModelRegistryFetchAssignmentsResult();
+    message.success = object.success ?? false;
+    message.models = (object.models !== undefined && object.models !== null)
+      ? ModelInfoList.fromPartial(object.models)
+      : undefined;
+    message.modelCount = object.modelCount ?? 0;
+    message.fetchedAtUnixMs = object.fetchedAtUnixMs ?? 0;
+    message.errorCode = object.errorCode ?? 0;
+    message.errorMessage = object.errorMessage ?? "";
     return message;
   },
 };

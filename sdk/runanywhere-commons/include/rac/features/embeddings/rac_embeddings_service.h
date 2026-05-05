@@ -169,6 +169,23 @@ RAC_API rac_result_t rac_embeddings_embed_batch_lifecycle_proto(
     rac_proto_buffer_t* out_result);
 
 /**
+ * @brief Create an embeddings session from serialized
+ *        runanywhere.v1.EmbeddingsCreateRequest bytes.
+ *
+ * Replaces the legacy rac_embeddings_create / rac_embeddings_create_with_config
+ * paths used by RN/Kotlin/Web bridges with a canonical proto-byte ABI.
+ * The result carries an opaque uint64 handle (rac_handle_t) the SDK uses
+ * for subsequent rac_embeddings_embed_batch_proto / cleanup / destroy
+ * calls. On failure the handle is zero and error_code/error_message are
+ * populated.
+ *
+ * out_result receives serialized runanywhere.v1.EmbeddingsCreateResult bytes.
+ */
+RAC_API rac_result_t rac_embeddings_create_proto(const uint8_t* request_proto_bytes,
+                                                 size_t request_proto_size,
+                                                 rac_proto_buffer_t* out_result);
+
+/**
  * @brief Get service information
  *
  * @param handle Service handle

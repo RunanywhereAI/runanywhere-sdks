@@ -84,13 +84,16 @@ void expand_voice_agent(const runanywhere::v1::VoiceAgentConfig& cfg,
 }
 
 // ---------------------------------------------------------------------------
-// RAG — Query → Embed → Retrieve → Context → LLM solution signature.
+// RAG — Query → Retrieve → Context → LLM solution signature.
+//
+// rac_rag_query_proto performs the embedding lookup internally against the
+// host-provided RAG session, so the L5 graph carries 4 operators + 3 edges
+// rather than 5 + 4 (no separate embed stage).
 // ---------------------------------------------------------------------------
 void expand_rag(const runanywhere::v1::RAGConfig& cfg, PipelineSpec* out) {
     out->set_name("rag");
 
     add_op(out, "query", "source");
-    auto* embed    = add_op(out, "embed", "embed", cfg.embed_model_id());
     auto* retrieve = add_op(out, "retrieve", "retrieve");
     auto* ctx      = add_op(out, "context", "context_build");
     auto* llm      = add_op(out, "llm", "generate_text", cfg.llm_model_id());
@@ -106,6 +109,9 @@ void expand_rag(const runanywhere::v1::RAGConfig& cfg, PipelineSpec* out) {
         (*retrieve->mutable_params())["vector_store_path"] =
             cfg.vector_store_path();
     }
+    if (!cfg.embed_model_id().empty()) {
+        (*retrieve->mutable_params())["embed_model_id"] = cfg.embed_model_id();
+    }
     if (!cfg.prompt_template().empty()) {
         (*ctx->mutable_params())["prompt_template"] = cfg.prompt_template();
     }
@@ -113,13 +119,11 @@ void expand_rag(const runanywhere::v1::RAGConfig& cfg, PipelineSpec* out) {
         (*retrieve->mutable_params())["rerank_model_id"] =
             cfg.rerank_model_id();
     }
-    (void)embed;  // embed params come from model_id only today
     (void)llm;
 
-    add_edge(out, "query.out",    "embed.in");
-    add_edge(out, "embed.vec",    "retrieve.in");
-    add_edge(out, "retrieve.out", "context.in");
-    add_edge(out, "context.out",  "llm.in");
+    add_edge(out, "query.out",        "retrieve.in");
+    add_edge(out, "retrieve.results", "context.in");
+    add_edge(out, "context.out",      "llm.in");
 }
 
 // ---------------------------------------------------------------------------

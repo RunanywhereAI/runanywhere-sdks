@@ -2441,6 +2441,184 @@ public struct RAModelDeleteResult: Sendable {
   public init() {}
 }
 
+/// ---------------------------------------------------------------------------
+/// Compatibility check request/result. Mirrors the public SDK
+/// `checkCompatibility(modelId)` calls (RN CompatibilityBridge,
+/// Kotlin compat path, Web ModelManager). The platform adapter supplies
+/// available_ram_bytes / available_storage_bytes; commons looks up the
+/// registry entry, computes the compatibility verdict (canRun / canFit),
+/// and returns reasons / suggested alternative model ids.
+/// ---------------------------------------------------------------------------
+public struct RAModelCompatibilityRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Required. Model identifier to evaluate.
+  public var modelID: String = String()
+
+  /// Optional cached hardware profile from the platform adapter. If
+  /// unset, commons will read whatever it has cached internally; the
+  /// RAM/storage values below remain authoritative for the verdict.
+  public var hardwareProfile: RAHardwareProfile {
+    get {_hardwareProfile ?? RAHardwareProfile()}
+    set {_hardwareProfile = newValue}
+  }
+  /// Returns true if `hardwareProfile` has been explicitly set.
+  public var hasHardwareProfile: Bool {self._hardwareProfile != nil}
+  /// Clears the value of `hardwareProfile`. Subsequent reads from it will return its default value.
+  public mutating func clearHardwareProfile() {self._hardwareProfile = nil}
+
+  /// Available RAM in bytes (from device probe). 0 = unknown — commons
+  /// will treat the requirement as satisfied.
+  public var availableRamBytes: Int64 = 0
+
+  /// Available storage in bytes (from filesystem probe). 0 = unknown.
+  public var availableStorageBytes: Int64 = 0
+
+  /// Optional caller preferences (acceleration, framework). Reserved for
+  /// future use; today's verdict is based on memory/storage alone.
+  public var acceleratorPreference: RAAcceleratorPreference {
+    get {_acceleratorPreference ?? .auto}
+    set {_acceleratorPreference = newValue}
+  }
+  /// Returns true if `acceleratorPreference` has been explicitly set.
+  public var hasAcceleratorPreference: Bool {self._acceleratorPreference != nil}
+  /// Clears the value of `acceleratorPreference`. Subsequent reads from it will return its default value.
+  public mutating func clearAcceleratorPreference() {self._acceleratorPreference = nil}
+
+  public var preferredFramework: RAInferenceFramework {
+    get {_preferredFramework ?? .unspecified}
+    set {_preferredFramework = newValue}
+  }
+  /// Returns true if `preferredFramework` has been explicitly set.
+  public var hasPreferredFramework: Bool {self._preferredFramework != nil}
+  /// Clears the value of `preferredFramework`. Subsequent reads from it will return its default value.
+  public mutating func clearPreferredFramework() {self._preferredFramework = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _hardwareProfile: RAHardwareProfile? = nil
+  fileprivate var _acceleratorPreference: RAAcceleratorPreference? = nil
+  fileprivate var _preferredFramework: RAInferenceFramework? = nil
+}
+
+public struct RAModelCompatibilityCheckResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Mirrors the existing struct fields so SDKs can keep using the same
+  /// field names; populated from rac_model_compatibility_result_t.
+  public var isCompatible: Bool = false
+
+  public var canRun: Bool = false
+
+  public var canFit: Bool = false
+
+  public var requiredMemoryBytes: Int64 = 0
+
+  public var availableMemoryBytes: Int64 = 0
+
+  public var requiredStorageBytes: Int64 = 0
+
+  public var availableStorageBytes: Int64 = 0
+
+  /// Human-readable reasons populated when the verdict is negative
+  /// (e.g. "insufficient RAM: requires X, available Y").
+  public var reasons: [String] = []
+
+  /// Optional suggested alternative model ids that *would* be compatible.
+  /// The current implementation leaves this empty; reserved for future
+  /// compatibility-aware suggestions.
+  public var suggestedAlternatives: [String] = []
+
+  /// Echo of the looked-up model id so callers can correlate batched
+  /// checks with their request id.
+  public var modelID: String = String()
+
+  /// Negative on failure; mirrors rac_result_t. Empty error_message on
+  /// success.
+  public var errorCode: Int32 = 0
+
+  public var errorMessage: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// ---------------------------------------------------------------------------
+/// FetchAssignments request/result. Replaces the JSON shim
+/// racModelRegistryFetchAssignments and the Web SDK's offline-friendly
+/// fetchModelAssignments() entry point. The platform adapter owns HTTP
+/// transport; commons consumes the cached / fetched entries and returns a
+/// canonical proto byte payload.
+/// ---------------------------------------------------------------------------
+public struct RAModelRegistryFetchAssignmentsRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Optional device identifier (forwarded to the platform adapter for
+  /// any auth headers it needs). May be empty when callers rely on
+  /// adapter-side auth state alone.
+  public var deviceID: String = String()
+
+  /// Optional environment selector; commons does not branch on this
+  /// value today, but it is preserved for adapter routing and telemetry.
+  public var environment: RASDKEnvironment {
+    get {_environment ?? .unspecified}
+    set {_environment = newValue}
+  }
+  /// Returns true if `environment` has been explicitly set.
+  public var hasEnvironment: Bool {self._environment != nil}
+  /// Clears the value of `environment`. Subsequent reads from it will return its default value.
+  public mutating func clearEnvironment() {self._environment = nil}
+
+  /// Bypass the assignment cache and force a fresh fetch.
+  public var forceRefresh: Bool = false
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _environment: RASDKEnvironment? = nil
+}
+
+public struct RAModelRegistryFetchAssignmentsResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var success: Bool = false
+
+  public var models: RAModelInfoList {
+    get {_models ?? RAModelInfoList()}
+    set {_models = newValue}
+  }
+  /// Returns true if `models` has been explicitly set.
+  public var hasModels: Bool {self._models != nil}
+  /// Clears the value of `models`. Subsequent reads from it will return its default value.
+  public mutating func clearModels() {self._models = nil}
+
+  public var modelCount: Int32 = 0
+
+  public var fetchedAtUnixMs: Int64 = 0
+
+  public var errorCode: Int32 = 0
+
+  public var errorMessage: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _models: RAModelInfoList? = nil
+}
+
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate let _protobuf_package = "runanywhere.v1"
@@ -4626,6 +4804,253 @@ extension RAModelDeleteResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
     if lhs.wasLoaded != rhs.wasLoaded {return false}
     if lhs.errorMessage != rhs.errorMessage {return false}
     if lhs.warnings != rhs.warnings {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAModelCompatibilityRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ModelCompatibilityRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{3}hardware_profile\0\u{3}available_ram_bytes\0\u{3}available_storage_bytes\0\u{3}accelerator_preference\0\u{3}preferred_framework\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._hardwareProfile) }()
+      case 3: try { try decoder.decodeSingularInt64Field(value: &self.availableRamBytes) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.availableStorageBytes) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self._acceleratorPreference) }()
+      case 6: try { try decoder.decodeSingularEnumField(value: &self._preferredFramework) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.modelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
+    }
+    try { if let v = self._hardwareProfile {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if self.availableRamBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.availableRamBytes, fieldNumber: 3)
+    }
+    if self.availableStorageBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.availableStorageBytes, fieldNumber: 4)
+    }
+    try { if let v = self._acceleratorPreference {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._preferredFramework {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 6)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAModelCompatibilityRequest, rhs: RAModelCompatibilityRequest) -> Bool {
+    if lhs.modelID != rhs.modelID {return false}
+    if lhs._hardwareProfile != rhs._hardwareProfile {return false}
+    if lhs.availableRamBytes != rhs.availableRamBytes {return false}
+    if lhs.availableStorageBytes != rhs.availableStorageBytes {return false}
+    if lhs._acceleratorPreference != rhs._acceleratorPreference {return false}
+    if lhs._preferredFramework != rhs._preferredFramework {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAModelCompatibilityCheckResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ModelCompatibilityCheckResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}is_compatible\0\u{3}can_run\0\u{3}can_fit\0\u{3}required_memory_bytes\0\u{3}available_memory_bytes\0\u{3}required_storage_bytes\0\u{3}available_storage_bytes\0\u{1}reasons\0\u{3}suggested_alternatives\0\u{3}model_id\0\u{3}error_code\0\u{3}error_message\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.isCompatible) }()
+      case 2: try { try decoder.decodeSingularBoolField(value: &self.canRun) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.canFit) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.requiredMemoryBytes) }()
+      case 5: try { try decoder.decodeSingularInt64Field(value: &self.availableMemoryBytes) }()
+      case 6: try { try decoder.decodeSingularInt64Field(value: &self.requiredStorageBytes) }()
+      case 7: try { try decoder.decodeSingularInt64Field(value: &self.availableStorageBytes) }()
+      case 8: try { try decoder.decodeRepeatedStringField(value: &self.reasons) }()
+      case 9: try { try decoder.decodeRepeatedStringField(value: &self.suggestedAlternatives) }()
+      case 10: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 11: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
+      case 12: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.isCompatible != false {
+      try visitor.visitSingularBoolField(value: self.isCompatible, fieldNumber: 1)
+    }
+    if self.canRun != false {
+      try visitor.visitSingularBoolField(value: self.canRun, fieldNumber: 2)
+    }
+    if self.canFit != false {
+      try visitor.visitSingularBoolField(value: self.canFit, fieldNumber: 3)
+    }
+    if self.requiredMemoryBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.requiredMemoryBytes, fieldNumber: 4)
+    }
+    if self.availableMemoryBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.availableMemoryBytes, fieldNumber: 5)
+    }
+    if self.requiredStorageBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.requiredStorageBytes, fieldNumber: 6)
+    }
+    if self.availableStorageBytes != 0 {
+      try visitor.visitSingularInt64Field(value: self.availableStorageBytes, fieldNumber: 7)
+    }
+    if !self.reasons.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.reasons, fieldNumber: 8)
+    }
+    if !self.suggestedAlternatives.isEmpty {
+      try visitor.visitRepeatedStringField(value: self.suggestedAlternatives, fieldNumber: 9)
+    }
+    if !self.modelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 10)
+    }
+    if self.errorCode != 0 {
+      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 11)
+    }
+    if !self.errorMessage.isEmpty {
+      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 12)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAModelCompatibilityCheckResult, rhs: RAModelCompatibilityCheckResult) -> Bool {
+    if lhs.isCompatible != rhs.isCompatible {return false}
+    if lhs.canRun != rhs.canRun {return false}
+    if lhs.canFit != rhs.canFit {return false}
+    if lhs.requiredMemoryBytes != rhs.requiredMemoryBytes {return false}
+    if lhs.availableMemoryBytes != rhs.availableMemoryBytes {return false}
+    if lhs.requiredStorageBytes != rhs.requiredStorageBytes {return false}
+    if lhs.availableStorageBytes != rhs.availableStorageBytes {return false}
+    if lhs.reasons != rhs.reasons {return false}
+    if lhs.suggestedAlternatives != rhs.suggestedAlternatives {return false}
+    if lhs.modelID != rhs.modelID {return false}
+    if lhs.errorCode != rhs.errorCode {return false}
+    if lhs.errorMessage != rhs.errorMessage {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAModelRegistryFetchAssignmentsRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ModelRegistryFetchAssignmentsRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}device_id\0\u{1}environment\0\u{3}force_refresh\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.deviceID) }()
+      case 2: try { try decoder.decodeSingularEnumField(value: &self._environment) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.forceRefresh) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.deviceID.isEmpty {
+      try visitor.visitSingularStringField(value: self.deviceID, fieldNumber: 1)
+    }
+    try { if let v = self._environment {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 2)
+    } }()
+    if self.forceRefresh != false {
+      try visitor.visitSingularBoolField(value: self.forceRefresh, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAModelRegistryFetchAssignmentsRequest, rhs: RAModelRegistryFetchAssignmentsRequest) -> Bool {
+    if lhs.deviceID != rhs.deviceID {return false}
+    if lhs._environment != rhs._environment {return false}
+    if lhs.forceRefresh != rhs.forceRefresh {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAModelRegistryFetchAssignmentsResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ModelRegistryFetchAssignmentsResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}success\0\u{1}models\0\u{3}model_count\0\u{3}fetched_at_unix_ms\0\u{3}error_code\0\u{3}error_message\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.success) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._models) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.modelCount) }()
+      case 4: try { try decoder.decodeSingularInt64Field(value: &self.fetchedAtUnixMs) }()
+      case 5: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.success != false {
+      try visitor.visitSingularBoolField(value: self.success, fieldNumber: 1)
+    }
+    try { if let v = self._models {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    if self.modelCount != 0 {
+      try visitor.visitSingularInt32Field(value: self.modelCount, fieldNumber: 3)
+    }
+    if self.fetchedAtUnixMs != 0 {
+      try visitor.visitSingularInt64Field(value: self.fetchedAtUnixMs, fieldNumber: 4)
+    }
+    if self.errorCode != 0 {
+      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 5)
+    }
+    if !self.errorMessage.isEmpty {
+      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 6)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAModelRegistryFetchAssignmentsResult, rhs: RAModelRegistryFetchAssignmentsResult) -> Bool {
+    if lhs.success != rhs.success {return false}
+    if lhs._models != rhs._models {return false}
+    if lhs.modelCount != rhs.modelCount {return false}
+    if lhs.fetchedAtUnixMs != rhs.fetchedAtUnixMs {return false}
+    if lhs.errorCode != rhs.errorCode {return false}
+    if lhs.errorMessage != rhs.errorMessage {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

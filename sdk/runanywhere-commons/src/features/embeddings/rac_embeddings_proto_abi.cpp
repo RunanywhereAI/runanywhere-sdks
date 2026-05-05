@@ -201,4 +201,73 @@ rac_result_t rac_embeddings_embed_batch_proto(
 #endif
 }
 
+rac_result_t rac_embeddings_create_proto(const uint8_t* request_proto_bytes,
+                                         size_t request_proto_size,
+                                         rac_proto_buffer_t* out_result) {
+    if (!out_result) return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return feature_unavailable(out_result);
+#else
+    if (!valid_bytes(request_proto_bytes, request_proto_size)) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "EmbeddingsCreateRequest bytes are invalid");
+    }
+
+    runanywhere::v1::EmbeddingsCreateRequest request;
+    if (request_proto_size > 0 &&
+        !request.ParseFromArray(parse_data(request_proto_bytes, request_proto_size),
+                                static_cast<int>(request_proto_size))) {
+        return rac_proto_buffer_set_error(out_result, RAC_ERROR_DECODING_ERROR,
+                                          "failed to parse EmbeddingsCreateRequest");
+    }
+
+    runanywhere::v1::EmbeddingsCreateResult create_result;
+    create_result.set_model_id(request.model_id());
+
+    if (request.model_id().empty()) {
+        const char* msg = "EmbeddingsCreateRequest.model_id is required";
+        create_result.set_error_code(static_cast<int32_t>(RAC_ERROR_INVALID_ARGUMENT));
+        create_result.set_error_message(msg);
+        publish_failure(RAC_ERROR_INVALID_ARGUMENT, "embeddings.create", msg);
+        return copy_proto(create_result, out_result);
+    }
+
+    rac_handle_t handle = nullptr;
+    rac_result_t rc = RAC_SUCCESS;
+    const std::string& cfg_json =
+        request.has_config_json() ? request.config_json() : std::string();
+    if (!cfg_json.empty()) {
+        rc = rac_embeddings_create_with_config(request.model_id().c_str(),
+                                               cfg_json.c_str(), &handle);
+    } else {
+        rc = rac_embeddings_create(request.model_id().c_str(), &handle);
+    }
+
+    if (rc != RAC_SUCCESS || !handle) {
+        const char* msg = rac_error_message(rc != RAC_SUCCESS ? rc : RAC_ERROR_UNKNOWN);
+        create_result.set_handle(0);
+        create_result.set_error_code(static_cast<int32_t>(
+            rc != RAC_SUCCESS ? rc : RAC_ERROR_UNKNOWN));
+        create_result.set_error_message(msg ? msg : "embeddings create failed");
+        publish_failure(rc != RAC_SUCCESS ? rc : RAC_ERROR_UNKNOWN, "embeddings.create",
+                        create_result.error_message().c_str());
+        return copy_proto(create_result, out_result);
+    }
+
+    create_result.set_handle(reinterpret_cast<uint64_t>(handle));
+
+    rac_embeddings_info_t info = {};
+    if (rac_embeddings_get_info(handle, &info) == RAC_SUCCESS) {
+        create_result.set_dimension(static_cast<int32_t>(info.dimension));
+        create_result.set_max_tokens(static_cast<int32_t>(info.max_tokens));
+    }
+
+    publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_EMBEDDINGS_STARTED,
+                       "embeddings.create", 1.0f, 0, 0, nullptr);
+    return copy_proto(create_result, out_result);
+#endif
+}
+
 }  // extern "C"

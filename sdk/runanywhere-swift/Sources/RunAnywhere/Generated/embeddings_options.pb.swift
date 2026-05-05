@@ -464,6 +464,82 @@ public struct RAEmbeddingsServiceState: Sendable {
   fileprivate var _errorMessage: String? = nil
 }
 
+/// ---------------------------------------------------------------------------
+/// Session/handle creation request envelope. Mirrors the public SDK
+/// `embeddingsCreate(modelId, configJson?)` calls in RN/Web/Kotlin which
+/// previously dropped down to the non-proto `rac_embeddings_create*` C ABI.
+/// The result carries an opaque uint64 handle the SDK uses for subsequent
+/// embed / embed_batch invocations.
+/// ---------------------------------------------------------------------------
+public struct RAEmbeddingsCreateRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Required. Model identifier (registry id) or absolute model path.
+  public var modelID: String = String()
+
+  /// Optional component configuration. When unset, commons applies its
+  /// defaults (RAC_EMBEDDINGS_*); when set, the named fields override
+  /// the per-component defaults at create time.
+  public var configuration: RAEmbeddingsConfiguration {
+    get {_configuration ?? RAEmbeddingsConfiguration()}
+    set {_configuration = newValue}
+  }
+  /// Returns true if `configuration` has been explicitly set.
+  public var hasConfiguration: Bool {self._configuration != nil}
+  /// Clears the value of `configuration`. Subsequent reads from it will return its default value.
+  public mutating func clearConfiguration() {self._configuration = nil}
+
+  /// Provider-specific JSON config. Mirrors the legacy
+  /// rac_embeddings_create_with_config(config_json) parameter for backends
+  /// that need companion file paths (e.g. {"vocab_path":"..."}).
+  public var configJson: String {
+    get {_configJson ?? String()}
+    set {_configJson = newValue}
+  }
+  /// Returns true if `configJson` has been explicitly set.
+  public var hasConfigJson: Bool {self._configJson != nil}
+  /// Clears the value of `configJson`. Subsequent reads from it will return its default value.
+  public mutating func clearConfigJson() {self._configJson = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _configuration: RAEmbeddingsConfiguration? = nil
+  fileprivate var _configJson: String? = nil
+}
+
+public struct RAEmbeddingsCreateResult: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Opaque handle (rac_handle_t cast to u64). Zero on failure.
+  public var handle: UInt64 = 0
+
+  /// Echo of the model id the caller requested — so JS/Swift/Kotlin can
+  /// store it next to the handle without re-parsing the request.
+  public var modelID: String = String()
+
+  /// Backend-resolved dimension/max_tokens after load. 0 = unknown until
+  /// the first embed call.
+  public var dimension: Int32 = 0
+
+  public var maxTokens: Int32 = 0
+
+  /// Negative on failure; mirrors rac_result_t. Empty error_message on
+  /// success.
+  public var errorCode: Int32 = 0
+
+  public var errorMessage: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate let _protobuf_package = "runanywhere.v1"
@@ -845,6 +921,105 @@ extension RAEmbeddingsServiceState: SwiftProtobuf.Message, SwiftProtobuf._Messag
     if lhs.maxTokens != rhs.maxTokens {return false}
     if lhs._errorMessage != rhs._errorMessage {return false}
     if lhs.errorCode != rhs.errorCode {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAEmbeddingsCreateRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".EmbeddingsCreateRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{3}model_id\0\u{1}configuration\0\u{3}config_json\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._configuration) }()
+      case 3: try { try decoder.decodeSingularStringField(value: &self._configJson) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.modelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 1)
+    }
+    try { if let v = self._configuration {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._configJson {
+      try visitor.visitSingularStringField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAEmbeddingsCreateRequest, rhs: RAEmbeddingsCreateRequest) -> Bool {
+    if lhs.modelID != rhs.modelID {return false}
+    if lhs._configuration != rhs._configuration {return false}
+    if lhs._configJson != rhs._configJson {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAEmbeddingsCreateResult: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".EmbeddingsCreateResult"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}handle\0\u{3}model_id\0\u{1}dimension\0\u{3}max_tokens\0\u{3}error_code\0\u{3}error_message\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularUInt64Field(value: &self.handle) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.modelID) }()
+      case 3: try { try decoder.decodeSingularInt32Field(value: &self.dimension) }()
+      case 4: try { try decoder.decodeSingularInt32Field(value: &self.maxTokens) }()
+      case 5: try { try decoder.decodeSingularInt32Field(value: &self.errorCode) }()
+      case 6: try { try decoder.decodeSingularStringField(value: &self.errorMessage) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.handle != 0 {
+      try visitor.visitSingularUInt64Field(value: self.handle, fieldNumber: 1)
+    }
+    if !self.modelID.isEmpty {
+      try visitor.visitSingularStringField(value: self.modelID, fieldNumber: 2)
+    }
+    if self.dimension != 0 {
+      try visitor.visitSingularInt32Field(value: self.dimension, fieldNumber: 3)
+    }
+    if self.maxTokens != 0 {
+      try visitor.visitSingularInt32Field(value: self.maxTokens, fieldNumber: 4)
+    }
+    if self.errorCode != 0 {
+      try visitor.visitSingularInt32Field(value: self.errorCode, fieldNumber: 5)
+    }
+    if !self.errorMessage.isEmpty {
+      try visitor.visitSingularStringField(value: self.errorMessage, fieldNumber: 6)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAEmbeddingsCreateResult, rhs: RAEmbeddingsCreateResult) -> Bool {
+    if lhs.handle != rhs.handle {return false}
+    if lhs.modelID != rhs.modelID {return false}
+    if lhs.dimension != rhs.dimension {return false}
+    if lhs.maxTokens != rhs.maxTokens {return false}
+    if lhs.errorCode != rhs.errorCode {return false}
+    if lhs.errorMessage != rhs.errorMessage {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

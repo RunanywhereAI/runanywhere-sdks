@@ -543,6 +543,8 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/model_management/model_strategy.cpp
     src/infrastructure/model_management/model_assignment.cpp
     src/infrastructure/model_management/model_compatibility.cpp
+    src/infrastructure/model_management/model_compatibility_proto.cpp
+    src/infrastructure/model_management/model_registry_fetch_assignments_proto.cpp
     src/infrastructure/storage/storage_analyzer.cpp
     src/infrastructure/file_management/file_manager.cpp
     src/infrastructure/network/environment.cpp

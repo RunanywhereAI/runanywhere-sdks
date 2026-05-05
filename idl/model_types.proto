@@ -9,6 +9,8 @@ syntax = "proto3";
 
 package runanywhere.v1;
 
+import "hardware_profile.proto";
+
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
 option java_package              = "ai.runanywhere.proto.v1";
@@ -712,6 +714,96 @@ message ModelDeleteResult {
     bool   was_loaded       = 6;
     string error_message    = 7;
     repeated string warnings = 8;
+}
+
+// ---------------------------------------------------------------------------
+// Compatibility check request/result. Mirrors the public SDK
+// `checkCompatibility(modelId)` calls (RN CompatibilityBridge,
+// Kotlin compat path, Web ModelManager). The platform adapter supplies
+// available_ram_bytes / available_storage_bytes; commons looks up the
+// registry entry, computes the compatibility verdict (canRun / canFit),
+// and returns reasons / suggested alternative model ids.
+// ---------------------------------------------------------------------------
+message ModelCompatibilityRequest {
+    // Required. Model identifier to evaluate.
+    string model_id = 1;
+
+    // Optional cached hardware profile from the platform adapter. If
+    // unset, commons will read whatever it has cached internally; the
+    // RAM/storage values below remain authoritative for the verdict.
+    optional HardwareProfile hardware_profile = 2;
+
+    // Available RAM in bytes (from device probe). 0 = unknown — commons
+    // will treat the requirement as satisfied.
+    int64 available_ram_bytes = 3;
+
+    // Available storage in bytes (from filesystem probe). 0 = unknown.
+    int64 available_storage_bytes = 4;
+
+    // Optional caller preferences (acceleration, framework). Reserved for
+    // future use; today's verdict is based on memory/storage alone.
+    optional AcceleratorPreference accelerator_preference = 5;
+    optional InferenceFramework preferred_framework = 6;
+}
+
+message ModelCompatibilityCheckResult {
+    // Mirrors the existing struct fields so SDKs can keep using the same
+    // field names; populated from rac_model_compatibility_result_t.
+    bool  is_compatible          = 1;
+    bool  can_run                = 2;
+    bool  can_fit                = 3;
+    int64 required_memory_bytes  = 4;
+    int64 available_memory_bytes = 5;
+    int64 required_storage_bytes = 6;
+    int64 available_storage_bytes = 7;
+
+    // Human-readable reasons populated when the verdict is negative
+    // (e.g. "insufficient RAM: requires X, available Y").
+    repeated string reasons      = 8;
+
+    // Optional suggested alternative model ids that *would* be compatible.
+    // The current implementation leaves this empty; reserved for future
+    // compatibility-aware suggestions.
+    repeated string suggested_alternatives = 9;
+
+    // Echo of the looked-up model id so callers can correlate batched
+    // checks with their request id.
+    string model_id              = 10;
+
+    // Negative on failure; mirrors rac_result_t. Empty error_message on
+    // success.
+    int32  error_code            = 11;
+    string error_message         = 12;
+}
+
+// ---------------------------------------------------------------------------
+// FetchAssignments request/result. Replaces the JSON shim
+// racModelRegistryFetchAssignments and the Web SDK's offline-friendly
+// fetchModelAssignments() entry point. The platform adapter owns HTTP
+// transport; commons consumes the cached / fetched entries and returns a
+// canonical proto byte payload.
+// ---------------------------------------------------------------------------
+message ModelRegistryFetchAssignmentsRequest {
+    // Optional device identifier (forwarded to the platform adapter for
+    // any auth headers it needs). May be empty when callers rely on
+    // adapter-side auth state alone.
+    string device_id = 1;
+
+    // Optional environment selector; commons does not branch on this
+    // value today, but it is preserved for adapter routing and telemetry.
+    optional SDKEnvironment environment = 2;
+
+    // Bypass the assignment cache and force a fresh fetch.
+    bool force_refresh = 3;
+}
+
+message ModelRegistryFetchAssignmentsResult {
+    bool          success         = 1;
+    ModelInfoList models          = 2;
+    int32         model_count     = 3;
+    int64         fetched_at_unix_ms = 4;
+    int32         error_code      = 5;
+    string        error_message   = 6;
 }
 
 // Logical ModelRegistry service contract. Platform adapters remain

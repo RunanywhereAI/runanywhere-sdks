@@ -699,6 +699,37 @@ RAC_API rac_result_t rac_model_registry_fetch_assignments(rac_bool_t force_refre
                                                           rac_model_info_t*** out_models,
                                                           size_t* out_count);
 
+/**
+ * @brief Fetch model assignments via the proto-byte ABI.
+ *
+ * Wraps rac_model_registry_fetch_assignments() so SDK bridges (RN, Web,
+ * Kotlin JNI) can replace the per-SDK JSON shims with one canonical
+ * proto-byte call. The implementation calls
+ * rac_model_assignment_fetch() under the hood (so the platform adapter
+ * still owns HTTP transport), then serializes the result into a
+ * runanywhere.v1.ModelRegistryFetchAssignmentsResult message containing
+ * the populated ModelInfoList plus error/timing metadata.
+ *
+ * Offline / pre-init behavior matches
+ * rac_model_registry_fetch_assignments(): if the assignment callbacks
+ * have not been registered yet, success is returned with zero models
+ * and an empty ModelInfoList — equivalent to the WASM offline path.
+ *
+ * @param request_bytes Serialized
+ *                      runanywhere.v1.ModelRegistryFetchAssignmentsRequest
+ *                      bytes. May be empty (size==0); commons treats it
+ *                      as a default request (force_refresh=false,
+ *                      device_id="").
+ * @param request_size  Byte count.
+ * @param out_result    Receives serialized
+ *                      runanywhere.v1.ModelRegistryFetchAssignmentsResult
+ *                      bytes on success or an error envelope on failure.
+ * @return RAC_SUCCESS or a negative rac_result_t.
+ */
+RAC_API rac_result_t rac_model_registry_fetch_assignments_proto(const uint8_t* request_bytes,
+                                                                size_t request_size,
+                                                                rac_proto_buffer_t* out_result);
+
 #ifdef __cplusplus
 }
 #endif
