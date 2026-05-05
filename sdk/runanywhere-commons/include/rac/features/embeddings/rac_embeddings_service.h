@@ -7,7 +7,7 @@
  * engine's `rac_plugin_entry_<name>()` returns a `rac_engine_vtable_t`
  * whose `embedding_ops` slot points at the ops struct defined by the
  * backend (e.g. `g_onnx_embeddings_ops` in
- * `sdk/runanywhere-commons/src/features/rag/rac_onnx_embeddings_register.cpp`).
+ * `engines/onnx/rac_onnx_embeddings_register.cpp`).
  *
  * Classification (see docs/CPP_PROTO_OWNERSHIP.md):
  *   - rac_embeddings_service_ops_t and rac_embeddings_service_t:

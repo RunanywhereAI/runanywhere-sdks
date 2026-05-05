@@ -3,7 +3,9 @@
  * @brief ONNX-based embedding provider implementation
  *
  * Standalone embedding provider using ONNX Runtime for sentence-transformer models.
- * Wrapped by rac_onnx_embeddings_register.cpp to expose via the embeddings service vtable.
+ * Engine-owned (ENG-ONNX-02): lives in engines/onnx/ and is wrapped by the
+ * sibling rac_onnx_embeddings_register.cpp to expose via the embeddings
+ * service vtable slot on the onnx engine plugin.
  */
 
 #ifndef RUNANYWHERE_ONNX_EMBEDDING_PROVIDER_H

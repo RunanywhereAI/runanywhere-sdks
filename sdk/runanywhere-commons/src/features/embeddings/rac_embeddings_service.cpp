@@ -110,7 +110,7 @@ static rac_result_t embeddings_create_internal(const char* model_id, const char*
     // primitives, embeddings consumer PRESERVES the config_json
     // parameter — the ONNX embeddings provider parses it for dim,
     // pooling, and tokenizer fields (see
-    // onnx_embedding_provider constructor).
+    // engines/onnx/onnx_embedding_provider constructor).
     rac_routing_hints_t hints = {};
     hints.preferred_engine_name = framework_to_plugin_name(framework);
 

@@ -66,10 +66,11 @@ set(RAG_PIPELINE_SOURCES
     rac_rag_proto_abi.cpp
 )
 
-# ONNX embedding provider (onnx_embedding_provider.cpp, rac_onnx_embeddings_register.cpp)
-# is compiled into rac_backend_onnx instead of this OBJECT library to avoid a
-# shared-library cycle: rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons.
-# See src/backends/onnx/CMakeLists.txt for where these sources are compiled.
+# ONNX embedding provider is owned by the ONNX engine plugin
+# (engines/onnx/onnx_embedding_provider.{h,cpp} +
+# engines/onnx/rac_onnx_embeddings_register.cpp). It compiles into
+# rac_backend_onnx so the engine fully owns its embedding primitive.
+# The RAG pipeline routes through rac_embeddings_service at runtime.
 
 set(RAG_PIPELINE_HEADERS
     rag_backend.h

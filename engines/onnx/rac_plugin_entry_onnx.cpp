@@ -16,11 +16,11 @@
 
 extern "C" {
 
-/* v3 Phase B7: embeddings ops live in sdk/runanywhere-commons/src/features/rag/
- * rac_onnx_embeddings_register.cpp but are plugged into this engine's
- * vtable since onnx naturally owns the embedding primitive. When RAG is off,
- * onnx_embedding_provider.cpp is not compiled and the symbol is unresolved —
- * the vtable slot stays nullptr below to match. */
+/* ENG-ONNX-02 resolved: embeddings ops live next to this file in
+ * engines/onnx/rac_onnx_embeddings_register.cpp (engine-owned). When
+ * RAC_BACKEND_RAG is off, onnx_embedding_provider.cpp is not compiled
+ * and the symbol is unresolved — the vtable slot stays nullptr below
+ * to match. */
 #if defined(RAC_BACKEND_RAG)
 extern const rac_embeddings_service_ops_t g_onnx_embeddings_ops;
 #endif

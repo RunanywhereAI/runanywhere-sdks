@@ -125,27 +125,22 @@ set(ONNX_BACKEND_SOURCES
     rac_plugin_entry_onnx.cpp
 )
 
-# ONNX embedding provider lives in commons under src/features/rag/ but is
-# compiled HERE (into rac_backend_onnx) to avoid a shared-library cycle:
-# rac_commons -> rac_backend_rag -> rac_backend_onnx -> rac_commons.
-#
-# Phase 1 / B1 fix: previously this pointed at engines/onnx/../../features/rag
-# which resolves to features/rag at the repo root (does not exist), so the
-# EXISTS check below silently SKIPPED both files and the embeddings provider
-# never compiled — leaving rac_backend_onnx_embeddings_register and
-# g_onnx_embeddings_ops as unresolved externals at every final link site
-# that touched the ONNX plugin entry. Path now points at the real location.
-set(RAG_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../sdk/runanywhere-commons/src/features/rag")
+# ONNX embedding provider (ENG-ONNX-02): engine-owned primitive. The
+# ONNXEmbeddingProvider class + its embeddings_service vtable adapter
+# live in this directory so the engine fully owns its primitives
+# (no cross-module surgery into commons/src/features/rag/). The files
+# are still gated by RAC_BACKEND_RAG because the RAG pipeline is the
+# sole consumer of the embeddings primitive today; when RAG is OFF the
+# plugin entry NULLs its embedding_ops vtable slot to match.
 set(ONNX_EXTRA_INCLUDES "")
 set(ONNX_RAG_PRESENT OFF)
-if(RAC_BACKEND_RAG AND EXISTS "${RAG_DIR}/onnx_embedding_provider.cpp")
+if(RAC_BACKEND_RAG AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/onnx_embedding_provider.cpp")
     list(APPEND ONNX_BACKEND_SOURCES
-        ${RAG_DIR}/onnx_embedding_provider.cpp
-        ${RAG_DIR}/rac_onnx_embeddings_register.cpp
+        onnx_embedding_provider.cpp
+        rac_onnx_embeddings_register.cpp
     )
-    list(APPEND ONNX_EXTRA_INCLUDES ${RAG_DIR})
     set(ONNX_RAG_PRESENT ON)
-    message(STATUS "  ONNX embedding provider: Compiled into rac_backend_onnx (from RAG dir)")
+    message(STATUS "  ONNX embedding provider: Compiled into rac_backend_onnx (engine-owned)")
 endif()
 
 # Compose link libs + compile defs. ORT C API ownership lives in

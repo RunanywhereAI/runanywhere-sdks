@@ -2,7 +2,7 @@
  * @file simple_tokenizer_test.cpp
  * @brief Unit tests for SimpleTokenizer (embedded in ONNX embedding provider)
  * 
- * Note: SimpleTokenizer is currently an internal class inside onnx_embedding_provider.cpp.
+ * Note: SimpleTokenizer is currently an internal class inside engines/onnx/onnx_embedding_provider.cpp.
  * These tests verify the tokenization logic through the ONNXEmbeddingProvider interface.
  * This file is a placeholder for future public tokenizer interface tests.
  */
@@ -26,7 +26,7 @@ protected:
 // ============================================================================
 
 TEST_F(SimpleTokenizerTest, PlaceholderTest) {
-    // SimpleTokenizer is currently private to onnx_embedding_provider.cpp
+    // SimpleTokenizer is currently private to engines/onnx/onnx_embedding_provider.cpp
     // These tests will be enabled once the class is extracted to a public interface
     EXPECT_TRUE(true);
 }
