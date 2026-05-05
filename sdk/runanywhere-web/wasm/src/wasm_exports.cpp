@@ -80,7 +80,6 @@
 #include "rac/features/embeddings/rac_embeddings.h"
 #include "rac/features/embeddings/rac_embeddings_service.h"
 #include "rac/features/lora/rac_lora_service.h"
-#include "rac/features/rag/rac_rag_pipeline.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
 #include "rac/features/llm/rac_tool_calling.h"
