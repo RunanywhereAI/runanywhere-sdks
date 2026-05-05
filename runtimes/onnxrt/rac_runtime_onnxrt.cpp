@@ -63,11 +63,44 @@ std::string status_message(const OrtApi* api, OrtStatus* status) {
 
 ONNXTensorElementDataType to_ort_type(ElementType type) {
     switch (type) {
-        case ElementType::Int64:
-            return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64;
-        case ElementType::Float32:
+        case ElementType::Float32:  return ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT;
+        case ElementType::Uint8:    return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8;
+        case ElementType::Int8:     return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8;
+        case ElementType::Uint16:   return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16;
+        case ElementType::Int16:    return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16;
+        case ElementType::Int32:    return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32;
+        case ElementType::Int64:    return ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64;
+        case ElementType::Float16:  return ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16;
+        case ElementType::Float64:  return ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE;
+        case ElementType::Uint32:   return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32;
+        case ElementType::Uint64:   return ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64;
+        case ElementType::BFloat16: return ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16;
+        case ElementType::Undefined:
         default:
             return ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT;
+    }
+}
+
+/** Map ORT tensor element type back to our public `ElementType` enum.
+ *  Returns `Undefined` for types we cannot currently marshal (strings,
+ *  complex, packed 4-bit, FP8 variants) so the caller can fail-fast instead
+ *  of silently copying garbage. */
+ElementType from_ort_type(ONNXTensorElementDataType type) {
+    switch (type) {
+        case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT:    return ElementType::Float32;
+        case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT8:    return ElementType::Uint8;
+        case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT8:     return ElementType::Int8;
+        case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT16:   return ElementType::Uint16;
+        case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT16:    return ElementType::Int16;
+        case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT32:    return ElementType::Int32;
+        case ONNX_TENSOR_ELEMENT_DATA_TYPE_INT64:    return ElementType::Int64;
+        case ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT16:  return ElementType::Float16;
+        case ONNX_TENSOR_ELEMENT_DATA_TYPE_DOUBLE:   return ElementType::Float64;
+        case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT32:   return ElementType::Uint32;
+        case ONNX_TENSOR_ELEMENT_DATA_TYPE_UINT64:   return ElementType::Uint64;
+        case ONNX_TENSOR_ELEMENT_DATA_TYPE_BFLOAT16: return ElementType::BFloat16;
+        default:
+            return ElementType::Undefined;
     }
 }
 
@@ -189,7 +222,7 @@ rac_result_t Session::run(const TensorInput* inputs,
                           size_t input_count,
                           const char* const* output_names,
                           size_t output_count,
-                          std::vector<FloatTensorOutput>& outputs,
+                          std::vector<TensorOutput>& outputs,
                           std::string* out_error) {
     if (!impl_ || !impl_->api || !impl_->session) return RAC_ERROR_BACKEND_NOT_READY;
     if (!inputs || input_count == 0 || !output_names || output_count == 0) {
@@ -256,40 +289,90 @@ rac_result_t Session::run(const TensorInput* inputs,
     outputs.clear();
     outputs.reserve(output_count);
     for (OrtValue* value : output_values) {
-        FloatTensorOutput out;
+        TensorOutput out;
+
+        /* RT-ONNX-02: consult the actual ORT tensor dtype and element count
+         * rather than force-casting to `float*`. We read shape, dtype, and
+         * element count via GetTensorTypeAndShapeInfo (the ORT-recommended
+         * single-call path) so the copy is `element_size × count` bytes of the
+         * tensor's real type. */
         OrtTensorTypeAndShapeInfo* shape_info = nullptr;
         status = api->GetTensorTypeAndShape(value, &shape_info);
-        if (status == nullptr && shape_info != nullptr) {
-            size_t dims = 0;
-            (void)api->GetDimensionsCount(shape_info, &dims);
-            out.shape.resize(dims);
-            if (dims > 0) {
-                (void)api->GetDimensions(shape_info, out.shape.data(), dims);
-            }
-            api->ReleaseTensorTypeAndShapeInfo(shape_info);
-        } else if (status != nullptr) {
-            if (out_error) *out_error = status_message(api, status);
+        if (status != nullptr || shape_info == nullptr) {
+            if (status != nullptr && out_error) *out_error = status_message(api, status);
             api->ReleaseValue(value);
             cleanup_inputs();
             return RAC_ERROR_INFERENCE_FAILED;
         }
 
-        float* data = nullptr;
-        status = api->GetTensorMutableData(value, reinterpret_cast<void**>(&data));
+        size_t dims = 0;
+        (void)api->GetDimensionsCount(shape_info, &dims);
+        out.shape.resize(dims);
+        if (dims > 0) {
+            (void)api->GetDimensions(shape_info, out.shape.data(), dims);
+        }
+
+        ONNXTensorElementDataType onnx_type = ONNX_TENSOR_ELEMENT_DATA_TYPE_UNDEFINED;
+        (void)api->GetTensorElementType(shape_info, &onnx_type);
+        out.dtype = from_ort_type(onnx_type);
+
+        size_t element_count_actual = 0;
+        (void)api->GetTensorShapeElementCount(shape_info, &element_count_actual);
+
+        api->ReleaseTensorTypeAndShapeInfo(shape_info);
+
+        const size_t elem_size = element_size_bytes(out.dtype);
+        if (elem_size == 0) {
+            if (out_error) *out_error = "onnxrt: unsupported output tensor dtype";
+            api->ReleaseValue(value);
+            cleanup_inputs();
+            return RAC_ERROR_INFERENCE_FAILED;
+        }
+
+        void* data = nullptr;
+        status = api->GetTensorMutableData(value, &data);
         if (status != nullptr || data == nullptr) {
             if (status != nullptr && out_error) *out_error = status_message(api, status);
             api->ReleaseValue(value);
             cleanup_inputs();
             return RAC_ERROR_INFERENCE_FAILED;
         }
-        const size_t count = element_count(out.shape);
-        out.data.assign(data, data + count);
+
+        const size_t byte_count = element_count_actual * elem_size;
+        out.bytes.resize(byte_count);
+        if (byte_count > 0) {
+            std::memcpy(out.bytes.data(), data, byte_count);
+        }
         outputs.push_back(std::move(out));
         api->ReleaseValue(value);
     }
 
     cleanup_inputs();
     return RAC_SUCCESS;
+}
+
+size_t element_size_bytes(ElementType type) {
+    switch (type) {
+        case ElementType::Uint8:
+        case ElementType::Int8:
+            return 1;
+        case ElementType::Uint16:
+        case ElementType::Int16:
+        case ElementType::Float16:
+        case ElementType::BFloat16:
+            return 2;
+        case ElementType::Float32:
+        case ElementType::Int32:
+        case ElementType::Uint32:
+            return 4;
+        case ElementType::Int64:
+        case ElementType::Uint64:
+        case ElementType::Float64:
+            return 8;
+        case ElementType::Undefined:
+        default:
+            return 0;
+    }
 }
 
 const char* runtime_version() {
@@ -370,7 +453,7 @@ rac_result_t onnxrt_run_session(rac_runtime_session_t* session,
         output_names.push_back(outputs[i].name);
     }
 
-    std::vector<runanywhere::runtime::onnxrt::FloatTensorOutput> runtime_outputs;
+    std::vector<runanywhere::runtime::onnxrt::TensorOutput> runtime_outputs;
     std::string error;
     rac_result_t rc = session->session->run(runtime_inputs.data(),
                                             runtime_inputs.size(),
@@ -386,10 +469,12 @@ rac_result_t onnxrt_run_session(rac_runtime_session_t* session,
      * count on every affected output so the caller can reallocate and retry.
      * We report truncation without copying any partial data, so the caller can
      * cleanly distinguish "legitimate zero-byte output" from "buffer too small,
-     * output dropped" (RT-ONNX-03). */
+     * output dropped" (RT-ONNX-03). RT-ONNX-02: `bytes` is now the real
+     * element-size × count payload from the tensor's actual dtype, not a
+     * `sizeof(float)` multiple. */
     bool truncated = false;
     for (size_t i = 0; i < output_count && i < runtime_outputs.size(); ++i) {
-        const size_t required = runtime_outputs[i].data.size() * sizeof(float);
+        const size_t required = runtime_outputs[i].bytes.size();
         if (outputs[i].data != nullptr && outputs[i].data_bytes < required) {
             outputs[i].data_bytes = required;
             truncated = true;
@@ -398,13 +483,17 @@ rac_result_t onnxrt_run_session(rac_runtime_session_t* session,
     if (truncated) {
         return RAC_ERROR_OUTPUT_TRUNCATED;
     }
-    /* Second pass: all outputs fit — commit the copies and record actual sizes. */
+    /* Second pass: all outputs fit — commit the copies and record actual sizes
+     * plus the observed dtype so the caller can interpret the bytes correctly. */
     for (size_t i = 0; i < output_count && i < runtime_outputs.size(); ++i) {
-        const size_t bytes = runtime_outputs[i].data.size() * sizeof(float);
+        const size_t bytes = runtime_outputs[i].bytes.size();
         if (outputs[i].data != nullptr) {
-            std::memcpy(outputs[i].data, runtime_outputs[i].data.data(), bytes);
+            if (bytes > 0) {
+                std::memcpy(outputs[i].data, runtime_outputs[i].bytes.data(), bytes);
+            }
             outputs[i].data_bytes = bytes;
         }
+        outputs[i].dtype = static_cast<uint32_t>(runtime_outputs[i].dtype);
     }
     return RAC_SUCCESS;
 }

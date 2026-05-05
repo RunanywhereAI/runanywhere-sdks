@@ -575,9 +575,19 @@ class ONNXEmbeddingProvider::Impl {
                  token_ids.size() - std::count(token_ids.begin(), token_ids.end(), 0), pad_length,
                  max_seq_length_);
 
-            runanywhere::runtime::onnxrt::FloatTensorOutput output;
+            runanywhere::runtime::onnxrt::TensorOutput output;
             if (!run_embedding_model(input_ids_buf_, attention_mask_buf_, token_type_ids_buf_,
                                      input_shape_, output)) {
+                return {};
+            }
+
+            /* RT-ONNX-02: output.bytes holds raw element-size × count bytes;
+             * embedding models publish `last_hidden_state` as float32, so we
+             * reinterpret the byte buffer as floats. Reject any non-float32
+             * dtype up front instead of copying garbage. */
+            if (output.dtype != runanywhere::runtime::onnxrt::ElementType::Float32) {
+                LOGE("Embedding output dtype %u is not float32",
+                     static_cast<unsigned>(output.dtype));
                 return {};
             }
 
@@ -592,7 +602,8 @@ class ONNXEmbeddingProvider::Impl {
                 }
             }
 
-            auto pooled = mean_pooling(output.data.data(), attention_mask, pad_length,
+            const float* output_floats = reinterpret_cast<const float*>(output.bytes.data());
+            auto pooled = mean_pooling(output_floats, attention_mask, pad_length,
                                        actual_hidden_dim);
 
             // 6. Normalize to unit vector
@@ -697,9 +708,17 @@ class ONNXEmbeddingProvider::Impl {
             std::vector<int64_t> batch_shape = {static_cast<int64_t>(count),
                                                 static_cast<int64_t>(pad_length)};
 
-            runanywhere::runtime::onnxrt::FloatTensorOutput output;
+            runanywhere::runtime::onnxrt::TensorOutput output;
             if (!run_embedding_model(flat_input_ids, flat_attention_mask, flat_token_type_ids,
                                      batch_shape, output)) {
+                return {};
+            }
+
+            /* RT-ONNX-02: reinterpret raw tensor bytes as float32 for
+             * last_hidden_state; bail if the model produced a different dtype. */
+            if (output.dtype != runanywhere::runtime::onnxrt::ElementType::Float32) {
+                LOGE("Batch embedding output dtype %u is not float32",
+                     static_cast<unsigned>(output.dtype));
                 return {};
             }
 
@@ -717,9 +736,10 @@ class ONNXEmbeddingProvider::Impl {
 
             std::vector<std::vector<float>> results(count);
             const size_t stride = actual_seq_len * actual_hidden_dim;
+            const float* output_floats = reinterpret_cast<const float*>(output.bytes.data());
 
             for (size_t i = 0; i < count; ++i) {
-                const float* sentence_data = output.data.data() + i * stride;
+                const float* sentence_data = output_floats + i * stride;
                 auto pooled = mean_pooling(sentence_data, attention_masks[i], actual_seq_len,
                                            actual_hidden_dim);
                 normalize_vector(pooled);
@@ -756,7 +776,7 @@ class ONNXEmbeddingProvider::Impl {
                              const std::vector<int64_t>& attention_mask,
                              const std::vector<int64_t>& token_type_ids,
                              const std::vector<int64_t>& shape,
-                             runanywhere::runtime::onnxrt::FloatTensorOutput& output) {
+                             runanywhere::runtime::onnxrt::TensorOutput& output) {
         if (!onnx_session_) {
             LOGE("ONNX Runtime session is not available");
             return false;
@@ -774,7 +794,7 @@ class ONNXEmbeddingProvider::Impl {
              shape.data(), shape.size(), ElementType::Int64},
         };
         const char* output_names[] = {"last_hidden_state"};
-        std::vector<runanywhere::runtime::onnxrt::FloatTensorOutput> outputs;
+        std::vector<runanywhere::runtime::onnxrt::TensorOutput> outputs;
         std::string error;
         rac_result_t rc = onnx_session_->run(inputs, 3, output_names, 1, outputs, &error);
         if (rc != RAC_SUCCESS || outputs.empty()) {

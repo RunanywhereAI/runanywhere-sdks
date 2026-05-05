@@ -1,6 +1,6 @@
 # Runtimes (L1 Adapters) — Current Inconsistencies
 
-Updated: 2026-05-05 (RT-CPU-01 + RT-CPU-02 + RT-ONNX-03 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
+Updated: 2026-05-05 (RT-CPU-01 + RT-CPU-02 + RT-ONNX-02 + RT-ONNX-03 resolved; pruned — Iteration I scope, CoreML/Metal deferred)
 Branch: feat/v2-architecture @ 6217d9e67
 
 ## Scope
@@ -70,17 +70,6 @@ V2 entry point will get a NULL-deref if the commons router calls
 `run_session_v2` — the router has to fall back to the V1 `run_session` slot,
 which means no V2-only feature (tensor-backed buffers, capacity-aware outputs)
 is reachable through onnxrt.
-
-#### RT-ONNX-02: Output marshaling forces every tensor to float32
-
-`Session::run` (`rac_runtime_onnxrt.cpp:267-277`) always calls
-`GetTensorMutableData` as `float*` and assigns into `std::vector<float>`
-without consulting the output tensor type. ORT models whose outputs are i64,
-f16, u8, or bf16 will silently produce garbage bytes. The public
-`ElementType` enum at `rac_runtime_onnxrt.h:16-19` only declares `Float32` and
-`Int64` — even that subset is lossy on the output side. This is a
-correctness/truncation bug masked as a "works for text-embedding models"
-behavior.
 
 #### RT-ONNX-04: Advertises CPU-only `RAC_DEVICE_CLASS_CPU` while ORT supports EPs
 

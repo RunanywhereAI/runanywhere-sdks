@@ -13,10 +13,30 @@ namespace runanywhere {
 namespace runtime {
 namespace onnxrt {
 
+/** ONNX tensor element types we can marshal in and out of ORT.
+ *  Values map 1:1 to `rac_runtime_dtype_t` so the public `rac_runtime_io_t::dtype`
+ *  wire is lossless. RT-ONNX-02: extended from {Float32, Int64} to the full
+ *  set of ORT primitive dtypes the adapter can actually round-trip. */
 enum class ElementType : uint32_t {
-    Float32 = RAC_RUNTIME_DTYPE_F32,
-    Int64 = RAC_RUNTIME_DTYPE_I64,
+    Undefined = RAC_RUNTIME_DTYPE_UNDEFINED,
+    Float32   = RAC_RUNTIME_DTYPE_F32,
+    Uint8     = RAC_RUNTIME_DTYPE_U8,
+    Int8      = RAC_RUNTIME_DTYPE_I8,
+    Uint16    = RAC_RUNTIME_DTYPE_U16,
+    Int16     = RAC_RUNTIME_DTYPE_I16,
+    Int32     = RAC_RUNTIME_DTYPE_I32,
+    Int64     = RAC_RUNTIME_DTYPE_I64,
+    Float16   = RAC_RUNTIME_DTYPE_F16,
+    Float64   = RAC_RUNTIME_DTYPE_F64,
+    Uint32    = RAC_RUNTIME_DTYPE_U32,
+    Uint64    = RAC_RUNTIME_DTYPE_U64,
+    BFloat16  = RAC_RUNTIME_DTYPE_BF16,
 };
+
+/** Return the byte width of a single element for the supported primitive
+ *  types. Returns 0 for `Undefined` or any unrecognized value (packed 4-bit
+ *  types and strings/bools are not currently supported on the output path). */
+size_t element_size_bytes(ElementType type);
 
 struct TensorInput {
     const char* name = nullptr;
@@ -27,9 +47,15 @@ struct TensorInput {
     ElementType type = ElementType::Float32;
 };
 
-struct FloatTensorOutput {
-    std::vector<float> data;
+/** Raw-bytes tensor output. RT-ONNX-02: previously a `std::vector<float>`
+ *  which force-cast every output to float32 regardless of the tensor's real
+ *  dtype, silently corrupting i64/f16/u8/bf16/f64 outputs. `bytes` now holds
+ *  the raw element-size × count payload and `dtype` records the ORT tensor's
+ *  actual element type so callers can interpret it correctly. */
+struct TensorOutput {
+    std::vector<uint8_t> bytes;
     std::vector<int64_t> shape;
+    ElementType          dtype = ElementType::Undefined;
 };
 
 struct SessionOptions {
@@ -53,7 +79,7 @@ public:
                      size_t input_count,
                      const char* const* output_names,
                      size_t output_count,
-                     std::vector<FloatTensorOutput>& outputs,
+                     std::vector<TensorOutput>& outputs,
                      std::string* out_error);
 
 private:
