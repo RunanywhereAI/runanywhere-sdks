@@ -15,7 +15,7 @@
     "unused": "knip",
     "pod-install": "cd ios && bundle exec pod install",
     "clean": "watchman watch-del-all && rm -rf node_modules && rm -rf ios/Pods && yarn install --ignore-scripts && patch-package && cd ios && bundle exec pod install",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package && node -e \"process.platform==='darwin' && require('fs').existsSync('ios/Podfile') && require('child_process').execSync('cd ios && bundle exec pod install', { stdio: 'inherit' })\""
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
