@@ -180,6 +180,7 @@ See `test_workflows/logs/20260505T183402-0700-seven-lane-validation/failure_summ
 **RESOLVED (Wave F-0 housekeeping)**: BUG-SWIFT-IOS-001 (commit 2dedd19ad), BUG-FLT-IOS-001 (commit e081a475c).
 **RESOLVED (Wave F-1)**: BUG-RN-IOS-002 (auto-run `bundle exec pod install` via `postinstall` script in `examples/react-native/RunAnywhereAI/package.json`); BUG-ANDROID-KOTLIN-001 + BUG-ANDROID-KOTLIN-004 (migrated 5 example-app call-sites to construct `VLMImage` / `STTOptions.language` directly from Wire-generated proto types; deleted path was intentional per KOT-DEAD-PROTOEXT (commit 765692eae); CLAUDE.md doc-drift fixed); BUG-ANDROID-KOTLIN-002 + BUG-ANDROID-KOTLIN-003 (migrated 9 `VoiceAssistantViewModel.kt` call-sites to `ai.runanywhere.proto.v1.ErrorCode` per IDL-08 mapping; deleted orphan generated `VoiceSessionErrorCode.kt` left behind by Wire 4.x additive codegen); BUG-SWIFT-IOS-002 (re-seeded the iOS example-app model catalog — 25 entries across LLM / VLM / STT / TTS / VAD / embedding / diffusion / MetalRT — via new `registerModulesAndModels()` in `examples/ios/RunAnywhereAI/RunAnywhereAI/App/RunAnywhereAIApp.swift`, called from `initializeSDK()` between `runSDKInitialize()` and `refreshSDKCatalogs()`; mirrors the Flutter / Kotlin / RN / Web example catalogs since the SDK does not ship a default seed; BUG-SWIFT-IOS-003's cross-contamination caveat verified against code — Swift app file had zero `RunAnywhere.registerModel(...)` calls prior to this fix).
 **RESOLVED (Wave F-2)**: BUG-RN-ANDROID-002 + BUG-WEB-001 (passed `model: ModelInfo` submessage to `DownloadPlanRequest` so `download_orchestrator.cpp`'s `request.has_model()` gate no longer rejects downloads. RN: `RunAnywhere+ModelManagement.ts` now fetches `ModelInfo` via `native.getModelInfoProto(modelId)` and decodes before building the plan request, mirroring iOS `RunAnywhere+Storage.swift:100-105`. Web: `examples/web/RunAnywhereAI/src/components/model-selection.ts` now calls `RunAnywhere.modelRegistry.get(modelId)` before `downloads.plan(...)` and passes the full model).
+**RESOLVED (Wave F-3)**: BUG-WEB-002 (web SDK now installs a synthetic `/opfs` base dir immediately after `rac_init` via `rac_model_paths_set_base_dir`, so the C++ download orchestrator's `g_base_dir.empty()` check no longer rejects `rac_model_paths_get_model_folder`. Emscripten MEMFS treats the prefix as a normal absolute path and the PlatformAdapter `file_*` callbacks handle I/O against it. Note: this fix unblocks the download path only — the MEMFS-is-volatile gap remains tracked separately as BUG-WEB-MEMFS-VOLATILE. Exports `_rac_model_paths_set_base_dir` + `_rac_model_paths_get_base_dir` added to `sdk/runanywhere-web/wasm/CMakeLists.txt`; call added in `LlamaCppBridge._initRACommons()`).
 
 ### Discovery-pass BUGs (appended by agents 1-6)
 
@@ -201,22 +202,6 @@ Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 **Fix pointer**: Either (a) materialize the shared harness — C++ "golden producer" binaries that emit `voice_agent_events` / `llm_golden_events` fixture files plus per-SDK readers — or (b) delete the stale CLAUDE.md language and acknowledge Flutter's self-contained `parity_test.dart` is the only streaming parity coverage. If choosing (a), reuse Flutter's local-only fixtures as the authoritative byte sequence and port to Swift (XCTest), Kotlin (JUnit + Wire decode), TS (vitest). Until then, there is no mechanism to catch BUG-STREAMING-001/002 at CI.
 **Severity**: MEDIUM
 
-### BUG-WEB-006 — Stale `.d.ts` files in published `@runanywhere/web` `dist/types/` describe deleted APIs (MEDIUM)
-**Lane**: 07_web
-**Category**: build-tooling | SDK-defect
-**Evidence**:
-- `sdk/runanywhere-web/packages/core/dist/types/` contains 93 `.d.ts` files vs. 72 current source `.ts` files — 21 stale declarations.
-- Specific stale files: `dist/types/Infrastructure/ModelManager.d.ts`, `ModelDownloader.d.ts`, `ModelRegistry.d.ts`, `ModelStateStore.d.ts`, `ModelLoaderTypes.d.ts`, `ModelFileInference.d.ts`, `ModelDownloadValidation.d.ts`, `ModelDownloadQuota.d.ts`, `ModelLifecycleArtifacts.d.ts`, `ArchiveUtility.d.ts`, `ExtensionPoint.d.ts`, `ExtensionRegistry.d.ts`, `ProviderTypes.d.ts`, plus stale `Public/Extensions/*.d.ts` (Convenience, ModelManagement variants, TextGeneration, ToolCalling, StructuredOutput, VisionLanguage, VLMModels, Embeddings, STT, TTS, VAD, VoiceAgent).
-- Source files for all of these were deleted during the V2 cleanup (see `sdk/runanywhere-web/packages/core/src/index.ts:9-11` comment: "ModelManager / ModelRegistry / ModelDownloader / ExtensionPoint / ExtensionRegistry / archive helpers / provider routing has been deleted").
-- `cat sdk/runanywhere-web/packages/core/dist/types/Infrastructure/ModelDownloader.d.ts` shows a full declaration referencing `OPFSStorage`, `LocalFileStorage`, `ManagedModel`, `QuotaCheckResult`, `saveModelFromStream`, etc. None of these exist in source.
-**Reproduction**:
-  1. `cd sdk/runanywhere-web/packages/core && npm run build`  (runs `tsc` per `package.json:22`).
-  2. `ls dist/types/Infrastructure/ModelDownloader.d.ts` → file still present.
-  3. An npm consumer importing `@runanywhere/web` gets broken IntelliSense pointing to non-existent exports.
-**Root cause (suspected)**: `tsc` does not clean `outDir` / `declarationDir` before emit. `package.json:22` `"build": "tsc"` lacks a `rm -rf dist` prerun; a `clean` script exists (line 31) but is not chained. `tsconfig.json` has no `incremental` / `composite` setting that would force clean-rebuild.
-**Fix pointer**: Change `package.json:22` to `"build": "npm run clean && tsc"` for `packages/core`, `packages/llamacpp`, `packages/onnx`. Alternatively add `tsc --build --clean` prerun step. Post-fix, verify `find dist/types -name "*.d.ts" | wc -l` equals source file count.
-**Severity**: MEDIUM
-
 ### BUG-WEB-007 — Example app's Settings tab hardcodes stale SDK version `0.1.0` instead of reading `RunAnywhere.version` (LOW)
 **Lane**: 07_web
 **Category**: example-app-drift
@@ -233,21 +218,20 @@ Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 **Fix pointer**: Replace `<span class="setting-value">0.1.0</span>` with `<span class="setting-value" id="settings-sdk-version"></span>` and populate in init with `textContent = RunAnywhere.version` (import `RunAnywhere` from `@runanywhere/web`). Matches the dynamic pattern already used in `storage.ts` for the storage-backend status row.
 **Severity**: LOW
 
-### BUG-WEB-008 — `OPFSStorage` is orphan code in V2: exported but never instantiated; C++ download orchestrator writes to volatile Emscripten MEMFS via PlatformAdapter callbacks (MEDIUM)
+### BUG-WEB-MEMFS-VOLATILE — PlatformAdapter file callbacks bind to Emscripten MEMFS, not OPFS; downloaded models are lost on page reload (MEDIUM, follow-up from deleted BUG-WEB-008)
 **Lane**: 07_web
 **Category**: SDK-defect | runtime
 **Evidence**:
-- `sdk/runanywhere-web/packages/core/src/Public/RunAnywhere.ts:31,358` — the only usage of `OPFSStorage` across the SDK source tree is the static `OPFSStorage.isSupported` check (feature detection); there is never a `new OPFSStorage()` instantiation anywhere.
-- `grep -rn "new OPFSStorage\|opfsStorage\." sdk/runanywhere-web/packages/` returns only matches inside `OPFSStorage.ts` itself and inside stale `dist/types/*.d.ts` (from BUG-WEB-006).
-- The PlatformAdapter at `sdk/runanywhere-web/packages/llamacpp/src/Foundation/PlatformAdapter.ts:174-201` implements `file_read` / `file_write` / `file_exists` / `file_delete` by calling `m.FS.readFile` / `writeFile` / `unlink` / `analyzePath`. `m.FS` is **Emscripten MEMFS** — in-memory, volatile, reset on page reload — NOT OPFS.
-- Consequence: even after BUG-WEB-001 + BUG-WEB-002 are fixed, any downloaded model is written only to volatile MEMFS; on next page reload the model is gone. The `storageBackend: opfs` label printed at startup is misleading because OPFS detection returns true but nothing writes to it.
-- `OPFSStorage.ts` is 440 lines of dead code exported from `src/index.ts:341-342`.
+- `sdk/runanywhere-web/packages/llamacpp/src/Foundation/PlatformAdapter.ts:174-201` implements `file_read` / `file_write` / `file_exists` / `file_delete` by calling `m.FS.readFile` / `writeFile` / `unlink` / `analyzePath`. `m.FS` is **Emscripten MEMFS** — in-memory, volatile, reset on page reload — NOT OPFS.
+- Any model downloaded by the C++ orchestrator is written only to volatile MEMFS; on next page reload the model is gone.
+- The `storageBackend: opfs` label printed at startup (from `RunAnywhere.storageBackend` capability check) is therefore misleading: OPFS detection returns true, but nothing writes to it.
+- Predecessor BUG-WEB-008 deleted the orphan `OPFSStorage` class (440 lines of never-instantiated code). This row tracks the remaining architectural gap.
 **Reproduction**:
-  1. (After BUG-WEB-001 + BUG-WEB-002 are fixed.) Download a model successfully.
+  1. Download a model successfully.
   2. Reload the page.
-  3. `modelRegistry.listDownloaded()` returns empty; the model has to be downloaded again.
-**Root cause (suspected)**: V2 collapsed model-storage ownership into the C++ download orchestrator + platform-adapter file callbacks. No one implemented an OPFS-backed file callback, so the default `m.FS` (MEMFS) path is invoked. `OPFSStorage` was left as a public export for the expected-but-unwired OPFS layer.
-**Fix pointer**: Either (a) wire PlatformAdapter's `file_*` callbacks to an `OPFSStorage` instance via a FileSystem Sync Access Handle worker so C++ can keep synchronous file semantics; or (b) delete `OPFSStorage` entirely and document that the web SDK does not yet persist model data. Option (a) is mandatory if the web SDK is to honor the "storage backend: opfs" label. This blocks the model lifecycle E2E path after downloads are unblocked.
+  3. The model has to be downloaded again.
+**Root cause (suspected)**: V2 collapsed model-storage ownership into the C++ download orchestrator + platform-adapter file callbacks. No one implemented an OPFS-backed file callback, so the default `m.FS` (MEMFS) path is invoked.
+**Fix pointer**: Wire PlatformAdapter's `file_*` callbacks to an OPFS FileSystem Sync Access Handle inside a dedicated Worker so C++ can keep synchronous file semantics. This is a non-trivial piece of work (async-to-sync bridging via Atomics or similar) and is tracked separately from the orphan-code cleanup.
 **Severity**: MEDIUM
 
 ### BUG-WEB-009 — Vite `copyWasmPlugin` ships unused 12 MB `sherpa-onnx.wasm` into `dist/assets/`; `SherpaONNXBridge` never loads it (LOW)

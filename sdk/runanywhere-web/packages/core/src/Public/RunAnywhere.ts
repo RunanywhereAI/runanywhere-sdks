@@ -28,7 +28,6 @@ import type { LLMStreamingResult } from '../types/index';
 import { EventBus } from '../Foundation/EventBus';
 import { SDKLogger, LogLevel } from '../Foundation/SDKLogger';
 import { LocalFileStorage } from '../Infrastructure/LocalFileStorage';
-import { OPFSStorage } from '../Infrastructure/OPFSStorage';
 import { SDKErrorCode, SDKException } from '../Foundation/SDKException';
 import { Runtime } from '../Foundation/RuntimeConfig';
 import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
@@ -348,14 +347,24 @@ export const RunAnywhere = {
    *
    * Resolution order:
    *   1. `fsAccess` — File System Access API with an active directory handle.
-   *   2. `opfs` — Origin Private File System (default persistent fallback).
-   *   3. `memory` — Neither backend is available; models live only in MEMFS.
+   *   2. `opfs` — Origin Private File System detected (feature-flag only; the C++
+   *      download orchestrator currently writes to Emscripten MEMFS via the
+   *      PlatformAdapter file callbacks, so OPFS persistence is NOT yet wired).
+   *   3. `memory` — No persistent backend available.
+   *
+   * NOTE: `'opfs'` here reflects browser capability only. Persisting downloaded
+   * models across reloads via OPFS requires wiring the PlatformAdapter file_*
+   * callbacks to an OPFS Sync Access Handle worker — tracked as a follow-up
+   * (see BUG-WEB-MEMFS-VOLATILE, successor of the deleted BUG-WEB-008).
    */
   get storageBackend(): StorageBackend {
     if (LocalFileStorage.isSupported && _localFileStorage?.isReady) {
       return 'fsAccess';
     }
-    if (OPFSStorage.isSupported) {
+    const hasOPFS = typeof navigator !== 'undefined'
+      && 'storage' in navigator
+      && 'getDirectory' in (navigator.storage || {});
+    if (hasOPFS) {
       return 'opfs';
     }
     return 'memory';

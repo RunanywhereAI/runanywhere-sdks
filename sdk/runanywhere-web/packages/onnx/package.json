@@ -20,7 +20,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "npm run clean && tsc",
     "dev": "tsc --watch",
     "lint": "eslint src --max-warnings 0",
     "lint:ts": "tsc --noEmit",

@@ -9,13 +9,15 @@
  *
  * Mirrors the storage-backend contract so that other platforms (Swift / Kotlin /
  * Flutter / RN) can implement their analogue under a shared API name. Today
- * the Web SDK already stores via OPFSStorage / LocalFileStorage internally — this
- * interface exposes a stable way for application code (and other platforms) to
- * reason about which backend is active without leaking implementation details.
+ * the Web SDK writes downloaded models via the C++ commons download
+ * orchestrator; LocalFileStorage is the only JS-side persistent adapter wired
+ * in V2. This interface exposes a stable way for application code (and other
+ * platforms) to reason about which backend is active without leaking
+ * implementation details.
  *
  * This file intentionally has no runtime dependencies on the Emscripten module
- * or `OPFSStorage` — it is a shape definition only. Concrete providers attach
- * via `RunAnywhere.storage.setProvider(...)`.
+ * — it is a shape definition only. Concrete providers attach via
+ * `RunAnywhere.storage.setProvider(...)`.
  */
 
 /** Stable identifier for a storage backend. */

@@ -334,10 +334,12 @@ export type { AudioFileLoaderResult } from './Infrastructure/AudioFileLoader';
 export { VideoCapture } from './Infrastructure/VideoCapture';
 export type { VideoCaptureConfig, CapturedFrame } from './Infrastructure/VideoCapture';
 
-// Browser-specific persistent storage adapters (OPFS / File System Access).
+// Browser-specific persistent storage adapters (File System Access API).
 // These are platform helpers the C++ commons layer cannot speak directly.
+// NOTE: A prior `OPFSStorage` export was removed — it was orphan code in V2
+// (never instantiated; only `isSupported` was read for storageBackend
+// feature-detection). OPFS persistence for downloaded models is not yet wired
+// through PlatformAdapter; tracked as a follow-up.
 export { detectCapabilities, getDeviceInfo } from './Infrastructure/DeviceCapabilities';
 export type { WebCapabilities } from './Infrastructure/DeviceCapabilities';
-export { OPFSStorage } from './Infrastructure/OPFSStorage';
-export type { StoredModelInfo, MetadataMap, ModelMetadata } from './Infrastructure/OPFSStorage';
 export { LocalFileStorage } from './Infrastructure/LocalFileStorage';

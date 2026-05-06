@@ -399,6 +399,15 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_framework_supports_tts"
     "_rac_model_format_extension"
 
+    # Model paths — base-dir configuration. Web has no native filesystem root,
+    # but the C++ download orchestrator rejects an empty base via
+    # `rac_model_paths_get_model_folder`. The TypeScript bridge installs a
+    # synthetic prefix (e.g. "/opfs") after rac_init so path composition can
+    # proceed; actual I/O still flows through PlatformAdapter file callbacks
+    # against Emscripten MEMFS (see BUG-WEB-002).
+    "_rac_model_paths_set_base_dir"
+    "_rac_model_paths_get_base_dir"
+
     # Lifecycle
     "_rac_lifecycle_create"
     "_rac_lifecycle_load"

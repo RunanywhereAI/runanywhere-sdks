@@ -42,6 +42,11 @@ export interface LlamaCppModule extends EmscriptenRunanywhereModule {
   _rac_set_platform_adapter?(adapterPtr: number): number;
   _rac_error_message?(code: number): number;
 
+  // Model paths — set a synthetic base directory so the C++ download
+  // orchestrator's `g_base_dir.empty()` check doesn't reject web paths.
+  // Returns 0 on success (rac_result_t).
+  _rac_model_paths_set_base_dir?(basePtr: number): number;
+
   // Smoke check
   _rac_wasm_ping?(): number;
 
@@ -334,8 +339,52 @@ export class LlamaCppBridge {
         throw new Error(`rac_init failed in LlamaCpp module: ${errMsg}`);
       }
       logger.info('RACommons initialized within LlamaCpp WASM module');
+
+      // BUG-WEB-002: Web has no native filesystem root, but the C++ download
+      // orchestrator rejects an empty base dir (g_base_dir.empty() causes
+      // rac_model_paths_get_model_folder to fail with RAC_ERROR_NOT_FOUND).
+      //
+      // Install a synthetic prefix so path composition succeeds. The
+      // PlatformAdapter's file_* callbacks operate on Emscripten's MEMFS using
+      // whatever absolute path string is passed to them, so the prefix value
+      // only needs to be non-empty and valid-looking — it does NOT need to map
+      // to a real OS directory.
+      this._setModelPathsBaseDir('/opfs');
     } finally {
       m._free(configPtr);
+    }
+  }
+
+  /**
+   * Install a synthetic model-paths base directory on the WASM-side
+   * `g_base_dir` static. Missing export is treated as non-fatal — older WASM
+   * builds without the export simply cannot support the C++ orchestrator
+   * download path, but other proto APIs still function.
+   */
+  private _setModelPathsBaseDir(base: string): void {
+    const m = this._module!;
+    const setFn = m._rac_model_paths_set_base_dir;
+    if (typeof setFn !== 'function') {
+      logger.warning(
+        'WASM module missing _rac_model_paths_set_base_dir export; ' +
+        'C++ download orchestrator path composition may fail. ' +
+        'Rebuild racommons-llamacpp.wasm with the latest wasm/CMakeLists.txt.',
+      );
+      return;
+    }
+
+    const len = m.lengthBytesUTF8(base) + 1;
+    const ptr = m._malloc(len);
+    try {
+      m.stringToUTF8(base, ptr, len);
+      const rc = setFn(ptr);
+      if (rc !== 0) {
+        logger.warning(`rac_model_paths_set_base_dir('${base}') returned ${rc}`);
+      } else {
+        logger.info(`Model paths base dir set to synthetic prefix '${base}'`);
+      }
+    } finally {
+      m._free(ptr);
     }
   }
 
