@@ -31,16 +31,6 @@ Swift is a thin platform bridge over the C ABI. All public data types (`RAModelI
 - **Validation**: unique warning sites drops from 28 to under 5 (architecture-specific warnings from DeviceKit tolerable; `@Sendable` / concurrency warnings should be 0).
 - **Scope**: M (one dedicated sendability file + ~8 surgical edits).
 
-### SWF-CROSS-01: Missing `initializeVoiceAgentWithLoadedModels()` + `getVoiceAgentComponentStates()` public API (LOW, cross-SDK)
-
-- **Symptom**: `Public/Extensions/VoiceAgent/RunAnywhere+VoiceAgent.swift` exposes only `initializeVoiceAgent(_:)`, `processVoiceTurn(_:)`, `streamVoiceAgent()`, `cleanupVoiceAgent()`. Kotlin (`sdk/runanywhere-kotlin/.../public/extensions/RunAnywhere+VoiceAgent.kt:49,71`) and Web both expose `initializeVoiceAgentWithLoadedModels()` and `getVoiceAgentComponentStates()`. Swift's own `Adapters/VoiceAgentStreamAdapter.swift:13` doc-comment still advertises `RunAnywhere.initializeVoiceAgentWithLoadedModels()` — suggesting Swift used to expose it but it was lost.
-- **Why it matters**: Cross-SDK API parity. Example apps that drive load-then-compose voice flows (which the iOS example does) need these as top-level.
-- **Fix steps**:
-  1. Add `initializeVoiceAgentWithLoadedModels()` static on `RunAnywhere` in `RunAnywhere+VoiceAgent.swift` — builds a `RAVoiceAgentComposeConfig` from currently-loaded model ids (`CppBridge.LLM.shared.currentModelId`, `.STT`, `.TTS`, VAD defaults) and forwards to `initializeVoiceAgent(_:)`.
-  2. Add `getVoiceAgentComponentStates() async throws -> RAVoiceAgentComponentStates` static — thin forwarder to the existing `CppBridge.VoiceAgent.shared.componentStatesProto()`.
-- **Validation**: `grep "static func initializeVoiceAgentWithLoadedModels\|static func getVoiceAgentComponentStates" sdk/runanywhere-swift/Sources` returns 2 hits.
-- **Scope**: S.
-
 ### SWF-CROSS-02: Missing `RunAnywhere.clearCache()` / `cleanTempFiles()` top-level API (LOW, cross-SDK)
 
 - **Symptom**: Swift exposes storage ops only through:
@@ -81,8 +71,8 @@ Swift is a thin platform bridge over the C ABI. All public data types (`RAModelI
 | **Solutions** | `RunAnywhere.solutions.run(yaml:)` / `run(config:)` | same | same | same | OK |
 | **Hardware** | `RunAnywhere.hardware.{getProfile,getAccelerators,setAcceleratorPreference}` | same | same | same | OK |
 | **Plugin loader** | `RunAnywhere.pluginLoader.{load,unload,registeredNames,apiVersion}` | same | same | same | OK |
-| **Voice agent init from loaded** | **MISSING** | `initializeVoiceAgentWithLoadedModels()` | (unknown) | `initializeVoiceAgentWithLoadedModels()` | **DRIFT** (SWF-CROSS-01) |
-| **Voice agent states** | **MISSING** | `getVoiceAgentComponentStates()` | (unknown) | `getVoiceAgentComponentStates()` | **DRIFT** (SWF-CROSS-01) |
+| **Voice agent init from loaded** | `initializeVoiceAgentWithLoadedModels()` | `initializeVoiceAgentWithLoadedModels()` | (unknown) | `initializeVoiceAgentWithLoadedModels()` | OK |
+| **Voice agent states** | `getVoiceAgentComponentStates()` | `getVoiceAgentComponentStates()` | (unknown) | `getVoiceAgentComponentStates()` | OK |
 | **Storage — clearCache** | Only via internal `SimplifiedFileManager` | `CppBridgeFileManager.clearCache()` + top-level `RunAnywhere.clearCache()` per header docs | (unknown) | docs advertise | **DRIFT** (SWF-CROSS-02) |
 | **Storage — cleanTempFiles** | Only via internal `SimplifiedFileManager` | (unknown) | (unknown) | docs advertise | **DRIFT** (SWF-CROSS-02) |
 | **Register model (convenience)** | `RunAnywhere.registerModel(id:name:url:framework:…)` top-level | `fun RunAnywhere.registerModel(id, name, url, framework, …)` top-level | (unknown) | (unknown) | OK |
