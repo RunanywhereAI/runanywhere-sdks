@@ -10,9 +10,10 @@ import RunAnywhere
 import LlamaCPPRuntime
 import ONNXRuntime
 import WhisperKitRuntime
-#if canImport(MetalRTRuntime)
-import MetalRTRuntime
-#endif
+// MetalRT is deferred scope — not declared as a product in the example's
+// Package.swift, so registering it here would be a dead code path for
+// external SPM consumers. Re-add when the backend is promoted out of
+// deferred scope and `RunAnywhereMetalRT` is declared as a dependency.
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -98,9 +99,6 @@ struct RunAnywhereAIApp: App {
             LlamaCPP.register(priority: 100)
             ONNX.register(priority: 100)
             WhisperKitSTT.register(priority: 200)
-            #if canImport(MetalRTRuntime)
-            MetalRT.register(priority: 100)
-            #endif
 
             // Clear any previous error
             await MainActor.run { initializationError = nil }
@@ -481,33 +479,8 @@ struct RunAnywhereAIApp: App {
         )
         logger.info("✅ Diffusion models registered (Apple Stable Diffusion / CoreML only)")
 
-        // --- MetalRT models (Apple-only custom Metal GPU kernels) -------------
-        #if canImport(MetalRTRuntime)
-        let metalrtBase = "https://huggingface.co/runanywhere/metalrt-ios/resolve/main"
-        await registerArchive(
-            id: "qwen3-0.6b-metalrt",
-            name: "Qwen3 0.6B (MetalRT)",
-            url: "\(metalrtBase)/qwen3-0.6b-metalrt.tar.gz",
-            framework: .metalrt,
-            modality: .language,
-            archive: .tarGz,
-            structure: .nestedDirectory,
-            memoryRequirement: 400_000_000
-        )
-        await registerArchive(
-            id: "qwen3-4b-metalrt",
-            name: "Qwen3 4B (MetalRT)",
-            url: "\(metalrtBase)/qwen3-4b-metalrt.tar.gz",
-            framework: .metalrt,
-            modality: .language,
-            archive: .tarGz,
-            structure: .nestedDirectory,
-            memoryRequirement: 2_500_000_000
-        )
-        logger.info("✅ MetalRT models registered")
-        #else
-        logger.info("ℹ️ MetalRT not available (MetalRTRuntime not linked)")
-        #endif
+        // MetalRT models are deferred scope — not registered until the MetalRT
+        // product is promoted and declared as a Package.swift dependency here.
 
         logger.info("🎉 All modules and models registered")
     }

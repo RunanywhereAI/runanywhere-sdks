@@ -152,7 +152,7 @@ extension VoiceAssistantView {
                 .padding(.vertical, 20)
                 .adaptiveConversationWidth()
             }
-            .onChange(of: viewModel.assistantResponse) { _ in
+            .onChange(of: viewModel.assistantResponse) { _, _ in
                 withAnimation {
                     proxy.scrollTo("assistant", anchor: .bottom)
                 }
@@ -297,7 +297,7 @@ extension VoiceAssistantView {
                             .id("responseEnd")
                         }
                         .padding(.horizontal, 30)
-                        .onChange(of: viewModel.assistantResponse) { _ in
+                        .onChange(of: viewModel.assistantResponse) { _, _ in
                             withAnimation {
                                 proxy.scrollTo("responseEnd", anchor: .bottom)
                             }
