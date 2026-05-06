@@ -1732,6 +1732,13 @@ class RacBindings {
               RacVoiceAgentComponentDestroyProtoDart>(
             'rac_voice_agent_component_destroy_proto',
           ),
+        ),
+        rac_structured_output_parse_proto =
+            _lookupOptional<RacLifecycleRequestProtoDart>(
+          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart>(
+            'rac_structured_output_parse_proto',
+          ),
         );
 
   // Shared proto buffers -----------------------------------------------------
@@ -2002,6 +2009,12 @@ class RacBindings {
 
   final RacVoiceAgentComponentDestroyProtoDart?
       rac_voice_agent_component_destroy_proto;
+
+  /// `rac_structured_output_parse_proto` — parses structured output JSON from
+  /// raw model text. Takes a serialized `StructuredOutputParseRequest` and
+  /// returns a `StructuredOutputResult`. Null when the commons binary predates
+  /// the proto-byte structured-output API.
+  final RacLifecycleRequestProtoDart? rac_structured_output_parse_proto;
 }
 
 /// Entry point for the typed commons FFI bindings.

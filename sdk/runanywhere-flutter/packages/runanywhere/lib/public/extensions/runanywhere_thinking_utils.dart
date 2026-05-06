@@ -1,15 +1,21 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // runanywhere_thinking_utils.dart — Pure Dart utilities for thinking-token
-// extraction and structured-output parsing.
+// extraction, plus structured-output parsing via commons proto bytes.
 //
-// These are stateless helpers — no FFI, no C ABI calls. All logic is
-// expressed in Dart against the canonical proto types.
+// Thinking-token helpers remain in Dart (simple regex); structured-output
+// extraction routes through `rac_structured_output_parse_proto` so SDKs do
+// not duplicate commons-owned JSON extraction logic.
 
-import 'dart:convert';
-
+import 'package:runanywhere/core/native/rac_native.dart';
+import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
 import 'package:runanywhere/generated/structured_output.pb.dart'
-    show StructuredOutputResult, StructuredOutputValidation, JSONSchema;
+    show
+        JSONSchema,
+        StructuredOutputOptions,
+        StructuredOutputParseRequest,
+        StructuredOutputResult;
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 
 /// Canonical result of `extractThinkingTokens` (§3).
 class ThinkingExtractionResult {
@@ -86,74 +92,31 @@ class RunAnywhereThinkingUtils {
 
   /// Extract structured output from raw [text] against [schema].
   ///
-  /// Strategy: locate the first JSON object / array in the text, attempt
-  /// to parse it, and return a [StructuredOutputResult] with validation
-  /// status. This is a pure Dart implementation (no C ABI call needed
-  /// because the extraction is a string search + JSON parse).
+  /// Routes through commons `rac_structured_output_parse_proto`, which runs
+  /// the canonical JSON extractor + schema validator in C++ and returns a
+  /// [StructuredOutputResult]. Thinking tokens are stripped first so the
+  /// parser sees the visible response only.
   static Future<StructuredOutputResult> extractStructuredOutput(
     String text,
     JSONSchema schema,
   ) async {
-    // Strip thinking tokens first.
+    final fn = RacNative.bindings.rac_structured_output_parse_proto;
+    if (fn == null) {
+      throw SDKException.featureNotAvailable(
+        'rac_structured_output_parse_proto is unavailable',
+      );
+    }
+
     final cleanText = stripThinkingTokens(text);
+    final request = StructuredOutputParseRequest()
+      ..text = cleanText
+      ..options = StructuredOutputOptions(schema: schema);
 
-    // Attempt to locate and parse a JSON object or array.
-    final jsonStr = _extractFirstJson(cleanText);
-    final isValid = jsonStr != null && _isValidJson(jsonStr);
-
-    return StructuredOutputResult(
-      rawText: text,
-      // jsonStr is non-null when isValid is true (flow analysis confirms).
-      parsedJson: isValid ? utf8.encode(jsonStr) : [],
-      validation: StructuredOutputValidation(isValid: isValid),
+    return DartBridgeProtoUtils.callRequest<StructuredOutputResult>(
+      request: request,
+      invoke: fn,
+      decode: StructuredOutputResult.fromBuffer,
+      symbol: 'rac_structured_output_parse_proto',
     );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Private helpers
-  // ---------------------------------------------------------------------------
-
-  /// Find the first balanced JSON object `{…}` or array `[…]` in [text].
-  static String? _extractFirstJson(String text) {
-    for (var i = 0; i < text.length; i++) {
-      final ch = text[i];
-      if (ch == '{' || ch == '[') {
-        final closing = ch == '{' ? '}' : ']';
-        final end = _findClosing(text, i, ch, closing);
-        if (end != -1) {
-          return text.substring(i, end + 1);
-        }
-      }
-    }
-    return null;
-  }
-
-  /// Find the index of the matching closing bracket starting from [start].
-  static int _findClosing(String s, int start, String open, String close) {
-    var depth = 0;
-    var inString = false;
-    for (var i = start; i < s.length; i++) {
-      final ch = s[i];
-      if (ch == '"' && (i == 0 || s[i - 1] != '\\')) {
-        inString = !inString;
-      }
-      if (!inString) {
-        if (ch == open) depth++;
-        if (ch == close) {
-          depth--;
-          if (depth == 0) return i;
-        }
-      }
-    }
-    return -1;
-  }
-
-  static bool _isValidJson(String s) {
-    try {
-      jsonDecode(s);
-      return true;
-    } catch (_) {
-      return false;
-    }
   }
 }

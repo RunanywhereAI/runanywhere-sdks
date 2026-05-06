@@ -21,34 +21,12 @@ checks are gone, and `DartBridgeVAD` is trimmed to a single
 
 What remains:
 
-- **FLT-11** — `RunAnywhereThinkingUtils._extractFirstJson` /
-  `_findClosing` / `_isValidJson` duplicate commons-owned JSON
-  extraction logic; commons still missing
-  `rac_structured_output_extract_proto` (has `..._extract_json`).
 - **FLT-12** — commons lifecycle-owned TTS stream/stop + VAD
   configure/start/stop/reset proto APIs still missing; capabilities
   throw `SDKException.featureNotAvailable` until commons lands the
   ABIs. (Diffusion portion of FLT-12 deferred — tracked separately.)
 
 ## Confirmed gaps
-
-### FLT-11: Structured-output helper still duplicates logic commons owns
-
-`lib/public/extensions/runanywhere_thinking_utils.dart:117-158` embeds
-`_extractFirstJson` / `_findClosing` / `_isValidJson` (brace-balanced
-JSON search + `jsonDecode`). Commons has
-`rac_structured_output_extract_json` in
-`sdk/runanywhere-commons/include/rac/features/llm/rac_llm_structured_output.h`
-and a proto-byte family (`rac_structured_output_parse_proto` /
-`generate_proto` / `prepare_prompt_proto` / `validate_proto`) but no
-`rac_structured_output_extract_proto`. Once commons adds that (or
-exposes `extract_json` through FFI), delete
-`extractStructuredOutput` + helpers (~70 LOC).
-
-Thinking-token regex helpers (lines 39-82) parallel Swift's
-`RunAnywhereThinkingUtils`; keep those.
-
-File refs: `lib/public/extensions/runanywhere_thinking_utils.dart:117-158`
 
 ### FLT-12: Commons lifecycle-owned TTS/VAD proto APIs still missing
 
@@ -74,13 +52,10 @@ File refs:
 
 ## Items to DELETE
 
-Concrete deletions once blockers clear (LOC estimates):
-
-| Target | LOC | Blocker / precondition |
-|---|---|---|
-| `RunAnywhereThinkingUtils.extractStructuredOutput` + helpers | ~70 | FLT-11 + commons `rac_structured_output_extract_proto` |
-
-Gross upper bound if every open item lands: ~70 LOC.
+No pending deletions — FLT-11 landed in Wave 3c: `extractStructuredOutput`
+now routes through commons `rac_structured_output_parse_proto` and the
+~42 LOC of `_extractFirstJson` / `_findClosing` / `_isValidJson`
+helpers have been removed.
 
 ## Cross-SDK naming alignment gaps
 
@@ -93,5 +68,5 @@ Gross upper bound if every open item lands: ~70 LOC.
 <tr><td>Model-format URL heuristic</td><td>commons proto (D-3)</td><td>commons proto (D-3)</td><td>commons proto (D-3)</td><td>commons proto (D-3)</td><td>commons proto via <code>DartBridgeModelFormat</code></td><td>Aligned</td></tr>
 <tr><td>ffigen / auto-gen FFI</td><td>N/A (module map)</td><td>expect/actual + JNI</td><td>Nitro codegen</td><td>TypeScript <code>Offsets</code> proxy</td><td>hand-written <code>RacBindings</code></td><td>Aligned — ffigen scaffold removed (FLT-05 resolved)</td></tr>
 <tr><td>Plugin ABI reported version</td><td>dynamic from native</td><td>dynamic from native</td><td>dynamic from native</td><td>dynamic</td><td>hard-coded <code>'0.19.13'</code> (aligned via FLT-07 fix)</td><td>Aligned</td></tr>
-<tr><td>Structured-output extract helper</td><td>in-SDK regex</td><td>in-SDK regex</td><td>in-SDK regex</td><td>in-SDK regex</td><td>in-SDK regex + brace balancer (FLT-11)</td><td>Aligned — optional migration once commons exposes <code>extract_proto</code></td></tr>
+<tr><td>Structured-output extract helper</td><td>in-SDK regex</td><td>in-SDK regex</td><td>in-SDK regex</td><td>in-SDK regex</td><td>commons <code>rac_structured_output_parse_proto</code> (FLT-11 landed)</td><td>Aligned — Flutter now routes through commons; other SDKs may follow once their wiring lands</td></tr>
 </table>
