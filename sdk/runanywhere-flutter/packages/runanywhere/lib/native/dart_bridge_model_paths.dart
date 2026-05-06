@@ -89,6 +89,20 @@ class DartBridgeModelPaths {
   /// Set the base directory for model storage.
   /// Must be called during SDK initialization.
   /// Matches Swift: CppBridge.ModelPaths.setBaseDirectory()
+  ///
+  /// On iOS, `getApplicationDocumentsDirectory()` resolves to
+  /// `NSDocumentDirectory` (e.g. `Application/<UUID>/Documents`). This
+  /// persists across normal app relaunches on both simulator and physical
+  /// device. On a physical device it also persists across App Store /
+  /// TestFlight reinstalls (bundle ID is the container key).
+  ///
+  /// Simulator caveat (expected, not a bug): `xcrun simctl install` will
+  /// reuse the existing data container UUID when the app is already
+  /// installed, but `simctl uninstall` (or a corrupted container that
+  /// forces Xcode to re-provision one) allocates a fresh UUID with an
+  /// empty `Documents/`. Previously-downloaded models are then not
+  /// discoverable because the SDK correctly scans the NEW container, not
+  /// the old one. This mirrors Swift, React Native, and Kotlin behavior.
   Future<void> setBaseDirectory([String? path]) async {
     final dir = path ?? (await getApplicationDocumentsDirectory()).path;
 
