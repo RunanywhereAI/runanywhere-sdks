@@ -91,17 +91,6 @@ struct VisionHubView: View {
                             subtitle: "Chat with images using your camera or photos"
                         )
                     }
-
-                    NavigationLink {
-                        ImageGenerationView()
-                    } label: {
-                        FeatureRow(
-                            icon: "photo.on.rectangle.angled",
-                            iconColor: .pink,
-                            title: "Image Generation",
-                            subtitle: "Create images from text prompts"
-                        )
-                    }
                 } header: {
                     Text("Vision AI")
                 } footer: {

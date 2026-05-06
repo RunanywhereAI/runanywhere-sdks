@@ -15,7 +15,6 @@ enum BenchmarkCategory: String, CaseIterable, Codable, Sendable, Identifiable {
     case stt
     case tts
     case vlm
-    case diffusion
 
     var id: String { rawValue }
 
@@ -25,7 +24,6 @@ enum BenchmarkCategory: String, CaseIterable, Codable, Sendable, Identifiable {
         case .stt: return "STT"
         case .tts: return "TTS"
         case .vlm: return "VLM"
-        case .diffusion: return "Diffusion"
         }
     }
 
@@ -35,7 +33,6 @@ enum BenchmarkCategory: String, CaseIterable, Codable, Sendable, Identifiable {
         case .stt: return "waveform"
         case .tts: return "speaker.wave.3"
         case .vlm: return "eye"
-        case .diffusion: return "paintbrush"
         }
     }
 
@@ -45,7 +42,6 @@ enum BenchmarkCategory: String, CaseIterable, Codable, Sendable, Identifiable {
         case .stt: return .speechRecognition
         case .tts: return .speechSynthesis
         case .vlm: return .multimodal
-        case .diffusion: return .imageGeneration
         }
     }
 }
@@ -140,7 +136,7 @@ struct BenchmarkMetrics: Codable, Sendable {
     var promptTokens: Int?
     var completionTokens: Int?
 
-    // Diffusion-specific
+    // Generation duration (LLM / VLM generate paths)
     var generationTimeMs: Double?
 
     // Error info

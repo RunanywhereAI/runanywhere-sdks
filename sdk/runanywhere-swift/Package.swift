@@ -27,7 +27,7 @@ let package = Package(
     products: [
         // -------------------------------------------------------------------
         // Core SDK — always needed. The `RunAnywhere` library vends the core
-        // target plus the four runtime backends so that a single product
+        // target plus the two runtime backends so that a single product
         // import pulls in the whole stack for local example apps.
         // -------------------------------------------------------------------
         .library(
@@ -36,8 +36,6 @@ let package = Package(
                 "RunAnywhere",
                 "LlamaCPPRuntime",
                 "ONNXRuntime",
-                "MetalRTRuntime",
-                "WhisperKitRuntime",
             ]
         ),
 
@@ -46,8 +44,6 @@ let package = Package(
         .library(name: "RunAnywhereCore", targets: ["RunAnywhere"]),
         .library(name: "RunAnywhereLlamaCPP", targets: ["LlamaCPPRuntime"]),
         .library(name: "RunAnywhereONNX", targets: ["ONNXRuntime"]),
-        .library(name: "RunAnywhereMetalRT", targets: ["MetalRTRuntime"]),
-        .library(name: "RunAnywhereWhisperKit", targets: ["WhisperKitRuntime"]),
     ],
     dependencies: [
         // Pins mirror `Package.resolved`.
@@ -55,13 +51,6 @@ let package = Package(
         .package(url: "https://github.com/JohnSundell/Files.git", from: "4.3.0"),
         .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
         .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
-        // ml-stable-diffusion powers the CoreML-based image generation path
-        // imported as `StableDiffusion` from the RunAnywhere core target.
-        .package(url: "https://github.com/apple/ml-stable-diffusion.git", from: "1.1.0"),
-        // WhisperKit is referenced from WhisperKitRuntime/WhisperKitSTTService.swift
-        // (`import WhisperKit`). Pin conservatively at 0.9.0+ to match the
-        // root-level Package.swift.
-        .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.9.0"),
         // swift-protobuf is consumed by the pb.swift files generated from
         // idl/*.proto in Sources/RunAnywhere/Generated/.
         .package(url: "https://github.com/apple/swift-protobuf.git", from: "1.27.0"),
@@ -105,16 +94,6 @@ let package = Package(
         ),
 
         // -------------------------------------------------------------------
-        // C Bridge Module — MetalRT Backend Headers
-        // -------------------------------------------------------------------
-        .target(
-            name: "MetalRTBackend",
-            dependencies: ["RABackendMetalRTBinary"],
-            path: "Sources/MetalRTRuntime/include",
-            publicHeadersPath: "."
-        ),
-
-        // -------------------------------------------------------------------
         // Core SDK target
         // -------------------------------------------------------------------
         .target(
@@ -124,7 +103,6 @@ let package = Package(
                 .product(name: "Files", package: "Files"),
                 .product(name: "DeviceKit", package: "DeviceKit"),
                 .product(name: "Sentry", package: "sentry-cocoa"),
-                .product(name: "StableDiffusion", package: "ml-stable-diffusion"),
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
                 "CRACommons",
                 "RACommonsBinary",
@@ -198,46 +176,6 @@ let package = Package(
         ),
 
         // -------------------------------------------------------------------
-        // MetalRT Runtime Backend (custom Metal GPU kernels)
-        // -------------------------------------------------------------------
-        .target(
-            name: "MetalRTRuntime",
-            dependencies: [
-                "RunAnywhere",
-                "MetalRTBackend",
-                "RABackendMetalRTBinary",
-            ],
-            path: "Sources/MetalRTRuntime",
-            exclude: ["include"],
-            resources: [
-                .copy("Resources/default.metallib"),
-            ],
-            linkerSettings: [
-                .linkedLibrary("c++"),
-                .linkedFramework("Accelerate"),
-                .linkedFramework("Metal"),
-                .linkedFramework("CoreGraphics"),
-                .linkedFramework("ImageIO"),
-            ]
-        ),
-
-        // -------------------------------------------------------------------
-        // WhisperKit Runtime Backend (Apple Neural Engine STT)
-        // -------------------------------------------------------------------
-        .target(
-            name: "WhisperKitRuntime",
-            dependencies: [
-                "RunAnywhere",
-                .product(name: "WhisperKit", package: "WhisperKit"),
-            ],
-            path: "Sources/WhisperKitRuntime",
-            linkerSettings: [
-                .linkedFramework("CoreML"),
-                .linkedFramework("Accelerate"),
-            ]
-        ),
-
-        // -------------------------------------------------------------------
         // Unit tests (AudioCaptureManager — see Issue #198)
         // -------------------------------------------------------------------
         .testTarget(
@@ -260,10 +198,6 @@ let package = Package(
         .binaryTarget(
             name: "RABackendONNXBinary",
             path: "Binaries/RABackendONNX.xcframework"
-        ),
-        .binaryTarget(
-            name: "RABackendMetalRTBinary",
-            path: "Binaries/RABackendMetalRT.xcframework"
         ),
         .binaryTarget(
             name: "RABackendSherpaBinary",

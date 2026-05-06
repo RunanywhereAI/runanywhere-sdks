@@ -4,7 +4,7 @@
 //
 //  Public API for Speech-to-Text operations.
 //  All transcription flows through C++ via CppBridge.STT / rac_stt_component,
-//  which provides automatic telemetry for every backend (ONNX, WhisperKit, etc.).
+//  which provides automatic telemetry for every registered STT backend.
 //
 
 import CRACommons

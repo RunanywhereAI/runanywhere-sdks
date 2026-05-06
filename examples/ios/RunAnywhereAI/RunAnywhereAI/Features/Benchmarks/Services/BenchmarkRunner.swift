@@ -64,8 +64,7 @@ final class BenchmarkRunner {
             LLMBenchmarkProvider(),
             STTBenchmarkProvider(),
             TTSBenchmarkProvider(),
-            VLMBenchmarkProvider(),
-            DiffusionBenchmarkProvider()
+            VLMBenchmarkProvider()
         ]
         for provider in all {
             map[provider.category] = provider

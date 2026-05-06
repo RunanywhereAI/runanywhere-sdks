@@ -16,9 +16,8 @@ import Foundation
 // FOR LOCAL DEVELOPMENT:
 //   1. Build native XCFrameworks from the repo root:
 //          ./scripts/build-core-xcframework.sh
-//      This writes RACommons.xcframework, RABackendLLAMACPP.xcframework,
-//      RABackendONNX.xcframework, and (on Apple) RABackendMetalRT.xcframework
-//      into sdk/runanywhere-swift/Binaries/.
+//      This writes RACommons.xcframework, RABackendLLAMACPP.xcframework, and
+//      RABackendONNX.xcframework into sdk/runanywhere-swift/Binaries/.
 //   2. Ensure `useLocalNatives = true` below so the package resolves to
 //      those on-disk XCFrameworks instead of the remote release URLs.
 //   3. Open the example app (examples/ios/RunAnywhereAI) in Xcode — it
@@ -58,14 +57,6 @@ let useLocalNatives = true //  Toggle: true for local dev, false for release
 // artifacts.
 let sdkVersion = "0.19.13"
 
-// MetalRT is currently only shipped as a local xcframework (built via
-// `./scripts/build-core-xcframework.sh` at the repo root). There is no
-// published remote binary target yet — when one exists, add a
-// `.binaryTarget(... url: ..., checksum: ...)` entry for
-// `RABackendMetalRTBinary` in the remote branch of `binaryTargets()` below
-// and flip `includeMetalRT` to also be true when `useLocalNatives == false`.
-let includeMetalRT = useLocalNatives
-
 let package = Package(
     name: "runanywhere-sdks",
     platforms: [
@@ -97,24 +88,12 @@ let package = Package(
             targets: ["LlamaCPPRuntime"]
         ),
 
-        // =================================================================
-        // WhisperKit Backend - adds STT via Apple Neural Engine
-        // =================================================================
-        .library(
-            name: "RunAnywhereWhisperKit",
-            targets: ["WhisperKitRuntime"]
-        ),
-
-    ] + metalRTProducts(),
+    ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
         .package(url: "https://github.com/JohnSundell/Files.git", from: "4.3.0"),
         .package(url: "https://github.com/devicekit/DeviceKit.git", from: "5.6.0"),
         .package(url: "https://github.com/getsentry/sentry-cocoa", from: "8.40.0"),
-        // ml-stable-diffusion for CoreML-based image generation
-        .package(url: "https://github.com/apple/ml-stable-diffusion.git", from: "1.1.0"),
-        // WhisperKit for Neural Engine STT
-        .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.9.0"),
         // swift-protobuf for idl/*.proto generated types consumed by
         // sdk/runanywhere-swift/Sources/RunAnywhere/Generated/*.pb.swift
         // (see v2_gap_specs/GAP_01_IDL_AND_CODEGEN.md for rationale)
@@ -177,7 +156,6 @@ let package = Package(
                 .product(name: "Files", package: "Files"),
                 .product(name: "DeviceKit", package: "DeviceKit"),
                 .product(name: "Sentry", package: "sentry-cocoa"),
-                .product(name: "StableDiffusion", package: "ml-stable-diffusion"),
                 .product(name: "SwiftProtobuf", package: "swift-protobuf"),
                 "CRACommons",
                 "RACommonsBinary",
@@ -248,22 +226,6 @@ let package = Package(
         ),
 
         // =================================================================
-        // WhisperKit Runtime Backend (Apple Neural Engine STT)
-        // =================================================================
-        .target(
-            name: "WhisperKitRuntime",
-            dependencies: [
-                "RunAnywhere",
-                .product(name: "WhisperKit", package: "whisperkit"),
-            ],
-            path: "sdk/runanywhere-swift/Sources/WhisperKitRuntime",
-            linkerSettings: [
-                .linkedFramework("CoreML"),
-                .linkedFramework("Accelerate"),
-            ]
-        ),
-
-        // =================================================================
         // RunAnywhere unit tests (e.g. AudioCaptureManager – Issue #198)
         // =================================================================
         .testTarget(
@@ -272,97 +234,8 @@ let package = Package(
             path: "sdk/runanywhere-swift/Tests/RunAnywhereTests"
         ),
 
-        // =================================================================
-        // Cross-SDK streaming parity / cancel / perf tests
-        //
-        // Wires the shared parity/cancel/perf consumers under tests/streaming
-        // (also consumed by the C++/Kotlin/Dart/RN/Web runners) into a
-        // single Swift test target so `swift test --filter
-        // "parity|cancel|perf"` exercises the same wire-format goldens.
-        //
-        // Pre-conditions for cancel/perf cases (skipped if missing):
-        //   cmake --build build/macos-release --target cancel_producer && \
-        //   ./build/macos-release/tests/streaming/cancel_parity/cancel_producer
-        //   cmake --build build/macos-release --target perf_producer && \
-        //   ./build/macos-release/tests/streaming/perf_bench/perf_producer
-        // =================================================================
-        .testTarget(
-            name: "StreamingParityTests",
-            dependencies: [
-                "RunAnywhere",
-                .product(name: "SwiftProtobuf", package: "swift-protobuf"),
-            ],
-            path: "tests/streaming",
-            // Limit Swift compilation to the parity/cancel/perf .swift
-            // files. The shared `tests/streaming` directory also hosts
-            // C++/Kotlin/Dart/TS sources (parity_test.{cpp,kt,dart,ts},
-            // perf_producer.cpp, etc.) that must not be fed to the Swift
-            // compiler. SPM's `sources:` whitelist achieves this without
-            // having to enumerate the (much larger) exclude list.
-            sources: [
-                "parity_test.swift",
-                "cancel_parity/cancel_parity.swift",
-                "cancel_parity/cancel_parity_test.swift",
-                "perf_bench/perf_bench.swift",
-                "perf_bench/perf_bench_test.swift",
-            ]
-        ),
-
-    ] + metalRTTargets() + binaryTargets()
+    ] + binaryTargets()
 )
-
-// =============================================================================
-// METALRT PRODUCT / TARGET GATING
-// =============================================================================
-// The RABackendMetalRT.xcframework is not yet published to GitHub releases.
-// To keep SPM resolution stable for external consumers, the MetalRT product
-// and its dependent targets are only included when `useLocalNatives == true`
-// (local dev with a checked-out xcframework). When a remote binary is
-// published, add a `RABackendMetalRTBinary` `.binaryTarget` to the remote
-// branch of `binaryTargets()` and update `includeMetalRT` accordingly.
-func metalRTProducts() -> [Product] {
-    guard includeMetalRT else { return [] }
-    return [
-        .library(
-            name: "RunAnywhereMetalRT",
-            targets: ["MetalRTRuntime"]
-        ),
-    ]
-}
-
-func metalRTTargets() -> [Target] {
-    guard includeMetalRT else { return [] }
-    return [
-        // MetalRT C Bridge Module - exposes rac_backend_metalrt_register()
-        .target(
-            name: "MetalRTBackend",
-            dependencies: ["RABackendMetalRTBinary"],
-            path: "sdk/runanywhere-swift/Sources/MetalRTRuntime/include",
-            publicHeadersPath: "."
-        ),
-        // MetalRT Runtime Backend (custom Metal GPU kernels)
-        .target(
-            name: "MetalRTRuntime",
-            dependencies: [
-                "RunAnywhere",
-                "MetalRTBackend",
-                "RABackendMetalRTBinary",
-            ],
-            path: "sdk/runanywhere-swift/Sources/MetalRTRuntime",
-            exclude: ["include"],
-            resources: [
-                .copy("Resources/default.metallib"),
-            ],
-            linkerSettings: [
-                .linkedLibrary("c++"),
-                .linkedFramework("Accelerate"),
-                .linkedFramework("Metal"),
-                .linkedFramework("CoreGraphics"),
-                .linkedFramework("ImageIO"),
-            ]
-        ),
-    ]
-}
 
 // =============================================================================
 // BINARY TARGET SELECTION
@@ -392,10 +265,6 @@ func binaryTargets() -> [Target] {
                 name: "RABackendONNXBinary",
                 path: "sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework"
             ),
-            .binaryTarget(
-                name: "RABackendMetalRTBinary",
-                path: "sdk/runanywhere-swift/Binaries/RABackendMetalRT.xcframework"
-            ),
         ]
     } else {
         // =====================================================================
@@ -403,12 +272,6 @@ func binaryTargets() -> [Target] {
         // Download XCFrameworks from GitHub releases
         // All xcframeworks include iOS + macOS slices (v0.19.0+)
         // =====================================================================
-        // NOTE: MetalRT is deliberately NOT published as a remote binary yet.
-        // The MetalRT product/targets are omitted from the package graph in
-        // the remote configuration (see `includeMetalRT` + `metalRTProducts()`
-        // / `metalRTTargets()`). When a real checksum is published, add a
-        // `RABackendMetalRTBinary` `.binaryTarget` below and update
-        // `includeMetalRT`.
         return [
             .binaryTarget(
                 name: "RACommonsBinary",

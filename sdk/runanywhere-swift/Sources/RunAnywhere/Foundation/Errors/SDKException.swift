@@ -252,15 +252,6 @@ extension SDKException {
         make(code: code, message: message, category: .component, underlying: underlying)
     }
 
-    /// Diffusion component error.
-    public static func diffusion(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .component, underlying: underlying)
-    }
-
     /// Download / model-management error.
     public static func download(
         _ code: RAErrorCode,

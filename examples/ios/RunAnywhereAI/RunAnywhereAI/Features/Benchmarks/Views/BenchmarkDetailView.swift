@@ -237,8 +237,6 @@ private struct MetricsGrid: View {
             if metrics.warmupTimeMs > 0 {
                 items.append(("Warmup", String(format: "%.0fms", metrics.warmupTimeMs)))
             }
-        case .diffusion:
-            if let gen = metrics.generationTimeMs { items.append(("Gen", String(format: "%.0fms", gen))) }
         }
 
         if metrics.memoryDeltaBytes != 0 {

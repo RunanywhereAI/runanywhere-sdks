@@ -9,11 +9,8 @@ import SwiftUI
 import RunAnywhere
 import LlamaCPPRuntime
 import ONNXRuntime
-import WhisperKitRuntime
-// MetalRT is deferred scope — not declared as a product in the example's
-// Package.swift, so registering it here would be a dead code path for
-// external SPM consumers. Re-add when the backend is promoted out of
-// deferred scope and `RunAnywhereMetalRT` is declared as a dependency.
+// Deferred backends (MetalRT, WhisperKit, Diffusion) are excluded from the
+// Swift v1 build. See `thoughts/shared/plans/curious-greeting-panda.md`.
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -98,7 +95,6 @@ struct RunAnywhereAIApp: App {
             // → only Platform is registered → -422 "No provider could handle the request".
             LlamaCPP.register(priority: 100)
             ONNX.register(priority: 100)
-            WhisperKitSTT.register(priority: 200)
 
             // Clear any previous error
             await MainActor.run { initializationError = nil }
@@ -426,29 +422,6 @@ struct RunAnywhereAIApp: App {
         )
         logger.info("✅ Sherpa STT/TTS + Silero VAD models registered")
 
-        // --- WhisperKit STT (Apple Neural Engine via Core ML) -----------------
-        await registerArchive(
-            id: "whisperkit-tiny.en",
-            name: "Whisper Tiny EN (WhisperKit)",
-            url: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-tiny.en.tar.gz",
-            framework: .whisperKitCoreML,
-            modality: .speechRecognition,
-            archive: .tarGz,
-            structure: .nestedDirectory,
-            memoryRequirement: 70_000_000
-        )
-        await registerArchive(
-            id: "whisperkit-base.en",
-            name: "Whisper Base EN (WhisperKit)",
-            url: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-base.en.tar.gz",
-            framework: .whisperKitCoreML,
-            modality: .speechRecognition,
-            archive: .tarGz,
-            structure: .nestedDirectory,
-            memoryRequirement: 134_000_000
-        )
-        logger.info("✅ WhisperKit STT models registered")
-
         // --- ONNX Embedding (RAG) ---------------------------------------------
         // MiniLM needs model.onnx + vocab.txt in the same folder for the C++
         // RAG pipeline to find its vocab next to the model.
@@ -465,22 +438,9 @@ struct RunAnywhereAIApp: App {
         )
         logger.info("✅ ONNX Embedding models registered")
 
-        // --- Diffusion (Apple Stable Diffusion CoreML) ------------------------
-        await registerArchive(
-            id: "sd15-coreml-palettized",
-            name: "Stable Diffusion 1.5 (CoreML)",
-            // swiftlint:disable:next line_length
-            url: "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized/resolve/main/coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled.zip",
-            framework: .coreml,
-            modality: .imageGeneration,
-            archive: .zip,
-            structure: .nestedDirectory,
-            memoryRequirement: 1_600_000_000
-        )
-        logger.info("✅ Diffusion models registered (Apple Stable Diffusion / CoreML only)")
-
-        // MetalRT models are deferred scope — not registered until the MetalRT
-        // product is promoted and declared as a Package.swift dependency here.
+        // MetalRT, WhisperKit, and Diffusion (CoreML) backends are deferred
+        // scope for Swift v1. Their model catalog entries are intentionally
+        // omitted. See `thoughts/shared/plans/curious-greeting-panda.md`.
 
         logger.info("🎉 All modules and models registered")
     }
