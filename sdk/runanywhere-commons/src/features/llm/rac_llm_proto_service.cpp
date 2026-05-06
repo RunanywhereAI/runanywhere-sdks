@@ -3,8 +3,6 @@
  * @brief Lifecycle-owned LLM generated-proto C ABI.
  */
 
-#include "rac/features/llm/rac_llm_service.h"
-
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -17,6 +15,7 @@
 
 #include "features/llm/rac_llm_lifecycle_bridge.h"
 #include "features/llm/rac_llm_stream_internal.h"
+#include "rac/features/llm/rac_llm_service.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
 #include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
@@ -37,13 +36,11 @@ namespace {
 #if defined(RAC_HAVE_PROTOBUF)
 
 using runanywhere::v1::CancellationEventKind;
-using runanywhere::v1::EventCategory;
 using runanywhere::v1::ErrorSeverity;
+using runanywhere::v1::EventCategory;
 using runanywhere::v1::GenerationEventKind;
 using runanywhere::v1::LLMGenerateRequest;
 using runanywhere::v1::LLMGenerationResult;
-using runanywhere::v1::LLMStreamEvent;
-using runanywhere::v1::LLMStreamEventKind;
 using runanywhere::v1::LLMStreamFinalResult;
 using runanywhere::v1::SDKComponent;
 using runanywhere::v1::SDKEvent;
@@ -54,24 +51,17 @@ int64_t now_ms() {
     return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 }
 
-int64_t now_us() {
-    using namespace std::chrono;
-    return duration_cast<microseconds>(system_clock::now().time_since_epoch()).count();
-}
-
 std::string make_event_id() {
     static std::atomic<uint64_t> counter{0};
     const uint64_t c = counter.fetch_add(1);
     char buffer[64];
-    std::snprintf(buffer, sizeof(buffer), "%lld-%llu",
-                  static_cast<long long>(now_ms()),
+    std::snprintf(buffer, sizeof(buffer), "%lld-%llu", static_cast<long long>(now_ms()),
                   static_cast<unsigned long long>(c));
     return buffer;
 }
 
 bool valid_bytes(const uint8_t* bytes, size_t size) {
-    return (size == 0 || bytes) &&
-           size <= static_cast<size_t>(std::numeric_limits<int>::max());
+    return (size == 0 || bytes) && size <= static_cast<size_t>(std::numeric_limits<int>::max());
 }
 
 const void* parse_data(const uint8_t* bytes, size_t size) {
@@ -79,15 +69,13 @@ const void* parse_data(const uint8_t* bytes, size_t size) {
     return size == 0 ? static_cast<const void*>(kEmpty) : static_cast<const void*>(bytes);
 }
 
-rac_result_t copy_proto(const google::protobuf::MessageLite& message,
-                        rac_proto_buffer_t* out) {
+rac_result_t copy_proto(const google::protobuf::MessageLite& message, rac_proto_buffer_t* out) {
     if (!out) {
         return RAC_ERROR_NULL_POINTER;
     }
     const size_t size = message.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size > 0 && !message.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         return rac_proto_buffer_set_error(out, RAC_ERROR_ENCODING_ERROR,
                                           "failed to serialize proto result");
     }
@@ -98,9 +86,7 @@ rac_result_t parse_error(rac_proto_buffer_t* out, const char* message) {
     return rac_proto_buffer_set_error(out, RAC_ERROR_DECODING_ERROR, message);
 }
 
-void populate_event_envelope(SDKEvent* event,
-                             EventCategory category,
-                             ErrorSeverity severity) {
+void populate_event_envelope(SDKEvent* event, EventCategory category, ErrorSeverity severity) {
     event->set_id(make_event_id());
     event->set_timestamp_ms(now_ms());
     event->set_category(category);
@@ -113,22 +99,15 @@ void populate_event_envelope(SDKEvent* event,
 rac_result_t publish_sdk_event(const SDKEvent& event) {
     const size_t size = event.ByteSizeLong();
     std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        !event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
         return RAC_ERROR_ENCODING_ERROR;
     }
     return rac_sdk_event_publish_proto(bytes.empty() ? nullptr : bytes.data(), bytes.size());
 }
 
-void publish_generation_event(GenerationEventKind kind,
-                              const char* prompt,
-                              const char* token,
-                              const char* response,
-                              const char* error,
-                              const char* model_id,
-                              int32_t token_count,
-                              int64_t latency_ms,
-                              int32_t input_tokens = 0) {
+void publish_generation_event(GenerationEventKind kind, const char* prompt, const char* token,
+                              const char* response, const char* error, const char* model_id,
+                              int32_t token_count, int64_t latency_ms, int32_t input_tokens = 0) {
     SDKEvent event;
     const bool failed = kind == runanywhere::v1::GENERATION_EVENT_KIND_FAILED;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_LLM,
@@ -165,10 +144,8 @@ void publish_generation_event(GenerationEventKind kind,
     (void)publish_sdk_event(event);
 }
 
-SDKEvent make_cancellation_event(CancellationEventKind kind,
-                                 const char* reason,
-                                 rac_bool_t user_initiated,
-                                 ErrorSeverity severity) {
+SDKEvent make_cancellation_event(CancellationEventKind kind, const char* reason,
+                                 rac_bool_t user_initiated, ErrorSeverity severity) {
     SDKEvent event;
     populate_event_envelope(&event, runanywhere::v1::EVENT_CATEGORY_CANCELLATION, severity);
     event.set_operation_id("llm.generate");
@@ -197,16 +174,10 @@ rac_llm_options_t options_from_request(const LLMGenerateRequest& request,
     return options;
 }
 
-void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref,
-                         const rac_llm_result_t& raw,
-                         const char* response,
-                         size_t response_len,
-                         const char* thinking,
-                         size_t thinking_len,
-                         int32_t thinking_tokens,
-                         int32_t response_tokens,
-                         int32_t requested_max_tokens,
-                         LLMGenerationResult* out) {
+void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref, const rac_llm_result_t& raw,
+                         const char* response, size_t response_len, const char* thinking,
+                         size_t thinking_len, int32_t thinking_tokens, int32_t response_tokens,
+                         int32_t requested_max_tokens, LLMGenerationResult* out) {
     out->set_text(response ? std::string(response, response_len) : std::string());
     if (thinking && thinking_len > 0) {
         out->set_thinking_content(std::string(thinking, thinking_len));
@@ -225,10 +196,9 @@ void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref,
     }
     // BUG-STREAMING-003: emit finish_reason="length" when max_tokens was exhausted
     // (matches OpenAI chat.completions contract — proto is modeled after it).
-    out->set_finish_reason((requested_max_tokens > 0 &&
-                            raw.completion_tokens >= requested_max_tokens)
-                               ? "length"
-                               : "stop");
+    out->set_finish_reason(
+        (requested_max_tokens > 0 && raw.completion_tokens >= requested_max_tokens) ? "length"
+                                                                                    : "stop");
     out->set_thinking_tokens(thinking_tokens);
     out->set_response_tokens(response_tokens);
     out->set_executed_on(runanywhere::v1::EXECUTION_TARGET_ON_DEVICE);
@@ -283,8 +253,7 @@ struct ProtoStreamContext {
     std::string thinking_text;
 };
 
-size_t matching_tag_suffix_len(const std::string& text,
-                               const char* const* tags,
+size_t matching_tag_suffix_len(const std::string& text, const char* const* tags,
                                size_t tags_count) {
     size_t best = 0;
     for (size_t i = 0; i < tags_count; ++i) {
@@ -300,9 +269,7 @@ size_t matching_tag_suffix_len(const std::string& text,
     return best;
 }
 
-size_t find_earliest_tag(const std::string& text,
-                         const char* const* tags,
-                         size_t tags_count,
+size_t find_earliest_tag(const std::string& text, const char* const* tags, size_t tags_count,
                          const char** out_tag) {
     size_t best = std::string::npos;
     const char* best_tag = nullptr;
@@ -319,63 +286,35 @@ size_t find_earliest_tag(const std::string& text,
     return best;
 }
 
-LLMStreamEventKind event_kind_for_token(TokenKind kind, bool is_final,
-                                        const char* error_message) {
-    if (is_final) {
-        return error_message && error_message[0]
-                   ? runanywhere::v1::LLM_STREAM_EVENT_KIND_ERROR
-                   : runanywhere::v1::LLM_STREAM_EVENT_KIND_COMPLETED;
-    }
-    return kind == runanywhere::v1::TOKEN_KIND_THOUGHT
-               ? runanywhere::v1::LLM_STREAM_EVENT_KIND_THINKING
-               : runanywhere::v1::LLM_STREAM_EVENT_KIND_TOKEN;
-}
-
-void dispatch_stream_event(ProtoStreamContext* ctx,
-                           const char* token,
-                           bool is_final,
-                           TokenKind kind,
-                           const char* finish_reason,
-                           const char* error_message,
+// BUG-STREAMING-001 unification: `dispatch_stream_event` now delegates
+// to `rac::llm::serialize_llm_stream_event` — the single canonical
+// 13-field emitter shared with `rac_llm_stream.cpp`. All callers
+// populate the same LLMStreamEvent shape so Swift iOS, Web, and Kotlin
+// Android consumers see identical wire bytes for identical inputs.
+void dispatch_stream_event(ProtoStreamContext* ctx, const char* token, bool is_final,
+                           TokenKind kind, const char* finish_reason, const char* error_message,
                            const LLMStreamFinalResult* result = nullptr) {
     if (!ctx || !ctx->callback) {
         return;
     }
 
-    LLMStreamEvent event;
-    event.set_seq(++ctx->seq);
-    event.set_timestamp_us(now_us());
-    if (token) {
-        event.set_token(token);
-    }
-    event.set_is_final(is_final);
-    event.set_kind(kind);
-    event.set_event_kind(event_kind_for_token(kind, is_final, error_message));
-    if (!ctx->request_id.empty()) {
-        event.set_request_id(ctx->request_id);
-    }
-    if (!ctx->conversation_id.empty()) {
-        event.set_conversation_id(ctx->conversation_id);
-    }
-    event.set_completion_tokens_generated(ctx->token_count);
-    event.set_elapsed_ms(now_ms() - ctx->started_ms);
-    if (finish_reason && finish_reason[0]) {
-        event.set_finish_reason(finish_reason);
-    }
-    if (error_message && error_message[0]) {
-        event.set_error_message(error_message);
-    }
-    if (result) {
-        *event.mutable_result() = *result;
-    }
+    rac::llm::LLMStreamEventParams params;
+    params.token = token ? token : "";
+    params.is_final = is_final;
+    params.kind = static_cast<int>(kind);
+    params.finish_reason = finish_reason;
+    params.error_message = error_message;
+    params.request_id = ctx->request_id.empty() ? nullptr : ctx->request_id.c_str();
+    params.conversation_id = ctx->conversation_id.empty() ? nullptr : ctx->conversation_id.c_str();
+    params.completion_tokens_generated = ctx->token_count;
+    params.elapsed_ms = now_ms() - ctx->started_ms;
+    params.final_result = result;
 
-    const size_t size = event.ByteSizeLong();
-    std::vector<uint8_t> bytes(size);
-    if (size > 0 &&
-        !event.SerializeToArray(bytes.data(), static_cast<int>(bytes.size()))) {
+    thread_local std::vector<uint8_t> scratch;
+    if (!rac::llm::serialize_llm_stream_event(++ctx->seq, params, scratch)) {
         return;
     }
-    ctx->callback(bytes.empty() ? nullptr : bytes.data(), bytes.size(), ctx->user_data);
+    ctx->callback(scratch.empty() ? nullptr : scratch.data(), scratch.size(), ctx->user_data);
 }
 
 void emit_stream_segment(ProtoStreamContext* ctx, const std::string& token, TokenKind kind) {
@@ -396,12 +335,12 @@ void emit_stream_segment(ProtoStreamContext* ctx, const std::string& token, Toke
     if (!ctx->first_token_sent) {
         ctx->first_token_sent = true;
         publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_FIRST_TOKEN_GENERATED,
-                                 nullptr, token.c_str(), nullptr, nullptr,
-                                 ctx->ref->model_id, 1, now_ms() - ctx->started_ms);
+                                 nullptr, token.c_str(), nullptr, nullptr, ctx->ref->model_id, 1,
+                                 now_ms() - ctx->started_ms);
     }
-    publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_TOKEN_GENERATED,
-                             nullptr, token.c_str(), nullptr, nullptr,
-                             ctx->ref->model_id, ctx->token_count, 0);
+    publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_TOKEN_GENERATED, nullptr,
+                             token.c_str(), nullptr, nullptr, ctx->ref->model_id, ctx->token_count,
+                             0);
     dispatch_stream_event(ctx, token.c_str(), false, kind, nullptr, nullptr);
 }
 
@@ -417,9 +356,9 @@ void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
     while (!ctx->pending_text.empty()) {
         if (ctx->inside_thinking) {
             const char* close_tag = nullptr;
-            const size_t close_pos = find_earliest_tag(
-                ctx->pending_text, kCloseTags, sizeof(kCloseTags) / sizeof(kCloseTags[0]),
-                &close_tag);
+            const size_t close_pos =
+                find_earliest_tag(ctx->pending_text, kCloseTags,
+                                  sizeof(kCloseTags) / sizeof(kCloseTags[0]), &close_tag);
             if (close_pos != std::string::npos) {
                 emit_stream_segment(ctx, ctx->pending_text.substr(0, close_pos),
                                     runanywhere::v1::TOKEN_KIND_THOUGHT);
@@ -428,8 +367,8 @@ void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
                 continue;
             }
 
-            const size_t keep = matching_tag_suffix_len(
-                ctx->pending_text, kCloseTags, sizeof(kCloseTags) / sizeof(kCloseTags[0]));
+            const size_t keep = matching_tag_suffix_len(ctx->pending_text, kCloseTags,
+                                                        sizeof(kCloseTags) / sizeof(kCloseTags[0]));
             const size_t emit_len = ctx->pending_text.size() - keep;
             if (emit_len == 0) {
                 break;
@@ -442,8 +381,7 @@ void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
 
         const char* open_tag = nullptr;
         const size_t open_pos = find_earliest_tag(
-            ctx->pending_text, kOpenTags, sizeof(kOpenTags) / sizeof(kOpenTags[0]),
-            &open_tag);
+            ctx->pending_text, kOpenTags, sizeof(kOpenTags) / sizeof(kOpenTags[0]), &open_tag);
         if (open_pos != std::string::npos) {
             emit_stream_segment(ctx, ctx->pending_text.substr(0, open_pos),
                                 runanywhere::v1::TOKEN_KIND_ANSWER);
@@ -452,8 +390,8 @@ void consume_thinking_aware_text(ProtoStreamContext* ctx, const char* token) {
             continue;
         }
 
-        const size_t keep = matching_tag_suffix_len(
-            ctx->pending_text, kOpenTags, sizeof(kOpenTags) / sizeof(kOpenTags[0]));
+        const size_t keep = matching_tag_suffix_len(ctx->pending_text, kOpenTags,
+                                                    sizeof(kOpenTags) / sizeof(kOpenTags[0]));
         const size_t emit_len = ctx->pending_text.size() - keep;
         if (emit_len == 0) {
             break;
@@ -474,8 +412,7 @@ void flush_pending_stream_text(ProtoStreamContext* ctx) {
     ctx->pending_text.clear();
 }
 
-void dispatch_terminal_once(ProtoStreamContext* ctx,
-                            const char* finish_reason,
+void dispatch_terminal_once(ProtoStreamContext* ctx, const char* finish_reason,
                             const char* error_message) {
     if (!ctx || ctx->terminal_sent) {
         return;
@@ -496,8 +433,8 @@ void dispatch_terminal_once(ProtoStreamContext* ctx,
         final_result.set_error_message(error_message);
     }
 
-    dispatch_stream_event(ctx, "", true, runanywhere::v1::TOKEN_KIND_ANSWER,
-                          finish_reason, error_message, &final_result);
+    dispatch_stream_event(ctx, "", true, runanywhere::v1::TOKEN_KIND_ANSWER, finish_reason,
+                          error_message, &final_result);
 }
 
 rac_bool_t stream_token_callback(const char* token, void* user_data) {
@@ -520,8 +457,7 @@ rac_bool_t stream_token_callback(const char* token, void* user_data) {
 
 extern "C" {
 
-rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes,
-                                    size_t request_proto_size,
+rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes, size_t request_proto_size,
                                     rac_proto_buffer_t* out_result) {
     if (!out_result) {
         return RAC_ERROR_NULL_POINTER;
@@ -553,8 +489,8 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes,
 
     rac::llm::clear_lifecycle_llm_cancel(&ref);
     publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STARTED,
-                             request.prompt().c_str(), nullptr, nullptr, nullptr,
-                             ref.model_id, 0, 0);
+                             request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0,
+                             0);
 
     const std::string system_prompt = request.system_prompt();
     rac_llm_options_t options = options_from_request(request, system_prompt);
@@ -569,8 +505,8 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes,
 
     if (rc != RAC_SUCCESS) {
         publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_FAILED,
-                                 request.prompt().c_str(), nullptr, nullptr,
-                                 rac_error_message(rc), ref.model_id, 0, elapsed);
+                                 request.prompt().c_str(), nullptr, nullptr, rac_error_message(rc),
+                                 ref.model_id, 0, elapsed);
         rac::llm::release_lifecycle_llm(&ref);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
     }
@@ -584,19 +520,18 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes,
 
     int32_t thinking_tokens = 0;
     int32_t response_tokens = raw.completion_tokens;
-    (void)rac_llm_split_thinking_tokens(raw.completion_tokens, response, thinking,
-                                        &thinking_tokens, &response_tokens);
+    (void)rac_llm_split_thinking_tokens(raw.completion_tokens, response, thinking, &thinking_tokens,
+                                        &response_tokens);
 
     LLMGenerationResult result;
-    set_result_from_raw(ref, raw, response, response_len, thinking, thinking_len,
-                        thinking_tokens, response_tokens, options.max_tokens, &result);
+    set_result_from_raw(ref, raw, response, response_len, thinking, thinking_len, thinking_tokens,
+                        response_tokens, options.max_tokens, &result);
     set_structured_output_if_present(response, &result);
 
-    publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED,
-                             request.prompt().c_str(), nullptr, response, nullptr,
-                             ref.model_id, raw.completion_tokens,
-                             raw.total_time_ms > 0 ? raw.total_time_ms : elapsed,
-                             raw.prompt_tokens);
+    publish_generation_event(
+        runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED, request.prompt().c_str(), nullptr,
+        response, nullptr, ref.model_id, raw.completion_tokens,
+        raw.total_time_ms > 0 ? raw.total_time_ms : elapsed, raw.prompt_tokens);
 
     rac_llm_result_free(&raw);
     rac::llm::release_lifecycle_llm(&ref);
@@ -643,8 +578,8 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
 
     rac::llm::clear_lifecycle_llm_cancel(&ref);
     publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STARTED,
-                             request.prompt().c_str(), nullptr, nullptr, nullptr,
-                             ref.model_id, 0, 0);
+                             request.prompt().c_str(), nullptr, nullptr, nullptr, ref.model_id, 0,
+                             0);
 
     const std::string system_prompt = request.system_prompt();
     rac_llm_options_t options = options_from_request(request, system_prompt);
@@ -662,15 +597,13 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
     rc = ref.ops->generate_stream(ref.impl, request.prompt().c_str(), &options,
                                   stream_token_callback, &ctx);
 
-    const bool cancelled =
-        rac::llm::lifecycle_llm_cancel_requested(&ref) ||
-        rc == RAC_ERROR_CANCELLED || rc == RAC_ERROR_STREAM_CANCELLED;
+    const bool cancelled = rac::llm::lifecycle_llm_cancel_requested(&ref) ||
+                           rc == RAC_ERROR_CANCELLED || rc == RAC_ERROR_STREAM_CANCELLED;
     if (cancelled) {
         dispatch_terminal_once(&ctx, "cancelled", nullptr);
         publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_CANCELLED,
                                  request.prompt().c_str(), nullptr, ctx.response_text.c_str(),
-                                 nullptr, ref.model_id, ctx.token_count,
-                                 now_ms() - ctx.started_ms);
+                                 nullptr, ref.model_id, ctx.token_count, now_ms() - ctx.started_ms);
         rc = RAC_SUCCESS;
     } else if (rc != RAC_SUCCESS) {
         dispatch_terminal_once(&ctx, "error", rac_error_message(rc));
@@ -682,8 +615,7 @@ rac_result_t rac_llm_generate_stream_proto(const uint8_t* request_proto_bytes,
         dispatch_terminal_once(&ctx, "stop", nullptr);
         publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_STREAM_COMPLETED,
                                  request.prompt().c_str(), nullptr, ctx.response_text.c_str(),
-                                 nullptr, ref.model_id, ctx.token_count,
-                                 now_ms() - ctx.started_ms);
+                                 nullptr, ref.model_id, ctx.token_count, now_ms() - ctx.started_ms);
     }
 
     rac::llm::release_lifecycle_llm(&ref);
@@ -701,17 +633,16 @@ rac_result_t rac_llm_cancel_proto(rac_proto_buffer_t* out_event) {
     rac::llm::LifecycleLlmRef ref;
     rac_result_t rc = rac::llm::acquire_lifecycle_llm(&ref);
     if (rc != RAC_SUCCESS) {
-        SDKEvent failed = make_cancellation_event(
-            runanywhere::v1::CANCELLATION_EVENT_KIND_FAILED,
-            "no lifecycle LLM model loaded", RAC_TRUE,
-            runanywhere::v1::ERROR_SEVERITY_ERROR);
+        SDKEvent failed = make_cancellation_event(runanywhere::v1::CANCELLATION_EVENT_KIND_FAILED,
+                                                  "no lifecycle LLM model loaded", RAC_TRUE,
+                                                  runanywhere::v1::ERROR_SEVERITY_ERROR);
         (void)publish_sdk_event(failed);
         return rac_proto_buffer_set_error(out_event, rc, "no lifecycle LLM model loaded");
     }
 
     rac::llm::request_lifecycle_llm_cancel(&ref);
-    publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_CANCEL_REQUESTED,
-                             nullptr, nullptr, nullptr, nullptr, ref.model_id, 0, 0);
+    publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_CANCEL_REQUESTED, nullptr,
+                             nullptr, nullptr, nullptr, ref.model_id, 0, 0);
     if (ref.ops && ref.ops->cancel) {
         rc = ref.ops->cancel(ref.impl);
     } else {
@@ -721,8 +652,7 @@ rac_result_t rac_llm_cancel_proto(rac_proto_buffer_t* out_event) {
     SDKEvent event = make_cancellation_event(
         rc == RAC_SUCCESS ? runanywhere::v1::CANCELLATION_EVENT_KIND_COMPLETED
                           : runanywhere::v1::CANCELLATION_EVENT_KIND_FAILED,
-        rc == RAC_SUCCESS ? "user_requested" : rac_error_message(rc),
-        RAC_TRUE,
+        rc == RAC_SUCCESS ? "user_requested" : rac_error_message(rc), RAC_TRUE,
         rc == RAC_SUCCESS ? runanywhere::v1::ERROR_SEVERITY_INFO
                           : runanywhere::v1::ERROR_SEVERITY_ERROR);
     (void)publish_sdk_event(event);

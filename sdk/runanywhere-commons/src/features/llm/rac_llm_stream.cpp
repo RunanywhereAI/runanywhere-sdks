@@ -21,9 +21,6 @@
 
 #include "rac/features/llm/rac_llm_stream.h"
 
-#include "rac/core/rac_logger.h"
-#include "features/llm/rac_llm_stream_internal.h"
-
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -32,11 +29,14 @@
 #include <unordered_map>
 #include <vector>
 
+#include "features/llm/rac_llm_stream_internal.h"
+#include "rac/core/rac_logger.h"
+
 namespace {
 
 struct CallbackSlot {
-    rac_llm_stream_proto_callback_fn fn        = nullptr;
-    void*                            user_data = nullptr;
+    rac_llm_stream_proto_callback_fn fn = nullptr;
+    void* user_data = nullptr;
     // B-FL-7-001 fix: per-handle, per-session sequence counter. Previously a
     // single process-wide `g_seq_counter` was used, which kept growing across
     // generateStream calls; the Wire / protobuf-java decoder threw "end-group
@@ -47,7 +47,10 @@ struct CallbackSlot {
     uint64_t seq = 0;
 };
 
-std::mutex&                                 g_mu()    { static std::mutex m; return m; }
+std::mutex& g_mu() {
+    static std::mutex m;
+    return m;
+}
 std::unordered_map<rac_handle_t, CallbackSlot>& g_slots() {
     static std::unordered_map<rac_handle_t, CallbackSlot> m;
     return m;
@@ -63,9 +66,9 @@ int64_t now_us() {
 
 extern "C" {
 
-rac_result_t rac_llm_set_stream_proto_callback(rac_handle_t                    handle,
-                                                rac_llm_stream_proto_callback_fn callback,
-                                                void*                           user_data) {
+rac_result_t rac_llm_set_stream_proto_callback(rac_handle_t handle,
+                                               rac_llm_stream_proto_callback_fn callback,
+                                               void* user_data) {
     if (handle == nullptr) {
         return RAC_ERROR_INVALID_HANDLE;
     }
@@ -77,7 +80,7 @@ rac_result_t rac_llm_set_stream_proto_callback(rac_handle_t                    h
         g_slots().erase(handle);
     } else {
         // Always start with seq = 0 for a fresh session.
-        g_slots()[handle] = CallbackSlot{ callback, user_data, /*seq=*/0 };
+        g_slots()[handle] = CallbackSlot{callback, user_data, /*seq=*/0};
     }
     return RAC_SUCCESS;
 }
@@ -100,10 +103,10 @@ int derive_event_kind(int kind, bool is_final, const char* error_message) {
     // idl/llm_service.proto. Encoded as int to keep this symbol
     // available on the hand-encoded (no-protobuf) WASM path.
     constexpr int kUnspecified = 0;
-    constexpr int kToken       = 2;
-    constexpr int kThinking    = 3;
-    constexpr int kCompleted   = 6;
-    constexpr int kError       = 7;
+    constexpr int kToken = 2;
+    constexpr int kThinking = 3;
+    constexpr int kCompleted = 6;
+    constexpr int kError = 7;
     constexpr int kTokenKindThought = 2;  // TOKEN_KIND_THOUGHT
 
     if (is_final) {
@@ -139,16 +142,19 @@ namespace rac::llm {
  */
 static runanywhere::v1::TokenKind to_proto_kind(int internal_kind) {
     switch (internal_kind) {
-        case 1: return runanywhere::v1::TOKEN_KIND_ANSWER;
-        case 2: return runanywhere::v1::TOKEN_KIND_THOUGHT;
-        case 3: return runanywhere::v1::TOKEN_KIND_TOOL_CALL;
-        default: return runanywhere::v1::TOKEN_KIND_UNSPECIFIED;
+        case 1:
+            return runanywhere::v1::TOKEN_KIND_ANSWER;
+        case 2:
+            return runanywhere::v1::TOKEN_KIND_THOUGHT;
+        case 3:
+            return runanywhere::v1::TOKEN_KIND_TOOL_CALL;
+        default:
+            return runanywhere::v1::TOKEN_KIND_UNSPECIFIED;
     }
 }
 
-bool serialize_llm_stream_event(uint64_t                    seq,
-                                const LLMStreamEventParams& p,
-                                std::vector<uint8_t>&       out) {
+bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
+                                std::vector<uint8_t>& out) {
     thread_local runanywhere::v1::LLMStreamEvent proto_event;
     proto_event.Clear();
 
@@ -177,8 +183,7 @@ bool serialize_llm_stream_event(uint64_t                    seq,
     // wire bytes to the pre-unification 9-field shape.
     const int event_kind = derive_event_kind(p.kind, p.is_final, p.error_message);
     if (event_kind != 0) {
-        proto_event.set_event_kind(
-            static_cast<runanywhere::v1::LLMStreamEventKind>(event_kind));
+        proto_event.set_event_kind(static_cast<runanywhere::v1::LLMStreamEventKind>(event_kind));
     }
     if (p.request_id && p.request_id[0] != '\0') {
         proto_event.set_request_id(p.request_id);
@@ -203,13 +208,15 @@ bool serialize_llm_stream_event(uint64_t                    seq,
     }
 
     const size_t needed = static_cast<size_t>(proto_event.ByteSizeLong());
-    if (out.size() < needed) out.resize(needed);
-    else                     out.resize(needed);
-    if (needed > 0 &&
-        !proto_event.SerializeToArray(out.data(), static_cast<int>(needed))) {
+    if (out.size() < needed)
+        out.resize(needed);
+    else
+        out.resize(needed);
+    if (needed > 0 && !proto_event.SerializeToArray(out.data(), static_cast<int>(needed))) {
         RAC_LOG_WARNING("llm",
                         "serialize_llm_stream_event: SerializeToArray failed "
-                        "(is_final=%d)", p.is_final ? 1 : 0);
+                        "(is_final=%d)",
+                        p.is_final ? 1 : 0);
         return false;
     }
     return true;
@@ -270,25 +277,29 @@ inline void wire_tag(std::vector<uint8_t>& out, uint32_t field, uint32_t wire_ty
 }
 
 inline void wire_uint64_field(std::vector<uint8_t>& out, uint32_t field, uint64_t value) {
-    if (value == 0) return;  // proto3 default omission
+    if (value == 0)
+        return;  // proto3 default omission
     wire_tag(out, field, /*wire_type=*/0);
     wire_varint(out, value);
 }
 
 inline void wire_int64_field(std::vector<uint8_t>& out, uint32_t field, int64_t value) {
-    if (value == 0) return;
+    if (value == 0)
+        return;
     wire_tag(out, field, /*wire_type=*/0);
     wire_varint(out, static_cast<uint64_t>(value));  // varint, not zigzag (proto3 int64)
 }
 
 inline void wire_uint32_field(std::vector<uint8_t>& out, uint32_t field, uint32_t value) {
-    if (value == 0) return;
+    if (value == 0)
+        return;
     wire_tag(out, field, /*wire_type=*/0);
     wire_varint(out, value);
 }
 
 inline void wire_int32_field(std::vector<uint8_t>& out, uint32_t field, int32_t value) {
-    if (value == 0) return;
+    if (value == 0)
+        return;
     wire_tag(out, field, /*wire_type=*/0);
     // proto3 int32 uses plain varint (negative values are 10-byte sign-extended;
     // our callers only emit >= 0 values for token counters).
@@ -296,19 +307,22 @@ inline void wire_int32_field(std::vector<uint8_t>& out, uint32_t field, int32_t 
 }
 
 inline void wire_bool_field(std::vector<uint8_t>& out, uint32_t field, bool value) {
-    if (!value) return;
+    if (!value)
+        return;
     wire_tag(out, field, /*wire_type=*/0);
     out.push_back(0x01);
 }
 
 inline void wire_enum_field(std::vector<uint8_t>& out, uint32_t field, int32_t value) {
-    if (value == 0) return;
+    if (value == 0)
+        return;
     wire_tag(out, field, /*wire_type=*/0);
     wire_varint(out, static_cast<uint64_t>(value));
 }
 
 inline void wire_float_field(std::vector<uint8_t>& out, uint32_t field, float value) {
-    if (value == 0.0f) return;
+    if (value == 0.0f)
+        return;
     wire_tag(out, field, /*wire_type=*/5);
     uint32_t bits;
     std::memcpy(&bits, &value, sizeof(bits));  // bit-cast (memcpy avoids strict-aliasing UB)
@@ -319,7 +333,8 @@ inline void wire_float_field(std::vector<uint8_t>& out, uint32_t field, float va
 }
 
 inline void wire_string_field(std::vector<uint8_t>& out, uint32_t field, const char* str) {
-    if (str == nullptr || str[0] == '\0') return;
+    if (str == nullptr || str[0] == '\0')
+        return;
     const size_t len = std::strlen(str);
     wire_tag(out, field, /*wire_type=*/2);
     wire_varint(out, len);
@@ -328,10 +343,14 @@ inline void wire_string_field(std::vector<uint8_t>& out, uint32_t field, const c
 
 int32_t to_proto_kind_int(int internal_kind) {
     switch (internal_kind) {
-        case 1: return 1;  // ANSWER
-        case 2: return 2;  // THOUGHT
-        case 3: return 3;  // TOOL_CALL
-        default: return 0;  // UNSPECIFIED
+        case 1:
+            return 1;  // ANSWER
+        case 2:
+            return 2;  // THOUGHT
+        case 3:
+            return 3;  // TOOL_CALL
+        default:
+            return 0;  // UNSPECIFIED
     }
 }
 
@@ -339,32 +358,31 @@ int32_t to_proto_kind_int(int internal_kind) {
 
 namespace rac::llm {
 
-bool serialize_llm_stream_event(uint64_t                    seq,
-                                const LLMStreamEventParams& p,
-                                std::vector<uint8_t>&       out) {
+bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
+                                std::vector<uint8_t>& out) {
     out.clear();
     out.reserve(96);
 
-    wire_uint64_field(out, /*field=*/1,  seq);
-    wire_int64_field (out, /*field=*/2,  now_us());
-    wire_string_field(out, /*field=*/3,  p.token);
-    wire_bool_field  (out, /*field=*/4,  p.is_final);
-    wire_enum_field  (out, /*field=*/5,  to_proto_kind_int(p.kind));
-    wire_uint32_field(out, /*field=*/6,  p.token_id);
-    wire_float_field (out, /*field=*/7,  p.logprob);
-    wire_string_field(out, /*field=*/8,  p.finish_reason);
-    wire_string_field(out, /*field=*/9,  p.error_message);
+    wire_uint64_field(out, /*field=*/1, seq);
+    wire_int64_field(out, /*field=*/2, now_us());
+    wire_string_field(out, /*field=*/3, p.token);
+    wire_bool_field(out, /*field=*/4, p.is_final);
+    wire_enum_field(out, /*field=*/5, to_proto_kind_int(p.kind));
+    wire_uint32_field(out, /*field=*/6, p.token_id);
+    wire_float_field(out, /*field=*/7, p.logprob);
+    wire_string_field(out, /*field=*/8, p.finish_reason);
+    wire_string_field(out, /*field=*/9, p.error_message);
 
     // Extended fields (BUG-STREAMING-001 fix). Nested `result` (field
     // 10) is intentionally not encoded on the hand-rolled path — no
     // caller sets `p.final_result` without libprotobuf.
-    wire_int32_field (out, /*field=*/11, p.error_code);
-    wire_enum_field  (out, /*field=*/12, derive_event_kind(p.kind, p.is_final, p.error_message));
+    wire_int32_field(out, /*field=*/11, p.error_code);
+    wire_enum_field(out, /*field=*/12, derive_event_kind(p.kind, p.is_final, p.error_message));
     wire_string_field(out, /*field=*/13, p.request_id);
     wire_string_field(out, /*field=*/14, p.conversation_id);
-    wire_int32_field (out, /*field=*/15, p.prompt_tokens_processed);
-    wire_int32_field (out, /*field=*/16, p.completion_tokens_generated);
-    wire_int64_field (out, /*field=*/17, p.elapsed_ms);
+    wire_int32_field(out, /*field=*/15, p.prompt_tokens_processed);
+    wire_int32_field(out, /*field=*/16, p.completion_tokens_generated);
+    wire_int64_field(out, /*field=*/17, p.elapsed_ms);
 
     return true;
 }
@@ -391,14 +409,14 @@ namespace rac::llm {
  * The serialization buffer is thread_local so concurrent dispatches on
  * different threads do not contend on heap allocation.
  */
-void dispatch_llm_stream_event(rac_handle_t                handle,
-                               const LLMStreamEventParams& p) {
+void dispatch_llm_stream_event(rac_handle_t handle, const LLMStreamEventParams& p) {
     CallbackSlot slot;
     uint64_t seq;
     {
         std::lock_guard<std::mutex> lock(g_mu());
         auto it = g_slots().find(handle);
-        if (it == g_slots().end() || it->second.fn == nullptr) return;
+        if (it == g_slots().end() || it->second.fn == nullptr)
+            return;
         slot = it->second;
         // Bump the per-handle counter under the lock so concurrent
         // dispatches on the same handle still produce monotonic seq values.
@@ -420,20 +438,15 @@ void dispatch_llm_stream_event(rac_handle_t                handle,
  *        fields left at proto3 defaults (identical wire output to the
  *        pre-unification 9-field shape).
  */
-void dispatch_llm_stream_event(rac_handle_t handle,
-                               const char*  token,
-                               bool         is_final,
-                               int          kind,
-                               uint32_t     token_id,
-                               float        logprob,
-                               const char*  finish_reason,
-                               const char*  error_message) {
+void dispatch_llm_stream_event(rac_handle_t handle, const char* token, bool is_final, int kind,
+                               uint32_t token_id, float logprob, const char* finish_reason,
+                               const char* error_message) {
     LLMStreamEventParams p;
-    p.token         = token ? token : "";
-    p.is_final      = is_final;
-    p.kind          = kind;
-    p.token_id      = token_id;
-    p.logprob       = logprob;
+    p.token = token ? token : "";
+    p.is_final = is_final;
+    p.kind = kind;
+    p.token_id = token_id;
+    p.logprob = logprob;
     p.finish_reason = finish_reason;
     p.error_message = error_message;
     dispatch_llm_stream_event(handle, p);

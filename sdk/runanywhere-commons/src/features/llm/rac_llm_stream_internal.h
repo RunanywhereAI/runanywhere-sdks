@@ -19,8 +19,8 @@
 #ifndef RAC_FEATURES_LLM_RAC_LLM_STREAM_INTERNAL_H
 #define RAC_FEATURES_LLM_RAC_LLM_STREAM_INTERNAL_H
 
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 #include "rac/core/rac_types.h"
@@ -42,25 +42,25 @@ namespace rac::llm {
  */
 struct LLMStreamEventParams {
     // Per-token scalars (always known by every caller).
-    const char* token         = "";
-    bool        is_final      = false;
-    int         kind          = 0;    // internal token kind (see to_proto_kind)
-    uint32_t    token_id      = 0;
-    float       logprob       = 0.0f;
+    const char* token = "";
+    bool is_final = false;
+    int kind = 0;  // internal token kind (see to_proto_kind)
+    uint32_t token_id = 0;
+    float logprob = 0.0f;
     const char* finish_reason = nullptr;
     const char* error_message = nullptr;
 
     // Session / progress fields (only the proto_service path populates
     // these today; registry-path callers leave them at defaults).
-    const char* request_id                  = nullptr;
-    const char* conversation_id             = nullptr;
-    int32_t     prompt_tokens_processed     = 0;   // proto field 15
-    int32_t     completion_tokens_generated = 0;   // proto field 16
-    int64_t     elapsed_ms                  = 0;   // proto field 17
+    const char* request_id = nullptr;
+    const char* conversation_id = nullptr;
+    int32_t prompt_tokens_processed = 0;      // proto field 15
+    int32_t completion_tokens_generated = 0;  // proto field 16
+    int64_t elapsed_ms = 0;                   // proto field 17
 
     // Backend error code on terminal failure events; proto field 11.
     // 0 = unset/success (matches proto3 scalar default).
-    int32_t     error_code                  = 0;
+    int32_t error_code = 0;
 
     // Optional terminal aggregate result. Only populated on the
     // is_final=true event by callers that have access to libprotobuf
@@ -95,9 +95,8 @@ int derive_event_kind(int kind, bool is_final, const char* error_message);
  * @param out Destination buffer — existing contents are cleared.
  * @return true on success, false on protobuf serialize failure.
  */
-bool serialize_llm_stream_event(uint64_t                     seq,
-                                const LLMStreamEventParams&  p,
-                                std::vector<uint8_t>&        out);
+bool serialize_llm_stream_event(uint64_t seq, const LLMStreamEventParams& p,
+                                std::vector<uint8_t>& out);
 
 /**
  * @brief Registry-backed dispatcher used by `llm_component.cpp`.
@@ -107,8 +106,7 @@ bool serialize_llm_stream_event(uint64_t                     seq,
  * serializes the event via `serialize_llm_stream_event()`, then fires
  * the callback without holding the registry lock.
  */
-void dispatch_llm_stream_event(rac_handle_t                 handle,
-                               const LLMStreamEventParams&  p);
+void dispatch_llm_stream_event(rac_handle_t handle, const LLMStreamEventParams& p);
 
 /**
  * @brief Legacy 9-arg dispatcher. Forwards to the struct-based overload
@@ -119,14 +117,9 @@ void dispatch_llm_stream_event(rac_handle_t                 handle,
  *        `final_result`) stay at proto3 defaults on this path —
  *        identical wire output to the pre-unification 9-field shape.
  */
-void dispatch_llm_stream_event(rac_handle_t handle,
-                               const char*  token,
-                               bool         is_final,
-                               int          kind,
-                               uint32_t     token_id,
-                               float        logprob,
-                               const char*  finish_reason,
-                               const char*  error_message);
+void dispatch_llm_stream_event(rac_handle_t handle, const char* token, bool is_final, int kind,
+                               uint32_t token_id, float logprob, const char* finish_reason,
+                               const char* error_message);
 
 }  // namespace rac::llm
 

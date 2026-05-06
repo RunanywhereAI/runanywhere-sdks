@@ -188,19 +188,6 @@ BUG-<TAG>-<NNN> — title (SEVERITY)
 Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 -->
 
-### BUG-STREAMING-001 — Two divergent LLM stream proto emitters populate different subsets of `LLMStreamEvent` fields (HIGH)
-**Lane**: cross-lane (affects Swift iOS + Web + any SDK using `rac_llm_set_stream_proto_callback` versus Kotlin Android using `rac_llm_generate_stream_proto`)
-**Category**: streaming-parity
-**Evidence**:
-- `sdk/runanywhere-commons/src/features/llm/rac_llm_stream.cpp:139-191` (`dispatch_llm_stream_event`) sets only 9 fields on the wire: `seq`, `timestamp_us`, `token`, `is_final`, `kind`, `token_id`, `logprob`, `finish_reason`, `error_message`.
-- `sdk/runanywhere-commons/src/features/llm/rac_llm_proto_service.cpp:327-372` (`dispatch_stream_event`) sets 13 fields: the above minus `token_id` / `logprob`, PLUS `event_kind` (12), `request_id` (13), `conversation_id` (14), `completion_tokens_generated` (16), `elapsed_ms` (17), and `result` (10, an embedded `LLMStreamFinalResult`).
-- Proto schema: `idl/llm_service.proto:90-144` defines 17 fields on `LLMStreamEvent`; neither emitter covers all 17 (`prompt_tokens_processed` field 15 and `error_code` field 11 are never set by either path).
-- Swift consumer `sdk/runanywhere-swift/Sources/RunAnywhere/Adapters/LLMStreamAdapter.swift:29-221` wires `rac_llm_set_stream_proto_callback` — so iOS app code that reads `event.eventKind`, `event.requestId`, `event.conversationId`, `event.completionTokensGenerated`, `event.elapsedMs`, or `event.result` always sees proto3 defaults.
-- Kotlin consumer `sdk/runanywhere-kotlin/src/jvmAndroidMain/kotlin/com/runanywhere/sdk/foundation/bridge/extensions/CppBridgeModalityProto.kt:170-183` wires `racLlmGenerateStreamProto` which goes through the richer proto-service path — so the same proto fields ARE populated on Android.
-**Root cause (suspected)**: Two independent streaming stacks were added (`rac_llm_stream.cpp` for callback-style fan-out used by Swift/Web; `rac_llm_proto_service.cpp` for the proto request/response wrapper used by Kotlin JNI). The callback-style helper `dispatch_llm_stream_event` takes only 8 scalar args and has no surface for the newer proto fields (`event_kind`, `request_id`, `conversation_id`, aggregate `result`, progress counters) that landed in `idl/llm_service.proto`.
-**Fix pointer**: Either (a) promote `rac_llm_proto_service.cpp`'s `dispatch_stream_event` to be the single emitter and have `rac_llm_stream.cpp` delegate to it (removing the 8-arg lowest-common-denominator dispatcher), or (b) widen `dispatch_llm_stream_event` to accept a `LLMStreamEvent&` reference pre-populated by `llm_component.cpp` callers. Cross-reference with `idl/llm_service.proto:90-144` to decide which fields MUST be populated on every event vs. only on terminal.
-**Severity**: HIGH
-
 ### BUG-STREAMING-004 — Cross-SDK streaming parity tests do NOT exist; Kotlin CLAUDE.md references non-existent test files (MEDIUM)
 **Lane**: test-infra
 **Category**: fixture-drift
