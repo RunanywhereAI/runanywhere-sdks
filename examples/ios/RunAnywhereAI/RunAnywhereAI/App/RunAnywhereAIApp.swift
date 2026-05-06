@@ -21,6 +21,15 @@ import os
 import AppKit
 #endif
 
+// MARK: - Model Catalog Seed
+//
+// Registers the default example-app model catalog with the SDK registry.
+// Mirrors the Flutter example's `_registerModulesAndModels()` and matches
+// the Kotlin / RN / Web examples so every SDK surfaces the same baseline
+// set of LLM / VLM / STT / TTS / VAD / embedding / diffusion models. The
+// example apps are each responsible for seeding their own catalog — the
+// SDK does not ship a default list. See BUG-SWIFT-IOS-002.
+
 // swiftlint:disable type_body_length
 @main
 struct RunAnywhereAIApp: App {
@@ -101,6 +110,11 @@ struct RunAnywhereAIApp: App {
             let startTime = Date()
 
             try runSDKInitialize()
+
+            // Seed the example-app model catalog (~30 LLM / VLM / STT / TTS /
+            // VAD / embedding / diffusion entries). Each SDK's example owns its
+            // own catalog; the SDK does not ship a default list.
+            await registerModulesAndModels()
 
             // Refresh generated model/catalog state.
             await refreshSDKCatalogs()
@@ -225,6 +239,396 @@ struct RunAnywhereAIApp: App {
         }
 
         logger.info("SDK catalog refresh complete")
+    }
+
+    // MARK: - Model Catalog Seeding
+    //
+    // Mirrors the Flutter example's `_registerModulesAndModels()`. Uses the
+    // canonical `RunAnywhere.registerModel(...)` async public API; multi-file
+    // models (VLM + MiniLM embedding) are constructed as `RAModelInfo` and
+    // persisted directly via `CppBridge.ModelRegistry.shared.save(...)` because
+    // the multi-file convenience shim was not retained in the new SDK surface.
+    //
+    // swiftlint:disable:next attributes function_body_length cyclomatic_complexity
+    private func registerModulesAndModels() async {
+        logger.info("📦 Registering modules with their models...")
+
+        // --- LLM models (LlamaCpp backend) ------------------------------------
+        await registerLLM(
+            id: "smollm2-360m-q8_0",
+            name: "SmolLM2 360M Q8_0",
+            url: "https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 500_000_000
+        )
+        await registerLLM(
+            id: "llama-2-7b-chat-q4_k_m",
+            name: "Llama 2 7B Chat Q4_K_M",
+            url: "https://huggingface.co/TheBloke/Llama-2-7B-Chat-GGUF/resolve/main/llama-2-7b-chat.Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 4_000_000_000
+        )
+        await registerLLM(
+            id: "mistral-7b-instruct-q4_k_m",
+            name: "Mistral 7B Instruct Q4_K_M",
+            url: "https://huggingface.co/TheBloke/Mistral-7B-Instruct-v0.1-GGUF/resolve/main/mistral-7b-instruct-v0.1.Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 4_000_000_000
+        )
+        await registerLLM(
+            id: "qwen2.5-0.5b-instruct-q6_k",
+            name: "Qwen 2.5 0.5B Instruct Q6_K",
+            url: "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 600_000_000
+        )
+        await registerLLM(
+            id: "qwen2.5-1.5b-instruct-q4_k_m",
+            name: "Qwen 2.5 1.5B Instruct Q4_K_M",
+            url: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 2_500_000_000,
+            supportsLora: true
+        )
+        await registerLLM(
+            id: "lfm2-350m-q4_k_m",
+            name: "LiquidAI LFM2 350M Q4_K_M",
+            url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 250_000_000
+        )
+        await registerLLM(
+            id: "lfm2-350m-q8_0",
+            name: "LiquidAI LFM2 350M Q8_0",
+            url: "https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q8_0.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 400_000_000
+        )
+        await registerLLM(
+            id: "lfm2-1.2b-tool-q4_k_m",
+            name: "LiquidAI LFM2 1.2B Tool Q4_K_M",
+            url: "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 800_000_000
+        )
+        await registerLLM(
+            id: "lfm2-1.2b-tool-q8_0",
+            name: "LiquidAI LFM2 1.2B Tool Q8_0",
+            url: "https://huggingface.co/LiquidAI/LFM2-1.2B-Tool-GGUF/resolve/main/LFM2-1.2B-Tool-Q8_0.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 1_400_000_000
+        )
+        await registerLLM(
+            id: "qwen3-0.6b-q4_k_m",
+            name: "Qwen3 0.6B Q4_K_M",
+            url: "https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 500_000_000,
+            supportsThinking: true
+        )
+        await registerLLM(
+            id: "qwen3-1.7b-q4_k_m",
+            name: "Qwen3 1.7B Q4_K_M",
+            url: "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 1_200_000_000,
+            supportsThinking: true
+        )
+        await registerLLM(
+            id: "qwen3-4b-q4_k_m",
+            name: "Qwen3 4B Q4_K_M",
+            url: "https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf",
+            framework: .llamaCpp,
+            memoryRequirement: 2_800_000_000,
+            supportsThinking: true
+        )
+        logger.info("✅ LLM models registered")
+
+        // --- VLM models (multi-modal, multi-file) -----------------------------
+        await registerArchive(
+            id: "smolvlm-500m-instruct-q8_0",
+            name: "SmolVLM 500M Instruct",
+            url: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-vlm-models-v1/smolvlm-500m-instruct-q8_0.tar.gz",
+            framework: .llamaCpp,
+            modality: .multimodal,
+            archive: .tarGz,
+            structure: .directoryBased,
+            memoryRequirement: 600_000_000
+        )
+        await registerMultiFile(
+            id: "qwen2-vl-2b-instruct-q4_k_m",
+            name: "Qwen2-VL 2B Instruct",
+            files: [
+                ("https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf",
+                 "Qwen2-VL-2B-Instruct-Q4_K_M.gguf"),
+                ("https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf",
+                 "mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf"),
+            ],
+            framework: .llamaCpp,
+            modality: .multimodal,
+            memoryRequirement: 1_800_000_000
+        )
+        await registerMultiFile(
+            id: "lfm2-vl-450m-q8_0",
+            name: "LFM2-VL 450M",
+            files: [
+                ("https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf",
+                 "LFM2-VL-450M-Q8_0.gguf"),
+                ("https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf",
+                 "mmproj-LFM2-VL-450M-Q8_0.gguf"),
+            ],
+            framework: .llamaCpp,
+            modality: .multimodal,
+            memoryRequirement: 600_000_000
+        )
+        logger.info("✅ VLM models registered")
+
+        // --- STT models (Sherpa-ONNX) -----------------------------------------
+        await registerArchive(
+            id: "sherpa-onnx-whisper-tiny.en",
+            name: "Sherpa Whisper Tiny (ONNX)",
+            url: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
+            framework: .sherpa,
+            modality: .speechRecognition,
+            archive: .tarGz,
+            structure: .nestedDirectory,
+            memoryRequirement: 75_000_000
+        )
+
+        // --- TTS models (Sherpa-ONNX Piper VITS) ------------------------------
+        await registerArchive(
+            id: "vits-piper-en_US-lessac-medium",
+            name: "Piper TTS (US English - Medium)",
+            url: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
+            framework: .sherpa,
+            modality: .speechSynthesis,
+            archive: .tarGz,
+            structure: .nestedDirectory,
+            memoryRequirement: 65_000_000
+        )
+        await registerArchive(
+            id: "vits-piper-en_GB-alba-medium",
+            name: "Piper TTS (British English)",
+            url: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz",
+            framework: .sherpa,
+            modality: .speechSynthesis,
+            archive: .tarGz,
+            structure: .nestedDirectory,
+            memoryRequirement: 65_000_000
+        )
+
+        // --- VAD (Silero, ONNX) -----------------------------------------------
+        await registerLLM(
+            id: "silero-vad",
+            name: "Silero VAD",
+            url: "https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx",
+            framework: .onnx,
+            modality: .voiceActivityDetection,
+            memoryRequirement: 5_000_000
+        )
+        logger.info("✅ Sherpa STT/TTS + Silero VAD models registered")
+
+        // --- WhisperKit STT (Apple Neural Engine via Core ML) -----------------
+        await registerArchive(
+            id: "whisperkit-tiny.en",
+            name: "Whisper Tiny EN (WhisperKit)",
+            url: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-tiny.en.tar.gz",
+            framework: .whisperKitCoreML,
+            modality: .speechRecognition,
+            archive: .tarGz,
+            structure: .nestedDirectory,
+            memoryRequirement: 70_000_000
+        )
+        await registerArchive(
+            id: "whisperkit-base.en",
+            name: "Whisper Base EN (WhisperKit)",
+            url: "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v2/whisperkit-base.en.tar.gz",
+            framework: .whisperKitCoreML,
+            modality: .speechRecognition,
+            archive: .tarGz,
+            structure: .nestedDirectory,
+            memoryRequirement: 134_000_000
+        )
+        logger.info("✅ WhisperKit STT models registered")
+
+        // --- ONNX Embedding (RAG) ---------------------------------------------
+        // MiniLM needs model.onnx + vocab.txt in the same folder for the C++
+        // RAG pipeline to find its vocab next to the model.
+        await registerMultiFile(
+            id: "all-minilm-l6-v2",
+            name: "All MiniLM L6 v2 (Embedding)",
+            files: [
+                ("https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx", "model.onnx"),
+                ("https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main/vocab.txt", "vocab.txt"),
+            ],
+            framework: .onnx,
+            modality: .embedding,
+            memoryRequirement: 25_500_000
+        )
+        logger.info("✅ ONNX Embedding models registered")
+
+        // --- Diffusion (Apple Stable Diffusion CoreML) ------------------------
+        await registerArchive(
+            id: "sd15-coreml-palettized",
+            name: "Stable Diffusion 1.5 (CoreML)",
+            // swiftlint:disable:next line_length
+            url: "https://huggingface.co/apple/coreml-stable-diffusion-v1-5-palettized/resolve/main/coreml-stable-diffusion-v1-5-palettized_split_einsum_v2_compiled.zip",
+            framework: .coreml,
+            modality: .imageGeneration,
+            archive: .zip,
+            structure: .nestedDirectory,
+            memoryRequirement: 1_600_000_000
+        )
+        logger.info("✅ Diffusion models registered (Apple Stable Diffusion / CoreML only)")
+
+        // --- MetalRT models (Apple-only custom Metal GPU kernels) -------------
+        #if canImport(MetalRTRuntime)
+        let metalrtBase = "https://huggingface.co/runanywhere/metalrt-ios/resolve/main"
+        await registerArchive(
+            id: "qwen3-0.6b-metalrt",
+            name: "Qwen3 0.6B (MetalRT)",
+            url: "\(metalrtBase)/qwen3-0.6b-metalrt.tar.gz",
+            framework: .metalrt,
+            modality: .language,
+            archive: .tarGz,
+            structure: .nestedDirectory,
+            memoryRequirement: 400_000_000
+        )
+        await registerArchive(
+            id: "qwen3-4b-metalrt",
+            name: "Qwen3 4B (MetalRT)",
+            url: "\(metalrtBase)/qwen3-4b-metalrt.tar.gz",
+            framework: .metalrt,
+            modality: .language,
+            archive: .tarGz,
+            structure: .nestedDirectory,
+            memoryRequirement: 2_500_000_000
+        )
+        logger.info("✅ MetalRT models registered")
+        #else
+        logger.info("ℹ️ MetalRT not available (MetalRTRuntime not linked)")
+        #endif
+
+        logger.info("🎉 All modules and models registered")
+    }
+
+    // MARK: - Catalog Seeding Helpers
+
+    /// Register a single-file model via the canonical `RunAnywhere.registerModel`
+    /// public API. Logs on failure but does not abort the whole seed pass.
+    private func registerLLM(
+        id: String,
+        name: String,
+        url: String,
+        framework: InferenceFramework,
+        modality: ModelCategory = .language,
+        memoryRequirement: Int64,
+        supportsThinking: Bool = false,
+        supportsLora: Bool = false
+    ) async {
+        do {
+            _ = try await RunAnywhere.registerModel(
+                id: id,
+                name: name,
+                url: url,
+                framework: framework,
+                modality: modality,
+                memoryRequirement: memoryRequirement,
+                supportsThinking: supportsThinking,
+                supportsLora: supportsLora
+            )
+        } catch {
+            logger.warning("Failed to register model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Register a tar.gz / zip archive model via the canonical public API.
+    /// The archive type + structure are preserved through `RAModelArtifactType`.
+    private func registerArchive(
+        id: String,
+        name: String,
+        url: String,
+        framework: InferenceFramework,
+        modality: ModelCategory,
+        archive: ArchiveType,
+        structure: ArchiveStructure,
+        memoryRequirement: Int64
+    ) async {
+        let artifactType: RAModelArtifactType
+        switch archive {
+        case .zip:      artifactType = .zipArchive
+        case .tarGz:    artifactType = .tarGzArchive
+        case .tarBz2:   artifactType = .tarBz2Archive
+        case .tarXz:    artifactType = .tarXzArchive
+        default:        artifactType = .archive
+        }
+
+        do {
+            var model = try await RunAnywhere.registerModel(
+                id: id,
+                name: name,
+                url: url,
+                framework: framework,
+                modality: modality,
+                artifactType: artifactType,
+                memoryRequirement: memoryRequirement
+            )
+            // Preserve structure in the archive artifact (inferredArtifact only
+            // captures the archive type, not the nested/directory layout).
+            if var archiveArtifact = model.archiveArtifact {
+                archiveArtifact.structure = structure
+                model.setArtifact(.archive(archiveArtifact))
+                try await CppBridge.ModelRegistry.shared.save(model)
+            }
+        } catch {
+            logger.warning("Failed to register archive model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Register a multi-file model (e.g., VLMs with a separate mmproj, MiniLM
+    /// embedding with vocab.txt). Constructs `RAModelInfo` directly because the
+    /// multi-file convenience shim was not retained in the new SDK surface.
+    private func registerMultiFile(
+        id: String,
+        name: String,
+        files: [(url: String, filename: String)],
+        framework: InferenceFramework,
+        modality: ModelCategory,
+        memoryRequirement: Int64
+    ) async {
+        let descriptors: [RAModelFileDescriptor] = files.compactMap { file in
+            guard let fileURL = URL(string: file.url) else { return nil }
+            return RAModelFileDescriptor(url: fileURL, filename: file.filename, isRequired: true)
+        }
+        guard descriptors.count == files.count else {
+            logger.warning("Invalid multi-file URL list for model \(id, privacy: .public)")
+            return
+        }
+
+        var artifact = RAMultiFileArtifact()
+        artifact.files = descriptors
+
+        let now = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+        var model = RAModelInfo()
+        model.id = id
+        model.name = name
+        model.category = modality
+        model.framework = framework
+        model.memoryRequiredBytes = memoryRequirement
+        model.downloadSizeBytes = memoryRequirement
+        model.contextLength = modality.requiresContextLength ? 2048 : 0
+        model.source = .remote
+        model.createdAtUnixMs = now
+        model.updatedAtUnixMs = now
+        model.setArtifact(.multiFile(artifact))
+        model.isDownloaded = model.isDownloadedOnDisk
+        model.isAvailable = model.isAvailableForUse
+
+        do {
+            try await CppBridge.ModelRegistry.shared.save(model)
+        } catch {
+            logger.warning("Failed to register multi-file model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
+        }
     }
 }
 // swiftlint:enable type_body_length
