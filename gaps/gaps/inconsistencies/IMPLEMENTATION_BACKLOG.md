@@ -313,20 +313,6 @@ Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 **Fix pointer**: Add `android:enableOnBackInvokedCallback="true"` to the `<application>` element in `examples/flutter/RunAnywhereAI/android/app/src/main/AndroidManifest.xml`.
 **Severity**: LOW — warning only; Android system falls back silently.
 
-### BUG-FLT-IOS-005 — Missing `Runner.entitlements` causes keychain/secure-storage failures with err -34018 (MEDIUM)
-**Lane**: 06_flutter_ios
-**Category**: example-app-drift
-**Evidence**:
-- `test_workflows/logs/20260505T183402-0700-seven-lane-validation/06_flutter_ios/logs/07_app_stream.log` at 18:44:24.705 and 18:44:24.740: `[DEBUG] [DartBridge.Auth] Failed to pre-load tokens from secure storage: PlatformException(Unexpected security result code, Code: -34018, Message: A required entitlement isn't present., -34018, null)` and `[WARNING] [DartBridge.Device] Failed to get device ID from secure storage: PlatformException(Unexpected security result code, Code: -34018, Message: A required entitlement isn't present., -34018, null)`.
-- `examples/flutter/RunAnywhereAI/ios/Runner/` directory contains `AppDelegate.swift`, `GeneratedPluginRegistrant.*`, `Info.plist`, `Main.storyboard` — **no `*.entitlements` file**.
-- `sdk/runanywhere-flutter/CLAUDE.md` documents iOS secure storage uses `flutter_secure_storage`. The iOS implementation maps to Keychain access-group requests which requires a `keychain-access-groups` entitlement.
-**Reproduction**:
-  1. `flutter build ios --simulator --debug` then `xcrun simctl install / launch`.
-  2. Observe first access to `flutter_secure_storage` returns OSStatus -34018 (`errSecMissingEntitlement`).
-**Root cause (suspected)**: Flutter example was bootstrapped without adding a `Runner.entitlements` file listing `keychain-access-groups`. iOS 15+ simulators enforce the check even on the simulator.
-**Fix pointer**: Create `examples/flutter/RunAnywhereAI/ios/Runner/Runner.entitlements` containing `keychain-access-groups` with the bundle ID `$(AppIdentifierPrefix)com.runanywhere.runanywhereAi`, then reference it from `Runner.xcodeproj` `CODE_SIGN_ENTITLEMENTS`. Mirror the file already present in the Swift example at `examples/ios/RunAnywhereAI/RunAnywhereAI/RunAnywhereAI.entitlements`.
-**Severity**: MEDIUM — device UUID is regenerated every launch (keychain miss each time); SDK auth/telemetry never complete. Regression vs iOS Swift lane which uses proper entitlements.
-
 ### BUG-FLT-IOS-006 — Duplicate `Starting download` dispatched from UI on single Get-button tap (LOW)
 **Lane**: 06_flutter_ios
 **Category**: example-app-drift
