@@ -2,7 +2,7 @@
 
 Date: 2026-05-05
 Branch: feat/v2-architecture @ 6217d9e67
-Total open rows: 78
+Total open rows: 76
 
 ## Execution rules
 
@@ -189,18 +189,14 @@ BUG-<TAG>-<NNN> — title (SEVERITY)
 Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 -->
 
-### BUG-STREAMING-004 — Cross-SDK streaming parity tests do NOT exist; Kotlin CLAUDE.md references non-existent test files (MEDIUM)
+### BUG-STREAMING-HARNESS-NEW — Materialize a shared cross-SDK streaming parity harness (NEW-FEATURE, MEDIUM)
 **Lane**: test-infra
-**Category**: fixture-drift
+**Category**: new-feature
 **Evidence**:
-- Task description references `tests/streaming/` with fixture files `voice_agent_events`, `llm_golden_events.txt` and cross-SDK parity tests. `tests/streaming/` directory does not exist anywhere in the repo; `find / -type d -name streaming | grep -v build | grep -v node_modules` returns only sherpa-onnx third-party dirs.
-- `sdk/runanywhere-kotlin/CLAUDE.md` claims: "The `jvmTest` source set also mounts `../../tests/streaming/` as an additional srcDir, pulling in cross-SDK streaming parity tests, cancel parity tests, and performance benchmarks. Tests: `VoiceAgentStreamAdapterFanOutTest`, `ChecksumPlumbingTest`, `PerfBenchTest`, `CancelParityTest`." None of those `PerfBenchTest`, `CancelParityTest`, `ChecksumPlumbingTest` files exist (`find sdk/runanywhere-kotlin -name 'PerfBench*' -o -name 'CancelParity*' -o -name 'ChecksumPlumbing*'` returns 0 results).
-- `sdk/runanywhere-kotlin/build.gradle.kts:289-298` does NOT add any `srcDir` for an external `tests/streaming/` path.
-- Only `sdk/runanywhere-flutter/packages/runanywhere/test/parity_test.dart` and `.../cancel_parity_test.dart` exist; they are self-contained and do not reference an external fixture file — they build their own events in `fixtures/streaming_proto_fixtures.dart`.
-- No Swift, RN, or Web parity test exists (`find . -type f -name "*.swift" -path "*Tests*" | xargs grep -l "parity\|golden"` returns zero matches; Swift `Tests/RunAnywhereTests/` contains only proto-surface tests).
-**Root cause (suspected)**: Earlier iteration removed or never materialized a shared `tests/streaming/` harness. Documentation in multiple CLAUDE.md files and this task prompt still references it. Per-SDK tests were either removed along with the shared harness or never written.
-**Fix pointer**: Either (a) materialize the shared harness — C++ "golden producer" binaries that emit `voice_agent_events` / `llm_golden_events` fixture files plus per-SDK readers — or (b) delete the stale CLAUDE.md language and acknowledge Flutter's self-contained `parity_test.dart` is the only streaming parity coverage. If choosing (a), reuse Flutter's local-only fixtures as the authoritative byte sequence and port to Swift (XCTest), Kotlin (JUnit + Wire decode), TS (vitest). Until then, there is no mechanism to catch BUG-STREAMING-001/002 at CI.
-**Severity**: MEDIUM
+- Flutter's `sdk/runanywhere-flutter/packages/runanywhere/test/parity_test.dart` + `cancel_parity_test.dart` are the only streaming-parity tests in the repo and build fixtures in-package (`fixtures/streaming_proto_fixtures.dart`). They cannot currently detect drift in Swift, Kotlin, RN, or Web.
+- Stale references to `../../tests/streaming/`, `PerfBenchTest`, `CancelParityTest`, `ChecksumPlumbingTest`, and `golden_events.txt` have been removed from `sdk/runanywhere-kotlin/CLAUDE.md` (prior BUG-STREAMING-004 fix). No current doc claims a shared harness exists.
+**Scope**: Port Flutter's `streaming_proto_fixtures.dart` byte sequences to a language-neutral `tests/streaming/fixtures/` (checked-in proto-encoded bytes + expected decoded JSON). Add thin readers per SDK: Swift XCTest, Kotlin JUnit + Wire decode, Dart (reuse existing), TS vitest. Wire a CI workflow that runs all four and diffs decoded output against a shared golden JSON. Without this, regressions like BUG-STREAMING-001 (Flutter iOS hang) / BUG-STREAMING-002 can only be caught at manual 7-lane runs.
+**Severity**: MEDIUM (no current regression — feature request to prevent future ones)
 
 ### BUG-WEB-007 — Example app's Settings tab hardcodes stale SDK version `0.1.0` instead of reading `RunAnywhere.version` (LOW)
 **Lane**: 07_web
@@ -297,33 +293,6 @@ Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 **Fix pointer**: Add `android:enableOnBackInvokedCallback="true"` to the `<application>` element in `examples/flutter/RunAnywhereAI/android/app/src/main/AndroidManifest.xml`.
 **Severity**: LOW — warning only; Android system falls back silently.
 
-### BUG-FLT-IOS-006 — Duplicate `Starting download` dispatched from UI on single Get-button tap (LOW)
-**Lane**: 06_flutter_ios
-**Category**: example-app-drift
-**Evidence**:
-- `test_workflows/logs/20260505T183402-0700-seven-lane-validation/06_flutter_ios/logs/07_app_stream.log:325` at 18:41:22.751 and `:12424` at 18:42:59.498 — both log `[INFO] [RunAnywhere.Download] Starting download for model: lfm2-1.2b-tool-q4_k_m`. Interval ~97 seconds, but `actions.jsonl` records only one tap-Get action between them.
-**Reproduction**:
-  1. Open Chat → Model picker.
-  2. Tap Get on an un-downloaded model once.
-  3. Observe two distinct "Starting download" entries several seconds apart with no intermediate cancel.
-**Root cause (suspected)**: `ModelSelectionSheet` (or `ModelListViewModel`) does not guard against re-dispatching `DartBridgeDownload.startProto(...)` when the UI state re-enters, OR an SDK event is retriggering `.downloads.start()`. No debounce / in-flight check in the example app's download handler.
-**Fix pointer**: Check `examples/flutter/RunAnywhereAI/lib/features/models/model_selection_sheet.dart` for a `_isDownloading` flag keyed by modelId. Compare against the iOS Swift `DownloadOrchestrator` pattern.
-**Severity**: LOW — second call likely resumes/no-ops inside C++ commons (the model still downloads to completion), but wasteful and could double-count telemetry.
-
-### BUG-FLT-IOS-007 — `[LLM.LlamaCpp.GGML]` log message truncated to single char "s" on iOS (LOW)
-**Lane**: 06_flutter_ios
-**Category**: SDK-defect
-**Evidence**:
-- `test_workflows/logs/20260505T183402-0700-seven-lane-validation/06_flutter_ios/logs/07_app_stream.log:13328`: `2026-05-05 18:44:44.353 Df Runner[99883:51531e5] (Flutter) flutter: [2026-05-05T18:44:44.353618] [WARNING] [LLM.LlamaCpp.GGML] s` — the message body is literally the single character "s".
-- Emitted immediately after `Model LiquidAI LFM2 1.2B Tool Q4_K_M loaded successfully` (line 13325).
-- No equivalent log on Flutter Android lane (checked all 38K lines of `05_flutter_android/logs/session.log`).
-**Reproduction**:
-  1. Load any GGUF model via llamacpp on iOS Simulator (Flutter).
-  2. First WARNING emission under `[LLM.LlamaCpp.GGML]` is truncated to 1 char.
-**Root cause (suspected)**: GGML log redirection in `engines/llamacpp/` hands a single char pointer rather than a `const char*` string, OR llama.cpp's internal logger writes per-char and the iOS log aggregator flushes after each byte. Alternate: a `printf("%s", c)` where `c` is a `char` not `char*`.
-**Fix pointer**: Grep `engines/llamacpp/` for the llama.cpp `llama_log_callback` / `ggml_log_callback` hookup. Compare to the Kotlin/Swift/iOS paths that correctly buffer GGML chunks before forwarding to the SDK logger.
-**Severity**: LOW — cosmetic, no functional impact.
-
 ### BUG-PERF-001 — Flutter Android app native SIGSEGV in dart-code region during LLM session (HIGH)
 **Lane(s)**: 05_flutter_android
 **Category**: memory | perf
@@ -363,21 +332,6 @@ Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 **Root cause (suspected)**: NitroModules `HandleFanOut` for the LLM stream receives the `is_final=true` terminal event from C++ but no intermediate token events. The callback emitter `dispatch_llm_stream_event` in `rac_llm_stream.cpp` may be emitting only the terminal event on iOS simulator (CPU path) — related to BUG-STREAMING-001.
 **Fix pointer**: Trace `rac_llm_generate_stream_proto` in `sdk/runanywhere-commons/src/features/llm/rac_llm_stream.cpp` on iOS simulator. Verify llama.cpp backend produces tokens (check `rac_llm_component_generate` return) and the fan-out forwards them. Capture NitroModule native thread stderr via direct file descriptor redirection, not `log stream` predicate.
 **Severity**: HIGH
-
-### BUG-UX-002 — Screenshot-INDEX filename collisions and taxonomy drift across all 7 lanes (LOW)
-**Lane(s)**: All 7 lanes
-**Category**: UX-parity | test-infra
-**Evidence**:
-- iOS: `000_launch.png, 001_after_get_started.png, 002_llm_inference.png ... 010_voice_tab.png, 011_vision_tab.png` (3-digit prefix).
-- Flutter-iOS: `00_launch.png, 01_chat_tab.png ... 30_final_chat_state.png` (2-digit prefix).
-- **RN-Android collision**: both `011_chat_initial.png` AND `011_chat_screen.png` exist at same prefix.
-- **RN-iOS collisions**: `000_launch.png` + `000_launch_rn_actual.png` and `001_rn_after_relaunch.png` + `001_welcome_screen.png` — two separate files at same prefix.
-- Web: clean 10-step grid `000, 010, 020, 030, ..., 090`.
-- Kotlin: only 1 screenshot (build blocked), no `_model_picker` / `_llm_inference` shots for cross-lane diff.
-- Missing lanes: iOS has no `_speak_tab` / `_tools_tab` shots captured by Flutter-iOS.
-**Root cause (suspected)**: No shared screenshot taxonomy between lane scripts. Each lane author invented its own numbering. When cross-lane comparison agents need to match "same screen across SDKs", filename matching fails.
-**Fix pointer**: Publish `test_workflows/SCREENSHOT_TAXONOMY.md` with mandatory prefixes: `001_launch`, `010_model_picker_llm`, `020_model_download_start`, `030_llm_chat_initial`, `040_llm_response_complete`, `050_voice_tab`, `060_stt_tab`, etc. Enforce via lane script `VALID_SCREENSHOT_NAMES` grep gate.
-**Severity**: LOW
 
 ## Wave F — Bug-discovery (from 7-lane E2E 20260505T183402)
 
@@ -455,23 +409,6 @@ Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 **Root cause (suspected)**: RN example created from `npx @react-native-community/cli@latest init RunAnywhereAI` and bundle ID was never customized. This blocks TestFlight (team provisioning profiles won't match a non-owned reverse-DNS), collides with any other RN app that uses the template default, and breaks Keychain sharing with other RunAnywhere-signed apps since Keychain access groups are namespaced by bundle ID.
 **Fix pointer**: Change 4 `PRODUCT_BUNDLE_IDENTIFIER` lines to `com.runanywhere.RunAnywhereReactNative` (or match Swift at `com.runanywhere.RunAnywhere` if bundle collision on the same simulator is acceptable). Also bump `MARKETING_VERSION` to read from the canonical `VERSION` file via `sync-versions.sh`.
 **Severity**: MEDIUM — blocks any future TestFlight/App Store release; also invalidates `04_react_native_ios/agent_report.md:7` claim.
-
-### BUG-RN-IOS-005 — STTScreen/TTSScreen emit console.warn('isSTTModelLoaded:'/...) on every mount producing the "Open debugger to view warnings" banner seen in 005_rn_reinstall_launch.png (LOW)
-**Lane**: 04_react_native_ios
-**Category**: example-app-drift
-**Evidence**:
-- `04_react_native_ios/screenshots/005_rn_reinstall_launch.png` — yellow banner at bottom reads **"Open debugger to view warnings."**.
-- `examples/react-native/RunAnywhereAI/src/screens/STTScreen.tsx:176` — `console.warn('[STTScreen] isSTTModelLoaded:', isLoaded);` fires on every model-status check.
-- `examples/react-native/RunAnywhereAI/src/screens/TTSScreen.tsx:235` — `console.warn('[TTSScreen] isTTSModelLoaded:', isLoaded);` same pattern.
-- `TTSScreen.tsx:334` — `console.warn('[TTSScreen] Unloading previous TTS model...');` normal-path informational use of `console.warn`.
-- `SettingsScreen.tsx:573` — `console.warn('[Settings] Downloaded models:', downloaded);` normal-path informational use.
-- Project ESLint config (`packages/core/.eslintrc.json`) already flags `no-console: error` with exceptions for `warn`/`error`; this rule is not enforced in the example app.
-**Reproduction**:
-  1. Launch RN example, open STT or TTS tab once.
-  2. Yellow "Open debugger to view warnings" banner appears — matches screenshot.
-**Root cause (suspected)**: Developer used `console.warn` as substitute for `console.log` (which would lint-error) to surface breadcrumbs during development. These are informational, not warnings, and pollute the RN dev warning system so real warnings get lost in the noise.
-**Fix pointer**: Replace 6-12 informational `console.warn` calls with `console.log` (lint-exempt for this one line) or route through the SDK's `SDKLogger.shared.info(...)` which fans out to OSLog without tripping the LogBox. Keep `console.error` only for actual error paths (model load failure, etc.).
-**Severity**: LOW — cosmetic noise, but masks real warnings from the dev during E2E testing.
 
 ## Convergence definition
 

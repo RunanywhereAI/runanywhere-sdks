@@ -173,7 +173,7 @@ export const STTScreen: React.FC = () => {
 
       // Check if model is already loaded
       const isLoaded = await RunAnywhere.isSTTModelLoaded();
-      console.warn('[STTScreen] isSTTModelLoaded:', isLoaded);
+      console.debug('[STTScreen] isSTTModelLoaded:', isLoaded);
       if (isLoaded && !currentModel) {
         // Try to find which model is loaded from downloaded models
         const downloadedStt = sttModels.filter((m) => m.isDownloaded);

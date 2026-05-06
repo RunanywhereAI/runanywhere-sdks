@@ -232,7 +232,7 @@ export const TTSScreen: React.FC = () => {
 
       // Check if model is already loaded
       const isLoaded = await RunAnywhere.isTTSModelLoaded();
-      console.warn('[TTSScreen] isTTSModelLoaded:', isLoaded);
+      console.debug('[TTSScreen] isTTSModelLoaded:', isLoaded);
       if (isLoaded && !currentModel) {
         // Try to find which model is loaded from downloaded models
         const downloadedTts = ttsModels.filter((m) => m.isDownloaded);

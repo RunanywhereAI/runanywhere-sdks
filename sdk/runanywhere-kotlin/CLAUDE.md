@@ -195,12 +195,14 @@ Both follow the same pattern: thin KMP wrappers that register a C++ backend with
 
 ## Testing
 
-Tests live in `src/jvmTest/` (4 files). The `jvmTest` source set also mounts `../../tests/streaming/` as an additional srcDir, pulling in cross-SDK streaming parity tests, cancel parity tests, and performance benchmarks.
+Tests live in two source sets:
 
-- `VoiceAgentStreamAdapterFanOutTest` — verifies SharedFlow fan-out for concurrent collectors
-- `ChecksumPlumbingTest` — verifies SHA256 checksum fields propagate through model types (no JNI required)
-- `PerfBenchTest` — conditional on `/tmp/perf_input.bin` existing; asserts p50 decode latency < 1ms
-- `CancelParityTest` — conditional on `/tmp/cancel_input.bin` existing; verifies cancel interrupt markers
+- `src/commonTest/` — Kotlin-layer surface tests (generated proto adapters, extension surfaces) that run on any target. No JNI required.
+- `src/jvmTest/` — JVM-only tests that exercise code which only exists in `jvmAndroidMain`.
+
+Notable test: `VoiceAgentStreamAdapterFanOutTest` (`src/jvmTest/`) verifies `SharedFlow` fan-out for concurrent collectors on `VoiceAgentStreamAdapter`.
+
+There is no shared cross-SDK streaming parity harness wired into this module today. A prior revision of this file referenced an external `../../tests/streaming/` srcDir mount and `PerfBenchTest` / `CancelParityTest` / `ChecksumPlumbingTest` classes — none of those paths or files exist. The only streaming-parity coverage anywhere in the repo is Flutter's self-contained `sdk/runanywhere-flutter/packages/runanywhere/test/parity_test.dart` (and its sibling `cancel_parity_test.dart`), which builds its own fixtures in-package and does not drive other SDKs. See backlog row `BUG-STREAMING-HARNESS-NEW` if the shared harness is re-prioritized.
 
 Most tests can run without JNI loaded (they test Kotlin-layer logic). Tests requiring the native library need `setupLocalDevelopment` to have been run first.
 
