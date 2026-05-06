@@ -2,6 +2,7 @@ package com.runanywhere.runanywhereai.presentation.voice
 
 import ai.runanywhere.proto.v1.AudioEncoding
 import ai.runanywhere.proto.v1.ComponentLifecycleState
+import ai.runanywhere.proto.v1.ErrorCode
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_LLM
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_STT
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_TTS
@@ -10,7 +11,6 @@ import ai.runanywhere.proto.v1.PipelineState
 import ai.runanywhere.proto.v1.VoiceAgentResult
 import ai.runanywhere.proto.v1.VoiceEvent
 import ai.runanywhere.proto.v1.VoiceSessionError
-import ai.runanywhere.proto.v1.VoiceSessionErrorCode
 import android.app.Application
 import android.content.Context
 import android.media.AudioAttributes
@@ -490,7 +490,7 @@ class VoiceAssistantViewModel(
                     Timber.w("Cannot start: Not all models loaded")
                     showSessionError(
                         VoiceSessionError(
-                            code = VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_NOT_READY,
+                            code = ErrorCode.ERROR_CODE_COMPONENT_NOT_READY,
                             message = "Please load all required models (STT, LLM, TTS) before starting",
                             recoverable = true,
                         ),
@@ -503,7 +503,7 @@ class VoiceAssistantViewModel(
                     Timber.e("AudioCaptureService not initialized")
                     showSessionError(
                         VoiceSessionError(
-                            code = VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_NOT_READY,
+                            code = ErrorCode.ERROR_CODE_COMPONENT_NOT_READY,
                             message = "Audio capture not initialized. Please grant microphone permission.",
                             recoverable = true,
                         ),
@@ -515,7 +515,7 @@ class VoiceAssistantViewModel(
                     Timber.e("No microphone permission")
                     showSessionError(
                         VoiceSessionError(
-                            code = VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_MICROPHONE_PERMISSION_DENIED,
+                            code = ErrorCode.ERROR_CODE_MICROPHONE_PERMISSION_DENIED,
                             message = "Microphone permission required",
                             recoverable = true,
                         ),
@@ -529,7 +529,7 @@ class VoiceAssistantViewModel(
                     } catch (e: Exception) {
                         showSessionError(
                             VoiceSessionError(
-                                code = VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_NOT_READY,
+                                code = ErrorCode.ERROR_CODE_COMPONENT_NOT_READY,
                                 message = "Native voice-agent event stream unavailable: ${e.message}",
                                 recoverable = false,
                             ),
@@ -544,7 +544,7 @@ class VoiceAssistantViewModel(
                             Timber.e(e, "Voice agent event error")
                             showSessionError(
                                 VoiceSessionError(
-                                    code = VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE,
+                                    code = ErrorCode.ERROR_CODE_PROCESSING_FAILED,
                                     message = "Voice agent event stream error: ${e.message}",
                                     failed_component = "voice_agent",
                                     recoverable = false,
@@ -598,7 +598,7 @@ class VoiceAssistantViewModel(
                 Timber.e(e, "Failed to start session")
                 showSessionError(
                     VoiceSessionError(
-                        code = VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE,
+                        code = ErrorCode.ERROR_CODE_PROCESSING_FAILED,
                         message = "Failed to start: ${e.message}",
                         failed_component = "voice_agent",
                         recoverable = true,
@@ -697,7 +697,7 @@ class VoiceAssistantViewModel(
                     Timber.e(e, "Error processing voice: ${e.message}")
                     showSessionError(
                         VoiceSessionError(
-                            code = VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE,
+                            code = ErrorCode.ERROR_CODE_PROCESSING_FAILED,
                             message = "Processing error: ${e.message}",
                             failed_component = "voice_agent",
                             recoverable = true,
@@ -845,7 +845,7 @@ class VoiceAssistantViewModel(
         if (!errorMessage.isNullOrBlank()) {
             showSessionError(
                 VoiceSessionError(
-                    code = VoiceSessionErrorCode.VOICE_SESSION_ERROR_CODE_COMPONENT_FAILURE,
+                    code = ErrorCode.ERROR_CODE_PROCESSING_FAILED,
                     message = errorMessage,
                     failed_component = "voice_agent",
                     recoverable = true,
