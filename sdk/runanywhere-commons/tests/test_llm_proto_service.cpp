@@ -344,7 +344,8 @@ int test_mocked_generation(rac_model_registry_handle_t registry) {
     CHECK(result.response_tokens() > 0, "generate splits response tokens");
     CHECK(result.has_json_output() && result.json_output() == "{\"ok\":true}",
           "generate extracts structured JSON");
-    CHECK(result.finish_reason() == "stop", "generate reports stop finish reason");
+    CHECK(result.finish_reason() == "length",
+          "generate reports length finish reason when completion_tokens == max_tokens");
     rac_proto_buffer_free(&out);
     cleanup_environment();
     return 0;
