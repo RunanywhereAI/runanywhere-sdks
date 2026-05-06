@@ -80,6 +80,7 @@ struct ModelSelectionSheet: View {
     @State private var availableFrameworks: [InferenceFramework] = []
     @State private var isLoadingModel = false
     @State private var loadingProgress: String = ""
+    @State private var loadErrorMessage: String?
 
     let context: ModelSelectionContext
     let onModelSelected: (RAModelInfo) async -> Void
@@ -145,6 +146,19 @@ struct ModelSelectionSheet: View {
         }
         .adaptiveSheetFrame()
         .task { await loadInitialData() }
+        .alert(
+            "Unable to Load Model",
+            isPresented: Binding(
+                get: { loadErrorMessage != nil },
+                set: { if !$0 { loadErrorMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { loadErrorMessage = nil }
+        } message: {
+            if let loadErrorMessage {
+                Text(loadErrorMessage)
+            }
+        }
     }
 
     @ToolbarContentBuilder private var toolbarContent: some ToolbarContent {
@@ -264,14 +278,22 @@ extension ModelSelectionSheet {
     private func selectAndLoadModel(_ model: RAModelInfo) async {
         if let reason = unavailableReason(for: model) {
             await MainActor.run {
-                viewModel.errorMessage = reason
                 selectedModel = nil
+                loadErrorMessage = reason
             }
             return
         }
 
-        if model.framework != .foundationModels {
-            guard model.localPathURL != nil else { return }
+        // Built-in models (Foundation Models, System TTS, artifactType .builtIn)
+        // have no on-disk artifact and are always ready to load via the platform
+        // backend. All other frameworks require a resolved local path — if it is
+        // missing we surface an error rather than silently dropping the tap.
+        if !model.isBuiltIn, model.localPathURL == nil {
+            await MainActor.run {
+                selectedModel = nil
+                loadErrorMessage = "Model files are not available on this device. Download the model and try again."
+            }
+            return
         }
 
         // RAG model selection does not pre-load into memory; just select and dismiss.
@@ -297,12 +319,18 @@ extension ModelSelectionSheet {
             await handleModelLoadSuccess(model)
             await MainActor.run { dismiss() }
         } catch {
+            // Surface the failure to the user instead of silently printing.
+            // The sheet stays open so the user can retry or pick a different
+            // model without navigating back through the setup flow.
+            let message = (error as? SDKException)?.message ?? error.localizedDescription
             await MainActor.run {
                 isLoadingModel = false
                 loadingProgress = ""
                 selectedModel = nil
+                loadErrorMessage = message.isEmpty
+                    ? "Failed to load \(model.name)."
+                    : "Failed to load \(model.name): \(message)"
             }
-            print("Failed to load model: \(error)")
         }
     }
 
