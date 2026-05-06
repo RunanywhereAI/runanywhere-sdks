@@ -424,8 +424,7 @@ class SettingsViewModel: ObservableObject {
     /// Clear cache
     func clearCache() async {
         do {
-            // TODO: migrate to RunAnywhere.clearCache() after SWF-CROSS-02
-            try SimplifiedFileManager.shared.clearCache()
+            try await RunAnywhere.clearCache()
             await refreshStorageData()
             print("Settings: Cache cleared successfully")
         } catch {
@@ -436,7 +435,7 @@ class SettingsViewModel: ObservableObject {
     /// Clean temporary files
     func cleanTempFiles() async {
         do {
-            try SimplifiedFileManager.shared.cleanTempFiles()
+            try await RunAnywhere.cleanTempFiles()
             await refreshStorageData()
             print("Settings: Temporary files cleaned successfully")
         } catch {

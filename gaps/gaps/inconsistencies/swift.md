@@ -31,20 +31,6 @@ Swift is a thin platform bridge over the C ABI. All public data types (`RAModelI
 - **Validation**: unique warning sites drops from 28 to under 5 (architecture-specific warnings from DeviceKit tolerable; `@Sendable` / concurrency warnings should be 0).
 - **Scope**: M (one dedicated sendability file + ~8 surgical edits).
 
-### SWF-CROSS-02: Missing `RunAnywhere.clearCache()` / `cleanTempFiles()` top-level API (LOW, cross-SDK)
-
-- **Symptom**: Swift exposes storage ops only through:
-  1. The internal `SimplifiedFileManager.shared.clearCache()` / `.cleanTempFiles()` at `Infrastructure/FileManagement/Services/SimplifiedFileManager.swift:127-141`. Declared `public class` with no counterpart in the `RunAnywhere` namespace.
-  2. The proto-typed `RunAnywhere.planStorageDelete(_:)` / `deleteStorage(_:)` / `getStorageInfo(_:)` entries in `Public/Extensions/Storage/RunAnywhere+Storage.swift`.
-  The iOS example ends up calling `SimplifiedFileManager.shared.clearCache()` directly (`SettingsViewModel.swift:428,439` and `StorageViewModel.swift:64,74`), bypassing the canonical SDK namespace. Kotlin provides `CppBridgeFileManager.clearCache()` at the bridge level and exposes `RunAnywhere.clearCache()` per the documented header at `CRACommons/include/rac_file_manager.h:263`.
-- **Why it matters**: Cross-SDK parity.
-- **Fix steps**:
-  1. Add `public static func clearCache() async throws` and `public static func cleanTempFiles() async throws` on `RunAnywhere` in `Public/Extensions/Storage/RunAnywhere+Storage.swift`, forwarding to `CppBridge.FileManager.clearCache()` / `clearTemp()` (these already exist at the bridge level — see `CppBridge+FileManager.swift:68`).
-  2. Downgrade `public class SimplifiedFileManager` to `internal class` (it's SDK-internal plumbing, not user API).
-  3. Update the iOS example call sites to use `RunAnywhere.clearCache()` / `RunAnywhere.cleanTempFiles()`.
-- **Validation**: `grep "SimplifiedFileManager\." examples/ios/RunAnywhereAI` returns zero matches; iOS example builds.
-- **Scope**: S.
-
 ## Items to DELETE (hard delete, no deprecation)
 
 (none open)
@@ -73,16 +59,15 @@ Swift is a thin platform bridge over the C ABI. All public data types (`RAModelI
 | **Plugin loader** | `RunAnywhere.pluginLoader.{load,unload,registeredNames,apiVersion}` | same | same | same | OK |
 | **Voice agent init from loaded** | `initializeVoiceAgentWithLoadedModels()` | `initializeVoiceAgentWithLoadedModels()` | (unknown) | `initializeVoiceAgentWithLoadedModels()` | OK |
 | **Voice agent states** | `getVoiceAgentComponentStates()` | `getVoiceAgentComponentStates()` | (unknown) | `getVoiceAgentComponentStates()` | OK |
-| **Storage — clearCache** | Only via internal `SimplifiedFileManager` | `CppBridgeFileManager.clearCache()` + top-level `RunAnywhere.clearCache()` per header docs | (unknown) | docs advertise | **DRIFT** (SWF-CROSS-02) |
-| **Storage — cleanTempFiles** | Only via internal `SimplifiedFileManager` | (unknown) | (unknown) | docs advertise | **DRIFT** (SWF-CROSS-02) |
+| **Storage — clearCache** | `RunAnywhere.clearCache()` (forwards to `CppBridge.FileManager.clearCache()`) | `CppBridgeFileManager.clearCache()` + top-level `RunAnywhere.clearCache()` per header docs | (unknown) | docs advertise | OK |
+| **Storage — cleanTempFiles** | `RunAnywhere.cleanTempFiles()` (forwards to `CppBridge.FileManager.clearTemp()`) | (unknown) | (unknown) | docs advertise | OK |
 | **Register model (convenience)** | `RunAnywhere.registerModel(id:name:url:framework:…)` top-level | `fun RunAnywhere.registerModel(id, name, url, framework, …)` top-level | (unknown) | (unknown) | OK |
 
 All `RA*` proto typealias names match Kotlin / Flutter / RN / Web conventions. No drift outside the five rows above.
 
 ## Example app (iOS) inconsistencies
 
-1. `examples/ios/RunAnywhereAI/.../SettingsViewModel.swift:428,439` and `.../StorageViewModel.swift:64,74` still call `SimplifiedFileManager.shared.clearCache()` / `cleanTempFiles()` directly. Migration to `RunAnywhere.clearCache()` / `cleanTempFiles()` lands with SWF-CROSS-02.
-2. `VoiceAgentViewModel.swift:472,479` contains two comments referring to unexposed symbols: `rac_voice_agent_interrupt(handle)`, `rac_voice_agent_force_commit(handle)`. These are future-work notes and acceptable as-is; flag only if the symbols eventually ship so the example can call the canonical SDK wrapper.
+1. `VoiceAgentViewModel.swift:472,479` contains two comments referring to unexposed symbols: `rac_voice_agent_interrupt(handle)`, `rac_voice_agent_force_commit(handle)`. These are future-work notes and acceptable as-is; flag only if the symbols eventually ship so the example can call the canonical SDK wrapper.
 
 ### SWF-THINKING-MIGRATE: `ThinkingContentParser` still binds 3 now-internal C helpers (MEDIUM)
 
@@ -104,6 +89,5 @@ All `RA*` proto typealias names match Kotlin / Flutter / RN / Web conventions. N
 ## Open questions
 
 1. Should `rac_model_compatibility_check_proto` / `rac_embeddings_create_proto` / `rac_model_registry_fetch_assignments_proto` be exported by the XCFramework? `nm` across the `ios-arm64` slice of `RACommons.xcframework` shows non-`_proto` versions are exported (`_rac_embeddings_create`, `_rac_model_registry_fetch_assignments`), but the proto variants are not. The Swift sources do NOT reference the `_proto` symbol names. **Not a Swift gap** — if commons should expose them, that's a commons issue.
-2. Should `public class SimplifiedFileManager` lose its `public` modifier? Making it `internal` breaks the example app until SWF-CROSS-02 lands, so the two changes must ship together.
-3. `Package.swift:50` (local) hard-codes `useLocalNatives = true` for local dev. The root `Package.swift:54` hard-codes it the same way. Release-tag flow needs to flip this automatically for external consumers. No change on this discovery pass; flagging as a persistent release-process question.
-4. Both root and local `Package.swift` expose both the monolithic `RunAnywhere` product and the individual backend products (`RunAnywhereCore`, `RunAnywhereLlamaCPP`, `RunAnywhereONNX`, `RunAnywhereMetalRT`, `RunAnywhereWhisperKit`), so external consumers can link per-backend today. Root-level `Active Issues` 002/005 concerns around collapsing backends into monoliths appear resolved; verify against the published artifact before closing them.
+2. `Package.swift:50` (local) hard-codes `useLocalNatives = true` for local dev. The root `Package.swift:54` hard-codes it the same way. Release-tag flow needs to flip this automatically for external consumers. No change on this discovery pass; flagging as a persistent release-process question.
+3. Both root and local `Package.swift` expose both the monolithic `RunAnywhere` product and the individual backend products (`RunAnywhereCore`, `RunAnywhereLlamaCPP`, `RunAnywhereONNX`, `RunAnywhereMetalRT`, `RunAnywhereWhisperKit`), so external consumers can link per-backend today. Root-level `Active Issues` 002/005 concerns around collapsing backends into monoliths appear resolved; verify against the published artifact before closing them.

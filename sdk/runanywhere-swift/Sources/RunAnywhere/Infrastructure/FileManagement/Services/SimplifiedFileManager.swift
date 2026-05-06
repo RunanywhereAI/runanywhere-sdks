@@ -14,12 +14,12 @@ import Foundation
 ///   Temp/
 ///   Downloads/
 /// ```
-public class SimplifiedFileManager {
+internal class SimplifiedFileManager {
 
     // MARK: - Shared Instance
 
     /// Shared file manager instance
-    public static let shared: SimplifiedFileManager = {
+    internal static let shared: SimplifiedFileManager = {
         do {
             return try SimplifiedFileManager()
         } catch {
@@ -34,7 +34,7 @@ public class SimplifiedFileManager {
 
     // MARK: - Initialization
 
-    public init() throws {
+    internal init() throws {
         guard let documentsFolder = Folder.documents else {
             throw SDKException.fileManagement(.permissionDenied, "Unable to access documents directory")
         }
@@ -51,23 +51,23 @@ public class SimplifiedFileManager {
     // MARK: - Model Folder Access
 
     /// Get the model folder path: Models/{framework}/{modelId}/
-    public func getModelFolder(for modelId: String, framework: InferenceFramework) throws -> Folder {
+    internal func getModelFolder(for modelId: String, framework: InferenceFramework) throws -> Folder {
         let modelFolderURL = try CppBridge.ModelPaths.getModelFolder(modelId: modelId, framework: framework)
         return try createFolderIfNeeded(at: modelFolderURL)
     }
 
     /// Check if a model folder exists and contains files
-    public func modelFolderExists(modelId: String, framework: InferenceFramework) -> Bool {
+    internal func modelFolderExists(modelId: String, framework: InferenceFramework) -> Bool {
         return CppBridge.FileManager.modelFolderHasContents(modelId: modelId, framework: framework)
     }
 
     /// Get the model folder URL (without creating it)
-    public func getModelFolderURL(modelId: String, framework: InferenceFramework) throws -> URL {
+    internal func getModelFolderURL(modelId: String, framework: InferenceFramework) throws -> URL {
         return try CppBridge.ModelPaths.getModelFolder(modelId: modelId, framework: framework)
     }
 
     /// Delete a model folder and all its contents
-    public func deleteModel(modelId: String, framework: InferenceFramework) throws {
+    internal func deleteModel(modelId: String, framework: InferenceFramework) throws {
         guard CppBridge.FileManager.deleteModel(modelId: modelId, framework: framework) else {
             throw SDKException.fileManagement(.deleteFailed, "Failed to delete model: \(modelId)")
         }
@@ -79,7 +79,7 @@ public class SimplifiedFileManager {
     /// Get all downloaded models organized by framework.
     /// Reconciles the registry through the generated discovery result, then
     /// groups the registered models by framework.
-    public func getDownloadedModels() async -> [InferenceFramework: [String]] {
+    internal func getDownloadedModels() async -> [InferenceFramework: [String]] {
         _ = await CppBridge.ModelRegistry.shared.discoverDownloadedModels()
 
         let models = await CppBridge.ModelRegistry.shared.getByFrameworks(
@@ -95,17 +95,17 @@ public class SimplifiedFileManager {
 
     /// Check if a specific model is downloaded
     @MainActor
-    public func isModelDownloaded(modelId: String, framework: InferenceFramework) -> Bool {
+    internal func isModelDownloaded(modelId: String, framework: InferenceFramework) -> Bool {
         return CppBridge.FileManager.modelFolderHasContents(modelId: modelId, framework: framework)
     }
 
     // MARK: - Download Management
 
-    public func getDownloadFolder() throws -> Folder {
+    internal func getDownloadFolder() throws -> Folder {
         return try baseFolder.subfolder(named: "Downloads")
     }
 
-    public func createTempDownloadFile(for modelId: String) throws -> File {
+    internal func createTempDownloadFile(for modelId: String) throws -> File {
         let downloadFolder = try getDownloadFolder()
         let tempFileName = "\(modelId)_\(UUID().uuidString).tmp"
         return try downloadFolder.createFile(named: tempFileName)
@@ -113,18 +113,18 @@ public class SimplifiedFileManager {
 
     // MARK: - Cache Management
 
-    public func storeCache(key: String, data: Data) throws {
+    internal func storeCache(key: String, data: Data) throws {
         let cacheFolder = try baseFolder.subfolder(named: "Cache")
         _ = try cacheFolder.createFile(named: "\(key).cache", contents: data)
     }
 
-    public func loadCache(key: String) throws -> Data? {
+    internal func loadCache(key: String) throws -> Data? {
         let cacheFolder = try baseFolder.subfolder(named: "Cache")
         guard cacheFolder.containsFile(named: "\(key).cache") else { return nil }
         return try cacheFolder.file(named: "\(key).cache").read()
     }
 
-    public func clearCache() throws {
+    internal func clearCache() throws {
         guard CppBridge.FileManager.clearCache() else {
             throw SDKException.fileManagement(.deleteFailed, "Failed to clear cache")
         }
@@ -133,7 +133,7 @@ public class SimplifiedFileManager {
 
     // MARK: - Temp Files
 
-    public func cleanTempFiles() throws {
+    internal func cleanTempFiles() throws {
         guard CppBridge.FileManager.clearTemp() else {
             throw SDKException.fileManagement(.deleteFailed, "Failed to clean temp files")
         }
@@ -142,11 +142,11 @@ public class SimplifiedFileManager {
 
     // MARK: - Storage Info
 
-    public func calculateDirectorySize(at url: URL) -> Int64 {
+    internal func calculateDirectorySize(at url: URL) -> Int64 {
         return CppBridge.FileManager.calculateDirectorySize(at: url)
     }
 
-    public func getBaseDirectoryURL() -> URL {
+    internal func getBaseDirectoryURL() -> URL {
         return URL(fileURLWithPath: baseFolder.path)
     }
 

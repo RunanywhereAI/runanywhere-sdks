@@ -213,6 +213,30 @@ public extension RunAnywhere {
     static func deleteStorage(_ request: RAStorageDeleteRequest) async -> RAStorageDeleteResult {
         await CppBridge.Storage.shared.delete(request)
     }
+
+    /// Clear the SDK's Cache directory. Forwards to `CppBridge.FileManager.clearCache()`,
+    /// matching Kotlin's top-level `RunAnywhere.clearCache()` entry point.
+    static func clearCache() async throws {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
+        }
+        try await ensureServicesReady()
+        guard CppBridge.FileManager.clearCache() else {
+            throw SDKException.fileManagement(.deleteFailed, "Failed to clear cache")
+        }
+    }
+
+    /// Clear the SDK's Temp directory. Forwards to `CppBridge.FileManager.clearTemp()`,
+    /// matching Kotlin's top-level `RunAnywhere.cleanTempFiles()` entry point.
+    static func cleanTempFiles() async throws {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
+        }
+        try await ensureServicesReady()
+        guard CppBridge.FileManager.clearTemp() else {
+            throw SDKException.fileManagement(.deleteFailed, "Failed to clean temp files")
+        }
+    }
 }
 
 private extension RunAnywhere {

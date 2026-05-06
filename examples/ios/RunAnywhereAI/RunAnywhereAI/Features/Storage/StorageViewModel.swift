@@ -60,8 +60,7 @@ class StorageViewModel: ObservableObject {
 
     func clearCache() async {
         do {
-            // TODO: migrate to RunAnywhere.clearCache() after SWF-CROSS-02
-            try SimplifiedFileManager.shared.clearCache()
+            try await RunAnywhere.clearCache()
             await refreshData()
         } catch {
             errorMessage = "Failed to clear cache: \(error.localizedDescription)"
@@ -70,8 +69,7 @@ class StorageViewModel: ObservableObject {
 
     func cleanTempFiles() async {
         do {
-            // TODO: migrate to RunAnywhere.cleanTempFiles() after SWF-CROSS-02
-            try SimplifiedFileManager.shared.cleanTempFiles()
+            try await RunAnywhere.cleanTempFiles()
             await refreshData()
         } catch {
             errorMessage = "Failed to clean temporary files: \(error.localizedDescription)"
