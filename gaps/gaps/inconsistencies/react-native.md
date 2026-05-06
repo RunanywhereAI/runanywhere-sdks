@@ -22,16 +22,11 @@ Yarn Berry 3.6.1 monorepo, three workspaces (`packages/core`, `packages/llamacpp
 
 ## Confirmed open gaps
 
-### RN-01: Jest harness dead weight (MEDIUM — decide + delete or rebuild)
+### RN-TEST-HARNESS-RELAND: Re-introduce RN streaming-parity harness (LOW — future wave)
 
-**Files**:
-- `packages/core/package.json:35` — `"test": "jest --passWithNoTests"`
-- `packages/core/package.json:75,77,80` — `@types/jest`, `jest`, `ts-jest` dev deps
-- No `packages/core/jest.config.js` exists.
-- No `tests/streaming/*.rn.test.ts` exist anywhere in the repo.
-- `sdk/runanywhere-react-native/CLAUDE.md:77` still documents the phantom `tests/streaming/*.rn.test.ts` harness.
+**Context**: Wave 3d Row 6 deleted the phantom Jest harness (`test` script + `jest`/`ts-jest`/`@types/jest` devDeps) from `packages/core/package.json` and corrected `sdk/runanywhere-react-native/CLAUDE.md`. No `jest.config.*` file existed at delete-time and no `tests/streaming/*.rn.test.ts` fixtures existed either — pure dead weight.
 
-**Acceptance**: either recreate the cross-SDK parity harness under `tests/streaming/*.rn.test.ts` consuming C++ golden fixtures, or delete the `test` script + jest/ts-jest/@types/jest devDependencies. Today Jest is installed on disk with no entry points.
+**Acceptance (future)**: rebuild `tests/streaming/*.rn.test.ts` consuming the shared C++ golden fixtures (see `tests/streaming/cancel_parity/` and `tests/streaming/perf_bench/`) to match Swift/Kotlin/Flutter/Web parity tests. Re-add `jest` + `ts-jest` + `@types/jest` devDeps + root-level `jest.config.js` with `--passWithNoTests` safety net.
 
 ### RN-06: JSON auth/device/HTTP surfaces mix with proto-byte world (MEDIUM)
 
@@ -89,9 +84,7 @@ User deferred diffusion support entirely. No action until the diffusion track re
 
 ## Items to DELETE
 
-| Target | Reason |
-|--------|--------|
-| `test` script + `jest` / `ts-jest` / `@types/jest` devDeps in `packages/core/package.json` | No config, no fixtures; harness is phantom (RN-01) — OR rebuild `tests/streaming/*.rn.test.ts` |
+_(none — tracked items resolved or moved to reland rows)_
 
 ## Cross-SDK naming alignment gaps
 

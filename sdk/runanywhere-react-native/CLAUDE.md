@@ -56,25 +56,11 @@ yarn release                    # lerna publish (npm, main branch only)
 yarn typecheck                  # tsc --noEmit
 yarn lint                       # ESLint src/**/*.ts
 yarn nitrogen                   # Regenerate Nitrogen bridge code
-yarn test                       # Jest (core only, --passWithNoTests)
 ```
 
 ### Running tests
 
-Tests live outside this directory at `tests/streaming/` (shared across SDKs). They require pre-built C++ binary fixture producers:
-
-```bash
-# Build fixture producers (from repo root)
-cmake --build build/macos-release --target cancel_producer
-./build/macos-release/tests/streaming/cancel_parity/cancel_producer  # writes /tmp/cancel_input.bin
-cmake --build build/macos-release --target perf_producer
-./build/macos-release/tests/streaming/perf_bench/perf_producer       # writes /tmp/perf_input.bin
-
-# Run tests
-cd packages/core && yarn test
-```
-
-Jest config (`packages/core/jest.config.js`) matches only `*.rn.test.ts` files in the shared `tests/streaming/` directory. Tests pass silently when fixture files are absent (`--passWithNoTests`).
+RN SDK currently has no unit tests; a streaming-parity harness was removed and will be reintroduced in a future iteration (see `RN-TEST-HARNESS-RELAND` in `gaps/gaps/inconsistencies/react-native.md`).
 
 ### Packaging for distribution
 
