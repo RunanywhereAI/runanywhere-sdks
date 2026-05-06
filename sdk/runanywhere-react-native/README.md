@@ -208,15 +208,22 @@ console.log('Latency:', result.latencyMs, 'ms');
 
 ### 4. Streaming Generation
 
+> Hermes caveat: `for await...of` does not work with NitroModules async iterables.
+> Use the manual-iterator pattern below. See [Hermes streaming](#hermes-streaming)
+> for details.
+
 ```typescript
 const streamResult = await RunAnywhere.generateStream(
   'Write a short poem about AI',
   { maxTokens: 150 }
 );
 
-// Display tokens in real-time
-for await (const token of streamResult.stream) {
-  process.stdout.write(token);
+// Display tokens in real-time (manual iterator — Hermes-safe)
+const iterator = streamResult.stream[Symbol.asyncIterator]();
+while (true) {
+  const { value, done } = await iterator.next();
+  if (done) break;
+  process.stdout.write(value);
 }
 
 // Get final metrics
@@ -258,6 +265,40 @@ const output = await RunAnywhere.synthesize(
 // output.audio contains base64-encoded float32 PCM
 // output.sampleRate, output.numSamples, output.duration
 ```
+
+---
+
+## Hermes streaming
+
+React Native's default JS engine (Hermes) does not support `for await...of`
+with NitroModules-backed async iterables. Any SDK API that returns an
+`AsyncIterable` must be consumed with a manual `Symbol.asyncIterator` loop:
+
+```typescript
+const stream = RunAnywhere.generateStream(prompt);
+const iterator = stream[Symbol.asyncIterator]();
+while (true) {
+  const { value, done } = await iterator.next();
+  if (done) break;
+  // handle value
+}
+```
+
+**Affected surfaces** (every public API that yields an `AsyncIterable`):
+
+| Surface | Yields |
+|---------|--------|
+| `RunAnywhere.generateStream(prompt, options)` | `LLMStreamEvent` (`token`, `completed`, `failed`, ...) |
+| `RunAnywhere.transcribe(audio, options)` / `transcribeStream(...)` | `STTStreamEvent` |
+| `RunAnywhere.synthesize(text, options)` / `synthesizeStream(...)` | `TTSStreamEvent` (audio chunks) |
+| `RunAnywhere.processImage(request)` | `VLMStreamEvent` (vision-language tokens) |
+| `RunAnywhere.downloadModel(id, onProgress?)` (when used as an async iterable) | `DownloadProgress` |
+| `RunAnywhere.voiceAgent.start(...)` | `VoiceEvent` |
+
+`for await` only works on Node / JavaScriptCore on iOS when Hermes is disabled.
+On Hermes-enabled apps (the default since RN 0.70), use the manual-iterator
+pattern above or wrap it in a helper. Breaking from the loop with `break` or
+`return` automatically cancels the native subscription.
 
 ---
 

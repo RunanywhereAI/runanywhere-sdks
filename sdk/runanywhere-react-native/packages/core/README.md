@@ -73,6 +73,41 @@ console.log('Version:', RunAnywhere.version);
 
 ---
 
+## Hermes streaming
+
+Hermes (the default JS engine in React Native since 0.70) does not support
+`for await...of` with NitroModules-backed async iterables. Every SDK API
+that returns an `AsyncIterable` must be consumed with a manual
+`Symbol.asyncIterator` loop:
+
+```typescript
+const stream = RunAnywhere.generateStream(prompt);
+const iterator = stream[Symbol.asyncIterator]();
+while (true) {
+  const { value, done } = await iterator.next();
+  if (done) break;
+  // handle value
+}
+```
+
+**Affected surfaces** (every public `AsyncIterable` the core exposes):
+
+| Surface | Yields |
+|---------|--------|
+| `RunAnywhere.generateStream(prompt, options)` | `LLMStreamEvent` (`token`, `completed`, `failed`, ...) |
+| `RunAnywhere.transcribe(audio, options)` / `transcribeStream(...)` | `STTStreamEvent` |
+| `RunAnywhere.synthesize(text, options)` / `synthesizeStream(...)` | `TTSStreamEvent` (audio chunks) |
+| `RunAnywhere.processImage(request)` | `VLMStreamEvent` (vision-language tokens) |
+| `RunAnywhere.downloadModel(id, onProgress?)` (when consumed as async iterable) | `DownloadProgress` |
+| `RunAnywhere.voiceAgent.start(...)` | `VoiceEvent` |
+
+Breaking out of the loop (`break` / `return` / `throw`) automatically
+unsubscribes the underlying native subscription, so idiomatic "cancel by
+breaking" behaviour is preserved. `for await` only works reliably when
+Hermes is disabled (Node, plain JSC).
+
+---
+
 ## API Reference
 
 ### RunAnywhere (Main API)
