@@ -2,7 +2,7 @@
 
 Date: 2026-05-05
 Branch: feat/v2-architecture @ 6217d9e67
-Total open rows: 80
+Total open rows: 79
 
 ## Execution rules
 
@@ -214,17 +214,6 @@ Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 **Fix pointer**: Either (a) materialize the shared harness — C++ "golden producer" binaries that emit `voice_agent_events` / `llm_golden_events` fixture files plus per-SDK readers — or (b) delete the stale CLAUDE.md language and acknowledge Flutter's self-contained `parity_test.dart` is the only streaming parity coverage. If choosing (a), reuse Flutter's local-only fixtures as the authoritative byte sequence and port to Swift (XCTest), Kotlin (JUnit + Wire decode), TS (vitest). Until then, there is no mechanism to catch BUG-STREAMING-001/002 at CI.
 **Severity**: MEDIUM
 
-### BUG-STREAMING-005 — Flutter DownloadProgress proto-ABI drift at runtime (HIGH, confirms C/Dart wire shape mismatch)
-**Lane**: 05_flutter_android
-**Category**: proto-abi-drift
-**Evidence**:
-- `test_workflows/logs/20260505T183402-0700-seven-lane-validation/05_flutter_android/logs/session.log:19639,19652-19697` (hundreds of identical failures during a 10-second download window): `DartBridge.Download: Failed to decode DownloadProgress: InvalidProtocolBufferException: Protocol message contained an invalid tag (zero)` / `tag had invalid wire type` / `end-group tag did not match`.
-- Terminal state at `session.log:25230` — `Download completed for model: LiquidAI LFM2 350M Q4_K_M` — file itself lands on disk fine; ONLY the progress stream is garbage.
-- Already captured as `BUG-FLT-ANDROID-001` in the 7-lane run (HIGH). Included here under streaming fidelity because the failure mode is the same shape as BUG-STREAMING-001/002 — C emits a raw callback struct while the SDK-side decoder expects length-prefixed proto bytes.
-**Root cause (suspected)**: The C callback is passing a raw `rac_download_progress_t` struct pointer while the Dart side expects a length-prefixed proto-encoded bytes buffer (per the DartBridge migration). Classic stream fan-out proto-ABI drift.
-**Fix pointer**: Compare `DartBridge.Download` callback glue in `sdk/runanywhere-flutter/packages/runanywhere/lib/src/bridge/dart_bridge_download.dart` against the C signature `rac_download_progress_callback_proto_t` in `sdk/runanywhere-commons/include/runanywhere/c_api/model_download.h`. Add a parity test that serializes one known `DownloadProgress` proto through the callback and round-trips it through the Dart decoder.
-**Severity**: HIGH
-
 ### BUG-WEB-006 — Stale `.d.ts` files in published `@runanywhere/web` `dist/types/` describe deleted APIs (MEDIUM)
 **Lane**: 07_web
 **Category**: build-tooling | SDK-defect
@@ -405,7 +394,7 @@ Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 **Severity**: HIGH
 
 ### BUG-PERF-003 — React Native iOS LLM inference returns in 0.3s with 0 tokens (HIGH)
-**Status**: RESOLVED (likely by BUG-RN-IOS-004 fix, Wave F-2); re-verify on Lane 04 rerun.
+**Status**: RESOLVED (likely by BUG-RN-IOS-004 fix commit 766965657); re-verify on Lane 04 rerun.
 **Lane(s)**: 04_react_native_ios
 **Category**: perf | correctness
 **Evidence**:
@@ -534,32 +523,6 @@ Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 **Root cause (suspected)**: RN example created from `npx @react-native-community/cli@latest init RunAnywhereAI` and bundle ID was never customized. This blocks TestFlight (team provisioning profiles won't match a non-owned reverse-DNS), collides with any other RN app that uses the template default, and breaks Keychain sharing with other RunAnywhere-signed apps since Keychain access groups are namespaced by bundle ID.
 **Fix pointer**: Change 4 `PRODUCT_BUNDLE_IDENTIFIER` lines to `com.runanywhere.RunAnywhereReactNative` (or match Swift at `com.runanywhere.RunAnywhere` if bundle collision on the same simulator is acceptable). Also bump `MARKETING_VERSION` to read from the canonical `VERSION` file via `sync-versions.sh`.
 **Severity**: MEDIUM — blocks any future TestFlight/App Store release; also invalidates `04_react_native_ios/agent_report.md:7` claim.
-
-### BUG-RN-IOS-004 — RN LLM stream C++ callback bridge captures stack-local lambda by pointer, may dangle if native generate path is asynchronous (HIGH)
-**Lane**: 04_react_native_ios
-**Category**: SDK-defect
-**Evidence**:
-- `sdk/runanywhere-react-native/packages/core/cpp/HybridRunAnywhereCore+Voice.cpp:280-298`:
-```cpp
-return Promise<void>::async([bytes = std::move(bytes), onEventBytes]() {
-    auto fn = proto_compat::symbol<proto_compat::LLMGenerateStreamProtoFn>(
-        "rac_llm_generate_stream_proto");
-    ...
-    auto callback = onEventBytes;              // stack copy of lambda
-    rac_result_t rc = fn(data, bytes.size(), protoBytesCallback, &callback);
-    if (rc != RAC_SUCCESS) { LOGE("llmGenerateStreamProto: rc=%d", rc); }
-});                                             // <-- callback destroyed here
-```
-- `protoBytesCallback` at lines 70-84 dereferences `userData` as a `std::function*` — i.e., the pointer to the stack local `callback`.
-- If `rac_llm_generate_stream_proto` is synchronous (generates all tokens before returning), pointer is valid. If it's asynchronous (posts work to a thread and returns), pointer dangles → **silent no-delivery of tokens** → matches BUG-RN-IOS-001 zero-tokens symptom (0.3s, 0.0 tok/s).
-- `sdk/runanywhere-commons/src/features/llm/rac_llm_proto_service.cpp:600-650` — `rac_llm_generate_stream_proto` calls into lifecycle llm then into `vt->llm_ops->generate_stream`. llama.cpp backend's `generate_stream` is blocking-synchronous, which is why this hasn't crashed — but the lifetime contract is fragile and any backend that defers to a worker thread will wedge.
-**Reproduction**:
-  1. On iPhone 16e simulator iOS 26.1, build RN example, select LFM2 1.2B Tool Q4_K_M, send "What is 2+2?".
-  2. Observe 0.3s completion with 0 tokens.
-  3. Compare `sdk/runanywhere-commons/tests/test_llm_proto_service.cpp:358,380,513` — the C++ unit tests all pass but use a synchronous stub backend, never exercising the async path.
-**Root cause (suspected)**: Bridge pattern assumes synchronous native generate. Simulator may schedule the generate onto a dispatch queue with different timing than device → callback fires after outer lambda unwinds → `callback*` dereferences freed memory. OR the llama.cpp code path on simulator returns early with RAC_SUCCESS but emits no events (different variant of BUG-PERF-003).
-**Fix pointer**: Allocate `callback` on heap via `new std::function<...>(onEventBytes)`, pass the raw pointer, and free it inside `protoBytesCallback` when a terminal `is_final=true` event arrives (or in an `on_done` callback). Or change the bridge to pass `onEventBytes` by shared_ptr captured into a heap-allocated context that outlives the outer async completion. Reference the Swift SDK's `LLMStreamAdapter` pattern which uses a `Subscription` that owns the callback for its lifetime.
-**Severity**: HIGH — root-cause candidate for BUG-RN-IOS-001 zero-tokens; even if not the current cause, it's a correctness landmine for any future async backend integration.
 
 ### BUG-RN-IOS-005 — STTScreen/TTSScreen emit console.warn('isSTTModelLoaded:'/...) on every mount producing the "Open debugger to view warnings" banner seen in 005_rn_reinstall_launch.png (LOW)
 **Lane**: 04_react_native_ios

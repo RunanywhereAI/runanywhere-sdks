@@ -290,11 +290,23 @@ HybridRunAnywhereCore::llmGenerateStreamProto(
             return;
         }
         const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
-        auto callback = onEventBytes;
-        rac_result_t rc = fn(data, bytes.size(), protoBytesCallback, &callback);
+        // BUG-RN-IOS-004: heap-allocate the std::function so its address is
+        // stable for the entire C callback window, even if a future async
+        // backend fires the callback after this outer lambda scope would
+        // ordinarily destroy a stack-local. The unique_ptr owns the heap
+        // storage for the duration of fn() (which is synchronous in the
+        // current contract), guaranteeing protoBytesCallback's user_data
+        // dereference is always valid. Matches the ownership pattern used
+        // by the JNI bridge (see runanywhere_commons_jni.cpp).
+        auto callback = std::make_unique<
+            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onEventBytes);
+        rac_result_t rc = fn(data, bytes.size(), protoBytesCallback, callback.get());
         if (rc != RAC_SUCCESS) {
             LOGE("llmGenerateStreamProto: rc=%d", rc);
         }
+        // callback unique_ptr is destroyed here AFTER fn() returns, freeing
+        // the heap. Since fn() is synchronous in the current C ABI contract,
+        // no more callback invocations are possible past this point.
     });
 }
 
@@ -637,7 +649,10 @@ HybridRunAnywhereCore::sttTranscribeStreamProto(
             LOGE("sttTranscribeStreamProto: STT handle or proto ABI unavailable");
             return;
         }
-        auto callback = onPartialBytes;
+        // BUG-RN-IOS-004 (adjacent): heap-allocate std::function so the
+        // user_data pointer is stable for the duration of the C call.
+        auto callback = std::make_unique<
+            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onPartialBytes);
         const uint8_t* optionsData = options.empty() ? nullptr : options.data();
         const void* audioData = audio.empty() ? nullptr : audio.data();
         rac_result_t rc = fn(
@@ -647,7 +662,7 @@ HybridRunAnywhereCore::sttTranscribeStreamProto(
             optionsData,
             options.size(),
             protoBytesCallback,
-            &callback);
+            callback.get());
         if (rc != RAC_SUCCESS) {
             LOGE("sttTranscribeStreamProto: rc=%d", rc);
         }
@@ -713,8 +728,11 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::ttsListVoicesProto(
             LOGE("ttsListVoicesProto: TTS handle or proto ABI unavailable");
             return false;
         }
-        auto callback = onVoiceBytes;
-        rac_result_t rc = fn(handle, protoBytesCallback, &callback);
+        // BUG-RN-IOS-004 (adjacent): heap-allocate std::function so the
+        // user_data pointer is stable for the duration of the C call.
+        auto callback = std::make_unique<
+            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onVoiceBytes);
+        rac_result_t rc = fn(handle, protoBytesCallback, callback.get());
         if (rc != RAC_SUCCESS) {
             LOGE("ttsListVoicesProto: rc=%d", rc);
             return false;
@@ -764,7 +782,10 @@ HybridRunAnywhereCore::ttsSynthesizeStreamProto(
             LOGE("ttsSynthesizeStreamProto: TTS handle or proto ABI unavailable");
             return;
         }
-        auto callback = onChunkBytes;
+        // BUG-RN-IOS-004 (adjacent): heap-allocate std::function so the
+        // user_data pointer is stable for the duration of the C call.
+        auto callback = std::make_unique<
+            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onChunkBytes);
         const uint8_t* optionsData = options.empty() ? nullptr : options.data();
         rac_result_t rc = fn(
             handle,
@@ -772,7 +793,7 @@ HybridRunAnywhereCore::ttsSynthesizeStreamProto(
             optionsData,
             options.size(),
             protoBytesCallback,
-            &callback);
+            callback.get());
         if (rc != RAC_SUCCESS) {
             LOGE("ttsSynthesizeStreamProto: rc=%d", rc);
         }
@@ -1101,7 +1122,10 @@ HybridRunAnywhereCore::vlmProcessStreamProto(
         }
         rac_proto_buffer_t out;
         proto_compat::initBuffer(&out);
-        auto callback = onEventBytes;
+        // BUG-RN-IOS-004 (adjacent): heap-allocate std::function so the
+        // user_data pointer is stable for the duration of the C call.
+        auto callback = std::make_unique<
+            std::function<void(const std::shared_ptr<ArrayBuffer>&)>>(onEventBytes);
         const uint8_t* imageData = image.empty() ? nullptr : image.data();
         const uint8_t* optionsData = options.empty() ? nullptr : options.data();
         rac_result_t rc = fn(
@@ -1111,7 +1135,7 @@ HybridRunAnywhereCore::vlmProcessStreamProto(
             optionsData,
             options.size(),
             vlmProtoBytesCallback,
-            &callback,
+            callback.get(),
             &out);
         if (rc != RAC_SUCCESS && out.status == RAC_SUCCESS) {
             LOGE("vlmProcessStreamProto: rc=%d", rc);
