@@ -35,17 +35,17 @@ struct VoiceAssistantView: View {
         }
         .adaptiveSheet(isPresented: $showSTTModelSelection) {
             ModelSelectionSheet(context: .stt) { model in
-                viewModel.setSTTModel(model)
+                await viewModel.setSTTModel(model)
             }
         }
         .adaptiveSheet(isPresented: $showLLMModelSelection) {
             ModelSelectionSheet(context: .llm) { model in
-                viewModel.setLLMModel(model)
+                await viewModel.setLLMModel(model)
             }
         }
         .adaptiveSheet(isPresented: $showTTSModelSelection) {
             ModelSelectionSheet(context: .tts) { model in
-                viewModel.setTTSModel(model)
+                await viewModel.setTTSModel(model)
             }
         }
         .onAppear {

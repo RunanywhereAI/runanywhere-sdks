@@ -284,6 +284,16 @@ final class VoiceAgentViewModel: ObservableObject {
     }
 
     private func handleSDKEvent(_ event: RASDKEvent) {
+        // The proto-lifecycle path publishes RAComponentLifecycleEvent under
+        // the `component` category. Handle that first so STT/TTS loads issued
+        // through RunAnywhere.loadModel reach the UI. Legacy model/generation
+        // payloads (still used by some LLM paths) fall through to the
+        // per-component handlers below.
+        if event.category == .component {
+            handleComponentLifecycleEvent(event)
+            return
+        }
+
         switch (event.category, event.component) {
         case (.llm, _), (_, .llm):
             handleLLMEvent(event)
@@ -291,6 +301,42 @@ final class VoiceAgentViewModel: ObservableObject {
             handleSTTEvent(event)
         case (.tts, _), (_, .tts):
             handleTTSEvent(event)
+        default:
+            break
+        }
+    }
+
+    /// Handle the canonical component-lifecycle proto event published by
+    /// `rac_model_lifecycle_load_proto` / `..._unload_proto`. This is how the
+    /// STT "Use" action (and every other modality that routes through
+    /// `RunAnywhere.loadModel`) signals load/unload completion to the app.
+    private func handleComponentLifecycleEvent(_ event: RASDKEvent) {
+        let lifecycle = event.componentLifecycle
+        let modelId = lifecycle.modelID
+        let state = mapState(lifecycle.currentState)
+
+        switch lifecycle.component {
+        case .llm:
+            llmModelState = state
+            if case .loaded = state, !modelId.isEmpty {
+                updateModel(.llm, id: modelId)
+            } else if case .notLoaded = state {
+                llmModel = nil
+            }
+        case .stt:
+            sttModelState = state
+            if case .loaded = state, !modelId.isEmpty {
+                updateModel(.stt, id: modelId)
+            } else if case .notLoaded = state {
+                sttModel = nil
+            }
+        case .tts:
+            ttsModelState = state
+            if case .loaded = state, !modelId.isEmpty {
+                updateModel(.tts, id: modelId)
+            } else if case .notLoaded = state {
+                ttsModel = nil
+            }
         default:
             break
         }
@@ -358,26 +404,31 @@ final class VoiceAgentViewModel: ObservableObject {
 
     // MARK: - Model Selection
 
-    /// Set the STT model
-    func setSTTModel(_ model: RAModelInfo) {
+    /// Commit the selected STT model to the Voice Agent pipeline.
+    ///
+    /// Called from the "Use" action in the STT picker after
+    /// `RunAnywhere.loadModel` has already loaded the model into the C++
+    /// lifecycle for `SDK_COMPONENT_STT`. This updates the Voice tab's
+    /// pipeline slot and re-syncs `sttModelState` from the canonical
+    /// component snapshot so the setup card transitions to "Loaded".
+    func setSTTModel(_ model: RAModelInfo) async {
         sttModel = SelectedModelInfo(framework: model.framework, name: model.name, id: model.id)
-        Task {
-            await syncModelStates()
-        }
+        sttModelState = .loaded  // Optimistic — corrected by snapshot below.
+        await syncModelStates()
     }
 
-    /// Set the LLM model
-    func setLLMModel(_ model: RAModelInfo) {
+    /// Commit the selected LLM model to the Voice Agent pipeline.
+    func setLLMModel(_ model: RAModelInfo) async {
         llmModel = SelectedModelInfo(framework: model.framework, name: model.name, id: model.id)
-        Task {
-            await syncModelStates()
-        }
+        llmModelState = .loaded
+        await syncModelStates()
     }
 
-    /// Set the TTS model
-    func setTTSModel(_ model: RAModelInfo) {
+    /// Commit the selected TTS model to the Voice Agent pipeline.
+    func setTTSModel(_ model: RAModelInfo) async {
         ttsModel = SelectedModelInfo(framework: model.framework, name: model.name, id: model.id)
-        Task { await syncModelStates() }
+        ttsModelState = .loaded
+        await syncModelStates()
     }
 
     // MARK: - Conversation Control
