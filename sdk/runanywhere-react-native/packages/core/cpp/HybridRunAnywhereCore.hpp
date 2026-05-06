@@ -151,6 +151,8 @@ public:
   // ============================================================================
 
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> hardwareProfileProto() override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> setAcceleratorPreferenceProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
 
   // ============================================================================
   // Events - Delegates to EventBridge

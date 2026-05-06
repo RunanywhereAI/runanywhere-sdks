@@ -100,8 +100,7 @@ export {
   hasNeuralEngine as hardwareHasNeuralEngine,
   accelerationMode as hardwareAccelerationMode,
   getAccelerators as getHardwareAccelerators,
-  setAccelerationPreference as setHardwareAcceleratorPreference,
-  getAccelerationPreference as getHardwareAcceleratorPreference,
+  setAcceleratorPreference as setHardwareAcceleratorPreference,
   AccelerationPreference,
   Hardware,
 } from './RunAnywhere+Hardware';

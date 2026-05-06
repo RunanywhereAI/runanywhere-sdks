@@ -43,18 +43,6 @@ Swift/Kotlin/Flutter/Web all marshal the same JSON subset, so this is consistent
 
 **Acceptance (commons-driven)**: add the proto messages and convert these surfaces, or document the JSON subset as a canonical exception in `docs/CPP_PROTO_OWNERSHIP.md`.
 
-### RN-07: Hardware preference setter is JS-only (LOW — naming drift + non-functional)
-
-**Files**:
-- `packages/core/src/Public/Extensions/RunAnywhere+Hardware.ts:43-44,197-227` — `_acceleratorPreference` in-memory cache; `setAccelerationPreference(preference)` writes the cache + best-effort forwards to `native.setAccelerationPreference?.(p)` which is not on the Nitro spec.
-- `packages/core/src/specs/RunAnywhereCore.nitro.ts:283` — only `hardwareProfileProto()`, no preference setter.
-
-**Naming drift**: Swift uses `setAcceleratorPreference`; RN uses `setAccelerationPreference`. Pick one.
-
-Downstream routing in commons is never informed of the preference — the call is effectively a JS cache with no native side effect.
-
-**Acceptance**: once commons exposes `rac_hardware_set_accelerator_preference` (ideally through a proto scalar method), wire the Nitro spec, delete the in-memory cache, and align the name with Swift (`setAcceleratorPreference`).
-
 ### RN-08: NPU chip resolver missing (MEDIUM)
 
 **Files**:
@@ -81,6 +69,7 @@ User deferred diffusion support entirely. No action until the diffusion track re
 | RN-02 (duplicate backend podspecs) | `323843061` — deleted `packages/llamacpp/ios/LlamaCPPBackend.podspec` and `packages/onnx/ios/ONNXBackend.podspec`. Canonical podspecs at package roots (`RunAnywhereLlama.podspec`, `RunAnywhereONNX.podspec`) are the only ones referenced by `react-native.config.js`. |
 | RN-12 (Hermes streaming caveat in READMEs) | `71e142ee5` — added "Hermes streaming" section to `sdk/runanywhere-react-native/README.md` and `packages/core/README.md` with the manual `Symbol.asyncIterator` loop pattern. Replaced the misleading `for await` example in the top-level Quick Start. Lists every affected `AsyncIterable` surface. |
 | RN-15 (EventBus README drift) | `2b8862f25` — rewrote `packages/core/README.md` EventBus section as "SDK Events" describing `RunAnywhere.subscribeSDKEvents((event) => ...)`. Deleted `EventBus.on`, `RunAnywhere.events.*`, and the Event Categories table. |
+| RN-07 (hardware preference setter wired) | Wave 3d Row 7 — added `setAcceleratorPreferenceProto(requestBytes)` Nitro method in `RunAnywhereCore.nitro.ts`, `HybridRunAnywhereCore+Hardware.cpp` impl calls `rac_hardware_set_accelerator_preference`, `RunAnywhere+Hardware.ts` renamed `setAccelerationPreference` → `setAcceleratorPreference` and the `_acceleratorPreference` JS cache is gone. |
 
 ## Items to DELETE
 
@@ -94,8 +83,8 @@ _(none — tracked items resolved or moved to reland rows)_
 | Init | `initialize()` + `completeServicesInitialization()` | same | same | same | same | OK |
 | LLM stream | `AsyncStream` | `Flow` | `Stream` | `AsyncIterable` | `AsyncIterable` (manual `iterator.next()` for Hermes) | OK |
 | Errors | `SDKException` proto-backed | same | same | same | same | OK |
-| Hardware preference setter | `setAcceleratorPreference(_:)` | `setAcceleratorPreference(...)` | — | — | **`setAccelerationPreference(p)`** (RN-07) | **NAME DRIFT** |
-| Hardware preference sink | C ABI `rac_hardware_set_accelerator_preference` | same | — | — | **JS in-memory only** (RN-07) | **BEHAVIOR DRIFT** |
+| Hardware preference setter | `setAcceleratorPreference(_:)` | `setAcceleratorPreference(...)` | — | — | `setAcceleratorPreference(p)` | OK |
+| Hardware preference sink | C ABI `rac_hardware_set_accelerator_preference` | same | — | — | C ABI (via Nitro `setAcceleratorPreferenceProto`) | OK |
 | NPU chip resolver | `NPUChipDetector.chip() -> NPUChip` | Android structured chip ID | — | — | **MISSING** (RN-08) | **DRIFT** |
 | Diffusion | `RunAnywhere+Diffusion.swift` | — | — | — | **MISSING — deferred** (RN-09) | Deferred |
 | `initialize(config)` wire | proto/plist | proto | proto | JSON string | JSON string (RN-06) | Consistent with Web |

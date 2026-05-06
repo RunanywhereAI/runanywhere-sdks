@@ -220,7 +220,6 @@ export {
   hardwareAccelerationMode,
   getHardwareAccelerators,
   setHardwareAcceleratorPreference,
-  getHardwareAcceleratorPreference,
   AccelerationPreference,
 } from './Public/Extensions';
 export type { AcceleratorInfo, HardwareProfileResult } from './Public/Extensions';

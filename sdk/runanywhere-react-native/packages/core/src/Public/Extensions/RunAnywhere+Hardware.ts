@@ -8,18 +8,20 @@
  *   - `hardware.getChip() -> string`
  *   - `hardware.hasNeuralEngine: boolean`
  *   - `hardware.accelerationMode: string`
- *   - `hardware.getAccelerators() -> AcceleratorInfo[]` (Swift parity)
- *   - `hardware.setAccelerationPreference(p) -> Promise<boolean>` (Swift parity)
+ *   - `hardware.getAccelerators() -> AcceleratorInfo[]`
+ *   - `hardware.setAcceleratorPreference(p) -> Promise<boolean>` (Swift parity)
  *
- * Values come from the `rac_hardware_profile_get` C ABI exposed through the
- * core Nitro object. A native platform fallback exists only for stale binaries
- * that do not expose the ABI yet.
+ * Values come from the `rac_hardware_*` C ABI exposed through the core Nitro
+ * HybridObject. A native platform fallback exists only for stale binaries that
+ * do not expose the ABI yet.
  */
 
 import { Platform } from 'react-native';
 import {
   type AcceleratorInfo,
   AccelerationPreference,
+  HardwareAcceleratorPreferenceRequest,
+  HardwareAcceleratorPreferenceResult,
   HardwareProfileResult as HardwareProfileResultCodec,
   type HardwareProfileResult,
 } from '@runanywhere/proto-ts/hardware_profile';
@@ -28,20 +30,13 @@ import {
   requireDeviceInfoModule,
   requireNativeModule,
 } from '../../native';
-import { arrayBufferToBytes } from '../../services/ProtoBytes';
+import { arrayBufferToBytes, bytesToArrayBuffer } from '../../services/ProtoBytes';
 
 export type {
   AcceleratorInfo,
   HardwareProfileResult,
 } from '@runanywhere/proto-ts/hardware_profile';
 export { AccelerationPreference } from '@runanywhere/proto-ts/hardware_profile';
-
-// In-memory cache for the preferred accelerator. The Nitro spec does not
-// surface `rac_hardware_set_accelerator_preference` yet, so the SDK persists
-// the preference here and exposes it through `getAccelerationPreference()`.
-// Mirrors Swift's `setAccelerationPreference(_:)` Public surface.
-let _acceleratorPreference: AccelerationPreference =
-  AccelerationPreference.ACCELERATION_PREFERENCE_AUTO;
 
 function detectAccelerationMode(hasNpu: boolean): string {
   if (Platform.OS === 'ios' || Platform.OS === 'macos') {
@@ -186,54 +181,53 @@ export async function getAccelerators(): Promise<AcceleratorInfo[]> {
 /**
  * Set the preferred accelerator for subsequent inference routing.
  *
- * Mirrors Swift's `RunAnywhere.hardware.setAccelerationPreference(_:)`.
- *
- * The Nitro spec does not yet surface `rac_hardware_set_accelerator_preference`
- * directly; this implementation persists the preference in-memory and exposes
- * it via `getAccelerationPreference()`. When the Nitro bridge is updated to
- * include the C ABI call this function will forward through to the native
- * implementation without breaking callers.
+ * Mirrors Swift's `RunAnywhere.hardware.setAcceleratorPreference(_:)`. Routes
+ * through the commons `rac_hardware_set_accelerator_preference` C ABI via the
+ * Nitro `setAcceleratorPreferenceProto` method. Returns `true` on success;
+ * `false` when the request is rejected (unsupported enum, stale native binary,
+ * or commons returned a non-success status).
  */
-export async function setAccelerationPreference(
+export async function setAcceleratorPreference(
   preference: AccelerationPreference
 ): Promise<boolean> {
   if (
     preference !== AccelerationPreference.ACCELERATION_PREFERENCE_AUTO &&
     preference !== AccelerationPreference.ACCELERATION_PREFERENCE_NPU &&
     preference !== AccelerationPreference.ACCELERATION_PREFERENCE_GPU &&
-    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_CPU
+    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_CPU &&
+    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_WEBGPU &&
+    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_METAL &&
+    preference !== AccelerationPreference.ACCELERATION_PREFERENCE_VULKAN
   ) {
     return false;
   }
 
-  _acceleratorPreference = preference;
-
-  // Best-effort forward to the native side if a future Nitro spec update
-  // exposes a `setAccelerationPreferenceProto`-style entry point.
-  try {
-    if (isNativeModuleAvailable()) {
-      const native = requireNativeModule() as unknown as {
-        setAccelerationPreference?: (p: number) => Promise<boolean>;
-      };
-      if (typeof native.setAccelerationPreference === 'function') {
-        return await native.setAccelerationPreference(preference);
-      }
-    }
-  } catch {
-    // Native call not available; the in-memory cache above is sufficient.
+  if (!isNativeModuleAvailable()) {
+    return false;
   }
 
-  return true;
-}
+  const native = requireNativeModule();
+  if (typeof native.setAcceleratorPreferenceProto !== 'function') {
+    return false;
+  }
 
-/**
- * Read back the most recently set accelerator preference.
- *
- * Returns `ACCELERATION_PREFERENCE_AUTO` if no preference has been set in this
- * SDK session.
- */
-export function getAccelerationPreference(): AccelerationPreference {
-  return _acceleratorPreference;
+  try {
+    const requestBytes = HardwareAcceleratorPreferenceRequest.encode({
+      preference,
+    }).finish();
+    const responseBuffer = await native.setAcceleratorPreferenceProto(
+      bytesToArrayBuffer(requestBytes)
+    );
+    if (responseBuffer.byteLength === 0) {
+      return false;
+    }
+    const result = HardwareAcceleratorPreferenceResult.decode(
+      arrayBufferToBytes(responseBuffer)
+    );
+    return result.success === true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -246,6 +240,5 @@ export const Hardware = {
   hasNeuralEngine,
   accelerationMode,
   getAccelerators,
-  setAccelerationPreference,
-  getAccelerationPreference,
+  setAcceleratorPreference,
 };
