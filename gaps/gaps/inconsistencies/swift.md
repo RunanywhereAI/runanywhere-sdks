@@ -55,16 +55,6 @@ Swift is a thin platform bridge over the C ABI. All public data types (`RAModelI
 - **Validation**: `grep "SimplifiedFileManager\." examples/ios/RunAnywhereAI` returns zero matches; iOS example builds.
 - **Scope**: S.
 
-### SWF-CROSS-03: Missing `RunAnywhere.registerModel(...)` top-level API (LOW, cross-SDK)
-
-- **Symptom**: Kotlin exposes `fun RunAnywhere.registerModel(...): ModelInfo` as a top-level API (`sdk/runanywhere-kotlin/.../public/extensions/RunAnywhere+ModelManagement.kt:51`). Swift has `RunAnywhere.importModel(_ request: RAModelImportRequest)` at `Public/Extensions/Storage/RunAnywhere+Storage.swift` (correct for file-picker flows) but no terse `registerModel(id:name:url:framework:...)` convenience. The Swift example app CLAUDE.md advertises `RunAnywhere.registerModel(id:name:url:framework:memoryRequirement:supportsThinking:)` as a shim, but the actual example shim file (`RunAnywhere+ExampleShims.swift`, 47 LOC) does not contain it.
-- **Why it matters**: Cross-SDK API-shape parity.
-- **Fix steps**: Either:
-  - (a) Promote by adding `public static func registerModel(id:name:url:framework:...)` that composes an `RAModelImportRequest` internally, OR
-  - (b) Add it to `examples/ios/RunAnywhereAI/RunAnywhereAI/Extensions/RunAnywhere+ExampleShims.swift` and clarify in the SDK docs / example CLAUDE.md that it's example-local.
-- **Validation**: Cross-SDK naming table below shows aligned rows.
-- **Scope**: S.
-
 ## Items to DELETE (hard delete, no deprecation)
 
 (none open)
@@ -95,7 +85,7 @@ Swift is a thin platform bridge over the C ABI. All public data types (`RAModelI
 | **Voice agent states** | **MISSING** | `getVoiceAgentComponentStates()` | (unknown) | `getVoiceAgentComponentStates()` | **DRIFT** (SWF-CROSS-01) |
 | **Storage — clearCache** | Only via internal `SimplifiedFileManager` | `CppBridgeFileManager.clearCache()` + top-level `RunAnywhere.clearCache()` per header docs | (unknown) | docs advertise | **DRIFT** (SWF-CROSS-02) |
 | **Storage — cleanTempFiles** | Only via internal `SimplifiedFileManager` | (unknown) | (unknown) | docs advertise | **DRIFT** (SWF-CROSS-02) |
-| **Register model (convenience)** | Only `importModel(_ request: RAModelImportRequest)` | `fun RunAnywhere.registerModel(id, name, url, framework, …)` top-level | (unknown) | (unknown) | **DRIFT** (SWF-CROSS-03) |
+| **Register model (convenience)** | `RunAnywhere.registerModel(id:name:url:framework:…)` top-level | `fun RunAnywhere.registerModel(id, name, url, framework, …)` top-level | (unknown) | (unknown) | OK |
 
 All `RA*` proto typealias names match Kotlin / Flutter / RN / Web conventions. No drift outside the five rows above.
 

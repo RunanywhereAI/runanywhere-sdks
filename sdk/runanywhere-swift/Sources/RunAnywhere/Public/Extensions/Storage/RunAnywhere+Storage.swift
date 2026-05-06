@@ -5,9 +5,85 @@
 //  Public API for storage and download operations.
 //
 
+import CRACommons
 import Foundation
 
 public extension RunAnywhere {
+    /// Register a remote model with the in-memory model registry from a
+    /// download URL. Cross-SDK convenience surface that matches Kotlin's
+    /// `RunAnywhere.registerModel(id, name, url, framework, ...)`
+    /// (`sdk/runanywhere-kotlin/.../public/extensions/RunAnywhere+ModelManagement.kt:51`).
+    ///
+    /// The format is inferred from the URL extension via the commons
+    /// `rac_model_detect_format_from_extension` helper; the artifact oneof
+    /// (single-file vs archive) is inferred via
+    /// `RAModelInfo.inferredArtifact(from:format:)`. The resulting
+    /// `RAModelInfo` is persisted to the registry through
+    /// `CppBridge.ModelRegistry.shared.save(...)`, matching Kotlin's
+    /// `registerModelInternal()` path.
+    @discardableResult
+    static func registerModel(
+        id: String? = nil,
+        name: String,
+        url: String,
+        framework: InferenceFramework,
+        modality: ModelCategory = .language,
+        artifactType: RAModelArtifactType? = nil,
+        memoryRequirement: Int64? = nil,
+        supportsThinking: Bool = false,
+        supportsLora: Bool = false
+    ) async throws -> RAModelInfo {
+        guard isInitialized else {
+            throw SDKException.general(.notInitialized, "SDK not initialized")
+        }
+
+        let logger = SDKLogger(category: "RunAnywhere.registerModel")
+        let modelId = id ?? generateModelId(fromURL: url)
+        let format = detectFormat(fromURL: url)
+        let now = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+
+        logger.debug("Registering model: \(modelId) (name: \(name))")
+        logger.debug("Detected format: \(format.wireString) for model: \(modelId)")
+
+        var model = RAModelInfo()
+        model.id = modelId
+        model.name = name
+        model.category = modality
+        model.format = format
+        model.framework = framework
+        model.downloadURL = url
+        model.downloadSizeBytes = memoryRequirement ?? 0
+        if let memoryRequirement {
+            model.memoryRequiredBytes = memoryRequirement
+        }
+        model.contextLength = modality.requiresContextLength ? 2048 : 0
+        model.supportsThinking = supportsThinking
+        model.supportsLora = supportsLora
+        if supportsThinking {
+            model.thinkingPattern = .defaultPattern
+        }
+        model.description_p = "User-added model"
+        model.source = .local
+        model.createdAtUnixMs = now
+        model.updatedAtUnixMs = now
+
+        let urlValue = URL(string: url)
+        let inferred = RAModelInfo.inferredArtifact(from: urlValue, format: format)
+        model.setArtifact(inferred)
+        if let artifactType {
+            model.artifactType = artifactType
+        }
+        model.isDownloaded = model.isDownloadedOnDisk
+        model.isAvailable = model.isAvailableForUse
+
+        try await CppBridge.ModelRegistry.shared.save(model)
+
+        logger.info(
+            "Registered model: \(modelId) (category: \(modality.wireString), framework: \(framework.wireString))"
+        )
+        return model
+    }
+
     /// Download a registered model with the generated download plan/start/progress
     /// contracts. Commons owns planning and registry updates; Swift owns the
     /// native URLSession transfer behind the C++ download adapter.
@@ -200,5 +276,46 @@ private extension RunAnywhere {
         }
 
         return progress
+    }
+
+    /// URL → model-format inference via the commons extension-detection helper
+    /// (`rac_model_detect_format_from_extension`). Matches the Kotlin
+    /// `formatFromUrl(...)` path which delegates to commons as well. Returns
+    /// `.unknown` when no known extension is found on the URL path.
+    static func detectFormat(fromURL url: String) -> ModelFormat {
+        let filename = trailingFilename(fromURL: url)
+        let ext = (filename as NSString).pathExtension.lowercased()
+        guard !ext.isEmpty else { return .unknown }
+
+        var cFormat: rac_model_format_t = RAC_MODEL_FORMAT_UNKNOWN
+        let detected = ext.withCString { rac_model_detect_format_from_extension($0, &cFormat) }
+        guard detected == RAC_TRUE else { return .unknown }
+        return ModelFormat(from: cFormat)
+    }
+
+    /// Derive a stable model id from a URL by stripping trailing known
+    /// extensions. Mirrors Kotlin `generateModelIdFromUrl(...)` so ids agree
+    /// across SDKs for URL-registered models.
+    static func generateModelId(fromURL url: String) -> String {
+        var filename = trailingFilename(fromURL: url)
+        let knownExtensions: Set<String> = [
+            "gz", "bz2", "tar", "zip", "gguf", "onnx", "ort", "bin",
+        ]
+        while true {
+            let ext = (filename as NSString).pathExtension.lowercased()
+            if !ext.isEmpty, knownExtensions.contains(ext) {
+                filename = (filename as NSString).deletingPathExtension
+            } else {
+                break
+            }
+        }
+        return filename
+    }
+
+    static func trailingFilename(fromURL url: String) -> String {
+        if let parsed = URL(string: url), !parsed.lastPathComponent.isEmpty {
+            return parsed.lastPathComponent
+        }
+        return url.split(separator: "/").last.map(String.init) ?? url
     }
 }
