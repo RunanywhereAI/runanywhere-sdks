@@ -274,8 +274,13 @@ async function startDownload(modelId: string): Promise<void> {
   setRow(modelId, { status: 'downloading', progress: 0 });
 
   try {
+    const model = RunAnywhere.modelRegistry.get(modelId);
+    if (!model) {
+      throw new Error(`Model ${modelId} not found in registry`);
+    }
     const plan = RunAnywhere.downloads.plan({
       modelId,
+      model,
       resumeExisting: false,
       availableStorageBytes: 0,
       allowMeteredNetwork: true,

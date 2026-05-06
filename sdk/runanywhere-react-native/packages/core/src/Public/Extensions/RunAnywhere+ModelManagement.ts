@@ -251,7 +251,19 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
         started = true;
         try {
           await native.setDownloadProgressCallbackProto(onBytes);
-          const planRequest = DownloadPlanRequest.fromPartial({ modelId });
+          const modelBuffer = await native.getModelInfoProto(modelId);
+          const modelBytes = arrayBufferToBytes(modelBuffer);
+          if (modelBytes.byteLength === 0) {
+            streamError = new Error(`model ${modelId} is not registered`);
+            await native.clearDownloadProgressCallbackProto().catch(() => {});
+            finish();
+            return;
+          }
+          const model = ModelInfoCodec.decode(modelBytes);
+          const planRequest = DownloadPlanRequest.fromPartial({
+            modelId,
+            model,
+          });
           const planBytes = await native.downloadPlanProto(
             bytesToArrayBuffer(DownloadPlanRequest.encode(planRequest).finish())
           );
