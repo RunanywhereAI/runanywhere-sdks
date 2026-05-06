@@ -28,20 +28,28 @@ Yarn Berry 3.6.1 monorepo, three workspaces (`packages/core`, `packages/llamacpp
 
 **Acceptance (future)**: rebuild `tests/streaming/*.rn.test.ts` consuming the shared C++ golden fixtures (see `tests/streaming/cancel_parity/` and `tests/streaming/perf_bench/`) to match Swift/Kotlin/Flutter/Web parity tests. Re-add `jest` + `ts-jest` + `@types/jest` devDeps + root-level `jest.config.js` with `--passWithNoTests` safety net.
 
-### RN-06: JSON auth/device/HTTP surfaces mix with proto-byte world (MEDIUM)
+### RN-JSON-PROTO-MIGRATE: Migrate 7 JSON-string Nitro surfaces to proto (LOW — future iteration)
 
-**Files**:
-- `RunAnywhereCore.nitro.ts:48` — `initialize(configJson: string): Promise<boolean>`
-- `RunAnywhereCore.nitro.ts:104` — `registerDevice(environmentJson: string): Promise<boolean>`
-- `RunAnywhereCore.nitro.ts:378` — `httpRequest(...): Promise<string>` (returns JSON body)
-- `RunAnywhereCore.nitro.ts:397` — `authAuthenticate(...): Promise<string>` (returns JSON body)
-- `RunAnywhereCore.nitro.ts:412` — `authRefreshToken(baseURL: string): Promise<string>` (returns JSON body)
-- `RunAnywhereCore.nitro.ts:434` — `getDeviceCapabilities(): Promise<string>` (returns JSON body)
-- `RunAnywhereCore.nitro.ts:63` — `getBackendInfo(): Promise<string>` (returns JSON body)
+**Context**: Wave 3d Row 9 documented the JSON-string subset as a canonical cross-SDK exception in `docs/CPP_PROTO_OWNERSHIP.md` (section "JSON String Surfaces (Cross-SDK)", classification `compat`). The 7 surfaces below all round-trip through `JSON.parse` on the TS side and carry the same JSON shape across Swift, Kotlin, Flutter, React Native, and Web SDKs — so there is no cross-SDK drift today, only a violation of the "all wire types are proto" rule.
 
-Swift/Kotlin/Flutter/Web all marshal the same JSON subset, so this is consistent across SDKs — but violates the "all wire types are proto" rule. `idl/` has no `SDKInitConfig`, `DeviceRegisterRequest`, `AuthResponse`, `BackendInfo`, or `DeviceCapabilities` messages.
+**Surfaces** (all on `RunAnywhereCore.nitro.ts`):
+- `initialize(configJson: string): Promise<boolean>` (line 48)
+- `registerDevice(environmentJson: string): Promise<boolean>` (line 97)
+- `httpRequest(method, url, headersJson, bodyJson, timeoutMs): Promise<string>` (line 371)
+- `authAuthenticate(apiKey, baseURL, deviceId, platform, sdkVersion): Promise<string>` (line 390)
+- `authRefreshToken(baseURL: string): Promise<string>` (line 405)
+- `getBackendInfo(): Promise<string>` (line 63)
+- `getDeviceCapabilities(): Promise<string>` (line 427)
 
-**Acceptance (commons-driven)**: add the proto messages and convert these surfaces, or document the JSON subset as a canonical exception in `docs/CPP_PROTO_OWNERSHIP.md`.
+**Acceptance (future)**: add the following proto messages under `idl/` and migrate each surface end-to-end across all 5 SDKs in the same iteration:
+- `SDKInitConfig` (replaces `initialize(configJson)`)
+- `DeviceRegisterRequest` (replaces `registerDevice(environmentJson)`)
+- `HTTPRequestEnvelope` / `HTTPResponseEnvelope` (replaces `httpRequest`)
+- `AuthRequest` / `AuthResponse` (replaces `authAuthenticate` / `authRefreshToken`)
+- `BackendInfo` (replaces `getBackendInfo`)
+- `DeviceCapabilities` (replaces `getDeviceCapabilities`)
+
+Until migration, the JSON wire form is the canonical contract (see `docs/CPP_PROTO_OWNERSHIP.md` → "JSON String Surfaces (Cross-SDK)"). Scope: L (proto design + C++ ABI + 5-SDK migration + TS migration).
 
 ### RN-09: *Deferred* (diffusion helper shim)
 

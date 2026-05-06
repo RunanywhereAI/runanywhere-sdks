@@ -330,6 +330,39 @@ does not exist and would force every SDK to render dead client stubs.
 | RAG legacy session create/query helpers in `features/rag/rac_rag_pipeline.h` (`rac_rag_pipeline_t` typedef, `rac_document_chunk_t`, `rac_search_result_t`, `rac_rag_pipeline_config_t`, `rac_rag_config_t`, `rac_rag_query_t`, `rac_rag_result_t`, `rac_rag_pipeline_create`/`create_standalone`/`add_document(s)`/`query`/`pipeline_query`/`clear_documents`/`get_document_count`/`get_statistics`/`result_free`/`pipeline_destroy`, plus `rac_rag_token_callback_fn`) | `delete after SDK migration` for SDK-facing entry points; `internal` for backend-only helpers | Use `rac_rag_session_create_proto`/`rac_rag_ingest_proto`/`rac_rag_query_proto`/`rac_rag_clear_proto`/`rac_rag_stats_proto` over generated `RAGConfiguration`/`RAGDocument`/`RAGQueryOptions`/`RAGResult`/`RAGStatistics` bytes. |
 | RAG backend registration helpers `rac_backend_rag_register`/`rac_backend_rag_unregister` in `features/rag/rac_rag.h` | `internal` | Plugin registration entry point invoked by SDK bootstrap; not a public data contract. |
 
+### JSON String Surfaces (Cross-SDK)
+
+The following Nitro (React Native) surfaces deliberately use JSON strings on
+the wire. They are **init-time / transport-time / introspection** entry points
+where the JSON subset is identical across Swift, Kotlin, Flutter, React
+Native, and Web SDKs (each platform marshals the same keys). Classification:
+**`compat`** — canonical exception, migration to proto deferred to a future
+iteration. The wire format is clearly labeled; TS callers round-trip through
+`JSON.parse`, so there is no ambiguity about encoding.
+
+| Nitro surface (`RunAnywhereCore`) | Shape | Cross-SDK parity |
+| --- | --- | --- |
+| `initialize(configJson: string): Promise<boolean>` | `{apiKey, baseURL, environment}` | Swift/Kotlin/Flutter pass proto, Web passes JSON; RN passes JSON |
+| `registerDevice(environmentJson: string): Promise<boolean>` | Device/environment JSON consumed by C++ `rac_device_register` | Same JSON subset across all 5 SDKs |
+| `httpRequest(method, url, headersJson, bodyJson, timeoutMs): Promise<string>` | HTTP request envelope; returns JSON body | Transport adapter; SDK-equivalent code paths elsewhere |
+| `authAuthenticate(apiKey, baseURL, deviceId, platform, sdkVersion): Promise<string>` | Returns `{access_token, refresh_token, expires_in, device_id, organization_id, user_id, token_type}` | Same JSON envelope as Swift/Kotlin/Flutter/Web auth paths |
+| `authRefreshToken(baseURL: string): Promise<string>` | Returns same auth response JSON | Same JSON envelope as above |
+| `getBackendInfo(): Promise<string>` | JSON snapshot of registered backend plugin vtables | Introspection; consumed by TS `JSON.parse` |
+| `getDeviceCapabilities(): Promise<string>` | JSON device-capabilities snapshot | Introspection; consumed by TS `JSON.parse` |
+
+**Migration trigger**: Add the following proto messages under `idl/` and
+migrate each surface end-to-end in one iteration:
+- `SDKInitConfig` (replaces `initialize(configJson)`)
+- `DeviceRegisterRequest` (replaces `registerDevice(environmentJson)`)
+- `HTTPRequestEnvelope` / `HTTPResponseEnvelope` (replaces `httpRequest`)
+- `AuthRequest` / `AuthResponse` (replaces `authAuthenticate` / `authRefreshToken`)
+- `BackendInfo` (replaces `getBackendInfo`)
+- `DeviceCapabilities` (replaces `getDeviceCapabilities`)
+
+Tracked as `RN-JSON-PROTO-MIGRATE` in
+`gaps/gaps/inconsistencies/react-native.md`. The JSON wire form is the
+canonical contract until that row ships.
+
 ### JSON APIs
 
 | JSON surface | Classification | Replacement / action |
