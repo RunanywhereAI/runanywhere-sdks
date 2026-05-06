@@ -179,11 +179,35 @@ async function registerModulesAndModels(): Promise<void> {
         memoryRequirement: 600_000_000,
       }),
       registerModel({
+        id: 'qwen2.5-1.5b-instruct-q4_k_m',
+        name: 'Qwen 2.5 1.5B Instruct Q4_K_M',
+        url: 'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirement: 2_500_000_000,
+      }),
+      registerModel({
         id: 'qwen3-0.6b-q4_k_m',
         name: 'Qwen3 0.6B Q4_K_M',
         url: 'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
         framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
         memoryRequirement: 477_000_000,
+        supportsThinking: true,
+      }),
+      registerModel({
+        id: 'qwen3-1.7b-q4_k_m',
+        name: 'Qwen3 1.7B Q4_K_M',
+        url: 'https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirement: 1_200_000_000,
+        supportsThinking: true,
+      }),
+      registerModel({
+        id: 'qwen3-4b-q4_k_m',
+        name: 'Qwen3 4B Q4_K_M',
+        url: 'https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf',
+        framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+        memoryRequirement: 2_800_000_000,
+        supportsThinking: true,
       }),
       registerModel({
         id: 'llama-3.2-3b-instruct-q4_k_m',
@@ -348,6 +372,16 @@ async function registerModulesAndModels(): Promise<void> {
       modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
       memoryRequirement: 65_000_000,
+    }),
+    // Silero VAD — one-per-modality minimum for voice-agent parity with
+    // iOS. Small .onnx file served directly from the upstream repo.
+    registerModel({
+      id: 'silero-vad',
+      name: 'Silero VAD',
+      url: 'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      modality: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+      memoryRequirement: 5_000_000,
     }),
     // Embedding model for RAG (multi-file: model.onnx + vocab.txt co-located)
     // Identical to iOS: RunAnywhere.registerMultiFileModel(id:name:files:framework:modality:memoryRequirement:)

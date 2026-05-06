@@ -292,12 +292,39 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       memoryRequirement: 600000000,
     );
     _registerLanguageModel(
+      id: 'qwen2.5-1.5b-instruct-q4_k_m',
+      name: 'Qwen 2.5 1.5B Instruct Q4_K_M',
+      url:
+          'https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      memoryRequirement: 2500000000,
+    );
+    _registerLanguageModel(
       id: 'qwen3-0.6b-q4_k_m',
       name: 'Qwen3 0.6B Q4_K_M',
       url:
           'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
       framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
       memoryRequirement: 477000000,
+      supportsThinking: true,
+    );
+    _registerLanguageModel(
+      id: 'qwen3-1.7b-q4_k_m',
+      name: 'Qwen3 1.7B Q4_K_M',
+      url:
+          'https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      memoryRequirement: 1200000000,
+      supportsThinking: true,
+    );
+    _registerLanguageModel(
+      id: 'qwen3-4b-q4_k_m',
+      name: 'Qwen3 4B Q4_K_M',
+      url:
+          'https://huggingface.co/unsloth/Qwen3-4B-GGUF/resolve/main/Qwen3-4B-Q4_K_M.gguf',
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      memoryRequirement: 2800000000,
+      supportsThinking: true,
     );
     _registerLanguageModel(
       id: 'lfm2-350m-q4_k_m',
@@ -359,6 +386,50 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       ),
       memoryRequirement: 600000000,
     );
+    // Qwen2-VL 2B — multi-file (main GGUF + mmproj companion).
+    RunAnywhereSDK.instance.models.registerMultiFile(
+      id: 'qwen2-vl-2b-instruct-q4_k_m',
+      name: 'Qwen2-VL 2B Instruct',
+      files: [
+        ModelFileDescriptor(
+          filename: 'Qwen2-VL-2B-Instruct-Q4_K_M.gguf',
+          url:
+              'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/Qwen2-VL-2B-Instruct-Q4_K_M.gguf',
+          isRequired: true,
+        ),
+        ModelFileDescriptor(
+          filename: 'mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf',
+          url:
+              'https://huggingface.co/ggml-org/Qwen2-VL-2B-Instruct-GGUF/resolve/main/mmproj-Qwen2-VL-2B-Instruct-Q8_0.gguf',
+          isRequired: true,
+        ),
+      ],
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+      memoryRequirement: 1800000000,
+    );
+    // LFM2-VL 450M — multi-file (LiquidAI compact VLM).
+    RunAnywhereSDK.instance.models.registerMultiFile(
+      id: 'lfm2-vl-450m-q8_0',
+      name: 'LFM2-VL 450M',
+      files: [
+        ModelFileDescriptor(
+          filename: 'LFM2-VL-450M-Q8_0.gguf',
+          url:
+              'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/LFM2-VL-450M-Q8_0.gguf',
+          isRequired: true,
+        ),
+        ModelFileDescriptor(
+          filename: 'mmproj-LFM2-VL-450M-Q8_0.gguf',
+          url:
+              'https://huggingface.co/runanywhere/LFM2-VL-450M-GGUF/resolve/main/mmproj-LFM2-VL-450M-Q8_0.gguf',
+          isRequired: true,
+        ),
+      ],
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+      modality: ModelCategory.MODEL_CATEGORY_MULTIMODAL,
+      memoryRequirement: 600000000,
+    );
     debugPrint('✅ VLM models registered');
     await Future<void>.delayed(Duration.zero);
 
@@ -416,7 +487,18 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
       memoryRequirement: 0,
     );
-    debugPrint('✅ STT/TTS models registered via Core SDK (incl. system-tts)');
+    // VAD (Silero) — registered here so the voice-agent pipeline has a
+    // default detector available alongside STT/TTS.
+    RunAnywhereSDK.instance.models.register(
+      id: 'silero-vad',
+      name: 'Silero VAD',
+      url: Uri.parse(
+          'https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx'),
+      framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
+      modality: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+      memoryRequirement: 5000000,
+    );
+    debugPrint('✅ STT/TTS/VAD models registered via Core SDK (incl. system-tts)');
     await Future<void>.delayed(Duration.zero);
 
     // --- RAG EMBEDDINGS ---

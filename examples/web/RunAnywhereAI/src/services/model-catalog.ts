@@ -95,6 +95,33 @@ const CATALOG: readonly CatalogEntry[] = [
     memoryRequiredBytes: 1_100_000_000,
     contextLength: 2048,
   },
+  {
+    id: 'lfm2-350m-q4_k_m',
+    name: 'LiquidAI LFM2 350M Q4_K_M',
+    description: 'LiquidAI compact LLM tuned for fast on-device chat.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/LiquidAI/LFM2-350M-GGUF/resolve/main/LFM2-350M-Q4_K_M.gguf',
+    downloadSizeBytes: 250_000_000,
+    memoryRequiredBytes: 250_000_000,
+    contextLength: 2048,
+  },
+  {
+    id: 'qwen3-0.6b-q4_k_m',
+    name: 'Qwen3 0.6B Q4_K_M',
+    description: 'Qwen3 series compact LLM with thinking-mode support.',
+    category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+    framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+    format: ModelFormat.MODEL_FORMAT_GGUF,
+    downloadUrl:
+      'https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q4_K_M.gguf',
+    downloadSizeBytes: 477_000_000,
+    memoryRequiredBytes: 500_000_000,
+    contextLength: 4096,
+    supportsThinking: true,
+  },
 
   // ---------- Multimodal (VLM) ----------
   {

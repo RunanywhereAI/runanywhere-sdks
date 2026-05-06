@@ -364,20 +364,6 @@ Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 **Fix pointer**: Trace `rac_llm_generate_stream_proto` in `sdk/runanywhere-commons/src/features/llm/rac_llm_stream.cpp` on iOS simulator. Verify llama.cpp backend produces tokens (check `rac_llm_component_generate` return) and the fan-out forwards them. Capture NitroModule native thread stderr via direct file descriptor redirection, not `log stream` predicate.
 **Severity**: HIGH
 
-### BUG-UX-001 — Model-catalog size parity drift across SDKs: iOS=1 visible / Flutter-Android=8+ / RN-iOS=7 / Web=7 (HIGH)
-**Lane(s)**: 02_ios_swift (iOS=1 visible, 0 available), 04_react_native_ios (7), 07_web (7), 05_flutter_android (8+), 06_flutter_ios (variable)
-**Category**: UX-parity
-**Evidence**:
-- `02_ios_swift/actions.jsonl:10` — `visible_models:1, available_models:0` — only "Platform LLM (Apple Foundation Models)" shown, marked Unavailable on simulator. No llama.cpp models exposed despite backend registered.
-- `02_ios_swift/logs/sdk_logs.log:627` — `Model registry refreshed: registered=3, downloaded=3, available=3` — SDK reports 3 internally but UI shows 1. **Visibility mismatch within the same lane.**
-- `04_react_native_ios/actions.jsonl:8` — `Model picker shows 7 models; LFM2 1.2B Tool Q4_K (762.9 MB) already Ready`.
-- `07_web/agent_report.md:67` — `7-model catalog registered and visible in dialog`.
-- `05_flutter_android/modality_table.tsv` shows models spanning multiple modalities (VLM, LLM, STT, TTS, embeddings).
-- Screenshot inventory mirrors the drift: iOS=12, Flutter-iOS=31, Flutter-Android=24, RN-Android=21, RN-iOS=11, Web=14, Kotlin=1 (build blocked).
-**Root cause (suspected)**: Each example app seeds its catalog independently. iOS example removed `registerModulesAndModels()` (BUG-SWIFT-IOS-002); RN example pre-hydrates 7 from JSON seed; Web example calls `ModelRegistry.register()` 7 times; Flutter example calls `DartBridge.registerModelProto`. The SDK does NOT seed a canonical default catalog. No cross-SDK parity test enforces a baseline.
-**Fix pointer**: Either (a) promote a canonical default-seed JSON (e.g., `sdk/runanywhere-commons/assets/default_models.json`) that every SDK loads during two-phase init, or (b) document that each example app owns its seed and accept the drift. Option (a) would fix BUG-SWIFT-IOS-002 trivially.
-**Severity**: HIGH
-
 ### BUG-UX-002 — Screenshot-INDEX filename collisions and taxonomy drift across all 7 lanes (LOW)
 **Lane(s)**: All 7 lanes
 **Category**: UX-parity | test-infra
@@ -392,17 +378,6 @@ Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 **Root cause (suspected)**: No shared screenshot taxonomy between lane scripts. Each lane author invented its own numbering. When cross-lane comparison agents need to match "same screen across SDKs", filename matching fails.
 **Fix pointer**: Publish `test_workflows/SCREENSHOT_TAXONOMY.md` with mandatory prefixes: `001_launch`, `010_model_picker_llm`, `020_model_download_start`, `030_llm_chat_initial`, `040_llm_response_complete`, `050_voice_tab`, `060_stt_tab`, etc. Enforce via lane script `VALID_SCREENSHOT_NAMES` grep gate.
 **Severity**: LOW
-
-### BUG-UX-003 — Flutter iOS model re-discovery fails after reinstall; all rows regress to "Get" from "Use" (MEDIUM)
-**Lane(s)**: 06_flutter_ios
-**Category**: UX-parity
-**Evidence**:
-- `06_flutter_ios/agent_report.md:51` — `After reinstall + launch, the model registry fails to re-discover the existing LFM2-1.2B-Tool-Q4_K_M.gguf on disk. All rows show 'Get' again.`
-- Screenshot sequence: `13_after_relaunch.png` correctly shows model as "Use" (first relaunch at 18:44); `24_after_relaunch2.png` after reinstall at 18:53 regresses to "Get" despite file still on disk.
-- Agent comment in report — `Possibly because simctl install wipes sandbox Documents/ only for non-persisted paths, or because sdk.registerModel() didn't fire before models.list() query.`
-**Root cause (suspected)**: Model file persists outside app sandbox (shared cache) but the app's own model-registry `registered=N` list does NOT persist across reinstall. On simple relaunch the SDK re-scans the on-disk path. On reinstall, the registration seed JSON is wiped and no scan happens before `models.list()` returns an empty "available" set. Race between `DartBridge.registerModelProto` and `DartBridge.Models.list`.
-**Fix pointer**: Make model registration synchronous (or make `list()` await it) in `sdk/runanywhere-flutter/packages/runanywhere/lib/src/bridge/dart_bridge_models.dart`. Parallel audit in iOS Swift (`RunAnywhere+ExampleShims.swift`) for the same race — iOS first-run is OK only because `simctl uninstall` preserves more state than `simctl install`.
-**Severity**: MEDIUM
 
 ## Wave F — Bug-discovery (from 7-lane E2E 20260505T183402)
 
