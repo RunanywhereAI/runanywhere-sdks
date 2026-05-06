@@ -245,6 +245,39 @@ RAC_API rac_result_t rac_vad_process_lifecycle_proto(
     const uint8_t* request_proto_bytes, size_t request_proto_size,
     rac_proto_buffer_t* out_result);
 
+/**
+ * @brief Configure the lifecycle-loaded VAD with a VADConfiguration proto.
+ *
+ * request_proto_bytes encodes runanywhere.v1.VADConfiguration. Applies
+ * threshold/sample-rate/frame-length to the backend. out_result receives
+ * serialized runanywhere.v1.VADServiceState bytes reflecting the post-
+ * configure state.
+ */
+RAC_API rac_result_t rac_vad_configure_lifecycle_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Start the lifecycle-loaded VAD processing session.
+ *
+ * out_result receives serialized runanywhere.v1.VADServiceState bytes.
+ */
+RAC_API rac_result_t rac_vad_start_lifecycle_proto(rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Stop the lifecycle-loaded VAD processing session.
+ *
+ * out_result receives serialized runanywhere.v1.VADServiceState bytes.
+ */
+RAC_API rac_result_t rac_vad_stop_lifecycle_proto(rac_proto_buffer_t* out_result);
+
+/**
+ * @brief Reset internal state on the lifecycle-loaded VAD.
+ *
+ * out_result receives serialized runanywhere.v1.VADServiceState bytes.
+ */
+RAC_API rac_result_t rac_vad_reset_lifecycle_proto(rac_proto_buffer_t* out_result);
+
 #ifdef __cplusplus
 }
 #endif

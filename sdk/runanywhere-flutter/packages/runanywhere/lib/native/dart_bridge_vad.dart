@@ -148,6 +148,63 @@ class DartBridgeVAD {
     );
   }
 
+  /// Configure the lifecycle-loaded VAD with a VADConfiguration proto.
+  vad_pb.VADServiceState configureLifecycleProto(
+    vad_pb.VADConfiguration config,
+  ) {
+    final fn = RacNative.bindings.rac_vad_configure_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError(
+        'rac_vad_configure_lifecycle_proto is unavailable',
+      );
+    }
+    return DartBridgeProtoUtils.callRequest<vad_pb.VADServiceState>(
+      request: config,
+      invoke: fn,
+      decode: vad_pb.VADServiceState.fromBuffer,
+      symbol: 'rac_vad_configure_lifecycle_proto',
+    );
+  }
+
+  /// Start the lifecycle-loaded VAD. Returns post-start service state.
+  vad_pb.VADServiceState startLifecycleProto() {
+    final fn = RacNative.bindings.rac_vad_start_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_vad_start_lifecycle_proto is unavailable');
+    }
+    return DartBridgeProtoUtils.callOut<vad_pb.VADServiceState>(
+      invoke: fn,
+      decode: vad_pb.VADServiceState.fromBuffer,
+      symbol: 'rac_vad_start_lifecycle_proto',
+    );
+  }
+
+  /// Stop the lifecycle-loaded VAD. Returns post-stop service state.
+  vad_pb.VADServiceState stopLifecycleProto() {
+    final fn = RacNative.bindings.rac_vad_stop_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_vad_stop_lifecycle_proto is unavailable');
+    }
+    return DartBridgeProtoUtils.callOut<vad_pb.VADServiceState>(
+      invoke: fn,
+      decode: vad_pb.VADServiceState.fromBuffer,
+      symbol: 'rac_vad_stop_lifecycle_proto',
+    );
+  }
+
+  /// Reset internal state on the lifecycle-loaded VAD.
+  vad_pb.VADServiceState resetLifecycleProto() {
+    final fn = RacNative.bindings.rac_vad_reset_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_vad_reset_lifecycle_proto is unavailable');
+    }
+    return DartBridgeProtoUtils.callOut<vad_pb.VADServiceState>(
+      invoke: fn,
+      decode: vad_pb.VADServiceState.fromBuffer,
+      symbol: 'rac_vad_reset_lifecycle_proto',
+    );
+  }
+
   void _validateLifecycleRequest(vad_pb.VADProcessRequest request) {
     if (!request.hasAudio()) {
       throw ArgumentError(

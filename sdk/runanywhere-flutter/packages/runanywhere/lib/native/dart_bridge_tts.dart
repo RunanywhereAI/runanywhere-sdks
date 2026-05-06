@@ -12,7 +12,13 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/tts_options.pb.dart'
-    show TTSOptions, TTSOutput, TTSSynthesisRequest, TTSVoiceInfo;
+    show
+        TTSOptions,
+        TTSOutput,
+        TTSServiceState,
+        TTSStreamEvent,
+        TTSSynthesisRequest,
+        TTSVoiceInfo;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
@@ -126,6 +132,92 @@ class DartBridgeTTS {
       invoke: fn,
       decode: TTSOutput.fromBuffer,
       symbol: 'rac_tts_synthesize_lifecycle_proto',
+    );
+  }
+
+  /// Stream TTSStreamEvent chunks via the lifecycle-owned generated-proto ABI.
+  ///
+  /// Mirrors STT's `transcribeStreamLifecycleProto`. Requires commons to have
+  /// the TTS model loaded through model lifecycle.
+  Stream<TTSStreamEvent> synthesizeStreamLifecycleProto(
+    TTSSynthesisRequest request,
+  ) {
+    _validateLifecycleRequest(request);
+
+    final fn = RacNative.bindings.rac_tts_synthesize_stream_lifecycle_proto;
+    if (fn == null) {
+      return Stream<TTSStreamEvent>.error(
+        UnsupportedError(
+          'rac_tts_synthesize_stream_lifecycle_proto is unavailable',
+        ),
+      );
+    }
+
+    final controller = StreamController<TTSStreamEvent>(sync: false);
+    NativeCallable<RacTtsStreamEventCallbackNative>? callback;
+
+    Future<void> run() async {
+      final bytes = request.writeToBuffer();
+      final requestPtr = DartBridgeProtoUtils.copyBytes(bytes);
+
+      try {
+        callback = NativeCallable<RacTtsStreamEventCallbackNative>.listener((
+          Pointer<Uint8> bytesPtr,
+          int bytesLen,
+          Pointer<Void> _,
+        ) {
+          if (controller.isClosed || bytesPtr == nullptr || bytesLen <= 0) {
+            return;
+          }
+          try {
+            final copy = Uint8List.fromList(bytesPtr.asTypedList(bytesLen));
+            controller.add(TTSStreamEvent.fromBuffer(copy));
+          } catch (e, st) {
+            controller.addError(e, st);
+            unawaited(controller.close());
+          }
+        });
+        final rc = fn(
+          requestPtr,
+          bytes.length,
+          callback!.nativeFunction,
+          nullptr,
+        );
+        if (rc != RAC_SUCCESS && !controller.isClosed) {
+          controller.addError(StateError(
+            'rac_tts_synthesize_stream_lifecycle_proto failed: '
+            '${RacResultCode.getMessage(rc)}',
+          ));
+        }
+        if (!controller.isClosed) {
+          await controller.close();
+        }
+      } finally {
+        calloc.free(requestPtr);
+        callback?.close();
+        callback = null;
+      }
+    }
+
+    controller.onCancel = () {
+      callback?.close();
+      callback = null;
+    };
+
+    unawaited(run());
+    return controller.stream;
+  }
+
+  /// Stop the lifecycle-loaded TTS synthesis. Returns post-stop service state.
+  TTSServiceState stopLifecycleProto() {
+    final fn = RacNative.bindings.rac_tts_stop_lifecycle_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_tts_stop_lifecycle_proto is unavailable');
+    }
+    return DartBridgeProtoUtils.callOut<TTSServiceState>(
+      invoke: fn,
+      decode: TTSServiceState.fromBuffer,
+      symbol: 'rac_tts_stop_lifecycle_proto',
     );
   }
 

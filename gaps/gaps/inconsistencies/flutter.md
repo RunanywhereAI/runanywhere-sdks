@@ -19,36 +19,15 @@ checks are gone, and `DartBridgeVAD` is trimmed to a single
 `processLifecycleProto` plus minimal handle state-query getters
 (171 LOC, down from 523).
 
-What remains:
-
-- **FLT-12** — commons lifecycle-owned TTS stream/stop + VAD
-  configure/start/stop/reset proto APIs still missing; capabilities
-  throw `SDKException.featureNotAvailable` until commons lands the
-  ABIs. (Diffusion portion of FLT-12 deferred — tracked separately.)
-
-## Confirmed gaps
-
-### FLT-12: Commons lifecycle-owned TTS/VAD proto APIs still missing
-
-`lib/public/capabilities/runanywhere_tts.dart:162-187` throws
-`SDKException.featureNotAvailable` for `synthesizeStream` and
-`stopSynthesis` pending commons-side APIs
-(`rac_tts_synthesize_stream_lifecycle_proto`,
-`rac_tts_stop_lifecycle_proto`). The same pattern blocks VAD
-lifecycle `initializeVAD` / `startVAD` / `stopVAD` / `reset` in
-`lib/public/capabilities/runanywhere_vad.dart:48-130`
-(pending `rac_vad_configure_lifecycle_proto`,
+No TTS/VAD capabilities remain stubbed. FLT-12 landed in Wave 3c:
+commons added `rac_tts_synthesize_stream_lifecycle_proto`,
+`rac_tts_stop_lifecycle_proto`, `rac_vad_configure_lifecycle_proto`,
 `rac_vad_start_lifecycle_proto`, `rac_vad_stop_lifecycle_proto`,
-`rac_vad_reset_lifecycle_proto`).
-
-Cross-cut with the commons backlog, not a pure-Flutter fix — tracked
-here so the gap is visible from the Flutter side. Diffusion portion
-of the original FLT-12 is deferred.
-
-File refs:
-
-- `lib/public/capabilities/runanywhere_tts.dart:162-187`
-- `lib/public/capabilities/runanywhere_vad.dart:48-130`
+`rac_vad_reset_lifecycle_proto`. Flutter TTS `synthesizeStream` /
+`stopSynthesis` and VAD `initializeVAD` / `startVAD` / `stopVAD` /
+`reset` now call the new lifecycle ABIs through
+`DartBridgeTTS` / `DartBridgeVAD`. Diffusion portion of the original
+FLT-12 remains deferred.
 
 ## Items to DELETE
 

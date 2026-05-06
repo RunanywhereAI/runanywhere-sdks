@@ -240,6 +240,33 @@ typedef RacTtsSynthesizeStreamProtoDart = int Function(
   ffi.Pointer<ffi.Void>,
 );
 
+/// Native callback signature for `rac_tts_lifecycle_stream_event_callback_fn`.
+typedef RacTtsStreamEventCallbackNative = ffi.Void Function(
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<ffi.Void>,
+);
+
+typedef RacTtsSynthesizeStreamLifecycleProtoNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Uint8>,
+  ffi.Size,
+  ffi.Pointer<ffi.NativeFunction<RacTtsStreamEventCallbackNative>>,
+  ffi.Pointer<ffi.Void>,
+);
+typedef RacTtsSynthesizeStreamLifecycleProtoDart = int Function(
+  ffi.Pointer<ffi.Uint8>,
+  int,
+  ffi.Pointer<ffi.NativeFunction<RacTtsStreamEventCallbackNative>>,
+  ffi.Pointer<ffi.Void>,
+);
+
+/// Single-arg out-only proto-buffer ABI (used by tts_stop_lifecycle /
+/// vad_start_lifecycle / vad_stop_lifecycle / vad_reset_lifecycle).
+typedef RacOutOnlyProtoNative = ffi.Int32 Function(
+  ffi.Pointer<RacProtoBuffer>,
+);
+typedef RacOutOnlyProtoDart = int Function(ffi.Pointer<RacProtoBuffer>);
+
 typedef RacVadProtoActivityCallbackNative = ffi.Void Function(
   ffi.Pointer<ffi.Uint8>,
   ffi.Size,
@@ -1201,6 +1228,40 @@ class RacBindings {
             'rac_vad_process_lifecycle_proto',
           ),
         ),
+        rac_tts_synthesize_stream_lifecycle_proto =
+            _lookupOptional<RacTtsSynthesizeStreamLifecycleProtoDart>(
+          () => lib.lookupFunction<RacTtsSynthesizeStreamLifecycleProtoNative,
+              RacTtsSynthesizeStreamLifecycleProtoDart>(
+            'rac_tts_synthesize_stream_lifecycle_proto',
+          ),
+        ),
+        rac_tts_stop_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
+          () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
+            'rac_tts_stop_lifecycle_proto',
+          ),
+        ),
+        rac_vad_configure_lifecycle_proto =
+            _lookupOptional<RacLifecycleRequestProtoDart>(
+          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart>(
+            'rac_vad_configure_lifecycle_proto',
+          ),
+        ),
+        rac_vad_start_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
+          () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
+            'rac_vad_start_lifecycle_proto',
+          ),
+        ),
+        rac_vad_stop_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
+          () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
+            'rac_vad_stop_lifecycle_proto',
+          ),
+        ),
+        rac_vad_reset_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
+          () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
+            'rac_vad_reset_lifecycle_proto',
+          ),
+        ),
         rac_vad_component_configure_proto =
             _lookupOptional<RacVadConfigureProtoDart>(
           () => lib.lookupFunction<RacVadConfigureProtoNative,
@@ -1780,6 +1841,19 @@ class RacBindings {
       rac_tts_component_synthesize_stream_proto;
 
   final RacLifecycleRequestProtoDart? rac_vad_process_lifecycle_proto;
+
+  final RacTtsSynthesizeStreamLifecycleProtoDart?
+      rac_tts_synthesize_stream_lifecycle_proto;
+
+  final RacOutOnlyProtoDart? rac_tts_stop_lifecycle_proto;
+
+  final RacLifecycleRequestProtoDart? rac_vad_configure_lifecycle_proto;
+
+  final RacOutOnlyProtoDart? rac_vad_start_lifecycle_proto;
+
+  final RacOutOnlyProtoDart? rac_vad_stop_lifecycle_proto;
+
+  final RacOutOnlyProtoDart? rac_vad_reset_lifecycle_proto;
 
   final RacVadConfigureProtoDart? rac_vad_component_configure_proto;
 

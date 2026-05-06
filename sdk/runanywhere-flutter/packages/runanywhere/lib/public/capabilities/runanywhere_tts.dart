@@ -166,13 +166,20 @@ class RunAnywhereTTS {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
-    await _requireLoadedVoiceId();
-    _effectiveOptions(options ?? TTSOptions());
-    throw SDKException.featureNotAvailable(
-      'Lifecycle-owned TTS streaming is unavailable in Flutter. '
-      'Use synthesize() for one-shot TTS until commons exposes '
-      'rac_tts_synthesize_stream_lifecycle_proto.',
+    final voiceId = await _requireLoadedVoiceId();
+    final opts = _effectiveOptions(options ?? TTSOptions());
+    final request = TTSSynthesisRequest(
+      text: opts.enableSsml ? null : text,
+      ssml: opts.enableSsml ? text : null,
+      options: opts,
+      metadata: {'voice_id': voiceId},
     );
+    await for (final event
+        in DartBridgeTTS.shared.synthesizeStreamLifecycleProto(request)) {
+      if (event.hasOutput()) {
+        yield event.output;
+      }
+    }
   }
 
   /// Stop in-flight synthesis.
@@ -180,10 +187,8 @@ class RunAnywhereTTS {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
-    throw SDKException.featureNotAvailable(
-      'Lifecycle-owned TTS stop is unavailable in Flutter until commons '
-      'exposes rac_tts_stop_lifecycle_proto.',
-    );
+    DartBridgeTTS.shared.stopLifecycleProto();
+    _isSpeaking = false;
   }
 
   /// Synthesize-and-play. Mirrors Swift's `RunAnywhere.speak(_:options:)`.

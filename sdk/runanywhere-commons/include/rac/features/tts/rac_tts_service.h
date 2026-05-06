@@ -205,6 +205,47 @@ RAC_API rac_result_t rac_tts_synthesize_lifecycle_proto(
     const uint8_t* request_proto_bytes, size_t request_proto_size,
     rac_proto_buffer_t* out_result);
 
+/**
+ * @brief Callback fired once per serialized runanywhere.v1.TTSStreamEvent.
+ *
+ * The buffer is valid only for the duration of the callback. Callers that
+ * need to retain the bytes MUST copy them out.
+ */
+typedef void (*rac_tts_lifecycle_stream_event_callback_fn)(const uint8_t* event_bytes,
+                                                            size_t event_size,
+                                                            void* user_data);
+
+/**
+ * @brief Stream synthesis using the lifecycle-loaded TTS voice/model.
+ *
+ * request_proto_bytes encodes runanywhere.v1.TTSSynthesisRequest. Commons
+ * resolves the current TTS lifecycle component, dispatches the request to the
+ * backend, and fires @p callback once per canonical
+ * runanywhere.v1.TTSStreamEvent envelope (kind = STARTED / AUDIO_CHUNK /
+ * COMPLETED / ERROR, each with monotonically-increasing `seq` and
+ * `timestamp_us`).
+ *
+ * Mirrors rac_stt_transcribe_stream_lifecycle_proto for TTS — lets SDKs
+ * collapse "load then stream" flows into a single native call.
+ *
+ * @retval RAC_SUCCESS                      Streaming completed successfully.
+ * @retval RAC_ERROR_INVALID_ARGUMENT       Request bytes/callback invalid.
+ * @retval RAC_ERROR_FEATURE_NOT_AVAILABLE  Commons built without Protobuf.
+ * @retval RAC_ERROR_NOT_INITIALIZED        No TTS lifecycle voice is loaded.
+ * @retval RAC_ERROR_NOT_SUPPORTED          Backend does not advertise streaming.
+ */
+RAC_API rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_tts_lifecycle_stream_event_callback_fn callback, void* user_data);
+
+/**
+ * @brief Stop the in-flight synthesis on the lifecycle-loaded TTS voice.
+ *
+ * out_result receives serialized runanywhere.v1.TTSServiceState bytes
+ * reflecting the post-stop state (is_ready, current_voice, optional error).
+ */
+RAC_API rac_result_t rac_tts_stop_lifecycle_proto(rac_proto_buffer_t* out_result);
+
 #ifdef __cplusplus
 }
 #endif

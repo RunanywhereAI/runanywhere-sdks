@@ -806,4 +806,363 @@ rac_result_t rac_embeddings_embed_batch_lifecycle_proto(
 #endif
 }
 
+// ---------------------------------------------------------------------------
+// TTS lifecycle stream / stop ABIs (FLT-12)
+// ---------------------------------------------------------------------------
+
+rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_tts_lifecycle_stream_event_callback_fn callback, void* user_data) {
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    (void)callback;
+    (void)user_data;
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    if (!callback) return RAC_ERROR_INVALID_ARGUMENT;
+    rac_proto_buffer_t error_buf;
+    rac_proto_buffer_init(&error_buf);
+
+    runanywhere::v1::TTSSynthesisRequest request;
+    rac_result_t rc = parse_tts_request(request_proto_bytes, request_proto_size,
+                                        &request, &error_buf);
+    if (rc != RAC_SUCCESS) {
+        rac_proto_buffer_free(&error_buf);
+        return rc;
+    }
+
+    rac::lifecycle::LifecycleTtsRef ref;
+    rc = rac::lifecycle::acquire_lifecycle_tts(&ref);
+    if (rc != RAC_SUCCESS) {
+        rac_proto_buffer_free(&error_buf);
+        return rc;
+    }
+
+    if (!ref.ops || !ref.ops->synthesize_stream) {
+        rac::lifecycle::release_lifecycle_tts(&ref);
+        rac_proto_buffer_free(&error_buf);
+        return RAC_ERROR_NOT_SUPPORTED;
+    }
+
+    rac_tts_options_t options = RAC_TTS_OPTIONS_DEFAULT;
+    if (request.has_options() &&
+        !rac::foundation::rac_tts_options_from_proto(request.options(), &options)) {
+        rac::lifecycle::release_lifecycle_tts(&ref);
+        rac_proto_buffer_free(&error_buf);
+        return RAC_ERROR_DECODING_ERROR;
+    }
+    if (request.has_options() && request.options().sample_rate() > 0) {
+        options.sample_rate = request.options().sample_rate();
+    }
+
+    const bool use_ssml = request.has_ssml() && !request.ssml().empty();
+    if (use_ssml) {
+        options.use_ssml = RAC_TRUE;
+    }
+    const std::string& text = use_ssml ? request.ssml() : request.text();
+
+    const std::string request_id =
+        request.request_id().empty()
+            ? std::string("tts-lifecycle-") + std::to_string(rac_get_current_time_ms())
+            : request.request_id();
+
+    struct StreamCtx {
+        rac_tts_lifecycle_stream_event_callback_fn fn;
+        void* user_data;
+        std::string request_id;
+        uint64_t next_seq;
+        std::string voice_id;
+        std::string language_code;
+        int32_t sample_rate;
+        rac_audio_format_enum_t audio_format;
+        int32_t character_count;
+    };
+    StreamCtx ctx{callback,
+                  user_data,
+                  request_id,
+                  1,
+                  options.voice ? options.voice : (ref.model_id ? ref.model_id : ""),
+                  options.language ? options.language : "",
+                  options.sample_rate > 0 ? options.sample_rate : RAC_TTS_DEFAULT_SAMPLE_RATE,
+                  options.audio_format,
+                  static_cast<int32_t>(text.size())};
+
+    auto emit_event = [](const runanywhere::v1::TTSStreamEvent& event,
+                         rac_tts_lifecycle_stream_event_callback_fn fn,
+                         void* user_ctx) {
+        const size_t size = event.ByteSizeLong();
+        std::vector<uint8_t> bytes(size);
+        if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(size))) {
+            return;
+        }
+        fn(bytes.empty() ? nullptr : bytes.data(), bytes.size(), user_ctx);
+    };
+
+    // STARTED envelope.
+    {
+        runanywhere::v1::TTSStreamEvent started;
+        started.set_seq(ctx.next_seq++);
+        started.set_timestamp_us(rac_get_current_time_ms() * 1000);
+        started.set_request_id(ctx.request_id);
+        started.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_STARTED);
+        emit_event(started, ctx.fn, ctx.user_data);
+    }
+
+    auto chunk_bridge = [](const void* audio_data, size_t audio_size, void* opaque) {
+        auto* c = static_cast<StreamCtx*>(opaque);
+        runanywhere::v1::TTSStreamEvent event;
+        event.set_seq(c->next_seq++);
+        event.set_timestamp_us(rac_get_current_time_ms() * 1000);
+        event.set_request_id(c->request_id);
+        event.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_AUDIO_CHUNK);
+        auto* output = event.mutable_output();
+        if (audio_data && audio_size > 0) {
+            output->set_audio_data(audio_data, audio_size);
+        }
+        const auto audio_format_proto = [c]() {
+            switch (c->audio_format) {
+                case RAC_AUDIO_FORMAT_WAV:  return runanywhere::v1::AUDIO_FORMAT_WAV;
+                case RAC_AUDIO_FORMAT_MP3:  return runanywhere::v1::AUDIO_FORMAT_MP3;
+                case RAC_AUDIO_FORMAT_OPUS: return runanywhere::v1::AUDIO_FORMAT_OPUS;
+                case RAC_AUDIO_FORMAT_AAC:  return runanywhere::v1::AUDIO_FORMAT_AAC;
+                case RAC_AUDIO_FORMAT_FLAC: return runanywhere::v1::AUDIO_FORMAT_FLAC;
+                case RAC_AUDIO_FORMAT_PCM:
+                default:                    return runanywhere::v1::AUDIO_FORMAT_PCM;
+            }
+        }();
+        output->set_audio_format(audio_format_proto);
+        output->set_sample_rate(c->sample_rate);
+        output->set_timestamp_ms(rac_get_current_time_ms());
+        output->set_audio_size_bytes(static_cast<int64_t>(audio_size));
+        auto* metadata = output->mutable_metadata();
+        metadata->set_voice_id(c->voice_id);
+        metadata->set_language_code(c->language_code);
+        metadata->set_character_count(c->character_count);
+        const size_t size = event.ByteSizeLong();
+        std::vector<uint8_t> bytes(size);
+        if (size > 0 && !event.SerializeToArray(bytes.data(), static_cast<int>(size))) {
+            return;
+        }
+        c->fn(bytes.empty() ? nullptr : bytes.data(), bytes.size(), c->user_data);
+    };
+
+    rc = ref.ops->synthesize_stream(ref.impl, text.c_str(), &options, chunk_bridge, &ctx);
+
+    if (rc != RAC_SUCCESS) {
+        runanywhere::v1::TTSStreamEvent error_event;
+        error_event.set_seq(ctx.next_seq++);
+        error_event.set_timestamp_us(rac_get_current_time_ms() * 1000);
+        error_event.set_request_id(ctx.request_id);
+        error_event.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_ERROR);
+        error_event.set_error_code(rc);
+        error_event.set_error_message(rac_error_message(rc));
+        emit_event(error_event, ctx.fn, ctx.user_data);
+    } else {
+        runanywhere::v1::TTSStreamEvent completed;
+        completed.set_seq(ctx.next_seq++);
+        completed.set_timestamp_us(rac_get_current_time_ms() * 1000);
+        completed.set_request_id(ctx.request_id);
+        completed.set_kind(runanywhere::v1::TTS_STREAM_EVENT_KIND_COMPLETED);
+        emit_event(completed, ctx.fn, ctx.user_data);
+    }
+
+    free_tts_options(&options);
+    rac::lifecycle::release_lifecycle_tts(&ref);
+    rac_proto_buffer_free(&error_buf);
+    return rc;
+#endif
+}
+
+rac_result_t rac_tts_stop_lifecycle_proto(rac_proto_buffer_t* out_result) {
+    if (!out_result) return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable(out_result);
+#else
+    rac::lifecycle::LifecycleTtsRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_tts(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc,
+                                          "TTS lifecycle voice/model is not loaded");
+    }
+
+    rac_result_t stop_rc = RAC_SUCCESS;
+    if (ref.ops && ref.ops->stop) {
+        stop_rc = ref.ops->stop(ref.impl);
+    }
+
+    runanywhere::v1::TTSServiceState state;
+    state.set_is_ready(stop_rc == RAC_SUCCESS);
+    if (ref.model_id) {
+        state.set_current_voice(ref.model_id);
+    }
+    if (stop_rc != RAC_SUCCESS) {
+        state.set_error_code(stop_rc);
+        state.set_error_message(rac_error_message(stop_rc));
+    }
+    rc = copy_proto(state, out_result);
+    rac::lifecycle::release_lifecycle_tts(&ref);
+    return rc == RAC_SUCCESS ? stop_rc : rc;
+#endif
+}
+
+// ---------------------------------------------------------------------------
+// VAD lifecycle configure / start / stop / reset ABIs (FLT-12)
+// ---------------------------------------------------------------------------
+
+#if defined(RAC_HAVE_PROTOBUF)
+namespace {
+
+rac_result_t emit_vad_service_state(const rac::lifecycle::LifecycleVadRef& ref,
+                                    rac_result_t op_rc,
+                                    float threshold,
+                                    int32_t sample_rate,
+                                    int32_t frame_length_ms,
+                                    rac_proto_buffer_t* out_result) {
+    runanywhere::v1::VADServiceState state;
+    state.set_is_ready(op_rc == RAC_SUCCESS);
+    const bool active =
+        (ref.ops && ref.ops->is_speech_active && ref.ops->is_speech_active(ref.impl) == RAC_TRUE);
+    state.set_is_speech_active(active);
+    state.set_energy_threshold(threshold);
+    state.set_sample_rate(sample_rate);
+    state.set_frame_length_ms(frame_length_ms);
+    if (ref.model_id) {
+        state.set_current_model(ref.model_id);
+    }
+    if (op_rc != RAC_SUCCESS) {
+        state.set_error_code(op_rc);
+        state.set_error_message(rac_error_message(op_rc));
+    }
+    return copy_proto(state, out_result);
+}
+
+}  // namespace
+#endif
+
+rac_result_t rac_vad_configure_lifecycle_proto(
+    const uint8_t* request_proto_bytes, size_t request_proto_size,
+    rac_proto_buffer_t* out_result) {
+    if (!out_result) return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    (void)request_proto_bytes;
+    (void)request_proto_size;
+    return feature_unavailable(out_result);
+#else
+    if (!valid_bytes(request_proto_bytes, request_proto_size)) {
+        return parse_error(out_result, "VADConfiguration bytes are invalid");
+    }
+    runanywhere::v1::VADConfiguration proto;
+    if (!proto.ParseFromArray(parse_data(request_proto_bytes, request_proto_size),
+                              static_cast<int>(request_proto_size))) {
+        return parse_error(out_result, "failed to parse VADConfiguration");
+    }
+
+    rac::lifecycle::LifecycleVadRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc,
+                                          "VAD lifecycle model is not loaded");
+    }
+
+    const int32_t sample_rate =
+        proto.sample_rate() > 0 ? proto.sample_rate() : RAC_VAD_DEFAULT_SAMPLE_RATE;
+    const int32_t frame_length_ms =
+        proto.frame_length_ms() > 0 ? proto.frame_length_ms()
+                                    : static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f);
+    const float threshold =
+        proto.threshold() > 0.0f ? proto.threshold() : RAC_VAD_DEFAULT_ENERGY_THRESHOLD;
+
+    rac_result_t op_rc = RAC_SUCCESS;
+    if (ref.ops && ref.ops->set_threshold) {
+        op_rc = ref.ops->set_threshold(ref.impl, threshold);
+    }
+
+    rc = emit_vad_service_state(ref, op_rc, threshold, sample_rate, frame_length_ms, out_result);
+    rac::lifecycle::release_lifecycle_vad(&ref);
+    return rc == RAC_SUCCESS ? op_rc : rc;
+#endif
+}
+
+rac_result_t rac_vad_start_lifecycle_proto(rac_proto_buffer_t* out_result) {
+    if (!out_result) return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable(out_result);
+#else
+    rac::lifecycle::LifecycleVadRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc,
+                                          "VAD lifecycle model is not loaded");
+    }
+
+    rac_result_t op_rc = RAC_SUCCESS;
+    if (ref.ops && ref.ops->start) {
+        op_rc = ref.ops->start(ref.impl);
+    }
+
+    rc = emit_vad_service_state(ref, op_rc,
+                                RAC_VAD_DEFAULT_ENERGY_THRESHOLD,
+                                RAC_VAD_DEFAULT_SAMPLE_RATE,
+                                static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f),
+                                out_result);
+    rac::lifecycle::release_lifecycle_vad(&ref);
+    return rc == RAC_SUCCESS ? op_rc : rc;
+#endif
+}
+
+rac_result_t rac_vad_stop_lifecycle_proto(rac_proto_buffer_t* out_result) {
+    if (!out_result) return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable(out_result);
+#else
+    rac::lifecycle::LifecycleVadRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc,
+                                          "VAD lifecycle model is not loaded");
+    }
+
+    rac_result_t op_rc = RAC_SUCCESS;
+    if (ref.ops && ref.ops->stop) {
+        op_rc = ref.ops->stop(ref.impl);
+    }
+
+    rc = emit_vad_service_state(ref, op_rc,
+                                RAC_VAD_DEFAULT_ENERGY_THRESHOLD,
+                                RAC_VAD_DEFAULT_SAMPLE_RATE,
+                                static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f),
+                                out_result);
+    rac::lifecycle::release_lifecycle_vad(&ref);
+    return rc == RAC_SUCCESS ? op_rc : rc;
+#endif
+}
+
+rac_result_t rac_vad_reset_lifecycle_proto(rac_proto_buffer_t* out_result) {
+    if (!out_result) return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable(out_result);
+#else
+    rac::lifecycle::LifecycleVadRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_vad(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out_result, rc,
+                                          "VAD lifecycle model is not loaded");
+    }
+
+    rac_result_t op_rc = RAC_SUCCESS;
+    if (ref.ops && ref.ops->reset) {
+        op_rc = ref.ops->reset(ref.impl);
+    }
+
+    rc = emit_vad_service_state(ref, op_rc,
+                                RAC_VAD_DEFAULT_ENERGY_THRESHOLD,
+                                RAC_VAD_DEFAULT_SAMPLE_RATE,
+                                static_cast<int32_t>(RAC_VAD_DEFAULT_FRAME_LENGTH * 1000.0f),
+                                out_result);
+    rac::lifecycle::release_lifecycle_vad(&ref);
+    return rc == RAC_SUCCESS ? op_rc : rc;
+#endif
+}
+
 }  // extern "C"

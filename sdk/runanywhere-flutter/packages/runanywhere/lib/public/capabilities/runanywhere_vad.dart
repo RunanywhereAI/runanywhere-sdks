@@ -49,11 +49,9 @@ class RunAnywhereVAD {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
-    _effectiveConfiguration(config);
-    throw SDKException.featureNotAvailable(
-      'Lifecycle-owned VAD configuration is unavailable in Flutter until '
-      'commons exposes rac_vad_configure_lifecycle_proto.',
-    );
+    await _requireLoadedModelId();
+    final effective = _effectiveConfiguration(config);
+    DartBridgeVAD.shared.configureLifecycleProto(effective);
   }
 
   /// True once commons lifecycle has a ready VAD model.
@@ -104,10 +102,8 @@ class RunAnywhereVAD {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
-    throw SDKException.featureNotAvailable(
-      'Lifecycle-owned VAD start is unavailable in Flutter until commons '
-      'exposes rac_vad_start_lifecycle_proto.',
-    );
+    await _requireLoadedModelId();
+    DartBridgeVAD.shared.startLifecycleProto();
   }
 
   /// Stop VAD processing.
@@ -115,18 +111,20 @@ class RunAnywhereVAD {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
     }
-    throw SDKException.featureNotAvailable(
-      'Lifecycle-owned VAD stop is unavailable in Flutter until commons '
-      'exposes rac_vad_stop_lifecycle_proto.',
-    );
+    await _requireLoadedModelId();
+    DartBridgeVAD.shared.stopLifecycleProto();
   }
 
   /// Reset VAD state.
   void reset() {
-    throw SDKException.featureNotAvailable(
-      'Lifecycle-owned VAD reset is unavailable in Flutter until commons '
-      'exposes rac_vad_reset_lifecycle_proto.',
-    );
+    if (!DartBridge.isInitialized) {
+      throw SDKException.notInitialized();
+    }
+    if (!isModelLoaded) {
+      // No-op when no VAD model is loaded through lifecycle.
+      return;
+    }
+    DartBridgeVAD.shared.resetLifecycleProto();
   }
 
   /// Tear down VAD state.
