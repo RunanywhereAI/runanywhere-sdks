@@ -254,6 +254,15 @@ public extension RAModelInfo.OneOf_Artifact {
                 required: artifact.requiredPatterns,
                 optional: artifact.optionalPatterns
             )
+        case .multiFile(let artifact):
+            // Commons download planner only walks `model.expected_files.files`
+            // for multi-file/per-descriptor downloads. Seed it from the
+            // multi-file artifact so the per-file loop runs and every URL
+            // (LLM + mmproj + tokenizer + ...) actually downloads.
+            guard !artifact.files.isEmpty else { return .none }
+            var expected = RAExpectedModelFiles()
+            expected.files = artifact.files
+            return expected
         default:
             return .none
         }
