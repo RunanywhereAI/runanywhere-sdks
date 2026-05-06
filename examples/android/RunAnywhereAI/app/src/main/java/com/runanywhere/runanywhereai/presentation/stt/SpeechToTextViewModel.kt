@@ -3,6 +3,7 @@ package com.runanywhere.runanywhereai.presentation.stt
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_STT
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelEventKind
+import ai.runanywhere.proto.v1.STTLanguage
 import ai.runanywhere.proto.v1.STTOptions
 import android.Manifest
 import android.content.Context
@@ -455,7 +456,7 @@ class SpeechToTextViewModel : ViewModel() {
                             // Transcribe in background
                             withContext(Dispatchers.IO) {
                                 try {
-                                    val options = STTOptions(language = com.runanywhere.sdk.foundation.protoext.sttLanguageFromBcp47(_uiState.value.language))
+                                    val options = STTOptions(language = sttLanguageFromBcp47(_uiState.value.language))
                                     var finalText = ""
                                     RunAnywhere.transcribeStream(
                                         audioData = chunkData,
@@ -666,5 +667,31 @@ class SpeechToTextViewModel : ViewModel() {
     private fun normalizeAudioLevel(rms: Float): Float {
         val dbLevel = 20 * log10(rms + 0.0001f)
         return max(0f, min(1f, (dbLevel + 60) / 60))
+    }
+}
+
+/**
+ * Parse a BCP-47 base language string into a proto STTLanguage.
+ * Falls back to STT_LANGUAGE_UNSPECIFIED for unrecognized values.
+ * Mirrors the iOS reference behavior and the previous
+ * `foundation.protoext.sttLanguageFromBcp47` helper semantics.
+ */
+private fun sttLanguageFromBcp47(code: String): STTLanguage {
+    val base = code.substringBefore('-').lowercase()
+    return when (base) {
+        "en" -> STTLanguage.STT_LANGUAGE_EN
+        "es" -> STTLanguage.STT_LANGUAGE_ES
+        "fr" -> STTLanguage.STT_LANGUAGE_FR
+        "de" -> STTLanguage.STT_LANGUAGE_DE
+        "zh" -> STTLanguage.STT_LANGUAGE_ZH
+        "ja" -> STTLanguage.STT_LANGUAGE_JA
+        "ko" -> STTLanguage.STT_LANGUAGE_KO
+        "it" -> STTLanguage.STT_LANGUAGE_IT
+        "pt" -> STTLanguage.STT_LANGUAGE_PT
+        "ar" -> STTLanguage.STT_LANGUAGE_AR
+        "ru" -> STTLanguage.STT_LANGUAGE_RU
+        "hi" -> STTLanguage.STT_LANGUAGE_HI
+        "auto" -> STTLanguage.STT_LANGUAGE_AUTO
+        else -> STTLanguage.STT_LANGUAGE_UNSPECIFIED
     }
 }

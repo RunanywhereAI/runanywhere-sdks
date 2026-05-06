@@ -2,6 +2,8 @@ package com.runanywhere.runanywhereai.presentation.vision
 
 import ai.runanywhere.proto.v1.SDKEvent
 import ai.runanywhere.proto.v1.VLMGenerationOptions
+import ai.runanywhere.proto.v1.VLMImage
+import ai.runanywhere.proto.v1.VLMImageFormat
 import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
@@ -29,6 +31,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okio.ByteString.Companion.toByteString
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
@@ -249,7 +252,13 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
         generationJob =
             viewModelScope.launch {
                 try {
-                    val image = com.runanywhere.sdk.foundation.protoext.vlmImageFromRgbPixels(frameData, w, h)
+                    val image =
+                        VLMImage(
+                            raw_rgb = frameData.toByteString(),
+                            width = w,
+                            height = h,
+                            format = VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB,
+                        )
                     val options = VLMGenerationOptions(max_tokens = 200, temperature = 0.7f)
 
                     Timber.i("Describing current camera frame (${w}x$h)")
@@ -298,7 +307,11 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                 var tempFile: File? = null
                 try {
                     tempFile = copyUriToTempFile(uri) ?: throw Exception("Failed to read image")
-                    val image = com.runanywhere.sdk.foundation.protoext.vlmImageFromFilePath(tempFile.absolutePath)
+                    val image =
+                        VLMImage(
+                            file_path = tempFile.absolutePath,
+                            format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
+                        )
                     val options = VLMGenerationOptions(max_tokens = 300, temperature = 0.7f)
 
                     Timber.i("Starting VLM streaming for image: ${tempFile.name}")
@@ -379,7 +392,13 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
 
         var newDescription = ""
         try {
-            val image = com.runanywhere.sdk.foundation.protoext.vlmImageFromRgbPixels(frameData, w, h)
+            val image =
+                VLMImage(
+                    raw_rgb = frameData.toByteString(),
+                    width = w,
+                    height = h,
+                    format = VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB,
+                )
             val options = VLMGenerationOptions(max_tokens = 100, temperature = 0.7f)
 
             RunAnywhere.processImageStream(

@@ -2,6 +2,8 @@ package com.runanywhere.runanywhereai.presentation.benchmarks.services
 
 import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.VLMGenerationOptions
+import ai.runanywhere.proto.v1.VLMImage
+import ai.runanywhere.proto.v1.VLMImageFormat
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkCategory
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkDeviceInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkMetrics
@@ -13,6 +15,7 @@ import com.runanywhere.sdk.public.extensions.processImage
 import com.runanywhere.sdk.public.extensions.unloadVLMModel
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
+import okio.ByteString.Companion.toByteString
 
 /**
  * Benchmarks VLM image understanding with synthetic images.
@@ -49,7 +52,13 @@ class VLMBenchmarkProvider : BenchmarkScenarioProvider {
                 } else {
                     SyntheticInputGenerator.gradientRgb(width, height)
                 }
-            val vlmImage = com.runanywhere.sdk.foundation.protoext.vlmImageFromRgbPixels(rgbData, width, height)
+            val vlmImage =
+                VLMImage(
+                    raw_rgb = rgbData.toByteString(),
+                    width = width,
+                    height = height,
+                    format = VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB,
+                )
 
             // Warmup
             val warmupStart = System.nanoTime()
