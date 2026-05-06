@@ -877,6 +877,15 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
     }
 
     // v2 close-out Phase G-2: terminal success event on the proto stream.
+    // BUG-STREAMING-003: emit finish_reason="length" when max_tokens was exhausted
+    // (matches OpenAI chat.completions contract — proto is modeled after it).
+    const char* finish_reason_str = "stop";
+    if (component->cancel_requested.load()) {
+        finish_reason_str = "cancelled";
+    } else if (effective_options->max_tokens > 0 &&
+               ctx.token_count >= effective_options->max_tokens) {
+        finish_reason_str = "length";
+    }
     rac::llm::dispatch_llm_stream_event(
         handle,
         /*token*/ "",
@@ -884,7 +893,7 @@ extern "C" rac_result_t rac_llm_component_generate_stream(
         /*kind*/ 1 /* ANSWER */,
         /*token_id*/ 0,
         /*logprob*/ 0.0f,
-        /*finish_reason*/ component->cancel_requested.load() ? "cancelled" : "stop",
+        /*finish_reason*/ finish_reason_str,
         /*error_message*/ nullptr);
 
     // Free the duplicated text
@@ -1156,10 +1165,19 @@ extern "C" rac_result_t rac_llm_component_generate_stream_with_timing(
     }
 
     // v2 close-out Phase G-2: terminal success event on the proto stream.
+    // BUG-STREAMING-003: emit finish_reason="length" when max_tokens was exhausted
+    // (matches OpenAI chat.completions contract — proto is modeled after it).
+    const char* finish_reason_str_t = "stop";
+    if (component->cancel_requested.load()) {
+        finish_reason_str_t = "cancelled";
+    } else if (effective_options->max_tokens > 0 &&
+               ctx.token_count >= effective_options->max_tokens) {
+        finish_reason_str_t = "length";
+    }
     rac::llm::dispatch_llm_stream_event(
         handle, "", /*is_final*/ true, /*kind*/ 1 /* ANSWER */,
         0, 0.0f,
-        /*finish_reason*/ component->cancel_requested.load() ? "cancelled" : "stop",
+        /*finish_reason*/ finish_reason_str_t,
         /*error_message*/ nullptr);
 
     // Free the duplicated text

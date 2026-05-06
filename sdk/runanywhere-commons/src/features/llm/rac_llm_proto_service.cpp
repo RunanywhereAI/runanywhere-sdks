@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "features/llm/rac_llm_stream_internal.h"
 #include "rac/features/llm/rac_llm_structured_output.h"
 #include "rac/features/llm/rac_llm_thinking.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
@@ -204,6 +205,7 @@ void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref,
                          size_t thinking_len,
                          int32_t thinking_tokens,
                          int32_t response_tokens,
+                         int32_t requested_max_tokens,
                          LLMGenerationResult* out) {
     out->set_text(response ? std::string(response, response_len) : std::string());
     if (thinking && thinking_len > 0) {
@@ -221,7 +223,12 @@ void set_result_from_raw(const rac::llm::LifecycleLlmRef& ref,
     if (ref.framework_name && ref.framework_name[0]) {
         out->set_framework(ref.framework_name);
     }
-    out->set_finish_reason("stop");
+    // BUG-STREAMING-003: emit finish_reason="length" when max_tokens was exhausted
+    // (matches OpenAI chat.completions contract — proto is modeled after it).
+    out->set_finish_reason((requested_max_tokens > 0 &&
+                            raw.completion_tokens >= requested_max_tokens)
+                               ? "length"
+                               : "stop");
     out->set_thinking_tokens(thinking_tokens);
     out->set_response_tokens(response_tokens);
     out->set_executed_on(runanywhere::v1::EXECUTION_TARGET_ON_DEVICE);
@@ -582,7 +589,7 @@ rac_result_t rac_llm_generate_proto(const uint8_t* request_proto_bytes,
 
     LLMGenerationResult result;
     set_result_from_raw(ref, raw, response, response_len, thinking, thinking_len,
-                        thinking_tokens, response_tokens, &result);
+                        thinking_tokens, response_tokens, options.max_tokens, &result);
     set_structured_output_if_present(response, &result);
 
     publish_generation_event(runanywhere::v1::GENERATION_EVENT_KIND_COMPLETED,

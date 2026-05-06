@@ -190,6 +190,27 @@ int test_unregister_stops_dispatch() {
     return 0;
 }
 
+// BUG-STREAMING-003: max-token exhaust must emit finish_reason="length"
+// (matches OpenAI chat.completions contract).
+int test_finish_reason_length_on_max_tokens() {
+    reset_capture();
+    rac_llm_set_stream_proto_callback(fake_handle(), test_callback, nullptr);
+
+    rac::llm::dispatch_llm_stream_event(fake_handle(), "",
+                                        /*is_final*/ true, /*kind*/ 1,
+                                        0, 0.0f, "length", nullptr);
+
+    runanywhere::v1::LLMStreamEvent terminal;
+    ASSERT_TRUE(terminal.ParseFromArray(
+        g_capture.events.back().data(),
+        static_cast<int>(g_capture.events.back().size())));
+    ASSERT_EQ(terminal.is_final(), true);
+    ASSERT_EQ(terminal.finish_reason(), "length");
+
+    rac_llm_unset_stream_proto_callback(fake_handle());
+    return 0;
+}
+
 int test_optional_fields_round_trip() {
     reset_capture();
     rac_llm_set_stream_proto_callback(fake_handle(), test_callback, nullptr);
@@ -232,6 +253,7 @@ int main() {
 #ifdef RAC_HAVE_PROTOBUF
     RUN(test_synthetic_token_schedule);
     RUN(test_error_termination);
+    RUN(test_finish_reason_length_on_max_tokens);
     RUN(test_unregister_stops_dispatch);
     RUN(test_optional_fields_round_trip);
 #else
