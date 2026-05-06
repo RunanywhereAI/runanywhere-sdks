@@ -555,7 +555,7 @@ void _getDeviceInfoCallback(
     outInfo.ref.osVersion = osVersionPtr;
 
     // SDK version
-    const sdkVersion = '0.1.4';
+    const sdkVersion = '0.19.13';
     final sdkVersionPtr = sdkVersion.toNativeUtf8();
     _cachedDeviceInfoPtrs.add(sdkVersionPtr);
     outInfo.ref.sdkVersion = sdkVersionPtr;

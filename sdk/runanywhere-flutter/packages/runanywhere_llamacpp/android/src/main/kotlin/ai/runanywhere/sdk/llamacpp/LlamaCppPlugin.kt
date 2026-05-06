@@ -18,7 +18,7 @@ class LlamaCppPlugin : FlutterPlugin, MethodCallHandler {
 
     companion object {
         private const val CHANNEL_NAME = "runanywhere_llamacpp"
-        private const val BACKEND_VERSION = "0.1.4"
+        private const val BACKEND_VERSION = "0.19.13"
         private const val BACKEND_NAME = "LlamaCPP"
 
         private fun loadFirstAvailable(vararg names: String) {

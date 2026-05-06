@@ -21,8 +21,8 @@ class RunAnywherePlugin : FlutterPlugin, MethodCallHandler {
     companion object {
         private const val TAG = "RunAnywherePlugin"
         private const val CHANNEL_NAME = "runanywhere"
-        private const val SDK_VERSION = "0.15.8"
-        private const val COMMONS_VERSION = "0.1.4"
+        private const val SDK_VERSION = "0.19.13"
+        private const val COMMONS_VERSION = "0.19.13"
 
         init {
             // Installing the OkHttp transport is the one-time wire-up for the

@@ -21,7 +21,7 @@ public class LlamaCppPlugin: NSObject, FlutterPlugin {
         case "getPlatformVersion":
             result("iOS " + UIDevice.current.systemVersion)
         case "getBackendVersion":
-            result("0.1.4")
+            result("0.19.13")
         case "getBackendName":
             result("LlamaCPP")
         default:

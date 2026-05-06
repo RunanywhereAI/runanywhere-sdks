@@ -120,7 +120,7 @@ class DartBridgeTelemetry {
       // Get device info
       final deviceModel = await _getDeviceModel();
       final osVersion = Platform.operatingSystemVersion;
-      const sdkVersion = '0.1.4';
+      const sdkVersion = '0.19.13';
       const platform = 'flutter';
 
       // Create telemetry manager

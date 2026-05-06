@@ -9,7 +9,7 @@
 
 Pod::Spec.new do |s|
   s.name             = 'runanywhere_genie'
-  s.version          = '0.16.0'
+  s.version          = '0.19.13'
   s.summary          = 'RunAnywhere Genie: experimental Android-only Qualcomm Genie backend shell'
   s.description      = <<-DESC
 Experimental Qualcomm Genie backend shell for RunAnywhere Flutter SDK. LLM
