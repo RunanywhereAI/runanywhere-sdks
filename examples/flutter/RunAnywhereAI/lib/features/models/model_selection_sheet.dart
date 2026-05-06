@@ -845,6 +845,16 @@ class _FlatModelRowState extends State<_FlatModelRow> {
   }
 
   Future<void> _downloadModel() async {
+    // Synchronous in-flight guard: a user can double-tap the Get button
+    // before the first setState lands in the widget tree, which previously
+    // dispatched two "Starting download" calls into the SDK. Reading
+    // _isDownloading here debounces the second tap before any async work.
+    if (_isDownloading) {
+      debugPrint(
+          '⚠️ Download already in flight for ${widget.model.name} — ignoring tap');
+      return;
+    }
+
     setState(() {
       _isDownloading = true;
       _downloadProgress = 0.0;

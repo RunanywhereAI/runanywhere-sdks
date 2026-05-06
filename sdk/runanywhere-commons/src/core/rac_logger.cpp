@@ -241,8 +241,20 @@ void rac_logger_log(rac_log_level_t level, const char* category, const char* mes
     // Also forward to platform adapter if available
     const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
     if (adapter && adapter->log) {
-        // Format message with metadata for the platform
-        char formatted[2048];
+        // Format message with metadata for the platform.
+        //
+        // The buffer is thread_local (not stack-local) so its storage survives
+        // past adapter->log()'s return. This matters for platform adapters that
+        // deliver log callbacks asynchronously (Flutter iOS uses
+        // NativeCallable.listener which posts the raw char* pointer to the
+        // Dart isolate's event loop; by the time Dart reads the pointer via
+        // .toDartString(), a stack-local buffer would already be freed and the
+        // message would be truncated — e.g., [LLM.LlamaCpp.GGML] was reduced
+        // to a single char "s" on iOS). thread_local keeps the pointer valid
+        // until the same thread logs its next message, which is always after
+        // the async listener has snapshotted the string. Each C++ thread has
+        // its own buffer, so cross-thread writes never race.
+        thread_local char formatted[2048];
         format_message_with_metadata(formatted, sizeof(formatted), message, metadata);
         adapter->log(level, category, formatted, adapter->user_data);
     } else if (stderr_always == 0 && stderr_fallback != 0) {
