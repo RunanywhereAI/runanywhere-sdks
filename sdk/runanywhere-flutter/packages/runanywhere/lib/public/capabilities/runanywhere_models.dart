@@ -14,8 +14,8 @@ import 'package:runanywhere/generated/model_types.pb.dart';
 import 'package:runanywhere/internal/sdk_init.dart';
 import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
+import 'package:runanywhere/native/dart_bridge_model_format.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
-import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
 
 /// Model registry capability surface.
 ///
@@ -119,7 +119,7 @@ class RunAnywhereModels {
   }) {
     final modelId =
         id ?? name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '-');
-    final format = protoModelFormatFromPath(url.path);
+    final format = DartBridgeModelFormat.shared.formatFromUrl(url.path);
 
     final baseModel = ModelInfo(
       id: modelId,
@@ -221,7 +221,9 @@ class RunAnywhereModels {
   }
 
   static ModelInfo _applyArtifact(ModelInfo model, Object? artifactType) {
-    if (artifactType == null) return withInferredArtifact(model);
+    if (artifactType == null) {
+      return DartBridgeModelFormat.shared.applyInferredArtifact(model);
+    }
 
     if (artifactType is ModelArtifactType) {
       return model.deepCopy()..artifactType = artifactType;
@@ -236,7 +238,7 @@ class RunAnywhereModels {
         ..multiFile = artifactType
         ..artifactType = ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY;
     }
-    return withInferredArtifact(model);
+    return DartBridgeModelFormat.shared.applyInferredArtifact(model);
   }
 
   static ModelArtifactType _artifactTypeForArchive(ArchiveType archiveType) {

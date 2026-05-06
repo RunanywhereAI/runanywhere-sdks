@@ -9,11 +9,8 @@ library model_types_cpp_bridge;
 import 'dart:io';
 
 import 'package:fixnum/fixnum.dart' as fixnum;
-import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
-import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pbenum.dart' as pb;
-import 'package:runanywhere/native/dart_bridge_model_format.dart';
 
 // =============================================================================
 // C++ Constants (from rac_model_types.h)
@@ -409,50 +406,6 @@ model_pb.ModelInfo protoModelInfoFromCFields({
     createdAtUnixMs: fixnum.Int64(createdAtUnixMs),
     updatedAtUnixMs: fixnum.Int64(updatedAtUnixMs),
   );
-}
-
-/// Commons-backed URL → ModelFormat inference. Delegates to
-/// `rac_model_format_from_url_proto` (Wave D-3). No Dart-side heuristics.
-pb.ModelFormat protoModelFormatFromPath(String path) {
-  try {
-    return DartBridgeModelFormat.shared.formatFromUrl(path);
-  } catch (e) {
-    SDKLogger('ModelTypes.CppBridge').warning(
-      'rac_model_format_from_url_proto unavailable; returning UNKNOWN: $e',
-    );
-    return pb.ModelFormat.MODEL_FORMAT_UNKNOWN;
-  }
-}
-
-/// Commons-backed URL → ModelArtifactType inference. Delegates to
-/// `rac_artifact_infer_from_url_proto` (Wave D-3).
-model_pb.ModelInfo withInferredArtifact(model_pb.ModelInfo model) {
-  if (model.hasArtifactType() ||
-      model.hasSingleFile() ||
-      model.hasArchive() ||
-      model.hasMultiFile() ||
-      model.hasBuiltIn() ||
-      model.hasCustomStrategyId()) {
-    return model;
-  }
-
-  if (model.isBuiltIn) {
-    return model.deepCopy()
-      ..artifactType = pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY
-      ..builtIn = true;
-  }
-
-  try {
-    return DartBridgeModelFormat.shared
-        .applyInferredArtifact(model, model.downloadUrl);
-  } catch (e) {
-    SDKLogger('ModelTypes.CppBridge').warning(
-      'rac_artifact_infer_from_url_proto unavailable; defaulting to SINGLE_FILE: $e',
-    );
-    return model.deepCopy()
-      ..artifactType = pb.ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE
-      ..singleFile = model_pb.SingleFileArtifact();
-  }
 }
 
 pb.ModelSource _sourceProtoFromC(int cSource) {

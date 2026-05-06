@@ -11,6 +11,7 @@ library dart_bridge_model_format;
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 
 import 'package:runanywhere/core/native/rac_native.dart';
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart'
     show
         ArchiveArtifact,
@@ -22,7 +23,7 @@ import 'package:runanywhere/generated/model_types.pb.dart'
         MultiFileArtifact,
         SingleFileArtifact;
 import 'package:runanywhere/generated/model_types.pbenum.dart'
-    show ArchiveType, ModelArtifactType, ModelFormat;
+    show ArchiveType, InferenceFramework, ModelArtifactType, ModelFormat;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 
 class DartBridgeModelFormat {
@@ -30,12 +31,16 @@ class DartBridgeModelFormat {
 
   static final DartBridgeModelFormat shared = DartBridgeModelFormat._();
 
-  /// URL → ModelFormat via commons.
+  static final _logger = SDKLogger('DartBridge.ModelFormat');
+
+  /// URL → ModelFormat via commons. Returns [ModelFormat.MODEL_FORMAT_UNKNOWN]
+  /// when the native proto ABI is unavailable (e.g. pre-init, unit tests).
   ModelFormat formatFromUrl(String url) {
     final fn = RacNative.bindings.rac_model_format_from_url_proto;
     if (fn == null) {
-      throw UnsupportedError(
-          'rac_model_format_from_url_proto is unavailable');
+      _logger.warning(
+          'rac_model_format_from_url_proto unavailable; returning UNKNOWN');
+      return ModelFormat.MODEL_FORMAT_UNKNOWN;
     }
     final result = DartBridgeProtoUtils.callRequest<ModelFormatFromUrlResult>(
       request: ModelFormatFromUrlRequest(url: url),
@@ -54,12 +59,15 @@ class DartBridgeModelFormat {
     return result.format;
   }
 
-  /// URL → ArtifactInferFromUrlResult via commons.
-  ArtifactInferFromUrlResult inferArtifact(String url, {String modelId = ''}) {
+  /// URL → ArtifactInferFromUrlResult via commons. Returns `null` when the
+  /// native proto ABI is unavailable.
+  ArtifactInferFromUrlResult? inferArtifact(String url,
+      {String modelId = ''}) {
     final fn = RacNative.bindings.rac_artifact_infer_from_url_proto;
     if (fn == null) {
-      throw UnsupportedError(
-          'rac_artifact_infer_from_url_proto is unavailable');
+      _logger.warning(
+          'rac_artifact_infer_from_url_proto unavailable; returning null');
+      return null;
     }
     return DartBridgeProtoUtils.callRequest<ArtifactInferFromUrlResult>(
       request: ArtifactInferFromUrlRequest(url: url, modelId: modelId),
@@ -69,10 +77,34 @@ class DartBridgeModelFormat {
     );
   }
 
-  /// Apply the commons-inferred artifact fields onto a copy of [model].
-  ModelInfo applyInferredArtifact(ModelInfo model, String url) {
-    if (url.isEmpty) return _asSingleFile(model);
-    final inference = inferArtifact(url, modelId: model.id);
+  /// Populate the artifact-classification fields on a copy of [model] based on
+  /// its `downloadUrl` via commons. Preserves caller-supplied artifact fields
+  /// when already set, handles the built-in short-circuit (DIRECTORY), and
+  /// falls back to [ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE] when
+  /// the native ABI is unavailable. Mirrors Kotlin
+  /// `CppBridgeModelFormat.applyInferredArtifact`.
+  ModelInfo applyInferredArtifact(ModelInfo model, [String? url]) {
+    if (model.hasArtifactType() ||
+        model.hasSingleFile() ||
+        model.hasArchive() ||
+        model.hasMultiFile() ||
+        model.hasBuiltIn() ||
+        model.hasCustomStrategyId()) {
+      return model;
+    }
+
+    if (_isBuiltIn(model)) {
+      return model.deepCopy()
+        ..artifactType = ModelArtifactType.MODEL_ARTIFACT_TYPE_DIRECTORY
+        ..builtIn = true;
+    }
+
+    final effectiveUrl = url ?? model.downloadUrl;
+    if (effectiveUrl.isEmpty) return _asSingleFile(model);
+
+    final inference = inferArtifact(effectiveUrl, modelId: model.id);
+    if (inference == null) return _asSingleFile(model);
+
     final copy = model.deepCopy()..artifactType = inference.artifactType;
     switch (inference.artifactType) {
       case ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE:
@@ -101,5 +133,17 @@ class DartBridgeModelFormat {
     return model.deepCopy()
       ..artifactType = ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE
       ..singleFile = SingleFileArtifact();
+  }
+
+  /// Mirrors the `ProtoModelInfoHelpers.isBuiltIn` extension in
+  /// `model_types_cpp_bridge.dart` without introducing a circular import.
+  static bool _isBuiltIn(ModelInfo model) {
+    if (model.hasBuiltIn() && model.builtIn) return true;
+    if (model.localPath.startsWith('builtin:')) return true;
+    return model.framework ==
+            InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
+        model.framework ==
+            InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS ||
+        model.framework == InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN;
   }
 }

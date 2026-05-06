@@ -9,9 +9,9 @@ import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
+import 'package:runanywhere/native/dart_bridge_model_format.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
 
 // =============================================================================
 // Exception Return Constants
@@ -225,7 +225,8 @@ class DartBridgeModelRegistry {
       final bytes = outBytesPtr.value
           .asTypedList(outSizePtr.value)
           .toList(growable: false);
-      return withInferredArtifact(model_pb.ModelInfo.fromBuffer(bytes));
+      return DartBridgeModelFormat.shared
+          .applyInferredArtifact(model_pb.ModelInfo.fromBuffer(bytes));
     } catch (e) {
       _logger.debug('rac_model_registry_get_proto error: $e');
       return null;
@@ -261,7 +262,9 @@ class DartBridgeModelRegistry {
           .asTypedList(outSizePtr.value)
           .toList(growable: false);
       final list = model_pb.ModelInfoList.fromBuffer(bytes);
-      return list.models.map(withInferredArtifact).toList(growable: false);
+      return list.models
+          .map(DartBridgeModelFormat.shared.applyInferredArtifact)
+          .toList(growable: false);
     } catch (e) {
       _logger.debug('rac_model_registry_list_proto error: $e');
       return null;
@@ -307,7 +310,9 @@ class DartBridgeModelRegistry {
           .asTypedList(outSizePtr.value)
           .toList(growable: false);
       final list = model_pb.ModelInfoList.fromBuffer(resultBytes);
-      return list.models.map(withInferredArtifact).toList(growable: false);
+      return list.models
+          .map(DartBridgeModelFormat.shared.applyInferredArtifact)
+          .toList(growable: false);
     } catch (e) {
       _logger.debug('rac_model_registry_query_proto error: $e');
       return null;
@@ -344,7 +349,9 @@ class DartBridgeModelRegistry {
           .asTypedList(outSizePtr.value)
           .toList(growable: false);
       final list = model_pb.ModelInfoList.fromBuffer(bytes);
-      return list.models.map(withInferredArtifact).toList(growable: false);
+      return list.models
+          .map(DartBridgeModelFormat.shared.applyInferredArtifact)
+          .toList(growable: false);
     } catch (e) {
       _logger.debug('rac_model_registry_list_downloaded_proto error: $e');
       return null;

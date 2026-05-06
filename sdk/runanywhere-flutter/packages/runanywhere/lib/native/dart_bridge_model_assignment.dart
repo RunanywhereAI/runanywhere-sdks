@@ -8,6 +8,7 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
+import 'package:runanywhere/native/dart_bridge_model_format.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -250,22 +251,24 @@ class DartBridgeModelAssignment {
   // ============================================================================
 
   model_pb.ModelInfo _structToModelInfo(Pointer<RacModelInfoStruct> struct) {
-    return withInferredArtifact(protoModelInfoFromCFields(
-      id: struct.ref.id.toDartString(),
-      name: struct.ref.name.toDartString(),
-      category: struct.ref.category,
-      format: struct.ref.format,
-      framework: struct.ref.framework,
-      source: struct.ref.source,
-      downloadSizeBytes: struct.ref.sizeBytes,
-      contextLength: struct.ref.contextLength,
-      downloadUrl: struct.ref.downloadURL != nullptr
-          ? struct.ref.downloadURL.toDartString()
-          : null,
-      localPath: struct.ref.localPath != nullptr
-          ? struct.ref.localPath.toDartString()
-          : null,
-    ));
+    return DartBridgeModelFormat.shared.applyInferredArtifact(
+      protoModelInfoFromCFields(
+        id: struct.ref.id.toDartString(),
+        name: struct.ref.name.toDartString(),
+        category: struct.ref.category,
+        format: struct.ref.format,
+        framework: struct.ref.framework,
+        source: struct.ref.source,
+        downloadSizeBytes: struct.ref.sizeBytes,
+        contextLength: struct.ref.contextLength,
+        downloadUrl: struct.ref.downloadURL != nullptr
+            ? struct.ref.downloadURL.toDartString()
+            : null,
+        localPath: struct.ref.localPath != nullptr
+            ? struct.ref.localPath.toDartString()
+            : null,
+      ),
+    );
   }
 }
 
