@@ -353,36 +353,31 @@ import type {
 
 ---
 
-### EventBus
+### SDK Events
 
-Subscribe to SDK events for reactive updates.
+All SDK events (initialization, model lifecycle, generation, voice pipeline,
+download progress, telemetry, ...) flow through a single native proto-byte
+pipe owned by `runanywhere-commons`. Subscribe via
+`RunAnywhere.subscribeSDKEvents(...)`, which decodes the bytes into a
+generated `SDKEvent` proto message before handing them to your callback.
 
 ```typescript
-import { EventBus, EventCategory } from '@runanywhere/core';
+import { RunAnywhere } from '@runanywhere/core';
 
-// Subscribe to events
-const unsubscribe = EventBus.on('Generation', (event) => {
-  console.log('Event:', event.type);
+const unsubscribe = await RunAnywhere.subscribeSDKEvents((event) => {
+  // `event` is a decoded SDKEvent proto message.
+  // Its `payload` oneof identifies the concrete event type
+  // (generation, model, voice, download, telemetry, ...).
+  console.log('SDK event:', event.payload?.$case, event);
 });
 
-// Shorthand methods
-RunAnywhere.events.onInitialization((event) => { ... });
-RunAnywhere.events.onGeneration((event) => { ... });
-RunAnywhere.events.onModel((event) => { ... });
-RunAnywhere.events.onVoice((event) => { ... });
-
-// Unsubscribe
-unsubscribe();
+// Later, when you no longer care about events:
+await unsubscribe();
 ```
 
-#### Event Categories
-
-| Category | Events |
-|----------|--------|
-| `Initialization` | `started`, `completed`, `failed` |
-| `Generation` | `started`, `tokenGenerated`, `completed`, `failed` |
-| `Model` | `downloadStarted`, `downloadProgress`, `downloadCompleted`, `loadCompleted` |
-| `Voice` | `sttStarted`, `sttCompleted`, `ttsStarted`, `ttsCompleted` |
+The in-process `EventBus` export is a publish-only façade used internally
+by the audio managers — it has no `on*` subscribers. Consumers must use
+`RunAnywhere.subscribeSDKEvents(...)` for all event observation.
 
 ---
 
