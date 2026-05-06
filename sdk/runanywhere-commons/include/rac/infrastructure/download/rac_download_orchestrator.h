@@ -105,9 +105,11 @@ RAC_API rac_result_t rac_download_orchestrate_multi(
 /**
  * @brief Callback for proto-encoded runanywhere.v1.DownloadProgress updates.
  *
- * The byte pointer is only valid for the duration of the synchronous callback.
- * SDK adapters that dispatch asynchronously must copy the bytes before
- * returning.
+ * Implementation keeps the last N emitted buffers alive in a ring slot, so
+ * async SDK bindings (Flutter Dart `NativeCallable.listener`, React Native
+ * NitroModules) may safely copy out the bytes after the synchronous invocation
+ * returns. Callers should still copy the payload as soon as possible; the slot
+ * is recycled after 32 further emissions.
  */
 typedef void (*rac_download_proto_progress_callback_fn)(const uint8_t* proto_bytes,
                                                         size_t proto_size,

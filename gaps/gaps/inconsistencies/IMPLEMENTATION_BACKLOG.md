@@ -2,7 +2,7 @@
 
 Date: 2026-05-05
 Branch: feat/v2-architecture @ 6217d9e67
-Total open rows: 79
+Total open rows: 78
 
 ## Execution rules
 

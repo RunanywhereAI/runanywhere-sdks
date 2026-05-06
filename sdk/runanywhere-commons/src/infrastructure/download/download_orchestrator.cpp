@@ -15,6 +15,7 @@
  */
 
 #include <condition_variable>
+#include <array>
 #include <atomic>
 #include <algorithm>
 #include <chrono>
@@ -279,6 +280,24 @@ struct proto_progress_sink {
     std::mutex mutex;
     rac_download_proto_progress_callback_fn callback = nullptr;
     void* user_data = nullptr;
+    // Ring of recently emitted DownloadProgress byte buffers.
+    //
+    // Some bindings (Flutter Dart `NativeCallable.listener`, React Native
+    // NitroModules async dispatch) process the callback on a different
+    // thread/isolate than the one that invoked it. A stack- or emission-
+    // scoped `std::string bytes` would be freed by the time those bindings
+    // finally read the pointer — producing `InvalidProtocolBufferException:
+    // invalid tag (zero)` (BUG-FLT-ANDROID-001 / BUG-STREAMING-005) when the
+    // decoder reads reused memory.
+    //
+    // Keeping the last N serializations alive guarantees each emitted pointer
+    // remains valid long enough for the slowest async binding to copy it out.
+    // A ring size of 32 comfortably exceeds the number of in-flight progress
+    // messages a SDK binding can queue during a typical download burst (~64
+    // KiB reporting interval).
+    static constexpr size_t kRingSize = 32;
+    std::array<std::string, kRingSize> bytes_ring;
+    size_t ring_index = 0;
 };
 
 proto_progress_sink& progress_sink() {
@@ -464,22 +483,24 @@ void emit_progress(const std::shared_ptr<proto_download_task>& task) {
         progress = task->progress;
     }
 
-    std::string bytes;
-    if (!progress.SerializeToString(&bytes)) {
+    // Serialize into a persistent ring slot so the pointer passed to the
+    // async SDK binding (Flutter Dart `NativeCallable.listener`, React
+    // Native NitroModules) remains valid until enough subsequent emissions
+    // rotate the slot. This prevents `InvalidProtocolBufferException:
+    // invalid tag (zero)` caused by the binding reading freed memory after
+    // the emission returns.
+    std::lock_guard<std::mutex> lock(progress_sink().mutex);
+    auto& sink = progress_sink();
+    if (!sink.callback) {
         return;
     }
-
-    rac_download_proto_progress_callback_fn callback = nullptr;
-    void* user_data = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(progress_sink().mutex);
-        callback = progress_sink().callback;
-        user_data = progress_sink().user_data;
+    std::string& slot = sink.bytes_ring[sink.ring_index];
+    sink.ring_index = (sink.ring_index + 1) % proto_progress_sink::kRingSize;
+    if (!progress.SerializeToString(&slot)) {
+        return;
     }
-
-    if (callback) {
-        callback(reinterpret_cast<const uint8_t*>(bytes.data()), bytes.size(), user_data);
-    }
+    sink.callback(reinterpret_cast<const uint8_t*>(slot.data()), slot.size(),
+                  sink.user_data);
 }
 
 int64_t file_size_or_zero(const std::string& path) {
@@ -1176,8 +1197,18 @@ static void orchestrate_http_complete(rac_result_t result, const char* downloade
 extern "C" rac_result_t rac_download_set_progress_proto_callback(
     rac_download_proto_progress_callback_fn callback, void* user_data) {
     std::lock_guard<std::mutex> lock(progress_sink().mutex);
-    progress_sink().callback = callback;
-    progress_sink().user_data = user_data;
+    auto& sink = progress_sink();
+    sink.callback = callback;
+    sink.user_data = user_data;
+    if (!callback) {
+        // Free ring memory once no subscriber remains. Leaving the ring
+        // allocated on clear would otherwise pin up to 32 serialized
+        // DownloadProgress buffers for the lifetime of the process.
+        for (auto& slot : sink.bytes_ring) {
+            std::string().swap(slot);
+        }
+        sink.ring_index = 0;
+    }
     return RAC_SUCCESS;
 }
 
