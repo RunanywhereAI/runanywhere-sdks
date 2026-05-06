@@ -194,7 +194,6 @@ packages/runanywhere/lib/
 - `android/src/.../RunAnywhereBridge.kt` — `System.loadLibrary("runanywhere_jni")`
 - `android/src/.../OkHttpTransport.kt` — Blocking OkHttp calls + streaming chunk delivery
 - `android/build.gradle` — Downloads `.so` from GitHub releases when `testLocal=false`
-- `android/CMakeLists.txt` — Builds `flutter_rag_bridge` shared library linking against `rac_commons`
 
 ### Binary Source Toggle (Local vs Remote)
 
