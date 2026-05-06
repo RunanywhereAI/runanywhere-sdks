@@ -14,7 +14,8 @@ import Foundation
 
 // C struct with raw pointers — safe to send across concurrency boundaries
 // because the backing Data (rgbData) is kept alive alongside it.
-extension rac_vlm_image_t: @unchecked Sendable {}
+// `@retroactive` acknowledges we're extending a type imported from CRACommons.
+extension rac_vlm_image_t: @retroactive @unchecked Sendable {}
 
 // MARK: - Vision Language Model
 

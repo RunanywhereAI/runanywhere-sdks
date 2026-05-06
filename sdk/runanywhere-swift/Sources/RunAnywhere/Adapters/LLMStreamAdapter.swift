@@ -65,12 +65,9 @@ public final class LLMStreamAdapter {
             // We must install the trampoline outside the lock because
             // installLocked invokes a C registration that might call back
             // synchronously on some platforms.
-            var didInstall = true
-            state.withLock { s in
-                if !s.installed { didInstall = false }
-            }
+            let alreadyInstalled = state.withLock { $0.installed }
 
-            if !didInstall {
+            if !alreadyInstalled {
                 if !install() { return nil }
             }
 

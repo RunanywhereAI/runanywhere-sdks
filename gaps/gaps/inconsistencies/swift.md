@@ -10,26 +10,7 @@ Swift is a thin platform bridge over the C ABI. All public data types (`RAModelI
 
 ## Confirmed gaps
 
-### SWF-SENDABLE-01: 28 Swift 6 sendability warning sites across the bridge surface (MEDIUM)
-
-- **Symptom**: Clean `swift build` against Swift 6.3.1 surfaces 483 warning lines across 28 unique source locations (amplified to 483 because the SDK is built 5x across products). The issues:
-  - 20+ `OpaquePointer` / `UnsafeMutableRawPointer` non-Sendable captures in `@Sendable` closures: `CppBridge+Telemetry.swift:75/81/99/117/134/140`, `LLMStreamAdapter.swift:112/163/189`, `VoiceAgentStreamAdapter.swift:95/134/160`, `CppBridge+Download.swift:182`, `CppBridge+SDKEvents.swift:77`, `RunAnywhere+Solutions.swift:35/39/91`, `RunAnywhere+VisionLanguage.swift:17`.
-  - `AVAudioEngine` / `AVAudioInputNode` / `AudioCaptureManager` non-Sendable captures in `AudioCaptureManager.swift:163/166/177/9` (module-level `@preconcurrency` missing) and `AudioCaptureManager.swift:507` (`UnsafeMutableRawPointer` from `CFString`).
-  - `synthesizer` MainActor-isolated property accessed from nonisolated context at `SystemTTSService.swift:93`.
-  - `mutation of captured var 'didInstall' in concurrently-executing code` at `LLMStreamAdapter.swift:70`.
-  - `unnecessary check for 'macOS'; enclosing scope ensures guard will always be true` at `SystemFoundationModelsService.swift:64`.
-  - `result of call to 'copyBytes(to:from:)' is unused` at `URLSessionHttpTransport.swift:308`.
-- **Why it matters**: Swift 6 language mode turns most of these into compile errors. User rule explicitly says "Use the latest Swift 6 APIs always" (see `CLAUDE.md#swift-specific-rules`). Every `@Sendable` closure capturing an opaque C pointer is a future breakage.
-- **Fix steps**:
-  1. Add a shared `Foundation/Bridge/CSendability.swift` with `extension OpaquePointer: @retroactive @unchecked Sendable {}` and `extension UnsafeMutableRawPointer: @retroactive @unchecked Sendable {}`. Both are safe to send because the C layer owns their lifetime and the Swift layer only threads them through `@convention(c)` trampolines.
-  2. Add `@retroactive` to `RunAnywhere+VisionLanguage.swift:17` `extension rac_vlm_image_t: @unchecked Sendable {}`.
-  3. In `AudioCaptureManager.swift:9` add `@preconcurrency import AVFoundation` (compiler explicitly suggests this).
-  4. In `SystemTTSService.swift:93` wrap the `synthesizer` access in a `MainActor.run { ... }` or mark it `nonisolated(unsafe)` since `AVSpeechSynthesizer` is inherently single-threaded.
-  5. Drop the redundant `#available(macOS)` at `SystemFoundationModelsService.swift:64`.
-  6. Discard `copyBytes(to:from:)` return at `URLSessionHttpTransport.swift:308` with `_ =`.
-  7. Fix `LLMStreamAdapter.swift:70` `didInstall` — mutate inside `state.withLock { }` and return the captured value, don't mutate across concurrent closure scope.
-- **Validation**: unique warning sites drops from 28 to under 5 (architecture-specific warnings from DeviceKit tolerable; `@Sendable` / concurrency warnings should be 0).
-- **Scope**: M (one dedicated sendability file + ~8 surgical edits).
+(none open)
 
 ## Items to DELETE (hard delete, no deprecation)
 

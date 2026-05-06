@@ -31,7 +31,12 @@ public final class SystemTTSService: NSObject {
 
     // MARK: - Properties
 
-    private let synthesizer = AVSpeechSynthesizer()
+    // `AVSpeechSynthesizer` is inherently single-threaded — it maintains no
+    // mutable Swift state we touch from multiple actors, and its read-only
+    // properties (isSpeaking) are documented as thread-safe. Marking it
+    // nonisolated(unsafe) lets `nonisolated` accessors such as
+    // `isSynthesizing` read it directly without hopping to MainActor.
+    private nonisolated(unsafe) let synthesizer = AVSpeechSynthesizer()
     private let logger = SDKLogger(category: "SystemTTS")
 
     /// Completion handler for current speech operation

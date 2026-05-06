@@ -305,7 +305,7 @@ private enum ResponseWriter {
         if let body = bodyBytes, !body.isEmpty {
             if let buffer = malloc(body.count) {
                 let typed = buffer.assumingMemoryBound(to: UInt8.self)
-                body.copyBytes(to: UnsafeMutableBufferPointer(start: typed, count: body.count))
+                _ = body.copyBytes(to: UnsafeMutableBufferPointer(start: typed, count: body.count))
                 out.pointee.body_bytes = typed
                 out.pointee.body_len = body.count
             }

@@ -61,11 +61,8 @@ public class SystemFoundationModelsService {
         }
 
         #if canImport(FoundationModels)
-        guard #available(iOS 26.0, macOS 26.0, *) else {
-            logger.error("iOS 26.0+ or macOS 26.0+ not available")
-            throw SDKException.llm(.notInitialized, "iOS 26.0+ or macOS 26.0+ not available")
-        }
-
+        // The enclosing @available(iOS 26.0, macOS 26.0, *) annotation on this class
+        // already guarantees the platform minimum; no runtime recheck needed.
         logger.info("FoundationModels framework is available, proceeding with initialization")
 
         do {
