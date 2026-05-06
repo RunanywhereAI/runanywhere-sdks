@@ -523,10 +523,16 @@ final class VoiceAgentViewModel: ObservableObject {
 
         case let .vad(vad):
             switch vad.type {
-            case .vadEventVoiceStart:
-                isSpeechDetected = true
-                currentStatus = "Listening..."
-            case .vadEventVoiceEndOfUtterance:
+            case .speechActivity:
+                if vad.isSpeech {
+                    isSpeechDetected = true
+                    currentStatus = "Listening..."
+                } else {
+                    sessionState = .processing
+                    currentStatus = "Processing..."
+                    isSpeechDetected = false
+                }
+            case .stopped:
                 sessionState = .processing
                 currentStatus = "Processing..."
                 isSpeechDetected = false
