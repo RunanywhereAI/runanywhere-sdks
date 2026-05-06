@@ -181,6 +181,8 @@ See `test_workflows/logs/20260505T183402-0700-seven-lane-validation/failure_summ
 **RESOLVED (Wave F-1)**: BUG-RN-IOS-002 (auto-run `bundle exec pod install` via `postinstall` script in `examples/react-native/RunAnywhereAI/package.json`); BUG-ANDROID-KOTLIN-001 + BUG-ANDROID-KOTLIN-004 (migrated 5 example-app call-sites to construct `VLMImage` / `STTOptions.language` directly from Wire-generated proto types; deleted path was intentional per KOT-DEAD-PROTOEXT (commit 765692eae); CLAUDE.md doc-drift fixed); BUG-ANDROID-KOTLIN-002 + BUG-ANDROID-KOTLIN-003 (migrated 9 `VoiceAssistantViewModel.kt` call-sites to `ai.runanywhere.proto.v1.ErrorCode` per IDL-08 mapping; deleted orphan generated `VoiceSessionErrorCode.kt` left behind by Wire 4.x additive codegen); BUG-SWIFT-IOS-002 (re-seeded the iOS example-app model catalog — 25 entries across LLM / VLM / STT / TTS / VAD / embedding / diffusion / MetalRT — via new `registerModulesAndModels()` in `examples/ios/RunAnywhereAI/RunAnywhereAI/App/RunAnywhereAIApp.swift`, called from `initializeSDK()` between `runSDKInitialize()` and `refreshSDKCatalogs()`; mirrors the Flutter / Kotlin / RN / Web example catalogs since the SDK does not ship a default seed; BUG-SWIFT-IOS-003's cross-contamination caveat verified against code — Swift app file had zero `RunAnywhere.registerModel(...)` calls prior to this fix).
 **RESOLVED (Wave F-2)**: BUG-RN-ANDROID-002 + BUG-WEB-001 (passed `model: ModelInfo` submessage to `DownloadPlanRequest` so `download_orchestrator.cpp`'s `request.has_model()` gate no longer rejects downloads. RN: `RunAnywhere+ModelManagement.ts` now fetches `ModelInfo` via `native.getModelInfoProto(modelId)` and decodes before building the plan request, mirroring iOS `RunAnywhere+Storage.swift:100-105`. Web: `examples/web/RunAnywhereAI/src/components/model-selection.ts` now calls `RunAnywhere.modelRegistry.get(modelId)` before `downloads.plan(...)` and passes the full model).
 **RESOLVED (Wave F-3)**: BUG-WEB-002 (web SDK now installs a synthetic `/opfs` base dir immediately after `rac_init` via `rac_model_paths_set_base_dir`, so the C++ download orchestrator's `g_base_dir.empty()` check no longer rejects `rac_model_paths_get_model_folder`. Emscripten MEMFS treats the prefix as a normal absolute path and the PlatformAdapter `file_*` callbacks handle I/O against it. Note: this fix unblocks the download path only — the MEMFS-is-volatile gap remains tracked separately as BUG-WEB-MEMFS-VOLATILE. Exports `_rac_model_paths_set_base_dir` + `_rac_model_paths_get_base_dir` added to `sdk/runanywhere-web/wasm/CMakeLists.txt`; call added in `LlamaCppBridge._initRACommons()`); BUG-WEB-003 (WebGPU WASM variant was missing the 15 `_rac_wasm_offsetof_platform_adapter_*` exports + `_rac_wasm_offsetof_config_platform_adapter` because the shipped `racommons-llamacpp-webgpu.{js,wasm}` (built 2026-05-03 19:24) predated commit `9226feb2c` (2026-05-04 23:29) that added those helpers to `wasm_exports.cpp` + CMakeLists. Source is already correct — all 15 fields carry `EMSCRIPTEN_KEEPALIVE` and appear in `RAC_EXPORTED_FUNCTIONS` unconditionally for BOTH CPU and WebGPU variants. Deleted the stale WebGPU artifacts from `sdk/runanywhere-web/packages/llamacpp/wasm/` + `examples/web/RunAnywhereAI/dist/assets/` and added a CMakeLists comment pinning the parity requirement. **Requires a fresh `./wasm/scripts/build.sh --llamacpp --webgpu` run before shipping to regenerate the WebGPU binaries**).
+**RESOLVED (Wave F-4)**: BUG-FLT-ANDROID-{003,004,005} — Android manifest + NDK polish. BUG-FLT-ANDROID-003 (debug-only cleartext to localhost / 127.0.0.1 / 10.0.2.2): added `examples/flutter/RunAnywhereAI/android/app/src/debug/res/xml/network_security_config.xml` + wired `android:networkSecurityConfig="@xml/network_security_config"` into the debug-variant overlay `AndroidManifest.xml`. BUG-FLT-ANDROID-005 (predictive back): added `android:enableOnBackInvokedCallback="true"` to the `<application>` element in the main manifest. BUG-FLT-ANDROID-004 (Android 16 / 16 KB page-size): unified `racFlutterNdkVersion=27.0.12077973` in root `gradle.properties` (was 25.2.9519653 — NDK 25 ships 4 KB-aligned `libc++_shared.so`/`libomp.so` which trips `PageSizeMismatchDialog` on Android 16), plus added `packagingOptions { jniLibs { useLegacyPackaging = false } }` in `examples/flutter/RunAnywhereAI/android/app/build.gradle` so APK entries stay page-aligned. Next Flutter SDK rebuild (`scripts/build-core-android.sh`) will re-stage the 16 KB-aligned NDK 27 runtime sidecars. Validation: `flutter analyze` → No issues.
+**RESOLVED (Wave F-4 web)**: BUG-WEB-{004,005,007,009,010} — 5 LOW-severity web cleanups batched in one commit. BUG-WEB-004 was a misclassification superseded by BUG-WEB-010 (both backend packages have real implementations, not empty stubs). BUG-WEB-010 fixed `examples/web/RunAnywhereAI/src/components/feature-unavailable.ts:45-47` to describe current state (LlamaCPP wired via `LlamaCPP.register()`; SherpaONNXBridge wired but gated on `RAC_WASM_ONNX` per CPP-13). BUG-WEB-007 replaced hardcoded `<span>0.1.0</span>` in `examples/web/RunAnywhereAI/src/views/settings.ts:73` with `${RunAnywhere.version}` (imports `RunAnywhere` from `@runanywhere/web`). BUG-WEB-009 removed the `sherpa-onnx.wasm` entry from `examples/web/RunAnywhereAI/vite.config.ts` `copyWasmPlugin`, saving 12 MB per deployment (SherpaONNXBridge never loads it). BUG-WEB-005 kept the `EMSCRIPTEN`→`RAC_BACKEND_RAG=OFF` default in `sdk/runanywhere-commons/CMakeLists.txt` (onnxruntime-wasm not vendored), but dropped the `FORCE` on the cache entry and added an explicit `-DRAC_BACKEND_RAG=OFF` flag + docs to `sdk/runanywhere-web/wasm/scripts/build.sh` so callers can opt-in once ONNX Runtime WASM lands (tracked by TODO(v0.21)). Validation: `cd sdk/runanywhere-web && npm run typecheck` → pass; `cd examples/web/RunAnywhereAI && npm run typecheck` → pass.
 
 ### Discovery-pass BUGs (appended by agents 1-6)
 
@@ -198,22 +200,6 @@ Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 **Scope**: Port Flutter's `streaming_proto_fixtures.dart` byte sequences to a language-neutral `tests/streaming/fixtures/` (checked-in proto-encoded bytes + expected decoded JSON). Add thin readers per SDK: Swift XCTest, Kotlin JUnit + Wire decode, Dart (reuse existing), TS vitest. Wire a CI workflow that runs all four and diffs decoded output against a shared golden JSON. Without this, regressions like BUG-STREAMING-001 (Flutter iOS hang) / BUG-STREAMING-002 can only be caught at manual 7-lane runs.
 **Severity**: MEDIUM (no current regression — feature request to prevent future ones)
 
-### BUG-WEB-007 — Example app's Settings tab hardcodes stale SDK version `0.1.0` instead of reading `RunAnywhere.version` (LOW)
-**Lane**: 07_web
-**Category**: example-app-drift
-**Evidence**:
-- `examples/web/RunAnywhereAI/src/views/settings.ts:73` — `<span class="setting-value">0.1.0</span>` is hardcoded in the template string.
-- Actual SDK version is `0.19.13` (per `sdk/runanywhere-commons/VERSION`, and per startup log `[RunAnywhere] SDK initialized, version: 0.19.13 | storage backend: opfs` captured at `test_workflows/logs/20260505T183402-0700-seven-lane-validation/07_web/logs/browser_console_final_all.jsonl`).
-- `screenshots/090_settings_tab.png` displays `0.1.0` to the user, leading them to misreport SDK version in bug reports.
-- `RunAnywhere.version` is available via the exposed singleton (already used by `main.ts:298`) but `settings.ts` never imports it.
-**Reproduction**:
-  1. Run the web example app, navigate to Settings tab.
-  2. Compare "SDK Version" row to the startup console log.
-  3. Version mismatch: `0.1.0` vs `0.19.13`.
-**Root cause (suspected)**: Template string was never updated when SDK version was bumped. No pre-commit guard for hardcoded version strings in examples.
-**Fix pointer**: Replace `<span class="setting-value">0.1.0</span>` with `<span class="setting-value" id="settings-sdk-version"></span>` and populate in init with `textContent = RunAnywhere.version` (import `RunAnywhere` from `@runanywhere/web`). Matches the dynamic pattern already used in `storage.ts` for the storage-backend status row.
-**Severity**: LOW
-
 ### BUG-WEB-MEMFS-VOLATILE — PlatformAdapter file callbacks bind to Emscripten MEMFS, not OPFS; downloaded models are lost on page reload (MEDIUM, follow-up from deleted BUG-WEB-008)
 **Lane**: 07_web
 **Category**: SDK-defect | runtime
@@ -229,69 +215,6 @@ Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 **Root cause (suspected)**: V2 collapsed model-storage ownership into the C++ download orchestrator + platform-adapter file callbacks. No one implemented an OPFS-backed file callback, so the default `m.FS` (MEMFS) path is invoked.
 **Fix pointer**: Wire PlatformAdapter's `file_*` callbacks to an OPFS FileSystem Sync Access Handle inside a dedicated Worker so C++ can keep synchronous file semantics. This is a non-trivial piece of work (async-to-sync bridging via Atomics or similar) and is tracked separately from the orphan-code cleanup.
 **Severity**: MEDIUM
-
-### BUG-WEB-009 — Vite `copyWasmPlugin` ships unused 12 MB `sherpa-onnx.wasm` into `dist/assets/`; `SherpaONNXBridge` never loads it (LOW)
-**Lane**: 07_web
-**Category**: build-tooling | example-app-drift
-**Evidence**:
-- `examples/web/RunAnywhereAI/vite.config.ts:35-40` configures `copyWasmPlugin` to copy three WASM files, including `sherpa-onnx.wasm` (12 MB).
-- `examples/web/RunAnywhereAI/dist/assets/sherpa-onnx.wasm` exists at 12 MB after build (confirmed via `ls -lah`).
-- `sdk/runanywhere-web/packages/onnx/src/Foundation/SherpaONNXBridge.ts:9-12` explicitly documents: "This bridge does NOT load `sherpa-onnx.wasm` directly — that file is a standalone Sherpa-ONNX library used only by the legacy direct-sherpa-JS path which V2 deletes." The bridge loads `racommons-llamacpp.js` as the commons module for both LLM and ONNX.
-- Build log `logs/03_example_build.log` confirms the copy: `✓ Copied sherpa-onnx.wasm (12.1 MB)`.
-- `logs/browser_network_final.log` confirms the browser NEVER requests `sherpa-onnx.wasm` (only the two `racommons-llamacpp*.wasm` fetches). The file is pure deploy-size bloat.
-**Reproduction**:
-  1. `cd examples/web/RunAnywhereAI && npm run build`.
-  2. `ls -lah dist/assets/*.wasm` → `sherpa-onnx.wasm` 12 MB present.
-  3. Load the app in a browser, inspect Network tab → `sherpa-onnx.wasm` is never requested.
-**Root cause (suspected)**: V2 architecture pivot away from direct-sherpa-JS loading did not prune the corresponding `vite.config.ts` `wasmFiles` entry. The commons WASM path was added but the legacy sherpa WASM copy was left in place.
-**Fix pointer**: Remove the `{ src: path.join(onnxWasmDir, 'sherpa-onnx.wasm'), dest: 'sherpa-onnx.wasm' }` entry from `vite.config.ts:35-40`. Also audit `sdk/runanywhere-web/wasm/scripts/build-sherpa-onnx.sh` — if the standalone sherpa wasm is not consumed anywhere in V2, delete that build step. Savings: 12 MB per deployment.
-**Severity**: LOW
-
-### BUG-WEB-010 — Example app's `feature-unavailable` placeholder hardcodes obsolete text claiming `@runanywhere/web-llamacpp` and `@runanywhere/web-onnx` are "empty stubs" (LOW)
-**Lane**: 07_web
-**Category**: example-app-drift
-**Evidence**:
-- `examples/web/RunAnywhereAI/src/components/feature-unavailable.ts:45-47` — hardcoded text: "currently `@runanywhere/web-llamacpp` and `@runanywhere/web-onnx` are intentionally empty stubs that will receive the new wiring in a follow-up."
-- The message is rendered on the Voice tab (`views/voice.ts:18-23`) — see `screenshots/030_voice_tab.png`, explicitly cited in the agent report (`agent_report.md:40`) and modality table (`modality_table.tsv` voice_agent row).
-- Reality check:
-  - `@runanywhere/web-llamacpp` is fully wired — `logs/browser_console_final_all.jsonl` lines 30-37 show WASM load, vtable registration, and `LlamaCPP.register()` returning `accelerationMode: 'cpu'` successfully.
-  - `@runanywhere/web-onnx` is NOT an empty stub — `sdk/runanywhere-web/packages/onnx/src/ONNX.ts` and `Foundation/SherpaONNXBridge.ts` contain a full implementation. Registration fails not because the package is a "stub" but because `rac_backend_onnx_register` is missing from the WASM build (pending CPP-13).
-- The inaccurate placeholder misleads test agents: this very run's `BUG-WEB-004` description ("empty stub") is downstream of this text.
-**Reproduction**:
-  1. Launch the example app, click Voice tab.
-  2. Read the large placeholder text referencing "empty stubs".
-  3. Compare against actual source — both packages have real, non-stub implementations.
-**Root cause (suspected)**: Placeholder text was written when WEB-01 deferred backend wiring; it was never updated after `SherpaONNXBridge` and the LlamaCPP registration path were re-landed. It bleeds incorrect framing into every observational test report.
-**Fix pointer**: Update `feature-unavailable.ts:45-47` to reflect current reality: the LLM backend is fully wired via `LlamaCPP.register()`; the ONNX backend bridge is wired but `rac_backend_onnx_register` is missing from the WASM build (RAC_WASM_ONNX=OFF pending CPP-13). Cross-reference `BUG-WEB-004` / `CPP-13` rather than claiming the packages are stubs.
-**Severity**: LOW
-
-### BUG-FLT-ANDROID-004 — Android 16 KB page-size compatibility failure: NDK-shipped `libc++_shared.so` and `libomp.so` are 4 KB-aligned (HIGH)
-**Lane**: 05_flutter_android
-**Category**: build-tooling
-**Evidence**:
-- `test_workflows/logs/20260505T183402-0700-seven-lane-validation/05_flutter_android/logs/session.log:273` → `W AppWarnings: Showing PageSizeMismatchDialog for package com.runanywhere.runanywhere_ai` (Android 16 / Pixel 8 Pro husky / API 36).
-- `test_workflows/logs/20260505T183402-0700-seven-lane-validation/05_flutter_android/logs/view_compat_dialog.xml` captures the OS dialog text listing 19 `.so` files as "not 16 KB aligned"; two have the explicit reason `LOAD segment not aligned`: `libc++_shared.so`, `libomp.so`. The rest are listed as `Unknown error` by the OS scanner.
-- Local ELF header inspection (arm64-v8a): `libc++_shared.so` (3 copies under `sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs/arm64-v8a/`) and `libomp.so` all report `LOAD align=0x1000` (4 KB). All `rac_*` / `librunanywhere_jni.so` / `libsherpa-onnx-*.so` / `libonnxruntime.so` are `LOAD align=0x4000` (16 KB) and pass.
-- Screenshots `000_launch.png`, `001_after_dialog.png` show the warning dialog appearing on first launch, dismissed by the agent.
-**Reproduction**:
-  1. Install Flutter example APK on a Pixel 8 Pro running Android 16 (16 KB page-size enabled).
-  2. Launch app — the OS-level "Android App Compatibility" dialog pops up immediately after splash.
-**Root cause (suspected)**: Flutter SDK packages are pinned to NDK `25.2.9519653` (see `sdk/runanywhere-flutter/packages/*/android/build.gradle` fallback + `racFlutterNdkVersion` root property). NDK 25.x ships 4 KB-aligned `libc++_shared.so` / `libomp.so`. NDK 27.x (used by the Kotlin / React-Native / commons SDKs — `racNdkVersion=27.0.12077973`) ships 16 KB-aligned runtime sidecars. Flutter is pinned to 25.x per root CLAUDE.md ("Flutter ships its own NDK pin"), but 25.x is incompatible with Android 16 page-size enforcement.
-**Fix pointer**: Upgrade Flutter SDK `racFlutterNdkVersion` to 27.0.12077973 (matching Kotlin) OR manually replace `libc++_shared.so` / `libomp.so` in the three Flutter package jniLibs dirs with the 16 KB-aligned variants from NDK r27. Verify every `LOAD` program-header `align` is `0x4000`. Ref: https://developer.android.com/16kb-page-size.
-**Severity**: HIGH — currently only a warning on debug builds (OS dialog auto-dismissible) but BLOCKS Play Store submissions targeting Android 15+ from Nov 2025, and WILL cause hard load failure on Android 16 devices running 16 KB-mode kernels.
-
-### BUG-FLT-ANDROID-005 — AndroidManifest missing `android:enableOnBackInvokedCallback="true"` (LOW)
-**Lane**: 05_flutter_android
-**Category**: example-app-drift
-**Evidence**:
-- `test_workflows/logs/20260505T183402-0700-seven-lane-validation/05_flutter_android/logs/session.log` — `05-05 19:09:33.300 13080 13080 W WindowOnBackDispatcher: OnBackInvokedCallback is not enabled for the application.` followed immediately by `Set 'android:enableOnBackInvokedCallback="true"' in the application manifest.`
-- `examples/flutter/RunAnywhereAI/android/app/src/main/AndroidManifest.xml:7-11` — the `<application>` element has no `android:enableOnBackInvokedCallback` attribute.
-**Reproduction**:
-  1. Launch Flutter example on any device running Android 13+.
-  2. Perform any back gesture — warning logged repeatedly.
-**Root cause (suspected)**: Android 13+ deprecates the legacy `onBackPressed` in favor of predictive-back. Flutter's PopScope widget handles the callback but the manifest must opt-in.
-**Fix pointer**: Add `android:enableOnBackInvokedCallback="true"` to the `<application>` element in `examples/flutter/RunAnywhereAI/android/app/src/main/AndroidManifest.xml`.
-**Severity**: LOW — warning only; Android system falls back silently.
 
 ### BUG-PERF-001 — Flutter Android app native SIGSEGV in dart-code region during LLM session (HIGH)
 **Lane(s)**: 05_flutter_android

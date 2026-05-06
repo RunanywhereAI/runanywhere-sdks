@@ -35,16 +35,19 @@ option(RAC_BUILD_BACKENDS "Build ML backends (LlamaCPP, ONNX, WhisperCPP, RAG)" 
 # Only commons-local backends (RAG pipeline) declare their option here.
 option(RAC_BACKEND_RAG "Build RAG pipeline (USearch vector search)" ON)
 
-# Emscripten: force the RAG backend OFF. FetchONNXRuntime.cmake has no WASM
+# Emscripten: default the RAG backend OFF. FetchONNXRuntime.cmake has no WASM
 # binary distribution (it expects headers under third_party/onnxruntime-wasm/
 # which are not vendored in this tree), so the RAG ONNX embedding TUs fail
 # to compile with `onnxruntime_c_api.h: file not found`. The ONNX WASM story
 # is delivered by `onnxruntime-web` (JavaScript package) from the frontend;
 # commons does not need an in-module ONNX runtime on WASM.
-# TODO(v0.21): wire a real ONNX Runtime WASM binary and flip this back to
-# default ON when the onnxruntime-wasm third_party package lands.
+#
+# We use `set(... CACHE ...)` (not `FORCE`) so callers of the WASM build
+# script (`sdk/runanywhere-web/wasm/scripts/build.sh`) can explicitly opt
+# in via `-DRAC_BACKEND_RAG=ON` once the onnxruntime-wasm third_party
+# package lands. See TODO(v0.21).
 if(EMSCRIPTEN)
-    set(RAC_BACKEND_RAG OFF CACHE BOOL "" FORCE)
+    set(RAC_BACKEND_RAG OFF CACHE BOOL "RAG disabled by default on Emscripten; opt-in via -DRAC_BACKEND_RAG=ON after vendoring onnxruntime-wasm")
 endif()
 option(RAC_BUILD_SERVER "Build OpenAI-compatible HTTP server (runanywhere-server)" OFF)
 

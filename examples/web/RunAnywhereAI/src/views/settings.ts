@@ -3,6 +3,8 @@
  * Matches iOS CombinedSettingsView.
  */
 
+import { RunAnywhere } from '@runanywhere/web';
+
 let container: HTMLElement;
 
 // Settings state
@@ -70,7 +72,7 @@ export function initSettingsTab(el: HTMLElement): void {
         <div class="settings-section-title">About</div>
         <div class="setting-row">
           <span class="setting-label">SDK Version</span>
-          <span class="setting-value">0.1.0</span>
+          <span class="setting-value">${RunAnywhere.version}</span>
         </div>
         <div class="setting-row">
           <span class="setting-label">Platform</span>

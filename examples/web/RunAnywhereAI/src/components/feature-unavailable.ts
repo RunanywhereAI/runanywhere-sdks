@@ -42,9 +42,11 @@ export function renderFeatureUnavailable(host: HTMLElement, options: FeatureUnav
         After the V2 SDK cleanup the legacy <code>ModelManager</code>,
         <code>ExtensionPoint</code>, and provider registry were removed. The
         replacement is a proto-byte WASM bridge installed by the backend
-        packages — currently <code>@runanywhere/web-llamacpp</code> and
-        <code>@runanywhere/web-onnx</code> are intentionally empty stubs that
-        will receive the new wiring in a follow-up.
+        packages. The LLM backend is fully wired via
+        <code>LlamaCPP.register()</code>. The ONNX backend bridge
+        (<code>SherpaONNXBridge</code>) is wired but depends on the WASM
+        module being built with <code>RAC_WASM_ONNX=ON</code> (tracked by
+        CPP-13) — until then STT/TTS/VAD views surface this placeholder.
       </p>
       <p class="feature-unavailable__hint">This view normally consumes:</p>
       <ul class="feature-unavailable__list">${requirementList}</ul>

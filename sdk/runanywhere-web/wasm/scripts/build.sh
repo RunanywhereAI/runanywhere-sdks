@@ -34,6 +34,11 @@ VLM="OFF"
 WHISPERCPP="OFF"
 ONNX="OFF"
 WEBGPU="OFF"
+# RAG (USearch vector search + ONNX embeddings) is force-OFF on Emscripten
+# in `sdk/runanywhere-commons/CMakeLists.txt` because FetchONNXRuntime.cmake
+# does not ship a WASM binary distribution. Flip this to ON once a real
+# ONNX Runtime WASM build is vendored (tracked by TODO(v0.21)).
+RAG="OFF"
 CLEAN=false
 
 # Parse arguments
@@ -165,7 +170,8 @@ emcmake cmake \
     -DRAC_WASM_VLM="${VLM}" \
     -DRAC_WASM_WHISPERCPP="${WHISPERCPP}" \
     -DRAC_WASM_ONNX="${ONNX}" \
-    -DRAC_WASM_WEBGPU="${WEBGPU}"
+    -DRAC_WASM_WEBGPU="${WEBGPU}" \
+    -DRAC_BACKEND_RAG="${RAG}"
 
 # Build
 echo ""
