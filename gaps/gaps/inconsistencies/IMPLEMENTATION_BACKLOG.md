@@ -378,20 +378,6 @@ Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 **Fix pointer**: Grep `engines/llamacpp/` for the llama.cpp `llama_log_callback` / `ggml_log_callback` hookup. Compare to the Kotlin/Swift/iOS paths that correctly buffer GGML chunks before forwarding to the SDK logger.
 **Severity**: LOW — cosmetic, no functional impact.
 
-### BUG-FLT-IOS-008 — `rac_model_format_from_url_proto` + `rac_artifact_infer_from_url_proto` unavailable on iOS Flutter as well (MEDIUM, cross-ref BUG-FLT-ANDROID-002)
-**Lane**: 06_flutter_ios
-**Category**: SDK-defect
-**Evidence**:
-- `test_workflows/logs/20260505T183402-0700-seven-lane-validation/06_flutter_ios/logs/07_app_stream.log` at 18:44:24.796 onward: dozens of `[WARNING] [DartBridge.ModelFormat] rac_model_format_from_url_proto unavailable; returning UNKNOWN` and `rac_artifact_infer_from_url_proto unavailable; returning null` entries on every launch and model-list refresh.
-- Every model in the log is shown as `[Unknown]` format: `LiquidAI LFM2 1.2B Tool Q4_K_M (Language) [Unknown]`, `Sherpa Whisper Tiny (ONNX) (Speech Recognition) [Unknown]`, etc.
-- `BUG-FLT-ANDROID-002` already filed the same issue for Android; this entry records that the iOS Flutter lane is also affected, i.e. the problem is inside `runanywhere-commons` (not platform-specific) since iOS static-links `RACommons.xcframework` and Android links `librac_commons.so` — both miss the same exports.
-**Reproduction**:
-  1. Launch Flutter iOS example.
-  2. Watch startup log: ~60+ `WARNING` lines per launch.
-**Root cause (suspected)**: `rac_model_format_from_url_proto` / `rac_artifact_infer_from_url_proto` are not exported (or not named as documented) by `runanywhere-commons`. Flutter's `RacNative.bindings.rac_model_format_from_url_proto` lookup returns null and the Dart helper degrades to `UNKNOWN` / `null`.
-**Fix pointer**: Add / export both helpers in `sdk/runanywhere-commons/src/model_registry/*` and the stable header `sdk/runanywhere-commons/include/runanywhere/c_api/model_registry.h`. Once exported, both Flutter Android and iOS lanes will pick them up via `DynamicLibrary.open()` / `DynamicLibrary.executable()`. Referenced in `thoughts/shared/plans/sdk_current_state.md`.
-**Severity**: MEDIUM — Flutter falls back to `UNKNOWN`, bypassing correct backend routing for opaque URLs and showing `[Unknown]` in UI. Known GGUF URLs still work because the Dart helper hard-codes GGUF detection from the `.gguf` suffix.
-
 ### BUG-PERF-001 — Flutter Android app native SIGSEGV in dart-code region during LLM session (HIGH)
 **Lane(s)**: 05_flutter_android
 **Category**: memory | perf
@@ -419,6 +405,7 @@ Lane / Category / Evidence / Reproduction / Root cause / Fix pointer
 **Severity**: HIGH
 
 ### BUG-PERF-003 — React Native iOS LLM inference returns in 0.3s with 0 tokens (HIGH)
+**Status**: RESOLVED (likely by BUG-RN-IOS-004 fix, Wave F-2); re-verify on Lane 04 rerun.
 **Lane(s)**: 04_react_native_ios
 **Category**: perf | correctness
 **Evidence**:

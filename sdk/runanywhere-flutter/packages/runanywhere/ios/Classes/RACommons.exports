@@ -9,6 +9,7 @@ _rac_api_error_from_response
 _rac_archive_type_extension
 _rac_archive_type_from_path
 _rac_artifact_infer_from_url
+_rac_artifact_infer_from_url_proto
 _rac_artifact_requires_download
 _rac_artifact_requires_extraction
 _rac_audio_float32_to_wav
@@ -288,6 +289,7 @@ _rac_model_file_descriptors_alloc
 _rac_model_file_descriptors_free
 _rac_model_filter_models
 _rac_model_format_extension
+_rac_model_format_from_url_proto
 _rac_model_generate_id
 _rac_model_generate_name
 _rac_model_infer_artifact_type
