@@ -6,6 +6,7 @@
  * Surface (matches Swift / Kotlin / Flutter / Web SDKs):
  *   - `hardware.getProfile() -> HardwareProfileResult`
  *   - `hardware.getChip() -> string`
+ *   - `hardware.getNPUChip() -> NPUChip` (Swift parity — structured vendor enum)
  *   - `hardware.hasNeuralEngine: boolean`
  *   - `hardware.accelerationMode: string`
  *   - `hardware.getAccelerators() -> AcceleratorInfo[]`
@@ -25,6 +26,7 @@ import {
   HardwareProfileResult as HardwareProfileResultCodec,
   type HardwareProfileResult,
 } from '@runanywhere/proto-ts/hardware_profile';
+import { NPUChip } from '@runanywhere/proto-ts/storage_types';
 import {
   isNativeModuleAvailable,
   requireDeviceInfoModule,
@@ -37,6 +39,7 @@ export type {
   HardwareProfileResult,
 } from '@runanywhere/proto-ts/hardware_profile';
 export { AccelerationPreference } from '@runanywhere/proto-ts/hardware_profile';
+export { NPUChip } from '@runanywhere/proto-ts/storage_types';
 
 function detectAccelerationMode(hasNpu: boolean): string {
   if (Platform.OS === 'ios' || Platform.OS === 'macos') {
@@ -148,6 +151,135 @@ export async function getChip(): Promise<string> {
 }
 
 /**
+ * Map a free-form chip / SoC name to the structured `NPUChip` vendor enum.
+ *
+ * Used by `getNPUChip()` to resolve the NPU family for Genie backend URL
+ * selection and runtime backend wiring. Matches the vendor grouping declared
+ * in `idl/storage_types.proto` `NPUChip`:
+ *
+ *   - Apple A-series / M-series / Apple Silicon -> APPLE_NEURAL_ENGINE
+ *   - Qualcomm Snapdragon / Hexagon / SDM / SM8/SM7/SM6 / MSM -> QUALCOMM_HEXAGON
+ *   - MediaTek Dimensity / Helio / MT6/MT8 -> MEDIATEK_APU
+ *   - Google Tensor / Pixel TPU / GS10x/GS20x/GS30x -> GOOGLE_TPU
+ *   - Intel Core Ultra (Meteor Lake / Lunar Lake / Arrow Lake) -> INTEL_NPU
+ *   - Samsung Exynos / HiSilicon Kirin -> OTHER (detected NPU, vendor unmapped)
+ *
+ * Exported for unit tests / host code; the public entry point is `getNPUChip()`.
+ */
+export function mapChipStringToNPUChip(chip: string): NPUChip {
+  const lower = chip.trim().toLowerCase();
+  if (lower.length === 0) {
+    return NPUChip.NPU_CHIP_UNSPECIFIED;
+  }
+
+  // Apple Neural Engine — A-series, M-series, generic "Apple Silicon" label.
+  if (
+    lower.includes('apple') ||
+    /\ba(?:[1-9]|1[0-9])\b/.test(lower) ||
+    /\bm[1-9]\b/.test(lower)
+  ) {
+    return NPUChip.NPU_CHIP_APPLE_NEURAL_ENGINE;
+  }
+
+  // Qualcomm Hexagon — Snapdragon, SDM, SM8/SM7/SM6, MSM.
+  if (
+    lower.includes('snapdragon') ||
+    lower.includes('qualcomm') ||
+    lower.includes('hexagon') ||
+    lower.startsWith('sdm') ||
+    lower.startsWith('sm8') ||
+    lower.startsWith('sm7') ||
+    lower.startsWith('sm6') ||
+    lower.startsWith('msm')
+  ) {
+    return NPUChip.NPU_CHIP_QUALCOMM_HEXAGON;
+  }
+
+  // MediaTek APU — Dimensity, Helio, MT6xxx, MT8xxx.
+  if (
+    lower.includes('mediatek') ||
+    lower.includes('dimensity') ||
+    lower.includes('helio') ||
+    lower.startsWith('mt6') ||
+    lower.startsWith('mt8')
+  ) {
+    return NPUChip.NPU_CHIP_MEDIATEK_APU;
+  }
+
+  // Google Tensor — Pixel SoC labels plus GS1xx/GS2xx/GS3xx codes.
+  if (
+    lower.includes('tensor') ||
+    lower.includes('pixel') ||
+    lower.startsWith('gs1') ||
+    lower.startsWith('gs2') ||
+    lower.startsWith('gs3')
+  ) {
+    return NPUChip.NPU_CHIP_GOOGLE_TPU;
+  }
+
+  // Intel Core Ultra NPU — Meteor Lake / Lunar Lake / Arrow Lake families.
+  if (
+    lower.includes('intel') ||
+    lower.includes('core ultra') ||
+    lower.includes('meteor lake') ||
+    lower.includes('lunar lake') ||
+    lower.includes('arrow lake')
+  ) {
+    return NPUChip.NPU_CHIP_INTEL_NPU;
+  }
+
+  // Known-non-NPU vendors: detected SoC but no dedicated NPU mapping yet.
+  if (
+    lower.includes('exynos') ||
+    lower.startsWith('s5e') ||
+    lower.includes('samsung') ||
+    lower.includes('kirin') ||
+    lower.includes('hisilicon')
+  ) {
+    return NPUChip.NPU_CHIP_OTHER;
+  }
+
+  return NPUChip.NPU_CHIP_UNSPECIFIED;
+}
+
+/**
+ * Resolve the NPU chipset enum for the current device.
+ *
+ * Mirrors Swift's `NPUChipDetector` behaviour by consuming the chip string
+ * reported by the native hardware profile (`rac_hardware_profile_get`). If the
+ * native profile reports `hasNeuralEngine == false`, this falls through to the
+ * string matcher and may still classify a known vendor (e.g. older Apple
+ * devices with no separate ANE silicon but the "Apple" label is still useful
+ * for Genie download URL selection).
+ *
+ * Returns `NPUChip.NPU_CHIP_UNSPECIFIED` for unknown or empty chip strings,
+ * and `NPUChip.NPU_CHIP_NONE` when the native profile explicitly reports no
+ * neural engine / NPU.
+ */
+export async function getNPUChip(): Promise<NPUChip> {
+  const result = await getProfile();
+  const chip = result.profile?.chip ?? '';
+  const mapped = mapChipStringToNPUChip(chip);
+
+  if (mapped !== NPUChip.NPU_CHIP_UNSPECIFIED) {
+    return mapped;
+  }
+
+  // Chip string unrecognised but the platform reports a neural engine / NPU;
+  // fall back to OTHER so callers still know an NPU exists.
+  if (result.profile?.hasNeuralEngine === true) {
+    return NPUChip.NPU_CHIP_OTHER;
+  }
+
+  // Explicit "no NPU" signal vs. truly unknown state.
+  if (result.profile && result.profile.hasNeuralEngine === false) {
+    return NPUChip.NPU_CHIP_NONE;
+  }
+
+  return NPUChip.NPU_CHIP_UNSPECIFIED;
+}
+
+/**
  * Whether the current device has a dedicated neural engine / NPU.
  *
  * Delegates to the native hardware profile when available.
@@ -237,6 +369,7 @@ export async function setAcceleratorPreference(
 export const Hardware = {
   getProfile,
   getChip,
+  getNPUChip,
   hasNeuralEngine,
   accelerationMode,
   getAccelerators,

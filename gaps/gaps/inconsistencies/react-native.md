@@ -43,17 +43,6 @@ Swift/Kotlin/Flutter/Web all marshal the same JSON subset, so this is consistent
 
 **Acceptance (commons-driven)**: add the proto messages and convert these surfaces, or document the JSON subset as a canonical exception in `docs/CPP_PROTO_OWNERSHIP.md`.
 
-### RN-08: NPU chip resolver missing (MEDIUM)
-
-**Files**:
-- `packages/core/src/types/index.ts:160` — re-exports `NPUChip` from `@runanywhere/proto-ts/storage_types`, unused.
-- `packages/core/src/Public/Extensions/RunAnywhere+Hardware.ts:151` — only `getChip()` returning a free-form string; no structured `NPUChip` resolver.
-- Swift parity reference: `NPUChipDetector` in the Swift SDK.
-
-Genie backend URL selection on Android needs the structured enum, not a free-form label.
-
-**Acceptance**: add `RunAnywhere.hardware.getNPUChip(): Promise<NPUChip>` backed by either a commons resolver exposed through Nitro, or a JS string-to-enum parser adjacent to `RunAnywhere+Hardware.ts`.
-
 ### RN-09: *Deferred* (diffusion helper shim)
 
 User deferred diffusion support entirely. No action until the diffusion track resumes.
@@ -70,6 +59,7 @@ User deferred diffusion support entirely. No action until the diffusion track re
 | RN-12 (Hermes streaming caveat in READMEs) | `71e142ee5` — added "Hermes streaming" section to `sdk/runanywhere-react-native/README.md` and `packages/core/README.md` with the manual `Symbol.asyncIterator` loop pattern. Replaced the misleading `for await` example in the top-level Quick Start. Lists every affected `AsyncIterable` surface. |
 | RN-15 (EventBus README drift) | `2b8862f25` — rewrote `packages/core/README.md` EventBus section as "SDK Events" describing `RunAnywhere.subscribeSDKEvents((event) => ...)`. Deleted `EventBus.on`, `RunAnywhere.events.*`, and the Event Categories table. |
 | RN-07 (hardware preference setter wired) | Wave 3d Row 7 — added `setAcceleratorPreferenceProto(requestBytes)` Nitro method in `RunAnywhereCore.nitro.ts`, `HybridRunAnywhereCore+Hardware.cpp` impl calls `rac_hardware_set_accelerator_preference`, `RunAnywhere+Hardware.ts` renamed `setAccelerationPreference` → `setAcceleratorPreference` and the `_acceleratorPreference` JS cache is gone. |
+| RN-08 (NPU chip resolver) | Wave 3d Row 8 — `RunAnywhere+Hardware.ts` now exports `getNPUChip(): Promise<NPUChip>` + `mapChipStringToNPUChip()` helper (~6 vendor families covered). `Hardware` namespace exposes `RunAnywhere.hardware.getNPUChip()`. JS-only string matcher over `hardwareProfileProto` chip field — no commons changes. |
 
 ## Items to DELETE
 
@@ -85,7 +75,7 @@ _(none — tracked items resolved or moved to reland rows)_
 | Errors | `SDKException` proto-backed | same | same | same | same | OK |
 | Hardware preference setter | `setAcceleratorPreference(_:)` | `setAcceleratorPreference(...)` | — | — | `setAcceleratorPreference(p)` | OK |
 | Hardware preference sink | C ABI `rac_hardware_set_accelerator_preference` | same | — | — | C ABI (via Nitro `setAcceleratorPreferenceProto`) | OK |
-| NPU chip resolver | `NPUChipDetector.chip() -> NPUChip` | Android structured chip ID | — | — | **MISSING** (RN-08) | **DRIFT** |
+| NPU chip resolver | `NPUChipDetector.chip() -> NPUChip` | Android structured chip ID | — | — | `Hardware.getNPUChip() -> NPUChip` (JS string matcher) | OK |
 | Diffusion | `RunAnywhere+Diffusion.swift` | — | — | — | **MISSING — deferred** (RN-09) | Deferred |
 | `initialize(config)` wire | proto/plist | proto | proto | JSON string | JSON string (RN-06) | Consistent with Web |
 | `transcribeFile` path | proto-byte | proto-byte | proto-byte | proto-byte | proto-byte (RN-05 resolved) | OK |
