@@ -163,14 +163,6 @@ export interface RunAnywhereCore extends HybridObject<{
   getDownloadedModelsProto(): Promise<ArrayBuffer>;
 
   /**
-   * Check if a model is compatible with the current device
-   * Compares model RAM/storage requirements against device capabilities
-   * @param modelId Model identifier
-   * @returns JSON with isCompatible, canRun, canFit, and resource details
-   */
-  checkCompatibility(modelId: string): Promise<string>;
-
-  /**
    * Refresh the model registry — T4.9 unified cross-SDK surface.
    *
    * Routes to `rac_model_registry_refresh` in commons. Each flag is

@@ -1,0 +1,149 @@
+# React Native SDK — Current Inconsistencies
+
+Updated: 2026-05-05 (Discovery I)
+Branch: `feat/v2-architecture` @ `6217d9e67`
+
+## Typecheck status
+
+| Package | Result |
+|---------|--------|
+| `@runanywhere/core` | PASS (`tsc --noEmit`) |
+| `@runanywhere/llamacpp` | PASS (`tsc --noEmit`) |
+| `@runanywhere/onnx` | PASS (`tsc --noEmit`) |
+
+## Current state summary
+
+Yarn Berry 3.6.1 monorepo, three workspaces (`packages/core`, `packages/llamacpp`, `packages/onnx`) + `../runanywhere-proto-ts`. The core package exposes a Nitro HybridObject spec
+(`packages/core/src/specs/RunAnywhereCore.nitro.ts`, 979 lines, **134 method slots: 74 `*Proto` + 60 non-proto**) plus 20 extension files under `Public/Extensions/` (~5.7K lines).
+
+**Backend packages**: `@runanywhere/llamacpp` and `@runanywhere/onnx` ship full native plumbing — Nitro spec + C++ HybridObject + iOS podspec + XCFrameworks (`packages/*/ios/Frameworks/`) + `.so` files (`packages/*/android/src/main/jniLibs/`) + JNI adapters. Registration APIs are proto-canonical (`registerBackend()` / `unregisterBackend()` / `isBackendRegistered()`).
+
+**Proto canonicalisation**: Types in `packages/core/src/types/index.ts` re-export from `@runanywhere/proto-ts/*`. The only RN-local types are `FrameworkModality`, `PrivacyMode`, `ModelCategoryDisplayNames`, and `SDKInitOptions`.
+
+## Confirmed open gaps
+
+### RN-01: Jest harness dead weight (MEDIUM — decide + delete or rebuild)
+
+**Files**:
+- `packages/core/package.json:35` — `"test": "jest --passWithNoTests"`
+- `packages/core/package.json:75,77,80` — `@types/jest`, `jest`, `ts-jest` dev deps
+- No `packages/core/jest.config.js` exists.
+- No `tests/streaming/*.rn.test.ts` exist anywhere in the repo.
+- `sdk/runanywhere-react-native/CLAUDE.md:77` still documents the phantom `tests/streaming/*.rn.test.ts` harness.
+
+**Acceptance**: either recreate the cross-SDK parity harness under `tests/streaming/*.rn.test.ts` consuming C++ golden fixtures, or delete the `test` script + jest/ts-jest/@types/jest devDependencies. Today Jest is installed on disk with no entry points.
+
+### RN-04: Dead Nitro method — `authenticate(apiKey)` (LOW)
+
+**Files**:
+- `packages/core/src/specs/RunAnywhereCore.nitro.ts:75` — declares `authenticate(apiKey: string): Promise<boolean>`.
+- `packages/core/nitrogen/generated/shared/c++/HybridRunAnywhereCoreSpec.hpp` — generated pure-virtual entry.
+
+Zero JS callers. The canonical auth path is `native.authAuthenticate(apiKey, baseURL, deviceId, platform, sdkVersion)` at `RunAnywhere.ts`.
+
+**Acceptance**: delete `authenticate` from the Nitro spec and the C++ impl; regenerate nitrogen.
+
+### RN-06: JSON auth/device/HTTP surfaces mix with proto-byte world (MEDIUM)
+
+**Files**:
+- `RunAnywhereCore.nitro.ts:48` — `initialize(configJson: string): Promise<boolean>`
+- `RunAnywhereCore.nitro.ts:104` — `registerDevice(environmentJson: string): Promise<boolean>`
+- `RunAnywhereCore.nitro.ts:378` — `httpRequest(...): Promise<string>` (returns JSON body)
+- `RunAnywhereCore.nitro.ts:397` — `authAuthenticate(...): Promise<string>` (returns JSON body)
+- `RunAnywhereCore.nitro.ts:412` — `authRefreshToken(baseURL: string): Promise<string>` (returns JSON body)
+- `RunAnywhereCore.nitro.ts:434` — `getDeviceCapabilities(): Promise<string>` (returns JSON body)
+- `RunAnywhereCore.nitro.ts:63` — `getBackendInfo(): Promise<string>` (returns JSON body)
+
+Swift/Kotlin/Flutter/Web all marshal the same JSON subset, so this is consistent across SDKs — but violates the "all wire types are proto" rule. `idl/` has no `SDKInitConfig`, `DeviceRegisterRequest`, `AuthResponse`, `BackendInfo`, or `DeviceCapabilities` messages.
+
+**Acceptance (commons-driven)**: add the proto messages and convert these surfaces, or document the JSON subset as a canonical exception in `docs/CPP_PROTO_OWNERSHIP.md`.
+
+### RN-07: Hardware preference setter is JS-only (LOW — naming drift + non-functional)
+
+**Files**:
+- `packages/core/src/Public/Extensions/RunAnywhere+Hardware.ts:43-44,197-227` — `_acceleratorPreference` in-memory cache; `setAccelerationPreference(preference)` writes the cache + best-effort forwards to `native.setAccelerationPreference?.(p)` which is not on the Nitro spec.
+- `packages/core/src/specs/RunAnywhereCore.nitro.ts:283` — only `hardwareProfileProto()`, no preference setter.
+
+**Naming drift**: Swift uses `setAcceleratorPreference`; RN uses `setAccelerationPreference`. Pick one.
+
+Downstream routing in commons is never informed of the preference — the call is effectively a JS cache with no native side effect.
+
+**Acceptance**: once commons exposes `rac_hardware_set_accelerator_preference` (ideally through a proto scalar method), wire the Nitro spec, delete the in-memory cache, and align the name with Swift (`setAcceleratorPreference`).
+
+### RN-08: NPU chip resolver missing (MEDIUM)
+
+**Files**:
+- `packages/core/src/types/index.ts:160` — re-exports `NPUChip` from `@runanywhere/proto-ts/storage_types`, unused.
+- `packages/core/src/Public/Extensions/RunAnywhere+Hardware.ts:151` — only `getChip()` returning a free-form string; no structured `NPUChip` resolver.
+- Swift parity reference: `NPUChipDetector` in the Swift SDK.
+
+Genie backend URL selection on Android needs the structured enum, not a free-form label.
+
+**Acceptance**: add `RunAnywhere.hardware.getNPUChip(): Promise<NPUChip>` backed by either a commons resolver exposed through Nitro, or a JS string-to-enum parser adjacent to `RunAnywhere+Hardware.ts`.
+
+### RN-09: *Deferred* (diffusion helper shim)
+
+User deferred diffusion support entirely. No action until the diffusion track resumes.
+
+## Resolved since Discovery H
+
+| Gap | Commit / Evidence |
+|-----|-------------------|
+| RN-05 / RN-10 (`transcribeFile` JSON path) | `RunAnywhere+STT.ts:276` now reads audio via `react-native-fs` and routes through `sttTranscribeProto`. Nitro spec contains zero `transcribeFile` declarations. |
+| RN-11 (RAGScreen inline defaults) | `c9fbc3e2a` — `examples/react-native/RunAnywhereAI/src/screens/RAGScreen.tsx:177` spreads `...helpers.ragHelpers.defaultRAGConfig()`. |
+| RN-13 (stale `lib/` in git) | `.gitignore` at `packages/core/.gitignore` contains `lib/` + `*.tsbuildinfo`. `git ls-files sdk/runanywhere-react-native/packages/core/lib/` → 0 entries (untracked). |
+| RN-14 (EventBus slim) | `5ceeaada9` — `Internal/Events/EventBus.ts` reduced to 43 LOC publish-only façade. **Doc drift opened → RN-15**. |
+| RN-02 (duplicate backend podspecs) | `323843061` — deleted `packages/llamacpp/ios/LlamaCPPBackend.podspec` and `packages/onnx/ios/ONNXBackend.podspec`. Canonical podspecs at package roots (`RunAnywhereLlama.podspec`, `RunAnywhereONNX.podspec`) are the only ones referenced by `react-native.config.js`. |
+| RN-12 (Hermes streaming caveat in READMEs) | `71e142ee5` — added "Hermes streaming" section to `sdk/runanywhere-react-native/README.md` and `packages/core/README.md` with the manual `Symbol.asyncIterator` loop pattern. Replaced the misleading `for await` example in the top-level Quick Start. Lists every affected `AsyncIterable` surface. |
+| RN-15 (EventBus README drift) | `2b8862f25` — rewrote `packages/core/README.md` EventBus section as "SDK Events" describing `RunAnywhere.subscribeSDKEvents((event) => ...)`. Deleted `EventBus.on`, `RunAnywhere.events.*`, and the Event Categories table. |
+
+## Items to DELETE
+
+| Target | Reason |
+|--------|--------|
+| `RunAnywhereCore.nitro.ts:75` `authenticate(apiKey)` + C++ impl + regen | Zero callers; canonical is `authAuthenticate` (RN-04) |
+| `RunAnywhereCore.nitro.ts:171` `checkCompatibility(modelId)` + C++ impl + regen | Zero callers (RN-03) |
+| `test` script + `jest` / `ts-jest` / `@types/jest` devDeps in `packages/core/package.json` | No config, no fixtures; harness is phantom (RN-01) — OR rebuild `tests/streaming/*.rn.test.ts` |
+
+## Cross-SDK naming alignment gaps
+
+| Concern | Swift | Kotlin | Flutter | Web | **React Native** | Drift? |
+|---------|-------|--------|---------|-----|------------------|--------|
+| Entry | `enum RunAnywhere` | `object RunAnywhere` | `RunAnywhereSDK.instance` | `RunAnywhere` object | `const RunAnywhere` object | OK |
+| Init | `initialize()` + `completeServicesInitialization()` | same | same | same | same | OK |
+| LLM stream | `AsyncStream` | `Flow` | `Stream` | `AsyncIterable` | `AsyncIterable` (manual `iterator.next()` for Hermes) | OK |
+| Errors | `SDKException` proto-backed | same | same | same | same | OK |
+| Hardware preference setter | `setAcceleratorPreference(_:)` | `setAcceleratorPreference(...)` | — | — | **`setAccelerationPreference(p)`** (RN-07) | **NAME DRIFT** |
+| Hardware preference sink | C ABI `rac_hardware_set_accelerator_preference` | same | — | — | **JS in-memory only** (RN-07) | **BEHAVIOR DRIFT** |
+| NPU chip resolver | `NPUChipDetector.chip() -> NPUChip` | Android structured chip ID | — | — | **MISSING** (RN-08) | **DRIFT** |
+| Diffusion | `RunAnywhere+Diffusion.swift` | — | — | — | **MISSING — deferred** (RN-09) | Deferred |
+| `initialize(config)` wire | proto/plist | proto | proto | JSON string | JSON string (RN-06) | Consistent with Web |
+| `transcribeFile` path | proto-byte | proto-byte | proto-byte | proto-byte | proto-byte (RN-05 resolved) | OK |
+| HTTP transport | URLSession | OkHttp | URLSession/OkHttp | `emscripten_fetch` | URLSession/OkHttp | OK |
+
+### RN-THINKING-MIGRATE: `LlmThinking` + C++ bridge bind 3 now-internal helpers (MEDIUM)
+
+- **TS facade**: `packages/core/src/Features/LLM/LlmThinking.ts` still calls the Nitro RPCs `core.llmExtractThinking/llmStripThinking/llmSplitThinkingTokens`.
+- **C++ bridge**: `packages/core/cpp/HybridRunAnywhereCore+Voice.cpp:476,506,523` implements those 3 RPCs by calling `rac_llm_extract_thinking`, `rac_llm_strip_thinking`, `rac_llm_split_thinking_tokens` directly.
+- **Nitro spec**: `packages/core/src/specs/RunAnywhereCore.nitro.ts:497,506,518` declares the 3 methods.
+- **Callers**: `packages/core/src/Public/Extensions/RunAnywhere+TextGeneration.ts:302,315,326`.
+
+These 3 C helpers were downgraded from `RAC_API` to `@internal` on 2026-05-05 under CPP-05 (Wave 1 Row 12, cpp-layer.md) and removed from `exports/RACommons.exports`. The NEXT `RACommons.xcframework` rebuild will break the Apple link of `HybridRunAnywhereCore+Voice.cpp`. Commons now populates `LLMGenerationResult.thinking_content` / `.thinking_tokens` / `.response_tokens` / `.text` in proto generate + stream, so the RN TS layer can read them off `LLMGenerationResult` / `LLMStreamEvent` proto bytes.
+
+Fix steps:
+1. Delete `packages/core/src/Features/LLM/LlmThinking.ts`.
+2. Delete the `llmExtractThinking` / `llmStripThinking` / `llmSplitThinkingTokens` blocks in `HybridRunAnywhereCore+Voice.cpp:469-537` + `HybridRunAnywhereCore.hpp:233-237` + `RunAnywhereCore.nitro.ts:497-522`.
+3. Regenerate nitrogen (`yarn core:nitrogen`).
+4. Update `RunAnywhere+TextGeneration.ts:302,315,326` to read `result.thinkingContent` / `result.text` from the generated proto type returned by `RunAnywhere.generate(...)`.
+5. Sync the header copy at `packages/core/cpp/` (if mirrored).
+
+Validation: `yarn typecheck` green; `grep -rn "rac_llm_extract_thinking\|rac_llm_strip_thinking\|rac_llm_split_thinking_tokens\|llmExtractThinking\|llmStripThinking\|llmSplitThinkingTokens" sdk/runanywhere-react-native/packages` returns 0 hits (except in the XCFramework Header copies, which are auto-synced on the next `core:download-ios`).
+
+Scope: S (~200 LOC delete across TS + C++ + Nitro spec + 3 TS call-site edits).
+
+## Example app (RN) inconsistencies
+
+| Issue | Files | Notes |
+|-------|-------|-------|
+| Local `STTMode` / `VoicePipelineStatus` enums | `examples/react-native/RunAnywhereAI/src/types/voice.ts:7-19` | UI-side state machines; `VoicePipelineStatus` overlaps `VoiceEventKind`. Low priority. |
+| Local `GenerationSettings` / `AppSettings` | `examples/react-native/RunAnywhereAI/src/types/settings.ts:20-54` | Fields overlap with `LLMGenerationOptions` — consider `Pick<LLMGenerationOptions, ...>`. Low priority. |

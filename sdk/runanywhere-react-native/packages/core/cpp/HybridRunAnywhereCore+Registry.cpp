@@ -19,10 +19,6 @@
  *     in commons. Migration target: change the Nitro spec to take an
  *     ArrayBuffer (serialized ModelRegistryRefreshRequest) and route
  *     through the proto API. Tracked under react-native gap.
- *   - Needs commons-side proto contract first: checkCompatibility(modelId)
- *     uses CompatibilityBridge to assemble JSON. There is no
- *     `rac_model_compatibility_*_proto` ABI today; the bridge must keep
- *     the JSON path until commons exposes one.
  */
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "HybridRunAnywhereCore+ProtoCompat.hpp"
@@ -401,34 +397,6 @@ HybridRunAnywhereCore::getDownloadedModelsProto() {
         }
 
         return ownedProtoBuffer(protoBytes, protoSize);
-    });
-}
-
-// ============================================================================
-// Compatibility Service
-// ============================================================================
-
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::checkCompatibility(
-    const std::string& modelId) {
-    return Promise<std::string>::async([modelId]() -> std::string {
-        auto registryHandle = ModelRegistryBridge::shared().getHandle();
-        if (!registryHandle) {
-            LOGE("Model registry not initialized");
-            return "{}";
-        }
-
-        // Delegate to CompatibilityBridge - it handles querying device capabilities
-        auto result = CompatibilityBridge::checkCompatibility(modelId, registryHandle);
-
-        return buildJsonObject({
-            {"isCompatible", result.isCompatible ? "true" : "false"},
-            {"canRun", result.canRun ? "true" : "false"},
-            {"canFit", result.canFit ? "true" : "false"},
-            {"requiredMemory", std::to_string(result.requiredMemory)},
-            {"availableMemory", std::to_string(result.availableMemory)},
-            {"requiredStorage", std::to_string(result.requiredStorage)},
-            {"availableStorage", std::to_string(result.availableStorage)}
-        });
     });
 }
 

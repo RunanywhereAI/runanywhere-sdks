@@ -109,7 +109,6 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> queryModelsProto(
     const std::shared_ptr<ArrayBuffer>& queryBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getDownloadedModelsProto() override;
-  std::shared_ptr<Promise<std::string>> checkCompatibility(const std::string& modelId) override;
   std::shared_ptr<Promise<bool>> refreshModelRegistry(
     bool includeRemoteCatalog,
     bool rescanLocal,

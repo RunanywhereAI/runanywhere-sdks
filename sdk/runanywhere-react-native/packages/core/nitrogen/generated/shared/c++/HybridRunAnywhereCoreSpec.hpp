@@ -19,9 +19,9 @@
 #include <string>
 #include <NitroModules/ArrayBuffer.hpp>
 #include <functional>
-#include <optional>
 // #include <NitroModules/Null.hpp> // Removed - file does not exist in nitro-modules 0.31.3
 #include <variant>
+#include <optional>
 
 namespace margelo::nitro::runanywhere {
 
@@ -73,7 +73,6 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> removeModelProto(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> queryModelsProto(const std::shared_ptr<ArrayBuffer>& queryBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getDownloadedModelsProto() = 0;
-      virtual std::shared_ptr<Promise<std::string>> checkCompatibility(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<bool>> refreshModelRegistry(bool includeRemoteCatalog, bool rescanLocal, bool pruneOrphans) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadPlanProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadStartProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;

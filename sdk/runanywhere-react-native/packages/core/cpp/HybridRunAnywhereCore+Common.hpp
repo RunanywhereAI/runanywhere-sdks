@@ -17,7 +17,6 @@
 #include "bridges/AuthBridge.hpp"
 #include "bridges/StorageBridge.hpp"
 #include "bridges/ModelRegistryBridge.hpp"
-#include "bridges/CompatibilityBridge.hpp"
 #include "bridges/EventBridge.hpp"
 #include "bridges/HTTPBridge.hpp"
 #include "bridges/DownloadBridge.hpp"
