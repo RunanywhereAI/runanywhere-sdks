@@ -33,16 +33,6 @@ Yarn Berry 3.6.1 monorepo, three workspaces (`packages/core`, `packages/llamacpp
 
 **Acceptance**: either recreate the cross-SDK parity harness under `tests/streaming/*.rn.test.ts` consuming C++ golden fixtures, or delete the `test` script + jest/ts-jest/@types/jest devDependencies. Today Jest is installed on disk with no entry points.
 
-### RN-04: Dead Nitro method — `authenticate(apiKey)` (LOW)
-
-**Files**:
-- `packages/core/src/specs/RunAnywhereCore.nitro.ts:75` — declares `authenticate(apiKey: string): Promise<boolean>`.
-- `packages/core/nitrogen/generated/shared/c++/HybridRunAnywhereCoreSpec.hpp` — generated pure-virtual entry.
-
-Zero JS callers. The canonical auth path is `native.authAuthenticate(apiKey, baseURL, deviceId, platform, sdkVersion)` at `RunAnywhere.ts`.
-
-**Acceptance**: delete `authenticate` from the Nitro spec and the C++ impl; regenerate nitrogen.
-
 ### RN-06: JSON auth/device/HTTP surfaces mix with proto-byte world (MEDIUM)
 
 **Files**:
@@ -101,8 +91,6 @@ User deferred diffusion support entirely. No action until the diffusion track re
 
 | Target | Reason |
 |--------|--------|
-| `RunAnywhereCore.nitro.ts:75` `authenticate(apiKey)` + C++ impl + regen | Zero callers; canonical is `authAuthenticate` (RN-04) |
-| `RunAnywhereCore.nitro.ts:171` `checkCompatibility(modelId)` + C++ impl + regen | Zero callers (RN-03) |
 | `test` script + `jest` / `ts-jest` / `@types/jest` devDeps in `packages/core/package.json` | No config, no fixtures; harness is phantom (RN-01) — OR rebuild `tests/streaming/*.rn.test.ts` |
 
 ## Cross-SDK naming alignment gaps

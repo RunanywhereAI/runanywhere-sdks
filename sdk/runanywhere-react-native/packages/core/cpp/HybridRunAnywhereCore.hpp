@@ -68,7 +68,6 @@ public:
   // Authentication - Delegates to AuthBridge
   // ============================================================================
 
-  std::shared_ptr<Promise<bool>> authenticate(const std::string& apiKey) override;
   std::shared_ptr<Promise<bool>> isAuthenticated() override;
   std::shared_ptr<Promise<std::string>> getUserId() override;
   std::shared_ptr<Promise<std::string>> getOrganizationId() override;

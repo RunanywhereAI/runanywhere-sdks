@@ -58,7 +58,6 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<void>> destroy() = 0;
       virtual std::shared_ptr<Promise<bool>> isInitialized() = 0;
       virtual std::shared_ptr<Promise<std::string>> getBackendInfo() = 0;
-      virtual std::shared_ptr<Promise<bool>> authenticate(const std::string& apiKey) = 0;
       virtual std::shared_ptr<Promise<bool>> isAuthenticated() = 0;
       virtual std::shared_ptr<Promise<std::string>> getUserId() = 0;
       virtual std::shared_ptr<Promise<std::string>> getOrganizationId() = 0;

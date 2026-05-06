@@ -18,7 +18,6 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("destroy", &HybridRunAnywhereCoreSpec::destroy);
       prototype.registerHybridMethod("isInitialized", &HybridRunAnywhereCoreSpec::isInitialized);
       prototype.registerHybridMethod("getBackendInfo", &HybridRunAnywhereCoreSpec::getBackendInfo);
-      prototype.registerHybridMethod("authenticate", &HybridRunAnywhereCoreSpec::authenticate);
       prototype.registerHybridMethod("isAuthenticated", &HybridRunAnywhereCoreSpec::isAuthenticated);
       prototype.registerHybridMethod("getUserId", &HybridRunAnywhereCoreSpec::getUserId);
       prototype.registerHybridMethod("getOrganizationId", &HybridRunAnywhereCoreSpec::getOrganizationId);

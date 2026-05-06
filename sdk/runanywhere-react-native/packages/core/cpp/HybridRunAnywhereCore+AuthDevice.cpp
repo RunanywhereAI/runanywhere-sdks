@@ -15,46 +15,6 @@ using namespace ::runanywhere::bridges;
 // Authentication
 // ============================================================================
 
-std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::authenticate(
-    const std::string& apiKey) {
-    return Promise<bool>::async([this, apiKey]() -> bool {
-        LOGI("Authenticating...");
-
-        // Build auth request JSON
-        std::string deviceId = DeviceBridge::shared().getDeviceId();
-        // Use actual platform (ios/android) as backend only accepts these values
-#if defined(__APPLE__)
-        std::string platform = "ios";
-#elif defined(ANDROID) || defined(__ANDROID__)
-        std::string platform = "android";
-#else
-        std::string platform = "ios"; // Default to ios for unknown platforms
-#endif
-        // Use centralized SDK version from InitBridge (set from TypeScript SDKConstants)
-        std::string sdkVersion = InitBridge::shared().getSdkVersion();
-
-        std::string requestJson = AuthBridge::shared().buildAuthenticateRequestJSON(
-            apiKey, deviceId, platform, sdkVersion
-        );
-
-        if (requestJson.empty()) {
-            setLastError("Failed to build auth request");
-            return false;
-        }
-
-        // NOTE: HTTP request must be made by JS layer
-        // This C++ method just prepares the request JSON
-        // The JS layer should:
-        // 1. Call this method to prepare
-        // 2. Make HTTP POST to /api/v1/auth/sdk/authenticate
-        // 3. Call handleAuthResponse() with the response
-
-        // For now, we indicate that auth JSON is prepared
-        LOGI("Auth request JSON prepared. HTTP must be done by JS layer.");
-        return true;
-    });
-}
-
 std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::isAuthenticated() {
     return Promise<bool>::async([]() -> bool {
         return AuthBridge::shared().isAuthenticated();

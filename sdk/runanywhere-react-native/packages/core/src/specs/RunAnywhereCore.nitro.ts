@@ -68,13 +68,6 @@ export interface RunAnywhereCore extends HybridObject<{
   // ============================================================================
 
   /**
-   * Authenticate with API key
-   * @param apiKey API key
-   * @returns true if authenticated successfully
-   */
-  authenticate(apiKey: string): Promise<boolean>;
-
-  /**
    * Check if currently authenticated
    */
   isAuthenticated(): Promise<boolean>;
