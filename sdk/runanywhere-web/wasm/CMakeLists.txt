@@ -821,6 +821,12 @@ set(RAC_EXPORTED_FUNCTIONS
     "_rac_wasm_sizeof_platform_adapter"
     # Per-field offsetof helpers for rac_platform_adapter_t — required so the
     # TS PlatformAdapter never hard-codes PTR_SIZE or sequential offsets.
+    # BUG-WEB-003 (resolved): These MUST ship in BOTH CPU and WebGPU variants.
+    # The pre-9226feb2c WebGPU artifact predated these helpers, which caused
+    # PlatformAdapter.register() to throw and LlamaCppBridge.ts to silently
+    # fall back to CPU. Always rebuild `racommons-llamacpp-webgpu.{js,wasm}`
+    # alongside the CPU variant via `./wasm/scripts/build.sh --llamacpp --webgpu`
+    # whenever this list or wasm/src/wasm_exports.cpp changes.
     "_rac_wasm_offsetof_platform_adapter_file_exists"
     "_rac_wasm_offsetof_platform_adapter_file_read"
     "_rac_wasm_offsetof_platform_adapter_file_write"
