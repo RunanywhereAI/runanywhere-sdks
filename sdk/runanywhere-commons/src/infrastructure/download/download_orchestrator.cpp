@@ -823,9 +823,23 @@ void run_proto_download_worker(std::shared_ptr<proto_download_task> task, int64_
     }
 
     int64_t completed_bytes = total_expected > 0 ? total_expected : completed_before_file;
+    // For multi-file downloads (e.g. VLM primary .gguf + mmproj, MiniLM
+    // model.onnx + vocab.txt) report the model *folder* as the resolved
+    // local_path instead of the last file's destination path. Downstream
+    // path resolution (`rac_model_paths_resolve_artifact`) scans the folder
+    // to discover every role (primary_model, vision_projector, tokenizer,
+    // ...). When `local_path` pointed at the last file we ended up scanning
+    // a single file — typically the mmproj — and the VLM load failed with
+    // "primary model not found".
+    std::string completion_local_path = final_path;
+    if (task->files.size() > 1 && !task->model_folder_path.empty() &&
+        task->model_folder_path != ".") {
+        completion_local_path = task->model_folder_path;
+    }
     set_task_progress(task, rav1::DOWNLOAD_STATE_COMPLETED, rav1::DOWNLOAD_STAGE_COMPLETED,
                       completed_bytes, total_expected, static_cast<int32_t>(task->files.size() - 1),
-                      task->files.empty() ? "" : task->files.back().storage_key, final_path, "");
+                      task->files.empty() ? "" : task->files.back().storage_key,
+                      completion_local_path, "");
     mark_task_stopped(task);
     emit_progress(task);
 }

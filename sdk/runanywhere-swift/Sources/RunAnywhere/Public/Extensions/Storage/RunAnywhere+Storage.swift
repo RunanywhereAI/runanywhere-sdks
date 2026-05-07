@@ -267,13 +267,22 @@ private extension RunAnywhere {
         model: RAModelInfo,
         progress: RADownloadProgress
     ) async throws -> RADownloadProgress {
-        let localPath = progress.localPath.isEmpty ? model.localPath : progress.localPath
-        guard !localPath.isEmpty else {
+        let reportedPath = progress.localPath.isEmpty ? model.localPath : progress.localPath
+        guard !reportedPath.isEmpty else {
             throw SDKException.download(
                 .invalidState,
                 "Download completed without a local_path; cannot import completion into the model registry"
             )
         }
+
+        // For multi-file downloads (VLM primary + mmproj, MiniLM model.onnx +
+        // vocab.txt, etc.) the commons download worker reports `local_path` as
+        // the last file's destination. Downstream VLM lifecycle resolution
+        // walks the path as a directory and fails when it's actually the
+        // mmproj file. Normalize to the parent folder so
+        // `rac_model_paths_resolve_artifact` can scan all sibling files and
+        // discover primary_model, vision_projector, tokenizer, etc.
+        let localPath = Self.normalizedCompletionPath(reportedPath, model: model)
 
         var importedModel = model
         importedModel.localPath = localPath
@@ -300,6 +309,27 @@ private extension RunAnywhere {
         }
 
         return progress
+    }
+
+    /// Collapse a multi-file completion `local_path` to the model folder when
+    /// the reported path is actually one of the child files. Mirrors the
+    /// commons-side fix in `run_proto_download_worker` so every flow (the
+    /// prebuilt xcframework still in circulation + the next rebuild) persists
+    /// the correct artifact root in the registry.
+    static func normalizedCompletionPath(_ reportedPath: String, model: RAModelInfo) -> String {
+        let hasMultipleDescriptors = model.multiFileDescriptors.count > 1
+        guard hasMultipleDescriptors else { return reportedPath }
+
+        let reportedURL = URL(fileURLWithPath: reportedPath)
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: reportedURL.path,
+                                                     isDirectory: &isDirectory)
+        if exists && isDirectory.boolValue {
+            return reportedPath
+        }
+        let parent = reportedURL.deletingLastPathComponent()
+        guard !parent.path.isEmpty, parent.path != "/" else { return reportedPath }
+        return parent.path
     }
 
     /// URL → model-format inference via the commons extension-detection helper
