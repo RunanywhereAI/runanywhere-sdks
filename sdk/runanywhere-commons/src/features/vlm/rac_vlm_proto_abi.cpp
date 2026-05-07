@@ -492,11 +492,19 @@ rac_result_t rac_vlm_process_stream_proto(
                        "vlm.processStream", 0.0f, 1, 0, nullptr);
 
     const auto start = std::chrono::steady_clock::now();
-    StreamCtx ctx;
-    ctx.callback = callback;
-    ctx.user_data = user_data;
+    // Heap-allocate StreamCtx via unique_ptr so its lifetime clearly outlives
+    // any stray callback invocation the engine might trigger after
+    // rac_vlm_process_stream returns. The previous stack-allocated ctx was
+    // correct in principle (process_stream is synchronous) but showed up in
+    // Phase 6f as an EXC_BAD_ACCESS with a garbage PC inside the trampoline
+    // call site on iOS Simulator. Heap allocation + move-capture-style
+    // ownership is the simpler, safer fix here than auditing every future
+    // engine to guarantee no post-return callback invocation.
+    auto ctx = std::make_unique<StreamCtx>();
+    ctx->callback = callback;
+    ctx->user_data = user_data;
     rc = rac_vlm_process_stream(handle, &image, prompt, &options,
-                                stream_token_trampoline, &ctx);
+                                stream_token_trampoline, ctx.get());
     const auto end = std::chrono::steady_clock::now();
 
     if (rc != RAC_SUCCESS) {
@@ -509,15 +517,15 @@ rac_result_t rac_vlm_process_stream_proto(
 
     if (out_result) {
         runanywhere::v1::VLMResult proto;
-        proto.set_text(ctx.text);
-        proto.set_completion_tokens(ctx.token_count);
-        proto.set_total_tokens(ctx.token_count);
+        proto.set_text(ctx->text);
+        proto.set_completion_tokens(ctx->token_count);
+        proto.set_total_tokens(ctx->token_count);
         proto.set_processing_time_ms(
             std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count());
         rc = copy_proto(proto, out_result);
     }
     publish_capability(runanywhere::v1::CAPABILITY_OPERATION_EVENT_KIND_VLM_COMPLETED,
-                       "vlm.processStream", 1.0f, 1, ctx.token_count, nullptr);
+                       "vlm.processStream", 1.0f, 1, ctx->token_count, nullptr);
     free_vlm_image(&image);
     rac_free(const_cast<char*>(prompt));
     return rc;

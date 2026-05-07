@@ -118,12 +118,6 @@ extension CppBridge {
                     result.errorMessage.isEmpty ? "STT lifecycle load failed" : result.errorMessage
                 )
             }
-            guard let primaryPath = result.lifecyclePrimaryArtifactPath else {
-                throw SDKException.stt(
-                    .modelLoadFailed,
-                    "STT lifecycle result did not include a primary model artifact"
-                )
-            }
 
             let framework: rac_inference_framework_t
             switch result.framework {
@@ -135,8 +129,16 @@ extension CppBridge {
                 framework = RAC_FRAMEWORK_UNKNOWN
             }
 
+            // `rac_stt_create` (called via the component's lifecycle service
+            // create callback) performs a registry lookup on the first arg.
+            // It tries (a) `rac_get_model(arg)` as a model-id lookup, then
+            // (b) `rac_get_model_by_path(arg)`, then (c) basename extraction.
+            // Passing the **model id** is the most reliable — the registry
+            // already knows the resolved path via local_path since the
+            // lifecycle load (commons) already succeeded for the same model.
+            // This matches what LLM/VLM do via the lifecycle service layer.
             try loadModel(
-                primaryPath,
+                result.modelID,
                 modelId: result.modelID,
                 modelName: modelName ?? result.modelID,
                 framework: framework

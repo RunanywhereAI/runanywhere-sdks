@@ -88,15 +88,13 @@ extension CppBridge {
                     result.errorMessage.isEmpty ? "TTS lifecycle load failed" : result.errorMessage
                 )
             }
-            guard let primaryPath = result.lifecyclePrimaryArtifactPath else {
-                throw SDKException.tts(
-                    .modelLoadFailed,
-                    "TTS lifecycle result did not include a primary voice artifact"
-                )
-            }
 
+            // Pass model id (not resolved path) so `rac_tts_create` registry
+            // lookup resolves the canonical local path. Same pattern as the
+            // STT loadModel(from:) method — the lifecycle load (commons)
+            // has already populated the registry entry's local_path.
             try loadVoice(
-                primaryPath,
+                result.modelID,
                 voiceId: result.modelID,
                 voiceName: voiceName ?? result.modelID
             )
