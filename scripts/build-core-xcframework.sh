@@ -285,32 +285,37 @@ merge_onnx_backend_slice() {
     local output="$3"
     local arch="$4"
     local scratch_dir="${STAGING_DIR}/prepared/${slice_dir}/onnx"
-    # ONNX owns generic ONNX Runtime services. Its compatibility speech shims
-    # still reference Sherpa C entry points, so keep this archive self-contained
-    # for consumers that link only RABackendONNX.
+    # ONNX owns generic ONNX Runtime services. When RABackendSherpa is being
+    # built as its own xcframework, keep sherpa's implementation objects and
+    # the sherpa-onnx prebuilt archives out of this slice so consumers linking
+    # both RABackendONNX + RABackendSherpa don't see duplicate symbols.
+    # When RAC_BACKEND_SHERPA=OFF, fold sherpa in here to keep the ONNX
+    # xcframework self-contained for consumers that want speech-capable ONNX
+    # without a separate sherpa artifact.
     local inputs=(
         "${build_root}/engines/onnx/${slice_dir}/librac_backend_onnx.a"
         "${build_root}/runtimes/onnxrt/${slice_dir}/librac_runtime_onnxrt.a"
         "$(find_onnxruntime_ios_archive "${slice_dir}")"
     )
-    if [ "${DRY_RUN}" = "1" ] || [ -f "${build_root}/engines/sherpa/${slice_dir}/librac_backend_sherpa.a" ]; then
-        inputs+=("${build_root}/engines/sherpa/${slice_dir}/librac_backend_sherpa.a")
-    fi
-    local sherpa_dir
 
-    if [ "${slice_dir}" = "Release-iphoneos" ]; then
-        sherpa_dir="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework/ios-arm64"
-    else
-        sherpa_dir="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator"
-    fi
-
-    if [ "${DRY_RUN}" = "1" ] || [ -d "${sherpa_dir}" ]; then
-        local sherpa_archive
-        for sherpa_archive in "${sherpa_dir}"/*.a; do
-            if [ "${DRY_RUN}" = "1" ] || [ -f "${sherpa_archive}" ]; then
-                inputs+=("${sherpa_archive}")
-            fi
-        done
+    if [ "${RAC_BACKEND_SHERPA:-ON}" = "OFF" ]; then
+        if [ "${DRY_RUN}" = "1" ] || [ -f "${build_root}/engines/sherpa/${slice_dir}/librac_backend_sherpa.a" ]; then
+            inputs+=("${build_root}/engines/sherpa/${slice_dir}/librac_backend_sherpa.a")
+        fi
+        local sherpa_dir
+        if [ "${slice_dir}" = "Release-iphoneos" ]; then
+            sherpa_dir="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework/ios-arm64"
+        else
+            sherpa_dir="${REPO_ROOT}/sdk/runanywhere-commons/third_party/sherpa-onnx-ios/sherpa-onnx.xcframework/ios-arm64_x86_64-simulator"
+        fi
+        if [ "${DRY_RUN}" = "1" ] || [ -d "${sherpa_dir}" ]; then
+            local sherpa_archive
+            for sherpa_archive in "${sherpa_dir}"/*.a; do
+                if [ "${DRY_RUN}" = "1" ] || [ -f "${sherpa_archive}" ]; then
+                    inputs+=("${sherpa_archive}")
+                fi
+            done
+        fi
     fi
 
     local prepared=()
@@ -402,6 +407,9 @@ echo "▶ Build ios-device (Release)"
 ios_build_targets=(rac_commons rac_backend_llamacpp)
 if [ "${RAC_BACKEND_ONNX}" = "ON" ]; then
     ios_build_targets+=(rac_backend_onnx)
+fi
+if [ "${RAC_BACKEND_SHERPA:-ON}" = "ON" ]; then
+    ios_build_targets+=(rac_backend_sherpa)
 fi
 run cmake --build --preset ios-device --config Release --target "${ios_build_targets[@]}"
 
