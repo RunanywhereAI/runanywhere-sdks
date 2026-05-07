@@ -104,6 +104,45 @@ extension CppBridge {
             logger.info("STT model loaded: \(modelId)")
         }
 
+        /// Load an STT model from a `RAModelLoadResult` returned by the proto-backed
+        /// lifecycle API. Mirrors `CppBridge.VLM.loadModel(from:)` so the Swift
+        /// component actor's `isLoaded` flag tracks the lifecycle service's state
+        /// after `RunAnywhere.loadModel(...)` returns `success=true`.
+        func loadModel(from result: RAModelLoadResult, modelName: String? = nil) throws {
+            if loadedModelId == result.modelID {
+                return
+            }
+            guard result.success else {
+                throw SDKException.stt(
+                    .modelLoadFailed,
+                    result.errorMessage.isEmpty ? "STT lifecycle load failed" : result.errorMessage
+                )
+            }
+            guard let primaryPath = result.lifecyclePrimaryArtifactPath else {
+                throw SDKException.stt(
+                    .modelLoadFailed,
+                    "STT lifecycle result did not include a primary model artifact"
+                )
+            }
+
+            let framework: rac_inference_framework_t
+            switch result.framework {
+            case .onnx:
+                framework = RAC_FRAMEWORK_ONNX
+            case .sherpa:
+                framework = RAC_FRAMEWORK_SHERPA
+            default:
+                framework = RAC_FRAMEWORK_UNKNOWN
+            }
+
+            try loadModel(
+                primaryPath,
+                modelId: result.modelID,
+                modelName: modelName ?? result.modelID,
+                framework: framework
+            )
+        }
+
         /// Unload the current model
         public func unload() {
             guard let handle = handle else { return }

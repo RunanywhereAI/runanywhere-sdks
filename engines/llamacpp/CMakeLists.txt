@@ -257,6 +257,16 @@ if(RAC_STATIC_PLUGINS)
     target_sources(rac_commons PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_llamacpp.cpp
     )
+    if(RAC_VLM_USE_MTMD)
+        # Swift-only E2E Phase 6e: VLM plugin needs its own static-register
+        # ctor to be routable via rac_plugin_route(framework=llamacpp,
+        # primitive=vlm). Without this, only the LLM plugin registers at
+        # process start and VLM loads fail with
+        # "no backend route for llamacpp_vlm".
+        target_sources(rac_commons PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/rac_static_register_llamacpp_vlm.cpp
+        )
+    endif()
     target_include_directories(rac_commons PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${RAC_COMMONS_ROOT_DIR}/include

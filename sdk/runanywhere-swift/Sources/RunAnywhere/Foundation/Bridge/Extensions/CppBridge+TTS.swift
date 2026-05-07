@@ -74,6 +74,34 @@ extension CppBridge {
             logger.info("TTS voice loaded: \(voiceId)")
         }
 
+        /// Load a TTS voice from a `RAModelLoadResult` returned by the proto-backed
+        /// lifecycle API. Mirrors `CppBridge.VLM.loadModel(from:)` so the Swift
+        /// component actor's `isLoaded` flag tracks the lifecycle service's state
+        /// after `RunAnywhere.loadModel(...)` returns `success=true`.
+        func loadVoice(from result: RAModelLoadResult, voiceName: String? = nil) throws {
+            if loadedVoiceId == result.modelID {
+                return
+            }
+            guard result.success else {
+                throw SDKException.tts(
+                    .modelLoadFailed,
+                    result.errorMessage.isEmpty ? "TTS lifecycle load failed" : result.errorMessage
+                )
+            }
+            guard let primaryPath = result.lifecyclePrimaryArtifactPath else {
+                throw SDKException.tts(
+                    .modelLoadFailed,
+                    "TTS lifecycle result did not include a primary voice artifact"
+                )
+            }
+
+            try loadVoice(
+                primaryPath,
+                voiceId: result.modelID,
+                voiceName: voiceName ?? result.modelID
+            )
+        }
+
         /// Unload the current voice
         public func unload() {
             guard let handle = handle else { return }
