@@ -28,7 +28,14 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
-        guard await CppBridge.TTS.shared.isLoaded else {
+        // Use ModelLifecycle.currentModel to check if a TTS voice is loaded in
+        // the lifecycle — CppBridge.TTS.shared.isLoaded queries the Swift
+        // actor's own handle which is separate from the lifecycle's handle,
+        // and would return false even after a successful RunAnywhere.loadModel().
+        var currentRequest = RACurrentModelRequest()
+        currentRequest.category = .speechSynthesis
+        let current = RunAnywhere.currentModel(currentRequest)
+        guard current.found else {
             throw SDKException.tts(.notInitialized, "TTS voice not loaded")
         }
 

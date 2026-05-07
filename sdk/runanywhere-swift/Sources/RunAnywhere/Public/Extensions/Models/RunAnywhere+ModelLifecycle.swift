@@ -23,14 +23,22 @@ public extension RunAnywhere {
         guard result.success else {
             return result
         }
+        // VLM still needs Swift-side actor sync because its process/stream API
+        // reads from CppBridge.VLM.shared.handle, which is distinct from the
+        // lifecycle's internal handle.
+        //
+        // STT + TTS sync removed in Phase 6h: the re-load through
+        // CppBridge.STT/TTS.shared.loadModel(from:) triggered duplicate
+        // sherpa backend state (second SherpaOnnxCreateOfflineRecognizer
+        // from the Swift actor's handle clashed with the lifecycle-owned one
+        // and returned RAC_ERROR_MODEL_LOAD_FAILED). The consequence is that
+        // CppBridge.STT/TTS.shared.isLoaded returns false after loadModel(),
+        // so transcribe() / synthesize() guards throw notInitialized. The
+        // proper fix is for the Swift actor to reuse the lifecycle's handle
+        // rather than creating its own via rac_stt_component_create; that's
+        // a cross-SDK architectural change out of scope for this phase.
         if result.category.isVLMCategory {
             return await synchronizeVLMComponentLoad(result)
-        }
-        if result.category == .speechRecognition {
-            return await synchronizeSTTComponentLoad(result)
-        }
-        if result.category == .speechSynthesis {
-            return await synchronizeTTSComponentLoad(result)
         }
         return result
     }

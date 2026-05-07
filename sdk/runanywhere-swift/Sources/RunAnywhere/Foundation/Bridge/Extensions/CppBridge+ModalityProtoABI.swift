@@ -38,31 +38,30 @@ private enum LLMGeneratedProtoABI {
 }
 
 private enum STTGeneratedProtoABI {
+    // Lifecycle-owned transcribe: takes no handle parameter, uses the
+    // currently-loaded STT component from the commons lifecycle directly.
+    // Fixes the Swift-actor-handle-separate-from-lifecycle bug that made
+    // transcribe() throw "STT model not loaded" after RunAnywhere.loadModel()
+    // returned success. Mirrors LLM's handle-less rac_llm_generate_proto.
     typealias Transcribe = @convention(c) (
-        rac_handle_t?,
-        UnsafeRawPointer?,
-        Int,
         UnsafePointer<UInt8>?,
         Int,
         UnsafeMutablePointer<rac_proto_buffer_t>?
     ) -> rac_result_t
-    typealias PartialCallback = @convention(c) (
+    typealias StreamEventCallback = @convention(c) (
         UnsafePointer<UInt8>?,
         Int,
         UnsafeMutableRawPointer?
     ) -> Void
     typealias TranscribeStream = @convention(c) (
-        rac_handle_t?,
-        UnsafeRawPointer?,
-        Int,
         UnsafePointer<UInt8>?,
         Int,
-        PartialCallback?,
+        StreamEventCallback?,
         UnsafeMutableRawPointer?
     ) -> rac_result_t
 
-    static let transcribeName = "rac_stt_component_transcribe_proto"
-    static let streamName = "rac_stt_component_transcribe_stream_proto"
+    static let transcribeName = "rac_stt_transcribe_lifecycle_proto"
+    static let streamName = "rac_stt_transcribe_stream_lifecycle_proto"
 
     static let transcribe = NativeProtoABI.load(transcribeName, as: Transcribe.self)
     static let stream = NativeProtoABI.load(streamName, as: TranscribeStream.self)
@@ -80,16 +79,13 @@ private enum TTSGeneratedProtoABI {
         VoiceCallback?,
         UnsafeMutableRawPointer?
     ) -> rac_result_t
+    // Lifecycle-owned synthesize: takes no handle parameter.
     typealias Synthesize = @convention(c) (
-        rac_handle_t?,
-        UnsafePointer<CChar>?,
         UnsafePointer<UInt8>?,
         Int,
         UnsafeMutablePointer<rac_proto_buffer_t>?
     ) -> rac_result_t
     typealias SynthesizeStream = @convention(c) (
-        rac_handle_t?,
-        UnsafePointer<CChar>?,
         UnsafePointer<UInt8>?,
         Int,
         ChunkCallback?,
@@ -97,8 +93,8 @@ private enum TTSGeneratedProtoABI {
     ) -> rac_result_t
 
     static let listVoicesName = "rac_tts_component_list_voices_proto"
-    static let synthesizeName = "rac_tts_component_synthesize_proto"
-    static let streamName = "rac_tts_component_synthesize_stream_proto"
+    static let synthesizeName = "rac_tts_synthesize_lifecycle_proto"
+    static let streamName = "rac_tts_synthesize_stream_lifecycle_proto"
 
     static let listVoices = NativeProtoABI.load(listVoicesName, as: ListVoices.self)
     static let synthesize = NativeProtoABI.load(synthesizeName, as: Synthesize.self)
@@ -458,37 +454,41 @@ extension CppBridge.LLM {
 
 extension CppBridge.STT {
     public func transcribe(audioData: Data, options: RASTTOptions) throws -> RASTTOutput {
-        let handle = try getHandle()
+        // Lifecycle-owned transcribe: binds to the currently-loaded STT
+        // model from the commons lifecycle directly (no Swift actor handle).
+        // Swift must now wrap audio + options into a STTTranscriptionRequest
+        // proto before calling; the lifecycle C API parses the proto and
+        // delegates to the lifecycle's STT service ops.
         let transcribe = try NativeProtoABI.require(
             STTGeneratedProtoABI.transcribe,
             named: STTGeneratedProtoABI.transcribeName
         )
+        var request = RASTTTranscriptionRequest()
+        var audioSource = RASTTAudioSource()
+        audioSource.audioData = audioData
+        request.audio = audioSource
+        request.options = options
         return try decodeBuffer(
             responseType: RASTTOutput.self,
             symbolName: STTGeneratedProtoABI.transcribeName
         ) { outBuffer in
-            try NativeProtoABI.withSerializedBytes(options) { optionBytes, optionSize in
-                audioData.withUnsafeBytes { audio in
-                    transcribe(
-                        handle,
-                        audio.baseAddress,
-                        audioData.count,
-                        optionBytes,
-                        optionSize,
-                        outBuffer
-                    )
-                }
+            try NativeProtoABI.withSerializedBytes(request) { bytes, size in
+                transcribe(bytes, size, outBuffer)
             }
         }
     }
 
     public func transcribeStream(audioData: Data, options: RASTTOptions) throws -> AsyncStream<RASTTPartialResult> {
-        let handle = try getHandle()
         let stream = try NativeProtoABI.require(
             STTGeneratedProtoABI.stream,
             named: STTGeneratedProtoABI.streamName
         )
-        let optionsData = try options.serializedData()
+        var request = RASTTTranscriptionRequest()
+        var audioSource = RASTTAudioSource()
+        audioSource.audioData = audioData
+        request.audio = audioSource
+        request.options = options
+        let requestData = try request.serializedData()
         return AsyncStream { continuation in
             let context = ProtoStreamContext<RASTTPartialResult>(
                 continuation: continuation,
@@ -496,24 +496,19 @@ extension CppBridge.STT {
             )
             let contextPtr = Unmanaged.passRetained(context).toOpaque()
             Task.detached {
-                let rc = optionsData.withUnsafeBytes { optionRaw in
-                    audioData.withUnsafeBytes { audioRaw in
-                        stream(
-                            handle,
-                            audioRaw.baseAddress,
-                            audioData.count,
-                            optionRaw.bindMemory(to: UInt8.self).baseAddress,
-                            optionRaw.count,
-                            { bytes, size, userData in
-                                guard let userData else { return }
-                                Unmanaged<ProtoStreamContext<RASTTPartialResult>>
-                                    .fromOpaque(userData)
-                                    .takeUnretainedValue()
-                                    .yield(bytes: bytes, size: size)
-                            },
-                            contextPtr
-                        )
-                    }
+                let rc = requestData.withUnsafeBytes { requestRaw in
+                    stream(
+                        requestRaw.bindMemory(to: UInt8.self).baseAddress,
+                        requestRaw.count,
+                        { bytes, size, userData in
+                            guard let userData else { return }
+                            Unmanaged<ProtoStreamContext<RASTTPartialResult>>
+                                .fromOpaque(userData)
+                                .takeUnretainedValue()
+                                .yield(bytes: bytes, size: size)
+                        },
+                        contextPtr
+                    )
                 }
                 Unmanaged<ProtoStreamContext<RASTTPartialResult>>
                     .fromOpaque(contextPtr)
@@ -558,30 +553,38 @@ extension CppBridge.TTS {
     }
 
     public func synthesize(text: String, options: RATTSOptions) throws -> RATTSOutput {
-        let handle = try getHandle()
+        // Lifecycle-owned synthesize: binds to the TTS voice loaded in the
+        // commons lifecycle directly. Mirrors LLM's rac_llm_generate_proto
+        // pattern. The handle-based rac_tts_component_synthesize_proto was
+        // failing because Swift's CppBridge.TTS actor handle is a separate
+        // handle from the lifecycle-owned one (which is what gets loaded by
+        // RunAnywhere.loadModel()).
         let synthesize = try NativeProtoABI.require(
             TTSGeneratedProtoABI.synthesize,
             named: TTSGeneratedProtoABI.synthesizeName
         )
+        var request = RATTSSynthesisRequest()
+        request.text = text
+        request.options = options
         return try decodeBuffer(
             responseType: RATTSOutput.self,
             symbolName: TTSGeneratedProtoABI.synthesizeName
         ) { outBuffer in
-            try NativeProtoABI.withSerializedBytes(options) { optionBytes, optionSize in
-                text.withCString { textPtr in
-                    synthesize(handle, textPtr, optionBytes, optionSize, outBuffer)
-                }
+            try NativeProtoABI.withSerializedBytes(request) { bytes, size in
+                synthesize(bytes, size, outBuffer)
             }
         }
     }
 
     public func synthesizeStream(text: String, options: RATTSOptions) throws -> AsyncStream<RATTSOutput> {
-        let handle = try getHandle()
         let stream = try NativeProtoABI.require(
             TTSGeneratedProtoABI.stream,
             named: TTSGeneratedProtoABI.streamName
         )
-        let optionData = try options.serializedData()
+        var request = RATTSSynthesisRequest()
+        request.text = text
+        request.options = options
+        let requestData = try request.serializedData()
         return AsyncStream { continuation in
             let context = ProtoStreamContext<RATTSOutput>(
                 continuation: continuation,
@@ -589,23 +592,19 @@ extension CppBridge.TTS {
             )
             let contextPtr = Unmanaged.passRetained(context).toOpaque()
             Task.detached {
-                let rc = optionData.withUnsafeBytes { raw in
-                    text.withCString { textPtr in
-                        stream(
-                            handle,
-                            textPtr,
-                            raw.bindMemory(to: UInt8.self).baseAddress,
-                            raw.count,
-                            { bytes, size, userData in
-                                guard let userData else { return }
-                                Unmanaged<ProtoStreamContext<RATTSOutput>>
-                                    .fromOpaque(userData)
-                                    .takeUnretainedValue()
-                                    .yield(bytes: bytes, size: size)
-                            },
-                            contextPtr
-                        )
-                    }
+                let rc = requestData.withUnsafeBytes { raw in
+                    stream(
+                        raw.bindMemory(to: UInt8.self).baseAddress,
+                        raw.count,
+                        { bytes, size, userData in
+                            guard let userData else { return }
+                            Unmanaged<ProtoStreamContext<RATTSOutput>>
+                                .fromOpaque(userData)
+                                .takeUnretainedValue()
+                                .yield(bytes: bytes, size: size)
+                        },
+                        contextPtr
+                    )
                 }
                 Unmanaged<ProtoStreamContext<RATTSOutput>>
                     .fromOpaque(contextPtr)

@@ -24,7 +24,13 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
-        guard await CppBridge.STT.shared.isLoaded else {
+        // Query ModelLifecycle instead of the CppBridge.STT actor's own
+        // handle — those handles are separate, and the one loaded by
+        // RunAnywhere.loadModel() is the lifecycle's, not the actor's.
+        var currentRequest = RACurrentModelRequest()
+        currentRequest.category = .speechRecognition
+        let current = RunAnywhere.currentModel(currentRequest)
+        guard current.found else {
             throw SDKException.stt(.notInitialized, "STT model not loaded")
         }
 
@@ -47,7 +53,10 @@ public extension RunAnywhere {
                     continuation.finish()
                     return
                 }
-                guard await CppBridge.STT.shared.isLoaded else {
+                var currentRequest = RACurrentModelRequest()
+                currentRequest.category = .speechRecognition
+                let current = RunAnywhere.currentModel(currentRequest)
+                guard current.found else {
                     continuation.finish()
                     return
                 }
