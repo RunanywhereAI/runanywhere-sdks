@@ -14,4 +14,9 @@
 #include "rac_tts_onnx.h"
 #include "rac_vad_onnx.h"
 
+// Sherpa-ONNX backend plugin entry (STT / TTS / VAD via Sherpa-ONNX).
+// Needed so `ONNX.register()` can register the sherpa plugin with the
+// unified plugin registry via `rac_plugin_register(rac_plugin_entry_sherpa())`.
+#include "rac_plugin_entry_sherpa.h"
+
 #endif /* ONNX_BACKEND_H */

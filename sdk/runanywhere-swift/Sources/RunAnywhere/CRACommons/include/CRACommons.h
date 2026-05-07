@@ -179,6 +179,7 @@
 #include "rac_cpu_runtime_provider.h"
 #include "rac_plugin_entry.h"
 #include "rac_plugin_loader.h"  // v2 close-out (B31): runtime dlopen path
+#include "rac_plugin_entry_platform.h"  // Phase 5b: platform plugin (Apple FM / System TTS / CoreML Diffusion)
 #include "rac_routing_hints.h"
 #include "rac_route.h"
 

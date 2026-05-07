@@ -62,6 +62,43 @@ extension CppBridge {
                 logger.info("✅ Platform backend registered successfully (result=\(result))")
             } else {
                 logger.error("❌ Failed to register platform backend: \(result)")
+                return
+            }
+
+            // `rac_backend_platform_register()` only registers the module
+            // record + built-in catalog entries; it does NOT wire the
+            // unified plugin vtable into the plugin router. Without this
+            // step the router has no `platform` engine so `loadModel` for
+            // `framework == .foundationModels / .systemTts / .coreml`
+            // returns "no backend route". Register the vtable here so the
+            // router can resolve the Apple FM + System TTS + CoreML
+            // Diffusion primitives via `rac_plugin_entry_platform()`.
+            registerPlatformPlugin()
+        }
+
+        /// Register the Apple platform engine plugin with the unified plugin
+        /// registry so the router can route `framework == .foundationModels`
+        /// (Apple FM), `.systemTts` (AVSpeechSynthesizer), and `.coreml`
+        /// (Stable Diffusion) model loads to the platform vtable.
+        @MainActor
+        private static func registerPlatformPlugin() {
+            guard let vtable = rac_plugin_entry_platform() else {
+                logger.warning("Platform plugin entry returned null — FM / System TTS / CoreML will not route")
+                return
+            }
+
+            let registerResult = vtable.withMemoryRebound(
+                to: rac_engine_vtable_t.self, capacity: 1
+            ) { typedPointer -> rac_result_t in
+                return rac_plugin_register(typedPointer)
+            }
+
+            if registerResult == RAC_SUCCESS ||
+               registerResult == RAC_ERROR_MODULE_ALREADY_REGISTERED {
+                logger.info("Platform engine plugin registered (LLM + TTS + Diffusion via Apple APIs)")
+            } else {
+                let errorMsg = String(cString: rac_error_message(registerResult))
+                logger.error("Platform plugin registration failed: \(errorMsg)")
             }
         }
 
