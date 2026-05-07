@@ -10,6 +10,10 @@
 
 #include "rac/backends/rac_vlm_llamacpp.h"
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
 #include <llama.h>
 
 #include <atomic>
@@ -580,6 +584,22 @@ rac_result_t rac_vlm_llamacpp_load_model(rac_handle_t handle, const char* model_
 
     // Load model
     int gpu_layers = backend->config.gpu_layers;
+
+#if defined(TARGET_OS_SIMULATOR) && TARGET_OS_SIMULATOR
+    // iOS Simulator: Metal GPU allocation via MTLSimDevice crashes
+    // in ggml_metal_buffer_set_tensor / _xpc_shmem_create for the mmproj
+    // clip tensors. Force CPU execution on simulator (mirrors the LLM
+    // backend's guard in llamacpp_backend.cpp:450). Physical iOS devices
+    // still use Metal.
+    if (gpu_layers != 0) {
+        RAC_LOG_INFO(LOG_CAT,
+                     "iOS Simulator detected: forcing VLM n_gpu_layers=0 + use_gpu_vision=0 "
+                     "(Metal on MTLSimDevice crashes during mmproj load)");
+        gpu_layers = 0;
+        backend->config.use_gpu_vision = 0;
+    }
+#endif
+
     llama_model_params model_params = llama_model_default_params();
     model_params.n_gpu_layers = gpu_layers;
 
