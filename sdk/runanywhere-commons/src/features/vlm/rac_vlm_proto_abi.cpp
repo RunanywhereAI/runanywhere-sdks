@@ -400,7 +400,24 @@ rac_result_t rac_vlm_process_proto(rac_handle_t handle,
     (void)options_proto_size;
     return feature_unavailable(out_result);
 #else
-    if (!handle) {
+    // Phase 6j fix: prefer the lifecycle-owned VLM service over the caller's
+    // handle. iOS SDK's `CppBridge.VLM` passes a `rac_vlm_component*` into this
+    // proto ABI (the only VLM handle it owns), not a `rac_vlm_service_t*`.
+    // Blindly casting to `rac_vlm_service_t*` previously misread the ops vtable
+    // pointer out of the component's `LifecycleManager::logger_category`
+    // std::string, producing `EXC_BAD_ACCESS` at `0x6566694c2e4d4c56` -- the
+    // little-endian encoding of "VLM.Life" -- on iPhone 17 Pro Max. Routing
+    // through `acquire_lifecycle_vlm` removes the handle-type dependency
+    // entirely; Swift, Kotlin, and JNI callers all populate the lifecycle via
+    // `rac_model_lifecycle_load_proto` before inference, so the lifecycle
+    // reference is always authoritative. The `handle` parameter is retained
+    // only for the legacy struct-API smoke tests that pass a mock
+    // `rac_vlm_service_t*` without going through the lifecycle.
+    rac::vlm::LifecycleVlmRef lifecycle_ref;
+    const rac_result_t acquire_rc = rac::vlm::acquire_lifecycle_vlm(&lifecycle_ref);
+    const bool have_lifecycle = (acquire_rc == RAC_SUCCESS);
+
+    if (!have_lifecycle && !handle) {
         publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "vlm.process",
                         "VLM lifecycle component is not loaded");
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_COMPONENT_NOT_READY,
@@ -416,6 +433,7 @@ rac_result_t rac_vlm_process_proto(rac_handle_t handle,
     if (rc != RAC_SUCCESS) {
         free_vlm_image(&image);
         rac_free(const_cast<char*>(prompt));
+        if (have_lifecycle) rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
         publish_failure(rc, "vlm.process", out_result->error_message);
         return rc;
     }
@@ -424,11 +442,22 @@ rac_result_t rac_vlm_process_proto(rac_handle_t handle,
                        "vlm.process", 0.0f, 1, 0, nullptr);
 
     rac_vlm_result_t result = {};
-    rc = rac_vlm_process(handle, &image, prompt, &options, &result);
+    if (have_lifecycle) {
+        if (!lifecycle_ref.ops || !lifecycle_ref.ops->process) {
+            rc = RAC_ERROR_NOT_SUPPORTED;
+        } else {
+            rc = lifecycle_ref.ops->process(lifecycle_ref.impl, &image, prompt, &options,
+                                            &result);
+        }
+    } else {
+        // Legacy struct-API path: caller provided a `rac_vlm_service_t*`.
+        rc = rac_vlm_process(handle, &image, prompt, &options, &result);
+    }
     if (rc != RAC_SUCCESS) {
         publish_failure(rc, "vlm.process", rac_error_message(rc));
         free_vlm_image(&image);
         rac_free(const_cast<char*>(prompt));
+        if (have_lifecycle) rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
         return rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc));
     }
 
@@ -444,6 +473,7 @@ rac_result_t rac_vlm_process_proto(rac_handle_t handle,
     rac_vlm_result_free(&result);
     free_vlm_image(&image);
     rac_free(const_cast<char*>(prompt));
+    if (have_lifecycle) rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
     return rc;
 #endif
 }
@@ -463,7 +493,14 @@ rac_result_t rac_vlm_process_stream_proto(
     (void)user_data;
     return feature_unavailable(out_result);
 #else
-    if (!handle) {
+    // Phase 6j fix: mirror rac_vlm_process_proto -- prefer the lifecycle-owned
+    // VLM service so Swift's component-handle and Kotlin's service-handle paths
+    // converge on the correct ops vtable.
+    rac::vlm::LifecycleVlmRef lifecycle_ref;
+    const rac_result_t acquire_rc = rac::vlm::acquire_lifecycle_vlm(&lifecycle_ref);
+    const bool have_lifecycle = (acquire_rc == RAC_SUCCESS);
+
+    if (!have_lifecycle && !handle) {
         publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "vlm.processStream",
                         "VLM lifecycle component is not loaded");
         return out_result ? rac_proto_buffer_set_error(out_result, RAC_ERROR_COMPONENT_NOT_READY,
@@ -485,6 +522,7 @@ rac_result_t rac_vlm_process_stream_proto(
         free_vlm_image(&image);
         rac_free(const_cast<char*>(prompt));
         if (!out_result) rac_proto_buffer_free(&local_error);
+        if (have_lifecycle) rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
         return rc;
     }
 
@@ -503,14 +541,24 @@ rac_result_t rac_vlm_process_stream_proto(
     auto ctx = std::make_unique<StreamCtx>();
     ctx->callback = callback;
     ctx->user_data = user_data;
-    rc = rac_vlm_process_stream(handle, &image, prompt, &options,
-                                stream_token_trampoline, ctx.get());
+    if (have_lifecycle) {
+        if (!lifecycle_ref.ops || !lifecycle_ref.ops->process_stream) {
+            rc = RAC_ERROR_NOT_SUPPORTED;
+        } else {
+            rc = lifecycle_ref.ops->process_stream(lifecycle_ref.impl, &image, prompt, &options,
+                                                   stream_token_trampoline, ctx.get());
+        }
+    } else {
+        rc = rac_vlm_process_stream(handle, &image, prompt, &options,
+                                    stream_token_trampoline, ctx.get());
+    }
     const auto end = std::chrono::steady_clock::now();
 
     if (rc != RAC_SUCCESS) {
         publish_failure(rc, "vlm.processStream", rac_error_message(rc));
         free_vlm_image(&image);
         rac_free(const_cast<char*>(prompt));
+        if (have_lifecycle) rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
         return out_result ? rac_proto_buffer_set_error(out_result, rc, rac_error_message(rc))
                           : rc;
     }
@@ -528,6 +576,7 @@ rac_result_t rac_vlm_process_stream_proto(
                        "vlm.processStream", 1.0f, 1, ctx->token_count, nullptr);
     free_vlm_image(&image);
     rac_free(const_cast<char*>(prompt));
+    if (have_lifecycle) rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
     return rc;
 #endif
 }
@@ -537,7 +586,14 @@ rac_result_t rac_vlm_cancel_proto(rac_handle_t handle) {
     (void)handle;
     return RAC_ERROR_FEATURE_NOT_AVAILABLE;
 #else
-    if (!handle) {
+    // Phase 6j fix: prefer the lifecycle-owned VLM to avoid the handle-type
+    // mismatch that crashed `rac_vlm_process_proto` on iOS. The `handle`
+    // parameter is kept only as a legacy fallback for struct-API smoke tests.
+    rac::vlm::LifecycleVlmRef lifecycle_ref;
+    const rac_result_t acquire_rc = rac::vlm::acquire_lifecycle_vlm(&lifecycle_ref);
+    const bool have_lifecycle = (acquire_rc == RAC_SUCCESS);
+
+    if (!have_lifecycle && !handle) {
         publish_failure(RAC_ERROR_COMPONENT_NOT_READY, "vlm.cancel",
                         "VLM lifecycle component is not loaded");
         return RAC_ERROR_COMPONENT_NOT_READY;
@@ -552,7 +608,16 @@ rac_result_t rac_vlm_cancel_proto(rac_handle_t handle) {
     cancel->set_user_initiated(true);
     publish_event(requested);
 
-    rac_result_t rc = rac_vlm_cancel(handle);
+    rac_result_t rc;
+    if (have_lifecycle) {
+        if (lifecycle_ref.ops && lifecycle_ref.ops->cancel) {
+            rc = lifecycle_ref.ops->cancel(lifecycle_ref.impl);
+        } else {
+            rc = RAC_SUCCESS;  // No-op if backend doesn't implement cancel
+        }
+    } else {
+        rc = rac_vlm_cancel(handle);
+    }
     runanywhere::v1::SDKEvent completed;
     populate_envelope(&completed, rc == RAC_SUCCESS ? runanywhere::v1::ERROR_SEVERITY_INFO
                                                     : runanywhere::v1::ERROR_SEVERITY_ERROR);
@@ -565,6 +630,7 @@ rac_result_t rac_vlm_cancel_proto(rac_handle_t handle) {
     completed_cancel->set_reason(rc == RAC_SUCCESS ? "cancelled" : rac_error_message(rc));
     completed_cancel->set_user_initiated(true);
     publish_event(completed);
+    if (have_lifecycle) rac::vlm::release_lifecycle_vlm(&lifecycle_ref);
     return rc;
 #endif
 }
