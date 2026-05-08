@@ -12,6 +12,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
@@ -83,14 +84,23 @@ static rac_result_t embeddings_create_internal(const char* model_id, const char*
     }
 
     rac_inference_framework_t framework = RAC_FRAMEWORK_LLAMACPP;
-    const char* model_path = model_id;
+    // Own the resolved path as a std::string so it survives
+    // rac_model_info_free() below. Previously we captured a raw pointer into
+    // model_info->local_path and then freed model_info before
+    // vt->embedding_ops->create() — a use-after-free that fed garbage bytes
+    // into the ONNX embedding provider's vocab.txt resolver on the second+
+    // pipeline create (first call happened to succeed because heap bytes
+    // were still intact).
+    std::string model_path_owned = model_id ? model_id : "";
 
     if (result == RAC_SUCCESS && model_info) {
         framework = model_info->framework;
-        model_path = model_info->local_path ? model_info->local_path : model_id;
+        if (model_info->local_path && model_info->local_path[0] != '\0') {
+            model_path_owned = model_info->local_path;
+        }
         RAC_LOG_INFO(LOG_CAT, "Found model in registry: id=%s, framework=%d, local_path=%s",
                      model_info->id ? model_info->id : "NULL", static_cast<int>(framework),
-                     model_path ? model_path : "NULL");
+                     model_path_owned.c_str());
     } else {
         // Model not in registry — infer framework from file extension
         // so the correct service provider handles it (ONNX for .onnx files).
@@ -130,11 +140,12 @@ static rac_result_t embeddings_create_internal(const char* model_id, const char*
         RAC_LOG_ERROR(LOG_CAT, "rac_plugin_route failed: %d", result);
         return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_FOUND;
     }
-    EMBED_LOGI("Routed to plugin: %s (model_path=%s)", vt->metadata.name, model_path);
+    EMBED_LOGI("Routed to plugin: %s (model_path=%s)", vt->metadata.name,
+               model_path_owned.c_str());
     RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
 
     void* impl = nullptr;
-    result = vt->embedding_ops->create(model_path, config_json, &impl);
+    result = vt->embedding_ops->create(model_path_owned.c_str(), config_json, &impl);
     if (result != RAC_SUCCESS || !impl) {
         EMBED_LOGE("Plugin create failed: result=%d impl=%p", result, impl);
         RAC_LOG_ERROR(LOG_CAT, "Plugin create failed: %d", result);
