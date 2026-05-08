@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <limits>
 #include <map>
 #include <mutex>
@@ -1484,6 +1485,129 @@ static InferenceFramework infer_framework_from_format(ModelFormat format) {
     }
 }
 
+// =============================================================================
+// FILESYSTEM RECONCILIATION (cold-launch discovery)
+// =============================================================================
+// When the SDK process starts, the in-memory registry is empty. Platform SDKs
+// re-seed entries via registerModel(url, ...) which only carry download_url,
+// never local_path. So even though the user's previously downloaded model
+// files still exist under {base_dir}/RunAnywhere/Models/{framework}/{id}/,
+// the default discover path skips every entry with an empty local_path.
+//
+// This helper walks the canonical on-disk layout that rac_model_paths_*
+// defines, and for each registry entry whose local_path is still empty, it
+// checks whether the matching <framework>/<id>/ directory exists and contains
+// at least one recognizable model file. When so, it rewrites local_path onto
+// the entry so the existing discover loop reports it as linked.
+//
+// This mirrors the pre-v2 Swift ModelInfoService.discoverDownloadedModels()
+// behavior behind the shared C ABI so every SDK benefits once.
+
+static bool directory_contains_recognizable_model_file(
+    const std::filesystem::path& dir) {
+    namespace fs = std::filesystem;
+    std::error_code ec;
+    if (!fs::is_directory(dir, ec)) {
+        return false;
+    }
+    // ModelFormat-agnostic recognition: any known model-file extension counts.
+    for (fs::recursive_directory_iterator
+             it(dir, fs::directory_options::skip_permission_denied, ec),
+         end;
+         !ec && it != end; it.increment(ec)) {
+        if (!it->is_regular_file(ec)) {
+            continue;
+        }
+        std::string ext = lowercase_copy(it->path().extension().generic_string());
+        if (!ext.empty() && ext.front() == '.') {
+            ext.erase(ext.begin());
+        }
+        if (ext == "gguf" || ext == "ggml" || ext == "onnx" || ext == "ort" ||
+            ext == "bin" || ext == "mlmodel" || ext == "mlpackage" ||
+            ext == "mlmodelc" || ext == "tflite" || ext == "safetensors") {
+            return true;
+        }
+    }
+    return false;
+}
+
+// Returns the canonical on-disk folder for a model id:
+//   {base_dir}/RunAnywhere/Models/{framework_raw_value}/{model_id}
+// Returns an empty path if base_dir is not configured.
+static std::filesystem::path canonical_model_folder_for(
+    const std::string& model_id, rac_inference_framework_t framework) {
+    namespace fs = std::filesystem;
+    const char* base = rac_model_paths_get_base_dir();
+    if (!base || !*base || model_id.empty()) {
+        return fs::path{};
+    }
+    const char* framework_dir = rac_framework_raw_value(framework);
+    if (!framework_dir || !*framework_dir) {
+        return fs::path{};
+    }
+    return fs::path(base) / "RunAnywhere" / "Models" / framework_dir / model_id;
+}
+
+// Walks the on-disk canonical layout and for every registry entry that
+// currently has an empty local_path but has a matching
+// {base_dir}/RunAnywhere/Models/{framework}/{id}/ folder containing at least
+// one recognizable model file, rewrites local_path back onto the entry. Also
+// normalizes download state flags via overwrite_download_state_from_local_path.
+// Returns the number of entries that were linked.
+static int32_t reconcile_registry_with_filesystem_locked(
+    rac_model_registry_handle_t handle) {
+    if (!handle) {
+        return 0;
+    }
+    const char* base = rac_model_paths_get_base_dir();
+    if (!base || !*base) {
+        return 0;
+    }
+
+    int32_t linked = 0;
+    for (auto& pair : handle->models) {
+        rac_model_info_t* model = pair.second;
+        if (!model || !model->id) {
+            continue;
+        }
+        if (model->local_path && strlen(model->local_path) > 0) {
+            continue;
+        }
+        const std::filesystem::path folder =
+            canonical_model_folder_for(model->id, model->framework);
+        if (folder.empty()) {
+            continue;
+        }
+        if (!directory_contains_recognizable_model_file(folder)) {
+            continue;
+        }
+
+        const std::string folder_str = folder.generic_string();
+
+        // Update legacy struct
+        if (model->local_path) {
+            free(model->local_path);
+        }
+        model->local_path = rac_strdup(folder_str.c_str());
+        model->updated_at = rac_get_current_time_ms() / 1000;
+
+        // Update proto snapshot
+        ModelInfo snapshot = model_snapshot_locked(handle, pair.first, model);
+        snapshot.set_local_path(folder_str);
+        overwrite_download_state_from_local_path(&snapshot);
+        std::string serialized;
+        if (snapshot.SerializeToString(&serialized)) {
+            handle->model_proto_bytes[pair.first] = std::move(serialized);
+        }
+
+        ++linked;
+        RAC_LOG_DEBUG("ModelRegistry",
+                      "Reconciled '%s' with on-disk folder: %s", model->id,
+                      folder_str.c_str());
+    }
+    return linked;
+}
+
 static int64_t imported_size_for_request(const ModelImportRequest& request,
                                          const ModelInfo& model) {
     int64_t total = 0;
@@ -2645,9 +2769,18 @@ rac_result_t rac_model_registry_discover_proto(rac_model_registry_handle_t handl
         return parse_rc;
     }
 
+    int32_t reconciled = 0;
     std::vector<ModelInfo> models;
     {
         std::lock_guard<std::mutex> lock(handle->mutex);
+        // Bridge the in-memory registry with the canonical on-disk layout so
+        // entries re-seeded by registerModel() after an app relaunch can be
+        // linked back to previously downloaded {base_dir}/RunAnywhere/Models/
+        // {framework}/{id}/ folders. Opt-in via link_downloaded (default true
+        // from Swift's defaultDiscoveryRequest).
+        if (request.link_downloaded()) {
+            reconciled = reconcile_registry_with_filesystem_locked(handle);
+        }
         models = collect_model_snapshots_locked(handle);
     }
 
@@ -2676,6 +2809,7 @@ rac_result_t rac_model_registry_discover_proto(rac_model_registry_handle_t handl
         discovered->mutable_model()->CopyFrom(model);
         discovered->set_size_bytes(model.download_size_bytes());
     }
+    (void)reconciled;  // logged via per-entry RAC_LOG_DEBUG above
 
     if (request.purge_invalid()) {
         result.add_warnings(
