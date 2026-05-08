@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <string>
 
 #include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
@@ -79,11 +80,17 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
     }
 
     rac_inference_framework_t framework = RAC_FRAMEWORK_ONNX;
-    const char* model_path = voice_id;
+    // Own the resolved path as a std::string because `rac_model_info_free`
+    // below frees `model_info->local_path` — a raw pointer into it would
+    // dangle. Mirrors the fix in rac_embeddings_service.cpp (commit
+    // 52e4ffc20) and rac_llm_service.cpp:95.
+    std::string model_path_owned = voice_id ? voice_id : "";
 
     if (result == RAC_SUCCESS && model_info) {
         framework = model_info->framework;
-        model_path = model_info->local_path ? model_info->local_path : voice_id;
+        if (model_info->local_path && model_info->local_path[0] != '\0') {
+            model_path_owned = model_info->local_path;
+        }
         RAC_LOG_DEBUG(LOG_CAT, "Found model in registry: id=%s, framework=%d",
                       model_info->id ? model_info->id : "NULL", framework);
     }
@@ -106,7 +113,7 @@ rac_result_t rac_tts_create(const char* voice_id, rac_handle_t* out_handle) {
     RAC_LOG_INFO(LOG_CAT, "Routed to plugin: %s", vt->metadata.name);
 
     void* impl = nullptr;
-    result = vt->tts_ops->create(model_path, /*config_json=*/nullptr, &impl);
+    result = vt->tts_ops->create(model_path_owned.c_str(), /*config_json=*/nullptr, &impl);
     if (result != RAC_SUCCESS || !impl) {
         RAC_LOG_ERROR(LOG_CAT, "Plugin create failed: %d", result);
         return (result != RAC_SUCCESS) ? result : RAC_ERROR_BACKEND_NOT_READY;
