@@ -1533,19 +1533,23 @@ static bool directory_contains_recognizable_model_file(
 
 // Returns the canonical on-disk folder for a model id:
 //   {base_dir}/RunAnywhere/Models/{framework_raw_value}/{model_id}
-// Returns an empty path if base_dir is not configured.
+// Returns an empty path if base_dir is not configured. Delegates to
+// rac_model_paths_get_model_folder (the single authority for path layout)
+// rather than hand-concatenating path components — any future change to the
+// canonical layout only needs to happen in one place.
 static std::filesystem::path canonical_model_folder_for(
     const std::string& model_id, rac_inference_framework_t framework) {
     namespace fs = std::filesystem;
-    const char* base = rac_model_paths_get_base_dir();
-    if (!base || !*base || model_id.empty()) {
+    if (model_id.empty()) {
         return fs::path{};
     }
-    const char* framework_dir = rac_framework_raw_value(framework);
-    if (!framework_dir || !*framework_dir) {
+    char buffer[4096];
+    rac_result_t rc =
+        rac_model_paths_get_model_folder(model_id.c_str(), framework, buffer, sizeof(buffer));
+    if (rc != RAC_SUCCESS) {
         return fs::path{};
     }
-    return fs::path(base) / "RunAnywhere" / "Models" / framework_dir / model_id;
+    return fs::path(buffer);
 }
 
 // Attempt to link a single registry entry to its canonical on-disk folder.

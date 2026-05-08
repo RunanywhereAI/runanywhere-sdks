@@ -1226,10 +1226,15 @@ rac_result_t rac_model_paths_extract_model_id(const char* path, char* out_model_
 
     // Check if next component is a framework name
     bool isFramework = false;
+    // Must stay in sync with rac_framework_raw_value() above. Any framework
+    // returned by rac_framework_raw_value MUST appear here; otherwise paths
+    // under {Models}/{framework}/{id}/ will be parsed as direct
+    // {Models}/{id}/ entries and model-id extraction will collapse to the
+    // framework name (observed previously for Sherpa which was missing here).
     const char* frameworks[] = {
-        "ONNX",   "LlamaCpp", "FoundationModels", "SystemTTS", "FluidAudio", "BuiltIn",
-        "CoreML", "MLX",      "WhisperKitCoreML", "MetalRT",   "Genie",      "None",
-        "Unknown"};
+        "ONNX",       "Sherpa",     "LlamaCpp",         "FoundationModels", "SystemTTS",
+        "FluidAudio", "BuiltIn",    "CoreML",           "WhisperKitCoreML", "MetalRT",
+        "Genie",      "None",       "Unknown"};
     for (const char* fw : frameworks) {
         if (nextComponent == fw) {
             isFramework = true;
@@ -1278,12 +1283,21 @@ rac_result_t rac_model_paths_extract_framework(const char* path,
 
     std::string nextComponent = components[modelsIndex + 1];
 
-    // Map to framework enum
+    // Map to framework enum. Must stay in sync with rac_framework_raw_value()
+    // above. Every raw value it returns must map back here, otherwise the
+    // reverse-lookup loses frameworks (e.g. Sherpa/CoreML were previously
+    // missing and paths under `Models/Sherpa/<id>/` would not round-trip).
     if (nextComponent == "ONNX") {
         *out_framework = RAC_FRAMEWORK_ONNX;
         return RAC_SUCCESS;
+    } else if (nextComponent == "Sherpa") {
+        *out_framework = RAC_FRAMEWORK_SHERPA;
+        return RAC_SUCCESS;
     } else if (nextComponent == "LlamaCpp") {
         *out_framework = RAC_FRAMEWORK_LLAMACPP;
+        return RAC_SUCCESS;
+    } else if (nextComponent == "CoreML") {
+        *out_framework = RAC_FRAMEWORK_COREML;
         return RAC_SUCCESS;
     } else if (nextComponent == "FoundationModels") {
         *out_framework = RAC_FRAMEWORK_FOUNDATION_MODELS;

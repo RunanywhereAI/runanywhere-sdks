@@ -914,9 +914,17 @@ void append_planned_file(rav1::DownloadPlanResult* result,
         destination_from_model_file(model_folder, out_file->file(), url, model_id);
 
     if (requires_extraction) {
+        // Archive downloads stage the raw archive under the shared
+        // `{base}/RunAnywhere/Downloads/` temp dir before extraction. The
+        // framework parameter is IGNORED by rac_download_compute_destination
+        // on the archive branch (it only computes a per-framework path for
+        // direct/non-archive files), so passing RAC_FRAMEWORK_UNKNOWN here is
+        // both correct and self-documenting — the final per-model location is
+        // resolved later via rac_model_paths_get_model_folder() in the
+        // download worker, keyed off the registry entry's framework.
         char computed[4096];
         rac_bool_t ignored = RAC_FALSE;
-        if (rac_download_compute_destination(model_id.c_str(), url.c_str(), RAC_FRAMEWORK_LLAMACPP,
+        if (rac_download_compute_destination(model_id.c_str(), url.c_str(), RAC_FRAMEWORK_UNKNOWN,
                                              RAC_MODEL_FORMAT_UNKNOWN, computed,
                                              sizeof(computed), &ignored) == RAC_SUCCESS) {
             destination = computed;
