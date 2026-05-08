@@ -37,6 +37,7 @@
 #include <direct.h>  // for _mkdir
 #endif
 
+#include "rac/core/rac_core.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_platform_adapter.h"
 #include "rac/foundation/rac_proto_buffer.h"
@@ -263,6 +264,14 @@ struct proto_download_task {
     int64_t last_partial_bytes = 0;
     int64_t last_deleted_bytes = 0;
     int64_t started_at_unix_ms = 0;
+    // Framework + archive structure preserved from the registry at task
+    // creation so the worker can (a) extract into the canonical per-model
+    // folder and (b) resolve the post-extraction nested subdirectory for
+    // archives whose top-level entry is a single directory (sherpa-onnx
+    // Piper TTS, Whisper STT — both ship as `<name>/<files>`).
+    rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
+    rac_archive_structure_t archive_structure = RAC_ARCHIVE_STRUCTURE_UNKNOWN;
+    rac_model_format_t format = RAC_MODEL_FORMAT_UNKNOWN;
 };
 
 struct proto_service_state {
@@ -783,6 +792,12 @@ void run_proto_download_worker(std::shared_ptr<proto_download_task> task, int64_
                               total_expected, static_cast<int32_t>(i), file.storage_key, "", "");
             emit_progress(task);
 
+            // Ensure the per-model folder exists. When `rac_download_start_proto`
+            // resolved `model_folder_path` via `rac_model_paths_get_model_folder`
+            // (archive flow) the folder does not exist yet — libarchive's native
+            // extractor silently degrades if the output directory is missing.
+            mkdir_p(task->model_folder_path.c_str());
+
             rac_extraction_result_t extraction_result{};
             rac_result_t extract_rc = rac_extract_archive_native(file.destination_path.c_str(),
                                                                  task->model_folder_path.c_str(),
@@ -801,7 +816,25 @@ void run_proto_download_worker(std::shared_ptr<proto_download_task> task, int64_
             }
 
             delete_file(file.destination_path.c_str());
-            final_path = task->model_folder_path;
+
+            // Sherpa-ONNX archives (Piper TTS VITS, Whisper STT) ship as
+            // `<name>/<files>` — a single top-level nested directory. When
+            // we extract into `Models/Sherpa/<model_id>/` we therefore end
+            // up with `Models/Sherpa/<model_id>/<nested>/<files>`. Collapse
+            // to the nested path so the backend's `load_model()` sees the
+            // directory that actually contains `model.onnx`/`tokens.txt`/
+            // `espeak-ng-data/`. Mirrors the legacy orchestrator path
+            // (`orchestrate_http_complete` above) which already does this
+            // via the same helper.
+            char resolved_path[4096];
+            rac_result_t find_rc = rac_find_model_path_after_extraction(
+                task->model_folder_path.c_str(), task->archive_structure, task->framework,
+                task->format, resolved_path, sizeof(resolved_path));
+            if (find_rc == RAC_SUCCESS && resolved_path[0] != '\0') {
+                final_path = resolved_path;
+            } else {
+                final_path = task->model_folder_path;
+            }
         } else {
             final_path = file.destination_path;
         }
@@ -1468,9 +1501,58 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes,
                                      ? request.plan().resume_token()
                                      : make_resume_token(task->task_id, model_id));
 
-    fs::path first_dest(task->files.front().destination_path);
-    if (first_dest.has_parent_path()) {
-        task->model_folder_path = first_dest.parent_path().string();
+    // Resolve the canonical per-model folder + archive structure from the
+    // registry. The download plan stages archive-bearing files under the
+    // shared `Downloads/` temp dir (so HTTP completion can write + verify
+    // the raw archive before extraction), which makes `parent_path(first
+    // file)` the shared `Downloads/` dir — NOT the per-model destination.
+    //
+    // Without this lookup, extraction target + reported `local_path`
+    // collapse to `Downloads/` (shared) and the backend later tries to
+    // load e.g. `Downloads/model.onnx` — fine for the first extracted
+    // model (only one nested subdir in `Downloads/`), broken as soon as
+    // two archive models have been extracted (`find_nested_directory`
+    // falls back to the root because it sees multiple subdirs).
+    //
+    // Mirrors the legacy `rac_download_manager_start_orchestrated_download`
+    // path (see `orchestrate_http_complete` below) which already computes
+    // `model_folder_path` via `rac_model_paths_get_model_folder` and then
+    // calls `rac_find_model_path_after_extraction` post-extract.
+    rac_model_info_t* model_registry_info = nullptr;
+    if (rac_get_model(model_id.c_str(), &model_registry_info) == RAC_SUCCESS &&
+        model_registry_info) {
+        task->framework = model_registry_info->framework;
+        task->format = model_registry_info->format;
+        task->archive_structure = model_registry_info->artifact_info.archive_structure;
+        rac_model_info_free(model_registry_info);
+        model_registry_info = nullptr;
+    }
+
+    bool any_archive = false;
+    for (const auto& file : task->files) {
+        if (file.requires_extraction) {
+            any_archive = true;
+            break;
+        }
+    }
+
+    if (any_archive && task->framework != RAC_FRAMEWORK_UNKNOWN) {
+        char model_folder_buf[4096];
+        if (rac_model_paths_get_model_folder(model_id.c_str(), task->framework,
+                                             model_folder_buf, sizeof(model_folder_buf)) ==
+            RAC_SUCCESS) {
+            task->model_folder_path = model_folder_buf;
+        }
+    }
+
+    if (task->model_folder_path.empty()) {
+        // Fallback (non-archive + anything we couldn't resolve above): use
+        // the first file's parent, matching the pre-fix behaviour so single-
+        // file and multi-file (VLM, MiniLM) flows are unchanged.
+        fs::path first_dest(task->files.front().destination_path);
+        if (first_dest.has_parent_path()) {
+            task->model_folder_path = first_dest.parent_path().string();
+        }
     }
     if (task->model_folder_path.empty()) {
         task->model_folder_path = ".";
