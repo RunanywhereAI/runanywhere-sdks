@@ -32,7 +32,11 @@ extension CppBridge {
                 throw SDKException.general(.initializationFailed, "Failed to set base directory")
             }
 
-            logger.debug("Base directory set to: \(baseDir.lastPathComponent)")
+            // Log the full absolute path (not lastPathComponent) so we can verify
+            // the C++ side actually received "/var/mobile/.../Documents" and not
+            // just the literal "Documents" — the latter was the red flag in the
+            // 2nd-launch persistence regression.
+            logger.debug("Base directory set to: \(baseDir.path)")
         }
 
         /// Get the configured base directory

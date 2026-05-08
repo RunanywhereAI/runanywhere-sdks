@@ -1548,6 +1548,57 @@ static std::filesystem::path canonical_model_folder_for(
     return fs::path(base) / "RunAnywhere" / "Models" / framework_dir / model_id;
 }
 
+// Attempt to link a single registry entry to its canonical on-disk folder.
+// Preconditions: caller holds the registry mutex. The entry's local_path must
+// currently be empty. Returns true when a matching folder exists and local_path
+// has been rewritten (legacy struct + proto snapshot). Used by both the
+// per-save fast path (rac_model_registry_save below) and the bulk discovery
+// sweep (reconcile_registry_with_filesystem_locked) so ordering of
+// registerModel() vs rac_model_paths_set_base_dir() no longer matters.
+static bool try_reconcile_model_local_path_locked(
+    rac_model_registry_handle_t handle,
+    const std::string& model_id,
+    rac_model_info_t* model) {
+    if (!handle || !model || !model->id) {
+        return false;
+    }
+    if (model->local_path && strlen(model->local_path) > 0) {
+        return false;
+    }
+    const char* base = rac_model_paths_get_base_dir();
+    if (!base || !*base) {
+        return false;
+    }
+    const std::filesystem::path folder =
+        canonical_model_folder_for(model->id, model->framework);
+    if (folder.empty() || !directory_contains_recognizable_model_file(folder)) {
+        return false;
+    }
+
+    const std::string folder_str = folder.generic_string();
+
+    // Update legacy struct
+    if (model->local_path) {
+        free(model->local_path);
+    }
+    model->local_path = rac_strdup(folder_str.c_str());
+    model->updated_at = rac_get_current_time_ms() / 1000;
+
+    // Update proto snapshot
+    ModelInfo snapshot = model_snapshot_locked(handle, model_id, model);
+    snapshot.set_local_path(folder_str);
+    overwrite_download_state_from_local_path(&snapshot);
+    std::string serialized;
+    if (snapshot.SerializeToString(&serialized)) {
+        handle->model_proto_bytes[model_id] = std::move(serialized);
+    }
+
+    RAC_LOG_DEBUG("ModelRegistry",
+                  "Reconciled '%s' with on-disk folder: %s", model->id,
+                  folder_str.c_str());
+    return true;
+}
+
 // Walks the on-disk canonical layout and for every registry entry that
 // currently has an empty local_path but has a matching
 // {base_dir}/RunAnywhere/Models/{framework}/{id}/ folder containing at least
@@ -1566,44 +1617,9 @@ static int32_t reconcile_registry_with_filesystem_locked(
 
     int32_t linked = 0;
     for (auto& pair : handle->models) {
-        rac_model_info_t* model = pair.second;
-        if (!model || !model->id) {
-            continue;
+        if (try_reconcile_model_local_path_locked(handle, pair.first, pair.second)) {
+            ++linked;
         }
-        if (model->local_path && strlen(model->local_path) > 0) {
-            continue;
-        }
-        const std::filesystem::path folder =
-            canonical_model_folder_for(model->id, model->framework);
-        if (folder.empty()) {
-            continue;
-        }
-        if (!directory_contains_recognizable_model_file(folder)) {
-            continue;
-        }
-
-        const std::string folder_str = folder.generic_string();
-
-        // Update legacy struct
-        if (model->local_path) {
-            free(model->local_path);
-        }
-        model->local_path = rac_strdup(folder_str.c_str());
-        model->updated_at = rac_get_current_time_ms() / 1000;
-
-        // Update proto snapshot
-        ModelInfo snapshot = model_snapshot_locked(handle, pair.first, model);
-        snapshot.set_local_path(folder_str);
-        overwrite_download_state_from_local_path(&snapshot);
-        std::string serialized;
-        if (snapshot.SerializeToString(&serialized)) {
-            handle->model_proto_bytes[pair.first] = std::move(serialized);
-        }
-
-        ++linked;
-        RAC_LOG_DEBUG("ModelRegistry",
-                      "Reconciled '%s' with on-disk folder: %s", model->id,
-                      folder_str.c_str());
     }
     return linked;
 }
@@ -1733,6 +1749,14 @@ rac_result_t rac_model_registry_save(rac_model_registry_handle_t handle,
         if (proto_rc != RAC_SUCCESS) {
             return proto_rc;
         }
+
+        // Self-healing reconcile: if the incoming entry has no local_path but
+        // the canonical {base_dir}/RunAnywhere/Models/{framework}/{id}/ folder
+        // already exists on disk (typical for the 2nd app launch after a
+        // previous download), relink local_path immediately. This removes the
+        // ordering dependency between registerModel() and the one-shot
+        // discoverDownloadedModels() sweep in Phase 2.
+        try_reconcile_model_local_path_locked(handle, model_id, stored->second);
     }
 #endif
 

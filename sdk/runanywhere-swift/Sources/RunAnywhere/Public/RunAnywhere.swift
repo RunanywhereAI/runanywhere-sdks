@@ -280,6 +280,20 @@ public enum RunAnywhere {
                 try KeychainManager.shared.storeSDKParams(params)
             }
 
+            // Step 4.5: Configure the C++ model-paths base directory synchronously.
+            // Must happen BEFORE registerModel() calls (which are issued right after
+            // initialize() returns) so rac_model_registry_save() can reconcile each
+            // entry against its on-disk folder inline. Moving this out of Phase 2
+            // closes the race where the first few registerModel() calls ran before
+            // the one-shot discoverDownloadedModels() sweep (see logs2.txt:99-104).
+            if let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
+                do {
+                    try CppBridge.ModelPaths.setBaseDirectory(documentsURL)
+                } catch {
+                    logger.warning("Failed to set model paths base directory: \(error.localizedDescription)")
+                }
+            }
+
             // Mark Phase 1 complete
             isInitializedFlag = true
 
@@ -411,11 +425,11 @@ public enum RunAnywhere {
         }
         logger.debug("Service bridges initialized")
 
-        // Step 4: Set base directory for C++ model paths
-        if let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
-            try CppBridge.ModelPaths.setBaseDirectory(documentsURL)
-            logger.debug("Model paths base directory set")
-        }
+        // Step 4: Base directory for C++ model paths is now configured
+        // synchronously during Phase 1 (see performCoreInit) so every
+        // registerModel() call that happens right after initialize() returns
+        // can reconcile against on-disk folders inline via
+        // rac_model_registry_save().
 
         // Step 5: Register device via CppBridge (C++ handles all business logic)
         do {
