@@ -2,17 +2,23 @@
 //  CppBridge+StructuredOutput.swift
 //  RunAnywhere SDK
 //
-//  Generated-proto ABI bindings for structured-output helper operations.
+//  Generated-proto ABI bindings for structured-output operations.
+//
+//  All structured-output orchestration (prompt preparation, generation,
+//  thinking-tag stripping, JSON extraction, schema validation) lives in the
+//  commons C++ layer. The Swift façade is a thin proto-byte bridge.
 //
 
 import Foundation
 
 private enum StructuredOutputGeneratedProtoABI {
     static let parseName = "rac_structured_output_parse_proto"
+    static let generateName = "rac_structured_output_generate_proto"
     static let preparePromptName = "rac_structured_output_prepare_prompt_proto"
     static let validateName = "rac_structured_output_validate_proto"
 
     static let parse = NativeProtoABI.load(parseName, as: NativeProtoABI.ProtoRequest.self)
+    static let generate = NativeProtoABI.load(generateName, as: NativeProtoABI.ProtoRequest.self)
     static let preparePrompt = NativeProtoABI.load(preparePromptName, as: NativeProtoABI.ProtoRequest.self)
     static let validate = NativeProtoABI.load(validateName, as: NativeProtoABI.ProtoRequest.self)
 }
@@ -28,13 +34,25 @@ extension CppBridge {
             )
         }
 
+        /// Full structured-output generation: commons handles prompt preparation,
+        /// LLM generation, thinking-tag stripping, JSON extraction, and schema
+        /// validation. Returns the canonical `RAStructuredOutputResult`.
+        static func generate(_ request: RAStructuredOutputRequest) throws -> RAStructuredOutputResult {
+            try NativeProtoABI.invoke(
+                request,
+                symbol: StructuredOutputGeneratedProtoABI.generate,
+                symbolName: StructuredOutputGeneratedProtoABI.generateName,
+                responseType: RAStructuredOutputResult.self
+            )
+        }
+
         static func preparePrompt(
             prompt: String,
             options: RAStructuredOutputOptions,
             requestID: String = UUID().uuidString
         ) throws -> RAStructuredOutputPromptResult {
             try NativeProtoABI.invoke(
-                makePreparePromptRequest(prompt: prompt, options: options, requestID: requestID),
+                makeGenerateRequest(prompt: prompt, options: options, requestID: requestID),
                 symbol: StructuredOutputGeneratedProtoABI.preparePrompt,
                 symbolName: StructuredOutputGeneratedProtoABI.preparePromptName,
                 responseType: RAStructuredOutputPromptResult.self
@@ -68,7 +86,7 @@ extension CppBridge {
             return request
         }
 
-        static func makePreparePromptRequest(
+        static func makeGenerateRequest(
             prompt: String,
             options: RAStructuredOutputOptions,
             requestID: String = UUID().uuidString

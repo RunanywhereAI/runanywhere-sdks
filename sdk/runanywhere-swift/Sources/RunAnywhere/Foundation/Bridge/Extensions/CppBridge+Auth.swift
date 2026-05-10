@@ -35,7 +35,7 @@ extension CppBridge {
                 )
             }
 
-            let deviceId = DeviceIdentity.persistentUUID
+            let deviceId = CppBridge.Device.persistentId
 
             // 1. Build request JSON via C++
             guard let json = buildAuthenticateRequestJSON(

@@ -6,14 +6,20 @@
 //  rac_model_types.h. Business logic (format support, capability checks)
 //  lives in C++.
 //
-//  GAP 01 Phase 2: enums below are typealiases for the IDL-generated
-//  `RAModelSource`, `RAModelFormat`, `RAModelCategory`,
-//  `RAInferenceFramework`, `RAArchiveType`, `RAArchiveStructure`
-//  (idl/model_types.proto). Hand-written case sets were removed; extensions
-//  preserve the public API surface: rawValue-style JSON encoding, display
-//  names, analytics keys, C-bridge converters, and the
-//  `requiresContextLength` / `supportsThinking` semantics previously on
-//  `ModelCategory`.
+//  P3-T2: most of the per-enum switch tables that used to live here have
+//  been replaced by calls into the C ABI exposed via CRACommons:
+//    - `rac_model_format_wire_string`
+//    - `rac_inference_framework_wire_string` / `_display_name` /
+//      `_analytics_key` / `_from_string`
+//    - `rac_model_category_requires_context_length`
+//    - `rac_model_category_supports_thinking`
+//    - `rac_archive_type_extension`
+//    - `rac_archive_type_from_path`
+//
+//  Wire strings now match the proto enum names emitted by swift-protobuf
+//  (e.g. `INFERENCE_FRAMEWORK_LLAMA_CPP`). The accompanying `from_string`
+//  decoder accepts wire strings, analytics keys, and display names
+//  case-insensitively, so legacy Codable inputs continue to round-trip.
 //
 //  Artifact / archive / expected-files helpers (RAModelInfo.make,
 //  resolvedPrimaryModelPath, inferredArtifact, etc.) live in
@@ -34,10 +40,27 @@ public typealias InferenceFramework = RAInferenceFramework
 public typealias ArchiveType = RAArchiveType
 public typealias ArchiveStructure = RAArchiveStructure
 
+// MARK: - Internal helper for wrapping `rac_*_wire_string` style ABIs
+
+/// Calls a C ABI of shape `rac_result_t fn(IN, const char** out)` and returns
+/// the resulting null-terminated string, or `fallback` if the call fails or
+/// returns NULL. Statically-allocated literal — caller must not free.
+@inline(__always)
+private func cWireString(
+    _ fallback: String,
+    _ block: (UnsafeMutablePointer<UnsafePointer<CChar>?>) -> rac_result_t
+) -> String {
+    var ptr: UnsafePointer<CChar>?
+    guard block(&ptr) == RAC_SUCCESS, let raw = ptr else { return fallback }
+    return String(cString: raw)
+}
+
 // MARK: - ModelSource
 //
 // Note: `SwiftProtobuf.Enum` already refines `Sendable`, so no extra
 // `@unchecked Sendable` is required on the typealiased enums.
+//
+// ModelSource has only 3 cases and no C ABI accessor — the tiny switch stays.
 
 extension RAModelSource: Codable {
     public init(from decoder: Swift.Decoder) throws {
@@ -81,47 +104,28 @@ extension RAModelFormat: Codable {
 }
 
 public extension RAModelFormat {
-    /// Canonical lowercase wire string (JSON compat).
+    /// Canonical wire string. Returns the proto enum name
+    /// (e.g. `MODEL_FORMAT_GGUF`) supplied by `rac_model_format_wire_string`.
+    ///
+    /// The proto enum (`RAModelFormat`) is value-aligned with the C++ binary's
+    /// `rac_model_format_t`. We forward `rawValue` directly rather than via
+    /// `ModelTypes+CppBridge.toC()` because the local `rac_model_types.h`
+    /// header in CRACommons/include/ still uses pre-proto numeric ordering.
     var wireString: String {
-        switch self {
-        case .gguf:         return "gguf"
-        case .ggml:         return "ggml"
-        case .onnx:         return "onnx"
-        case .ort:          return "ort"
-        case .bin:          return "bin"
-        case .coreml:       return "coreml"
-        case .mlmodel:      return "mlmodel"
-        case .mlpackage:    return "mlpackage"
-        case .tflite:       return "tflite"
-        case .safetensors:  return "safetensors"
-        case .qnnContext:   return "qnn_context"
-        case .zip:          return "zip"
-        case .folder:       return "folder"
-        case .proprietary:  return "proprietary"
-        case .unknown:      return "unknown"
-        default:            return "unknown"
+        cWireString("MODEL_FORMAT_UNKNOWN") {
+            rac_model_format_wire_string(rac_model_format_t(UInt32(self.rawValue)), $0)
         }
     }
 
+    /// Parse a `RAModelFormat` from a wire string. Matches case-insensitively
+    /// against the proto-name `wireString` emitted by `rac_model_format_wire_string`
+    /// (e.g. `MODEL_FORMAT_GGUF`).
     static func fromWireString(_ s: String) -> RAModelFormat? {
-        switch s.lowercased() {
-        case "gguf":                return .gguf
-        case "ggml":                return .ggml
-        case "onnx":                return .onnx
-        case "ort":                 return .ort
-        case "bin":                 return .bin
-        case "coreml":              return .coreml
-        case "mlmodel":             return .mlmodel
-        case "mlpackage":           return .mlpackage
-        case "tflite":              return .tflite
-        case "safetensors":         return .safetensors
-        case "qnn_context":         return .qnnContext
-        case "zip":                 return .zip
-        case "folder":              return .folder
-        case "proprietary":         return .proprietary
-        case "", "unknown":         return .unknown
-        default:                    return nil
+        let lowered = s.lowercased()
+        for f in RAModelFormat.allCases where f.wireString.lowercased() == lowered {
+            return f
         }
+        return nil
     }
 }
 
@@ -140,7 +144,8 @@ extension RAModelCategory: Codable {
 }
 
 public extension RAModelCategory {
-    /// Canonical kebab-case wire string (JSON compat).
+    /// Canonical kebab-case wire string (JSON compat). No C ABI exists for
+    /// `RAModelCategory.wireString` — kept as a small Swift table.
     var wireString: String {
         switch self {
         case .language:                 return "language"
@@ -172,28 +177,15 @@ public extension RAModelCategory {
     }
 
     /// Whether this category typically requires a context length.
-    /// Used by `RAModelInfo.make(...)` default computation. Mirrors
-    /// `rac_model_category_requires_context_length()` on the C side.
+    /// Delegates to `rac_model_category_requires_context_length`.
     var requiresContextLength: Bool {
-        switch self {
-        case .language, .multimodal:
-            return true
-        default:
-            return false
-        }
+        rac_model_category_requires_context_length(self.toC()) == RAC_TRUE
     }
 
     /// Whether this category typically supports thinking/reasoning.
-    /// Used by `RAModelInfo.make(...)` to gate the per-model
-    /// `supportsThinking` field. Mirrors
-    /// `rac_model_category_supports_thinking()` on the C side.
+    /// Delegates to `rac_model_category_supports_thinking`.
     var supportsThinking: Bool {
-        switch self {
-        case .language, .multimodal:
-            return true
-        default:
-            return false
-        }
+        rac_model_category_supports_thinking(self.toC()) == RAC_TRUE
     }
 }
 
@@ -216,98 +208,33 @@ extension RAInferenceFramework: Codable {
 }
 
 public extension RAInferenceFramework {
-    /// Canonical PascalCase wire string matching the original Swift raw values
-    /// used in existing JSON payloads.
+    /// Canonical wire string. Returns the proto enum name
+    /// (e.g. `INFERENCE_FRAMEWORK_LLAMA_CPP`) supplied by
+    /// `rac_inference_framework_wire_string`.
     var wireString: String {
-        switch self {
-        case .onnx:                return "ONNX"
-        case .sherpa:              return "Sherpa"
-        case .llamaCpp:            return "LlamaCpp"
-        case .foundationModels:    return "FoundationModels"
-        case .systemTts:           return "SystemTTS"
-        case .fluidAudio:          return "FluidAudio"
-        case .coreml:              return "CoreML"
-        case .mlx:                 return "MLX"
-        case .whisperkitCoreml:    return "WhisperKitCoreML"
-        case .metalrt:             return "MetalRT"
-        case .genie:               return "Genie"
-        case .tflite:              return "TFLite"
-        case .executorch:          return "ExecuTorch"
-        case .mediapipe:           return "MediaPipe"
-        case .mlc:                 return "MLC"
-        case .picoLlm:             return "PicoLLM"
-        case .piperTts:            return "PiperTTS"
-        case .whisperkit:          return "WhisperKit"
-        case .openaiWhisper:       return "OpenAIWhisper"
-        case .swiftTransformers:   return "SwiftTransformers"
-        case .builtIn:             return "BuiltIn"
-        case .none:                return "None"
-        case .unknown:             return "Unknown"
-        default:                   return "Unknown"
+        cWireString("INFERENCE_FRAMEWORK_UNKNOWN") {
+            rac_inference_framework_wire_string(self.toCFramework(), $0)
         }
     }
 
-    /// Human-readable display name.
+    /// Human-readable display name from `rac_inference_framework_display_name`.
     var displayName: String {
-        switch self {
-        case .onnx:                return "ONNX Runtime"
-        case .sherpa:              return "Sherpa-ONNX"
-        case .llamaCpp:            return "llama.cpp"
-        case .foundationModels:    return "Foundation Models"
-        case .systemTts:           return "System TTS"
-        case .fluidAudio:          return "FluidAudio"
-        case .coreml:              return "Core ML"
-        case .mlx:                 return "MLX"
-        case .whisperkitCoreml:    return "WhisperKit CoreML"
-        case .metalrt:             return "MetalRT"
-        case .genie:               return "Genie"
-        case .tflite:              return "TFLite"
-        case .executorch:          return "ExecuTorch"
-        case .mediapipe:           return "MediaPipe"
-        case .mlc:                 return "MLC"
-        case .picoLlm:             return "PicoLLM"
-        case .piperTts:            return "Piper TTS"
-        case .whisperkit:          return "WhisperKit"
-        case .openaiWhisper:       return "OpenAI Whisper"
-        case .swiftTransformers:   return "Swift Transformers"
-        case .builtIn:             return "Built-in"
-        case .none:                return "None"
-        case .unknown:             return "Unknown"
-        default:                   return "Unknown"
+        cWireString("Unknown") {
+            rac_inference_framework_display_name(self.toCFramework(), $0)
         }
     }
 
-    /// Snake_case key for analytics/telemetry.
+    /// Snake_case key for analytics/telemetry from
+    /// `rac_inference_framework_analytics_key`.
     var analyticsKey: String {
-        switch self {
-        case .onnx:                return "onnx"
-        case .sherpa:              return "sherpa"
-        case .llamaCpp:            return "llama_cpp"
-        case .foundationModels:    return "foundation_models"
-        case .systemTts:           return "system_tts"
-        case .fluidAudio:          return "fluid_audio"
-        case .coreml:              return "coreml"
-        case .mlx:                 return "mlx"
-        case .whisperkitCoreml:    return "whisperkit_coreml"
-        case .metalrt:             return "metalrt"
-        case .genie:               return "genie"
-        case .tflite:              return "tflite"
-        case .executorch:          return "executorch"
-        case .mediapipe:           return "mediapipe"
-        case .mlc:                 return "mlc"
-        case .picoLlm:             return "pico_llm"
-        case .piperTts:            return "piper_tts"
-        case .whisperkit:          return "whisperkit"
-        case .openaiWhisper:       return "openai_whisper"
-        case .swiftTransformers:   return "swift_transformers"
-        case .builtIn:             return "built_in"
-        case .none:                return "none"
-        case .unknown:             return "unknown"
-        default:                   return "unknown"
+        cWireString("unknown") {
+            rac_inference_framework_analytics_key(self.toCFramework(), $0)
         }
     }
 
     /// Convert Swift InferenceFramework to C rac_inference_framework_t.
+    /// Required because the Swift enum (proto-aligned values) and the C
+    /// enum (legacy ordering) are NOT raw-value compatible.
     func toCFramework() -> rac_inference_framework_t {
         switch self {
         case .onnx:                return RAC_FRAMEWORK_ONNX
@@ -348,18 +275,12 @@ public extension RAInferenceFramework {
     }
 
     /// Initialize from a string matching case-insensitively against wire names,
-    /// display names, and analytics keys.
+    /// display names, and analytics keys. Delegates to
+    /// `rac_inference_framework_from_string`.
     init?(caseInsensitive string: String) {
-        let lowered = string.lowercased()
-        for c in RAInferenceFramework.knownCases {
-            if c.wireString.lowercased() == lowered
-                || c.analyticsKey == lowered
-                || c.displayName.lowercased() == lowered {
-                self = c
-                return
-            }
-        }
-        return nil
+        var c: rac_inference_framework_t = RAC_FRAMEWORK_UNKNOWN
+        guard rac_inference_framework_from_string(string, &c) == RAC_SUCCESS else { return nil }
+        self = RAInferenceFramework.fromCFramework(c)
     }
 
     /// All known concrete cases (excludes `.UNRECOGNIZED` and `.unspecified`).
@@ -434,28 +355,22 @@ extension RAArchiveType: Codable {
 }
 
 public extension RAArchiveType {
-    /// File extension used in URLs (preserved from hand-written enum raw values).
+    /// File extension used in URLs, sourced from
+    /// `rac_archive_type_extension` (e.g. "zip", "tar.bz2").
     var fileExtension: String {
-        switch self {
-        case .zip:     return "zip"
-        case .tarBz2:  return "tar.bz2"
-        case .tarGz:   return "tar.gz"
-        case .tarXz:   return "tar.xz"
-        default:       return ""
-        }
+        guard let raw = rac_archive_type_extension(self.toC()) else { return "" }
+        return String(cString: raw)
     }
 
     /// Short uppercase form used in UI labels (e.g. "ZIP", "TAR.BZ2").
     var displayName: String { fileExtension.uppercased() }
 
-    /// Detect archive type from URL suffix.
+    /// Detect archive type from URL suffix via `rac_archive_type_from_path`.
     static func from(url: URL) -> RAArchiveType? {
-        let path = url.path.lowercased()
-        if path.hasSuffix(".tar.bz2") || path.hasSuffix(".tbz2") { return .tarBz2 }
-        if path.hasSuffix(".tar.gz")  || path.hasSuffix(".tgz")  { return .tarGz }
-        if path.hasSuffix(".tar.xz")  || path.hasSuffix(".txz")  { return .tarXz }
-        if path.hasSuffix(".zip")                                 { return .zip }
-        return nil
+        var c: rac_archive_type_t = RAC_ARCHIVE_TYPE_NONE
+        guard rac_archive_type_from_path(url.path, &c) == RAC_TRUE,
+              let resolved = RAArchiveType(from: c) else { return nil }
+        return resolved
     }
 }
 

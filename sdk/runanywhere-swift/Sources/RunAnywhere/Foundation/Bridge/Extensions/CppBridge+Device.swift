@@ -8,6 +8,7 @@
 
 import CRACommons
 import Foundation
+import os
 
 // MARK: - Device Bridge
 
@@ -20,6 +21,59 @@ extension CppBridge {
         // MARK: - Callback Storage (must persist for C++ to call)
 
         private static var callbacksRegistered = false
+
+        // MARK: - Persistent Device ID Cache
+
+        /// In-process cache of the persistent device id resolved by commons.
+        /// Commons also caches internally — this Swift cache avoids paying
+        /// the C ABI round-trip on hot paths (telemetry, auth, device-info).
+        /// Per CLAUDE.md, NSLock is forbidden — `OSAllocatedUnfairLock` only.
+        private static let cachedPersistentId =
+            OSAllocatedUnfairLock<String?>(initialState: nil)
+
+        /// Persistent device identifier (Keychain-backed, survives reinstalls).
+        ///
+        /// Walks the canonical chain inside commons:
+        ///   1. secure_get("device_id")
+        ///   2. get_vendor_id callback (UIDevice.identifierForVendor on iOS)
+        ///   3. freshly synthesized RFC-4122 v4 UUID (then persisted)
+        ///
+        /// On the rare resolver failure (e.g. before the platform adapter is
+        /// registered) we synthesize a one-shot UUID locally so callers always
+        /// receive a stable, non-empty string for the SDK lifetime.
+        public static var persistentId: String {
+            if let cached = cachedPersistentId.withLock({ $0 }) {
+                return cached
+            }
+
+            let resolved = resolvePersistentId()
+
+            return cachedPersistentId.withLock { current in
+                if let existing = current { return existing }
+                current = resolved
+                return resolved
+            }
+        }
+
+        private static func resolvePersistentId() -> String {
+            let bufferSize = Int(RAC_DEVICE_ID_BUFFER_MIN_SIZE)
+            var buffer = [CChar](repeating: 0, count: bufferSize)
+            let result = buffer.withUnsafeMutableBufferPointer { ptr -> rac_result_t in
+                guard let base = ptr.baseAddress else { return RAC_ERROR_NULL_POINTER }
+                return rac_device_get_or_create_persistent_id(base, bufferSize)
+            }
+
+            if result == RAC_SUCCESS {
+                return String(cString: buffer)
+            }
+
+            // Fallback: commons resolver unavailable (e.g. platform adapter
+            // not yet registered). Synthesize a UUID so callers never see an
+            // empty string. This is non-persistent for this run only.
+            let logger = SDKLogger(category: "CppBridge.Device")
+            logger.warning("rac_device_get_or_create_persistent_id failed (result=\(result)); using transient UUID")
+            return UUID().uuidString
+        }
 
         // MARK: - Public API
 
@@ -36,7 +90,7 @@ extension CppBridge {
                 guard let outInfo = outInfo else { return }
 
                 let deviceInfo = DeviceInfo.current
-                let deviceId = DeviceIdentity.persistentUUID
+                let deviceId = CppBridge.Device.persistentId
 
                 // Fill out the device info struct
                 // Note: C strings are managed by Swift and remain valid during callback
@@ -68,7 +122,7 @@ extension CppBridge {
 
             // Get device ID callback
             callbacks.get_device_id = { _ in
-                let deviceId = DeviceIdentity.persistentUUID
+                let deviceId = CppBridge.Device.persistentId
                 return (deviceId as NSString).utf8String
             }
 

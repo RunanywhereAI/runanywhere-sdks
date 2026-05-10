@@ -17,6 +17,7 @@
 #include <stdint.h>
 
 #include "rac_error.h"
+#include "rac_proto_buffer.h"
 #include "rac_types.h"
 #include "rac_model_types.h"
 
@@ -407,24 +408,21 @@ typedef rac_bool_t (*rac_is_directory_fn)(const char* path, void* user_data);
 typedef rac_bool_t (*rac_path_exists_discovery_fn)(const char* path, void* user_data);
 
 /**
- * @brief Callback to check if file has model extension
- * @param path File path
- * @param framework Expected framework
- * @param user_data User context
- * @return RAC_TRUE if valid model file
- */
-typedef rac_bool_t (*rac_is_model_file_fn)(const char* path, rac_inference_framework_t framework,
-                                           void* user_data);
-
-/**
- * @brief Callbacks for model discovery file operations
+ * @brief Callbacks for model discovery file operations.
+ *
+ * NOTE: The `is_model_file` callback that previously sat between
+ * `path_exists` and `user_data` was removed when the canonical commons
+ * helper `rac_model_format_for_framework()` (declared in
+ * rac_model_types.h) became the single source of truth for "is this file
+ * a model file for this framework?". SDK bridges no longer wire that
+ * callback — commons consults `rac_model_format_for_framework()` directly
+ * using the file extension parsed from the path.
  */
 typedef struct {
     rac_list_directory_fn list_directory;
     rac_free_directory_entries_fn free_entries;
     rac_is_directory_fn is_directory;
     rac_path_exists_discovery_fn path_exists;
-    rac_is_model_file_fn is_model_file;
     void* user_data;
 } rac_discovery_callbacks_t;
 
@@ -523,6 +521,31 @@ typedef struct {
  */
 RAC_API rac_result_t rac_model_registry_refresh(rac_model_registry_handle_t handle,
                                                 rac_model_registry_refresh_opts_t opts);
+
+// =============================================================================
+// REGISTER MODEL FROM URL (P2-T6) — single-call URL+name+framework → save
+// =============================================================================
+
+/**
+ * @brief Build a fully-populated ModelInfo from a URL+name+framework tuple and
+ *        persist it to the global model registry.
+ *
+ * Consumes serialized `runanywhere.v1.RegisterModelFromUrlRequest` bytes and
+ * returns serialized `runanywhere.v1.ModelInfo` bytes (the saved entry) in
+ * out_proto. Internally composes `rac_model_info_make_proto` (field defaults,
+ * id/name/framework/category/source/format/artifact inference) with the
+ * registry persistence path used by every other SDK adapter.
+ *
+ * @param in_request_bytes Serialized RegisterModelFromUrlRequest bytes (may be
+ *                         empty — treated as a default-zeroed request).
+ * @param in_size          Byte count.
+ * @param out_proto        Receives serialized ModelInfo bytes on success or an
+ *                         error status on failure.
+ * @return RAC_SUCCESS on success, or a negative rac_result_t on failure.
+ */
+RAC_API rac_result_t rac_register_model_from_url_proto(const uint8_t* in_request_bytes,
+                                                       size_t in_size,
+                                                       rac_proto_buffer_t* out_proto);
 
 #ifdef __cplusplus
 }

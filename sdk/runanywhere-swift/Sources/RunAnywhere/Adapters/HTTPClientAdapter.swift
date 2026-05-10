@@ -2,9 +2,14 @@
 //  HTTPClientAdapter.swift
 //  RunAnywhere SDK
 //
-//  Swift-side actor wrapping the canonical `rac_http_client_*` C ABI
-//  (curl-backed, shared across all SDKs). All platform SDKs now route
-//  HTTP transport through this single C implementation.
+//  P3-T4 (Swift simplification, see
+//  `gaps/gaps/simplification/swift-services-duplication.md` §2).
+//
+//  Thin Swift bridge over the canonical `rac_http_client_*` C ABI.
+//  All cross-platform HTTP policy lives in commons:
+//    - `rac_http_default_headers`         → canonical SDK header list
+//    - `rac_http_request_set_upsert_mode` → Supabase upsert semantics
+//    - `rac_api_error_from_response`      → HTTP-status → SDKException
 //
 
 import CRACommons
@@ -13,25 +18,21 @@ import Foundation
 /// HTTPClientAdapter — thin Swift bridge over `rac_http_client_*`.
 public actor HTTPClientAdapter: NetworkService {
 
-    // MARK: - Singleton
-
     public static let shared = HTTPClientAdapter()
-
-    // MARK: - State
 
     private var baseURL: URL?
     private var apiKey: String?
     private let logger = SDKLogger(category: "HTTPClientAdapter")
 
-    /// Serial queue used to run the blocking curl request off the
-    /// Swift concurrency pool.
+    /// Concurrent queue used to run the blocking `rac_http_client_*`
+    /// request off the Swift concurrency pool.
     private static let executionQueue = DispatchQueue(
         label: "com.runanywhere.sdk.httpclient.adapter",
         qos: .userInitiated,
         attributes: .concurrent
     )
 
-    // MARK: - Init
+    private static let defaultTimeoutMs: Int32 = 30_000
 
     private init() {}
 
@@ -46,7 +47,6 @@ public actor HTTPClientAdapter: NetworkService {
             logger.info("HTTP adapter not configured: no usable external config")
             return
         }
-
         self.baseURL = baseURL
         self.apiKey = trimmedAPIKey
         logger.info("HTTP adapter configured with base URL: \(baseURL.host ?? "unknown")")
@@ -63,9 +63,6 @@ public actor HTTPClientAdapter: NetworkService {
     }
 
     public var isConfigured: Bool { baseURL != nil }
-
-    public var currentBaseURL: URL? { baseURL }
-
     public var hasUsableConfiguration: Bool {
         guard let baseURL else { return false }
         return CppBridge.DevConfig.isUsableHTTPURL(baseURL.absoluteString) &&
@@ -74,38 +71,15 @@ public actor HTTPClientAdapter: NetworkService {
 
     // MARK: - NetworkService Protocol
 
-    public func postRaw(
-        _ path: String,
-        _ payload: Data,
-        requiresAuth: Bool
-    ) async throws -> Data {
-        // Supabase device registration uses UPSERT semantics — both
-        // the `on_conflict` query param and the merge-duplicates
-        // Prefer header are required.
-        if path.contains(RAC_ENDPOINT_DEV_DEVICE_REGISTER) {
-            let upsertPath = path.contains("?")
-                ? "\(path)&on_conflict=device_id"
-                : "\(path)?on_conflict=device_id"
-            return try await execute(
-                method: "POST",
-                path: upsertPath,
-                body: payload,
-                requiresAuth: requiresAuth,
-                additionalHeaders: ["Prefer": "resolution=merge-duplicates"]
-            )
-        }
-        return try await execute(method: "POST", path: path, body: payload, requiresAuth: requiresAuth)
+    public func postRaw(_ path: String, _ payload: Data, requiresAuth: Bool) async throws -> Data {
+        try await execute(method: "POST", path: path, body: payload, requiresAuth: requiresAuth)
     }
 
-    public func getRaw(
-        _ path: String,
-        requiresAuth: Bool
-    ) async throws -> Data {
+    public func getRaw(_ path: String, requiresAuth: Bool) async throws -> Data {
         try await execute(method: "GET", path: path, body: nil, requiresAuth: requiresAuth)
     }
 
-    // MARK: - Convenience Methods
-
+    /// Raw-JSON-string post. Used by telemetry and auth.
     public func post(_ path: String, json: String, requiresAuth: Bool = false) async throws -> Data {
         guard let data = json.data(using: .utf8) else {
             throw SDKException(code: .validationFailed, message: "Invalid JSON string", category: .internal)
@@ -113,35 +87,20 @@ public actor HTTPClientAdapter: NetworkService {
         return try await postRaw(path, data, requiresAuth: requiresAuth)
     }
 
-    public func post<T: Encodable>(_ path: String, payload: T, requiresAuth: Bool = true) async throws -> Data {
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(payload)
-        return try await postRaw(path, data, requiresAuth: requiresAuth)
-    }
-
-    public func delete(_ path: String, requiresAuth: Bool = true) async throws -> Data {
-        try await execute(method: "DELETE", path: path, body: nil, requiresAuth: requiresAuth)
-    }
-
-    public func put(_ path: String, _ payload: Data, requiresAuth: Bool = true) async throws -> Data {
-        try await execute(method: "PUT", path: path, body: payload, requiresAuth: requiresAuth)
-    }
-
     // MARK: - One-shot URL fetch
 
-    /// Fetch an absolute URL without requiring adapter configuration
-    /// or auth. Intended for ancillary asset fetches (e.g. tokenizer
-    /// blobs) that live outside the SDK's configured base URL.
+    /// Fetch an absolute URL without requiring adapter configuration or auth.
+    /// Intended for ancillary asset fetches (e.g. tokenizer blobs) that live
+    /// outside the SDK's configured base URL.
     public static func fetchURL(_ url: URL, timeoutMs: Int32 = 30_000) async throws -> Data {
-        let fetchLogger = SDKLogger(category: "HTTPClientAdapter.fetchURL")
-        return try await perform(
+        try await dispatch(
             method: "GET",
             urlString: url.absoluteString,
-            headers: defaultHeaders,
+            apiKey: nil,
+            authToken: nil,
+            upsertField: nil,
             body: nil,
-            logger: fetchLogger,
-            isDeviceRegistration: false
+            logger: SDKLogger(category: "HTTPClientAdapter.fetchURL")
         )
     }
 
@@ -151,48 +110,31 @@ public actor HTTPClientAdapter: NetworkService {
         method: String,
         path: String,
         body: Data?,
-        requiresAuth: Bool,
-        additionalHeaders: [String: String] = [:]
+        requiresAuth: Bool
     ) async throws -> Data {
         guard let baseURL = baseURL else {
             throw SDKException(code: .serviceNotAvailable, message: "HTTP adapter not configured", category: .network)
         }
-
-        let url = buildURL(base: baseURL, path: path)
-        var headers = Self.defaultHeaders
-        if let apiKey = apiKey {
-            headers["apikey"] = apiKey
-            // Supabase PostgREST default behaviour — include the
-            // inserted/updated row in the response body.
-            headers["Prefer"] = "return=representation"
-        }
+        let urlString = Self.buildURL(base: baseURL, path: path).absoluteString
         let token = try await resolveToken(requiresAuth: requiresAuth)
-        if !token.isEmpty {
-            headers["Authorization"] = "Bearer \(token)"
-        }
-        for (key, value) in additionalHeaders {
-            headers[key] = value
-        }
-
-        let urlString = url.absoluteString
-        let isDeviceRegistration = urlString.contains(RAC_ENDPOINT_DEV_DEVICE_REGISTER)
-
-        let logger = self.logger
-        return try await Self.perform(
+        // Supabase device registration uses UPSERT semantics — defer the URL
+        // / header rewrite to commons via `rac_http_request_set_upsert_mode`.
+        let upsertField: String? = path.contains(RAC_ENDPOINT_DEV_DEVICE_REGISTER) ? "device_id" : nil
+        return try await Self.dispatch(
             method: method,
             urlString: urlString,
-            headers: headers,
+            apiKey: apiKey,
+            authToken: token.isEmpty ? nil : token,
+            upsertField: upsertField,
             body: body,
-            logger: logger,
-            isDeviceRegistration: isDeviceRegistration
+            logger: logger
         )
     }
 
     private func resolveToken(requiresAuth: Bool) async throws -> String {
         if !requiresAuth { return apiKey ?? "" }
-
-        // `rac_auth_get_valid_token` encodes the "valid → return /
-        // expired → signal refresh" handshake in one call.
+        // `rac_auth_get_valid_token` encodes the "valid → return / expired
+        // → signal refresh" handshake in one call.
         var tokenPtr: UnsafePointer<CChar>?
         var needsRefresh = false
         var status = rac_auth_get_valid_token(&tokenPtr, &needsRefresh)
@@ -200,271 +142,197 @@ public actor HTTPClientAdapter: NetworkService {
             try await CppBridge.Auth.refreshToken()
             status = rac_auth_get_valid_token(&tokenPtr, &needsRefresh)
         }
-        if status == 0, let ptr = tokenPtr {
-            return String(cString: ptr)
-        }
-        // Fall back to API-key-only auth (production mode).
+        if status == 0, let ptr = tokenPtr { return String(cString: ptr) }
         if let key = apiKey, !key.isEmpty { return key }
         throw SDKException(code: .authenticationFailed, message: "No valid authentication token", category: .auth)
     }
 
-    private func buildURL(base: URL, path: String) -> URL {
+    /// Join `base` + `path`, preserving any query string on `path`. Returns
+    /// `path` as-is when it is already absolute.
+    private static func buildURL(base: URL, path: String) -> URL {
         if path.hasPrefix("http://") || path.hasPrefix("https://") {
             return URL(string: path) ?? base.appendingPathComponent(path)
         }
-
-        if path.contains("?") {
-            let components = path.split(separator: "?", maxSplits: 1)
-            let pathPart = String(components[0])
-            let queryPart = String(components[1])
-
-            guard var urlComponents = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
-                return base.appendingPathComponent(path)
-            }
-            urlComponents.path += pathPart
-            urlComponents.query = queryPart
-            return urlComponents.url ?? base.appendingPathComponent(path)
+        guard var components = URLComponents(url: base, resolvingAgainstBaseURL: true) else {
+            return base.appendingPathComponent(path)
         }
-
-        return base.appendingPathComponent(path)
+        if let qIdx = path.firstIndex(of: "?") {
+            components.path += String(path[..<qIdx])
+            components.query = String(path[path.index(after: qIdx)...])
+        } else {
+            components.path += path
+        }
+        return components.url ?? base.appendingPathComponent(path)
     }
 
-    // MARK: - Static helpers
+    // MARK: - C ABI marshalling (URLSession-flavoured continuation)
 
-    private static var defaultHeaders: [String: String] {
-        [
-            "Content-Type": "application/json",
-            "Accept": "application/json",
-            "X-SDK-Client": "RunAnywhereSDK",
-            "X-SDK-Version": SDKConstants.version,
-            "X-Platform": SDKConstants.platform
-        ]
-    }
-
-    /// Default request timeout: 30s.
-    private static let defaultTimeoutMs: Int32 = 30_000
-
-    /// Run the blocking curl call on a background queue and surface
-    /// the result as a Swift async value.
-    private static func perform(
+    /// Runs a single `rac_http_request_send` off the cooperative pool and
+    /// maps the result back to `Data` / `SDKException`.
+    private static func dispatch(
         method: String,
         urlString: String,
-        headers: [String: String],
+        apiKey: String?,
+        authToken: String?,
+        upsertField: String?,
         body: Data?,
-        logger: SDKLogger,
-        isDeviceRegistration: Bool
+        logger: SDKLogger
     ) async throws -> Data {
         try await withCheckedThrowingContinuation { continuation in
             executionQueue.async {
-                do {
-                    let data = try syncPerform(
+                continuation.resume(with: Result {
+                    try syncDispatch(
                         method: method,
                         urlString: urlString,
-                        headers: headers,
+                        apiKey: apiKey,
+                        authToken: authToken,
+                        upsertField: upsertField,
                         body: body,
-                        logger: logger,
-                        isDeviceRegistration: isDeviceRegistration
+                        logger: logger
                     )
-                    continuation.resume(returning: data)
-                } catch {
-                    continuation.resume(throwing: error)
-                }
+                })
             }
         }
     }
 
-    private static func syncPerform(
+    private static func syncDispatch(
         method: String,
         urlString: String,
-        headers: [String: String],
+        apiKey: String?,
+        authToken: String?,
+        upsertField: String?,
         body: Data?,
-        logger: SDKLogger,
-        isDeviceRegistration: Bool
+        logger: SDKLogger
     ) throws -> Data {
-        // Build client (one libcurl easy handle per request — simple,
-        // thread-safe, no pool contention).
         var clientHandle: OpaquePointer?
-        let createResult = rac_http_client_create(&clientHandle)
-        guard createResult == RAC_SUCCESS, let client = clientHandle else {
-            throw SDKException(code: .networkError, message: "Failed to create HTTP client (rc=\(createResult))", category: .network)
+        guard rac_http_client_create(&clientHandle) == RAC_SUCCESS, let client = clientHandle else {
+            throw SDKException(code: .networkError, message: "Failed to create HTTP client", category: .network)
         }
         defer { rac_http_client_destroy(client) }
 
-        // Keep C-string backing storage alive for the duration of the
-        // call. libcurl does copy into its slist internally but the
-        // request struct carries raw `const char*` pointers.
-        let methodCString = strdup(method)
-        let urlCString = strdup(urlString)
-        defer {
-            free(methodCString)
-            free(urlCString)
+        // Build header set: commons canonical list + per-request overlays.
+        var headers: [String: String] = [:]
+        var defaultKVs: UnsafePointer<rac_http_header_kv_t>?
+        var defaultCount: Int = 0
+        if rac_http_default_headers(&defaultKVs, &defaultCount) == RAC_SUCCESS, let kvs = defaultKVs {
+            for index in 0..<defaultCount {
+                if let name = kvs[index].name, let value = kvs[index].value {
+                    headers[String(cString: name)] = String(cString: value)
+                }
+            }
         }
-        guard let methodCString = methodCString, let urlCString = urlCString else {
+        headers["X-Platform"] = SDKConstants.platform
+        if let apiKey {
+            headers["apikey"] = apiKey
+            // Supabase PostgREST: include the inserted/updated row in body.
+            headers["Prefer"] = "return=representation"
+        }
+        if let authToken {
+            headers["Authorization"] = "Bearer \(authToken)"
+        }
+
+        // C-string backing storage for the duration of the request.
+        guard let methodC = strdup(method), let urlC = strdup(urlString) else {
             throw SDKException(code: .networkError, message: "Out of memory building HTTP request", category: .network)
         }
+        defer { free(methodC); free(urlC) }
 
-        let headerPairs: [(UnsafeMutablePointer<CChar>, UnsafeMutablePointer<CChar>)] =
-            headers.compactMap { name, value in
-                guard let n = strdup(name), let v = strdup(value) else { return nil }
-                return (n, v)
-            }
-        defer {
-            for (n, v) in headerPairs {
-                free(n)
-                free(v)
-            }
+        let pairs = headers.compactMap { name, value -> (UnsafeMutablePointer<CChar>, UnsafeMutablePointer<CChar>)? in
+            guard let nameC = strdup(name), let valueC = strdup(value) else { return nil }
+            return (nameC, valueC)
         }
+        defer { pairs.forEach { free($0.0); free($0.1) } }
+        let kvs = pairs.map { rac_http_header_kv_t(name: UnsafePointer($0.0), value: UnsafePointer($0.1)) }
 
-        let headerKVs: [rac_http_header_kv_t] = headerPairs.map { name, value in
-            rac_http_header_kv_t(name: UnsafePointer(name), value: UnsafePointer(value))
-        }
-
-        var responseData: Data = Data()
-        var responseStatus: Int32 = 0
-
-        let sendResult: rac_result_t
-        if let body = body, !body.isEmpty {
-            (sendResult, responseStatus, responseData) = body.withUnsafeBytes { bodyPtr -> (rac_result_t, Int32, Data) in
-                sendWithHeaders(
-                    client: client,
-                    methodC: methodCString,
-                    urlC: urlCString,
-                    headerKVs: headerKVs,
-                    bodyBase: bodyPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
-                    bodyLen: body.count
-                )
-            }
-        } else {
-            (sendResult, responseStatus, responseData) = sendWithHeaders(
+        let (rc, status, data): (rac_result_t, Int32, Data) = kvs.withUnsafeBufferPointer { kvBuf in
+            send(
                 client: client,
-                methodC: methodCString,
-                urlC: urlCString,
-                headerKVs: headerKVs,
-                bodyBase: nil,
-                bodyLen: 0
+                methodC: methodC,
+                urlC: urlC,
+                headerKVs: kvBuf,
+                body: body,
+                upsertField: upsertField
             )
         }
 
-        guard sendResult == RAC_SUCCESS else {
-            let message = transportErrorMessage(result: sendResult)
-            logger.error("HTTP transport failure (rc=\(sendResult)) for \(method) \(urlString)")
-            throw networkError(forResult: sendResult, message: message)
+        guard rc == RAC_SUCCESS else {
+            logger.error("HTTP transport failure (rc=\(rc)) for \(method) \(urlString)")
+            let code: RAErrorCode = (rc == RAC_ERROR_TIMEOUT) ? .timeout : .networkError
+            throw SDKException(code: code, message: "HTTP transport error (rc=\(rc))", category: .network)
         }
-
-        let isSuccess = (200...299).contains(responseStatus)
-            || (isDeviceRegistration && responseStatus == 409)
-
-        guard isSuccess else {
-            logger.error("HTTP \(responseStatus): \(method) \(urlString)")
-            throw parseHTTPError(
-                statusCode: Int(responseStatus),
-                data: responseData,
-                url: urlString
-            )
-        }
-
-        if isDeviceRegistration && responseStatus == 409 {
-            logger.info("Device already registered (409) - treating as success")
-        }
-
-        return responseData
+        if (200...299).contains(status) { return data }
+        logger.error("HTTP \(status): \(method) \(urlString)")
+        throw mapAPIError(statusCode: status, body: data, url: urlString)
     }
 
-    private static func sendWithHeaders(
+    /// Builds the request struct, optionally arms upsert mode, dispatches,
+    /// and copies the response body into Swift-owned `Data`.
+    private static func send(
         client: OpaquePointer,
         methodC: UnsafeMutablePointer<CChar>,
         urlC: UnsafeMutablePointer<CChar>,
-        headerKVs: [rac_http_header_kv_t],
-        bodyBase: UnsafePointer<UInt8>?,
-        bodyLen: Int
+        headerKVs: UnsafeBufferPointer<rac_http_header_kv_t>,
+        body: Data?,
+        upsertField: String?
     ) -> (rac_result_t, Int32, Data) {
-        headerKVs.withUnsafeBufferPointer { kvBuffer in
+        func dispatchWith(bodyBase: UnsafePointer<UInt8>?, bodyLen: Int) -> (rac_result_t, Int32, Data) {
             var request = rac_http_request_t(
                 method: UnsafePointer(methodC),
                 url: UnsafePointer(urlC),
-                headers: kvBuffer.baseAddress,
-                header_count: kvBuffer.count,
+                headers: headerKVs.baseAddress,
+                header_count: headerKVs.count,
                 body_bytes: bodyBase,
                 body_len: bodyLen,
                 timeout_ms: defaultTimeoutMs,
                 follow_redirects: RAC_TRUE,
                 expected_checksum_hex: nil
             )
-
+            if let upsertField {
+                upsertField.withCString { _ = rac_http_request_set_upsert_mode(&request, $0) }
+            }
             var response = rac_http_response_t()
             let result = rac_http_request_send(client, &request, &response)
             defer { rac_http_response_free(&response) }
-
-            if result != RAC_SUCCESS {
-                return (result, 0, Data())
-            }
-
-            var body = Data()
-            if let bytes = response.body_bytes, response.body_len > 0 {
-                body = Data(bytes: bytes, count: response.body_len)
-            }
-            return (RAC_SUCCESS, response.status, body)
+            guard result == RAC_SUCCESS else { return (result, 0, Data()) }
+            let bytes = response.body_bytes.map { Data(bytes: $0, count: response.body_len) } ?? Data()
+            return (RAC_SUCCESS, response.status, bytes)
         }
-    }
 
-    private static func transportErrorMessage(result: rac_result_t) -> String {
-        switch result {
-        case RAC_ERROR_NETWORK_ERROR:
-            return "Network error"
-        case RAC_ERROR_TIMEOUT:
-            return "Request timed out"
-        case RAC_ERROR_CANCELLED:
-            return "Request cancelled"
-        case RAC_ERROR_INVALID_ARGUMENT:
-            return "Invalid HTTP request"
-        case RAC_ERROR_OUT_OF_MEMORY:
-            return "Out of memory"
-        default:
-            return "HTTP transport error (rc=\(result))"
-        }
-    }
-
-    private static func networkError(forResult result: rac_result_t, message: String) -> SDKException {
-        switch result {
-        case RAC_ERROR_TIMEOUT:
-            return SDKException(code: .timeout, message: message, category: .network)
-        case RAC_ERROR_CANCELLED:
-            return SDKException(code: .networkError, message: message, category: .network)
-        default:
-            return SDKException(code: .networkError, message: message, category: .network)
-        }
-    }
-
-    private static func parseHTTPError(statusCode: Int, data: Data, url _: String) -> SDKException {
-        var errorMessage = "HTTP error \(statusCode)"
-
-        // JSONSerialization returns heterogeneous dictionary for parsing unknown JSON error responses
-        // swiftlint:disable:next avoid_any_type
-        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if let message = json["message"] as? String {
-                errorMessage = message
-            } else if let error = json["error"] as? String {
-                errorMessage = error
-            } else if let hint = json["hint"] as? String {
-                errorMessage = "\(errorMessage): \(hint)"
+        if let body, !body.isEmpty {
+            return body.withUnsafeBytes { ptr in
+                dispatchWith(
+                    bodyBase: ptr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+                    bodyLen: body.count
+                )
             }
         }
+        return dispatchWith(bodyBase: nil, bodyLen: 0)
+    }
 
+    /// Maps an HTTP error (status + body) to `SDKException` via commons'
+    /// `rac_api_error_from_response`.
+    private static func mapAPIError(statusCode: Int32, body: Data, url: String) -> SDKException {
+        let bodyString = body.isEmpty ? "" : (String(data: body, encoding: .utf8) ?? "")
+        var apiError = rac_api_error_t()
+        let parsed = bodyString.withCString { bodyC in
+            url.withCString { urlC in
+                rac_api_error_from_response(statusCode, bodyC, urlC, &apiError)
+            }
+        }
+        defer { if parsed == 0 { rac_api_error_free(&apiError) } }
+
+        let message: String = (parsed == 0 && apiError.message != nil)
+            ? String(cString: apiError.message)
+            : "HTTP error \(statusCode)"
+
+        let code: RAErrorCode
+        let category: RAErrorCategory
         switch statusCode {
-        case 400:
-            return SDKException(code: .httpError, message: "Bad request: \(errorMessage)", category: .network)
-        case 401:
-            return SDKException(code: .authenticationFailed, message: errorMessage, category: .auth)
-        case 403:
-            return SDKException(code: .forbidden, message: errorMessage, category: .auth)
-        case 404:
-            return SDKException(code: .httpError, message: "Not found: \(errorMessage)", category: .network)
-        case 429:
-            return SDKException(code: .httpError, message: "Rate limited: \(errorMessage)", category: .network)
-        case 500...599:
-            return SDKException(code: .serverError, message: "Server error (\(statusCode)): \(errorMessage)", category: .network)
-        default:
-            return SDKException(code: .httpError, message: "HTTP \(statusCode): \(errorMessage)", category: .network)
+        case 401: (code, category) = (.authenticationFailed, .auth)
+        case 403: (code, category) = (.forbidden, .auth)
+        case 500...599: (code, category) = (.serverError, .network)
+        default: (code, category) = (.httpError, .network)
         }
+        return SDKException(code: code, message: message, category: category)
     }
 }

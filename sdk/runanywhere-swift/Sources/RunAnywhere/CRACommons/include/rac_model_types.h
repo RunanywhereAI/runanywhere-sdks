@@ -20,6 +20,7 @@
 #include <stdint.h>
 
 #include "rac_error.h"
+#include "rac_proto_buffer.h"
 #include "rac_types.h"
 
 #ifdef __cplusplus
@@ -407,6 +408,49 @@ RAC_API const char* rac_framework_display_name(rac_inference_framework_t framewo
  */
 RAC_API const char* rac_framework_analytics_key(rac_inference_framework_t framework);
 
+// =============================================================================
+// WIRE STRING / DISPLAY NAME / FROM-STRING ABIs (Phase 2 — proto-aligned)
+// =============================================================================
+//
+// These accessors centralize the per-SDK switch tables that used to live in
+// `Sources/RunAnywhere/Public/Extensions/Models/ModelTypes.swift`. Wire
+// strings are the canonical proto enum names (e.g. "MODEL_FORMAT_GGUF",
+// "INFERENCE_FRAMEWORK_LLAMA_CPP") which match what swift-protobuf emits
+// during JSON encoding. Display names and analytics keys mirror the legacy
+// Swift tables. All returned strings are statically allocated literals owned
+// by the C++ runtime — callers MUST NOT free.
+
+/**
+ * @brief Canonical wire string for a model format.
+ */
+RAC_API rac_result_t rac_model_format_wire_string(rac_model_format_t f, const char** out);
+
+/**
+ * @brief Canonical wire string for an inference framework.
+ */
+RAC_API rac_result_t rac_inference_framework_wire_string(rac_inference_framework_t f,
+                                                         const char** out);
+
+/**
+ * @brief Human-readable display name for an inference framework.
+ */
+RAC_API rac_result_t rac_inference_framework_display_name(rac_inference_framework_t f,
+                                                          const char** out);
+
+/**
+ * @brief Snake_case analytics key for an inference framework.
+ */
+RAC_API rac_result_t rac_inference_framework_analytics_key(rac_inference_framework_t f,
+                                                           const char** out);
+
+/**
+ * @brief Parse an inference framework from a string (case-insensitive).
+ * Matches against wire_string / display_name / analytics_key. Returns
+ * RAC_ERROR_NOT_FOUND when no known framework matches.
+ */
+RAC_API rac_result_t rac_inference_framework_from_string(const char* s,
+                                                         rac_inference_framework_t* out);
+
 /**
  * @brief Check if artifact requires extraction.
  * Mirrors Swift's ModelArtifactType.requiresExtraction.
@@ -494,6 +538,26 @@ RAC_API const char* rac_model_format_extension(rac_model_format_t format);
  * @param max_len Maximum length of output buffer
  */
 RAC_API void rac_model_generate_id(const char* url, char* out_id, size_t max_len);
+
+/**
+ * @brief Generate a stable, NUL-terminated model id from a URL (P2-T5).
+ *
+ * Strict, return-coded port of Swift's `RunAnywhere.generateModelId(fromURL:)`.
+ * Iteratively strips known archive/model extensions (`gz, bz2, tar, zip,
+ * gguf, onnx, ort, bin`) from the trailing path component.
+ *
+ * @param url       URL or filename (UTF-8). NULL → RAC_ERROR_NULL_POINTER.
+ * @param out       Caller-provided output buffer. Always NUL-terminated on
+ *                  success. Set to empty string on RAC_ERROR_BUFFER_TOO_SMALL
+ *                  when @p out_size > 0.
+ * @param out_size  Capacity of @p out in bytes (must be > 0).
+ *
+ * @retval RAC_SUCCESS                Id written to @p out.
+ * @retval RAC_ERROR_NULL_POINTER     @p url or @p out is NULL.
+ * @retval RAC_ERROR_BUFFER_TOO_SMALL @p out_size is 0 or insufficient for the
+ *                                    derived id + NUL terminator.
+ */
+RAC_API rac_result_t rac_model_id_from_url(const char* url, char* out, size_t out_size);
 
 /**
  * @brief Generate human-readable model name from URL.
@@ -618,6 +682,47 @@ RAC_API void rac_model_info_array_free(rac_model_info_t** models, size_t count);
  * @return Deep copy (must be freed with rac_model_info_free)
  */
 RAC_API rac_model_info_t* rac_model_info_copy(const rac_model_info_t* model);
+
+// =============================================================================
+// CANONICAL RAModelInfo FACTORY (P2-T4)
+// =============================================================================
+//
+// Commons-owned implementation of Swift's RAModelInfo.make(...). Consumes a
+// serialized runanywhere.v1.ModelInfoMakeRequest and produces a fully
+// populated runanywhere.v1.ModelInfo. See full doc in commons header.
+
+/**
+ * @brief Build a fully-populated ModelInfo from a ModelInfoMakeRequest.
+ *
+ * Consumes serialized runanywhere.v1.ModelInfoMakeRequest bytes and returns
+ * serialized runanywhere.v1.ModelInfo bytes in out_proto.
+ */
+RAC_API rac_result_t rac_model_info_make_proto(
+    const uint8_t* in_request_bytes,
+    size_t in_request_size,
+    rac_proto_buffer_t* out_proto);
+
+/**
+ * @brief Probe whether a path is a directory containing at least one entry.
+ *
+ * Mirrors Swift's `FileOperationsUtilities.isNonEmptyDirectory(at:)`. NULL-safe.
+ */
+RAC_API rac_bool_t rac_path_is_non_empty_directory(const char* path);
+
+// =============================================================================
+// CANONICAL ARTIFACT EXPECTED-FILES HELPER (P2-T7)
+// =============================================================================
+
+/**
+ * @brief Compute the canonical ExpectedModelFiles manifest for a ModelInfo.
+ *
+ * Consumes serialized runanywhere.v1.ModelInfo bytes and returns serialized
+ * runanywhere.v1.ExpectedModelFiles bytes in out_proto.
+ */
+RAC_API rac_result_t rac_artifact_expected_files_proto(
+    const uint8_t* in_model_bytes,
+    size_t in_model_size,
+    rac_proto_buffer_t* out_proto);
 
 #ifdef __cplusplus
 }

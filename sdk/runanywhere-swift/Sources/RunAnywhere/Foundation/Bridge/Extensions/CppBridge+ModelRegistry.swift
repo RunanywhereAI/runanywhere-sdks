@@ -101,31 +101,6 @@ private enum RegistryProtoABI {
     )
 }
 
-// Top-level helper so it can be referenced from a C function pointer (no `Self` capture).
-private func racIsModelFile(ext: String, filename: String, framework: rac_inference_framework_t) -> rac_bool_t {
-    switch framework {
-    case RAC_FRAMEWORK_LLAMACPP:
-        return (ext == "gguf" || ext == "bin") ? RAC_TRUE : RAC_FALSE
-    case RAC_FRAMEWORK_ONNX:
-        return (ext == "onnx" || ext == "ort") ? RAC_TRUE : RAC_FALSE
-    case RAC_FRAMEWORK_COREML:
-        if ext == "mlmodelc" || ext == "mlpackage" || ext == "mlmodel" {
-            return RAC_TRUE
-        }
-        if filename.contains("unet") || filename.contains("textencoder") ||
-           filename.contains("vaeencoder") || filename.contains("vaedecoder") {
-            return RAC_TRUE
-        }
-        return RAC_FALSE
-    case RAC_FRAMEWORK_METALRT:
-        return (ext == "safetensors" || ext == "json") ? RAC_TRUE : RAC_FALSE
-    case RAC_FRAMEWORK_FOUNDATION_MODELS, RAC_FRAMEWORK_SYSTEM_TTS:
-        return RAC_TRUE
-    default:
-        return (ext == "gguf" || ext == "onnx" || ext == "bin" || ext == "ort" || ext == "mlmodelc") ? RAC_TRUE : RAC_FALSE
-    }
-}
-
 // MARK: - ModelRegistry Bridge
 
 extension CppBridge {
@@ -479,77 +454,6 @@ extension CppBridge {
                 symbolName: "rac_model_registry_import_proto",
                 responseType: RAModelImportResult.self
             )
-        }
-
-        // MARK: - Discovery Callbacks
-
-        private func makeDiscoveryCallbacks() -> rac_discovery_callbacks_t {
-            var callbacks = rac_discovery_callbacks_t()
-            callbacks.user_data = nil
-            callbacks.list_directory = { path, outEntries, outCount, _ -> rac_result_t in
-                guard let path = path else { return RAC_ERROR_INVALID_ARGUMENT }
-
-                let url = URL(fileURLWithPath: String(cString: path))
-                let fm = Foundation.FileManager.default
-
-                guard let contents = try? fm.contentsOfDirectory(at: url, includingPropertiesForKeys: nil) else {
-                    outEntries?.pointee = nil
-                    outCount?.pointee = 0
-                    return RAC_SUCCESS
-                }
-
-                let count = contents.count
-                outCount?.pointee = count
-
-                if contents.isEmpty {
-                    outEntries?.pointee = nil
-                    return RAC_SUCCESS
-                }
-
-                let entries = UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>.allocate(capacity: count)
-                for (i, item) in contents.enumerated() {
-                    entries[i] = strdup(item.lastPathComponent)
-                }
-
-                outEntries?.pointee = entries
-                return RAC_SUCCESS
-            }
-
-            callbacks.free_entries = { entries, count, _ in
-                guard let entries = entries else { return }
-                for i in 0..<count {
-                    if let entry = entries[i] {
-                        free(entry)
-                    }
-                }
-                entries.deallocate()
-            }
-
-            callbacks.is_directory = { path, _ -> rac_bool_t in
-                guard let path = path else { return RAC_FALSE }
-                let pathStr = String(cString: path)
-                var isDir: ObjCBool = false
-                if Foundation.FileManager.default.fileExists(atPath: pathStr, isDirectory: &isDir) {
-                    return isDir.boolValue ? RAC_TRUE : RAC_FALSE
-                }
-                return RAC_FALSE
-            }
-
-            callbacks.path_exists = { path, _ -> rac_bool_t in
-                guard let path = path else { return RAC_FALSE }
-                let pathStr = String(cString: path)
-                return Foundation.FileManager.default.fileExists(atPath: pathStr) ? RAC_TRUE : RAC_FALSE
-            }
-
-            callbacks.is_model_file = { path, framework, _ -> rac_bool_t in
-                guard let path = path else { return RAC_FALSE }
-                let pathStr = String(cString: path)
-                let ext = (pathStr as NSString).pathExtension.lowercased()
-                let filename = (pathStr as NSString).lastPathComponent.lowercased()
-                return racIsModelFile(ext: ext, filename: filename, framework: framework)
-            }
-
-            return callbacks
         }
 
         private func modelListResult(

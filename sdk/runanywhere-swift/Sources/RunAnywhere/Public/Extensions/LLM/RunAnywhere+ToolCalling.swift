@@ -6,16 +6,19 @@
 //  Allows LLMs to request external actions (API calls, device functions, etc.)
 //
 //  ARCHITECTURE:
-//  - CppBridge.ToolCalling: C++ bridge for parsing <tool_call> tags (SINGLE SOURCE OF TRUTH)
-//  - This file: Tool registration, executor storage, orchestration
-//  - Orchestration: generate → parse (C++) → execute → loop
+//  - C++ owns the orchestration loop (`rac_tool_calling_run_loop_proto`,
+//    P2-T8). Swift only carries the tool registry (closures) and trampolines
+//    a Swift `ToolExecutor` invocation through the C executor callback.
+//  - All parsing, validation, prompt formatting, and follow-up generation
+//    happens in commons. There is no Swift-side orchestration loop.
 //
-//  *** ALL PARSING LOGIC IS IN C++ (rac_tool_calling.h) - NO SWIFT FALLBACKS ***
-//
-//  Mirrors sdk/runanywhere-react-native RunAnywhere+ToolCalling.ts
+//  *** ALL TOOL-CALLING LOGIC IS IN C++ (rac_tool_calling.h) - NO SWIFT FALLBACKS ***
 //
 
+import CRACommons
+import Darwin
 import Foundation
+import SwiftProtobuf
 
 // MARK: - Tool Registry (Thread-safe)
 
@@ -44,6 +47,27 @@ private actor ToolRegistry {
     func clear() {
         tools.removeAll()
     }
+}
+
+// MARK: - Native run-loop ABI binding
+
+private enum ToolCallingRunLoopProtoABI {
+    typealias ExecuteCallback = @convention(c) (
+        UnsafePointer<UInt8>?,
+        Int,
+        UnsafeMutablePointer<rac_proto_buffer_t>?,
+        UnsafeMutableRawPointer?
+    ) -> rac_result_t
+    typealias RunLoop = @convention(c) (
+        UnsafePointer<UInt8>?,
+        Int,
+        ExecuteCallback?,
+        UnsafeMutableRawPointer?,
+        UnsafeMutablePointer<rac_proto_buffer_t>?
+    ) -> rac_result_t
+
+    static let runLoopName = "rac_tool_calling_run_loop_proto"
+    static let runLoop = NativeProtoABI.load(runLoopName, as: RunLoop.self)
 }
 
 // MARK: - Tool Calling Extension
@@ -147,12 +171,10 @@ public extension RunAnywhere {
 
     /// Generates a response with tool calling support (CANONICAL_API §3).
     ///
-    /// Orchestrates a generate → parse → execute → loop cycle:
-    /// 1. Builds a system prompt describing available tools
-    /// 2. Generates LLM response
-    /// 3. Parses output for `<tool_call>` tags
-    /// 4. If tool call found and `autoExecute` is true, executes and continues
-    /// 5. Repeats until no more tool calls or `maxToolCalls` reached
+    /// Delegates the entire generate -> parse -> validate -> execute -> follow-up
+    /// loop to the C++ commons layer (`rac_tool_calling_run_loop_proto`, P2-T8).
+    /// Swift only registers a `@convention(c)` trampoline so the C loop can
+    /// reach the Swift `ToolExecutor` closures stored in `ToolRegistry`.
     ///
     /// - Parameters:
     ///   - prompt: The user's prompt
@@ -176,88 +198,58 @@ public extension RunAnywhere {
         let registeredTools = await ToolRegistry.shared.getAll()
         let tools = tcOpts.tools.isEmpty ? registeredTools : tcOpts.tools
 
-        var fullPrompt = prompt
-        if !tools.isEmpty {
-            fullPrompt = try CppBridge.ToolCalling.buildInitialPrompt(
-                userPrompt: prompt,
-                tools: tools,
-                options: tcOpts
-            )
+        let request = makeRunLoopRequest(
+            prompt: prompt,
+            options: options,
+            toolOptions: tcOpts,
+            tools: tools
+        )
+        let requestBytes = try request.serializedData()
+        let runLoop = try NativeProtoABI.require(
+            ToolCallingRunLoopProtoABI.runLoop,
+            named: ToolCallingRunLoopProtoABI.runLoopName
+        )
+
+        // Drain the run loop on a background thread so the synchronous C call
+        // doesn't block the structured-concurrency thread pool.
+        return try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let context = ToolExecuteContext()
+                let contextPtr = Unmanaged.passRetained(context).toOpaque()
+                var outBuffer = rac_proto_buffer_t()
+                let status = requestBytes.withUnsafeBytes { rawBuffer -> rac_result_t in
+                    runLoop(
+                        rawBuffer.bindMemory(to: UInt8.self).baseAddress,
+                        rawBuffer.count,
+                        toolExecuteTrampoline,
+                        contextPtr,
+                        &outBuffer
+                    )
+                }
+                Unmanaged<ToolExecuteContext>.fromOpaque(contextPtr).release()
+
+                defer { NativeProtoABI.free(&outBuffer) }
+                guard status == RAC_SUCCESS else {
+                    let message = outBuffer.error_message.map { String(cString: $0) }
+                        ?? "Tool calling run loop failed: \(status)"
+                    continuation.resume(throwing: SDKException(
+                        code: .processingFailed,
+                        message: message,
+                        category: .component
+                    ))
+                    return
+                }
+                do {
+                    let result = try NativeProtoABI.decode(
+                        RAToolCallingResult.self,
+                        from: outBuffer
+                    )
+                    continuation.resume(returning: result)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
         }
-
-        var finalText = ""
-        var toolCalls: [RAToolCall] = []
-        var toolResults: [RAToolResult] = []
-        var isComplete = true
-
-        for _ in 0..<tcOpts.maxToolCallCount {
-            let responseText = try await generateAndCollect(
-                prompt: fullPrompt,
-                baseOptions: options,
-                toolOptions: tcOpts
-            )
-
-            // Parse using C++ implementation (SINGLE SOURCE OF TRUTH - NO FALLBACK)
-            let (text, toolCall) = try CppBridge.ToolCalling.parseToolCall(
-                from: responseText,
-                options: tcOpts
-            )
-            finalText = text
-
-            guard let toolCall = toolCall else {
-                isComplete = true
-                break
-            }
-
-            toolCalls.append(toolCall)
-
-            guard tcOpts.autoExecute else {
-                isComplete = false
-                break
-            }
-
-            let validation = try CppBridge.ToolCalling.validateToolCall(
-                toolCall,
-                tools: tools,
-                options: tcOpts
-            )
-            guard validation.isValid else {
-                let error = validation.hasErrorMessage && !validation.errorMessage.isEmpty
-                    ? validation.errorMessage
-                    : validation.validationErrors.joined(separator: "; ")
-                toolResults.append(makeToolResult(
-                    name: toolCall.name,
-                    success: false,
-                    error: error.isEmpty ? "Tool call validation failed" : error,
-                    toolCallID: toolCallIdentifier(toolCall)
-                ))
-                isComplete = false
-                break
-            }
-
-            let executableToolCall = toolCallWithValidatedArguments(
-                toolCall,
-                validation: validation
-            )
-            let toolResult = await executeTool(executableToolCall)
-            toolResults.append(toolResult)
-
-            let followUpPrompt = try CppBridge.ToolCalling.buildFollowupPrompt(
-                originalPrompt: prompt,
-                tools: tools,
-                toolResult: toolResult,
-                options: tcOpts
-            )
-            fullPrompt = followUpPrompt.isEmpty ? prompt : followUpPrompt
-            isComplete = false
-        }
-
-        var result = RAToolCallingResult()
-        result.text = finalText
-        result.toolCalls = toolCalls
-        result.toolResults = toolResults
-        result.isComplete = isComplete
-        return result
     }
 
     // MARK: - Private Helpers
@@ -296,53 +288,155 @@ public extension RunAnywhere {
         return toolResult
     }
 
-    private static func toolCallWithValidatedArguments(
-        _ toolCall: RAToolCall,
-        validation: RAToolCallValidationResult
-    ) -> RAToolCall {
-        guard !validation.normalizedArgumentsJson.isEmpty else {
-            return toolCall
+    /// Build the `ToolCallingSessionCreateRequest` proto consumed by
+    /// `rac_tool_calling_run_loop_proto`. Mirrors the loop's old Swift
+    /// orchestration: applies `toolOptions` overrides on top of the base LLM
+    /// generation options and forwards the registered tool list.
+    private static func makeRunLoopRequest(
+        prompt: String,
+        options: RALLMGenerationOptions,
+        toolOptions: RAToolCallingOptions,
+        tools: [RAToolDefinition]
+    ) -> RAToolCallingSessionCreateRequest {
+        var request = RAToolCallingSessionCreateRequest()
+        request.prompt = prompt
+
+        let maxTokens: Int32
+        if toolOptions.hasMaxTokens, toolOptions.maxTokens > 0 {
+            maxTokens = toolOptions.maxTokens
+        } else {
+            maxTokens = options.maxTokens
+        }
+        request.maxTokens = maxTokens
+
+        let temperature: Float
+        if toolOptions.hasTemperature {
+            temperature = toolOptions.temperature
+        } else {
+            temperature = options.temperature
+        }
+        request.temperature = temperature
+        request.topP = options.topP
+
+        if toolOptions.hasSystemPrompt, !toolOptions.systemPrompt.isEmpty {
+            request.systemPrompt = toolOptions.systemPrompt
+        } else if options.hasSystemPrompt, !options.systemPrompt.isEmpty {
+            request.systemPrompt = options.systemPrompt
         }
 
-        // IDL-13: typed `arguments` map removed — only `argumentsJson`
-        // survives as the canonical wire shape.
-        var normalized = toolCall
-        normalized.argumentsJson = validation.normalizedArgumentsJson
-        return normalized
+        request.tools = tools
+        request.formatHint = toolOptions.resolvedFormatName
+        request.maxIterations = UInt32(max(toolOptions.maxToolCallCount, 0))
+        request.keepToolsAvailable = toolOptions.keepToolsAvailable
+        request.validateCalls = true
+        return request
+    }
+}
+
+// MARK: - C trampoline + context
+
+/// Context passed through the C `user_data` pointer so the trampoline can
+/// reach the Swift tool registry without capturing state in the
+/// `@convention(c)` closure (Swift forbids generic captures there).
+private final class ToolExecuteContext: @unchecked Sendable {
+    let logger = SDKLogger(category: "RunAnywhere.ToolCalling.RunLoop")
+}
+
+/// Synchronously invoke the registered Swift `ToolExecutor` for a tool call
+/// emitted by the C loop. Bridges async to sync via `DispatchSemaphore`,
+/// matching the canonical Swift bridge pattern used elsewhere
+/// (e.g. `CppBridge+Device.swift` HTTP callbacks). Errors / unknown tools are
+/// surfaced as a failed `ToolResult` so the C loop can record them and
+/// continue or terminate per its policy.
+private let toolExecuteTrampoline: ToolCallingRunLoopProtoABI.ExecuteCallback = { inBytes, inSize, outBuffer, userData in
+    guard let outBuffer else {
+        return RAC_ERROR_NULL_POINTER
+    }
+    rac_proto_buffer_init(outBuffer)
+
+    let context: ToolExecuteContext? = userData.map {
+        Unmanaged<ToolExecuteContext>.fromOpaque($0).takeUnretainedValue()
+    }
+    let logger = context?.logger ?? SDKLogger(category: "RunAnywhere.ToolCalling.RunLoop")
+
+    // Decode the incoming ToolCall.
+    let toolCall: RAToolCall
+    do {
+        guard let inBytes, inSize > 0 else {
+            let failed = failedResult(name: "", error: "Empty tool-call payload")
+            return writeToolResult(toolResult: failed, into: outBuffer, logger: logger)
+        }
+        toolCall = try RAToolCall(serializedBytes: Data(bytes: inBytes, count: inSize))
+    } catch {
+        let failed = failedResult(
+            name: "",
+            error: "Failed to decode ToolCall: \(error.localizedDescription)"
+        )
+        return writeToolResult(toolResult: failed, into: outBuffer, logger: logger)
     }
 
-    /// Generate text using streaming and collect all tokens into a single string.
-    private static func generateAndCollect(
-        prompt: String,
-        baseOptions: RALLMGenerationOptions,
-        toolOptions: RAToolCallingOptions
-    ) async throws -> String {
-        var genOptions = baseOptions
-        if toolOptions.hasMaxTokens, toolOptions.maxTokens > 0 {
-            genOptions.maxTokens = toolOptions.maxTokens
-        }
-        if toolOptions.hasTemperature {
-            genOptions.temperature = toolOptions.temperature
-        }
-        genOptions.streamingEnabled = true
-        var request = genOptions.toRALLMGenerateRequest(prompt: prompt)
-        request.streamingEnabled = true
+    // Bridge the async Swift executor to the synchronous C callback.
+    let semaphore = DispatchSemaphore(value: 0)
+    let resultBox = ToolResultBox()
+    Task.detached {
+        let result = await RunAnywhere.executeTool(toolCall)
+        resultBox.set(result)
+        semaphore.signal()
+    }
+    semaphore.wait()
+    let toolResult = resultBox.value ?? failedResult(
+        name: toolCall.name,
+        error: "Tool executor returned no result"
+    )
 
-        let eventStream = try await generateStream(request)
+    return writeToolResult(toolResult: toolResult, into: outBuffer, logger: logger)
+}
 
-        var responseText = ""
-        for await event in eventStream {
-            if !event.token.isEmpty {
-                responseText += event.token
+/// Single-slot box used to ferry an async-produced `RAToolResult` back to the
+/// blocking C trampoline. The semaphore enforces happens-before, but a
+/// concurrency-safe wrapper keeps Swift 6 strict-concurrency happy.
+private final class ToolResultBox: @unchecked Sendable {
+    private var stored: RAToolResult?
+
+    func set(_ value: RAToolResult) {
+        stored = value
+    }
+
+    var value: RAToolResult? { stored }
+}
+
+private func failedResult(name: String, error: String) -> RAToolResult {
+    var result = RAToolResult()
+    result.name = name
+    result.success = false
+    result.resultJson = "{}"
+    result.error = error
+    return result
+}
+
+private func writeToolResult(
+    toolResult: RAToolResult,
+    into outBuffer: UnsafeMutablePointer<rac_proto_buffer_t>,
+    logger: SDKLogger
+) -> rac_result_t {
+    do {
+        let bytes = try toolResult.serializedData()
+        let rc = bytes.withUnsafeBytes { raw -> rac_result_t in
+            guard let base = raw.bindMemory(to: UInt8.self).baseAddress else {
+                return rac_proto_buffer_copy(nil, 0, outBuffer)
             }
-            if event.isFinal {
-                if !event.errorMessage.isEmpty {
-                    throw SDKException(code: .generationFailed, message: event.errorMessage, category: .component)
-                }
-                break
-            }
+            return rac_proto_buffer_copy(base, raw.count, outBuffer)
         }
-
-        return responseText
+        if rc != RAC_SUCCESS {
+            logger.warning("rac_proto_buffer_copy failed: \(rc)")
+        }
+        return rc
+    } catch {
+        logger.warning("Failed to serialize ToolResult: \(error.localizedDescription)")
+        let message = "Failed to serialize ToolResult: \(error.localizedDescription)"
+        _ = message.withCString { cstr in
+            rac_proto_buffer_set_error(outBuffer, RAC_ERROR_INTERNAL, cstr)
+        }
+        return RAC_ERROR_INTERNAL
     }
 }

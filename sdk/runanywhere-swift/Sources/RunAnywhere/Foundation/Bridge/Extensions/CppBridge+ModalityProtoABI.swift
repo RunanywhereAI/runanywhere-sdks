@@ -270,6 +270,7 @@ private enum RAGGeneratedProtoABI {
     static let queryName = "rac_rag_query_proto"
     static let clearName = "rac_rag_clear_proto"
     static let statsName = "rac_rag_stats_proto"
+    static let requestWithDefaultsName = "rac_rag_request_with_defaults_proto"
 
     static let create = NativeProtoABI.load(createName, as: Create.self)
     static let destroy = NativeProtoABI.load(destroyName, as: Destroy.self)
@@ -277,6 +278,11 @@ private enum RAGGeneratedProtoABI {
     static let query = NativeProtoABI.load(queryName, as: Request.self)
     static let clear = NativeProtoABI.load(clearName, as: NoRequest.self)
     static let stats = NativeProtoABI.load(statsName, as: NoRequest.self)
+    /// P2-T14: canonical RAGConfiguration defaults merge owned by commons.
+    static let requestWithDefaults = NativeProtoABI.load(
+        requestWithDefaultsName,
+        as: NativeProtoABI.ProtoRequest.self
+    )
 }
 
 private enum LoRAGeneratedProtoABI {
@@ -316,6 +322,23 @@ private enum LoRAGeneratedProtoABI {
     static let remove = NativeProtoABI.load(removeName, as: LLMRequest.self)
     static let list = NativeProtoABI.load(listName, as: LLMRequest.self)
     static let state = NativeProtoABI.load(stateName, as: LLMRequest.self)
+}
+
+private enum StructuredOutputStreamProtoABI {
+    typealias StreamCallback = @convention(c) (
+        UnsafePointer<UInt8>?,
+        Int,
+        UnsafeMutableRawPointer?
+    ) -> Void
+    typealias Stream = @convention(c) (
+        UnsafePointer<UInt8>?,
+        Int,
+        StreamCallback?,
+        UnsafeMutableRawPointer?
+    ) -> rac_result_t
+
+    static let streamName = "rac_structured_output_generate_stream_proto"
+    static let stream = NativeProtoABI.load(streamName, as: Stream.self)
 }
 
 // MARK: - Callback contexts
@@ -484,6 +507,22 @@ func destroyRAGProtoSessionIfAvailable(_ session: rac_handle_t) {
     RAGGeneratedProtoABI.destroy?(session)
 }
 
+/// P2-T14: Resolve canonical RAGConfiguration defaults via the commons ABI.
+/// Returns `nil` when the native symbol is not exported (e.g. RAG backend
+/// disabled in the linked binary); callers fall back to a zero-initialized
+/// proto so the public API surface keeps working without RAG support.
+func resolveRAGConfigurationDefaults(_ request: RARAGConfiguration) -> RARAGConfiguration? {
+    guard let symbol = RAGGeneratedProtoABI.requestWithDefaults else {
+        return nil
+    }
+    return try? NativeProtoABI.invoke(
+        request,
+        symbol: symbol,
+        symbolName: RAGGeneratedProtoABI.requestWithDefaultsName,
+        responseType: RARAGConfiguration.self
+    )
+}
+
 // MARK: - LLM
 
 extension CppBridge.LLM {
@@ -505,7 +544,7 @@ extension CppBridge.LLM {
             request: request,
             category: "CppBridge.LLM.ProtoStream",
             onError: { rc in
-                let mapped = CommonsErrorMapping.toSDKException(rc)
+                let mapped = RASDKError.from(rcResult: rc)
                 var event = RALLMStreamEvent()
                 event.isFinal = true
                 event.finishReason = "error"
@@ -531,6 +570,35 @@ extension CppBridge.LLM {
         ) { outBuffer in
             cancel(outBuffer)
         }
+    }
+}
+
+// MARK: - StructuredOutput streaming
+
+extension CppBridge.StructuredOutput {
+    /// Streaming structured-output generation. Yields `RAStructuredOutputStreamEvent`
+    /// payloads (token, partial JSON, completed/error) as they arrive from
+    /// commons. Per-event seq, timestamp, and request_id are populated by C++.
+    static func generateStream(
+        _ request: RAStructuredOutputRequest
+    ) throws -> AsyncStream<RAStructuredOutputStreamEvent> {
+        let stream = try NativeProtoABI.require(
+            StructuredOutputStreamProtoABI.stream,
+            named: StructuredOutputStreamProtoABI.streamName
+        )
+        return try ProtoStreamContext<RAStructuredOutputStreamEvent>.runRequestStream(
+            request: request,
+            category: "CppBridge.StructuredOutput.ProtoStream",
+            onError: { rc in
+                var event = RAStructuredOutputStreamEvent()
+                event.kind = .error
+                event.errorMessage = "Structured output stream failed: \(rc)"
+                return event
+            },
+            body: { bytes, size, trampoline, userData in
+                stream(bytes, size, trampoline, userData)
+            }
+        )
     }
 }
 

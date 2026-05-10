@@ -195,7 +195,7 @@ public struct DeviceInfo: Codable, Sendable, Equatable {
             coreCount: coreCount,
             performanceCores: perfCores,
             efficiencyCores: effCores,
-            deviceFingerprint: DeviceIdentity.persistentUUID
+            deviceFingerprint: CppBridge.Device.persistentId
         )
     }
 

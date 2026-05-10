@@ -3,7 +3,18 @@
 //  RunAnywhere SDK
 //
 //  The main entry point for the RunAnywhere SDK.
-//  Contains SDK initialization, state management, and event access.
+//  Two-phase initialization is owned by commons (rac_sdk_init.h, P2-T9):
+//    * Phase 1 → rac_sdk_init_phase1_proto (validate + state init)
+//    * Phase 2 → rac_sdk_init_phase2_proto (device registration, model
+//      assignments, HTTP-state snapshot)
+//    * HTTP retry → rac_sdk_retry_http_proto
+//  Swift retains only the parts that cannot move into C++:
+//    * Task.detached spawning + _servicesInitLock concurrency primitive
+//    * Keychain SDK params persistence (Apple-specific)
+//    * MainActor platform-plugin registration
+//    * HTTP authentication round-trip via URLSession (deferred per
+//      sdk_init.cpp file header)
+//    * Telemetry flush + model discovery (deferred — handles owned by SDK)
 //
 
 import Combine
@@ -11,47 +22,6 @@ import Foundation
 #if os(iOS) || os(tvOS) || os(watchOS)
 import UIKit
 #endif
-
-// MARK: - SDK Initialization Flow
-//
-// ┌─────────────────────────────────────────────────────────────────────────────┐
-// │                         SDK INITIALIZATION FLOW                              │
-// └─────────────────────────────────────────────────────────────────────────────┘
-//
-// PHASE 1: Core Init (Synchronous, ~1-5ms, No Network)
-// ─────────────────────────────────────────────────────
-//   initialize() or initializeForDevelopment()
-//     ├─ Validate params (API key, URL, environment)
-//     ├─ Set log level
-//     ├─ Store params locally
-//     ├─ Store in Keychain (production/staging only)
-//     └─ Mark: isInitialized = true
-//
-// PHASE 2: Services Init (Async, ~100-500ms, Network Required)
-// ────────────────────────────────────────────────────────────
-//   completeServicesInitialization()
-//     ├─ Setup API Client
-//     │    ├─ Development: Use Supabase
-//     │    └─ Production/Staging: Authenticate with backend
-//     ├─ Register C++ Bridge Callbacks
-//     │    ├─ Model Assignment (CppBridge.ModelAssignment)
-//     │    └─ Platform Services (CppBridge.Platform)
-//     ├─ Load Models (from remote API via C++)
-//     ├─ Initialize EventPublisher (telemetry → backend)
-//     └─ Register Device with Backend
-//
-// USAGE:
-// ──────
-//   // Development mode (default)
-//   try RunAnywhere.initialize()
-//
-//   // Production mode - requires API key and backend URL
-//   try RunAnywhere.initialize(
-//       apiKey: "your_api_key",
-//       baseURL: "https://api.runanywhere.ai",
-//       environment: .production
-//   )
-//
 
 /// The RunAnywhere SDK - Single entry point for on-device AI
 public enum RunAnywhere {
@@ -78,72 +48,47 @@ public enum RunAnywhere {
     // MARK: - SDK State
 
     /// Check if SDK is initialized (Phase 1 complete).
-    /// Canonical name per CANONICAL_API §2.
-    public static var isInitialized: Bool {
-        isInitializedFlag
-    }
+    public static var isInitialized: Bool { isInitializedFlag }
 
     /// Check if services are fully ready (Phase 2 complete)
-    public static var areServicesReady: Bool {
-        hasCompletedServicesInit
-    }
+    public static var areServicesReady: Bool { hasCompletedServicesInit }
 
     /// Check if SDK is active and ready for use
-    public static var isActive: Bool {
-        isInitializedFlag && initParams != nil
-    }
+    public static var isActive: Bool { isInitializedFlag && initParams != nil }
 
     /// Current SDK version
-    public static var version: String {
-        SDKConstants.version
-    }
+    public static var version: String { SDKConstants.version }
 
     /// Current environment (nil if not initialized)
-    public static var environment: SDKEnvironment? {
-        currentEnvironment
-    }
+    public static var environment: SDKEnvironment? { currentEnvironment }
 
     /// Device ID (Keychain-persisted, survives reinstalls)
-    public static var deviceId: String {
-        DeviceIdentity.persistentUUID
-    }
+    /// Resolved by commons via the device-identity chain
+    /// (secure_get → vendor ID → freshly synthesized UUID).
+    public static var deviceId: String { CppBridge.Device.persistentId }
 
     // MARK: - Event Access
 
     /// Access to all SDK events for subscription-based patterns
-    public static var events: EventBus {
-        EventBus.shared
-    }
+    public static var events: EventBus { EventBus.shared }
 
     // MARK: - Authentication Info (Production/Staging only)
 
     /// Get current user ID from authentication
-    /// - Returns: User ID if authenticated, nil otherwise
-    public static func getUserId() -> String? {
-        CppBridge.State.userId
-    }
+    public static func getUserId() -> String? { CppBridge.State.userId }
 
     /// Get current organization ID from authentication
-    /// - Returns: Organization ID if authenticated, nil otherwise
-    public static func getOrganizationId() -> String? {
-        CppBridge.State.organizationId
-    }
+    public static func getOrganizationId() -> String? { CppBridge.State.organizationId }
 
     /// Check if currently authenticated
-    /// - Returns: true if authenticated with valid token
-    public static var isAuthenticated: Bool {
-        CppBridge.Auth.isAuthenticated
-    }
+    public static var isAuthenticated: Bool { CppBridge.Auth.isAuthenticated }
 
     /// Check if device is registered with backend
-    public static func isDeviceRegistered() -> Bool {
-        CppBridge.Device.isRegistered
-    }
+    public static func isDeviceRegistered() -> Bool { CppBridge.Device.isRegistered }
 
     // MARK: - SDK Reset (Testing)
 
     /// Reset SDK state (for testing purposes)
-    /// Clears all initialization state and cached data
     public static func reset() async {
         let logger = SDKLogger(category: "RunAnywhere.Reset")
         logger.info("Resetting SDK state...")
@@ -154,139 +99,74 @@ public enum RunAnywhere {
         initParams = nil
         currentEnvironment = nil
 
-        // Shutdown all C++ bridges and state
         await CppBridge.shutdown()
         CppBridge.State.shutdown()
 
         logger.info("SDK state reset completed")
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // MARK: - SDK Initialization
-    // ═══════════════════════════════════════════════════════════════════════════
 
-    /**
-     * Initialize the RunAnywhere SDK
-     *
-     * This performs fast synchronous initialization, then starts async services in background.
-     * The SDK is usable immediately - services will be ready when first API call is made.
-     *
-     * **Phase 1 (Sync, ~1-5ms):** Validates params, sets up logging, stores config
-     * **Phase 2 (Background):** Network auth, service creation, model loading, device registration
-     *
-     * ## Usage Examples
-     *
-     * ```swift
-     * // Development mode (default)
-     * try RunAnywhere.initialize()
-     *
-     * // Production mode - requires API key and backend URL
-     * try RunAnywhere.initialize(
-     *     apiKey: "your_api_key",
-     *     baseURL: "https://api.runanywhere.ai",
-     *     environment: .production
-     * )
-     * ```
-     *
-     * - Parameters:
-     *   - apiKey: API key (optional for development, required for production/staging)
-     *   - baseURL: Backend API base URL (optional for development, required for production/staging)
-     *   - environment: SDK environment (default: .development)
-     *
-     * - Throws: SDKException if validation fails
-     */
+    /// Initialize the RunAnywhere SDK.
+    /// Phase 1 runs synchronously; Phase 2 spawns in a detached Task.
     public static func initialize(
         apiKey: String? = nil,
         baseURL: String? = nil,
         environment: SDKEnvironment = .development
     ) throws {
         let params: SDKInitParams
-
         if environment == .development {
-            // Development mode - use Supabase, no auth needed
             params = SDKInitParams(forDevelopmentWithAPIKey: apiKey ?? "")
         } else {
-            // Production/Staging mode - require API key and URL
-            let trimmedAPIKey = apiKey?.trimmingCharacters(in: .whitespacesAndNewlines)
-            let trimmedBaseURL = baseURL?.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard let apiKey = trimmedAPIKey,
-                  CppBridge.DevConfig.isUsableCredential(apiKey) else {
-                throw SDKException(code: .invalidConfiguration, message: "API key is required for \(environment.description) mode", category: .internal)
-            }
-            guard let baseURL = trimmedBaseURL,
-                  CppBridge.DevConfig.isUsableHTTPURL(baseURL) else {
-                throw SDKException(code: .invalidConfiguration, message: "Base URL is required for \(environment.description) mode", category: .internal)
-            }
-            params = try SDKInitParams(apiKey: apiKey, baseURL: baseURL, environment: environment)
+            params = try SDKInitParams(
+                apiKey: apiKey ?? "",
+                baseURL: baseURL ?? "",
+                environment: environment
+            )
         }
-
         try performCoreInit(with: params, startBackgroundServices: true)
     }
 
-    /// Initialize with URL type for base URL
+    /// Initialize with URL type for base URL.
     public static func initialize(
         apiKey: String,
         baseURL: URL,
         environment: SDKEnvironment = .production
     ) throws {
-        if environment != .development {
-            guard CppBridge.DevConfig.isUsableCredential(apiKey),
-                  CppBridge.DevConfig.isUsableHTTPURL(baseURL.absoluteString) else {
-                throw SDKException(
-                    code: .invalidConfiguration,
-                    message: "Usable API key and baseURL are required for \(environment.description) mode",
-                    category: .internal
-                )
-            }
-        }
-
         let params = try SDKInitParams(apiKey: apiKey, baseURL: baseURL, environment: environment)
         try performCoreInit(with: params, startBackgroundServices: true)
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MARK: - Phase 1: Core Initialization (Synchronous)
-    // ═══════════════════════════════════════════════════════════════════════════
+    // MARK: - Phase 1: Core Initialization (delegated to C++)
 
-    /// Perform core initialization (Phase 1)
-    /// - Parameters:
-    ///   - params: SDK initialization parameters
-    ///   - startBackgroundServices: If true, starts Phase 2 in background task
     private static func performCoreInit(with params: SDKInitParams, startBackgroundServices: Bool) throws {
-        // Return early if already initialized
         guard !isInitializedFlag else { return }
 
         let initStartTime = CFAbsoluteTimeGetCurrent()
 
-        // Step 1: Set environment FIRST so Logging.shared initializes with correct config
-        // This must happen before any SDKLogger usage to ensure logs appear correctly
+        // Set environment first so logging boots with correct config.
         currentEnvironment = params.environment
         initParams = params
-
-        // Step 2: Apply environment-specific logging configuration
         Logging.shared.applyEnvironmentConfiguration(params.environment)
 
-        // Step 3: Initialize all core C++ bridges (platform adapter, events, telemetry, device)
-        // This must happen early so all C++ logs route to SDKLogger and events can be emitted
+        // Bring up the core C++ bridges (platform adapter, events,
+        // telemetry, device callbacks). Must run before Phase 1 proto so
+        // every C++ log routes through SDKLogger and analytics callbacks
+        // are wired up.
         CppBridge.initialize(environment: params.environment)
 
-        // Now safe to create logger and track events
         let logger = SDKLogger(category: "RunAnywhere.Init")
         CppBridge.Events.emitSDKInitStarted()
 
         do {
-
-            // Step 4: Persist to Keychain (production/staging only)
+            // Persist credentials (Apple-specific Keychain — must stay in Swift).
             if params.environment != .development {
                 try KeychainManager.shared.storeSDKParams(params)
             }
 
-            // Step 4.5: Configure the C++ model-paths base directory synchronously.
-            // Must happen BEFORE registerModel() calls (which are issued right after
-            // initialize() returns) so rac_model_registry_save() can reconcile each
-            // entry against its on-disk folder inline. Moving this out of Phase 2
-            // closes the race where the first few registerModel() calls ran before
-            // the one-shot discoverDownloadedModels() sweep (see logs2.txt:99-104).
+            // Configure C++ model-paths base directory before any
+            // registerModel() calls so rac_model_registry_save() can
+            // reconcile entries against on-disk folders inline.
             if let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first {
                 do {
                     try CppBridge.ModelPaths.setBaseDirectory(documentsURL)
@@ -295,30 +175,45 @@ public enum RunAnywhere {
                 }
             }
 
-            // Mark Phase 1 complete
+            // Phase 1 proto: validates inputs and runs rac_state_initialize.
+            try CppBridge.SdkInit.phase1(
+                environment: params.environment,
+                apiKey: params.apiKey,
+                baseURL: params.baseURL.absoluteString,
+                deviceId: CppBridge.Device.persistentId
+            )
+
+            // SDK config (rac_sdk_init) + Keychain auth-storage install.
+            // Idempotent state re-init is harmless; this call also wires up
+            // version/platform metadata that Phase 1 proto does not touch.
+            CppBridge.State.initialize(
+                environment: params.environment,
+                apiKey: params.apiKey,
+                baseURL: params.baseURL,
+                deviceId: CppBridge.Device.persistentId
+            )
+
             isInitializedFlag = true
 
             let initDurationMs = (CFAbsoluteTimeGetCurrent() - initStartTime) * 1000
-            logger.info("✅ Phase 1 complete in \(String(format: "%.1f", initDurationMs))ms (\(params.environment.description))")
-
+            logger.info("Phase 1 complete in \(String(format: "%.1f", initDurationMs))ms (\(params.environment.description))")
             CppBridge.Events.emitSDKInitCompleted(durationMs: initDurationMs)
 
-            // Optionally start Phase 2 in background
             if startBackgroundServices {
                 logger.debug("Starting Phase 2 (services) in background...")
                 Task.detached(priority: .userInitiated) {
                     do {
                         try await completeServicesInitialization()
-                        SDKLogger(category: "RunAnywhere.Init").info("✅ Phase 2 complete (background)")
+                        SDKLogger(category: "RunAnywhere.Init").info("Phase 2 complete (background)")
                     } catch {
                         SDKLogger(category: "RunAnywhere.Init")
-                            .warning("⚠️ Phase 2 failed (non-critical): \(error.localizedDescription)")
+                            .warning("Phase 2 failed (non-critical): \(error.localizedDescription)")
                     }
                 }
             }
 
         } catch {
-            logger.error("❌ Initialization failed: \(error.localizedDescription)")
+            logger.error("Initialization failed: \(error.localizedDescription)")
             initParams = nil
             isInitializedFlag = false
             CppBridge.Events.emitSDKInitFailed(error: SDKException.from(error))
@@ -326,48 +221,25 @@ public enum RunAnywhere {
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // MARK: - Phase 2: Services Initialization (Async)
-    // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Complete services initialization (Phase 2)
-    ///
-    /// Called automatically in background by `initialize()`, or can be awaited directly
-    /// via `initializeAsync()`. Safe to call multiple times — returns immediately if Phase 2
-    /// is already complete. Note: if initialization succeeded in offline mode (HTTP/auth setup
-    /// failed), this fast-path still returns immediately. HTTP/auth retry is handled
-    /// automatically by `ensureServicesReady()` on the next API call.
-    ///
-    /// This method:
-    /// 1. Sets up API client (with authentication for production/staging)
-    /// 2. Initializes C++ model registry and bridges
-    /// 3. Initializes EventPublisher for telemetry
-    /// 4. Registers device with backend
+    /// Complete services initialization (Phase 2). Safe to call multiple
+    /// times; concurrent callers share the same Task so the step list runs
+    /// at most once.
     public static func completeServicesInitialization() async throws {
-        // Fast path: already completed
-        if hasCompletedServicesInit {
-            return
-        }
+        if hasCompletedServicesInit { return }
 
-        // Atomically check-or-create the shared init task. Without the lock, two
-        // concurrent callers could both see `_servicesInitTask == nil` and spawn
-        // duplicate init tasks (e.g., the background Task.detached from initialize()
-        // racing a caller via ensureServicesReady()).
         let task: Task<Void, Error> = _servicesInitLock.sync {
             if let existingTask = _servicesInitTask {
                 return existingTask
             }
-            let newTask = Task<Void, Error> {
-                try await _performServicesInitialization()
-            }
+            let newTask = Task<Void, Error> { try await _performServicesInitialization() }
             _servicesInitTask = newTask
             return newTask
         }
 
         do {
             try await task.value
-            // Clear on success so the completed Task is released; subsequent calls
-            // hit the fast path via `hasCompletedServicesInit`.
             _servicesInitLock.sync { _servicesInitTask = nil }
         } catch {
             _servicesInitLock.sync { _servicesInitTask = nil }
@@ -375,8 +247,10 @@ public enum RunAnywhere {
         }
     }
 
-    /// The actual Phase 2 work, separated so completeServicesInitialization()
-    /// can wrap it in a shared Task for serialization.
+    /// Phase 2 step list. Owned by `rac_sdk_init_phase2_proto` for the parts
+    /// commons can drive directly; Swift retains the deferred pieces:
+    /// HTTP authentication, MainActor platform-plugin registration,
+    /// telemetry flush, model discovery (per sdk_init.cpp file header).
     private static func _performServicesInitialization() async throws {
         guard let params = initParams, let environment = currentEnvironment else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
@@ -384,101 +258,101 @@ public enum RunAnywhere {
 
         let logger = SDKLogger(category: "RunAnywhere.Services")
 
-        // Check if HTTP needs initialization
-        let httpNeedsInit = await !CppBridge.HTTP.shared.isConfigured
-
-        if httpNeedsInit {
-            logger.info("Initializing services for \(environment.description) mode...")
-
-            // Step 1: Configure HTTP transport
+        // Step 1 (deferred from C++): HTTP transport + auth round-trip.
+        // Tolerates offline mode — local/cached models stay accessible.
+        if await !CppBridge.HTTP.shared.isConfigured {
             do {
                 try await setupHTTP(params: params, environment: environment, logger: logger)
                 hasCompletedHTTPSetup = await CppBridge.HTTP.shared.isConfigured
             } catch {
-                // If HTTP/auth setup fails (e.g. device is offline), log warning but
-                // continue initialization so local/cached models remain accessible.
-                logger.warning("⚠️ HTTP/Auth setup failed (offline?): \(error.localizedDescription)")
+                logger.warning("HTTP/Auth setup failed (offline?): \(error.localizedDescription)")
                 logger.info("Continuing SDK init in offline mode – local models will be available")
             }
 
-            // Step 1.5: Flush any queued telemetry events (may be no-op if HTTP unconfigured)
             if await CppBridge.HTTP.shared.isConfigured {
                 CppBridge.Telemetry.flush()
-                logger.debug("Attempted telemetry flush")
-            } else {
-                logger.debug("Skipping telemetry flush: HTTP not configured")
             }
         }
 
-        // Step 2: Initialize C++ state
-        CppBridge.State.initialize(
-            environment: environment,
-            apiKey: params.apiKey,
-            baseURL: params.baseURL,
-            deviceId: DeviceIdentity.persistentUUID
-        )
-        logger.debug("C++ state initialized")
+        // Step 2 (MainActor — must stay in Swift): platform-plugin registration.
+        await MainActor.run { CppBridge.initializeServices() }
 
-        // Step 3: Initialize service bridges (Platform, ModelAssignment)
-        // Must be on MainActor for Platform services
-        await MainActor.run {
-            CppBridge.initializeServices()
+        // Step 3 (C++): device registration + model assignments + HTTP-state
+        // snapshot. The C ABI handles step ordering and warning surfacing;
+        // Swift just relays the result for logging.
+        let phase2Result = try CppBridge.SdkInit.phase2()
+        if !phase2Result.warning.isEmpty {
+            logger.info("Phase 2 warning: \(phase2Result.warning)")
         }
-        logger.debug("Service bridges initialized")
+        if phase2Result.linkedModelsCount > 0 {
+            logger.info("Phase 2 linked \(phase2Result.linkedModelsCount) assigned models")
+        }
 
-        // Step 4: Base directory for C++ model paths is now configured
-        // synchronously during Phase 1 (see performCoreInit) so every
-        // registerModel() call that happens right after initialize() returns
-        // can reconcile against on-disk folders inline via
-        // rac_model_registry_save().
-
-        // Step 5: Register device via CppBridge (C++ handles all business logic)
-        do {
-            if shouldUseExternalDeviceRegistration(environment: environment) {
+        // Step 4 (deferred from C++): rerun the dev-mode device registration
+        // path that needs the build token. C++ Phase 2 calls
+        // rac_device_manager_register_if_needed with build_token=nullptr,
+        // which is correct for staging/production but skips the dev-mode
+        // path that requires a build token.
+        if environment == .development && CppBridge.DevConfig.hasUsableDevelopmentRegistrationConfig {
+            do {
                 try await CppBridge.Device.registerIfNeeded(environment: environment)
-                logger.debug("Device registration check completed")
-            } else {
-                logger.debug("Skipping device registration: no usable external config")
+            } catch {
+                logger.warning("Dev device registration failed (non-critical): \(error.localizedDescription)")
             }
-        } catch {
-            logger.warning("Device registration failed (non-critical): \(error.localizedDescription)")
         }
 
-        // Step 6: Reconcile registry entries that already have downloaded local paths.
+        // Step 5 (deferred from C++): filesystem-backed model discovery using
+        // the registry handle the SDK already owns.
         let discoveryResult = await CppBridge.ModelRegistry.shared.discoverDownloadedModels()
         if discoveryResult.linkedCount > 0 {
             logger.info("Discovered \(discoveryResult.linkedCount) downloaded models on startup")
         }
 
-        // Mark Phase 2 complete
         hasCompletedServicesInit = true
     }
 
-    /// Ensure services are ready before API calls (internal guard)
+    /// Ensure services are ready before API calls (internal guard).
     /// O(1) after first successful initialization with HTTP configured.
     /// If core services are done but HTTP/auth failed (offline init), retries auth only.
     internal static func ensureServicesReady() async throws {
         if hasCompletedServicesInit && hasCompletedHTTPSetup {
-            return // O(1) fast path — fully initialized
+            return
         }
         if hasCompletedServicesInit && !hasCompletedHTTPSetup {
-            // Core services done, but HTTP/auth failed earlier (offline init).
-            // Retry HTTP setup only — safe because setupHTTP is idempotent.
             await retryHTTPSetup()
             return
         }
         try await completeServicesInitialization()
     }
 
-    /// Retry HTTP/auth setup after an offline initialization.
-    /// Safe to call multiple times — checks `CppBridge.HTTP.shared.isConfigured` first.
-    /// Failures are silently logged; the next `ensureServicesReady()` call will retry.
+    /// Retry HTTP/auth after an offline initialization. Combines the C ABI
+    /// idempotency guard with the platform-side auth round-trip that
+    /// rac_sdk_retry_http_proto explicitly defers (sdk_init.cpp file header).
     private static func retryHTTPSetup() async {
         guard let params = initParams, let environment = currentEnvironment else { return }
         let logger = SDKLogger(category: "RunAnywhere.HTTPRetry")
 
-        let httpNeedsInit = await !CppBridge.HTTP.shared.isConfigured
-        guard httpNeedsInit else {
+        // Idempotent fast path + config sanity check, owned by C++.
+        let proto: RASdkInitResult
+        do {
+            proto = try CppBridge.SdkInit.retryHTTP()
+        } catch {
+            logger.debug("HTTP retry proto failed: \(error.localizedDescription)")
+            return
+        }
+
+        if proto.httpConfigured {
+            hasCompletedHTTPSetup = true
+            return
+        }
+
+        if !proto.warning.isEmpty {
+            logger.debug("HTTP retry warning: \(proto.warning)")
+        }
+
+        // Already-configured fast path on the Swift side (e.g. another
+        // caller raced ahead through completeServicesInitialization).
+        if await CppBridge.HTTP.shared.isConfigured {
             hasCompletedHTTPSetup = true
             return
         }
@@ -487,71 +361,43 @@ public enum RunAnywhere {
             try await setupHTTP(params: params, environment: environment, logger: logger)
             hasCompletedHTTPSetup = await CppBridge.HTTP.shared.isConfigured
             if hasCompletedHTTPSetup {
-                logger.info("✅ HTTP/Auth setup succeeded on retry")
-            } else {
-                logger.debug("HTTP/Auth retry skipped: no usable external config")
-                return
+                logger.info("HTTP/Auth setup succeeded on retry")
+                CppBridge.Telemetry.flush()
             }
-
-            // Flush any telemetry events queued during offline period
-            CppBridge.Telemetry.flush()
-            logger.debug("Flushed queued telemetry after successful HTTP retry")
         } catch {
             logger.debug("HTTP/Auth retry failed (still offline?): \(error.localizedDescription)")
         }
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
     // MARK: - Private: Service Setup Helpers
-    // ═══════════════════════════════════════════════════════════════════════════
 
-    /// Setup HTTP transport via CppBridge.HTTP
+    /// HTTP transport + auth round-trip. Stays in Swift because URLSession
+    /// is the canonical Apple HTTP stack; C++ exposes only the wire format
+    /// (rac_auth_request_to_json / rac_auth_handle_authenticate_response).
     private static func setupHTTP(
         params: SDKInitParams,
         environment: SDKEnvironment,
         logger: SDKLogger
     ) async throws {
-        switch environment {
-        case .development:
-            // Use C++ development config for Supabase (cross-platform)
+        if !CppBridge.Environment.requiresAuth(environment) {
+            // Development (or unspecified) — Supabase config drives HTTP if
+            // present; otherwise leave HTTP unconfigured (offline mode).
             if await CppBridge.DevConfig.configureHTTP() {
                 logger.debug("HTTP: Supabase from C++ config (development)")
             } else {
-                logger.debug("HTTP disabled: development Supabase config is missing or placeholder")
+                logger.debug("HTTP disabled: no usable development Supabase config")
             }
-
-        case .staging, .production:
-            guard CppBridge.DevConfig.isUsableCredential(params.apiKey),
-                  CppBridge.DevConfig.isUsableHTTPURL(params.baseURL.absoluteString) else {
-                logger.debug("HTTP/Auth disabled: no usable external config")
-                return
-            }
-
-            // Configure HTTP first
-            await CppBridge.HTTP.shared.configure(baseURL: params.baseURL, apiKey: params.apiKey)
-
-            // Authenticate via CppBridge.Auth
-            try await CppBridge.Auth.authenticate(apiKey: params.apiKey)
-            logger.info("Authenticated for \(environment.description)")
-
-        default:
-            // .unspecified / UNRECOGNIZED — treat like development (no auth).
-            await CppBridge.HTTP.shared.configure(baseURL: params.baseURL, apiKey: params.apiKey)
-            logger.warning("HTTP: unknown environment \(environment.wireString); defaulting to development behavior")
+            return
         }
-    }
 
-    private static func shouldUseExternalDeviceRegistration(environment: SDKEnvironment) -> Bool {
-        switch environment {
-        case .development:
-            return CppBridge.DevConfig.hasUsableDevelopmentRegistrationConfig
-        case .staging, .production:
-            guard let params = initParams else { return false }
-            return CppBridge.DevConfig.isUsableCredential(params.apiKey) &&
-                CppBridge.DevConfig.isUsableHTTPURL(params.baseURL.absoluteString)
-        default:
-            return false
+        guard CppBridge.DevConfig.isUsableCredential(params.apiKey),
+              CppBridge.DevConfig.isUsableHTTPURL(params.baseURL.absoluteString) else {
+            logger.debug("HTTP/Auth disabled: no usable external config")
+            return
         }
-    }
 
+        await CppBridge.HTTP.shared.configure(baseURL: params.baseURL, apiKey: params.apiKey)
+        try await CppBridge.Auth.authenticate(apiKey: params.apiKey)
+        logger.info("Authenticated for \(environment.description)")
+    }
 }

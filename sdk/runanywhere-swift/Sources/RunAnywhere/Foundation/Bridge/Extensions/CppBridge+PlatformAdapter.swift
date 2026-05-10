@@ -8,8 +8,12 @@
 
 import CRACommons
 import Foundation
-import Security
 import os
+import Security
+
+#if os(iOS) || os(tvOS) || os(visionOS)
+import UIKit
+#endif
 
 // MARK: - Platform Adapter Bridge
 
@@ -69,6 +73,13 @@ extension CppBridge {
             adapter.http_download = platformHttpDownloadCallback
             adapter.http_download_cancel = platformHttpDownloadCancelCallback
             adapter.extract_archive = nil
+
+            // MARK: Vendor ID (Apple-only — used by commons device-identity chain)
+            // Commons walks: secure_get -> get_vendor_id -> generate fresh UUID.
+            // Swift only contributes the iOS-specific UIDevice.identifierForVendor;
+            // Keychain persistence happens automatically via secure_set/secure_get.
+            adapter.get_vendor_id = platformGetVendorIdCallback
+
             adapter.user_data = nil
 
             // Register with C++
@@ -342,6 +353,46 @@ private func platformNowMsCallback(
     Int64(Date().timeIntervalSince1970 * 1000)
 }
 
+// MARK: - Vendor ID Callback (Apple-only)
+
+/// Provides UIDevice.identifierForVendor.uuidString to the commons
+/// device-identity resolver (P2-T13). On macOS the API is unavailable so
+/// commons falls through to its synthesized-UUID branch. The returned
+/// UUID string is guaranteed to fit in the 36-char canonical form + NUL.
+private func platformGetVendorIdCallback(
+    outBuffer: UnsafeMutablePointer<CChar>?,
+    bufferSize: Int,
+    userData _: UnsafeMutableRawPointer?
+) -> rac_result_t {
+    guard let outBuffer = outBuffer else {
+        return RAC_ERROR_NULL_POINTER
+    }
+    if bufferSize < Int(RAC_DEVICE_ID_BUFFER_MIN_SIZE) {
+        return RAC_ERROR_BUFFER_TOO_SMALL
+    }
+
+    #if os(iOS) || os(tvOS) || os(visionOS)
+    // UIDevice.identifierForVendor is synchronous and thread-safe; no
+    // MainActor hop required. Returns nil on rare provisioning errors.
+    guard let vendorId = UIDevice.current.identifierForVendor?.uuidString else {
+        return RAC_ERROR_NOT_FOUND
+    }
+
+    let copied = vendorId.withCString { src -> Bool in
+        // strlen excludes NUL — bufferSize must accommodate len + NUL.
+        let len = strlen(src)
+        guard len + 1 <= bufferSize else { return false }
+        memcpy(outBuffer, src, len + 1)
+        return true
+    }
+    return copied ? RAC_SUCCESS : RAC_ERROR_BUFFER_TOO_SMALL
+    #else
+    // macOS / watchOS have no identifierForVendor analog — let commons
+    // fall through to its synthesized-UUID branch.
+    return RAC_ERROR_NOT_SUPPORTED
+    #endif
+}
+
 // MARK: - Memory Info Callback
 
 /// Reports process-level memory usage to C++ via the platform adapter.
@@ -471,8 +522,9 @@ private func createSDKErrorFromCppError(_ errorDict: [String: Any]) -> SDKExcept
     default:              category = .internal
     }
 
-    // Map C++ error code to RAErrorCode
-    let errorCode = CommonsErrorMapping.toSDKException(code)?.proto.code ?? .unknown
+    // Map C++ error code to RAErrorCode via the canonical commons ABI
+    // (rac_result_to_proto_error).
+    let errorCode = RASDKError.from(rcResult: code)?.code ?? .unknown
 
     return SDKException(
         code: errorCode,

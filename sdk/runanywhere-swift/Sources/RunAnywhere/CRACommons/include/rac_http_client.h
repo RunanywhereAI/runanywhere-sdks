@@ -212,6 +212,43 @@ RAC_API rac_result_t rac_http_request_resume(rac_http_client_t* c, const rac_htt
 RAC_API void rac_http_response_free(rac_http_response_t* resp);
 
 // =============================================================================
+// REQUEST OPTIONS — UPSERT MODE (P2-T10)
+// =============================================================================
+
+/**
+ * @brief Configures a request for Supabase-style upsert mode.
+ *
+ * When the request is later submitted via `rac_http_request_send`,
+ * `rac_http_request_stream`, or `rac_http_request_resume`, the HTTP
+ * client will transparently append `?on_conflict=<on_conflict_field>` to
+ * the URL and emit
+ * `Prefer: resolution=merge-duplicates,return=representation`.
+ *
+ * `on_conflict_field == NULL` clears any previously-set upsert mode.
+ */
+RAC_API rac_result_t rac_http_request_set_upsert_mode(rac_http_request_t* req,
+                                                      const char* on_conflict_field);
+
+// =============================================================================
+// CANONICAL DEFAULT HEADERS (P2-T11)
+// =============================================================================
+
+/**
+ * @brief Returns commons' canonical default SDK header list.
+ *
+ * Provides:
+ *   - "X-SDK-Client":  "RunAnywhereSDK"
+ *   - "X-SDK-Version": rac_get_version().string
+ *   - "Content-Type":  "application/json"
+ *   - "Accept":        "application/json"
+ *
+ * "X-Platform" is intentionally NOT included; the calling SDK supplies it.
+ * The returned pointer is statically owned by commons (do NOT free).
+ */
+RAC_API rac_result_t rac_http_default_headers(const rac_http_header_kv_t** out_kvs,
+                                              size_t* out_count);
+
+// =============================================================================
 // RESULT CODES
 // =============================================================================
 // Phase H consumers only need to check against RAC_SUCCESS; the other

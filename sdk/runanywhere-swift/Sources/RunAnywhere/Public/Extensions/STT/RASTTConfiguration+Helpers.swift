@@ -5,9 +5,14 @@
 //  Ergonomic helpers for canonical STT proto types.
 //
 
+import CRACommons
 import Foundation
 
 // MARK: - RASTTLanguage
+//
+// NOTE: BCP-47 round-trip lives in Swift because no `rac_stt_language_*`
+// C ABI exists yet. When commons gains canonical mappers we collapse the
+// switches into a single C call (see swift simplification plan §STT).
 
 extension RASTTLanguage {
     /// Map a BCP-47 language string (e.g. "en-US", "zh-Hans") to the canonical enum.
@@ -54,26 +59,19 @@ extension RASTTLanguage {
 // MARK: - RASTTConfiguration
 
 extension RASTTConfiguration {
-    public static func defaults(
-        modelId: String = "",
-        language: RASTTLanguage = .en,
-        sampleRate: Int32 = 16_000,
-        enableVad: Bool = false
-    ) -> RASTTConfiguration {
-        var c = RASTTConfiguration()
-        c.modelID = modelId
-        c.language = language
-        c.sampleRate = sampleRate
-        c.enableVad = enableVad
-        return c
-    }
-
-    public func validate() throws {
-        guard sampleRate > 0 && sampleRate <= 48_000 else {
-            throw SDKException.validationFailed(
-                "Sample rate must be between 1 and 48000 Hz (got \(sampleRate))"
-            )
+    /// Canonical defaults sourced from C++ commons (P2-T14).
+    public static func defaults() -> RASTTConfiguration {
+        var outBuffer = rac_proto_buffer_t()
+        defer { rac_proto_buffer_free(&outBuffer) }
+        guard rac_stt_configuration_defaults_proto(&outBuffer) == RAC_SUCCESS,
+              let data = outBuffer.data, outBuffer.size > 0,
+              let proto = try? RASTTConfiguration(
+                serializedBytes: Data(bytes: data, count: outBuffer.size)
+              )
+        else {
+            return RASTTConfiguration()
         }
+        return proto
     }
 }
 
@@ -96,42 +94,4 @@ extension RASTTOptions {
 
 extension RASTTOutput {
     public var detectedLanguageCode: RASTTLanguage { language }
-}
-
-// MARK: - RAWordTimestamp
-
-extension RAWordTimestamp {
-    public init(word: String, startTime: TimeInterval, endTime: TimeInterval, confidence: Float) {
-        self.init()
-        self.word = word
-        self.startMs = Int64(startTime * 1000)
-        self.endMs = Int64(endTime * 1000)
-        self.confidence = confidence
-    }
-
-    public var startTime: TimeInterval { TimeInterval(startMs) / 1000.0 }
-    public var endTime: TimeInterval { TimeInterval(endMs) / 1000.0 }
-    public var duration: TimeInterval { max(0, endTime - startTime) }
-}
-
-// MARK: - RATranscriptionMetadata
-
-extension RATranscriptionMetadata {
-    public var realTimeFactorComputed: Double {
-        guard audioLengthMs > 0 else { return 0 }
-        return Double(processingTimeMs) / Double(audioLengthMs)
-    }
-
-    public var processingTime: TimeInterval { TimeInterval(processingTimeMs) / 1000.0 }
-    public var audioLength: TimeInterval { TimeInterval(audioLengthMs) / 1000.0 }
-}
-
-// MARK: - RATranscriptionAlternative
-
-extension RATranscriptionAlternative {
-    public init(text: String, confidence: Float) {
-        self.init()
-        self.text = text
-        self.confidence = confidence
-    }
 }

@@ -2,7 +2,11 @@
 //  RAGProto+Helpers.swift
 //  RunAnywhere SDK
 //
-//  Ergonomic helpers for canonical RAG proto types.
+//  Ergonomic helpers for canonical RAG proto types. Defaults/validation are
+//  owned by commons (P2-T14, `rac_rag_request_with_defaults_proto`); the
+//  Swift side keeps only proto-ergonomics that have no C equivalent: JSON
+//  decode into the `metadata` map, lifecycle-id stamping, and TimeInterval
+//  / Date conveniences over the raw `*Ms` Int64 fields.
 //
 
 import Foundation
@@ -10,45 +14,33 @@ import Foundation
 // MARK: - RARAGConfiguration
 
 extension RARAGConfiguration {
+    /// Canonical RAG defaults resolved by commons via
+    /// `rac_rag_request_with_defaults_proto` (P2-T14). Falls back to a
+    /// pure-Swift defaults populator when the native symbol is not exported
+    /// (e.g. RAG backend disabled in the linked binary).
     public static func defaults(
         embeddingModelID: String = "",
         llmModelID: String = ""
     ) -> RARAGConfiguration {
-        var c = RARAGConfiguration()
-        c.embeddingModelID = embeddingModelID
-        c.llmModelID = llmModelID
-        c.embeddingDimension = 384
-        c.topK = 5
-        c.similarityThreshold = 0.7
-        c.chunkSize = 512
-        c.chunkOverlap = 64
-        return c
+        var request = RARAGConfiguration()
+        request.embeddingModelID = embeddingModelID
+        request.llmModelID = llmModelID
+        if let resolved = resolveRAGConfigurationDefaults(request) {
+            return resolved
+        }
+        // Symbol unavailable — mirror commons defaults so callers keep working.
+        request.embeddingDimension = 384
+        request.topK = 5
+        request.similarityThreshold = 0.7
+        request.chunkSize = 512
+        request.chunkOverlap = 64
+        return request
     }
 
-    public func validate() throws {
-        guard topK > 0 else {
-            throw SDKException.validationFailed("topK must be > 0 (got \(topK))")
-        }
-        guard similarityThreshold >= 0 && similarityThreshold <= 1.0 else {
-            throw SDKException.validationFailed(
-                "Similarity threshold must be in 0...1.0 (got \(similarityThreshold))"
-            )
-        }
-        guard chunkSize > 0 else {
-            throw SDKException.validationFailed("Chunk size must be > 0")
-        }
-        guard chunkOverlap >= 0 && chunkOverlap < chunkSize else {
-            throw SDKException.validationFailed(
-                "Chunk overlap must be >= 0 and < chunkSize (got \(chunkOverlap) vs \(chunkSize))"
-            )
-        }
-    }
-
-    /// D-6: Since commons owns model-id → path resolution, this helper now
-    /// only stamps the resolved model ids onto the configuration and defers
-    /// path resolution to the native RAG session-create ABI. Callers still
-    /// pass ``RAModelLoadResult`` so the lifecycle has been invoked (which
-    /// ensures the models are registered) before the native create runs.
+    /// D-6: Commons owns model-id → path resolution; this helper now only
+    /// stamps resolved model ids onto the configuration. Callers pass
+    /// `RAModelLoadResult` values so the lifecycle has been invoked (and the
+    /// models are registered) before the native session-create runs.
     public func resolvingLifecycleArtifacts(
         embedding: RAModelLoadResult,
         llm: RAModelLoadResult
@@ -96,8 +88,6 @@ extension RARAGQueryOptions {
 
 extension RARAGResult {
     public var totalTime: TimeInterval { TimeInterval(totalTimeMs) / 1000.0 }
-    public var retrievalTime: TimeInterval { TimeInterval(retrievalTimeMs) / 1000.0 }
-    public var generationTime: TimeInterval { TimeInterval(generationTimeMs) / 1000.0 }
 }
 
 // MARK: - RARAGStatistics
@@ -108,8 +98,3 @@ extension RARAGStatistics {
         return Date(timeIntervalSince1970: TimeInterval(lastUpdatedMs) / 1000.0)
     }
 }
-
-// D-6: `mergingRAGConfig` and its JSONSerialization-backed embedding config
-// merger are deleted — commons now resolves vocabulary paths itself from the
-// registered model descriptor, so Swift no longer assembles
-// `embeddingConfigJson` on the SDK side.

@@ -1,8 +1,10 @@
 //
-//  ToolCallingTypes.swift
-//  RunAnywhere SDK
+//  ToolCallingTypes.swift — Swift-side helpers for generated tool-calling protos.
 //
-//  Swift executor helpers for the generated tool-calling proto contracts.
+//  Keep: closures (`ToolExecutor`, `RegisteredTool`), JSON bridge for
+//  `argumentsJson` / `resultJson` (IDL-13 oneof tree, no C ABI equivalent),
+//  and tight RA* convenience inits/getters consumed by the example app or
+//  SDK internals. Do not grow without a real caller.
 //
 
 import Foundation
@@ -21,138 +23,74 @@ internal struct RegisteredTool: Sendable {
 // MARK: - RAToolValue Helpers
 
 public extension RAToolValue {
-    init(_ value: String) {
-        self.init()
-        self.stringValue = value
-    }
-
-    init(_ value: Int) {
-        self.init()
-        self.numberValue = Double(value)
-    }
-
-    init(_ value: Double) {
-        self.init()
-        self.numberValue = value
-    }
-
-    init(_ value: Bool) {
-        self.init()
-        self.boolValue = value
-    }
+    init(_ value: String) { self.init(); self.stringValue = value }
+    init(_ value: Int) { self.init(); self.numberValue = Double(value) }
+    init(_ value: Double) { self.init(); self.numberValue = value }
+    init(_ value: Bool) { self.init(); self.boolValue = value }
 
     static func array(_ values: [RAToolValue]) -> RAToolValue {
-        var array = RAToolValueArray()
-        array.values = values
-        var value = RAToolValue()
-        value.arrayValue = array
-        return value
+        var arr = RAToolValueArray(); arr.values = values
+        var value = RAToolValue(); value.arrayValue = arr; return value
     }
 
     static func object(_ fields: [String: RAToolValue]) -> RAToolValue {
-        var object = RAToolValueObject()
-        object.fields = fields
-        var value = RAToolValue()
-        value.objectValue = object
-        return value
+        var obj = RAToolValueObject(); obj.fields = fields
+        var value = RAToolValue(); value.objectValue = obj; return value
     }
 
-    static var null: RAToolValue {
-        var value = RAToolValue()
-        value.nullValue = true
-        return value
-    }
+    var string: String? { if case .stringValue(let v)? = kind { return v }; return nil }
+    var number: Double? { if case .numberValue(let v)? = kind { return v }; return nil }
+    var int: Int? { number.map(Int.init) }
+    var bool: Bool? { if case .boolValue(let v)? = kind { return v }; return nil }
+    var array: [RAToolValue]? { if case .arrayValue(let v)? = kind { return v.values }; return nil }
+    var object: [String: RAToolValue]? { if case .objectValue(let v)? = kind { return v.fields }; return nil }
 
-    var string: String? {
-        if case .stringValue(let value)? = kind { return value }
-        return nil
-    }
-
-    var number: Double? {
-        if case .numberValue(let value)? = kind { return value }
-        return nil
-    }
-
-    var int: Int? {
-        number.map(Int.init)
-    }
-
-    var bool: Bool? {
-        if case .boolValue(let value)? = kind { return value }
-        return nil
-    }
-
-    var array: [RAToolValue]? {
-        if case .arrayValue(let value)? = kind { return value.values }
-        return nil
-    }
-
-    var object: [String: RAToolValue]? {
-        if case .objectValue(let value)? = kind { return value.fields }
-        return nil
-    }
-
-    var isNull: Bool {
-        if case .nullValue = kind { return true }
-        return false
-    }
+    // JSON bridge — required by IDL-13 (`argumentsJson` / `resultJson`).
+    // Swift consumers see `[String: RAToolValue]`; the wire shape is JSON.
 
     func toJSONString(pretty: Bool = false) -> String? {
-        let options: JSONSerialization.WritingOptions = pretty ? [.prettyPrinted, .sortedKeys] : [.sortedKeys]
-        guard JSONSerialization.isValidJSONObject(jsonObject) else { return nil }
-        guard let data = try? JSONSerialization.data(withJSONObject: jsonObject, options: options) else { return nil }
+        let opts: JSONSerialization.WritingOptions = pretty ? [.prettyPrinted, .sortedKeys] : [.sortedKeys]
+        guard JSONSerialization.isValidJSONObject(jsonObject),
+              let data = try? JSONSerialization.data(withJSONObject: jsonObject, options: opts) else { return nil }
         return String(data: data, encoding: .utf8)
     }
 
     static func parseObjectJSON(_ json: String) -> [String: RAToolValue] {
         guard let data = json.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return [:]
-        }
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
         return object.mapValues(RAToolValue.fromJSONObject(_:))
     }
 
     static func jsonString(from object: [String: RAToolValue]) -> String {
-        let jsonObject = object.mapValues { $0.jsonObject }
-        guard JSONSerialization.isValidJSONObject(jsonObject),
-              let data = try? JSONSerialization.data(withJSONObject: jsonObject, options: [.sortedKeys]),
-              let json = String(data: data, encoding: .utf8) else {
-            return "{}"
-        }
-        return json
+        let json = object.mapValues(\.jsonObject)
+        guard JSONSerialization.isValidJSONObject(json),
+              let data = try? JSONSerialization.data(withJSONObject: json, options: [.sortedKeys]),
+              let str = String(data: data, encoding: .utf8) else { return "{}" }
+        return str
     }
 
     private var jsonObject: Any {
         switch kind {
-        case .stringValue(let value): return value
-        case .numberValue(let value): return value
-        case .boolValue(let value): return value
-        case .arrayValue(let value): return value.values.map { $0.jsonObject }
-        case .objectValue(let value): return value.fields.mapValues { $0.jsonObject }
+        case .stringValue(let v): return v
+        case .numberValue(let v): return v
+        case .boolValue(let v): return v
+        case .arrayValue(let v): return v.values.map(\.jsonObject)
+        case .objectValue(let v): return v.fields.mapValues(\.jsonObject)
         case .nullValue, .none: return NSNull()
         }
     }
 
     private static func fromJSONObject(_ object: Any) -> RAToolValue {
         switch object {
-        case is NSNull:
-            return .null
-        case let value as Bool:
-            return RAToolValue(value)
-        case let value as Int:
-            return RAToolValue(value)
-        case let value as Double:
-            return RAToolValue(value)
-        case let value as NSNumber:
-            return RAToolValue(value.doubleValue)
-        case let value as String:
-            return RAToolValue(value)
-        case let value as [Any]:
-            return .array(value.map(RAToolValue.fromJSONObject(_:)))
-        case let value as [String: Any]:
-            return .object(value.mapValues(RAToolValue.fromJSONObject(_:)))
+        case let v as Bool: return RAToolValue(v)
+        case let v as Int: return RAToolValue(v)
+        case let v as Double: return RAToolValue(v)
+        case let v as NSNumber: return RAToolValue(v.doubleValue)
+        case let v as String: return RAToolValue(v)
+        case let v as [Any]: return .array(v.map(RAToolValue.fromJSONObject(_:)))
+        case let v as [String: Any]: return .object(v.mapValues(RAToolValue.fromJSONObject(_:)))
         default:
-            return .null
+            var value = RAToolValue(); value.nullValue = true; return value
         }
     }
 }
@@ -160,13 +98,8 @@ public extension RAToolValue {
 // MARK: - Tool Definition Helpers
 
 public extension RAToolParameter {
-    init(
-        name: String,
-        type: RAToolParameterType,
-        description: String,
-        required: Bool = true,
-        enumValues: [String] = []
-    ) {
+    init(name: String, type: RAToolParameterType, description: String,
+         required: Bool = true, enumValues: [String] = []) {
         self.init()
         self.name = name
         self.type = type
@@ -177,44 +110,23 @@ public extension RAToolParameter {
 }
 
 public extension RAToolDefinition {
-    init(
-        name: String,
-        description: String,
-        parameters: [RAToolParameter],
-        category: String? = nil
-    ) {
+    init(name: String, description: String, parameters: [RAToolParameter], category: String? = nil) {
         self.init()
         self.name = name
         self.description_p = description
         self.parameters = parameters
-        if let category {
-            self.category = category
-        }
+        if let category { self.category = category }
     }
 }
 
-extension RAToolCall {
-    init(toolName: String, arguments: [String: RAToolValue], callId: String? = nil) {
-        // IDL-13: typed `arguments` map removed — only `argumentsJson` survives.
-        self.init()
-        self.name = toolName
-        self.argumentsJson = RAToolValue.jsonString(from: arguments)
-        if let callId {
-            self.id = callId
-            self.callID = callId
-        }
-    }
-}
+// MARK: - Tool Calling Options Helpers
 
 public extension RAToolCallingOptions {
     static func defaults() -> RAToolCallingOptions {
-        var options = RAToolCallingOptions()
-        options.maxIterations = 5
-        options.maxToolCalls = 5
-        options.autoExecute = true
-        options.format = .json
-        options.formatHint = "default"
-        return options
+        var o = RAToolCallingOptions()
+        o.maxIterations = 5; o.maxToolCalls = 5; o.autoExecute = true
+        o.format = .json; o.formatHint = "default"
+        return o
     }
 }
 

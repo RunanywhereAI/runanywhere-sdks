@@ -2,161 +2,67 @@
 //  RunAnywhere+StructuredOutput.swift
 //  RunAnywhere SDK
 //
-//  Public API for structured output generation.
-//  Uses generated structured-output proto requests/results through commons.
+//  Public façade for structured output generation. All orchestration —
+//  prompt preparation, model invocation, thinking-tag stripping, JSON
+//  extraction, schema validation — lives in the commons C++ layer behind
+//  `rac_structured_output_*_proto`. Swift exposes Swift-idiomatic
+//  async/throws/AsyncStream wrappers and nothing else.
 //
 
 import Foundation
 
-// MARK: - Structured Output Extensions
-
 public extension RunAnywhere {
-
-    // MARK: - Canonical JSONSchema-based API (CANONICAL_API §3)
 
     /// Generate structured output from a prompt using a JSON schema (CANONICAL_API §3).
     ///
-    /// The model is instructed to produce JSON conforming to `schema`. The raw
-    /// output is extracted and returned as an `RAStructuredOutputResult`.
-    ///
-    /// - Parameters:
-    ///   - prompt: The text prompt.
-    ///   - schema: The expected JSON schema (`RAJSONSchema`).
-    ///   - options: Generation options (optional).
-    /// - Returns: `RAStructuredOutputResult` with `rawOutput`, `jsonOutput`, and `validation`.
+    /// Commons owns the full pipeline (prepare prompt → run lifecycle LLM →
+    /// strip thinking tags → extract JSON → validate). `options` is accepted
+    /// for cross-SDK API parity; commons currently uses default generation
+    /// parameters.
     static func generateStructured(
         prompt: String,
         schema: RAJSONSchema,
         options: RALLMGenerationOptions? = nil
     ) async throws -> RAStructuredOutputResult {
+        _ = options
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
-
-        let structuredOptions = RAStructuredOutputOptions.defaults(schema: schema)
-        let promptResult = try CppBridge.StructuredOutput.preparePrompt(
-            prompt: prompt,
-            options: structuredOptions
+        return try CppBridge.StructuredOutput.generate(
+            CppBridge.StructuredOutput.makeGenerateRequest(
+                prompt: prompt,
+                options: .defaults(schema: schema)
+            )
         )
-        try throwIfStructuredPromptError(promptResult)
-
-        var effectiveOptions = options ?? RALLMGenerationOptions.defaults()
-        effectiveOptions.maxTokens = effectiveOptions.maxTokens > 0 ? effectiveOptions.maxTokens : 1500
-        effectiveOptions.temperature = effectiveOptions.temperature > 0 ? effectiveOptions.temperature : 0.7
-        effectiveOptions.topP = effectiveOptions.topP > 0 ? effectiveOptions.topP : 1.0
-        effectiveOptions.streamingEnabled = false
-        if promptResult.hasSystemPrompt {
-            effectiveOptions.systemPrompt = promptResult.systemPrompt
-        }
-        effectiveOptions.jsonSchema = promptResult.hasJsonSchema ? promptResult.jsonSchema : structuredOptions.jsonSchema
-        effectiveOptions.structuredOutput = structuredOptions
-
-        let generationResult = try await generateForStructuredOutput(prompt, options: effectiveOptions)
-        return try extractStructuredOutput(text: generationResult.text, schema: schema)
     }
 
     /// Stream structured output generation using a JSON schema (CANONICAL_API §3).
     ///
-    /// Yields generated `RAStructuredOutputStreamEvent` values as tokens
-    /// accumulate, with a completed event carrying the final extracted result.
-    ///
-    /// - Parameters:
-    ///   - prompt: The text prompt.
-    ///   - schema: The expected JSON schema (`RAJSONSchema`).
-    ///   - options: Generation options (optional).
-    /// - Returns: `AsyncStream<RAStructuredOutputStreamEvent>` with token,
-    ///            completed, or error events.
+    /// Commons emits `RAStructuredOutputStreamEvent` payloads (token, partial
+    /// JSON, terminal completed/error). Sequence numbers, timestamps and
+    /// request IDs are populated by the C++ stream producer.
     static func generateStructuredStream(
         prompt: String,
         schema: RAJSONSchema,
         options: RALLMGenerationOptions? = nil
     ) -> AsyncStream<RAStructuredOutputStreamEvent> {
-        AsyncStream { continuation in
-            Task {
-                let requestID = UUID().uuidString
-                var sequence: UInt64 = 0
-
-                func makeEvent(_ kind: RAStructuredOutputStreamEventKind) -> RAStructuredOutputStreamEvent {
-                    var event = RAStructuredOutputStreamEvent()
-                    event.seq = sequence
-                    event.timestampUs = Int64(Date().timeIntervalSince1970 * 1_000_000)
-                    event.requestID = requestID
-                    event.kind = kind
-                    sequence += 1
-                    return event
-                }
-
-                guard isInitialized else {
-                    var event = makeEvent(.error)
-                    event.errorMessage = "SDK not initialized"
-                    continuation.yield(event)
-                    continuation.finish()
-                    return
-                }
-                do {
-                    let structuredOptions = RAStructuredOutputOptions.defaults(schema: schema)
-                    let promptResult = try CppBridge.StructuredOutput.preparePrompt(
-                        prompt: prompt,
-                        options: structuredOptions
-                    )
-                    try throwIfStructuredPromptError(promptResult)
-                    var effectiveOptions = options ?? RALLMGenerationOptions.defaults()
-                    effectiveOptions.maxTokens = effectiveOptions.maxTokens > 0 ? effectiveOptions.maxTokens : 1500
-                    effectiveOptions.temperature = effectiveOptions.temperature > 0 ? effectiveOptions.temperature : 0.7
-                    effectiveOptions.topP = effectiveOptions.topP > 0 ? effectiveOptions.topP : 1.0
-                    effectiveOptions.streamingEnabled = true
-                    if promptResult.hasSystemPrompt {
-                        effectiveOptions.systemPrompt = promptResult.systemPrompt
-                    }
-                    effectiveOptions.jsonSchema = promptResult.hasJsonSchema
-                        ? promptResult.jsonSchema
-                        : structuredOptions.jsonSchema
-                    effectiveOptions.structuredOutput = structuredOptions
-                    var accumulated = ""
-                    var streamRequest = effectiveOptions.toRALLMGenerateRequest(prompt: prompt)
-                    streamRequest.streamingEnabled = true
-                    let eventStream = try await generateStream(streamRequest)
-                    for await event in eventStream {
-                        if !event.token.isEmpty {
-                            accumulated += event.token
-                            var tokenEvent = makeEvent(.token)
-                            tokenEvent.token = event.token
-                            tokenEvent.partialJson = accumulated
-                            continuation.yield(tokenEvent)
-                        }
-                        if event.isFinal {
-                            if !event.errorMessage.isEmpty {
-                                var errorEvent = makeEvent(.error)
-                                errorEvent.errorMessage = event.errorMessage
-                                continuation.yield(errorEvent)
-                                continuation.finish()
-                                return
-                            }
-                            break
-                        }
-                    }
-                    let finalResult = try extractStructuredOutput(text: accumulated, schema: schema)
-                    var completedEvent = makeEvent(.completed)
-                    completedEvent.result = finalResult
-                    completedEvent.validation = finalResult.validation
-                    continuation.yield(completedEvent)
-                    continuation.finish()
-                } catch {
-                    var errorEvent = makeEvent(.error)
-                    errorEvent.errorMessage = error.localizedDescription
-                    continuation.yield(errorEvent)
-                    continuation.finish()
-                }
-            }
+        _ = options
+        guard isInitialized else { return errorStream("SDK not initialized") }
+        do {
+            return try CppBridge.StructuredOutput.generateStream(
+                CppBridge.StructuredOutput.makeGenerateRequest(
+                    prompt: prompt,
+                    options: .defaults(schema: schema)
+                )
+            )
+        } catch {
+            return errorStream(error.localizedDescription)
         }
     }
 
-    /// Generate with structured output configuration
-    /// - Parameters:
-    ///   - prompt: The prompt to generate from
-    ///   - structuredOutput: Structured output configuration
-    ///   - options: Generation options
-    /// - Returns: Generation result with structured data
+    /// Generate raw text via the LLM with a structured-output configuration
+    /// applied to the request. Returns the raw `RALLMGenerationResult`; callers
+    /// can pass `text` to `extractStructuredOutput(text:schema:)` for parsing.
     static func generateWithStructuredOutput(
         prompt: String,
         structuredOutput: RAStructuredOutputOptions,
@@ -164,47 +70,25 @@ public extension RunAnywhere {
     ) async throws -> RALLMGenerationResult {
         var internalOptions = options ?? RALLMGenerationOptions.defaults()
         internalOptions.structuredOutput = structuredOutput
-        let schemaJson = structuredOutput.hasJsonSchema && !structuredOutput.jsonSchema.isEmpty
-            ? structuredOutput.jsonSchema
-            : structuredOutput.schema.jsonSchemaString
-        internalOptions.jsonSchema = schemaJson
         if structuredOutput.includeSchemaInPrompt {
-            let promptResult = try CppBridge.StructuredOutput.preparePrompt(
-                prompt: prompt,
-                options: structuredOutput
-            )
-            try throwIfStructuredPromptError(promptResult)
-            if promptResult.hasSystemPrompt {
-                internalOptions.systemPrompt = promptResult.systemPrompt
+            let prep = try CppBridge.StructuredOutput.preparePrompt(prompt: prompt, options: structuredOutput)
+            guard prep.errorCode == 0 else {
+                throw SDKException(code: .processingFailed, message: prep.errorMessage, category: .internal)
             }
+            if prep.hasSystemPrompt { internalOptions.systemPrompt = prep.systemPrompt }
         }
-
-        return try await generateForStructuredOutput(prompt, options: internalOptions)
-    }
-
-    // MARK: - Private Helpers
-
-    private static func throwIfStructuredPromptError(
-        _ result: RAStructuredOutputPromptResult
-    ) throws {
-        guard result.errorCode == 0 else {
-            throw SDKException(
-                code: .processingFailed,
-                message: result.hasErrorMessage && !result.errorMessage.isEmpty
-                    ? result.errorMessage
-                    : "Structured output prompt preparation failed: \(result.errorCode)",
-                category: .internal
-            )
-        }
-    }
-
-    /// Internal generation for structured output through the generated-proto LLM ABI.
-    private static func generateForStructuredOutput(
-        _ prompt: String,
-        options: RALLMGenerationOptions
-    ) async throws -> RALLMGenerationResult {
-        var request = options.toRALLMGenerateRequest(prompt: prompt)
+        var request = internalOptions.toRALLMGenerateRequest(prompt: prompt)
         request.streamingEnabled = false
         return try await generate(request)
+    }
+
+    private static func errorStream(_ message: String) -> AsyncStream<RAStructuredOutputStreamEvent> {
+        AsyncStream { continuation in
+            var event = RAStructuredOutputStreamEvent()
+            event.kind = .error
+            event.errorMessage = message
+            continuation.yield(event)
+            continuation.finish()
+        }
     }
 }

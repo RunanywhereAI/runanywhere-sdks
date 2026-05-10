@@ -11,6 +11,7 @@
 #define RAC_TTS_SERVICE_H
 
 #include "rac_error.h"
+#include "rac_proto_buffer.h"
 #include "rac_tts_types.h"
 
 #ifdef __cplusplus
@@ -183,6 +184,19 @@ RAC_API void rac_tts_result_free(rac_tts_result_t* result);
  * @return RAC_SUCCESS or error code
  */
 RAC_API rac_result_t rac_tts_get_languages(rac_handle_t handle, char** out_json);
+
+// =============================================================================
+// CANONICAL DEFAULTS (P2-T14)
+// =============================================================================
+
+/**
+ * @brief Populate a default-initialised runanywhere.v1.TTSConfiguration.
+ *
+ * out_RATTSConfiguration receives serialized runanywhere.v1.TTSConfiguration
+ * bytes. Caller MUST release with rac_proto_buffer_free().
+ */
+RAC_API rac_result_t rac_tts_configuration_defaults_proto(
+    rac_proto_buffer_t* out_RATTSConfiguration);
 
 #ifdef __cplusplus
 }
