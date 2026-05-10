@@ -3178,6 +3178,33 @@ rac_artifact_type_kind_t rac_model_infer_artifact_type(const char* url, rac_mode
 // PUBLIC API - MODEL DISCOVERY
 // =============================================================================
 
+// Helper: extract a lower-cased file extension from a path or filename.
+// Returns "" if the basename has no '.' or starts with '.' (hidden file).
+static std::string extension_from_path(const char* path) {
+    if (!path) return std::string();
+    std::string s(path);
+    size_t slash = s.find_last_of('/');
+    std::string base = (slash == std::string::npos) ? s : s.substr(slash + 1);
+    if (base.empty() || base.front() == '.') return std::string();
+    size_t dot = base.find_last_of('.');
+    if (dot == std::string::npos || dot + 1 >= base.size()) return std::string();
+    std::string ext = base.substr(dot + 1);
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return ext;
+}
+
+// Helper: ask the canonical commons mapping whether a path is a model file
+// for a given framework, replacing the legacy
+// rac_discovery_callbacks_t.is_model_file callback that each SDK had to
+// wire up previously.
+static bool path_is_model_file(const char* path, rac_inference_framework_t framework) {
+    std::string ext = extension_from_path(path);
+    rac_bool_t out = RAC_FALSE;
+    rac_result_t rc = rac_model_format_for_framework(framework, ext.c_str(), &out);
+    return rc == RAC_SUCCESS && out == RAC_TRUE;
+}
+
 // Helper to check if a folder contains valid model files for a framework
 static bool is_valid_model_folder(const rac_discovery_callbacks_t* callbacks,
                                   const char* folder_path, rac_inference_framework_t framework) {
@@ -3203,12 +3230,10 @@ static bool is_valid_model_folder(const rac_discovery_callbacks_t* callbacks,
         // Build full path
         std::string full_path = std::string(folder_path) + "/" + entries[i];
 
-        // Check if it's a model file for this framework
-        if (callbacks->is_model_file) {
-            if (callbacks->is_model_file(full_path.c_str(), framework, callbacks->user_data) ==
-                RAC_TRUE) {
-                found_model_file = true;
-            }
+        // Check if it's a model file for this framework via the canonical
+        // commons mapping (replaces the legacy is_model_file callback).
+        if (path_is_model_file(full_path.c_str(), framework)) {
+            found_model_file = true;
         }
 
         // For nested directories, recursively check (one level deep)
@@ -3223,9 +3248,7 @@ static bool is_valid_model_folder(const rac_discovery_callbacks_t* callbacks,
                         if (!sub_entries[j])
                             continue;
                         std::string sub_path = full_path + "/" + sub_entries[j];
-                        if (callbacks->is_model_file &&
-                            callbacks->is_model_file(sub_path.c_str(), framework,
-                                                     callbacks->user_data) == RAC_TRUE) {
+                        if (path_is_model_file(sub_path.c_str(), framework)) {
                             found_model_file = true;
                         }
                     }

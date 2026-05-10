@@ -344,6 +344,20 @@ const char* rac_error_message(rac_result_t error_code) {
         case RAC_ERROR_INTERNAL:
             return "Internal error";
 
+        // =================================================================
+        // PLUGIN ERRORS (-810 to -829)
+        // =================================================================
+        case RAC_ERROR_ABI_VERSION_MISMATCH:
+            return "Plugin ABI version mismatch";
+        case RAC_ERROR_CAPABILITY_UNSUPPORTED:
+            return "Plugin capability unsupported on this host";
+        case RAC_ERROR_PLUGIN_DUPLICATE:
+            return "Plugin with this name already registered";
+        case RAC_ERROR_PLUGIN_LOAD_FAILED:
+            return "Plugin load failed";
+        case RAC_ERROR_PLUGIN_BUSY:
+            return "Plugin is busy with active sessions";
+
         default:
             return "Unknown error code";
     }

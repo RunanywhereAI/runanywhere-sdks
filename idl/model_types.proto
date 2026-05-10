@@ -848,6 +848,65 @@ message ModelRegistryFetchAssignmentsResult {
     string        error_message   = 6;
 }
 
+// ---------------------------------------------------------------------------
+// Inputs for the canonical RAModelInfo factory (P2-T4). Replaces Swift's
+// `RAModelInfo.make(...)` ~370 LOC of field-defaulting and artifact-inference
+// logic with a commons-owned implementation. Commons fills 18 ModelInfo fields
+// (id, name, category/format/framework defaults, context-length defaults,
+// thinking gating + default pattern, artifact inference, source mark,
+// timestamps, and is_downloaded probe).
+// ---------------------------------------------------------------------------
+message ModelInfoMakeRequest {
+    // Required. Download URL or file path. Used both as the metadata field
+    // and as input to artifact-type inference (zip/tar.gz/tgz/... → archive,
+    // anything else → single_file).
+    string url = 1;
+
+    // Optional human-readable name. When empty commons derives it from the
+    // URL via rac_model_generate_name() (replaces underscores/dashes with
+    // spaces).
+    string name = 2;
+
+    // Optional inference framework. UNSPECIFIED triggers detection from the
+    // URL extension; commons looks up the format and maps to a default
+    // framework via rac_model_detect_framework_from_format().
+    optional InferenceFramework framework = 3;
+
+    // Optional category. UNSPECIFIED falls back to the framework default
+    // (rac_model_category_from_framework()).
+    optional ModelCategory category = 4;
+
+    // Optional source. UNSPECIFIED is treated as MODEL_SOURCE_REMOTE.
+    optional ModelSource source = 5;
+}
+
+// ---------------------------------------------------------------------------
+// Inputs for the canonical "register a model from a URL" entry point (P2-T6).
+// Composes ModelInfoMakeRequest (P2-T4) with the existing registry save path
+// so SDKs replace ~60 LOC of build-and-save glue with a single ABI call.
+// Produces the saved ModelInfo (matches rac_model_registry_register_proto_buffer
+// shape).
+// ---------------------------------------------------------------------------
+message RegisterModelFromUrlRequest {
+    // Required. Download URL or file path. Routed straight into
+    // ModelInfoMakeRequest.url; format/artifact inference and id/name
+    // generation reuse the same factory semantics.
+    string url = 1;
+
+    // Optional human-readable name. Empty → derived from URL.
+    string name = 2;
+
+    // Optional inference framework. UNSPECIFIED triggers detection from the
+    // URL extension (rac_model_detect_framework_from_format).
+    optional InferenceFramework framework = 3;
+
+    // Optional category. UNSPECIFIED falls back to the framework default.
+    optional ModelCategory category = 4;
+
+    // Optional source. UNSPECIFIED is treated as MODEL_SOURCE_REMOTE.
+    optional ModelSource source = 5;
+}
+
 // Logical ModelRegistry service contract. Platform adapters remain
 // responsible for native file handles, sandbox permissions, HTTP execution,
 // and destructive filesystem operations. This service carries only the

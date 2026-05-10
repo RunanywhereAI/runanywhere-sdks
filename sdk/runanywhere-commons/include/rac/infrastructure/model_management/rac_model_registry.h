@@ -554,24 +554,22 @@ typedef rac_bool_t (*rac_is_directory_fn)(const char* path, void* user_data);
 typedef rac_bool_t (*rac_path_exists_discovery_fn)(const char* path, void* user_data);
 
 /**
- * @brief Callback to check if file has model extension
- * @param path File path
- * @param framework Expected framework
- * @param user_data User context
- * @return RAC_TRUE if valid model file
- */
-typedef rac_bool_t (*rac_is_model_file_fn)(const char* path, rac_inference_framework_t framework,
-                                           void* user_data);
-
-/**
- * @brief Callbacks for model discovery file operations
+ * @brief Callbacks for model discovery file operations.
+ *
+ * NOTE: The `is_model_file` callback that previously sat between
+ * `path_exists` and `user_data` was removed when the canonical commons
+ * helper `rac_model_format_for_framework()` (declared in
+ * include/rac/infrastructure/model_management/rac_model_types.h) became the
+ * single source of truth for "is this file a model file for this
+ * framework?". SDK bridges no longer need to wire that callback — the
+ * commons discovery path consults `rac_model_format_for_framework()`
+ * directly using the file extension parsed from the path.
  */
 typedef struct {
     rac_list_directory_fn list_directory;
     rac_free_directory_entries_fn free_entries;
     rac_is_directory_fn is_directory;
     rac_path_exists_discovery_fn path_exists;
-    rac_is_model_file_fn is_model_file;
     void* user_data;
 } rac_discovery_callbacks_t;
 
@@ -772,6 +770,50 @@ RAC_API rac_result_t rac_model_format_from_url_proto(const uint8_t* request_byte
 RAC_API rac_result_t rac_artifact_infer_from_url_proto(const uint8_t* request_bytes,
                                                        size_t request_size,
                                                        rac_proto_buffer_t* out_result);
+
+// =============================================================================
+// REGISTER MODEL FROM URL (P2-T6) — single-call URL+name+framework → save
+//
+// Composes the canonical RAModelInfo factory (rac_model_info_make_proto, P2-T4)
+// with the existing registry persistence path so SDKs replace the ~60 LOC
+// build-and-save body of Swift's RunAnywhere.registerModel(...) (and the
+// equivalent Kotlin/Flutter/RN/Web glue) with a single ABI call. Output is
+// the saved ModelInfo bytes — same shape as
+// rac_model_registry_register_proto_buffer.
+// =============================================================================
+
+/**
+ * @brief Build a fully-populated ModelInfo from a URL+name+framework tuple and
+ *        persist it to the global model registry.
+ *
+ * Consumes serialized runanywhere.v1.RegisterModelFromUrlRequest bytes and
+ * returns serialized runanywhere.v1.ModelInfo bytes (the saved entry) in
+ * out_proto. Internally:
+ *
+ *   1. Translates RegisterModelFromUrlRequest → ModelInfoMakeRequest.
+ *   2. Calls rac_model_info_make_proto() to default the 18 ModelInfo fields
+ *      (id from URL, name fallback, format/framework/category detection,
+ *      artifact inference, source mark, timestamps, …).
+ *   3. Saves the resulting ModelInfo through
+ *      rac_model_registry_register_proto_buffer() on the global registry
+ *      (rac_get_model_registry()), which round-trips through the same
+ *      conversion + save path used by every other SDK adapter.
+ *
+ * On encode/decode failure the error envelope is set on out_proto via the
+ * canonical rac_proto_buffer_set_error() convention.
+ *
+ * @param in_request_bytes Serialized RegisterModelFromUrlRequest bytes (may be
+ *                         empty — treated as a default-zeroed request, which
+ *                         results in a model with empty url/id/name and the
+ *                         standard make() defaults).
+ * @param in_size          Byte count.
+ * @param out_proto        Receives serialized runanywhere.v1.ModelInfo bytes
+ *                         on success or an error status on failure.
+ * @return RAC_SUCCESS on success, or a negative rac_result_t on failure.
+ */
+RAC_API rac_result_t rac_register_model_from_url_proto(const uint8_t* in_request_bytes,
+                                                       size_t in_size,
+                                                       rac_proto_buffer_t* out_proto);
 
 #ifdef __cplusplus
 }

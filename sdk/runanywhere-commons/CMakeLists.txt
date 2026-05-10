@@ -514,6 +514,7 @@ set(RAC_CORE_SOURCES
     src/core/capabilities/lifecycle_manager.cpp
     src/core/model_lifecycle.cpp
     src/core/rac_error_model.cpp
+    src/core/rac_error_proto.cpp
     src/foundation/rac_proto_buffer.cpp
 )
 
@@ -551,6 +552,9 @@ set(RAC_INFRASTRUCTURE_SOURCES
     src/infrastructure/model_management/model_compatibility_proto.cpp
     src/infrastructure/model_management/model_registry_fetch_assignments_proto.cpp
     src/infrastructure/model_management/model_format_infer_proto.cpp
+    src/infrastructure/model_management/model_info_make_proto.cpp
+    src/infrastructure/model_management/register_model_from_url.cpp
+    src/infrastructure/model_management/artifact_expected_files_proto.cpp
     src/infrastructure/storage/storage_analyzer.cpp
     src/infrastructure/file_management/file_manager.cpp
     src/infrastructure/network/environment.cpp

@@ -28,6 +28,40 @@ namespace _fl = ::google::protobuf::internal::field_layout;
 namespace runanywhere {
 namespace v1 {
 
+inline constexpr RegisterModelFromUrlRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        url_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        name_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        framework_{static_cast< ::runanywhere::v1::InferenceFramework >(0)},
+        category_{static_cast< ::runanywhere::v1::ModelCategory >(0)},
+        source_{static_cast< ::runanywhere::v1::ModelSource >(0)} {}
+
+template <typename>
+constexpr RegisterModelFromUrlRequest::RegisterModelFromUrlRequest(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(RegisterModelFromUrlRequest_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct RegisterModelFromUrlRequestDefaultTypeInternal {
+  constexpr RegisterModelFromUrlRequestDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~RegisterModelFromUrlRequestDefaultTypeInternal() {}
+  union {
+    RegisterModelFromUrlRequest _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 RegisterModelFromUrlRequestDefaultTypeInternal _RegisterModelFromUrlRequest_default_instance_;
+
 inline constexpr ModelUnloadResult::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
     ::_pbi::ConstantInitialized) noexcept
@@ -297,6 +331,40 @@ struct ModelInfoMetadataDefaultTypeInternal {
 
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ModelInfoMetadataDefaultTypeInternal _ModelInfoMetadata_default_instance_;
+
+inline constexpr ModelInfoMakeRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    ::_pbi::ConstantInitialized) noexcept
+      : _cached_size_{0},
+        url_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        name_(
+            &::google::protobuf::internal::fixed_address_empty_string,
+            ::_pbi::ConstantInitialized()),
+        framework_{static_cast< ::runanywhere::v1::InferenceFramework >(0)},
+        category_{static_cast< ::runanywhere::v1::ModelCategory >(0)},
+        source_{static_cast< ::runanywhere::v1::ModelSource >(0)} {}
+
+template <typename>
+constexpr ModelInfoMakeRequest::ModelInfoMakeRequest(::_pbi::ConstantInitialized)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(ModelInfoMakeRequest_class_data_.base()),
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(),
+#endif  // PROTOBUF_CUSTOM_VTABLE
+      _impl_(internal_visibility(), ::_pbi::ConstantInitialized()) {
+}
+struct ModelInfoMakeRequestDefaultTypeInternal {
+  constexpr ModelInfoMakeRequestDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
+  ~ModelInfoMakeRequestDefaultTypeInternal() {}
+  union {
+    ModelInfoMakeRequest _instance;
+  };
+};
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ModelInfoMakeRequestDefaultTypeInternal _ModelInfoMakeRequest_default_instance_;
 
 inline constexpr ModelGetRequest::Impl_::Impl_(
     [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
@@ -2086,6 +2154,32 @@ const ::uint32_t
         4,
         5,
         0,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelInfoMakeRequest, _impl_._has_bits_),
+        8, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelInfoMakeRequest, _impl_.url_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelInfoMakeRequest, _impl_.name_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelInfoMakeRequest, _impl_.framework_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelInfoMakeRequest, _impl_.category_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::ModelInfoMakeRequest, _impl_.source_),
+        0,
+        1,
+        2,
+        3,
+        4,
+        0x081, // bitmap
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RegisterModelFromUrlRequest, _impl_._has_bits_),
+        8, // hasbit index offset
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RegisterModelFromUrlRequest, _impl_.url_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RegisterModelFromUrlRequest, _impl_.name_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RegisterModelFromUrlRequest, _impl_.framework_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RegisterModelFromUrlRequest, _impl_.category_),
+        PROTOBUF_FIELD_OFFSET(::runanywhere::v1::RegisterModelFromUrlRequest, _impl_.source_),
+        0,
+        1,
+        2,
+        3,
+        4,
 };
 
 static const ::_pbi::MigrationSchema
@@ -2127,6 +2221,8 @@ static const ::_pbi::MigrationSchema
         {538, sizeof(::runanywhere::v1::ArtifactInferFromUrlResult)},
         {551, sizeof(::runanywhere::v1::ModelRegistryFetchAssignmentsRequest)},
         {560, sizeof(::runanywhere::v1::ModelRegistryFetchAssignmentsResult)},
+        {575, sizeof(::runanywhere::v1::ModelInfoMakeRequest)},
+        {588, sizeof(::runanywhere::v1::RegisterModelFromUrlRequest)},
 };
 static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::runanywhere::v1::_ModelInfoMetadata_default_instance_._instance,
@@ -2166,6 +2262,8 @@ static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
     &::runanywhere::v1::_ArtifactInferFromUrlResult_default_instance_._instance,
     &::runanywhere::v1::_ModelRegistryFetchAssignmentsRequest_default_instance_._instance,
     &::runanywhere::v1::_ModelRegistryFetchAssignmentsResult_default_instance_._instance,
+    &::runanywhere::v1::_ModelInfoMakeRequest_default_instance_._instance,
+    &::runanywhere::v1::_RegisterModelFromUrlRequest_default_instance_._instance,
 };
 const char descriptor_table_protodef_model_5ftypes_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
@@ -2406,132 +2504,145 @@ const char descriptor_table_protodef_model_5ftypes_2eproto[] ABSL_ATTRIBUTE_SECT
     "\022-\n\006models\030\002 \001(\0132\035.runanywhere.v1.ModelI"
     "nfoList\022\023\n\013model_count\030\003 \001(\005\022\032\n\022fetched_"
     "at_unix_ms\030\004 \001(\003\022\022\n\nerror_code\030\005 \001(\005\022\025\n\r"
-    "error_message\030\006 \001(\t*\371\001\n\013AudioFormat\022\034\n\030A"
-    "UDIO_FORMAT_UNSPECIFIED\020\000\022\024\n\020AUDIO_FORMA"
-    "T_PCM\020\001\022\024\n\020AUDIO_FORMAT_WAV\020\002\022\024\n\020AUDIO_F"
-    "ORMAT_MP3\020\003\022\025\n\021AUDIO_FORMAT_OPUS\020\004\022\024\n\020AU"
-    "DIO_FORMAT_AAC\020\005\022\025\n\021AUDIO_FORMAT_FLAC\020\006\022"
-    "\024\n\020AUDIO_FORMAT_OGG\020\007\022\024\n\020AUDIO_FORMAT_M4"
-    "A\020\010\022\032\n\026AUDIO_FORMAT_PCM_S16LE\020\t*\247\003\n\013Mode"
-    "lFormat\022\034\n\030MODEL_FORMAT_UNSPECIFIED\020\000\022\025\n"
-    "\021MODEL_FORMAT_GGUF\020\001\022\025\n\021MODEL_FORMAT_GGM"
-    "L\020\002\022\025\n\021MODEL_FORMAT_ONNX\020\003\022\024\n\020MODEL_FORM"
-    "AT_ORT\020\004\022\024\n\020MODEL_FORMAT_BIN\020\005\022\027\n\023MODEL_"
-    "FORMAT_COREML\020\006\022\030\n\024MODEL_FORMAT_MLMODEL\020"
-    "\007\022\032\n\026MODEL_FORMAT_MLPACKAGE\020\010\022\027\n\023MODEL_F"
-    "ORMAT_TFLITE\020\t\022\034\n\030MODEL_FORMAT_SAFETENSO"
-    "RS\020\n\022\034\n\030MODEL_FORMAT_QNN_CONTEXT\020\013\022\024\n\020MO"
-    "DEL_FORMAT_ZIP\020\014\022\027\n\023MODEL_FORMAT_FOLDER\020"
-    "\r\022\034\n\030MODEL_FORMAT_PROPRIETARY\020\016\022\030\n\024MODEL"
-    "_FORMAT_UNKNOWN\020\017*\330\006\n\022InferenceFramework"
-    "\022#\n\037INFERENCE_FRAMEWORK_UNSPECIFIED\020\000\022\034\n"
-    "\030INFERENCE_FRAMEWORK_ONNX\020\001\022!\n\035INFERENCE"
-    "_FRAMEWORK_LLAMA_CPP\020\002\022)\n%INFERENCE_FRAM"
-    "EWORK_FOUNDATION_MODELS\020\003\022\"\n\036INFERENCE_F"
-    "RAMEWORK_SYSTEM_TTS\020\004\022#\n\037INFERENCE_FRAME"
-    "WORK_FLUID_AUDIO\020\005\022\036\n\032INFERENCE_FRAMEWOR"
-    "K_COREML\020\006\022\033\n\027INFERENCE_FRAMEWORK_MLX\020\007\022"
-    ")\n%INFERENCE_FRAMEWORK_WHISPERKIT_COREML"
-    "\020\010\022\037\n\033INFERENCE_FRAMEWORK_METALRT\020\t\022\035\n\031I"
-    "NFERENCE_FRAMEWORK_GENIE\020\n\022\036\n\032INFERENCE_"
-    "FRAMEWORK_TFLITE\020\013\022\"\n\036INFERENCE_FRAMEWOR"
-    "K_EXECUTORCH\020\014\022!\n\035INFERENCE_FRAMEWORK_ME"
-    "DIAPIPE\020\r\022\033\n\027INFERENCE_FRAMEWORK_MLC\020\016\022 "
-    "\n\034INFERENCE_FRAMEWORK_PICO_LLM\020\017\022!\n\035INFE"
-    "RENCE_FRAMEWORK_PIPER_TTS\020\020\022\"\n\036INFERENCE"
-    "_FRAMEWORK_WHISPERKIT\020\021\022&\n\"INFERENCE_FRA"
-    "MEWORK_OPENAI_WHISPER\020\022\022*\n&INFERENCE_FRA"
-    "MEWORK_SWIFT_TRANSFORMERS\020\023\022 \n\034INFERENCE"
-    "_FRAMEWORK_BUILT_IN\020\024\022\034\n\030INFERENCE_FRAME"
-    "WORK_NONE\020\025\022\037\n\033INFERENCE_FRAMEWORK_UNKNO"
-    "WN\020\026\022\036\n\032INFERENCE_FRAMEWORK_SHERPA\020\027*\334\002\n"
-    "\rModelCategory\022\036\n\032MODEL_CATEGORY_UNSPECI"
-    "FIED\020\000\022\033\n\027MODEL_CATEGORY_LANGUAGE\020\001\022%\n!M"
-    "ODEL_CATEGORY_SPEECH_RECOGNITION\020\002\022#\n\037MO"
-    "DEL_CATEGORY_SPEECH_SYNTHESIS\020\003\022\031\n\025MODEL"
-    "_CATEGORY_VISION\020\004\022#\n\037MODEL_CATEGORY_IMA"
-    "GE_GENERATION\020\005\022\035\n\031MODEL_CATEGORY_MULTIM"
-    "ODAL\020\006\022\030\n\024MODEL_CATEGORY_AUDIO\020\007\022\034\n\030MODE"
-    "L_CATEGORY_EMBEDDING\020\010\022+\n\'MODEL_CATEGORY"
-    "_VOICE_ACTIVITY_DETECTION\020\t*\217\001\n\016SDKEnvir"
-    "onment\022\037\n\033SDK_ENVIRONMENT_UNSPECIFIED\020\000\022"
-    "\037\n\033SDK_ENVIRONMENT_DEVELOPMENT\020\001\022\033\n\027SDK_"
-    "ENVIRONMENT_STAGING\020\002\022\036\n\032SDK_ENVIRONMENT"
-    "_PRODUCTION\020\003*w\n\013ModelSource\022\034\n\030MODEL_SO"
-    "URCE_UNSPECIFIED\020\000\022\027\n\023MODEL_SOURCE_REMOT"
-    "E\020\001\022\026\n\022MODEL_SOURCE_LOCAL\020\002\022\031\n\025MODEL_SOU"
-    "RCE_BUILT_IN\020\003*\215\001\n\013ArchiveType\022\034\n\030ARCHIV"
-    "E_TYPE_UNSPECIFIED\020\000\022\024\n\020ARCHIVE_TYPE_ZIP"
-    "\020\001\022\030\n\024ARCHIVE_TYPE_TAR_BZ2\020\002\022\027\n\023ARCHIVE_"
-    "TYPE_TAR_GZ\020\003\022\027\n\023ARCHIVE_TYPE_TAR_XZ\020\004*\315"
-    "\001\n\020ArchiveStructure\022!\n\035ARCHIVE_STRUCTURE"
-    "_UNSPECIFIED\020\000\022(\n$ARCHIVE_STRUCTURE_SING"
-    "LE_FILE_NESTED\020\001\022%\n!ARCHIVE_STRUCTURE_DI"
-    "RECTORY_BASED\020\002\022&\n\"ARCHIVE_STRUCTURE_NES"
-    "TED_DIRECTORY\020\003\022\035\n\031ARCHIVE_STRUCTURE_UNK"
-    "NOWN\020\004*\245\003\n\021ModelArtifactType\022#\n\037MODEL_AR"
-    "TIFACT_TYPE_UNSPECIFIED\020\000\022#\n\037MODEL_ARTIF"
-    "ACT_TYPE_SINGLE_FILE\020\001\022&\n\"MODEL_ARTIFACT"
-    "_TYPE_TAR_GZ_ARCHIVE\020\002\022!\n\035MODEL_ARTIFACT"
-    "_TYPE_DIRECTORY\020\003\022#\n\037MODEL_ARTIFACT_TYPE"
-    "_ZIP_ARCHIVE\020\004\022\036\n\032MODEL_ARTIFACT_TYPE_CU"
-    "STOM\020\005\022\037\n\033MODEL_ARTIFACT_TYPE_ARCHIVE\020\006\022"
-    "\"\n\036MODEL_ARTIFACT_TYPE_MULTI_FILE\020\007\022 \n\034M"
-    "ODEL_ARTIFACT_TYPE_BUILT_IN\020\010\022\'\n#MODEL_A"
-    "RTIFACT_TYPE_TAR_BZ2_ARCHIVE\020\t\022&\n\"MODEL_"
-    "ARTIFACT_TYPE_TAR_XZ_ARCHIVE\020\n*\225\002\n\023Model"
-    "RegistryStatus\022%\n!MODEL_REGISTRY_STATUS_"
-    "UNSPECIFIED\020\000\022$\n MODEL_REGISTRY_STATUS_R"
-    "EGISTERED\020\001\022%\n!MODEL_REGISTRY_STATUS_DOW"
-    "NLOADING\020\002\022$\n MODEL_REGISTRY_STATUS_DOWN"
-    "LOADED\020\003\022!\n\035MODEL_REGISTRY_STATUS_LOADIN"
-    "G\020\004\022 \n\034MODEL_REGISTRY_STATUS_LOADED\020\005\022\037\n"
-    "\033MODEL_REGISTRY_STATUS_ERROR\020\006*\305\002\n\023Model"
-    "QuerySortField\022&\n\"MODEL_QUERY_SORT_FIELD"
-    "_UNSPECIFIED\020\000\022\037\n\033MODEL_QUERY_SORT_FIELD"
-    "_NAME\020\001\022-\n)MODEL_QUERY_SORT_FIELD_CREATE"
-    "D_AT_UNIX_MS\020\002\022-\n)MODEL_QUERY_SORT_FIELD"
-    "_UPDATED_AT_UNIX_MS\020\003\022.\n*MODEL_QUERY_SOR"
-    "T_FIELD_DOWNLOAD_SIZE_BYTES\020\004\022/\n+MODEL_Q"
-    "UERY_SORT_FIELD_LAST_USED_AT_UNIX_MS\020\005\022&"
-    "\n\"MODEL_QUERY_SORT_FIELD_USAGE_COUNT\020\006*\212"
-    "\001\n\023ModelQuerySortOrder\022&\n\"MODEL_QUERY_SO"
-    "RT_ORDER_UNSPECIFIED\020\000\022$\n MODEL_QUERY_SO"
-    "RT_ORDER_ASCENDING\020\001\022%\n!MODEL_QUERY_SORT"
-    "_ORDER_DESCENDING\020\002*\253\002\n\rModelFileRole\022\037\n"
-    "\033MODEL_FILE_ROLE_UNSPECIFIED\020\000\022!\n\035MODEL_"
-    "FILE_ROLE_PRIMARY_MODEL\020\001\022\035\n\031MODEL_FILE_"
-    "ROLE_COMPANION\020\002\022$\n MODEL_FILE_ROLE_VISI"
-    "ON_PROJECTOR\020\003\022\035\n\031MODEL_FILE_ROLE_TOKENI"
-    "ZER\020\004\022\032\n\026MODEL_FILE_ROLE_CONFIG\020\005\022\036\n\032MOD"
-    "EL_FILE_ROLE_VOCABULARY\020\006\022\032\n\026MODEL_FILE_"
-    "ROLE_MERGES\020\007\022\032\n\026MODEL_FILE_ROLE_LABELS\020"
-    "\010*\325\001\n\rRoutingPolicy\022\036\n\032ROUTING_POLICY_UN"
-    "SPECIFIED\020\000\022\037\n\033ROUTING_POLICY_PREFER_LOC"
-    "AL\020\001\022\037\n\033ROUTING_POLICY_PREFER_CLOUD\020\002\022!\n"
-    "\035ROUTING_POLICY_COST_OPTIMIZED\020\003\022$\n ROUT"
-    "ING_POLICY_LATENCY_OPTIMIZED\020\004\022\031\n\025ROUTIN"
-    "G_POLICY_MANUAL\020\0052\203\005\n\rModelRegistry\022@\n\010R"
-    "egister\022\031.runanywhere.v1.ModelInfo\032\031.run"
-    "anywhere.v1.ModelInfo\022>\n\006Update\022\031.runany"
-    "where.v1.ModelInfo\032\031.runanywhere.v1.Mode"
-    "lInfo\022F\n\003Get\022\037.runanywhere.v1.ModelGetRe"
-    "quest\032\036.runanywhere.v1.ModelGetResult\022I\n"
-    "\004List\022 .runanywhere.v1.ModelListRequest\032"
-    "\037.runanywhere.v1.ModelListResult\022O\n\006Remo"
-    "ve\022\".runanywhere.v1.ModelDeleteRequest\032!"
-    ".runanywhere.v1.ModelDeleteResult\022O\n\006Imp"
-    "ort\022\".runanywhere.v1.ModelImportRequest\032"
-    "!.runanywhere.v1.ModelImportResult\022W\n\010Di"
-    "scover\022%.runanywhere.v1.ModelDiscoveryRe"
-    "quest\032$.runanywhere.v1.ModelDiscoveryRes"
-    "ult\022b\n\007Refresh\022+.runanywhere.v1.ModelReg"
-    "istryRefreshRequest\032*.runanywhere.v1.Mod"
-    "elRegistryRefreshResultB\212\001\n\027ai.runanywhe"
-    "re.proto.v1B\017ModelTypesProtoP\001Z<github.c"
-    "om/runanywhere/runanywhere-sdks/idl/v1;r"
-    "unanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272"
-    "\002\002RAb\006proto3"
+    "error_message\030\006 \001(\t\"\373\001\n\024ModelInfoMakeReq"
+    "uest\022\013\n\003url\030\001 \001(\t\022\014\n\004name\030\002 \001(\t\022:\n\tframe"
+    "work\030\003 \001(\0162\".runanywhere.v1.InferenceFra"
+    "meworkH\000\210\001\001\0224\n\010category\030\004 \001(\0162\035.runanywh"
+    "ere.v1.ModelCategoryH\001\210\001\001\0220\n\006source\030\005 \001("
+    "\0162\033.runanywhere.v1.ModelSourceH\002\210\001\001B\014\n\n_"
+    "frameworkB\013\n\t_categoryB\t\n\007_source\"\202\002\n\033Re"
+    "gisterModelFromUrlRequest\022\013\n\003url\030\001 \001(\t\022\014"
+    "\n\004name\030\002 \001(\t\022:\n\tframework\030\003 \001(\0162\".runany"
+    "where.v1.InferenceFrameworkH\000\210\001\001\0224\n\010cate"
+    "gory\030\004 \001(\0162\035.runanywhere.v1.ModelCategor"
+    "yH\001\210\001\001\0220\n\006source\030\005 \001(\0162\033.runanywhere.v1."
+    "ModelSourceH\002\210\001\001B\014\n\n_frameworkB\013\n\t_categ"
+    "oryB\t\n\007_source*\371\001\n\013AudioFormat\022\034\n\030AUDIO_"
+    "FORMAT_UNSPECIFIED\020\000\022\024\n\020AUDIO_FORMAT_PCM"
+    "\020\001\022\024\n\020AUDIO_FORMAT_WAV\020\002\022\024\n\020AUDIO_FORMAT"
+    "_MP3\020\003\022\025\n\021AUDIO_FORMAT_OPUS\020\004\022\024\n\020AUDIO_F"
+    "ORMAT_AAC\020\005\022\025\n\021AUDIO_FORMAT_FLAC\020\006\022\024\n\020AU"
+    "DIO_FORMAT_OGG\020\007\022\024\n\020AUDIO_FORMAT_M4A\020\010\022\032"
+    "\n\026AUDIO_FORMAT_PCM_S16LE\020\t*\247\003\n\013ModelForm"
+    "at\022\034\n\030MODEL_FORMAT_UNSPECIFIED\020\000\022\025\n\021MODE"
+    "L_FORMAT_GGUF\020\001\022\025\n\021MODEL_FORMAT_GGML\020\002\022\025"
+    "\n\021MODEL_FORMAT_ONNX\020\003\022\024\n\020MODEL_FORMAT_OR"
+    "T\020\004\022\024\n\020MODEL_FORMAT_BIN\020\005\022\027\n\023MODEL_FORMA"
+    "T_COREML\020\006\022\030\n\024MODEL_FORMAT_MLMODEL\020\007\022\032\n\026"
+    "MODEL_FORMAT_MLPACKAGE\020\010\022\027\n\023MODEL_FORMAT"
+    "_TFLITE\020\t\022\034\n\030MODEL_FORMAT_SAFETENSORS\020\n\022"
+    "\034\n\030MODEL_FORMAT_QNN_CONTEXT\020\013\022\024\n\020MODEL_F"
+    "ORMAT_ZIP\020\014\022\027\n\023MODEL_FORMAT_FOLDER\020\r\022\034\n\030"
+    "MODEL_FORMAT_PROPRIETARY\020\016\022\030\n\024MODEL_FORM"
+    "AT_UNKNOWN\020\017*\330\006\n\022InferenceFramework\022#\n\037I"
+    "NFERENCE_FRAMEWORK_UNSPECIFIED\020\000\022\034\n\030INFE"
+    "RENCE_FRAMEWORK_ONNX\020\001\022!\n\035INFERENCE_FRAM"
+    "EWORK_LLAMA_CPP\020\002\022)\n%INFERENCE_FRAMEWORK"
+    "_FOUNDATION_MODELS\020\003\022\"\n\036INFERENCE_FRAMEW"
+    "ORK_SYSTEM_TTS\020\004\022#\n\037INFERENCE_FRAMEWORK_"
+    "FLUID_AUDIO\020\005\022\036\n\032INFERENCE_FRAMEWORK_COR"
+    "EML\020\006\022\033\n\027INFERENCE_FRAMEWORK_MLX\020\007\022)\n%IN"
+    "FERENCE_FRAMEWORK_WHISPERKIT_COREML\020\010\022\037\n"
+    "\033INFERENCE_FRAMEWORK_METALRT\020\t\022\035\n\031INFERE"
+    "NCE_FRAMEWORK_GENIE\020\n\022\036\n\032INFERENCE_FRAME"
+    "WORK_TFLITE\020\013\022\"\n\036INFERENCE_FRAMEWORK_EXE"
+    "CUTORCH\020\014\022!\n\035INFERENCE_FRAMEWORK_MEDIAPI"
+    "PE\020\r\022\033\n\027INFERENCE_FRAMEWORK_MLC\020\016\022 \n\034INF"
+    "ERENCE_FRAMEWORK_PICO_LLM\020\017\022!\n\035INFERENCE"
+    "_FRAMEWORK_PIPER_TTS\020\020\022\"\n\036INFERENCE_FRAM"
+    "EWORK_WHISPERKIT\020\021\022&\n\"INFERENCE_FRAMEWOR"
+    "K_OPENAI_WHISPER\020\022\022*\n&INFERENCE_FRAMEWOR"
+    "K_SWIFT_TRANSFORMERS\020\023\022 \n\034INFERENCE_FRAM"
+    "EWORK_BUILT_IN\020\024\022\034\n\030INFERENCE_FRAMEWORK_"
+    "NONE\020\025\022\037\n\033INFERENCE_FRAMEWORK_UNKNOWN\020\026\022"
+    "\036\n\032INFERENCE_FRAMEWORK_SHERPA\020\027*\334\002\n\rMode"
+    "lCategory\022\036\n\032MODEL_CATEGORY_UNSPECIFIED\020"
+    "\000\022\033\n\027MODEL_CATEGORY_LANGUAGE\020\001\022%\n!MODEL_"
+    "CATEGORY_SPEECH_RECOGNITION\020\002\022#\n\037MODEL_C"
+    "ATEGORY_SPEECH_SYNTHESIS\020\003\022\031\n\025MODEL_CATE"
+    "GORY_VISION\020\004\022#\n\037MODEL_CATEGORY_IMAGE_GE"
+    "NERATION\020\005\022\035\n\031MODEL_CATEGORY_MULTIMODAL\020"
+    "\006\022\030\n\024MODEL_CATEGORY_AUDIO\020\007\022\034\n\030MODEL_CAT"
+    "EGORY_EMBEDDING\020\010\022+\n\'MODEL_CATEGORY_VOIC"
+    "E_ACTIVITY_DETECTION\020\t*\217\001\n\016SDKEnvironmen"
+    "t\022\037\n\033SDK_ENVIRONMENT_UNSPECIFIED\020\000\022\037\n\033SD"
+    "K_ENVIRONMENT_DEVELOPMENT\020\001\022\033\n\027SDK_ENVIR"
+    "ONMENT_STAGING\020\002\022\036\n\032SDK_ENVIRONMENT_PROD"
+    "UCTION\020\003*w\n\013ModelSource\022\034\n\030MODEL_SOURCE_"
+    "UNSPECIFIED\020\000\022\027\n\023MODEL_SOURCE_REMOTE\020\001\022\026"
+    "\n\022MODEL_SOURCE_LOCAL\020\002\022\031\n\025MODEL_SOURCE_B"
+    "UILT_IN\020\003*\215\001\n\013ArchiveType\022\034\n\030ARCHIVE_TYP"
+    "E_UNSPECIFIED\020\000\022\024\n\020ARCHIVE_TYPE_ZIP\020\001\022\030\n"
+    "\024ARCHIVE_TYPE_TAR_BZ2\020\002\022\027\n\023ARCHIVE_TYPE_"
+    "TAR_GZ\020\003\022\027\n\023ARCHIVE_TYPE_TAR_XZ\020\004*\315\001\n\020Ar"
+    "chiveStructure\022!\n\035ARCHIVE_STRUCTURE_UNSP"
+    "ECIFIED\020\000\022(\n$ARCHIVE_STRUCTURE_SINGLE_FI"
+    "LE_NESTED\020\001\022%\n!ARCHIVE_STRUCTURE_DIRECTO"
+    "RY_BASED\020\002\022&\n\"ARCHIVE_STRUCTURE_NESTED_D"
+    "IRECTORY\020\003\022\035\n\031ARCHIVE_STRUCTURE_UNKNOWN\020"
+    "\004*\245\003\n\021ModelArtifactType\022#\n\037MODEL_ARTIFAC"
+    "T_TYPE_UNSPECIFIED\020\000\022#\n\037MODEL_ARTIFACT_T"
+    "YPE_SINGLE_FILE\020\001\022&\n\"MODEL_ARTIFACT_TYPE"
+    "_TAR_GZ_ARCHIVE\020\002\022!\n\035MODEL_ARTIFACT_TYPE"
+    "_DIRECTORY\020\003\022#\n\037MODEL_ARTIFACT_TYPE_ZIP_"
+    "ARCHIVE\020\004\022\036\n\032MODEL_ARTIFACT_TYPE_CUSTOM\020"
+    "\005\022\037\n\033MODEL_ARTIFACT_TYPE_ARCHIVE\020\006\022\"\n\036MO"
+    "DEL_ARTIFACT_TYPE_MULTI_FILE\020\007\022 \n\034MODEL_"
+    "ARTIFACT_TYPE_BUILT_IN\020\010\022\'\n#MODEL_ARTIFA"
+    "CT_TYPE_TAR_BZ2_ARCHIVE\020\t\022&\n\"MODEL_ARTIF"
+    "ACT_TYPE_TAR_XZ_ARCHIVE\020\n*\225\002\n\023ModelRegis"
+    "tryStatus\022%\n!MODEL_REGISTRY_STATUS_UNSPE"
+    "CIFIED\020\000\022$\n MODEL_REGISTRY_STATUS_REGIST"
+    "ERED\020\001\022%\n!MODEL_REGISTRY_STATUS_DOWNLOAD"
+    "ING\020\002\022$\n MODEL_REGISTRY_STATUS_DOWNLOADE"
+    "D\020\003\022!\n\035MODEL_REGISTRY_STATUS_LOADING\020\004\022 "
+    "\n\034MODEL_REGISTRY_STATUS_LOADED\020\005\022\037\n\033MODE"
+    "L_REGISTRY_STATUS_ERROR\020\006*\305\002\n\023ModelQuery"
+    "SortField\022&\n\"MODEL_QUERY_SORT_FIELD_UNSP"
+    "ECIFIED\020\000\022\037\n\033MODEL_QUERY_SORT_FIELD_NAME"
+    "\020\001\022-\n)MODEL_QUERY_SORT_FIELD_CREATED_AT_"
+    "UNIX_MS\020\002\022-\n)MODEL_QUERY_SORT_FIELD_UPDA"
+    "TED_AT_UNIX_MS\020\003\022.\n*MODEL_QUERY_SORT_FIE"
+    "LD_DOWNLOAD_SIZE_BYTES\020\004\022/\n+MODEL_QUERY_"
+    "SORT_FIELD_LAST_USED_AT_UNIX_MS\020\005\022&\n\"MOD"
+    "EL_QUERY_SORT_FIELD_USAGE_COUNT\020\006*\212\001\n\023Mo"
+    "delQuerySortOrder\022&\n\"MODEL_QUERY_SORT_OR"
+    "DER_UNSPECIFIED\020\000\022$\n MODEL_QUERY_SORT_OR"
+    "DER_ASCENDING\020\001\022%\n!MODEL_QUERY_SORT_ORDE"
+    "R_DESCENDING\020\002*\253\002\n\rModelFileRole\022\037\n\033MODE"
+    "L_FILE_ROLE_UNSPECIFIED\020\000\022!\n\035MODEL_FILE_"
+    "ROLE_PRIMARY_MODEL\020\001\022\035\n\031MODEL_FILE_ROLE_"
+    "COMPANION\020\002\022$\n MODEL_FILE_ROLE_VISION_PR"
+    "OJECTOR\020\003\022\035\n\031MODEL_FILE_ROLE_TOKENIZER\020\004"
+    "\022\032\n\026MODEL_FILE_ROLE_CONFIG\020\005\022\036\n\032MODEL_FI"
+    "LE_ROLE_VOCABULARY\020\006\022\032\n\026MODEL_FILE_ROLE_"
+    "MERGES\020\007\022\032\n\026MODEL_FILE_ROLE_LABELS\020\010*\325\001\n"
+    "\rRoutingPolicy\022\036\n\032ROUTING_POLICY_UNSPECI"
+    "FIED\020\000\022\037\n\033ROUTING_POLICY_PREFER_LOCAL\020\001\022"
+    "\037\n\033ROUTING_POLICY_PREFER_CLOUD\020\002\022!\n\035ROUT"
+    "ING_POLICY_COST_OPTIMIZED\020\003\022$\n ROUTING_P"
+    "OLICY_LATENCY_OPTIMIZED\020\004\022\031\n\025ROUTING_POL"
+    "ICY_MANUAL\020\0052\203\005\n\rModelRegistry\022@\n\010Regist"
+    "er\022\031.runanywhere.v1.ModelInfo\032\031.runanywh"
+    "ere.v1.ModelInfo\022>\n\006Update\022\031.runanywhere"
+    ".v1.ModelInfo\032\031.runanywhere.v1.ModelInfo"
+    "\022F\n\003Get\022\037.runanywhere.v1.ModelGetRequest"
+    "\032\036.runanywhere.v1.ModelGetResult\022I\n\004List"
+    "\022 .runanywhere.v1.ModelListRequest\032\037.run"
+    "anywhere.v1.ModelListResult\022O\n\006Remove\022\"."
+    "runanywhere.v1.ModelDeleteRequest\032!.runa"
+    "nywhere.v1.ModelDeleteResult\022O\n\006Import\022\""
+    ".runanywhere.v1.ModelImportRequest\032!.run"
+    "anywhere.v1.ModelImportResult\022W\n\010Discove"
+    "r\022%.runanywhere.v1.ModelDiscoveryRequest"
+    "\032$.runanywhere.v1.ModelDiscoveryResult\022b"
+    "\n\007Refresh\022+.runanywhere.v1.ModelRegistry"
+    "RefreshRequest\032*.runanywhere.v1.ModelReg"
+    "istryRefreshResultB\212\001\n\027ai.runanywhere.pr"
+    "oto.v1B\017ModelTypesProtoP\001Z<github.com/ru"
+    "nanywhere/runanywhere-sdks/idl/v1;runany"
+    "wherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RAb"
+    "\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_model_5ftypes_2eproto_deps[2] = {
@@ -2542,13 +2653,13 @@ static ::absl::once_flag descriptor_table_model_5ftypes_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_model_5ftypes_2eproto = {
     false,
     false,
-    14492,
+    15007,
     descriptor_table_protodef_model_5ftypes_2eproto,
     "model_types.proto",
     &descriptor_table_model_5ftypes_2eproto_once,
     descriptor_table_model_5ftypes_2eproto_deps,
     2,
-    37,
+    39,
     schemas,
     file_default_instances,
     TableStruct_model_5ftypes_2eproto::offsets,
@@ -20144,6 +20255,824 @@ void ModelRegistryFetchAssignmentsResult::InternalSwap(ModelRegistryFetchAssignm
 }
 
 ::google::protobuf::Metadata ModelRegistryFetchAssignmentsResult::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class ModelInfoMakeRequest::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<ModelInfoMakeRequest>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(ModelInfoMakeRequest, _impl_._has_bits_);
+};
+
+ModelInfoMakeRequest::ModelInfoMakeRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, ModelInfoMakeRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.ModelInfoMakeRequest)
+}
+PROTOBUF_NDEBUG_INLINE ModelInfoMakeRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::ModelInfoMakeRequest& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        url_(arena, from.url_),
+        name_(arena, from.name_) {}
+
+ModelInfoMakeRequest::ModelInfoMakeRequest(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const ModelInfoMakeRequest& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, ModelInfoMakeRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  ModelInfoMakeRequest* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, framework_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, framework_),
+           offsetof(Impl_, source_) -
+               offsetof(Impl_, framework_) +
+               sizeof(Impl_::source_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.ModelInfoMakeRequest)
+}
+PROTOBUF_NDEBUG_INLINE ModelInfoMakeRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        url_(arena),
+        name_(arena) {}
+
+inline void ModelInfoMakeRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, framework_),
+           0,
+           offsetof(Impl_, source_) -
+               offsetof(Impl_, framework_) +
+               sizeof(Impl_::source_));
+}
+ModelInfoMakeRequest::~ModelInfoMakeRequest() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.ModelInfoMakeRequest)
+  SharedDtor(*this);
+}
+inline void ModelInfoMakeRequest::SharedDtor(MessageLite& self) {
+  ModelInfoMakeRequest& this_ = static_cast<ModelInfoMakeRequest&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.url_.Destroy();
+  this_._impl_.name_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL ModelInfoMakeRequest::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) ModelInfoMakeRequest(arena);
+}
+constexpr auto ModelInfoMakeRequest::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(ModelInfoMakeRequest),
+                                            alignof(ModelInfoMakeRequest));
+}
+constexpr auto ModelInfoMakeRequest::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_ModelInfoMakeRequest_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &ModelInfoMakeRequest::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<ModelInfoMakeRequest>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &ModelInfoMakeRequest::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<ModelInfoMakeRequest>(), &ModelInfoMakeRequest::ByteSizeLong,
+              &ModelInfoMakeRequest::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(ModelInfoMakeRequest, _impl_._cached_size_),
+          false,
+      },
+      &ModelInfoMakeRequest::kDescriptorMethods,
+      &descriptor_table_model_5ftypes_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull ModelInfoMakeRequest_class_data_ =
+        ModelInfoMakeRequest::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+ModelInfoMakeRequest::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&ModelInfoMakeRequest_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(ModelInfoMakeRequest_class_data_.tc_table);
+  return ModelInfoMakeRequest_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<3, 5, 0, 51, 2>
+ModelInfoMakeRequest::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(ModelInfoMakeRequest, _impl_._has_bits_),
+    0, // no _extensions_
+    5, 56,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967264,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    5,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    ModelInfoMakeRequest_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::ModelInfoMakeRequest>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    {::_pbi::TcParser::MiniParse, {}},
+    // string url = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(ModelInfoMakeRequest, _impl_.url_)}},
+    // string name = 2;
+    {::_pbi::TcParser::FastUS1,
+     {18, 1, 0,
+      PROTOBUF_FIELD_OFFSET(ModelInfoMakeRequest, _impl_.name_)}},
+    // optional .runanywhere.v1.InferenceFramework framework = 3;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ModelInfoMakeRequest, _impl_.framework_), 2>(),
+     {24, 2, 0,
+      PROTOBUF_FIELD_OFFSET(ModelInfoMakeRequest, _impl_.framework_)}},
+    // optional .runanywhere.v1.ModelCategory category = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ModelInfoMakeRequest, _impl_.category_), 3>(),
+     {32, 3, 0,
+      PROTOBUF_FIELD_OFFSET(ModelInfoMakeRequest, _impl_.category_)}},
+    // optional .runanywhere.v1.ModelSource source = 5;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(ModelInfoMakeRequest, _impl_.source_), 4>(),
+     {40, 4, 0,
+      PROTOBUF_FIELD_OFFSET(ModelInfoMakeRequest, _impl_.source_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // string url = 1;
+    {PROTOBUF_FIELD_OFFSET(ModelInfoMakeRequest, _impl_.url_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // string name = 2;
+    {PROTOBUF_FIELD_OFFSET(ModelInfoMakeRequest, _impl_.name_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // optional .runanywhere.v1.InferenceFramework framework = 3;
+    {PROTOBUF_FIELD_OFFSET(ModelInfoMakeRequest, _impl_.framework_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    // optional .runanywhere.v1.ModelCategory category = 4;
+    {PROTOBUF_FIELD_OFFSET(ModelInfoMakeRequest, _impl_.category_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    // optional .runanywhere.v1.ModelSource source = 5;
+    {PROTOBUF_FIELD_OFFSET(ModelInfoMakeRequest, _impl_.source_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+  }},
+  // no aux_entries
+  {{
+    "\43\3\4\0\0\0\0\0"
+    "runanywhere.v1.ModelInfoMakeRequest"
+    "url"
+    "name"
+  }},
+};
+PROTOBUF_NOINLINE void ModelInfoMakeRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.ModelInfoMakeRequest)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.url_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.name_.ClearNonDefaultToEmpty();
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001cU)) {
+    ::memset(&_impl_.framework_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.source_) -
+        reinterpret_cast<char*>(&_impl_.framework_)) + sizeof(_impl_.source_));
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL ModelInfoMakeRequest::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const ModelInfoMakeRequest& this_ = static_cast<const ModelInfoMakeRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL ModelInfoMakeRequest::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const ModelInfoMakeRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.ModelInfoMakeRequest)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string url = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_url().empty()) {
+      const ::std::string& _s = this_._internal_url();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ModelInfoMakeRequest.url");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  // string name = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_name().empty()) {
+      const ::std::string& _s = this_._internal_name();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.ModelInfoMakeRequest.name");
+      target = stream->WriteStringMaybeAliased(2, _s, target);
+    }
+  }
+
+  // optional .runanywhere.v1.InferenceFramework framework = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteEnumToArray(
+        3, this_._internal_framework(), target);
+  }
+
+  // optional .runanywhere.v1.ModelCategory category = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteEnumToArray(
+        4, this_._internal_category(), target);
+  }
+
+  // optional .runanywhere.v1.ModelSource source = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteEnumToArray(
+        5, this_._internal_source(), target);
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.ModelInfoMakeRequest)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t ModelInfoMakeRequest::ByteSizeLong(const MessageLite& base) {
+  const ModelInfoMakeRequest& this_ = static_cast<const ModelInfoMakeRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t ModelInfoMakeRequest::ByteSizeLong() const {
+  const ModelInfoMakeRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.ModelInfoMakeRequest)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    // string url = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_url().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_url());
+      }
+    }
+    // string name = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_name().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_name());
+      }
+    }
+    // optional .runanywhere.v1.InferenceFramework framework = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      total_size += 1 +
+                    ::_pbi::WireFormatLite::EnumSize(this_._internal_framework());
+    }
+    // optional .runanywhere.v1.ModelCategory category = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      total_size += 1 +
+                    ::_pbi::WireFormatLite::EnumSize(this_._internal_category());
+    }
+    // optional .runanywhere.v1.ModelSource source = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      total_size += 1 +
+                    ::_pbi::WireFormatLite::EnumSize(this_._internal_source());
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void ModelInfoMakeRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<ModelInfoMakeRequest*>(&to_msg);
+  auto& from = static_cast<const ModelInfoMakeRequest&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.ModelInfoMakeRequest)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_url().empty()) {
+        _this->_internal_set_url(from._internal_url());
+      } else {
+        if (_this->_impl_.url_.IsDefault()) {
+          _this->_internal_set_url("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_name().empty()) {
+        _this->_internal_set_name(from._internal_name());
+      } else {
+        if (_this->_impl_.name_.IsDefault()) {
+          _this->_internal_set_name("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _this->_impl_.framework_ = from._impl_.framework_;
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      _this->_impl_.category_ = from._impl_.category_;
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      _this->_impl_.source_ = from._impl_.source_;
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void ModelInfoMakeRequest::CopyFrom(const ModelInfoMakeRequest& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.ModelInfoMakeRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void ModelInfoMakeRequest::InternalSwap(ModelInfoMakeRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.url_, &other->_impl_.url_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.name_, &other->_impl_.name_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(ModelInfoMakeRequest, _impl_.source_)
+      + sizeof(ModelInfoMakeRequest::_impl_.source_)
+      - PROTOBUF_FIELD_OFFSET(ModelInfoMakeRequest, _impl_.framework_)>(
+          reinterpret_cast<char*>(&_impl_.framework_),
+          reinterpret_cast<char*>(&other->_impl_.framework_));
+}
+
+::google::protobuf::Metadata ModelInfoMakeRequest::GetMetadata() const {
+  return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
+}
+// ===================================================================
+
+class RegisterModelFromUrlRequest::_Internal {
+ public:
+  using HasBits =
+      decltype(::std::declval<RegisterModelFromUrlRequest>()._impl_._has_bits_);
+  static constexpr ::int32_t kHasBitsOffset =
+      8 * PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_._has_bits_);
+};
+
+RegisterModelFromUrlRequest::RegisterModelFromUrlRequest(::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, RegisterModelFromUrlRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  SharedCtor(arena);
+  // @@protoc_insertion_point(arena_constructor:runanywhere.v1.RegisterModelFromUrlRequest)
+}
+PROTOBUF_NDEBUG_INLINE RegisterModelFromUrlRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+    [[maybe_unused]] const ::runanywhere::v1::RegisterModelFromUrlRequest& from_msg)
+      : _has_bits_{from._has_bits_},
+        _cached_size_{0},
+        url_(arena, from.url_),
+        name_(arena, from.name_) {}
+
+RegisterModelFromUrlRequest::RegisterModelFromUrlRequest(
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena,
+    const RegisterModelFromUrlRequest& from)
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+    : ::google::protobuf::Message(arena, RegisterModelFromUrlRequest_class_data_.base()) {
+#else   // PROTOBUF_CUSTOM_VTABLE
+    : ::google::protobuf::Message(arena) {
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  RegisterModelFromUrlRequest* const _this = this;
+  (void)_this;
+  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+  new (&_impl_) Impl_(internal_visibility(), arena, from._impl_, from);
+  ::memcpy(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, framework_),
+           reinterpret_cast<const char*>(&from._impl_) +
+               offsetof(Impl_, framework_),
+           offsetof(Impl_, source_) -
+               offsetof(Impl_, framework_) +
+               sizeof(Impl_::source_));
+
+  // @@protoc_insertion_point(copy_constructor:runanywhere.v1.RegisterModelFromUrlRequest)
+}
+PROTOBUF_NDEBUG_INLINE RegisterModelFromUrlRequest::Impl_::Impl_(
+    [[maybe_unused]] ::google::protobuf::internal::InternalVisibility visibility,
+    [[maybe_unused]] ::google::protobuf::Arena* PROTOBUF_NULLABLE arena)
+      : _cached_size_{0},
+        url_(arena),
+        name_(arena) {}
+
+inline void RegisterModelFromUrlRequest::SharedCtor(::_pb::Arena* PROTOBUF_NULLABLE arena) {
+  new (&_impl_) Impl_(internal_visibility(), arena);
+  ::memset(reinterpret_cast<char*>(&_impl_) +
+               offsetof(Impl_, framework_),
+           0,
+           offsetof(Impl_, source_) -
+               offsetof(Impl_, framework_) +
+               sizeof(Impl_::source_));
+}
+RegisterModelFromUrlRequest::~RegisterModelFromUrlRequest() {
+  // @@protoc_insertion_point(destructor:runanywhere.v1.RegisterModelFromUrlRequest)
+  SharedDtor(*this);
+}
+inline void RegisterModelFromUrlRequest::SharedDtor(MessageLite& self) {
+  RegisterModelFromUrlRequest& this_ = static_cast<RegisterModelFromUrlRequest&>(self);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  this_._internal_metadata_.Delete<::google::protobuf::UnknownFieldSet>();
+  ABSL_DCHECK(this_.GetArena() == nullptr);
+  this_._impl_.url_.Destroy();
+  this_._impl_.name_.Destroy();
+  this_._impl_.~Impl_();
+}
+
+inline void* PROTOBUF_NONNULL RegisterModelFromUrlRequest::PlacementNew_(
+    const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+    ::google::protobuf::Arena* PROTOBUF_NULLABLE arena) {
+  return ::new (mem) RegisterModelFromUrlRequest(arena);
+}
+constexpr auto RegisterModelFromUrlRequest::InternalNewImpl_() {
+  return ::google::protobuf::internal::MessageCreator::CopyInit(sizeof(RegisterModelFromUrlRequest),
+                                            alignof(RegisterModelFromUrlRequest));
+}
+constexpr auto RegisterModelFromUrlRequest::InternalGenerateClassData_() {
+  return ::google::protobuf::internal::ClassDataFull{
+      ::google::protobuf::internal::ClassData{
+          &_RegisterModelFromUrlRequest_default_instance_._instance,
+          &_table_.header,
+          nullptr,  // IsInitialized
+          &RegisterModelFromUrlRequest::MergeImpl,
+          ::google::protobuf::Message::GetNewImpl<RegisterModelFromUrlRequest>(),
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+          &RegisterModelFromUrlRequest::SharedDtor,
+          ::google::protobuf::Message::GetClearImpl<RegisterModelFromUrlRequest>(), &RegisterModelFromUrlRequest::ByteSizeLong,
+              &RegisterModelFromUrlRequest::_InternalSerialize,
+#endif  // PROTOBUF_CUSTOM_VTABLE
+          PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_._cached_size_),
+          false,
+      },
+      &RegisterModelFromUrlRequest::kDescriptorMethods,
+      &descriptor_table_model_5ftypes_2eproto,
+      nullptr,  // tracker
+  };
+}
+
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 const
+    ::google::protobuf::internal::ClassDataFull RegisterModelFromUrlRequest_class_data_ =
+        RegisterModelFromUrlRequest::InternalGenerateClassData_();
+
+PROTOBUF_ATTRIBUTE_WEAK const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL
+RegisterModelFromUrlRequest::GetClassData() const {
+  ::google::protobuf::internal::PrefetchToLocalCache(&RegisterModelFromUrlRequest_class_data_);
+  ::google::protobuf::internal::PrefetchToLocalCache(RegisterModelFromUrlRequest_class_data_.tc_table);
+  return RegisterModelFromUrlRequest_class_data_.base();
+}
+PROTOBUF_CONSTINIT PROTOBUF_ATTRIBUTE_INIT_PRIORITY1
+const ::_pbi::TcParseTable<3, 5, 0, 58, 2>
+RegisterModelFromUrlRequest::_table_ = {
+  {
+    PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_._has_bits_),
+    0, // no _extensions_
+    5, 56,  // max_field_number, fast_idx_mask
+    offsetof(decltype(_table_), field_lookup_table),
+    4294967264,  // skipmap
+    offsetof(decltype(_table_), field_entries),
+    5,  // num_field_entries
+    0,  // num_aux_entries
+    offsetof(decltype(_table_), field_names),  // no aux_entries
+    RegisterModelFromUrlRequest_class_data_.base(),
+    nullptr,  // post_loop_handler
+    ::_pbi::TcParser::GenericFallback,  // fallback
+    #ifdef PROTOBUF_PREFETCH_PARSE_TABLE
+    ::_pbi::TcParser::GetTable<::runanywhere::v1::RegisterModelFromUrlRequest>(),  // to_prefetch
+    #endif  // PROTOBUF_PREFETCH_PARSE_TABLE
+  }, {{
+    {::_pbi::TcParser::MiniParse, {}},
+    // string url = 1;
+    {::_pbi::TcParser::FastUS1,
+     {10, 0, 0,
+      PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.url_)}},
+    // string name = 2;
+    {::_pbi::TcParser::FastUS1,
+     {18, 1, 0,
+      PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.name_)}},
+    // optional .runanywhere.v1.InferenceFramework framework = 3;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RegisterModelFromUrlRequest, _impl_.framework_), 2>(),
+     {24, 2, 0,
+      PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.framework_)}},
+    // optional .runanywhere.v1.ModelCategory category = 4;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RegisterModelFromUrlRequest, _impl_.category_), 3>(),
+     {32, 3, 0,
+      PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.category_)}},
+    // optional .runanywhere.v1.ModelSource source = 5;
+    {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(RegisterModelFromUrlRequest, _impl_.source_), 4>(),
+     {40, 4, 0,
+      PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.source_)}},
+    {::_pbi::TcParser::MiniParse, {}},
+    {::_pbi::TcParser::MiniParse, {}},
+  }}, {{
+    65535, 65535
+  }}, {{
+    // string url = 1;
+    {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.url_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // string name = 2;
+    {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.name_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
+    // optional .runanywhere.v1.InferenceFramework framework = 3;
+    {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.framework_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    // optional .runanywhere.v1.ModelCategory category = 4;
+    {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.category_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+    // optional .runanywhere.v1.ModelSource source = 5;
+    {PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.source_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
+  }},
+  // no aux_entries
+  {{
+    "\52\3\4\0\0\0\0\0"
+    "runanywhere.v1.RegisterModelFromUrlRequest"
+    "url"
+    "name"
+  }},
+};
+PROTOBUF_NOINLINE void RegisterModelFromUrlRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:runanywhere.v1.RegisterModelFromUrlRequest)
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  cached_has_bits = _impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x00000003U)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      _impl_.url_.ClearNonDefaultToEmpty();
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      _impl_.name_.ClearNonDefaultToEmpty();
+    }
+  }
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001cU)) {
+    ::memset(&_impl_.framework_, 0, static_cast<::size_t>(
+        reinterpret_cast<char*>(&_impl_.source_) -
+        reinterpret_cast<char*>(&_impl_.framework_)) + sizeof(_impl_.source_));
+  }
+  _impl_._has_bits_.Clear();
+  _internal_metadata_.Clear<::google::protobuf::UnknownFieldSet>();
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::uint8_t* PROTOBUF_NONNULL RegisterModelFromUrlRequest::_InternalSerialize(
+    const ::google::protobuf::MessageLite& base, ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) {
+  const RegisterModelFromUrlRequest& this_ = static_cast<const RegisterModelFromUrlRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::uint8_t* PROTOBUF_NONNULL RegisterModelFromUrlRequest::_InternalSerialize(
+    ::uint8_t* PROTOBUF_NONNULL target,
+    ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+  const RegisterModelFromUrlRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    this_.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(serialize_to_array_start:runanywhere.v1.RegisterModelFromUrlRequest)
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = this_._impl_._has_bits_[0];
+  // string url = 1;
+  if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+    if (!this_._internal_url().empty()) {
+      const ::std::string& _s = this_._internal_url();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.RegisterModelFromUrlRequest.url");
+      target = stream->WriteStringMaybeAliased(1, _s, target);
+    }
+  }
+
+  // string name = 2;
+  if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+    if (!this_._internal_name().empty()) {
+      const ::std::string& _s = this_._internal_name();
+      ::google::protobuf::internal::WireFormatLite::VerifyUtf8String(
+          _s.data(), static_cast<int>(_s.length()), ::google::protobuf::internal::WireFormatLite::SERIALIZE, "runanywhere.v1.RegisterModelFromUrlRequest.name");
+      target = stream->WriteStringMaybeAliased(2, _s, target);
+    }
+  }
+
+  // optional .runanywhere.v1.InferenceFramework framework = 3;
+  if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteEnumToArray(
+        3, this_._internal_framework(), target);
+  }
+
+  // optional .runanywhere.v1.ModelCategory category = 4;
+  if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteEnumToArray(
+        4, this_._internal_category(), target);
+  }
+
+  // optional .runanywhere.v1.ModelSource source = 5;
+  if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+    target = stream->EnsureSpace(target);
+    target = ::_pbi::WireFormatLite::WriteEnumToArray(
+        5, this_._internal_source(), target);
+  }
+
+  if (ABSL_PREDICT_FALSE(this_._internal_metadata_.have_unknown_fields())) {
+    target =
+        ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
+            this_._internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:runanywhere.v1.RegisterModelFromUrlRequest)
+  return target;
+}
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+::size_t RegisterModelFromUrlRequest::ByteSizeLong(const MessageLite& base) {
+  const RegisterModelFromUrlRequest& this_ = static_cast<const RegisterModelFromUrlRequest&>(base);
+#else   // PROTOBUF_CUSTOM_VTABLE
+::size_t RegisterModelFromUrlRequest::ByteSizeLong() const {
+  const RegisterModelFromUrlRequest& this_ = *this;
+#endif  // PROTOBUF_CUSTOM_VTABLE
+  // @@protoc_insertion_point(message_byte_size_start:runanywhere.v1.RegisterModelFromUrlRequest)
+  ::size_t total_size = 0;
+
+  ::uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void)cached_has_bits;
+
+  ::_pbi::Prefetch5LinesFrom7Lines(&this_);
+  cached_has_bits = this_._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    // string url = 1;
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!this_._internal_url().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_url());
+      }
+    }
+    // string name = 2;
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!this_._internal_name().empty()) {
+        total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
+                                        this_._internal_name());
+      }
+    }
+    // optional .runanywhere.v1.InferenceFramework framework = 3;
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      total_size += 1 +
+                    ::_pbi::WireFormatLite::EnumSize(this_._internal_framework());
+    }
+    // optional .runanywhere.v1.ModelCategory category = 4;
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      total_size += 1 +
+                    ::_pbi::WireFormatLite::EnumSize(this_._internal_category());
+    }
+    // optional .runanywhere.v1.ModelSource source = 5;
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      total_size += 1 +
+                    ::_pbi::WireFormatLite::EnumSize(this_._internal_source());
+    }
+  }
+  return this_.MaybeComputeUnknownFieldsSize(total_size,
+                                             &this_._impl_._cached_size_);
+}
+
+void RegisterModelFromUrlRequest::MergeImpl(::google::protobuf::MessageLite& to_msg,
+                            const ::google::protobuf::MessageLite& from_msg) {
+   auto* const _this =
+      static_cast<RegisterModelFromUrlRequest*>(&to_msg);
+  auto& from = static_cast<const RegisterModelFromUrlRequest&>(from_msg);
+  if constexpr (::_pbi::DebugHardenCheckHasBitConsistency()) {
+    from.CheckHasBitConsistency();
+  }
+  // @@protoc_insertion_point(class_specific_merge_from_start:runanywhere.v1.RegisterModelFromUrlRequest)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
+  (void)cached_has_bits;
+
+  cached_has_bits = from._impl_._has_bits_[0];
+  if (BatchCheckHasBit(cached_has_bits, 0x0000001fU)) {
+    if (CheckHasBit(cached_has_bits, 0x00000001U)) {
+      if (!from._internal_url().empty()) {
+        _this->_internal_set_url(from._internal_url());
+      } else {
+        if (_this->_impl_.url_.IsDefault()) {
+          _this->_internal_set_url("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000002U)) {
+      if (!from._internal_name().empty()) {
+        _this->_internal_set_name(from._internal_name());
+      } else {
+        if (_this->_impl_.name_.IsDefault()) {
+          _this->_internal_set_name("");
+        }
+      }
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000004U)) {
+      _this->_impl_.framework_ = from._impl_.framework_;
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000008U)) {
+      _this->_impl_.category_ = from._impl_.category_;
+    }
+    if (CheckHasBit(cached_has_bits, 0x00000010U)) {
+      _this->_impl_.source_ = from._impl_.source_;
+    }
+  }
+  _this->_impl_._has_bits_[0] |= cached_has_bits;
+  _this->_internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
+      from._internal_metadata_);
+}
+
+void RegisterModelFromUrlRequest::CopyFrom(const RegisterModelFromUrlRequest& from) {
+  // @@protoc_insertion_point(class_specific_copy_from_start:runanywhere.v1.RegisterModelFromUrlRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+
+void RegisterModelFromUrlRequest::InternalSwap(RegisterModelFromUrlRequest* PROTOBUF_RESTRICT PROTOBUF_NONNULL other) {
+  using ::std::swap;
+  auto* arena = GetArena();
+  ABSL_DCHECK_EQ(arena, other->GetArena());
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  swap(_impl_._has_bits_[0], other->_impl_._has_bits_[0]);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.url_, &other->_impl_.url_, arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.name_, &other->_impl_.name_, arena);
+  ::google::protobuf::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.source_)
+      + sizeof(RegisterModelFromUrlRequest::_impl_.source_)
+      - PROTOBUF_FIELD_OFFSET(RegisterModelFromUrlRequest, _impl_.framework_)>(
+          reinterpret_cast<char*>(&_impl_.framework_),
+          reinterpret_cast<char*>(&other->_impl_.framework_));
+}
+
+::google::protobuf::Metadata RegisterModelFromUrlRequest::GetMetadata() const {
   return ::google::protobuf::Message::GetMetadataImpl(GetClassData()->full());
 }
 // @@protoc_insertion_point(namespace_scope)

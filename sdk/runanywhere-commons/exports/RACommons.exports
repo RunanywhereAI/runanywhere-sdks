@@ -233,6 +233,8 @@ _rac_model_registry_proto_free
 _rac_model_registry_fetch_assignments_proto
 _rac_model_format_from_url_proto
 _rac_artifact_infer_from_url_proto
+_rac_register_model_from_url_proto
+_rac_artifact_expected_files_proto
 _rac_model_compatibility_check_proto
 _rac_model_lifecycle_load_proto
 _rac_model_lifecycle_unload_proto
@@ -670,6 +672,21 @@ _rac_model_category_requires_context_length
 _rac_model_category_supports_thinking
 _rac_model_check_compatibility
 _rac_model_matches_filter
+
+# Canonical model-id derivation. Source-of-truth port of Swift's
+# RunAnywhere.generateModelId(fromURL:) — every platform SDK delegates to this
+# C ABI to keep URL → id derivation byte-exact across SDKs.
+_rac_model_id_from_url
+
+# Canonical wire-string / display / analytics accessors for the format and
+# inference framework enums. Replaces the per-SDK ~400 LOC switch tables
+# (Swift's RAModelFormat / RAInferenceFramework wireString / displayName /
+# analyticsKey extensions in ModelTypes.swift).
+_rac_model_format_wire_string
+_rac_inference_framework_wire_string
+_rac_inference_framework_display_name
+_rac_inference_framework_analytics_key
+_rac_inference_framework_from_string
 
 # Model registry supporting result/freeing helpers.
 _rac_discovery_result_free

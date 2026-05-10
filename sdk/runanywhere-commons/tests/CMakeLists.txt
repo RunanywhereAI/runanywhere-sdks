@@ -343,6 +343,18 @@ rac_link_archive_deps(test_proto_buffer)
 target_compile_features(test_proto_buffer PRIVATE cxx_std_17)
 add_test(NAME proto_buffer_tests COMMAND test_proto_buffer)
 
+# --- rac_result_t -> RASDKError proto parity tests --------------------------
+add_executable(test_result_to_proto_error test_result_to_proto_error.cpp)
+target_include_directories(test_result_to_proto_error PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_result_to_proto_error PRIVATE rac_commons)
+rac_link_archive_deps(test_result_to_proto_error)
+target_compile_features(test_result_to_proto_error PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_result_to_proto_error)
+add_test(NAME result_to_proto_error_tests COMMAND test_result_to_proto_error)
+
 # --- Canonical SDKEvent proto-byte stream tests -----------------------------
 add_executable(test_sdk_event_stream test_sdk_event_stream.cpp)
 target_include_directories(test_sdk_event_stream PRIVATE
@@ -456,6 +468,102 @@ rac_link_archive_deps(test_model_format_infer_proto)
 target_compile_features(test_model_format_infer_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_model_format_infer_proto)
 add_test(NAME model_format_infer_proto_tests COMMAND test_model_format_infer_proto)
+
+# --- Canonical RAModelInfo factory parity tests (P2-T4) ----------------------
+# Exercises rac_model_info_make_proto — the commons-owned factory that
+# replaces Swift's ModelTypes+Artifacts.swift::RAModelInfo.make. Verifies
+# the 18-field defaulting logic plus the rac_path_is_non_empty_directory
+# probe (callback path + file_list_directory fallback).
+add_executable(test_model_info_make_proto test_model_info_make_proto.cpp)
+target_include_directories(test_model_info_make_proto PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_model_info_make_proto PRIVATE rac_commons)
+rac_link_archive_deps(test_model_info_make_proto)
+target_compile_features(test_model_info_make_proto PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_model_info_make_proto)
+add_test(NAME model_info_make_proto_tests COMMAND test_model_info_make_proto)
+
+# --- Register model from URL parity tests (P2-T6) ----------------------------
+# Exercises rac_register_model_from_url_proto — the canonical
+# RegisterModelFromUrlRequest → save → ModelInfo entry point. Composes
+# rac_model_info_make_proto (P2-T4) with the existing registry persistence
+# path. End-to-end test: call the new ABI; round-trip via
+# rac_model_registry_get_proto for the returned id; verify equality.
+add_executable(test_register_model_from_url test_register_model_from_url.cpp)
+target_include_directories(test_register_model_from_url PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_register_model_from_url PRIVATE rac_commons)
+rac_link_archive_deps(test_register_model_from_url)
+target_compile_features(test_register_model_from_url PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_register_model_from_url)
+add_test(NAME register_model_from_url_tests COMMAND test_register_model_from_url)
+
+# --- Artifact ExpectedModelFiles parity tests (P2-T7) ------------------------
+# Exercises rac_artifact_expected_files_proto — the commons-owned port of
+# Swift's RAModelInfo.expectedArtifactFiles + OneOf_Artifact.expectedFiles.
+# Verifies every artifact subtype (single_file/archive/multi_file) plus the
+# top-level expected_files short-circuit and the empty/built_in/custom_strategy
+# fallback paths.
+add_executable(test_artifact_helpers_proto test_artifact_helpers_proto.cpp)
+target_include_directories(test_artifact_helpers_proto PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_artifact_helpers_proto PRIVATE rac_commons)
+rac_link_archive_deps(test_artifact_helpers_proto)
+target_compile_features(test_artifact_helpers_proto PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_artifact_helpers_proto)
+add_test(NAME artifact_helpers_proto_tests COMMAND test_artifact_helpers_proto)
+
+# --- Per-framework "is this file a model file?" parity tests -----------------
+# Exercises rac_model_format_for_framework() — the canonical commons helper
+# that replaced the per-SDK rac_discovery_callbacks_t.is_model_file callback
+# (Swift's racIsModelFile). Pure C ABI test, no protobuf required.
+add_executable(test_model_format_for_framework test_model_format_for_framework.cpp)
+target_include_directories(test_model_format_for_framework PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_model_format_for_framework PRIVATE rac_commons)
+rac_link_archive_deps(test_model_format_for_framework)
+target_compile_features(test_model_format_for_framework PRIVATE cxx_std_17)
+add_test(NAME model_format_for_framework_tests COMMAND test_model_format_for_framework)
+
+# --- Canonical model-id-from-URL parity tests --------------------------------
+# Exercises rac_model_id_from_url() — the commons-owned port of Swift's
+# RunAnywhere.generateModelId(fromURL:) (Storage.swift). Each platform SDK's
+# generateModelId helper now delegates to this function, so the parity test
+# locks every SDK to the same byte-exact output. Pure C ABI test, no protobuf
+# required.
+add_executable(test_model_id_from_url test_model_id_from_url.cpp)
+target_include_directories(test_model_id_from_url PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_model_id_from_url PRIVATE rac_commons)
+rac_link_archive_deps(test_model_id_from_url)
+target_compile_features(test_model_id_from_url PRIVATE cxx_std_17)
+add_test(NAME model_id_from_url_tests COMMAND test_model_id_from_url)
+
+# --- Canonical wire-string / display / analytics accessor parity tests -------
+# Exercises rac_model_format_wire_string,
+# rac_inference_framework_wire_string / display_name / analytics_key and the
+# inverse rac_inference_framework_from_string. Replaces the ~400 LOC of Swift
+# switch tables in ModelTypes.swift with a commons-owned source of truth.
+# Pure C ABI test, no protobuf required.
+add_executable(test_model_string_accessors test_model_string_accessors.cpp)
+target_include_directories(test_model_string_accessors PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_model_string_accessors PRIVATE rac_commons)
+rac_link_archive_deps(test_model_string_accessors)
+target_compile_features(test_model_string_accessors PRIVATE cxx_std_17)
+add_test(NAME model_string_accessors_tests COMMAND test_model_string_accessors)
 
 # --- Model lifecycle proto-byte ABI tests ------------------------------------
 # Exercises ModelLoad/Unload/CurrentModel and ComponentLifecycleSnapshot over

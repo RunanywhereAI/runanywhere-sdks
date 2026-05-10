@@ -307,6 +307,26 @@ typedef struct rac_platform_adapter {
     rac_file_list_directory_fn file_list_directory;
 
     // -------------------------------------------------------------------------
+    // Directory Probe (Optional - can be NULL)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Check whether a path is a directory containing at least one entry.
+     *
+     * Optional. Used by the canonical RAModelInfo factory
+     * (rac_model_info_make_proto) to compute the `is_downloaded` field for
+     * directory-based artifacts (multi-file, archive-extracted) without
+     * forcing the SDK to enumerate the directory itself. When NULL, commons
+     * falls back to file_list_directory + entry-count.
+     *
+     * @param path Absolute directory path (UTF-8, NUL-terminated).
+     * @param user_data Platform context.
+     * @return RAC_TRUE when the path is a directory with at least one entry;
+     *         RAC_FALSE otherwise (missing, empty, or a regular file).
+     */
+    rac_bool_t (*is_non_empty_directory)(const char* path, void* user_data);
+
+    // -------------------------------------------------------------------------
     // User Data
     // -------------------------------------------------------------------------
 
