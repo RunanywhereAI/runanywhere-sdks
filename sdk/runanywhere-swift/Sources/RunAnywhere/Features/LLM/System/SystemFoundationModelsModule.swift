@@ -51,17 +51,7 @@ import FoundationModels
 /// let result = try await RunAnywhere.generate(req)
 /// print(result.text)
 /// ```
-public enum SystemFoundationModels: RunAnywhereModule {
-    // MARK: - RunAnywhereModule Conformance
-
-    public static let moduleId = "system-foundation-models"
-    public static let moduleName = "System Foundation Models"
-    public static let capabilities: Set<SDKComponent> = [.llm]
-    public static let defaultPriority: Int = 50  // Lower than LlamaCPP (100)
-
-    /// System Foundation Models uses Apple's built-in Foundation Models
-    public static let inferenceFramework: InferenceFramework = .foundationModels
-
+public enum SystemFoundationModels {
     // MARK: - Public API
 
     /// Check if Foundation Models is available on this device
@@ -83,34 +73,6 @@ public enum SystemFoundationModels: RunAnywhereModule {
         return "FoundationModels framework is not available in this build."
         #endif
         #endif
-    }
-
-    /// Check if this module can handle the given model ID
-    public static func canHandle(modelId: String?) -> Bool {
-        guard isAvailable else {
-            return false
-        }
-
-        guard let modelId = modelId, !modelId.isEmpty else {
-            return false
-        }
-
-        let lowercasedId = modelId.lowercased()
-        return lowercasedId.contains("foundation-models")
-            || lowercasedId.contains("foundation")
-            || lowercasedId.contains("apple-intelligence")
-            || lowercasedId == "foundation-models-default"
-            || lowercasedId == "system-llm"
-    }
-
-    /// Create a SystemFoundationModelsService instance directly
-    ///
-    /// Use this for direct access without going through the service registry.
-    @available(iOS 26.0, macOS 26.0, *)
-    public static func createService() async throws -> SystemFoundationModelsService {
-        let service = SystemFoundationModelsService()
-        try await service.initialize(modelPath: "built-in")
-        return service
     }
 
     #if canImport(FoundationModels)

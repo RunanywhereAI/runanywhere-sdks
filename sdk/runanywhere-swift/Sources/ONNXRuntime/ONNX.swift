@@ -39,7 +39,7 @@ import RunAnywhere
 /// // TTS via public API
 /// try await RunAnywhere.speak("Hello")
 /// ```
-public enum ONNX: RunAnywhereModule {
+public enum ONNX {
     private static let logger = SDKLogger(category: "ONNX")
 
     // MARK: - Module Info
@@ -49,16 +49,6 @@ public enum ONNX: RunAnywhereModule {
 
     /// ONNX Runtime library version (underlying C library)
     public static let onnxRuntimeVersion = "1.23.2"
-
-    // MARK: - RunAnywhereModule Conformance
-
-    public static let moduleId = "onnx"
-    public static let moduleName = "ONNX Runtime"
-    public static let capabilities: Set<SDKComponent> = [.stt, .tts, .vad]
-    public static let defaultPriority: Int = 100
-
-    /// ONNX uses the ONNX Runtime inference framework
-    public static let inferenceFramework: InferenceFramework = .onnx
 
     // MARK: - Registration State
 
@@ -163,30 +153,6 @@ public enum ONNX: RunAnywhereModule {
         logger.info("ONNX backend unregistered")
     }
 
-    // MARK: - Model Handling
-
-    /// Check if ONNX can handle a given model for STT
-    /// Uses model name pattern matching - actual framework info is in C++ registry
-    public static func canHandleSTT(modelId: String?) -> Bool {
-        guard let modelId = modelId else { return false }
-        let lowercased = modelId.lowercased()
-        return lowercased.contains("whisper") ||
-               lowercased.contains("zipformer") ||
-               lowercased.contains("paraformer")
-    }
-
-    /// Check if ONNX can handle a given model for TTS
-    /// Uses model name pattern matching - actual framework info is in C++ registry
-    public static func canHandleTTS(modelId: String?) -> Bool {
-        guard let modelId = modelId else { return false }
-        let lowercased = modelId.lowercased()
-        return lowercased.contains("piper") || lowercased.contains("vits")
-    }
-
-    /// Check if ONNX can handle VAD (always true for Silero VAD)
-    public static func canHandleVAD(modelId _: String?) -> Bool {
-        return true  // ONNX Silero VAD is the default
-    }
 }
 
 // MARK: - Auto-Registration

@@ -50,7 +50,7 @@ import RunAnywhere
 ///     }
 /// }
 /// ```
-public enum LlamaCPP: RunAnywhereModule {
+public enum LlamaCPP {
     private static let logger = SDKLogger(category: "LlamaCPP")
 
     // MARK: - Module Info
@@ -60,16 +60,6 @@ public enum LlamaCPP: RunAnywhereModule {
 
     /// LlamaCPP library version (underlying C++ library)
     public static let llamaCppVersion = "b7199"
-
-    // MARK: - RunAnywhereModule Conformance
-
-    public static let moduleId = "llamacpp"
-    public static let moduleName = "LlamaCPP"
-    public static let capabilities: Set<SDKComponent> = [.llm]
-    public static let defaultPriority: Int = 100
-
-    /// LlamaCPP uses the llama.cpp inference framework
-    public static let inferenceFramework: InferenceFramework = .llamaCpp
 
     // MARK: - Registration State
 
@@ -149,14 +139,6 @@ public enum LlamaCPP: RunAnywhereModule {
         }
     }
 
-    // MARK: - Model Handling
-
-    /// Check if LlamaCPP can handle a given model
-    /// Uses file extension pattern matching - actual framework info is in C++ registry
-    public static func canHandle(modelId: String?) -> Bool {
-        guard let modelId = modelId else { return false }
-        return modelId.lowercased().hasSuffix(".gguf")
-    }
 }
 
 // MARK: - Auto-Registration
