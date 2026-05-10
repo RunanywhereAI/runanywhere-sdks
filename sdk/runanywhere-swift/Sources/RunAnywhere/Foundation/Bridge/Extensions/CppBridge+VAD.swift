@@ -105,44 +105,62 @@ extension CppBridge {
             logger.info("VAD model unloaded")
         }
 
+        /// Load a VAD model from a `RAModelLoadResult` returned by the proto-backed
+        /// lifecycle API. Mirrors `CppBridge.STT.loadModel(from:)` / `CppBridge.TTS.loadVoice(from:)`
+        /// so the Swift component actor's `isLoaded` mirror tracks the lifecycle
+        /// service's state after `RunAnywhere.loadModel(...)` returns `success=true`.
+        /// Without this, VAD never connects to the lifecycle-loaded Silero model
+        /// (SWIFT-VAD-001).
+        func loadModel(from result: RAModelLoadResult, modelName: String? = nil) throws {
+            if loadedModelId == result.modelID {
+                return
+            }
+            guard result.success else {
+                throw SDKException.vad(
+                    .modelLoadFailed,
+                    result.errorMessage.isEmpty ? "VAD lifecycle load failed" : result.errorMessage
+                )
+            }
+            // Pass the model id — `rac_vad_component_load_model` resolves through
+            // `rac_get_model(arg)` → `rac_get_model_by_path(arg)` → basename,
+            // and the registry already knows the resolved path from the lifecycle
+            // load that just succeeded. Matches STT/TTS pattern.
+            try loadModel(
+                result.modelID,
+                modelId: result.modelID,
+                modelName: modelName ?? result.modelID
+            )
+        }
+
         // MARK: - Lifecycle
 
-        /// Initialize VAD
-        public func initialize() throws {
-            let handle = try getHandle()
-            let result = rac_vad_component_initialize(handle)
-            guard result == RAC_SUCCESS else {
-                throw SDKException.vad(.initializationFailed, "Failed to initialize VAD: \(result)")
-            }
-            logger.info("VAD initialized")
+        /// Initialize VAD — binds to the commons lifecycle VAD service.
+        /// Returns the post-configure service state.
+        @discardableResult
+        public func initialize(_ config: RAVADConfiguration = RAVADConfiguration()) throws -> RAVADServiceState {
+            let state = try configureLifecycle(config)
+            logger.info("VAD initialized (lifecycle)")
+            return state
         }
 
-        /// Start VAD processing
-        public func start() throws {
-            let handle = try getHandle()
-            let result = rac_vad_component_start(handle)
-            guard result == RAC_SUCCESS else {
-                throw SDKException.vad(.processingFailed, "Failed to start VAD: \(result)")
-            }
+        /// Start VAD processing on the lifecycle-loaded service.
+        @discardableResult
+        public func start() throws -> RAVADServiceState {
+            try startLifecycle()
         }
 
-        /// Stop VAD processing
-        public func stop() throws {
-            let handle = try getHandle()
-            let result = rac_vad_component_stop(handle)
-            guard result == RAC_SUCCESS else {
-                throw SDKException.vad(.processingFailed, "Failed to stop VAD: \(result)")
-            }
+        /// Stop VAD processing on the lifecycle-loaded service.
+        @discardableResult
+        public func stop() throws -> RAVADServiceState {
+            try stopLifecycle()
         }
 
-        /// Reset VAD internal state (clears adaptive thresholds, speech segments, timing)
-        public func reset() throws {
-            let handle = try getHandle()
-            let result = rac_vad_component_reset(handle)
-            guard result == RAC_SUCCESS else {
-                throw SDKException.vad(.processingFailed, "Failed to reset VAD: \(result)")
-            }
-            logger.info("VAD state reset")
+        /// Reset VAD internal state (adaptive thresholds, speech segments, timing).
+        @discardableResult
+        public func reset() throws -> RAVADServiceState {
+            let state = try resetLifecycle()
+            logger.info("VAD state reset (lifecycle)")
+            return state
         }
 
         /// Cleanup VAD

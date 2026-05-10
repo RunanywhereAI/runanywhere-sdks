@@ -15,23 +15,27 @@ import Foundation
 public extension RunAnywhere {
 
     /// Detect voice activity in a raw PCM audio buffer.
+    ///
+    /// Routes through the commons VAD lifecycle service (handle-less) so the
+    /// Silero model loaded via `RunAnywhere.loadModel(...)` is actually used
+    /// instead of falling through to the energy-based fallback. Fixes SWIFT-VAD-001.
     static func detectVoiceActivity(_ audioData: Data, options: RAVADOptions? = nil) async throws -> RAVADResult {
         guard isInitialized else {
             throw SDKException.general(.notInitialized, "SDK not initialized")
         }
 
-        let sampleCount = audioData.count / MemoryLayout<Float>.size
-        guard sampleCount > 0 else {
+        guard audioData.count >= MemoryLayout<Float>.size else {
             throw SDKException.vad(.emptyAudioBuffer, "Audio data is empty")
         }
 
-        let samples: [Float] = audioData.withUnsafeBytes { rawBuf in
-            Array(rawBuf.bindMemory(to: Float.self).prefix(sampleCount))
+        var request = RAVADProcessRequest()
+        var audioSource = RAVADAudioSource()
+        audioSource.audioData = audioData
+        request.audio = audioSource
+        if let options {
+            request.options = options
         }
-        return try await CppBridge.VAD.shared.process(
-            samples: samples,
-            options: options ?? RAVADOptions()
-        )
+        return try await CppBridge.VAD.shared.processLifecycle(request: request)
     }
 
     /// Stream VAD results over a sequence of raw PCM audio chunks.

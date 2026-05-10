@@ -144,6 +144,34 @@ private enum VADGeneratedProtoABI {
     )
 }
 
+private enum VADLifecycleProtoABI {
+    // Lifecycle-owned VAD operations: take no handle parameter, use the
+    // currently-loaded VAD component from the commons lifecycle directly.
+    // Fixes the Swift-actor-handle-separate-from-lifecycle bug (SWIFT-VAD-001)
+    // that made VAD never fire speech-start/end events. Mirrors the STT/TTS
+    // handle-less proto surfaces landed in Phase 6h.
+    typealias ProcessOrConfigure = @convention(c) (
+        UnsafePointer<UInt8>?,
+        Int,
+        UnsafeMutablePointer<rac_proto_buffer_t>?
+    ) -> rac_result_t
+    typealias StateOnly = @convention(c) (
+        UnsafeMutablePointer<rac_proto_buffer_t>?
+    ) -> rac_result_t
+
+    static let processName = "rac_vad_process_lifecycle_proto"
+    static let configureName = "rac_vad_configure_lifecycle_proto"
+    static let startName = "rac_vad_start_lifecycle_proto"
+    static let stopName = "rac_vad_stop_lifecycle_proto"
+    static let resetName = "rac_vad_reset_lifecycle_proto"
+
+    static let process = NativeProtoABI.load(processName, as: ProcessOrConfigure.self)
+    static let configure = NativeProtoABI.load(configureName, as: ProcessOrConfigure.self)
+    static let start = NativeProtoABI.load(startName, as: StateOnly.self)
+    static let stop = NativeProtoABI.load(stopName, as: StateOnly.self)
+    static let reset = NativeProtoABI.load(resetName, as: StateOnly.self)
+}
+
 private enum VoiceAgentGeneratedProtoABI {
     typealias Initialize = @convention(c) (
         rac_voice_agent_handle_t?,
@@ -701,6 +729,84 @@ extension CppBridge.VAD {
                 .fromOpaque(contextPtr)
                 .release()
             throw SDKException.vad(.processingFailed, "VAD activity callback failed: \(rc)")
+        }
+    }
+
+    // MARK: - Lifecycle-proto surface (SWIFT-VAD-001)
+    //
+    // These four calls bind the Swift actor to the C++ lifecycle's VAD
+    // component instead of the private `rac_vad_component_*` handle. Without
+    // this, loading a VAD model through `RunAnywhere.loadModel(...)` (which
+    // routes through the commons lifecycle) never connects to the handle the
+    // VAD actor owned — VAD reported "not loaded" and never fired events.
+    // Mirrors the Phase 6h fix for STT/TTS.
+
+    public func configureLifecycle(_ config: RAVADConfiguration) throws -> RAVADServiceState {
+        let configure = try NativeProtoABI.require(
+            VADLifecycleProtoABI.configure,
+            named: VADLifecycleProtoABI.configureName
+        )
+        return try decodeBuffer(
+            responseType: RAVADServiceState.self,
+            symbolName: VADLifecycleProtoABI.configureName
+        ) { outBuffer in
+            try NativeProtoABI.withSerializedBytes(config) { bytes, size in
+                configure(bytes, size, outBuffer)
+            }
+        }
+    }
+
+    public func startLifecycle() throws -> RAVADServiceState {
+        let start = try NativeProtoABI.require(
+            VADLifecycleProtoABI.start,
+            named: VADLifecycleProtoABI.startName
+        )
+        return try decodeBuffer(
+            responseType: RAVADServiceState.self,
+            symbolName: VADLifecycleProtoABI.startName
+        ) { outBuffer in
+            start(outBuffer)
+        }
+    }
+
+    public func stopLifecycle() throws -> RAVADServiceState {
+        let stop = try NativeProtoABI.require(
+            VADLifecycleProtoABI.stop,
+            named: VADLifecycleProtoABI.stopName
+        )
+        return try decodeBuffer(
+            responseType: RAVADServiceState.self,
+            symbolName: VADLifecycleProtoABI.stopName
+        ) { outBuffer in
+            stop(outBuffer)
+        }
+    }
+
+    public func resetLifecycle() throws -> RAVADServiceState {
+        let reset = try NativeProtoABI.require(
+            VADLifecycleProtoABI.reset,
+            named: VADLifecycleProtoABI.resetName
+        )
+        return try decodeBuffer(
+            responseType: RAVADServiceState.self,
+            symbolName: VADLifecycleProtoABI.resetName
+        ) { outBuffer in
+            reset(outBuffer)
+        }
+    }
+
+    public func processLifecycle(request: RAVADProcessRequest) throws -> RAVADResult {
+        let process = try NativeProtoABI.require(
+            VADLifecycleProtoABI.process,
+            named: VADLifecycleProtoABI.processName
+        )
+        return try decodeBuffer(
+            responseType: RAVADResult.self,
+            symbolName: VADLifecycleProtoABI.processName
+        ) { outBuffer in
+            try NativeProtoABI.withSerializedBytes(request) { bytes, size in
+                process(bytes, size, outBuffer)
+            }
         }
     }
 }
