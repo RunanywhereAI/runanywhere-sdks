@@ -68,24 +68,33 @@ let package = Package(
 
         // -------------------------------------------------------------------
         // C Bridge Module — LlamaCPP Backend Headers
+        //
+        // Depends on CRACommons so the backend registration header can pull
+        // `rac_types.h` / `rac_error.h` / `rac_llm.h` from the single source
+        // of truth instead of carrying drifting local copies.
         // -------------------------------------------------------------------
         .target(
             name: "LlamaCPPBackend",
-            dependencies: ["RABackendLlamaCPPBinary"],
+            dependencies: [
+                "CRACommons",
+                "RABackendLlamaCPPBinary",
+            ],
             path: "Sources/LlamaCPPRuntime/include",
             publicHeadersPath: "."
         ),
 
         // -------------------------------------------------------------------
         // C Bridge Module — ONNX Backend Headers
-        // Depends on RABackendONNXBinary (ONNX Runtime now statically linked
-        // into the xcframework, so no separate ort binaries needed) plus the
-        // Sherpa-ONNX binary, which is consumed by the ONNX runtime target
-        // for STT/TTS/VAD pipelines.
+        //
+        // Depends on CRACommons so the registration header pulls `rac_types.h`
+        // / `rac_result_t` from the single source of truth. The xcframework
+        // dependencies (RABackendONNX + RABackendSherpa) carry the actual
+        // symbol bodies.
         // -------------------------------------------------------------------
         .target(
             name: "ONNXBackend",
             dependencies: [
+                "CRACommons",
                 "RABackendONNXBinary",
                 "RABackendSherpaBinary",
             ],

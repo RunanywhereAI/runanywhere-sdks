@@ -11,8 +11,13 @@
 #ifndef RAC_LLM_LLAMACPP_H
 #define RAC_LLM_LLAMACPP_H
 
-#include "rac_error.h"
+// Pull shared types (rac_result_t, rac_handle_t, RAC_API, error codes, LLM
+// types) from the CRACommons umbrella rather than carrying local duplicates.
+// The CRACommons Clang module is a sibling here; depending on it means any
+// drift between the SDK-local copy and `sdk/runanywhere-commons/include/rac/*`
+// becomes impossible.
 #include "rac_types.h"
+#include "rac_error.h"
 #include "rac_llm.h"
 
 #ifdef __cplusplus
