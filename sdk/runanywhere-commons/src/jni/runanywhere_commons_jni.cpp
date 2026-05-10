@@ -4109,6 +4109,135 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraRegisterProto(
     return makeProtoCallResult(env, rc, &result, "racLoraRegisterProto");
 }
 
+// LoRA catalog proto thunks (gaps/kotlin.md KOT-JNI-ORPHAN). Kotlin
+// `RunAnywhereBridge.racLoraCatalog{List,Query,Get,MarkDownloadCompleted}Proto`
+// declared `external fun` for these but no JNI thunks existed, causing
+// `UnsatisfiedLinkError` on the first LoRA catalog access from
+// `CppBridgeModalityProto.kt`. Mirrors the `racLoraRegisterProto` shape.
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraCatalogListProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView req(env, requestProto);
+    if (!req.ok) return nullptr;
+    rac_lora_registry_handle_t registry = rac_get_lora_registry();
+    if (!registry) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_lora_catalog_list_proto(registry, req.u8(), req.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racLoraCatalogListProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraCatalogQueryProto(
+    JNIEnv* env, jclass clazz, jbyteArray queryProto) {
+    (void)clazz;
+    JByteArrayView query(env, queryProto);
+    if (!query.ok) return nullptr;
+    rac_lora_registry_handle_t registry = rac_get_lora_registry();
+    if (!registry) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_lora_catalog_query_proto(registry, query.u8(), query.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racLoraCatalogQueryProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraCatalogGetProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView req(env, requestProto);
+    if (!req.ok) return nullptr;
+    rac_lora_registry_handle_t registry = rac_get_lora_registry();
+    if (!registry) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_lora_catalog_get_proto(registry, req.u8(), req.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racLoraCatalogGetProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLoraCatalogMarkDownloadCompletedProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
+    (void)clazz;
+    JByteArrayView req(env, requestProto);
+    if (!req.ok) return nullptr;
+    rac_lora_registry_handle_t registry = rac_get_lora_registry();
+    if (!registry) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_lora_catalog_mark_download_completed_proto(
+        registry, req.u8(), req.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racLoraCatalogMarkDownloadCompletedProto");
+}
+
+// Plugin registry thunks (gaps/kotlin.md KOT-JNI-ORPHAN). Kotlin
+// `RunAnywhere+PluginLoader.jvmAndroid.kt` calls these at module
+// registration time (PluginInfo.apiVersion, .count, .load, .unload,
+// .registeredNames), but no JNI thunks existed, causing UnsatisfiedLinkError.
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegistryGetPluginApiVersion(
+    JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    return static_cast<jint>(rac_plugin_api_version());
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegistryLoadPlugin(
+    JNIEnv* env, jclass clazz, jstring pathStr) {
+    (void)clazz;
+    if (pathStr == nullptr) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    const char* path = env->GetStringUTFChars(pathStr, nullptr);
+    if (path == nullptr) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    rac_result_t rc = rac_registry_load_plugin(path);
+    env->ReleaseStringUTFChars(pathStr, path);
+    return static_cast<jint>(rc);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegistryUnloadPlugin(
+    JNIEnv* env, jclass clazz, jstring nameStr) {
+    (void)clazz;
+    if (nameStr == nullptr) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    const char* name = env->GetStringUTFChars(nameStr, nullptr);
+    if (name == nullptr) return static_cast<jint>(RAC_ERROR_NULL_POINTER);
+    rac_result_t rc = rac_registry_unload_plugin(name);
+    env->ReleaseStringUTFChars(nameStr, name);
+    return static_cast<jint>(rc);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegistryGetPluginCount(
+    JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    return static_cast<jint>(rac_registry_plugin_count());
+}
+
+JNIEXPORT jobjectArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racRegistryGetRegisteredNames(
+    JNIEnv* env, jclass clazz) {
+    (void)clazz;
+    const char** names = nullptr;
+    size_t count = 0;
+    rac_result_t rc = rac_registry_list_plugins(&names, &count);
+    if (rc != RAC_SUCCESS) return nullptr;
+    jclass stringClass = env->FindClass("java/lang/String");
+    jobjectArray arr = env->NewObjectArray(static_cast<jsize>(count), stringClass, nullptr);
+    for (size_t i = 0; i < count; ++i) {
+        if (names[i] != nullptr) {
+            jstring jname = env->NewStringUTF(names[i]);
+            env->SetObjectArrayElement(arr, static_cast<jsize>(i), jname);
+            env->DeleteLocalRef(jname);
+        }
+    }
+    rac_registry_free_plugin_list(names, count);
+    return arr;
+}
+
 // =============================================================================
 // Voice Agent Handle API (v3.1 P3.2: Android sample needs a voice agent
 // handle to feed VoiceAgentStreamAdapter. Mirrors Swift's

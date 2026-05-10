@@ -383,99 +383,17 @@ object RunAnywhereBridge {
     // XCFramework (RABackendLlamaCPP, RABackendONNX) with separate registration.
     // ========================================================================
 
-    // ========================================================================
-    // DOWNLOAD MANAGER (rac_download.h)
-    // ========================================================================
-
-    @JvmStatic
-    external fun racDownloadStart(url: String, destPath: String, progressCallback: Any?): Long
-
-    @JvmStatic
-    external fun racDownloadCancel(downloadId: Long): Int
-
-    @JvmStatic
-    external fun racDownloadGetProgress(downloadId: Long): String?
+    // Download + non-proto model-registry thunks removed per
+    // gaps/kotlin.md KOT-JNI-ORPHAN. All of `racDownloadStart` /
+    // `racDownloadCancel` / `racDownloadGetProgress` /
+    // `racModelRegistry{Save,Get,GetAll,GetDownloaded,Remove,UpdateDownloadStatus}`
+    // had zero Kotlin callers; the proto-backed siblings below
+    // (`racDownloadStartProto`, `racModelRegistry*Proto`) are the canonical
+    // surface.
 
     // ========================================================================
     // MODEL REGISTRY - Direct C++ registry access (mirrors Swift CppBridge+ModelRegistry)
     // ========================================================================
-
-    /**
-     * Save model to C++ registry.
-     * This stores the model directly in the C++ model registry for service provider lookup.
-     *
-     * @param modelId Unique model identifier
-     * @param name Display name
-     * @param category Model category (0=LLM, 1=STT, 2=TTS, 3=VAD)
-     * @param format Model format (0=UNKNOWN, 1=GGUF, 2=ONNX, etc.)
-     * @param framework Inference framework (0=LLAMACPP, 1=ONNX, etc.)
-     * @param downloadUrl Download URL (nullable)
-     * @param localPath Local file path (nullable)
-     * @param downloadSize Size in bytes
-     * @param contextLength Context length for LLM
-     * @param supportsThinking Whether model supports thinking mode
-     * @param description Model description (nullable)
-     * @return RAC_SUCCESS on success, error code on failure
-     */
-    @JvmStatic
-    external fun racModelRegistrySave(
-        modelId: String,
-        name: String,
-        category: Int,
-        format: Int,
-        framework: Int,
-        downloadUrl: String?,
-        localPath: String?,
-        downloadSize: Long,
-        contextLength: Int,
-        supportsThinking: Boolean,
-        supportsLora: Boolean,
-        description: String?,
-    ): Int
-
-    /**
-     * Get model info from C++ registry as JSON.
-     *
-     * @param modelId Model identifier
-     * @return JSON string with model info, or null if not found
-     */
-    @JvmStatic
-    external fun racModelRegistryGet(modelId: String): String?
-
-    /**
-     * Get all models from C++ registry as JSON array.
-     *
-     * @return JSON array string with all models
-     */
-    @JvmStatic
-    external fun racModelRegistryGetAll(): String
-
-    /**
-     * Get downloaded models from C++ registry as JSON array.
-     *
-     * @return JSON array string with downloaded models
-     */
-    @JvmStatic
-    external fun racModelRegistryGetDownloaded(): String
-
-    /**
-     * Remove model from C++ registry.
-     *
-     * @param modelId Model identifier
-     * @return RAC_SUCCESS on success, error code on failure
-     */
-    @JvmStatic
-    external fun racModelRegistryRemove(modelId: String): Int
-
-    /**
-     * Update download status in C++ registry.
-     *
-     * @param modelId Model identifier
-     * @param localPath Local path after download (or null to clear)
-     * @return RAC_SUCCESS on success, error code on failure
-     */
-    @JvmStatic
-    external fun racModelRegistryUpdateDownloadStatus(modelId: String, localPath: String?): Int
 
     /**
      * Register model metadata from serialized runanywhere.v1.ModelInfo bytes.
