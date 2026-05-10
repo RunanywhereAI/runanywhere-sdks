@@ -54,25 +54,6 @@ public extension RALLMGenerationOptions {
         self = o
     }
 
-    func withCOptions<T>(_ body: (UnsafePointer<rac_llm_options_t>) throws -> T) rethrows -> T {
-        var cOptions = rac_llm_options_t()
-        cOptions.max_tokens = maxTokens
-        cOptions.temperature = temperature
-        cOptions.top_p = topP
-        cOptions.streaming_enabled = streamingEnabled ? RAC_TRUE : RAC_FALSE
-        cOptions.stop_sequences = nil
-        cOptions.num_stop_sequences = 0
-        if hasSystemPrompt {
-            return try systemPrompt.withCString { ptr in
-                cOptions.system_prompt = ptr
-                return try body(&cOptions)
-            }
-        } else {
-            cOptions.system_prompt = nil
-            return try body(&cOptions)
-        }
-    }
-
     func toRALLMGenerateRequest(prompt: String) -> RALLMGenerateRequest {
         var request = RALLMGenerateRequest()
         request.prompt = prompt
@@ -106,45 +87,21 @@ public extension RALLMGenerationOptions {
     }
 }
 
-// MARK: - RALLMGenerationResult: C-bridge
+// MARK: - RALLMGenerationResult: proto-convenience accessors
+//
+// The `init(from cResult:)` / `init(from cStreamResult:)` constructors that
+// used to live here were orphaned after Phase 6h moved LLM generation to the
+// proto-byte ABI (`rac_llm_generate_proto`). Results now arrive as proto bytes
+// and decode directly into `RALLMGenerationResult`; no C-struct marshaling
+// path remains. Deleted per swift.md SWIFT-DUP-RACTYPES-CPPBRIDGE-DEAD.
 
 public extension RALLMGenerationResult {
     var tokensUsed: Int { Int(tokensGenerated) }
     var latencyMs: TimeInterval { generationTimeMs }
     var timeToFirstTokenMs: Double? { hasTtftMs ? ttftMs : nil }
-
-    init(from cResult: rac_llm_result_t, modelId: String) {
-        var r = RALLMGenerationResult()
-        r.text = cResult.text.map { String(cString: $0) } ?? ""
-        r.inputTokens = cResult.prompt_tokens
-        r.tokensGenerated = cResult.completion_tokens
-        r.modelUsed = modelId
-        r.generationTimeMs = Double(cResult.total_time_ms)
-        r.tokensPerSecond = Double(cResult.tokens_per_second)
-        if cResult.time_to_first_token_ms > 0 {
-            r.ttftMs = Double(cResult.time_to_first_token_ms)
-        }
-        self = r
-    }
-
-    init(from cStreamResult: rac_llm_stream_result_t, modelId: String) {
-        let m = cStreamResult.metrics
-        var r = RALLMGenerationResult()
-        r.text = cStreamResult.text.map { String(cString: $0) } ?? ""
-        if let tc = cStreamResult.thinking_content { r.thinkingContent = String(cString: tc) }
-        r.inputTokens = m.prompt_tokens
-        r.tokensGenerated = m.tokens_generated
-        r.modelUsed = modelId
-        r.generationTimeMs = Double(m.total_time_ms)
-        r.tokensPerSecond = Double(m.tokens_per_second)
-        if m.time_to_first_token_ms > 0 { r.ttftMs = Double(m.time_to_first_token_ms) }
-        r.thinkingTokens = m.thinking_tokens
-        r.responseTokens = m.response_tokens
-        self = r
-    }
 }
 
-// MARK: - RAThinkingTagPattern: C-bridge
+// MARK: - RAThinkingTagPattern: defaults
 
 public extension RAThinkingTagPattern {
     static var defaultPattern: RAThinkingTagPattern {
@@ -152,13 +109,6 @@ public extension RAThinkingTagPattern {
         p.openTag = "<think>"
         p.closeTag = "</think>"
         return p
-    }
-
-    init(from cPattern: rac_thinking_tag_pattern_t) {
-        var p = RAThinkingTagPattern()
-        if let o = cPattern.opening_tag { p.openTag = String(cString: o) }
-        if let c = cPattern.closing_tag { p.closeTag = String(cString: c) }
-        self = p
     }
 }
 

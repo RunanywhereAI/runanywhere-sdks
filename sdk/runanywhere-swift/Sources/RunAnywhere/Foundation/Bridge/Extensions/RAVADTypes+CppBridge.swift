@@ -14,19 +14,10 @@ extension RAVADConfiguration: ComponentConfiguration {
     public var modelId: String? { modelID.isEmpty ? nil : modelID }
 }
 
-// MARK: - RAVADStatistics: C-bridge
-
-public extension RAVADStatistics {
-    init(from cStats: rac_energy_vad_stats_t) {
-        var s = RAVADStatistics()
-        s.currentEnergy = cStats.current
-        s.currentThreshold = cStats.threshold
-        s.ambientLevel = cStats.ambient
-        s.recentAvg = cStats.recent_avg
-        s.recentMax = cStats.recent_max
-        self = s
-    }
-}
+// Post-Phase-6h, VAD statistics arrive via `rac_vad_component_get_statistics_proto`
+// decoded directly into `RAVADStatistics`. The `init(from cStats: rac_energy_vad_stats_t)`
+// constructor was orphaned after that migration. Deleted per swift.md
+// SWIFT-DUP-RACTYPES-CPPBRIDGE-DEAD.
 
 // MARK: - RAVADResult convenience
 

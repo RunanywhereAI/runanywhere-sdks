@@ -53,27 +53,6 @@ public extension RATTSOptions {
         set { enableSsml = newValue }
     }
 
-    func withCOptions<T>(_ body: (UnsafePointer<rac_tts_options_t>) throws -> T) rethrows -> T {
-        var cOptions = rac_tts_options_t()
-        cOptions.rate = speakingRate == 0 ? 1.0 : speakingRate
-        cOptions.pitch = pitch == 0 ? 1.0 : pitch
-        cOptions.volume = volume == 0 ? 1.0 : volume
-        cOptions.audio_format = audioFormat.toCFormat()
-        cOptions.sample_rate = 22050
-        cOptions.use_ssml = enableSsml ? RAC_TRUE : RAC_FALSE
-        return try languageCode.withCString { langPtr in
-            cOptions.language = langPtr
-            if voice.isEmpty {
-                cOptions.voice = nil
-                return try body(&cOptions)
-            } else {
-                return try voice.withCString { voicePtr in
-                    cOptions.voice = voicePtr
-                    return try body(&cOptions)
-                }
-            }
-        }
-    }
 }
 
 // MARK: - RATTSOutput: ComponentOutput
@@ -82,61 +61,11 @@ extension RATTSOutput: ComponentOutput { }
 
 public extension RATTSOutput {
     var format: RAAudioFormat { audioFormat }
-
-    init(from cOutput: rac_tts_output_t) {
-        let audioData: Data
-        if cOutput.audio_size > 0, let ptr = cOutput.audio_data {
-            audioData = Data(bytes: ptr, count: cOutput.audio_size)
-        } else {
-            audioData = Data()
-        }
-
-        var phonemes: [RATTSPhonemeTimestamp] = []
-        if cOutput.num_phoneme_timestamps > 0, let cPh = cOutput.phoneme_timestamps {
-            for i in 0..<Int(cOutput.num_phoneme_timestamps) {
-                let p = cPh[i]
-                guard let sym = p.phoneme else { continue }
-                var pt = RATTSPhonemeTimestamp()
-                pt.phoneme = String(cString: sym)
-                pt.startMs = p.start_time_ms
-                pt.endMs = p.end_time_ms
-                phonemes.append(pt)
-            }
-        }
-
-        var meta = RATTSSynthesisMetadata()
-        meta.processingTimeMs = cOutput.metadata.processing_time_ms
-        meta.characterCount = cOutput.metadata.character_count
-
-        var o = RATTSOutput()
-        o.audioData = audioData
-        o.audioFormat = RAAudioFormat(from: cOutput.format)
-        o.durationMs = cOutput.duration_ms
-        o.phonemeTimestamps = phonemes
-        o.metadata = meta
-        o.timestampMs = cOutput.timestamp_ms
-        self = o
-    }
 }
 
-// MARK: - RATTSSynthesisMetadata: C-bridge
-
-public extension RATTSSynthesisMetadata {
-    init(processingTime: TimeInterval) {
-        var m = RATTSSynthesisMetadata()
-        m.processingTimeMs = Int64(processingTime * 1000)
-        self = m
-    }
-}
-
-// MARK: - RATTSSpeakResult
-
-public extension RATTSSpeakResult {
-    init(from output: RATTSOutput) {
-        var r = RATTSSpeakResult()
-        r.durationMs = output.durationMs
-        r.audioSizeBytes = Int64(output.audioData.count)
-        r.metadata = output.metadata
-        self = r
-    }
-}
+// Post-Phase-6h, TTS synthesis arrives as proto bytes via
+// `rac_tts_synthesize_lifecycle_proto` and decodes directly into `RATTSOutput`.
+// `withCOptions`, `RATTSOutput.init(from cOutput:)`, the
+// `RATTSSynthesisMetadata(processingTime:)` convenience init, and the
+// `RATTSSpeakResult(from output:)` repack were orphaned after that migration.
+// Deleted per swift.md SWIFT-DUP-RACTYPES-CPPBRIDGE-DEAD.
