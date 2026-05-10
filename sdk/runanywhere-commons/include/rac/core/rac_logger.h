@@ -309,6 +309,26 @@ RAC_API void rac_logger_logv(rac_log_level_t level, const char* category,
         }                                                                       \
     } while (0)
 
+// =============================================================================
+// METADATA REDACTION POLICY
+// =============================================================================
+
+/**
+ * @brief Returns true (1) if a log metadata key should be redacted.
+ *
+ * Match policy: case-insensitive substring match against the canonical
+ * sensitive-substring list ("key", "secret", "password", "token", "auth",
+ * "credential"). Centralizes the policy across C++ and platform logs so
+ * Swift's SDKLogger and the C++ logger remain in sync.
+ *
+ * @param key      Null-terminated metadata key. Must not be NULL.
+ * @param out      Output flag (RAC_TRUE if key should be redacted, RAC_FALSE
+ *                 otherwise). Must not be NULL.
+ * @return RAC_SUCCESS on success, RAC_ERROR_NULL_POINTER if either argument
+ *         is NULL.
+ */
+RAC_API rac_result_t rac_log_metadata_should_redact(const char* key, rac_bool_t* out);
+
 #ifdef __cplusplus
 }
 #endif

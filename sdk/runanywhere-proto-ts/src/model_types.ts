@@ -1785,6 +1785,81 @@ export interface ModelRegistryFetchAssignmentsResult {
   errorMessage: string;
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * Inputs for the canonical RAModelInfo factory (P2-T4). Replaces Swift's
+ * `RAModelInfo.make(...)` ~370 LOC of field-defaulting and artifact-inference
+ * logic with a commons-owned implementation. Commons fills 18 ModelInfo fields
+ * (id, name, category/format/framework defaults, context-length defaults,
+ * thinking gating + default pattern, artifact inference, source mark,
+ * timestamps, and is_downloaded probe).
+ * ---------------------------------------------------------------------------
+ */
+export interface ModelInfoMakeRequest {
+  /**
+   * Required. Download URL or file path. Used both as the metadata field
+   * and as input to artifact-type inference (zip/tar.gz/tgz/... → archive,
+   * anything else → single_file).
+   */
+  url: string;
+  /**
+   * Optional human-readable name. When empty commons derives it from the
+   * URL via rac_model_generate_name() (replaces underscores/dashes with
+   * spaces).
+   */
+  name: string;
+  /**
+   * Optional inference framework. UNSPECIFIED triggers detection from the
+   * URL extension; commons looks up the format and maps to a default
+   * framework via rac_model_detect_framework_from_format().
+   */
+  framework?:
+    | InferenceFramework
+    | undefined;
+  /**
+   * Optional category. UNSPECIFIED falls back to the framework default
+   * (rac_model_category_from_framework()).
+   */
+  category?:
+    | ModelCategory
+    | undefined;
+  /** Optional source. UNSPECIFIED is treated as MODEL_SOURCE_REMOTE. */
+  source?: ModelSource | undefined;
+}
+
+/**
+ * ---------------------------------------------------------------------------
+ * Inputs for the canonical "register a model from a URL" entry point (P2-T6).
+ * Composes ModelInfoMakeRequest (P2-T4) with the existing registry save path
+ * so SDKs replace ~60 LOC of build-and-save glue with a single ABI call.
+ * Produces the saved ModelInfo (matches rac_model_registry_register_proto_buffer
+ * shape).
+ * ---------------------------------------------------------------------------
+ */
+export interface RegisterModelFromUrlRequest {
+  /**
+   * Required. Download URL or file path. Routed straight into
+   * ModelInfoMakeRequest.url; format/artifact inference and id/name
+   * generation reuse the same factory semantics.
+   */
+  url: string;
+  /** Optional human-readable name. Empty → derived from URL. */
+  name: string;
+  /**
+   * Optional inference framework. UNSPECIFIED triggers detection from the
+   * URL extension (rac_model_detect_framework_from_format).
+   */
+  framework?:
+    | InferenceFramework
+    | undefined;
+  /** Optional category. UNSPECIFIED falls back to the framework default. */
+  category?:
+    | ModelCategory
+    | undefined;
+  /** Optional source. UNSPECIFIED is treated as MODEL_SOURCE_REMOTE. */
+  source?: ModelSource | undefined;
+}
+
 function createBaseModelInfoMetadata(): ModelInfoMetadata {
   return { description: "", author: "", license: "", tags: [], version: "" };
 }
@@ -7174,6 +7249,244 @@ export const ModelRegistryFetchAssignmentsResult = {
     message.fetchedAtUnixMs = object.fetchedAtUnixMs ?? 0;
     message.errorCode = object.errorCode ?? 0;
     message.errorMessage = object.errorMessage ?? "";
+    return message;
+  },
+};
+
+function createBaseModelInfoMakeRequest(): ModelInfoMakeRequest {
+  return { url: "", name: "", framework: undefined, category: undefined, source: undefined };
+}
+
+export const ModelInfoMakeRequest = {
+  encode(message: ModelInfoMakeRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.url !== "") {
+      writer.uint32(10).string(message.url);
+    }
+    if (message.name !== "") {
+      writer.uint32(18).string(message.name);
+    }
+    if (message.framework !== undefined) {
+      writer.uint32(24).int32(message.framework);
+    }
+    if (message.category !== undefined) {
+      writer.uint32(32).int32(message.category);
+    }
+    if (message.source !== undefined) {
+      writer.uint32(40).int32(message.source);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ModelInfoMakeRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseModelInfoMakeRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.url = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.framework = reader.int32() as any;
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.category = reader.int32() as any;
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.source = reader.int32() as any;
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ModelInfoMakeRequest {
+    return {
+      url: isSet(object.url) ? globalThis.String(object.url) : "",
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : undefined,
+      category: isSet(object.category) ? modelCategoryFromJSON(object.category) : undefined,
+      source: isSet(object.source) ? modelSourceFromJSON(object.source) : undefined,
+    };
+  },
+
+  toJSON(message: ModelInfoMakeRequest): unknown {
+    const obj: any = {};
+    if (message.url !== "") {
+      obj.url = message.url;
+    }
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.framework !== undefined) {
+      obj.framework = inferenceFrameworkToJSON(message.framework);
+    }
+    if (message.category !== undefined) {
+      obj.category = modelCategoryToJSON(message.category);
+    }
+    if (message.source !== undefined) {
+      obj.source = modelSourceToJSON(message.source);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ModelInfoMakeRequest>, I>>(base?: I): ModelInfoMakeRequest {
+    return ModelInfoMakeRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ModelInfoMakeRequest>, I>>(object: I): ModelInfoMakeRequest {
+    const message = createBaseModelInfoMakeRequest();
+    message.url = object.url ?? "";
+    message.name = object.name ?? "";
+    message.framework = object.framework ?? undefined;
+    message.category = object.category ?? undefined;
+    message.source = object.source ?? undefined;
+    return message;
+  },
+};
+
+function createBaseRegisterModelFromUrlRequest(): RegisterModelFromUrlRequest {
+  return { url: "", name: "", framework: undefined, category: undefined, source: undefined };
+}
+
+export const RegisterModelFromUrlRequest = {
+  encode(message: RegisterModelFromUrlRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.url !== "") {
+      writer.uint32(10).string(message.url);
+    }
+    if (message.name !== "") {
+      writer.uint32(18).string(message.name);
+    }
+    if (message.framework !== undefined) {
+      writer.uint32(24).int32(message.framework);
+    }
+    if (message.category !== undefined) {
+      writer.uint32(32).int32(message.category);
+    }
+    if (message.source !== undefined) {
+      writer.uint32(40).int32(message.source);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): RegisterModelFromUrlRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRegisterModelFromUrlRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.url = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.framework = reader.int32() as any;
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.category = reader.int32() as any;
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.source = reader.int32() as any;
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RegisterModelFromUrlRequest {
+    return {
+      url: isSet(object.url) ? globalThis.String(object.url) : "",
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      framework: isSet(object.framework) ? inferenceFrameworkFromJSON(object.framework) : undefined,
+      category: isSet(object.category) ? modelCategoryFromJSON(object.category) : undefined,
+      source: isSet(object.source) ? modelSourceFromJSON(object.source) : undefined,
+    };
+  },
+
+  toJSON(message: RegisterModelFromUrlRequest): unknown {
+    const obj: any = {};
+    if (message.url !== "") {
+      obj.url = message.url;
+    }
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.framework !== undefined) {
+      obj.framework = inferenceFrameworkToJSON(message.framework);
+    }
+    if (message.category !== undefined) {
+      obj.category = modelCategoryToJSON(message.category);
+    }
+    if (message.source !== undefined) {
+      obj.source = modelSourceToJSON(message.source);
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<RegisterModelFromUrlRequest>, I>>(base?: I): RegisterModelFromUrlRequest {
+    return RegisterModelFromUrlRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<RegisterModelFromUrlRequest>, I>>(object: I): RegisterModelFromUrlRequest {
+    const message = createBaseRegisterModelFromUrlRequest();
+    message.url = object.url ?? "";
+    message.name = object.name ?? "";
+    message.framework = object.framework ?? undefined;
+    message.category = object.category ?? undefined;
+    message.source = object.source ?? undefined;
     return message;
   },
 };

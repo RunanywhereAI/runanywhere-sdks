@@ -469,6 +469,32 @@ export interface VLMServiceState {
   errorCode: number;
 }
 
+/**
+ * ---------------------------------------------------------------------------
+ * VLM load-resolved-artifacts request / response.
+ *
+ * Replaces the legacy trio `rac_vlm_create` + `rac_vlm_initialize` +
+ * `rac_vlm_destroy` (on error) with a single proto-backed call. Consumers
+ * pass the already-resolved model paths (primary model + optional mmproj
+ * vision projector) together with an optional model_id for telemetry. The
+ * response carries the resulting native handle as an opaque uint64; callers
+ * store the handle and use it for subsequent process/cancel/destroy calls.
+ * ---------------------------------------------------------------------------
+ */
+export interface VLMLoadResolvedArtifactsRequest {
+  modelId: string;
+  primaryModelPath: string;
+  mmprojPath?: string | undefined;
+}
+
+export interface VLMLoadResolvedArtifactsResponse {
+  /** opaque native handle (0 on failure) */
+  handle: number;
+  /** RAC_SUCCESS or error code */
+  resultCode: number;
+  errorMessage?: string | undefined;
+}
+
 function createBaseVLMChatTemplate(): VLMChatTemplate {
   return { templateText: "", imageMarker: undefined, defaultSystemPrompt: undefined };
 }
@@ -2271,6 +2297,190 @@ export const VLMServiceState = {
     message.visionEncoderType = object.visionEncoderType ?? undefined;
     message.errorMessage = object.errorMessage ?? undefined;
     message.errorCode = object.errorCode ?? 0;
+    return message;
+  },
+};
+
+function createBaseVLMLoadResolvedArtifactsRequest(): VLMLoadResolvedArtifactsRequest {
+  return { modelId: "", primaryModelPath: "", mmprojPath: undefined };
+}
+
+export const VLMLoadResolvedArtifactsRequest = {
+  encode(message: VLMLoadResolvedArtifactsRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.modelId !== "") {
+      writer.uint32(10).string(message.modelId);
+    }
+    if (message.primaryModelPath !== "") {
+      writer.uint32(18).string(message.primaryModelPath);
+    }
+    if (message.mmprojPath !== undefined) {
+      writer.uint32(26).string(message.mmprojPath);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): VLMLoadResolvedArtifactsRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseVLMLoadResolvedArtifactsRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.modelId = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.primaryModelPath = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.mmprojPath = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): VLMLoadResolvedArtifactsRequest {
+    return {
+      modelId: isSet(object.modelId) ? globalThis.String(object.modelId) : "",
+      primaryModelPath: isSet(object.primaryModelPath) ? globalThis.String(object.primaryModelPath) : "",
+      mmprojPath: isSet(object.mmprojPath) ? globalThis.String(object.mmprojPath) : undefined,
+    };
+  },
+
+  toJSON(message: VLMLoadResolvedArtifactsRequest): unknown {
+    const obj: any = {};
+    if (message.modelId !== "") {
+      obj.modelId = message.modelId;
+    }
+    if (message.primaryModelPath !== "") {
+      obj.primaryModelPath = message.primaryModelPath;
+    }
+    if (message.mmprojPath !== undefined) {
+      obj.mmprojPath = message.mmprojPath;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<VLMLoadResolvedArtifactsRequest>, I>>(base?: I): VLMLoadResolvedArtifactsRequest {
+    return VLMLoadResolvedArtifactsRequest.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<VLMLoadResolvedArtifactsRequest>, I>>(
+    object: I,
+  ): VLMLoadResolvedArtifactsRequest {
+    const message = createBaseVLMLoadResolvedArtifactsRequest();
+    message.modelId = object.modelId ?? "";
+    message.primaryModelPath = object.primaryModelPath ?? "";
+    message.mmprojPath = object.mmprojPath ?? undefined;
+    return message;
+  },
+};
+
+function createBaseVLMLoadResolvedArtifactsResponse(): VLMLoadResolvedArtifactsResponse {
+  return { handle: 0, resultCode: 0, errorMessage: undefined };
+}
+
+export const VLMLoadResolvedArtifactsResponse = {
+  encode(message: VLMLoadResolvedArtifactsResponse, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.handle !== 0) {
+      writer.uint32(8).uint64(message.handle);
+    }
+    if (message.resultCode !== 0) {
+      writer.uint32(16).int32(message.resultCode);
+    }
+    if (message.errorMessage !== undefined) {
+      writer.uint32(26).string(message.errorMessage);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): VLMLoadResolvedArtifactsResponse {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseVLMLoadResolvedArtifactsResponse();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 8) {
+            break;
+          }
+
+          message.handle = longToNumber(reader.uint64() as Long);
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.resultCode = reader.int32();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.errorMessage = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): VLMLoadResolvedArtifactsResponse {
+    return {
+      handle: isSet(object.handle) ? globalThis.Number(object.handle) : 0,
+      resultCode: isSet(object.resultCode) ? globalThis.Number(object.resultCode) : 0,
+      errorMessage: isSet(object.errorMessage) ? globalThis.String(object.errorMessage) : undefined,
+    };
+  },
+
+  toJSON(message: VLMLoadResolvedArtifactsResponse): unknown {
+    const obj: any = {};
+    if (message.handle !== 0) {
+      obj.handle = Math.round(message.handle);
+    }
+    if (message.resultCode !== 0) {
+      obj.resultCode = Math.round(message.resultCode);
+    }
+    if (message.errorMessage !== undefined) {
+      obj.errorMessage = message.errorMessage;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<VLMLoadResolvedArtifactsResponse>, I>>(
+    base?: I,
+  ): VLMLoadResolvedArtifactsResponse {
+    return VLMLoadResolvedArtifactsResponse.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<VLMLoadResolvedArtifactsResponse>, I>>(
+    object: I,
+  ): VLMLoadResolvedArtifactsResponse {
+    const message = createBaseVLMLoadResolvedArtifactsResponse();
+    message.handle = object.handle ?? 0;
+    message.resultCode = object.resultCode ?? 0;
+    message.errorMessage = object.errorMessage ?? undefined;
     return message;
   },
 };

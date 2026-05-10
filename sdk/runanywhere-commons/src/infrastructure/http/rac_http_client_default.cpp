@@ -29,12 +29,14 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <vector>
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_logger.h"
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
+#include "rac_http_upsert_mode.h"
 
 // =============================================================================
 // Internal accessor defined in rac_http_transport.cpp. Returns the
@@ -85,6 +87,51 @@ extern "C" void rac_http_client_destroy(rac_http_client_t* c) {
 
 namespace {
 
+/// Result of merging an upsert transform into a request descriptor.
+/// `effective_request` is the descriptor to hand to the adapter — it
+/// either references `req` directly (when no transform was armed) or a
+/// stack-built copy with rewritten URL + augmented headers.
+///
+/// `header_storage` and the `effective_request.headers` array members
+/// must out-live the dispatch call; both live in this struct.
+struct PreparedRequest {
+    rac_http_request_t effective_request{};
+    std::vector<rac_http_header_kv_t> header_storage;  // valid only when transformed
+    std::string url_storage;                           // backing for transformed url
+    std::string prefer_value_storage;                  // backing for "Prefer" header
+    bool transformed = false;
+};
+
+/// Builds the descriptor passed to the platform transport. When upsert
+/// mode is engaged we rewrite the URL and append a `Prefer` header;
+/// otherwise we pass `*req` through unchanged.
+PreparedRequest prepare_request(const rac_http_request_t* req) {
+    PreparedRequest prepared;
+    auto transform = rac::http::consume_upsert_transform(req);
+    if (!transform.engaged) {
+        prepared.effective_request = *req;
+        return prepared;
+    }
+
+    prepared.transformed = true;
+    prepared.url_storage = std::move(transform.transformed_url);
+    prepared.prefer_value_storage = std::move(transform.prefer_header_value);
+
+    // Copy existing headers and append the upsert "Prefer" header.
+    prepared.header_storage.reserve(req->header_count + 1);
+    for (size_t i = 0; i < req->header_count; ++i) {
+        prepared.header_storage.push_back(req->headers[i]);
+    }
+    prepared.header_storage.push_back(
+        rac_http_header_kv_t{"Prefer", prepared.prefer_value_storage.c_str()});
+
+    prepared.effective_request = *req;
+    prepared.effective_request.url = prepared.url_storage.c_str();
+    prepared.effective_request.headers = prepared.header_storage.data();
+    prepared.effective_request.header_count = prepared.header_storage.size();
+    return prepared;
+}
+
 rac_result_t dispatch_send(const rac_http_request_t* req, rac_http_response_t* out_resp) {
     const rac_http_transport_ops_t* ops = nullptr;
     void* ud = nullptr;
@@ -95,7 +142,8 @@ rac_result_t dispatch_send(const rac_http_request_t* req, rac_http_response_t* o
                       "Every SDK must call rac_http_transport_register() during init.");
         return RAC_ERROR_FEATURE_NOT_AVAILABLE;
     }
-    return ops->request_send(ud, req, out_resp);
+    PreparedRequest prepared = prepare_request(req);
+    return ops->request_send(ud, &prepared.effective_request, out_resp);
 }
 
 rac_result_t dispatch_stream(const rac_http_request_t* req, rac_http_body_chunk_fn cb,
@@ -109,7 +157,8 @@ rac_result_t dispatch_stream(const rac_http_request_t* req, rac_http_body_chunk_
                       "request_stream op). Every SDK must register a streaming-capable adapter.");
         return RAC_ERROR_FEATURE_NOT_AVAILABLE;
     }
-    return ops->request_stream(ud, req, cb, user_data, out_resp_meta);
+    PreparedRequest prepared = prepare_request(req);
+    return ops->request_stream(ud, &prepared.effective_request, cb, user_data, out_resp_meta);
 }
 
 rac_result_t dispatch_resume(const rac_http_request_t* req, uint64_t resume_from_byte,
@@ -124,7 +173,9 @@ rac_result_t dispatch_resume(const rac_http_request_t* req, uint64_t resume_from
                       "request_resume op). Every SDK must register a resumable-capable adapter.");
         return RAC_ERROR_FEATURE_NOT_AVAILABLE;
     }
-    return ops->request_resume(ud, req, resume_from_byte, cb, user_data, out_resp_meta);
+    PreparedRequest prepared = prepare_request(req);
+    return ops->request_resume(ud, &prepared.effective_request, resume_from_byte, cb, user_data,
+                               out_resp_meta);
 }
 
 }  // namespace

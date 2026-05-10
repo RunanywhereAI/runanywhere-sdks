@@ -17,6 +17,7 @@
 
 #include "rac_types.h"
 #include "rac_error.h"
+#include "rac_error_proto.h"  // P2-T1: rac_result_to_proto_error
 #include "rac_proto_buffer.h"
 #include "rac_structured_error.h"
 #include "rac_logger.h"
@@ -28,6 +29,7 @@
 // Lifecycle management
 #include "rac_lifecycle.h"
 #include "rac_model_lifecycle.h"
+#include "rac_sdk_init.h"  // P2-T9: rac_sdk_init_phase{1,2}_proto + retry_http_proto
 
 // SDK State (centralized state management)
 #include "rac_sdk_state.h"
@@ -44,6 +46,7 @@
 #include "rac_llm_metrics.h"
 #include "rac_llm_analytics.h"
 #include "rac_llm_structured_output.h"
+#include "rac_llm_schema_to_json.h"  // P2-T15: rac_structured_output_schema_to_json_proto
 #include "rac_llm_thinking.h"
 // v2 close-out Phase G-2: proto-byte LLM stream ABI.
 #include "rac_llm_stream.h"
@@ -130,6 +133,7 @@
 
 // Device
 #include "rac_device_manager.h"
+#include "rac_device_identity.h"  // P2-T13: rac_device_get_or_create_persistent_id
 
 // =============================================================================
 // PLATFORM BACKEND - Apple Foundation Models, System TTS, CoreML Diffusion

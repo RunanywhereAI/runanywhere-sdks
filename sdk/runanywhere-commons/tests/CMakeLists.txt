@@ -85,6 +85,34 @@ rac_link_archive_deps(test_graph_primitives)
 target_compile_features(test_graph_primitives PRIVATE cxx_std_17)
 add_test(NAME graph_primitives_tests COMMAND test_graph_primitives)
 
+# --- P2-T12: log redaction policy parity tests ------------------------------
+# Validates rac_log_metadata_should_redact() against the same fixture set
+# Swift's SDKLogger.swift honors. Pure-C++ helper, no backend dependency.
+add_executable(test_log_redact test_log_redact.cpp)
+target_include_directories(test_log_redact PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_log_redact PRIVATE rac_commons)
+rac_link_archive_deps(test_log_redact)
+target_compile_features(test_log_redact PRIVATE cxx_std_17)
+add_test(NAME log_redact_tests COMMAND test_log_redact --run-all)
+
+# --- P2-T13: persistent device-id resolution chain --------------------------
+# Validates rac_device_get_or_create_persistent_id() against a mocked
+# rac_platform_adapter_t (secure_get / secure_set / get_vendor_id). Replaces
+# the local Keychain -> identifierForVendor -> generate-UUID chain that each
+# platform SDK previously reimplemented. No backend dependency.
+add_executable(test_device_identity test_device_identity.cpp)
+target_include_directories(test_device_identity PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_device_identity PRIVATE rac_commons)
+rac_link_archive_deps(test_device_identity)
+target_compile_features(test_device_identity PRIVATE cxx_std_17)
+add_test(NAME device_identity_tests COMMAND test_device_identity --run-all)
+
 # --- v3.1 Phase 9 Phase 2: MemoryPool<T> tests ------------------------------
 # Header-only template; verifies acquire/release, blocking, cancel, and a
 # concurrent stress test.
@@ -207,6 +235,22 @@ target_compile_features(test_tool_calling_session_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_calling_session_proto)
 add_test(NAME tool_calling_session_proto_tests COMMAND test_tool_calling_session_proto)
 
+# --- P2-T8: synchronous tool-calling run loop --------------------------------
+# Mirrors the session proto test setup but exercises the single-call API
+# (rac_tool_calling_run_loop_proto). Verifies executor callback wiring,
+# iteration cap, validation failure path, and no-tool-call completion.
+add_executable(test_tool_calling_run_loop test_tool_calling_run_loop.cpp)
+target_include_directories(test_tool_calling_run_loop PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
+)
+target_link_libraries(test_tool_calling_run_loop PRIVATE rac_commons)
+rac_link_archive_deps(test_tool_calling_run_loop)
+target_compile_features(test_tool_calling_run_loop PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_tool_calling_run_loop)
+add_test(NAME tool_calling_run_loop_tests COMMAND test_tool_calling_run_loop)
+
 # --- CPP-09A: structured-output helper tests --------------------------------
 add_executable(test_structured_output test_structured_output.cpp)
 target_include_directories(test_structured_output PRIVATE
@@ -218,6 +262,23 @@ rac_link_archive_deps(test_structured_output)
 target_compile_features(test_structured_output PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_structured_output)
 add_test(NAME structured_output_tests COMMAND test_structured_output)
+
+# --- P2-T15: JSONSchema-proto -> JSON Schema text canonical-writer parity ----
+# Verifies rac_structured_output_schema_to_json_proto produces byte-exact
+# output matching Swift's JSONSchemaWriter
+# (StructuredOutputProto+Helpers.swift) so Swift can drop its private writer
+# in P3-T9.
+add_executable(test_schema_to_json test_schema_to_json.cpp)
+target_include_directories(test_schema_to_json PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/include
+    ${CMAKE_SOURCE_DIR}/sdk/runanywhere-commons/src/generated/proto
+)
+target_link_libraries(test_schema_to_json PRIVATE rac_commons)
+rac_link_archive_deps(test_schema_to_json)
+target_compile_features(test_schema_to_json PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_schema_to_json)
+add_test(NAME schema_to_json_tests COMMAND test_schema_to_json)
 
 # --- v2 close-out Phase 2: proto-byte event dispatch test --------------------
 # Exercises rac::voice_agent::dispatch_proto_event() — the C union → proto
@@ -379,6 +440,21 @@ target_compile_features(test_auth_sdk_events PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_auth_sdk_events)
 add_test(NAME auth_sdk_event_tests COMMAND test_auth_sdk_events)
 
+# --- P2-T9: canonical two-phase SDK init ABI tests --------------------------
+# Drives rac_sdk_init_phase{1,2}_proto + rac_sdk_retry_http_proto with hand
+# built request bytes; verifies the SdkInitResult envelope mirrors Swift's
+# Phase 1 / Phase 2 / retryHTTPSetup behaviour.
+add_executable(test_sdk_init test_sdk_init.cpp)
+target_include_directories(test_sdk_init PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_sdk_init PRIVATE rac_commons)
+rac_link_archive_deps(test_sdk_init)
+target_compile_features(test_sdk_init PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_sdk_init)
+add_test(NAME sdk_init_tests COMMAND test_sdk_init)
+
 # --- SDKEvents generated service descriptor test ----------------------------
 add_executable(test_sdk_events_service_proto_abi test_sdk_events_service_proto_abi.cpp)
 target_include_directories(test_sdk_events_service_proto_abi PRIVATE
@@ -518,6 +594,49 @@ rac_link_archive_deps(test_artifact_helpers_proto)
 target_compile_features(test_artifact_helpers_proto PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_artifact_helpers_proto)
 add_test(NAME artifact_helpers_proto_tests COMMAND test_artifact_helpers_proto)
+
+# --- STT/TTS/RAG configuration defaults parity tests (P2-T14) ----------------
+# Exercises rac_stt_configuration_defaults_proto / rac_tts_configuration_defaults_proto
+# / rac_rag_request_with_defaults_proto — the commons-owned ports of Swift's
+# RA{STT,TTS,RAG}Configuration.defaults() helpers. Each test decodes the
+# returned proto bytes and pins the canonical default values so any drift
+# between commons and the Swift source-of-truth fails CI.
+add_executable(test_stt_config_defaults test_stt_config_defaults.cpp)
+target_include_directories(test_stt_config_defaults PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_stt_config_defaults PRIVATE rac_commons)
+rac_link_archive_deps(test_stt_config_defaults)
+target_compile_features(test_stt_config_defaults PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_stt_config_defaults)
+add_test(NAME stt_config_defaults_tests COMMAND test_stt_config_defaults)
+
+add_executable(test_tts_config_defaults test_tts_config_defaults.cpp)
+target_include_directories(test_tts_config_defaults PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_tts_config_defaults PRIVATE rac_commons)
+rac_link_archive_deps(test_tts_config_defaults)
+target_compile_features(test_tts_config_defaults PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_tts_config_defaults)
+add_test(NAME tts_config_defaults_tests COMMAND test_tts_config_defaults)
+
+# RAG symbols are folded into rac_commons only when the RAG OBJECT target is
+# enabled, so guard this test the same way as test_advanced_modality_proto_abi.
+if(TARGET rac_backend_rag)
+    add_executable(test_rag_request_defaults test_rag_request_defaults.cpp)
+    target_include_directories(test_rag_request_defaults PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_SOURCE_DIR}/include
+    )
+    target_link_libraries(test_rag_request_defaults PRIVATE rac_commons)
+    rac_link_archive_deps(test_rag_request_defaults)
+    target_compile_features(test_rag_request_defaults PRIVATE cxx_std_17)
+    rac_test_define_have_protobuf(test_rag_request_defaults)
+    add_test(NAME rag_request_defaults_tests COMMAND test_rag_request_defaults)
+endif()
 
 # --- Per-framework "is this file a model file?" parity tests -----------------
 # Exercises rac_model_format_for_framework() — the canonical commons helper
@@ -968,6 +1087,35 @@ if(UNIX)
     target_compile_features(test_http_download PRIVATE cxx_std_17)
     add_test(NAME http_download_tests COMMAND test_http_download)
 endif()
+
+# --- P2-T10: rac_http_request_set_upsert_mode parity test ---------------
+# Pure ABI / dispatch test — registers a stub rac_http_transport_ops_t,
+# arms the upsert flag, and verifies the URL/header rewrite the SDKs rely
+# on. No sockets, so it builds on every platform.
+add_executable(test_http_upsert_mode test_http_upsert_mode.cpp)
+target_include_directories(test_http_upsert_mode PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_http_upsert_mode PRIVATE rac_commons)
+rac_link_archive_deps(test_http_upsert_mode)
+target_compile_features(test_http_upsert_mode PRIVATE cxx_std_17)
+add_test(NAME http_upsert_mode_tests COMMAND test_http_upsert_mode)
+
+# --- P2-T11: rac_http_default_headers parity test ----------------------
+# Pure ABI test — verifies the canonical default-header list matches
+# Swift's HTTPClientAdapter.defaultHeaders content (sans X-Platform),
+# returns the same static-array pointer across calls, and rejects NULL
+# out-pointers.
+add_executable(test_http_default_headers test_http_default_headers.cpp)
+target_include_directories(test_http_default_headers PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_http_default_headers PRIVATE rac_commons)
+rac_link_archive_deps(test_http_default_headers)
+target_compile_features(test_http_default_headers PRIVATE cxx_std_17)
+add_test(NAME http_default_headers_tests COMMAND test_http_default_headers --run-all)
 
 # --- test_download_orchestrator: Always built (no backend dependency) ---
 add_executable(test_download_orchestrator test_download_orchestrator.cpp)

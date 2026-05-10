@@ -529,6 +529,73 @@ RAC_API rac_result_t rac_tool_calling_session_step_with_result_proto(
 
 RAC_API rac_result_t rac_tool_calling_session_destroy_proto(uint64_t session_handle);
 
+// =============================================================================
+// TOOL CALLING RUN LOOP (P2-T8) - Single-call native orchestration
+// =============================================================================
+//
+// Collapses the per-SDK generate -> parse -> validate -> execute -> follow-up
+// loop into a single C ABI call. Caller provides:
+//   - serialized runanywhere.v1.ToolCallingSessionCreateRequest (reused as
+//     input shape; identical fields to a hypothetical RunLoopRequest)
+//   - on_execute callback that synchronously executes a tool call and
+//     returns its serialized runanywhere.v1.ToolResult bytes
+//
+// On return, out_result carries a serialized runanywhere.v1.ToolCallingResult
+// describing the final text, recorded tool calls, executed tool results,
+// is_complete flag, and iterations_used counter.
+//
+// SINGLE SOURCE OF TRUTH: the orchestration loop lives in commons. Swift,
+// Kotlin, Flutter, and React Native call this and only register the tool
+// executor (which owns platform side-effects).
+
+/**
+ * @brief Synchronous tool-execute callback used by rac_tool_calling_run_loop_proto.
+ *
+ * Borrowed inputs:
+ *   - in_tool_call_bytes / in_size: serialized runanywhere.v1.ToolCall
+ * Owned output:
+ *   - out_tool_result_bytes: filled with a serialized
+ *     runanywhere.v1.ToolResult (caller of the callback owns the buffer
+ *     and must release it with rac_proto_buffer_free()).
+ *
+ * Returning anything other than RAC_SUCCESS terminates the loop and
+ * surfaces a failed ToolResult with the error code in out_result.
+ */
+typedef rac_result_t (*rac_tool_execute_callback_fn)(
+    const uint8_t* in_tool_call_bytes,
+    size_t in_size,
+    rac_proto_buffer_t* out_tool_result_bytes,
+    void* user_data);
+
+/**
+ * @brief Run the full tool-calling loop in commons.
+ *
+ * Loop:
+ *   1. Build initial prompt from request (tools + format + system prompt)
+ *   2. Generate response via the lifecycle-owned LLM
+ *   3. Parse output for a tool call
+ *   4. If found and validate_calls: validate against the request's tools
+ *   5. Invoke on_execute(tool_call) -> tool_result
+ *   6. Build follow-up prompt and loop
+ *   7. Stop when no tool call found, max_iterations reached, or error
+ *
+ * @param in_request_bytes    Borrowed serialized
+ *                            runanywhere.v1.ToolCallingSessionCreateRequest.
+ * @param in_size             Size of in_request_bytes.
+ * @param on_execute          Synchronous tool-execute callback.
+ * @param user_data           Opaque pointer forwarded to on_execute.
+ * @param out_result          Owned serialized
+ *                            runanywhere.v1.ToolCallingResult on success.
+ * @return RAC_SUCCESS when out_result carries a serialized result; a negative
+ *         rac_result_t on failure (out_result also carries the status text).
+ */
+RAC_API rac_result_t rac_tool_calling_run_loop_proto(
+    const uint8_t* in_request_bytes,
+    size_t in_size,
+    rac_tool_execute_callback_fn on_execute,
+    void* user_data,
+    rac_proto_buffer_t* out_result);
+
 #ifdef __cplusplus
 }
 #endif

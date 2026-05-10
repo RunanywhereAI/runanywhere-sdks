@@ -327,6 +327,30 @@ typedef struct rac_platform_adapter {
     rac_bool_t (*is_non_empty_directory)(const char* path, void* user_data);
 
     // -------------------------------------------------------------------------
+    // Vendor ID (Optional - can be NULL)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Apple-specific: returns the platform's persistent vendor ID
+     * (UIDevice.identifierForVendor.uuidString on iOS).
+     *
+     * Used by rac_device_get_or_create_persistent_id() as a stable fallback
+     * when the secure-storage cache miss occurs. NULL on non-Apple platforms
+     * or when the platform cannot supply a vendor ID; commons then synthesizes
+     * a fresh UUID and persists it via secure_set.
+     *
+     * Buffer should be >= 37 bytes (UUID string + NUL).
+     *
+     * @param out_buffer  Caller-provided buffer to receive the UUID string.
+     * @param buffer_size Buffer size in bytes; MUST be >= 37 to succeed.
+     * @param user_data   Platform context.
+     * @return RAC_SUCCESS on success (out_buffer is NUL-terminated).
+     *         On any error the buffer contents are unspecified and MUST NOT be
+     *         consumed by the caller.
+     */
+    rac_result_t (*get_vendor_id)(char* out_buffer, size_t buffer_size, void* user_data);
+
+    // -------------------------------------------------------------------------
     // User Data
     // -------------------------------------------------------------------------
 

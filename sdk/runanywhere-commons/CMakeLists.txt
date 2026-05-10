@@ -506,6 +506,7 @@ set(RAC_CORE_SOURCES
     src/core/rac_benchmark_stats.cpp
     src/core/rac_memory.cpp
     src/core/rac_logger.cpp
+    src/infrastructure/logging/log_redact.cpp
     src/core/rac_audio_utils.cpp
     src/core/component_types.cpp
     src/core/events.cpp
@@ -516,6 +517,11 @@ set(RAC_CORE_SOURCES
     src/core/rac_error_model.cpp
     src/core/rac_error_proto.cpp
     src/foundation/rac_proto_buffer.cpp
+    # P2-T9: canonical two-phase SDK init ABI. Wraps existing rac_state /
+    # rac_auth / rac_device_manager / rac_model_assignment internals behind
+    # one rac_sdk_init_phase{1,2}_proto + rac_sdk_retry_http_proto surface so
+    # platform SDKs collapse their duplicated step list.
+    src/lifecycle/sdk_init.cpp
 )
 
 # Infrastructure sources - registry, model management, network, telemetry
@@ -587,10 +593,24 @@ set(RAC_INFRASTRUCTURE_SOURCES
     # rac::http::execute / execute_stream. The facade routes through the
     # platform transport vtable above and has no portable HTTP fallback.
     src/infrastructure/http/rac_http_internal.cpp
+    # P2-T10 — Supabase-style upsert request flag. Lets platform SDKs
+    # arm a request via `rac_http_request_set_upsert_mode`; the dispatch
+    # sites in rac_http_client_default.cpp / rac_http_client_emscripten.cpp
+    # consume it and apply the on_conflict URL rewrite + Prefer header.
+    src/infrastructure/http/rac_http_upsert_mode.cpp
+    # P2-T11 — single canonical default-header list shared across SDKs
+    # (RunAnywhereSDK / commons VERSION / application-json). Lets every
+    # platform's `defaultHeaders` block resolve through one C entry point
+    # so they stay in lockstep with the commons VERSION file.
+    src/infrastructure/http/http_default_headers.cpp
     src/infrastructure/telemetry/telemetry_types.cpp
     src/infrastructure/telemetry/telemetry_json.cpp
     src/infrastructure/telemetry/telemetry_manager.cpp
     src/infrastructure/device/rac_device_manager.cpp
+    # P2-T13: persistent device-id resolution chain
+    # (Keychain -> identifierForVendor -> generate UUID) collapsed from each
+    # platform SDK into a single C entry point.
+    src/infrastructure/device/device_identity.cpp
     src/infrastructure/extraction/rac_extraction.cpp
     # v3.1 Phase 9: DAG streaming runtime (GAP 05 Phase 2). The primitives
     # under include/rac/graph/ (CancelToken / StreamEdge / RingBuffer /
@@ -621,6 +641,9 @@ set(RAC_FEATURES_SOURCES
     src/features/llm/streaming_metrics.cpp
     src/features/llm/llm_analytics.cpp
     src/features/llm/structured_output.cpp
+    # P2-T15: JSONSchema-proto -> JSON Schema text canonical writer (replaces
+    # Swift JSONSchemaWriter / per-SDK serializers).
+    src/features/llm/schema_to_json.cpp
     # v2 close-out Phase 5: thinking-content split (replaces Swift
     # ThinkingContentParser; rac_llm_split_thinking_tokens C ABI)
     src/features/llm/rac_llm_thinking.cpp
@@ -628,6 +651,10 @@ set(RAC_FEATURES_SOURCES
     # Wave D-4: tool-calling session state machine (collapses per-SDK
     # 200-400 LOC orchestration loop into one native session).
     src/features/llm/tool_calling_session.cpp
+    # P2-T8: synchronous single-call tool-calling loop (parse -> validate ->
+    # execute -> follow-up). Collapses Swift's ~100 LOC generateWithTools
+    # to ~10 LOC; same loop will benefit Kotlin/RN over the same ABI.
+    src/features/llm/tool_calling_run_loop.cpp
     # v2 close-out Phase G-2: proto-byte LLM stream ABI (mirrors
     # voice_agent/rac_voice_event_abi.cpp; replaces per-SDK hand-rolled
     # AsyncThrowingStream / callbackFlow / tokenQueue shims).
@@ -638,12 +665,16 @@ set(RAC_FEATURES_SOURCES
     src/features/stt/stt_analytics.cpp
     # CPP-03: lifecycle-owned proto-byte STTStreamEvent ABI
     src/features/stt/rac_stt_stream.cpp
+    # P2-T14: canonical STTConfiguration defaults helper
+    src/features/stt/rac_stt_config_defaults.cpp
     # TTS
     src/features/tts/tts_component.cpp
     src/features/tts/rac_tts_service.cpp
     src/features/tts/tts_analytics.cpp
     # CPP-03: lifecycle-owned proto-byte TTSStreamEvent ABI
     src/features/tts/rac_tts_stream.cpp
+    # P2-T14: canonical TTSConfiguration defaults helper
+    src/features/tts/rac_tts_config_defaults.cpp
     # VAD
     src/features/vad/vad_component.cpp
     src/features/vad/energy_vad.cpp
@@ -951,6 +982,8 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/thinking_tag_pattern.pb.cc
     ${_RAC_PROTO_GEN_DIR}/component_types.pb.cc
     ${_RAC_PROTO_GEN_DIR}/lifecycle_service.pb.cc
+    # P2-T9: two-phase SDK init request/result envelope.
+    ${_RAC_PROTO_GEN_DIR}/sdk_init.pb.cc
 )
 set(RAC_PROTOBUF_COMPILE_OPTIONS "")
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")

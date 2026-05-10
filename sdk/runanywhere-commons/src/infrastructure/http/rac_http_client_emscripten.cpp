@@ -70,6 +70,7 @@
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
+#include "rac_http_upsert_mode.h"
 
 namespace {
 
@@ -511,26 +512,68 @@ bool get_http_transport(const rac_http_transport_ops_t** out_ops, void** out_use
 
 namespace {
 
+/// Mirror of `PreparedRequest` in `rac_http_client_default.cpp` — see
+/// `rac_http_upsert_mode.h` for rationale. Both dispatch sites apply the
+/// same Supabase-style URL/header rewrite when a request was armed via
+/// `rac_http_request_set_upsert_mode` so behaviour is identical across
+/// native and WASM targets.
+struct PreparedRequest {
+    rac_http_request_t effective_request{};
+    std::vector<rac_http_header_kv_t> header_storage;
+    std::string url_storage;
+    std::string prefer_value_storage;
+    bool transformed = false;
+};
+
+PreparedRequest prepare_request(const rac_http_request_t* req) {
+    PreparedRequest prepared;
+    auto transform = rac::http::consume_upsert_transform(req);
+    if (!transform.engaged) {
+        prepared.effective_request = *req;
+        return prepared;
+    }
+
+    prepared.transformed = true;
+    prepared.url_storage = std::move(transform.transformed_url);
+    prepared.prefer_value_storage = std::move(transform.prefer_header_value);
+
+    prepared.header_storage.reserve(req->header_count + 1);
+    for (size_t i = 0; i < req->header_count; ++i) {
+        prepared.header_storage.push_back(req->headers[i]);
+    }
+    prepared.header_storage.push_back(
+        rac_http_header_kv_t{"Prefer", prepared.prefer_value_storage.c_str()});
+
+    prepared.effective_request = *req;
+    prepared.effective_request.url = prepared.url_storage.c_str();
+    prepared.effective_request.headers = prepared.header_storage.data();
+    prepared.effective_request.header_count = prepared.header_storage.size();
+    return prepared;
+}
+
 rac_result_t dispatch_send(const rac_http_request_t* req, rac_http_response_t* out_resp) {
     const rac_http_transport_ops_t* ops = nullptr;
     void* ud = nullptr;
+    PreparedRequest prepared = prepare_request(req);
     if (!rac_internal::get_http_transport(&ops, &ud) || ops == nullptr ||
         ops->request_send == nullptr) {
-        return emscripten_request_send(/*user_data=*/nullptr, req, out_resp);
+        return emscripten_request_send(/*user_data=*/nullptr, &prepared.effective_request,
+                                       out_resp);
     }
-    return ops->request_send(ud, req, out_resp);
+    return ops->request_send(ud, &prepared.effective_request, out_resp);
 }
 
 rac_result_t dispatch_stream(const rac_http_request_t* req, rac_http_body_chunk_fn cb,
                              void* user_data, rac_http_response_t* out_resp_meta) {
     const rac_http_transport_ops_t* ops = nullptr;
     void* ud = nullptr;
+    PreparedRequest prepared = prepare_request(req);
     if (!rac_internal::get_http_transport(&ops, &ud) || ops == nullptr ||
         ops->request_stream == nullptr) {
-        return emscripten_request_stream(/*user_data=*/nullptr, req, cb, user_data,
-                                         out_resp_meta);
+        return emscripten_request_stream(/*user_data=*/nullptr, &prepared.effective_request, cb,
+                                         user_data, out_resp_meta);
     }
-    return ops->request_stream(ud, req, cb, user_data, out_resp_meta);
+    return ops->request_stream(ud, &prepared.effective_request, cb, user_data, out_resp_meta);
 }
 
 rac_result_t dispatch_resume(const rac_http_request_t* req, uint64_t resume_from_byte,
@@ -538,12 +581,14 @@ rac_result_t dispatch_resume(const rac_http_request_t* req, uint64_t resume_from
                              rac_http_response_t* out_resp_meta) {
     const rac_http_transport_ops_t* ops = nullptr;
     void* ud = nullptr;
+    PreparedRequest prepared = prepare_request(req);
     if (!rac_internal::get_http_transport(&ops, &ud) || ops == nullptr ||
         ops->request_resume == nullptr) {
-        return emscripten_request_resume(/*user_data=*/nullptr, req, resume_from_byte, cb,
-                                         user_data, out_resp_meta);
+        return emscripten_request_resume(/*user_data=*/nullptr, &prepared.effective_request,
+                                         resume_from_byte, cb, user_data, out_resp_meta);
     }
-    return ops->request_resume(ud, req, resume_from_byte, cb, user_data, out_resp_meta);
+    return ops->request_resume(ud, &prepared.effective_request, resume_from_byte, cb, user_data,
+                               out_resp_meta);
 }
 
 }  // namespace

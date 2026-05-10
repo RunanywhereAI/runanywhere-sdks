@@ -2593,6 +2593,131 @@ public struct RAModelRegistryFetchAssignmentsResult: Sendable {
   fileprivate var _models: RAModelInfoList? = nil
 }
 
+/// ---------------------------------------------------------------------------
+/// Inputs for the canonical RAModelInfo factory (P2-T4). Replaces Swift's
+/// `RAModelInfo.make(...)` ~370 LOC of field-defaulting and artifact-inference
+/// logic with a commons-owned implementation. Commons fills 18 ModelInfo fields
+/// (id, name, category/format/framework defaults, context-length defaults,
+/// thinking gating + default pattern, artifact inference, source mark,
+/// timestamps, and is_downloaded probe).
+/// ---------------------------------------------------------------------------
+public struct RAModelInfoMakeRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Required. Download URL or file path. Used both as the metadata field
+  /// and as input to artifact-type inference (zip/tar.gz/tgz/... → archive,
+  /// anything else → single_file).
+  public var url: String = String()
+
+  /// Optional human-readable name. When empty commons derives it from the
+  /// URL via rac_model_generate_name() (replaces underscores/dashes with
+  /// spaces).
+  public var name: String = String()
+
+  /// Optional inference framework. UNSPECIFIED triggers detection from the
+  /// URL extension; commons looks up the format and maps to a default
+  /// framework via rac_model_detect_framework_from_format().
+  public var framework: RAInferenceFramework {
+    get {_framework ?? .unspecified}
+    set {_framework = newValue}
+  }
+  /// Returns true if `framework` has been explicitly set.
+  public var hasFramework: Bool {self._framework != nil}
+  /// Clears the value of `framework`. Subsequent reads from it will return its default value.
+  public mutating func clearFramework() {self._framework = nil}
+
+  /// Optional category. UNSPECIFIED falls back to the framework default
+  /// (rac_model_category_from_framework()).
+  public var category: RAModelCategory {
+    get {_category ?? .unspecified}
+    set {_category = newValue}
+  }
+  /// Returns true if `category` has been explicitly set.
+  public var hasCategory: Bool {self._category != nil}
+  /// Clears the value of `category`. Subsequent reads from it will return its default value.
+  public mutating func clearCategory() {self._category = nil}
+
+  /// Optional source. UNSPECIFIED is treated as MODEL_SOURCE_REMOTE.
+  public var source: RAModelSource {
+    get {_source ?? .unspecified}
+    set {_source = newValue}
+  }
+  /// Returns true if `source` has been explicitly set.
+  public var hasSource: Bool {self._source != nil}
+  /// Clears the value of `source`. Subsequent reads from it will return its default value.
+  public mutating func clearSource() {self._source = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _framework: RAInferenceFramework? = nil
+  fileprivate var _category: RAModelCategory? = nil
+  fileprivate var _source: RAModelSource? = nil
+}
+
+/// ---------------------------------------------------------------------------
+/// Inputs for the canonical "register a model from a URL" entry point (P2-T6).
+/// Composes ModelInfoMakeRequest (P2-T4) with the existing registry save path
+/// so SDKs replace ~60 LOC of build-and-save glue with a single ABI call.
+/// Produces the saved ModelInfo (matches rac_model_registry_register_proto_buffer
+/// shape).
+/// ---------------------------------------------------------------------------
+public struct RARegisterModelFromUrlRequest: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  /// Required. Download URL or file path. Routed straight into
+  /// ModelInfoMakeRequest.url; format/artifact inference and id/name
+  /// generation reuse the same factory semantics.
+  public var url: String = String()
+
+  /// Optional human-readable name. Empty → derived from URL.
+  public var name: String = String()
+
+  /// Optional inference framework. UNSPECIFIED triggers detection from the
+  /// URL extension (rac_model_detect_framework_from_format).
+  public var framework: RAInferenceFramework {
+    get {_framework ?? .unspecified}
+    set {_framework = newValue}
+  }
+  /// Returns true if `framework` has been explicitly set.
+  public var hasFramework: Bool {self._framework != nil}
+  /// Clears the value of `framework`. Subsequent reads from it will return its default value.
+  public mutating func clearFramework() {self._framework = nil}
+
+  /// Optional category. UNSPECIFIED falls back to the framework default.
+  public var category: RAModelCategory {
+    get {_category ?? .unspecified}
+    set {_category = newValue}
+  }
+  /// Returns true if `category` has been explicitly set.
+  public var hasCategory: Bool {self._category != nil}
+  /// Clears the value of `category`. Subsequent reads from it will return its default value.
+  public mutating func clearCategory() {self._category = nil}
+
+  /// Optional source. UNSPECIFIED is treated as MODEL_SOURCE_REMOTE.
+  public var source: RAModelSource {
+    get {_source ?? .unspecified}
+    set {_source = newValue}
+  }
+  /// Returns true if `source` has been explicitly set.
+  public var hasSource: Bool {self._source != nil}
+  /// Clears the value of `source`. Subsequent reads from it will return its default value.
+  public mutating func clearSource() {self._source = nil}
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+
+  fileprivate var _framework: RAInferenceFramework? = nil
+  fileprivate var _category: RAModelCategory? = nil
+  fileprivate var _source: RAModelSource? = nil
+}
+
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
 fileprivate let _protobuf_package = "runanywhere.v1"
@@ -5066,6 +5191,114 @@ extension RAModelRegistryFetchAssignmentsResult: SwiftProtobuf.Message, SwiftPro
     if lhs.fetchedAtUnixMs != rhs.fetchedAtUnixMs {return false}
     if lhs.errorCode != rhs.errorCode {return false}
     if lhs.errorMessage != rhs.errorMessage {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAModelInfoMakeRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ModelInfoMakeRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}name\0\u{1}framework\0\u{1}category\0\u{1}source\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.url) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self._framework) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self._category) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self._source) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.url.isEmpty {
+      try visitor.visitSingularStringField(value: self.url, fieldNumber: 1)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    try { if let v = self._framework {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._category {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._source {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 5)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAModelInfoMakeRequest, rhs: RAModelInfoMakeRequest) -> Bool {
+    if lhs.url != rhs.url {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs._framework != rhs._framework {return false}
+    if lhs._category != rhs._category {return false}
+    if lhs._source != rhs._source {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RARegisterModelFromUrlRequest: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".RegisterModelFromUrlRequest"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}url\0\u{1}name\0\u{1}framework\0\u{1}category\0\u{1}source\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.url) }()
+      case 2: try { try decoder.decodeSingularStringField(value: &self.name) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self._framework) }()
+      case 4: try { try decoder.decodeSingularEnumField(value: &self._category) }()
+      case 5: try { try decoder.decodeSingularEnumField(value: &self._source) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if !self.url.isEmpty {
+      try visitor.visitSingularStringField(value: self.url, fieldNumber: 1)
+    }
+    if !self.name.isEmpty {
+      try visitor.visitSingularStringField(value: self.name, fieldNumber: 2)
+    }
+    try { if let v = self._framework {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._category {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 4)
+    } }()
+    try { if let v = self._source {
+      try visitor.visitSingularEnumField(value: v, fieldNumber: 5)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RARegisterModelFromUrlRequest, rhs: RARegisterModelFromUrlRequest) -> Bool {
+    if lhs.url != rhs.url {return false}
+    if lhs.name != rhs.name {return false}
+    if lhs._framework != rhs._framework {return false}
+    if lhs._category != rhs._category {return false}
+    if lhs._source != rhs._source {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -157,6 +157,8 @@ _rac_structured_output_generate_stream_proto
 _rac_structured_output_parse_proto
 _rac_structured_output_prepare_prompt_proto
 _rac_structured_output_validate_proto
+# P2-T15: JSONSchema-proto -> JSON Schema text canonical writer.
+_rac_structured_output_schema_to_json_proto
 
 # LLM Tool Calling — SDK-facing surface is proto-byte only.
 # Legacy struct/JSON helpers are now internal (still implemented for
@@ -170,6 +172,11 @@ _rac_tool_call_format_prompt_proto
 _rac_tool_calling_session_create_proto
 _rac_tool_calling_session_step_with_result_proto
 _rac_tool_calling_session_destroy_proto
+
+# P2-T8: Synchronous single-call tool-calling loop. Mirrors the session
+# machinery but exposes one C ABI call instead of an outer-driven event
+# stream — Swift's generateWithTools collapses to ~10 LOC.
+_rac_tool_calling_run_loop_proto
 
 # VLM / Diffusion components — non-proto APIs are internal helpers used
 # by JNI during migration. SDK-facing surface is the proto-byte ABI
@@ -242,6 +249,13 @@ _rac_model_lifecycle_current_model_proto
 _rac_component_lifecycle_snapshot_proto
 _rac_model_lifecycle_reset
 
+# P2-T9: canonical two-phase SDK init surface (Phase 1 / Phase 2 / retry HTTP).
+# Mirrors RunAnywhere.swift::initialize / completeServicesInitialization /
+# retryHTTPSetup so every SDK shares one step list.
+_rac_sdk_init_phase1_proto
+_rac_sdk_init_phase2_proto
+_rac_sdk_retry_http_proto
+
 # Download and storage generated-proto ABI
 _rac_download_set_progress_proto_callback
 _rac_download_plan_proto
@@ -266,12 +280,16 @@ _rac_stt_transcribe_lifecycle_proto
 _rac_stt_transcribe_stream_lifecycle_proto
 _rac_stt_component_transcribe_proto
 _rac_stt_component_transcribe_stream_proto
+# P2-T14: canonical STTConfiguration defaults helper.
+_rac_stt_configuration_defaults_proto
 _rac_tts_synthesize_lifecycle_proto
 _rac_tts_synthesize_stream_lifecycle_proto
 _rac_tts_stop_lifecycle_proto
 _rac_tts_component_list_voices_proto
 _rac_tts_component_synthesize_proto
 _rac_tts_component_synthesize_stream_proto
+# P2-T14: canonical TTSConfiguration defaults helper.
+_rac_tts_configuration_defaults_proto
 _rac_vad_process_lifecycle_proto
 _rac_vad_configure_lifecycle_proto
 _rac_vad_start_lifecycle_proto
@@ -348,8 +366,10 @@ _rac_router_frameworks_for_capability_proto_free
 # here and the C ABI download executor dispatches through it.
 _rac_http_client_create
 _rac_http_client_destroy
+_rac_http_default_headers
 _rac_http_download_execute
 _rac_http_request_send
+_rac_http_request_set_upsert_mode
 _rac_http_request_stream
 _rac_http_response_free
 _rac_http_transport_is_registered
@@ -425,6 +445,12 @@ _rac_device_manager_get_device_id
 _rac_device_manager_is_registered
 _rac_device_manager_register_if_needed
 _rac_device_manager_set_callbacks
+
+# P2-T13: persistent device-id resolution chain (Keychain ->
+# identifierForVendor -> generate UUID) collapsed from each platform SDK
+# into one C entry point.
+_rac_device_get_or_create_persistent_id
+_rac_device_identity_reset_cache_for_testing
 
 # Backend registration entry points — every backend (platform FM, RAG,
 # WhisperKit CoreML, etc.) publishes a rac_backend_*_register()/_unregister()

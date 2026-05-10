@@ -298,6 +298,31 @@ RAC_API rac_result_t rac_stt_transcribe_stream_lifecycle_proto(
     const uint8_t* request_proto_bytes, size_t request_proto_size,
     rac_stt_lifecycle_stream_event_callback_fn callback, void* user_data);
 
+// =============================================================================
+// CANONICAL DEFAULTS (P2-T14)
+// =============================================================================
+
+/**
+ * @brief Populate a default-initialised runanywhere.v1.STTConfiguration.
+ *
+ * Commons-owned port of Swift's `RASTTConfiguration.defaults()` so every
+ * platform SDK shares a single source of truth for the canonical defaults:
+ *
+ *   model_id            = ""
+ *   language            = STT_LANGUAGE_EN
+ *   sample_rate         = 16000
+ *   enable_vad          = false
+ *
+ * out_RASTTConfiguration receives serialized runanywhere.v1.STTConfiguration
+ * bytes. Caller MUST release with rac_proto_buffer_free().
+ *
+ * @retval RAC_SUCCESS                      Defaults serialized successfully.
+ * @retval RAC_ERROR_NULL_POINTER           out_RASTTConfiguration is NULL.
+ * @retval RAC_ERROR_FEATURE_NOT_AVAILABLE  Commons built without Protobuf.
+ */
+RAC_API rac_result_t rac_stt_configuration_defaults_proto(
+    rac_proto_buffer_t* out_RASTTConfiguration);
+
 #ifdef __cplusplus
 }
 #endif

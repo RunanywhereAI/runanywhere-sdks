@@ -246,6 +246,37 @@ RAC_API rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
  */
 RAC_API rac_result_t rac_tts_stop_lifecycle_proto(rac_proto_buffer_t* out_result);
 
+// =============================================================================
+// CANONICAL DEFAULTS (P2-T14)
+// =============================================================================
+
+/**
+ * @brief Populate a default-initialised runanywhere.v1.TTSConfiguration.
+ *
+ * Commons-owned port of Swift's `RATTSConfiguration.defaults()` so every
+ * platform SDK shares a single source of truth for the canonical defaults:
+ *
+ *   model_id              = ""
+ *   voice                 = "default"
+ *   language_code         = "en-US"
+ *   speaking_rate         = 1.0
+ *   pitch                 = 1.0
+ *   volume                = 1.0
+ *   audio_format          = AUDIO_FORMAT_PCM
+ *   sample_rate           = 22050
+ *   enable_neural_voice   = true
+ *   enable_ssml           = false
+ *
+ * out_RATTSConfiguration receives serialized runanywhere.v1.TTSConfiguration
+ * bytes. Caller MUST release with rac_proto_buffer_free().
+ *
+ * @retval RAC_SUCCESS                      Defaults serialized successfully.
+ * @retval RAC_ERROR_NULL_POINTER           out_RATTSConfiguration is NULL.
+ * @retval RAC_ERROR_FEATURE_NOT_AVAILABLE  Commons built without Protobuf.
+ */
+RAC_API rac_result_t rac_tts_configuration_defaults_proto(
+    rac_proto_buffer_t* out_RATTSConfiguration);
+
 #ifdef __cplusplus
 }
 #endif
