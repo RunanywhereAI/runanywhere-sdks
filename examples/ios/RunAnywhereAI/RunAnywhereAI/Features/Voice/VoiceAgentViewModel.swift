@@ -461,6 +461,28 @@ final class VoiceAgentViewModel: ObservableObject {
         assistantResponse = ""
 
         do {
+            // SWIFT-VOICE-AGENT-001: auto-load the default Silero VAD if the
+            // user hasn't already loaded one from the standalone VAD tab. The
+            // voice agent's VAD slot is not represented in the setup-card UI,
+            // but a Silero commit is what Phase 6h/6VAD needs to fire
+            // speech-start / speech-end events through the lifecycle surface.
+            // The energy-based fallback does not produce the events the
+            // voice-agent orchestrator listens for, so without a VAD lifecycle
+            // load the session stays silent after init.
+            var vadCurrentRequest = RACurrentModelRequest()
+            vadCurrentRequest.category = .voiceActivityDetection
+            let vadSnap = RunAnywhere.currentModel(vadCurrentRequest)
+            if !vadSnap.found {
+                logger.info("Auto-loading default Silero VAD for Voice Agent session")
+                var vadLoad = RAModelLoadRequest()
+                vadLoad.modelID = "silero-vad"
+                vadLoad.category = .voiceActivityDetection
+                let vadResult = await RunAnywhere.loadModel(vadLoad)
+                if !vadResult.success {
+                    logger.warning("Silero VAD auto-load failed: \(vadResult.errorMessage) — voice agent will use energy-based fallback")
+                }
+            }
+
             // Initialize voice agent against the currently-loaded models.
             // Compose from the canonical currentModel(_:) snapshots per category.
             var composeConfig = RAVoiceAgentComposeConfig()
