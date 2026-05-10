@@ -3,7 +3,6 @@ package com.runanywhere.runanywhereai.data
 import ai.runanywhere.proto.v1.ModelRegistryRefreshRequest
 import com.runanywhere.sdk.core.onnx.ONNX
 import com.runanywhere.sdk.foundation.errors.SDKException
-import com.runanywhere.sdk.llm.genie.Genie
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.refreshModelRegistry
@@ -25,12 +24,11 @@ object ModelBootstrap {
             Timber.e(e, "Failed to register core backends")
         }
 
-        try {
-            Genie.register(priority = 200)
-            Timber.i("Genie NPU backend registered")
-        } catch (e: Exception) {
-            Timber.w(e, "Genie backend unavailable")
-        }
+        // Genie (Qualcomm NPU) registration removed — gaps/kotlin.md
+        // KOT-E2E-R2-001. The 0.2.1 AAR was compiled against a pre-proto
+        // Kotlin SDK surface (`com.runanywhere.sdk.core.types.SDKComponent`)
+        // that no longer exists. Re-introduce once a 16KB-compatible AAR
+        // aligned with the current proto-based SDK is published.
     }
 
     private suspend fun refreshNativeCatalog() {
