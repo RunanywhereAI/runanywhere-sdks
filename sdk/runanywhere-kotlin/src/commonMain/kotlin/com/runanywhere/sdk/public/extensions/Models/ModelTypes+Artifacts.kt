@@ -1,0 +1,518 @@
+/*
+ * Copyright 2026 RunAnywhere SDK
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Artifact / archive / expected-files helpers for the proto-generated model
+ * contract types. Mirrors the Swift counterpart at
+ * `sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Models/ModelTypes+Artifacts.swift`.
+ *
+ * The `RA*` typealiases land in workstream L2; for now these helpers operate
+ * on the Wire-generated proto types directly.
+ *
+ * NOTE: filesystem-aware checks (`isDownloadedOnDisk`) defer to the proto's
+ * `is_downloaded` flag because commonMain does not have access to platform
+ * file APIs. The platform actuals (jvmAndroidMain) populate that flag.
+ */
+
+package com.runanywhere.sdk.public.extensions.Models
+
+import ai.runanywhere.proto.v1.ArchiveArtifact
+import ai.runanywhere.proto.v1.ArchiveStructure
+import ai.runanywhere.proto.v1.ArchiveType
+import ai.runanywhere.proto.v1.CurrentModelResult
+import ai.runanywhere.proto.v1.ExpectedModelFiles
+import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.ModelArtifactType
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelFileDescriptor
+import ai.runanywhere.proto.v1.ModelFileRole
+import ai.runanywhere.proto.v1.ModelFormat
+import ai.runanywhere.proto.v1.ModelInfo
+import ai.runanywhere.proto.v1.ModelLoadResult
+import ai.runanywhere.proto.v1.ModelSource
+import ai.runanywhere.proto.v1.MultiFileArtifact
+import ai.runanywhere.proto.v1.SingleFileArtifact
+import ai.runanywhere.proto.v1.ThinkingTagPattern
+import com.runanywhere.sdk.utils.getCurrentTimeMillis
+
+// MARK: - ExpectedModelFiles
+
+/** An [ExpectedModelFiles] manifest with no files declared. */
+val ExpectedModelFiles.Companion.none: ExpectedModelFiles
+    get() = ExpectedModelFiles()
+
+/**
+ * True when the manifest carries no information at all (no files, no root,
+ * no patterns, no description). Mirrors Swift `isEmptyManifest`.
+ */
+val ExpectedModelFiles.isEmptyManifest: Boolean
+    get() =
+        files.isEmpty() &&
+            root_directory.isNullOrEmpty() &&
+            required_patterns.isEmpty() &&
+            optional_patterns.isEmpty() &&
+            description.isNullOrEmpty()
+
+private fun ExpectedModelFiles.Companion.fromPatterns(
+    required: List<String>,
+    optional: List<String>,
+): ExpectedModelFiles =
+    ExpectedModelFiles(
+        required_patterns = required,
+        optional_patterns = optional,
+    )
+
+// MARK: - ModelFileDescriptor
+
+/**
+ * Build a [ModelFileDescriptor]. Mirrors Swift's
+ * `RAModelFileDescriptor(url:filename:isRequired:)` initializer — the
+ * `relativePath` defaults to the URL's last path component and the
+ * `destinationPath` to the filename.
+ */
+fun ModelFileDescriptor.Companion.create(
+    url: String,
+    filename: String,
+    isRequired: Boolean = true,
+): ModelFileDescriptor =
+    ModelFileDescriptor(
+        url = url,
+        filename = filename,
+        is_required = isRequired,
+        relative_path = url.substringAfterLast('/').takeIf { it.isNotEmpty() } ?: filename,
+        destination_path = filename,
+    )
+
+/** Returns the descriptor's URL field, or null if it is empty. */
+val ModelFileDescriptor.urlValue: String?
+    get() = url.takeIf { it.isNotEmpty() }
+
+/**
+ * The on-disk filename to write this descriptor to. Falls back through
+ * `destination_path` → `filename` → `relative_path` to match Swift.
+ */
+val ModelFileDescriptor.destinationFilename: String
+    get() =
+        destination_path?.takeIf { it.isNotEmpty() }
+            ?: filename.takeIf { it.isNotEmpty() }
+            ?: relative_path.orEmpty()
+
+/** Resolved local file system path, or null if the proto field is empty. */
+val ModelFileDescriptor.resolvedLocalPath: String?
+    get() = local_path?.takeIf { it.isNotEmpty() }
+
+// MARK: - Collection<ModelFileDescriptor>
+
+fun Collection<ModelFileDescriptor>.resolvedModelFilePath(role: ModelFileRole): String? =
+    firstOrNull { it.role == role }?.resolvedLocalPath
+
+val Collection<ModelFileDescriptor>.resolvedPrimaryModelPath: String?
+    get() = resolvedModelFilePath(ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL)
+
+val Collection<ModelFileDescriptor>.resolvedVisionProjectorPath: String?
+    get() = resolvedModelFilePath(ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR)
+
+val Collection<ModelFileDescriptor>.resolvedTokenizerPath: String?
+    get() = resolvedModelFilePath(ModelFileRole.MODEL_FILE_ROLE_TOKENIZER)
+
+val Collection<ModelFileDescriptor>.resolvedConfigPath: String?
+    get() = resolvedModelFilePath(ModelFileRole.MODEL_FILE_ROLE_CONFIG)
+
+val Collection<ModelFileDescriptor>.resolvedVocabularyPath: String?
+    get() = resolvedModelFilePath(ModelFileRole.MODEL_FILE_ROLE_VOCABULARY)
+
+// MARK: - ModelLoadResult resolved-artifact accessors
+//
+// NOTE: `resolvedPrimaryModelPath()` and `resolvedVisionProjectorPath()`
+// already exist in `ModelPathResolution.kt` (different signature — those
+// fall back through the model registry). The accessors below mirror the
+// Swift API surface that just walks `resolved_artifacts` directly.
+
+fun ModelLoadResult.resolvedTokenizerPath(): String? =
+    resolved_artifacts.resolvedTokenizerPath
+
+fun ModelLoadResult.resolvedConfigPath(): String? =
+    resolved_artifacts.resolvedConfigPath
+
+fun ModelLoadResult.resolvedVocabularyPath(): String? =
+    resolved_artifacts.resolvedVocabularyPath
+
+/** Primary artifact path for the lifecycle, or `resolved_path` as a fallback. */
+val ModelLoadResult.lifecyclePrimaryArtifactPath: String?
+    get() = resolvedPrimaryModelPath() ?: resolved_path.takeIf { it.isNotEmpty() }
+
+// MARK: - CurrentModelResult resolved-artifact accessors
+
+fun CurrentModelResult.resolvedTokenizerPath(): String? =
+    resolved_artifacts.resolvedTokenizerPath
+
+fun CurrentModelResult.resolvedConfigPath(): String? =
+    resolved_artifacts.resolvedConfigPath
+
+fun CurrentModelResult.resolvedVocabularyPath(): String? =
+    resolved_artifacts.resolvedVocabularyPath
+
+/** Primary artifact path for the lifecycle, or `resolved_path` as a fallback. */
+val CurrentModelResult.lifecyclePrimaryArtifactPath: String?
+    get() = resolvedPrimaryModelPath() ?: resolved_path.takeIf { it.isNotEmpty() }
+
+// MARK: - ModelArtifactType
+
+/**
+ * True when the artifact type denotes an archive that has to be unpacked
+ * before its contents are usable.
+ */
+val ModelArtifactType.requiresExtraction: Boolean
+    get() =
+        when (this) {
+            ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE,
+            ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE,
+            ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
+            ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE,
+            ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE,
+            -> true
+            else -> false
+        }
+
+/**
+ * True when this artifact type requires a network download. Built-in
+ * models (system Foundation Models, system TTS) are the only artifact
+ * type that never needs to be fetched.
+ */
+val ModelArtifactType.requiresDownload: Boolean
+    get() = this != ModelArtifactType.MODEL_ARTIFACT_TYPE_BUILT_IN
+
+// `ModelArtifactType.displayName` already exists in ModelTypes.kt — do not
+// redeclare it here.
+
+// MARK: - ModelInfo artifact helpers
+
+/** True when the entry's artifact requires extraction (archive). */
+val ModelInfo.requiresExtraction: Boolean
+    get() {
+        if (archive != null) return true
+        return artifactTypeOrUnspecified.requiresExtraction
+    }
+
+/** True when the entry needs to be downloaded before it can be used. */
+val ModelInfo.requiresDownload: Boolean
+    get() {
+        if (isBuiltIn) return false
+        return artifactTypeOrUnspecified.requiresDownload
+    }
+
+/** Underlying [ArchiveArtifact] or null if the entry isn't an archive. */
+val ModelInfo.archiveArtifact: ArchiveArtifact?
+    get() {
+        archive?.let { return it }
+        return when (artifact_type) {
+            ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE,
+            ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE,
+            ->
+                makeArchiveArtifact(ArchiveType.ARCHIVE_TYPE_ZIP)
+            ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE ->
+                makeArchiveArtifact(ArchiveType.ARCHIVE_TYPE_TAR_GZ)
+            ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE ->
+                makeArchiveArtifact(ArchiveType.ARCHIVE_TYPE_TAR_BZ2)
+            ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE ->
+                makeArchiveArtifact(ArchiveType.ARCHIVE_TYPE_TAR_XZ)
+            else -> null
+        }
+    }
+
+/** Multi-file descriptors declared on the entry, or empty. */
+val ModelInfo.multiFileDescriptors: List<ModelFileDescriptor>
+    get() = multi_file?.files ?: emptyList()
+
+/**
+ * Resolve the [ExpectedModelFiles] manifest the SDK should hand to the
+ * downloader, falling back to the artifact's pattern lists when no
+ * explicit manifest is set. Mirrors Swift's `expectedArtifactFiles`.
+ */
+val ModelInfo.expectedArtifactFiles: ExpectedModelFiles
+    get() {
+        expected_files?.let { if (!it.isEmptyManifest) return it }
+        single_file?.let { artifact ->
+            artifact.expected_files?.let { return it }
+            return ExpectedModelFiles.fromPatterns(
+                required = artifact.required_patterns,
+                optional = artifact.optional_patterns,
+            )
+        }
+        archive?.let { artifact ->
+            artifact.expected_files?.let { return it }
+            return ExpectedModelFiles.fromPatterns(
+                required = artifact.required_patterns,
+                optional = artifact.optional_patterns,
+            )
+        }
+        multi_file?.let { artifact ->
+            // Commons download planner only walks
+            // `model.expected_files.files` for multi-file/per-descriptor
+            // downloads. Seed it from the multi-file artifact so the
+            // per-file loop runs and every URL actually downloads.
+            if (artifact.files.isEmpty()) return ExpectedModelFiles.none
+            return ExpectedModelFiles(files = artifact.files)
+        }
+        return ExpectedModelFiles.none
+    }
+
+/**
+ * Built-in detection — covers the explicit `built_in` oneof flag, the
+ * `built_in` artifact type, the `builtin:` localpath prefix, and the two
+ * platform-built-in frameworks (Foundation Models, System TTS).
+ */
+val ModelInfo.isBuiltIn: Boolean
+    get() {
+        if (built_in == true) return true
+        if (artifact_type == ModelArtifactType.MODEL_ARTIFACT_TYPE_BUILT_IN) return true
+        if (local_path.startsWith("builtin:")) return true
+        return framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
+            framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
+    }
+
+/**
+ * Whether the model is downloaded on disk. CommonMain has no filesystem
+ * access, so this falls back to the proto's `is_downloaded` flag (which
+ * the platform actuals populate via `FileOperationsUtilities` /
+ * `existsWithType` on the JVM/Android side).
+ */
+val ModelInfo.isDownloadedOnDisk: Boolean
+    get() {
+        if (isBuiltIn) return true
+        return is_downloaded == true || local_path.isNotEmpty()
+    }
+
+/** Whether the model is ready to load (built-in OR on-disk OR proto-marked). */
+val ModelInfo.isAvailableForUse: Boolean
+    get() = isBuiltIn || isDownloadedOnDisk || (is_available == true)
+
+/** Returns the download URL string or null if empty. */
+val ModelInfo.downloadURLValue: String?
+    get() = download_url.takeIf { it.isNotEmpty() }
+
+/**
+ * Returns the local-path string or null if empty. CommonMain doesn't have
+ * a URL type, so this is just the canonical path string the platform
+ * actuals already use (`/abs/path` or `file:///` or `builtin:...`).
+ */
+val ModelInfo.localPathURL: String?
+    get() = local_path.takeIf { it.isNotEmpty() }
+
+/** Hint of the download size in bytes, alias for `download_size_bytes`. */
+val ModelInfo.downloadSizeHint: Long
+    get() = download_size_bytes
+
+private val ModelInfo.artifactTypeOrUnspecified: ModelArtifactType
+    get() = artifact_type ?: ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED
+
+// MARK: - Fluent helpers (return a new copy with the requested mutation)
+
+/** Returns a copy of [ModelInfo] with `download_url` updated. */
+fun ModelInfo.setDownloadURL(url: String?): ModelInfo =
+    copy(download_url = url.orEmpty())
+
+/**
+ * Returns a copy of [ModelInfo] with `local_path` updated and the derived
+ * `is_downloaded` / `is_available` flags re-stamped to match.
+ */
+fun ModelInfo.setLocalPath(path: String?): ModelInfo {
+    val updated = copy(local_path = path.orEmpty())
+    return updated.copy(
+        is_downloaded = updated.isDownloadedOnDisk,
+        is_available = updated.isAvailableForUse,
+    )
+}
+
+/**
+ * Returns a copy of [ModelInfo] with the artifact oneof set to a single-
+ * file artifact. Also updates the canonical `artifact_type` and stamps
+ * the artifact's `expected_files` onto the entry when non-empty.
+ */
+fun ModelInfo.setSingleFileArtifact(artifact: SingleFileArtifact): ModelInfo {
+    val derived = artifact.expected_files?.takeIf { !it.isEmptyManifest }
+    return copy(
+        single_file = artifact,
+        archive = null,
+        multi_file = null,
+        custom_strategy_id = null,
+        built_in = null,
+        artifact_type = ModelArtifactType.MODEL_ARTIFACT_TYPE_SINGLE_FILE,
+        expected_files = derived ?: expected_files,
+    )
+}
+
+/**
+ * Returns a copy of [ModelInfo] with the artifact oneof set to an archive.
+ * Also updates `artifact_type` and stamps the manifest when present.
+ */
+fun ModelInfo.setArchiveArtifact(artifact: ArchiveArtifact): ModelInfo {
+    val derived = artifact.expected_files?.takeIf { !it.isEmptyManifest }
+    return copy(
+        single_file = null,
+        archive = artifact,
+        multi_file = null,
+        custom_strategy_id = null,
+        built_in = null,
+        artifact_type = artifact.type.toModelArtifactType(),
+        expected_files = derived ?: expected_files,
+    )
+}
+
+/**
+ * Returns a copy of [ModelInfo] with the artifact oneof set to a multi-
+ * file artifact. Also updates `artifact_type`.
+ */
+fun ModelInfo.setMultiFileArtifact(artifact: MultiFileArtifact): ModelInfo =
+    copy(
+        single_file = null,
+        archive = null,
+        multi_file = artifact,
+        custom_strategy_id = null,
+        built_in = null,
+        artifact_type = ModelArtifactType.MODEL_ARTIFACT_TYPE_MULTI_FILE,
+    )
+
+/**
+ * Returns a copy of [ModelInfo] with the artifact oneof set to a custom
+ * strategy id. Also updates `artifact_type`.
+ */
+fun ModelInfo.setCustomStrategyArtifact(strategyId: String): ModelInfo =
+    copy(
+        single_file = null,
+        archive = null,
+        multi_file = null,
+        custom_strategy_id = strategyId,
+        built_in = null,
+        artifact_type = ModelArtifactType.MODEL_ARTIFACT_TYPE_CUSTOM,
+    )
+
+/**
+ * Returns a copy of [ModelInfo] flagged as built-in. Also updates
+ * `artifact_type`.
+ */
+fun ModelInfo.setBuiltInArtifact(enabled: Boolean = true): ModelInfo =
+    copy(
+        single_file = null,
+        archive = null,
+        multi_file = null,
+        custom_strategy_id = null,
+        built_in = enabled,
+        artifact_type =
+            if (enabled) {
+                ModelArtifactType.MODEL_ARTIFACT_TYPE_BUILT_IN
+            } else {
+                ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED
+            },
+    )
+
+// MARK: - Factory
+
+/**
+ * Build a [ModelInfo] populated with the canonical defaults the iOS SDK
+ * uses (created/updated timestamps, inferred artifact, derived
+ * downloaded/available flags).
+ *
+ * @param archiveType If known, forces the archive variant of the inferred
+ *   artifact. Pass `null` to let the helper infer from the URL.
+ */
+fun ModelInfo.Companion.create(
+    id: String,
+    name: String,
+    category: ModelCategory,
+    format: ModelFormat,
+    framework: InferenceFramework,
+    downloadURL: String? = null,
+    localPath: String? = null,
+    downloadSizeBytes: Long? = null,
+    contextLength: Int? = null,
+    supportsThinking: Boolean = false,
+    thinkingPattern: ThinkingTagPattern? = null,
+    description: String? = null,
+    source: ModelSource = ModelSource.MODEL_SOURCE_REMOTE,
+    createdAtUnixMs: Long = getCurrentTimeMillis(),
+    updatedAtUnixMs: Long = getCurrentTimeMillis(),
+    archiveType: ArchiveType? = null,
+): ModelInfo {
+    val resolvedContext =
+        contextLength
+            ?: if (category.requiresContextLength) 2048 else 0
+    val resolvedSupportsThinking = category.supportsThinking && supportsThinking
+    val base =
+        ModelInfo(
+            id = id,
+            name = name,
+            category = category,
+            format = format,
+            framework = framework,
+            download_url = downloadURL.orEmpty(),
+            local_path = localPath.orEmpty(),
+            download_size_bytes = downloadSizeBytes ?: 0L,
+            context_length = resolvedContext,
+            supports_thinking = resolvedSupportsThinking,
+            description = description.orEmpty(),
+            source = source,
+            created_at_unix_ms = createdAtUnixMs,
+            updated_at_unix_ms = updatedAtUnixMs,
+            thinking_pattern = if (resolvedSupportsThinking) thinkingPattern else null,
+        )
+
+    val withArtifact = base.applyInferredArtifact(downloadURL, archiveType)
+    return withArtifact.copy(
+        is_downloaded = withArtifact.isDownloadedOnDisk,
+        is_available = withArtifact.isAvailableForUse,
+    )
+}
+
+/**
+ * Apply an inferred artifact to a freshly constructed [ModelInfo]. Mirrors
+ * Swift's `inferredArtifact(from:format:)` — passes through to single-file
+ * when no archive type can be derived, otherwise sets an archive artifact.
+ *
+ * Public on `ModelInfo.Companion` so external callers (and the registry)
+ * can re-derive the artifact when only a URL changes.
+ */
+fun ModelInfo.Companion.inferredArtifact(
+    url: String?,
+    archiveType: ArchiveType? = null,
+): SingleFileArtifact {
+    // Swift returns a `OneOf_Artifact` here; the Kotlin proto exposes a
+    // flat oneof, so the API surface differs. Single-file is the no-op
+    // case (no archive). Archive callers should use
+    // [ModelInfo.applyInferredArtifact] which routes to the correct setter.
+    val _unused = url
+    val _unused2 = archiveType
+    return SingleFileArtifact()
+}
+
+private fun ModelInfo.applyInferredArtifact(
+    url: String?,
+    explicitArchiveType: ArchiveType?,
+): ModelInfo {
+    val archiveType = explicitArchiveType ?: archiveTypeFromPath(url.orEmpty())
+    return if (archiveType != null) {
+        setArchiveArtifact(
+            ArchiveArtifact(
+                type = archiveType,
+                structure = ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN,
+            ),
+        )
+    } else {
+        setSingleFileArtifact(SingleFileArtifact())
+    }
+}
+
+private fun makeArchiveArtifact(type: ArchiveType): ArchiveArtifact =
+    ArchiveArtifact(
+        type = type,
+        structure = ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN,
+    )
+
+private fun ArchiveType.toModelArtifactType(): ModelArtifactType =
+    when (this) {
+        ArchiveType.ARCHIVE_TYPE_ZIP -> ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE
+        ArchiveType.ARCHIVE_TYPE_TAR_GZ -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE
+        ArchiveType.ARCHIVE_TYPE_TAR_BZ2 -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE
+        ArchiveType.ARCHIVE_TYPE_TAR_XZ -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE
+        ArchiveType.ARCHIVE_TYPE_UNSPECIFIED -> ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE
+    }

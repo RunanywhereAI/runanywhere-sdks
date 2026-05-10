@@ -1282,7 +1282,7 @@ object RunAnywhereBridge {
     //
     // Registers / unregisters the OkHttp-backed `rac_http_transport_ops`
     // adapter. When registered, every `rac_http_request_*` call from
-    // native code routes through Kotlin's `OkHttpTransport` instead of
+    // native code routes through Kotlin's `CppBridgeHTTP` instead of
     // libcurl — so Android consumers get the system CA trust store,
     // NetworkSecurityConfig, user-CAs, and proxy support for free.
     //

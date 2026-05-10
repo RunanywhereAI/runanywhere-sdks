@@ -273,7 +273,7 @@ kotlin {
                 implementation("org.json:json:20240303")
 
                 // v2 close-out H4: OkHttp powers the platform HTTP transport
-                // adapter (`foundation/http/OkHttpTransport.kt`), so that the
+                // adapter (`foundation/bridge/extensions/CppBridgeHTTP.kt`), so that the
                 // C++ core's `rac_http_transport_ops` vtable can route
                 // requests through the Android/JVM system TLS stack instead
                 // of libcurl. Exposed as `api` so downstream consumers can

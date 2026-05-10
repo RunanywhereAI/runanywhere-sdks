@@ -1,9 +1,7 @@
 package com.runanywhere.sdk.llm.llamacpp
 
-import ai.runanywhere.proto.v1.InferenceFramework
-import ai.runanywhere.proto.v1.SDKComponent
-import com.runanywhere.sdk.core.module.RunAnywhereModule
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.public.RunAnywhereModule
 
 /**
  * LlamaCPP module for LLM text generation.
@@ -19,7 +17,7 @@ import com.runanywhere.sdk.foundation.SDKLogger
  * ```kotlin
  * import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
  *
- * // Register the backend (done automatically if auto-registration is enabled)
+ * // Register the backend (suspend, called once during SDK bootstrap)
  * LlamaCPP.register()
  * ```
  *
@@ -51,18 +49,12 @@ object LlamaCPP : RunAnywhereModule {
     /** LlamaCPP library version (underlying C++ library) */
     const val llamaCppVersion = "b7199"
 
+    /** Default priority used when callers do not specify one. */
+    const val defaultPriority: Int = 100
+
     // MARK: - RunAnywhereModule Conformance
 
-    override val moduleId: String = "llamacpp"
-
     override val moduleName: String = "LlamaCPP"
-
-    override val capabilities: Set<SDKComponent> = setOf(SDKComponent.SDK_COMPONENT_LLM)
-
-    override val defaultPriority: Int = 100
-
-    /** LlamaCPP uses the llama.cpp inference framework */
-    override val inferenceFramework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP
 
     // MARK: - Registration State
 
@@ -75,22 +67,57 @@ object LlamaCPP : RunAnywhereModule {
     // MARK: - Registration
 
     /**
-     * Register LlamaCPP backend with the C++ service registry.
+     * Register LlamaCPP backend with the C++ service registry (RunAnywhereModule override).
      *
-     * This calls `rac_backend_llamacpp_register()` to register the
-     * LlamaCPP service provider with the C++ commons layer, then
-     * also registers the VLM (Vision Language Model) backend.
+     * Mirrors iOS `LlamaCPP.register()` which registers both LLM and VLM.
+     * Suspend so that callers can await module bootstrap from a coroutine scope.
+     */
+    override suspend fun register() {
+        registerInternal()
+    }
+
+    /**
+     * Unregister the LlamaCPP backend from C++ registry (RunAnywhereModule override).
+     */
+    override suspend fun unregister() {
+        if (!isRegistered) return
+
+        // Unregister VLM backend first (matches iOS unregister order)
+        if (isVlmRegistered) {
+            try {
+                unregisterVlmNative()
+                isVlmRegistered = false
+                logger.info("LlamaCPP VLM backend unregistered")
+            } catch (e: UnsatisfiedLinkError) {
+                isVlmRegistered = false
+                logger.warning("LlamaCPP VLM unregister skipped — native symbols not available")
+            }
+        }
+
+        unregisterNative()
+        isRegistered = false
+        logger.info("LlamaCPP backend unregistered")
+    }
+
+    /**
+     * Backwards-compatible non-suspend registration entry point.
      *
-     * Safe to call multiple times - subsequent calls are no-ops.
+     * Apps that bootstrap on the main thread (e.g. `Application.onCreate`)
+     * call `LlamaCPP.register(priority = 100)`. The `priority` argument is
+     * ignored — the C++ plugin registry assigns priority internally.
      *
-     * Matches iOS LlamaCPP.register() which registers both LLM and VLM.
+     * No default value is set here so that the no-arg suspend [register]
+     * override remains unambiguous on the call site.
      *
-     * @param priority Ignored (C++ uses its own priority system)
+     * @param priority Ignored (C++ uses its own priority system).
      */
     @Suppress("UNUSED_PARAMETER")
     @JvmStatic
-    @JvmOverloads
-    fun register(priority: Int = defaultPriority) {
+    fun register(priority: Int) {
+        registerInternal()
+    }
+
+    private fun registerInternal() {
         if (isRegistered) {
             logger.debug("LlamaCPP already registered, returning")
             return
@@ -145,29 +172,6 @@ object LlamaCPP : RunAnywhereModule {
         }
     }
 
-    /**
-     * Unregister the LlamaCPP backend from C++ registry.
-     */
-    fun unregister() {
-        if (!isRegistered) return
-
-        // Unregister VLM backend first (matches iOS unregister order)
-        if (isVlmRegistered) {
-            try {
-                unregisterVlmNative()
-                isVlmRegistered = false
-                logger.info("LlamaCPP VLM backend unregistered")
-            } catch (e: UnsatisfiedLinkError) {
-                isVlmRegistered = false
-                logger.warning("LlamaCPP VLM unregister skipped — native symbols not available")
-            }
-        }
-
-        unregisterNative()
-        isRegistered = false
-        logger.info("LlamaCPP backend unregistered")
-    }
-
     // `canHandle(modelId)` deleted per gaps/kotlin.md — mirrors
     // SWIFT-DUP-CANHANDLE. The C++ plugin router (`rac_router_*`) is the
     // only routing authority; Kotlin-side file-extension matching was never
@@ -180,7 +184,7 @@ object LlamaCPP : RunAnywhereModule {
      * Access this property to trigger C++ backend registration.
      */
     val autoRegister: Unit by lazy {
-        register()
+        registerInternal()
     }
 }
 

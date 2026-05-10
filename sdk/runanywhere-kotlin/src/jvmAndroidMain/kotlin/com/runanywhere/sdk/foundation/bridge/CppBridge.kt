@@ -14,6 +14,7 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeAuth
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatform
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
@@ -214,6 +215,20 @@ object CppBridge {
             // Register file manager I/O callbacks for C++ file management
             CppBridgeFileManager.register()
 
+            // Eagerly materialize the model storage base directory AND push it
+            // into the C++ core via rac_model_paths_set_base_dir. Without this,
+            // rac_model_paths_get_model_folder() returns RAC_ERROR_NOT_INITIALIZED
+            // and any rac_download_plan_proto() call fails with "failed to
+            // compute model storage path" — blocking all model downloads.
+            // CppBridgeModelPaths.pathProvider must already be set by the app
+            // (e.g., AndroidPlatformContext.initialize() wires context.filesDir).
+            try {
+                val baseDir = CppBridgeModelPaths.getBaseDirectory()
+                logger.debug("Model storage base directory materialized: $baseDir")
+            } catch (t: Throwable) {
+                logger.warn("Failed to materialize model storage base dir: ${t.message}")
+            }
+
             _isInitialized = true
 
             // Emit SDK init completed event with duration
@@ -343,7 +358,7 @@ object CppBridge {
      * Register the OkHttp platform HTTP transport with the C++ core.
      *
      * Installs `rac_http_transport_ops` so that every `rac_http_request_*`
-     * call routes through Kotlin's [com.runanywhere.sdk.foundation.http.OkHttpTransport]
+     * call routes through Kotlin's [com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeHTTP]
      * instead of libcurl. Gives Android / JVM consumers the system trust
      * store + NetworkSecurityConfig + proxy + HTTP/2 for free.
      *

@@ -14,9 +14,27 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import ai.runanywhere.proto.v1.VoiceAgentComponentStates
+import ai.runanywhere.proto.v1.VoiceAgentComposeConfig
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.squareup.wire.Message
+import com.squareup.wire.ProtoAdapter
 import java.util.concurrent.atomic.AtomicLong
+
+private fun <M : Message<M, *>> decodeOrThrow(
+    adapter: ProtoAdapter<M>,
+    bytes: ByteArray?,
+    operation: String,
+): M {
+    val payload = bytes ?: throw SDKException.operation("$operation returned null")
+    return try {
+        adapter.decode(payload)
+    } catch (e: Exception) {
+        throw SDKException.operation("Failed to decode $operation result: ${e.message}")
+    }
+}
 
 /**
  * Voice-agent handle lifecycle facade. Thread-safe; uses atomic handle
@@ -100,4 +118,21 @@ object CppBridgeVoiceAgent {
             logger.info("Voice agent handle destroyed: $existing")
         }
     }
+
+    fun initialize(handle: Long, config: VoiceAgentComposeConfig): VoiceAgentComponentStates =
+        decodeOrThrow(
+            VoiceAgentComponentStates.ADAPTER,
+            RunAnywhereBridge.racVoiceAgentInitializeProto(
+                handle,
+                VoiceAgentComposeConfig.ADAPTER.encode(config),
+            ),
+            "racVoiceAgentInitializeProto",
+        )
+
+    fun states(handle: Long): VoiceAgentComponentStates =
+        decodeOrThrow(
+            VoiceAgentComponentStates.ADAPTER,
+            RunAnywhereBridge.racVoiceAgentComponentStatesProto(handle),
+            "racVoiceAgentComponentStatesProto",
+        )
 }

@@ -1,8 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.models
 
 import ai.runanywhere.proto.v1.InferenceFramework
-import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelInfo
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -21,7 +19,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -183,34 +180,6 @@ fun ModelSelectionBottomSheet(
                         )
                     }
                 } else {
-                    if (context == ModelSelectionContext.TTS && uiState.frameworks.contains(InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS)) {
-                        SystemTTSRow(
-                            isLoading = uiState.isLoadingModel,
-                            onSelect = {
-                                scope.launch {
-                                    viewModel.setLoadingModel(true)
-                                    try {
-                                        val systemTTSModel =
-                                            ModelInfo(
-                                                id = SYSTEM_TTS_MODEL_ID,
-                                                name = "System TTS",
-                                                format = ModelFormat.MODEL_FORMAT_PROPRIETARY,
-                                                category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-                                                framework = InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS,
-                                                built_in = true,
-                                                is_downloaded = true,
-                                            )
-                                        onModelSelected(systemTTSModel)
-                                        onDismiss()
-                                    } finally {
-                                        viewModel.setLoadingModel(false)
-                                    }
-                                }
-                            },
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
                     val sortedModels =
                         uiState.models.sortedWith(
                             compareBy<ModelInfo> {
@@ -657,72 +626,3 @@ private fun Badge(
     }
 }
 
-// System TTS Row
-
-// SystemTTSRow: card-style row matching ModelCard, "Use" action
-@Composable
-private fun SystemTTSRow(
-    isLoading: Boolean,
-    onSelect: () -> Unit,
-) {
-    Surface(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .clickable(enabled = !isLoading, onClick = onSelect),
-        shape = RoundedCornerShape(16.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 0.dp,
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier =
-                    Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(AppColors.primaryAccent.copy(alpha = 0.08f)),
-            ) {
-                Text(text = "🔊", style = MaterialTheme.typography.titleSmall)
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "System Voice",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.CheckCircle,
-                        contentDescription = null,
-                        modifier = Modifier.size(12.dp),
-                        tint = AppColors.primaryGreen,
-                    )
-                    Text(
-                        text = "Built-in - Always available",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = AppColors.primaryGreen,
-                    )
-                }
-            }
-            Badge(
-                text = "System",
-                textColor = AppColors.primaryAccent,
-                backgroundColor = AppColors.primaryAccent.copy(alpha = 0.10f),
-            )
-        }
-    }
-}
-
-private const val SYSTEM_TTS_MODEL_ID = "system-tts"

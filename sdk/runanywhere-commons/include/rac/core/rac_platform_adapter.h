@@ -52,6 +52,60 @@ typedef void (*rac_extract_progress_callback_fn)(int32_t files_extracted, int32_
                                                  void* callback_user_data);
 
 // =============================================================================
+// DIRECTORY LISTING (for model registry rescan)
+// =============================================================================
+
+/**
+ * Maximum length (including null terminator) of a directory entry name written
+ * by the file_list_directory callback. Mirrors POSIX `NAME_MAX`-class sizing
+ * so platform implementations can stack-allocate fixed buffers.
+ */
+#define RAC_DIRECTORY_ENTRY_NAME_MAX 512
+
+/**
+ * One entry produced by `rac_platform_adapter_t::file_list_directory`.
+ *
+ * The struct is plain-old-data so the platform adapter (Swift/Kotlin/Dart/JS)
+ * can fill caller-provided arrays without managing additional ownership.
+ */
+typedef struct rac_directory_entry {
+    /** Entry name (no path component). UTF-8, null-terminated. */
+    char name[RAC_DIRECTORY_ENTRY_NAME_MAX];
+    /** RAC_TRUE if the entry is a directory, RAC_FALSE for regular files. */
+    rac_bool_t is_dir;
+    /** File size in bytes (0 for directories or unknown). */
+    int64_t size_bytes;
+} rac_directory_entry_t;
+
+/**
+ * List directory contents into a caller-provided array.
+ *
+ * Two-call semantics mirroring POSIX `getdents`/Win32 `FindFirstFile`:
+ *
+ *   1. Caller passes `out_entries == NULL` to query required capacity. The
+ *      callback writes the total entry count into *in_out_count and returns
+ *      RAC_SUCCESS without touching the entries array.
+ *   2. Caller allocates an array of at least *in_out_count entries, calls
+ *      again with `out_entries` non-NULL. The callback fills up to
+ *      *in_out_count entries and updates *in_out_count to the number actually
+ *      written.
+ *
+ * Hidden entries ("." / ".." / dotfiles) MAY be filtered by the implementation;
+ * the C++ rescan code does not require them.
+ *
+ * @param dir_path     Absolute directory path to enumerate.
+ * @param out_entries  Caller-allocated array (or NULL for capacity query).
+ * @param in_out_count In: capacity of out_entries; Out: entries written
+ *                     (or total available when out_entries is NULL).
+ * @param user_data    Platform context.
+ * @return RAC_SUCCESS, RAC_ERROR_FILE_NOT_FOUND when dir_path doesn't exist,
+ *         or another error code on failure.
+ */
+typedef rac_result_t (*rac_file_list_directory_fn)(const char* dir_path,
+                                                   rac_directory_entry_t* out_entries,
+                                                   size_t* in_out_count, void* user_data);
+
+// =============================================================================
 // PLATFORM ADAPTER STRUCTURE
 // =============================================================================
 
@@ -234,6 +288,23 @@ typedef struct rac_platform_adapter {
     rac_result_t (*extract_archive)(const char* archive_path, const char* destination_dir,
                                     rac_extract_progress_callback_fn progress_callback,
                                     void* callback_user_data, void* user_data);
+
+    // -------------------------------------------------------------------------
+    // Directory Enumeration (Optional - can be NULL)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Enumerate the entries in a directory.
+     *
+     * Optional. When non-NULL, the C++ model registry refresh path can rescan
+     * on-disk model folders without the SDK having to wire up the legacy
+     * `rac_discovery_callbacks_t` struct. When NULL the rescan path falls
+     * back to a no-op + warning, preserving prior behaviour.
+     *
+     * Two-call semantics: pass NULL `out_entries` to query capacity, then
+     * allocate and call again. See `rac_file_list_directory_fn` docs.
+     */
+    rac_file_list_directory_fn file_list_directory;
 
     // -------------------------------------------------------------------------
     // User Data

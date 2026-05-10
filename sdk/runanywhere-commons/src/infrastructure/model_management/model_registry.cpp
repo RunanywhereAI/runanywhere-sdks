@@ -2851,6 +2851,187 @@ rac_result_t rac_model_registry_discover_proto(rac_model_registry_handle_t handl
 #endif
 }
 
+// =============================================================================
+// REFRESH HELPERS — file_list_directory adapter rescan
+// =============================================================================
+//
+// When the proto refresh request asks for `rescan_local` but the legacy
+// rac_discovery_callbacks_t struct is unavailable (most SDKs have moved off
+// it), we fall back to the platform adapter's file_list_directory callback.
+// This rescans {base_dir}/RunAnywhere/Models/{framework}/{model_id}/ folders
+// and links registered models to their on-disk folders via
+// rac_model_registry_update_download_status.
+
+namespace {
+
+constexpr size_t kRescanInitialEntryCapacity = 64;
+constexpr size_t kRescanMaxEntryCapacity = 4096;
+
+// List a directory through the platform adapter. Resizes the entry buffer to
+// fit. Returns RAC_SUCCESS on success (entries.size() is the count) or the
+// callback's error code (FILE_NOT_FOUND when the directory does not exist).
+rac_result_t list_directory_via_adapter(const rac_platform_adapter_t* adapter,
+                                        const char* dir_path,
+                                        std::vector<rac_directory_entry_t>* out_entries) {
+    if (!adapter || !adapter->file_list_directory || !dir_path || !out_entries) {
+        return RAC_ERROR_INVALID_ARGUMENT;
+    }
+    out_entries->clear();
+    size_t capacity = kRescanInitialEntryCapacity;
+    while (capacity <= kRescanMaxEntryCapacity) {
+        out_entries->resize(capacity);
+        size_t count = capacity;
+        rac_result_t rc = adapter->file_list_directory(dir_path, out_entries->data(), &count,
+                                                       adapter->user_data);
+        if (rc != RAC_SUCCESS) {
+            out_entries->clear();
+            return rc;
+        }
+        if (count <= capacity) {
+            out_entries->resize(count);
+            return RAC_SUCCESS;
+        }
+        // Caller asked for more space than we provided — grow and retry.
+        capacity = count;
+    }
+    out_entries->clear();
+    return RAC_ERROR_OUT_OF_MEMORY;
+}
+
+// Walk {models_dir}/{framework}/{model_id}/ and link any registry entry whose
+// on-disk folder contains at least one file. Returns the number of models we
+// linked.
+int32_t rescan_local_via_platform_adapter(rac_model_registry_handle_t handle) {
+    if (!handle) {
+        return 0;
+    }
+    const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
+    if (!adapter || !adapter->file_list_directory) {
+        return 0;
+    }
+
+    char models_dir[1024];
+    if (rac_model_paths_get_models_directory(models_dir, sizeof(models_dir)) != RAC_SUCCESS) {
+        return 0;
+    }
+
+    // Same framework set used by rac_model_registry_discover_downloaded so the
+    // ABI refresh path covers every backend an SDK can install.
+    const rac_inference_framework_t frameworks[] = {
+        RAC_FRAMEWORK_LLAMACPP,    RAC_FRAMEWORK_ONNX,
+        RAC_FRAMEWORK_COREML,      RAC_FRAMEWORK_MLX,
+        RAC_FRAMEWORK_FLUID_AUDIO, RAC_FRAMEWORK_FOUNDATION_MODELS,
+        RAC_FRAMEWORK_SYSTEM_TTS,  RAC_FRAMEWORK_WHISPERKIT_COREML,
+        RAC_FRAMEWORK_METALRT,     RAC_FRAMEWORK_GENIE,
+        RAC_FRAMEWORK_SHERPA,      RAC_FRAMEWORK_UNKNOWN};
+    constexpr size_t kFrameworkCount = sizeof(frameworks) / sizeof(frameworks[0]);
+
+    int32_t linked = 0;
+    std::vector<rac_directory_entry_t> framework_entries;
+    std::vector<rac_directory_entry_t> model_entries;
+
+    for (size_t f = 0; f < kFrameworkCount; ++f) {
+        char framework_dir[1024];
+        if (rac_model_paths_get_framework_directory(frameworks[f], framework_dir,
+                                                    sizeof(framework_dir)) != RAC_SUCCESS) {
+            continue;
+        }
+
+        rac_result_t list_rc =
+            list_directory_via_adapter(adapter, framework_dir, &framework_entries);
+        if (list_rc != RAC_SUCCESS) {
+            // Missing framework dirs are normal — only one or two backends may
+            // have downloads on this device.
+            continue;
+        }
+
+        for (const rac_directory_entry_t& entry : framework_entries) {
+            if (entry.name[0] == '\0' || entry.name[0] == '.') {
+                continue;  // skip hidden / empty
+            }
+            if (entry.is_dir != RAC_TRUE) {
+                continue;  // model_id slots are always directories
+            }
+
+            const std::string model_id = entry.name;
+            const std::string model_path =
+                std::string(framework_dir) + "/" + model_id;
+
+            // Verify the model folder contains at least one regular file —
+            // mirrors the Kotlin self-heal heuristic and the legacy
+            // is_valid_model_folder() shape (file existence is enough; we
+            // don't filter by extension because each backend defines its own
+            // file shape and platform `is_model_file` callback is optional).
+            if (list_directory_via_adapter(adapter, model_path.c_str(), &model_entries) !=
+                RAC_SUCCESS) {
+                continue;
+            }
+            bool has_regular_file = false;
+            for (const rac_directory_entry_t& child : model_entries) {
+                if (child.is_dir != RAC_TRUE && child.name[0] != '\0' &&
+                    child.name[0] != '.') {
+                    has_regular_file = true;
+                    break;
+                }
+            }
+            if (!has_regular_file) {
+                // Allow one level of nested folder (sherpa-onnx archives ship
+                // as <name>/<files>) — match is_valid_model_folder semantics.
+                for (const rac_directory_entry_t& child : model_entries) {
+                    if (child.is_dir != RAC_TRUE || child.name[0] == '.') {
+                        continue;
+                    }
+                    std::vector<rac_directory_entry_t> nested;
+                    std::string nested_path = model_path + "/" + child.name;
+                    if (list_directory_via_adapter(adapter, nested_path.c_str(), &nested) ==
+                        RAC_SUCCESS) {
+                        for (const rac_directory_entry_t& leaf : nested) {
+                            if (leaf.is_dir != RAC_TRUE && leaf.name[0] != '\0' &&
+                                leaf.name[0] != '.') {
+                                has_regular_file = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (has_regular_file) {
+                        break;
+                    }
+                }
+            }
+            if (!has_regular_file) {
+                continue;
+            }
+
+            // Only link models that are actually registered.
+            bool registered = false;
+            {
+                std::lock_guard<std::mutex> lock(handle->mutex);
+                registered = handle->models.find(model_id) != handle->models.end();
+            }
+            if (!registered) {
+                continue;
+            }
+
+            rac_result_t update_rc = rac_model_registry_update_download_status(
+                handle, model_id.c_str(), model_path.c_str());
+            if (update_rc == RAC_SUCCESS) {
+                ++linked;
+                RAC_LOG_INFO("ModelRegistry",
+                             "Refresh rescan: linked '%s' to local_path '%s'",
+                             model_id.c_str(), model_path.c_str());
+            } else {
+                RAC_LOG_WARNING("ModelRegistry",
+                                "Refresh rescan: failed to update '%s' (rc=%d)",
+                                model_id.c_str(), update_rc);
+            }
+        }
+    }
+
+    return linked;
+}
+
+}  // namespace
+
 rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle,
                                               const uint8_t* request_proto_bytes,
                                               size_t request_proto_size,
@@ -2894,6 +3075,21 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
         refresh_rc = rac_model_registry_refresh(handle, opts);
     }
 
+    // Platform-adapter-backed local rescan: when the request asked for
+    // rescan_local and the SDK has wired up file_list_directory on the
+    // platform adapter, walk the canonical model folders and link registered
+    // entries to their downloads. Falls back to the legacy warning when the
+    // callback is NULL so older SDK builds keep working without changes.
+    int32_t adapter_rescan_linked = 0;
+    bool adapter_rescan_ran = false;
+    if (request.rescan_local()) {
+        const rac_platform_adapter_t* adapter = rac_get_platform_adapter();
+        if (adapter && adapter->file_list_directory) {
+            adapter_rescan_linked = rescan_local_via_platform_adapter(handle);
+            adapter_rescan_ran = true;
+        }
+    }
+
     std::vector<ModelInfo> models;
     {
         std::lock_guard<std::mutex> lock(handle->mutex);
@@ -2914,8 +3110,8 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
     ModelRegistryRefreshResult result;
     result.set_success(refresh_rc == RAC_SUCCESS);
     result.set_registered_count(counts.total);
-    result.set_updated_count(0);
-    result.set_discovered_count(0);
+    result.set_updated_count(adapter_rescan_linked);
+    result.set_discovered_count(adapter_rescan_linked);
     result.set_pruned_count(0);
     result.set_refreshed_at_unix_ms(rac_get_current_time_ms());
     result.set_downloaded_count(counts.downloaded);
@@ -2924,7 +3120,7 @@ rac_result_t rac_model_registry_refresh_proto(rac_model_registry_handle_t handle
     if (refresh_rc != RAC_SUCCESS) {
         result.set_error_message(rac_error_message(refresh_rc));
     }
-    if (request.rescan_local()) {
+    if (request.rescan_local() && !adapter_rescan_ran) {
         result.add_warnings(
             "rescan_local requires platform filesystem callbacks in the C ABI refresh path");
     }

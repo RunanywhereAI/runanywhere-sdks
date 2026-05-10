@@ -11,6 +11,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.SDKEvent
 import ai.runanywhere.proto.v1.VLMGenerationOptions
 import ai.runanywhere.proto.v1.VLMImage
@@ -125,3 +126,24 @@ expect val RunAnywhere.currentVLMModelId: String?
  * Safe to call even if no generation is in progress.
  */
 expect fun RunAnywhere.cancelVLMGeneration()
+
+// MARK: - VLM Models
+
+/**
+ * Load a VLM model from a [ModelInfo] using the C++ model registry.
+ *
+ * The C++ lifecycle resolves primary and vision-projector artifacts and
+ * returns them as generated `ModelFileDescriptor` values.
+ *
+ * @param model The model to load (must be registered in the global registry).
+ */
+expect suspend fun RunAnywhere.loadVLMModelInfo(model: ModelInfo)
+
+/**
+ * Load a VLM model by ID using the C++ model registry. Alias for the
+ * existing [loadVLMModel] entry point — preserved here for parity with
+ * Swift's `loadVLMModelById(_:)`.
+ *
+ * @param modelId Model identifier (must be registered in the global registry).
+ */
+expect suspend fun RunAnywhere.loadVLMModelById(modelId: String)

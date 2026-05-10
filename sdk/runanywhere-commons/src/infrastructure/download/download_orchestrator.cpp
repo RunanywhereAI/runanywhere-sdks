@@ -46,6 +46,7 @@
 #include "rac/infrastructure/extraction/rac_extraction.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
 #include "rac/infrastructure/model_management/rac_model_paths.h"
+#include "rac/infrastructure/model_management/rac_model_registry.h"
 #include "rac/infrastructure/model_management/rac_model_types.h"
 #include "../http/rac_http_internal.h"
 
@@ -272,6 +273,11 @@ struct proto_download_task {
     rac_inference_framework_t framework = RAC_FRAMEWORK_UNKNOWN;
     rac_archive_structure_t archive_structure = RAC_ARCHIVE_STRUCTURE_UNKNOWN;
     rac_model_format_t format = RAC_MODEL_FORMAT_UNKNOWN;
+    // Mirrors DownloadStartRequest.update_registry_on_completion. When set,
+    // the worker calls rac_model_registry_update_download_status() after the
+    // download + extraction succeed so the registry observes is_downloaded
+    // = true + local_path = <resolved path> without an SDK-side self-heal.
+    bool update_registry_on_completion = false;
 };
 
 struct proto_service_state {
@@ -875,6 +881,24 @@ void run_proto_download_worker(std::shared_ptr<proto_download_task> task, int64_
                       completion_local_path, "");
     mark_task_stopped(task);
     emit_progress(task);
+
+    // CPP-02 registry self-heal: when the SDK requested
+    // update_registry_on_completion, mark the model as downloaded and write
+    // its resolved local_path back into the registry. Replaces the per-SDK
+    // self-heal (e.g. Kotlin's markModelDownloadedInRegistry()).
+    if (task->update_registry_on_completion && !completion_local_path.empty()) {
+        rac_result_t update_rc = rac_model_registry_update_download_status(
+            rac_get_model_registry(), task->model_id.c_str(), completion_local_path.c_str());
+        if (update_rc == RAC_SUCCESS) {
+            RAC_LOG_INFO(LOG_TAG,
+                         "Registry self-heal: marked '%s' downloaded with local_path '%s'",
+                         task->model_id.c_str(), completion_local_path.c_str());
+        } else {
+            RAC_LOG_WARNING(LOG_TAG,
+                            "Registry self-heal failed for '%s' (rc=%d); SDK fallback may apply",
+                            task->model_id.c_str(), update_rc);
+        }
+    }
 }
 
 std::string destination_from_model_file(const std::string& model_folder,
@@ -1592,11 +1616,7 @@ extern "C" rac_result_t rac_download_start_proto(const uint8_t* request_bytes,
         }
     }
 
-    if (request.update_registry_on_completion()) {
-        RAC_LOG_WARNING(LOG_TAG,
-                        "update_registry_on_completion requested; registry mutation is a CPP-02 "
-                        "integration follow-up");
-    }
+    task->update_registry_on_completion = request.update_registry_on_completion();
 
     set_task_progress(task, request.resume() ? rav1::DOWNLOAD_STATE_RESUMING
                                              : rav1::DOWNLOAD_STATE_PENDING,

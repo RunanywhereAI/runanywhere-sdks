@@ -1,9 +1,7 @@
 package com.runanywhere.sdk.core.onnx
 
-import ai.runanywhere.proto.v1.InferenceFramework
-import ai.runanywhere.proto.v1.SDKComponent
-import com.runanywhere.sdk.core.module.RunAnywhereModule
 import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.public.RunAnywhereModule
 
 /**
  * ONNX Runtime module for STT, TTS, and VAD services.
@@ -19,7 +17,7 @@ import com.runanywhere.sdk.foundation.SDKLogger
  * ```kotlin
  * import com.runanywhere.sdk.core.onnx.ONNX
  *
- * // Register the backend (done automatically if auto-registration is enabled)
+ * // Register the backend (suspend, called once during SDK bootstrap)
  * ONNX.register()
  * ```
  *
@@ -49,23 +47,12 @@ object ONNX : RunAnywhereModule {
     /** ONNX Runtime library version (underlying C library) */
     const val onnxRuntimeVersion = "1.23.2"
 
+    /** Default priority used when callers do not specify one. */
+    const val defaultPriority: Int = 100
+
     // MARK: - RunAnywhereModule Conformance
 
-    override val moduleId: String = "onnx"
-
-    override val moduleName: String = "ONNX Runtime"
-
-    override val capabilities: Set<SDKComponent> =
-        setOf(
-            SDKComponent.SDK_COMPONENT_STT,
-            SDKComponent.SDK_COMPONENT_TTS,
-            SDKComponent.SDK_COMPONENT_VAD,
-        )
-
-    override val defaultPriority: Int = 100
-
-    /** ONNX uses the ONNX Runtime inference framework */
-    override val inferenceFramework: InferenceFramework = InferenceFramework.INFERENCE_FRAMEWORK_ONNX
+    override val moduleName: String = "ONNX"
 
     // MARK: - Registration State
 
@@ -75,19 +62,46 @@ object ONNX : RunAnywhereModule {
     // MARK: - Registration
 
     /**
-     * Register ONNX backend with the C++ service registry.
+     * Register ONNX backend with the C++ service registry (RunAnywhereModule override).
      *
-     * This calls `rac_backend_onnx_register()` to register all ONNX
-     * service providers (STT, TTS, VAD) with the C++ commons layer.
+     * Calls `rac_backend_onnx_register()` to register all ONNX service providers
+     * (STT, TTS, VAD) with the C++ commons layer. Suspend so that callers can
+     * await module bootstrap from a coroutine scope.
+     */
+    override suspend fun register() {
+        registerInternal()
+    }
+
+    /**
+     * Unregister the ONNX backend from C++ registry (RunAnywhereModule override).
+     */
+    override suspend fun unregister() {
+        if (!isRegistered) return
+
+        unregisterNative()
+        isRegistered = false
+        logger.info("ONNX backend unregistered")
+    }
+
+    /**
+     * Backwards-compatible non-suspend registration entry point.
      *
-     * Safe to call multiple times - subsequent calls are no-ops.
+     * Apps that bootstrap on the main thread (e.g. `Application.onCreate`)
+     * call `ONNX.register(priority = 100)`. The `priority` argument is
+     * ignored — the C++ plugin registry assigns priority internally.
      *
-     * @param priority Ignored (C++ uses its own priority system)
+     * No default value is set here so that the no-arg suspend [register]
+     * override remains unambiguous on the call site.
+     *
+     * @param priority Ignored (C++ uses its own priority system).
      */
     @Suppress("UNUSED_PARAMETER")
     @JvmStatic
-    @JvmOverloads
-    fun register(priority: Int = defaultPriority) {
+    fun register(priority: Int) {
+        registerInternal()
+    }
+
+    private fun registerInternal() {
         if (isRegistered) {
             logger.debug("ONNX already registered, returning")
             return
@@ -108,17 +122,6 @@ object ONNX : RunAnywhereModule {
         logger.info("ONNX backend registered successfully (STT + TTS + VAD)")
     }
 
-    /**
-     * Unregister the ONNX backend from C++ registry.
-     */
-    fun unregister() {
-        if (!isRegistered) return
-
-        unregisterNative()
-        isRegistered = false
-        logger.info("ONNX backend unregistered")
-    }
-
     // `canHandleSTT` / `canHandleTTS` / `canHandleVAD` deleted per
     // gaps/kotlin.md — mirrors SWIFT-DUP-CANHANDLE. The C++ plugin router
     // (`rac_router_*` / `rac_plugin_route`) is the only routing authority;
@@ -131,7 +134,7 @@ object ONNX : RunAnywhereModule {
      * Access this property to trigger C++ backend registration.
      */
     val autoRegister: Unit by lazy {
-        register()
+        registerInternal()
     }
 }
 

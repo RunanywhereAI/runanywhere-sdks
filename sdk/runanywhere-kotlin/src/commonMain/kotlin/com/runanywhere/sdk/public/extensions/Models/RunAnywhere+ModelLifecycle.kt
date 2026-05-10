@@ -1,0 +1,53 @@
+/*
+ * Copyright 2026 RunAnywhere SDK
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Public API for proto-backed model and component lifecycle.
+ *
+ * Mirrors Swift sdk/runanywhere-swift/.../Models/RunAnywhere+ModelLifecycle.swift.
+ */
+
+package com.runanywhere.sdk.public.extensions
+
+import ai.runanywhere.proto.v1.ComponentLifecycleSnapshot
+import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.CurrentModelResult
+import ai.runanywhere.proto.v1.ModelInfo
+import ai.runanywhere.proto.v1.ModelLoadRequest
+import ai.runanywhere.proto.v1.ModelLoadResult
+import ai.runanywhere.proto.v1.ModelUnloadRequest
+import ai.runanywhere.proto.v1.ModelUnloadResult
+import ai.runanywhere.proto.v1.SDKComponent
+import com.runanywhere.sdk.public.RunAnywhere
+
+// MARK: - Lifecycle Operations
+
+expect suspend fun RunAnywhere.loadModel(request: ModelLoadRequest): ModelLoadResult
+
+expect suspend fun RunAnywhere.unloadModel(request: ModelUnloadRequest): ModelUnloadResult
+
+expect suspend fun RunAnywhere.currentModel(request: CurrentModelRequest = CurrentModelRequest()): CurrentModelResult
+
+expect suspend fun RunAnywhere.componentLifecycleSnapshot(component: SDKComponent): ComponentLifecycleSnapshot
+
+// MARK: - Model Loading
+
+expect suspend fun RunAnywhere.loadModel(modelId: String)
+
+expect suspend fun RunAnywhere.loadLLMModel(modelId: String)
+
+expect suspend fun RunAnywhere.unloadLLMModel()
+
+expect val RunAnywhere.isLLMModelLoaded: Boolean
+
+expect val RunAnywhere.currentLLMModel: ModelInfo?
+
+expect suspend fun RunAnywhere.currentSTTModel(): ModelInfo?
+
+expect suspend fun RunAnywhere.loadSTTModel(modelId: String)
+
+// MARK: - Model Assignments
+// `fetchModelAssignments` was deleted in the dead-code wave (KOT-DEAD).
+// The legacy path was a JSON adapter over `racModelAssignmentFetch`.
+// Use `refreshModelRegistry(includeRemoteCatalog = true)` followed by
+// `availableModels()` to drive the proto-backed catalog refresh instead.

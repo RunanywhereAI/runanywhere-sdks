@@ -136,11 +136,19 @@ let package = Package(
         // separate ONNXRuntime{iOS,macOS}Binary targets needed. They were
         // previously distributed as separate xcframeworks but are bundled
         // since v0.19.0.
+        //
+        // The Sherpa-ONNX backend ships as a peer xcframework. It owns the
+        // STT (Whisper / Zipformer / Paraformer), TTS (Piper / VITS) and
+        // VAD (Silero) primitives under `framework == .sherpa`. ONNX owns
+        // embeddings and generic ONNX Runtime services under
+        // `framework == .onnx`. Both must be linked so the unified plugin
+        // router can resolve either framework at load time.
         // =================================================================
         .target(
             name: "ONNXBackend",
             dependencies: [
                 "RABackendONNXBinary",
+                "RABackendSherpaBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/ONNXRuntime/include",
             publicHeadersPath: "."
@@ -186,6 +194,10 @@ let package = Package(
 
         // =================================================================
         // ONNX Runtime Backend
+        //
+        // Depends on both RABackendONNXBinary (embeddings + Silero VAD) and
+        // RABackendSherpaBinary (Sherpa-ONNX STT/TTS/VAD). `ONNX.register()`
+        // plumbs both plugins into the commons plugin registry at SDK boot.
         // =================================================================
         .target(
             name: "ONNXRuntime",
@@ -193,6 +205,7 @@ let package = Package(
                 "RunAnywhere",
                 "ONNXBackend",
                 "RABackendONNXBinary",
+                "RABackendSherpaBinary",
             ],
             path: "sdk/runanywhere-swift/Sources/ONNXRuntime",
             exclude: ["include"],
@@ -252,6 +265,10 @@ func binaryTargets() -> [Target] {
         // =====================================================================
         // ONNX Runtime is statically linked into RABackendONNX — no separate
         // local xcframework targets needed (v0.19.0+).
+        //
+        // Sherpa-ONNX ships as RABackendSherpa — owner of the `sherpa` engine
+        // plugin (STT / TTS / VAD). `ONNXRuntime.register()` registers this
+        // plugin's vtable via `rac_plugin_entry_sherpa()` at boot.
         return [
             .binaryTarget(
                 name: "RACommonsBinary",
@@ -264,6 +281,10 @@ func binaryTargets() -> [Target] {
             .binaryTarget(
                 name: "RABackendONNXBinary",
                 path: "sdk/runanywhere-swift/Binaries/RABackendONNX.xcframework"
+            ),
+            .binaryTarget(
+                name: "RABackendSherpaBinary",
+                path: "sdk/runanywhere-swift/Binaries/RABackendSherpa.xcframework"
             ),
         ]
     } else {
@@ -288,6 +309,12 @@ func binaryTargets() -> [Target] {
                 url: "https://github.com/RunanywhereAI/runanywhere-sdks/releases/download/v\(sdkVersion)/RABackendONNX-ios-v\(sdkVersion).zip",
                 checksum: "0f8575559ac96a9a7b872bb3adca3608acef38fdec1ab8ccf9b0716a8d627c6c"
             ),
+            // NOTE: Sherpa xcframework release URL + checksum TBD — once the
+            // release pipeline publishes RABackendSherpa-ios-v<sdkVersion>.zip,
+            // add a matching `.binaryTarget(name: "RABackendSherpaBinary", …)`
+            // entry here so production consumers link the sherpa plugin too.
+            // Until then external SPM consumers will be missing STT/TTS via
+            // sherpa (LLM via llamacpp + embeddings via onnx continue to work).
         ]
     }
 }

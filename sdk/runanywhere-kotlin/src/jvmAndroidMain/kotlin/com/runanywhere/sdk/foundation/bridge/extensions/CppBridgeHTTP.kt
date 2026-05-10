@@ -10,7 +10,7 @@
  *
  * This class is the Kotlin side of the adapter. A thin C++ JNI wrapper
  * (okhttp_transport_adapter.cpp) implements the vtable and calls
- * [OkHttpTransport.executeRequest] / [executeStreamingRequest] via
+ * [CppBridgeHTTP.executeRequest] / [executeStreamingRequest] via
  * reflection when requests arrive.
  *
  * Why OkHttp? The libcurl default is portable but uses its own TLS /
@@ -29,7 +29,7 @@
  *   - Custom OkHttpClient injection for interceptors / custom certs
  */
 
-package com.runanywhere.sdk.foundation.http
+package com.runanywhere.sdk.foundation.bridge.extensions
 
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -45,7 +45,7 @@ import java.util.concurrent.atomic.AtomicReference
  * the OkHttp transport is registered. OkHttp gives us the system CA store,
  * proxies, NetworkSecurityConfig, HTTP/2, cert pinning, user-CAs for free.
  */
-object OkHttpTransport {
+object CppBridgeHTTP {
     /** Chunk size used for streaming body delivery (32 KB matches Okio's default). */
     private const val STREAM_CHUNK_SIZE = 32 * 1024
 
@@ -90,7 +90,7 @@ object OkHttpTransport {
      *     .readTimeout(5, TimeUnit.MINUTES)
      *     .addInterceptor(ChuckerInterceptor.Builder(context).build())
      *     .build()
-     * OkHttpTransport.setHttpClient(workerClient)
+     * CppBridgeHTTP.setHttpClient(workerClient)
      * ```
      */
     @JvmStatic

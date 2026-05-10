@@ -2,14 +2,13 @@
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
- * Public API for model management operations.
+ * Public API for proto-backed model registry, discovery, and downloads.
+ *
+ * Mirrors Swift sdk/runanywhere-swift/.../Models/RunAnywhere+ModelRegistry.swift.
  */
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.ComponentLifecycleSnapshot
-import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.CurrentModelResult
 import ai.runanywhere.proto.v1.DownloadCancelRequest
 import ai.runanywhere.proto.v1.DownloadCancelResult
 import ai.runanywhere.proto.v1.DownloadPlanRequest
@@ -27,16 +26,11 @@ import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelInfoList
-import ai.runanywhere.proto.v1.ModelLoadRequest
-import ai.runanywhere.proto.v1.ModelLoadResult
 import ai.runanywhere.proto.v1.ModelQuery
 import ai.runanywhere.proto.v1.ModelRegistryRefreshRequest
 import ai.runanywhere.proto.v1.ModelRegistryRefreshResult
 import ai.runanywhere.proto.v1.ModelSource
-import ai.runanywhere.proto.v1.ModelUnloadRequest
-import ai.runanywhere.proto.v1.ModelUnloadResult
 import ai.runanywhere.proto.v1.MultiFileArtifact
-import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.catalogKey
@@ -181,14 +175,6 @@ expect suspend fun RunAnywhere.queryModels(query: ModelQuery = ModelQuery()): Mo
 
 expect suspend fun RunAnywhere.downloadedModelsProto(): ModelInfoList
 
-expect suspend fun RunAnywhere.loadModel(request: ModelLoadRequest): ModelLoadResult
-
-expect suspend fun RunAnywhere.unloadModel(request: ModelUnloadRequest): ModelUnloadResult
-
-expect suspend fun RunAnywhere.currentModel(request: CurrentModelRequest = CurrentModelRequest()): CurrentModelResult
-
-expect suspend fun RunAnywhere.componentLifecycleSnapshot(component: SDKComponent): ComponentLifecycleSnapshot
-
 // MARK: - Model Downloads
 
 expect fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress>
@@ -224,25 +210,3 @@ expect suspend fun RunAnywhere.refreshModelRegistry(
 expect suspend fun RunAnywhere.refreshModelRegistry(
     request: ModelRegistryRefreshRequest,
 ): ModelRegistryRefreshResult
-
-// MARK: - Model Loading
-
-expect suspend fun RunAnywhere.loadModel(modelId: String)
-
-expect suspend fun RunAnywhere.loadLLMModel(modelId: String)
-
-expect suspend fun RunAnywhere.unloadLLMModel()
-
-expect val RunAnywhere.isLLMModelLoaded: Boolean
-
-expect val RunAnywhere.currentLLMModel: ModelInfo?
-
-expect suspend fun RunAnywhere.currentSTTModel(): ModelInfo?
-
-expect suspend fun RunAnywhere.loadSTTModel(modelId: String)
-
-// MARK: - Model Assignments
-// `fetchModelAssignments` was deleted in the dead-code wave (KOT-DEAD).
-// The legacy path was a JSON adapter over `racModelAssignmentFetch`.
-// Use `refreshModelRegistry(includeRemoteCatalog = true)` followed by
-// `availableModels()` to drive the proto-backed catalog refresh instead.

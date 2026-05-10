@@ -1,51 +1,63 @@
 # Flutter SDK — Current Inconsistencies
 
-Updated: 2026-05-05 (Discovery H audit)
-Branch: feat/v2-architecture @ 6217d9e67
-Build status: all 4 pubspecs at 0.19.13; `SdkState` trimmed to a single
-`hasRunDiscovery` flag; downloads / STT streaming / LLM streaming / VLM
-streaming all consume proto-byte callbacks via
-`NativeCallable.listener`; 100% of Dart capabilities read
-`DartBridge.isInitialized` (zero `SdkState.shared.isInitialized`
-surface).
+Updated: 2026-05-06
+Branch: feat/v2-architecture @ bb63158d6
 
 ## Current state summary
 
-Structurally the Flutter SDK is in good shape. The public surface is
-entirely generated-proto driven, isolate fallback paths are gone from
-LLM/STT/TTS, both streaming adapter shims and the `native_backend`
-barrel have been deleted, the `DartBridgePlatformServices` availability
-checks are gone, and `DartBridgeVAD` is trimmed to a single
-`processLifecycleProto` plus minimal handle state-query getters
-(171 LOC, down from 523).
+Structurally the Flutter SDK is clean: proto-driven public surface, no
+isolate fallbacks, `DartBridgeVAD` / `DartBridgeTTS` on lifecycle ABIs,
+`extractStructuredOutput` routed through commons. Runtime e2e
+(20260505-232326, Lanes 05/06) surfaced 4 regressions listed below.
 
-No TTS/VAD capabilities remain stubbed. FLT-12 landed in Wave 3c:
-commons added `rac_tts_synthesize_stream_lifecycle_proto`,
-`rac_tts_stop_lifecycle_proto`, `rac_vad_configure_lifecycle_proto`,
-`rac_vad_start_lifecycle_proto`, `rac_vad_stop_lifecycle_proto`,
-`rac_vad_reset_lifecycle_proto`. Flutter TTS `synthesizeStream` /
-`stopSynthesis` and VAD `initializeVAD` / `startVAD` / `stopVAD` /
-`reset` now call the new lifecycle ABIs through
-`DartBridgeTTS` / `DartBridgeVAD`. Diffusion portion of the original
-FLT-12 remains deferred.
+## Deferred backend Flutter packages (stub or exclude OK)
 
-## Items to DELETE
+The following Flutter packages wrap deferred backends and are NOT in scope.
+Stubbing, excluding from the melos workspace, or deleting is acceptable —
+do not file bugs about these being unimplemented.
 
-No pending deletions — FLT-11 landed in Wave 3c: `extractStructuredOutput`
-now routes through commons `rac_structured_output_parse_proto` and the
-~42 LOC of `_extractFirstJson` / `_findClosing` / `_isValidJson`
-helpers have been removed.
+- `sdk/runanywhere-flutter/packages/runanywhere_genie/` — Genie backend wrapper.
+
+(No Flutter wrappers currently exist for MetalRT, WhisperKit, WhisperKit
+CoreML, WhisperCPP, or Diffusion.)
+
+## Open items (from 20260505-232326 e2e)
+
+<table>
+<tr><th>ID</th><th>Severity</th><th>Lane</th><th>Summary</th><th>Fix hint</th></tr>
+<tr>
+  <td><code>FLT-E2E-R2-001</code></td>
+  <td>HIGH</td>
+  <td>05 Flutter Android</td>
+  <td>Android 16 KB page-size warning dialog lists 19 unaligned native libraries at install/launch. <code>gradle.properties</code> now pins <code>racFlutterNdkVersion=27.0.12077973</code> (same as <code>racNdkVersion</code>), so the source of the unaligned <code>.so</code> set is <strong>not</strong> the Flutter NDK pin. Likely the Flutter packaging path in <code>scripts/build-core-android.sh</code> or a Flutter Gradle plugin step is still emitting pre-aligned artifacts.</td>
+  <td>Audit the Flutter Android packaging output in <code>build/</code>; confirm every <code>.so</code> dropped into <code>sdk/runanywhere-flutter/packages/*/android/src/main/jniLibs/</code> was linked with <code>-Wl,-z,max-page-size=16384</code> under NDK 27.</td>
+</tr>
+<tr>
+  <td><code>FLT-E2E-R2-002</code></td>
+  <td>HIGH</td>
+  <td>05 Flutter Android</td>
+  <td><code>DartBridge</code> logs 7 783 <code>InvalidProtocolBufferException</code> while decoding <code>DownloadProgress</code>. 219 MB lands on disk but the terminal COMPLETED event fails to decode; UI stalls at 91 %. Proto wire-format drift between the C++ producer and the Dart parser.</td>
+  <td>Regenerate Dart proto bindings (<code>./idl/codegen/generate_dart.sh</code>) and diff <code>DownloadProgress</code> field layout against <code>rac/infrastructure/download/rac_download.h</code>.</td>
+</tr>
+<tr>
+  <td><code>FLT-E2E-R2-003</code></td>
+  <td>HIGH</td>
+  <td>06 Flutter iOS</td>
+  <td><code>DartBridge</code> repeatedly logs <code>rac_model_format_from_url_proto unavailable; returning UNKNOWN</code> and <code>rac_artifact_infer_from_url_proto unavailable; returning null</code> on every model-catalog entry. Symbols are declared in <code>RACommons.exports</code> and bound in <code>rac_native.dart</code>, so the breakage is a runtime <code>dlsym</code> miss — most likely <code>scripts/build-core-xcframework.sh</code>'s <code>rac_plugin_entry_whisperkit_coreml.o</code> strip step is over-removing symbols from the Flutter-consumed xcframework.</td>
+  <td>Inspect <code>sdk/runanywhere-flutter/packages/runanywhere/ios/Frameworks/RACommons.xcframework/*/RACommons.framework/RACommons</code> with <code>nm -gU</code> for the two symbols; tighten the strip workaround to keep Wave D-3 entry points.</td>
+</tr>
+<tr>
+  <td><code>FLT-E2E-R2-004</code></td>
+  <td>LOW</td>
+  <td>06 Flutter iOS</td>
+  <td><code>rac_http_request_send</code> returns code <code>-151</code> against the localhost dev env; SDK proceeds gracefully but auth fails silently.</td>
+  <td>Surface the HTTP transport error code to the developer via <code>SDKException</code> / event bus instead of swallowing it.</td>
+</tr>
+</table>
 
 ## Cross-SDK naming alignment gaps
 
 <table>
 <tr><th>Concern</th><th>Swift</th><th>Kotlin</th><th>RN</th><th>Web</th><th>Flutter</th><th>Status</th></tr>
 <tr><td>Entry point</td><td><code>enum RunAnywhere</code></td><td><code>object RunAnywhere</code></td><td><code>RunAnywhere</code></td><td><code>RunAnywhere</code></td><td><code>class RunAnywhereSDK</code> (<code>.instance</code>)</td><td>Flutter uses instance-getter; others use enum/object. Cosmetic.</td></tr>
-<tr><td>LLM streaming</td><td><code>AsyncStream&lt;LLMStreamEvent&gt;</code></td><td><code>Flow&lt;LLMStreamEvent&gt;</code></td><td><code>AsyncIterable&lt;LLMStreamEvent&gt;</code></td><td><code>AsyncIterable&lt;LLMStreamEvent&gt;</code></td><td><code>Stream&lt;LLMStreamEvent&gt;</code></td><td>Aligned</td></tr>
-<tr><td>Voice agent events</td><td><code>AsyncStream&lt;VoiceEvent&gt;</code></td><td><code>Flow&lt;VoiceEvent&gt;</code></td><td><code>AsyncIterable&lt;VoiceEvent&gt;</code></td><td><code>AsyncIterable&lt;VoiceEvent&gt;</code></td><td><code>Stream&lt;VoiceEvent&gt;</code></td><td>Aligned</td></tr>
-<tr><td>Bridge layer</td><td><code>CppBridge</code> enum</td><td><code>CppBridge</code> object</td><td><code>HybridRunAnywhereCore</code> (Nitro)</td><td><code>LlamaCppBridge</code> / <code>SherpaONNXBridge</code></td><td><code>DartBridge</code> static class</td><td>Aligned</td></tr>
-<tr><td>Model-format URL heuristic</td><td>commons proto (D-3)</td><td>commons proto (D-3)</td><td>commons proto (D-3)</td><td>commons proto (D-3)</td><td>commons proto via <code>DartBridgeModelFormat</code></td><td>Aligned</td></tr>
-<tr><td>ffigen / auto-gen FFI</td><td>N/A (module map)</td><td>expect/actual + JNI</td><td>Nitro codegen</td><td>TypeScript <code>Offsets</code> proxy</td><td>hand-written <code>RacBindings</code></td><td>Aligned — ffigen scaffold removed (FLT-05 resolved)</td></tr>
-<tr><td>Plugin ABI reported version</td><td>dynamic from native</td><td>dynamic from native</td><td>dynamic from native</td><td>dynamic</td><td>hard-coded <code>'0.19.13'</code> (aligned via FLT-07 fix)</td><td>Aligned</td></tr>
-<tr><td>Structured-output extract helper</td><td>in-SDK regex</td><td>in-SDK regex</td><td>in-SDK regex</td><td>in-SDK regex</td><td>commons <code>rac_structured_output_parse_proto</code> (FLT-11 landed)</td><td>Aligned — Flutter now routes through commons; other SDKs may follow once their wiring lands</td></tr>
 </table>

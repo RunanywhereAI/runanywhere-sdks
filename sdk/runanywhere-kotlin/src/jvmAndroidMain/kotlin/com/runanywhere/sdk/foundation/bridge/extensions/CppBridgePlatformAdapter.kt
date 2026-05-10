@@ -452,7 +452,7 @@ object CppBridgePlatformAdapter {
     }
 
     // ========================================================================
-    // Platform HTTP byte execution is registered through OkHttpTransport.
+    // Platform HTTP byte execution is registered through CppBridgeHTTP.
     // Download workflow planning/progress/state now flows through generated
     // Download* proto calls; direct HTTP callbacks here remain intentionally
     // absent from the platform adapter surface.

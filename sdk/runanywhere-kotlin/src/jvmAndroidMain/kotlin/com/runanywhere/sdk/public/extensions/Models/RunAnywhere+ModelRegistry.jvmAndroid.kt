@@ -2,15 +2,12 @@
  * Copyright 2024 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
- * JVM/Android actual implementations for model management operations.
+ * JVM/Android actual implementations for proto-backed model registry,
+ * discovery, and download operations.
  */
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.ComponentLifecycleSnapshot
-import ai.runanywhere.proto.v1.ComponentLifecycleState
-import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.CurrentModelResult
 import ai.runanywhere.proto.v1.DownloadCancelRequest
 import ai.runanywhere.proto.v1.DownloadCancelResult
 import ai.runanywhere.proto.v1.DownloadPlanRequest
@@ -22,24 +19,17 @@ import ai.runanywhere.proto.v1.DownloadStartRequest
 import ai.runanywhere.proto.v1.DownloadStartResult
 import ai.runanywhere.proto.v1.DownloadState
 import ai.runanywhere.proto.v1.DownloadSubscribeRequest
-import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelInfoList
-import ai.runanywhere.proto.v1.ModelLoadRequest
-import ai.runanywhere.proto.v1.ModelLoadResult
 import ai.runanywhere.proto.v1.ModelQuery
 import ai.runanywhere.proto.v1.ModelRegistryRefreshRequest
 import ai.runanywhere.proto.v1.ModelRegistryRefreshResult
-import ai.runanywhere.proto.v1.ModelUnloadRequest
-import ai.runanywhere.proto.v1.ModelUnloadResult
-import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.StorageDeleteRequest
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDownloadProto
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelFormat
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorageProto
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -108,34 +98,6 @@ actual suspend fun RunAnywhere.queryModels(query: ModelQuery): ModelInfoList {
 actual suspend fun RunAnywhere.downloadedModelsProto(): ModelInfoList {
     requireInitialized(this)
     return CppBridgeModelRegistry.query(ModelQuery(downloaded_only = true))
-}
-
-actual suspend fun RunAnywhere.loadModel(request: ModelLoadRequest): ModelLoadResult {
-    requireInitialized(this)
-    return withContext(Dispatchers.IO) {
-        CppBridgeModelLifecycleProto.load(request)
-            ?: throw SDKException.model("Native model lifecycle load proto API unavailable")
-    }
-}
-
-actual suspend fun RunAnywhere.unloadModel(request: ModelUnloadRequest): ModelUnloadResult {
-    requireInitialized(this)
-    return CppBridgeModelLifecycleProto.unload(request)
-        ?: throw SDKException.model("Native model lifecycle unload proto API unavailable")
-}
-
-actual suspend fun RunAnywhere.currentModel(request: CurrentModelRequest): CurrentModelResult {
-    requireInitialized(this)
-    return CppBridgeModelLifecycleProto.currentModel(request)
-        ?: throw SDKException.model("Native current model proto API unavailable")
-}
-
-actual suspend fun RunAnywhere.componentLifecycleSnapshot(
-    component: SDKComponent,
-): ComponentLifecycleSnapshot {
-    requireInitialized(this)
-    return CppBridgeModelLifecycleProto.snapshot(component)
-        ?: throw SDKException.model("Native component lifecycle snapshot proto API unavailable")
 }
 
 // MARK: - Model Downloads
@@ -234,6 +196,13 @@ private fun RunAnywhere.startDownloadFromPlan(modelId: String): Flow<DownloadPro
             val matchesTask = taskId.isBlank() || progress.task_id == taskId
             if (progress.model_id == modelId && matchesTask) {
                 trySend(progress)
+                if (progress.state == DownloadState.DOWNLOAD_STATE_COMPLETED) {
+                    // KOT-DOWNLOAD-004: C++ `update_registry_on_completion` is a
+                    // deferred follow-up (CPP-02). Until then, self-heal the
+                    // registry here so `ModelInfo.isDownloadedModel` flips true
+                    // and the sheet shows "Use" after download completes.
+                    markModelDownloadedInRegistry(modelId, progress.local_path)
+                }
                 if (progress.isTerminal()) close()
             }
             true
@@ -379,91 +348,26 @@ actual suspend fun RunAnywhere.refreshModelRegistry(
     }
 }
 
-// MARK: - Model Loading
-
-actual suspend fun RunAnywhere.loadModel(modelId: String) {
-    requireInitialized(this)
-    val result = loadModel(ModelLoadRequest(model_id = modelId))
-    if (!result.success) {
-        throw SDKException.model(
-            result.error_message.ifBlank { "Failed to load model '$modelId'" },
-        )
+/**
+ * Self-heal the registry entry for a model that just finished downloading by
+ * setting `is_downloaded=true` and (when provided) `local_path`.
+ *
+ * Needed because `rac_download_start_proto` honours
+ * `update_registry_on_completion=true` only as a logged warning today
+ * (commons CPP-02 follow-up). Without this, `ModelInfo.isDownloadedModel`
+ * stays false after a successful download and the UI never flips from
+ * "Download" → "Use".
+ */
+private fun markModelDownloadedInRegistry(modelId: String, reportedLocalPath: String) {
+    try {
+        val existing = CppBridgeModelRegistry.get(modelId) ?: return
+        val updated =
+            existing.copy(
+                is_downloaded = true,
+                local_path = reportedLocalPath.ifBlank { existing.local_path },
+            )
+        CppBridgeModelRegistry.save(updated)
+    } catch (_: Throwable) {
+        // non-fatal: if save fails, refreshModelRegistry() is the recovery path
     }
 }
-
-actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {
-    requireInitialized(this)
-    val framework =
-        CppBridgeModelRegistry.get(modelId)?.framework
-            ?: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
-    val result =
-        loadModel(
-            ModelLoadRequest(
-                model_id = modelId,
-                category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
-                framework = framework,
-            ),
-        )
-    if (!result.success) {
-        throw SDKException.llm(result.error_message.ifBlank { "Failed to load LLM model '$modelId'" })
-    }
-}
-
-actual suspend fun RunAnywhere.unloadLLMModel() {
-    requireInitialized(this)
-    unloadModel(ModelUnloadRequest(category = ModelCategory.MODEL_CATEGORY_LANGUAGE))
-}
-
-actual val RunAnywhere.isLLMModelLoaded: Boolean
-    get() =
-        CppBridgeModelLifecycleProto
-            .snapshot(SDKComponent.SDK_COMPONENT_LLM)
-            ?.let {
-                it.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
-                    it.model_id.isNotEmpty()
-            } ?: false
-
-actual val RunAnywhere.currentLLMModel: ModelInfo?
-    get() {
-        val current =
-            CppBridgeModelLifecycleProto.currentModel(
-                CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_LANGUAGE),
-            ) ?: return null
-        current.model?.let { return it }
-        val modelId = current.model_id.takeIf { it.isNotEmpty() } ?: return null
-        return CppBridgeModelRegistry.get(modelId)
-    }
-
-actual suspend fun RunAnywhere.currentSTTModel(): ModelInfo? {
-    val current =
-        currentModel(CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION))
-    current.model?.let { return it }
-    val modelId = current.model_id.takeIf { it.isNotEmpty() } ?: return null
-    return CppBridgeModelRegistry.get(modelId)
-}
-
-actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
-    requireInitialized(this)
-    val framework =
-        CppBridgeModelRegistry.get(modelId)?.framework
-            ?: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
-    val result =
-        loadModel(
-            ModelLoadRequest(
-                model_id = modelId,
-                category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-                framework = framework,
-            ),
-        )
-    if (!result.success) {
-        throw SDKException.stt(result.error_message.ifBlank { "Failed to load STT model '$modelId'" })
-    }
-}
-
-// MARK: - Model Assignments
-// Deleted in the dead-code wave (KOT-DEAD): the previous
-// `fetchModelAssignments` actual built a `ModelAssignmentDto`
-// from `CppBridgeModelAssignment.fetchModelAssignments` JSON.
-// Both legacy paths were removed. Consumers should call
-// `refreshModelRegistry(includeRemoteCatalog = true)` followed by
-// `availableModels()` for the proto-backed catalog refresh.

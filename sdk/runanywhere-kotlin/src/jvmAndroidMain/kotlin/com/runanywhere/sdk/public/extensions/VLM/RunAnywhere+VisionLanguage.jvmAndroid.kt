@@ -11,6 +11,7 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.CurrentModelResult
 import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelLoadRequest
 import ai.runanywhere.proto.v1.ModelLoadResult
 import ai.runanywhere.proto.v1.ModelUnloadRequest
@@ -233,4 +234,14 @@ private suspend fun RunAnywhere.unloadLifecycleVLMQuietly(modelId: String) {
     } catch (e: Exception) {
         vlmLogger.warn("Failed to clean up lifecycle VLM model '$modelId': ${e.message}")
     }
+}
+
+// MARK: - VLM Models
+
+actual suspend fun RunAnywhere.loadVLMModelInfo(model: ModelInfo) {
+    loadVLMModel(model.id)
+}
+
+actual suspend fun RunAnywhere.loadVLMModelById(modelId: String) {
+    loadVLMModel(modelId)
 }
