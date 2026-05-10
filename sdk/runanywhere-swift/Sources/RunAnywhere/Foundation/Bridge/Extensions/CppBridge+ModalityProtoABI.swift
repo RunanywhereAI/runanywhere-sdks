@@ -320,7 +320,28 @@ private enum LoRAGeneratedProtoABI {
 
 // MARK: - Callback contexts
 
-private final class ProtoStreamContext<Event: Message>: @unchecked Sendable {
+/// Non-generic protocol that exposes the byte-yield entry point. The C
+/// trampoline can only see non-generic types (Swift forbids generic captures
+/// in `@convention(c)` closures), so we bridge through this protocol and let
+/// dynamic dispatch reach the generic body in `ProtoStreamContext.yield`.
+private protocol ProtoStreamYielder: AnyObject {
+    func yield(bytes: UnsafePointer<UInt8>?, size: Int)
+}
+
+/// Single shared C trampoline used by `ProtoStreamContext.runRequestStream`.
+/// Holds no generic state; recovers the yielder via `Unmanaged` and dispatches
+/// dynamically through `ProtoStreamYielder`.
+private let protoStreamTrampoline: @convention(c) (
+    UnsafePointer<UInt8>?,
+    Int,
+    UnsafeMutableRawPointer?
+) -> Void = { bytes, size, userData in
+    guard let userData else { return }
+    let yielder = Unmanaged<AnyObject>.fromOpaque(userData).takeUnretainedValue()
+    (yielder as? ProtoStreamYielder)?.yield(bytes: bytes, size: size)
+}
+
+private final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStreamYielder {
     let continuation: AsyncStream<Event>.Continuation
     let logger: SDKLogger
 
@@ -336,6 +357,62 @@ private final class ProtoStreamContext<Event: Message>: @unchecked Sendable {
             continuation.yield(event)
         } catch {
             logger.warning("Failed to decode proto stream event: \(error.localizedDescription)")
+        }
+    }
+
+    /// Run a request-shaped streaming C call: serialises `request`, retains a
+    /// fresh `ProtoStreamContext<Event>` as the userData pointer, invokes
+    /// `body` with the shared `@convention(c)` trampoline, and balances the
+    /// retain on completion. If the call returns non-`RAC_SUCCESS`, the
+    /// optional `onError` closure may produce a terminal `Event` to yield
+    /// before the stream finishes.
+    ///
+    /// - Parameters:
+    ///   - request: Proto request to serialise into the bytes/size pair.
+    ///   - category: Logger category for decode failures.
+    ///   - onError: Optional terminal-event factory invoked when the C call
+    ///     reports a non-success status. Returning `nil` finishes the stream
+    ///     silently. The closure runs on the detached task.
+    ///   - body: Closure that invokes the C streaming function pointer with
+    ///     the serialised bytes, the trampoline, and the userData pointer.
+    /// - Returns: An `AsyncStream<Event>` that yields decoded events as the C
+    ///   callback fires and finishes when the C call returns.
+    /// - Throws: Errors raised by `request.serializedData()`.
+    static func runRequestStream<Request: Message>(
+        request: Request,
+        category: String,
+        onError: (@Sendable (rac_result_t) -> Event?)? = nil,
+        body: @escaping @Sendable (
+            UnsafePointer<UInt8>?,
+            Int,
+            @convention(c) (UnsafePointer<UInt8>?, Int, UnsafeMutableRawPointer?) -> Void,
+            UnsafeMutableRawPointer
+        ) -> rac_result_t
+    ) throws -> AsyncStream<Event> {
+        let requestData = try request.serializedData()
+        return AsyncStream { continuation in
+            let context = ProtoStreamContext<Event>(
+                continuation: continuation,
+                category: category
+            )
+            let contextPtr = Unmanaged.passRetained(context).toOpaque()
+            Task.detached {
+                let rc = requestData.withUnsafeBytes { rawBuffer in
+                    body(
+                        rawBuffer.bindMemory(to: UInt8.self).baseAddress,
+                        rawBuffer.count,
+                        protoStreamTrampoline,
+                        contextPtr
+                    )
+                }
+                Unmanaged<ProtoStreamContext<Event>>
+                    .fromOpaque(contextPtr)
+                    .release()
+                if rc != RAC_SUCCESS, let terminal = onError?(rc) {
+                    continuation.yield(terminal)
+                }
+                continuation.finish()
+            }
         }
     }
 }
@@ -424,43 +501,22 @@ extension CppBridge.LLM {
             LLMGeneratedProtoABI.stream,
             named: LLMGeneratedProtoABI.streamName
         )
-        let data = try request.serializedData()
-        return AsyncStream { continuation in
-            let context = ProtoStreamContext<RALLMStreamEvent>(
-                continuation: continuation,
-                category: "CppBridge.LLM.ProtoStream"
-            )
-            let contextPtr = Unmanaged.passRetained(context).toOpaque()
-            Task.detached {
-                let rc = data.withUnsafeBytes { rawBuffer in
-                    stream(
-                        rawBuffer.bindMemory(to: UInt8.self).baseAddress,
-                        rawBuffer.count,
-                        { bytes, size, userData in
-                            guard let userData else { return }
-                            Unmanaged<ProtoStreamContext<RALLMStreamEvent>>
-                                .fromOpaque(userData)
-                                .takeUnretainedValue()
-                                .yield(bytes: bytes, size: size)
-                        },
-                        contextPtr
-                    )
-                }
-                Unmanaged<ProtoStreamContext<RALLMStreamEvent>>
-                    .fromOpaque(contextPtr)
-                    .release()
-                if rc != RAC_SUCCESS {
-                    let mapped = CommonsErrorMapping.toSDKException(rc)
-                    var event = RALLMStreamEvent()
-                    event.isFinal = true
-                    event.finishReason = "error"
-                    event.errorCode = rc
-                    event.errorMessage = mapped?.message ?? "LLM stream failed: \(rc)"
-                    continuation.yield(event)
-                }
-                continuation.finish()
+        return try ProtoStreamContext<RALLMStreamEvent>.runRequestStream(
+            request: request,
+            category: "CppBridge.LLM.ProtoStream",
+            onError: { rc in
+                let mapped = CommonsErrorMapping.toSDKException(rc)
+                var event = RALLMStreamEvent()
+                event.isFinal = true
+                event.finishReason = "error"
+                event.errorCode = rc
+                event.errorMessage = mapped?.message ?? "LLM stream failed: \(rc)"
+                return event
+            },
+            body: { bytes, size, trampoline, userData in
+                stream(bytes, size, trampoline, userData)
             }
-        }
+        )
     }
 
     @discardableResult
@@ -516,40 +572,19 @@ extension CppBridge.STT {
         audioSource.audioData = audioData
         request.audio = audioSource
         request.options = options
-        let requestData = try request.serializedData()
-        return AsyncStream { continuation in
-            let context = ProtoStreamContext<RASTTPartialResult>(
-                continuation: continuation,
-                category: "CppBridge.STT.ProtoStream"
-            )
-            let contextPtr = Unmanaged.passRetained(context).toOpaque()
-            Task.detached {
-                let rc = requestData.withUnsafeBytes { requestRaw in
-                    stream(
-                        requestRaw.bindMemory(to: UInt8.self).baseAddress,
-                        requestRaw.count,
-                        { bytes, size, userData in
-                            guard let userData else { return }
-                            Unmanaged<ProtoStreamContext<RASTTPartialResult>>
-                                .fromOpaque(userData)
-                                .takeUnretainedValue()
-                                .yield(bytes: bytes, size: size)
-                        },
-                        contextPtr
-                    )
-                }
-                Unmanaged<ProtoStreamContext<RASTTPartialResult>>
-                    .fromOpaque(contextPtr)
-                    .release()
-                if rc != RAC_SUCCESS {
-                    var final = RASTTPartialResult()
-                    final.isFinal = true
-                    final.text = "STT stream failed: \(rc)"
-                    continuation.yield(final)
-                }
-                continuation.finish()
+        return try ProtoStreamContext<RASTTPartialResult>.runRequestStream(
+            request: request,
+            category: "CppBridge.STT.ProtoStream",
+            onError: { rc in
+                var final = RASTTPartialResult()
+                final.isFinal = true
+                final.text = "STT stream failed: \(rc)"
+                return final
+            },
+            body: { bytes, size, trampoline, userData in
+                stream(bytes, size, trampoline, userData)
             }
-        }
+        )
     }
 }
 
@@ -612,39 +647,18 @@ extension CppBridge.TTS {
         var request = RATTSSynthesisRequest()
         request.text = text
         request.options = options
-        let requestData = try request.serializedData()
-        return AsyncStream { continuation in
-            let context = ProtoStreamContext<RATTSOutput>(
-                continuation: continuation,
-                category: "CppBridge.TTS.ProtoStream"
-            )
-            let contextPtr = Unmanaged.passRetained(context).toOpaque()
-            Task.detached {
-                let rc = requestData.withUnsafeBytes { raw in
-                    stream(
-                        raw.bindMemory(to: UInt8.self).baseAddress,
-                        raw.count,
-                        { bytes, size, userData in
-                            guard let userData else { return }
-                            Unmanaged<ProtoStreamContext<RATTSOutput>>
-                                .fromOpaque(userData)
-                                .takeUnretainedValue()
-                                .yield(bytes: bytes, size: size)
-                        },
-                        contextPtr
-                    )
-                }
-                Unmanaged<ProtoStreamContext<RATTSOutput>>
-                    .fromOpaque(contextPtr)
-                    .release()
-                if rc != RAC_SUCCESS {
-                    var output = RATTSOutput()
-                    output.timestampMs = Int64(Date().timeIntervalSince1970 * 1000)
-                    continuation.yield(output)
-                }
-                continuation.finish()
+        return try ProtoStreamContext<RATTSOutput>.runRequestStream(
+            request: request,
+            category: "CppBridge.TTS.ProtoStream",
+            onError: { _ in
+                var output = RATTSOutput()
+                output.timestampMs = Int64(Date().timeIntervalSince1970 * 1000)
+                return output
+            },
+            body: { bytes, size, trampoline, userData in
+                stream(bytes, size, trampoline, userData)
             }
-        }
+        )
     }
 }
 
@@ -994,9 +1008,9 @@ extension CppBridge.RAG {
 
     public func ingest(_ document: RARAGDocument) throws -> RARAGStatistics {
         let session = try requireProtoSession()
-        return try invokeRAGRequest(
-            session: session,
-            request: document,
+        return try NativeProtoABI.invoke(
+            document,
+            on: session,
             symbol: RAGGeneratedProtoABI.ingest,
             symbolName: RAGGeneratedProtoABI.ingestName,
             responseType: RARAGStatistics.self
@@ -1005,9 +1019,9 @@ extension CppBridge.RAG {
 
     public func query(_ options: RARAGQueryOptions) throws -> RARAGResult {
         let session = try requireProtoSession()
-        return try invokeRAGRequest(
-            session: session,
-            request: options,
+        return try NativeProtoABI.invoke(
+            options,
+            on: session,
             symbol: RAGGeneratedProtoABI.query,
             symbolName: RAGGeneratedProtoABI.queryName,
             responseType: RARAGResult.self
@@ -1042,20 +1056,6 @@ extension CppBridge.RAG {
         }
     }
 
-    private func invokeRAGRequest<Request: Message, Response: Message>(
-        session: rac_handle_t,
-        request: Request,
-        symbol: RAGGeneratedProtoABI.Request?,
-        symbolName: String,
-        responseType: Response.Type
-    ) throws -> Response {
-        let symbol = try NativeProtoABI.require(symbol, named: symbolName)
-        return try decodeBuffer(responseType: responseType, symbolName: symbolName) { outBuffer in
-            try NativeProtoABI.withSerializedBytes(request) { bytes, size in
-                symbol(session, bytes, size, outBuffer)
-            }
-        }
-    }
 }
 
 // MARK: - LoRA
@@ -1063,9 +1063,9 @@ extension CppBridge.RAG {
 extension CppBridge.LLM {
     public func applyLoraAdapters(_ request: RALoRAApplyRequest) throws -> RALoRAApplyResult {
         let handle = try getHandle()
-        return try invokeLoRARequest(
-            handle: handle,
-            request: request,
+        return try NativeProtoABI.invoke(
+            request,
+            on: handle,
             symbol: LoRAGeneratedProtoABI.apply,
             symbolName: LoRAGeneratedProtoABI.applyName,
             responseType: RALoRAApplyResult.self
@@ -1074,9 +1074,9 @@ extension CppBridge.LLM {
 
     public func removeLoraAdapters(_ request: RALoRARemoveRequest) throws -> RALoRAState {
         let handle = try getHandle()
-        return try invokeLoRARequest(
-            handle: handle,
-            request: request,
+        return try NativeProtoABI.invoke(
+            request,
+            on: handle,
             symbol: LoRAGeneratedProtoABI.remove,
             symbolName: LoRAGeneratedProtoABI.removeName,
             responseType: RALoRAState.self
@@ -1085,9 +1085,9 @@ extension CppBridge.LLM {
 
     public func listLoraAdapters() throws -> RALoRAState {
         let handle = try getHandle()
-        return try invokeLoRARequest(
-            handle: handle,
-            request: RALoRAState(),
+        return try NativeProtoABI.invoke(
+            RALoRAState(),
+            on: handle,
             symbol: LoRAGeneratedProtoABI.list,
             symbolName: LoRAGeneratedProtoABI.listName,
             responseType: RALoRAState.self
@@ -1096,9 +1096,9 @@ extension CppBridge.LLM {
 
     public func getLoraState() throws -> RALoRAState {
         let handle = try getHandle()
-        return try invokeLoRARequest(
-            handle: handle,
-            request: RALoRAState(),
+        return try NativeProtoABI.invoke(
+            RALoRAState(),
+            on: handle,
             symbol: LoRAGeneratedProtoABI.state,
             symbolName: LoRAGeneratedProtoABI.stateName,
             responseType: RALoRAState.self
@@ -1107,35 +1107,22 @@ extension CppBridge.LLM {
 
     public func checkLoraCompatibility(_ config: RALoRAAdapterConfig) throws -> RALoraCompatibilityResult {
         let handle = try getHandle()
-        return try invokeLoRARequest(
-            handle: handle,
-            request: config,
+        return try NativeProtoABI.invoke(
+            config,
+            on: handle,
             symbol: LoRAGeneratedProtoABI.compatibility,
             symbolName: LoRAGeneratedProtoABI.compatibilityName,
             responseType: RALoraCompatibilityResult.self
         )
     }
-
-    private func invokeLoRARequest<Request: Message, Response: Message>(
-        handle: rac_handle_t,
-        request: Request,
-        symbol: LoRAGeneratedProtoABI.LLMRequest?,
-        symbolName: String,
-        responseType: Response.Type
-    ) throws -> Response {
-        let symbol = try NativeProtoABI.require(symbol, named: symbolName)
-        return try decodeBuffer(responseType: responseType, symbolName: symbolName) { outBuffer in
-            try NativeProtoABI.withSerializedBytes(request) { bytes, size in
-                symbol(handle, bytes, size, outBuffer)
-            }
-        }
-    }
 }
 
 extension CppBridge.LoraRegistry {
     public func register(_ entry: RALoraAdapterCatalogEntry) throws -> RALoraAdapterCatalogEntry {
-        try invokeRegistryRequest(
-            request: entry,
+        let handle = try requireRegistryHandle()
+        return try NativeProtoABI.invoke(
+            entry,
+            on: handle,
             symbol: LoRAGeneratedProtoABI.register,
             symbolName: LoRAGeneratedProtoABI.registerName,
             responseType: RALoraAdapterCatalogEntry.self
@@ -1145,8 +1132,10 @@ extension CppBridge.LoraRegistry {
     public func listCatalog(
         _ request: RALoraAdapterCatalogListRequest
     ) throws -> RALoraAdapterCatalogListResult {
-        try invokeRegistryRequest(
-            request: request,
+        let handle = try requireRegistryHandle()
+        return try NativeProtoABI.invoke(
+            request,
+            on: handle,
             symbol: LoRAGeneratedProtoABI.catalogList,
             symbolName: LoRAGeneratedProtoABI.catalogListName,
             responseType: RALoraAdapterCatalogListResult.self
@@ -1156,8 +1145,10 @@ extension CppBridge.LoraRegistry {
     public func queryCatalog(
         _ query: RALoraAdapterCatalogQuery
     ) throws -> RALoraAdapterCatalogListResult {
-        try invokeRegistryRequest(
-            request: query,
+        let handle = try requireRegistryHandle()
+        return try NativeProtoABI.invoke(
+            query,
+            on: handle,
             symbol: LoRAGeneratedProtoABI.catalogQuery,
             symbolName: LoRAGeneratedProtoABI.catalogQueryName,
             responseType: RALoraAdapterCatalogListResult.self
@@ -1167,8 +1158,10 @@ extension CppBridge.LoraRegistry {
     public func getCatalogEntry(
         _ request: RALoraAdapterCatalogGetRequest
     ) throws -> RALoraAdapterCatalogGetResult {
-        try invokeRegistryRequest(
-            request: request,
+        let handle = try requireRegistryHandle()
+        return try NativeProtoABI.invoke(
+            request,
+            on: handle,
             symbol: LoRAGeneratedProtoABI.catalogGet,
             symbolName: LoRAGeneratedProtoABI.catalogGetName,
             responseType: RALoraAdapterCatalogGetResult.self
@@ -1178,29 +1171,21 @@ extension CppBridge.LoraRegistry {
     public func markDownloadCompleted(
         _ request: RALoraAdapterDownloadCompletedRequest
     ) throws -> RALoraAdapterDownloadCompletedResult {
-        try invokeRegistryRequest(
-            request: request,
+        let handle = try requireRegistryHandle()
+        return try NativeProtoABI.invoke(
+            request,
+            on: handle,
             symbol: LoRAGeneratedProtoABI.catalogMarkDownloadCompleted,
             symbolName: LoRAGeneratedProtoABI.catalogMarkDownloadCompletedName,
             responseType: RALoraAdapterDownloadCompletedResult.self
         )
     }
 
-    private func invokeRegistryRequest<Request: Message, Response: Message>(
-        request: Request,
-        symbol: LoRAGeneratedProtoABI.RegistryRequest?,
-        symbolName: String,
-        responseType: Response.Type
-    ) throws -> Response {
+    private func requireRegistryHandle() throws -> rac_lora_registry_handle_t {
         guard let handle = rac_get_lora_registry() else {
             throw SDKException(code: .initializationFailed, message: "LoRA registry not initialized", category: .internal)
         }
-        let symbol = try NativeProtoABI.require(symbol, named: symbolName)
-        return try decodeBuffer(responseType: responseType, symbolName: symbolName) { outBuffer in
-            try NativeProtoABI.withSerializedBytes(request) { bytes, size in
-                symbol(handle, bytes, size, outBuffer)
-            }
-        }
+        return handle
     }
 }
 

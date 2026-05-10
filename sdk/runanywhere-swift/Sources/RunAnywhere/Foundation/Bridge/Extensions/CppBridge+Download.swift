@@ -78,9 +78,10 @@ extension CppBridge {
 
         public func plan(_ request: RADownloadPlanRequest) -> RADownloadPlanResult {
             do {
-                return try invokeProto(
+                return try NativeProtoABI.invoke(
                     request,
                     symbol: DownloadProtoABI.plan,
+                    symbolName: "rac_download_plan_proto",
                     responseType: RADownloadPlanResult.self
                 )
             } catch {
@@ -94,9 +95,10 @@ extension CppBridge {
 
         public func start(_ request: RADownloadStartRequest) -> RADownloadStartResult {
             do {
-                return try invokeProto(
+                return try NativeProtoABI.invoke(
                     request,
                     symbol: DownloadProtoABI.start,
+                    symbolName: "rac_download_start_proto",
                     responseType: RADownloadStartResult.self
                 )
             } catch {
@@ -110,9 +112,10 @@ extension CppBridge {
 
         public func cancel(_ request: RADownloadCancelRequest) -> RADownloadCancelResult {
             do {
-                return try invokeProto(
+                return try NativeProtoABI.invoke(
                     request,
                     symbol: DownloadProtoABI.cancel,
+                    symbolName: "rac_download_cancel_proto",
                     responseType: RADownloadCancelResult.self
                 )
             } catch {
@@ -127,9 +130,10 @@ extension CppBridge {
 
         public func resume(_ request: RADownloadResumeRequest) -> RADownloadResumeResult {
             do {
-                return try invokeProto(
+                return try NativeProtoABI.invoke(
                     request,
                     symbol: DownloadProtoABI.resume,
+                    symbolName: "rac_download_resume_proto",
                     responseType: RADownloadResumeResult.self
                 )
             } catch {
@@ -144,9 +148,10 @@ extension CppBridge {
 
         public func pollProgress(_ request: RADownloadSubscribeRequest) -> RADownloadProgress {
             do {
-                return try invokeProto(
+                return try NativeProtoABI.invoke(
                     request,
                     symbol: DownloadProtoABI.pollProgress,
+                    symbolName: "rac_download_progress_poll_proto",
                     responseType: RADownloadProgress.self
                 )
             } catch {
@@ -182,27 +187,6 @@ extension CppBridge {
                     Unmanaged<DownloadProtoProgressBox>.fromOpaque(opaque).release()
                 }
             }
-        }
-
-        private func invokeProto<Request: Message, Response: Message>(
-            _ request: Request,
-            symbol: DownloadProtoABI.ProtoFunction?,
-            responseType: Response.Type
-        ) throws -> Response {
-            guard let symbol, NativeProtoABI.canReceiveProtoBuffer else {
-                throw SDKException(code: .notSupported, message: NativeProtoABI.unavailableMessage, category: .internal)
-            }
-
-            var outBuffer = rac_proto_buffer_t()
-            defer { NativeProtoABI.free(&outBuffer) }
-
-            let status = try NativeProtoABI.withSerializedBytes(request) { bytes, size in
-                symbol(bytes, size, &outBuffer)
-            }
-            guard status == RAC_SUCCESS else {
-                throw SDKException(code: .processingFailed, message: "Download proto request failed: \(status)", category: .internal)
-            }
-            return try NativeProtoABI.decode(responseType, from: outBuffer)
         }
     }
 }

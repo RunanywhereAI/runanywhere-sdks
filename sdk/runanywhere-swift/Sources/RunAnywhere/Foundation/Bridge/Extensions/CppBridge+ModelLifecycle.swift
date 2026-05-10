@@ -84,9 +84,10 @@ extension CppBridge {
 
         public static func unload(_ request: RAModelUnloadRequest) -> RAModelUnloadResult {
             do {
-                return try invoke(
+                return try NativeProtoABI.invoke(
                     request,
                     symbol: ModelLifecycleProtoABI.unload,
+                    symbolName: "rac_model_lifecycle_unload_proto",
                     responseType: RAModelUnloadResult.self
                 )
             } catch {
@@ -100,9 +101,10 @@ extension CppBridge {
         public static func currentModel(
             _ request: RACurrentModelRequest
         ) -> RACurrentModelResult {
-            (try? invoke(
+            (try? NativeProtoABI.invoke(
                 request,
                 symbol: ModelLifecycleProtoABI.currentModel,
+                symbolName: "rac_model_lifecycle_current_model_proto",
                 responseType: RACurrentModelResult.self
             )) ?? RACurrentModelResult()
         }
@@ -126,26 +128,6 @@ extension CppBridge {
 
         public static func reset() {
             ModelLifecycleProtoABI.reset?()
-        }
-
-        private static func invoke<Request: Message, Response: Message>(
-            _ request: Request,
-            symbol: ModelLifecycleProtoABI.Request?,
-            responseType: Response.Type
-        ) throws -> Response {
-            guard let symbol, NativeProtoABI.canReceiveProtoBuffer else {
-                throw SDKException(code: .notSupported, message: NativeProtoABI.unavailableMessage, category: .internal)
-            }
-
-            var outBuffer = rac_proto_buffer_t()
-            defer { NativeProtoABI.free(&outBuffer) }
-            let status = try NativeProtoABI.withSerializedBytes(request) { bytes, size in
-                symbol(bytes, size, &outBuffer)
-            }
-            guard status == RAC_SUCCESS else {
-                throw SDKException(code: .processingFailed, message: "Model lifecycle request failed: \(status)", category: .internal)
-            }
-            return try NativeProtoABI.decode(responseType, from: outBuffer)
         }
     }
 }
