@@ -168,16 +168,10 @@ object LlamaCPP : RunAnywhereModule {
         logger.info("LlamaCPP backend unregistered")
     }
 
-    // MARK: - Model Handling
-
-    /**
-     * Check if LlamaCPP can handle a given model.
-     * Uses file extension pattern matching - actual framework info is in C++ registry.
-     */
-    fun canHandle(modelId: String?): Boolean {
-        if (modelId == null) return false
-        return modelId.lowercase().endsWith(".gguf")
-    }
+    // `canHandle(modelId)` deleted per gaps/kotlin.md — mirrors
+    // SWIFT-DUP-CANHANDLE. The C++ plugin router (`rac_router_*`) is the
+    // only routing authority; Kotlin-side file-extension matching was never
+    // called from the dispatch path and could drift from C++ format tables.
 
     // MARK: - Auto-Registration
 

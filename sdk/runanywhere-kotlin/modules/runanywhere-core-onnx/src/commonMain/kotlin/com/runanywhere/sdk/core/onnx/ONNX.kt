@@ -119,38 +119,10 @@ object ONNX : RunAnywhereModule {
         logger.info("ONNX backend unregistered")
     }
 
-    // MARK: - Model Handling
-
-    /**
-     * Check if ONNX can handle a given model for STT.
-     * Uses model name pattern matching - actual framework info is in C++ registry.
-     */
-    fun canHandleSTT(modelId: String?): Boolean {
-        if (modelId == null) return false
-        val lowercased = modelId.lowercase()
-        return lowercased.contains("whisper") ||
-            lowercased.contains("zipformer") ||
-            lowercased.contains("paraformer")
-    }
-
-    /**
-     * Check if ONNX can handle a given model for TTS.
-     * Uses model name pattern matching - actual framework info is in C++ registry.
-     */
-    fun canHandleTTS(modelId: String?): Boolean {
-        if (modelId == null) return false
-        val lowercased = modelId.lowercase()
-        return lowercased.contains("piper") || lowercased.contains("vits")
-    }
-
-    /**
-     * Check if ONNX can handle VAD (always true for Silero VAD).
-     * ONNX Silero VAD is the default VAD implementation.
-     */
-    @Suppress("UNUSED_PARAMETER", "FunctionOnlyReturningConstant")
-    fun canHandleVAD(modelId: String?): Boolean {
-        return true
-    }
+    // `canHandleSTT` / `canHandleTTS` / `canHandleVAD` deleted per
+    // gaps/kotlin.md — mirrors SWIFT-DUP-CANHANDLE. The C++ plugin router
+    // (`rac_router_*` / `rac_plugin_route`) is the only routing authority;
+    // Kotlin-side substring matching was never called from the dispatch path.
 
     // MARK: - Auto-Registration
 
