@@ -1,7 +1,5 @@
 package com.runanywhere.runanywhereai.presentation.benchmarks.services
 
-import ai.runanywhere.proto.v1.LLMGenerationOptions
-import ai.runanywhere.proto.v1.ModelInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkCategory
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkDeviceInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkMetrics
@@ -11,6 +9,8 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.unloadLLMModel
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.withContext
@@ -32,7 +32,7 @@ class LLMBenchmarkProvider : BenchmarkScenarioProvider {
 
     override suspend fun execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo,
+        model: RAModelInfo,
         deviceInfo: BenchmarkDeviceInfo,
     ): BenchmarkMetrics {
         val maxTokens = tokenCount(scenario)
@@ -47,7 +47,7 @@ class LLMBenchmarkProvider : BenchmarkScenarioProvider {
             // v2 close-out Phase G-2: generateStream returns Flow<LLMStreamEvent>;
             // compute TTFT + tokens/sec from the event sequence directly.
             val warmupStart = System.nanoTime()
-            val warmupOptions = LLMGenerationOptions(max_tokens = 5, temperature = 0.0f)
+            val warmupOptions = RALLMGenerationOptions(max_tokens = 5, temperature = 0.0f)
             // B-AK-20-003 — takeWhile closes the Flow on is_final; timeout guards a missing terminal event.
             withTimeoutOrNull(10_000L) {
                 RunAnywhere.generateStream("Hello", warmupOptions)
@@ -60,7 +60,7 @@ class LLMBenchmarkProvider : BenchmarkScenarioProvider {
 
             // Benchmark
             val benchStart = System.nanoTime()
-            val options = LLMGenerationOptions(max_tokens = maxTokens, temperature = 0.0f)
+            val options = RALLMGenerationOptions(max_tokens = maxTokens, temperature = 0.0f)
             val prompt = "Explain the concept of machine learning in detail."
 
             var tokenCount = 0

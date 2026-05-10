@@ -17,6 +17,7 @@ import ai.runanywhere.proto.v1.StructuredOutputValidationRequest
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.types.RAStructuredOutputResult
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
@@ -39,7 +40,7 @@ object CppBridgeStructuredOutput {
             "racStructuredOutputValidateProto",
         )
 
-    fun parse(request: StructuredOutputParseRequest): StructuredOutputResult =
+    fun parse(request: StructuredOutputParseRequest): RAStructuredOutputResult =
         decodeOrThrow(
             StructuredOutputResult.ADAPTER,
             RunAnywhereBridge.racStructuredOutputParseProto(

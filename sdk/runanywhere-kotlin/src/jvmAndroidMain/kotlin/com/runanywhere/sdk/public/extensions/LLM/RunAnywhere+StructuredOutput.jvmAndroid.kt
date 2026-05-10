@@ -9,15 +9,11 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.JSONSchema
-import ai.runanywhere.proto.v1.LLMGenerationOptions
-import ai.runanywhere.proto.v1.LLMGenerationResult
 import ai.runanywhere.proto.v1.StructuredOutputMode
 import ai.runanywhere.proto.v1.StructuredOutputOptions
 import ai.runanywhere.proto.v1.StructuredOutputParseRequest
 import ai.runanywhere.proto.v1.StructuredOutputPromptResult
 import ai.runanywhere.proto.v1.StructuredOutputRequest
-import ai.runanywhere.proto.v1.StructuredOutputResult
 import ai.runanywhere.proto.v1.StructuredOutputStreamEvent
 import ai.runanywhere.proto.v1.StructuredOutputStreamEventKind
 import ai.runanywhere.proto.v1.StructuredOutputValidation
@@ -25,6 +21,11 @@ import ai.runanywhere.proto.v1.StructuredOutputValidationRequest
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStructuredOutput
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RAJSONSchema
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RALLMGenerationResult
+import com.runanywhere.sdk.public.types.RAStructuredOutputResult
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -32,13 +33,12 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.UUID
 
 actual suspend fun RunAnywhere.generateStructured(
     prompt: String,
-    schema: JSONSchema,
-    options: LLMGenerationOptions?,
-): StructuredOutputResult {
+    schema: RAJSONSchema,
+    options: RALLMGenerationOptions?,
+): RAStructuredOutputResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
 
     val (generationPrompt, _, effectiveOptions) =
@@ -50,11 +50,11 @@ actual suspend fun RunAnywhere.generateStructured(
 actual suspend fun RunAnywhere.generateWithStructuredOutput(
     prompt: String,
     structuredOutput: StructuredOutputOptions,
-    options: LLMGenerationOptions?,
-): LLMGenerationResult {
+    options: RALLMGenerationOptions?,
+): RALLMGenerationResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
 
-    val baseOptions = options ?: LLMGenerationOptions()
+    val baseOptions = options ?: RALLMGenerationOptions()
     val schemaJson =
         structuredOutput.json_schema?.takeIf { it.isNotBlank() }
             ?: structuredOutput.schema?.jsonSchemaString
@@ -88,8 +88,8 @@ actual suspend fun RunAnywhere.generateWithStructuredOutput(
 
 actual suspend fun RunAnywhere.extractStructuredOutput(
     text: String,
-    schema: JSONSchema,
-): StructuredOutputResult {
+    schema: RAJSONSchema,
+): RAStructuredOutputResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     val request =
         StructuredOutputParseRequest(
@@ -104,8 +104,8 @@ actual suspend fun RunAnywhere.extractStructuredOutput(
 
 actual fun RunAnywhere.generateStructuredStream(
     prompt: String,
-    schema: JSONSchema,
-    options: LLMGenerationOptions?,
+    schema: RAJSONSchema,
+    options: RALLMGenerationOptions?,
 ): Flow<StructuredOutputStreamEvent> {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
 
@@ -169,13 +169,13 @@ actual suspend fun RunAnywhere.validateStructuredOutput(
 private data class StructuredGenerationPlan(
     val prompt: String,
     val structuredOptions: StructuredOutputOptions,
-    val llmOptions: LLMGenerationOptions,
+    val llmOptions: RALLMGenerationOptions,
 )
 
 private suspend fun RunAnywhere.prepareGeneration(
     prompt: String,
-    schema: JSONSchema,
-    options: LLMGenerationOptions?,
+    schema: RAJSONSchema,
+    options: RALLMGenerationOptions?,
     streaming: Boolean,
     requestId: String = UUID.randomUUID().toString(),
 ): StructuredGenerationPlan {
@@ -204,7 +204,7 @@ private suspend fun RunAnywhere.prepareGeneration(
         initialStructuredOptions.copy(
             json_schema = promptResult.json_schema ?: initialStructuredOptions.json_schema,
         )
-    val baseOptions = options ?: LLMGenerationOptions()
+    val baseOptions = options ?: RALLMGenerationOptions()
     val llmOptions =
         baseOptions.copy(
             max_tokens = baseOptions.max_tokens.takeIf { it > 0 } ?: 1500,

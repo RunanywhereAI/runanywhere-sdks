@@ -30,7 +30,7 @@ public extension RunAnywhere {
         options: RALLMGenerationOptions? = nil
     ) async throws -> RAStructuredOutputResult {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
         let structuredOptions = RAStructuredOutputOptions.defaults(schema: schema)
@@ -188,11 +188,12 @@ public extension RunAnywhere {
         _ result: RAStructuredOutputPromptResult
     ) throws {
         guard result.errorCode == 0 else {
-            throw SDKException.general(
-                .processingFailed,
-                result.hasErrorMessage && !result.errorMessage.isEmpty
+            throw SDKException(
+                code: .processingFailed,
+                message: result.hasErrorMessage && !result.errorMessage.isEmpty
                     ? result.errorMessage
-                    : "Structured output prompt preparation failed: \(result.errorCode)"
+                    : "Structured output prompt preparation failed: \(result.errorCode)",
+                category: .internal
             )
         }
     }

@@ -27,14 +27,15 @@ package com.runanywhere.sdk.adapters
 // physically under src/commonMain/.../com/runanywhere/sdk/generated/
 // but their `package` declaration matches the proto java_package).
 import ai.runanywhere.proto.v1.VoiceEvent
+import com.runanywhere.sdk.public.types.RAVoiceEvent
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.SendChannel
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Streams [VoiceEvent]s from a C++ voice agent handle.
@@ -66,10 +67,10 @@ class VoiceAgentStreamAdapter internal constructor(
      * handle share a single C callback registration and each receives the
      * full decoded event sequence.
      */
-    fun stream(): Flow<VoiceEvent> =
-        callbackFlow<VoiceEvent> {
+    fun stream(): Flow<RAVoiceEvent> =
+        callbackFlow<RAVoiceEvent> {
             val fanOut = fanOutFor(handle, bridge)
-            val channel: SendChannel<VoiceEvent> = channel
+            val channel: SendChannel<RAVoiceEvent> = channel
             val added = fanOut.attach(channel)
             if (!added) {
                 close(
@@ -111,7 +112,7 @@ class VoiceAgentStreamAdapter internal constructor(
         private val onTornDown: () -> Unit,
     ) {
         private val lock = Any()
-        private val collectors = CopyOnWriteArrayList<SendChannel<VoiceEvent>>()
+        private val collectors = CopyOnWriteArrayList<SendChannel<RAVoiceEvent>>()
 
         @Volatile
         private var callbackId: Long = INVALID_CALLBACK_ID
@@ -122,7 +123,7 @@ class VoiceAgentStreamAdapter internal constructor(
          * subscriber AND the C-side registration failed, so the caller
          * can propagate the error to its own flow.
          */
-        fun attach(channel: SendChannel<VoiceEvent>): Boolean {
+        fun attach(channel: SendChannel<RAVoiceEvent>): Boolean {
             synchronized(lock) {
                 if (collectors.isEmpty()) {
                     val id = bridge.registerCallback(handle) { bytes -> broadcast(bytes) }
@@ -134,7 +135,7 @@ class VoiceAgentStreamAdapter internal constructor(
             }
         }
 
-        fun detach(channel: SendChannel<VoiceEvent>) {
+        fun detach(channel: SendChannel<RAVoiceEvent>) {
             synchronized(lock) {
                 collectors.remove(channel)
                 if (collectors.isEmpty() && callbackId != INVALID_CALLBACK_ID) {

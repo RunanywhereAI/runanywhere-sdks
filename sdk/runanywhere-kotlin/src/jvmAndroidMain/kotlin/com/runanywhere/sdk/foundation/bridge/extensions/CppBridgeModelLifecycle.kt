@@ -14,6 +14,8 @@ import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.ModelUnloadResult
 import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RAModelLoadResult
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
@@ -41,7 +43,7 @@ private fun <M : Message<M, *>> decodeOrNull(
  * Mirrors iOS [CppBridge+ModelLifecycle.swift](../../../../../../../../../../../../sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+ModelLifecycle.swift).
  */
 object CppBridgeModelLifecycle {
-    fun load(request: ModelLoadRequest): ModelLoadResult? =
+    fun load(request: RAModelLoadRequest): RAModelLoadResult? =
         decodeOrNull(
             ModelLoadResult.ADAPTER,
             RunAnywhereBridge.racModelLifecycleLoadProto(ModelLoadRequest.ADAPTER.encode(request)),

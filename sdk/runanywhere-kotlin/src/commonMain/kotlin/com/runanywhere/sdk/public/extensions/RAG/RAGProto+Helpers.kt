@@ -16,9 +16,11 @@ import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
-import ai.runanywhere.proto.v1.RAGStatistics
-import ai.runanywhere.proto.v1.ModelLoadResult
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.public.types.RAModelLoadResult
+import com.runanywhere.sdk.public.types.RARAGConfiguration
+import com.runanywhere.sdk.public.types.RARAGDocument
+import com.runanywhere.sdk.public.types.RARAGStatistics
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -34,8 +36,8 @@ import kotlinx.serialization.json.contentOrNull
 fun RAGConfiguration.Companion.defaults(
     embeddingModelId: String = "",
     llmModelId: String = "",
-): RAGConfiguration =
-    RAGConfiguration(
+): RARAGConfiguration =
+    RARAGConfiguration(
         embedding_model_id = embeddingModelId,
         llm_model_id = llmModelId,
         embedding_dimension = 384,
@@ -54,7 +56,7 @@ fun RAGConfiguration.Companion.defaults(
  *
  * @throws SDKException if any constraint is violated.
  */
-fun RAGConfiguration.validate() {
+fun RARAGConfiguration.validate() {
     if (top_k <= 0) {
         throw SDKException.invalidArgument("topK must be > 0 (got $top_k)")
     }
@@ -82,10 +84,10 @@ fun RAGConfiguration.validate() {
  * (which guarantees the models are registered) before the native create
  * runs.
  */
-fun RAGConfiguration.resolvingLifecycleArtifacts(
-    embedding: ModelLoadResult,
-    llm: ModelLoadResult,
-): RAGConfiguration =
+fun RARAGConfiguration.resolvingLifecycleArtifacts(
+    embedding: RAModelLoadResult,
+    llm: RAModelLoadResult,
+): RARAGConfiguration =
     copy(
         embedding_model_id = embedding.model_id,
         llm_model_id = llm.model_id,
@@ -106,8 +108,8 @@ fun RAGConfiguration.resolvingLifecycleArtifacts(
 fun RAGDocument.Companion.create(
     text: String,
     metadataJSON: String? = null,
-): RAGDocument =
-    RAGDocument(text = text, metadata = decodeMetadataJSON(metadataJSON))
+): RARAGDocument =
+    RARAGDocument(text = text, metadata = decodeMetadataJSON(metadataJSON))
 
 /**
  * Acronym-preserving alias matching the Swift `metadataJSON` accessor on
@@ -117,7 +119,7 @@ fun RAGDocument.Companion.create(
  * (where the original proto field name `metadata_json` is camel-cased to
  * `metadataJSON`).
  */
-val RAGDocument.metadataJSON: String?
+val RARAGDocument.metadataJSON: String?
     get() {
         if (metadata.isEmpty()) return null
         // Encode the typed map as a JSON object so callers expecting the
@@ -201,7 +203,7 @@ val RAGResult.generationTime: Double
  * here — consumers can convert this to `kotlinx.datetime.Instant` or
  * `java.util.Date` themselves if needed.
  */
-val RAGStatistics.lastUpdated: Long?
+val RARAGStatistics.lastUpdated: Long?
     get() = last_updated_ms.takeIf { it > 0L }
 
 // D-6: `mergingRAGConfig` and the JSONSerialization-backed embedding-config

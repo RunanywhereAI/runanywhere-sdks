@@ -23,14 +23,7 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.ComponentLifecycleState
-import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.SDKComponent
-import ai.runanywhere.proto.v1.STTOptions
-import ai.runanywhere.proto.v1.STTOutput
-import ai.runanywhere.proto.v1.TTSOptions
-import ai.runanywhere.proto.v1.TTSOutput
-import ai.runanywhere.proto.v1.VoiceAgentComponentStates
-import ai.runanywhere.proto.v1.VoiceAgentComposeConfig
 import ai.runanywhere.proto.v1.VoiceAgentConfig
 import ai.runanywhere.proto.v1.VoiceAgentResult
 import ai.runanywhere.proto.v1.VoiceAgentTurnRequest
@@ -42,6 +35,13 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RASTTOptions
+import com.runanywhere.sdk.public.types.RATTSOptions
+import com.runanywhere.sdk.public.types.RATTSOutput
+import com.runanywhere.sdk.public.types.RATranscriptionResult
+import com.runanywhere.sdk.public.types.RAVoiceAgentComponentStates
+import com.runanywhere.sdk.public.types.RAVoiceAgentComposeConfig
 // v3.1: VoiceSessionEvent / Flow / flow imports removed — the actual declarations using them
 // (processVoice / startVoiceSession / streamVoiceSession) were deleted.
 
@@ -76,7 +76,7 @@ actual suspend fun RunAnywhere.initializeVoiceAgent(config: VoiceAgentConfig) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     voiceAgentInitialized = false
     val composeConfig =
-        VoiceAgentComposeConfig(
+        RAVoiceAgentComposeConfig(
             stt_model_id = config.stt_model_id.takeIf { it.isNotBlank() },
             llm_model_id = config.llm_model_id.takeIf { it.isNotBlank() },
             tts_voice_id = config.tts_model_id.takeIf { it.isNotBlank() },
@@ -91,7 +91,7 @@ actual suspend fun RunAnywhere.initializeVoiceAgent(config: VoiceAgentConfig) {
     voiceAgentLogger.info("Voice agent initialized from VoiceAgentConfig: ready=${states.ready}")
 }
 
-actual suspend fun RunAnywhere.getVoiceAgentComponentStates(): VoiceAgentComponentStates {
+actual suspend fun RunAnywhere.getVoiceAgentComponentStates(): RAVoiceAgentComponentStates {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     return CppBridgeVoiceAgent.states(CppBridgeVoiceAgent.getRawHandle())
 }
@@ -234,20 +234,20 @@ actual suspend fun RunAnywhere.processVoiceTurn(
     )
 }
 
-actual suspend fun RunAnywhere.voiceAgentTranscribe(audioData: ByteArray): STTOutput {
+actual suspend fun RunAnywhere.voiceAgentTranscribe(audioData: ByteArray): RATranscriptionResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    return transcribe(audioData, STTOptions())
+    return transcribe(audioData, RASTTOptions())
 }
 
 actual suspend fun RunAnywhere.voiceAgentGenerateResponse(prompt: String): String {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    val result = generate(prompt, LLMGenerationOptions(system_prompt = currentSystemPrompt))
+    val result = generate(prompt, RALLMGenerationOptions(system_prompt = currentSystemPrompt))
     return result.text
 }
 
-actual suspend fun RunAnywhere.voiceAgentSynthesizeSpeech(text: String): TTSOutput {
+actual suspend fun RunAnywhere.voiceAgentSynthesizeSpeech(text: String): RATTSOutput {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    return synthesize(text, TTSOptions())
+    return synthesize(text, RATTSOptions())
 }
 
 actual suspend fun RunAnywhere.cleanupVoiceAgent() {

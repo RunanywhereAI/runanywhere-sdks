@@ -195,7 +195,7 @@ struct AddModelFromURLView: View {
         do {
             let result = try await RunAnywhere.importModel(request)
             guard result.success, result.hasModel else {
-                throw SDKException.general(.unknown, result.warnings.joined(separator: "; "))
+                throw SDKException(code: .unknown, message: result.warnings.joined(separator: "; "), category: .internal)
             }
             await MainActor.run {
                 onModelAdded(result.model)

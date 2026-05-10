@@ -133,33 +133,54 @@ public extension RunAnywhere {
             let suffix = " (pluginLoader.\(op): \(context))"
             switch rc {
             case RAC_ERROR_NULL_POINTER:
-                throw SDKException.runtime(.invalidConfiguration, "Null path/name" + suffix)
+                throw SDKException(code: .invalidConfiguration, message: "Null path/name" + suffix, category: .internal)
             case RAC_ERROR_PLUGIN_LOAD_FAILED:
-                throw SDKException.runtime(.invalidConfiguration,
-                                           "dlopen / dlsym failed" + suffix)
+                throw SDKException(
+                    code: .invalidConfiguration,
+                    message: "dlopen / dlsym failed" + suffix,
+                    category: .internal
+                )
             case RAC_ERROR_ABI_VERSION_MISMATCH:
-                throw SDKException.runtime(.invalidModelFormat,
-                                           "Plugin built against a different RAC_PLUGIN_API_VERSION " +
-                                           "(host = \(apiVersion))" + suffix)
+                throw SDKException(
+                    code: .invalidModelFormat,
+                    message: "Plugin built against a different RAC_PLUGIN_API_VERSION " +
+                                           "(host = \(apiVersion))" + suffix,
+                    category: .internal
+                )
             case RAC_ERROR_CAPABILITY_UNSUPPORTED:
-                throw SDKException.runtime(.unsupportedModality,
-                                           "Plugin capability_check() declined" + suffix)
+                throw SDKException(
+                    code: .unsupportedModality,
+                    message: "Plugin capability_check() declined" + suffix,
+                    category: .internal
+                )
             case RAC_ERROR_PLUGIN_DUPLICATE:
-                throw SDKException.runtime(.alreadyInitialized,
-                                           "Plugin name already registered with higher priority" + suffix)
+                throw SDKException(
+                    code: .alreadyInitialized,
+                    message: "Plugin name already registered with higher priority" + suffix,
+                    category: .internal
+                )
             case RAC_ERROR_FEATURE_NOT_AVAILABLE:
-                throw SDKException.runtime(.featureNotAvailable,
-                                           "Dynamic plugin loading not available — host built with " +
+                throw SDKException(
+                    code: .featureNotAvailable,
+                    message: "Dynamic plugin loading not available — host built with " +
                                            "RAC_STATIC_PLUGINS=ON (typically iOS / WASM). Bundle the " +
-                                           "engine at compile time instead." + suffix)
+                                           "engine at compile time instead." + suffix,
+                    category: .internal
+                )
             case RAC_ERROR_NOT_FOUND:
-                throw SDKException.runtime(.modelNotFound, "Plugin not registered" + suffix)
+                throw SDKException(code: .modelNotFound, message: "Plugin not registered" + suffix, category: .internal)
             case RAC_ERROR_PLUGIN_BUSY:
-                throw SDKException.runtime(.notImplemented,
-                                           "Plugin held by an active session" + suffix)
+                throw SDKException(
+                    code: .notImplemented,
+                    message: "Plugin held by an active session" + suffix,
+                    category: .internal
+                )
             default:
-                throw SDKException.runtime(.unknown,
-                                           "rac_registry_\(op)_plugin returned \(rc)" + suffix)
+                throw SDKException(
+                    code: .unknown,
+                    message: "rac_registry_\(op)_plugin returned \(rc)" + suffix,
+                    category: .internal
+                )
             }
         }
     }

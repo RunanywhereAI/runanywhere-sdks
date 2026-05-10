@@ -15,12 +15,14 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.ModelLoadRequest
 import ai.runanywhere.proto.v1.VoiceAgentComponentStates
 import ai.runanywhere.proto.v1.VoiceAgentComposeConfig
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RAVoiceAgentComponentStates
+import com.runanywhere.sdk.public.types.RAVoiceAgentComposeConfig
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 import java.util.concurrent.atomic.AtomicLong
@@ -127,7 +129,7 @@ object CppBridgeVoiceAgent {
             return
         }
         val request =
-            ModelLoadRequest(
+            RAModelLoadRequest(
                 model_id = "silero-vad",
                 category = ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
                 framework = vad.framework,
@@ -162,7 +164,7 @@ object CppBridgeVoiceAgent {
         }
     }
 
-    fun initialize(handle: Long, config: VoiceAgentComposeConfig): VoiceAgentComponentStates =
+    fun initialize(handle: Long, config: RAVoiceAgentComposeConfig): RAVoiceAgentComponentStates =
         decodeOrThrow(
             VoiceAgentComponentStates.ADAPTER,
             RunAnywhereBridge.racVoiceAgentInitializeProto(
@@ -172,7 +174,7 @@ object CppBridgeVoiceAgent {
             "racVoiceAgentInitializeProto",
         )
 
-    fun states(handle: Long): VoiceAgentComponentStates =
+    fun states(handle: Long): RAVoiceAgentComponentStates =
         decodeOrThrow(
             VoiceAgentComponentStates.ADAPTER,
             RunAnywhereBridge.racVoiceAgentComponentStatesProto(handle),

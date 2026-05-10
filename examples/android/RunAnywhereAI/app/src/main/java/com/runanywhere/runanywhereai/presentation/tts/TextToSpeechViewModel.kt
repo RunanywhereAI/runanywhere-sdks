@@ -3,7 +3,6 @@ package com.runanywhere.runanywhereai.presentation.tts
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_TTS
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelEventKind
-import ai.runanywhere.proto.v1.TTSOptions
 import android.app.Application
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -21,6 +20,10 @@ import com.runanywhere.sdk.public.extensions.isTTSVoiceLoaded
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
 import com.runanywhere.sdk.public.extensions.stopSynthesis
 import com.runanywhere.sdk.public.extensions.synthesize
+import com.runanywhere.sdk.public.types.RATTSOptions
+import java.util.Locale
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,9 +36,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import java.util.Locale
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
 private const val SYSTEM_TTS_MODEL_ID = "system-tts"
 
@@ -365,7 +365,7 @@ class TextToSpeechViewModel(
 
                 // Create TTS options with current settings (proto-canonical)
                 val options =
-                    TTSOptions(
+                    RATTSOptions(
                         voice = _uiState.value.selectedModelId ?: "",
                         language_code = "en-US",
                         speaking_rate = _uiState.value.speed,
@@ -629,7 +629,7 @@ class TextToSpeechViewModel(
 
     private suspend fun speakSystemTts(
         text: String,
-        options: TTSOptions,
+        options: RATTSOptions,
     ) {
         val ready = ensureSystemTtsReady()
         if (!ready) {

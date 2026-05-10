@@ -9,6 +9,7 @@ import ai.runanywhere.proto.v1.EmbeddingsRequest
 import ai.runanywhere.proto.v1.EmbeddingsResult
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.types.RAEmbeddingsResult
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 import java.util.concurrent.ConcurrentHashMap
@@ -16,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap
 object CppBridgeEmbeddings {
     private val handles = ConcurrentHashMap<String, Long>()
 
-    fun embed(request: EmbeddingsRequest, modelId: String): EmbeddingsResult {
+    fun embed(request: EmbeddingsRequest, modelId: String): RAEmbeddingsResult {
         val handle =
             handles.computeIfAbsent(modelId) {
                 RunAnywhereBridge.racEmbeddingsCreate(it).also { created ->

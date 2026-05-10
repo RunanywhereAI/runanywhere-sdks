@@ -1,7 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.benchmarks.models
 
 import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.ModelInfo
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.ChatBubble
@@ -9,9 +8,10 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.runanywhere.sdk.public.extensions.Models.displayName
+import com.runanywhere.sdk.public.types.RAModelInfo
+import java.util.UUID
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import java.util.UUID
 
 // -- Benchmark Category --
 
@@ -95,7 +95,7 @@ data class ComponentModelInfo(
     val category: String,
 ) {
     companion object {
-        fun from(model: ModelInfo): ComponentModelInfo =
+        fun from(model: RAModelInfo): ComponentModelInfo =
             ComponentModelInfo(
                 id = model.id,
                 name = model.name,

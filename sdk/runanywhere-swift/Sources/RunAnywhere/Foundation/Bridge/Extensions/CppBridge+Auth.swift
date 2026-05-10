@@ -28,9 +28,10 @@ extension CppBridge {
         public static func authenticate(apiKey: String) async throws {
             guard CppBridge.DevConfig.isUsableCredential(apiKey),
                   await CppBridge.HTTP.hasUsableConfiguration else {
-                throw SDKException.general(
-                    .invalidConfiguration,
-                    "Authentication skipped: no usable external config"
+                throw SDKException(
+                    code: .invalidConfiguration,
+                    message: "Authentication skipped: no usable external config",
+                    category: .internal
                 )
             }
 
@@ -43,7 +44,7 @@ extension CppBridge {
                 platform: SDKConstants.platform,
                 sdkVersion: SDKConstants.version
             ) else {
-                throw SDKException.general(.validationFailed, "Failed to build auth request")
+                throw SDKException(code: .validationFailed, message: "Failed to build auth request", category: .internal)
             }
 
             logger.info("Starting authentication...")
@@ -70,16 +71,17 @@ extension CppBridge {
         /// - Throws: SDKException on failure
         public static func refreshToken() async throws {
             guard await CppBridge.HTTP.hasUsableConfiguration else {
-                throw SDKException.general(
-                    .invalidConfiguration,
-                    "Token refresh skipped: no usable external config"
+                throw SDKException(
+                    code: .invalidConfiguration,
+                    message: "Token refresh skipped: no usable external config",
+                    category: .internal
                 )
             }
 
             // 1. Build refresh request JSON via C++ (reads refresh_token
             //    and device_id from C++ auth state).
             guard let jsonPtr = rac_auth_build_refresh_request() else {
-                throw SDKException.authentication(.invalidApiKey, "No refresh token")
+                throw SDKException(code: .invalidApiKey, message: "No refresh token", category: .auth)
             }
             let json = String(cString: jsonPtr)
             free(jsonPtr)
@@ -139,9 +141,10 @@ extension CppBridge {
             }
 
             guard status == 0 else {
-                throw SDKException.authentication(
-                    .authenticationFailed,
-                    "Failed to parse auth response (status=\(status))"
+                throw SDKException(
+                    code: .authenticationFailed,
+                    message: "Failed to parse auth response (status=\(status))",
+                    category: .auth
                 )
             }
             logger.info("\(successMessage)")
@@ -250,21 +253,21 @@ extension CppBridge {
             // Map status code to SDKException category
             switch statusCode {
             case 401:
-                return SDKException.network(.unauthorized, message)
+                return SDKException(code: .unauthorized, message: message, category: .network)
             case 403:
-                return SDKException.network(.forbidden, message)
+                return SDKException(code: .forbidden, message: message, category: .network)
             case 404:
-                return SDKException.network(.invalidResponse, message)
+                return SDKException(code: .invalidResponse, message: message, category: .network)
             case 408, 504:
-                return SDKException.network(.timeout, message)
+                return SDKException(code: .timeout, message: message, category: .network)
             case 422:
-                return SDKException.network(.validationFailed, message)
+                return SDKException(code: .validationFailed, message: message, category: .network)
             case 400..<500:
-                return SDKException.network(.httpError, "Client error \(statusCode): \(message)")
+                return SDKException(code: .httpError, message: "Client error \(statusCode): \(message)", category: .network)
             case 500..<600:
-                return SDKException.network(.serverError, "Server error \(statusCode): \(message)")
+                return SDKException(code: .serverError, message: "Server error \(statusCode): \(message)", category: .network)
             default:
-                return SDKException.network(.unknown, "\(message) (status: \(statusCode))")
+                return SDKException(code: .unknown, message: "\(message) (status: \(statusCode))", category: .network)
             }
         }
     }

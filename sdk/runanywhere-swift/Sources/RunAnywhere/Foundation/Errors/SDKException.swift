@@ -8,7 +8,7 @@
 //
 //  Usage:
 //      throw SDKException.modelNotFound("whisper-base")
-//      throw SDKException.stt(.notInitialized, "STT model not loaded")
+//      throw SDKException(code: .notInitialized, message: "STT model not loaded", category: .component)
 //      do { ... } catch let ex as SDKException { print(ex.proto.message) }
 //
 
@@ -153,160 +153,6 @@ extension SDKException {
     }
 }
 
-// MARK: - Category-specific factories
-//
-// These mirror the legacy SDKError surface so callers like
-// `SDKException.stt(.notInitialized, "msg")` continue to read naturally.
-// Internally each one routes to `make(code:message:category:...)` with the
-// proto's 9-bucket category enum.
-
-extension SDKException {
-
-    /// Generic / general SDK error.
-    public static func general(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .internal, underlying: underlying)
-    }
-
-    /// Speech-to-Text component error.
-    public static func stt(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .component, underlying: underlying)
-    }
-
-    /// Text-to-Speech component error.
-    public static func tts(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .component, underlying: underlying)
-    }
-
-    /// LLM component error.
-    public static func llm(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .component, underlying: underlying)
-    }
-
-    /// VAD component error.
-    public static func vad(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .component, underlying: underlying)
-    }
-
-    /// VLM component error.
-    public static func vlm(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .component, underlying: underlying)
-    }
-
-    /// Speaker diarization component error.
-    public static func speakerDiarization(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .component, underlying: underlying)
-    }
-
-    /// Wake-word component error.
-    public static func wakeWord(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .component, underlying: underlying)
-    }
-
-    /// Voice agent component error.
-    public static func voiceAgent(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .component, underlying: underlying)
-    }
-
-    /// RAG component error.
-    public static func rag(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .component, underlying: underlying)
-    }
-
-    /// Download / model-management error.
-    public static func download(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .network, underlying: underlying)
-    }
-
-    /// File management error.
-    public static func fileManagement(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .io, underlying: underlying)
-    }
-
-    /// Network error.
-    public static func network(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .network, underlying: underlying)
-    }
-
-    /// Authentication error.
-    public static func authentication(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .auth, underlying: underlying)
-    }
-
-    /// Security error.
-    public static func security(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .auth, underlying: underlying)
-    }
-
-    /// Runtime error.
-    public static func runtime(
-        _ code: RAErrorCode,
-        _ message: String,
-        underlying: (any Error)? = nil
-    ) -> SDKException {
-        make(code: code, message: message, category: .internal, underlying: underlying)
-    }
-}
-
 // MARK: - Common shortcuts
 
 extension SDKException {
@@ -406,32 +252,47 @@ extension SDKException {
 extension SDKException {
     /// Map an ONNX Runtime C error code into an SDKException.
     public static func fromONNXCode(_ code: Int32) -> SDKException {
+        let raCode: RAErrorCode
+        let message: String
         switch code {
         case 0:
-            return runtime(.unknown, "Unexpected success code passed to error handler")
+            raCode = .unknown
+            message = "Unexpected success code passed to error handler"
         case -1:
-            return runtime(.initializationFailed, "ONNX Runtime initialization failed")
+            raCode = .initializationFailed
+            message = "ONNX Runtime initialization failed"
         case -2:
-            return runtime(.modelLoadFailed, "Failed to load ONNX model")
+            raCode = .modelLoadFailed
+            message = "Failed to load ONNX model"
         case -3:
-            return runtime(.generationFailed, "ONNX inference failed")
+            raCode = .generationFailed
+            message = "ONNX inference failed"
         case -4:
-            return runtime(.invalidState, "Invalid ONNX handle")
+            raCode = .invalidState
+            message = "Invalid ONNX handle"
         case -5:
-            return runtime(.invalidInput, "Invalid ONNX parameters")
+            raCode = .invalidInput
+            message = "Invalid ONNX parameters"
         case -6:
-            return runtime(.insufficientMemory, "ONNX Runtime out of memory")
+            raCode = .insufficientMemory
+            message = "ONNX Runtime out of memory"
         case -7:
-            return runtime(.notImplemented, "ONNX feature not implemented")
+            raCode = .notImplemented
+            message = "ONNX feature not implemented"
         case -8:
-            return runtime(.cancelled, "ONNX operation cancelled")
+            raCode = .cancelled
+            message = "ONNX operation cancelled"
         case -9:
-            return runtime(.timeout, "ONNX operation timed out")
+            raCode = .timeout
+            message = "ONNX operation timed out"
         case -10:
-            return runtime(.storageError, "ONNX IO error")
+            raCode = .storageError
+            message = "ONNX IO error"
         default:
-            return runtime(.unknown, "ONNX error code: \(code)")
+            raCode = .unknown
+            message = "ONNX error code: \(code)"
         }
+        return make(code: raCode, message: message, category: .internal)
     }
 }
 

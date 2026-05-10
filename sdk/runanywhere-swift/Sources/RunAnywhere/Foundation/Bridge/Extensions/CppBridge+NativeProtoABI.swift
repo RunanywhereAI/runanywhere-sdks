@@ -41,7 +41,7 @@ enum NativeProtoABI {
 
     static func require<T>(_ symbol: T?, named symbolName: String) throws -> T {
         guard let symbol, canReceiveProtoBuffer else {
-            throw SDKException.general(.notSupported, missingSymbolMessage(symbolName))
+            throw SDKException(code: .notSupported, message: missingSymbolMessage(symbolName), category: .internal)
         }
         return symbol
     }
@@ -65,7 +65,7 @@ enum NativeProtoABI {
     ) throws -> Response {
         guard buffer.status == RAC_SUCCESS else {
             let message = buffer.error_message.map { String(cString: $0) } ?? unavailableMessage
-            throw SDKException.general(.processingFailed, message)
+            throw SDKException(code: .processingFailed, message: message, category: .internal)
         }
         guard let data = buffer.data, buffer.size > 0 else {
             return responseType.init()
@@ -92,7 +92,7 @@ enum NativeProtoABI {
         guard status == RAC_SUCCESS else {
             let message = outBuffer.error_message.map { String(cString: $0) }
                 ?? "Native proto request failed: \(symbolName) rc=\(status)"
-            throw SDKException.general(.processingFailed, message)
+            throw SDKException(code: .processingFailed, message: message, category: .internal)
         }
         return try decode(responseType, from: outBuffer)
     }

@@ -1,7 +1,5 @@
 package com.runanywhere.runanywhereai.presentation.benchmarks.services
 
-import ai.runanywhere.proto.v1.ModelInfo
-import ai.runanywhere.proto.v1.TTSOptions
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkCategory
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkDeviceInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkMetrics
@@ -11,6 +9,8 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
 import com.runanywhere.sdk.public.extensions.synthesize
 import com.runanywhere.sdk.public.extensions.unloadTTSVoice
+import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RATTSOptions
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
@@ -29,7 +29,7 @@ class TTSBenchmarkProvider : BenchmarkScenarioProvider {
 
     override suspend fun execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo,
+        model: RAModelInfo,
         deviceInfo: BenchmarkDeviceInfo,
     ): BenchmarkMetrics {
         val text =
@@ -49,7 +49,7 @@ class TTSBenchmarkProvider : BenchmarkScenarioProvider {
         try {
             // Synthesize (not speak)
             val benchStart = System.nanoTime()
-            val options = TTSOptions()
+            val options = RATTSOptions()
             val result = RunAnywhere.synthesize(text, options)
             val endToEndMs = (System.nanoTime() - benchStart) / 1_000_000.0
 

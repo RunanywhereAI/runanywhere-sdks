@@ -13,10 +13,10 @@ package com.runanywhere.sdk.features.tts
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFormat
-import ai.runanywhere.proto.v1.ModelInfo
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhereModule
 import com.runanywhere.sdk.public.extensions.registerModelInternal
+import com.runanywhere.sdk.public.types.RAModelInfo
 
 /**
  * Built-in Android system TTS module.
@@ -39,7 +39,7 @@ object SystemTTSModule : RunAnywhereModule {
     override suspend fun register() {
         logger.info("Registering System TTS as a built-in registry entry")
         registerModelInternal(
-            ModelInfo(
+            RAModelInfo(
                 id = MODEL_ID,
                 name = "System TTS",
                 framework = InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS,

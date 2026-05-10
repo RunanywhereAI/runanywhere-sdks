@@ -48,7 +48,7 @@ extension CppBridge {
 
         func requireProtoSession() throws -> rac_handle_t {
             guard let protoSession else {
-                throw SDKException.rag(.notInitialized, "RAG proto session not created")
+                throw SDKException(code: .notInitialized, message: "RAG proto session not created", category: .component)
             }
             return protoSession
         }

@@ -20,7 +20,7 @@ public extension RunAnywhere {
         options: RASTTOptions = .defaults()
     ) async throws -> RASTTOutput {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
 
@@ -31,7 +31,7 @@ public extension RunAnywhere {
         currentRequest.category = .speechRecognition
         let current = RunAnywhere.currentModel(currentRequest)
         guard current.found else {
-            throw SDKException.stt(.notInitialized, "STT model not loaded")
+            throw SDKException(code: .notInitialized, message: "STT model not loaded", category: .component)
         }
 
         return try await CppBridge.STT.shared.transcribe(audioData: audioData, options: options)

@@ -21,6 +21,10 @@ import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedResult
 import ai.runanywhere.proto.v1.LoraCompatibilityResult
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.types.RALoRAAdapterConfig
+import com.runanywhere.sdk.public.types.RALoRAApplyRequest
+import com.runanywhere.sdk.public.types.RALoRARemoveRequest
+import com.runanywhere.sdk.public.types.RALoRAState
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
@@ -47,7 +51,7 @@ object CppBridgeLoRA {
         cause: UnsatisfiedLinkError,
     ): String = "$operation native JNI symbol is unavailable: ${cause.message.orEmpty()}"
 
-    fun apply(request: LoRAApplyRequest): LoRAApplyResult {
+    fun apply(request: RALoRAApplyRequest): LoRAApplyResult {
         CppBridgeLLM.create()
         return decodeOrThrow(
             LoRAApplyResult.ADAPTER,
@@ -59,7 +63,7 @@ object CppBridgeLoRA {
         )
     }
 
-    fun remove(request: LoRARemoveRequest): LoRAState {
+    fun remove(request: RALoRARemoveRequest): RALoRAState {
         CppBridgeLLM.create()
         return decodeOrThrow(
             LoRAState.ADAPTER,
@@ -71,7 +75,7 @@ object CppBridgeLoRA {
         )
     }
 
-    fun list(request: LoRAState): LoRAState {
+    fun list(request: RALoRAState): RALoRAState {
         CppBridgeLLM.create()
         return decodeOrThrow(
             LoRAState.ADAPTER,
@@ -83,7 +87,7 @@ object CppBridgeLoRA {
         )
     }
 
-    fun state(request: LoRAState): LoRAState {
+    fun state(request: RALoRAState): RALoRAState {
         CppBridgeLLM.create()
         return decodeOrThrow(
             LoRAState.ADAPTER,
@@ -95,7 +99,7 @@ object CppBridgeLoRA {
         )
     }
 
-    fun compatibility(config: LoRAAdapterConfig): LoraCompatibilityResult {
+    fun compatibility(config: RALoRAAdapterConfig): LoraCompatibilityResult {
         CppBridgeLLM.create()
         return decodeOrThrow(
             LoraCompatibilityResult.ADAPTER,

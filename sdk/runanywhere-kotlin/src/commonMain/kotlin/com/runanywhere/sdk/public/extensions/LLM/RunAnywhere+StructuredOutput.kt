@@ -9,17 +9,17 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.JSONSchema
-import ai.runanywhere.proto.v1.LLMGenerationOptions
-import ai.runanywhere.proto.v1.LLMGenerationResult
 import ai.runanywhere.proto.v1.StructuredOutputOptions
 import ai.runanywhere.proto.v1.StructuredOutputPromptResult
 import ai.runanywhere.proto.v1.StructuredOutputRequest
-import ai.runanywhere.proto.v1.StructuredOutputResult
 import ai.runanywhere.proto.v1.StructuredOutputStreamEvent
 import ai.runanywhere.proto.v1.StructuredOutputValidation
 import ai.runanywhere.proto.v1.StructuredOutputValidationRequest
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RAJSONSchema
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RALLMGenerationResult
+import com.runanywhere.sdk.public.types.RAStructuredOutputResult
 import kotlinx.coroutines.flow.Flow
 
 // MARK: - Structured Output
@@ -36,9 +36,9 @@ import kotlinx.coroutines.flow.Flow
  */
 expect suspend fun RunAnywhere.generateStructured(
     prompt: String,
-    schema: JSONSchema,
-    options: LLMGenerationOptions? = null,
-): StructuredOutputResult
+    schema: RAJSONSchema,
+    options: RALLMGenerationOptions? = null,
+): RAStructuredOutputResult
 
 /**
  * Stream structured output results for a prompt.
@@ -50,8 +50,8 @@ expect suspend fun RunAnywhere.generateStructured(
  */
 expect fun RunAnywhere.generateStructuredStream(
     prompt: String,
-    schema: JSONSchema,
-    options: LLMGenerationOptions? = null,
+    schema: RAJSONSchema,
+    options: RALLMGenerationOptions? = null,
 ): Flow<StructuredOutputStreamEvent>
 
 /**
@@ -69,8 +69,8 @@ expect fun RunAnywhere.generateStructuredStream(
 expect suspend fun RunAnywhere.generateWithStructuredOutput(
     prompt: String,
     structuredOutput: StructuredOutputOptions,
-    options: LLMGenerationOptions? = null,
-): LLMGenerationResult
+    options: RALLMGenerationOptions? = null,
+): RALLMGenerationResult
 
 /**
  * Extract structured output from a raw text string using a JSON schema.
@@ -85,8 +85,8 @@ expect suspend fun RunAnywhere.generateWithStructuredOutput(
  */
 expect suspend fun RunAnywhere.extractStructuredOutput(
     text: String,
-    schema: JSONSchema,
-): StructuredOutputResult
+    schema: RAJSONSchema,
+): RAStructuredOutputResult
 
 /**
  * Prepare a structured-output prompt through the generated proto commons ABI.

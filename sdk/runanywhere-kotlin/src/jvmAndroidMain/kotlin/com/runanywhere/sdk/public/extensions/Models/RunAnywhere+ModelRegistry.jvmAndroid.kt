@@ -23,7 +23,6 @@ import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelImportRequest
 import ai.runanywhere.proto.v1.ModelImportResult
-import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelInfoList
 import ai.runanywhere.proto.v1.ModelQuery
 import ai.runanywhere.proto.v1.ModelRegistryRefreshRequest
@@ -36,19 +35,20 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RAModelInfo
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.withContext
-import java.util.concurrent.ConcurrentHashMap
 
 private val activeDownloadIdsByModel = ConcurrentHashMap<String, String>()
 private val modelsLogger = SDKLogger.models
 
 // MARK: - Model Registration Implementation
 
-internal actual fun registerModelInternal(modelInfo: ModelInfo) {
+internal actual fun registerModelInternal(modelInfo: RAModelInfo) {
     try {
         CppBridgeModelRegistry.save(modelInfo)
         modelsLogger.info("Registered model: ${modelInfo.name} (${modelInfo.id})")
@@ -61,7 +61,7 @@ internal actual fun registerModelInternal(modelInfo: ModelInfo) {
 internal actual fun formatFromUrl(url: String): ModelFormat =
     CppBridgeModelFormat.formatFromUrl(url)
 
-internal actual fun applyInferredArtifact(modelInfo: ModelInfo, url: String): ModelInfo =
+internal actual fun applyInferredArtifact(modelInfo: RAModelInfo, url: String): RAModelInfo =
     CppBridgeModelFormat.applyInferredArtifact(modelInfo, url)
 
 private fun requireInitialized(sdk: RunAnywhere) {
@@ -70,24 +70,24 @@ private fun requireInitialized(sdk: RunAnywhere) {
     }
 }
 
-private fun getAllBridgeModels(): List<ModelInfo> = CppBridgeModelRegistry.getAll()
+private fun getAllBridgeModels(): List<RAModelInfo> = CppBridgeModelRegistry.getAll()
 
-actual suspend fun RunAnywhere.availableModels(): List<ModelInfo> {
+actual suspend fun RunAnywhere.availableModels(): List<RAModelInfo> {
     requireInitialized(this)
     return getAllBridgeModels()
 }
 
-actual suspend fun RunAnywhere.models(category: ModelCategory): List<ModelInfo> {
+actual suspend fun RunAnywhere.models(category: ModelCategory): List<RAModelInfo> {
     requireInitialized(this)
     return CppBridgeModelRegistry.query(ModelQuery(category = category)).models
 }
 
-actual suspend fun RunAnywhere.downloadedModels(): List<ModelInfo> {
+actual suspend fun RunAnywhere.downloadedModels(): List<RAModelInfo> {
     requireInitialized(this)
     return CppBridgeModelRegistry.query(ModelQuery(downloaded_only = true)).models
 }
 
-actual suspend fun RunAnywhere.model(modelId: String): ModelInfo? {
+actual suspend fun RunAnywhere.model(modelId: String): RAModelInfo? {
     requireInitialized(this)
     return CppBridgeModelRegistry.get(modelId)
 }

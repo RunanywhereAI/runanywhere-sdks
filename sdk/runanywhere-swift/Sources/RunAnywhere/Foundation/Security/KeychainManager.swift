@@ -96,7 +96,7 @@ public final class KeychainManager {
     /// - Throws: SDKException if storage fails
     public func store(_ value: String, for key: String) throws {
         guard let data = value.data(using: .utf8) else {
-            throw SDKException.security(.encodingError, "Failed to encode string data for keychain storage")
+            throw SDKException(code: .encodingError, message: "Failed to encode string data for keychain storage", category: .auth)
         }
 
         try store(data, for: key)
@@ -120,7 +120,7 @@ public final class KeychainManager {
         }
 
         guard status == errSecSuccess else {
-            throw SDKException.security(.keychainError, "Failed to store item in keychain: OSStatus \(status)")
+            throw SDKException(code: .keychainError, message: "Failed to store item in keychain: OSStatus \(status)", category: .auth)
         }
     }
 
@@ -132,7 +132,7 @@ public final class KeychainManager {
         let data = try retrieveData(for: key)
 
         guard let string = String(data: data, encoding: .utf8) else {
-            throw SDKException.security(.decodingError, "Failed to decode string data from keychain")
+            throw SDKException(code: .decodingError, message: "Failed to decode string data from keychain", category: .auth)
         }
 
         return string
@@ -154,9 +154,9 @@ public final class KeychainManager {
         guard status == errSecSuccess,
               let data = result as? Data else {
             if status == errSecItemNotFound {
-                throw SDKException.security(.keychainError, "Item not found in keychain")
+                throw SDKException(code: .keychainError, message: "Item not found in keychain", category: .auth)
             }
-            throw SDKException.security(.keychainError, "Failed to retrieve item from keychain: OSStatus \(status)")
+            throw SDKException(code: .keychainError, message: "Failed to retrieve item from keychain: OSStatus \(status)", category: .auth)
         }
 
         return data
@@ -183,7 +183,7 @@ public final class KeychainManager {
         // Other errors are actual problems
         guard status == errSecSuccess,
               let data = result as? Data else {
-            throw SDKException.security(.keychainError, "Failed to retrieve item from keychain: OSStatus \(status)")
+            throw SDKException(code: .keychainError, message: "Failed to retrieve item from keychain: OSStatus \(status)", category: .auth)
         }
 
         return data
@@ -199,7 +199,7 @@ public final class KeychainManager {
         }
 
         guard let string = String(data: data, encoding: .utf8) else {
-            throw SDKException.security(.decodingError, "Failed to decode string data from keychain")
+            throw SDKException(code: .decodingError, message: "Failed to decode string data from keychain", category: .auth)
         }
 
         return string
@@ -213,7 +213,7 @@ public final class KeychainManager {
         let status = SecItemDelete(query as CFDictionary)
 
         guard status == errSecSuccess || status == errSecItemNotFound else {
-            throw SDKException.security(.keychainError, "Failed to delete item from keychain: OSStatus \(status)")
+            throw SDKException(code: .keychainError, message: "Failed to delete item from keychain: OSStatus \(status)", category: .auth)
         }
     }
 

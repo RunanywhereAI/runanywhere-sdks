@@ -21,11 +21,11 @@ public extension RunAnywhere {
     /// instead of falling through to the energy-based fallback. Fixes SWIFT-VAD-001.
     static func detectVoiceActivity(_ audioData: Data, options: RAVADOptions? = nil) async throws -> RAVADResult {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
         guard audioData.count >= MemoryLayout<Float>.size else {
-            throw SDKException.vad(.emptyAudioBuffer, "Audio data is empty")
+            throw SDKException(code: .emptyAudioBuffer, message: "Audio data is empty", category: .component)
         }
 
         var request = RAVADProcessRequest()
@@ -61,7 +61,7 @@ public extension RunAnywhere {
     /// Reset VAD internal state.
     static func resetVAD() async throws {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await CppBridge.VAD.shared.reset()
     }

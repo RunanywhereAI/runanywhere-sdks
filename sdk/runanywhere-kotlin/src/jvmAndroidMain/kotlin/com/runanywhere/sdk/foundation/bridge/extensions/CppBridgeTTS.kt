@@ -12,6 +12,8 @@ import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.types.RATTSOptions
+import com.runanywhere.sdk.public.types.RATTSOutput
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
@@ -99,7 +101,7 @@ object CppBridgeTTS {
         return voices
     }
 
-    fun synthesize(text: String, options: TTSOptions): TTSOutput {
+    fun synthesize(text: String, options: RATTSOptions): RATTSOutput {
         create()
         return decodeOrThrow(
             TTSOutput.ADAPTER,
@@ -114,8 +116,8 @@ object CppBridgeTTS {
 
     fun synthesizeStream(
         text: String,
-        options: TTSOptions,
-        onChunk: (TTSOutput) -> Boolean,
+        options: RATTSOptions,
+        onChunk: (RATTSOutput) -> Boolean,
     ) {
         create()
         val rc =

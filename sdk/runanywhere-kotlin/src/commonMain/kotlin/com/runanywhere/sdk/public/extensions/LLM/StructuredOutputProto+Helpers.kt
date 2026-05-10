@@ -10,13 +10,13 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.JSONSchema
 import ai.runanywhere.proto.v1.JSONSchemaProperty
 import ai.runanywhere.proto.v1.JSONSchemaType
 import ai.runanywhere.proto.v1.NamedEntity
 import ai.runanywhere.proto.v1.StructuredOutputMode
 import ai.runanywhere.proto.v1.StructuredOutputOptions
-import ai.runanywhere.proto.v1.StructuredOutputResult
+import com.runanywhere.sdk.public.types.RAJSONSchema
+import com.runanywhere.sdk.public.types.RAStructuredOutputResult
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -41,7 +41,7 @@ import kotlinx.serialization.json.longOrNull
  * `STRUCTURED_OUTPUT_MODE_JSON_SCHEMA` as the mode.
  */
 fun StructuredOutputOptions.Companion.defaults(
-    schema: JSONSchema,
+    schema: RAJSONSchema,
     includeSchemaInPrompt: Boolean = true,
     strict: Boolean = true,
 ): StructuredOutputOptions =
@@ -65,7 +65,7 @@ private val jsonSerializer: Json = Json {
  * C ABI. Returns the proto's `raw_json` verbatim when present and
  * non-blank; otherwise serializes the typed schema tree.
  */
-val JSONSchema.jsonSchemaString: String
+val RAJSONSchema.jsonSchemaString: String
     get() {
         raw_json?.takeIf { it.isNotBlank() }?.let { return it }
         val element = jsonElement(this)
@@ -88,7 +88,7 @@ val JSONSchemaType.jsonSchemaName: String?
         JSONSchemaType.JSON_SCHEMA_TYPE_UNSPECIFIED -> null
     }
 
-private fun jsonElement(schema: JSONSchema): JsonObject {
+private fun jsonElement(schema: RAJSONSchema): JsonObject {
     schema.raw_json?.takeIf { it.isNotBlank() }?.let { raw ->
         runCatching { jsonSerializer.parseToJsonElement(raw) }
             .getOrNull()
@@ -177,7 +177,7 @@ private fun jsonPrimitiveAsAny(primitive: JsonPrimitive): Any? =
 /**
  * Convenience flag mirroring Swift `RAStructuredOutputResult.success`.
  */
-val StructuredOutputResult.success: Boolean
+val RAStructuredOutputResult.success: Boolean
     get() = validation?.is_valid ?: false
 
 // MARK: - NamedEntity

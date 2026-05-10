@@ -168,7 +168,7 @@ public extension RunAnywhere {
         toolOptions: RAToolCallingOptions? = nil
     ) async throws -> RAToolCallingResult {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
 
@@ -337,7 +337,7 @@ public extension RunAnywhere {
             }
             if event.isFinal {
                 if !event.errorMessage.isEmpty {
-                    throw SDKException.llm(.generationFailed, event.errorMessage)
+                    throw SDKException(code: .generationFailed, message: event.errorMessage, category: .component)
                 }
                 break
             }

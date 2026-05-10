@@ -2,9 +2,6 @@ package com.runanywhere.runanywhereai.presentation.vision
 
 import ai.runanywhere.proto.v1.ComponentLifecycleState
 import ai.runanywhere.proto.v1.SDKComponent
-import ai.runanywhere.proto.v1.SDKEvent
-import ai.runanywhere.proto.v1.VLMGenerationOptions
-import ai.runanywhere.proto.v1.VLMImage
 import ai.runanywhere.proto.v1.VLMImageFormat
 import android.Manifest
 import android.app.Application
@@ -25,6 +22,12 @@ import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
 import com.runanywhere.sdk.public.extensions.componentLifecycleSnapshot
 import com.runanywhere.sdk.public.extensions.fromBitmap
 import com.runanywhere.sdk.public.extensions.processImageStream
+import com.runanywhere.sdk.public.types.RASDKEvent
+import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAVLMImage
+import java.io.File
+import java.io.FileOutputStream
+import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -36,9 +39,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okio.ByteString.Companion.toByteString
 import timber.log.Timber
-import java.io.File
-import java.io.FileOutputStream
-import java.util.concurrent.Executors
 
 /**
  * UI state for VLM screen.
@@ -196,7 +196,7 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
     private fun captureFrame(imageProxy: ImageProxy) {
         try {
             val bitmap = imageProxy.toBitmap()
-            val image = VLMImage.fromBitmap(bitmap)
+            val image = RAVLMImage.fromBitmap(bitmap)
             val rgb = image.raw_rgb?.toByteArray() ?: return
 
             synchronized(frameLock) {
@@ -246,14 +246,14 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
             viewModelScope.launch {
                 try {
                     val image =
-                        VLMImage(
+                        RAVLMImage(
                             raw_rgb = frameData.toByteString(),
                             width = w,
                             height = h,
                             format = VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB,
                         )
                     val options =
-                        VLMGenerationOptions(
+                        RAVLMGenerationOptions(
                             prompt = "Describe what you see briefly.",
                             max_tokens = 200,
                             temperature = 0.7f,
@@ -302,12 +302,12 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     tempFile = copyUriToTempFile(uri) ?: throw Exception("Failed to read image")
                     val image =
-                        VLMImage(
+                        RAVLMImage(
                             file_path = tempFile.absolutePath,
                             format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
                         )
                     val options =
-                        VLMGenerationOptions(
+                        RAVLMGenerationOptions(
                             prompt = prompt,
                             max_tokens = 300,
                             temperature = 0.7f,
@@ -392,14 +392,14 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
         var newDescription = ""
         try {
             val image =
-                VLMImage(
+                RAVLMImage(
                     raw_rgb = frameData.toByteString(),
                     width = w,
                     height = h,
                     format = VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB,
                 )
             val options =
-                VLMGenerationOptions(
+                RAVLMGenerationOptions(
                     prompt = "Describe what you see in one sentence.",
                     max_tokens = 100,
                     temperature = 0.7f,
@@ -460,7 +460,7 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun applyVlmStreamEvent(
         currentText: String,
-        event: SDKEvent,
+        event: RASDKEvent,
     ): String {
         val generation = event.generation ?: return currentText
         return when {

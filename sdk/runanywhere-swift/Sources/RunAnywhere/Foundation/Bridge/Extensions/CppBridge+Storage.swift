@@ -85,7 +85,7 @@ extension CppBridge {
         /// Calculate size at a path
         public func calculateSize(at path: URL) throws -> Int64 {
             guard let handle = handle else {
-                throw SDKException.general(.initializationFailed, "Storage analyzer not initialized")
+                throw SDKException(code: .initializationFailed, message: "Storage analyzer not initialized", category: .internal)
             }
 
             var size: Int64 = 0
@@ -95,9 +95,9 @@ extension CppBridge {
 
             guard result == RAC_SUCCESS else {
                 if result == RAC_ERROR_NOT_FOUND {
-                    throw SDKException.fileManagement(.fileNotFound, "Path not found: \(path.path)")
+                    throw SDKException(code: .fileNotFound, message: "Path not found: \(path.path)", category: .io)
                 }
-                throw SDKException.general(.processingFailed, "Failed to calculate size")
+                throw SDKException(code: .processingFailed, message: "Failed to calculate size", category: .internal)
             }
 
             return size
@@ -180,10 +180,10 @@ extension CppBridge {
             responseType: Response.Type
         ) async throws -> Response {
             guard let symbol, NativeProtoABI.canReceiveProtoBuffer else {
-                throw SDKException.general(.notSupported, NativeProtoABI.unavailableMessage)
+                throw SDKException(code: .notSupported, message: NativeProtoABI.unavailableMessage, category: .internal)
             }
             guard let handle = handle, let registryHandle = await getRegistryHandle() else {
-                throw SDKException.general(.initializationFailed, "Storage analyzer not initialized")
+                throw SDKException(code: .initializationFailed, message: "Storage analyzer not initialized", category: .internal)
             }
 
             var outBuffer = rac_proto_buffer_t()
@@ -193,7 +193,7 @@ extension CppBridge {
                 symbol(handle, registryHandle, bytes, size, &outBuffer)
             }
             guard status == RAC_SUCCESS else {
-                throw SDKException.general(.processingFailed, "Storage proto request failed: \(status)")
+                throw SDKException(code: .processingFailed, message: "Storage proto request failed: \(status)", category: .internal)
             }
             return try NativeProtoABI.decode(responseType, from: outBuffer)
         }

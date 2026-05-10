@@ -26,7 +26,7 @@ extension LLMViewModel {
             }
         } else {
             await MainActor.run {
-                self.setError(SDKException.general(.unknown, result.errorMessage))
+                self.setError(SDKException(code: .unknown, message: result.errorMessage, category: .internal))
                 self.updateModelLoadedState(isLoaded: false)
                 self.clearLoadedModelInfo()
             }

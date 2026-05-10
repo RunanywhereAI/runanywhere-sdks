@@ -1,18 +1,18 @@
 package com.runanywhere.runanywhereai.presentation.benchmarks.services
 
-import ai.runanywhere.proto.v1.ModelInfo
-import ai.runanywhere.proto.v1.STTOptions
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelUnloadRequest
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkCategory
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkDeviceInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkMetrics
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkScenario
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
-import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.ModelUnloadRequest
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.transcribe
 import com.runanywhere.sdk.public.extensions.unloadModel
+import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RASTTOptions
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
@@ -31,7 +31,7 @@ class STTBenchmarkProvider : BenchmarkScenarioProvider {
 
     override suspend fun execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo,
+        model: RAModelInfo,
         deviceInfo: BenchmarkDeviceInfo,
     ): BenchmarkMetrics {
         val memBefore = SyntheticInputGenerator.availableMemoryBytes()
@@ -55,7 +55,7 @@ class STTBenchmarkProvider : BenchmarkScenarioProvider {
 
             // Transcribe
             val benchStart = System.nanoTime()
-            val options = STTOptions()
+            val options = RASTTOptions()
             val result = RunAnywhere.transcribe(audioData, options)
             val endToEndMs = (System.nanoTime() - benchStart) / 1_000_000.0
 

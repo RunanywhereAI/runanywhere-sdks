@@ -365,7 +365,7 @@ extension ModelSelectionSheet {
         request.category = category
         let result = await RunAnywhere.loadModel(request)
         if !result.success {
-            throw SDKException.general(.unknown, result.errorMessage)
+            throw SDKException(code: .unknown, message: result.errorMessage, category: .internal)
         }
     }
 

@@ -12,17 +12,17 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.ComponentLifecycleSnapshot
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.CurrentModelResult
-import ai.runanywhere.proto.v1.ModelInfo
-import ai.runanywhere.proto.v1.ModelLoadRequest
-import ai.runanywhere.proto.v1.ModelLoadResult
 import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.ModelUnloadResult
 import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RAModelLoadResult
 
 // MARK: - Lifecycle Operations
 
-expect suspend fun RunAnywhere.loadModel(request: ModelLoadRequest): ModelLoadResult
+expect suspend fun RunAnywhere.loadModel(request: RAModelLoadRequest): RAModelLoadResult
 
 expect suspend fun RunAnywhere.unloadModel(request: ModelUnloadRequest): ModelUnloadResult
 
@@ -40,9 +40,9 @@ expect suspend fun RunAnywhere.unloadLLMModel()
 
 expect val RunAnywhere.isLLMModelLoaded: Boolean
 
-expect val RunAnywhere.currentLLMModel: ModelInfo?
+expect val RunAnywhere.currentLLMModel: RAModelInfo?
 
-expect suspend fun RunAnywhere.currentSTTModel(): ModelInfo?
+expect suspend fun RunAnywhere.currentSTTModel(): RAModelInfo?
 
 expect suspend fun RunAnywhere.loadSTTModel(modelId: String)
 

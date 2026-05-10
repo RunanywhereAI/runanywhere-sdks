@@ -11,13 +11,7 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.CurrentModelResult
 import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.ModelLoadRequest
-import ai.runanywhere.proto.v1.ModelLoadResult
 import ai.runanywhere.proto.v1.ModelUnloadRequest
-import ai.runanywhere.proto.v1.SDKEvent
-import ai.runanywhere.proto.v1.VLMGenerationOptions
-import ai.runanywhere.proto.v1.VLMImage
-import ai.runanywhere.proto.v1.VLMResult
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
@@ -25,6 +19,12 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.resolvedPrimaryModelPath
 import com.runanywhere.sdk.public.extensions.Models.resolvedVisionProjectorPath
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RAModelLoadResult
+import com.runanywhere.sdk.public.types.RASDKEvent
+import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAVLMImage
+import com.runanywhere.sdk.public.types.RAVLMResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -43,7 +43,7 @@ private data class ResolvedVLMArtifacts(
     val visionProjectorPath: String,
 )
 
-private fun ModelLoadResult.requireVLMArtifacts(requestedModelId: String): ResolvedVLMArtifacts {
+private fun RAModelLoadResult.requireVLMArtifacts(requestedModelId: String): ResolvedVLMArtifacts {
     val primaryPath =
         resolvedPrimaryModelPath()
             ?: throw SDKException.vlm(
@@ -75,9 +75,9 @@ private fun currentVLMModelFromLifecycle(): CurrentModelResult? =
 // MARK: - Inference
 
 actual suspend fun RunAnywhere.processImage(
-    image: VLMImage,
-    options: VLMGenerationOptions,
-): VLMResult {
+    image: RAVLMImage,
+    options: RAVLMGenerationOptions,
+): RAVLMResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
@@ -103,9 +103,9 @@ actual suspend fun RunAnywhere.processImage(
 }
 
 actual fun RunAnywhere.processImageStream(
-    image: VLMImage,
-    options: VLMGenerationOptions,
-): Flow<SDKEvent> =
+    image: RAVLMImage,
+    options: RAVLMGenerationOptions,
+): Flow<RASDKEvent> =
     callbackFlow {
         if (!isInitialized) {
             throw SDKException.notInitialized("SDK not initialized")
@@ -150,7 +150,7 @@ actual suspend fun RunAnywhere.loadVLMModel(modelId: String) {
 
     CppBridgeVLM.destroy()
 
-    val lifecycleResult = loadModel(ModelLoadRequest(model_id = modelId))
+    val lifecycleResult = loadModel(RAModelLoadRequest(model_id = modelId))
     if (!lifecycleResult.success) {
         throw SDKException.vlm(
             lifecycleResult.error_message.ifBlank { "Failed to load VLM model '$modelId'" },

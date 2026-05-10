@@ -10,11 +10,9 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.ComponentLifecycleState
 import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.ModelLoadRequest
+import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.SDKComponent
-import ai.runanywhere.proto.v1.TTSOptions
-import ai.runanywhere.proto.v1.TTSOutput
 import ai.runanywhere.proto.v1.TTSSpeakResult
 import ai.runanywhere.proto.v1.TTSVoiceInfo
 import com.runanywhere.sdk.features.tts.TtsAudioPlayback
@@ -24,10 +22,12 @@ import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RATTSOptions
+import com.runanywhere.sdk.public.types.RATTSOutput
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 
 private val ttsLogger = SDKLogger.tts
 private val ttsAudioPlayback = TtsAudioPlayback
@@ -68,7 +68,7 @@ actual suspend fun RunAnywhere.loadTTSVoice(voiceId: String) {
 
     val result =
         loadModel(
-            ModelLoadRequest(
+            RAModelLoadRequest(
                 model_id = voiceId,
                 category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
                 framework = modelInfo.framework,
@@ -103,8 +103,8 @@ actual val RunAnywhere.currentTTSVoiceId: String?
 
 actual suspend fun RunAnywhere.synthesize(
     text: String,
-    options: TTSOptions,
-): TTSOutput {
+    options: RATTSOptions,
+): RATTSOutput {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
@@ -120,15 +120,15 @@ actual suspend fun RunAnywhere.synthesize(
 actual fun RunAnywhere.synthesizeStream(
     text: String,
     voiceId: String?,
-): Flow<TTSOutput> =
+): Flow<RATTSOutput> =
     callbackFlow {
         if (!isInitialized) {
             throw SDKException.notInitialized("SDK not initialized")
         }
 
         val options =
-            voiceId?.takeIf { it.isNotBlank() }?.let { TTSOptions(voice = it) }
-                ?: TTSOptions()
+            voiceId?.takeIf { it.isNotBlank() }?.let { RATTSOptions(voice = it) }
+                ?: RATTSOptions()
 
         try {
             CppBridgeTTS.synthesizeStream(text, options) { output ->
@@ -148,7 +148,7 @@ actual suspend fun RunAnywhere.stopSynthesis() {
 
 actual suspend fun RunAnywhere.speak(
     text: String,
-    options: TTSOptions,
+    options: RATTSOptions,
 ): TTSSpeakResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")

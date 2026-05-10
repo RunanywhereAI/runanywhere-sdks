@@ -17,6 +17,7 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.VLMImage
 import android.graphics.Bitmap
+import com.runanywhere.sdk.public.types.RAVLMImage
 
 /**
  * Build a [VLMImage] from a [Bitmap], stripping the alpha channel into a
@@ -30,7 +31,7 @@ import android.graphics.Bitmap
  * byte stream (each row may carry trailing padding bytes, especially for
  * non-power-of-two widths).
  */
-fun VLMImage.Companion.fromBitmap(bitmap: Bitmap): VLMImage {
+fun VLMImage.Companion.fromBitmap(bitmap: Bitmap): RAVLMImage {
     val width = bitmap.width
     val height = bitmap.height
     val pixelCount = width * height
@@ -49,5 +50,5 @@ fun VLMImage.Companion.fromBitmap(bitmap: Bitmap): VLMImage {
         rgb[dst++] = (argb and 0xFF).toByte() // B
     }
 
-    return VLMImage.fromRawRGB(rgb, width, height)
+    return RAVLMImage.fromRawRGB(rgb, width, height)
 }

@@ -11,7 +11,6 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.LLMGenerateRequest
-import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.LLMGenerationResult
 import ai.runanywhere.proto.v1.LLMStreamEvent
 import ai.runanywhere.proto.v1.SDKEvent
@@ -19,6 +18,11 @@ import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.types.RALLMGenerateRequest
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RALLMGenerationResult
+import com.runanywhere.sdk.public.types.RALLMStreamEvent
+import com.runanywhere.sdk.public.types.RASDKEvent
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
@@ -41,13 +45,13 @@ private fun checkRc(rc: Int, operation: String) {
     }
 }
 
-private fun LLMGenerationOptions?.toGenerateRequest(
+private fun RALLMGenerationOptions?.toGenerateRequest(
     prompt: String,
     streaming: Boolean,
-): LLMGenerateRequest {
-    val options = this ?: LLMGenerationOptions()
+): RALLMGenerateRequest {
+    val options = this ?: RALLMGenerationOptions()
     val schema = options.structured_output?.json_schema ?: options.json_schema.orEmpty()
-    return LLMGenerateRequest(
+    return RALLMGenerateRequest(
         prompt = prompt,
         max_tokens = options.max_tokens,
         temperature = options.temperature,
@@ -123,7 +127,7 @@ object CppBridgeLLM {
         }
     }
 
-    fun generate(prompt: String, options: LLMGenerationOptions?): LLMGenerationResult {
+    fun generate(prompt: String, options: RALLMGenerationOptions?): RALLMGenerationResult {
         val request = options.toGenerateRequest(prompt, streaming = false)
         return decodeOrThrow(
             LLMGenerationResult.ADAPTER,
@@ -134,8 +138,8 @@ object CppBridgeLLM {
 
     fun generateStream(
         prompt: String,
-        options: LLMGenerationOptions?,
-        onEvent: (LLMStreamEvent) -> Boolean,
+        options: RALLMGenerationOptions?,
+        onEvent: (RALLMStreamEvent) -> Boolean,
     ) {
         val request = options.toGenerateRequest(prompt, streaming = true)
         val rc =
@@ -148,6 +152,6 @@ object CppBridgeLLM {
         checkRc(rc, "racLlmGenerateStreamProto")
     }
 
-    fun cancel(): SDKEvent? =
+    fun cancel(): RASDKEvent? =
         RunAnywhereBridge.racLlmCancelProto()?.let(SDKEvent.ADAPTER::decode)
 }

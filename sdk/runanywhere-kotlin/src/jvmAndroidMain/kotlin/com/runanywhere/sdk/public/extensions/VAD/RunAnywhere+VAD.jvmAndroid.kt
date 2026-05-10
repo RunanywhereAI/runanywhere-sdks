@@ -8,11 +8,10 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.ModelLoadRequest
+import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.VADConfiguration
 import ai.runanywhere.proto.v1.VADOptions
-import ai.runanywhere.proto.v1.VADResult
 import ai.runanywhere.proto.v1.VADStatistics
 import ai.runanywhere.proto.v1.VADStreamEvent
 import ai.runanywhere.proto.v1.VADStreamEventKind
@@ -22,21 +21,23 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RAVADOptions
+import com.runanywhere.sdk.public.types.RAVADResult
 import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.collect
-import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 
 private val vadLogger = SDKLogger.vad
 
-actual suspend fun RunAnywhere.detectVoiceActivity(audioData: ByteArray): VADResult =
-    detectVoiceActivity(audioData, VADOptions())
+actual suspend fun RunAnywhere.detectVoiceActivity(audioData: ByteArray): RAVADResult =
+    detectVoiceActivity(audioData, RAVADOptions())
 
 actual suspend fun RunAnywhere.detectVoiceActivity(
     audioData: ByteArray,
-    options: VADOptions,
-): VADResult {
+    options: RAVADOptions,
+): RAVADResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
@@ -54,7 +55,7 @@ actual suspend fun RunAnywhere.detectVoiceActivity(
 
 actual fun RunAnywhere.streamVAD(
     audioSamples: Flow<FloatArray>,
-    options: VADOptions,
+    options: RAVADOptions,
 ): Flow<VADStreamEvent> =
     channelFlow {
         if (!isInitialized) {
@@ -126,7 +127,7 @@ actual suspend fun RunAnywhere.calibrateVAD(ambientAudioData: ByteArray) {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
-    CppBridgeVAD.process(ambientAudioData.toFloatArray(), VADOptions())
+    CppBridgeVAD.process(ambientAudioData.toFloatArray(), RAVADOptions())
 }
 
 actual suspend fun RunAnywhere.resetVAD() {
@@ -236,7 +237,7 @@ actual suspend fun RunAnywhere.loadVADModel(modelId: String) {
     val localPath = model.local_path.takeIf { it.isNotEmpty() } ?: throw SDKException.modelNotLoaded(modelId)
     val result =
         loadModel(
-            ModelLoadRequest(
+            RAModelLoadRequest(
                 model_id = modelId,
                 category = ProtoModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
                 framework = model.framework,

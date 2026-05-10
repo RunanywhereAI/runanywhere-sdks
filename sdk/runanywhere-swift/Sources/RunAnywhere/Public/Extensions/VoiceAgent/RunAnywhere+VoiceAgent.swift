@@ -23,7 +23,7 @@ public extension RunAnywhere {
     /// Initialize the voice agent with configuration.
     static func initializeVoiceAgent(_ config: RAVoiceAgentComposeConfig) async throws {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
         try await ensureServicesReady()
@@ -38,13 +38,13 @@ public extension RunAnywhere {
     /// `initializeVoiceAgent(_:)`. Mirrors the Kotlin / Web SDKs'
     /// `initializeVoiceAgentWithLoadedModels()` API.
     ///
-    /// - Throws: `SDKException.general(.notInitialized, ...)` if the SDK has
+    /// - Throws: `SDKException(code: .notInitialized, message: ..., category: .internal)` if the SDK has
     ///           not completed Phase 1 initialization.
-    /// - Throws: `SDKException.voiceAgent(.modelNotLoaded, ...)` if STT, LLM,
+    /// - Throws: `SDKException(code: .modelNotLoaded, message: ..., category: .component)` if STT, LLM,
     ///           or TTS has no model loaded.
     static func initializeVoiceAgentWithLoadedModels() async throws {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
         try await ensureServicesReady()
@@ -58,9 +58,10 @@ public extension RunAnywhere {
         if llmModelId?.isEmpty ?? true { missing.append("LLM") }
         if ttsVoiceId?.isEmpty ?? true { missing.append("TTS") }
         guard missing.isEmpty else {
-            throw SDKException.voiceAgent(
-                .modelNotLoaded,
-                "Cannot initialize voice agent: Models not loaded: \(missing.joined(separator: ", "))"
+            throw SDKException(
+                code: .modelNotLoaded,
+                message: "Cannot initialize voice agent: Models not loaded: \(missing.joined(separator: ", "))",
+                category: .component
             )
         }
 
@@ -80,11 +81,11 @@ public extension RunAnywhere {
     ///
     /// - Returns: Proto `RAVoiceAgentComponentStates` with per-component
     ///            `ComponentLifecycleState` and a computed `ready` flag.
-    /// - Throws: `SDKException.general(.notInitialized, ...)` if the SDK has
+    /// - Throws: `SDKException(code: .notInitialized, message: ..., category: .internal)` if the SDK has
     ///           not completed Phase 1 initialization.
     static func getVoiceAgentComponentStates() async throws -> RAVoiceAgentComponentStates {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
         try await ensureServicesReady()
@@ -94,11 +95,11 @@ public extension RunAnywhere {
     /// Process a complete voice turn through the proto C++ ABI.
     static func processVoiceTurn(_ audioData: Data) async throws -> RAVoiceAgentResult {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
         guard await CppBridge.VoiceAgent.shared.isReady else {
-            throw SDKException.voiceAgent(.notInitialized, "Voice agent not ready")
+            throw SDKException(code: .notInitialized, message: "Voice agent not ready", category: .component)
         }
 
         return try await CppBridge.VoiceAgent.shared.processVoiceTurnProto(audioData)

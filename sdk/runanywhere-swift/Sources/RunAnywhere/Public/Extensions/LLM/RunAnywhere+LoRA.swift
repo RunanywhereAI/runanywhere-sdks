@@ -37,7 +37,7 @@ public extension RunAnywhere {
         @discardableResult
         public func apply(_ request: RALoRAApplyRequest) async throws -> RALoRAApplyResult {
             guard RunAnywhere.isInitialized else {
-                throw SDKException.general(.notInitialized, "SDK not initialized")
+                throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
             return try await CppBridge.LLM.shared.applyLoraAdapters(request)
         }
@@ -50,7 +50,7 @@ public extension RunAnywhere {
         @discardableResult
         public func remove(_ request: RALoRARemoveRequest) async throws -> RALoRAState {
             guard RunAnywhere.isInitialized else {
-                throw SDKException.general(.notInitialized, "SDK not initialized")
+                throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
             return try await CppBridge.LLM.shared.removeLoraAdapters(request)
         }
@@ -58,7 +58,7 @@ public extension RunAnywhere {
         /// Get info about all currently loaded LoRA adapters.
         public func list() async throws -> RALoRAState {
             guard RunAnywhere.isInitialized else {
-                throw SDKException.general(.notInitialized, "SDK not initialized")
+                throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
             return try await CppBridge.LLM.shared.listLoraAdapters()
         }
@@ -66,7 +66,7 @@ public extension RunAnywhere {
         /// Get the LoRA service state reported by commons.
         public func state() async throws -> RALoRAState {
             guard RunAnywhere.isInitialized else {
-                throw SDKException.general(.notInitialized, "SDK not initialized")
+                throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
             return try await CppBridge.LLM.shared.getLoraState()
         }
@@ -92,7 +92,7 @@ public extension RunAnywhere {
         @discardableResult
         public func register(_ entry: RALoraAdapterCatalogEntry) async throws -> RALoraAdapterCatalogEntry {
             guard RunAnywhere.isInitialized else {
-                throw SDKException.general(.notInitialized, "SDK not initialized")
+                throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
             return try await CppBridge.LoraRegistry.shared.register(entry)
         }
@@ -102,7 +102,7 @@ public extension RunAnywhere {
             _ request: RALoraAdapterCatalogListRequest = RALoraAdapterCatalogListRequest()
         ) async throws -> RALoraAdapterCatalogListResult {
             guard RunAnywhere.isInitialized else {
-                throw SDKException.general(.notInitialized, "SDK not initialized")
+                throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
             return try await CppBridge.LoraRegistry.shared.listCatalog(request)
         }
@@ -112,7 +112,7 @@ public extension RunAnywhere {
             _ query: RALoraAdapterCatalogQuery
         ) async throws -> RALoraAdapterCatalogListResult {
             guard RunAnywhere.isInitialized else {
-                throw SDKException.general(.notInitialized, "SDK not initialized")
+                throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
             return try await CppBridge.LoraRegistry.shared.queryCatalog(query)
         }
@@ -122,7 +122,7 @@ public extension RunAnywhere {
             _ request: RALoraAdapterCatalogGetRequest
         ) async throws -> RALoraAdapterCatalogGetResult {
             guard RunAnywhere.isInitialized else {
-                throw SDKException.general(.notInitialized, "SDK not initialized")
+                throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
             return try await CppBridge.LoraRegistry.shared.getCatalogEntry(request)
         }
@@ -136,7 +136,7 @@ public extension RunAnywhere {
             _ request: RALoraAdapterDownloadCompletedRequest
         ) async throws -> RALoraAdapterDownloadCompletedResult {
             guard RunAnywhere.isInitialized else {
-                throw SDKException.general(.notInitialized, "SDK not initialized")
+                throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
             return try await CppBridge.LoraRegistry.shared.markDownloadCompleted(request)
         }
@@ -167,9 +167,10 @@ public extension RunAnywhere {
             query.modelID = modelId
             let result = try await queryCatalog(query)
             guard result.success else {
-                throw SDKException.general(
-                    .processingFailed,
-                    result.errorMessage.isEmpty ? "LoRA catalog query failed" : result.errorMessage
+                throw SDKException(
+                    code: .processingFailed,
+                    message: result.errorMessage.isEmpty ? "LoRA catalog query failed" : result.errorMessage,
+                    category: .internal
                 )
             }
             return result.entries
@@ -181,9 +182,10 @@ public extension RunAnywhere {
         public func allRegistered() async throws -> [RALoraAdapterCatalogEntry] {
             let result = try await listCatalog()
             guard result.success else {
-                throw SDKException.general(
-                    .processingFailed,
-                    result.errorMessage.isEmpty ? "LoRA catalog list failed" : result.errorMessage
+                throw SDKException(
+                    code: .processingFailed,
+                    message: result.errorMessage.isEmpty ? "LoRA catalog list failed" : result.errorMessage,
+                    category: .internal
                 )
             }
             return result.entries

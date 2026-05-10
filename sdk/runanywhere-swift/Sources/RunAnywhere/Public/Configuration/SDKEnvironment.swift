@@ -197,7 +197,7 @@ public struct SDKInitParams {
         environment: SDKEnvironment = .production
     ) throws {
         guard let url = URL(string: baseURL) else {
-            throw SDKException.general(.validationFailed, "Invalid base URL format: \(baseURL)")
+            throw SDKException(code: .validationFailed, message: "Invalid base URL format: \(baseURL)", category: .internal)
         }
         try self.init(apiKey: apiKey, baseURL: url, environment: environment)
     }
@@ -227,11 +227,11 @@ public struct SDKInitParams {
             let message = String(cString: rac_validation_error_message(apiKeyResult))
             switch apiKeyResult {
             case RAC_VALIDATION_API_KEY_REQUIRED:
-                throw SDKException.general(.invalidApiKey, "\(message) for \(environment.description)")
+                throw SDKException(code: .invalidApiKey, message: "\(message) for \(environment.description)", category: .internal)
             case RAC_VALIDATION_API_KEY_TOO_SHORT:
-                throw SDKException.general(.invalidApiKey, message)
+                throw SDKException(code: .invalidApiKey, message: message, category: .internal)
             default:
-                throw SDKException.general(.validationFailed, message)
+                throw SDKException(code: .validationFailed, message: message, category: .internal)
             }
         }
 
@@ -240,7 +240,7 @@ public struct SDKInitParams {
         }
         if urlResult != RAC_VALIDATION_OK {
             let message = String(cString: rac_validation_error_message(urlResult))
-            throw SDKException.general(.validationFailed, message)
+            throw SDKException(code: .validationFailed, message: message, category: .internal)
         }
 
         if environment == .staging, baseURL.scheme?.lowercased() == "http" {

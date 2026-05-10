@@ -15,7 +15,7 @@ import ai.runanywhere.proto.v1.EventDestination
 import ai.runanywhere.proto.v1.InitializationEvent
 import ai.runanywhere.proto.v1.InitializationStage
 import ai.runanywhere.proto.v1.SDKComponent
-import ai.runanywhere.proto.v1.SDKEvent
+import com.runanywhere.sdk.public.types.RASDKEvent
 import com.runanywhere.sdk.utils.SDKConstants
 import java.util.UUID
 
@@ -79,7 +79,7 @@ object CppBridgeEvents {
         properties: Map<String, String> = emptyMap(),
     ) {
         publish(
-            SDKEvent(
+            RASDKEvent(
                 timestamp_ms = System.currentTimeMillis(),
                 severity = severity,
                 category = EventCategory.EVENT_CATEGORY_INITIALIZATION,
@@ -106,7 +106,7 @@ object CppBridgeEvents {
         error: String = "",
     ) {
         publish(
-            SDKEvent(
+            RASDKEvent(
                 timestamp_ms = System.currentTimeMillis(),
                 severity = severity,
                 category = EventCategory.EVENT_CATEGORY_DEVICE,
@@ -125,7 +125,7 @@ object CppBridgeEvents {
         )
     }
 
-    private fun publish(event: SDKEvent) {
+    private fun publish(event: RASDKEvent) {
         CppBridgeSDKEventStream.publish(event)
     }
 }

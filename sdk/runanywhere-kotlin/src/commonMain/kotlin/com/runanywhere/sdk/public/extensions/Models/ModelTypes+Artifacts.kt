@@ -28,11 +28,12 @@ import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelFileRole
 import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelInfo
-import ai.runanywhere.proto.v1.ModelLoadResult
 import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.MultiFileArtifact
 import ai.runanywhere.proto.v1.SingleFileArtifact
 import ai.runanywhere.proto.v1.ThinkingTagPattern
+import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RAModelLoadResult
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
 // MARK: - ExpectedModelFiles
@@ -128,17 +129,17 @@ val Collection<ModelFileDescriptor>.resolvedVocabularyPath: String?
 // fall back through the model registry). The accessors below mirror the
 // Swift API surface that just walks `resolved_artifacts` directly.
 
-fun ModelLoadResult.resolvedTokenizerPath(): String? =
+fun RAModelLoadResult.resolvedTokenizerPath(): String? =
     resolved_artifacts.resolvedTokenizerPath
 
-fun ModelLoadResult.resolvedConfigPath(): String? =
+fun RAModelLoadResult.resolvedConfigPath(): String? =
     resolved_artifacts.resolvedConfigPath
 
-fun ModelLoadResult.resolvedVocabularyPath(): String? =
+fun RAModelLoadResult.resolvedVocabularyPath(): String? =
     resolved_artifacts.resolvedVocabularyPath
 
 /** Primary artifact path for the lifecycle, or `resolved_path` as a fallback. */
-val ModelLoadResult.lifecyclePrimaryArtifactPath: String?
+val RAModelLoadResult.lifecyclePrimaryArtifactPath: String?
     get() = resolvedPrimaryModelPath() ?: resolved_path.takeIf { it.isNotEmpty() }
 
 // MARK: - CurrentModelResult resolved-artifact accessors
@@ -188,21 +189,21 @@ val ModelArtifactType.requiresDownload: Boolean
 // MARK: - ModelInfo artifact helpers
 
 /** True when the entry's artifact requires extraction (archive). */
-val ModelInfo.requiresExtraction: Boolean
+val RAModelInfo.requiresExtraction: Boolean
     get() {
         if (archive != null) return true
         return artifactTypeOrUnspecified.requiresExtraction
     }
 
 /** True when the entry needs to be downloaded before it can be used. */
-val ModelInfo.requiresDownload: Boolean
+val RAModelInfo.requiresDownload: Boolean
     get() {
         if (isBuiltIn) return false
         return artifactTypeOrUnspecified.requiresDownload
     }
 
 /** Underlying [ArchiveArtifact] or null if the entry isn't an archive. */
-val ModelInfo.archiveArtifact: ArchiveArtifact?
+val RAModelInfo.archiveArtifact: ArchiveArtifact?
     get() {
         archive?.let { return it }
         return when (artifact_type) {
@@ -221,7 +222,7 @@ val ModelInfo.archiveArtifact: ArchiveArtifact?
     }
 
 /** Multi-file descriptors declared on the entry, or empty. */
-val ModelInfo.multiFileDescriptors: List<ModelFileDescriptor>
+val RAModelInfo.multiFileDescriptors: List<ModelFileDescriptor>
     get() = multi_file?.files ?: emptyList()
 
 /**
@@ -229,7 +230,7 @@ val ModelInfo.multiFileDescriptors: List<ModelFileDescriptor>
  * downloader, falling back to the artifact's pattern lists when no
  * explicit manifest is set. Mirrors Swift's `expectedArtifactFiles`.
  */
-val ModelInfo.expectedArtifactFiles: ExpectedModelFiles
+val RAModelInfo.expectedArtifactFiles: ExpectedModelFiles
     get() {
         expected_files?.let { if (!it.isEmptyManifest) return it }
         single_file?.let { artifact ->
@@ -262,7 +263,7 @@ val ModelInfo.expectedArtifactFiles: ExpectedModelFiles
  * `built_in` artifact type, the `builtin:` localpath prefix, and the two
  * platform-built-in frameworks (Foundation Models, System TTS).
  */
-val ModelInfo.isBuiltIn: Boolean
+val RAModelInfo.isBuiltIn: Boolean
     get() {
         if (built_in == true) return true
         if (artifact_type == ModelArtifactType.MODEL_ARTIFACT_TYPE_BUILT_IN) return true
@@ -277,18 +278,18 @@ val ModelInfo.isBuiltIn: Boolean
  * the platform actuals populate via `FileOperationsUtilities` /
  * `existsWithType` on the JVM/Android side).
  */
-val ModelInfo.isDownloadedOnDisk: Boolean
+val RAModelInfo.isDownloadedOnDisk: Boolean
     get() {
         if (isBuiltIn) return true
         return is_downloaded == true || local_path.isNotEmpty()
     }
 
 /** Whether the model is ready to load (built-in OR on-disk OR proto-marked). */
-val ModelInfo.isAvailableForUse: Boolean
+val RAModelInfo.isAvailableForUse: Boolean
     get() = isBuiltIn || isDownloadedOnDisk || (is_available == true)
 
 /** Returns the download URL string or null if empty. */
-val ModelInfo.downloadURLValue: String?
+val RAModelInfo.downloadURLValue: String?
     get() = download_url.takeIf { it.isNotEmpty() }
 
 /**
@@ -296,27 +297,27 @@ val ModelInfo.downloadURLValue: String?
  * a URL type, so this is just the canonical path string the platform
  * actuals already use (`/abs/path` or `file:///` or `builtin:...`).
  */
-val ModelInfo.localPathURL: String?
+val RAModelInfo.localPathURL: String?
     get() = local_path.takeIf { it.isNotEmpty() }
 
 /** Hint of the download size in bytes, alias for `download_size_bytes`. */
-val ModelInfo.downloadSizeHint: Long
+val RAModelInfo.downloadSizeHint: Long
     get() = download_size_bytes
 
-private val ModelInfo.artifactTypeOrUnspecified: ModelArtifactType
+private val RAModelInfo.artifactTypeOrUnspecified: ModelArtifactType
     get() = artifact_type ?: ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED
 
 // MARK: - Fluent helpers (return a new copy with the requested mutation)
 
 /** Returns a copy of [ModelInfo] with `download_url` updated. */
-fun ModelInfo.setDownloadURL(url: String?): ModelInfo =
+fun RAModelInfo.setDownloadURL(url: String?): RAModelInfo =
     copy(download_url = url.orEmpty())
 
 /**
  * Returns a copy of [ModelInfo] with `local_path` updated and the derived
  * `is_downloaded` / `is_available` flags re-stamped to match.
  */
-fun ModelInfo.setLocalPath(path: String?): ModelInfo {
+fun RAModelInfo.setLocalPath(path: String?): RAModelInfo {
     val updated = copy(local_path = path.orEmpty())
     return updated.copy(
         is_downloaded = updated.isDownloadedOnDisk,
@@ -329,7 +330,7 @@ fun ModelInfo.setLocalPath(path: String?): ModelInfo {
  * file artifact. Also updates the canonical `artifact_type` and stamps
  * the artifact's `expected_files` onto the entry when non-empty.
  */
-fun ModelInfo.setSingleFileArtifact(artifact: SingleFileArtifact): ModelInfo {
+fun RAModelInfo.setSingleFileArtifact(artifact: SingleFileArtifact): RAModelInfo {
     val derived = artifact.expected_files?.takeIf { !it.isEmptyManifest }
     return copy(
         single_file = artifact,
@@ -346,7 +347,7 @@ fun ModelInfo.setSingleFileArtifact(artifact: SingleFileArtifact): ModelInfo {
  * Returns a copy of [ModelInfo] with the artifact oneof set to an archive.
  * Also updates `artifact_type` and stamps the manifest when present.
  */
-fun ModelInfo.setArchiveArtifact(artifact: ArchiveArtifact): ModelInfo {
+fun RAModelInfo.setArchiveArtifact(artifact: ArchiveArtifact): RAModelInfo {
     val derived = artifact.expected_files?.takeIf { !it.isEmptyManifest }
     return copy(
         single_file = null,
@@ -363,7 +364,7 @@ fun ModelInfo.setArchiveArtifact(artifact: ArchiveArtifact): ModelInfo {
  * Returns a copy of [ModelInfo] with the artifact oneof set to a multi-
  * file artifact. Also updates `artifact_type`.
  */
-fun ModelInfo.setMultiFileArtifact(artifact: MultiFileArtifact): ModelInfo =
+fun RAModelInfo.setMultiFileArtifact(artifact: MultiFileArtifact): RAModelInfo =
     copy(
         single_file = null,
         archive = null,
@@ -377,7 +378,7 @@ fun ModelInfo.setMultiFileArtifact(artifact: MultiFileArtifact): ModelInfo =
  * Returns a copy of [ModelInfo] with the artifact oneof set to a custom
  * strategy id. Also updates `artifact_type`.
  */
-fun ModelInfo.setCustomStrategyArtifact(strategyId: String): ModelInfo =
+fun RAModelInfo.setCustomStrategyArtifact(strategyId: String): RAModelInfo =
     copy(
         single_file = null,
         archive = null,
@@ -391,7 +392,7 @@ fun ModelInfo.setCustomStrategyArtifact(strategyId: String): ModelInfo =
  * Returns a copy of [ModelInfo] flagged as built-in. Also updates
  * `artifact_type`.
  */
-fun ModelInfo.setBuiltInArtifact(enabled: Boolean = true): ModelInfo =
+fun RAModelInfo.setBuiltInArtifact(enabled: Boolean = true): RAModelInfo =
     copy(
         single_file = null,
         archive = null,
@@ -433,13 +434,13 @@ fun ModelInfo.Companion.create(
     createdAtUnixMs: Long = getCurrentTimeMillis(),
     updatedAtUnixMs: Long = getCurrentTimeMillis(),
     archiveType: ArchiveType? = null,
-): ModelInfo {
+): RAModelInfo {
     val resolvedContext =
         contextLength
             ?: if (category.requiresContextLength) 2048 else 0
     val resolvedSupportsThinking = category.supportsThinking && supportsThinking
     val base =
-        ModelInfo(
+        RAModelInfo(
             id = id,
             name = name,
             category = category,
@@ -485,10 +486,10 @@ fun ModelInfo.Companion.inferredArtifact(
     return SingleFileArtifact()
 }
 
-private fun ModelInfo.applyInferredArtifact(
+private fun RAModelInfo.applyInferredArtifact(
     url: String?,
     explicitArchiveType: ArchiveType?,
-): ModelInfo {
+): RAModelInfo {
     val archiveType = explicitArchiveType ?: archiveTypeFromPath(url.orEmpty())
     return if (archiveType != null) {
         setArchiveArtifact(

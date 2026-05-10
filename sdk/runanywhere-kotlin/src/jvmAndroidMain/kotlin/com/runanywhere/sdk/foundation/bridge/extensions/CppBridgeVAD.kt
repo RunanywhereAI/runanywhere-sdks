@@ -12,6 +12,8 @@ import ai.runanywhere.proto.v1.VADStatistics
 import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.types.RAVADOptions
+import com.runanywhere.sdk.public.types.RAVADResult
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
@@ -104,7 +106,7 @@ object CppBridgeVAD {
         checkRc(rc, "racVadComponentConfigureProto")
     }
 
-    fun process(samples: FloatArray, options: VADOptions = VADOptions()): VADResult {
+    fun process(samples: FloatArray, options: RAVADOptions = RAVADOptions()): RAVADResult {
         create()
         return decodeOrThrow(
             VADResult.ADAPTER,

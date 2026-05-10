@@ -11,10 +11,10 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.STTOptions
-import ai.runanywhere.proto.v1.STTOutput
 import ai.runanywhere.proto.v1.STTStreamEvent
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RASTTOptions
+import com.runanywhere.sdk.public.types.RATranscriptionResult
 import kotlinx.coroutines.flow.Flow
 
 // MARK: - Model Loading
@@ -38,8 +38,8 @@ expect val RunAnywhere.currentSTTModelId: String?
  */
 expect suspend fun RunAnywhere.transcribe(
     audio: ByteArray,
-    options: STTOptions = STTOptions(),
-): STTOutput
+    options: RASTTOptions = RASTTOptions(),
+): RATranscriptionResult
 
 // MARK: - Streaming Transcription
 
@@ -56,5 +56,5 @@ expect suspend fun RunAnywhere.transcribe(
  */
 expect fun RunAnywhere.transcribeStream(
     audioData: Flow<ByteArray>,
-    options: STTOptions? = null,
+    options: RASTTOptions? = null,
 ): Flow<STTStreamEvent>

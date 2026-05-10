@@ -12,6 +12,8 @@ import com.runanywhere.sdk.foundation.bridge.CppBridge
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.types.RASTTOptions
+import com.runanywhere.sdk.public.types.RATranscriptionResult
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
@@ -84,7 +86,7 @@ object CppBridgeSTT {
         }
     }
 
-    fun transcribe(audioData: ByteArray, options: STTOptions): STTOutput {
+    fun transcribe(audioData: ByteArray, options: RASTTOptions): RATranscriptionResult {
         create()
         return decodeOrThrow(
             STTOutput.ADAPTER,
@@ -99,7 +101,7 @@ object CppBridgeSTT {
 
     fun transcribeStream(
         audioData: ByteArray,
-        options: STTOptions,
+        options: RASTTOptions,
         onEvent: (STTStreamEvent) -> Boolean,
     ) {
         create()

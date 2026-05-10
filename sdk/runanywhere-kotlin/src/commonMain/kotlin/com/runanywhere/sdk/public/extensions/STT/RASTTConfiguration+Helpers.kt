@@ -15,11 +15,12 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.STTConfiguration
 import ai.runanywhere.proto.v1.STTLanguage
 import ai.runanywhere.proto.v1.STTOptions
-import ai.runanywhere.proto.v1.STTOutput
 import ai.runanywhere.proto.v1.TranscriptionAlternative
 import ai.runanywhere.proto.v1.TranscriptionMetadata
 import ai.runanywhere.proto.v1.WordTimestamp
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.public.types.RASTTOptions
+import com.runanywhere.sdk.public.types.RATranscriptionResult
 
 // MARK: - STTLanguage
 
@@ -100,7 +101,7 @@ fun STTConfiguration.validate() {
  */
 fun STTOptions.Companion.defaults(
     language: STTLanguage = STTLanguage.STT_LANGUAGE_EN,
-): STTOptions = STTOptions(
+): RASTTOptions = RASTTOptions(
     language = language,
     enable_punctuation = true,
     enable_diarization = false,
@@ -115,7 +116,7 @@ fun STTOptions.Companion.defaults(
  * Convenience alias for the detected language enum on the output.
  * Mirrors Swift `RASTTOutput.detectedLanguageCode`.
  */
-val STTOutput.detectedLanguageCode: STTLanguage
+val RATranscriptionResult.detectedLanguageCode: STTLanguage
     get() = language
 
 // MARK: - WordTimestamp

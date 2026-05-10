@@ -12,16 +12,17 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.RAGConfig
 import ai.runanywhere.proto.v1.RAGConfiguration
-import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
 import ai.runanywhere.proto.v1.RAGSearchResult
-import ai.runanywhere.proto.v1.RAGStatistics
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RARAGConfiguration
+import com.runanywhere.sdk.public.types.RARAGDocument
+import com.runanywhere.sdk.public.types.RARAGStatistics
 
 // MARK: - Pipeline Lifecycle
 
@@ -31,10 +32,10 @@ import com.runanywhere.sdk.public.RunAnywhere
  * `RunAnywhere.ragResolvedConfiguration(embeddingModel:llmModel:baseConfiguration:)`.
  */
 expect suspend fun RunAnywhere.ragResolvedConfiguration(
-    embeddingModel: ModelInfo,
-    llmModel: ModelInfo,
-    baseConfiguration: RAGConfiguration = RAGConfiguration.defaults(),
-): RAGConfiguration
+    embeddingModel: RAModelInfo,
+    llmModel: RAModelInfo,
+    baseConfiguration: RARAGConfiguration = RAGConfiguration.defaults(),
+): RARAGConfiguration
 
 /**
  * Create the RAG pipeline with the given configuration.
@@ -44,7 +45,7 @@ expect suspend fun RunAnywhere.ragResolvedConfiguration(
  * @param config RAG pipeline configuration (model paths, tuning parameters)
  * @throws IllegalStateException if pipeline creation fails
  */
-expect suspend fun RunAnywhere.ragCreatePipeline(config: RAGConfiguration)
+expect suspend fun RunAnywhere.ragCreatePipeline(config: RARAGConfiguration)
 
 /**
  * Create the RAG pipeline from a generated solution RAG config.
@@ -62,7 +63,7 @@ suspend fun RunAnywhere.ragCreatePipeline(config: RAGConfig) {
             ?: throw SDKException.invalidConfiguration("RAGConfig.llm_model_id is required")
 
     ragCreatePipeline(
-        RAGConfiguration(
+        RARAGConfiguration(
             embedding_model_id = embeddingModelId,
             llm_model_id = llmModelId,
             reranker_model_id = config.rerank_model_id.takeIf { it.isNotBlank() },
@@ -101,7 +102,7 @@ expect suspend fun RunAnywhere.ragIngest(text: String, metadataJSON: String? = n
  *
  * Mirrors Swift `ragIngest(_ document: RARAGDocument)`.
  */
-expect suspend fun RunAnywhere.ragIngest(document: RAGDocument): RAGStatistics
+expect suspend fun RunAnywhere.ragIngest(document: RARAGDocument): RARAGStatistics
 
 /**
  * Clear all previously ingested documents from the pipeline.
@@ -128,7 +129,7 @@ expect suspend fun RunAnywhere.ragGetDocumentCount(): Int
  *
  * @throws IllegalStateException if the pipeline is not created or ingestion fails.
  */
-expect suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RAGDocument>): RAGStatistics
+expect suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RARAGDocument>): RARAGStatistics
 
 /**
  * Get statistics for the current RAG pipeline.
@@ -138,7 +139,7 @@ expect suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RAGDocument>
  * @return RAGStatistics with chunk count, last query timing, etc.
  * @throws IllegalStateException if the pipeline is not created
  */
-expect suspend fun RunAnywhere.ragGetStatistics(): RAGStatistics
+expect suspend fun RunAnywhere.ragGetStatistics(): RARAGStatistics
 
 // MARK: - Query
 

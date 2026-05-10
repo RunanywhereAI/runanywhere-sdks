@@ -11,12 +11,12 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.VADOptions
-import ai.runanywhere.proto.v1.VADResult
 import ai.runanywhere.proto.v1.VADStatistics
 import ai.runanywhere.proto.v1.VADStreamEvent
 import ai.runanywhere.proto.v1.VADStreamEventKind
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RAVADOptions
+import com.runanywhere.sdk.public.types.RAVADResult
 import kotlinx.coroutines.flow.Flow
 
 // MARK: - VAD Operations
@@ -27,13 +27,13 @@ import kotlinx.coroutines.flow.Flow
  * @param audioData Audio data to analyze
  * @return VAD result with speech detection and confidence
  */
-expect suspend fun RunAnywhere.detectVoiceActivity(audioData: ByteArray): VADResult
+expect suspend fun RunAnywhere.detectVoiceActivity(audioData: ByteArray): RAVADResult
 
 /** Canonical cross-SDK signature: detectVoiceActivity(audio, options) returns VADResult. */
 expect suspend fun RunAnywhere.detectVoiceActivity(
     audioData: ByteArray,
-    options: VADOptions,
-): VADResult
+    options: RAVADOptions,
+): RAVADResult
 
 /**
  * Process audio samples and stream generated VAD event envelopes.
@@ -42,7 +42,7 @@ expect suspend fun RunAnywhere.detectVoiceActivity(
  * @return Flow of generated VAD stream events
  */
 fun RunAnywhere.streamVAD(audioSamples: Flow<FloatArray>): Flow<VADStreamEvent> =
-    streamVAD(audioSamples, VADOptions())
+    streamVAD(audioSamples, RAVADOptions())
 
 /**
  * Process audio samples and stream generated VAD event envelopes using options.
@@ -52,7 +52,7 @@ fun RunAnywhere.streamVAD(audioSamples: Flow<FloatArray>): Flow<VADStreamEvent> 
  */
 expect fun RunAnywhere.streamVAD(
     audioSamples: Flow<FloatArray>,
-    options: VADOptions,
+    options: RAVADOptions,
 ): Flow<VADStreamEvent>
 
 /**

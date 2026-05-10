@@ -1,5 +1,271 @@
 # Kotlin SDK — Current Inconsistencies
 
+Updated: 2026-05-10
+Branch: `feat/v2-architecture` (post-wave-3)
+
+---
+
+# Update 2026-05-10 — Wave 1 + 2 + 3 progress
+
+This PR closes the Swift-parity backlog for the Kotlin SDK across three
+waves (folder layout + bridge split + module pattern in wave 1, public
+API rename + missing-method ports + helper-file additions in wave 2,
+commons-side `update_registry_on_completion` + `file_list_directory`
+adapter callback + RA-prefix typealias adoption sweep in wave 3). The
+Kotlin extension API now mirrors Swift one-for-one (no `@Deprecated`
+shims) and the Android example app's bootstrap path matches Swift's
+curated catalog seed + LoRA seed + system-TTS module registration.
+
+## Items closed in waves 1–3
+
+### KOT-API-ALIGNMENT-SWIFT (LOW) — ✅ CLOSED in wave 2
+
+15 cosmetic divergences from the Swift canonical surface have all been
+resolved. The Kotlin extension API now matches Swift exactly. No
+`@Deprecated` shims were left behind (per repo "DELETE, don't deprecate"
+rule).
+
+**Renames**:
+- `parseStructuredOutput(request)` → `extractStructuredOutput(text, schema)`
+- `checkStorageAvailability(...)` → `checkStorageAvailable(...)`
+- `metadataJson` → `metadataJSON`
+- `LoRA.list(request)` / `LoRA.state(request)` → no-arg `list()` / `state()`
+- `VLM.processImage(image, prompt, options)` → `processImage(image, options)` (prompt optional)
+- `Solutions.SolutionHandle.feed(ByteArray)` → `feed(String)`
+
+**Deletions**:
+- `RunAnywhere.chat(prompt)` (no Swift equivalent)
+- `ToolCalling.clearTools()` (no Swift equivalent)
+- `STT.transcribeWithOptions(...)` (no Swift equivalent)
+- `VLM.describeImage(...)` / `askAboutImage(...)` convenience methods (no Swift equivalent)
+- `VoiceAgent.isVoiceAgentReady()` (callers use `getVoiceAgentComponentStates()`)
+- `VAD.initializeVAD()` / `initializeVAD(config)` from public surface (made internal)
+
+**Additions**:
+- `TTS.stopSpeaking()`
+- `VoiceAgent.processVoiceTurn(audioData)`
+- `completeServicesInitialization()` now auto-called from `ensureServicesReady()`
+
+### KOT-VAD-001 / KOT-VAD-002 (MED) — ✅ CLOSED in wave 2
+
+Silero VAD now auto-loads on Voice Agent init. Direct port of
+`SWIFT-VOICE-AGENT-001` (commit `6c26b24f6`). The Voice Agent component
+boot sequence ensures the registered Silero model is loaded before
+audio capture begins; no manual `loadModel("silero-vad-onnx")` is
+required from the example app.
+
+### KOT-STT-001 (HIGH) — ✅ CLOSED in wave 2
+
+STT chunk transcription errors now surface to the UI via
+`uiState.errorMessage` instead of being silently swallowed in the
+chunk-decode coroutine. Mirrors Swift's `STTViewModel` error-routing.
+
+### KOT-TTS-001 / KOT-TTS-003 (HIGH/MED) — ✅ CLOSED in wave 2
+
+System TTS is now registered as a built-in `system-tts` `ModelInfo` via
+`SystemTTSModule.register()` (Android) and `JvmSystemTTSModule.register()`
+(JVM). The Android example's inline synthetic `ModelInfo` block in
+`ModelSelectionBottomSheet` was removed; the registry is now the single
+source of truth for available TTS models.
+
+### KOT-VLM-001 (MED) — ✅ CLOSED in wave 2
+
+The RGBA→RGB stride bug is fixed by routing through `VLMImage.fromBitmap()`
+helper which uses Android's stride-aware `Bitmap.getPixels()`. The
+helper produces a correctly packed `RAVLMImage` proto regardless of
+the source bitmap's stride.
+
+### KOT-RAG-001 (CRIT) — ✅ CLOSED in wave 2
+
+`RAGViewModel.onCleared()` now destroys the active pipeline (no more
+handle leak). Mirrors Swift's `RAGViewModel` lifecycle hook.
+
+### KOT-DOWNLOAD-001 (MED) — ✅ CLOSED in wave 2
+
+Replaced the 500 ms `delay()` wait with an `EventBus` subscription that
+waits for `MODEL_EVENT_KIND_DOWNLOAD_COMPLETED` for the specific model
+ID. Eliminates the race window where a fast download would complete
+before the sleep finished, and removes the unbounded wait when a slow
+download runs longer than 500 ms.
+
+### KOT-DOWNLOAD-004 (HIGH) — ✅ CLOSED in wave 2 (deferred → conditional)
+
+The Kotlin self-heal `markModelDownloadedInRegistry()` was deferred
+until commons CPP-02 lands. **J1 lands CPP-02 in this PR**
+(`update_registry_on_completion` in `download_orchestrator.cpp`); the
+Kotlin self-heal can be removed in a follow-up after a clean rebuild
+and end-to-end verification on Pixel 8 Pro confirms the C++ side
+toggles `is_downloaded=true` + `local_path` autonomously.
+
+### KOT-VOICE-001 (LOW) — ✅ CLOSED in wave 2
+
+Audio chunks skipped during in-flight processing now log a
+`Timber.d("voice-agent: dropped audio chunk while processing in flight")`
+so the drop is observable in logcat instead of being silent.
+
+### KOT-LORA-001 (CRIT) — ✅ CLOSED in wave 2
+
+The curated LoRA adapter (`abliterated-lora`) is now registered on app
+start via `seedLoRAAdapters()` in `ModelBootstrap.kt`. Mirrors the
+Swift example app's LoRA seed step; the More → LoRA panel now renders
+a non-empty list on first launch.
+
+### KOT-E2E-PER-MODALITY-UNTESTED (MED) — verification queued (Workstream I)
+
+Status now "verification queued". Workstream I drills run after wave 3
+commit lands. Per-modality download → load → inference flows on Pixel
+8 Pro across LLM / VLM / STT / TTS / VAD / Voice Agent / RAG / LoRA /
+Tool Calling / Structured Output / Benchmarks / Solutions remain to be
+exercised on-device.
+
+## New "Closed in this PR" entries (wave 1–3)
+
+### KOT-PARITY-FOLDER-LAYOUT — ✅ CLOSED in wave 1
+
+Public extensions moved into modality subfolders (`LLM/`, `STT/`, `TTS/`,
+`VAD/`, `VLM/`, `VoiceAgent/`, `Models/`, `RAG/`, `Storage/`, `Solutions/`,
+`Events/`) matching Swift exactly. The flat
+`commonMain/.../public/extensions/` layout is gone; each modality now
+owns its own subfolder of `RunAnywhere+*.kt` extension files.
+
+### KOT-PARITY-BRIDGE-SPLIT — ✅ CLOSED in wave 1
+
+Split monolithic `CppBridgeModalityProto.kt` (867 lines) and
+`CppBridgeStableProto.kt` (205 lines) into per-domain top-level
+bridges: `CppBridgeLLM`, `CppBridgeSTT`, `CppBridgeTTS`, `CppBridgeVAD`,
+`CppBridgeVLM`, `CppBridgeRAG`, `CppBridgeEmbeddings`, `CppBridgeLoRA`,
+`CppBridgeDiffusion`, `CppBridgeDownload`, `CppBridgeModelLifecycle`,
+`CppBridgeStorage`, `CppBridgeSDKEventStream`. Each bridge file is now
+single-purpose and matches Swift's per-domain `CppBridge+*.swift`
+extension layout.
+
+### KOT-PARITY-API-RENAME — ✅ CLOSED in wave 2
+
+Full rename of public extension surface to Swift canonical names. No
+`@Deprecated` shims. See KOT-API-ALIGNMENT-SWIFT entry above for the
+full delta.
+
+### KOT-PARITY-MODULE-PATTERN — ✅ CLOSED in wave 1
+
+`RunAnywhereModule` interface added in `commonMain/public`. `LlamaCPP`,
+`ONNX`, `SystemTTSModule` (Android), `JvmSystemTTSModule` (JVM) all
+conform. The Android example's `ModelBootstrap.registerBackends()`
+now iterates a uniform `List<RunAnywhereModule>` and calls
+`module.register(priority)` on each, mirroring Swift's
+`RunAnywhereModule` protocol pattern.
+
+### KOT-PARITY-SYSTEM-TTS-REGISTRATION — ✅ CLOSED in wave 2
+
+System TTS is now registered as a real `ModelInfo` in the registry via
+`SystemTTSModule.register()`. The inline synthetic `ModelInfo` block in
+`ModelSelectionBottomSheet` was removed. Selecting "System TTS" in the
+example app now follows the same registry-driven path as any other
+model.
+
+### KOT-PARITY-MISSING-METHODS — ✅ CLOSED in wave 2
+
+Added Swift parity methods on the public extension surface:
+`RunAnywhere.lora.*` namespace, `RunAnywhere.solutions.*` namespace,
+`extractStructuredOutput`, `processVoiceTurn`, `streamVoiceAgent`,
+`getVoiceAgentComponentStates`, `getStorageInfo`, `clearCache`,
+`cleanTempFiles`, `planStorageDelete`, `deleteStorage`, `ragSearch`,
+`ragQueryWithContext`, `ragResolvedConfiguration`, `ragAddDocumentsBatch`,
+`ragGetDocumentCount`, `supportsAccelerator`, `synchronizeVLMComponentLoad`,
+`shouldUnloadVLMComponent`, `importModel`, `subscribeSDKEvents`,
+`unsubscribeSDKEvents`, `pollSDKEvent`, `publishSDKEvent`,
+`publishSDKFailure`, `extractStructuredOutput`,
+`generateWithStructuredOutput`.
+
+### KOT-PARITY-HELPER-FILES — ✅ CLOSED in wave 2
+
+Added 9 helper files mirroring Swift:
+- `RASTTConfiguration+Helpers`
+- `RATTSConfiguration+Helpers`
+- `RAVADConfiguration+Helpers`
+- `RAVLMImage+Helpers` (plus an Android-only Bitmap helper)
+- `EmbeddingsProto+Helpers`
+- `StructuredOutputProto+Helpers`
+- `RAGProto+Helpers`
+- `StorageProto+Helpers`
+- `ModelTypes+Artifacts`
+
+### KOT-PARITY-CPP02 — ✅ CLOSED in wave 3
+
+Implemented `update_registry_on_completion` in `download_orchestrator.cpp`
+so the C++ side now self-heals the registry on download completion.
+This closes the parity gap with Swift, where commons handled the
+post-download registry toggle. The Kotlin-side
+`markModelDownloadedInRegistry()` self-heal becomes redundant once
+this code path is verified end-to-end.
+
+### KOT-PARITY-FILE-LISTDIR — ✅ CLOSED in wave 3
+
+Added a `file_list_directory` callback to `rac_platform_adapter_t` so
+that `rac_model_registry_refresh_proto(rescan_local=true)` actually
+walks the model storage tree on Android once the platform adapter
+wires the callback. Without this, the rescan path was a no-op on
+Android because the C++ core had no way to enumerate the on-disk
+model directory.
+
+### KOT-PARITY-RA-ALIASES — ✅ CLOSED in wave 3
+
+Added `commonMain/.../public/types/SwiftAliases.kt` with 37 RA-prefix
+typealiases mirroring Swift's RA prefix convention (e.g.
+`typealias RAModelInfo = ai.runanywhere.proto.v1.RAModelInfo`,
+`typealias RAGenerationOptions = ai.runanywhere.proto.v1.RAGenerationOptions`,
+etc.). Adoption sweep across SDK + example app per task L2 — all
+public-surface call sites now reference the RA-prefixed aliases
+instead of the fully-qualified proto types.
+
+### KOT-CATALOG-SEED-RESTORED — ✅ CLOSED in wave 3
+
+Restored the curated model catalog in
+`examples/android/RunAnywhereAI/app/src/main/.../ModelBootstrap.kt`
+(LLM / VLM / STT / TTS / VAD / Embedding) that was deleted in commit
+`34e32b68a`. The seed is idempotent: re-registration on every launch
+preserves `is_downloaded` / `local_path` state from prior runs because
+`ModelInfo.upsert(...)` semantics are merge-by-id. The More tab now
+renders the same set of selectable models as Swift's iOS example.
+
+### KOT-STORAGE-PATH-INIT — ✅ CLOSED in wave 3
+
+`CppBridge.initialize()` now eagerly materializes the model storage
+base directory at end of Phase 1 so `rac_download_plan_proto` no longer
+fails with "failed to compute model storage path". Previously the
+storage dir was created lazily on first download attempt, which
+produced a confusing first-run error.
+
+### KOT-DOWNLOAD-COMPLETION-SELFHEAL — ✅ CLOSED in wave 3 (transitional)
+
+Kotlin-side `markModelDownloadedInRegistry()` toggles
+`is_downloaded=true` + `local_path` when the download stream emits
+`DOWNLOAD_STATE_COMPLETED`. This is the transitional Kotlin-side
+self-heal — it will be removed once commons CPP-02 (this PR) is
+verified end-to-end on Pixel 8 Pro.
+
+---
+
+## Open / updated items
+
+### KOT-E2E-PER-MODALITY-UNTESTED — verification queued
+
+Status now "verification queued". Workstream I drills run after wave 3
+commit lands; per-modality screenshots are pending on Pixel 8 Pro
+across LLM / VLM / STT / TTS / VAD / Voice Agent / RAG / LoRA / Tool
+Calling / Structured Output / Benchmarks / Solutions.
+
+### B19-followup: align C++ JNI lookup paths after `OkHttpTransport` rename — NEW OPEN
+
+After the `OkHttpTransport` rename, the C++ JNI lookup paths that
+resolve the Kotlin transport bridge by FQCN need a follow-up audit to
+confirm no stale class names remain in `runanywhere_commons_jni.cpp`
+or related bridge code. Track as new open item; not blocking for this
+PR.
+
+---
+
+# Part 0 — Pre-2026-05-10 history (preserved verbatim below)
+
 Updated: 2026-05-09
 Branch: `feat/v2-architecture` @ `2c4b8b599` (post-B4)
 

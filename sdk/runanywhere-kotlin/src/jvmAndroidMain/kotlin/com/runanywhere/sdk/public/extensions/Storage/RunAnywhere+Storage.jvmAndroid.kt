@@ -18,13 +18,13 @@ import ai.runanywhere.proto.v1.StorageDeletePlan
 import ai.runanywhere.proto.v1.StorageDeletePlanRequest
 import ai.runanywhere.proto.v1.StorageDeleteRequest
 import ai.runanywhere.proto.v1.StorageDeleteResult
-import ai.runanywhere.proto.v1.StorageInfo
 import ai.runanywhere.proto.v1.StorageInfoRequest
 import ai.runanywhere.proto.v1.StorageInfoResult
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RAStorageInfo
 
 private fun requireStorageInitialized(sdk: RunAnywhere) {
     if (!sdk.isInitialized) {
@@ -32,7 +32,7 @@ private fun requireStorageInitialized(sdk: RunAnywhere) {
     }
 }
 
-actual suspend fun RunAnywhere.getStorageInfo(): StorageInfo {
+actual suspend fun RunAnywhere.getStorageInfo(): RAStorageInfo {
     requireStorageInitialized(this)
     return getStorageInfo(
         StorageInfoRequest(

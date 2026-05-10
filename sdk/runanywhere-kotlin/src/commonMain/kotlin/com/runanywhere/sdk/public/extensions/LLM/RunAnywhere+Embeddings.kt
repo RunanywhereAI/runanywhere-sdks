@@ -11,8 +11,8 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.EmbeddingsOptions
-import ai.runanywhere.proto.v1.EmbeddingsResult
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RAEmbeddingsResult
 
 /**
  * Generate an embedding vector for a single text.
@@ -30,4 +30,4 @@ expect suspend fun RunAnywhere.embed(
     text: String,
     modelId: String,
     options: EmbeddingsOptions? = null,
-): EmbeddingsResult
+): RAEmbeddingsResult

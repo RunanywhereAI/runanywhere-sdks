@@ -15,8 +15,8 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.SpeechActivityEvent
 import ai.runanywhere.proto.v1.SpeechActivityKind
 import ai.runanywhere.proto.v1.VADConfiguration
-import ai.runanywhere.proto.v1.VADResult
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.public.types.RAVADResult
 
 // MARK: - VADConfiguration
 
@@ -61,7 +61,7 @@ val VADConfiguration.frameLengthSeconds: Float
 // MARK: - VADResult
 
 /** Frame duration in seconds. */
-val VADResult.duration: Double
+val RAVADResult.duration: Double
     get() = duration_ms.toDouble() / 1000.0
 
 // MARK: - SpeechActivityEvent

@@ -24,7 +24,7 @@ public extension RunAnywhere {
         options: RATTSOptions = .defaults()
     ) async throws -> RATTSOutput {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
 
@@ -36,7 +36,7 @@ public extension RunAnywhere {
         currentRequest.category = .speechSynthesis
         let current = RunAnywhere.currentModel(currentRequest)
         guard current.found else {
-            throw SDKException.tts(.notInitialized, "TTS voice not loaded")
+            throw SDKException(code: .notInitialized, message: "TTS voice not loaded", category: .component)
         }
 
         return try await CppBridge.TTS.shared.synthesize(text: text, options: options)
@@ -79,7 +79,7 @@ public extension RunAnywhere {
         options: RATTSOptions = .defaults()
     ) async throws -> RATTSSpeakResult {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
         let output = try await synthesize(text, options: options)
@@ -125,7 +125,7 @@ public extension RunAnywhere {
         }
 
         guard result == RAC_SUCCESS, let ptr = wavDataPtr, wavSize > 0 else {
-            throw SDKException.tts(.processingFailed, "Failed to convert PCM to WAV: \(result)")
+            throw SDKException(code: .processingFailed, message: "Failed to convert PCM to WAV: \(result)", category: .component)
         }
 
         let wavData = Data(bytes: ptr, count: wavSize)

@@ -163,14 +163,15 @@ extension CppBridge {
         /// Save model metadata to registry
         public func save(_ model: RAModelInfo) throws {
             guard let handle = handle else {
-                throw SDKException.general(.initializationFailed, "Registry not initialized")
+                throw SDKException(code: .initializationFailed, message: "Registry not initialized", category: .internal)
             }
 
             logger.info("Saving model: \(model.id), Swift framework: \(model.framework.wireString) (\(model.framework.displayName))")
             guard let registerProto = RegistryProtoABI.registerProto else {
-                throw SDKException.general(
-                    .notSupported,
-                    NativeProtoABI.missingSymbolMessage("rac_model_registry_register_proto")
+                throw SDKException(
+                    code: .notSupported,
+                    message: NativeProtoABI.missingSymbolMessage("rac_model_registry_register_proto"),
+                    category: .internal
                 )
             }
 
@@ -183,7 +184,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else {
-                throw SDKException.general(.processingFailed, "Failed to save model via proto registry")
+                throw SDKException(code: .processingFailed, message: "Failed to save model via proto registry", category: .internal)
             }
 
             logger.info("Model saved successfully via proto registry: \(model.id)")
@@ -192,13 +193,14 @@ extension CppBridge {
         /// Update existing model metadata in the registry.
         public func update(_ model: RAModelInfo) throws {
             guard let handle = handle else {
-                throw SDKException.general(.initializationFailed, "Registry not initialized")
+                throw SDKException(code: .initializationFailed, message: "Registry not initialized", category: .internal)
             }
 
             guard let updateProto = RegistryProtoABI.updateProto else {
-                throw SDKException.general(
-                    .notSupported,
-                    NativeProtoABI.missingSymbolMessage("rac_model_registry_update_proto")
+                throw SDKException(
+                    code: .notSupported,
+                    message: NativeProtoABI.missingSymbolMessage("rac_model_registry_update_proto"),
+                    category: .internal
                 )
             }
 
@@ -211,7 +213,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else {
-                throw SDKException.general(.modelNotFound, "Model not found: \(model.id)")
+                throw SDKException(code: .modelNotFound, message: "Model not found: \(model.id)", category: .internal)
             }
 
             logger.debug("Model updated via proto registry: \(model.id)")
@@ -369,7 +371,7 @@ extension CppBridge {
         /// Update download status for a model
         public func updateDownloadStatus(modelId: String, localPath: URL?) throws {
             guard var model = get(modelId: modelId) else {
-                throw SDKException.general(.modelNotFound, "Model not found: \(modelId)")
+                throw SDKException(code: .modelNotFound, message: "Model not found: \(modelId)", category: .internal)
             }
 
             model.setLocalPath(localPath)
@@ -381,7 +383,7 @@ extension CppBridge {
         /// Update last used timestamp
         public func updateLastUsed(modelId: String) throws {
             guard var model = get(modelId: modelId) else {
-                throw SDKException.general(.modelNotFound, "Model not found: \(modelId)")
+                throw SDKException(code: .modelNotFound, message: "Model not found: \(modelId)", category: .internal)
             }
 
             model.lastUsedAtUnixMs = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
@@ -394,13 +396,14 @@ extension CppBridge {
         /// Remove model from registry
         public func remove(modelId: String) throws {
             guard let handle = handle else {
-                throw SDKException.general(.initializationFailed, "Registry not initialized")
+                throw SDKException(code: .initializationFailed, message: "Registry not initialized", category: .internal)
             }
 
             guard let removeProto = RegistryProtoABI.removeProto else {
-                throw SDKException.general(
-                    .notSupported,
-                    NativeProtoABI.missingSymbolMessage("rac_model_registry_remove_proto")
+                throw SDKException(
+                    code: .notSupported,
+                    message: NativeProtoABI.missingSymbolMessage("rac_model_registry_remove_proto"),
+                    category: .internal
                 )
             }
 
@@ -409,7 +412,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else {
-                throw SDKException.general(.modelNotFound, "Model not found: \(modelId)")
+                throw SDKException(code: .modelNotFound, message: "Model not found: \(modelId)", category: .internal)
             }
 
             logger.debug("Model removed via proto registry: \(modelId)")
@@ -570,12 +573,13 @@ extension CppBridge {
             responseType: Response.Type
         ) throws -> Response {
             guard let handle else {
-                throw SDKException.general(.initializationFailed, "Registry not initialized")
+                throw SDKException(code: .initializationFailed, message: "Registry not initialized", category: .internal)
             }
             guard let symbol, NativeProtoABI.canReceiveProtoBuffer else {
-                throw SDKException.general(
-                    .notSupported,
-                    NativeProtoABI.missingSymbolMessage(symbolName)
+                throw SDKException(
+                    code: .notSupported,
+                    message: NativeProtoABI.missingSymbolMessage(symbolName),
+                    category: .internal
                 )
             }
 
@@ -588,7 +592,7 @@ extension CppBridge {
             guard status == RAC_SUCCESS else {
                 let message = outBuffer.error_message.map { String(cString: $0) }
                     ?? "Registry proto request failed: \(symbolName) rc=\(status)"
-                throw SDKException.general(.processingFailed, message)
+                throw SDKException(code: .processingFailed, message: message, category: .internal)
             }
             return try NativeProtoABI.decode(responseType, from: outBuffer)
         }

@@ -15,11 +15,12 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.AudioFormat
 import ai.runanywhere.proto.v1.TTSConfiguration
 import ai.runanywhere.proto.v1.TTSOptions
-import ai.runanywhere.proto.v1.TTSOutput
 import ai.runanywhere.proto.v1.TTSPhonemeTimestamp
 import ai.runanywhere.proto.v1.TTSSpeakResult
 import ai.runanywhere.proto.v1.TTSSynthesisMetadata
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.public.types.RATTSOptions
+import com.runanywhere.sdk.public.types.RATTSOutput
 
 // MARK: - TTSConfiguration
 
@@ -73,7 +74,7 @@ fun TTSConfiguration.validate() {
 /**
  * Default TTS runtime options. Mirrors Swift `RATTSOptions.defaults()`.
  */
-fun TTSOptions.Companion.defaults(): TTSOptions = TTSOptions(
+fun TTSOptions.Companion.defaults(): RATTSOptions = RATTSOptions(
     language_code = "en-US",
     speaking_rate = 1.0f,
     pitch = 1.0f,
@@ -124,11 +125,11 @@ val TTSSynthesisMetadata.audioDuration: Double
 // MARK: - TTSOutput
 
 /** Audio duration in seconds. */
-val TTSOutput.duration: Double
+val RATTSOutput.duration: Double
     get() = duration_ms.toDouble() / 1000.0
 
 /** Wall-clock timestamp in milliseconds since the Unix epoch. */
-val TTSOutput.timestampEpochMs: Long
+val RATTSOutput.timestampEpochMs: Long
     get() = timestamp_ms
 
 // MARK: - TTSSpeakResult
@@ -137,7 +138,7 @@ val TTSOutput.timestampEpochMs: Long
  * Construct a [TTSSpeakResult] copying audio metadata from a [TTSOutput].
  * Mirrors Swift's `RATTSSpeakResult(output:)`.
  */
-fun TTSSpeakResult.Companion.fromOutput(output: TTSOutput): TTSSpeakResult = TTSSpeakResult(
+fun TTSSpeakResult.Companion.fromOutput(output: RATTSOutput): TTSSpeakResult = TTSSpeakResult(
     audio_format = output.audio_format,
     sample_rate = output.sample_rate,
     duration_ms = output.duration_ms,

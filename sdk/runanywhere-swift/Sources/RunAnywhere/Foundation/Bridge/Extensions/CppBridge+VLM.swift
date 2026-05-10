@@ -38,7 +38,7 @@ extension CppBridge {
             var newHandle: rac_handle_t?
             let result = rac_vlm_component_create(&newHandle)
             guard result == RAC_SUCCESS, let handle = newHandle else {
-                throw SDKException.vlm(.notInitialized, "Failed to create VLM component: \(result)")
+                throw SDKException(code: .notInitialized, message: "Failed to create VLM component: \(result)", category: .component)
             }
 
             self.handle = handle
@@ -67,23 +67,26 @@ extension CppBridge {
                 return
             }
             guard result.success else {
-                throw SDKException.vlm(
-                    .modelLoadFailed,
-                    result.errorMessage.isEmpty ? "VLM lifecycle load failed" : result.errorMessage
+                throw SDKException(
+                    code: .modelLoadFailed,
+                    message: result.errorMessage.isEmpty ? "VLM lifecycle load failed" : result.errorMessage,
+                    category: .component
                 )
             }
             guard let primaryPath = result.resolvedPrimaryModelPath else {
-                throw SDKException.vlm(
-                    .modelLoadFailed,
-                    "VLM lifecycle result did not include a primary model artifact"
+                throw SDKException(
+                    code: .modelLoadFailed,
+                    message: "VLM lifecycle result did not include a primary model artifact",
+                    category: .component
                 )
             }
 
             let projectorPath = result.resolvedVisionProjectorPath
             if result.framework == .llamaCpp && projectorPath == nil {
-                throw SDKException.vlm(
-                    .modelLoadFailed,
-                    "VLM lifecycle result did not include a vision projector artifact"
+                throw SDKException(
+                    code: .modelLoadFailed,
+                    message: "VLM lifecycle result did not include a vision projector artifact",
+                    category: .component
                 )
             }
 
@@ -100,20 +103,22 @@ extension CppBridge {
                 return
             }
             guard result.found else {
-                throw SDKException.vlm(.modelLoadFailed, "No lifecycle-loaded VLM model found")
+                throw SDKException(code: .modelLoadFailed, message: "No lifecycle-loaded VLM model found", category: .component)
             }
             guard let primaryPath = result.resolvedPrimaryModelPath else {
-                throw SDKException.vlm(
-                    .modelLoadFailed,
-                    "Current VLM lifecycle result did not include a primary model artifact"
+                throw SDKException(
+                    code: .modelLoadFailed,
+                    message: "Current VLM lifecycle result did not include a primary model artifact",
+                    category: .component
                 )
             }
 
             let projectorPath = result.resolvedVisionProjectorPath
             if result.framework == .llamaCpp && projectorPath == nil {
-                throw SDKException.vlm(
-                    .modelLoadFailed,
-                    "Current VLM lifecycle result did not include a vision projector artifact"
+                throw SDKException(
+                    code: .modelLoadFailed,
+                    message: "Current VLM lifecycle result did not include a vision projector artifact",
+                    category: .component
                 )
             }
 
@@ -156,7 +161,7 @@ extension CppBridge {
             }
 
             guard result == RAC_SUCCESS else {
-                throw SDKException.vlm(.modelLoadFailed, "Failed to load VLM model: \(result)")
+                throw SDKException(code: .modelLoadFailed, message: "Failed to load VLM model: \(result)", category: .component)
             }
 
             loadedModelId = modelId

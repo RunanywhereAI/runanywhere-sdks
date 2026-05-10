@@ -36,7 +36,7 @@ extension CppBridge {
             var newHandle: rac_handle_t?
             let result = rac_stt_component_create(&newHandle)
             guard result == RAC_SUCCESS, let handle = newHandle else {
-                throw SDKException.stt(.notInitialized, "Failed to create STT component: \(result)")
+                throw SDKException(code: .notInitialized, message: "Failed to create STT component: \(result)", category: .component)
             }
 
             self.handle = handle
@@ -98,7 +98,7 @@ extension CppBridge {
                 }
             }
             guard result == RAC_SUCCESS else {
-                throw SDKException.stt(.modelLoadFailed, "Failed to load model: \(result)")
+                throw SDKException(code: .modelLoadFailed, message: "Failed to load model: \(result)", category: .component)
             }
             loadedModelId = modelId
             logger.info("STT model loaded: \(modelId)")
@@ -113,9 +113,10 @@ extension CppBridge {
                 return
             }
             guard result.success else {
-                throw SDKException.stt(
-                    .modelLoadFailed,
-                    result.errorMessage.isEmpty ? "STT lifecycle load failed" : result.errorMessage
+                throw SDKException(
+                    code: .modelLoadFailed,
+                    message: result.errorMessage.isEmpty ? "STT lifecycle load failed" : result.errorMessage,
+                    category: .component
                 )
             }
 

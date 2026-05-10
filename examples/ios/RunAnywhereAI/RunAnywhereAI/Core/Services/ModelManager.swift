@@ -30,7 +30,7 @@ class ModelManager: ObservableObject {
         }
         let result = await RunAnywhere.loadModel(request)
         guard result.success else {
-            let err = SDKException.general(.unknown, result.errorMessage)
+            let err = SDKException(code: .unknown, message: result.errorMessage, category: .internal)
             self.error = err
             throw err
         }

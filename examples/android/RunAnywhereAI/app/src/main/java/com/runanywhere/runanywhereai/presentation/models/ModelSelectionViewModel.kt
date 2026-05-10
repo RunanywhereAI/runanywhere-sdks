@@ -4,7 +4,6 @@ import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelEventKind
-import ai.runanywhere.proto.v1.ModelInfo
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -23,6 +22,7 @@ import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
 import com.runanywhere.sdk.public.extensions.loadVLMModel
+import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -246,7 +246,7 @@ class ModelSelectionViewModel(
     /**
      * Get models for a specific framework
      */
-    fun getModelsForFramework(framework: InferenceFramework): List<ModelInfo> {
+    fun getModelsForFramework(framework: InferenceFramework): List<RAModelInfo> {
         return _uiState.value.models.filter { model ->
             model.framework == framework
         }
@@ -450,11 +450,11 @@ class ModelSelectionViewModel(
 data class ModelSelectionUiState(
     val context: ModelSelectionContext = ModelSelectionContext.LLM,
     val deviceInfo: AppDeviceInfo? = null,
-    val models: List<ModelInfo> = emptyList(),
+    val models: List<RAModelInfo> = emptyList(),
     val frameworks: List<InferenceFramework> = emptyList(),
     val expandedFramework: InferenceFramework? = null,
     val selectedModelId: String? = null,
-    val currentModel: ModelInfo? = null,
+    val currentModel: RAModelInfo? = null,
     val isLoading: Boolean = true,
     val isLoadingModel: Boolean = false,
     val loadingProgress: String = "",

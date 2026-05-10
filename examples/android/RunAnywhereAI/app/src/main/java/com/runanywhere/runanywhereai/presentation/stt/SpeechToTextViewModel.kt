@@ -6,7 +6,6 @@ import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelEventKind
 import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.STTLanguage
-import ai.runanywhere.proto.v1.STTOptions
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -24,20 +23,21 @@ import com.runanywhere.sdk.public.extensions.currentSTTModelId
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.transcribe
 import com.runanywhere.sdk.public.extensions.transcribeStream
-import kotlinx.coroutines.flow.flowOf
+import com.runanywhere.sdk.public.types.RASTTOptions
+import java.io.ByteArrayOutputStream
+import kotlin.math.log10
+import kotlin.math.max
+import kotlin.math.min
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import java.io.ByteArrayOutputStream
-import kotlin.math.log10
-import kotlin.math.max
-import kotlin.math.min
 
 /**
  * STT Recording Mode
@@ -463,7 +463,7 @@ class SpeechToTextViewModel : ViewModel() {
                             // Transcribe in background
                             withContext(Dispatchers.IO) {
                                 try {
-                                    val options = STTOptions(language = sttLanguageFromBcp47(_uiState.value.language))
+                                    val options = RASTTOptions(language = sttLanguageFromBcp47(_uiState.value.language))
                                     var finalText = ""
                                     RunAnywhere.transcribeStream(
                                         audioData = flowOf(chunkData),
@@ -593,7 +593,7 @@ class SpeechToTextViewModel : ViewModel() {
                 val audioDurationMs = (audioBytes.size.toDouble() / (SAMPLE_RATE * 2)) * 1000
 
                 // Use SDK's transcribe extension function
-                val transcriptionOutput = RunAnywhere.transcribe(audioBytes, STTOptions())
+                val transcriptionOutput = RunAnywhere.transcribe(audioBytes, RASTTOptions())
                 val result = transcriptionOutput.text
 
                 val inferenceTimeMs = System.currentTimeMillis() - startTime

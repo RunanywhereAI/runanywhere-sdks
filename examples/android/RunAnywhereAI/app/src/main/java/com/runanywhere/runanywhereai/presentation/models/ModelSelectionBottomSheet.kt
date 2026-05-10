@@ -1,7 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.models
 
 import ai.runanywhere.proto.v1.InferenceFramework
-import ai.runanywhere.proto.v1.ModelInfo
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -63,6 +62,7 @@ import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedModel
+import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -97,7 +97,7 @@ private data class AIModel(
 fun ModelSelectionBottomSheet(
     context: ModelSelectionContext = ModelSelectionContext.LLM,
     onDismiss: () -> Unit,
-    onModelSelected: suspend (ModelInfo) -> Unit,
+    onModelSelected: suspend (RAModelInfo) -> Unit,
     viewModel: ModelSelectionViewModel =
         viewModel(
             key = "ModelSelectionViewModel_${context.name}",
@@ -182,7 +182,7 @@ fun ModelSelectionBottomSheet(
                 } else {
                     val sortedModels =
                         uiState.models.sortedWith(
-                            compareBy<ModelInfo> {
+                            compareBy<RAModelInfo> {
                                 if (it.framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS) {
                                     0
                                 } else if (it.isDownloadedModel) {
@@ -257,7 +257,7 @@ private fun toDeviceStatus(info: AppDeviceInfo): DeviceStatus =
         hasNeuralEngine = false,
     )
 
-private fun toAIModel(m: ModelInfo): AIModel {
+private fun toAIModel(m: RAModelInfo): AIModel {
     val isGenie = m.framework == InferenceFramework.INFERENCE_FRAMEWORK_GENIE
     val formatStr =
         when (m.framework) {
@@ -288,7 +288,7 @@ private fun toAIModel(m: ModelInfo): AIModel {
 }
 
 /** Drawable resource ID for model logo (matches iOS ModelInfo+Logo). */
-private fun getModelLogoResId(model: ModelInfo): Int {
+private fun getModelLogoResId(model: RAModelInfo): Int {
     val name = model.name.lowercase()
     return when {
         model.framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||

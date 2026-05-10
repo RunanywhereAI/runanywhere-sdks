@@ -20,9 +20,9 @@ import ai.runanywhere.proto.v1.ModelArtifactType
 import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelFormatFromUrlRequest
 import ai.runanywhere.proto.v1.ModelFormatFromUrlResult
-import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.SingleFileArtifact
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.types.RAModelInfo
 
 /**
  * Bridge wrapper over the two commons URL-inference proto APIs.
@@ -62,7 +62,7 @@ internal object CppBridgeModelFormat {
      * related fields are left untouched — those are populated by
      * `registerMultiFileModel` or server-side metadata.
      */
-    fun applyInferredArtifact(modelInfo: ModelInfo, url: String): ModelInfo {
+    fun applyInferredArtifact(modelInfo: RAModelInfo, url: String): RAModelInfo {
         val result = artifactInferFromUrlProto(url, modelInfo.id)
         val existingType = modelInfo.artifact_type ?: ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED
         if (result == null) {

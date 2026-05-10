@@ -18,6 +18,7 @@ import ai.runanywhere.proto.v1.ModelStorageMetrics
 import ai.runanywhere.proto.v1.StorageAvailability
 import ai.runanywhere.proto.v1.StorageInfo
 import ai.runanywhere.proto.v1.StoredModel
+import com.runanywhere.sdk.public.types.RAStorageInfo
 
 // MARK: - DeviceStorageInfo
 
@@ -85,9 +86,9 @@ fun AppStorageInfo.Companion.create(
  * An empty [StorageInfo] with default device/app sub-records and no
  * per-model rows. Matches Swift's `RAStorageInfo.empty` static.
  */
-val StorageInfo.Companion.empty: StorageInfo
+val StorageInfo.Companion.empty: RAStorageInfo
     get() =
-        StorageInfo(
+        RAStorageInfo(
             app = AppStorageInfo(),
             device = DeviceStorageInfo(),
             models = emptyList(),
@@ -96,25 +97,25 @@ val StorageInfo.Companion.empty: StorageInfo
         )
 
 /** Sum of `size_on_disk_bytes` across all per-model rows. */
-val StorageInfo.totalModelsSizeBytes: Long
+val RAStorageInfo.totalModelsSizeBytes: Long
     get() = models.sumOf { it.size_on_disk_bytes }
 
 /**
  * Aggregate "models size" — prefers the denormalized `total_models_bytes`
  * counter, falls back to a fresh sum over the rows when the counter is 0.
  */
-val StorageInfo.totalModelsSize: Long
+val RAStorageInfo.totalModelsSize: Long
     get() = if (total_models_bytes > 0L) total_models_bytes else totalModelsSizeBytes
 
 /** Number of model rows currently in the storage view. */
-val StorageInfo.modelCount: Int
+val RAStorageInfo.modelCount: Int
     get() = models.size
 
 /**
  * Project the per-model storage rows into the legacy `StoredModel` view
  * Swift, Flutter, and React Native call sites consume.
  */
-val StorageInfo.storedModels: List<StoredModel>
+val RAStorageInfo.storedModels: List<StoredModel>
     get() =
         models.map { metrics ->
             StoredModel(

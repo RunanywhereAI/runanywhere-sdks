@@ -1,10 +1,7 @@
 package com.runanywhere.runanywhereai.presentation.settings
 
-import ai.runanywhere.proto.v1.ToolCall
-import ai.runanywhere.proto.v1.ToolDefinition
 import ai.runanywhere.proto.v1.ToolParameter
 import ai.runanywhere.proto.v1.ToolParameterType
-import ai.runanywhere.proto.v1.ToolResult
 import ai.runanywhere.proto.v1.ToolValue
 import android.app.Application
 import android.content.Context
@@ -14,6 +11,16 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.clearTools
 import com.runanywhere.sdk.public.extensions.getRegisteredTools
 import com.runanywhere.sdk.public.extensions.registerTool
+import com.runanywhere.sdk.public.types.RAToolCall
+import com.runanywhere.sdk.public.types.RAToolDefinition
+import com.runanywhere.sdk.public.types.RAToolResult
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,20 +32,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
 import timber.log.Timber
-import java.net.HttpURLConnection
-import java.net.URL
-import java.net.URLEncoder
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
 
 /**
  * Tool Settings UI State
  */
 data class ToolSettingsUiState(
     val toolCallingEnabled: Boolean = false,
-    val registeredTools: List<ToolDefinition> = emptyList(),
+    val registeredTools: List<RAToolDefinition> = emptyList(),
     val isLoading: Boolean = false,
 )
 
@@ -109,7 +109,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                 // Weather Tool - Uses Open-Meteo API (free, no API key required)
                 RunAnywhere.registerTool(
                     definition =
-                        ToolDefinition(
+                        RAToolDefinition(
                             name = "get_weather",
                             description = "Gets the current weather for a given location using Open-Meteo API",
                             parameters =
@@ -123,7 +123,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                                 ),
                             category = "Utility",
                         ),
-                    executor = { call: ToolCall ->
+                    executor = { call: RAToolCall ->
                         toolResult(
                             call,
                             fetchWeather(call.stringArgument("location", "San Francisco")),
@@ -134,13 +134,13 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                 // Time Tool - Real system time with timezone
                 RunAnywhere.registerTool(
                     definition =
-                        ToolDefinition(
+                        RAToolDefinition(
                             name = "get_current_time",
                             description = "Gets the current date, time, and timezone information",
                             parameters = emptyList(),
                             category = "Utility",
                         ),
-                    executor = { call: ToolCall ->
+                    executor = { call: RAToolCall ->
                         val now = Date()
                         val dateFormatter = SimpleDateFormat("EEEE, MMMM d, yyyy 'at' h:mm:ss a", Locale.getDefault())
                         val timeFormatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
@@ -166,7 +166,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                 // Calculator Tool - Math evaluation
                 RunAnywhere.registerTool(
                     definition =
-                        ToolDefinition(
+                        RAToolDefinition(
                             name = "calculate",
                             description = "Performs math calculations. Supports +, -, *, /, and parentheses",
                             parameters =
@@ -180,7 +180,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                                 ),
                             category = "Utility",
                         ),
-                    executor = { call: ToolCall ->
+                    executor = { call: RAToolCall ->
                         val expression =
                             call.stringArgument(
                                 name = "expression",
@@ -235,7 +235,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
 
     // Tool Executor Implementations
 
-    private fun ToolCall.stringArgument(
+    private fun RAToolCall.stringArgument(
         name: String,
         defaultValue: String,
     ): String {
@@ -245,9 +245,9 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
     }
 
     private fun toolResult(
-        call: ToolCall,
+        call: RAToolCall,
         values: Map<String, ToolValue>,
-    ): ToolResult {
+    ): RAToolResult {
         val json =
             JSONObject().apply {
                 values.forEach { (key, value) ->
@@ -255,7 +255,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                 }
             }
         val callId = call.call_id ?: call.id
-        return ToolResult(
+        return RAToolResult(
             tool_call_id = callId,
             name = call.name,
             result_json = json.toString(),

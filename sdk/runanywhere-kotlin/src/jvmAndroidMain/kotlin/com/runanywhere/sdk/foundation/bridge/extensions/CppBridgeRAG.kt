@@ -12,6 +12,9 @@ import ai.runanywhere.proto.v1.RAGResult
 import ai.runanywhere.proto.v1.RAGStatistics
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.types.RARAGConfiguration
+import com.runanywhere.sdk.public.types.RARAGDocument
+import com.runanywhere.sdk.public.types.RARAGStatistics
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
@@ -19,7 +22,7 @@ object CppBridgeRAG {
     @Volatile private var sessionHandle: Long = 0L
 
     @Synchronized
-    fun create(config: RAGConfiguration) {
+    fun create(config: RARAGConfiguration) {
         destroy()
         val handle =
             RunAnywhereBridge.racRagSessionCreateProto(RAGConfiguration.ADAPTER.encode(config))
@@ -35,7 +38,7 @@ object CppBridgeRAG {
         sessionHandle = 0L
     }
 
-    fun ingest(document: RAGDocument): RAGStatistics =
+    fun ingest(document: RARAGDocument): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,
             RunAnywhereBridge.racRagIngestProto(
@@ -55,14 +58,14 @@ object CppBridgeRAG {
             "racRagQueryProto",
         )
 
-    fun clear(): RAGStatistics =
+    fun clear(): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,
             RunAnywhereBridge.racRagClearProto(requireSession()),
             "racRagClearProto",
         )
 
-    fun stats(): RAGStatistics =
+    fun stats(): RARAGStatistics =
         decodeOrThrow(
             RAGStatistics.ADAPTER,
             RunAnywhereBridge.racRagStatsProto(requireSession()),

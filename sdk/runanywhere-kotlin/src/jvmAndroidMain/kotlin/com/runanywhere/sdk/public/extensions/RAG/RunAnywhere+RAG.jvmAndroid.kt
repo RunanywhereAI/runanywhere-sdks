@@ -12,22 +12,23 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.ModelInfo
-import ai.runanywhere.proto.v1.ModelLoadRequest
-import ai.runanywhere.proto.v1.ModelLoadResult
-import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
 import ai.runanywhere.proto.v1.RAGSearchResult
-import ai.runanywhere.proto.v1.RAGStatistics
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeRAG
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RAModelLoadResult
+import com.runanywhere.sdk.public.types.RARAGConfiguration
+import com.runanywhere.sdk.public.types.RARAGDocument
+import com.runanywhere.sdk.public.types.RARAGStatistics
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.util.concurrent.atomic.AtomicBoolean
 
 // RAG native library loading (relocated from the deleted RAGBridge.kt).
 //
@@ -57,10 +58,10 @@ private fun ensureRagNativeLibsLoaded() {
 }
 
 actual suspend fun RunAnywhere.ragResolvedConfiguration(
-    embeddingModel: ModelInfo,
-    llmModel: ModelInfo,
-    baseConfiguration: RAGConfiguration,
-): RAGConfiguration {
+    embeddingModel: RAModelInfo,
+    llmModel: RAModelInfo,
+    baseConfiguration: RARAGConfiguration,
+): RARAGConfiguration {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     val embedding =
         loadRagArtifactModel(
@@ -81,12 +82,12 @@ actual suspend fun RunAnywhere.ragResolvedConfiguration(
 
 private suspend fun loadRagArtifactModel(
     sdk: RunAnywhere,
-    model: ModelInfo,
+    model: RAModelInfo,
     fallbackCategory: ModelCategory,
     errorLabel: String,
-): ModelLoadResult {
+): RAModelLoadResult {
     val request =
-        ModelLoadRequest(
+        RAModelLoadRequest(
             model_id = model.id,
             category =
                 if (model.category == ModelCategory.MODEL_CATEGORY_UNSPECIFIED) {
@@ -105,7 +106,7 @@ private suspend fun loadRagArtifactModel(
     return result
 }
 
-actual suspend fun RunAnywhere.ragCreatePipeline(config: RAGConfiguration) {
+actual suspend fun RunAnywhere.ragCreatePipeline(config: RARAGConfiguration) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     ensureRagNativeLibsLoaded()
     withContext(Dispatchers.IO) {
@@ -128,7 +129,7 @@ actual suspend fun RunAnywhere.ragIngest(text: String, metadataJSON: String?) {
     }
 }
 
-actual suspend fun RunAnywhere.ragIngest(document: RAGDocument): RAGStatistics {
+actual suspend fun RunAnywhere.ragIngest(document: RARAGDocument): RARAGStatistics {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     return withContext(Dispatchers.IO) {
         CppBridgeRAG.ingest(document)
@@ -189,7 +190,7 @@ actual suspend fun RunAnywhere.ragSearch(
     }
 }
 
-actual suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RAGDocument>): RAGStatistics {
+actual suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RARAGDocument>): RARAGStatistics {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     if (documents.isEmpty()) return ragGetStatistics()
     return withContext(Dispatchers.IO) {
@@ -201,7 +202,7 @@ actual suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RAGDocument>
     }
 }
 
-actual suspend fun RunAnywhere.ragGetStatistics(): RAGStatistics {
+actual suspend fun RunAnywhere.ragGetStatistics(): RARAGStatistics {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     return withContext(Dispatchers.IO) {
         CppBridgeRAG.stats()

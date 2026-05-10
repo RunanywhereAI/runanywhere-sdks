@@ -390,7 +390,7 @@ private func decodeBuffer<Response: Message>(
     _ body: (UnsafeMutablePointer<rac_proto_buffer_t>) throws -> rac_result_t
 ) throws -> Response {
     guard NativeProtoABI.canReceiveProtoBuffer else {
-        throw SDKException.general(.notSupported, NativeProtoABI.missingSymbolMessage(symbolName))
+        throw SDKException(code: .notSupported, message: NativeProtoABI.missingSymbolMessage(symbolName), category: .internal)
     }
     var outBuffer = rac_proto_buffer_t()
     defer { NativeProtoABI.free(&outBuffer) }
@@ -398,7 +398,7 @@ private func decodeBuffer<Response: Message>(
     guard status == RAC_SUCCESS else {
         let message = outBuffer.error_message.map { String(cString: $0) }
             ?? "Native proto request failed: \(symbolName) rc=\(status)"
-        throw SDKException.general(.processingFailed, message)
+        throw SDKException(code: .processingFailed, message: message, category: .internal)
     }
     return try NativeProtoABI.decode(responseType, from: outBuffer)
 }
@@ -575,7 +575,7 @@ extension CppBridge.TTS {
             .fromOpaque(contextPtr)
             .release()
         guard rc == RAC_SUCCESS else {
-            throw SDKException.general(.processingFailed, "TTS voice listing failed: \(rc)")
+            throw SDKException(code: .processingFailed, message: "TTS voice listing failed: \(rc)", category: .internal)
         }
         return context.values
     }
@@ -661,7 +661,7 @@ extension CppBridge.VAD {
             configure(handle, bytes, size)
         }
         guard rc == RAC_SUCCESS else {
-            throw SDKException.vad(.invalidConfiguration, "VAD configure proto failed: \(rc)")
+            throw SDKException(code: .invalidConfiguration, message: "VAD configure proto failed: \(rc)", category: .component)
         }
     }
 
@@ -728,7 +728,7 @@ extension CppBridge.VAD {
             Unmanaged<ProtoProgressContext<RASpeechActivityEvent>>
                 .fromOpaque(contextPtr)
                 .release()
-            throw SDKException.vad(.processingFailed, "VAD activity callback failed: \(rc)")
+            throw SDKException(code: .processingFailed, message: "VAD activity callback failed: \(rc)", category: .component)
         }
     }
 
@@ -948,7 +948,7 @@ extension CppBridge.VLM {
         )
         let rc = cancel(handle)
         guard rc == RAC_SUCCESS else {
-            throw SDKException.vlm(.cancelled, "VLM cancel proto failed: \(rc)")
+            throw SDKException(code: .cancelled, message: "VLM cancel proto failed: \(rc)", category: .component)
         }
     }
 }
@@ -987,7 +987,7 @@ extension CppBridge.RAG {
             create(bytes, size, &newSession)
         }
         guard rc == RAC_SUCCESS, let newSession else {
-            throw SDKException.rag(.notInitialized, "RAG proto session create failed: \(rc)")
+            throw SDKException(code: .notInitialized, message: "RAG proto session create failed: \(rc)", category: .component)
         }
         setProtoSession(newSession)
     }
@@ -1193,7 +1193,7 @@ extension CppBridge.LoraRegistry {
         responseType: Response.Type
     ) throws -> Response {
         guard let handle = rac_get_lora_registry() else {
-            throw SDKException.general(.initializationFailed, "LoRA registry not initialized")
+            throw SDKException(code: .initializationFailed, message: "LoRA registry not initialized", category: .internal)
         }
         let symbol = try NativeProtoABI.require(symbol, named: symbolName)
         return try decodeBuffer(responseType: responseType, symbolName: symbolName) { outBuffer in

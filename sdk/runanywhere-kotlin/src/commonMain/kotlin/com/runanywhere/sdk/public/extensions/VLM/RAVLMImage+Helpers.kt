@@ -16,6 +16,8 @@ import ai.runanywhere.proto.v1.VLMConfiguration
 import ai.runanywhere.proto.v1.VLMGenerationOptions
 import ai.runanywhere.proto.v1.VLMImage
 import ai.runanywhere.proto.v1.VLMImageFormat
+import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAVLMImage
 import okio.ByteString.Companion.toByteString
 
 // MARK: - VLMConfiguration
@@ -39,8 +41,8 @@ fun VLMConfiguration.Companion.defaults(modelId: String = ""): VLMConfiguration 
 /**
  * Default VLM generation options mirroring Swift `RAVLMGenerationOptions.defaults`.
  */
-fun VLMGenerationOptions.Companion.defaults(prompt: String = ""): VLMGenerationOptions =
-    VLMGenerationOptions(
+fun VLMGenerationOptions.Companion.defaults(prompt: String = ""): RAVLMGenerationOptions =
+    RAVLMGenerationOptions(
         prompt = prompt,
         max_tokens = 256,
         temperature = 0.7f,
@@ -56,8 +58,8 @@ fun VLMGenerationOptions.Companion.defaults(prompt: String = ""): VLMGenerationO
 fun VLMImage.Companion.fromEncoded(
     data: ByteArray,
     format: VLMImageFormat,
-): VLMImage =
-    VLMImage(
+): RAVLMImage =
+    RAVLMImage(
         encoded = data.toByteString(),
         format = format,
     )
@@ -65,8 +67,8 @@ fun VLMImage.Companion.fromEncoded(
 /**
  * Create a [VLMImage] from an on-disk file path.
  */
-fun VLMImage.Companion.fromFilePath(path: String): VLMImage =
-    VLMImage(
+fun VLMImage.Companion.fromFilePath(path: String): RAVLMImage =
+    RAVLMImage(
         file_path = path,
         format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
     )
@@ -74,8 +76,8 @@ fun VLMImage.Companion.fromFilePath(path: String): VLMImage =
 /**
  * Create a [VLMImage] from a base64-encoded string.
  */
-fun VLMImage.Companion.fromBase64(base64: String): VLMImage =
-    VLMImage(
+fun VLMImage.Companion.fromBase64(base64: String): RAVLMImage =
+    RAVLMImage(
         base64 = base64,
         format = VLMImageFormat.VLM_IMAGE_FORMAT_BASE64,
     )
@@ -87,8 +89,8 @@ fun VLMImage.Companion.fromRawRGB(
     data: ByteArray,
     width: Int,
     height: Int,
-): VLMImage =
-    VLMImage(
+): RAVLMImage =
+    RAVLMImage(
         raw_rgb = data.toByteString(),
         width = width,
         height = height,
@@ -104,8 +106,8 @@ fun VLMImage.Companion.fromRawRGBA(
     data: ByteArray,
     width: Int,
     height: Int,
-): VLMImage =
-    VLMImage(
+): RAVLMImage =
+    RAVLMImage(
         raw_rgb = data.toByteString(),
         width = width,
         height = height,

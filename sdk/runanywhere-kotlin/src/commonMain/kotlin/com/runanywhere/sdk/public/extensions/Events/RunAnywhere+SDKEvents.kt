@@ -9,8 +9,8 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.SDKEvent
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RASDKEvent
 
 /**
  * Subscribe to canonical SDK events emitted by the C++ event stream.
@@ -22,7 +22,7 @@ import com.runanywhere.sdk.public.RunAnywhere
  * @return The subscription identifier — pass this to [unsubscribeSDKEvents]
  *         to detach early.
  */
-expect fun RunAnywhere.subscribeSDKEvents(handler: (SDKEvent) -> Boolean): Long
+expect fun RunAnywhere.subscribeSDKEvents(handler: (RASDKEvent) -> Boolean): Long
 
 /**
  * Detach a previously registered SDK event subscription.
@@ -36,14 +36,14 @@ expect fun RunAnywhere.unsubscribeSDKEvents(subscriptionId: Long)
  *
  * @return Native result code (`RAC_SUCCESS = 0` on success).
  */
-expect fun RunAnywhere.publishSDKEvent(event: SDKEvent): Int
+expect fun RunAnywhere.publishSDKEvent(event: RASDKEvent): Int
 
 /**
  * Poll the next pending [SDKEvent] from the C++ event queue.
  *
  * @return The next available event, or `null` when the queue is empty.
  */
-expect fun RunAnywhere.pollSDKEvent(): SDKEvent?
+expect fun RunAnywhere.pollSDKEvent(): RASDKEvent?
 
 /**
  * Publish a structured failure event.

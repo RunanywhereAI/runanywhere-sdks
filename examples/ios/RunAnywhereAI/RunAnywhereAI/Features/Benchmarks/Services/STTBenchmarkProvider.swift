@@ -33,7 +33,7 @@ struct STTBenchmarkProvider: BenchmarkScenarioProvider {
         loadRequest.category = .speechRecognition
         let loadResult = await RunAnywhere.loadModel(loadRequest)
         guard loadResult.success else {
-            throw SDKException.general(.unknown, loadResult.errorMessage)
+            throw SDKException(code: .unknown, message: loadResult.errorMessage, category: .internal)
         }
         metrics.loadTimeMs = Date().timeIntervalSince(loadStart) * 1000
 

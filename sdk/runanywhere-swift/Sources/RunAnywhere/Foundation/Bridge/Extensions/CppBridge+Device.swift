@@ -154,7 +154,7 @@ extension CppBridge {
         /// All business logic is in C++ - this is just a thin wrapper
         public static func registerIfNeeded(environment: SDKEnvironment) async throws {
             guard callbacksRegistered else {
-                throw SDKException.general(.notInitialized, "Device manager callbacks not registered")
+                throw SDKException(code: .notInitialized, message: "Device manager callbacks not registered", category: .internal)
             }
 
             if environment == .development && !CppBridge.DevConfig.hasUsableDevelopmentRegistrationConfig {
@@ -184,7 +184,7 @@ extension CppBridge {
 
             // RAC_SUCCESS means registered successfully or already registered
             if result != RAC_SUCCESS {
-                throw SDKException.network(.serviceNotAvailable, "Device registration failed: \(result)")
+                throw SDKException(code: .serviceNotAvailable, message: "Device registration failed: \(result)", category: .network)
             }
         }
 

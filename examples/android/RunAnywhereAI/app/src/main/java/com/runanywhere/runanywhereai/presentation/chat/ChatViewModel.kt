@@ -3,7 +3,6 @@ package com.runanywhere.runanywhereai.presentation.chat
 import ai.runanywhere.proto.v1.GenerationEvent
 import ai.runanywhere.proto.v1.GenerationEventKind
 import ai.runanywhere.proto.v1.InferenceFramework
-import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ToolCallingOptions
 import android.app.Application
@@ -32,6 +31,8 @@ import com.runanywhere.sdk.public.extensions.getRegisteredTools
 import com.runanywhere.sdk.public.extensions.isLLMModelLoaded
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.lora
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import kotlin.math.ceil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,7 +43,6 @@ import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import kotlin.math.ceil
 
 /**
  * Enhanced ChatUiState  functionality
@@ -269,7 +269,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             val result =
                 RunAnywhere.generateWithTools(
                     prompt,
-                    LLMGenerationOptions(tool_calling = toolOptions),
+                    RALLMGenerationOptions(tool_calling = toolOptions),
                 )
             val endTime = System.currentTimeMillis()
 
@@ -943,7 +943,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     /**
      * Get generation options from SharedPreferences
      */
-    private fun getGenerationOptions(): LLMGenerationOptions {
+    private fun getGenerationOptions(): RALLMGenerationOptions {
         val temperature = generationPrefs.getFloat("defaultTemperature", 0.7f)
         val maxTokens = generationPrefs.getInt("defaultMaxTokens", 1000)
         val systemPromptValue = generationPrefs.getString("defaultSystemPrompt", "")
@@ -952,7 +952,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
         Timber.i("[PARAMS] App getGenerationOptions: temperature=$temperature, maxTokens=$maxTokens, systemPrompt=$systemPromptInfo")
 
-        return LLMGenerationOptions(
+        return RALLMGenerationOptions(
             max_tokens = maxTokens,
             temperature = temperature,
             system_prompt = systemPrompt,

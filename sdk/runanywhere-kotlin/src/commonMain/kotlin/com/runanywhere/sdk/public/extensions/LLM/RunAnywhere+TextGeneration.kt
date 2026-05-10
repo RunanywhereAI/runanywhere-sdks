@@ -11,10 +11,10 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.LLMGenerationOptions
-import ai.runanywhere.proto.v1.LLMGenerationResult
-import ai.runanywhere.proto.v1.LLMStreamEvent
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RALLMGenerationResult
+import com.runanywhere.sdk.public.types.RALLMStreamEvent
 import kotlinx.coroutines.flow.Flow
 
 // MARK: - Text Generation
@@ -29,8 +29,8 @@ import kotlinx.coroutines.flow.Flow
  */
 expect suspend fun RunAnywhere.generate(
     prompt: String,
-    options: LLMGenerationOptions? = null,
-): LLMGenerationResult
+    options: RALLMGenerationOptions? = null,
+): RALLMGenerationResult
 
 /**
  * Streaming text generation.
@@ -56,8 +56,8 @@ expect suspend fun RunAnywhere.generate(
  */
 expect fun RunAnywhere.generateStream(
     prompt: String,
-    options: LLMGenerationOptions? = null,
-): Flow<LLMStreamEvent>
+    options: RALLMGenerationOptions? = null,
+): Flow<RALLMStreamEvent>
 
 // MARK: - Generation Control
 

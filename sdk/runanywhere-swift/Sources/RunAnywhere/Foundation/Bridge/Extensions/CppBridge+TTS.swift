@@ -36,7 +36,7 @@ extension CppBridge {
             var newHandle: rac_handle_t?
             let result = rac_tts_component_create(&newHandle)
             guard result == RAC_SUCCESS, let handle = newHandle else {
-                throw SDKException.tts(.notInitialized, "Failed to create TTS component: \(result)")
+                throw SDKException(code: .notInitialized, message: "Failed to create TTS component: \(result)", category: .component)
             }
 
             self.handle = handle
@@ -68,7 +68,7 @@ extension CppBridge {
                 }
             }
             guard result == RAC_SUCCESS else {
-                throw SDKException.tts(.modelLoadFailed, "Failed to load voice: \(result)")
+                throw SDKException(code: .modelLoadFailed, message: "Failed to load voice: \(result)", category: .component)
             }
             loadedVoiceId = voiceId
             logger.info("TTS voice loaded: \(voiceId)")
@@ -83,9 +83,10 @@ extension CppBridge {
                 return
             }
             guard result.success else {
-                throw SDKException.tts(
-                    .modelLoadFailed,
-                    result.errorMessage.isEmpty ? "TTS lifecycle load failed" : result.errorMessage
+                throw SDKException(
+                    code: .modelLoadFailed,
+                    message: result.errorMessage.isEmpty ? "TTS lifecycle load failed" : result.errorMessage,
+                    category: .component
                 )
             }
 

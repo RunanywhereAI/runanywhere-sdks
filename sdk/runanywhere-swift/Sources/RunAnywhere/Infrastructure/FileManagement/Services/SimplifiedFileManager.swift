@@ -36,7 +36,7 @@ internal class SimplifiedFileManager {
 
     internal init() throws {
         guard let documentsFolder = Folder.documents else {
-            throw SDKException.fileManagement(.permissionDenied, "Unable to access documents directory")
+            throw SDKException(code: .permissionDenied, message: "Unable to access documents directory", category: .io)
         }
         self.baseFolder = try documentsFolder.createSubfolderIfNeeded(withName: "RunAnywhere")
         try createDirectoryStructure()
@@ -44,7 +44,7 @@ internal class SimplifiedFileManager {
 
     private func createDirectoryStructure() throws {
         guard CppBridge.FileManager.createDirectoryStructure() else {
-            throw SDKException.fileManagement(.directoryCreationFailed, "Failed to create directory structure via C++ bridge")
+            throw SDKException(code: .directoryCreationFailed, message: "Failed to create directory structure via C++ bridge", category: .io)
         }
     }
 
@@ -69,7 +69,7 @@ internal class SimplifiedFileManager {
     /// Delete a model folder and all its contents
     internal func deleteModel(modelId: String, framework: InferenceFramework) throws {
         guard CppBridge.FileManager.deleteModel(modelId: modelId, framework: framework) else {
-            throw SDKException.fileManagement(.deleteFailed, "Failed to delete model: \(modelId)")
+            throw SDKException(code: .deleteFailed, message: "Failed to delete model: \(modelId)", category: .io)
         }
         logger.info("Deleted model: \(modelId) from \(framework.wireString)")
     }
@@ -126,7 +126,7 @@ internal class SimplifiedFileManager {
 
     internal func clearCache() throws {
         guard CppBridge.FileManager.clearCache() else {
-            throw SDKException.fileManagement(.deleteFailed, "Failed to clear cache")
+            throw SDKException(code: .deleteFailed, message: "Failed to clear cache", category: .io)
         }
         logger.info("Cleared cache")
     }
@@ -135,7 +135,7 @@ internal class SimplifiedFileManager {
 
     internal func cleanTempFiles() throws {
         guard CppBridge.FileManager.clearTemp() else {
-            throw SDKException.fileManagement(.deleteFailed, "Failed to clean temp files")
+            throw SDKException(code: .deleteFailed, message: "Failed to clean temp files", category: .io)
         }
         logger.info("Cleaned temp files")
     }

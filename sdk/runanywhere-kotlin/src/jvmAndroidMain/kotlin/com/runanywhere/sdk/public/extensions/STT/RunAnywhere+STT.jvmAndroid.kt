@@ -9,20 +9,20 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.STTOptions
-import ai.runanywhere.proto.v1.STTOutput
+import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 import ai.runanywhere.proto.v1.STTStreamEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RASTTOptions
+import com.runanywhere.sdk.public.types.RATranscriptionResult
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 
 private val sttLogger = SDKLogger.stt
 
@@ -38,8 +38,8 @@ actual val RunAnywhere.currentSTTModelId: String?
 
 actual suspend fun RunAnywhere.transcribe(
     audio: ByteArray,
-    options: STTOptions,
-): STTOutput {
+    options: RASTTOptions,
+): RATranscriptionResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
@@ -54,7 +54,7 @@ actual suspend fun RunAnywhere.transcribe(
 
 actual fun RunAnywhere.transcribeStream(
     audioData: Flow<ByteArray>,
-    options: STTOptions?,
+    options: RASTTOptions?,
 ): Flow<STTStreamEvent> =
     callbackFlow {
         if (!isInitialized) {
@@ -62,7 +62,7 @@ actual fun RunAnywhere.transcribeStream(
             return@callbackFlow
         }
 
-        val effectiveOptions = options ?: STTOptions()
+        val effectiveOptions = options ?: RASTTOptions()
 
         val streamJob =
             launch {

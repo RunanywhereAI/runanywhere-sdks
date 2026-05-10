@@ -1,20 +1,20 @@
 package com.runanywhere.runanywhereai.presentation.benchmarks.services
 
-import ai.runanywhere.proto.v1.ModelInfo
-import ai.runanywhere.proto.v1.VLMGenerationOptions
-import ai.runanywhere.proto.v1.VLMImage
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.VLMImageFormat
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkCategory
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkDeviceInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkMetrics
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkScenario
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
-import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.ModelUnloadRequest
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.loadVLMModel
 import com.runanywhere.sdk.public.extensions.processImage
 import com.runanywhere.sdk.public.extensions.unloadModel
+import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAVLMImage
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import okio.ByteString.Companion.toByteString
@@ -34,7 +34,7 @@ class VLMBenchmarkProvider : BenchmarkScenarioProvider {
 
     override suspend fun execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo,
+        model: RAModelInfo,
         deviceInfo: BenchmarkDeviceInfo,
     ): BenchmarkMetrics {
         val memBefore = SyntheticInputGenerator.availableMemoryBytes()
@@ -55,7 +55,7 @@ class VLMBenchmarkProvider : BenchmarkScenarioProvider {
                     SyntheticInputGenerator.gradientRgb(width, height)
                 }
             val vlmImage =
-                VLMImage(
+                RAVLMImage(
                     raw_rgb = rgbData.toByteString(),
                     width = width,
                     height = height,
@@ -64,13 +64,13 @@ class VLMBenchmarkProvider : BenchmarkScenarioProvider {
 
             // Warmup
             val warmupStart = System.nanoTime()
-            val warmupOptions = VLMGenerationOptions(prompt = "Hi", max_tokens = 5, temperature = 0.0f)
+            val warmupOptions = RAVLMGenerationOptions(prompt = "Hi", max_tokens = 5, temperature = 0.0f)
             RunAnywhere.processImage(vlmImage, warmupOptions)
             val warmupTimeMs = (System.nanoTime() - warmupStart) / 1_000_000.0
 
             // Benchmark
             val benchOptions =
-                VLMGenerationOptions(
+                RAVLMGenerationOptions(
                     prompt = "Describe this image in detail.",
                     max_tokens = 128,
                     temperature = 0.0f,

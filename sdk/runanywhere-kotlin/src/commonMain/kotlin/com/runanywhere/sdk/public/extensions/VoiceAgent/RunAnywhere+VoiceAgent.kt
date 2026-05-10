@@ -11,13 +11,13 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.AudioEncoding
-import ai.runanywhere.proto.v1.STTOutput
-import ai.runanywhere.proto.v1.TTSOutput
-import ai.runanywhere.proto.v1.VoiceAgentComponentStates
 import ai.runanywhere.proto.v1.VoiceAgentConfig
 import ai.runanywhere.proto.v1.VoiceAgentResult
 import ai.runanywhere.proto.v1.VoiceAgentTurnRequest
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RATTSOutput
+import com.runanywhere.sdk.public.types.RATranscriptionResult
+import com.runanywhere.sdk.public.types.RAVoiceAgentComponentStates
 import okio.ByteString.Companion.toByteString
 // v3.1: VoiceAgentResult / VoiceSessionEvent imports removed — the
 // expect declarations that used them (processVoice / startVoiceSession /
@@ -27,7 +27,7 @@ import okio.ByteString.Companion.toByteString
  * Canonical alias: the proto `VoiceAgentComponentStates` is the `ComponentStates`
  * type referenced in §10 of CANONICAL_API.md. SDK consumers can use either name.
  */
-typealias ComponentStates = VoiceAgentComponentStates
+typealias ComponentStates = RAVoiceAgentComponentStates
 
 // MARK: - Voice Agent Configuration
 
@@ -162,7 +162,7 @@ fun ByteArray.toVoiceAgentTurnRequest(
  *
  * @return [STTOutput] proto with transcription text and metadata
  */
-expect suspend fun RunAnywhere.voiceAgentTranscribe(audioData: ByteArray): STTOutput
+expect suspend fun RunAnywhere.voiceAgentTranscribe(audioData: ByteArray): RATranscriptionResult
 
 /**
  * Generate an LLM response using the voice-agent's LLM component.
@@ -178,7 +178,7 @@ expect suspend fun RunAnywhere.voiceAgentGenerateResponse(prompt: String): Strin
  *
  * @return [TTSOutput] proto with audio data and metadata
  */
-expect suspend fun RunAnywhere.voiceAgentSynthesizeSpeech(text: String): TTSOutput
+expect suspend fun RunAnywhere.voiceAgentSynthesizeSpeech(text: String): RATTSOutput
 
 /**
  * Cleanup voice-agent resources.

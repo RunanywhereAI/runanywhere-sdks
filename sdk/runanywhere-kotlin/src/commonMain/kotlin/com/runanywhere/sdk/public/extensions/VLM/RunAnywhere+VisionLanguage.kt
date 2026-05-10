@@ -11,11 +11,11 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.SDKEvent
-import ai.runanywhere.proto.v1.VLMGenerationOptions
-import ai.runanywhere.proto.v1.VLMImage
-import ai.runanywhere.proto.v1.VLMResult
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RASDKEvent
+import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAVLMImage
+import com.runanywhere.sdk.public.types.RAVLMResult
 import kotlinx.coroutines.flow.Flow
 
 // MARK: - Inference
@@ -30,9 +30,9 @@ import kotlinx.coroutines.flow.Flow
  * @return VLMResult with generated text and detailed metrics
  */
 expect suspend fun RunAnywhere.processImage(
-    image: VLMImage,
-    options: VLMGenerationOptions = VLMGenerationOptions(),
-): VLMResult
+    image: RAVLMImage,
+    options: RAVLMGenerationOptions = RAVLMGenerationOptions(),
+): RAVLMResult
 
 /**
  * Process an image with streaming output.
@@ -50,9 +50,9 @@ expect suspend fun RunAnywhere.processImage(
  * @return Flow of generated SDK events as they are emitted
  */
 expect fun RunAnywhere.processImageStream(
-    image: VLMImage,
-    options: VLMGenerationOptions = VLMGenerationOptions(),
-): Flow<SDKEvent>
+    image: RAVLMImage,
+    options: RAVLMGenerationOptions = RAVLMGenerationOptions(),
+): Flow<RASDKEvent>
 
 // MARK: - Model Management
 

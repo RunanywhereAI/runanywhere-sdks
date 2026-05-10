@@ -9,7 +9,6 @@ import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_TTS
 import ai.runanywhere.proto.v1.ModelEventKind
 import ai.runanywhere.proto.v1.PipelineState
 import ai.runanywhere.proto.v1.VoiceAgentResult
-import ai.runanywhere.proto.v1.VoiceEvent
 import ai.runanywhere.proto.v1.VoiceSessionError
 import android.app.Application
 import android.content.Context
@@ -29,6 +28,8 @@ import com.runanywhere.sdk.public.extensions.getVoiceAgentComponentStates
 import com.runanywhere.sdk.public.extensions.processVoiceTurn
 import com.runanywhere.sdk.public.extensions.streamVoiceAgent
 import com.runanywhere.sdk.public.extensions.toVoiceAgentTurnRequest
+import com.runanywhere.sdk.public.types.RAVoiceEvent
+import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -39,7 +40,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
-import java.io.ByteArrayOutputStream
 
 /**
  * Selected Model Info matching iOS pattern
@@ -613,10 +613,10 @@ class VoiceAssistantViewModel(
     }
 
     private fun showSessionError(error: VoiceSessionError) {
-        handleProtoEvent(VoiceEvent(session_error = error))
+        handleProtoEvent(RAVoiceEvent(session_error = error))
     }
 
-    private fun handleProtoEvent(event: VoiceEvent) {
+    private fun handleProtoEvent(event: RAVoiceEvent) {
         val nextPipelineState = event.pipelineStateOrNull()
         val errorMessage = event.errorMessageOrNull()
         val assistantToken = event.assistant_token?.text

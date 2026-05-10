@@ -91,14 +91,15 @@ public final class SolutionHandle: @unchecked Sendable {
         let snapshot = handle.withLock { $0 }
 
         guard let snapshot else {
-            throw SDKException.runtime(.invalidState, "Solution handle has already been destroyed")
+            throw SDKException(code: .invalidState, message: "Solution handle has already been destroyed", category: .internal)
         }
 
         let result = body(snapshot)
         guard result == RAC_SUCCESS else {
-            throw SDKException.runtime(
-                .processingFailed,
-                "Solution call failed with rac_result_t \(result)"
+            throw SDKException(
+                code: .processingFailed,
+                message: "Solution call failed with rac_result_t \(result)",
+                category: .internal
             )
         }
     }
@@ -138,9 +139,10 @@ public extension RunAnywhere {
             }
 
             guard result == RAC_SUCCESS, let raw else {
-                throw SDKException.runtime(
-                    .invalidConfiguration,
-                    "rac_solution_create_from_proto failed with \(result)"
+                throw SDKException(
+                    code: .invalidConfiguration,
+                    message: "rac_solution_create_from_proto failed with \(result)",
+                    category: .internal
                 )
             }
 
@@ -166,9 +168,10 @@ public extension RunAnywhere {
             let result = yaml.withCString { rac_solution_create_from_yaml($0, &raw) }
 
             guard result == RAC_SUCCESS, let raw else {
-                throw SDKException.runtime(
-                    .invalidConfiguration,
-                    "rac_solution_create_from_yaml failed with \(result)"
+                throw SDKException(
+                    code: .invalidConfiguration,
+                    message: "rac_solution_create_from_yaml failed with \(result)",
+                    category: .internal
                 )
             }
 
@@ -177,7 +180,7 @@ public extension RunAnywhere {
 
         private func ensureReady() async throws {
             guard RunAnywhere.isInitialized else {
-                throw SDKException.general(.notInitialized, "SDK not initialized")
+                throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
             }
             try await RunAnywhere.ensureServicesReady()
         }

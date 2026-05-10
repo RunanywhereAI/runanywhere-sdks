@@ -34,7 +34,7 @@ public extension RunAnywhere {
         supportsLora: Bool = false
     ) async throws -> RAModelInfo {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
         let logger = SDKLogger(category: "RunAnywhere.registerModel")
@@ -93,7 +93,7 @@ public extension RunAnywhere {
         onProgress: ((RADownloadProgress) async -> Void)? = nil
     ) async throws -> RADownloadProgress {
         guard isInitialized else {
-            throw SDKException.download(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .network)
         }
         try await ensureServicesReady()
 
@@ -106,9 +106,10 @@ public extension RunAnywhere {
 
         let plan = await downloadPlan(planRequest)
         guard plan.canStart else {
-            throw SDKException.download(
-                .downloadFailed,
-                plan.errorMessage.isEmpty ? "Unable to create a download plan" : plan.errorMessage
+            throw SDKException(
+                code: .downloadFailed,
+                message: plan.errorMessage.isEmpty ? "Unable to create a download plan" : plan.errorMessage,
+                category: .network
             )
         }
 
@@ -124,9 +125,10 @@ public extension RunAnywhere {
 
         let startResult = await startDownload(startRequest)
         guard startResult.accepted else {
-            throw SDKException.download(
-                .downloadFailed,
-                startResult.errorMessage.isEmpty ? "The download could not be started" : startResult.errorMessage
+            throw SDKException(
+                code: .downloadFailed,
+                message: startResult.errorMessage.isEmpty ? "The download could not be started" : startResult.errorMessage,
+                category: .network
             )
         }
 
@@ -157,7 +159,7 @@ public extension RunAnywhere {
     /// picker/bookmark flows after Swift has handled sandbox access.
     static func importModel(_ request: RAModelImportRequest) async throws -> RAModelImportResult {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         return try await CppBridge.ModelRegistry.shared.importModel(request)
     }
@@ -218,11 +220,11 @@ public extension RunAnywhere {
     /// matching Kotlin's top-level `RunAnywhere.clearCache()` entry point.
     static func clearCache() async throws {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
         guard CppBridge.FileManager.clearCache() else {
-            throw SDKException.fileManagement(.deleteFailed, "Failed to clear cache")
+            throw SDKException(code: .deleteFailed, message: "Failed to clear cache", category: .io)
         }
     }
 
@@ -230,11 +232,11 @@ public extension RunAnywhere {
     /// matching Kotlin's top-level `RunAnywhere.cleanTempFiles()` entry point.
     static func cleanTempFiles() async throws {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
         guard CppBridge.FileManager.clearTemp() else {
-            throw SDKException.fileManagement(.deleteFailed, "Failed to clean temp files")
+            throw SDKException(code: .deleteFailed, message: "Failed to clean temp files", category: .io)
         }
     }
 }
@@ -252,12 +254,13 @@ private extension RunAnywhere {
         case .completed:
             return true
         case .failed:
-            throw SDKException.download(
-                .downloadFailed,
-                progress.errorMessage.isEmpty ? "Download failed" : progress.errorMessage
+            throw SDKException(
+                code: .downloadFailed,
+                message: progress.errorMessage.isEmpty ? "Download failed" : progress.errorMessage,
+                category: .network
             )
         case .cancelled:
-            throw SDKException.download(.cancelled, "Download cancelled")
+            throw SDKException(code: .cancelled, message: "Download cancelled", category: .network)
         default:
             return progress.stage == .completed
         }
@@ -269,9 +272,10 @@ private extension RunAnywhere {
     ) async throws -> RADownloadProgress {
         let reportedPath = progress.localPath.isEmpty ? model.localPath : progress.localPath
         guard !reportedPath.isEmpty else {
-            throw SDKException.download(
-                .invalidState,
-                "Download completed without a local_path; cannot import completion into the model registry"
+            throw SDKException(
+                code: .invalidState,
+                message: "Download completed without a local_path; cannot import completion into the model registry",
+                category: .network
             )
         }
 
@@ -300,11 +304,12 @@ private extension RunAnywhere {
 
         let result = try await importModel(request)
         guard result.success else {
-            throw SDKException.download(
-                .downloadFailed,
-                result.errorMessage.isEmpty
+            throw SDKException(
+                code: .downloadFailed,
+                message: result.errorMessage.isEmpty
                     ? "Downloaded model could not be imported into the registry"
-                    : result.errorMessage
+                    : result.errorMessage,
+                category: .network
             )
         }
 

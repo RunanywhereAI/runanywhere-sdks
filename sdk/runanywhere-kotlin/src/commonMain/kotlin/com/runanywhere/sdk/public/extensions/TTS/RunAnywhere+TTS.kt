@@ -11,10 +11,10 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.TTSOptions
-import ai.runanywhere.proto.v1.TTSOutput
 import ai.runanywhere.proto.v1.TTSSpeakResult
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RATTSOptions
+import com.runanywhere.sdk.public.types.RATTSOutput
 import kotlinx.coroutines.flow.Flow
 
 // MARK: - Voice Loading
@@ -58,8 +58,8 @@ expect val RunAnywhere.currentTTSVoiceId: String?
  */
 expect suspend fun RunAnywhere.synthesize(
     text: String,
-    options: TTSOptions = TTSOptions(),
-): TTSOutput
+    options: RATTSOptions = RATTSOptions(),
+): RATTSOutput
 
 /**
  * Stream audio chunks for long text synthesis.
@@ -74,7 +74,7 @@ expect suspend fun RunAnywhere.synthesize(
 expect fun RunAnywhere.synthesizeStream(
     text: String,
     voiceId: String? = null,
-): Flow<TTSOutput>
+): Flow<RATTSOutput>
 
 /**
  * Stop current TTS synthesis.
@@ -106,7 +106,7 @@ expect suspend fun RunAnywhere.stopSynthesis()
  */
 expect suspend fun RunAnywhere.speak(
     text: String,
-    options: TTSOptions = TTSOptions(),
+    options: RATTSOptions = RATTSOptions(),
 ): TTSSpeakResult
 
 /**

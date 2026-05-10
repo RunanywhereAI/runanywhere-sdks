@@ -11,11 +11,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.LoRAAdapterConfig
-import ai.runanywhere.proto.v1.LoRAApplyRequest
 import ai.runanywhere.proto.v1.LoRAApplyResult
-import ai.runanywhere.proto.v1.LoRARemoveRequest
-import ai.runanywhere.proto.v1.LoRAState
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.LoraAdapterCatalogGetRequest
 import ai.runanywhere.proto.v1.LoraAdapterCatalogGetResult
@@ -27,6 +23,10 @@ import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedResult
 import ai.runanywhere.proto.v1.LoraCompatibilityResult
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLoRA
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RALoRAAdapterConfig
+import com.runanywhere.sdk.public.types.RALoRAApplyRequest
+import com.runanywhere.sdk.public.types.RALoRARemoveRequest
+import com.runanywhere.sdk.public.types.RALoRAState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -35,27 +35,27 @@ import kotlinx.coroutines.withContext
  * delegate to [CppBridgeLoRA] on `Dispatchers.IO`.
  */
 internal object AndroidLoRANamespace : LoRANamespace {
-    override suspend fun apply(request: LoRAApplyRequest): LoRAApplyResult =
+    override suspend fun apply(request: RALoRAApplyRequest): LoRAApplyResult =
         withContext(Dispatchers.IO) {
             CppBridgeLoRA.apply(request)
         }
 
-    override suspend fun remove(request: LoRARemoveRequest): LoRAState =
+    override suspend fun remove(request: RALoRARemoveRequest): RALoRAState =
         withContext(Dispatchers.IO) {
             CppBridgeLoRA.remove(request)
         }
 
-    override suspend fun list(): LoRAState =
+    override suspend fun list(): RALoRAState =
         withContext(Dispatchers.IO) {
-            CppBridgeLoRA.list(LoRAState())
+            CppBridgeLoRA.list(RALoRAState())
         }
 
-    override suspend fun state(): LoRAState =
+    override suspend fun state(): RALoRAState =
         withContext(Dispatchers.IO) {
-            CppBridgeLoRA.state(LoRAState())
+            CppBridgeLoRA.state(RALoRAState())
         }
 
-    override suspend fun checkCompatibility(config: LoRAAdapterConfig): LoraCompatibilityResult =
+    override suspend fun checkCompatibility(config: RALoRAAdapterConfig): LoraCompatibilityResult =
         withContext(Dispatchers.IO) {
             try {
                 CppBridgeLoRA.compatibility(config)

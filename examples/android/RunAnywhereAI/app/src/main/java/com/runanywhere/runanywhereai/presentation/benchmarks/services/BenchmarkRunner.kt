@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.presentation.benchmarks.services
 
-import ai.runanywhere.proto.v1.ModelInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkCategory
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkDeviceInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkMetrics
@@ -13,8 +12,9 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.isBuiltInModel
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedModel
 import com.runanywhere.sdk.public.extensions.availableModels
-import kotlinx.coroutines.ensureActive
+import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.ensureActive
 
 // -- Provider Interface --
 
@@ -25,7 +25,7 @@ interface BenchmarkScenarioProvider {
 
     suspend fun execute(
         scenario: BenchmarkScenario,
-        model: ModelInfo,
+        model: RAModelInfo,
         deviceInfo: BenchmarkDeviceInfo,
     ): BenchmarkMetrics
 }
@@ -45,7 +45,7 @@ sealed class BenchmarkRunnerError(message: String) : Exception(message) {
 // -- Preflight Result --
 
 data class BenchmarkPreflightResult(
-    val availableCategories: Map<BenchmarkCategory, List<ModelInfo>>,
+    val availableCategories: Map<BenchmarkCategory, List<RAModelInfo>>,
     val skippedCategories: List<BenchmarkCategory>,
     val totalWorkItems: Int,
 )
@@ -69,14 +69,14 @@ class BenchmarkRunner {
     // -- Preflight Check --
 
     suspend fun preflight(categories: Set<BenchmarkCategory>): BenchmarkPreflightResult {
-        val allModels: List<ModelInfo> =
+        val allModels: List<RAModelInfo> =
             try {
                 RunAnywhere.availableModels()
             } catch (e: Exception) {
                 throw BenchmarkRunnerError.FetchModelsFailed(e)
             }
 
-        val available = mutableMapOf<BenchmarkCategory, List<ModelInfo>>()
+        val available = mutableMapOf<BenchmarkCategory, List<RAModelInfo>>()
         val skipped = mutableListOf<BenchmarkCategory>()
 
         for (category in BenchmarkCategory.entries) {
@@ -130,7 +130,7 @@ class BenchmarkRunner {
 
         data class WorkItem(
             val category: BenchmarkCategory,
-            val model: ModelInfo,
+            val model: RAModelInfo,
             val scenario: BenchmarkScenario,
         )
 

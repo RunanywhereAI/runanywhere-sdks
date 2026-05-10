@@ -228,9 +228,10 @@ extension CppBridge {
 
         private static func throwIfError(_ errorCode: Int32, message: String) throws {
             guard errorCode == RAC_SUCCESS else {
-                throw SDKException.general(
-                    .processingFailed,
-                    message.isEmpty ? "Tool calling proto request failed: \(errorCode)" : message
+                throw SDKException(
+                    code: .processingFailed,
+                    message: message.isEmpty ? "Tool calling proto request failed: \(errorCode)" : message,
+                    category: .internal
                 )
             }
         }

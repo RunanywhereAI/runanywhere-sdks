@@ -211,11 +211,11 @@ public enum RunAnywhere {
             let trimmedBaseURL = baseURL?.trimmingCharacters(in: .whitespacesAndNewlines)
             guard let apiKey = trimmedAPIKey,
                   CppBridge.DevConfig.isUsableCredential(apiKey) else {
-                throw SDKException.general(.invalidConfiguration, "API key is required for \(environment.description) mode")
+                throw SDKException(code: .invalidConfiguration, message: "API key is required for \(environment.description) mode", category: .internal)
             }
             guard let baseURL = trimmedBaseURL,
                   CppBridge.DevConfig.isUsableHTTPURL(baseURL) else {
-                throw SDKException.general(.invalidConfiguration, "Base URL is required for \(environment.description) mode")
+                throw SDKException(code: .invalidConfiguration, message: "Base URL is required for \(environment.description) mode", category: .internal)
             }
             params = try SDKInitParams(apiKey: apiKey, baseURL: baseURL, environment: environment)
         }
@@ -232,9 +232,10 @@ public enum RunAnywhere {
         if environment != .development {
             guard CppBridge.DevConfig.isUsableCredential(apiKey),
                   CppBridge.DevConfig.isUsableHTTPURL(baseURL.absoluteString) else {
-                throw SDKException.general(
-                    .invalidConfiguration,
-                    "Usable API key and baseURL are required for \(environment.description) mode"
+                throw SDKException(
+                    code: .invalidConfiguration,
+                    message: "Usable API key and baseURL are required for \(environment.description) mode",
+                    category: .internal
                 )
             }
         }
@@ -378,7 +379,7 @@ public enum RunAnywhere {
     /// can wrap it in a shared Task for serialization.
     private static func _performServicesInitialization() async throws {
         guard let params = initParams, let environment = currentEnvironment else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
         let logger = SDKLogger(category: "RunAnywhere.Services")

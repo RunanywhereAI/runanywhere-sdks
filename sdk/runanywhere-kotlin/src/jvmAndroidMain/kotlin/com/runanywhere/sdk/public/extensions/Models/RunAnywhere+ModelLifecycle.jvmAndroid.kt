@@ -14,9 +14,6 @@ import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.CurrentModelResult
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.ModelInfo
-import ai.runanywhere.proto.v1.ModelLoadRequest
-import ai.runanywhere.proto.v1.ModelLoadResult
 import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.ModelUnloadResult
 import ai.runanywhere.proto.v1.SDKComponent
@@ -27,6 +24,9 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.resolvedPrimaryModelPath
 import com.runanywhere.sdk.public.extensions.Models.resolvedVisionProjectorPath
+import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
+import com.runanywhere.sdk.public.types.RAModelLoadResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -42,7 +42,7 @@ private fun ModelCategory.isVLMCategory(): Boolean =
 
 // MARK: - Lifecycle Operations
 
-actual suspend fun RunAnywhere.loadModel(request: ModelLoadRequest): ModelLoadResult {
+actual suspend fun RunAnywhere.loadModel(request: RAModelLoadRequest): RAModelLoadResult {
     requireLifecycleInitialized(this)
     val result =
         withContext(Dispatchers.IO) {
@@ -80,7 +80,7 @@ actual suspend fun RunAnywhere.unloadModel(request: ModelUnloadRequest): ModelUn
  * Mirrors Swift `synchronizeVLMComponentLoad`. On failure, this rolls back
  * the lifecycle load and surfaces the error message via the result.
  */
-private suspend fun synchronizeVLMComponentLoad(result: ModelLoadResult): ModelLoadResult {
+private suspend fun synchronizeVLMComponentLoad(result: RAModelLoadResult): RAModelLoadResult {
     val primaryPath = result.resolvedPrimaryModelPath()
     val projectorPath = result.resolvedVisionProjectorPath()
     if (primaryPath == null || projectorPath == null) {
@@ -151,7 +151,7 @@ private fun currentVLMComponentModelId(): String? {
     }
 }
 
-private fun rollbackVLMLifecycle(result: ModelLoadResult) {
+private fun rollbackVLMLifecycle(result: RAModelLoadResult) {
     try {
         CppBridgeModelLifecycle.unload(
             ModelUnloadRequest(
@@ -183,7 +183,7 @@ actual suspend fun RunAnywhere.componentLifecycleSnapshot(
 
 actual suspend fun RunAnywhere.loadModel(modelId: String) {
     requireLifecycleInitialized(this)
-    val result = loadModel(ModelLoadRequest(model_id = modelId))
+    val result = loadModel(RAModelLoadRequest(model_id = modelId))
     if (!result.success) {
         throw SDKException.model(
             result.error_message.ifBlank { "Failed to load model '$modelId'" },
@@ -198,7 +198,7 @@ actual suspend fun RunAnywhere.loadLLMModel(modelId: String) {
             ?: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
     val result =
         loadModel(
-            ModelLoadRequest(
+            RAModelLoadRequest(
                 model_id = modelId,
                 category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
                 framework = framework,
@@ -223,7 +223,7 @@ actual val RunAnywhere.isLLMModelLoaded: Boolean
                     it.model_id.isNotEmpty()
             } ?: false
 
-actual val RunAnywhere.currentLLMModel: ModelInfo?
+actual val RunAnywhere.currentLLMModel: RAModelInfo?
     get() {
         val current =
             CppBridgeModelLifecycle.currentModel(
@@ -234,7 +234,7 @@ actual val RunAnywhere.currentLLMModel: ModelInfo?
         return CppBridgeModelRegistry.get(modelId)
     }
 
-actual suspend fun RunAnywhere.currentSTTModel(): ModelInfo? {
+actual suspend fun RunAnywhere.currentSTTModel(): RAModelInfo? {
     val current =
         currentModel(CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION))
     current.model?.let { return it }
@@ -249,7 +249,7 @@ actual suspend fun RunAnywhere.loadSTTModel(modelId: String) {
             ?: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED
     val result =
         loadModel(
-            ModelLoadRequest(
+            RAModelLoadRequest(
                 model_id = modelId,
                 category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
                 framework = framework,

@@ -81,9 +81,10 @@ final class BenchmarkRunner {
         let listResult = await RunAnywhere.listModels()
         guard listResult.success else {
             throw BenchmarkRunnerError.fetchModelsFailed(
-                underlying: SDKException.general(
-                    .processingFailed,
-                    listResult.errorMessage.isEmpty ? "model registry" : listResult.errorMessage
+                underlying: SDKException(
+                    code: .processingFailed,
+                    message: listResult.errorMessage.isEmpty ? "model registry" : listResult.errorMessage,
+                    category: .internal
                 )
             )
         }

@@ -27,12 +27,12 @@ public extension RunAnywhere {
         options: RAVLMGenerationOptions
     ) async throws -> RAVLMResult {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
 
         guard await CppBridge.VLM.shared.isLoaded else {
-            throw SDKException.vlm(.notInitialized, "VLM model not loaded")
+            throw SDKException(code: .notInitialized, message: "VLM model not loaded", category: .component)
         }
 
         return try await CppBridge.VLM.shared.process(image: image, options: options)
@@ -49,12 +49,12 @@ public extension RunAnywhere {
         options: RAVLMGenerationOptions
     ) async throws -> AsyncStream<RASDKEvent> {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
 
         guard await CppBridge.VLM.shared.isLoaded else {
-            throw SDKException.vlm(.notInitialized, "VLM model not loaded")
+            throw SDKException(code: .notInitialized, message: "VLM model not loaded", category: .component)
         }
 
         return try await CppBridge.VLM.shared.processStream(image: image, options: options)

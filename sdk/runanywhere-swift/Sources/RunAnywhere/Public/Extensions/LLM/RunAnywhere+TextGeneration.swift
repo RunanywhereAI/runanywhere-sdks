@@ -17,7 +17,7 @@ public extension RunAnywhere {
     /// Generate text through the generated-proto C++ LLM service ABI.
     static func generate(_ request: RALLMGenerateRequest) async throws -> RALLMGenerationResult {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
         try await ensureServicesReady()
@@ -35,7 +35,7 @@ public extension RunAnywhere {
     /// Stream text generation through the generated-proto C++ LLM service ABI.
     static func generateStream(_ request: RALLMGenerateRequest) async throws -> AsyncStream<RALLMStreamEvent> {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
 
         try await ensureServicesReady()

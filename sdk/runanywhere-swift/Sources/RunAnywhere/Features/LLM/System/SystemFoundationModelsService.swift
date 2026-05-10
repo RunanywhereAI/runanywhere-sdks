@@ -43,7 +43,7 @@ public class SystemFoundationModelsService {
 
         if let reason = SystemFoundationModels.unavailableReason {
             logger.error("Foundation Models unavailable: \(reason)")
-            throw SDKException.llm(.serviceNotAvailable, reason)
+            throw SDKException(code: .serviceNotAvailable, message: reason, category: .component)
         }
 
         #if canImport(FoundationModels)
@@ -56,12 +56,12 @@ public class SystemFoundationModelsService {
             logger.info("Foundation Models initialized successfully")
         } catch {
             logger.error("Failed to initialize Foundation Models: \(error)")
-            throw SDKException.llm(.initializationFailed, "Failed to initialize Foundation Models", underlying: error)
+            throw SDKException(code: .initializationFailed, message: "Failed to initialize Foundation Models", category: .component, underlying: error)
         }
         #else
         // Foundation Models framework not available
         logger.error("FoundationModels framework not available")
-        throw SDKException.llm(.frameworkNotAvailable, "FoundationModels framework not available")
+        throw SDKException(code: .frameworkNotAvailable, message: "FoundationModels framework not available", category: .component)
         #endif
     }
 
@@ -91,19 +91,19 @@ public class SystemFoundationModelsService {
             logger.info("Foundation Models is available")
         case .unavailable(.deviceNotEligible):
             logger.error("Device not eligible for Apple Intelligence")
-            throw SDKException.llm(.hardwareUnsupported, "Device not eligible for Apple Intelligence")
+            throw SDKException(code: .hardwareUnsupported, message: "Device not eligible for Apple Intelligence", category: .component)
         case .unavailable(.appleIntelligenceNotEnabled):
             logger.error("Apple Intelligence not enabled. Please enable it in Settings.")
-            throw SDKException.llm(.notInitialized, "Apple Intelligence not enabled. Please enable it in Settings.")
+            throw SDKException(code: .notInitialized, message: "Apple Intelligence not enabled. Please enable it in Settings.", category: .component)
         case .unavailable(.modelNotReady):
             logger.error("Model not ready. It may be downloading or initializing.")
-            throw SDKException.llm(.componentNotReady, "Model not ready. It may be downloading or initializing.")
+            throw SDKException(code: .componentNotReady, message: "Model not ready. It may be downloading or initializing.", category: .component)
         case .unavailable(let other):
             logger.error("Foundation Models unavailable: \(String(describing: other))")
-            throw SDKException.llm(.serviceNotAvailable, "Foundation Models unavailable: \(String(describing: other))")
+            throw SDKException(code: .serviceNotAvailable, message: "Foundation Models unavailable: \(String(describing: other))", category: .component)
         @unknown default:
             logger.error("Unknown availability status")
-            throw SDKException.llm(.unknown, "Unknown Foundation Models availability status")
+            throw SDKException(code: .unknown, message: "Unknown Foundation Models availability status", category: .component)
         }
     }
     #endif
@@ -114,7 +114,7 @@ public class SystemFoundationModelsService {
         #if canImport(FoundationModels)
         guard let sessionWrapper = session else {
             logger.error("Session not available - was initialization successful?")
-            throw SDKException.llm(.notInitialized, "Session not available - was initialization successful?")
+            throw SDKException(code: .notInitialized, message: "Session not available - was initialization successful?", category: .component)
         }
 
         let sessionObj = sessionWrapper.session
@@ -122,7 +122,7 @@ public class SystemFoundationModelsService {
         // Check if session is responding to another request
         guard !sessionObj.isResponding else {
             logger.warning("Session is already responding to another request")
-            throw SDKException.llm(.serviceBusy, "Session is busy with another request")
+            throw SDKException(code: .serviceBusy, message: "Session is busy with another request", category: .component)
         }
 
         do {
@@ -135,15 +135,15 @@ public class SystemFoundationModelsService {
             return response
         } catch let error as LanguageModelSession.GenerationError {
             try handleGenerationError(error)
-            throw SDKException.llm(.generationFailed, "Generation failed", underlying: error)
+            throw SDKException(code: .generationFailed, message: "Generation failed", category: .component, underlying: error)
         } catch {
             logger.error("Generation failed: \(error)")
-            throw SDKException.llm(.generationFailed, "Generation failed", underlying: error)
+            throw SDKException(code: .generationFailed, message: "Generation failed", category: .component, underlying: error)
         }
         #else
         // Foundation Models framework not available
         logger.error("FoundationModels framework not available")
-        throw SDKException.llm(.frameworkNotAvailable, "FoundationModels framework not available")
+        throw SDKException(code: .frameworkNotAvailable, message: "FoundationModels framework not available", category: .component)
         #endif
     }
 
@@ -157,7 +157,7 @@ public class SystemFoundationModelsService {
         #if canImport(FoundationModels)
         guard let sessionWrapper = session else {
             logger.error("Session not available for streaming")
-            throw SDKException.llm(.notInitialized, "Session not available for streaming")
+            throw SDKException(code: .notInitialized, message: "Session not available for streaming", category: .component)
         }
 
         let sessionObj = sessionWrapper.session
@@ -165,7 +165,7 @@ public class SystemFoundationModelsService {
         // Check if session is responding to another request
         guard !sessionObj.isResponding else {
             logger.warning("Session is already responding to another request")
-            throw SDKException.llm(.serviceBusy, "Session is busy with another request")
+            throw SDKException(code: .serviceBusy, message: "Session is busy with another request", category: .component)
         }
 
         do {
@@ -178,15 +178,15 @@ public class SystemFoundationModelsService {
             logger.debug("Streaming generation completed successfully")
         } catch let error as LanguageModelSession.GenerationError {
             try handleGenerationError(error)
-            throw SDKException.llm(.generationFailed, "Streaming generation failed", underlying: error)
+            throw SDKException(code: .generationFailed, message: "Streaming generation failed", category: .component, underlying: error)
         } catch {
             logger.error("Streaming generation failed: \(error)")
-            throw SDKException.llm(.generationFailed, "Streaming generation failed", underlying: error)
+            throw SDKException(code: .generationFailed, message: "Streaming generation failed", category: .component, underlying: error)
         }
         #else
         // Foundation Models framework not available
         logger.error("FoundationModels framework not available for streaming")
-        throw SDKException.llm(.frameworkNotAvailable, "FoundationModels framework not available for streaming")
+        throw SDKException(code: .frameworkNotAvailable, message: "FoundationModels framework not available for streaming", category: .component)
         #endif
     }
 
@@ -230,10 +230,10 @@ public class SystemFoundationModelsService {
         case .exceededContextWindowSize:
             logger.error("Exceeded context window size - please reduce prompt length")
             // Foundation Models has a 4096 token context window
-            throw SDKException.llm(.contextTooLong, "Exceeded context window size (max 4096 tokens) - please reduce prompt length")
+            throw SDKException(code: .contextTooLong, message: "Exceeded context window size (max 4096 tokens) - please reduce prompt length", category: .component)
         default:
             logger.error("Other generation error: \(error)")
-            throw SDKException.llm(.generationFailed, "Foundation Models generation error", underlying: error)
+            throw SDKException(code: .generationFailed, message: "Foundation Models generation error", category: .component, underlying: error)
         }
     }
     #endif

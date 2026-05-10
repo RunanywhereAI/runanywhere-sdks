@@ -12,8 +12,7 @@ import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelArtifactType
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFormat
-import ai.runanywhere.proto.v1.ModelInfo
-
+import com.runanywhere.sdk.public.types.RAModelInfo
 // KOT-15: `ModelSelectionContext` lived here as a UI filter helper but had
 // zero consumers inside the SDK. It was moved to the Android example app at
 // `examples/android/RunAnywhereAI/.../models/ModelSelectionContext.kt`.
@@ -140,13 +139,13 @@ val ModelArtifactType.displayName: String
             ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED -> "Unspecified"
         }
 
-val ModelInfo.isDownloadedModel: Boolean
+val RAModelInfo.isDownloadedModel: Boolean
     get() = is_downloaded ?: local_path.isNotEmpty() || built_in == true
 
-val ModelInfo.isAvailableModel: Boolean
+val RAModelInfo.isAvailableModel: Boolean
     get() = is_available ?: isDownloadedModel
 
-val ModelInfo.isBuiltInModel: Boolean
+val RAModelInfo.isBuiltInModel: Boolean
     get() =
         built_in == true ||
             source == ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_BUILT_IN ||

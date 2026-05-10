@@ -1,6 +1,5 @@
 package com.runanywhere.runanywhereai.presentation.rag
 
-import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.RAGConfig
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,6 +31,7 @@ import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomShe
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedModel
+import com.runanywhere.sdk.public.types.RAModelInfo
 
 /**
  * Document Q&A Screen — Compose port of iOS DocumentRAGView.swift
@@ -56,8 +56,8 @@ fun DocumentRAGScreen(
     var showLLMPicker by remember { mutableStateOf(false) }
 
     // Selected models
-    var selectedEmbeddingModel by remember { mutableStateOf<ModelInfo?>(null) }
-    var selectedLLMModel by remember { mutableStateOf<ModelInfo?>(null) }
+    var selectedEmbeddingModel by remember { mutableStateOf<RAModelInfo?>(null) }
+    var selectedLLMModel by remember { mutableStateOf<RAModelInfo?>(null) }
 
     // Error banner visibility
     var isErrorBannerVisible by remember { mutableStateOf(false) }
@@ -169,8 +169,8 @@ fun DocumentRAGScreen(
  */
 @Composable
 private fun ModelSetupSection(
-    selectedEmbeddingModel: ModelInfo?,
-    selectedLLMModel: ModelInfo?,
+    selectedEmbeddingModel: RAModelInfo?,
+    selectedLLMModel: RAModelInfo?,
     onEmbeddingPickerTap: () -> Unit,
     onLLMPickerTap: () -> Unit,
 ) {
@@ -209,7 +209,7 @@ private fun ModelSetupSection(
 private fun ModelPickerRow(
     label: String,
     icon: @Composable () -> Unit,
-    selectedModel: ModelInfo?,
+    selectedModel: RAModelInfo?,
     onClick: () -> Unit,
 ) {
     TextButton(
@@ -692,8 +692,8 @@ private fun InputBar(
  * Registry-backed descriptor resolution happens inside the SDK RAG helper.
  */
 private fun buildRAGConfig(
-    embeddingModel: ModelInfo?,
-    llmModel: ModelInfo?,
+    embeddingModel: RAModelInfo?,
+    llmModel: RAModelInfo?,
 ): RAGConfig? {
     val embedding = embeddingModel ?: return null
     val llm = llmModel ?: return null

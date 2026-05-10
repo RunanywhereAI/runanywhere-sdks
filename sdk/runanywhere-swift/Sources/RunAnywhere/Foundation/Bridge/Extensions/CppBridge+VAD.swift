@@ -36,7 +36,7 @@ extension CppBridge {
             var newHandle: rac_handle_t?
             let result = rac_vad_component_create(&newHandle)
             guard result == RAC_SUCCESS, let handle = newHandle else {
-                throw SDKException.vad(.notInitialized, "Failed to create VAD component: \(result)")
+                throw SDKException(code: .notInitialized, message: "Failed to create VAD component: \(result)", category: .component)
             }
 
             self.handle = handle
@@ -91,7 +91,7 @@ extension CppBridge {
                 }
             }
             guard result == RAC_SUCCESS else {
-                throw SDKException.vad(.modelLoadFailed, "Failed to load VAD model: \(result)")
+                throw SDKException(code: .modelLoadFailed, message: "Failed to load VAD model: \(result)", category: .component)
             }
             loadedModelId = modelId
             logger.info("VAD model loaded: \(modelId)")
@@ -116,9 +116,10 @@ extension CppBridge {
                 return
             }
             guard result.success else {
-                throw SDKException.vad(
-                    .modelLoadFailed,
-                    result.errorMessage.isEmpty ? "VAD lifecycle load failed" : result.errorMessage
+                throw SDKException(
+                    code: .modelLoadFailed,
+                    message: result.errorMessage.isEmpty ? "VAD lifecycle load failed" : result.errorMessage,
+                    category: .component
                 )
             }
             // Pass the model id — `rac_vad_component_load_model` resolves through

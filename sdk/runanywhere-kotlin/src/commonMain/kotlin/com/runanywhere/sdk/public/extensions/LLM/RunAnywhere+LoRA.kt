@@ -13,11 +13,7 @@ package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.ExpectedModelFiles
 import ai.runanywhere.proto.v1.InferenceFramework
-import ai.runanywhere.proto.v1.LoRAAdapterConfig
-import ai.runanywhere.proto.v1.LoRAApplyRequest
 import ai.runanywhere.proto.v1.LoRAApplyResult
-import ai.runanywhere.proto.v1.LoRARemoveRequest
-import ai.runanywhere.proto.v1.LoRAState
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.LoraAdapterCatalogGetRequest
 import ai.runanywhere.proto.v1.LoraAdapterCatalogGetResult
@@ -32,11 +28,15 @@ import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelFileRole
 import ai.runanywhere.proto.v1.ModelFormat
-import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelInfoMetadata
 import ai.runanywhere.proto.v1.ModelSource
 import ai.runanywhere.proto.v1.SingleFileArtifact
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RALoRAAdapterConfig
+import com.runanywhere.sdk.public.types.RALoRAApplyRequest
+import com.runanywhere.sdk.public.types.RALoRARemoveRequest
+import com.runanywhere.sdk.public.types.RALoRAState
+import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
 /**
@@ -50,22 +50,22 @@ import com.runanywhere.sdk.utils.getCurrentTimeMillis
  */
 interface LoRANamespace {
     /** Apply one or more LoRA adapters to the currently loaded model. */
-    suspend fun apply(request: LoRAApplyRequest): LoRAApplyResult
+    suspend fun apply(request: RALoRAApplyRequest): LoRAApplyResult
 
     /** Remove adapters by generated request semantics, including `clear_all`. */
-    suspend fun remove(request: LoRARemoveRequest): LoRAState
+    suspend fun remove(request: RALoRARemoveRequest): RALoRAState
 
     /** Get info about all currently loaded LoRA adapters. */
-    suspend fun list(): LoRAState
+    suspend fun list(): RALoRAState
 
     /** Get the LoRA service state reported by commons. */
-    suspend fun state(): LoRAState
+    suspend fun state(): RALoRAState
 
     /**
      * Check whether a LoRA adapter is compatible with the current base model.
      * Mirrors Swift: returns an incompatible result instead of throwing.
      */
-    suspend fun checkCompatibility(config: LoRAAdapterConfig): LoraCompatibilityResult
+    suspend fun checkCompatibility(config: RALoRAAdapterConfig): LoraCompatibilityResult
 
     /** Register a LoRA adapter from a full catalog entry. */
     suspend fun register(entry: LoraAdapterCatalogEntry): LoraAdapterCatalogEntry
@@ -160,7 +160,7 @@ val LoraAdapterCatalogEntry.loraArtifactModelId: String
  */
 fun LoraAdapterCatalogEntry.toLoraArtifactModelInfo(
     timestampUnixMs: Long = getCurrentTimeMillis(),
-): ModelInfo {
+): RAModelInfo {
     val artifactFilename = filename.ifBlank { url.substringAfterLast('/').substringBefore('?') }
     val descriptor =
         ModelFileDescriptor(
@@ -184,7 +184,7 @@ fun LoraAdapterCatalogEntry.toLoraArtifactModelInfo(
             addAll(tags)
         }.distinct()
 
-    return ModelInfo(
+    return RAModelInfo(
         id = loraArtifactModelId,
         name = name,
         category = ModelCategory.MODEL_CATEGORY_UNSPECIFIED,
@@ -220,7 +220,7 @@ fun LoraAdapterCatalogEntry.toLoraArtifactModelInfo(
  * Register both the generated LoRA catalog entry and its generated download
  * artifact record. This does not fetch bytes.
  */
-suspend fun RunAnywhere.registerLoraArtifact(entry: LoraAdapterCatalogEntry): ModelInfo {
+suspend fun RunAnywhere.registerLoraArtifact(entry: LoraAdapterCatalogEntry): RAModelInfo {
     val registeredEntry = lora.register(entry)
     val artifact = registeredEntry.toLoraArtifactModelInfo()
     registerModelInternal(artifact)

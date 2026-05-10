@@ -26,7 +26,6 @@ import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelFormat
 import ai.runanywhere.proto.v1.ModelImportRequest
 import ai.runanywhere.proto.v1.ModelImportResult
-import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelInfoList
 import ai.runanywhere.proto.v1.ModelQuery
 import ai.runanywhere.proto.v1.ModelRegistryRefreshRequest
@@ -39,6 +38,7 @@ import com.runanywhere.sdk.public.extensions.Models.catalogKey
 import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.Models.rawValue
 import com.runanywhere.sdk.public.extensions.Models.requiresContextLength
+import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 import kotlinx.coroutines.flow.Flow
 
@@ -54,7 +54,7 @@ fun RunAnywhere.registerModel(
     memoryRequirement: Long? = null,
     supportsThinking: Boolean = false,
     supportsLora: Boolean = false,
-): ModelInfo {
+): RAModelInfo {
     val logger = SDKLogger.models
     val modelId = id ?: generateModelIdFromUrl(url)
     val format = formatFromUrl(url)
@@ -64,7 +64,7 @@ fun RunAnywhere.registerModel(
     logger.debug("Detected format: ${format.catalogKey} for model: $modelId")
 
     val baseInfo =
-        ModelInfo(
+        RAModelInfo(
             id = modelId,
             name = name,
             category = modality,
@@ -100,7 +100,7 @@ fun RunAnywhere.registerMultiFileModel(
     framework: InferenceFramework,
     modality: ModelCategory = ModelCategory.MODEL_CATEGORY_MULTIMODAL,
     memoryRequirement: Long? = null,
-): ModelInfo {
+): RAModelInfo {
     val logger = SDKLogger.models
     require(files.isNotEmpty()) { "Multi-file model must have at least one file descriptor" }
 
@@ -108,7 +108,7 @@ fun RunAnywhere.registerMultiFileModel(
 
     val now = getCurrentTimeMillis()
     val modelInfo =
-        ModelInfo(
+        RAModelInfo(
             id = id,
             name = name,
             category = modality,
@@ -132,7 +132,7 @@ fun RunAnywhere.registerMultiFileModel(
     return modelInfo
 }
 
-internal expect fun registerModelInternal(modelInfo: ModelInfo)
+internal expect fun registerModelInternal(modelInfo: RAModelInfo)
 
 /**
  * Platform-backed URL → ModelFormat inference. Delegates to the commons
@@ -147,7 +147,7 @@ internal expect fun formatFromUrl(url: String): ModelFormat
  * commons proto ABI (`rac_artifact_infer_from_url_proto`). Returns
  * [modelInfo] unchanged when the native ABI is unavailable.
  */
-internal expect fun applyInferredArtifact(modelInfo: ModelInfo, url: String): ModelInfo
+internal expect fun applyInferredArtifact(modelInfo: RAModelInfo, url: String): RAModelInfo
 
 private fun generateModelIdFromUrl(url: String): String {
     var filename = url.substringAfterLast('/')
@@ -165,13 +165,13 @@ private fun generateModelIdFromUrl(url: String): String {
 
 // MARK: - Model Discovery
 
-expect suspend fun RunAnywhere.availableModels(): List<ModelInfo>
+expect suspend fun RunAnywhere.availableModels(): List<RAModelInfo>
 
-expect suspend fun RunAnywhere.models(category: ModelCategory): List<ModelInfo>
+expect suspend fun RunAnywhere.models(category: ModelCategory): List<RAModelInfo>
 
-expect suspend fun RunAnywhere.downloadedModels(): List<ModelInfo>
+expect suspend fun RunAnywhere.downloadedModels(): List<RAModelInfo>
 
-expect suspend fun RunAnywhere.model(modelId: String): ModelInfo?
+expect suspend fun RunAnywhere.model(modelId: String): RAModelInfo?
 
 expect suspend fun RunAnywhere.queryModels(query: ModelQuery = ModelQuery()): ModelInfoList
 

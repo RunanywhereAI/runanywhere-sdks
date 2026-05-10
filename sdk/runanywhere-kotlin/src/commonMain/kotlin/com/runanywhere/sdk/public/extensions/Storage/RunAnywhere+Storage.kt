@@ -20,10 +20,10 @@ import ai.runanywhere.proto.v1.StorageDeletePlan
 import ai.runanywhere.proto.v1.StorageDeletePlanRequest
 import ai.runanywhere.proto.v1.StorageDeleteRequest
 import ai.runanywhere.proto.v1.StorageDeleteResult
-import ai.runanywhere.proto.v1.StorageInfo
 import ai.runanywhere.proto.v1.StorageInfoRequest
 import ai.runanywhere.proto.v1.StorageInfoResult
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RAStorageInfo
 
 // MARK: - Storage Information
 
@@ -34,7 +34,7 @@ import com.runanywhere.sdk.public.RunAnywhere
  * [getStorageInfo] with the default request that includes device, app and
  * model storage details.
  */
-expect suspend fun RunAnywhere.getStorageInfo(): StorageInfo
+expect suspend fun RunAnywhere.getStorageInfo(): RAStorageInfo
 
 /**
  * Get storage information through the canonical generated proto API.

@@ -13,21 +13,21 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.ToolCallFormatName
 import ai.runanywhere.proto.v1.ToolCallingOptions
-import ai.runanywhere.proto.v1.ToolDefinition
 import ai.runanywhere.proto.v1.ToolPromptFormatRequest
 import ai.runanywhere.proto.v1.ToolPromptFormatResult
-import ai.runanywhere.proto.v1.ToolResult
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.extensions.LLM.effectiveToolFormatHint
+import com.runanywhere.sdk.public.types.RAToolDefinition
+import com.runanywhere.sdk.public.types.RAToolResult
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
 object CppBridgeToolCalling {
     fun buildFollowupPrompt(
         originalPrompt: String,
-        tools: List<ToolDefinition>,
-        toolResult: ToolResult,
+        tools: List<RAToolDefinition>,
+        toolResult: RAToolResult,
         options: ToolCallingOptions,
     ): String =
         formattedPrompt(
@@ -58,7 +58,7 @@ object CppBridgeToolCalling {
         )
 
     private fun ToolCallingOptions.bridgeOptions(
-        toolsOverride: List<ToolDefinition>? = null,
+        toolsOverride: List<RAToolDefinition>? = null,
     ): ToolCallingOptions {
         val hint = effectiveToolFormatHint()
         return copy(

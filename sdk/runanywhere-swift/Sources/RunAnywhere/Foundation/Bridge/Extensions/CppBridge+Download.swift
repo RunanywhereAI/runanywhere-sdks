@@ -190,7 +190,7 @@ extension CppBridge {
             responseType: Response.Type
         ) throws -> Response {
             guard let symbol, NativeProtoABI.canReceiveProtoBuffer else {
-                throw SDKException.general(.notSupported, NativeProtoABI.unavailableMessage)
+                throw SDKException(code: .notSupported, message: NativeProtoABI.unavailableMessage, category: .internal)
             }
 
             var outBuffer = rac_proto_buffer_t()
@@ -200,7 +200,7 @@ extension CppBridge {
                 symbol(bytes, size, &outBuffer)
             }
             guard status == RAC_SUCCESS else {
-                throw SDKException.general(.processingFailed, "Download proto request failed: \(status)")
+                throw SDKException(code: .processingFailed, message: "Download proto request failed: \(status)", category: .internal)
             }
             return try NativeProtoABI.decode(responseType, from: outBuffer)
         }

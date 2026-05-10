@@ -9,13 +9,13 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.LLMGenerationOptions
-import ai.runanywhere.proto.v1.LLMGenerationResult
-import ai.runanywhere.proto.v1.LLMStreamEvent
 import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RALLMGenerationResult
+import com.runanywhere.sdk.public.types.RALLMStreamEvent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
@@ -27,28 +27,28 @@ private val llmLogger = SDKLogger.llm
 
 actual suspend fun RunAnywhere.generate(
     prompt: String,
-    options: LLMGenerationOptions?,
-): LLMGenerationResult {
+    options: RALLMGenerationOptions?,
+): RALLMGenerationResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
 
     ensureServicesReady()
 
-    val opts = options ?: LLMGenerationOptions()
+    val opts = options ?: RALLMGenerationOptions()
     llmLogger.info("[PARAMS] generate: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_tokens}")
     return CppBridgeLLM.generate(prompt, opts)
 }
 
 actual fun RunAnywhere.generateStream(
     prompt: String,
-    options: LLMGenerationOptions?,
-): Flow<LLMStreamEvent> {
+    options: RALLMGenerationOptions?,
+): Flow<RALLMStreamEvent> {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }
 
-    val opts = options ?: LLMGenerationOptions()
+    val opts = options ?: RALLMGenerationOptions()
     llmLogger.info("[PARAMS] generateStream: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_tokens}")
 
     return callbackFlow {

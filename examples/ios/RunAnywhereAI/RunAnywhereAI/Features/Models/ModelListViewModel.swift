@@ -83,9 +83,10 @@ class ModelListViewModel: ObservableObject {
             // 4. User-added models
             let listResult = await RunAnywhere.listModels()
             guard listResult.success else {
-                throw SDKException.general(
-                    .processingFailed,
-                    listResult.errorMessage.isEmpty ? "model registry" : listResult.errorMessage
+                throw SDKException(
+                    code: .processingFailed,
+                    message: listResult.errorMessage.isEmpty ? "model registry" : listResult.errorMessage,
+                    category: .internal
                 )
             }
             let allModels = listResult.models.models
@@ -202,7 +203,7 @@ class ModelListViewModel: ObservableObject {
         }
         let result = await RunAnywhere.loadModel(request)
         guard result.success else {
-            throw SDKException.general(.unknown, result.errorMessage)
+            throw SDKException(code: .unknown, message: result.errorMessage, category: .internal)
         }
         currentModel = model
     }

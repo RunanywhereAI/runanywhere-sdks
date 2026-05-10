@@ -10,22 +10,21 @@ package com.runanywhere.sdk.public.extensions.Models
 import ai.runanywhere.proto.v1.CurrentModelResult
 import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelFileRole
-import ai.runanywhere.proto.v1.ModelInfo
-import ai.runanywhere.proto.v1.ModelLoadResult
-
-fun ModelInfo.resolvedPrimaryModelPath(): String? =
+import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RAModelLoadResult
+fun RAModelInfo.resolvedPrimaryModelPath(): String? =
     resolvedModelFilePath(ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL)
 
-fun ModelInfo.resolvedVocabularyPath(): String? =
+fun RAModelInfo.resolvedVocabularyPath(): String? =
     resolvedModelFilePath(ModelFileRole.MODEL_FILE_ROLE_VOCABULARY)
 
-fun ModelLoadResult.resolvedPrimaryModelPath(): String? =
+fun RAModelLoadResult.resolvedPrimaryModelPath(): String? =
     resolvedModelFilePath(ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL)
 
-fun ModelLoadResult.resolvedVisionProjectorPath(): String? =
+fun RAModelLoadResult.resolvedVisionProjectorPath(): String? =
     resolvedModelFilePath(ModelFileRole.MODEL_FILE_ROLE_VISION_PROJECTOR)
 
-fun ModelLoadResult.resolvedModelFilePath(role: ModelFileRole): String? =
+fun RAModelLoadResult.resolvedModelFilePath(role: ModelFileRole): String? =
     resolved_artifacts.resolvedArtifactLocalPath(role)
 
 fun CurrentModelResult.resolvedPrimaryModelPath(): String? =
@@ -37,7 +36,7 @@ fun CurrentModelResult.resolvedVisionProjectorPath(): String? =
 fun CurrentModelResult.resolvedModelFilePath(role: ModelFileRole): String? =
     resolved_artifacts.resolvedArtifactLocalPath(role)
 
-fun ModelInfo.resolvedModelFilePath(role: ModelFileRole): String? {
+fun RAModelInfo.resolvedModelFilePath(role: ModelFileRole): String? {
     val descriptors = declaredModelFileDescriptors
     if (descriptors.isEmpty()) {
         return local_path.takeIf { role == ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL && it.isNotBlank() }
@@ -58,7 +57,7 @@ fun ModelInfo.resolvedModelFilePath(role: ModelFileRole): String? {
     return resolveDescriptorPath(descriptorRootPath(descriptors), pathFragment)
 }
 
-private val ModelInfo.declaredModelFileDescriptors: List<ModelFileDescriptor>
+private val RAModelInfo.declaredModelFileDescriptors: List<ModelFileDescriptor>
     get() =
         expected_files?.files?.takeIf { it.isNotEmpty() }
             ?: multi_file?.files?.takeIf { it.isNotEmpty() }
@@ -69,7 +68,7 @@ private val ModelInfo.declaredModelFileDescriptors: List<ModelFileDescriptor>
 private fun List<ModelFileDescriptor>.resolvedArtifactLocalPath(role: ModelFileRole): String? =
     firstOrNull { it.role == role }?.local_path.takeIfNotBlank()
 
-private fun ModelInfo.descriptorRootPath(descriptors: List<ModelFileDescriptor>): String {
+private fun RAModelInfo.descriptorRootPath(descriptors: List<ModelFileDescriptor>): String {
     val modelPath = local_path.takeIfNotBlank().orEmpty()
     val primaryDescriptor =
         descriptors.firstOrNull { it.role == ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL }

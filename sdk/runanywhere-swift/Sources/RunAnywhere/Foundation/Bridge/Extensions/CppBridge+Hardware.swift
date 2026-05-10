@@ -53,17 +53,19 @@ extension CppBridge {
 
         public static func setAcceleratorPreference(_ preference: RAAccelerationPreference) throws {
             guard let setPreference = HardwareProtoABI.setPreference else {
-                throw SDKException.general(
-                    .notSupported,
-                    NativeProtoABI.missingSymbolMessage("rac_hardware_set_accelerator_preference")
+                throw SDKException(
+                    code: .notSupported,
+                    message: NativeProtoABI.missingSymbolMessage("rac_hardware_set_accelerator_preference"),
+                    category: .internal
                 )
             }
 
             let status = setPreference(CInt(preference.rawValue))
             guard status == RAC_SUCCESS else {
-                throw SDKException.general(
-                    .processingFailed,
-                    "Failed to set accelerator preference: \(status)"
+                throw SDKException(
+                    code: .processingFailed,
+                    message: "Failed to set accelerator preference: \(status)",
+                    category: .internal
                 )
             }
         }
@@ -73,15 +75,17 @@ extension CppBridge {
             symbolName: String
         ) throws -> RAHardwareProfileResult {
             guard let symbol else {
-                throw SDKException.general(
-                    .notSupported,
-                    NativeProtoABI.missingSymbolMessage(symbolName)
+                throw SDKException(
+                    code: .notSupported,
+                    message: NativeProtoABI.missingSymbolMessage(symbolName),
+                    category: .internal
                 )
             }
             guard let free = HardwareProtoABI.free else {
-                throw SDKException.general(
-                    .notSupported,
-                    NativeProtoABI.missingSymbolMessage("rac_hardware_profile_free")
+                throw SDKException(
+                    code: .notSupported,
+                    message: NativeProtoABI.missingSymbolMessage("rac_hardware_profile_free"),
+                    category: .internal
                 )
             }
 
@@ -89,9 +93,10 @@ extension CppBridge {
             var byteCount = 0
             let status = symbol(&bytesPtr, &byteCount)
             guard status == RAC_SUCCESS, let bytesPtr else {
-                throw SDKException.general(
-                    .processingFailed,
-                    "Hardware proto request failed: \(status)"
+                throw SDKException(
+                    code: .processingFailed,
+                    message: "Hardware proto request failed: \(status)",
+                    category: .internal
                 )
             }
             defer { free(bytesPtr) }

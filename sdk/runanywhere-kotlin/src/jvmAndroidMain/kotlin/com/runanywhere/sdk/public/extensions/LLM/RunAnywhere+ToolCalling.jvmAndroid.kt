@@ -11,8 +11,6 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.LLMGenerationOptions
-import ai.runanywhere.proto.v1.LLMGenerationResult
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
@@ -22,6 +20,8 @@ import com.runanywhere.sdk.public.extensions.LLM.ToolExecutor
 import com.runanywhere.sdk.public.extensions.LLM.ToolResult
 import com.runanywhere.sdk.public.extensions.LLM.toLLMGenerationResult
 import com.runanywhere.sdk.public.extensions.LLM.toToolCallingOptions
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RALLMGenerationResult
 
 actual suspend fun RunAnywhere.registerTool(definition: ToolDefinition, executor: ToolExecutor) {
     RunAnywhereToolCalling.registerTool(definition, executor)
@@ -43,8 +43,8 @@ actual suspend fun RunAnywhere.executeTool(toolCall: ToolCall): ToolResult =
 
 actual suspend fun RunAnywhere.generateWithTools(
     prompt: String,
-    options: LLMGenerationOptions?,
-): LLMGenerationResult {
+    options: RALLMGenerationOptions?,
+): RALLMGenerationResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     val toolOptions = options.toToolCallingOptions()
     val toolResult = RunAnywhereToolCalling.generateWithTools(prompt, toolOptions)

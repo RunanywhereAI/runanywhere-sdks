@@ -58,7 +58,7 @@ public extension RunAnywhere {
     /// - Throws: `SDKException` if the SDK is not initialized or pipeline creation fails
     static func ragCreatePipeline(config: RARAGConfiguration) async throws {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
 
@@ -100,7 +100,7 @@ public extension RunAnywhere {
     @discardableResult
     static func ragIngest(_ document: RARAGDocument) async throws -> RARAGStatistics {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
 
@@ -116,7 +116,7 @@ public extension RunAnywhere {
     /// - Throws: `SDKException` if the SDK or pipeline is not ready, or ingestion fails.
     static func ragAddDocumentsBatch(documents: [RARAGDocument]) async throws {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         guard !documents.isEmpty else { return }
         try await ensureServicesReady()
@@ -147,7 +147,7 @@ public extension RunAnywhere {
     /// - Throws: `SDKException` if the SDK is not initialized or the pipeline is not ready.
     static func ragGetStatistics() async throws -> RARAGStatistics {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         return try await CppBridge.RAG.shared.statsProto()
     }
@@ -157,7 +157,7 @@ public extension RunAnywhere {
     /// - Throws: `SDKException` if the SDK is not initialized or the pipeline is not ready
     static func ragClearDocuments() async throws {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         _ = try await CppBridge.RAG.shared.clearProto()
     }
@@ -193,7 +193,7 @@ public extension RunAnywhere {
     /// Query through the generated-proto C++ RAG ABI.
     static func ragQuery(_ options: RARAGQueryOptions) async throws -> RARAGResult {
         guard isInitialized else {
-            throw SDKException.general(.notInitialized, "SDK not initialized")
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
         try await ensureServicesReady()
 
@@ -221,7 +221,7 @@ private extension RunAnywhere {
             let code: RAErrorCode = message.contains(NativeProtoABI.unavailableMessage)
                 ? .featureNotAvailable
                 : .modelLoadFailed
-            throw SDKException.rag(code, "\(errorLabel) model '\(model.id)': \(message)")
+            throw SDKException(code: code, message: "\(errorLabel) model '\(model.id)': \(message)", category: .component)
         }
         return result
     }

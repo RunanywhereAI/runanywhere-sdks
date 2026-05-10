@@ -8,21 +8,21 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.SDKEvent
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEventStream
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.types.RASDKEvent
 
-actual fun RunAnywhere.subscribeSDKEvents(handler: (SDKEvent) -> Boolean): Long =
+actual fun RunAnywhere.subscribeSDKEvents(handler: (RASDKEvent) -> Boolean): Long =
     CppBridgeSDKEventStream.subscribe(handler)
 
 actual fun RunAnywhere.unsubscribeSDKEvents(subscriptionId: Long) {
     CppBridgeSDKEventStream.unsubscribe(subscriptionId)
 }
 
-actual fun RunAnywhere.publishSDKEvent(event: SDKEvent): Int =
+actual fun RunAnywhere.publishSDKEvent(event: RASDKEvent): Int =
     CppBridgeSDKEventStream.publish(event)
 
-actual fun RunAnywhere.pollSDKEvent(): SDKEvent? =
+actual fun RunAnywhere.pollSDKEvent(): RASDKEvent? =
     CppBridgeSDKEventStream.poll()
 
 actual fun RunAnywhere.publishSDKFailure(

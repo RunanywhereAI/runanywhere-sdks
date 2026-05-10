@@ -35,7 +35,7 @@ extension CppBridge {
             var newHandle: rac_handle_t?
             let result = rac_llm_component_create(&newHandle)
             guard result == RAC_SUCCESS, let handle = newHandle else {
-                throw SDKException.llm(.notInitialized, "Failed to create LLM component: \(result)")
+                throw SDKException(code: .notInitialized, message: "Failed to create LLM component: \(result)", category: .component)
             }
 
             self.handle = handle
@@ -67,7 +67,7 @@ extension CppBridge {
                 }
             }
             guard result == RAC_SUCCESS else {
-                throw SDKException.llm(.modelLoadFailed, "Failed to load model: \(result)")
+                throw SDKException(code: .modelLoadFailed, message: "Failed to load model: \(result)", category: .component)
             }
             loadedModelId = modelId
             logger.info("LLM model loaded: \(modelId)")

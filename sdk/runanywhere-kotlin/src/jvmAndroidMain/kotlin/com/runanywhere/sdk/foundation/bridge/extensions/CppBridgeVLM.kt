@@ -14,6 +14,10 @@ import ai.runanywhere.proto.v1.VLMResult
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.types.RASDKEvent
+import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAVLMImage
+import com.runanywhere.sdk.public.types.RAVLMResult
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
@@ -80,7 +84,7 @@ object CppBridgeVLM {
         if (handle != 0L) RunAnywhereBridge.racVlmCancelProto(handle)
     }
 
-    fun process(image: VLMImage, options: VLMGenerationOptions): VLMResult =
+    fun process(image: RAVLMImage, options: RAVLMGenerationOptions): RAVLMResult =
         decodeOrThrow(
             VLMResult.ADAPTER,
             RunAnywhereBridge.racVlmProcessProto(
@@ -92,10 +96,10 @@ object CppBridgeVLM {
         )
 
     fun processStream(
-        image: VLMImage,
-        options: VLMGenerationOptions,
-        onEvent: (SDKEvent) -> Boolean,
-    ): VLMResult =
+        image: RAVLMImage,
+        options: RAVLMGenerationOptions,
+        onEvent: (RASDKEvent) -> Boolean,
+    ): RAVLMResult =
         decodeOrThrow(
             VLMResult.ADAPTER,
             RunAnywhereBridge.racVlmProcessStreamProto(

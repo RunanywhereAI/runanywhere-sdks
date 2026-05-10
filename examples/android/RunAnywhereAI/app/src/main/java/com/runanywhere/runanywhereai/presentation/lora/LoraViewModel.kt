@@ -2,11 +2,7 @@ package com.runanywhere.runanywhereai.presentation.lora
 
 import ai.runanywhere.proto.v1.DownloadProgress
 import ai.runanywhere.proto.v1.DownloadState
-import ai.runanywhere.proto.v1.LoRAAdapterConfig
 import ai.runanywhere.proto.v1.LoRAAdapterInfo
-import ai.runanywhere.proto.v1.LoRAApplyRequest
-import ai.runanywhere.proto.v1.LoRARemoveRequest
-import ai.runanywhere.proto.v1.LoRAState
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.LoraAdapterCatalogListRequest
 import ai.runanywhere.proto.v1.LoraAdapterCatalogListResult
@@ -24,6 +20,10 @@ import com.runanywhere.sdk.public.extensions.lora
 import com.runanywhere.sdk.public.extensions.loraArtifactModelId
 import com.runanywhere.sdk.public.extensions.model
 import com.runanywhere.sdk.public.extensions.registerLoraArtifact
+import com.runanywhere.sdk.public.types.RALoRAAdapterConfig
+import com.runanywhere.sdk.public.types.RALoRAApplyRequest
+import com.runanywhere.sdk.public.types.RALoRARemoveRequest
+import com.runanywhere.sdk.public.types.RALoRAState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -105,10 +105,10 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         viewModelScope.launch {
             try {
-                val config = LoRAAdapterConfig(adapter_path = path, scale = scale)
+                val config = RALoRAAdapterConfig(adapter_path = path, scale = scale)
                 val result =
                     withContext(Dispatchers.IO) {
-                        RunAnywhere.lora.apply(LoRAApplyRequest(adapters = listOf(config)))
+                        RunAnywhere.lora.apply(RALoRAApplyRequest(adapters = listOf(config)))
                     }
                 if (!result.success) {
                     throw IllegalStateException(result.error_message ?: "LoRA apply failed")
@@ -129,7 +129,7 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val state =
                     withContext(Dispatchers.IO) {
-                        RunAnywhere.lora.remove(LoRARemoveRequest(adapter_paths = listOf(path)))
+                        RunAnywhere.lora.remove(RALoRARemoveRequest(adapter_paths = listOf(path)))
                     }
                 state.throwIfError()
                 val loaded = state.loaded_adapters
@@ -148,7 +148,7 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val state =
                     withContext(Dispatchers.IO) {
-                        RunAnywhere.lora.remove(LoRARemoveRequest(clear_all = true))
+                        RunAnywhere.lora.remove(RALoRARemoveRequest(clear_all = true))
                     }
                 state.throwIfError()
                 _uiState.update { it.copy(loadedAdapters = emptyList(), error = null) }
@@ -168,7 +168,7 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val result =
                 withContext(Dispatchers.IO) {
-                    RunAnywhere.lora.checkCompatibility(LoRAAdapterConfig(adapter_path = loraPath))
+                    RunAnywhere.lora.checkCompatibility(RALoRAAdapterConfig(adapter_path = loraPath))
                 }
             onResult(result)
         }
@@ -345,7 +345,7 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
                 withContext(Dispatchers.IO) {
                     if (!loadedPath.isNullOrBlank()) {
                         RunAnywhere.lora
-                            .remove(LoRARemoveRequest(adapter_paths = listOf(loadedPath)))
+                            .remove(RALoRARemoveRequest(adapter_paths = listOf(loadedPath)))
                             .throwIfError()
                     }
                     RunAnywhere.deleteModel(entry.loraArtifactModelId)
@@ -434,7 +434,7 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun LoRAState.throwIfError() {
+    private fun RALoRAState.throwIfError() {
         if (!error_message.isNullOrBlank()) {
             throw IllegalStateException(error_message)
         }

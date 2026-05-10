@@ -20,13 +20,13 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.LLMGenerationOptions
-import ai.runanywhere.proto.v1.LLMGenerationResult
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.LLM.ToolCall
 import com.runanywhere.sdk.public.extensions.LLM.ToolDefinition
 import com.runanywhere.sdk.public.extensions.LLM.ToolExecutor
 import com.runanywhere.sdk.public.extensions.LLM.ToolResult
+import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RALLMGenerationResult
 
 // =============================================================================
 // TOOL REGISTRATION
@@ -122,5 +122,5 @@ expect suspend fun RunAnywhere.executeTool(toolCall: ToolCall): ToolResult
  */
 expect suspend fun RunAnywhere.generateWithTools(
     prompt: String,
-    options: LLMGenerationOptions? = null,
-): LLMGenerationResult
+    options: RALLMGenerationOptions? = null,
+): RALLMGenerationResult
