@@ -71,6 +71,104 @@ public extension RunAnywhere {
         return model
     }
 
+    /// Register an archive-packaged model (tar.gz / tar.bz2 / tar.xz / zip)
+    /// where the caller needs to specify the on-disk layout (`directoryBased`,
+    /// `nestedDirectory`, etc.) the URL-form `registerModel` cannot infer.
+    ///
+    /// Composes the canonical URL-form `registerModel(...)` (which delegates
+    /// to `rac_register_model_from_url_proto`) and then patches the resolved
+    /// `RAArchiveArtifact.structure` before re-saving through the registry.
+    @discardableResult
+    static func registerModel(
+        archive url: String,
+        structure: RAArchiveStructure,
+        id: String? = nil,
+        name: String,
+        framework: InferenceFramework,
+        modality: ModelCategory = .language,
+        archive archiveType: RAArchiveType? = nil,
+        memoryRequirement: Int64? = nil,
+        supportsThinking: Bool = false,
+        supportsLora: Bool = false
+    ) async throws -> RAModelInfo {
+        let resolvedArtifactType: RAModelArtifactType? = archiveType.map { type in
+            switch type {
+            case .zip:      return .zipArchive
+            case .tarGz:    return .tarGzArchive
+            case .tarBz2:   return .tarBz2Archive
+            case .tarXz:    return .tarXzArchive
+            default:        return .archive
+            }
+        }
+
+        var model = try await registerModel(
+            id: id,
+            name: name,
+            url: url,
+            framework: framework,
+            modality: modality,
+            artifactType: resolvedArtifactType,
+            memoryRequirement: memoryRequirement,
+            supportsThinking: supportsThinking,
+            supportsLora: supportsLora
+        )
+
+        // Preserve structure on the archive artifact. `inferredArtifact` only
+        // captures the archive type, not the nested/directory layout, so we
+        // patch it here and re-persist through the registry's proto save path.
+        guard var archiveArtifact = model.archiveArtifact else {
+            return model
+        }
+        archiveArtifact.structure = structure
+        model.setArtifact(.archive(archiveArtifact))
+        model.updatedAtUnixMs = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
+        try await CppBridge.ModelRegistry.shared.save(model)
+        return model
+    }
+
+    /// Register a multi-file model (e.g., VLMs with a separate mmproj, MiniLM
+    /// embedding with vocab.txt). Builds `RAModelInfo` via the canonical
+    /// `RAModelInfo.make(...)` factory and persists through the registry's
+    /// proto save path — no URL is involved at the model level because each
+    /// `RAModelFileDescriptor` carries its own URL.
+    @discardableResult
+    static func registerModel(
+        multiFile descriptors: [RAModelFileDescriptor],
+        id: String,
+        name: String,
+        framework: InferenceFramework,
+        modality: ModelCategory = .language,
+        memoryRequirement: Int64? = nil,
+        contextLength: Int? = nil,
+        supportsThinking: Bool = false,
+        source: RAModelSource = .remote
+    ) async throws -> RAModelInfo {
+        guard isInitialized else {
+            throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
+        }
+
+        var artifact = RAMultiFileArtifact()
+        artifact.files = descriptors
+
+        var model = RAModelInfo.make(
+            id: id,
+            name: name,
+            category: modality,
+            format: .unspecified,
+            framework: framework,
+            artifact: .multiFile(artifact),
+            downloadSizeBytes: memoryRequirement,
+            contextLength: contextLength ?? (modality.requiresContextLength ? 2048 : nil),
+            supportsThinking: supportsThinking,
+            source: source
+        )
+        if let memoryRequirement {
+            model.memoryRequiredBytes = memoryRequirement
+        }
+        try await CppBridge.ModelRegistry.shared.save(model)
+        return model
+    }
+
     /// Download a registered model. Commons owns planning, transfer (via the
     /// URLSession HTTP adapter), extraction, and validation; Swift owns the
     /// plan → start → poll → import orchestration loop and surfaces the

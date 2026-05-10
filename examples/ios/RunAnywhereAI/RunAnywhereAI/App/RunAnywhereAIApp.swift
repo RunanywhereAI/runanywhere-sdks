@@ -238,10 +238,8 @@ struct RunAnywhereAIApp: App {
     // MARK: - Model Catalog Seeding
     //
     // Mirrors the Flutter example's `_registerModulesAndModels()`. Uses the
-    // canonical `RunAnywhere.registerModel(...)` async public API; multi-file
-    // models (VLM + MiniLM embedding) are constructed as `RAModelInfo` and
-    // persisted directly via `CppBridge.ModelRegistry.shared.save(...)` because
-    // the multi-file convenience shim was not retained in the new SDK surface.
+    // canonical `RunAnywhere.registerModel(...)` async public API, including
+    // the multi-file and archive-with-structure overloads added in P5-T2.
     //
     // swiftlint:disable:next attributes function_body_length cyclomatic_complexity
     private func registerModulesAndModels() async {
@@ -476,7 +474,8 @@ struct RunAnywhereAIApp: App {
     }
 
     /// Register a tar.gz / zip archive model via the canonical public API.
-    /// The archive type + structure are preserved through `RAModelArtifactType`.
+    /// Delegates to `RunAnywhere.registerModel(archive:structure:...)` (P5-T2),
+    /// which preserves the archive type + on-disk layout.
     private func registerArchive(
         id: String,
         name: String,
@@ -487,40 +486,25 @@ struct RunAnywhereAIApp: App {
         structure: ArchiveStructure,
         memoryRequirement: Int64
     ) async {
-        let artifactType: RAModelArtifactType
-        switch archive {
-        case .zip:      artifactType = .zipArchive
-        case .tarGz:    artifactType = .tarGzArchive
-        case .tarBz2:   artifactType = .tarBz2Archive
-        case .tarXz:    artifactType = .tarXzArchive
-        default:        artifactType = .archive
-        }
-
         do {
-            var model = try await RunAnywhere.registerModel(
+            _ = try await RunAnywhere.registerModel(
+                archive: url,
+                structure: structure,
                 id: id,
                 name: name,
-                url: url,
                 framework: framework,
                 modality: modality,
-                artifactType: artifactType,
+                archive: archive,
                 memoryRequirement: memoryRequirement
             )
-            // Preserve structure in the archive artifact (inferredArtifact only
-            // captures the archive type, not the nested/directory layout).
-            if var archiveArtifact = model.archiveArtifact {
-                archiveArtifact.structure = structure
-                model.setArtifact(.archive(archiveArtifact))
-                try await CppBridge.ModelRegistry.shared.save(model)
-            }
         } catch {
             logger.warning("Failed to register archive model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
     }
 
     /// Register a multi-file model (e.g., VLMs with a separate mmproj, MiniLM
-    /// embedding with vocab.txt). Constructs `RAModelInfo` directly because the
-    /// multi-file convenience shim was not retained in the new SDK surface.
+    /// embedding with vocab.txt). Delegates to
+    /// `RunAnywhere.registerModel(multiFile:...)` (P5-T2).
     private func registerMultiFile(
         id: String,
         name: String,
@@ -540,27 +524,15 @@ struct RunAnywhereAIApp: App {
             return
         }
 
-        var artifact = RAMultiFileArtifact()
-        artifact.files = descriptors
-
-        let now = Int64((Date().timeIntervalSince1970 * 1_000).rounded())
-        var model = RAModelInfo()
-        model.id = id
-        model.name = name
-        model.category = modality
-        model.framework = framework
-        model.memoryRequiredBytes = memoryRequirement
-        model.downloadSizeBytes = memoryRequirement
-        model.contextLength = modality.requiresContextLength ? 2048 : 0
-        model.source = .remote
-        model.createdAtUnixMs = now
-        model.updatedAtUnixMs = now
-        model.setArtifact(.multiFile(artifact))
-        model.isDownloaded = model.isDownloadedOnDisk
-        model.isAvailable = model.isAvailableForUse
-
         do {
-            try await CppBridge.ModelRegistry.shared.save(model)
+            _ = try await RunAnywhere.registerModel(
+                multiFile: descriptors,
+                id: id,
+                name: name,
+                framework: framework,
+                modality: modality,
+                memoryRequirement: memoryRequirement
+            )
         } catch {
             logger.warning("Failed to register multi-file model \(id, privacy: .public): \(error.localizedDescription, privacy: .public)")
         }
