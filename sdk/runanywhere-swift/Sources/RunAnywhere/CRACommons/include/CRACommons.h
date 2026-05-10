@@ -43,7 +43,6 @@
 #include "rac_llm_component.h"
 #include "rac_llm_metrics.h"
 #include "rac_llm_analytics.h"
-#include "rac_llm_events.h"
 #include "rac_llm_structured_output.h"
 #include "rac_llm_thinking.h"
 // v2 close-out Phase G-2: proto-byte LLM stream ABI.
@@ -56,7 +55,6 @@
 #include "rac_stt_service.h"
 #include "rac_stt_component.h"
 #include "rac_stt_analytics.h"
-#include "rac_stt_events.h"
 #include "rac_stt_whisperkit_coreml.h"
 
 // TTS (Text-to-Speech)
@@ -65,7 +63,6 @@
 #include "rac_tts_service.h"
 #include "rac_tts_component.h"
 #include "rac_tts_analytics.h"
-#include "rac_tts_events.h"
 
 // VAD (Voice Activity Detection)
 #include "rac_vad.h"
@@ -74,7 +71,6 @@
 #include "rac_vad_component.h"
 #include "rac_vad_energy.h"
 #include "rac_vad_analytics.h"
-#include "rac_vad_events.h"
 
 // VLM (Vision Language Model)
 #include "rac_vlm.h"
@@ -100,7 +96,6 @@
 #include "rac_embeddings.h"
 
 // RAG (Retrieval-Augmented Generation)
-#include "rac_rag_pipeline.h"
 #include "rac_rag.h"
 
 // Solutions (T4.7) — proto/YAML driven L5 solution runtime

@@ -9,7 +9,6 @@
 #define RAC_RAG_H
 
 #include "rac_types.h"
-#include "rac_rag_pipeline.h"
 
 #ifdef __cplusplus
 extern "C" {
