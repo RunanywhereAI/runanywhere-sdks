@@ -172,7 +172,8 @@ public extension RAModelCategory {
     }
 
     /// Whether this category typically requires a context length.
-    /// Matches `rac_model_category_requires_context_length()` on the C side.
+    /// Used by `RAModelInfo.make(...)` default computation. Mirrors
+    /// `rac_model_category_requires_context_length()` on the C side.
     var requiresContextLength: Bool {
         switch self {
         case .language, .multimodal:
@@ -183,7 +184,9 @@ public extension RAModelCategory {
     }
 
     /// Whether this category typically supports thinking/reasoning.
-    /// Matches `rac_model_category_supports_thinking()` on the C side.
+    /// Used by `RAModelInfo.make(...)` to gate the per-model
+    /// `supportsThinking` field. Mirrors
+    /// `rac_model_category_supports_thinking()` on the C side.
     var supportsThinking: Bool {
         switch self {
         case .language, .multimodal:

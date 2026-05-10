@@ -12,7 +12,6 @@ import Foundation
 
 extension RALLMConfiguration: ComponentConfiguration {
     public var modelId: String? { nil }
-    public func validate() throws { }
 }
 
 // MARK: - RALLMGenerationOptions: C-bridge + convenience

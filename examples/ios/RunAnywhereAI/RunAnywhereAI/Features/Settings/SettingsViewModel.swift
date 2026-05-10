@@ -407,8 +407,8 @@ class SettingsViewModel: ObservableObject {
         }
 
         let storageInfo = storageResult.info
-        totalStorageSize = storageInfo.appStorage.totalSize
-        availableSpace = storageInfo.deviceStorage.freeSpace
+        totalStorageSize = storageInfo.appStorage.totalBytes
+        availableSpace = storageInfo.deviceStorage.freeBytes
         modelStorageSize = storageInfo.totalModelsSize
         storedModels = storageInfo.storedModels
 

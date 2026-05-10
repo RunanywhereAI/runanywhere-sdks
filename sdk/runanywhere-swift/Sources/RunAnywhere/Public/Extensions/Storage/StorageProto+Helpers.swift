@@ -20,20 +20,9 @@ extension RADeviceStorageInfo {
             : 0.0
     }
 
-    public var totalSpace: Int64 {
-        get { totalBytes }
-        set { totalBytes = newValue }
-    }
-
-    public var freeSpace: Int64 {
-        get { freeBytes }
-        set { freeBytes = newValue }
-    }
-
-    public var usedSpace: Int64 {
-        get { usedBytes }
-        set { usedBytes = newValue }
-    }
+    // Aliases `totalSpace` / `freeSpace` / `usedSpace` removed — shadowed
+    // the canonical proto field names (`totalBytes`/`freeBytes`/`usedBytes`)
+    // without semantic value. Per swift.md SWIFT-DUP-STORAGE-ALIASES.
 
     public var usagePercentage: Double {
         guard totalBytes > 0 else { return 0 }
@@ -52,25 +41,10 @@ extension RAAppStorageInfo {
         self.totalBytes = totalBytes
     }
 
-    public var documentsSize: Int64 {
-        get { documentsBytes }
-        set { documentsBytes = newValue }
-    }
-
-    public var cacheSize: Int64 {
-        get { cacheBytes }
-        set { cacheBytes = newValue }
-    }
-
-    public var appSupportSize: Int64 {
-        get { appSupportBytes }
-        set { appSupportBytes = newValue }
-    }
-
-    public var totalSize: Int64 {
-        get { totalBytes }
-        set { totalBytes = newValue }
-    }
+    // `documentsSize` / `cacheSize` / `appSupportSize` / `totalSize` aliases
+    // removed. Per swift.md SWIFT-DUP-STORAGE-ALIASES — canonical proto
+    // field names (`documentsBytes`/`cacheBytes`/`appSupportBytes`/
+    // `totalBytes`) are what app code should use.
 }
 
 // MARK: - RAStorageInfo

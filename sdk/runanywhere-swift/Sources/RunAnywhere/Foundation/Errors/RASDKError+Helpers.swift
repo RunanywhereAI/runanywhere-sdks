@@ -20,6 +20,12 @@ import Foundation
 
 extension RASDKError {
     /// Construct a proto error directly.
+    ///
+    /// `cAbiCode` is NOT populated here — the canonical C↔Swift translation
+    /// of the ABI integer lives in `CommonsErrorMapping.toSDKException` and
+    /// `fromSDKException`. Having a second derivation in this factory let
+    /// the two sources drift. Callers that need to round-trip through the
+    /// C ABI should go through `CommonsErrorMapping` directly.
     public static func make(
         code: RAErrorCode,
         message: String,
@@ -30,10 +36,6 @@ extension RASDKError {
         p.code = code
         p.message = message
         p.category = category
-        let raw = code.rawValue
-        if raw > 0 && raw <= 899 {
-            p.cAbiCode = -Int32(raw)
-        }
         if let nested = nestedMessage {
             p.nestedMessage = nested
         }

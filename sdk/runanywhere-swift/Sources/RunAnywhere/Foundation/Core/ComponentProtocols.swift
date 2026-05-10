@@ -14,7 +14,6 @@ import SwiftProtobuf
 public protocol ComponentConfiguration: Sendable {
     var modelId: String? { get }
     var preferredFramework: InferenceFramework? { get }
-    func validate() throws
 }
 
 extension ComponentConfiguration {
@@ -47,20 +46,4 @@ public extension RASDKComponent {
         }
     }
 
-    var analyticsKey: String {
-        switch self {
-        case .llm:                return "llm"
-        case .vlm:                return "vlm"
-        case .stt:                return "stt"
-        case .tts:                return "tts"
-        case .vad:                return "vad"
-        case .voiceAgent:         return "voice"
-        case .embeddings:         return "embedding"
-        case .diffusion:          return "diffusion"
-        case .rag:                return "rag"
-        case .wakeword:           return "wakeword"
-        case .speakerDiarization: return "speaker_diarization"
-        default:                  return "unknown"
-        }
-    }
 }

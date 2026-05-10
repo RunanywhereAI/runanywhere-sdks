@@ -44,8 +44,8 @@ class StorageViewModel: ObservableObject {
         let storageInfo = storageResult.info
 
         // Update storage sizes from the public API
-        totalStorageSize = storageInfo.appStorage.totalSize
-        availableSpace = storageInfo.deviceStorage.freeSpace
+        totalStorageSize = storageInfo.appStorage.totalBytes
+        availableSpace = storageInfo.deviceStorage.freeBytes
         modelStorageSize = storageInfo.totalModelsSize
 
         // Use RAStoredModel directly from SDK

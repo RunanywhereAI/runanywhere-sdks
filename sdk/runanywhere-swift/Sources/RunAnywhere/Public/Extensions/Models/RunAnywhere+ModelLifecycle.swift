@@ -88,51 +88,6 @@ private extension RunAnywhere {
         }
     }
 
-    /// Sync the STT component actor's `isLoaded` state with the lifecycle result,
-    /// matching the VLM synchronization pattern. Without this step,
-    /// `RunAnywhere.transcribe(...)` throws "STT model not loaded" even though
-    /// the C++ lifecycle service reported success — because the Swift actor's
-    /// handle hasn't been told about the new model yet.
-    static func synchronizeSTTComponentLoad(_ result: RAModelLoadResult) async -> RAModelLoadResult {
-        do {
-            try await CppBridge.STT.shared.loadModel(from: result)
-            return result
-        } catch {
-            var unloadRequest = RAModelUnloadRequest()
-            unloadRequest.modelID = result.modelID
-            unloadRequest.category = result.category
-            _ = CppBridge.ModelLifecycle.unload(unloadRequest)
-            await CppBridge.STT.shared.unload()
-
-            var failed = result
-            failed.success = false
-            failed.errorMessage = error.localizedDescription
-            return failed
-        }
-    }
-
-    /// Sync the TTS component actor's `isLoaded` state with the lifecycle result.
-    /// Same pattern as STT/VLM: `RunAnywhere.synthesize(...)` requires
-    /// `CppBridge.TTS.shared.isLoaded == true`, which only becomes true after
-    /// the component actor is fed the voice path.
-    static func synchronizeTTSComponentLoad(_ result: RAModelLoadResult) async -> RAModelLoadResult {
-        do {
-            try await CppBridge.TTS.shared.loadVoice(from: result)
-            return result
-        } catch {
-            var unloadRequest = RAModelUnloadRequest()
-            unloadRequest.modelID = result.modelID
-            unloadRequest.category = result.category
-            _ = CppBridge.ModelLifecycle.unload(unloadRequest)
-            await CppBridge.TTS.shared.unload()
-
-            var failed = result
-            failed.success = false
-            failed.errorMessage = error.localizedDescription
-            return failed
-        }
-    }
-
     static func shouldUnloadVLMComponent(
         request: RAModelUnloadRequest,
         result: RAModelUnloadResult,
