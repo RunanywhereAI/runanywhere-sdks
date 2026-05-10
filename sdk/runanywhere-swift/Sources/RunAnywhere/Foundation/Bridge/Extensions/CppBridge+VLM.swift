@@ -2,7 +2,17 @@
 //  CppBridge+VLM.swift
 //  RunAnywhere SDK
 //
-//  VLM component bridge - manages C++ VLM component lifecycle
+//  VLM component bridge - manages C++ VLM component lifecycle.
+//
+//  Generic scaffolding (handle creation, isLoaded, unload, destroy)
+//  lives in `CppBridge.ComponentActor`. VLM-specific surfaces kept here:
+//   - 5-string `loadResolvedModel(...)` with an optional vision-projector
+//     artifact (the path-only variant on the generic actor would lose
+//     the projector slot)
+//   - `loadModel(from:)` lifecycle adapters for `RAModelLoadResult` and
+//     `RACurrentModelResult` (multi-artifact-aware)
+//   - `cancel()`, `supportsStreaming`, and `state` introspection
+//   - `currentModelPath` mirror used by the cross-actor lifecycle code.
 //
 
 import CRACommons
@@ -19,10 +29,24 @@ extension CppBridge {
         /// Shared VLM component instance
         public static let shared = VLM()
 
-        private var handle: rac_handle_t?
+        /// Generic scaffold (handle / isLoaded / destroy). VLM's
+        /// vtable.loadModel uses the path-only overload of
+        /// `rac_vlm_component_load_model` (NULL projector). The multi-
+        /// artifact case goes through `loadResolvedModel(...)` below.
+        private let inner = ComponentActor(vtable: .vlm)
+
+        /// Mirror of the currently-loaded model id (also tracked on the
+        /// inner actor via `markAssetLoaded`).
         private var loadedModelId: String?
+
+        /// Mirror of the resolved primary-model path used by the
+        /// `currentModelPath` accessor.
         private var loadedModelPath: String?
+
+        /// Path to the loaded vision-projector artifact (llama.cpp VLMs
+        /// require this; nil for single-artifact VLMs).
         private var loadedVisionProjectorPath: String?
+
         private let logger = SDKLogger(category: "CppBridge.VLM")
 
         private init() {}
@@ -30,28 +54,15 @@ extension CppBridge {
         // MARK: - Handle Management
 
         /// Get or create the VLM component handle
-        public func getHandle() throws -> rac_handle_t {
-            if let handle = handle {
-                return handle
-            }
-
-            var newHandle: rac_handle_t?
-            let result = rac_vlm_component_create(&newHandle)
-            guard result == RAC_SUCCESS, let handle = newHandle else {
-                throw SDKException(code: .notInitialized, message: "Failed to create VLM component: \(result)", category: .component)
-            }
-
-            self.handle = handle
-            logger.debug("VLM component created")
-            return handle
+        public func getHandle() async throws -> rac_handle_t {
+            try await inner.getHandle()
         }
 
         // MARK: - State
 
         /// Check if a model is loaded
         public var isLoaded: Bool {
-            guard let handle = handle else { return false }
-            return rac_vlm_component_is_loaded(handle) == RAC_TRUE
+            get async { await inner.isLoaded }
         }
 
         /// Get the currently loaded model ID
@@ -62,8 +73,8 @@ extension CppBridge {
 
         // MARK: - Model Lifecycle
 
-        func loadModel(from result: RAModelLoadResult, modelName: String? = nil) throws {
-            if loadedModelId == result.modelID, isLoaded {
+        func loadModel(from result: RAModelLoadResult, modelName: String? = nil) async throws {
+            if loadedModelId == result.modelID, await inner.isLoaded {
                 return
             }
             guard result.success else {
@@ -90,7 +101,7 @@ extension CppBridge {
                 )
             }
 
-            try loadResolvedModel(
+            try await loadResolvedModel(
                 primaryPath,
                 visionProjectorPath: projectorPath,
                 modelId: result.modelID,
@@ -98,8 +109,8 @@ extension CppBridge {
             )
         }
 
-        func loadModel(from result: RACurrentModelResult) throws {
-            if loadedModelId == result.modelID, isLoaded {
+        func loadModel(from result: RACurrentModelResult) async throws {
+            if loadedModelId == result.modelID, await inner.isLoaded {
                 return
             }
             guard result.found else {
@@ -122,7 +133,7 @@ extension CppBridge {
                 )
             }
 
-            try loadResolvedModel(
+            try await loadResolvedModel(
                 primaryPath,
                 visionProjectorPath: projectorPath,
                 modelId: result.modelID,
@@ -136,8 +147,8 @@ extension CppBridge {
             visionProjectorPath: String?,
             modelId: String,
             modelName: String
-        ) throws {
-            let handle = try getHandle()
+        ) async throws {
+            let handle = try await inner.getHandle()
 
             let result: rac_result_t
             if let visionProjectorPath = visionProjectorPath {
@@ -167,50 +178,48 @@ extension CppBridge {
             loadedModelId = modelId
             loadedModelPath = modelPath
             loadedVisionProjectorPath = visionProjectorPath
+            await inner.markAssetLoaded(modelId)
             logger.info("VLM model loaded: \(modelId)")
         }
 
         /// Unload the current model
-        public func unload() {
-            guard let handle = handle else { return }
-            rac_vlm_component_cleanup(handle)
+        public func unload() async {
+            await inner.unload()
             loadedModelId = nil
             loadedModelPath = nil
             loadedVisionProjectorPath = nil
-            logger.info("VLM model unloaded")
         }
 
         /// Cancel ongoing generation
-        public func cancel() {
-            guard let handle = handle else { return }
+        public func cancel() async {
+            guard let handle = await inner.existingHandle() else { return }
             _ = rac_vlm_component_cancel(handle)
         }
 
         /// Check if streaming is supported
         public var supportsStreaming: Bool {
-            guard let handle = handle else { return false }
-            return rac_vlm_component_supports_streaming(handle) == RAC_TRUE
+            get async {
+                guard let handle = await inner.existingHandle() else { return false }
+                return rac_vlm_component_supports_streaming(handle) == RAC_TRUE
+            }
         }
 
         /// Get lifecycle state
         public var state: rac_lifecycle_state_t {
-            guard let handle = handle else { return RAC_LIFECYCLE_STATE_IDLE }
-            return rac_vlm_component_get_state(handle)
+            get async {
+                guard let handle = await inner.existingHandle() else { return RAC_LIFECYCLE_STATE_IDLE }
+                return rac_vlm_component_get_state(handle)
+            }
         }
 
         // MARK: - Cleanup
 
         /// Destroy the component
-        public func destroy() {
-            if let handle = handle {
-                rac_vlm_component_destroy(handle)
-                self.handle = nil
-                loadedModelId = nil
-                loadedModelPath = nil
-                loadedVisionProjectorPath = nil
-                logger.debug("VLM component destroyed")
-            }
+        public func destroy() async {
+            await inner.destroy()
+            loadedModelId = nil
+            loadedModelPath = nil
+            loadedVisionProjectorPath = nil
         }
     }
 }
-

@@ -659,8 +659,8 @@ extension CppBridge.STT {
 // MARK: - TTS
 
 extension CppBridge.TTS {
-    public func listVoices() throws -> [RATTSVoiceInfo] {
-        let handle = try getHandle()
+    public func listVoices() async throws -> [RATTSVoiceInfo] {
+        let handle = try await getHandle()
         let listVoices = try NativeProtoABI.require(
             TTSGeneratedProtoABI.listVoices,
             named: TTSGeneratedProtoABI.listVoicesName
@@ -733,8 +733,8 @@ extension CppBridge.TTS {
 // MARK: - VAD
 
 extension CppBridge.VAD {
-    public func configure(_ config: RAVADConfiguration) throws {
-        let handle = try getHandle()
+    public func configure(_ config: RAVADConfiguration) async throws {
+        let handle = try await getHandle()
         let configure = try NativeProtoABI.require(
             VADGeneratedProtoABI.configure,
             named: VADGeneratedProtoABI.configureName
@@ -747,8 +747,8 @@ extension CppBridge.VAD {
         }
     }
 
-    public func process(samples: [Float], options: RAVADOptions) throws -> RAVADResult {
-        let handle = try getHandle()
+    public func process(samples: [Float], options: RAVADOptions) async throws -> RAVADResult {
+        let handle = try await getHandle()
         let process = try NativeProtoABI.require(
             VADGeneratedProtoABI.process,
             named: VADGeneratedProtoABI.processName
@@ -772,8 +772,8 @@ extension CppBridge.VAD {
         }
     }
 
-    public func statisticsProto() throws -> RAVADStatistics {
-        let handle = try getHandle()
+    public func statisticsProto() async throws -> RAVADStatistics {
+        let handle = try await getHandle()
         let statistics = try NativeProtoABI.require(
             VADGeneratedProtoABI.statistics,
             named: VADGeneratedProtoABI.statisticsName
@@ -786,8 +786,8 @@ extension CppBridge.VAD {
         }
     }
 
-    public func setActivityCallbackProto(_ callback: @escaping (RASpeechActivityEvent) -> Void) throws {
-        let handle = try getHandle()
+    public func setActivityCallbackProto(_ callback: @escaping (RASpeechActivityEvent) -> Void) async throws {
+        let handle = try await getHandle()
         let setCallback = try NativeProtoABI.require(
             VADGeneratedProtoABI.setActivityCallback,
             named: VADGeneratedProtoABI.setActivityCallbackName
@@ -946,8 +946,8 @@ extension CppBridge.VoiceAgent {
 // MARK: - VLM
 
 extension CppBridge.VLM {
-    public func process(image: RAVLMImage, options: RAVLMGenerationOptions) throws -> RAVLMResult {
-        let handle = try getHandle()
+    public func process(image: RAVLMImage, options: RAVLMGenerationOptions) async throws -> RAVLMResult {
+        let handle = try await getHandle()
         let process = try NativeProtoABI.require(
             VLMGeneratedProtoABI.process,
             named: VLMGeneratedProtoABI.processName
@@ -972,8 +972,8 @@ extension CppBridge.VLM {
         }
     }
 
-    public func processStream(image: RAVLMImage, options: RAVLMGenerationOptions) throws -> AsyncStream<RASDKEvent> {
-        let handle = try getHandle()
+    public func processStream(image: RAVLMImage, options: RAVLMGenerationOptions) async throws -> AsyncStream<RASDKEvent> {
+        let handle = try await getHandle()
         let stream = try NativeProtoABI.require(
             VLMGeneratedProtoABI.stream,
             named: VLMGeneratedProtoABI.streamName
@@ -1022,8 +1022,8 @@ extension CppBridge.VLM {
         }
     }
 
-    public func cancelProto() throws {
-        guard let handle = try? getHandle() else { return }
+    public func cancelProto() async throws {
+        guard let handle = try? await getHandle() else { return }
         let cancel = try NativeProtoABI.require(
             VLMGeneratedProtoABI.cancel,
             named: VLMGeneratedProtoABI.cancelName
@@ -1129,8 +1129,8 @@ extension CppBridge.RAG {
 // MARK: - LoRA
 
 extension CppBridge.LLM {
-    public func applyLoraAdapters(_ request: RALoRAApplyRequest) throws -> RALoRAApplyResult {
-        let handle = try getHandle()
+    public func applyLoraAdapters(_ request: RALoRAApplyRequest) async throws -> RALoRAApplyResult {
+        let handle = try await getHandle()
         return try NativeProtoABI.invoke(
             request,
             on: handle,
@@ -1140,8 +1140,8 @@ extension CppBridge.LLM {
         )
     }
 
-    public func removeLoraAdapters(_ request: RALoRARemoveRequest) throws -> RALoRAState {
-        let handle = try getHandle()
+    public func removeLoraAdapters(_ request: RALoRARemoveRequest) async throws -> RALoRAState {
+        let handle = try await getHandle()
         return try NativeProtoABI.invoke(
             request,
             on: handle,
@@ -1151,8 +1151,8 @@ extension CppBridge.LLM {
         )
     }
 
-    public func listLoraAdapters() throws -> RALoRAState {
-        let handle = try getHandle()
+    public func listLoraAdapters() async throws -> RALoRAState {
+        let handle = try await getHandle()
         return try NativeProtoABI.invoke(
             RALoRAState(),
             on: handle,
@@ -1162,8 +1162,8 @@ extension CppBridge.LLM {
         )
     }
 
-    public func getLoraState() throws -> RALoRAState {
-        let handle = try getHandle()
+    public func getLoraState() async throws -> RALoRAState {
+        let handle = try await getHandle()
         return try NativeProtoABI.invoke(
             RALoRAState(),
             on: handle,
@@ -1173,8 +1173,8 @@ extension CppBridge.LLM {
         )
     }
 
-    public func checkLoraCompatibility(_ config: RALoRAAdapterConfig) throws -> RALoraCompatibilityResult {
-        let handle = try getHandle()
+    public func checkLoraCompatibility(_ config: RALoRAAdapterConfig) async throws -> RALoraCompatibilityResult {
+        let handle = try await getHandle()
         return try NativeProtoABI.invoke(
             config,
             on: handle,

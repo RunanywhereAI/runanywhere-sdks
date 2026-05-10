@@ -52,6 +52,9 @@ set(_RAC_IDL_PROTO_FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/component_types.proto
     # Wave H-5 (KOT-12) — engine-router capability query types.
     ${CMAKE_CURRENT_SOURCE_DIR}/router.proto
+    # Phase 4 — custom FieldOptions / EnumValueOptions extensions consumed by
+    # SDK codegen post-processors (defaults(), validate(), wire-string).
+    ${CMAKE_CURRENT_SOURCE_DIR}/rac_options.proto
 )
 
 # Emit C++ source + headers into a dedicated build directory so CMake can track

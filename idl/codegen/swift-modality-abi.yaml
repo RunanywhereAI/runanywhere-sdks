@@ -1,0 +1,498 @@
+# swift-modality-abi.yaml
+#
+# Manifest that drives codegen of CppBridge+ModalityProtoABI.swift.
+#
+# Source enumerated from sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/
+# Bridge/Extensions/CppBridge+ModalityProtoABI.swift (~1,191 LOC). Each entry
+# captures the swift method name, the rac_* C symbol resolved via dlsym, the
+# request/response proto types, the call kind, and an optional handle context.
+#
+# kind values
+# -----------
+# invoke
+#     Unary call. Serialise `request`, invoke C symbol with bytes+size+outBuffer
+#     (and optional context handle), decode `response` from the out-buffer. Maps
+#     to NativeProtoABI.invoke / NativeProtoABI.invoke(_:on:).
+#
+# stream
+#     Streaming call sharing the runRequestStream shape. Serialise `request`,
+#     register the shared C trampoline, run the C symbol on a detached task,
+#     decode each callback chunk as `response` and yield it on an AsyncStream.
+#     Maps to ProtoStreamContext<Response>.runRequestStream.
+#
+# invokeRequestStream
+#     Reserved for request-shaped streaming calls that diverge from the unified
+#     runRequestStream helper (no current entries -- all four streaming methods
+#     today use the unified runRequestStream path and are tagged kind: stream).
+#
+# custom
+#     Cannot be expressed by the three helper variants above (extra raw-pointer
+#     args, callback-collection patterns, lifecycle-only state queries, handle
+#     creation/destruction, dual byte-buffer inputs, etc.). Codegen MUST leave
+#     these methods hand-written in CppBridge+ModalityProtoABI.swift; the field
+#     `custom_reason` documents why.
+#
+# context
+#     Optional. Type of the opaque handle passed as the first argument of the
+#     C symbol (rac_handle_t, rac_voice_agent_handle_t, rac_lora_registry_handle_t).
+#     Omit for context-less / lifecycle-owned calls.
+#
+# extension
+#     Optional. Swift extension target where the generated method lives. Defaults
+#     to the modality `name` (e.g. CppBridge.LLM). Used to disambiguate when a
+#     modality fans out into multiple Swift extensions (LoRA reuses CppBridge.LLM,
+#     RAG-config helper is a top-level free function, embeddings lives under a
+#     nested namespace, etc.).
+#
+modalities:
+
+  # --------------------------------------------------------------------------
+  # LLM
+  # --------------------------------------------------------------------------
+  - name: LLM
+    handle: rac_handle_t
+    extension: CppBridge.LLM
+    methods:
+      - swift_name: generate
+        c_symbol: rac_llm_generate_proto
+        request: RALLMGenerateRequest
+        response: RALLMGenerationResult
+        kind: invoke
+
+      - swift_name: generateStream
+        c_symbol: rac_llm_generate_stream_proto
+        request: RALLMGenerateRequest
+        response: RALLMStreamEvent
+        kind: stream
+        # Terminal-event factory on rc != RAC_SUCCESS:
+        #   isFinal=true, finishReason="error",
+        #   errorCode=rc, errorMessage from RASDKError.from(rcResult:).
+
+      - swift_name: cancelProto
+        c_symbol: rac_llm_cancel_proto
+        request: ~
+        response: RASDKEvent
+        kind: custom
+        custom_reason: |
+          Out-buffer-only ABI: signature is (outBuffer*) -> rc with no request
+          bytes and no context handle. Decodes RASDKEvent from the buffer.
+
+  # --------------------------------------------------------------------------
+  # StructuredOutput  (lives on CppBridge.StructuredOutput, static method)
+  # --------------------------------------------------------------------------
+  - name: StructuredOutput
+    handle: ~
+    extension: CppBridge.StructuredOutput
+    methods:
+      - swift_name: generateStream
+        c_symbol: rac_structured_output_generate_stream_proto
+        request: RAStructuredOutputRequest
+        response: RAStructuredOutputStreamEvent
+        kind: stream
+        static: true
+        # Terminal-event factory on rc != RAC_SUCCESS:
+        #   kind=.error, errorMessage="Structured output stream failed: <rc>".
+
+  # --------------------------------------------------------------------------
+  # STT  (lifecycle-owned -- no Swift actor handle threaded through)
+  # --------------------------------------------------------------------------
+  - name: STT
+    handle: ~
+    extension: CppBridge.STT
+    methods:
+      - swift_name: transcribe
+        c_symbol: rac_stt_transcribe_lifecycle_proto
+        request: RASTTTranscriptionRequest
+        response: RASTTOutput
+        kind: invoke
+        # Swift facade signature wraps audioData+options into the request proto
+        # before invoking; codegen should preserve that helper construction.
+
+      - swift_name: transcribeStream
+        c_symbol: rac_stt_transcribe_stream_lifecycle_proto
+        request: RASTTTranscriptionRequest
+        response: RASTTPartialResult
+        kind: stream
+        # Terminal-event factory on rc != RAC_SUCCESS:
+        #   isFinal=true, text="STT stream failed: <rc>".
+
+  # --------------------------------------------------------------------------
+  # TTS
+  # --------------------------------------------------------------------------
+  - name: TTS
+    handle: rac_handle_t
+    extension: CppBridge.TTS
+    methods:
+      - swift_name: listVoices
+        c_symbol: rac_tts_component_list_voices_proto
+        request: ~
+        response: RATTSVoiceInfo
+        kind: custom
+        context: rac_handle_t
+        custom_reason: |
+          Voice-collection callback pattern: C symbol invokes the per-voice
+          callback once per RATTSVoiceInfo, and Swift collects them into [..]
+          via ProtoCollectingContext. No request bytes; multiple response
+          decodes per call. Doesn't match invoke/stream/invokeRequestStream.
+
+      - swift_name: synthesize
+        c_symbol: rac_tts_synthesize_lifecycle_proto
+        request: RATTSSynthesisRequest
+        response: RATTSOutput
+        kind: invoke
+        # Lifecycle-owned: no handle context. Swift facade wraps text+options
+        # into the request proto before invoking.
+
+      - swift_name: synthesizeStream
+        c_symbol: rac_tts_synthesize_stream_lifecycle_proto
+        request: RATTSSynthesisRequest
+        response: RATTSOutput
+        kind: stream
+        # Terminal-event factory on rc != RAC_SUCCESS:
+        #   timestampMs = current time in ms (zero-payload sentinel).
+
+  # --------------------------------------------------------------------------
+  # VAD  (component-handle surface + lifecycle surface; both must be generated)
+  # --------------------------------------------------------------------------
+  - name: VAD
+    handle: rac_handle_t
+    extension: CppBridge.VAD
+    methods:
+      # Component-handle surface (rac_vad_component_*)
+      - swift_name: configure
+        c_symbol: rac_vad_component_configure_proto
+        request: RAVADConfiguration
+        response: ~
+        kind: custom
+        context: rac_handle_t
+        custom_reason: |
+          Returns rc only (no out-buffer). Throws SDKException(.invalidConfiguration)
+          on failure. No response decode -- doesn't fit invoke (which always
+          decodes a Response).
+
+      - swift_name: process
+        c_symbol: rac_vad_component_process_proto
+        request: RAVADOptions
+        response: RAVADResult
+        kind: custom
+        context: rac_handle_t
+        custom_reason: |
+          Mixed scalar + proto signature: takes raw Float* + sample count
+          alongside the serialised options bytes. Doesn't fit the standard
+          invoke shape which serialises a single Message request.
+
+      - swift_name: statisticsProto
+        c_symbol: rac_vad_component_get_statistics_proto
+        request: ~
+        response: RAVADStatistics
+        kind: custom
+        context: rac_handle_t
+        custom_reason: |
+          GET-shaped: signature is (handle, outBuffer*) -> rc with no request
+          bytes. Doesn't fit invoke (which serialises a request). A future
+          codegen could add a "get_with_context" kind covering this pattern
+          (also used by RAG.clearProto / RAG.statsProto / VoiceAgent.componentStatesProto).
+
+      - swift_name: setActivityCallbackProto
+        c_symbol: rac_vad_component_set_activity_proto_callback
+        request: ~
+        response: RASpeechActivityEvent
+        kind: custom
+        context: rac_handle_t
+        custom_reason: |
+          Long-lived callback registration, not a request/response invocation.
+          Installs a Swift closure as a C callback for the lifetime of the
+          component, with retain-balance handled on rc failure.
+
+      # Lifecycle-owned surface (rac_vad_*_lifecycle_proto)
+      - swift_name: configureLifecycle
+        c_symbol: rac_vad_configure_lifecycle_proto
+        request: RAVADConfiguration
+        response: RAVADServiceState
+        kind: invoke
+
+      - swift_name: startLifecycle
+        c_symbol: rac_vad_start_lifecycle_proto
+        request: ~
+        response: RAVADServiceState
+        kind: custom
+        custom_reason: |
+          State-only: signature is (outBuffer*) -> rc -- no request bytes,
+          no handle. Doesn't fit invoke. Could be modelled by a future
+          "state_only" kind shared with stop/reset lifecycle calls.
+
+      - swift_name: stopLifecycle
+        c_symbol: rac_vad_stop_lifecycle_proto
+        request: ~
+        response: RAVADServiceState
+        kind: custom
+        custom_reason: State-only (outBuffer*) -> rc, see startLifecycle.
+
+      - swift_name: resetLifecycle
+        c_symbol: rac_vad_reset_lifecycle_proto
+        request: ~
+        response: RAVADServiceState
+        kind: custom
+        custom_reason: State-only (outBuffer*) -> rc, see startLifecycle.
+
+      - swift_name: processLifecycle
+        c_symbol: rac_vad_process_lifecycle_proto
+        request: RAVADProcessRequest
+        response: RAVADResult
+        kind: invoke
+
+  # --------------------------------------------------------------------------
+  # VoiceAgent
+  # --------------------------------------------------------------------------
+  - name: VoiceAgent
+    handle: rac_voice_agent_handle_t
+    extension: CppBridge.VoiceAgent
+    methods:
+      - swift_name: initialize
+        c_symbol: rac_voice_agent_initialize_proto
+        request: RAVoiceAgentComposeConfig
+        response: RAVoiceAgentComponentStates
+        kind: invoke
+        context: rac_voice_agent_handle_t
+        async_handle: true
+        # Swift facade is `async throws` because getHandle() is async (it
+        # composes handles from LLM/STT/TTS/VAD before calling).
+
+      - swift_name: componentStatesProto
+        c_symbol: rac_voice_agent_component_states_proto
+        request: ~
+        response: RAVoiceAgentComponentStates
+        kind: custom
+        context: rac_voice_agent_handle_t
+        custom_reason: |
+          GET-shaped (handle, outBuffer*) -> rc, no request bytes. Uses
+          requireExistingHandle() (sync) instead of getHandle() (async),
+          unlike initialize/processVoiceTurnProto.
+
+      - swift_name: processVoiceTurnProto
+        c_symbol: rac_voice_agent_process_voice_turn_proto
+        request: ~
+        response: RAVoiceAgentResult
+        kind: custom
+        context: rac_voice_agent_handle_t
+        async_handle: true
+        custom_reason: |
+          Takes raw audio Data via UnsafeRawPointer + count -- not a serialised
+          proto Message. Doesn't fit invoke.
+
+  # --------------------------------------------------------------------------
+  # VLM
+  # --------------------------------------------------------------------------
+  - name: VLM
+    handle: rac_handle_t
+    extension: CppBridge.VLM
+    methods:
+      - swift_name: process
+        c_symbol: rac_vlm_process_proto
+        request: ~
+        response: RAVLMResult
+        kind: custom
+        context: rac_handle_t
+        custom_reason: |
+          Dual proto inputs (image bytes + options bytes) plus an outBuffer.
+          Doesn't fit invoke (which serialises a single Message request).
+
+      - swift_name: processStream
+        c_symbol: rac_vlm_process_stream_proto
+        request: ~
+        response: RASDKEvent
+        kind: custom
+        context: rac_handle_t
+        custom_reason: |
+          Diverges from runRequestStream in three ways: (1) dual proto inputs
+          (image + options), (2) the per-chunk callback returns rac_bool_t to
+          signal continue/cancel, (3) the call also writes into a final
+          outBuffer alongside the streaming callbacks. Custom AsyncStream wiring.
+
+      - swift_name: cancelProto
+        c_symbol: rac_vlm_cancel_proto
+        request: ~
+        response: ~
+        kind: custom
+        context: rac_handle_t
+        custom_reason: |
+          Handle-only signature (handle) -> rc with no request and no response.
+          Doesn't fit invoke or any other helper variant.
+
+  # --------------------------------------------------------------------------
+  # Embeddings  (CppBridge.EmbeddingsProto namespace, static method)
+  # --------------------------------------------------------------------------
+  - name: Embeddings
+    handle: rac_handle_t
+    extension: CppBridge.EmbeddingsProto
+    methods:
+      - swift_name: embedBatch
+        c_symbol: rac_embeddings_embed_batch_proto
+        request: RAEmbeddingsRequest
+        response: RAEmbeddingsResult
+        kind: invoke
+        context: rac_handle_t
+        static: true
+        # Caller passes the handle explicitly: embedBatch(handle:, request:).
+
+  # --------------------------------------------------------------------------
+  # RAG  (extension CppBridge.RAG -- session handle is owned by the actor)
+  # --------------------------------------------------------------------------
+  - name: RAG
+    handle: rac_handle_t
+    extension: CppBridge.RAG
+    methods:
+      - swift_name: createPipeline
+        c_symbol: rac_rag_session_create_proto
+        request: RARAGConfiguration
+        response: ~
+        kind: custom
+        custom_reason: |
+          Handle-creation primitive: signature is (bytes, size, outHandle*) -> rc.
+          Returns a fresh rac_handle_t via an out-pointer rather than decoding
+          a response Message; the new handle is stashed via setProtoSession().
+
+      - swift_name: ingest
+        c_symbol: rac_rag_ingest_proto
+        request: RARAGDocument
+        response: RARAGStatistics
+        kind: invoke
+        context: rac_handle_t
+        # Context is requireProtoSession() -- the session handle the actor owns.
+
+      - swift_name: query
+        c_symbol: rac_rag_query_proto
+        request: RARAGQueryOptions
+        response: RARAGResult
+        kind: invoke
+        context: rac_handle_t
+
+      - swift_name: clearProto
+        c_symbol: rac_rag_clear_proto
+        request: ~
+        response: RARAGStatistics
+        kind: custom
+        context: rac_handle_t
+        custom_reason: GET-shaped (session, outBuffer*) -> rc, no request bytes.
+
+      - swift_name: statsProto
+        c_symbol: rac_rag_stats_proto
+        request: ~
+        response: RARAGStatistics
+        kind: custom
+        context: rac_handle_t
+        custom_reason: GET-shaped (session, outBuffer*) -> rc, no request bytes.
+
+  # --------------------------------------------------------------------------
+  # RAG -- top-level free functions (not on any extension)
+  # --------------------------------------------------------------------------
+  - name: RAGFreeFunctions
+    handle: ~
+    extension: ""   # top-level free function, not an extension method
+    methods:
+      - swift_name: resolveRAGConfigurationDefaults
+        c_symbol: rac_rag_request_with_defaults_proto
+        request: RARAGConfiguration
+        response: RARAGConfiguration
+        kind: invoke
+        # Returns Optional<RARAGConfiguration>: returns nil instead of throwing
+        # when the symbol isn't exported (RAG backend disabled). Codegen needs
+        # to support an "optional_when_unsupported" tweak, or this entry stays
+        # hand-written.
+
+      - swift_name: destroyRAGProtoSessionIfAvailable
+        c_symbol: rac_rag_session_destroy_proto
+        request: ~
+        response: ~
+        kind: custom
+        custom_reason: |
+          Handle-destruction primitive: signature is (handle) -> void with no
+          request, no response, and a void return (not rac_result_t). The Swift
+          facade is silently a no-op when the symbol isn't exported.
+
+  # --------------------------------------------------------------------------
+  # LoRA -- lives on CppBridge.LLM extension (operates on the LLM handle)
+  # --------------------------------------------------------------------------
+  - name: LoRA
+    handle: rac_handle_t
+    extension: CppBridge.LLM
+    methods:
+      - swift_name: applyLoraAdapters
+        c_symbol: rac_lora_apply_proto
+        request: RALoRAApplyRequest
+        response: RALoRAApplyResult
+        kind: invoke
+        context: rac_handle_t
+
+      - swift_name: removeLoraAdapters
+        c_symbol: rac_lora_remove_proto
+        request: RALoRARemoveRequest
+        response: RALoRAState
+        kind: invoke
+        context: rac_handle_t
+
+      - swift_name: listLoraAdapters
+        c_symbol: rac_lora_list_proto
+        request: RALoRAState
+        response: RALoRAState
+        kind: invoke
+        context: rac_handle_t
+        # Sentinel/empty request: facade passes RALoRAState() because the C
+        # ABI uses the LLMRequest shape but ignores the body.
+
+      - swift_name: getLoraState
+        c_symbol: rac_lora_state_proto
+        request: RALoRAState
+        response: RALoRAState
+        kind: invoke
+        context: rac_handle_t
+        # Sentinel/empty request -- see listLoraAdapters.
+
+      - swift_name: checkLoraCompatibility
+        c_symbol: rac_lora_compatibility_proto
+        request: RALoRAAdapterConfig
+        response: RALoraCompatibilityResult
+        kind: invoke
+        context: rac_handle_t
+
+  # --------------------------------------------------------------------------
+  # LoraRegistry  (CppBridge.LoraRegistry, threads rac_lora_registry_handle_t)
+  # --------------------------------------------------------------------------
+  - name: LoraRegistry
+    handle: rac_lora_registry_handle_t
+    extension: CppBridge.LoraRegistry
+    methods:
+      - swift_name: register
+        c_symbol: rac_lora_register_proto
+        request: RALoraAdapterCatalogEntry
+        response: RALoraAdapterCatalogEntry
+        kind: invoke
+        context: rac_lora_registry_handle_t
+
+      - swift_name: listCatalog
+        c_symbol: rac_lora_catalog_list_proto
+        request: RALoraAdapterCatalogListRequest
+        response: RALoraAdapterCatalogListResult
+        kind: invoke
+        context: rac_lora_registry_handle_t
+
+      - swift_name: queryCatalog
+        c_symbol: rac_lora_catalog_query_proto
+        request: RALoraAdapterCatalogQuery
+        response: RALoraAdapterCatalogListResult
+        kind: invoke
+        context: rac_lora_registry_handle_t
+
+      - swift_name: getCatalogEntry
+        c_symbol: rac_lora_catalog_get_proto
+        request: RALoraAdapterCatalogGetRequest
+        response: RALoraAdapterCatalogGetResult
+        kind: invoke
+        context: rac_lora_registry_handle_t
+
+      - swift_name: markDownloadCompleted
+        c_symbol: rac_lora_catalog_mark_download_completed_proto
+        request: RALoraAdapterDownloadCompletedRequest
+        response: RALoraAdapterDownloadCompletedResult
+        kind: invoke
+        context: rac_lora_registry_handle_t

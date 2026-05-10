@@ -76,6 +76,7 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "model_types.proto";
+import "rac_options.proto";
 
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
@@ -98,21 +99,25 @@ option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/
 // AUTO is the explicit "detect from audio" sentinel; UNSPECIFIED falls
 // back to the backend default (typically "en").
 // ---------------------------------------------------------------------------
+// `rac_wire_string` annotations expose the BCP-47 base code for each value via
+// the codegen-generated `wireString` accessor (see idl/rac_options.proto and
+// idl/codegen/generate_swift_convenience.py). Swift SDK `bcp47Code` is sourced
+// from this annotation; the unspecified case falls back to "" by default.
 enum STTLanguage {
     STT_LANGUAGE_UNSPECIFIED = 0;
-    STT_LANGUAGE_AUTO        = 1;   // Auto-detect from audio
-    STT_LANGUAGE_EN          = 2;
-    STT_LANGUAGE_ES          = 3;
-    STT_LANGUAGE_FR          = 4;
-    STT_LANGUAGE_DE          = 5;
-    STT_LANGUAGE_ZH          = 6;
-    STT_LANGUAGE_JA          = 7;
-    STT_LANGUAGE_KO          = 8;
-    STT_LANGUAGE_IT          = 9;
-    STT_LANGUAGE_PT          = 10;
-    STT_LANGUAGE_AR          = 11;
-    STT_LANGUAGE_RU          = 12;
-    STT_LANGUAGE_HI          = 13;
+    STT_LANGUAGE_AUTO        = 1 [(runanywhere.v1.rac_wire_string) = "auto"];   // Auto-detect from audio
+    STT_LANGUAGE_EN          = 2 [(runanywhere.v1.rac_wire_string) = "en"];
+    STT_LANGUAGE_ES          = 3 [(runanywhere.v1.rac_wire_string) = "es"];
+    STT_LANGUAGE_FR          = 4 [(runanywhere.v1.rac_wire_string) = "fr"];
+    STT_LANGUAGE_DE          = 5 [(runanywhere.v1.rac_wire_string) = "de"];
+    STT_LANGUAGE_ZH          = 6 [(runanywhere.v1.rac_wire_string) = "zh"];
+    STT_LANGUAGE_JA          = 7 [(runanywhere.v1.rac_wire_string) = "ja"];
+    STT_LANGUAGE_KO          = 8 [(runanywhere.v1.rac_wire_string) = "ko"];
+    STT_LANGUAGE_IT          = 9 [(runanywhere.v1.rac_wire_string) = "it"];
+    STT_LANGUAGE_PT          = 10 [(runanywhere.v1.rac_wire_string) = "pt"];
+    STT_LANGUAGE_AR          = 11 [(runanywhere.v1.rac_wire_string) = "ar"];
+    STT_LANGUAGE_RU          = 12 [(runanywhere.v1.rac_wire_string) = "ru"];
+    STT_LANGUAGE_HI          = 13 [(runanywhere.v1.rac_wire_string) = "hi"];
 }
 
 enum STTAudioEncoding {

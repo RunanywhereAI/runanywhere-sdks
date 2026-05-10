@@ -2,7 +2,17 @@
 //  CppBridge+VAD.swift
 //  RunAnywhere SDK
 //
-//  VAD component bridge - manages C++ VAD component lifecycle
+//  VAD component bridge - manages C++ VAD component lifecycle.
+//
+//  Generic scaffolding (handle creation, isLoaded, unload, destroy)
+//  lives in `CppBridge.ComponentActor`. VAD-specific surfaces kept here:
+//   - `isInitialized` (separate from isLoaded; queries the component, not
+//     the model slot)
+//   - `unloadModel()` calls `rac_vad_component_unload` (which reverts to
+//     energy-based VAD), distinct from the generic component cleanup.
+//   - lifecycle methods (`initialize`/`start`/`stop`/`reset`) forwarding
+//     to the lifecycle proto surface in CppBridge+ModalityProtoABI.swift
+//   - "clear loadedModelId on retry" same-model fast-path.
 //
 
 import CRACommons
@@ -19,8 +29,14 @@ extension CppBridge {
         /// Shared VAD component instance
         public static let shared = VAD()
 
-        private var handle: rac_handle_t?
+        /// Generic scaffold (handle / isLoaded / loadModel / destroy).
+        private let inner = ComponentActor(vtable: .vad)
+
+        /// Mirror of the loaded model id used by the same-model fast-path.
+        /// Must be cleared on every load attempt before the C call so a
+        /// failed load doesn't poison a subsequent retry.
         private var loadedModelId: String?
+
         private let logger = SDKLogger(category: "CppBridge.VAD")
 
         private init() {}
@@ -28,36 +44,25 @@ extension CppBridge {
         // MARK: - Handle Management
 
         /// Get or create the VAD component handle
-        public func getHandle() throws -> rac_handle_t {
-            if let handle = handle {
-                return handle
-            }
-
-            var newHandle: rac_handle_t?
-            let result = rac_vad_component_create(&newHandle)
-            guard result == RAC_SUCCESS, let handle = newHandle else {
-                throw SDKException(code: .notInitialized, message: "Failed to create VAD component: \(result)", category: .component)
-            }
-
-            self.handle = handle
-            logger.debug("VAD component created")
-            return handle
+        public func getHandle() async throws -> rac_handle_t {
+            try await inner.getHandle()
         }
 
         // MARK: - State
 
         /// Check if VAD is initialized
         public var isInitialized: Bool {
-            guard let handle = handle else { return false }
-            return rac_vad_component_is_initialized(handle) == RAC_TRUE
+            get async {
+                guard let handle = await inner.existingHandle() else { return false }
+                return rac_vad_component_is_initialized(handle) == RAC_TRUE
+            }
         }
 
         // MARK: - Model Lifecycle
 
         /// Check if a VAD model is loaded
         public var isModelLoaded: Bool {
-            guard let handle = handle else { return false }
-            return rac_vad_component_is_loaded(handle) == RAC_TRUE
+            get async { await inner.isLoaded }
         }
 
         /// Get the currently loaded model ID
@@ -68,14 +73,12 @@ extension CppBridge {
             _ modelPath: String,
             modelId: String,
             modelName: String
-        ) throws {
+        ) async throws {
             // Skip if the same model is already loaded
             guard loadedModelId != modelId else {
                 logger.info("VAD model already loaded: \(modelId)")
                 return
             }
-
-            let handle = try getHandle()
 
             // `rac_vad_component_load_model` unloads any previously loaded model
             // first. If the subsequent load fails, the C++ side is already
@@ -83,25 +86,16 @@ extension CppBridge {
             // skipped by the `loadedModelId != modelId` fast path above.
             loadedModelId = nil
 
-            let result = modelPath.withCString { pathPtr in
-                modelId.withCString { idPtr in
-                    modelName.withCString { namePtr in
-                        rac_vad_component_load_model(handle, pathPtr, idPtr, namePtr)
-                    }
-                }
-            }
-            guard result == RAC_SUCCESS else {
-                throw SDKException(code: .modelLoadFailed, message: "Failed to load VAD model: \(result)", category: .component)
-            }
+            try await inner.loadModel(path: modelPath, id: modelId, name: modelName)
             loadedModelId = modelId
-            logger.info("VAD model loaded: \(modelId)")
         }
 
         /// Unload the current VAD model (reverts to energy-based VAD)
-        public func unloadModel() {
-            guard let handle = handle else { return }
+        public func unloadModel() async {
+            guard let handle = await inner.existingHandle() else { return }
             rac_vad_component_unload(handle)
             loadedModelId = nil
+            await inner.markAssetLoaded(nil)
             logger.info("VAD model unloaded")
         }
 
@@ -111,7 +105,7 @@ extension CppBridge {
         /// service's state after `RunAnywhere.loadModel(...)` returns `success=true`.
         /// Without this, VAD never connects to the lifecycle-loaded Silero model
         /// (SWIFT-VAD-001).
-        func loadModel(from result: RAModelLoadResult, modelName: String? = nil) throws {
+        func loadModel(from result: RAModelLoadResult, modelName: String? = nil) async throws {
             if loadedModelId == result.modelID {
                 return
             }
@@ -126,7 +120,7 @@ extension CppBridge {
             // `rac_get_model(arg)` → `rac_get_model_by_path(arg)` → basename,
             // and the registry already knows the resolved path from the lifecycle
             // load that just succeeded. Matches STT/TTS pattern.
-            try loadModel(
+            try await loadModel(
                 result.modelID,
                 modelId: result.modelID,
                 modelName: modelName ?? result.modelID
@@ -165,8 +159,8 @@ extension CppBridge {
         }
 
         /// Cleanup VAD
-        public func cleanup() {
-            guard let handle = handle else { return }
+        public func cleanup() async {
+            guard let handle = await inner.existingHandle() else { return }
             rac_vad_component_cleanup(handle)
             logger.info("VAD cleaned up")
         }
@@ -174,13 +168,9 @@ extension CppBridge {
         // MARK: - Cleanup
 
         /// Destroy the component
-        public func destroy() {
-            if let handle = handle {
-                rac_vad_component_destroy(handle)
-                self.handle = nil
-                loadedModelId = nil
-                logger.debug("VAD component destroyed")
-            }
+        public func destroy() async {
+            await inner.destroy()
+            loadedModelId = nil
         }
     }
 }

@@ -2,7 +2,13 @@
 //  CppBridge+STT.swift
 //  RunAnywhere SDK
 //
-//  STT component bridge - manages C++ STT component lifecycle
+//  STT component bridge - manages C++ STT component lifecycle.
+//
+//  Generic scaffolding (handle creation, isLoaded, unload, destroy)
+//  lives in `CppBridge.ComponentActor`. STT-specific surfaces kept here:
+//  `supportsStreaming`, the `framework:`-aware `loadModel(...)` variant
+//  (which configures the component before loading), the same-model
+//  fast-path, and the `loadModel(from:)` lifecycle adapter.
 //
 
 import CRACommons
@@ -19,8 +25,14 @@ extension CppBridge {
         /// Shared STT component instance
         public static let shared = STT()
 
-        private var handle: rac_handle_t?
+        /// Generic scaffold (handle / isLoaded / loadModel / unload / destroy).
+        private let inner = ComponentActor(vtable: .stt)
+
+        /// Mirror of the inner actor's loadedAssetId for the same-model
+        /// fast-path; allows the fast-path check without awaiting the
+        /// inner actor first.
         private var loadedModelId: String?
+
         private let logger = SDKLogger(category: "CppBridge.STT")
 
         private init() {}
@@ -28,28 +40,15 @@ extension CppBridge {
         // MARK: - Handle Management
 
         /// Get or create the STT component handle
-        public func getHandle() throws -> rac_handle_t {
-            if let handle = handle {
-                return handle
-            }
-
-            var newHandle: rac_handle_t?
-            let result = rac_stt_component_create(&newHandle)
-            guard result == RAC_SUCCESS, let handle = newHandle else {
-                throw SDKException(code: .notInitialized, message: "Failed to create STT component: \(result)", category: .component)
-            }
-
-            self.handle = handle
-            logger.debug("STT component created")
-            return handle
+        public func getHandle() async throws -> rac_handle_t {
+            try await inner.getHandle()
         }
 
         // MARK: - State
 
         /// Check if a model is loaded
         public var isLoaded: Bool {
-            guard let handle = handle else { return false }
-            return rac_stt_component_is_loaded(handle) == RAC_TRUE
+            get async { await inner.isLoaded }
         }
 
         /// Get the currently loaded model ID
@@ -57,8 +56,10 @@ extension CppBridge {
 
         /// Check if streaming is supported
         public var supportsStreaming: Bool {
-            guard let handle = handle else { return false }
-            return rac_stt_component_supports_streaming(handle) == RAC_TRUE
+            get async {
+                guard let handle = await inner.existingHandle() else { return false }
+                return rac_stt_component_supports_streaming(handle) == RAC_TRUE
+            }
         }
 
         // MARK: - Model Lifecycle
@@ -69,7 +70,7 @@ extension CppBridge {
             modelId: String,
             modelName: String,
             framework: rac_inference_framework_t = RAC_FRAMEWORK_UNKNOWN
-        ) throws {
+        ) async throws {
             // Skip if the same model is already loaded — avoids redundant
             // backend model-compilation/load work.
             guard loadedModelId != modelId else {
@@ -77,7 +78,7 @@ extension CppBridge {
                 return
             }
 
-            let handle = try getHandle()
+            let handle = try await inner.getHandle()
 
             // Configure the component with the correct framework so telemetry events
             // carry the real framework value instead of "unknown".
@@ -90,25 +91,15 @@ extension CppBridge {
                 }
             }
 
-            let result = modelPath.withCString { pathPtr in
-                modelId.withCString { idPtr in
-                    modelName.withCString { namePtr in
-                        rac_stt_component_load_model(handle, pathPtr, idPtr, namePtr)
-                    }
-                }
-            }
-            guard result == RAC_SUCCESS else {
-                throw SDKException(code: .modelLoadFailed, message: "Failed to load model: \(result)", category: .component)
-            }
+            try await inner.loadModel(path: modelPath, id: modelId, name: modelName)
             loadedModelId = modelId
-            logger.info("STT model loaded: \(modelId)")
         }
 
         /// Load an STT model from a `RAModelLoadResult` returned by the proto-backed
         /// lifecycle API. Mirrors `CppBridge.VLM.loadModel(from:)` so the Swift
         /// component actor's `isLoaded` flag tracks the lifecycle service's state
         /// after `RunAnywhere.loadModel(...)` returns `success=true`.
-        func loadModel(from result: RAModelLoadResult, modelName: String? = nil) throws {
+        func loadModel(from result: RAModelLoadResult, modelName: String? = nil) async throws {
             if loadedModelId == result.modelID {
                 return
             }
@@ -138,7 +129,7 @@ extension CppBridge {
             // already knows the resolved path via local_path since the
             // lifecycle load (commons) already succeeded for the same model.
             // This matches what LLM/VLM do via the lifecycle service layer.
-            try loadModel(
+            try await loadModel(
                 result.modelID,
                 modelId: result.modelID,
                 modelName: modelName ?? result.modelID,
@@ -147,23 +138,17 @@ extension CppBridge {
         }
 
         /// Unload the current model
-        public func unload() {
-            guard let handle = handle else { return }
-            rac_stt_component_cleanup(handle)
+        public func unload() async {
+            await inner.unload()
             loadedModelId = nil
-            logger.info("STT model unloaded")
         }
 
         // MARK: - Cleanup
 
         /// Destroy the component
-        public func destroy() {
-            if let handle = handle {
-                rac_stt_component_destroy(handle)
-                self.handle = nil
-                loadedModelId = nil
-                logger.debug("STT component destroyed")
-            }
+        public func destroy() async {
+            await inner.destroy()
+            loadedModelId = nil
         }
     }
 }

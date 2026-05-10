@@ -80,4 +80,16 @@ rm -f "${OUT_DIR}/voice_agent_service.grpc.swift" \
       "${OUT_DIR}/llm_service.grpc.swift" \
       "${OUT_DIR}/download_service.grpc.swift"
 
+# P4-T2: emit RAConvenience.swift from rac_options.proto annotations
+# (rac_display_name / rac_analytics_key / rac_wire_string + future rac_default /
+# rac_required / rac_min / rac_max). The post-processor reads idl/*.proto via
+# protoc --descriptor_set_out and writes hand-friendly accessor extensions onto
+# the RA* swift-protobuf types in the same module.
+if command -v python3 >/dev/null 2>&1; then
+    python3 "${SCRIPT_DIR}/generate_swift_convenience.py"
+else
+    echo "warning: python3 not found — skipping RAConvenience.swift generation." >&2
+    echo "         Install python3 (https://www.python.org) to enable P4-T2 annotations." >&2
+fi
+
 ls -1 "${OUT_DIR}"

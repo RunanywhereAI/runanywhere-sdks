@@ -2,7 +2,11 @@
 //  CppBridge+LLM.swift
 //  RunAnywhere SDK
 //
-//  LLM component bridge - manages C++ LLM component lifecycle
+//  LLM component bridge - manages C++ LLM component lifecycle.
+//
+//  All generic scaffolding (handle creation, isLoaded, loadModel,
+//  unload, destroy) lives in `CppBridge.ComponentActor`; this file
+//  only adds the LLM-specific `cancel()` op on top.
 //
 
 import CRACommons
@@ -18,85 +22,53 @@ extension CppBridge {
         /// Shared LLM component instance
         public static let shared = LLM()
 
-        private var handle: rac_handle_t?
-        private var loadedModelId: String?
-        private let logger = SDKLogger(category: "CppBridge.LLM")
+        /// Generic scaffold (handle / isLoaded / loadModel / unload / destroy).
+        private let inner = ComponentActor(vtable: .llm)
 
         private init() {}
 
         // MARK: - Handle Management
 
         /// Get or create the LLM component handle
-        public func getHandle() throws -> rac_handle_t {
-            if let handle = handle {
-                return handle
-            }
-
-            var newHandle: rac_handle_t?
-            let result = rac_llm_component_create(&newHandle)
-            guard result == RAC_SUCCESS, let handle = newHandle else {
-                throw SDKException(code: .notInitialized, message: "Failed to create LLM component: \(result)", category: .component)
-            }
-
-            self.handle = handle
-            logger.debug("LLM component created")
-            return handle
+        public func getHandle() async throws -> rac_handle_t {
+            try await inner.getHandle()
         }
 
         // MARK: - State
 
         /// Check if a model is loaded
         public var isLoaded: Bool {
-            guard let handle = handle else { return false }
-            return rac_llm_component_is_loaded(handle) == RAC_TRUE
+            get async { await inner.isLoaded }
         }
 
         /// Get the currently loaded model ID
-        public var currentModelId: String? { loadedModelId }
+        public var currentModelId: String? {
+            get async { await inner.currentAssetId }
+        }
 
         // MARK: - Model Lifecycle
 
         /// Load an LLM model
-        public func loadModel(_ modelPath: String, modelId: String, modelName: String) throws {
-            let handle = try getHandle()
-            let result = modelPath.withCString { pathPtr in
-                modelId.withCString { idPtr in
-                    modelName.withCString { namePtr in
-                        rac_llm_component_load_model(handle, pathPtr, idPtr, namePtr)
-                    }
-                }
-            }
-            guard result == RAC_SUCCESS else {
-                throw SDKException(code: .modelLoadFailed, message: "Failed to load model: \(result)", category: .component)
-            }
-            loadedModelId = modelId
-            logger.info("LLM model loaded: \(modelId)")
+        public func loadModel(_ modelPath: String, modelId: String, modelName: String) async throws {
+            try await inner.loadModel(path: modelPath, id: modelId, name: modelName)
         }
 
         /// Unload the current model
-        public func unload() {
-            guard let handle = handle else { return }
-            rac_llm_component_cleanup(handle)
-            loadedModelId = nil
-            logger.info("LLM model unloaded")
+        public func unload() async {
+            await inner.unload()
         }
 
         /// Cancel ongoing generation
-        public func cancel() {
-            guard let handle = handle else { return }
+        public func cancel() async {
+            guard let handle = await inner.existingHandle() else { return }
             rac_llm_component_cancel(handle)
         }
 
         // MARK: - Cleanup
 
         /// Destroy the component
-        public func destroy() {
-            if let handle = handle {
-                rac_llm_component_destroy(handle)
-                self.handle = nil
-                loadedModelId = nil
-                logger.debug("LLM component destroyed")
-            }
+        public func destroy() async {
+            await inner.destroy()
         }
     }
 }

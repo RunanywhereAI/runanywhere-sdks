@@ -10,9 +10,13 @@ import Foundation
 
 // MARK: - RASTTLanguage
 //
-// NOTE: BCP-47 round-trip lives in Swift because no `rac_stt_language_*`
-// C ABI exists yet. When commons gains canonical mappers we collapse the
-// switches into a single C call (see swift simplification plan §STT).
+// Forward map (`bcp47Code`) is sourced from the codegen-generated
+// `wireString` accessor (see idl/stt_options.proto rac_wire_string
+// annotations + Generated/RAConvenience.swift). The reverse map
+// (`fromBcp47`) stays in Swift because the convenience post-processor only
+// emits forward enum→string accessors today; promoting it would require a
+// reverse-map emitter in idl/codegen/generate_swift_convenience.py, which
+// is deferred until a second modality needs the same shape.
 
 extension RASTTLanguage {
     /// Map a BCP-47 language string (e.g. "en-US", "zh-Hans") to the canonical enum.
@@ -36,24 +40,10 @@ extension RASTTLanguage {
         }
     }
 
-    public var bcp47Code: String {
-        switch self {
-        case .unspecified, .UNRECOGNIZED: return ""
-        case .auto: return "auto"
-        case .en:   return "en"
-        case .es:   return "es"
-        case .fr:   return "fr"
-        case .de:   return "de"
-        case .zh:   return "zh"
-        case .ja:   return "ja"
-        case .ko:   return "ko"
-        case .it:   return "it"
-        case .pt:   return "pt"
-        case .ar:   return "ar"
-        case .ru:   return "ru"
-        case .hi:   return "hi"
-        }
-    }
+    /// BCP-47 base language code (e.g. "en", "zh"). Empty for unspecified
+    /// or unrecognized values. Backed by `rac_wire_string` annotations in
+    /// idl/stt_options.proto via the generated `wireString` accessor.
+    public var bcp47Code: String { wireString }
 }
 
 // MARK: - RASTTConfiguration
