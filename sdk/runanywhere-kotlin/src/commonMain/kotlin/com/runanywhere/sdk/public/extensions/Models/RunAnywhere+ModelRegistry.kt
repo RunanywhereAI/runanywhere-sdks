@@ -24,6 +24,8 @@ import ai.runanywhere.proto.v1.ModelArtifactType
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelFormat
+import ai.runanywhere.proto.v1.ModelImportRequest
+import ai.runanywhere.proto.v1.ModelImportResult
 import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelInfoList
 import ai.runanywhere.proto.v1.ModelQuery
@@ -210,3 +212,22 @@ expect suspend fun RunAnywhere.refreshModelRegistry(
 expect suspend fun RunAnywhere.refreshModelRegistry(
     request: ModelRegistryRefreshRequest,
 ): ModelRegistryRefreshResult
+
+// MARK: - Model Import
+
+/**
+ * Import a stable, platform-normalized local model path into the generated
+ * registry. Mirrors Swift `importModel(_ request: RAModelImportRequest)`.
+ *
+ * Adapters should first copy/link/authorize transient OS file picker handles
+ * and provide a stable path visible to the C++ workflow. The request's
+ * `source_path` must be a stable, normalized path under platform control.
+ *
+ * NOTE: The dedicated commons proto thunk `rac_model_registry_import_proto`
+ * is not yet exposed via the Kotlin JNI bridge (`RunAnywhereBridge` has no
+ * `racModelRegistryImportProto`). Until that thunk is wired, this entry
+ * point falls back to the existing `registerModel` flow on
+ * [CppBridgeModelRegistry] (`save`/`update`), which performs a registry
+ * merge with the supplied [ModelImportRequest.model] payload.
+ */
+expect suspend fun RunAnywhere.importModel(request: ModelImportRequest): ModelImportResult

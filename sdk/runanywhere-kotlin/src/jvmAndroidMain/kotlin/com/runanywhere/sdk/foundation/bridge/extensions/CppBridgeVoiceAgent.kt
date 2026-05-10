@@ -14,6 +14,8 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelLoadRequest
 import ai.runanywhere.proto.v1.VoiceAgentComponentStates
 import ai.runanywhere.proto.v1.VoiceAgentComposeConfig
 import com.runanywhere.sdk.foundation.SDKLogger
@@ -85,6 +87,14 @@ object CppBridgeVoiceAgent {
 
         val newHandle = createStandaloneHandle()
 
+        // Mirror iOS SWIFT-VOICE-AGENT-001: auto-load the default Silero VAD if it
+        // is registered + downloaded but no VAD model has been loaded yet. The
+        // voice-agent orchestrator listens for lifecycle proto events (speech-start
+        // / speech-end) which only the Silero lifecycle commit emits — the
+        // energy-based fallback inside C++ commons does not fire those events, so
+        // without an explicit VAD load the session stays silent post-init.
+        autoLoadSileroVad()
+
         val initResult = RunAnywhereBridge.racVoiceAgentInitializeWithLoadedModels(newHandle)
         if (initResult != 0) {
             RunAnywhereBridge.racVoiceAgentDestroy(newHandle)
@@ -97,6 +107,39 @@ object CppBridgeVoiceAgent {
         handleRef.set(newHandle)
         logger.info("Voice agent handle created + initialized: $newHandle")
         return newHandle
+    }
+
+    /**
+     * Auto-load `silero-vad` if it is registered and downloaded. No-op when
+     * the model isn't in the registry (e.g. user hasn't downloaded it) — the
+     * voice agent will fall back to whatever VAD the C++ commons provides
+     * internally. Mirrors the iOS implementation in
+     * VoiceAgentViewModel.startConversation() (SWIFT-VOICE-AGENT-001).
+     */
+    private fun autoLoadSileroVad() {
+        val vad = CppBridgeModelRegistry.get("silero-vad")
+        if (vad == null) {
+            logger.debug("silero-vad not in registry — skipping auto-load")
+            return
+        }
+        if (vad.is_downloaded != true) {
+            logger.debug("silero-vad not downloaded — skipping auto-load")
+            return
+        }
+        val request =
+            ModelLoadRequest(
+                model_id = "silero-vad",
+                category = ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
+                framework = vad.framework,
+            )
+        val result = CppBridgeModelLifecycle.load(request)
+        if (result?.success != true) {
+            SDKLogger.voiceAgent.warn(
+                "Silero VAD auto-load failed: ${result?.error_message ?: "unknown"}",
+            )
+        } else {
+            SDKLogger.voiceAgent.info("Silero VAD auto-loaded for Voice Agent")
+        }
     }
 
     /** True when a voice-agent handle exists AND the C layer reports ready. */

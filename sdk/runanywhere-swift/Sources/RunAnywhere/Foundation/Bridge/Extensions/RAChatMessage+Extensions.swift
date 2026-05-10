@@ -2,17 +2,11 @@
 //  RAChatMessage+Extensions.swift
 //  RunAnywhere SDK
 //
-//  Public typealiases and extensions for proto-generated chat types.
-//  Canonical source for ChatMessage and MessageRole across the SDK.
+//  Extensions for proto-generated chat types.
 //
 
 import Foundation
 import SwiftProtobuf
-
-// MARK: - Typealiases to proto-generated chat types
-
-public typealias ChatMessage = RAChatMessage
-public typealias MessageRole = RAMessageRole
 
 // MARK: - MessageRole convenience
 

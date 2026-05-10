@@ -17,7 +17,7 @@ import ai.runanywhere.proto.v1.DiffusionConfig
 import ai.runanywhere.proto.v1.DiffusionGenerationOptions
 import ai.runanywhere.proto.v1.DiffusionProgress
 import ai.runanywhere.proto.v1.DiffusionResult
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDiffusionProto
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDiffusion
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
@@ -33,7 +33,7 @@ actual suspend fun RunAnywhere.generateImage(
 ): DiffusionResult =
     withContext(Dispatchers.IO) {
         if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-        CppBridgeDiffusionProto.generate(prompt, options)
+        CppBridgeDiffusion.generate(prompt, options)
     }
 
 actual suspend fun RunAnywhere.generateImage(
@@ -43,7 +43,7 @@ actual suspend fun RunAnywhere.generateImage(
 ): DiffusionResult =
     withContext(Dispatchers.IO) {
         if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-        CppBridgeDiffusionProto.generateWithProgress(prompt, options, onProgress)
+        CppBridgeDiffusion.generateWithProgress(prompt, options, onProgress)
     }
 
 actual fun RunAnywhere.generateImageStream(
@@ -57,7 +57,7 @@ actual fun RunAnywhere.generateImageStream(
         // Drive generation on the calling thread; the JNI thunk blocks until
         // the final progress event has been emitted.
         try {
-            CppBridgeDiffusionProto.generateWithProgress(prompt, options) progress@{ progress ->
+            CppBridgeDiffusion.generateWithProgress(prompt, options) progress@{ progress ->
                 if (cancelled) return@progress false
                 trySend(progress)
                 true
@@ -73,28 +73,28 @@ actual fun RunAnywhere.generateImageStream(
 actual suspend fun RunAnywhere.cancelImageGeneration() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     withContext(Dispatchers.IO) {
-        CppBridgeDiffusionProto.cancel()
+        CppBridgeDiffusion.cancel()
     }
 }
 
 actual suspend fun RunAnywhere.loadDiffusionModel(config: DiffusionConfig) {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     withContext(Dispatchers.IO) {
-        CppBridgeDiffusionProto.load(config)
+        CppBridgeDiffusion.load(config)
     }
 }
 
 actual suspend fun RunAnywhere.unloadDiffusionModel() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     withContext(Dispatchers.IO) {
-        CppBridgeDiffusionProto.unload()
+        CppBridgeDiffusion.unload()
     }
 }
 
 actual val RunAnywhere.isDiffusionModelLoaded: Boolean
-    get() = CppBridgeDiffusionProto.isLoaded()
+    get() = CppBridgeDiffusion.isLoaded()
 
 actual suspend fun RunAnywhere.currentDiffusionModelId(): String? =
     withContext(Dispatchers.IO) {
-        CppBridgeDiffusionProto.currentModelId()
+        CppBridgeDiffusion.currentModelId()
     }

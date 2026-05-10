@@ -182,10 +182,11 @@ class RunAnywhereApplication : Application() {
                 }
             }
 
-            // Phase 2: Complete services initialization (device registration, etc.)
-            // This triggers device registration with the backend
-            RunAnywhere.completeServicesInitialization()
-            Timber.i("✅ SDK services initialization complete (device registered)")
+            // Phase 2 (services / device registration) is now triggered lazily
+            // on the first feature entry via `RunAnywhere.ensureServicesReady()`.
+            // Mirrors Swift `_servicesInitTask` fan-in — explicit Phase 2 kick
+            // here is no longer required.
+            Timber.i("✅ SDK Phase 1 ready (Phase 2 will run lazily on first feature call)")
         } catch (e: Exception) {
             // Log the failure but continue
             Timber.w("⚠️ SDK initialization failed (backend may be unavailable): ${e.message}")

@@ -40,8 +40,8 @@ expect class SolutionHandle {
     /** Force-cancel the graph. Returns once worker threads observe cancellation. */
     suspend fun cancel()
 
-    /** Feed a single byte payload into the root input edge. */
-    suspend fun feed(input: ByteArray)
+    /** Feed a single UTF-8 item into the root input edge. */
+    suspend fun feed(input: String)
 
     /** Signal end-of-stream on the root input edge. */
     suspend fun closeInput()

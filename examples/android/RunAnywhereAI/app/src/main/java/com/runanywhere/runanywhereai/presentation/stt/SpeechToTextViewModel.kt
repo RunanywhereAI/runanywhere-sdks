@@ -1,8 +1,10 @@
 package com.runanywhere.runanywhereai.presentation.stt
 
+import ai.runanywhere.proto.v1.ComponentLifecycleState
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_STT
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelEventKind
+import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.STTLanguage
 import ai.runanywhere.proto.v1.STTOptions
 import android.Manifest
@@ -16,12 +18,13 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.events.ModelEvent
 import com.runanywhere.sdk.public.extensions.Models.displayName
+import com.runanywhere.sdk.public.extensions.componentLifecycleSnapshot
 import com.runanywhere.sdk.public.extensions.currentSTTModel
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
-import com.runanywhere.sdk.public.extensions.isSTTModelLoaded
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.transcribe
 import com.runanywhere.sdk.public.extensions.transcribeStream
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -243,7 +246,11 @@ class SpeechToTextViewModel : ViewModel() {
      * Uses currentSTTModel() for display name so app bar shows correct model icon.
      */
     private suspend fun checkInitialModelState() {
-        if (RunAnywhere.isSTTModelLoaded) {
+        val sttSnapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_STT)
+        val isLoaded =
+            sttSnapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+                sttSnapshot.model_id.isNotEmpty()
+        if (isLoaded) {
             val currentModel = RunAnywhere.currentSTTModel()
             val modelId = RunAnywhere.currentSTTModelId
             val displayName = currentModel?.name ?: modelId
@@ -459,7 +466,7 @@ class SpeechToTextViewModel : ViewModel() {
                                     val options = STTOptions(language = sttLanguageFromBcp47(_uiState.value.language))
                                     var finalText = ""
                                     RunAnywhere.transcribeStream(
-                                        audioData = chunkData,
+                                        audioData = flowOf(chunkData),
                                         options = options,
                                     ).collect { event ->
                                         val streamText = event.final_output?.text ?: event.partial?.text.orEmpty()
@@ -586,7 +593,8 @@ class SpeechToTextViewModel : ViewModel() {
                 val audioDurationMs = (audioBytes.size.toDouble() / (SAMPLE_RATE * 2)) * 1000
 
                 // Use SDK's transcribe extension function
-                val result = RunAnywhere.transcribe(audioBytes)
+                val transcriptionOutput = RunAnywhere.transcribe(audioBytes, STTOptions())
+                val result = transcriptionOutput.text
 
                 val inferenceTimeMs = System.currentTimeMillis() - startTime
                 val wordCount = result.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size

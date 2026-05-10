@@ -569,7 +569,11 @@ class VoiceAssistantViewModel(
                     viewModelScope.launch {
                         try {
                             audioCapture.startCapture().collect { audioData ->
-                                if (isProcessingTurn) return@collect
+                                if (isProcessingTurn) {
+                                    // KOT-VOICE-001: trace why audio is being dropped during turn handoff.
+                                    Timber.d("Skipping audio chunk while processing turn (size=${audioData.size})")
+                                    return@collect
+                                }
 
                                 synchronized(audioBufferLock) {
                                     audioBuffer.write(audioData)

@@ -8,9 +8,9 @@
 import CRACommons
 import Foundation
 
-// MARK: - RATTSConfiguration: ComponentConfiguration
+// MARK: - RATTSConfiguration
 
-extension RATTSConfiguration: ComponentConfiguration {
+extension RATTSConfiguration {
     public var modelId: String? { modelID.isEmpty ? nil : modelID }
 }
 
@@ -55,9 +55,7 @@ public extension RATTSOptions {
 
 }
 
-// MARK: - RATTSOutput: ComponentOutput
-
-extension RATTSOutput: ComponentOutput { }
+// MARK: - RATTSOutput
 
 public extension RATTSOutput {
     var format: RAAudioFormat { audioFormat }

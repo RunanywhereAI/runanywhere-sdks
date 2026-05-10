@@ -5,7 +5,7 @@
  * over the rac_llm_*_proto C ABI. Mirrors Swift's
  * Foundation/Bridge/Extensions/CppBridge+LLM.swift one-to-one; logic is
  * copied verbatim, only the enclosing object name changes from
- * CppBridgeLLMProto to CppBridgeLLM.
+ * the legacy `Proto` suffix to the canonical `CppBridgeLLM` name.
  */
 
 package com.runanywhere.sdk.foundation.bridge.extensions

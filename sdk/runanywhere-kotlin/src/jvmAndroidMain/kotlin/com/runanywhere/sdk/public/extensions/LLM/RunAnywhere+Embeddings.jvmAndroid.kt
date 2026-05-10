@@ -13,7 +13,7 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.EmbeddingsOptions
 import ai.runanywhere.proto.v1.EmbeddingsRequest
 import ai.runanywhere.proto.v1.EmbeddingsResult
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEmbeddingsProto
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEmbeddings
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
@@ -28,7 +28,7 @@ actual suspend fun RunAnywhere.embed(
         throw SDKException.notInitialized("SDK not initialized")
     }
     return withContext(Dispatchers.IO) {
-        CppBridgeEmbeddingsProto.embed(
+        CppBridgeEmbeddings.embed(
             EmbeddingsRequest(texts = listOf(text), options = options),
             modelId,
         )

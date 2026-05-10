@@ -8,9 +8,9 @@
 import CRACommons
 import Foundation
 
-// MARK: - RALLMConfiguration: ComponentConfiguration
+// MARK: - RALLMConfiguration
 
-extension RALLMConfiguration: ComponentConfiguration {
+extension RALLMConfiguration {
     public var modelId: String? { nil }
 }
 

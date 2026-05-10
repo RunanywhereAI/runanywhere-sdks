@@ -19,9 +19,9 @@ import ai.runanywhere.proto.v1.TTSSpeakResult
 import ai.runanywhere.proto.v1.TTSVoiceInfo
 import com.runanywhere.sdk.features.tts.TtsAudioPlayback
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTSProto
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.channels.awaitClose
@@ -33,45 +33,22 @@ private val ttsLogger = SDKLogger.tts
 private val ttsAudioPlayback = TtsAudioPlayback
 
 private fun currentTtsVoiceIdFromLifecycle(): String? =
-    CppBridgeModelLifecycleProto
+    CppBridgeModelLifecycle
         .currentModel(
             CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS),
         )?.model_id
         ?.takeIf { it.isNotEmpty() }
 
-actual suspend fun RunAnywhere.loadTTSModel(modelId: String) {
-    if (!isInitialized) {
-        throw SDKException.notInitialized("SDK not initialized")
-    }
-    ttsLogger.debug("Loading TTS model: $modelId")
-    val modelInfo =
-        CppBridgeModelRegistry.get(modelId)
-            ?: throw SDKException.tts("TTS model '$modelId' not found in registry")
-    val localPath =
-        modelInfo.local_path.takeIf { it.isNotEmpty() }
-            ?: throw SDKException.tts("TTS model '$modelId' is not downloaded")
-    val result =
-        loadModel(
-            ModelLoadRequest(
-                model_id = modelId,
-                category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-                framework = modelInfo.framework,
-            ),
-        )
-    if (!result.success) {
-        throw SDKException.tts(
-            result.error_message.ifBlank { "Failed to load TTS model '$modelId' from $localPath" },
-        )
-    }
-    ttsLogger.info("TTS model loaded: $modelId")
-}
-
-actual suspend fun RunAnywhere.unloadTTSModel() {
-    if (!isInitialized) {
-        throw SDKException.notInitialized("SDK not initialized")
-    }
-    unloadModel(ModelUnloadRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS))
-    ttsLogger.info("TTS model unloaded")
+/**
+ * Internal helper: list available TTS voices from the C ABI.
+ *
+ * Per Swift parity, the public surface uses the model registry filtered by
+ * `MODEL_CATEGORY_SPEECH_SYNTHESIS` to enumerate voices. This helper is
+ * retained as INTERNAL for callers that still need the
+ * `racTtsComponentListVoicesProto` enumeration.
+ */
+internal suspend fun RunAnywhere.availableTTSVoicesInternal(): List<TTSVoiceInfo> {
+    return CppBridgeTTS.voices()
 }
 
 actual suspend fun RunAnywhere.loadTTSVoice(voiceId: String) {
@@ -114,7 +91,7 @@ actual suspend fun RunAnywhere.unloadTTSVoice() {
 
 actual val RunAnywhere.isTTSVoiceLoaded: Boolean
     get() =
-        CppBridgeModelLifecycleProto
+        CppBridgeModelLifecycle
             .snapshot(SDKComponent.SDK_COMPONENT_TTS)
             ?.let {
                 it.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
@@ -123,10 +100,6 @@ actual val RunAnywhere.isTTSVoiceLoaded: Boolean
 
 actual val RunAnywhere.currentTTSVoiceId: String?
     get() = currentTtsVoiceIdFromLifecycle()
-
-actual suspend fun RunAnywhere.availableTTSVoices(): List<TTSVoiceInfo> {
-    return CppBridgeTTSProto.voices()
-}
 
 actual suspend fun RunAnywhere.synthesize(
     text: String,
@@ -139,22 +112,26 @@ actual suspend fun RunAnywhere.synthesize(
     val voiceId = currentTtsVoiceIdFromLifecycle() ?: "unknown"
     ttsLogger.debug("Synthesizing text: ${text.take(50)}${if (text.length > 50) "..." else ""} (voice: $voiceId)")
 
-    val result = CppBridgeTTSProto.synthesize(text, options)
+    val result = CppBridgeTTS.synthesize(text, options)
     ttsLogger.info("Synthesis complete: ${result.duration_ms}ms audio")
     return result
 }
 
 actual fun RunAnywhere.synthesizeStream(
     text: String,
-    options: TTSOptions,
+    voiceId: String?,
 ): Flow<TTSOutput> =
     callbackFlow {
         if (!isInitialized) {
             throw SDKException.notInitialized("SDK not initialized")
         }
 
+        val options =
+            voiceId?.takeIf { it.isNotBlank() }?.let { TTSOptions(voice = it) }
+                ?: TTSOptions()
+
         try {
-            CppBridgeTTSProto.synthesizeStream(text, options) { output ->
+            CppBridgeTTS.synthesizeStream(text, options) { output ->
                 trySend(output)
                 true
             }

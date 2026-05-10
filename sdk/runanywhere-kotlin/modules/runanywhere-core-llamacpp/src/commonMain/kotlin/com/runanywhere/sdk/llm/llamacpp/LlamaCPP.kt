@@ -28,11 +28,11 @@ import com.runanywhere.sdk.public.RunAnywhereModule
  *
  * ```kotlin
  * // Generate text via public API
- * val response = RunAnywhere.chat("Hello!")
+ * val response = RunAnywhere.generate("Hello!")
  *
  * // Stream text via public API
- * RunAnywhere.streamChat("Tell me a story").collect { token ->
- *     print(token)
+ * RunAnywhere.generateStream("Tell me a story").collect { event ->
+ *     if (!event.is_final) print(event.token_)
  * }
  * ```
  *

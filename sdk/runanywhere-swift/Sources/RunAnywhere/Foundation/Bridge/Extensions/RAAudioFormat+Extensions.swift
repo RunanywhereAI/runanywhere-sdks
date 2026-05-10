@@ -17,14 +17,6 @@ import CRACommons
 import Foundation
 import SwiftProtobuf
 
-// MARK: - Audio Format (generated)
-
-/// Audio format options for audio processing.
-///
-/// The underlying type is the IDL-generated `RAAudioFormat`; the public name
-/// `AudioFormat` is preserved for source compatibility across every call site.
-public typealias AudioFormat = RAAudioFormat
-
 // MARK: - Codable (wire format = lowercase short name)
 //
 // Existing JSON payloads use lowercase short names ("pcm", "wav", …). The

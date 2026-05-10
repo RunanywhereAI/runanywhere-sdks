@@ -17,29 +17,7 @@ import ai.runanywhere.proto.v1.STTStreamEvent
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.Flow
 
-// MARK: - Simple Transcription
-
-/**
- * Simple voice transcription using default model.
- *
- * @param audioData Audio data to transcribe
- * @return Transcribed text
- */
-expect suspend fun RunAnywhere.transcribe(audioData: ByteArray): String
-
 // MARK: - Model Loading
-
-/**
- * Unload the currently loaded STT model.
- */
-expect suspend fun RunAnywhere.unloadSTTModel()
-
-/**
- * Check if an STT model is loaded.
- *
- * Sync property — reads cached state from the component layer without suspension.
- */
-expect val RunAnywhere.isSTTModelLoaded: Boolean
 
 /**
  * Get the currently loaded STT model ID.
@@ -49,39 +27,34 @@ expect val RunAnywhere.isSTTModelLoaded: Boolean
  */
 expect val RunAnywhere.currentSTTModelId: String?
 
-// MARK: - Transcription with Options
+// MARK: - Transcription
 
 /**
- * Transcribe audio data to text with options.
+ * Transcribe audio data to text. Mirrors Swift's `transcribe(audio:options:)`.
  *
- * @param audioData Raw audio data
- * @param options Transcription options
+ * @param audio Raw audio data
+ * @param options Transcription options (defaults to `STTOptions()`)
  * @return Transcription output with text and metadata
  */
-expect suspend fun RunAnywhere.transcribeWithOptions(
-    audioData: ByteArray,
-    options: STTOptions,
-): STTOutput
-
-/** Canonical cross-SDK signature: transcribe(audio, options) → STTOutput */
-suspend fun RunAnywhere.transcribe(
+expect suspend fun RunAnywhere.transcribe(
     audio: ByteArray,
-    options: STTOptions,
-): STTOutput = transcribeWithOptions(audio, options)
+    options: STTOptions = STTOptions(),
+): STTOutput
 
 // MARK: - Streaming Transcription
 
 /**
- * Stream transcription results from audio data.
+ * Stream transcription results from a flow of audio chunks.
  *
- * Returns a [Flow] that emits generated [STTStreamEvent] envelopes for
- * stream start, partial transcription chunks, final chunks, and errors.
+ * Mirrors Swift's `transcribeStream(audio:options:)` which consumes an
+ * `AsyncStream<Data>` of PCM audio chunks and yields `STTStreamEvent`
+ * envelopes (stream start, partial transcription chunks, final, error).
  *
- * @param audioData Audio data to transcribe
- * @param options Transcription options
+ * @param audioData Flow of audio chunk byte arrays
+ * @param options Transcription options (defaults to `STTOptions()` when null)
  * @return Flow of generated stream events
  */
 expect fun RunAnywhere.transcribeStream(
-    audioData: ByteArray,
-    options: STTOptions = STTOptions(),
+    audioData: Flow<ByteArray>,
+    options: STTOptions? = null,
 ): Flow<STTStreamEvent>

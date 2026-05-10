@@ -38,6 +38,18 @@ object CppBridgeFileManager {
     }
 
     /**
+     * Clear the SDK-owned Cache directory via the commons FileManager. Returns
+     * `true` on success. Mirrors Swift `CppBridge.FileManager.clearCache()`.
+     */
+    fun clearCache(): Boolean = RunAnywhereBridge.nativeFileManagerClearCache() == 0
+
+    /**
+     * Clear the SDK-owned Temp directory via the commons FileManager. Returns
+     * `true` on success. Mirrors Swift `CppBridge.FileManager.clearTemp()`.
+     */
+    fun clearTemp(): Boolean = RunAnywhereBridge.nativeFileManagerClearTemp() == 0
+
+    /**
      * Provides platform file I/O methods called by C++ via JNI.
      * Method signatures must match JNI expectations exactly.
      */

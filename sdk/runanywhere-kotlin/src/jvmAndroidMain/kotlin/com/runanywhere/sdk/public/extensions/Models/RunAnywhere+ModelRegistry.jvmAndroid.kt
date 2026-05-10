@@ -21,6 +21,8 @@ import ai.runanywhere.proto.v1.DownloadState
 import ai.runanywhere.proto.v1.DownloadSubscribeRequest
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFormat
+import ai.runanywhere.proto.v1.ModelImportRequest
+import ai.runanywhere.proto.v1.ModelImportResult
 import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelInfoList
 import ai.runanywhere.proto.v1.ModelQuery
@@ -28,10 +30,10 @@ import ai.runanywhere.proto.v1.ModelRegistryRefreshRequest
 import ai.runanywhere.proto.v1.ModelRegistryRefreshResult
 import ai.runanywhere.proto.v1.StorageDeleteRequest
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDownloadProto
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDownload
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelFormat
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorageProto
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStorage
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
@@ -107,7 +109,7 @@ actual fun RunAnywhere.downloadModel(modelId: String): Flow<DownloadProgress> =
 
 actual suspend fun RunAnywhere.planDownload(request: DownloadPlanRequest): DownloadPlanResult {
     requireInitialized(this)
-    return CppBridgeDownloadProto.plan(request)
+    return CppBridgeDownload.plan(request)
         ?: throw SDKException.download("Native download plan proto API unavailable")
 }
 
@@ -121,7 +123,7 @@ actual fun RunAnywhere.startDownload(request: DownloadStartRequest): Flow<Downlo
         val expectedModelId = request.model_id.ifBlank { request.plan?.model_id.orEmpty() }
         var taskId = request.resume_token
 
-        CppBridgeDownloadProto.setProgressCallback { progress ->
+        CppBridgeDownload.setProgressCallback { progress ->
             val matchesTask = taskId.isBlank() || progress.task_id == taskId
             val matchesModel = expectedModelId.isBlank() || progress.model_id == expectedModelId
             if (matchesTask && matchesModel) {
@@ -132,9 +134,9 @@ actual fun RunAnywhere.startDownload(request: DownloadStartRequest): Flow<Downlo
         }
 
         val result =
-            CppBridgeDownloadProto.start(request)
+            CppBridgeDownload.start(request)
                 ?: run {
-                    CppBridgeDownloadProto.setProgressCallback(null)
+                    CppBridgeDownload.setProgressCallback(null)
                     close(SDKException.download("Native download start proto API unavailable"))
                     return@callbackFlow
                 }
@@ -147,14 +149,14 @@ actual fun RunAnywhere.startDownload(request: DownloadStartRequest): Flow<Downlo
             if (it.isTerminal()) close()
         }
         if (!result.accepted) {
-            CppBridgeDownloadProto.setProgressCallback(null)
+            CppBridgeDownload.setProgressCallback(null)
             close(SDKException.download(result.error_message.ifBlank { "Download was not accepted" }))
             return@callbackFlow
         }
 
         awaitClose {
             if (expectedModelId.isNotBlank()) activeDownloadIdsByModel.remove(expectedModelId, taskId)
-            CppBridgeDownloadProto.setProgressCallback(null)
+            CppBridgeDownload.setProgressCallback(null)
         }
     }
 
@@ -173,7 +175,7 @@ private fun RunAnywhere.startDownloadFromPlan(modelId: String): Flow<DownloadPro
                 }
 
         val plan =
-            CppBridgeDownloadProto.plan(
+            CppBridgeDownload.plan(
                 DownloadPlanRequest(
                     model_id = modelId,
                     model = modelInfo,
@@ -192,7 +194,7 @@ private fun RunAnywhere.startDownloadFromPlan(modelId: String): Flow<DownloadPro
         }
 
         var taskId = plan.resume_token
-        CppBridgeDownloadProto.setProgressCallback { progress ->
+        CppBridgeDownload.setProgressCallback { progress ->
             val matchesTask = taskId.isBlank() || progress.task_id == taskId
             if (progress.model_id == modelId && matchesTask) {
                 trySend(progress)
@@ -209,7 +211,7 @@ private fun RunAnywhere.startDownloadFromPlan(modelId: String): Flow<DownloadPro
         }
 
         val result =
-            CppBridgeDownloadProto.start(
+            CppBridgeDownload.start(
                 DownloadStartRequest(
                     model_id = modelId,
                     plan = plan,
@@ -218,7 +220,7 @@ private fun RunAnywhere.startDownloadFromPlan(modelId: String): Flow<DownloadPro
                     update_registry_on_completion = true,
                 ),
             ) ?: run {
-                CppBridgeDownloadProto.setProgressCallback(null)
+                CppBridgeDownload.setProgressCallback(null)
                 close(SDKException.download("Native download start proto API unavailable"))
                 return@callbackFlow
             }
@@ -230,14 +232,14 @@ private fun RunAnywhere.startDownloadFromPlan(modelId: String): Flow<DownloadPro
             if (it.isTerminal()) close()
         }
         if (!result.accepted) {
-            CppBridgeDownloadProto.setProgressCallback(null)
+            CppBridgeDownload.setProgressCallback(null)
             close(SDKException.download(result.error_message.ifBlank { "Download was not accepted" }))
             return@callbackFlow
         }
 
         awaitClose {
             activeDownloadIdsByModel.remove(modelId, taskId)
-            CppBridgeDownloadProto.setProgressCallback(null)
+            CppBridgeDownload.setProgressCallback(null)
         }
     }
 
@@ -248,14 +250,14 @@ private fun DownloadProgress.isTerminal(): Boolean =
 
 actual suspend fun RunAnywhere.startDownloadProto(request: DownloadStartRequest): DownloadStartResult {
     requireInitialized(this)
-    return CppBridgeDownloadProto.start(request)
+    return CppBridgeDownload.start(request)
         ?: throw SDKException.download("Native download start proto API unavailable")
 }
 
 actual suspend fun RunAnywhere.cancelDownload(request: DownloadCancelRequest): DownloadCancelResult {
     requireInitialized(this)
     val result =
-        CppBridgeDownloadProto.cancel(request)
+        CppBridgeDownload.cancel(request)
             ?: throw SDKException.download("Native download cancel proto API unavailable")
     if (result.model_id.isNotBlank()) activeDownloadIdsByModel.remove(result.model_id, result.task_id)
     return result
@@ -263,20 +265,20 @@ actual suspend fun RunAnywhere.cancelDownload(request: DownloadCancelRequest): D
 
 actual suspend fun RunAnywhere.resumeDownload(request: DownloadResumeRequest): DownloadResumeResult {
     requireInitialized(this)
-    return CppBridgeDownloadProto.resume(request)
+    return CppBridgeDownload.resume(request)
         ?: throw SDKException.download("Native download resume proto API unavailable")
 }
 
 actual suspend fun RunAnywhere.downloadProgress(request: DownloadSubscribeRequest): DownloadProgress? {
     requireInitialized(this)
-    return CppBridgeDownloadProto.pollProgress(request)
+    return CppBridgeDownload.pollProgress(request)
 }
 
 actual suspend fun RunAnywhere.cancelDownload(modelId: String) {
     requireInitialized(this)
     val taskId = activeDownloadIdsByModel.remove(modelId).orEmpty()
     val result =
-        CppBridgeDownloadProto.cancel(
+        CppBridgeDownload.cancel(
             DownloadCancelRequest(
                 task_id = taskId,
                 model_id = modelId,
@@ -309,7 +311,7 @@ actual suspend fun RunAnywhere.deleteAllModels() {
 
 private fun deleteStorageForModels(modelIds: List<String>) {
     val result =
-        CppBridgeStorageProto.delete(
+        CppBridgeStorage.delete(
             StorageDeleteRequest(
                 model_ids = modelIds,
                 delete_files = true,
@@ -345,6 +347,64 @@ actual suspend fun RunAnywhere.refreshModelRegistry(
     return withContext(Dispatchers.IO) {
         CppBridgeModelRegistry.refresh(request)
             ?: throw SDKException.model("Native model registry refresh proto API unavailable")
+    }
+}
+
+// MARK: - Model Import
+
+/**
+ * Mirrors Swift `RunAnywhere.importModel(_:)`. Imports a platform-normalized
+ * local model into the C++ registry.
+ *
+ * NOTE: The native commons proto thunk `rac_model_registry_import_proto` is
+ * not yet exposed through the Kotlin JNI bridge — see
+ * [com.runanywhere.sdk.native.bridge.RunAnywhereBridge] (no
+ * `racModelRegistryImportProto` external fun exists). Until that thunk is
+ * wired, this implementation falls back to merging the supplied
+ * [ModelImportRequest.model] into the registry via
+ * [CppBridgeModelRegistry.save], which is functionally equivalent to the
+ * `registerModel` flow.
+ */
+actual suspend fun RunAnywhere.importModel(request: ModelImportRequest): ModelImportResult {
+    requireInitialized(this)
+    val model =
+        request.model
+            ?: return ModelImportResult(
+                success = false,
+                error_message = "ModelImportRequest.model is required (Kotlin fallback path)",
+            )
+    val sourcePath = request.source_path
+    val nowMs = System.currentTimeMillis()
+    val mergedModel =
+        if (sourcePath.isNotBlank()) {
+            model.copy(
+                local_path = sourcePath,
+                is_downloaded = true,
+                is_available = true,
+                updated_at_unix_ms = nowMs,
+            )
+        } else {
+            model.copy(updated_at_unix_ms = nowMs)
+        }
+    return withContext(Dispatchers.IO) {
+        try {
+            CppBridgeModelRegistry.save(mergedModel)
+            ModelImportResult(
+                success = true,
+                model = mergedModel,
+                local_path = mergedModel.local_path,
+                imported_bytes = mergedModel.download_size_bytes,
+                registered = true,
+                copied_into_managed_storage = false,
+            )
+        } catch (e: Throwable) {
+            modelsLogger.error("Failed to import model '${mergedModel.id}': ${e.message}")
+            ModelImportResult(
+                success = false,
+                model = mergedModel,
+                error_message = e.message ?: "Failed to import model",
+            )
+        }
     }
 }
 

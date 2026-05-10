@@ -224,8 +224,7 @@ final class VoiceAgentViewModel: ObservableObject {
     }
 
     // IDL-04: RAComponentLoadState consolidated into the richer
-    // RAComponentLifecycleState (shared with SDKEvent). ComponentLoadState is
-    // kept as a public typealias for continuity.
+    // RAComponentLifecycleState (shared with SDKEvent).
     private func componentStateFromSnapshot(_ component: RASDKComponent) -> RAComponentLifecycleState {
         guard let snapshot = RunAnywhere.componentLifecycleSnapshot(component) else {
             return .notLoaded
@@ -233,7 +232,7 @@ final class VoiceAgentViewModel: ObservableObject {
         return snapshot.state
     }
 
-    private func mapState(_ state: ComponentLoadState) -> ModelLoadState {
+    private func mapState(_ state: RAComponentLifecycleState) -> ModelLoadState {
         switch state {
         case .unspecified, .notLoaded: return .notLoaded
         case .loading, .downloading, .updating: return .loading

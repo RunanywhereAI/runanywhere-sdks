@@ -12,6 +12,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.AccelerationPreference
 import ai.runanywhere.proto.v1.HardwareProfileResult
 import com.runanywhere.sdk.public.RunAnywhere
 
@@ -67,3 +68,24 @@ expect class Hardware {
  * Namespace accessor for hardware profile operations.
  */
 expect val RunAnywhere.hardware: Hardware
+
+// ---------------------------------------------------------------------------
+// Top-level accelerator probe — mirrors Swift `Hardware.supportsAccelerator`
+// ---------------------------------------------------------------------------
+
+/**
+ * Check whether the device exposes the requested hardware accelerator.
+ *
+ * Reads the current [HardwareProfileResult] via [Hardware.getProfile] and
+ * returns `true` when an [ai.runanywhere.proto.v1.AcceleratorInfo] entry
+ * matches both the requested [accelerator] type and is reported as
+ * `available`.
+ *
+ * Mirrors Swift's accelerator-probe surface; the canonical
+ * [AccelerationPreference] enum (defined in `hardware_profile.proto`) is
+ * shared across SDKs.
+ *
+ * @param accelerator The accelerator type to probe (NPU, GPU, METAL, …).
+ * @return `true` when the requested accelerator is present and available.
+ */
+expect suspend fun RunAnywhere.supportsAccelerator(accelerator: AccelerationPreference): Boolean

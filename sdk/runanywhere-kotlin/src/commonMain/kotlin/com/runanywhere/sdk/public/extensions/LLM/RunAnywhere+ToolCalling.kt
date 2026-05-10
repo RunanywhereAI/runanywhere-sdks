@@ -124,18 +124,3 @@ expect suspend fun RunAnywhere.generateWithTools(
     prompt: String,
     options: LLMGenerationOptions? = null,
 ): LLMGenerationResult
-
-/**
- * Continue generation after a manual tool execution.
- *
- * Use this after calling [generateWithTools] and executing the tool call
- * returned in the response externally.
- *
- * @param toolCallId The ID of the tool call that was executed
- * @param result The result string from executing the tool
- * @return [LLMGenerationResult] of the continued generation
- */
-expect suspend fun RunAnywhere.continueWithToolResult(
-    toolCallId: String,
-    result: String,
-): LLMGenerationResult

@@ -3,12 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  *
  * JVM/Android actuals for structured output generation.
+ *
+ * Mirrors Swift `RunAnywhere+StructuredOutput.swift`.
  */
 
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.JSONSchema
 import ai.runanywhere.proto.v1.LLMGenerationOptions
+import ai.runanywhere.proto.v1.LLMGenerationResult
 import ai.runanywhere.proto.v1.StructuredOutputMode
 import ai.runanywhere.proto.v1.StructuredOutputOptions
 import ai.runanywhere.proto.v1.StructuredOutputParseRequest
@@ -38,16 +41,65 @@ actual suspend fun RunAnywhere.generateStructured(
 ): StructuredOutputResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
 
-    val (generationPrompt, structuredOptions, effectiveOptions) =
+    val (generationPrompt, _, effectiveOptions) =
         prepareGeneration(prompt, schema, options, streaming = false)
     val generationResult = generate(generationPrompt, effectiveOptions)
-    return parseStructuredOutput(
+    return extractStructuredOutput(generationResult.text, schema)
+}
+
+actual suspend fun RunAnywhere.generateWithStructuredOutput(
+    prompt: String,
+    structuredOutput: StructuredOutputOptions,
+    options: LLMGenerationOptions?,
+): LLMGenerationResult {
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+
+    val baseOptions = options ?: LLMGenerationOptions()
+    val schemaJson =
+        structuredOutput.json_schema?.takeIf { it.isNotBlank() }
+            ?: structuredOutput.schema?.jsonSchemaString
+            ?: ""
+    var effectiveOptions =
+        baseOptions.copy(
+            structured_output = structuredOutput,
+            json_schema = schemaJson,
+        )
+    if (structuredOutput.include_schema_in_prompt) {
+        val promptResult =
+            prepareStructuredOutputPrompt(
+                StructuredOutputRequest(
+                    request_id = UUID.randomUUID().toString(),
+                    prompt = prompt,
+                    options = structuredOutput,
+                ),
+            )
+        if (promptResult.error_code != 0) {
+            throw SDKException.operation(
+                promptResult.error_message
+                    ?: "Structured output prompt preparation failed: ${promptResult.error_code}",
+            )
+        }
+        promptResult.system_prompt?.let { sys ->
+            effectiveOptions = effectiveOptions.copy(system_prompt = sys)
+        }
+    }
+    return generate(prompt, effectiveOptions)
+}
+
+actual suspend fun RunAnywhere.extractStructuredOutput(
+    text: String,
+    schema: JSONSchema,
+): StructuredOutputResult {
+    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
+    val request =
         StructuredOutputParseRequest(
             request_id = UUID.randomUUID().toString(),
-            text = generationResult.text,
-            options = structuredOptions,
-        ),
-    )
+            text = text,
+            options = StructuredOutputOptions.defaults(schema = schema),
+        )
+    return withContext(Dispatchers.IO) {
+        CppBridgeStructuredOutput.parse(request)
+    }
 }
 
 actual fun RunAnywhere.generateStructuredStream(
@@ -111,15 +163,6 @@ actual suspend fun RunAnywhere.validateStructuredOutput(
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     return withContext(Dispatchers.IO) {
         CppBridgeStructuredOutput.validate(request)
-    }
-}
-
-actual suspend fun RunAnywhere.parseStructuredOutput(
-    request: StructuredOutputParseRequest,
-): StructuredOutputResult {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    return withContext(Dispatchers.IO) {
-        CppBridgeStructuredOutput.parse(request)
     }
 }
 

@@ -40,31 +40,34 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.utils.getCurrentTimeMillis
 
 /**
- * Capability namespace for LoRA adapter management.
+ * Stateless capability namespace for LoRA adapter management.
  *
- * This surface intentionally follows the generated LoRA service messages:
- * runtime apply/remove/list/state, catalog list/query/get, and download
- * completion all use request/result/state types generated from
- * `lora_options.proto`. Legacy `load`/`clear` compatibility helpers were
- * removed with the corresponding C ABI symbols.
+ * Mirrors Swift's `RunAnywhere.lora` (`RunAnywhere+LoRA.swift`) surface 1:1.
+ * Runtime operations (apply / remove / list / state / checkCompatibility) and
+ * catalog operations (register / listCatalog / queryCatalog / getCatalogEntry /
+ * markDownloadCompleted / markImportCompleted) all flow through generated
+ * request / result types from `lora_options.proto`.
  */
-expect class LoRA internal constructor() {
-    /** Apply one or more LoRA adapters to the current LLM session. */
+interface LoRANamespace {
+    /** Apply one or more LoRA adapters to the currently loaded model. */
     suspend fun apply(request: LoRAApplyRequest): LoRAApplyResult
 
     /** Remove adapters by generated request semantics, including `clear_all`. */
     suspend fun remove(request: LoRARemoveRequest): LoRAState
 
-    /** Return the current loaded-adapter snapshot from native state. */
-    suspend fun list(request: LoRAState): LoRAState
+    /** Get info about all currently loaded LoRA adapters. */
+    suspend fun list(): LoRAState
 
-    /** Return the logical LoRA service state from native state. */
-    suspend fun state(request: LoRAState): LoRAState
+    /** Get the LoRA service state reported by commons. */
+    suspend fun state(): LoRAState
 
-    /** Pre-flight compatibility check for an adapter config and current base model. */
+    /**
+     * Check whether a LoRA adapter is compatible with the current base model.
+     * Mirrors Swift: returns an incompatible result instead of throwing.
+     */
     suspend fun checkCompatibility(config: LoRAAdapterConfig): LoraCompatibilityResult
 
-    /** Register an adapter catalog entry. */
+    /** Register a LoRA adapter from a full catalog entry. */
     suspend fun register(entry: LoraAdapterCatalogEntry): LoraAdapterCatalogEntry
 
     /** List catalog entries using the generated catalog request/result ABI. */
@@ -78,14 +81,59 @@ expect class LoRA internal constructor() {
     /** Fetch one catalog entry by generated request semantics. */
     suspend fun getCatalogEntry(request: LoraAdapterCatalogGetRequest): LoraAdapterCatalogGetResult
 
-    /** Persist native-reported completion state after Android has fetched bytes. */
+    /** Persist native-reported completion state after the platform has fetched bytes. */
     suspend fun markDownloadCompleted(
         request: LoraAdapterDownloadCompletedRequest,
     ): LoraAdapterDownloadCompletedResult
+
+    /**
+     * Persist native-reported import completion state. Sets `imported = true`
+     * and a default status message when not already populated, matching the
+     * IDL contract for platform file-picker / import completion.
+     */
+    suspend fun markImportCompleted(
+        request: LoraAdapterDownloadCompletedRequest,
+    ): LoraAdapterDownloadCompletedResult {
+        val patched =
+            request.copy(
+                imported = true,
+                status_message =
+                    request.status_message.ifBlank { "import completed" },
+            )
+        return markDownloadCompleted(patched)
+    }
+
+    /**
+     * Get all LoRA adapters compatible with a specific model
+     * (CANONICAL_API §3, mirrors Swift `adaptersForModel`).
+     */
+    suspend fun adaptersForModel(modelId: String): List<LoraAdapterCatalogEntry> {
+        val result = queryCatalog(LoraAdapterCatalogQuery(model_id = modelId))
+        if (!result.success) {
+            throw IllegalStateException(
+                result.error_message.ifBlank { "LoRA catalog query failed" },
+            )
+        }
+        return result.entries
+    }
+
+    /**
+     * Get all registered LoRA adapters
+     * (CANONICAL_API §3, mirrors Swift `allRegistered`).
+     */
+    suspend fun allRegistered(): List<LoraAdapterCatalogEntry> {
+        val result = listCatalog()
+        if (!result.success) {
+            throw IllegalStateException(
+                result.error_message.ifBlank { "LoRA catalog list failed" },
+            )
+        }
+        return result.entries
+    }
 }
 
 /** Public capability accessor: `RunAnywhere.lora.apply(request)`. */
-expect val RunAnywhere.lora: LoRA
+expect val RunAnywhere.lora: LoRANamespace
 
 private const val LORA_ARTIFACT_MODEL_ID_PREFIX = "lora-adapter:"
 private const val LORA_ARTIFACT_TAG = "lora-adapter"

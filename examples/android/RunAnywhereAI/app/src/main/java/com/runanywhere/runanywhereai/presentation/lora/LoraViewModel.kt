@@ -405,7 +405,7 @@ class LoraViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun loadCurrentState(): List<LoRAAdapterInfo> {
         return try {
-            val state = RunAnywhere.lora.list(LoRAState())
+            val state = RunAnywhere.lora.list()
             if (state.error_message.isNullOrBlank()) state.loaded_adapters else emptyList()
         } catch (e: Exception) {
             Timber.w(e, "LoRA state unavailable")

@@ -35,12 +35,11 @@ import ai.runanywhere.proto.v1.VoiceAgentConfig
 import ai.runanywhere.proto.v1.VoiceAgentResult
 import ai.runanywhere.proto.v1.VoiceAgentTurnRequest
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLMProto
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTTProto
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTSProto
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgentProto
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 // v3.1: VoiceSessionEvent / Flow / flow imports removed — the actual declarations using them
@@ -55,7 +54,7 @@ private val voiceAgentLogger = SDKLogger.voiceAgent
 @Volatile private var voiceAgentInitialized: Boolean = false
 
 private fun isComponentReady(component: SDKComponent): Boolean =
-    CppBridgeModelLifecycleProto.snapshot(component)?.let {
+    CppBridgeModelLifecycle.snapshot(component)?.let {
         it.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
             it.model_id.isNotEmpty()
     } ?: false
@@ -84,7 +83,7 @@ actual suspend fun RunAnywhere.initializeVoiceAgent(config: VoiceAgentConfig) {
             vad_sample_rate = config.sample_rate_hz,
         )
     val states =
-        CppBridgeVoiceAgentProto.initialize(
+        CppBridgeVoiceAgent.initialize(
             CppBridgeVoiceAgent.getRawHandle(),
             composeConfig,
         )
@@ -94,11 +93,11 @@ actual suspend fun RunAnywhere.initializeVoiceAgent(config: VoiceAgentConfig) {
 
 actual suspend fun RunAnywhere.getVoiceAgentComponentStates(): VoiceAgentComponentStates {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    return CppBridgeVoiceAgentProto.states(CppBridgeVoiceAgent.getRawHandle())
+    return CppBridgeVoiceAgent.states(CppBridgeVoiceAgent.getRawHandle())
 }
 
 actual suspend fun RunAnywhere.isVoiceAgentReady(): Boolean =
-    isInitialized && CppBridgeVoiceAgentProto.states(CppBridgeVoiceAgent.getRawHandle()).ready
+    isInitialized && CppBridgeVoiceAgent.states(CppBridgeVoiceAgent.getRawHandle()).ready
 
 actual suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels() {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
@@ -123,12 +122,12 @@ actual suspend fun RunAnywhere.stopVoiceSession() {
     // Cancel each component via the native cancel ABI — C++ owns the
     // cancellation flag. The legacy CppBridge{LLM,STT,TTS}.cancel
     // shims (which managed per-component Kotlin state) were deleted.
-    CppBridgeLLMProto.cancel()
+    CppBridgeLLM.cancel()
     com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racSttComponentCancel(
-        CppBridgeSTTProto.getHandle(),
+        CppBridgeSTT.getHandle(),
     )
     com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racTtsComponentCancel(
-        CppBridgeTTSProto.getHandle(),
+        CppBridgeTTS.getHandle(),
     )
 }
 
@@ -146,7 +145,7 @@ actual suspend fun RunAnywhere.setVoiceSystemPrompt(prompt: String) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Phase 4a — VoiceAgent processing parity actuals.
 //
-// One-shot composition of CppBridgeSTTProto/LLMProto/TTSProto, mirroring Swift's
+// One-shot composition of CppBridgeSTT/LLMProto/TTSProto, mirroring Swift's
 // `RunAnywhere+VoiceAgent.swift`. The streaming path remains via
 // `VoiceAgentStreamAdapter`.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -237,7 +236,7 @@ actual suspend fun RunAnywhere.processVoiceTurn(
 
 actual suspend fun RunAnywhere.voiceAgentTranscribe(audioData: ByteArray): STTOutput {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    return transcribeWithOptions(audioData, STTOptions())
+    return transcribe(audioData, STTOptions())
 }
 
 actual suspend fun RunAnywhere.voiceAgentGenerateResponse(prompt: String): String {

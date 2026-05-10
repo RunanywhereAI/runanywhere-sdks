@@ -1,5 +1,7 @@
 package com.runanywhere.runanywhereai.presentation.vision
 
+import ai.runanywhere.proto.v1.ComponentLifecycleState
+import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.SDKEvent
 import ai.runanywhere.proto.v1.VLMGenerationOptions
 import ai.runanywhere.proto.v1.VLMImage
@@ -20,7 +22,8 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.cancelVLMGeneration
-import com.runanywhere.sdk.public.extensions.isVLMModelLoaded
+import com.runanywhere.sdk.public.extensions.componentLifecycleSnapshot
+import com.runanywhere.sdk.public.extensions.fromBitmap
 import com.runanywhere.sdk.public.extensions.processImageStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -97,9 +100,12 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
 
     // MODEL
 
-    fun checkModelStatus() {
+    suspend fun checkModelStatus() {
         try {
-            val isLoaded = RunAnywhere.isVLMModelLoaded
+            val snapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_VLM)
+            val isLoaded =
+                snapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+                    snapshot.model_id.isNotEmpty()
             _uiState.update { it.copy(isModelLoaded = isLoaded) }
             Timber.d("VLM model loaded: $isLoaded")
         } catch (e: Exception) {
@@ -178,38 +184,25 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
      * Capture the latest camera frame as RGB bytes.
      * Mirrors iOS captureOutput delegate that stores currentFrame (CVPixelBuffer).
      *
-     * CameraX delivers RGBA_8888 format; we strip alpha to get RGB.
+     * KOT-VLM-001 fix: route through `VLMImage.Companion.fromBitmap` so that
+     * Android handles `rowStride` / `pixelStride` internally via
+     * `Bitmap.getPixels`. The previous hand-rolled loop assumed
+     * `pixelStride == 4` and ignored row padding, which produced misaligned
+     * RGB / horizontal-shift artifacts on devices where the RGBA_8888 plane
+     * carries trailing row bytes. We still cache the packed RGB byte buffer
+     * (plus dimensions) because `describeCurrentFrame*` reuses it without
+     * re-reading the camera plane.
      */
     private fun captureFrame(imageProxy: ImageProxy) {
         try {
-            val plane = imageProxy.planes[0]
-            val buffer = plane.buffer
-            val width = imageProxy.width
-            val height = imageProxy.height
-            val rowStride = plane.rowStride
-            val pixelStride = plane.pixelStride
-
-            // RGBA_8888 -> RGB (strip alpha), handle row stride padding
-            val rgbSize = width * height * 3
-            val rgb = ByteArray(rgbSize)
-            var rgbIdx = 0
-            for (row in 0 until height) {
-                for (col in 0 until width) {
-                    val srcIdx = row * rowStride + col * pixelStride
-                    if (srcIdx + 2 < buffer.limit()) {
-                        rgb[rgbIdx++] = buffer[srcIdx] // R
-                        rgb[rgbIdx++] = buffer[srcIdx + 1] // G
-                        rgb[rgbIdx++] = buffer[srcIdx + 2] // B
-                    } else {
-                        rgbIdx += 3 // skip pixel but keep alignment
-                    }
-                }
-            }
+            val bitmap = imageProxy.toBitmap()
+            val image = VLMImage.fromBitmap(bitmap)
+            val rgb = image.raw_rgb?.toByteArray() ?: return
 
             synchronized(frameLock) {
                 currentFrameRgb = rgb
-                currentFrameWidth = width
-                currentFrameHeight = height
+                currentFrameWidth = bitmap.width
+                currentFrameHeight = bitmap.height
             }
         } catch (e: Exception) {
             Timber.e("Frame capture failed: ${e.message}")
@@ -259,15 +252,16 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                             height = h,
                             format = VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB,
                         )
-                    val options = VLMGenerationOptions(max_tokens = 200, temperature = 0.7f)
+                    val options =
+                        VLMGenerationOptions(
+                            prompt = "Describe what you see briefly.",
+                            max_tokens = 200,
+                            temperature = 0.7f,
+                        )
 
                     Timber.i("Describing current camera frame (${w}x$h)")
 
-                    RunAnywhere.processImageStream(
-                        image,
-                        "Describe what you see briefly.",
-                        options,
-                    ).collect { event ->
+                    RunAnywhere.processImageStream(image, options).collect { event ->
                         _uiState.update {
                             it.copy(currentDescription = applyVlmStreamEvent(it.currentDescription, event))
                         }
@@ -312,11 +306,16 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                             file_path = tempFile.absolutePath,
                             format = VLMImageFormat.VLM_IMAGE_FORMAT_FILE_PATH,
                         )
-                    val options = VLMGenerationOptions(max_tokens = 300, temperature = 0.7f)
+                    val options =
+                        VLMGenerationOptions(
+                            prompt = prompt,
+                            max_tokens = 300,
+                            temperature = 0.7f,
+                        )
 
                     Timber.i("Starting VLM streaming for image: ${tempFile.name}")
 
-                    RunAnywhere.processImageStream(image, prompt, options)
+                    RunAnywhere.processImageStream(image, options)
                         .collect { event ->
                             _uiState.update {
                                 it.copy(currentDescription = applyVlmStreamEvent(it.currentDescription, event))
@@ -399,13 +398,14 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                     height = h,
                     format = VLMImageFormat.VLM_IMAGE_FORMAT_RAW_RGB,
                 )
-            val options = VLMGenerationOptions(max_tokens = 100, temperature = 0.7f)
+            val options =
+                VLMGenerationOptions(
+                    prompt = "Describe what you see in one sentence.",
+                    max_tokens = 100,
+                    temperature = 0.7f,
+                )
 
-            RunAnywhere.processImageStream(
-                image,
-                "Describe what you see in one sentence.",
-                options,
-            ).collect { event ->
+            RunAnywhere.processImageStream(image, options).collect { event ->
                 newDescription = applyVlmStreamEvent(newDescription, event)
                 _uiState.update { it.copy(currentDescription = newDescription) }
             }

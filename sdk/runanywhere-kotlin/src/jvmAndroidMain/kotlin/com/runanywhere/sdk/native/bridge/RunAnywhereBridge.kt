@@ -1253,7 +1253,7 @@ object RunAnywhereBridge {
     //
     // Legacy direct HTTP runner retained for modality-specific adapters that
     // still need KOT-03 migration. Registry/model downloads use the generated
-    // Download* proto service in CppBridgeDownloadProto.
+    // Download* proto service in CppBridgeDownload.
     //
     // @param url                  Absolute HTTP/HTTPS URL.
     // @param destPath             Local file path to write bytes to.

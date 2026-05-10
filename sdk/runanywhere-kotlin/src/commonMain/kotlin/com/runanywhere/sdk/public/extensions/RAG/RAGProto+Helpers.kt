@@ -106,27 +106,63 @@ fun RAGConfiguration.resolvingLifecycleArtifacts(
 fun RAGDocument.Companion.create(
     text: String,
     metadataJSON: String? = null,
-): RAGDocument {
-    val metadata: Map<String, String> =
-        if (metadataJSON.isNullOrEmpty()) {
-            emptyMap()
-        } else {
-            runCatching { Json.parseToJsonElement(metadataJSON) }
-                .getOrNull()
-                ?.let { it as? JsonObject }
-                ?.entries
-                ?.associate { (key, value) ->
-                    val str =
-                        when (value) {
-                            is JsonPrimitive -> value.contentOrNull ?: value.toString()
-                            else -> value.toString()
-                        }
-                    key to str
-                }
-                ?: emptyMap()
+): RAGDocument =
+    RAGDocument(text = text, metadata = decodeMetadataJSON(metadataJSON))
+
+/**
+ * Acronym-preserving alias matching the Swift `metadataJSON` accessor on
+ * `RARAGDocument`. The Wire-generated Kotlin proto exposes the typed
+ * `metadata` map under a snake_case name; this read-only extension property
+ * surfaces the equivalent JSON-encoded blob for parity with the Swift API
+ * (where the original proto field name `metadata_json` is camel-cased to
+ * `metadataJSON`).
+ */
+val RAGDocument.metadataJSON: String?
+    get() {
+        if (metadata.isEmpty()) return null
+        // Encode the typed map as a JSON object so callers expecting the
+        // Swift-style `metadataJSON` blob can round-trip the value.
+        return buildString {
+            append('{')
+            metadata.entries.forEachIndexed { index, (key, value) ->
+                if (index > 0) append(',')
+                append('"').append(escapeJsonString(key)).append("\":\"")
+                append(escapeJsonString(value)).append('"')
+            }
+            append('}')
         }
-    return RAGDocument(text = text, metadata = metadata)
+    }
+
+private fun decodeMetadataJSON(metadataJSON: String?): Map<String, String> {
+    if (metadataJSON.isNullOrEmpty()) return emptyMap()
+    return runCatching { Json.parseToJsonElement(metadataJSON) }
+        .getOrNull()
+        ?.let { it as? JsonObject }
+        ?.entries
+        ?.associate { (key, value) ->
+            val str =
+                when (value) {
+                    is JsonPrimitive -> value.contentOrNull ?: value.toString()
+                    else -> value.toString()
+                }
+            key to str
+        }
+        ?: emptyMap()
 }
+
+private fun escapeJsonString(value: String): String =
+    buildString(value.length) {
+        for (c in value) {
+            when (c) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> append(c)
+            }
+        }
+    }
 
 // MARK: - RAGQueryOptions
 

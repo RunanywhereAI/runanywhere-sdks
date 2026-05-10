@@ -5,21 +5,36 @@
  * Public API for Retrieval-Augmented Generation (RAG) operations.
  * Delegates all pipeline work to RAGBridge (JNI), publishes events to EventBus.
  *
- * Mirrors Swift RunAnywhere+RAG.swift exactly.
+ * Mirrors Swift RunAnywhere+RAG.swift exactly. Acronym-preserving names
+ * (`metadataJSON`) are used to match the Swift surface; the Wire-generated
+ * proto continues to expose the snake_case `metadata` map under the hood.
  */
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.RAGConfig
 import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
+import ai.runanywhere.proto.v1.RAGSearchResult
 import ai.runanywhere.proto.v1.RAGStatistics
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 
 // MARK: - Pipeline Lifecycle
+
+/**
+ * Build a generated RAG configuration from registry models by delegating
+ * artifact resolution to commons (model-id → path) — Swift parity for
+ * `RunAnywhere.ragResolvedConfiguration(embeddingModel:llmModel:baseConfiguration:)`.
+ */
+expect suspend fun RunAnywhere.ragResolvedConfiguration(
+    embeddingModel: ModelInfo,
+    llmModel: ModelInfo,
+    baseConfiguration: RAGConfiguration = RAGConfiguration.defaults(),
+): RAGConfiguration
 
 /**
  * Create the RAG pipeline with the given configuration.
@@ -74,10 +89,19 @@ expect suspend fun RunAnywhere.ragDestroyPipeline()
  * and indexed for vector search.
  *
  * @param text Plain text content of the document
- * @param metadataJson Optional JSON string attached to all chunks from this document
+ * @param metadataJSON Optional JSON string attached to all chunks from this document.
+ *                     Acronym-preserving spelling matches the Swift signature
+ *                     `RunAnywhere.ragIngest(text:metadataJSON:)`.
  * @throws IllegalStateException if the pipeline is not created or ingestion fails
  */
-expect suspend fun RunAnywhere.ragIngest(text: String, metadataJson: String? = null)
+expect suspend fun RunAnywhere.ragIngest(text: String, metadataJSON: String? = null)
+
+/**
+ * Ingest a generated-proto document through the C++ RAG ABI.
+ *
+ * Mirrors Swift `ragIngest(_ document: RARAGDocument)`.
+ */
+expect suspend fun RunAnywhere.ragIngest(document: RAGDocument): RAGStatistics
 
 /**
  * Clear all previously ingested documents from the pipeline.
@@ -94,6 +118,27 @@ expect suspend fun RunAnywhere.ragClearDocuments()
  * not a property, to match the cross-SDK naming convention.
  */
 expect suspend fun RunAnywhere.ragGetDocumentCount(): Int
+
+/**
+ * Ingest a batch of documents into the RAG pipeline.
+ *
+ * Returns the latest [RAGStatistics] reported by the C++ pipeline after
+ * the final document has been ingested. Mirrors Swift
+ * `ragAddDocumentsBatch(documents:)`.
+ *
+ * @throws IllegalStateException if the pipeline is not created or ingestion fails.
+ */
+expect suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RAGDocument>): RAGStatistics
+
+/**
+ * Get statistics for the current RAG pipeline.
+ *
+ * Mirrors Swift `ragGetStatistics()`.
+ *
+ * @return RAGStatistics with chunk count, last query timing, etc.
+ * @throws IllegalStateException if the pipeline is not created
+ */
+expect suspend fun RunAnywhere.ragGetStatistics(): RAGStatistics
 
 // MARK: - Query
 
@@ -115,20 +160,27 @@ expect suspend fun RunAnywhere.ragQuery(
 ): RAGResult
 
 /**
- * Ingest a batch of documents into the RAG pipeline.
+ * Query the RAG pipeline while overriding the system prompt for this turn.
  *
- * @param documents List of documents to ingest
- * @throws IllegalStateException if the pipeline is not created or ingestion fails
+ * Convenience wrapper around [ragQuery] that sets [RAGQueryOptions.system_prompt]
+ * before delegating to the C++ ABI.
  */
-expect suspend fun RunAnywhere.ragAddDocumentsBatch(documents: List<RAGDocument>)
+expect suspend fun RunAnywhere.ragQueryWithContext(
+    query: String,
+    systemPrompt: String? = null,
+    options: RAGQueryOptions = RAGQueryOptions.defaults(query),
+): RAGResult
 
 /**
- * Get statistics for the current RAG pipeline.
- *
- * @return RAGStatistics with chunk count, last query timing, etc.
- * @throws IllegalStateException if the pipeline is not created
+ * Vector-only retrieval: returns the top-K chunks ranked by cosine
+ * similarity without invoking the LLM. Implemented by issuing a
+ * zero-token [ragQuery] and surfacing the [RAGResult.retrieved_chunks].
  */
-expect suspend fun RunAnywhere.ragGetStatistics(): RAGStatistics
+expect suspend fun RunAnywhere.ragSearch(
+    query: String,
+    topK: Int = 5,
+    threshold: Float = 0.0f,
+): List<RAGSearchResult>
 
 // D-6: resolveRAGConfiguration deleted.  Commons now owns model-id ->
 // path resolution, so the Kotlin SDK no longer re-implements lookup +

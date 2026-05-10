@@ -11,7 +11,6 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.CurrentModelResult
 import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelLoadRequest
 import ai.runanywhere.proto.v1.ModelLoadResult
 import ai.runanywhere.proto.v1.ModelUnloadRequest
@@ -20,8 +19,8 @@ import ai.runanywhere.proto.v1.VLMGenerationOptions
 import ai.runanywhere.proto.v1.VLMImage
 import ai.runanywhere.proto.v1.VLMResult
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycleProto
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLMProto
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.resolvedPrimaryModelPath
@@ -64,7 +63,7 @@ private fun CurrentModelResult.hasVLMArtifacts(): Boolean =
 private fun currentVLMModelFromLifecycle(): CurrentModelResult? =
     try {
         vlmLifecycleCategories.firstNotNullOfOrNull { category ->
-            CppBridgeModelLifecycleProto
+            CppBridgeModelLifecycle
                 .currentModel(CurrentModelRequest(category = category))
                 ?.takeIf { it.found && it.hasVLMArtifacts() }
         }
@@ -73,32 +72,11 @@ private fun currentVLMModelFromLifecycle(): CurrentModelResult? =
         null
     }
 
-// MARK: - Simple API
-
-actual suspend fun RunAnywhere.describeImage(
-    image: VLMImage,
-    prompt: String,
-): String {
-    val result = processImage(image, prompt, null)
-    return result.text
-}
-
-actual suspend fun RunAnywhere.askAboutImage(
-    question: String,
-    image: VLMImage,
-): String {
-    // Per canonical §7: askAboutImage(question, image) is a convenience
-    // over processImage with the question as the prompt.
-    val result = processImage(image, question, null)
-    return result.text
-}
-
-// MARK: - Full API
+// MARK: - Inference
 
 actual suspend fun RunAnywhere.processImage(
     image: VLMImage,
-    prompt: String,
-    options: VLMGenerationOptions?,
+    options: VLMGenerationOptions,
 ): VLMResult {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
@@ -106,13 +84,15 @@ actual suspend fun RunAnywhere.processImage(
 
     ensureServicesReady()
 
-    if (!CppBridgeVLMProto.isLoaded()) {
+    if (!CppBridgeVLM.isLoaded()) {
         throw SDKException.vlm("VLM model not loaded")
     }
 
-    vlmLogger.debug("Processing image with prompt: ${prompt.take(50)}${if (prompt.length > 50) "..." else ""}")
+    vlmLogger.debug(
+        "Processing image with prompt: ${options.prompt.take(50)}${if (options.prompt.length > 50) "..." else ""}",
+    )
 
-    val result = CppBridgeVLMProto.process(image, (options ?: VLMGenerationOptions()).copy(prompt = prompt))
+    val result = CppBridgeVLM.process(image, options)
 
     vlmLogger.info(
         "VLM processing complete: ${result.completion_tokens} tokens in ${result.processing_time_ms}ms " +
@@ -124,8 +104,7 @@ actual suspend fun RunAnywhere.processImage(
 
 actual fun RunAnywhere.processImageStream(
     image: VLMImage,
-    prompt: String,
-    options: VLMGenerationOptions?,
+    options: VLMGenerationOptions,
 ): Flow<SDKEvent> =
     callbackFlow {
         if (!isInitialized) {
@@ -134,7 +113,7 @@ actual fun RunAnywhere.processImageStream(
 
         ensureServicesReady()
 
-        if (!CppBridgeVLMProto.isLoaded()) {
+        if (!CppBridgeVLM.isLoaded()) {
             throw SDKException.vlm("VLM model not loaded")
         }
 
@@ -142,10 +121,7 @@ actual fun RunAnywhere.processImageStream(
         val job =
             launch(Dispatchers.IO) {
                 try {
-                    CppBridgeVLMProto.processStream(
-                        image,
-                        (options ?: VLMGenerationOptions()).copy(prompt = prompt),
-                    ) { event ->
+                    CppBridgeVLM.processStream(image, options) { event ->
                         trySend(event)
                         true
                     }
@@ -156,7 +132,7 @@ actual fun RunAnywhere.processImageStream(
             }
 
         awaitClose {
-            CppBridgeVLMProto.cancel()
+            CppBridgeVLM.cancel()
             job.cancel()
         }
     }
@@ -172,7 +148,7 @@ actual suspend fun RunAnywhere.loadVLMModel(modelId: String) {
 
     vlmLogger.info("Loading VLM model through lifecycle: $modelId")
 
-    CppBridgeVLMProto.destroy()
+    CppBridgeVLM.destroy()
 
     val lifecycleResult = loadModel(ModelLoadRequest(model_id = modelId))
     if (!lifecycleResult.success) {
@@ -185,7 +161,7 @@ actual suspend fun RunAnywhere.loadVLMModel(modelId: String) {
     val resolvedModelId = lifecycleResult.model_id.ifBlank { modelId }
 
     val result =
-        CppBridgeVLMProto.loadResolvedArtifacts(
+        CppBridgeVLM.loadResolvedArtifacts(
             modelId = resolvedModelId,
             primaryModelPath = artifacts.primaryModelPath,
             visionProjectorPath = artifacts.visionProjectorPath,
@@ -198,34 +174,10 @@ actual suspend fun RunAnywhere.loadVLMModel(modelId: String) {
     vlmLogger.info("VLM model loaded successfully: $resolvedModelId")
 }
 
-actual suspend fun RunAnywhere.unloadVLMModel() {
-    if (!isInitialized) {
-        throw SDKException.notInitialized("SDK not initialized")
-    }
-
-    val current = currentVLMModelFromLifecycle()
-    CppBridgeVLMProto.destroy()
-    current?.model_id?.takeIf { it.isNotBlank() }?.let { modelId ->
-        val result = unloadModel(ModelUnloadRequest(model_id = modelId))
-        if (!result.success) {
-            throw SDKException.vlm(
-                result.error_message.ifBlank { "Failed to unload VLM model '$modelId'" },
-            )
-        }
-    }
-    vlmLogger.info("VLM model unloaded")
-}
-
-actual val RunAnywhere.isVLMModelLoaded: Boolean
-    get() = CppBridgeVLMProto.isLoaded() && currentVLMModelFromLifecycle() != null
-
-actual val RunAnywhere.currentVLMModelId: String?
-    get() = currentVLMModelFromLifecycle()?.model_id
-
 // MARK: - Generation Control
 
 actual fun RunAnywhere.cancelVLMGeneration() {
-    CppBridgeVLMProto.cancel()
+    CppBridgeVLM.cancel()
 }
 
 private suspend fun RunAnywhere.unloadLifecycleVLMQuietly(modelId: String) {
@@ -234,14 +186,4 @@ private suspend fun RunAnywhere.unloadLifecycleVLMQuietly(modelId: String) {
     } catch (e: Exception) {
         vlmLogger.warn("Failed to clean up lifecycle VLM model '$modelId': ${e.message}")
     }
-}
-
-// MARK: - VLM Models
-
-actual suspend fun RunAnywhere.loadVLMModelInfo(model: ModelInfo) {
-    loadVLMModel(model.id)
-}
-
-actual suspend fun RunAnywhere.loadVLMModelById(modelId: String) {
-    loadVLMModel(modelId)
 }

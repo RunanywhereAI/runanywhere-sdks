@@ -20,14 +20,6 @@ import kotlinx.coroutines.flow.Flow
 // MARK: - Text Generation
 
 /**
- * Simple text generation with automatic event publishing.
- *
- * @param prompt The text prompt
- * @return Generated response (text only)
- */
-expect suspend fun RunAnywhere.chat(prompt: String): String
-
-/**
  * Generate text with full metrics and analytics.
  *
  * @param prompt The text prompt

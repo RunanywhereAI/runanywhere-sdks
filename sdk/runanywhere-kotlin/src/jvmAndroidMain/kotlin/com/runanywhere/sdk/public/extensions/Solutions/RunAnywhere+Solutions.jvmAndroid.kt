@@ -59,12 +59,10 @@ actual class SolutionHandle internal constructor(
         }
     }
 
-    actual suspend fun feed(input: ByteArray) {
+    actual suspend fun feed(input: String) {
         val h = requireHandle()
-        // The C ABI's feed accepts a UTF-8 string — encode the bytes accordingly.
-        val item = input.toString(Charsets.UTF_8)
         withContext(Dispatchers.IO) {
-            val rc = RunAnywhereBridge.racSolutionFeed(h, item)
+            val rc = RunAnywhereBridge.racSolutionFeed(h, input)
             if (rc != RunAnywhereBridge.RAC_SUCCESS) {
                 throw SDKException.operation("rac_solution_feed failed with rc=$rc")
             }

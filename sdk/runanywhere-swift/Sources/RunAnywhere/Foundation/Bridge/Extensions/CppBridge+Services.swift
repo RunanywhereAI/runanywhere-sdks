@@ -36,13 +36,13 @@ extension CppBridge {
             public let id: String
             public let name: String
             public let version: String
-            public let capabilities: Set<SDKComponent>
+            public let capabilities: Set<RASDKComponent>
         }
 
         // MARK: - Plugin Queries
 
         /// List all plugin names registered for a capability, sorted by priority.
-        public static func listProviders(for capability: SDKComponent) -> [String] {
+        public static func listProviders(for capability: RASDKComponent) -> [String] {
             guard let primitive = capability.toPrimitive() else { return [] }
 
             // Fixed-size buffer — 16 plugins per primitive is well above the
@@ -67,12 +67,12 @@ extension CppBridge {
         }
 
         /// Check if any plugin is registered for a capability.
-        public static func hasProvider(for capability: SDKComponent) -> Bool {
+        public static func hasProvider(for capability: RASDKComponent) -> Bool {
             !listProviders(for: capability).isEmpty
         }
 
         /// Check if a specific plugin (by metadata.name, e.g. "llamacpp") is registered.
-        public static func isProviderRegistered(_ name: String, for capability: SDKComponent) -> Bool {
+        public static func isProviderRegistered(_ name: String, for capability: RASDKComponent) -> Bool {
             listProviders(for: capability).contains(name)
         }
 
@@ -92,10 +92,10 @@ extension CppBridge {
             for i in 0..<count {
                 let module = modules[i]
 
-                var capabilities: Set<SDKComponent> = []
+                var capabilities: Set<RASDKComponent> = []
                 if let caps = module.capabilities {
                     for j in 0..<Int(module.num_capabilities) {
-                        if let component = SDKComponent.from(caps[j]) {
+                        if let component = RASDKComponent.from(caps[j]) {
                             capabilities.insert(component)
                         }
                     }
@@ -124,10 +124,10 @@ extension CppBridge {
                 return nil
             }
 
-            var capabilities: Set<SDKComponent> = []
+            var capabilities: Set<RASDKComponent> = []
             if let caps = module.capabilities {
                 for j in 0..<Int(module.num_capabilities) {
-                    if let component = SDKComponent.from(caps[j]) {
+                    if let component = RASDKComponent.from(caps[j]) {
                         capabilities.insert(component)
                     }
                 }
@@ -148,9 +148,9 @@ extension CppBridge {
     }
 }
 
-// MARK: - SDKComponent ↔ rac_primitive_t / rac_capability_t conversion
+// MARK: - RASDKComponent ↔ rac_primitive_t / rac_capability_t conversion
 
-extension SDKComponent {
+extension RASDKComponent {
 
     /// Convert to the GAP 02 `rac_primitive_t` enum used by the plugin registry.
     /// Returns nil for aggregate components (.voice, .rag) that span multiple
@@ -187,7 +187,7 @@ extension SDKComponent {
     }
 
     /// Convert from C++ capability type.
-    static func from(_ capability: rac_capability_t) -> SDKComponent? {
+    static func from(_ capability: rac_capability_t) -> RASDKComponent? {
         switch capability {
         case RAC_CAPABILITY_TEXT_GENERATION: return .llm
         case RAC_CAPABILITY_VISION_LANGUAGE: return .vlm

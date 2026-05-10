@@ -27,7 +27,7 @@ object CppBridgeVAD {
     /**
      * Whether the underlying native component has been created.
      * Replaces the legacy isReady/isLoaded — readiness should be queried
-     * through `CppBridgeModelLifecycleProto.snapshot(SDK_COMPONENT_VAD)`.
+     * through `CppBridgeModelLifecycle.snapshot(SDK_COMPONENT_VAD)`.
      */
     val isReady: Boolean
         get() = handle != 0L

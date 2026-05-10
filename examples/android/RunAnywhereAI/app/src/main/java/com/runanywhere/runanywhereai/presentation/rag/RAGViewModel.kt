@@ -237,4 +237,28 @@ class RAGViewModel : ViewModel() {
             }
         }
     }
+
+    // MARK: - Lifecycle
+
+    /**
+     * KOT-RAG-001: Destroy any active RAG pipeline when the ViewModel is cleared
+     * so the native pipeline + index do not leak after the screen is closed.
+     *
+     * `viewModelScope` is cancelled by `super.onCleared()`, so we use `GlobalScope`
+     * for fire-and-forget teardown of the suspend `ragDestroyPipeline()` call.
+     * Errors are swallowed — best-effort cleanup.
+     */
+    @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
+    override fun onCleared() {
+        super.onCleared()
+        if (_uiState.value.isDocumentLoaded) {
+            kotlinx.coroutines.GlobalScope.launch {
+                try {
+                    RunAnywhere.ragDestroyPipeline()
+                } catch (_: Throwable) {
+                    // best-effort cleanup; ignore failures during teardown
+                }
+            }
+        }
+    }
 }

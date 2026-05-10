@@ -8,9 +8,9 @@
 import CRACommons
 import Foundation
 
-// MARK: - RAVADConfiguration: ComponentConfiguration
+// MARK: - RAVADConfiguration
 
-extension RAVADConfiguration: ComponentConfiguration {
+extension RAVADConfiguration {
     public var modelId: String? { modelID.isEmpty ? nil : modelID }
 }
 

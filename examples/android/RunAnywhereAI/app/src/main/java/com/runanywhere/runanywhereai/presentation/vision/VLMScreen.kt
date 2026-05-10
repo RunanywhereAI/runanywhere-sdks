@@ -69,8 +69,10 @@ import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredO
 import com.runanywhere.runanywhereai.presentation.components.ConfigureCustomTopBar
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
+import ai.runanywhere.proto.v1.ComponentLifecycleState
+import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.isVLMModelLoaded
+import com.runanywhere.sdk.public.extensions.componentLifecycleSnapshot
 import kotlinx.coroutines.launch
 
 /**
@@ -236,7 +238,12 @@ fun VLMScreen(
             onModelSelected = { model ->
                 scope.launch {
                     viewModel.checkModelStatus()
-                    if (RunAnywhere.isVLMModelLoaded) {
+                    val snapshot =
+                        RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_VLM)
+                    val isLoaded =
+                        snapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+                            snapshot.model_id.isNotEmpty()
+                    if (isLoaded) {
                         viewModel.onModelLoaded(modelName = model.name)
                     }
                 }

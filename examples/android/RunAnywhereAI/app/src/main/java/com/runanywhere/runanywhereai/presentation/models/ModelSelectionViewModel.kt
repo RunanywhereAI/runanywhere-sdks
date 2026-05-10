@@ -1,5 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.models
 
+import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelEventKind
@@ -14,22 +15,24 @@ import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.currentLLMModel
+import com.runanywhere.sdk.public.extensions.currentModel
 import com.runanywhere.sdk.public.extensions.currentSTTModelId
 import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
-import com.runanywhere.sdk.public.extensions.currentVLMModelId
 import com.runanywhere.sdk.public.extensions.downloadModel
 import com.runanywhere.sdk.public.extensions.loadLLMModel
 import com.runanywhere.sdk.public.extensions.loadSTTModel
 import com.runanywhere.sdk.public.extensions.loadTTSVoice
 import com.runanywhere.sdk.public.extensions.loadVLMModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 
 /**
@@ -192,7 +195,11 @@ class ModelSelectionViewModel(
             ModelSelectionContext.RAG_EMBEDDING,
             ModelSelectionContext.RAG_LLM,
             -> null
-            ModelSelectionContext.VLM -> RunAnywhere.currentVLMModelId
+            ModelSelectionContext.VLM ->
+                RunAnywhere
+                    .currentModel(CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_MULTIMODAL))
+                    .model_id
+                    .takeIf { it.isNotEmpty() }
         }
     }
 
@@ -284,8 +291,25 @@ class ModelSelectionViewModel(
 
                 Timber.d("✅ Download completed for $modelId")
 
-                // Small delay to ensure registry update propagates
-                delay(500)
+                // KOT-DOWNLOAD-001: Wait for the SDK to publish the
+                // MODEL_EVENT_KIND_DOWNLOAD_COMPLETED event for this model
+                // before refreshing the catalog. This avoids racing the
+                // registry update (previously a 500ms blind sleep) and
+                // returns immediately once the event lands. A 30s timeout
+                // guards against the event never firing.
+                val completed =
+                    withTimeoutOrNull(30_000L) {
+                        EventBus.events
+                            .mapNotNull { it.model }
+                            .filter {
+                                it.model_id == modelId &&
+                                    it.kind == ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED
+                            }
+                            .first()
+                    }
+                if (completed == null) {
+                    Timber.w("⏱️ Timed out waiting for DOWNLOAD_COMPLETED event for $modelId; refreshing anyway")
+                }
 
                 // Reload models after download completes
                 loadModelsAndFrameworks()

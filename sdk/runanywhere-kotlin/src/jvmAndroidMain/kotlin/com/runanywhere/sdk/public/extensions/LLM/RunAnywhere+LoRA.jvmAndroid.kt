@@ -2,7 +2,11 @@
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
- * JVM/Android actual implementations for generated LoRA service operations.
+ * JVM/Android actual implementations for the LoRA capability namespace.
+ *
+ * Mirrors Swift's `RunAnywhere.lora` (the `LoRA` value type in
+ * `RunAnywhere+LoRA.swift`). All runtime + catalog ops delegate to
+ * `CppBridgeLoRA` which wraps the generated `rac_lora_*_proto` C ABI.
  */
 
 package com.runanywhere.sdk.public.extensions
@@ -21,70 +25,79 @@ import ai.runanywhere.proto.v1.LoraAdapterCatalogQuery
 import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedRequest
 import ai.runanywhere.proto.v1.LoraAdapterDownloadCompletedResult
 import ai.runanywhere.proto.v1.LoraCompatibilityResult
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLoraProto
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLoRA
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-actual class LoRA internal actual constructor() {
-    actual suspend fun apply(request: LoRAApplyRequest): LoRAApplyResult =
+/**
+ * JVM/Android backing object for [LoRANamespace]. Stateless; all calls
+ * delegate to [CppBridgeLoRA] on `Dispatchers.IO`.
+ */
+internal object AndroidLoRANamespace : LoRANamespace {
+    override suspend fun apply(request: LoRAApplyRequest): LoRAApplyResult =
         withContext(Dispatchers.IO) {
-            CppBridgeLoraProto.apply(request)
+            CppBridgeLoRA.apply(request)
         }
 
-    actual suspend fun remove(request: LoRARemoveRequest): LoRAState =
+    override suspend fun remove(request: LoRARemoveRequest): LoRAState =
         withContext(Dispatchers.IO) {
-            CppBridgeLoraProto.remove(request)
+            CppBridgeLoRA.remove(request)
         }
 
-    actual suspend fun list(request: LoRAState): LoRAState =
+    override suspend fun list(): LoRAState =
         withContext(Dispatchers.IO) {
-            CppBridgeLoraProto.list(request)
+            CppBridgeLoRA.list(LoRAState())
         }
 
-    actual suspend fun state(request: LoRAState): LoRAState =
+    override suspend fun state(): LoRAState =
         withContext(Dispatchers.IO) {
-            CppBridgeLoraProto.state(request)
+            CppBridgeLoRA.state(LoRAState())
         }
 
-    actual suspend fun checkCompatibility(config: LoRAAdapterConfig): LoraCompatibilityResult =
+    override suspend fun checkCompatibility(config: LoRAAdapterConfig): LoraCompatibilityResult =
         withContext(Dispatchers.IO) {
-            CppBridgeLoraProto.compatibility(config)
+            try {
+                CppBridgeLoRA.compatibility(config)
+            } catch (e: Exception) {
+                LoraCompatibilityResult(
+                    is_compatible = false,
+                    error_message = e.message.orEmpty(),
+                )
+            }
         }
 
-    actual suspend fun register(entry: LoraAdapterCatalogEntry): LoraAdapterCatalogEntry =
+    override suspend fun register(entry: LoraAdapterCatalogEntry): LoraAdapterCatalogEntry =
         withContext(Dispatchers.IO) {
-            CppBridgeLoraProto.register(entry)
+            CppBridgeLoRA.register(entry)
         }
 
-    actual suspend fun listCatalog(
+    override suspend fun listCatalog(
         request: LoraAdapterCatalogListRequest,
     ): LoraAdapterCatalogListResult =
         withContext(Dispatchers.IO) {
-            CppBridgeLoraProto.listCatalog(request)
+            CppBridgeLoRA.listCatalog(request)
         }
 
-    actual suspend fun queryCatalog(query: LoraAdapterCatalogQuery): LoraAdapterCatalogListResult =
+    override suspend fun queryCatalog(query: LoraAdapterCatalogQuery): LoraAdapterCatalogListResult =
         withContext(Dispatchers.IO) {
-            CppBridgeLoraProto.queryCatalog(query)
+            CppBridgeLoRA.queryCatalog(query)
         }
 
-    actual suspend fun getCatalogEntry(
+    override suspend fun getCatalogEntry(
         request: LoraAdapterCatalogGetRequest,
     ): LoraAdapterCatalogGetResult =
         withContext(Dispatchers.IO) {
-            CppBridgeLoraProto.getCatalogEntry(request)
+            CppBridgeLoRA.getCatalogEntry(request)
         }
 
-    actual suspend fun markDownloadCompleted(
+    override suspend fun markDownloadCompleted(
         request: LoraAdapterDownloadCompletedRequest,
     ): LoraAdapterDownloadCompletedResult =
         withContext(Dispatchers.IO) {
-            CppBridgeLoraProto.markDownloadCompleted(request)
+            CppBridgeLoRA.markDownloadCompleted(request)
         }
 }
 
-private val LoRASingleton = LoRA()
-
-actual val RunAnywhere.lora: LoRA
-    get() = LoRASingleton
+actual val RunAnywhere.lora: LoRANamespace
+    get() = AndroidLoRANamespace

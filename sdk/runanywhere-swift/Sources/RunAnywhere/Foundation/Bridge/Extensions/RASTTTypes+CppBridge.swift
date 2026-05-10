@@ -8,9 +8,9 @@
 import CRACommons
 import Foundation
 
-// MARK: - RASTTConfiguration: ComponentConfiguration
+// MARK: - RASTTConfiguration
 
-extension RASTTConfiguration: ComponentConfiguration {
+extension RASTTConfiguration {
     public var modelId: String? { modelID.isEmpty ? nil : modelID }
 }
 
@@ -77,9 +77,9 @@ public extension RASTTOptions {
 
 }
 
-// MARK: - RASTTOutput: ComponentOutput
+// MARK: - RASTTOutput
 
-extension RASTTOutput: ComponentOutput {
+extension RASTTOutput {
     public var timestamp: Date { Date() }
 }
 

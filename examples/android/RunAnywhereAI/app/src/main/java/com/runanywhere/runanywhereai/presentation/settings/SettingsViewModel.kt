@@ -9,8 +9,10 @@ import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
+import com.runanywhere.sdk.public.extensions.cleanTempFiles
+import com.runanywhere.sdk.public.extensions.clearCache
 import com.runanywhere.sdk.public.extensions.deleteModel
-import com.runanywhere.sdk.public.extensions.storageInfo
+import com.runanywhere.sdk.public.extensions.getStorageInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -246,17 +248,17 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Load storage data using SDK's storageInfo() API
+     * Load storage data using SDK's getStorageInfo() API
      */
     private fun loadStorageData() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
 
             try {
-                Timber.d("Loading storage info via storageInfo()...")
+                Timber.d("Loading storage info via getStorageInfo()...")
 
-                // Use SDK's storageInfo()
-                val storageInfo = RunAnywhere.storageInfo()
+                // Use SDK's getStorageInfo() (Swift parity name).
+                val storageInfo = RunAnywhere.getStorageInfo()
 
                 // Map stored models to UI model
                 val storedModels =
@@ -327,12 +329,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Clear app-owned cache directories with Android filesystem APIs.
+     * Clear the SDK-owned Cache directory via the canonical
+     * `RunAnywhere.clearCache()` API (Swift parity), then sweep the
+     * Android-app-owned cache directories.
      */
     fun clearAppCache() {
         viewModelScope.launch {
             try {
-                Timber.d("Clearing app cache directories...")
+                Timber.d("Clearing SDK cache via RunAnywhere.clearCache()...")
+                RunAnywhere.clearCache()
+                Timber.d("Sweeping Android app cache directories...")
                 clearAppOwnedCache()
                 Timber.d("Cache cleared successfully")
 
@@ -348,12 +354,15 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     }
 
     /**
-     * Clean temporary files
+     * Clean temporary files via the canonical `RunAnywhere.cleanTempFiles()`
+     * API (Swift parity), then sweep the Android-app-owned cache directories.
      */
     fun cleanTempFiles() {
         viewModelScope.launch {
             try {
-                Timber.d("Cleaning app temporary files...")
+                Timber.d("Cleaning SDK temp via RunAnywhere.cleanTempFiles()...")
+                RunAnywhere.cleanTempFiles()
+                Timber.d("Sweeping Android app cache directories...")
                 clearAppOwnedCache()
                 Timber.d("Temp files cleaned successfully")
 

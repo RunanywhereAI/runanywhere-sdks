@@ -13,7 +13,7 @@ import ai.runanywhere.proto.v1.LLMGenerationOptions
 import ai.runanywhere.proto.v1.LLMGenerationResult
 import ai.runanywhere.proto.v1.LLMStreamEvent
 import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLMProto
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
@@ -24,11 +24,6 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 
 private val llmLogger = SDKLogger.llm
-
-actual suspend fun RunAnywhere.chat(prompt: String): String {
-    val result = generate(prompt, null)
-    return result.text
-}
 
 actual suspend fun RunAnywhere.generate(
     prompt: String,
@@ -42,7 +37,7 @@ actual suspend fun RunAnywhere.generate(
 
     val opts = options ?: LLMGenerationOptions()
     llmLogger.info("[PARAMS] generate: temperature=${opts.temperature}, topP=${opts.top_p}, maxTokens=${opts.max_tokens}")
-    return CppBridgeLLMProto.generate(prompt, opts)
+    return CppBridgeLLM.generate(prompt, opts)
 }
 
 actual fun RunAnywhere.generateStream(
@@ -59,7 +54,7 @@ actual fun RunAnywhere.generateStream(
     return callbackFlow {
         val driver =
             launch(Dispatchers.IO) {
-                CppBridgeLLMProto.generateStream(prompt, opts) { event ->
+                CppBridgeLLM.generateStream(prompt, opts) { event ->
                     trySend(event)
                     !event.is_final
                 }
@@ -67,11 +62,11 @@ actual fun RunAnywhere.generateStream(
             }
         awaitClose {
             driver.cancel()
-            CppBridgeLLMProto.cancel()
+            CppBridgeLLM.cancel()
         }
     }.flowOn(Dispatchers.IO)
 }
 
 actual fun RunAnywhere.cancelGeneration() {
-    CppBridgeLLMProto.cancel()
+    CppBridgeLLM.cancel()
 }

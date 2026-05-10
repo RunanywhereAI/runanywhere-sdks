@@ -52,7 +52,7 @@ import kotlinx.coroutines.sync.withLock
  * Feature-specific APIs are available through extension functions in public/extensions/:
  * - STT: RunAnywhere.transcribe(), RunAnywhere.loadSTTModel()
  * - TTS: RunAnywhere.synthesize(), RunAnywhere.loadTTSVoice()
- * - LLM: RunAnywhere.chat(), RunAnywhere.generate(), RunAnywhere.generateStream()
+ * - LLM: RunAnywhere.generate(), RunAnywhere.generateStream()
  * - VAD: RunAnywhere.detectSpeech()
  * - VoiceAgent: VoiceAgentStreamAdapter(handle).stream() (v3.1)
  *
@@ -254,13 +254,27 @@ object RunAnywhere {
     }
 
     /**
-     * Ensure services are ready before API calls (internal guard)
-     * O(1) after first successful initialization
+     * Ensure services are ready before API calls (internal guard).
+     *
+     * Mirrors Swift `RunAnywhere.ensureServicesReady()`. Lazily kicks off
+     * Phase 2 (`completeServicesInitialization()`) the first time a feature
+     * entry is hit, so commonMain consumers do **not** need to make that
+     * call explicitly — the same shape as the iOS SDK's `_servicesInitTask`
+     * fan-in. The Mutex guard inside [completeServicesInitialization]
+     * serializes concurrent first-callers.
+     *
+     * O(1) after the first successful initialization.
+     *
+     * @throws IllegalStateException if Phase 1 ([initialize]) has not run.
      */
     internal suspend fun ensureServicesReady() {
         if (_areServicesReady) {
-            return // O(1) fast path
+            return // O(1) fast path — Phase 2 already complete
         }
+        // Phase 1 must be complete before we can lazily start Phase 2.
+        requireInitialized()
+        // Auto-start Phase 2 — `completeServicesInitialization` is mutex-guarded
+        // and short-circuits if another caller already finished the work.
         completeServicesInitialization()
     }
 

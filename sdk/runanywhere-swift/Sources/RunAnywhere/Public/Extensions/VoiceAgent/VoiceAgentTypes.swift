@@ -12,13 +12,7 @@ import Foundation
 // MARK: - Canonical Proto Typealiases
 
 public typealias VoiceAgentResult = RAVoiceAgentResult
-// IDL-04: VoiceAgentComponentStates now uses the canonical
-// RAComponentLifecycleState (richer taxonomy shared with SDKEvent), replacing
-// the private RAComponentLoadState. The old `.loaded` case maps to `.ready`.
-public typealias ComponentLoadState = RAComponentLifecycleState
 public typealias VoiceAgentComponentStates = RAVoiceAgentComponentStates
-public typealias ComponentStates = RAVoiceAgentComponentStates
-public typealias VoiceAgentConfiguration = RAVoiceAgentComposeConfig
 public typealias VoiceAgentConfig = RAVoiceAgentComposeConfig
 
 public extension RAVoiceAgentResult {
@@ -37,20 +31,6 @@ public extension RAVoiceAgentResult {
         if let thinkingContent { self.thinkingContent = thinkingContent }
         if let synthesizedAudio { self.synthesizedAudio = synthesizedAudio }
         if let finalState { self.finalState = finalState }
-    }
-
-    init(from cResult: rac_voice_agent_result_t) {
-        self.init(
-            speechDetected: cResult.speech_detected == RAC_TRUE,
-            transcription: cResult.transcription.map { String(cString: $0) },
-            response: cResult.response.map { String(cString: $0) },
-            synthesizedAudio: {
-                guard cResult.synthesized_audio_size > 0, let audioPtr = cResult.synthesized_audio else {
-                    return nil
-                }
-                return Data(bytes: audioPtr, count: cResult.synthesized_audio_size)
-            }()
-        )
     }
 
     var response: String? {

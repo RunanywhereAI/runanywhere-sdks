@@ -1,6 +1,7 @@
 package com.runanywhere.runanywhereai.data
 
 import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelRegistryRefreshRequest
@@ -9,6 +10,7 @@ import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.availableModels
+import com.runanywhere.sdk.public.extensions.lora
 import com.runanywhere.sdk.public.extensions.refreshModelRegistry
 import com.runanywhere.sdk.public.extensions.registerModel
 import com.runanywhere.sdk.public.extensions.registerMultiFileModel
@@ -27,6 +29,7 @@ object ModelBootstrap {
         Timber.i("Registering backends + curated model catalog + refreshing native registry...")
         registerBackends()
         seedCuratedCatalog()
+        seedLoRAAdapters()
         refreshNativeCatalog()
         try {
             RunAnywhere.availableModels().forEach { m ->
@@ -106,6 +109,48 @@ object ModelBootstrap {
         }
 
         Timber.i("🌱 Catalog seed complete — registered=$registered, preserved=$skipped, failed=$failed")
+    }
+
+    /**
+     * KOT-LORA-001: Seed the curated LoRA adapter catalog. The deleted
+     * `ModelList.kt` registered one adapter (abliterated-lora) for the
+     * Qwen 2.5 0.5B base model so the apply/remove pipeline could be
+     * exercised from the Chat / LoRA Manager screens. This restores it
+     * via the new `RunAnywhere.lora.register(entry)` namespace API.
+     *
+     * Note: this LoRA was trained against the third-party Void2377
+     * re-packaged base GGUF. The base model in this app points to the
+     * official Qwen/Qwen2.5-0.5B-Instruct-GGUF release, so adapter weights
+     * may not align cleanly — output quality could be degraded even though
+     * the LoRA load/apply flow itself remains testable.
+     */
+    private suspend fun seedLoRAAdapters() {
+        val adapters =
+            listOf(
+                LoraAdapterCatalogEntry(
+                    id = "abliterated-lora",
+                    name = "Abliterated LoRA (F16)",
+                    description = "Removes refusal behavior — model answers directly without disclaimers",
+                    url = "https://huggingface.co/Void2377/qwen-lora-gguf/resolve/main/qwen2.5-0.5b-abliterated-lora-f16.gguf",
+                    filename = "qwen2.5-0.5b-abliterated-lora-f16.gguf",
+                    compatible_models = listOf("qwen2.5-0.5b-instruct-q8_0"),
+                    size_bytes = 17_600_000,
+                    default_scale = 1.0f,
+                ),
+            )
+
+        var registered = 0
+        var failed = 0
+        for (adapter in adapters) {
+            try {
+                RunAnywhere.lora.register(adapter)
+                registered++
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to register LoRA adapter: ${adapter.id}")
+                failed++
+            }
+        }
+        Timber.i("🌱 LoRA adapter seed complete — registered=$registered, failed=$failed")
     }
 
     private fun tryRegisterSingle(m: SingleFileModel): Boolean =

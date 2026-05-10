@@ -7,10 +7,6 @@
  * Events are emitted by C++ layer via CppEventBridge.
  *
  * Mirrors Swift RunAnywhere+TTS.swift exactly.
- *
- * Round 2 KOTLIN: Added loadTTSModel/unloadTTSModel public surface and
- * availableTTSVoices to return List<TTSVoiceInfo>.
- * KOT-STREAM-04: synthesizeStream returns generated TTSOutput chunks.
  */
 
 package com.runanywhere.sdk.public.extensions
@@ -18,24 +14,8 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.TTSOptions
 import ai.runanywhere.proto.v1.TTSOutput
 import ai.runanywhere.proto.v1.TTSSpeakResult
-import ai.runanywhere.proto.v1.TTSVoiceInfo
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.flow.Flow
-
-// MARK: - Model Loading
-
-/**
- * Load a TTS model.
- *
- * @param modelId The model identifier
- * @throws Error if loading fails
- */
-expect suspend fun RunAnywhere.loadTTSModel(modelId: String)
-
-/**
- * Unload the currently loaded TTS model.
- */
-expect suspend fun RunAnywhere.unloadTTSModel()
 
 // MARK: - Voice Loading
 
@@ -67,20 +47,13 @@ expect val RunAnywhere.isTTSVoiceLoaded: Boolean
  */
 expect val RunAnywhere.currentTTSVoiceId: String?
 
-/**
- * Get available TTS voices.
- *
- * @return List of [TTSVoiceInfo] proto objects describing each available voice
- */
-expect suspend fun RunAnywhere.availableTTSVoices(): List<TTSVoiceInfo>
-
 // MARK: - Synthesis
 
 /**
  * Synthesize text to speech.
  *
  * @param text Text to synthesize
- * @param options Synthesis options
+ * @param options Synthesis options (defaults to `TTSOptions()`)
  * @return TTS output with audio data
  */
 expect suspend fun RunAnywhere.synthesize(
@@ -91,15 +64,16 @@ expect suspend fun RunAnywhere.synthesize(
 /**
  * Stream audio chunks for long text synthesis.
  *
- * Returns a [Flow] that emits generated [TTSOutput] chunks as they are synthesized.
+ * Mirrors Swift's `synthesizeStream(_:options:)` — yields generated [TTSOutput]
+ * chunks as they are synthesized.
  *
  * @param text Text to synthesize
- * @param options Synthesis options
+ * @param voiceId Optional override voice ID
  * @return Flow of generated TTS output chunks
  */
 expect fun RunAnywhere.synthesizeStream(
     text: String,
-    options: TTSOptions = TTSOptions(),
+    voiceId: String? = null,
 ): Flow<TTSOutput>
 
 /**
@@ -143,6 +117,6 @@ expect suspend fun RunAnywhere.speak(
 expect val RunAnywhere.isSpeaking: Boolean
 
 /**
- * Stop current speech playback.
+ * Stop current speech playback. Mirrors Swift's `stopSpeaking()`.
  */
 expect suspend fun RunAnywhere.stopSpeaking()

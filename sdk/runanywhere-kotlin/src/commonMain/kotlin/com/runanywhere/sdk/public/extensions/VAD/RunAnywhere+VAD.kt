@@ -11,7 +11,6 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.VADConfiguration
 import ai.runanywhere.proto.v1.VADOptions
 import ai.runanywhere.proto.v1.VADResult
 import ai.runanywhere.proto.v1.VADStatistics
@@ -35,13 +34,6 @@ expect suspend fun RunAnywhere.detectVoiceActivity(
     audioData: ByteArray,
     options: VADOptions,
 ): VADResult
-
-/**
- * Get current VAD statistics for debugging.
- *
- * @return Current VAD statistics
- */
-expect suspend fun RunAnywhere.getVADStatistics(): VADStatistics
 
 /**
  * Process audio samples and stream generated VAD event envelopes.
@@ -84,21 +76,6 @@ expect suspend fun RunAnywhere.resetVAD()
 //   `setVADSpeechActivityCallback(...)` / `setVADAudioBufferCallback(...)`
 //   `cleanupVAD()`   / `loadVADModel(_)`
 // ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Initialize VAD with default configuration.
- *
- * Mirrors Swift's `RunAnywhere.initializeVAD()`.
- */
-expect suspend fun RunAnywhere.initializeVAD()
-
-/**
- * Initialize VAD with the given configuration.
- *
- * Mirrors Swift's `RunAnywhere.initializeVAD(_ config:)`. This is the
- * Preferred overload when a configuration is available.
- */
-expect suspend fun RunAnywhere.initializeVAD(configuration: VADConfiguration)
 
 /**
  * True when the VAD subsystem is initialized and ready to process audio.
@@ -144,20 +121,6 @@ expect suspend fun RunAnywhere.cleanupVAD()
  * `RunAnywhere.loadVADModel(_ modelId:)`.
  */
 expect suspend fun RunAnywhere.loadVADModel(modelId: String)
-
-/**
- * Unload the currently loaded VAD model.
- * Mirrors Swift's `RunAnywhere.unloadVADModel()`.
- */
-expect suspend fun RunAnywhere.unloadVADModel()
-
-/**
- * True if a VAD model is currently loaded.
- *
- * Sync property — reads cached state from the component layer without suspension.
- * Mirrors Swift's `RunAnywhere.isVADModelLoaded` getter.
- */
-expect val RunAnywhere.isVADModelLoaded: Boolean
 
 /**
  * The currently loaded VAD model ID, or `null` if no model is loaded.

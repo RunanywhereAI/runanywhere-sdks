@@ -7,10 +7,12 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkDev
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkMetrics
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkScenario
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelUnloadRequest
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.loadSTTModel
-import com.runanywhere.sdk.public.extensions.transcribeWithOptions
-import com.runanywhere.sdk.public.extensions.unloadSTTModel
+import com.runanywhere.sdk.public.extensions.transcribe
+import com.runanywhere.sdk.public.extensions.unloadModel
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 
@@ -54,7 +56,7 @@ class STTBenchmarkProvider : BenchmarkScenarioProvider {
             // Transcribe
             val benchStart = System.nanoTime()
             val options = STTOptions()
-            val result = RunAnywhere.transcribeWithOptions(audioData, options)
+            val result = RunAnywhere.transcribe(audioData, options)
             val endToEndMs = (System.nanoTime() - benchStart) / 1_000_000.0
 
             val memAfter = SyntheticInputGenerator.availableMemoryBytes()
@@ -69,7 +71,9 @@ class STTBenchmarkProvider : BenchmarkScenarioProvider {
         } finally {
             withContext(NonCancellable) {
                 try {
-                    RunAnywhere.unloadSTTModel()
+                    RunAnywhere.unloadModel(
+                        ModelUnloadRequest(category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION),
+                    )
                 } catch (_: Exception) {
                 }
             }

@@ -48,11 +48,11 @@ object CppBridgeLoRA {
     ): String = "$operation native JNI symbol is unavailable: ${cause.message.orEmpty()}"
 
     fun apply(request: LoRAApplyRequest): LoRAApplyResult {
-        CppBridgeLLMProto.create()
+        CppBridgeLLM.create()
         return decodeOrThrow(
             LoRAApplyResult.ADAPTER,
             RunAnywhereBridge.racLoraApplyProto(
-                CppBridgeLLMProto.getHandle(),
+                CppBridgeLLM.getHandle(),
                 LoRAApplyRequest.ADAPTER.encode(request),
             ),
             "racLoraApplyProto",
@@ -60,11 +60,11 @@ object CppBridgeLoRA {
     }
 
     fun remove(request: LoRARemoveRequest): LoRAState {
-        CppBridgeLLMProto.create()
+        CppBridgeLLM.create()
         return decodeOrThrow(
             LoRAState.ADAPTER,
             RunAnywhereBridge.racLoraRemoveProto(
-                CppBridgeLLMProto.getHandle(),
+                CppBridgeLLM.getHandle(),
                 LoRARemoveRequest.ADAPTER.encode(request),
             ),
             "racLoraRemoveProto",
@@ -72,11 +72,11 @@ object CppBridgeLoRA {
     }
 
     fun list(request: LoRAState): LoRAState {
-        CppBridgeLLMProto.create()
+        CppBridgeLLM.create()
         return decodeOrThrow(
             LoRAState.ADAPTER,
             RunAnywhereBridge.racLoraListProto(
-                CppBridgeLLMProto.getHandle(),
+                CppBridgeLLM.getHandle(),
                 LoRAState.ADAPTER.encode(request),
             ),
             "racLoraListProto",
@@ -84,11 +84,11 @@ object CppBridgeLoRA {
     }
 
     fun state(request: LoRAState): LoRAState {
-        CppBridgeLLMProto.create()
+        CppBridgeLLM.create()
         return decodeOrThrow(
             LoRAState.ADAPTER,
             RunAnywhereBridge.racLoraStateProto(
-                CppBridgeLLMProto.getHandle(),
+                CppBridgeLLM.getHandle(),
                 LoRAState.ADAPTER.encode(request),
             ),
             "racLoraStateProto",
@@ -96,11 +96,11 @@ object CppBridgeLoRA {
     }
 
     fun compatibility(config: LoRAAdapterConfig): LoraCompatibilityResult {
-        CppBridgeLLMProto.create()
+        CppBridgeLLM.create()
         return decodeOrThrow(
             LoraCompatibilityResult.ADAPTER,
             RunAnywhereBridge.racLoraCompatibilityProto(
-                CppBridgeLLMProto.getHandle(),
+                CppBridgeLLM.getHandle(),
                 LoRAAdapterConfig.ADAPTER.encode(config),
             ),
             "racLoraCompatibilityProto",

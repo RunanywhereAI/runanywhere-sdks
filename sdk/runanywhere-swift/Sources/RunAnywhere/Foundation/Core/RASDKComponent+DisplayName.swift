@@ -1,32 +1,11 @@
 //
-//  ComponentProtocols.swift
+//  RASDKComponent+DisplayName.swift
 //  RunAnywhere SDK
 //
-//  Core Swift protocols for components.  SDKComponent is a typealias for the
-//  canonical proto-generated RASDKComponent (sdk_events.proto).
+//  Human-readable display name for the proto-generated RASDKComponent enum.
 //
 
 import Foundation
-import SwiftProtobuf
-
-// MARK: - Component Protocols
-
-public protocol ComponentConfiguration: Sendable {
-    var modelId: String? { get }
-    var preferredFramework: InferenceFramework? { get }
-}
-
-extension ComponentConfiguration {
-    public var preferredFramework: InferenceFramework? { nil }
-}
-
-public protocol ComponentOutput: Sendable {
-    var timestamp: Date { get }
-}
-
-// MARK: - SDKComponent
-
-public typealias SDKComponent = RASDKComponent
 
 public extension RASDKComponent {
     var displayName: String {
@@ -45,5 +24,4 @@ public extension RASDKComponent {
         default:                  return "Unknown"
         }
     }
-
 }

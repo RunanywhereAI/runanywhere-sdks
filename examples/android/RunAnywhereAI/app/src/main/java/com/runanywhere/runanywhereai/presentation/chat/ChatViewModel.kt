@@ -4,7 +4,6 @@ import ai.runanywhere.proto.v1.GenerationEvent
 import ai.runanywhere.proto.v1.GenerationEventKind
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LLMGenerationOptions
-import ai.runanywhere.proto.v1.LoRAState
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ToolCallingOptions
 import android.app.Application
@@ -871,7 +870,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         loraRefreshJob =
             viewModelScope.launch {
                 try {
-                    val state = withContext(Dispatchers.IO) { RunAnywhere.lora.list(LoRAState()) }
+                    val state = withContext(Dispatchers.IO) { RunAnywhere.lora.list() }
                     _uiState.value =
                         _uiState.value.copy(
                             hasActiveLoraAdapter =

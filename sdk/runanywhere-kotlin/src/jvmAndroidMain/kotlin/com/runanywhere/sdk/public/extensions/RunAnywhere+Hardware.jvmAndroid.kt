@@ -15,6 +15,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.AccelerationPreference
 import ai.runanywhere.proto.v1.HardwareProfileResult
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
@@ -42,3 +43,8 @@ private val hardwareInstance = Hardware()
 
 actual val RunAnywhere.hardware: Hardware
     get() = hardwareInstance
+
+actual suspend fun RunAnywhere.supportsAccelerator(accelerator: AccelerationPreference): Boolean {
+    val profile = hardwareInstance.getProfile()
+    return profile.accelerators.any { it.type == accelerator && it.available }
+}
