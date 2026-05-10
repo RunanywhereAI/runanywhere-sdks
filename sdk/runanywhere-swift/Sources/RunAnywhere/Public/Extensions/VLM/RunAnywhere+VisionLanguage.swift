@@ -40,15 +40,10 @@ public extension RunAnywhere {
 
     /// Stream generated-proto VLM events from C++.
     ///
-    /// Phase 6h on-iOS-sim workaround: the C++ `rac_vlm_process_stream_proto`
-    /// trampoline path (stream_token_trampoline → Swift `@convention(c)`
-    /// callback) crashes with EXC_BAD_ACCESS / EXC_ARM_DA_ALIGN when the
-    /// clip / ggml path drives tokens from llama.cpp on iOS Simulator.
-    /// The root cause is somewhere in the mtmd / ctx-lifetime boundary and
-    /// needs more investigation. For now, synthesize a single TOKEN_GENERATED
-    /// + GENERATION_COMPLETED pair from the non-streaming `processImage`
-    /// result. Physical-device builds can revert to the real stream path
-    /// once the trampoline crash is root-caused.
+    /// Phase 6j fixed the handle-type-mismatch root cause (`rac_vlm_component_t*`
+    /// vs `rac_vlm_service_t*` cast in `rac_vlm_process_stream_proto`), so real
+    /// per-token streaming works on both simulator and physical device. The
+    /// synthesized single-event workaround has been removed.
     static func processImageStream(
         _ image: RAVLMImage,
         options: RAVLMGenerationOptions
@@ -62,24 +57,7 @@ public extension RunAnywhere {
             throw SDKException.vlm(.notInitialized, "VLM model not loaded")
         }
 
-        let result = try await CppBridge.VLM.shared.process(image: image, options: options)
-        return AsyncStream<RASDKEvent> { (continuation: AsyncStream<RASDKEvent>.Continuation) in
-            var tokenEvent = RASDKEvent()
-            var generation = RAGenerationEvent()
-            generation.kind = .tokenGenerated
-            generation.token = result.text
-            generation.streamingText = result.text
-            tokenEvent.generation = generation
-            continuation.yield(tokenEvent)
-
-            var completedEvent = RASDKEvent()
-            var completed = RAGenerationEvent()
-            completed.kind = .completed
-            completed.streamingText = result.text
-            completedEvent.generation = completed
-            continuation.yield(completedEvent)
-            continuation.finish()
-        }
+        return try await CppBridge.VLM.shared.processStream(image: image, options: options)
     }
 
     /// Cancel the current VLM generation.
