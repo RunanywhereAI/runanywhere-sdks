@@ -19,30 +19,16 @@ import FoundationModels
 /// It requires iOS 26+ / macOS 26+ and an Apple Intelligence capable device.
 @available(iOS 26.0, macOS 26.0, *)
 public class SystemFoundationModelsService {
-    private var _currentModel: String?
-    private var _isReady = false
     private let logger = SDKLogger(category: "SystemFoundationModels")
 
     #if canImport(FoundationModels)
-    // Type-erased wrapper for FoundationModels session
+    // Type-erased wrapper for FoundationModels session. Presence of a non-nil
+    // `session` is the canonical "ready" signal — the C++ lifecycle manager
+    // (`rac_lifecycle_t` / `LifecycleManager`) is the single source of truth
+    // for overall component readiness, so the Swift service no longer tracks
+    // a duplicate `_isReady` / `_currentModel` mirror.
     private var session: LanguageSessionWrapper?
-    #endif
 
-    // MARK: - Framework Identification
-
-    /// Apple Foundation Models inference framework
-    public let inferenceFramework: InferenceFramework = .foundationModels
-
-    public var isReady: Bool { _isReady }
-    public var currentModel: String? { _currentModel }
-
-    /// Foundation Models has a 4096 token context window
-    public var contextLength: Int? { 4096 }
-
-    /// Apple Foundation Models does not support true token-by-token streaming
-    public var supportsStreaming: Bool { false }
-
-    #if canImport(FoundationModels)
     /// Type-erased wrapper for LanguageModelSession
     private struct LanguageSessionWrapper {
         let session: LanguageModelSession
@@ -67,8 +53,6 @@ public class SystemFoundationModelsService {
 
         do {
             try await initializeFoundationModel()
-            _currentModel = "foundation-models-native"
-            _isReady = true
             logger.info("Foundation Models initialized successfully")
         } catch {
             logger.error("Failed to initialize Foundation Models: \(error)")
@@ -125,10 +109,6 @@ public class SystemFoundationModelsService {
     #endif
 
     public func generate(prompt: String, options: RALLMGenerationOptions) async throws -> String {
-        guard isReady else {
-            throw SDKException.llm(.notInitialized, "Foundation Models service not initialized")
-        }
-
         logger.debug("Generating response for prompt: \(prompt.prefix(100))...")
 
         #if canImport(FoundationModels)
@@ -172,10 +152,6 @@ public class SystemFoundationModelsService {
         options: RALLMGenerationOptions,
         onToken: @escaping (String) -> Void
     ) async throws {
-        guard isReady else {
-            throw SDKException.llm(.notInitialized, "Foundation Models service not initialized")
-        }
-
         logger.debug("Starting streaming generation for prompt: \(prompt.prefix(100))...")
 
         #if canImport(FoundationModels)
@@ -269,8 +245,5 @@ public class SystemFoundationModelsService {
         // Clean up the session
         session = nil
         #endif
-
-        _isReady = false
-        _currentModel = nil
     }
 }
