@@ -6,6 +6,7 @@
 //  Thread-safe, Sendable-compliant, and easy to configure.
 //
 
+import CRACommons
 import Foundation
 import os
 
@@ -289,15 +290,21 @@ public final class Logging: @unchecked Sendable {
 
     // MARK: - Metadata Sanitization
 
-    private static let sensitivePatterns = ["key", "secret", "password", "token", "auth", "credential"]
+    /// Determines if a metadata key should be redacted by delegating to the
+    /// canonical C++ policy (`rac_log_metadata_should_redact`). Keeps Swift
+    /// and C++ logs in sync without duplicating the substring list.
+    private func shouldRedact(_ key: String) -> Bool {
+        var out: rac_bool_t = 0
+        let rc = key.withCString { rac_log_metadata_should_redact($0, &out) }
+        return rc == RAC_SUCCESS && out != 0
+    }
 
     private func sanitizeMetadata(_ metadata: [String: Any]?) -> [String: Any]? { // swiftlint:disable:this prefer_concrete_types avoid_any_type
         guard let metadata = metadata else { return nil }
 
         var sanitized: [String: Any] = [:] // swiftlint:disable:this prefer_concrete_types avoid_any_type
         for (key, value) in metadata {
-            let lowercased = key.lowercased()
-            if Self.sensitivePatterns.contains(where: { lowercased.contains($0) }) {
+            if shouldRedact(key) {
                 sanitized[key] = "[REDACTED]"
             } else if let nested = value as? [String: Any] { // swiftlint:disable:this avoid_any_type
                 sanitized[key] = sanitizeMetadata(nested) ?? [:]

@@ -86,6 +86,41 @@ RAC_API size_t rac_runtime_count(void);
  */
 RAC_API int rac_runtime_is_available(rac_runtime_id_t id);
 
+/**
+ * @brief True iff a runtime with `id` is currently registered.
+ *
+ * Routing-oriented alias for `rac_runtime_is_available`, named after the
+ * registry verb. The engine router uses this to filter engines whose
+ * declared runtimes are not present on the current host (e.g. CoreML on
+ * Android, Metal on Web, QNN on a non-Snapdragon device). Returns 0/1.
+ *
+ * Behaviorally identical to `rac_runtime_is_available`; provided as a
+ * clearer name for the routing pre-flight check so callers don't have to
+ * read it as "is the runtime *available* (= registered)".
+ */
+RAC_API int rac_runtime_is_registered(rac_runtime_id_t id);
+
+/**
+ * @brief Runtime ABI version this build of `rac_commons` supports.
+ */
+RAC_API uint32_t rac_runtime_abi_version(void);
+
+/**
+ * @brief Load a runtime shared library, resolve `rac_runtime_entry_<stem>`,
+ *        and register the returned vtable.
+ *
+ * The loader strips directory, optional `lib` prefix, extension, and optional
+ * `runanywhere_` prefix from `path`, then looks up `rac_runtime_entry_<stem>`.
+ * It mirrors the engine plugin loader while keeping runtime loading separate
+ * from generic engine plugin loading.
+ *
+ * @return RAC_SUCCESS on accept, or RAC_ERROR_NULL_POINTER,
+ *         RAC_ERROR_PLUGIN_LOAD_FAILED, RAC_ERROR_ABI_VERSION_MISMATCH,
+ *         RAC_ERROR_CAPABILITY_UNSUPPORTED, RAC_ERROR_PLUGIN_DUPLICATE, or
+ *         RAC_ERROR_FEATURE_NOT_AVAILABLE when the host is built static-only.
+ */
+RAC_API rac_result_t rac_runtime_load(const char* path);
+
 /* ===========================================================================
  * Static registration helper (parallel to RAC_STATIC_PLUGIN_REGISTER).
  *

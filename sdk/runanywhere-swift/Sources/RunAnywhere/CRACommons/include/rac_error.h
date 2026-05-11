@@ -232,6 +232,11 @@ extern "C" {
 #define RAC_ERROR_NULL_POINTER ((rac_result_t) - 260)
 /** Buffer too small */
 #define RAC_ERROR_BUFFER_TOO_SMALL ((rac_result_t) - 261)
+/** Output was truncated: caller-provided output capacity is insufficient to
+ *  hold the produced bytes. The runtime populates the output size field with
+ *  the required byte count so the caller can re-allocate and retry; no partial
+ *  data is written to the caller's buffer. */
+#define RAC_ERROR_OUTPUT_TRUNCATED ((rac_result_t) - 262)
 
 // =============================================================================
 // AUDIO ERRORS (-280 to -299)
@@ -367,6 +372,12 @@ extern "C" {
 #define RAC_ERROR_BACKEND_BUSY ((rac_result_t) - 603)
 /** Backend unavailable: backend compiled as stub, engine binary not installed */
 #define RAC_ERROR_BACKEND_UNAVAILABLE ((rac_result_t) - 604)
+/** Routing rejected: engine declares one or more L1 runtimes (Metal / CoreML /
+ *  CUDA / QNN / WebGPU / …) but none of them are registered on this host.
+ *  Returned by `rac_plugin_route` when no candidate plugin survives the
+ *  runtime-availability filter. Engines with `runtimes == NULL` bypass the
+ *  filter and never produce this error. */
+#define RAC_ERROR_RUNTIME_UNAVAILABLE ((rac_result_t) - 605)
 /** Invalid handle */
 #define RAC_ERROR_INVALID_HANDLE ((rac_result_t) - 610)
 

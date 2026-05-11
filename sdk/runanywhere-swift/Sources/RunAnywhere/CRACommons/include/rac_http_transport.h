@@ -11,11 +11,11 @@
  * Follows the same convention as `rac/core/rac_platform_adapter.h` —
  * the SDK layer provides the callbacks, the C++ core delegates.
  *
- * When an adapter is registered, every call into the `rac_http_client_*`
- * C ABI (`rac_http_request_send`, `_stream`, `_resume`) is routed to the
- * registered adapter instead of libcurl. When no adapter is registered,
- * the default libcurl implementation handles the request (current
- * behavior, backward-compatible).
+ * Every call into the `rac_http_client_*` C ABI
+ * (`rac_http_request_send`, `_stream`, `_resume`) is routed to the
+ * registered adapter. When no adapter is registered, or when the
+ * adapter does not implement the requested capability, the public HTTP
+ * calls fail with `RAC_ERROR_FEATURE_NOT_AVAILABLE`.
  *
  * Cancellation follows the same rule as the underlying HTTP client:
  * streaming / resume transfers are cancelled by returning `RAC_FALSE`
@@ -49,8 +49,10 @@ extern "C" {
  * @brief Platform HTTP transport vtable.
  *
  * Adapters implement these function pointers to route HTTP through their
- * native stack. All fields except `request_send` are optional — set them
- * to NULL to fall back to libcurl for that capability.
+ * native stack. `request_send` is mandatory. `request_stream` and
+ * `request_resume` are optional capabilities; if an adapter omits one,
+ * the corresponding public HTTP call returns
+ * `RAC_ERROR_FEATURE_NOT_AVAILABLE`.
  *
  * Return codes match the `rac_http_request_*` contract:
  *   RAC_SUCCESS on any HTTP response (check `out_resp->status`),
@@ -66,8 +68,8 @@ typedef struct rac_http_transport_ops {
      * Ownership: `out_resp->body_bytes`, `out_resp->headers`, and
      * `out_resp->redirected_url` must be heap-allocated by the adapter
      * and are freed by the caller via `rac_http_response_free(out_resp)`.
-     * Use `malloc`/`strdup`-compatible allocators (same contract as the
-     * libcurl default).
+     * Use `malloc`/`strdup`-compatible allocators so
+     * `rac_http_response_free` can release them.
      *
      * Required; must not be NULL.
      */
@@ -81,8 +83,8 @@ typedef struct rac_http_transport_ops {
      * The callback returning `RAC_FALSE` cancels the transfer; adapters
      * must surface this as `RAC_ERROR_CANCELLED`.
      *
-     * Optional — when NULL the router falls back to libcurl for
-     * streaming calls.
+     * Optional; when NULL, `rac_http_request_stream` returns
+     * `RAC_ERROR_FEATURE_NOT_AVAILABLE`.
      */
     rac_result_t (*request_stream)(void* user_data, const rac_http_request_t* req,
                                    rac_http_body_chunk_fn cb, void* cb_user_data,
@@ -93,8 +95,8 @@ typedef struct rac_http_transport_ops {
      * `Range: bytes=N-`. Semantically identical to `request_stream`,
      * except the adapter must attach the `Range` header itself.
      *
-     * Optional — when NULL the router falls back to libcurl for resume
-     * calls.
+     * Optional; when NULL, `rac_http_request_resume` returns
+     * `RAC_ERROR_FEATURE_NOT_AVAILABLE`.
      */
     rac_result_t (*request_resume)(void* user_data, const rac_http_request_t* req,
                                    uint64_t resume_from_byte, rac_http_body_chunk_fn cb,
@@ -127,12 +129,13 @@ typedef struct rac_http_transport_ops {
  * @brief Register a platform HTTP transport.
  *
  * Installs `ops` / `user_data` as the active transport. Subsequent
- * `rac_http_request_*` calls are routed through the adapter instead of
- * libcurl. A previously-registered adapter's `destroy` callback is
- * invoked (if any) before the new one is installed.
+ * `rac_http_request_*` calls are routed through the adapter. A
+ * previously-registered adapter's `destroy` callback is invoked (if
+ * any) before the new one is installed.
  *
- * Pass `ops == NULL` to unregister the current adapter and fall back
- * to the libcurl default.
+ * Pass `ops == NULL` to unregister the current adapter. Subsequent
+ * HTTP calls fail with `RAC_ERROR_FEATURE_NOT_AVAILABLE` until another
+ * adapter is registered.
  *
  * Should be called before the first HTTP request for reliable
  * ordering. The `ops` struct must remain valid for the lifetime of
@@ -152,7 +155,7 @@ RAC_API rac_result_t rac_http_transport_register(const rac_http_transport_ops_t*
  * @brief Query whether a platform HTTP transport is currently registered.
  *
  * @return RAC_TRUE if an adapter is installed, RAC_FALSE if the router
- *         is using the libcurl default.
+ *         is empty.
  */
 RAC_API rac_bool_t rac_http_transport_is_registered(void);
 

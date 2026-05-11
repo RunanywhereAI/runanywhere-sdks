@@ -16,7 +16,7 @@ import CRACommons
 import Foundation
 
 /// HTTPClientAdapter — thin Swift bridge over `rac_http_client_*`.
-public actor HTTPClientAdapter: NetworkService {
+public actor HTTPClientAdapter {
 
     public static let shared = HTTPClientAdapter()
 
@@ -68,8 +68,6 @@ public actor HTTPClientAdapter: NetworkService {
         return CppBridge.DevConfig.isUsableHTTPURL(baseURL.absoluteString) &&
             CppBridge.DevConfig.isUsableCredential(apiKey)
     }
-
-    // MARK: - NetworkService Protocol
 
     public func postRaw(_ path: String, _ payload: Data, requiresAuth: Bool) async throws -> Data {
         try await execute(method: "POST", path: path, body: payload, requiresAuth: requiresAuth)
