@@ -21,17 +21,14 @@ import SwiftProtobuf
 //
 // Existing JSON payloads use lowercase short names ("pcm", "wav", …). The
 // proto3 canonical string form would be uppercase `AUDIO_FORMAT_*`. We keep
-// the wire format compatible by encoding the short name here; the proto
-// binary wire format (int32 tag) is unaffected.
+// the wire format compatible via the codegen-generated `wireString` /
+// `from(wireString:)` accessors (Generated/RAConvenience.swift) which are
+// emitted from the `rac_wire_string` annotations in idl/model_types.proto.
 
 extension RAAudioFormat: Codable {
     public init(from decoder: Swift.Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
-        if let parsed = RAAudioFormat.fromWireString(raw) {
-            self = parsed
-        } else {
-            self = .unspecified
-        }
+        self = RAAudioFormat.from(wireString: raw) ?? .unspecified
     }
 
     public func encode(to encoder: Swift.Encoder) throws {
@@ -48,39 +45,6 @@ public extension RAAudioFormat {
     /// `AudioFormat.allCases` on the hand-written enum.
     static var knownCases: [RAAudioFormat] {
         [.pcm, .wav, .mp3, .opus, .aac, .flac, .ogg, .m4A, .pcmS16Le]
-    }
-
-    /// Canonical lowercase short name used on the JSON wire.
-    var wireString: String {
-        switch self {
-        case .unspecified:     return "unspecified"
-        case .pcm:             return "pcm"
-        case .wav:             return "wav"
-        case .mp3:             return "mp3"
-        case .opus:            return "opus"
-        case .aac:             return "aac"
-        case .flac:            return "flac"
-        case .ogg:             return "ogg"
-        case .m4A:             return "m4a"
-        case .pcmS16Le:        return "pcm_s16le"
-        case .UNRECOGNIZED:    return "unspecified"
-        }
-    }
-
-    /// Parse a wire-format string (lowercase short name) back into a case.
-    static func fromWireString(_ s: String) -> RAAudioFormat? {
-        switch s.lowercased() {
-        case "pcm":                       return .pcm
-        case "wav":                       return .wav
-        case "mp3":                       return .mp3
-        case "opus":                      return .opus
-        case "aac":                       return .aac
-        case "flac":                      return .flac
-        case "ogg":                       return .ogg
-        case "m4a":                       return .m4A
-        case "pcm_s16le", "pcm_16bit":    return .pcmS16Le
-        default:                          return nil
-        }
     }
 
     /// File extension for this format.

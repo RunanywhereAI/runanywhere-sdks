@@ -10,6 +10,7 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "hardware_profile.proto";
+import "rac_options.proto";
 import "thinking_tag_pattern.proto";
 
 option cc_enable_arenas          = true;
@@ -31,16 +32,16 @@ option go_package                = "github.com/runanywhere/runanywhere-sdks/idl/
 //   RN      TTSTypes.ts:36            ('pcm' | 'wav' | 'mp3')
 // ---------------------------------------------------------------------------
 enum AudioFormat {
-    AUDIO_FORMAT_UNSPECIFIED = 0;
-    AUDIO_FORMAT_PCM         = 1;
-    AUDIO_FORMAT_WAV         = 2;
-    AUDIO_FORMAT_MP3         = 3;
-    AUDIO_FORMAT_OPUS        = 4;
-    AUDIO_FORMAT_AAC         = 5;
-    AUDIO_FORMAT_FLAC        = 6;
-    AUDIO_FORMAT_OGG         = 7;
-    AUDIO_FORMAT_M4A         = 8;   // iOS / Dart, container of AAC
-    AUDIO_FORMAT_PCM_S16LE   = 9;   // Android "pcm_16bit" — signed 16-bit LE PCM
+    AUDIO_FORMAT_UNSPECIFIED = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
+    AUDIO_FORMAT_PCM         = 1  [(runanywhere.v1.rac_wire_string) = "pcm"];
+    AUDIO_FORMAT_WAV         = 2  [(runanywhere.v1.rac_wire_string) = "wav"];
+    AUDIO_FORMAT_MP3         = 3  [(runanywhere.v1.rac_wire_string) = "mp3"];
+    AUDIO_FORMAT_OPUS        = 4  [(runanywhere.v1.rac_wire_string) = "opus"];
+    AUDIO_FORMAT_AAC         = 5  [(runanywhere.v1.rac_wire_string) = "aac"];
+    AUDIO_FORMAT_FLAC        = 6  [(runanywhere.v1.rac_wire_string) = "flac"];
+    AUDIO_FORMAT_OGG         = 7  [(runanywhere.v1.rac_wire_string) = "ogg"];
+    AUDIO_FORMAT_M4A         = 8  [(runanywhere.v1.rac_wire_string) = "m4a"];        // iOS / Dart, container of AAC
+    AUDIO_FORMAT_PCM_S16LE   = 9  [(runanywhere.v1.rac_wire_string) = "pcm_s16le"];   // Android "pcm_16bit" — signed 16-bit LE PCM
 }
 
 // ---------------------------------------------------------------------------
@@ -120,16 +121,16 @@ enum InferenceFramework {
 //   Web   enums.ts:39                 (7 cases, Audio labeled as VAD)
 // ---------------------------------------------------------------------------
 enum ModelCategory {
-    MODEL_CATEGORY_UNSPECIFIED              = 0;
-    MODEL_CATEGORY_LANGUAGE                 = 1;
-    MODEL_CATEGORY_SPEECH_RECOGNITION       = 2;
-    MODEL_CATEGORY_SPEECH_SYNTHESIS         = 3;
-    MODEL_CATEGORY_VISION                   = 4;
-    MODEL_CATEGORY_IMAGE_GENERATION         = 5;
-    MODEL_CATEGORY_MULTIMODAL               = 6;
-    MODEL_CATEGORY_AUDIO                    = 7;
-    MODEL_CATEGORY_EMBEDDING                = 8;
-    MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9;  // present in Swift only pre-IDL
+    MODEL_CATEGORY_UNSPECIFIED              = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
+    MODEL_CATEGORY_LANGUAGE                 = 1  [(runanywhere.v1.rac_wire_string) = "language"];
+    MODEL_CATEGORY_SPEECH_RECOGNITION       = 2  [(runanywhere.v1.rac_wire_string) = "speech-recognition"];
+    MODEL_CATEGORY_SPEECH_SYNTHESIS         = 3  [(runanywhere.v1.rac_wire_string) = "speech-synthesis"];
+    MODEL_CATEGORY_VISION                   = 4  [(runanywhere.v1.rac_wire_string) = "vision"];
+    MODEL_CATEGORY_IMAGE_GENERATION         = 5  [(runanywhere.v1.rac_wire_string) = "image-generation"];
+    MODEL_CATEGORY_MULTIMODAL               = 6  [(runanywhere.v1.rac_wire_string) = "multimodal"];
+    MODEL_CATEGORY_AUDIO                    = 7  [(runanywhere.v1.rac_wire_string) = "audio"];
+    MODEL_CATEGORY_EMBEDDING                = 8  [(runanywhere.v1.rac_wire_string) = "embedding"];
+    MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION = 9  [(runanywhere.v1.rac_wire_string) = "voice-activity-detection"];  // present in Swift only pre-IDL
 }
 
 // ---------------------------------------------------------------------------
@@ -142,20 +143,20 @@ enum ModelCategory {
 //   Web    enums.ts:9                 (Development, Staging, Production)
 // ---------------------------------------------------------------------------
 enum SDKEnvironment {
-    SDK_ENVIRONMENT_UNSPECIFIED = 0;
-    SDK_ENVIRONMENT_DEVELOPMENT = 1;
-    SDK_ENVIRONMENT_STAGING     = 2;
-    SDK_ENVIRONMENT_PRODUCTION  = 3;
+    SDK_ENVIRONMENT_UNSPECIFIED = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
+    SDK_ENVIRONMENT_DEVELOPMENT = 1  [(runanywhere.v1.rac_wire_string) = "development"];
+    SDK_ENVIRONMENT_STAGING     = 2  [(runanywhere.v1.rac_wire_string) = "staging"];
+    SDK_ENVIRONMENT_PRODUCTION  = 3  [(runanywhere.v1.rac_wire_string) = "production"];
 }
 
 // ---------------------------------------------------------------------------
 // Model source — where the catalog entry came from.
 // ---------------------------------------------------------------------------
 enum ModelSource {
-    MODEL_SOURCE_UNSPECIFIED = 0;
-    MODEL_SOURCE_REMOTE      = 1;   // Downloaded from a URL
-    MODEL_SOURCE_LOCAL       = 2;   // Bundled or user-imported
-    MODEL_SOURCE_BUILT_IN    = 3;   // Platform/system model with no portable download artifact
+    MODEL_SOURCE_UNSPECIFIED = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
+    MODEL_SOURCE_REMOTE      = 1  [(runanywhere.v1.rac_wire_string) = "remote"];     // Downloaded from a URL
+    MODEL_SOURCE_LOCAL       = 2  [(runanywhere.v1.rac_wire_string) = "local"];      // Bundled or user-imported
+    MODEL_SOURCE_BUILT_IN    = 3  [(runanywhere.v1.rac_wire_string) = "built-in"];   // Platform/system model with no portable download artifact
 }
 
 // ---------------------------------------------------------------------------
@@ -173,11 +174,11 @@ enum ArchiveType {
 }
 
 enum ArchiveStructure {
-    ARCHIVE_STRUCTURE_UNSPECIFIED        = 0;
-    ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED = 1;
-    ARCHIVE_STRUCTURE_DIRECTORY_BASED    = 2;
-    ARCHIVE_STRUCTURE_NESTED_DIRECTORY   = 3;
-    ARCHIVE_STRUCTURE_UNKNOWN            = 4;
+    ARCHIVE_STRUCTURE_UNSPECIFIED        = 0  [(runanywhere.v1.rac_wire_string) = "unspecified"];
+    ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED = 1  [(runanywhere.v1.rac_wire_string) = "singleFileNested"];
+    ARCHIVE_STRUCTURE_DIRECTORY_BASED    = 2  [(runanywhere.v1.rac_wire_string) = "directoryBased"];
+    ARCHIVE_STRUCTURE_NESTED_DIRECTORY   = 3  [(runanywhere.v1.rac_wire_string) = "nestedDirectory"];
+    ARCHIVE_STRUCTURE_UNKNOWN            = 4  [(runanywhere.v1.rac_wire_string) = "unknown"];
 }
 
 // ---------------------------------------------------------------------------

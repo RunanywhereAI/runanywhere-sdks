@@ -56,13 +56,90 @@ SWIFT_PREFIX = "RA"
 
 
 def _camel_case_from_snake(s: str) -> str:
-    """Convert UPPER_SNAKE / lower_snake to lowerCamelCase."""
-    parts = [p for p in s.split("_") if p]
-    if not parts:
-        return s
-    head = parts[0].lower()
-    tail = "".join(p[:1].upper() + p[1:].lower() for p in parts[1:])
-    return head + tail
+    """Convert UPPER_SNAKE / lower_snake to lowerCamelCase, mirroring
+    apple/swift-protobuf's NamingUtils.toLowerCamelCase behaviour.
+
+    Key rules duplicated from swift-protobuf:
+      - underscores are word separators
+      - runs of uppercase letters are treated as acronyms; when followed by a
+        lowercase letter, the trailing uppercase char terminates the acronym
+        and starts the next word (e.g. ``S16LE`` followed by lowercase would
+        split, but with no follower the entire run lowercases except the
+        first char if not in the first word — ``S16LE`` -> ``s16Le`` standalone)
+      - digit runs are passed through verbatim and end their current word
+        run, so the next alphabetic chunk begins a new word
+      - the very first emitted character is always lowercase (per the
+        ``lowerCamelCase`` contract)
+
+    Hand-tested against the swift-protobuf-generated case names in
+    ``model_types.pb.swift`` for: ``m4A``, ``pcmS16Le``, ``llamaCpp``,
+    ``speechRecognition``, ``voiceActivityDetection``, ``singleFileNested``,
+    ``builtIn`` and the simple letter cases (``auto``, ``en``, ...).
+    """
+    out: list[str] = []
+    i = 0
+    n = len(s)
+    first = True
+    while i < n:
+        ch = s[i]
+        if ch == "_":
+            i += 1
+            continue
+        if ch.isalpha():
+            if ch.isupper():
+                # Uppercase run — consume up to first non-upper char.
+                j = i
+                while j < n and s[j].isupper():
+                    j += 1
+                run = s[i:j]
+                if j < n and s[j].islower():
+                    # Acronym terminator: last char of run starts the new word.
+                    head = run[:-1]
+                    tail_start = run[-1]
+                    k = j
+                    while k < n and (s[k].islower() or s[k].isdigit()):
+                        k += 1
+                    rest = s[j:k]
+                    if first:
+                        out.append(head.lower())
+                        first = False
+                    else:
+                        out.append(head[:1].upper() + head[1:].lower())
+                    out.append(tail_start + rest)
+                    i = k
+                else:
+                    # All-upper run at end of chunk or before digit / underscore.
+                    if first:
+                        out.append(run.lower())
+                        first = False
+                    else:
+                        out.append(run[:1].upper() + run[1:].lower())
+                    i = j
+            else:
+                # Lowercase run (rare in proto enum constants, but supported).
+                j = i
+                while j < n and (s[j].islower() or s[j].isdigit()):
+                    j += 1
+                run = s[i:j]
+                if first:
+                    out.append(run)
+                    first = False
+                else:
+                    out.append(run[:1].upper() + run[1:])
+                i = j
+        elif ch.isdigit():
+            # Digit run — passed through verbatim, treated as part of the
+            # current word (no capitalization toggle).
+            j = i
+            while j < n and s[j].isdigit():
+                j += 1
+            out.append(s[i:j])
+            if first:
+                first = False
+            i = j
+        else:
+            i += 1
+    return "".join(out)
 
 
 def _enum_name_to_screaming_snake(name: str) -> str:
@@ -250,6 +327,51 @@ def _emit_enum_accessor(
     return "\n".join(lines)
 
 
+def _emit_enum_reverse_factory(
+    proto_enum_name: str,
+    enum_desc: descriptor_pb2.EnumDescriptorProto,
+    factory_name: str,
+    parameter_label: str,
+    field_num: int,
+) -> str | None:
+    """Emit a Swift `static func <factory_name>(<parameter_label>:)` factory on
+    RA<EnumName> that reverses the wire-string annotation lookup. Returns None
+    when no values are annotated.
+
+    We expose this as a static factory rather than `init?(...)` to avoid
+    collisions with swift-protobuf's auto-generated `init?(rawValue:)` and
+    `init?(name:)` initializers. Matching is case-insensitive against the
+    annotation value (preserves the lowercased pre-IDL behavior of every
+    hand-written `fromWireString` switch in the SDK)."""
+    cases: list[tuple[str, str]] = []
+    for value in enum_desc.value:
+        if not value.HasField("options"):
+            continue
+        opt_str = _get_uninterpreted_string(value.options, field_num)
+        if opt_str is None:
+            continue
+        swift_case = _swift_case_name(proto_enum_name, value.name)
+        safe = opt_str.replace("\\", "\\\\").replace("\"", "\\\"").lower()
+        cases.append((swift_case, safe))
+    if not cases:
+        return None
+
+    swift_type = f"{SWIFT_PREFIX}{proto_enum_name}"
+    lines: list[str] = []
+    lines.append(f"extension {swift_type} {{")
+    lines.append(f"    /// Generated reverse of the `{_annotation_name(field_num)}` accessor.")
+    lines.append(f"    /// Matches case-insensitively against the annotation value.")
+    lines.append(f"    public static func {factory_name}({parameter_label}: String) -> {swift_type}? {{")
+    lines.append(f"        switch {parameter_label}.lowercased() {{")
+    for swift_case, value in cases:
+        lines.append(f"        case \"{value}\": return .{swift_case}")
+    lines.append("        default: return nil")
+    lines.append("        }")
+    lines.append("    }")
+    lines.append("}")
+    return "\n".join(lines)
+
+
 def _annotation_name(field_num: int) -> str:
     return {
         RAC_DEFAULT_FIELD_NUM:       "rac_default",
@@ -323,6 +445,19 @@ def main() -> int:
                     blocks.append(block)
                     annotated_enum_count += 1
 
+            # Reverse factory for wireString (mirrors the hand-written
+            # `fromWireString` switches that lived across SDKEnvironment.swift,
+            # RAAudioFormat+Extensions.swift, ModelTypes.swift, ...).
+            reverse_block = _emit_enum_reverse_factory(
+                proto_enum_name,
+                enum_desc,
+                factory_name="from",
+                parameter_label="wireString",
+                field_num=RAC_WIRE_STRING_FIELD_NUM,
+            )
+            if reverse_block is not None:
+                blocks.append(reverse_block)
+
     header = [
         "// DO NOT EDIT.",
         "// swift-format-ignore-file",
@@ -332,9 +467,10 @@ def main() -> int:
         "//",
         "// This file exposes hand-friendly convenience accessors derived from",
         "// RunAnywhere's custom proto annotations (see idl/rac_options.proto):",
-        "//   - .displayName    (rac_display_name)",
-        "//   - .analyticsKey   (rac_analytics_key)",
-        "//   - .wireString     (rac_wire_string)",
+        "//   - .displayName              (rac_display_name)",
+        "//   - .analyticsKey             (rac_analytics_key)",
+        "//   - .wireString               (rac_wire_string)",
+        "//   - .from(wireString:)        (reverse of rac_wire_string)",
         "//",
         "// FieldOptions-driven defaults() / validate() helpers will be added as",
         "// individual *Options messages adopt rac_default / rac_required / rac_min / rac_max",

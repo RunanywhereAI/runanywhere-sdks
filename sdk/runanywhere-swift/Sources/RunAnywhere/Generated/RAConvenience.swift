@@ -6,15 +6,177 @@
 //
 // This file exposes hand-friendly convenience accessors derived from
 // RunAnywhere's custom proto annotations (see idl/rac_options.proto):
-//   - .displayName    (rac_display_name)
-//   - .analyticsKey   (rac_analytics_key)
-//   - .wireString     (rac_wire_string)
+//   - .displayName              (rac_display_name)
+//   - .analyticsKey             (rac_analytics_key)
+//   - .wireString               (rac_wire_string)
+//   - .from(wireString:)        (reverse of rac_wire_string)
 //
 // FieldOptions-driven defaults() / validate() helpers will be added as
 // individual *Options messages adopt rac_default / rac_required / rac_min / rac_max
 // (Phase 4 of the Swift simplification plan, P4-T4..T9).
 
 import Foundation
+
+extension RAAudioFormat {
+    /// Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/.
+    public var wireString: String {
+        switch self {
+        case .unspecified: return "unspecified"
+        case .pcm: return "pcm"
+        case .wav: return "wav"
+        case .mp3: return "mp3"
+        case .opus: return "opus"
+        case .aac: return "aac"
+        case .flac: return "flac"
+        case .ogg: return "ogg"
+        case .m4A: return "m4a"
+        case .pcmS16Le: return "pcm_s16le"
+        default: return ""
+        }
+    }
+}
+
+extension RAAudioFormat {
+    /// Generated reverse of the `rac_wire_string` accessor.
+    /// Matches case-insensitively against the annotation value.
+    public static func from(wireString: String) -> RAAudioFormat? {
+        switch wireString.lowercased() {
+        case "unspecified": return .unspecified
+        case "pcm": return .pcm
+        case "wav": return .wav
+        case "mp3": return .mp3
+        case "opus": return .opus
+        case "aac": return .aac
+        case "flac": return .flac
+        case "ogg": return .ogg
+        case "m4a": return .m4A
+        case "pcm_s16le": return .pcmS16Le
+        default: return nil
+        }
+    }
+}
+
+extension RAModelCategory {
+    /// Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/.
+    public var wireString: String {
+        switch self {
+        case .unspecified: return "unspecified"
+        case .language: return "language"
+        case .speechRecognition: return "speech-recognition"
+        case .speechSynthesis: return "speech-synthesis"
+        case .vision: return "vision"
+        case .imageGeneration: return "image-generation"
+        case .multimodal: return "multimodal"
+        case .audio: return "audio"
+        case .embedding: return "embedding"
+        case .voiceActivityDetection: return "voice-activity-detection"
+        default: return ""
+        }
+    }
+}
+
+extension RAModelCategory {
+    /// Generated reverse of the `rac_wire_string` accessor.
+    /// Matches case-insensitively against the annotation value.
+    public static func from(wireString: String) -> RAModelCategory? {
+        switch wireString.lowercased() {
+        case "unspecified": return .unspecified
+        case "language": return .language
+        case "speech-recognition": return .speechRecognition
+        case "speech-synthesis": return .speechSynthesis
+        case "vision": return .vision
+        case "image-generation": return .imageGeneration
+        case "multimodal": return .multimodal
+        case "audio": return .audio
+        case "embedding": return .embedding
+        case "voice-activity-detection": return .voiceActivityDetection
+        default: return nil
+        }
+    }
+}
+
+extension RASDKEnvironment {
+    /// Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/.
+    public var wireString: String {
+        switch self {
+        case .unspecified: return "unspecified"
+        case .development: return "development"
+        case .staging: return "staging"
+        case .production: return "production"
+        default: return ""
+        }
+    }
+}
+
+extension RASDKEnvironment {
+    /// Generated reverse of the `rac_wire_string` accessor.
+    /// Matches case-insensitively against the annotation value.
+    public static func from(wireString: String) -> RASDKEnvironment? {
+        switch wireString.lowercased() {
+        case "unspecified": return .unspecified
+        case "development": return .development
+        case "staging": return .staging
+        case "production": return .production
+        default: return nil
+        }
+    }
+}
+
+extension RAModelSource {
+    /// Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/.
+    public var wireString: String {
+        switch self {
+        case .unspecified: return "unspecified"
+        case .remote: return "remote"
+        case .local: return "local"
+        case .builtIn: return "built-in"
+        default: return ""
+        }
+    }
+}
+
+extension RAModelSource {
+    /// Generated reverse of the `rac_wire_string` accessor.
+    /// Matches case-insensitively against the annotation value.
+    public static func from(wireString: String) -> RAModelSource? {
+        switch wireString.lowercased() {
+        case "unspecified": return .unspecified
+        case "remote": return .remote
+        case "local": return .local
+        case "built-in": return .builtIn
+        default: return nil
+        }
+    }
+}
+
+extension RAArchiveStructure {
+    /// Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/.
+    public var wireString: String {
+        switch self {
+        case .unspecified: return "unspecified"
+        case .singleFileNested: return "singleFileNested"
+        case .directoryBased: return "directoryBased"
+        case .nestedDirectory: return "nestedDirectory"
+        case .unknown: return "unknown"
+        default: return ""
+        }
+    }
+}
+
+extension RAArchiveStructure {
+    /// Generated reverse of the `rac_wire_string` accessor.
+    /// Matches case-insensitively against the annotation value.
+    public static func from(wireString: String) -> RAArchiveStructure? {
+        switch wireString.lowercased() {
+        case "unspecified": return .unspecified
+        case "singlefilenested": return .singleFileNested
+        case "directorybased": return .directoryBased
+        case "nesteddirectory": return .nestedDirectory
+        case "unknown": return .unknown
+        default: return nil
+        }
+    }
+}
 
 extension RASTTLanguage {
     /// Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/.
@@ -34,6 +196,29 @@ extension RASTTLanguage {
         case .ru: return "ru"
         case .hi: return "hi"
         default: return ""
+        }
+    }
+}
+
+extension RASTTLanguage {
+    /// Generated reverse of the `rac_wire_string` accessor.
+    /// Matches case-insensitively against the annotation value.
+    public static func from(wireString: String) -> RASTTLanguage? {
+        switch wireString.lowercased() {
+        case "auto": return .auto
+        case "en": return .en
+        case "es": return .es
+        case "fr": return .fr
+        case "de": return .de
+        case "zh": return .zh
+        case "ja": return .ja
+        case "ko": return .ko
+        case "it": return .it
+        case "pt": return .pt
+        case "ar": return .ar
+        case "ru": return .ru
+        case "hi": return .hi
+        default: return nil
         }
     }
 }

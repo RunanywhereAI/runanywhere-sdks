@@ -60,32 +60,19 @@ private func cWireString(
 // Note: `SwiftProtobuf.Enum` already refines `Sendable`, so no extra
 // `@unchecked Sendable` is required on the typealiased enums.
 //
-// ModelSource has only 3 cases and no C ABI accessor — the tiny switch stays.
+// `wireString` / `from(wireString:)` are codegen-generated in
+// Generated/RAConvenience.swift from the `rac_wire_string` annotations in
+// idl/model_types.proto.
 
 extension RAModelSource: Codable {
     public init(from decoder: Swift.Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
-        switch raw.lowercased() {
-        case "remote": self = .remote
-        case "local":  self = .local
-        default:       self = .unspecified
-        }
+        self = RAModelSource.from(wireString: raw) ?? .unspecified
     }
 
     public func encode(to encoder: Swift.Encoder) throws {
         var c = encoder.singleValueContainer()
         try c.encode(self.wireString)
-    }
-}
-
-public extension RAModelSource {
-    /// Canonical lowercase wire string (JSON compat).
-    var wireString: String {
-        switch self {
-        case .remote:       return "remote"
-        case .local:        return "local"
-        default:            return "unspecified"
-        }
     }
 }
 
@@ -130,11 +117,15 @@ public extension RAModelFormat {
 }
 
 // MARK: - ModelCategory
+//
+// `wireString` / `from(wireString:)` are codegen-generated in
+// Generated/RAConvenience.swift from the `rac_wire_string` annotations in
+// idl/model_types.proto.
 
 extension RAModelCategory: Codable {
     public init(from decoder: Swift.Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
-        self = RAModelCategory.fromWireString(raw) ?? .unspecified
+        self = RAModelCategory.from(wireString: raw) ?? .unspecified
     }
 
     public func encode(to encoder: Swift.Encoder) throws {
@@ -144,38 +135,6 @@ extension RAModelCategory: Codable {
 }
 
 public extension RAModelCategory {
-    /// Canonical kebab-case wire string (JSON compat). No C ABI exists for
-    /// `RAModelCategory.wireString` — kept as a small Swift table.
-    var wireString: String {
-        switch self {
-        case .language:                 return "language"
-        case .speechRecognition:        return "speech-recognition"
-        case .speechSynthesis:          return "speech-synthesis"
-        case .vision:                   return "vision"
-        case .imageGeneration:          return "image-generation"
-        case .multimodal:               return "multimodal"
-        case .audio:                    return "audio"
-        case .embedding:                return "embedding"
-        case .voiceActivityDetection:   return "voice-activity-detection"
-        default:                        return "unspecified"
-        }
-    }
-
-    static func fromWireString(_ s: String) -> RAModelCategory? {
-        switch s.lowercased() {
-        case "language":                    return .language
-        case "speech-recognition":          return .speechRecognition
-        case "speech-synthesis":            return .speechSynthesis
-        case "vision":                      return .vision
-        case "image-generation":            return .imageGeneration
-        case "multimodal":                  return .multimodal
-        case "audio":                       return .audio
-        case "embedding":                   return .embedding
-        case "voice-activity-detection":    return .voiceActivityDetection
-        default:                            return nil
-        }
-    }
-
     /// Whether this category typically requires a context length.
     /// Delegates to `rac_model_category_requires_context_length`.
     var requiresContextLength: Bool {
@@ -375,33 +334,19 @@ public extension RAArchiveType {
 }
 
 // MARK: - ArchiveStructure
+//
+// `wireString` / `from(wireString:)` are codegen-generated in
+// Generated/RAConvenience.swift from the `rac_wire_string` annotations in
+// idl/model_types.proto.
 
 extension RAArchiveStructure: Codable {
     public init(from decoder: Swift.Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
-        switch raw {
-        case "singleFileNested":    self = .singleFileNested
-        case "directoryBased":      self = .directoryBased
-        case "nestedDirectory":     self = .nestedDirectory
-        case "unknown":             self = .unknown
-        default:                    self = .unspecified
-        }
+        self = RAArchiveStructure.from(wireString: raw) ?? .unspecified
     }
 
     public func encode(to encoder: Swift.Encoder) throws {
         var c = encoder.singleValueContainer()
         try c.encode(self.wireString)
-    }
-}
-
-public extension RAArchiveStructure {
-    var wireString: String {
-        switch self {
-        case .singleFileNested: return "singleFileNested"
-        case .directoryBased:   return "directoryBased"
-        case .nestedDirectory:  return "nestedDirectory"
-        case .unknown:          return "unknown"
-        default:                return "unspecified"
-        }
     }
 }

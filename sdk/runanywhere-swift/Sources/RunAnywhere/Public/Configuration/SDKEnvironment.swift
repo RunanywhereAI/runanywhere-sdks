@@ -20,16 +20,16 @@ import SwiftProtobuf
 public typealias SDKEnvironment = RASDKEnvironment
 
 // MARK: - Codable (wire format = lowercase)
+//
+// `wireString` and `from(wireString:)` are codegen-generated in
+// Generated/RAConvenience.swift from the `rac_wire_string` annotations in
+// idl/model_types.proto. The Codable conformance below delegates to those
+// generated accessors so legacy JSON payloads round-trip identically.
 
 extension RASDKEnvironment: Codable {
     public init(from decoder: Swift.Decoder) throws {
         let raw = try decoder.singleValueContainer().decode(String.self)
-        switch raw.lowercased() {
-        case "development": self = .development
-        case "staging":     self = .staging
-        case "production":  self = .production
-        default:            self = .unspecified
-        }
+        self = RASDKEnvironment.from(wireString: raw) ?? .unspecified
     }
 
     public func encode(to encoder: Swift.Encoder) throws {
@@ -41,26 +41,6 @@ extension RASDKEnvironment: Codable {
 // MARK: - Extensions (preserved from the hand-written enum)
 
 public extension RASDKEnvironment {
-    /// Lowercase wire string ("development" / "staging" / "production").
-    var wireString: String {
-        switch self {
-        case .development: return "development"
-        case .staging:     return "staging"
-        case .production:  return "production"
-        default:           return "unspecified"
-        }
-    }
-
-    /// Parse a wire-format string back into a case.
-    static func fromWireString(_ s: String) -> RASDKEnvironment? {
-        switch s.lowercased() {
-        case "development": return .development
-        case "staging":     return .staging
-        case "production":  return .production
-        default:            return nil
-        }
-    }
-
     /// All three deployable environments, excluding `.unspecified` /
     /// `UNRECOGNIZED`. Preserves the `CaseIterable.allCases` semantics of
     /// the pre-IDL hand-written enum.
