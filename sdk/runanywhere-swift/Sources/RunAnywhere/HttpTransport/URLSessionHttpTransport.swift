@@ -226,7 +226,6 @@ private struct RequestSnapshot {
     let headers: [(name: String, value: String)]
     let body: Data?
     let timeoutMs: Int32
-    let followRedirects: Bool
 
     init?(_ req: rac_http_request_t) {
         guard let methodPtr = req.method, let urlPtr = req.url else {
@@ -257,7 +256,6 @@ private struct RequestSnapshot {
         self.headers = headerList
         self.body = bodyData
         self.timeoutMs = req.timeout_ms
-        self.followRedirects = (req.follow_redirects == RAC_TRUE)
     }
 
     func makeURLRequest(additionalRangeFromByte: UInt64 = 0) -> URLRequest {
@@ -461,7 +459,6 @@ private enum RequestExecutor {
             // API introduced in iOS 15 / macOS 12.
             task.delegate = delegate
         }
-        delegate.taskIdentifier = task.taskIdentifier
         delegate.task = task
         URLSessionHttpTransport.streamRegistry.insert(taskId: task.taskIdentifier, delegate: delegate)
 
@@ -588,7 +585,6 @@ private final class StreamDelegate: NSObject, URLSessionDataDelegate, @unchecked
     // Populated on the delegate queue; read on the caller thread after
     // `completion` is signalled — no explicit lock needed because the
     // semaphore establishes the happens-before edge.
-    var taskIdentifier: Int = 0
     // Retained weakly-ish — URLSessionTask holds `self` as delegate in
     // the host-session path, so storing the task here would create a
     // cycle until teardown. We only use it for explicit cancel, which

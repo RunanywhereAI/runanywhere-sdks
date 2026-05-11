@@ -68,11 +68,6 @@ public enum CppBridge {
     private static let state =
         OSAllocatedUnfairLock<CppBridgeSharedState>(initialState: CppBridgeSharedState())
 
-    /// Current SDK environment
-    static var environment: SDKEnvironment {
-        state.withLock { $0.environment }
-    }
-
     /// Whether core bridges are initialized (Phase 1)
     public static var isInitialized: Bool {
         state.withLock { $0.isInitialized }

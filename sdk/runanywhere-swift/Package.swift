@@ -128,6 +128,15 @@ let package = Package(
                 // have been removed from the repo. The hand-written VoiceAgentStreamAdapter /
                 // LLMStreamAdapter expose the same AsyncStream surface over the
                 // in-process C callback, so no compilation target needs them.
+                //
+                // SWIFT-DUP-UNUSED-PROTO-TYPES (Wave 6A / T8): the two proto
+                // schemas below are still emitted by codegen but have zero
+                // consumers in the Swift SDK. Excluding them avoids compiling
+                // ~2154 lines of dead generated code. Keep `pipeline.pb.swift`
+                // and `solutions.pb.swift` — those are consumed via the
+                // Solutions facade.
+                "Generated/router.pb.swift",
+                "Generated/diffusion_options.pb.swift",
             ],
             swiftSettings: [
                 .define("SWIFT_PACKAGE"),

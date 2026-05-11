@@ -24,14 +24,6 @@ private enum StorageProtoABI {
         "rac_storage_analyzer_info_proto",
         as: StorageProtoFunction.self
     )
-    static let availability = NativeProtoABI.load(
-        "rac_storage_analyzer_availability_proto",
-        as: StorageProtoFunction.self
-    )
-    static let deletePlan = NativeProtoABI.load(
-        "rac_storage_analyzer_delete_plan_proto",
-        as: StorageProtoFunction.self
-    )
     static let delete = NativeProtoABI.load(
         "rac_storage_analyzer_delete_proto",
         as: StorageProtoFunction.self
@@ -60,8 +52,8 @@ extension CppBridge {
             callbacks.get_available_space = storageGetAvailableSpaceCallback
             callbacks.get_total_space = storageGetTotalSpaceCallback
             callbacks.delete_path = storageDeletePathCallback
-            callbacks.is_model_loaded = storageIsModelLoadedCallback
-            callbacks.unload_model = storageUnloadModelCallback
+            callbacks.is_model_loaded = nil  // C++ treats missing callback as "loaded state unavailable"
+            callbacks.unload_model = nil     // C++ refuses to unload-then-delete when callback is NULL
             callbacks.user_data = nil  // We use global FileManager
 
             var handlePtr: rac_storage_analyzer_handle_t?
@@ -82,27 +74,6 @@ extension CppBridge {
 
         // MARK: - Public API
 
-        /// Calculate size at a path
-        public func calculateSize(at path: URL) throws -> Int64 {
-            guard let handle = handle else {
-                throw SDKException(code: .initializationFailed, message: "Storage analyzer not initialized", category: .internal)
-            }
-
-            var size: Int64 = 0
-            let result = path.path.withCString { pathPtr in
-                rac_storage_analyzer_calculate_size(handle, pathPtr, &size)
-            }
-
-            guard result == RAC_SUCCESS else {
-                if result == RAC_ERROR_NOT_FOUND {
-                    throw SDKException(code: .fileNotFound, message: "Path not found: \(path.path)", category: .io)
-                }
-                throw SDKException(code: .processingFailed, message: "Failed to calculate size", category: .internal)
-            }
-
-            return size
-        }
-
         public func info(_ request: RAStorageInfoRequest = RAStorageInfoRequest()) async -> RAStorageInfoResult {
             do {
                 return try await invokeProto(
@@ -115,39 +86,6 @@ extension CppBridge {
                 result.success = false
                 result.errorMessage = String(describing: error)
                 return result
-            }
-        }
-
-        public func availability(
-            _ request: RAStorageAvailabilityRequest
-        ) async -> RAStorageAvailabilityResult {
-            do {
-                return try await invokeProto(
-                    request,
-                    symbol: StorageProtoABI.availability,
-                    responseType: RAStorageAvailabilityResult.self
-                )
-            } catch {
-                var result = RAStorageAvailabilityResult()
-                result.success = false
-                result.errorMessage = String(describing: error)
-                return result
-            }
-        }
-
-        public func deletePlan(
-            _ request: RAStorageDeletePlanRequest
-        ) async -> RAStorageDeletePlan {
-            do {
-                return try await invokeProto(
-                    request,
-                    symbol: StorageProtoABI.deletePlan,
-                    responseType: RAStorageDeletePlan.self
-                )
-            } catch {
-                var plan = RAStorageDeletePlan()
-                plan.errorMessage = String(describing: error)
-                return plan
             }
         }
 
@@ -276,22 +214,6 @@ private func storageDeletePathCallback(
     } catch {
         return RAC_ERROR_FILE_DELETE_FAILED
     }
-}
-
-private func storageIsModelLoadedCallback(
-    modelId _: UnsafePointer<CChar>?,
-    outIsLoaded: UnsafeMutablePointer<rac_bool_t>?,
-    userData _: UnsafeMutableRawPointer?
-) -> rac_result_t {
-    outIsLoaded?.pointee = RAC_FALSE
-    return RAC_SUCCESS
-}
-
-private func storageUnloadModelCallback(
-    modelId _: UnsafePointer<CChar>?,
-    userData _: UnsafeMutableRawPointer?
-) -> rac_result_t {
-    return RAC_SUCCESS
 }
 
 // MARK: - ModelRegistry Handle Access

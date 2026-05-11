@@ -15,12 +15,10 @@ private enum StructuredOutputGeneratedProtoABI {
     static let parseName = "rac_structured_output_parse_proto"
     static let generateName = "rac_structured_output_generate_proto"
     static let preparePromptName = "rac_structured_output_prepare_prompt_proto"
-    static let validateName = "rac_structured_output_validate_proto"
 
     static let parse = NativeProtoABI.load(parseName, as: NativeProtoABI.ProtoRequest.self)
     static let generate = NativeProtoABI.load(generateName, as: NativeProtoABI.ProtoRequest.self)
     static let preparePrompt = NativeProtoABI.load(preparePromptName, as: NativeProtoABI.ProtoRequest.self)
-    static let validate = NativeProtoABI.load(validateName, as: NativeProtoABI.ProtoRequest.self)
 }
 
 extension CppBridge {
@@ -56,21 +54,6 @@ extension CppBridge {
                 symbol: StructuredOutputGeneratedProtoABI.preparePrompt,
                 symbolName: StructuredOutputGeneratedProtoABI.preparePromptName,
                 responseType: RAStructuredOutputPromptResult.self
-            )
-        }
-
-        static func validate(
-            text: String,
-            options: RAStructuredOutputOptions
-        ) throws -> RAStructuredOutputValidation {
-            var request = RAStructuredOutputValidationRequest()
-            request.text = text
-            request.options = options
-            return try NativeProtoABI.invoke(
-                request,
-                symbol: StructuredOutputGeneratedProtoABI.validate,
-                symbolName: StructuredOutputGeneratedProtoABI.validateName,
-                responseType: RAStructuredOutputValidation.self
             )
         }
 

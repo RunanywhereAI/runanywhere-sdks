@@ -52,10 +52,5 @@ extension CppBridge {
             }
             return protoSession
         }
-
-        /// Get document count
-        public var documentCount: Int {
-            0
-        }
     }
 }

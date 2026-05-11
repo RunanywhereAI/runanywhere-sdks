@@ -142,7 +142,7 @@ public extension RunAnywhere {
            let stats = try? await CppBridge.RAG.shared.statsProto(handle: session) {
             return Int(stats.indexedChunks)
         }
-        return await CppBridge.RAG.shared.documentCount
+        return 0
     }
 
     /// Get RAG pipeline statistics.

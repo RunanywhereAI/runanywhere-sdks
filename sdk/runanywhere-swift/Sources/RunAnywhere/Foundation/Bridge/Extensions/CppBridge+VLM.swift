@@ -43,10 +43,6 @@ extension CppBridge {
         /// `currentModelPath` accessor.
         private var loadedModelPath: String?
 
-        /// Path to the loaded vision-projector artifact (llama.cpp VLMs
-        /// require this; nil for single-artifact VLMs).
-        private var loadedVisionProjectorPath: String?
-
         private let logger = SDKLogger(category: "CppBridge.VLM")
 
         private init() {}
@@ -177,7 +173,6 @@ extension CppBridge {
 
             loadedModelId = modelId
             loadedModelPath = modelPath
-            loadedVisionProjectorPath = visionProjectorPath
             await inner.markAssetLoaded(modelId)
             logger.info("VLM model loaded: \(modelId)")
         }
@@ -187,7 +182,6 @@ extension CppBridge {
             await inner.unload()
             loadedModelId = nil
             loadedModelPath = nil
-            loadedVisionProjectorPath = nil
         }
 
         /// Cancel ongoing generation
@@ -219,7 +213,6 @@ extension CppBridge {
             await inner.destroy()
             loadedModelId = nil
             loadedModelPath = nil
-            loadedVisionProjectorPath = nil
         }
     }
 }

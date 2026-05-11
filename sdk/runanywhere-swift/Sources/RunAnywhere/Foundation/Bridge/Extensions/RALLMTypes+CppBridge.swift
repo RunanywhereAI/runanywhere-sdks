@@ -8,12 +8,6 @@
 import CRACommons
 import Foundation
 
-// MARK: - RALLMConfiguration
-
-extension RALLMConfiguration {
-    public var modelId: String? { nil }
-}
-
 // MARK: - RALLMGenerationOptions: C-bridge + convenience
 
 public extension RALLMGenerationOptions {
