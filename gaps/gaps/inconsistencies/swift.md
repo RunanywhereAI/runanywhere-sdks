@@ -22,7 +22,7 @@ Branch: `feat/v2-architecture`
 | VLM (LFM2-VL) | PASS | photo library fixture |
 | TTS (platform / AVSpeech) | PASS | iOS system synthesizer |
 | Embeddings (MiniLM L6 v2) | PASS | loaded |
-| VAD (Silero, ONNX) | FAIL | SWIFT-IOS-001: VAD route mismatch — see RCA |
+| VAD (Silero, ONNX) | FAIL | SWIFT-IOS-001 route fix landed in `507fd3bfd` — route error gone; new loader-level failure tracked as SWIFT-IOS-012 |
 | STT (Sherpa Whisper Tiny) | BLOCKED | model downloaded + loaded; no mic input on sim; no file fallback in UI |
 | Voice agent | BLOCKED (DEGRADED) | components ready, VAD falls back to energy; mic-blocked anyway |
 | RAG (Document Q&A) | BLOCKED | requires PDF/JSON file; no bundled fixture |
@@ -32,13 +32,14 @@ Branch: `feat/v2-architecture`
 
 ### Failure inventory
 
-#### SWIFT-IOS-001 (HIGH) — VAD route mismatch (cross-platform C++ root cause)
+#### SWIFT-IOS-001 (HIGH) — VAD route mismatch (cross-platform C++ root cause) — **CLOSED** in `507fd3bfd`
 
 - **Symptom**: `RunAnywhere.loadModel(silero-vad)` returns `success=false` with `errorMessage = "no backend route supports requested model for framework onnx"`. Voice agent falls back to energy VAD; speech-start / speech-end events never fire.
 - **Root cause**: `framework_to_plugin_name()` returns `"onnx"` for ONNX VAD, but the only engine that actually owns `vad_ops` is named `"sherpa"`. The lifecycle path pins the route by name with `no_fallback=true`, so the router hard-rejects the Sherpa engine on pin-name mismatch.
 - **Fix**: ~6-line change in `sdk/runanywhere-commons/src/core/model_lifecycle.cpp:287-312` to special-case speech primitives (`DETECT_VOICE`, `TRANSCRIBE`, `SYNTHESIZE`) when framework is `INFERENCE_FRAMEWORK_ONNX` to return `"sherpa"`. Mirrors the existing `LLAMA_CPP + VLM → "llamacpp_vlm"` special-case in the same function.
 - **Cross-platform**: Swift + Kotlin + Flutter + RN all affected (shared C++ lifecycle path).
 - **Full RCA**: `gaps/gaps/inconsistencies/SWIFT-IOS-001-vad-route.md`.
+- **Status**: **CLOSED** in `507fd3bfd`. Wave 1 verification on iPhone 17 Pro simulator confirms the specific `"no backend route supports requested model for framework onnx"` error is gone. A different downstream failure (`"Failed to load the model"`) now surfaces at the Sherpa plugin's `vad_ops.load_model` — tracked as **SWIFT-IOS-012**.
 
 #### SWIFT-IOS-005 (HIGH) — Qwen3 0.6B Q4_K_M LLM inference hangs main thread on simulator
 
@@ -50,35 +51,39 @@ Branch: `feat/v2-architecture`
 - **Next**: Reproduce on physical device (not simulator) and gate the model with a streaming-progress indicator + cancel/timeout affordance.
 - **Evidence**: `screenshots/103_llm_switched_qwen3.png` (model loaded), `screenshots/108_after_long_wait.png` (no response after 4 min).
 
-#### SWIFT-IOS-006 (MEDIUM) — Storage view shows phantom Zero-KB models + `MODEL_FORMAT_UNKNOWN` tags
+#### SWIFT-IOS-006 (MEDIUM) — Storage view shows phantom Zero-KB models + `MODEL_FORMAT_UNKNOWN` tags — **CLOSED** in `1b3b74791`
 
 - **Symptom**: Storage tab lists 9 Downloaded Models totalling 1.88 GB, but only 6 actually consume disk. The other 3 (`coreml-diffusion`, `foundation-models-default`, `system-tts`) report "Zero KB". All 9 also display `MODEL_FORMAT_UNKNOWN` tag.
 - **Root cause**: Registry-only entries (registered modules with no on-disk weights) leak into the disk view; the storage UI is not reading the model's proto-defined format from registry.
 - **Fix**: distinguish "registered but not downloaded" from "downloaded" in the Storage view; consult the format enum via proto-generated type rather than printing `MODEL_FORMAT_UNKNOWN`.
 - **Evidence**: `screenshots/120_storage_view.png`, `screenshots/121_storage_scroll1.png`, `screenshots/124_after_delete.png`.
+- **Status**: **CLOSED** in `1b3b74791`. Storage view filters size > 0 entries; `MODEL_FORMAT_UNKNOWN` badge suppressed.
 
-#### SWIFT-IOS-007 (MEDIUM / UX) — Tap target overlap: "Add Demo Tools" overlaps Voice tab nav bar
+#### SWIFT-IOS-007 (MEDIUM / UX) — Tap target overlap: "Add Demo Tools" overlaps Voice tab nav bar — **CLOSED** in `1b3b74791`
 
 - **Symptom**: Settings → Tool Calling → "Add Demo Tools" button at y=788–840 overlaps the bottom tab bar at y=795–849. Centre-of-button taps register the Voice tab instead of the action.
 - **Reproduction**: 3× — Settings → scroll to Tool Calling → tap centre of "Add Demo Tools" → land on Voice Assistant Setup screen instead of seeing Registered Tools count change.
 - **Fix**: add safe-area-insets bottom padding so the button is fully above the tab bar.
 - **Evidence**: `screenshots/142_tool_section_view.png` (button position), `screenshots/145_voice_setup_no_file_input.png` (accidental nav).
+- **Status**: **CLOSED** in `1b3b74791`. Button no longer overlaps the tab bar.
 
-#### SWIFT-IOS-008 (MEDIUM) — `CRACommons.h` umbrella header missing `rac_runtime_registry.h` include
+#### SWIFT-IOS-008 (MEDIUM) — `CRACommons.h` umbrella header missing `rac_runtime_registry.h` include — **CLOSED** in `507fd3bfd`
 
 - **Symptom**: `Sources/RunAnywhere/CRACommons/include/CRACommons.h` does not include `rac_runtime_registry.h`. Works today via textual headers but breaks strict explicit-module mode (Swift 6 / `-strict-concurrency=complete` future tightening).
 - **Fix**: 1-line addition to the umbrella header.
 - **Scope**: XS.
+- **Status**: **CLOSED** in `507fd3bfd`. Umbrella now includes `rac_runtime_registry.h` + `rac_runtime_vtable.h`.
 
-#### SWIFT-IOS-009 (LOW) — SwiftPM `unhandled files` warnings
+#### SWIFT-IOS-009 (LOW) — SwiftPM `unhandled files` warnings — **CLOSED** in `0eeccda3e`
 
 - **Symptom**: SwiftPM emits "unhandled files" warnings during build:
   - `Sources/LlamaCPPRuntime/README.md` and `Sources/ONNXRuntime/README.md` not classified as resources.
   - Vendored DeviceKit `.gyb` / `Info.plist` files in dependency path.
 - **Fix**: Add `exclude:` entries in `Package.swift` for the affected targets. Cosmetic — no functional impact.
 - **Scope**: XS.
+- **Status**: **CLOSED** in `0eeccda3e`. Warnings 2 → 0 in our targets; DeviceKit warning remains in external dep (cannot be silenced).
 
-#### SWIFT-IOS-010 (LOW) — Example app Swift 6 warnings (5 sites)
+#### SWIFT-IOS-010 (LOW) — Example app Swift 6 warnings (5 sites) — **CLOSED** in `0eeccda3e` (5 of 6)
 
 - `examples/ios/RunAnywhereAI/.../VLMViewModel.swift:39` — `nonisolated(unsafe)` has no effect.
 - `examples/ios/RunAnywhereAI/.../STTViewModel.swift:312` — `await` with no async operation.
@@ -87,12 +92,23 @@ Branch: `feat/v2-architecture`
 - `examples/ios/RunAnywhereAI/.../FlowSessionManager.swift:416` — `await` with no async operation.
 - `examples/ios/RunAnywhereAI/.../ConversationStore.swift:378` — unused result.
 - **Fix**: Drop redundant `await` / `nonisolated(unsafe)` annotations; use `_ =` for intentionally unused results.
+- **Status**: **CLOSED** in `0eeccda3e` — 5 of 6 sites fixed (redundant `await` x4, unused result x1). `VLMViewModel.swift:39 nonisolated(unsafe)` KEPT — load-bearing for `@Observable` + nonisolated deinit.
 
-#### SWIFT-IOS-011 (LOW) — `CSendability.swift` retroactive `@unchecked Sendable` conformances are now redundant
+#### SWIFT-IOS-011 (LOW) — `CSendability.swift` retroactive `@unchecked Sendable` conformances are now redundant — **CLOSED** in `507fd3bfd`
 
 - **File**: `Sources/RunAnywhere/Foundation/Concurrency/CSendability.swift:37-39`.
 - **Symptom**: Swift 6 ships built-in unavailable `Sendable` conformances for the affected C-bridged opaque pointer types. Our retroactive `extension ... : @unchecked Sendable {}` declarations trigger "retroactive conformance" warnings.
 - **Fix**: Delete the retroactive conformances; rely on the standard-library / Swift 6 defaults.
+- **Status**: **CLOSED** in `507fd3bfd`. Retroactive `@unchecked Sendable` declarations on `OpaquePointer`, `UnsafeMutableRawPointer`, `UnsafeRawPointer` deleted.
+
+#### SWIFT-IOS-012 (HIGH) — Silero VAD loader-level failure after the SWIFT-IOS-001 route fix (NEW)
+
+- **Symptom**: After Wave 1's SWIFT-IOS-001 route fix, the auto-load now reaches the Sherpa plugin but Silero VAD `vad_ops.load_model` returns `"Failed to load the model"` on iPhone 17 Pro simulator. Voice agent silently falls back to energy VAD.
+- **Diagnostic**: Auto-load fails in ~30 ms — too fast to be a real ONNX model load. Likely path resolution or plugin registration order issue, not actual model file I/O.
+- **Evidence**: `test_workflows/logs/20260510-160835-swift-e2e/02_ios_swift/logs/wave1_vad_verification_retry.log` line 60.
+- **Cross-platform**: Likely affects Kotlin / Flutter / RN as well (shared Sherpa-ONNX backend path), though not yet re-verified post-Wave-1 on those SDKs.
+- **Severity**: HIGH — blocks neural VAD in voice agent; blocks SWIFT-VOICE-AGENT-001 from full unblock.
+- **Action**: Investigate Sherpa plugin's `vad_ops.load_model` — path resolution, plugin registration ordering, and whether the Silero VAD model URL/path passed to the plugin matches what the loader expects.
 
 ### Confirmed-not-issues (positive findings)
 
@@ -126,8 +142,8 @@ Branch: `feat/v2-architecture`
 | Archive extraction → canonical path | PASS |
 | Model persistence across relaunch | PASS |
 | Settings / Hardware / Permissions | PASS |
-| VAD | BROKEN — `SWIFT-VAD-001` (same as SWIFT-IOS-001) |
-| Voice Agent (end-to-end pipeline) | BROKEN — `SWIFT-VOICE-AGENT-001` (blocked by SWIFT-VAD-001) |
+| VAD | BROKEN — route fix landed in `507fd3bfd`; remaining blocker is loader-level `SWIFT-IOS-012` |
+| Voice Agent (end-to-end pipeline) | BROKEN — `SWIFT-VOICE-AGENT-001` (PARTIALLY UNBLOCKED; remaining blocker is SWIFT-IOS-012) |
 | Solutions | UNTESTED — `SWIFT-SOLUTIONS-UNTESTED` |
 
 ## Deferred backend Swift bindings (do not file bugs)
@@ -146,7 +162,7 @@ No Genie or WhisperCPP Swift bindings exist.
 
 # Part 1 — Runtime correctness issues
 
-## SWIFT-VAD-001: Voice Activity Detection is broken (HIGH) — C++ ROUTER ROOT CAUSE
+## SWIFT-VAD-001: Voice Activity Detection is broken (HIGH) — C++ ROUTER ROOT CAUSE — **ROUTE FIX LANDED**; loader-level failure remains (see SWIFT-IOS-012)
 
 > **Attribution corrected 2026-05-10**: This was previously attributed to a Swift bridge gap (`VADLifecycleProtoABI` missing). Deep RCA during the 20260510-160835 E2E run identified the actual root cause as a C++ router misroute. See `gaps/gaps/inconsistencies/SWIFT-IOS-001-vad-route.md` for the full evidence chain.
 
@@ -158,8 +174,9 @@ No Genie or WhisperCPP Swift bindings exist.
 - **Fix (Option B, cleaner)**: Update every model registration that says `framework: .onnx` for speech models to say `framework: .sherpa` (iOS, Kotlin, Flutter, RN). Honest about which engine runs the model; more cross-SDK alignment work.
 - **Cross-platform implication**: One C++ change fixes Swift, Kotlin, Flutter, and RN simultaneously — they all share the C++ lifecycle path.
 - **Scope**: XS (Option A, single C++ file).
+- **Status (2026-05-10, post-Wave 1)**: **ROUTE FIX LANDED in `507fd3bfd`** (Option A applied). The original `"no backend route supports requested model for framework onnx"` error is gone (verified on iPhone 17 Pro simulator). However, a different loader-level failure now surfaces at the Sherpa plugin's `vad_ops.load_model` (`"Failed to load the model"`, ~30 ms) — tracked as **SWIFT-IOS-012**.
 
-## SWIFT-VOICE-AGENT-001: End-to-end Voice Agent pipeline is broken (HIGH)
+## SWIFT-VOICE-AGENT-001: End-to-end Voice Agent pipeline is broken (HIGH) — **PARTIALLY UNBLOCKED**
 
 - **Symptom**: Voice Agent initializes but no full VAD → STT → LLM → TTS round-trip. Only LLM commits.
 - **Evidence**: `logs3.txt:2349-2385` — init immediately followed by `VAD:false, STT:false, LLM:true, TTS:false`, then cleanup without voice events.
@@ -169,7 +186,7 @@ No Genie or WhisperCPP Swift bindings exist.
   2. Audit `VoiceAssistantView.swift` picker "Use" closures — confirm they `await viewModel.setXXXModel(model)`.
   3. Confirm commons emits `componentLifecycle.loaded` events for VAD component on load.
   4. Verify `CppBridge.VoiceAgent.shared.getHandle()` gathers all 4 component handles.
-- **Blocked by**: `SWIFT-VAD-001` (VAD must commit before the voice agent can assemble 4 handles).
+- **Status (2026-05-10, post-Wave 1)**: **PARTIALLY UNBLOCKED** — `SWIFT-IOS-001` route fix landed in `507fd3bfd`, so the VAD lifecycle no longer hard-rejects on routing. Remaining blocker is **SWIFT-IOS-012** (Sherpa plugin's `vad_ops.load_model` returns failure). Once SWIFT-IOS-012 is investigated and fixed, the secondary audit of `VoiceAgentViewModel.setVADModel/setSTTModel/setTTSModel` (correct `RAModelCategory` usage) should follow.
 - **Scope**: M–L.
 
 ## SWIFT-SOLUTIONS-UNTESTED: Solutions feature has not been tested (UNKNOWN)
@@ -178,12 +195,13 @@ No Genie or WhisperCPP Swift bindings exist.
 - **Action**: Include a Solutions smoke test in the next validation pass after VAD + Voice Agent are unblocked.
 - **No failure observed yet** — known-untested, not known-broken.
 
-## SWIFT-VLM-STREAM-REVERT: Revert VLM `processImageStream` workaround (LOW)
+## SWIFT-VLM-STREAM-REVERT: Revert VLM `processImageStream` workaround (LOW) — **CLOSED (NO-OP)**
 
 - **Current state**: `Public/Extensions/VLM/RunAnywhere+VisionLanguage.swift:42-83` routes `processImageStream` through non-streaming `process()` and synthesizes a single TOKEN_GENERATED + COMPLETED pair.
 - **Why it's obsolete**: Phase 6j (`26ce54160`) fixed the handle-type-mismatch root cause. Real streaming should work now. The C++ `rac_vlm_process_stream_proto` (`include/rac/features/vlm/rac_vlm_service.h:230`) is never exercised by this workaround.
 - **Fix**: Revert the workaround; verify per-token streaming works on device.
 - **Scope**: S.
+- **Status**: **CLOSED (NO-OP)** during Wave 2 — already cleaned up in a prior phase; Wave 2 audit was stale.
 
 ---
 
@@ -208,7 +226,7 @@ The following have been DELETED or migrated and are no longer present in the cod
 
 ## OPEN
 
-### SWIFT-DUP-CRACOMMONS-THINKING-DRIFT: `rac_llm_thinking.h` regressed the SWF-THINKING-MIGRATE cleanup (MEDIUM)
+### SWIFT-DUP-CRACOMMONS-THINKING-DRIFT: `rac_llm_thinking.h` regressed the SWF-THINKING-MIGRATE cleanup (MEDIUM) — **DEFERRED / ABORTED** (Wave 2)
 
 `Sources/RunAnywhere/CRACommons/include/rac_llm_thinking.h:52-88` still declares three functions with `RAC_API`:
 - `rac_llm_extract_thinking`
@@ -219,8 +237,9 @@ Canonical commons `sdk/runanywhere-commons/include/rac/features/llm/rac_llm_thin
 
 **Fix**: Either (a) restore `RAC_API` + exports entries in commons if Swift actually needs these (audit `CppBridge+LLMThinking.swift` call sites), or (b) delete the Swift wrappers and migrate thinking extraction to the proto-field-based API on `RALLMGenerationResult`.
 **Scope**: S.
+**Status**: **DEFERRED / ABORTED in Wave 2**. Commit `57dbcdfbd` deliberately marked the 3 thinking helpers `@internal`. The correct fix is Swift-side migration to the proto-field-based API on `RALLMGenerationResult` (tracked as **SWF-THINKING-MIGRATE**) — not restoration of `RAC_API` + exports. The Swift mirror header is slightly stale (still says `RAC_API`) but functionally everything links and works today. Deferred to a future Swift migration task.
 
-### SWIFT-DUP-HTTP-ADAPTER-MISLOCATED: `HTTPClientAdapter` is in the wrong directory (MEDIUM)
+### SWIFT-DUP-HTTP-ADAPTER-MISLOCATED: `HTTPClientAdapter` is in the wrong directory (MEDIUM) — **CLOSED** in `0eeccda3e`
 
 `Sources/RunAnywhere/Adapters/HTTPClientAdapter.swift` is named like an IoC platform adapter but is mislocated. Phase 3 already absorbed most of the business logic (Supabase upsert injection, auth retry loop, `parseHTTPError` status-code→`SDKException` classification — now in C++ via `rac_api_error_from_response`, `rac_http_request_set_upsert_mode`, `rac_http_default_headers`).
 
@@ -229,6 +248,7 @@ The remaining items:
 2. Review `Data/Network/Protocols/NetworkService.swift` — a second Swift protocol layer over `rac_http_transport_ops_t`. If nothing uses it, delete.
 
 **Scope**: S.
+**Status**: **CLOSED** in `0eeccda3e`. `HTTPClientAdapter.swift` moved to `Foundation/Bridge/`. `NetworkService.swift` kept; the protocol still serves as a conformance marker but has no real type-level consumers — deferred for removal in a future cleanup pass.
 
 ### SWIFT-DUP-MODELTYPES-COMPUTED: `RAModelCategory` Swift computed properties duplicate C functions (LOW)
 
@@ -250,12 +270,13 @@ These aliases create two names for each field, divorcing Swift callers from the 
 **Fix**: Delete the aliases. Callers should use the proto field names directly. Keep the `usedPercent` computation as a utility (it's a derived value, not an alias).
 **Scope**: XS.
 
-### SWIFT-DUP-DEAD-LIFECYCLE-HELPERS: Dead component-sync helpers (LOW)
+### SWIFT-DUP-DEAD-LIFECYCLE-HELPERS: Dead component-sync helpers (LOW) — **CLOSED (NO-OP)**
 
 `Sources/RunAnywhere/Public/Extensions/Models/RunAnywhere+ModelLifecycle.swift:96-134` — `synchronizeSTTComponentLoad` and `synchronizeTTSComponentLoad` private functions are never called. The file's own comment at lines 38-43 explicitly says STT+TTS sync was removed in Phase 6h; the helpers weren't cleaned up.
 
 **Fix**: Delete both functions.
 **Scope**: XS.
+**Status**: **CLOSED (NO-OP)** during Wave 2 — already cleaned up in a prior phase; Wave 2 audit was stale.
 
 ### SWIFT-DUP-ERROR-CABI: Proto factory reconstructs `cAbiCode` (LOW)
 
