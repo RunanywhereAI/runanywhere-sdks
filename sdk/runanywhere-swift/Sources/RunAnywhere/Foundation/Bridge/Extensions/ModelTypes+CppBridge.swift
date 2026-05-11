@@ -12,85 +12,46 @@ import Foundation
 // MARK: - ModelCategory C++ Conversion
 
 extension ModelCategory {
-    /// Convert to C++ model category type
+    /// Convert to C++ model category type.
+    /// Delegates to commons' `rac_model_category_from_proto`.
     func toC() -> rac_model_category_t {
-        switch self {
-        case .language:                 return RAC_MODEL_CATEGORY_LANGUAGE
-        case .speechRecognition:        return RAC_MODEL_CATEGORY_SPEECH_RECOGNITION
-        case .speechSynthesis:          return RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS
-        case .vision:                   return RAC_MODEL_CATEGORY_VISION
-        case .imageGeneration:          return RAC_MODEL_CATEGORY_IMAGE_GENERATION
-        case .multimodal:               return RAC_MODEL_CATEGORY_MULTIMODAL
-        case .audio:                    return RAC_MODEL_CATEGORY_AUDIO
-        case .embedding:                return RAC_MODEL_CATEGORY_EMBEDDING
-        case .voiceActivityDetection:   return RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
-        default:                        return RAC_MODEL_CATEGORY_UNKNOWN
-        }
+        var out: rac_model_category_t = RAC_MODEL_CATEGORY_UNKNOWN
+        _ = rac_model_category_from_proto(Int32(self.rawValue), &out)
+        return out
     }
 
-    /// Initialize from C++ model category type
+    /// Initialize from C++ model category type.
+    /// Delegates to commons' `rac_model_category_to_proto`.
     init(from cCategory: rac_model_category_t) {
-        switch cCategory {
-        case RAC_MODEL_CATEGORY_LANGUAGE:
-            self = .language
-        case RAC_MODEL_CATEGORY_SPEECH_RECOGNITION:
-            self = .speechRecognition
-        case RAC_MODEL_CATEGORY_SPEECH_SYNTHESIS:
-            self = .speechSynthesis
-        case RAC_MODEL_CATEGORY_VISION:
-            self = .vision
-        case RAC_MODEL_CATEGORY_IMAGE_GENERATION:
-            self = .imageGeneration
-        case RAC_MODEL_CATEGORY_MULTIMODAL:
-            self = .multimodal
-        case RAC_MODEL_CATEGORY_AUDIO:
-            self = .audio
-        case RAC_MODEL_CATEGORY_EMBEDDING:
-            self = .embedding
-        case RAC_MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
-            self = .voiceActivityDetection
-        default:
+        var protoValue: Int32 = 0
+        guard rac_model_category_to_proto(cCategory, &protoValue) == RAC_SUCCESS else {
             self = .unspecified
+            return
         }
+        self = ModelCategory(rawValue: Int(protoValue)) ?? .unspecified
     }
 }
 
 // MARK: - ModelFormat C++ Conversion
 
 extension ModelFormat {
-    /// Convert to C++ model format type
+    /// Convert to C++ model format type.
+    /// Delegates to commons' `rac_model_format_from_proto`.
     func toC() -> rac_model_format_t {
-        switch self {
-        case .onnx:     return RAC_MODEL_FORMAT_ONNX
-        case .ort:      return RAC_MODEL_FORMAT_ORT
-        case .gguf:     return RAC_MODEL_FORMAT_GGUF
-        case .bin:      return RAC_MODEL_FORMAT_BIN
-        case .coreml, .mlmodel, .mlpackage:
-            return RAC_MODEL_FORMAT_COREML
-        case .qnnContext:
-            return RAC_MODEL_FORMAT_QNN_CONTEXT
-        default:        return RAC_MODEL_FORMAT_UNKNOWN
-        }
+        var out: rac_model_format_t = RAC_MODEL_FORMAT_UNKNOWN
+        _ = rac_model_format_from_proto(Int32(self.rawValue), &out)
+        return out
     }
 
-    /// Initialize from C++ model format type
+    /// Initialize from C++ model format type.
+    /// Delegates to commons' `rac_model_format_to_proto`.
     init(from cFormat: rac_model_format_t) {
-        switch cFormat {
-        case RAC_MODEL_FORMAT_ONNX:
-            self = .onnx
-        case RAC_MODEL_FORMAT_ORT:
-            self = .ort
-        case RAC_MODEL_FORMAT_GGUF:
-            self = .gguf
-        case RAC_MODEL_FORMAT_BIN:
-            self = .bin
-        case RAC_MODEL_FORMAT_COREML:
-            self = .coreml
-        case RAC_MODEL_FORMAT_QNN_CONTEXT:
-            self = .qnnContext
-        default:
+        var protoValue: Int32 = 0
+        guard rac_model_format_to_proto(cFormat, &protoValue) == RAC_SUCCESS else {
             self = .unknown
+            return
         }
+        self = ModelFormat(rawValue: Int(protoValue)) ?? .unknown
     }
 }
 
@@ -111,13 +72,15 @@ extension InferenceFramework {
 // MARK: - ModelSource C++ Conversion
 
 extension ModelSource {
-    /// Initialize from C++ model source type
+    /// Initialize from C++ model source type.
+    /// Delegates to commons' `rac_model_source_to_proto`.
     init(from cSource: rac_model_source_t) {
-        switch cSource {
-        case RAC_MODEL_SOURCE_REMOTE:   self = .remote
-        case RAC_MODEL_SOURCE_LOCAL:    self = .local
-        default:                        self = .local
+        var protoValue: Int32 = 0
+        guard rac_model_source_to_proto(cSource, &protoValue) == RAC_SUCCESS else {
+            self = .local
+            return
         }
+        self = ModelSource(rawValue: Int(protoValue)) ?? .local
     }
 }
 

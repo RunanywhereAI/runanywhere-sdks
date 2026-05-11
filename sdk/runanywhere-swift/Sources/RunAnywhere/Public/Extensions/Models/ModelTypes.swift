@@ -192,45 +192,24 @@ public extension RAInferenceFramework {
     }
 
     /// Convert Swift InferenceFramework to C rac_inference_framework_t.
-    /// Required because the Swift enum (proto-aligned values) and the C
-    /// enum (legacy ordering) are NOT raw-value compatible.
+    /// Delegates to commons' `rac_inference_framework_from_proto`, which
+    /// maps the proto enum int32 value (this enum's rawValue) to the C
+    /// enum's legacy ordering.
     func toCFramework() -> rac_inference_framework_t {
-        switch self {
-        case .onnx:                return RAC_FRAMEWORK_ONNX
-        case .sherpa:              return RAC_FRAMEWORK_SHERPA
-        case .llamaCpp:            return RAC_FRAMEWORK_LLAMACPP
-        case .foundationModels:    return RAC_FRAMEWORK_FOUNDATION_MODELS
-        case .systemTts:           return RAC_FRAMEWORK_SYSTEM_TTS
-        case .fluidAudio:          return RAC_FRAMEWORK_FLUID_AUDIO
-        case .coreml:              return RAC_FRAMEWORK_COREML
-        case .mlx:                 return RAC_FRAMEWORK_MLX
-        case .whisperkitCoreml:    return RAC_FRAMEWORK_WHISPERKIT_COREML
-        case .metalrt:             return RAC_FRAMEWORK_METALRT
-        case .genie:               return RAC_FRAMEWORK_GENIE
-        case .builtIn:             return RAC_FRAMEWORK_BUILTIN
-        case .none:                return RAC_FRAMEWORK_NONE
-        default:                   return RAC_FRAMEWORK_UNKNOWN
-        }
+        var out: rac_inference_framework_t = RAC_FRAMEWORK_UNKNOWN
+        _ = rac_inference_framework_from_proto(Int32(self.rawValue), &out)
+        return out
     }
 
     /// Create Swift InferenceFramework from C rac_inference_framework_t.
+    /// Delegates to commons' `rac_inference_framework_to_proto`, which
+    /// maps the C enum back to the proto enum int32 value.
     static func fromCFramework(_ cFramework: rac_inference_framework_t) -> RAInferenceFramework {
-        switch cFramework {
-        case RAC_FRAMEWORK_ONNX:                return .onnx
-        case RAC_FRAMEWORK_SHERPA:              return .sherpa
-        case RAC_FRAMEWORK_LLAMACPP:            return .llamaCpp
-        case RAC_FRAMEWORK_FOUNDATION_MODELS:   return .foundationModels
-        case RAC_FRAMEWORK_SYSTEM_TTS:          return .systemTts
-        case RAC_FRAMEWORK_FLUID_AUDIO:         return .fluidAudio
-        case RAC_FRAMEWORK_COREML:              return .coreml
-        case RAC_FRAMEWORK_MLX:                 return .mlx
-        case RAC_FRAMEWORK_WHISPERKIT_COREML:   return .whisperkitCoreml
-        case RAC_FRAMEWORK_METALRT:             return .metalrt
-        case RAC_FRAMEWORK_GENIE:               return .genie
-        case RAC_FRAMEWORK_BUILTIN:             return .builtIn
-        case RAC_FRAMEWORK_NONE:                return .none
-        default:                                return .unknown
+        var protoValue: Int32 = 0
+        guard rac_inference_framework_to_proto(cFramework, &protoValue) == RAC_SUCCESS else {
+            return .unknown
         }
+        return RAInferenceFramework(rawValue: Int(protoValue)) ?? .unknown
     }
 
     /// Initialize from a string matching case-insensitively against wire names,

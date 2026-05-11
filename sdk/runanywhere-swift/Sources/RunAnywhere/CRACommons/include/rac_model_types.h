@@ -451,6 +451,86 @@ RAC_API rac_result_t rac_inference_framework_analytics_key(rac_inference_framewo
 RAC_API rac_result_t rac_inference_framework_from_string(const char* s,
                                                          rac_inference_framework_t* out);
 
+// =============================================================================
+// PROTO <-> C ENUM MAPPERS (T15a — Wave 6D)
+// =============================================================================
+//
+// Bidirectional mappers between proto enum int32 values and the corresponding
+// rac_*_t C enums. Centralizes per-SDK switch tables so Swift / Kotlin / etc.
+// callers no longer hand-write the conversions. The proto enum values are the
+// canonical `runanywhere.v1.*` integers; rac_*_t values may differ where the
+// C-side has historical sentinels (e.g. ARCHIVE_TYPE_NONE = -1).
+
+/**
+ * @brief Convert a proto `runanywhere.v1.InferenceFramework` int32 value to a
+ *        `rac_inference_framework_t` value.
+ */
+RAC_API rac_result_t rac_inference_framework_from_proto(int32_t proto_value,
+                                                        rac_inference_framework_t* out);
+
+/**
+ * @brief Convert a `rac_inference_framework_t` value to the proto
+ *        `runanywhere.v1.InferenceFramework` int32 value.
+ */
+RAC_API rac_result_t rac_inference_framework_to_proto(rac_inference_framework_t value,
+                                                      int32_t* out);
+
+/**
+ * @brief Convert a proto `runanywhere.v1.ModelCategory` int32 value to a
+ *        `rac_model_category_t` value.
+ */
+RAC_API rac_result_t rac_model_category_from_proto(int32_t proto_value,
+                                                   rac_model_category_t* out);
+
+/**
+ * @brief Convert a `rac_model_category_t` value to the proto
+ *        `runanywhere.v1.ModelCategory` int32 value.
+ */
+RAC_API rac_result_t rac_model_category_to_proto(rac_model_category_t value, int32_t* out);
+
+/**
+ * @brief Convert a proto `runanywhere.v1.ModelFormat` int32 value to a
+ *        `rac_model_format_t` value.
+ */
+RAC_API rac_result_t rac_model_format_from_proto(int32_t proto_value, rac_model_format_t* out);
+
+/**
+ * @brief Convert a `rac_model_format_t` value to the proto
+ *        `runanywhere.v1.ModelFormat` int32 value.
+ */
+RAC_API rac_result_t rac_model_format_to_proto(rac_model_format_t value, int32_t* out);
+
+/**
+ * @brief Convert a proto `runanywhere.v1.ModelSource` int32 value to a
+ *        `rac_model_source_t` value.
+ *
+ * Note: `rac_model_source_t` only has REMOTE and LOCAL today; proto's
+ * BUILT_IN (=3) is mapped to RAC_MODEL_SOURCE_LOCAL.
+ */
+RAC_API rac_result_t rac_model_source_from_proto(int32_t proto_value, rac_model_source_t* out);
+
+/**
+ * @brief Convert a `rac_model_source_t` value to the proto
+ *        `runanywhere.v1.ModelSource` int32 value.
+ */
+RAC_API rac_result_t rac_model_source_to_proto(rac_model_source_t value, int32_t* out);
+
+/**
+ * @brief Convert a proto `runanywhere.v1.ArchiveType` int32 value to a
+ *        `rac_archive_type_t` value.
+ *
+ * Note: proto's ARCHIVE_TYPE_UNSPECIFIED (=0) maps to the C
+ * RAC_ARCHIVE_TYPE_NONE (=-1) which represents the "no archive / direct
+ * file" sentinel.
+ */
+RAC_API rac_result_t rac_archive_type_from_proto(int32_t proto_value, rac_archive_type_t* out);
+
+/**
+ * @brief Convert a `rac_archive_type_t` value to the proto
+ *        `runanywhere.v1.ArchiveType` int32 value.
+ */
+RAC_API rac_result_t rac_archive_type_to_proto(rac_archive_type_t value, int32_t* out);
+
 /**
  * @brief Check if artifact requires extraction.
  * Mirrors Swift's ModelArtifactType.requiresExtraction.
