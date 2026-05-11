@@ -6,6 +6,24 @@
  * Sources/RunAnywhere/Features/VoiceAgent/VoiceAgentCapability.swift
  *
  * CRITICAL: This is a direct port of Swift implementation - do NOT add custom logic!
+ *
+ * Lifecycle-acquire pattern (SWIFT-VOICE-AGENT-001 / T16 / Path X):
+ *
+ *   All proto-byte entry points (`rac_voice_agent_*_proto`) MUST resolve
+ *   modality state via `acquire_lifecycle_{stt,tts,vad,llm}` instead of
+ *   dereferencing `handle->{stt,llm,tts,vad}_handle`. The per-component
+ *   handles stored on the agent are owned by the Swift bridge actor and
+ *   are NOT the same as the level-1 (impl + ops) entries that
+ *   `rac_model_lifecycle_load_proto` populates. Mirrors the precedent
+ *   established in `rac_vlm_process_proto` (Phase 6j) where the
+ *   component-handle pointer arithmetic produced an EXC_BAD_ACCESS on
+ *   iPhone 17 Pro Max.
+ *
+ *   Legacy non-proto entry points (`rac_voice_agent_process_voice_turn`,
+ *   `rac_voice_agent_process_stream`, individual `transcribe/`
+ *   `generate_response/synthesize_speech/detect_speech` helpers) keep
+ *   using `handle->*_handle` for backward compatibility. They are
+ *   scheduled for removal in a follow-up cleanup (out of scope here).
  */
 
 #include <atomic>
@@ -36,6 +54,24 @@
 #include "rac/features/vad/rac_vad_types.h"
 #include "rac/features/voice_agent/rac_voice_agent.h"
 #include "rac/infrastructure/events/rac_sdk_event_stream.h"
+
+// SWIFT-VOICE-AGENT-001 (T16 / Path X) — voice agent proto path now consults
+// the global model lifecycle (level 1: impl + ops) instead of dereferencing
+// the per-component handles stored on the rac_voice_agent struct (level 3).
+// Background: the iOS Swift bridge owns its component handles inside Swift
+// actors and passes them to rac_voice_agent_create(...) for backward compat.
+// When the user loads a model via `RunAnywhere.loadModel(...)` (the lifecycle
+// path), only the global lifecycle service is populated -- the per-component
+// handle passed at create time is never bound to the loaded model. The
+// previous code path read `handle->stt_handle->state` etc. and reported
+// `not_loaded` for every modality. Routing through `acquire_lifecycle_*`
+// makes the proto API see the same state the lifecycle owns, matching the
+// Phase 6j VLM precedent in `rac_vlm_process_proto`.
+#include "features/llm/rac_llm_lifecycle_bridge.h"
+#include "features/rac_nonllm_lifecycle_bridge.h"
+#include "rac/features/llm/rac_llm_service.h"
+#include "rac/features/stt/rac_stt_service.h"
+#include "rac/features/tts/rac_tts_service.h"
 
 #if defined(RAC_HAVE_PROTOBUF)
 #include "errors.pb.h"
@@ -95,38 +131,58 @@ std::string event_id(const char* prefix) {
     return std::string(prefix) + "-" + std::to_string(rac_get_current_time_ms());
 }
 
-runanywhere::v1::ComponentLifecycleState component_load_state_from_lifecycle(
-    rac_lifecycle_state_t state) {
-    switch (state) {
-        case RAC_LIFECYCLE_STATE_LOADING:
-            return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING;
-        case RAC_LIFECYCLE_STATE_LOADED:
-            return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY;
-        case RAC_LIFECYCLE_STATE_FAILED:
-            return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_ERROR;
-        default:
-            return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
+// T16/Path X: probe the global lifecycle for each modality. A successful
+// acquire/release pair means the modality is READY (level-1 impl + ops are
+// bound to a loaded model). Anything else -> NOT_LOADED.
+//
+// We can't distinguish LOADING vs. NOT_LOADED purely from the lifecycle
+// snapshot (an in-progress load briefly holds an entry in non-READY state
+// then transitions). For the proto path callers this is fine: they only
+// gate execution on READY anyway. If a future caller needs LOADING
+// granularity, extend the lifecycle bridge -- do not reintroduce the
+// component-handle indirection here.
+runanywhere::v1::ComponentLifecycleState lifecycle_state_stt() {
+    rac::lifecycle::LifecycleSttRef ref;
+    if (rac::lifecycle::acquire_lifecycle_stt(&ref) == RAC_SUCCESS) {
+        rac::lifecycle::release_lifecycle_stt(&ref);
+        return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY;
     }
+    return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
 }
 
-void fill_component_states(rac_voice_agent_handle_t handle,
+runanywhere::v1::ComponentLifecycleState lifecycle_state_llm() {
+    rac::llm::LifecycleLlmRef ref;
+    if (rac::llm::acquire_lifecycle_llm(&ref) == RAC_SUCCESS) {
+        rac::llm::release_lifecycle_llm(&ref);
+        return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY;
+    }
+    return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
+}
+
+runanywhere::v1::ComponentLifecycleState lifecycle_state_tts() {
+    rac::lifecycle::LifecycleTtsRef ref;
+    if (rac::lifecycle::acquire_lifecycle_tts(&ref) == RAC_SUCCESS) {
+        rac::lifecycle::release_lifecycle_tts(&ref);
+        return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY;
+    }
+    return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
+}
+
+runanywhere::v1::ComponentLifecycleState lifecycle_state_vad() {
+    rac::lifecycle::LifecycleVadRef ref;
+    if (rac::lifecycle::acquire_lifecycle_vad(&ref) == RAC_SUCCESS) {
+        rac::lifecycle::release_lifecycle_vad(&ref);
+        return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY;
+    }
+    return runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
+}
+
+void fill_component_states(rac_voice_agent_handle_t /*handle*/,
                            runanywhere::v1::VoiceAgentComponentStates* out) {
-    const auto stt = handle && handle->stt_handle
-                         ? component_load_state_from_lifecycle(
-                               rac_stt_component_get_state(handle->stt_handle))
-                         : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
-    const auto llm = handle && handle->llm_handle
-                         ? component_load_state_from_lifecycle(
-                               rac_llm_component_get_state(handle->llm_handle))
-                         : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
-    const auto tts = handle && handle->tts_handle
-                         ? component_load_state_from_lifecycle(
-                               rac_tts_component_get_state(handle->tts_handle))
-                         : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
-    const auto vad = handle && handle->vad_handle
-                         ? component_load_state_from_lifecycle(
-                               rac_vad_component_get_state(handle->vad_handle))
-                         : runanywhere::v1::COMPONENT_LIFECYCLE_STATE_NOT_LOADED;
+    const auto stt = lifecycle_state_stt();
+    const auto llm = lifecycle_state_llm();
+    const auto tts = lifecycle_state_tts();
+    const auto vad = lifecycle_state_vad();
     out->set_stt_state(stt);
     out->set_llm_state(llm);
     out->set_tts_state(tts);
@@ -135,10 +191,7 @@ void fill_component_states(rac_voice_agent_handle_t handle,
                    llm == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY &&
                    tts == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY &&
                    vad == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_READY);
-    out->set_any_loading(stt == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING ||
-                         llm == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING ||
-                         tts == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING ||
-                         vad == runanywhere::v1::COMPONENT_LIFECYCLE_STATE_LOADING);
+    out->set_any_loading(false);  // not exposed by the lifecycle bridge snapshot
 }
 
 void publish_voice_pipeline_sdk_event(const runanywhere::v1::VoiceEvent& voice_event,
@@ -293,68 +346,94 @@ void emit_voice_agent_all_ready();
 // =============================================================================
 
 /**
- * @brief Validate that a component is ready for use
+ * @brief Validate a single modality is ready via the global lifecycle.
  *
- * Performs defensive checks:
- * 1. Handle is non-null
- * 2. Component is in LOADED state
- *
- * This provides early failure with clear error messages instead of
- * cryptic crashes from dangling pointers or uninitialized components.
- *
- * @param component_name Human-readable name for error messages
- * @param handle Component handle
- * @param get_state_fn Function to get component lifecycle state
- * @return RAC_SUCCESS if valid, error code otherwise
+ * Returns RAC_SUCCESS iff `acquire_lifecycle_*` succeeds (the modality
+ * has a level-1 impl + ops bound to a loaded model).
  */
-static rac_result_t validate_component_ready(const char* component_name, rac_handle_t handle,
-                                             rac_lifecycle_state_t (*get_state_fn)(rac_handle_t)) {
-    if (handle == nullptr) {
-        RAC_LOG_ERROR("VoiceAgent", "%s handle is null", component_name);
+template <typename Ref, rac_result_t (*Acquire)(Ref*), void (*Release)(Ref*)>
+static rac_result_t lifecycle_modality_ready(const char* name) {
+    Ref ref;
+    rac_result_t rc = Acquire(&ref);
+    if (rc == RAC_SUCCESS) {
+        Release(&ref);
+        return RAC_SUCCESS;
+    }
+    RAC_LOG_DEBUG("VoiceAgent", "%s lifecycle is not loaded (rc=%d)", name, rc);
+    return RAC_ERROR_NOT_INITIALIZED;
+}
+
+/**
+ * @brief Fallback: validate via the legacy per-component handle.
+ *
+ * Mirrors the previous validate_component_ready helper. Used only by the
+ * legacy non-proto entry points (Swift's pre-lifecycle bridge path) that
+ * load via `rac_*_component_load_model` and never populate the global
+ * lifecycle.
+ */
+static rac_result_t legacy_component_ready(const char* name, rac_handle_t handle,
+                                           rac_lifecycle_state_t (*get_state_fn)(rac_handle_t)) {
+    if (!handle) {
         return RAC_ERROR_INVALID_HANDLE;
     }
-
     rac_lifecycle_state_t state = get_state_fn(handle);
     if (state != RAC_LIFECYCLE_STATE_LOADED) {
-        RAC_LOG_ERROR("VoiceAgent", "%s is not loaded (state: %s)", component_name,
+        RAC_LOG_ERROR("VoiceAgent", "%s component is not loaded (state: %s)", name,
                       rac_lifecycle_state_name(state));
         return RAC_ERROR_NOT_INITIALIZED;
     }
-
     return RAC_SUCCESS;
 }
 
 /**
- * @brief Validate all voice agent components are ready for processing
+ * @brief Validate all voice agent components are ready for processing.
  *
- * Checks STT, LLM, and TTS components are properly loaded before
- * attempting voice processing. This provides early failure with clear
- * error messages instead of cryptic crashes from dangling pointers.
+ * SWIFT-VOICE-AGENT-001 (T16/Path X): prefer the global model lifecycle
+ * (level 1: impl + ops) -- the only authoritative source for the proto
+ * entry points and `RunAnywhere.loadModel(...)` flows. Falls back to the
+ * legacy per-component handle check for callers that loaded via the
+ * deprecated `rac_voice_agent_load_*_model` family (which writes through
+ * the component handle but not the lifecycle).
  *
- * @param handle Voice agent handle
- * @return RAC_SUCCESS if all components ready, error code otherwise
+ * @param handle Voice agent handle (used only for the legacy fallback)
+ * @return RAC_SUCCESS if all components are READY, error code otherwise
  */
 static rac_result_t validate_all_components_ready(rac_voice_agent_handle_t handle) {
-    rac_result_t result;
-
-    // Validate STT component
-    result = validate_component_ready("STT", handle->stt_handle, rac_stt_component_get_state);
-    if (result != RAC_SUCCESS) {
-        return result;
+    // STT
+    {
+        rac_result_t rc =
+            lifecycle_modality_ready<rac::lifecycle::LifecycleSttRef,
+                                     rac::lifecycle::acquire_lifecycle_stt,
+                                     rac::lifecycle::release_lifecycle_stt>("STT");
+        if (rc != RAC_SUCCESS) {
+            rc = legacy_component_ready("STT", handle ? handle->stt_handle : nullptr,
+                                        rac_stt_component_get_state);
+            if (rc != RAC_SUCCESS) return rc;
+        }
     }
-
-    // Validate LLM component
-    result = validate_component_ready("LLM", handle->llm_handle, rac_llm_component_get_state);
-    if (result != RAC_SUCCESS) {
-        return result;
+    // LLM
+    {
+        rac_result_t rc = lifecycle_modality_ready<rac::llm::LifecycleLlmRef,
+                                                   rac::llm::acquire_lifecycle_llm,
+                                                   rac::llm::release_lifecycle_llm>("LLM");
+        if (rc != RAC_SUCCESS) {
+            rc = legacy_component_ready("LLM", handle ? handle->llm_handle : nullptr,
+                                        rac_llm_component_get_state);
+            if (rc != RAC_SUCCESS) return rc;
+        }
     }
-
-    // Validate TTS component
-    result = validate_component_ready("TTS", handle->tts_handle, rac_tts_component_get_state);
-    if (result != RAC_SUCCESS) {
-        return result;
+    // TTS
+    {
+        rac_result_t rc =
+            lifecycle_modality_ready<rac::lifecycle::LifecycleTtsRef,
+                                     rac::lifecycle::acquire_lifecycle_tts,
+                                     rac::lifecycle::release_lifecycle_tts>("TTS");
+        if (rc != RAC_SUCCESS) {
+            rc = legacy_component_ready("TTS", handle ? handle->tts_handle : nullptr,
+                                        rac_tts_component_get_state);
+            if (rc != RAC_SUCCESS) return rc;
+        }
     }
-
     return RAC_SUCCESS;
 }
 
@@ -419,6 +498,15 @@ rac_result_t rac_voice_agent_create_standalone(rac_voice_agent_handle_t* out_han
     return RAC_SUCCESS;
 }
 
+// DEPRECATED. Prefer `rac_voice_agent_create_standalone()` plus
+// `rac_model_lifecycle_load_proto(...)` for each modality. The 4-handle
+// API is retained for the iOS Swift bridge, which still constructs its
+// per-modality component handles inside actors and threads them through
+// here. After SWIFT-VOICE-AGENT-001 (T16/Path X), proto entry points
+// dispatch through the global lifecycle and ignore these stored handles
+// entirely; only the legacy non-proto entry points still dereference
+// them for backward compatibility. Removal is gated on T17/T18 (Swift
+// migration).
 rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
                                     rac_handle_t stt_component_handle,
                                     rac_handle_t tts_component_handle,
@@ -439,12 +527,15 @@ rac_result_t rac_voice_agent_create(rac_handle_t llm_component_handle,
         return RAC_ERROR_OUT_OF_MEMORY;
     }
     agent->owns_components = false;  // External handles, don't destroy them
+    // Stored for legacy non-proto entry points only. Proto path resolves
+    // ops via `acquire_lifecycle_*` and never touches these fields.
     agent->llm_handle = llm_component_handle;
     agent->stt_handle = stt_component_handle;
     agent->tts_handle = tts_component_handle;
     agent->vad_handle = vad_component_handle;
 
-    RAC_LOG_INFO("VoiceAgent", "Voice agent created with external handles");
+    RAC_LOG_INFO("VoiceAgent",
+                 "Voice agent created with external handles (legacy compose API)");
 
     *out_handle = agent;
     return RAC_SUCCESS;
@@ -1226,15 +1317,32 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(
     emit_turn_lifecycle(handle,
                         runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_USER_SPEECH_ENDED);
 
-    rac_stt_result_t stt = {};
-    rac_result_t rc =
-        rac_stt_component_transcribe(handle->stt_handle, audio_data, audio_size, nullptr, &stt);
+    // SWIFT-VOICE-AGENT-001 (T16/Path X): dispatch through the lifecycle
+    // (level-1 impl + ops) instead of the agent's per-modality component
+    // handles. The handles are owned by the Swift bridge actor and are
+    // not the same as the lifecycle entries populated by
+    // `rac_model_lifecycle_load_proto`. Mirrors the Phase 6j VLM
+    // precedent in `rac_vlm_process_proto`.
+    rac::lifecycle::LifecycleSttRef stt_ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_stt(&stt_ref);
     if (rc != RAC_SUCCESS) {
+        emit_component_failure(handle, "stt", rc, "STT lifecycle is not loaded");
+        return rac_proto_buffer_set_error(out_result, rc, "STT lifecycle is not loaded");
+    }
+
+    rac_stt_result_t stt = {};
+    {
+        rac_stt_service_t stt_service{stt_ref.ops, stt_ref.impl, stt_ref.model_id};
+        rc = rac_stt_transcribe(&stt_service, audio_data, audio_size, nullptr, &stt);
+    }
+    if (rc != RAC_SUCCESS) {
+        rac::lifecycle::release_lifecycle_stt(&stt_ref);
         emit_component_failure(handle, "stt", rc, "STT transcription failed");
         return rac_proto_buffer_set_error(out_result, rc, "STT transcription failed");
     }
     if (!stt.text || stt.text[0] == '\0') {
         rac_stt_result_free(&stt);
+        rac::lifecycle::release_lifecycle_stt(&stt_ref);
         emit_component_failure(handle, "stt", RAC_ERROR_INVALID_STATE,
                                "STT transcription was empty");
         return rac_proto_buffer_set_error(out_result, RAC_ERROR_INVALID_STATE,
@@ -1247,10 +1355,25 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(
     emit_turn_lifecycle(handle,
                         runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_STARTED,
                         stt.text);
-    rac_llm_result_t llm = {};
-    rc = rac_llm_component_generate(handle->llm_handle, stt.text, nullptr, &llm);
+
+    rac::llm::LifecycleLlmRef llm_ref;
+    rc = rac::llm::acquire_lifecycle_llm(&llm_ref);
     if (rc != RAC_SUCCESS) {
         rac_stt_result_free(&stt);
+        rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        emit_component_failure(handle, "llm", rc, "LLM lifecycle is not loaded");
+        return rac_proto_buffer_set_error(out_result, rc, "LLM lifecycle is not loaded");
+    }
+
+    rac_llm_result_t llm = {};
+    {
+        rac_llm_service_t llm_service{llm_ref.ops, llm_ref.impl, llm_ref.model_id};
+        rc = rac_llm_generate(&llm_service, stt.text, nullptr, &llm);
+    }
+    if (rc != RAC_SUCCESS) {
+        rac::llm::release_lifecycle_llm(&llm_ref);
+        rac_stt_result_free(&stt);
+        rac::lifecycle::release_lifecycle_stt(&stt_ref);
         emit_component_failure(handle, "llm", rc, "LLM generation failed");
         return rac_proto_buffer_set_error(out_result, rc, "LLM generation failed");
     }
@@ -1258,11 +1381,28 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(
                         runanywhere::v1::TURN_LIFECYCLE_EVENT_KIND_AGENT_RESPONSE_COMPLETED,
                         stt.text, llm.text);
 
-    rac_tts_result_t tts = {};
-    rc = rac_tts_component_synthesize(handle->tts_handle, llm.text, nullptr, &tts);
+    rac::lifecycle::LifecycleTtsRef tts_ref;
+    rc = rac::lifecycle::acquire_lifecycle_tts(&tts_ref);
     if (rc != RAC_SUCCESS) {
-        rac_stt_result_free(&stt);
         rac_llm_result_free(&llm);
+        rac::llm::release_lifecycle_llm(&llm_ref);
+        rac_stt_result_free(&stt);
+        rac::lifecycle::release_lifecycle_stt(&stt_ref);
+        emit_component_failure(handle, "tts", rc, "TTS lifecycle is not loaded");
+        return rac_proto_buffer_set_error(out_result, rc, "TTS lifecycle is not loaded");
+    }
+
+    rac_tts_result_t tts = {};
+    {
+        rac_tts_service_t tts_service{tts_ref.ops, tts_ref.impl, tts_ref.model_id};
+        rc = rac_tts_synthesize(&tts_service, llm.text, nullptr, &tts);
+    }
+    if (rc != RAC_SUCCESS) {
+        rac::lifecycle::release_lifecycle_tts(&tts_ref);
+        rac_llm_result_free(&llm);
+        rac::llm::release_lifecycle_llm(&llm_ref);
+        rac_stt_result_free(&stt);
+        rac::lifecycle::release_lifecycle_stt(&stt_ref);
         emit_component_failure(handle, "tts", rc, "TTS synthesis failed");
         return rac_proto_buffer_set_error(out_result, rc, "TTS synthesis failed");
     }
@@ -1275,9 +1415,12 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(
                                                           : RAC_TTS_DEFAULT_SAMPLE_RATE,
                                       &wav_data, &wav_size);
         if (rc != RAC_SUCCESS) {
-            rac_stt_result_free(&stt);
-            rac_llm_result_free(&llm);
             rac_tts_result_free(&tts);
+            rac::lifecycle::release_lifecycle_tts(&tts_ref);
+            rac_llm_result_free(&llm);
+            rac::llm::release_lifecycle_llm(&llm_ref);
+            rac_stt_result_free(&stt);
+            rac::lifecycle::release_lifecycle_stt(&stt_ref);
             emit_component_failure(handle, "tts", rc, "TTS audio conversion failed");
             return rac_proto_buffer_set_error(out_result, rc, "TTS audio conversion failed");
         }
@@ -1298,9 +1441,12 @@ rac_result_t rac_voice_agent_process_voice_turn_proto(
                         stt.text, llm.text);
 
     std::free(wav_data);
-    rac_stt_result_free(&stt);
-    rac_llm_result_free(&llm);
     rac_tts_result_free(&tts);
+    rac::lifecycle::release_lifecycle_tts(&tts_ref);
+    rac_llm_result_free(&llm);
+    rac::llm::release_lifecycle_llm(&llm_ref);
+    rac_stt_result_free(&stt);
+    rac::lifecycle::release_lifecycle_stt(&stt_ref);
     return copy_proto_message(result, out_result);
 #endif
 }
