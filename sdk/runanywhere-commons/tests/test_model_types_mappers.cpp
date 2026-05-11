@@ -3,7 +3,7 @@
  * @brief Round-trip parity tests for proto enum ↔ C enum mappers
  *        (T15a / SWIFT-DUP-MODELTYPES-COMPUTED).
  *
- * Exercises the 5 mapper pairs added in
+ * Exercises the 6 mapper pairs in
  * sdk/runanywhere-commons/src/infrastructure/model_management/model_types_mappers.cpp:
  *
  *   - InferenceFramework  ↔ rac_inference_framework_t
@@ -11,6 +11,7 @@
  *   - ModelFormat         ↔ rac_model_format_t
  *   - ModelSource         ↔ rac_model_source_t
  *   - ArchiveType         ↔ rac_archive_type_t
+ *   - ArchiveStructure    ↔ rac_archive_structure_t
  *
  * For each pair the test:
  *   - Round-trips every defined enum value: proto → C → proto and
@@ -138,6 +139,16 @@ constexpr rac_archive_type_t kCAllArchiveTypes[] = {
     RAC_ARCHIVE_TYPE_TAR_BZ2,
     RAC_ARCHIVE_TYPE_TAR_GZ,
     RAC_ARCHIVE_TYPE_TAR_XZ,
+};
+
+// ArchiveStructure — proto 0..4.
+constexpr int32_t kProtoAsAll[] = {0, 1, 2, 3, 4};
+
+constexpr rac_archive_structure_t kCAllArchiveStructures[] = {
+    RAC_ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED,
+    RAC_ARCHIVE_STRUCTURE_DIRECTORY_BASED,
+    RAC_ARCHIVE_STRUCTURE_NESTED_DIRECTORY,
+    RAC_ARCHIVE_STRUCTURE_UNKNOWN,
 };
 
 // ---------------------------------------------------------------------------
@@ -317,6 +328,42 @@ int test_archive_type_c_round_trip() {
 }
 
 // ---------------------------------------------------------------------------
+// ArchiveStructure: proto UNSPECIFIED (0) and proto UNKNOWN (4) both fold into
+// the C RAC_ARCHIVE_STRUCTURE_UNKNOWN sentinel. The single C UNKNOWN value
+// canonicalises forward to proto UNKNOWN (4), not back to UNSPECIFIED. Every
+// other value round-trips 1:1.
+// ---------------------------------------------------------------------------
+int test_archive_structure_proto_round_trip() {
+    for (int32_t proto : kProtoAsAll) {
+        rac_archive_structure_t c = RAC_ARCHIVE_STRUCTURE_UNKNOWN;
+        EXPECT_RC(rac_archive_structure_from_proto(proto, &c), RAC_SUCCESS);
+
+        int32_t back = -1;
+        EXPECT_RC(rac_archive_structure_to_proto(c, &back), RAC_SUCCESS);
+
+        if (proto == 0) {
+            // UNSPECIFIED collapses to C UNKNOWN which forwards to proto UNKNOWN.
+            EXPECT_TRUE(back == 4);
+        } else {
+            EXPECT_TRUE(back == proto);
+        }
+    }
+    return 0;
+}
+
+int test_archive_structure_c_round_trip() {
+    for (rac_archive_structure_t c : kCAllArchiveStructures) {
+        int32_t proto = -1;
+        EXPECT_RC(rac_archive_structure_to_proto(c, &proto), RAC_SUCCESS);
+
+        rac_archive_structure_t back = RAC_ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED;
+        EXPECT_RC(rac_archive_structure_from_proto(proto, &back), RAC_SUCCESS);
+        EXPECT_TRUE(back == c);
+    }
+    return 0;
+}
+
+// ---------------------------------------------------------------------------
 // Invalid / out-of-range proto values must fail with INVALID_ARGUMENT and
 // reset the out parameter to a safe default.
 // ---------------------------------------------------------------------------
@@ -343,6 +390,10 @@ int test_invalid_proto_values() {
         rac_archive_type_t at = RAC_ARCHIVE_TYPE_ZIP;
         EXPECT_RC(rac_archive_type_from_proto(bad, &at), RAC_ERROR_INVALID_ARGUMENT);
         EXPECT_TRUE(at == RAC_ARCHIVE_TYPE_NONE);
+
+        rac_archive_structure_t as = RAC_ARCHIVE_STRUCTURE_DIRECTORY_BASED;
+        EXPECT_RC(rac_archive_structure_from_proto(bad, &as), RAC_ERROR_INVALID_ARGUMENT);
+        EXPECT_TRUE(as == RAC_ARCHIVE_STRUCTURE_UNKNOWN);
     }
     return 0;
 }
@@ -378,6 +429,11 @@ int test_invalid_c_values() {
               RAC_ERROR_INVALID_ARGUMENT);
     EXPECT_TRUE(out == 0);
 
+    out = -1;
+    EXPECT_RC(rac_archive_structure_to_proto(static_cast<rac_archive_structure_t>(12345), &out),
+              RAC_ERROR_INVALID_ARGUMENT);
+    EXPECT_TRUE(out == 0);
+
     return 0;
 }
 
@@ -403,6 +459,10 @@ int test_null_out_pointer_rejection() {
 
     EXPECT_RC(rac_archive_type_from_proto(1, nullptr), RAC_ERROR_NULL_POINTER);
     EXPECT_RC(rac_archive_type_to_proto(RAC_ARCHIVE_TYPE_ZIP, nullptr),
+              RAC_ERROR_NULL_POINTER);
+
+    EXPECT_RC(rac_archive_structure_from_proto(1, nullptr), RAC_ERROR_NULL_POINTER);
+    EXPECT_RC(rac_archive_structure_to_proto(RAC_ARCHIVE_STRUCTURE_DIRECTORY_BASED, nullptr),
               RAC_ERROR_NULL_POINTER);
 
     return 0;
@@ -441,6 +501,21 @@ int test_canonical_mappings() {
     EXPECT_RC(rac_archive_type_from_proto(0, &at), RAC_SUCCESS);
     EXPECT_TRUE(at == RAC_ARCHIVE_TYPE_NONE);
 
+    // Proto SINGLE_FILE_NESTED (=1) → C SINGLE_FILE_NESTED.
+    rac_archive_structure_t as = RAC_ARCHIVE_STRUCTURE_UNKNOWN;
+    EXPECT_RC(rac_archive_structure_from_proto(1, &as), RAC_SUCCESS);
+    EXPECT_TRUE(as == RAC_ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED);
+
+    // Proto UNSPECIFIED archive_structure → C UNKNOWN.
+    as = RAC_ARCHIVE_STRUCTURE_DIRECTORY_BASED;
+    EXPECT_RC(rac_archive_structure_from_proto(0, &as), RAC_SUCCESS);
+    EXPECT_TRUE(as == RAC_ARCHIVE_STRUCTURE_UNKNOWN);
+
+    int32_t proto_as = -1;
+    EXPECT_RC(rac_archive_structure_to_proto(RAC_ARCHIVE_STRUCTURE_UNKNOWN, &proto_as),
+              RAC_SUCCESS);
+    EXPECT_TRUE(proto_as == 4);
+
     return 0;
 }
 
@@ -458,6 +533,8 @@ int main(int /*argc*/, char** /*argv*/) {
     failures += test_model_source_c_round_trip();
     failures += test_archive_type_proto_round_trip();
     failures += test_archive_type_c_round_trip();
+    failures += test_archive_structure_proto_round_trip();
+    failures += test_archive_structure_c_round_trip();
     failures += test_invalid_proto_values();
     failures += test_invalid_c_values();
     failures += test_null_out_pointer_rejection();

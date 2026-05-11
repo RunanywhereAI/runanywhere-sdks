@@ -359,6 +359,11 @@ _rac_registry_load_plugin
 _rac_registry_plugin_count
 _rac_registry_unload_plugin
 
+# Runtime registry — L1 runtime plugin lifecycle (CPU, Metal, CoreML, ONNX,
+# CUDA, …). Mirrors the engine plugin loader but keyed by rac_runtime_id_t.
+# (SWIFT-CRACOMMONS-RUNTIME-UNLOAD-EXPORT / Wave 7 T24.)
+_rac_runtime_unload
+
 # Plugin router — primitive → vtable resolution. NOTE: declared in
 # include/rac/router/rac_route.h WITHOUT RAC_API today; see TODO in Wave D followup
 # to add the annotation. Keeping exported so commons built as dynamic lib works.
@@ -734,6 +739,8 @@ _rac_model_source_from_proto
 _rac_model_source_to_proto
 _rac_archive_type_from_proto
 _rac_archive_type_to_proto
+_rac_archive_structure_from_proto
+_rac_archive_structure_to_proto
 
 # Model registry supporting result/freeing helpers.
 _rac_discovery_result_free

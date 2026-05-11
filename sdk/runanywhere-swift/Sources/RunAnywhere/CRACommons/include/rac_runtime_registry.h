@@ -125,7 +125,6 @@ RAC_API rac_result_t rac_runtime_load(const char* path);
  * @brief Unregister a runtime by id and close its dynamic-library handle when
  *        it was loaded through `rac_runtime_load`.
  */
-/* Note: not currently exported via dlsym; add to RACommons.exports if Swift consumes this. */
 RAC_API rac_result_t rac_runtime_unload(rac_runtime_id_t id);
 
 /* ===========================================================================

@@ -73,6 +73,13 @@ constexpr int32_t kProtoAtTarBz2      = 2;
 constexpr int32_t kProtoAtTarGz       = 3;
 constexpr int32_t kProtoAtTarXz       = 4;
 
+// ArchiveStructure
+constexpr int32_t kProtoAsUnspecified       = 0;
+constexpr int32_t kProtoAsSingleFileNested  = 1;
+constexpr int32_t kProtoAsDirectoryBased    = 2;
+constexpr int32_t kProtoAsNestedDirectory   = 3;
+constexpr int32_t kProtoAsUnknown           = 4;
+
 // ModelFormat — these already match rac_model_format_t value-for-value via
 // RAC_MODEL_FORMAT_ID_*, so listing them here is for documentation.
 constexpr int32_t kProtoMfUnspecified = 0;
@@ -427,6 +434,62 @@ rac_result_t rac_archive_type_to_proto(rac_archive_type_t value, int32_t* out) {
             return RAC_SUCCESS;
         default:
             *out = kProtoAtUnspecified;
+            return RAC_ERROR_INVALID_ARGUMENT;
+    }
+}
+
+// =============================================================================
+// ArchiveStructure
+// =============================================================================
+
+rac_result_t rac_archive_structure_from_proto(int32_t proto_value,
+                                              rac_archive_structure_t* out) {
+    if (out == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    switch (proto_value) {
+        case kProtoAsUnspecified:
+            // No "unknown structure" sentinel in proto-space distinct from
+            // UNSPECIFIED; both surface as the C UNKNOWN value.
+            *out = RAC_ARCHIVE_STRUCTURE_UNKNOWN;
+            return RAC_SUCCESS;
+        case kProtoAsSingleFileNested:
+            *out = RAC_ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED;
+            return RAC_SUCCESS;
+        case kProtoAsDirectoryBased:
+            *out = RAC_ARCHIVE_STRUCTURE_DIRECTORY_BASED;
+            return RAC_SUCCESS;
+        case kProtoAsNestedDirectory:
+            *out = RAC_ARCHIVE_STRUCTURE_NESTED_DIRECTORY;
+            return RAC_SUCCESS;
+        case kProtoAsUnknown:
+            *out = RAC_ARCHIVE_STRUCTURE_UNKNOWN;
+            return RAC_SUCCESS;
+        default:
+            *out = RAC_ARCHIVE_STRUCTURE_UNKNOWN;
+            return RAC_ERROR_INVALID_ARGUMENT;
+    }
+}
+
+rac_result_t rac_archive_structure_to_proto(rac_archive_structure_t value, int32_t* out) {
+    if (out == nullptr) {
+        return RAC_ERROR_NULL_POINTER;
+    }
+    switch (value) {
+        case RAC_ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED:
+            *out = kProtoAsSingleFileNested;
+            return RAC_SUCCESS;
+        case RAC_ARCHIVE_STRUCTURE_DIRECTORY_BASED:
+            *out = kProtoAsDirectoryBased;
+            return RAC_SUCCESS;
+        case RAC_ARCHIVE_STRUCTURE_NESTED_DIRECTORY:
+            *out = kProtoAsNestedDirectory;
+            return RAC_SUCCESS;
+        case RAC_ARCHIVE_STRUCTURE_UNKNOWN:
+            *out = kProtoAsUnknown;
+            return RAC_SUCCESS;
+        default:
+            *out = kProtoAsUnspecified;
             return RAC_ERROR_INVALID_ARGUMENT;
     }
 }
