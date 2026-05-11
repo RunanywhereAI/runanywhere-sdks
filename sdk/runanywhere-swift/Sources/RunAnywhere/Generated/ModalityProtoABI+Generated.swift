@@ -158,11 +158,13 @@ private enum VoiceAgentGeneratedProtoABI {
 }
 
 private enum VLMGeneratedProtoABI {
-    typealias CancelProtoFn = @convention(c) (rac_handle_t?) -> rac_result_t
+    typealias CancelLifecycleFn = @convention(c) (
+        UnsafeMutablePointer<rac_proto_buffer_t>?
+    ) -> rac_result_t
 
-    static let cancelProtoName = "rac_vlm_cancel_proto"
+    static let cancelLifecycleName = "rac_vlm_cancel_lifecycle_proto"
 
-    static let cancelProto = NativeProtoABI.load(cancelProtoName, as: CancelProtoFn.self)
+    static let cancelLifecycle = NativeProtoABI.load(cancelLifecycleName, as: CancelLifecycleFn.self)
 }
 
 private enum EmbeddingsGeneratedProtoABI {
@@ -605,15 +607,20 @@ extension CppBridge.VoiceAgent {
 // MARK: - VLM
 
 extension CppBridge.VLM {
-    public func cancelProto(handle: rac_handle_t) throws {
+    public func cancelLifecycle() throws -> RASDKEvent {
         let symbol = try NativeProtoABI.require(
-            VLMGeneratedProtoABI.cancelProto,
-            named: VLMGeneratedProtoABI.cancelProtoName
+            VLMGeneratedProtoABI.cancelLifecycle,
+            named: VLMGeneratedProtoABI.cancelLifecycleName
         )
-        let status = symbol(handle)
+        var outBuffer = rac_proto_buffer_t()
+        defer { NativeProtoABI.free(&outBuffer) }
+        let status = symbol(&outBuffer)
         guard status == RAC_SUCCESS else {
-            throw SDKException(code: .cancelled, message: "VLM cancel proto failed: \(status)", category: .component)
+            let message = outBuffer.error_message.map { String(cString: $0) }
+                ?? "Native proto request failed: \(VLMGeneratedProtoABI.cancelLifecycleName) rc=\(status)"
+            throw SDKException(code: .processingFailed, message: message, category: .internal)
         }
+        return try NativeProtoABI.decode(RASDKEvent.self, from: outBuffer)
     }
 }
 

@@ -344,16 +344,16 @@ modalities:
           signal continue/cancel, (3) the call also writes into a final
           outBuffer alongside the streaming callbacks. Custom AsyncStream wiring.
 
-      - swift_name: cancelProto
-        c_symbol: rac_vlm_cancel_proto
+      - swift_name: cancelLifecycle
+        c_symbol: rac_vlm_cancel_lifecycle_proto
         request: ~
-        response: ~
-        kind: voidCall
-        context: rac_handle_t
-        # ABI: (handle) -> rc. No request, no out-buffer.
-        error_code: cancelled
-        error_category: component
-        error_message_prefix: "VLM cancel proto failed"
+        response: RASDKEvent
+        kind: invokeOutOnly
+        # ABI: (outBuffer*) -> rc, no request, no handle. Returns RASDKEvent.
+        # Mirrors LLM.cancelProto — internally acquires the lifecycle-owned
+        # VLM service, requests cancel, releases, and emits canonical
+        # cancellation events. Replaces the legacy handle-based cancelProto
+        # (rac_vlm_cancel_proto) which depended on the per-handle service.
 
   # --------------------------------------------------------------------------
   # Embeddings  (CppBridge.EmbeddingsProto namespace, static method)

@@ -129,6 +129,7 @@ RAC_API rac_result_t rac_vlm_process_stream_proto(
     void* user_data,
     rac_proto_buffer_t* out_result);
 RAC_API rac_result_t rac_vlm_cancel_proto(rac_handle_t handle);
+RAC_API rac_result_t rac_vlm_cancel_lifecycle_proto(rac_proto_buffer_t* out_event);
 
 // Embeddings proto ABI.
 RAC_API rac_result_t rac_embeddings_embed_batch_proto(

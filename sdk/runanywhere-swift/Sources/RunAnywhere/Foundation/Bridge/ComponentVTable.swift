@@ -115,12 +115,12 @@ extension CppBridge.ComponentVTable {
 
     /// VLM component vtable — `rac_vlm_component_*` family.
     ///
-    /// `loadModel` here uses the path-only overload of
-    /// `rac_vlm_component_load_model` (NULL projector). Callers that need
-    /// to pass a vision-projector artifact must use the VLM-specific
-    /// `loadResolvedModel(path:visionProjectorPath:...)` on the per-modality
-    /// extension — that signature has 4 strings, not 3, and is not a
-    /// reasonable generalization here.
+    /// Wave 7 / T23 removed all SDK-side `loadModel(from:)` adapters on the
+    /// VLM actor; the level-3 handle is never loaded with a model and the
+    /// `loadModel` slot is dead in practice. The slot is kept here only so
+    /// the `ComponentVTable` shape stays uniform with the sibling modalities
+    /// (LLM, STT, TTS, VAD). Inference and cancel now route through the
+    /// lifecycle service via the proto ABI.
     public static let vlm = CppBridge.ComponentVTable(
         component: .vlm,
         create: { rac_vlm_component_create($0) },

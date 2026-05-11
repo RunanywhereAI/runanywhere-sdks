@@ -38,31 +38,30 @@ extension ArchiveType {
 }
 
 // MARK: - ArchiveStructure C++ Conversion
-//
-// TODO: add ArchiveStructure mapper in commons. T15a added proto<->C mappers
-// for 5 enum pairs (InferenceFramework, ModelCategory, ModelFormat,
-// ModelSource, ArchiveType) but not ArchiveStructure. Keep the hand-written
-// switches here until commons exposes `rac_archive_structure_from/to_proto`.
 
 extension ArchiveStructure {
-    /// Convert to C++ archive structure
+    /// Convert to C++ archive structure.
+    /// Delegates to commons' `rac_archive_structure_from_proto`. Falls back to
+    /// `RAC_ARCHIVE_STRUCTURE_UNKNOWN` when the proto value is unrecognized
+    /// (preserves legacy hand-written behaviour for unspecified inputs).
     func toC() -> rac_archive_structure_t {
-        switch self {
-        case .singleFileNested:     return RAC_ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED
-        case .directoryBased:       return RAC_ARCHIVE_STRUCTURE_DIRECTORY_BASED
-        case .nestedDirectory:      return RAC_ARCHIVE_STRUCTURE_NESTED_DIRECTORY
-        case .unknown:              return RAC_ARCHIVE_STRUCTURE_UNKNOWN
-        default:                    return RAC_ARCHIVE_STRUCTURE_UNKNOWN
+        var out: rac_archive_structure_t = RAC_ARCHIVE_STRUCTURE_UNKNOWN
+        guard rac_archive_structure_from_proto(Int32(self.rawValue), &out) == RAC_SUCCESS else {
+            return RAC_ARCHIVE_STRUCTURE_UNKNOWN
         }
+        return out
     }
 
-    /// Initialize from C++ archive structure
+    /// Initialize from C++ archive structure.
+    /// Delegates to commons' `rac_archive_structure_to_proto`. Falls back to
+    /// `.unknown` for unrecognized C values (matches legacy hand-written switch).
     init(from cStructure: rac_archive_structure_t) {
-        switch cStructure {
-        case RAC_ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED:   self = .singleFileNested
-        case RAC_ARCHIVE_STRUCTURE_DIRECTORY_BASED:      self = .directoryBased
-        case RAC_ARCHIVE_STRUCTURE_NESTED_DIRECTORY:     self = .nestedDirectory
-        default:                                         self = .unknown
+        var protoValue: Int32 = 0
+        guard rac_archive_structure_to_proto(cStructure, &protoValue) == RAC_SUCCESS,
+              let resolved = ArchiveStructure(rawValue: Int(protoValue)) else {
+            self = .unknown
+            return
         }
+        self = resolved
     }
 }

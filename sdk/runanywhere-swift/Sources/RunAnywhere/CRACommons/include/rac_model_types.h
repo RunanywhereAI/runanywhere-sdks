@@ -532,6 +532,24 @@ RAC_API rac_result_t rac_archive_type_from_proto(int32_t proto_value, rac_archiv
 RAC_API rac_result_t rac_archive_type_to_proto(rac_archive_type_t value, int32_t* out);
 
 /**
+ * @brief Convert a proto `runanywhere.v1.ArchiveStructure` int32 value to a
+ *        `rac_archive_structure_t` value.
+ *
+ * Note: proto's ARCHIVE_STRUCTURE_UNSPECIFIED (=0) maps to the C
+ * RAC_ARCHIVE_STRUCTURE_UNKNOWN (=99) since both represent "no structure
+ * information known". The remaining proto values 1..4 map 1:1 onto the
+ * corresponding C structure enums.
+ */
+RAC_API rac_result_t rac_archive_structure_from_proto(int32_t proto_value,
+                                                      rac_archive_structure_t* out);
+
+/**
+ * @brief Convert a `rac_archive_structure_t` value to the proto
+ *        `runanywhere.v1.ArchiveStructure` int32 value.
+ */
+RAC_API rac_result_t rac_archive_structure_to_proto(rac_archive_structure_t value, int32_t* out);
+
+/**
  * @brief Check if artifact requires extraction.
  * Mirrors Swift's ModelArtifactType.requiresExtraction.
  *

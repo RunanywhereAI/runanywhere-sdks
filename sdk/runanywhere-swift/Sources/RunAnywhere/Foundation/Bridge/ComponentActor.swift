@@ -146,9 +146,10 @@ extension CppBridge {
         }
 
         /// Update the locally-tracked loaded asset id without touching
-        /// the C side. Used by modality-specific load paths (e.g. VLM's
-        /// projector-aware loader, or `CppBridge.VLM.loadModel(from:)`
-        /// lifecycle adapter that bypasses this scaffold's `loadModel`).
+        /// the C side. Used by modality-specific load paths that bypass
+        /// this scaffold's `loadModel` (e.g. modalities with non-standard
+        /// load signatures). Currently only VAD calls this to clear the
+        /// asset id on unload.
         public func markAssetLoaded(_ id: String?) {
             loadedAssetId = id
         }

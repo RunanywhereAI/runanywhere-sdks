@@ -4,19 +4,23 @@
 //
 //  VLM component bridge - manages C++ VLM component lifecycle.
 //
-//  Generic scaffolding (handle creation, unload, destroy) lives in
-//  `CppBridge.ComponentActor`. VLM-specific surfaces kept here:
-//   - 5-string `loadResolvedModel(...)` with an optional vision-projector
-//     artifact (the path-only variant on the generic actor would lose
-//     the projector slot)
-//   - `loadModel(from:)` lifecycle adapters for `RAModelLoadResult` and
-//     `RACurrentModelResult` (multi-artifact-aware)
-//   - `cancel()`, `supportsStreaming`, and `state` introspection
-//   - `currentModelPath` mirror used by the cross-actor lifecycle code.
+//  Generic scaffolding (handle creation, destroy) lives in
+//  `CppBridge.ComponentActor`. The VLM actor exists only to host a
+//  per-process handle that `process()`/`processStream()` pass to the
+//  proto ABI to satisfy the C signature — the canonical model state
+//  is owned by the C++ lifecycle (`rac_model_lifecycle_load_proto`),
+//  and `rac_vlm_process[_stream]_proto` route through the lifecycle
+//  whenever it is loaded (Phase 6j). All VLM-specific load helpers
+//  have been removed in Wave 7 / T23 in favour of that single source
+//  of truth.
 //
-//  The public `isLoaded` accessor was removed in Wave 6C (T13) — call
-//  sites now query `RunAnywhere.currentModel(category:)` on the lifecycle
-//  for both `.multimodal` and `.vision` as the single source of truth.
+//  VLM-specific surfaces kept here:
+//   - `cancel()` — calls `rac_vlm_cancel_lifecycle_proto` (Wave 7 / T23).
+//     No handle is threaded; the cancel acquires the lifecycle service
+//     internally, mirroring the LLM cancel-proto path.
+//   - `supportsStreaming` and `state` introspection on the legacy
+//     per-handle component (still exposed for parity with sibling
+//     modalities; not consulted by SDK consumers).
 //
 
 import CRACommons
@@ -33,19 +37,11 @@ extension CppBridge {
         /// Shared VLM component instance
         public static let shared = VLM()
 
-        /// Generic scaffold (handle / isLoaded / destroy). VLM's
-        /// vtable.loadModel uses the path-only overload of
-        /// `rac_vlm_component_load_model` (NULL projector). The multi-
-        /// artifact case goes through `loadResolvedModel(...)` below.
+        /// Generic scaffold (handle / destroy). The level-3 handle is never
+        /// loaded with a model in V2 — `rac_vlm_process_proto` falls back to
+        /// the lifecycle-owned VLM service. The handle survives only to
+        /// satisfy the proto ABI's `rac_handle_t` parameter.
         private let inner = ComponentActor(vtable: .vlm)
-
-        /// Mirror of the currently-loaded model id (also tracked on the
-        /// inner actor via `markAssetLoaded`).
-        private var loadedModelId: String?
-
-        /// Mirror of the resolved primary-model path used by the
-        /// `currentModelPath` accessor.
-        private var loadedModelPath: String?
 
         private let logger = SDKLogger(category: "CppBridge.VLM")
 
@@ -58,135 +54,26 @@ extension CppBridge {
             try await inner.getHandle()
         }
 
-        // MARK: - State
-
-        /// Get the currently loaded model ID
-        public var currentModelId: String? { loadedModelId }
-
-        /// Get the currently loaded model path
-        public var currentModelPath: String? { loadedModelPath }
-
         // MARK: - Model Lifecycle
 
-        func loadModel(from result: RAModelLoadResult, modelName: String? = nil) async throws {
-            if loadedModelId == result.modelID, await inner.isLoaded {
-                return
-            }
-            guard result.success else {
-                throw SDKException(
-                    code: .modelLoadFailed,
-                    message: result.errorMessage.isEmpty ? "VLM lifecycle load failed" : result.errorMessage,
-                    category: .component
-                )
-            }
-            guard let primaryPath = result.resolvedPrimaryModelPath else {
-                throw SDKException(
-                    code: .modelLoadFailed,
-                    message: "VLM lifecycle result did not include a primary model artifact",
-                    category: .component
-                )
-            }
-
-            let projectorPath = result.resolvedVisionProjectorPath
-            if result.framework == .llamaCpp && projectorPath == nil {
-                throw SDKException(
-                    code: .modelLoadFailed,
-                    message: "VLM lifecycle result did not include a vision projector artifact",
-                    category: .component
-                )
-            }
-
-            try await loadResolvedModel(
-                primaryPath,
-                visionProjectorPath: projectorPath,
-                modelId: result.modelID,
-                modelName: modelName ?? result.modelID
-            )
-        }
-
-        func loadModel(from result: RACurrentModelResult) async throws {
-            if loadedModelId == result.modelID, await inner.isLoaded {
-                return
-            }
-            guard result.found else {
-                throw SDKException(code: .modelLoadFailed, message: "No lifecycle-loaded VLM model found", category: .component)
-            }
-            guard let primaryPath = result.resolvedPrimaryModelPath else {
-                throw SDKException(
-                    code: .modelLoadFailed,
-                    message: "Current VLM lifecycle result did not include a primary model artifact",
-                    category: .component
-                )
-            }
-
-            let projectorPath = result.resolvedVisionProjectorPath
-            if result.framework == .llamaCpp && projectorPath == nil {
-                throw SDKException(
-                    code: .modelLoadFailed,
-                    message: "Current VLM lifecycle result did not include a vision projector artifact",
-                    category: .component
-                )
-            }
-
-            try await loadResolvedModel(
-                primaryPath,
-                visionProjectorPath: projectorPath,
-                modelId: result.modelID,
-                modelName: result.hasModel && !result.model.name.isEmpty ? result.model.name : result.modelID
-            )
-        }
-
-        /// Load a VLM model using artifacts already resolved by commons lifecycle.
-        func loadResolvedModel(
-            _ modelPath: String,
-            visionProjectorPath: String?,
-            modelId: String,
-            modelName: String
-        ) async throws {
-            let handle = try await inner.getHandle()
-
-            let result: rac_result_t
-            if let visionProjectorPath = visionProjectorPath {
-                result = modelPath.withCString { pathPtr in
-                    visionProjectorPath.withCString { projectorPtr in
-                        modelId.withCString { idPtr in
-                            modelName.withCString { namePtr in
-                                rac_vlm_component_load_model(handle, pathPtr, projectorPtr, idPtr, namePtr)
-                            }
-                        }
-                    }
-                }
-            } else {
-                result = modelPath.withCString { pathPtr in
-                    modelId.withCString { idPtr in
-                        modelName.withCString { namePtr in
-                            rac_vlm_component_load_model(handle, pathPtr, nil, idPtr, namePtr)
-                        }
-                    }
-                }
-            }
-
-            guard result == RAC_SUCCESS else {
-                throw SDKException(code: .modelLoadFailed, message: "Failed to load VLM model: \(result)", category: .component)
-            }
-
-            loadedModelId = modelId
-            loadedModelPath = modelPath
-            await inner.markAssetLoaded(modelId)
-            logger.info("VLM model loaded: \(modelId)")
-        }
-
-        /// Unload the current model
-        public func unload() async {
-            await inner.unload()
-            loadedModelId = nil
-            loadedModelPath = nil
-        }
-
-        /// Cancel ongoing generation
+        /// Cancel ongoing generation via the lifecycle cancel proto.
+        ///
+        /// Replaces the legacy handle-based `rac_vlm_component_cancel` path
+        /// (Wave 7 / T23). The lifecycle ABI acquires the lifecycle-owned
+        /// VLM service internally, dispatches `cancel` on its vtable, and
+        /// emits canonical `CANCELLATION_EVENT_KIND_*` SDKEvents — keeping
+        /// the cancel path consistent with LLM cancellation semantics.
         public func cancel() async {
-            guard let handle = await inner.existingHandle() else { return }
-            _ = rac_vlm_component_cancel(handle)
+            do {
+                _ = try cancelLifecycle()
+            } catch let error as SDKException {
+                // No lifecycle VLM loaded is a no-op; surface anything else
+                // at warning level (parity with LLM cancel — failures here
+                // are not fatal to the caller).
+                logger.warning("VLM cancel skipped: \(error.message)")
+            } catch {
+                logger.warning("VLM cancel skipped: \(error.localizedDescription)")
+            }
         }
 
         /// Check if streaming is supported
@@ -210,8 +97,6 @@ extension CppBridge {
         /// Destroy the component
         public func destroy() async {
             await inner.destroy()
-            loadedModelId = nil
-            loadedModelPath = nil
         }
     }
 }
