@@ -375,7 +375,7 @@ struct ConversationListView: View {
                 ForEach(filteredConversations) { conversation in
                     ConversationRow(conversation: conversation, searchQuery: searchQuery)
                         .onTapGesture {
-                            store.loadConversation(conversation.id)
+                            _ = store.loadConversation(conversation.id)
                             NotificationCenter.default.post(
                                 name: Self.conversationSelectedNotification,
                                 object: conversation

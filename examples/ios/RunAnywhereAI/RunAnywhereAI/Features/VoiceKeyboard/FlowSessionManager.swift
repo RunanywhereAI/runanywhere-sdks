@@ -405,7 +405,7 @@ final class FlowSessionManager: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 1_000_000_000)
                 guard let self else { break }
-                let phase = await self.sessionPhase
+                let phase = self.sessionPhase
                 guard phase != .idle else { break }
                 await MainActor.run {
                     self.elapsedSeconds += 1
@@ -413,7 +413,7 @@ final class FlowSessionManager: ObservableObject {
                     SharedDataBridge.shared.lastHeartbeatTimestamp = Date().timeIntervalSince1970
                 }
                 if #available(iOS 16.1, *) {
-                    let currentPhase = await self.sessionPhase
+                    let currentPhase = self.sessionPhase
                     await self.updateLiveActivity(phase: currentPhase.liveActivityPhase, transcript: "")
                 }
             }

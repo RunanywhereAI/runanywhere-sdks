@@ -309,9 +309,9 @@ class STTViewModel: ObservableObject {
 
         silenceCheckTask = Task { [weak self] in
             while !Task.isCancelled {
-                guard let self = self, await self.isRecording else { break }
+                guard let self = self, self.isRecording else { break }
 
-                let level = await self.audioLevel
+                let level = self.audioLevel
                 await self.checkSpeechState(level: level)
 
                 try? await Task.sleep(nanoseconds: 50_000_000) // 50ms

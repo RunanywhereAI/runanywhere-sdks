@@ -153,7 +153,12 @@ let package = Package(
                 "RABackendLlamaCPPBinary",
             ],
             path: "Sources/LlamaCPPRuntime",
-            exclude: ["include"],
+            exclude: [
+                "include",
+                // Stray docs file picked up by SwiftPM as an unhandled
+                // resource. Silence the "unhandled file(s)" warning.
+                "README.md",
+            ],
             linkerSettings: [
                 .linkedLibrary("c++"),
                 .linkedFramework("Accelerate"),
@@ -174,7 +179,12 @@ let package = Package(
                 "RABackendSherpaBinary",
             ],
             path: "Sources/ONNXRuntime",
-            exclude: ["include"],
+            exclude: [
+                "include",
+                // Stray docs file picked up by SwiftPM as an unhandled
+                // resource. Silence the "unhandled file(s)" warning.
+                "README.md",
+            ],
             linkerSettings: [
                 .linkedLibrary("c++"),
                 .linkedFramework("Accelerate"),
