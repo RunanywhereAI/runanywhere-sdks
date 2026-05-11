@@ -87,9 +87,13 @@ rm -f "${OUT_DIR}/voice_agent_service.grpc.swift" \
 # the RA* swift-protobuf types in the same module.
 if command -v python3 >/dev/null 2>&1; then
     python3 "${SCRIPT_DIR}/generate_swift_convenience.py"
+    # Phase B (P4-T13): generate `ModalityProtoABI+Generated.swift` from the
+    # manifest at swift-modality-abi.yaml. Owns the dlsym table for the 7
+    # fully-equivalent modality-ABI methods.
+    python3 "${SCRIPT_DIR}/generate_swift_modality_abi.py"
 else
-    echo "warning: python3 not found — skipping RAConvenience.swift generation." >&2
-    echo "         Install python3 (https://www.python.org) to enable P4-T2 annotations." >&2
+    echo "warning: python3 not found — skipping RAConvenience.swift + ModalityProtoABI codegen." >&2
+    echo "         Install python3 (https://www.python.org) to enable P4-T2/P4-T13 annotations." >&2
 fi
 
 ls -1 "${OUT_DIR}"

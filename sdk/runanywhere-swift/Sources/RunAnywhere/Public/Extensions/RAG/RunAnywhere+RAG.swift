@@ -104,7 +104,8 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
-        return try await CppBridge.RAG.shared.ingest(document)
+        let session = try await CppBridge.RAG.shared.requireProtoSession()
+        return try await CppBridge.RAG.shared.ingest(handle: session, document)
     }
 
     /// Ingest multiple text documents into the RAG pipeline in a single batch.
@@ -121,8 +122,9 @@ public extension RunAnywhere {
         guard !documents.isEmpty else { return }
         try await ensureServicesReady()
 
+        let session = try await CppBridge.RAG.shared.requireProtoSession()
         for document in documents {
-            _ = try await CppBridge.RAG.shared.ingest(document)
+            _ = try await CppBridge.RAG.shared.ingest(handle: session, document)
         }
     }
 
@@ -197,7 +199,8 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
-        return try await CppBridge.RAG.shared.query(options)
+        let session = try await CppBridge.RAG.shared.requireProtoSession()
+        return try await CppBridge.RAG.shared.query(handle: session, options)
     }
 }
 

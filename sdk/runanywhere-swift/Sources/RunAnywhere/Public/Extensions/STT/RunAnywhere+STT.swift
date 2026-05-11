@@ -34,7 +34,12 @@ public extension RunAnywhere {
             throw SDKException(code: .notInitialized, message: "STT model not loaded", category: .component)
         }
 
-        return try await CppBridge.STT.shared.transcribe(audioData: audioData, options: options)
+        var request = RASTTTranscriptionRequest()
+        var audioSource = RASTTAudioSource()
+        audioSource.audioData = audioData
+        request.audio = audioSource
+        request.options = options
+        return try await CppBridge.STT.shared.transcribe(request)
     }
 
     /// Canonical stream-in / stream-out transcription.
@@ -62,10 +67,12 @@ public extension RunAnywhere {
                 }
                 for await chunk in audio {
                     if Task.isCancelled { break }
-                    guard let partials = try? await CppBridge.STT.shared.transcribeStream(
-                        audioData: chunk,
-                        options: options
-                    ) else {
+                    var request = RASTTTranscriptionRequest()
+                    var audioSource = RASTTAudioSource()
+                    audioSource.audioData = chunk
+                    request.audio = audioSource
+                    request.options = options
+                    guard let partials = try? await CppBridge.STT.shared.transcribeStream(request) else {
                         continue
                     }
                     for await partial in partials {

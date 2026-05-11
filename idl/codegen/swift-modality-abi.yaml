@@ -44,6 +44,18 @@
 #     RAG-config helper is a top-level free function, embeddings lives under a
 #     nested namespace, etc.).
 #
+# swift_first_arg_label
+#     Optional. Argument label for the first parameter of the emitted method.
+#     "_" (default) emits an unlabeled first arg (e.g. `generate(_ request:)`).
+#     Any other value emits a labeled arg (e.g. `processLifecycle(request:)`).
+#
+# swift_first_arg_name
+#     Optional. Parameter name of the first arg. Defaults to `request`.
+#
+# swift_visibility
+#     Optional. `public` (default) or `internal`. Controls the emitted Swift
+#     access modifier on the method.
+#
 modalities:
 
   # --------------------------------------------------------------------------
@@ -210,6 +222,10 @@ modalities:
         request: RAVADConfiguration
         response: RAVADServiceState
         kind: invoke
+        swift_first_arg_label: "_"
+        swift_first_arg_name: "config"
+        # Hand-written shape: `public func configureLifecycle(_ config:)` —
+        # instance method on the VAD actor, unlabeled first arg named `config`.
 
       - swift_name: startLifecycle
         c_symbol: rac_vad_start_lifecycle_proto
@@ -240,6 +256,10 @@ modalities:
         request: RAVADProcessRequest
         response: RAVADResult
         kind: invoke
+        swift_first_arg_label: "request"
+        swift_first_arg_name: "request"
+        # Hand-written shape: `public func processLifecycle(request:)` — instance
+        # method on the VAD actor, labeled first arg named `request`.
 
   # --------------------------------------------------------------------------
   # VoiceAgent
@@ -333,6 +353,8 @@ modalities:
         kind: invoke
         context: rac_handle_t
         static: true
+        swift_first_arg_label: "request"
+        swift_first_arg_name: "request"
         # Caller passes the handle explicitly: embedBatch(handle:, request:).
 
   # --------------------------------------------------------------------------

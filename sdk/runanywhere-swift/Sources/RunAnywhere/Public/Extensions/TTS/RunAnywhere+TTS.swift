@@ -39,7 +39,10 @@ public extension RunAnywhere {
             throw SDKException(code: .notInitialized, message: "TTS voice not loaded", category: .component)
         }
 
-        return try await CppBridge.TTS.shared.synthesize(text: text, options: options)
+        var request = RATTSSynthesisRequest()
+        request.text = text
+        request.options = options
+        return try await CppBridge.TTS.shared.synthesize(request)
     }
 
     /// Stream synthesis through the generated-proto C++ TTS ABI.
@@ -49,9 +52,12 @@ public extension RunAnywhere {
     ) -> AsyncStream<RATTSOutput> {
         AsyncStream { continuation in
             Task {
+                var request = RATTSSynthesisRequest()
+                request.text = text
+                request.options = options
                 guard isInitialized,
                       await CppBridge.TTS.shared.isLoaded,
-                      let stream = try? await CppBridge.TTS.shared.synthesizeStream(text: text, options: options) else {
+                      let stream = try? await CppBridge.TTS.shared.synthesizeStream(request) else {
                     continuation.finish()
                     return
                 }

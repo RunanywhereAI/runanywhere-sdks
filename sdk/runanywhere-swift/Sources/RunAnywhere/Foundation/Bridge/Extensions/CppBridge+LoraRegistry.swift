@@ -30,7 +30,21 @@ extension CppBridge {
             }
         }
 
-        // Catalog operations are implemented in `CppBridge+ModalityProtoABI.swift`
-        // so all LoRA public calls use serialized generated proto messages.
+        // Catalog operations are implemented in
+        // `Generated/ModalityProtoABI+Generated.swift` (proto-first APIs that
+        // take the registry handle explicitly). Callers fetch the handle via
+        // `requireHandle()` before invoking those methods.
+
+        /// Resolves the registry handle, lazily reacquiring it from the
+        /// commons global singleton if the initial fetch failed.
+        public func requireHandle() throws -> rac_lora_registry_handle_t {
+            if handle == nil {
+                handle = rac_get_lora_registry()
+            }
+            guard let handle else {
+                throw SDKException(code: .initializationFailed, message: "LoRA registry not initialized", category: .internal)
+            }
+            return handle
+        }
     }
 }

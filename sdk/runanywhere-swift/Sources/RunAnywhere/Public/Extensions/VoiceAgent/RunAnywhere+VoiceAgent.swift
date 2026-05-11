@@ -27,7 +27,8 @@ public extension RunAnywhere {
         }
 
         try await ensureServicesReady()
-        _ = try await CppBridge.VoiceAgent.shared.initialize(config)
+        let handle = try await CppBridge.VoiceAgent.shared.getHandle()
+        _ = try await CppBridge.VoiceAgent.shared.initialize(handle: handle, config)
     }
 
     /// Initialize the voice agent from currently-loaded STT / LLM / TTS models.
@@ -70,7 +71,8 @@ public extension RunAnywhere {
         if let id = llmModelId { config.llmModelID = id }
         if let id = ttsVoiceId { config.ttsVoiceID = id }
 
-        _ = try await CppBridge.VoiceAgent.shared.initialize(config)
+        let handle = try await CppBridge.VoiceAgent.shared.getHandle()
+        _ = try await CppBridge.VoiceAgent.shared.initialize(handle: handle, config)
     }
 
     /// Get the current voice-agent component states (per-component load status

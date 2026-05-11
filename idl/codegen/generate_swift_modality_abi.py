@@ -5,35 +5,27 @@
 #
 # Phase 4 / P4-T11 of the Swift simplification plan: read the manifest at
 # idl/codegen/swift-modality-abi.yaml (P4-T10) and emit a Swift file containing
-# the 24 codegen-eligible methods (invoke + stream kinds). The 18 methods tagged
-# `kind: custom` cannot be expressed by the helper variants below and stay
+# the codegen-eligible methods (invoke + stream kinds where the hand-written
+# Swift body is a 1:1 wrapper around the C ABI). The 18 methods tagged
+# `kind: custom` and the 17 facade methods tagged `keep_handwritten: true` stay
 # hand-written in CppBridge+ModalityProtoABI.swift.
 #
 # Output:
 #   sdk/runanywhere-swift/Sources/RunAnywhere/Generated/ModalityProtoABI+Generated.swift
 #
-# The generated file lives under Generated/ (clearly marked auto-generated) and
-# coexists with the hand-written CppBridge+ModalityProtoABI.swift during P4-T11
-# / P4-T12 validation. To avoid method-name collisions while both files coexist,
-# all generated methods are emitted into a parallel namespace:
-#
-#     enum CppBridge_Generated { enum LLM { static func generate(...) ... } }
-#
-# P4-T13 will:
-#   * Delete the hand-written CppBridge+ModalityProtoABI.swift's invoke/stream
-#     methods.
-#   * Strip the `CppBridge_Generated` namespace wrapper and emit straight into
-#     `extension CppBridge.LLM { ... }` etc. so the public API surface is
-#     unchanged.
-#
-# This file's generated methods accept handles as explicit parameters (since
-# they live outside the actor and can't call `getHandle()`). After P4-T13's
-# swap, the regenerated file will reside on the actor extensions and call
-# `getHandle()` directly. For P4-T11 we only need a SHAPE check.
+# Phase B simplification (B2 + B3): the generated file is now emitted directly
+# onto `extension CppBridge.<Modality>` (no parallel `CppBridge_Generated`
+# wrapper). Dlsym tables drop the `v2` suffix and own the C symbols outright;
+# the hand-written `+ModalityProtoABI.swift` deletes its corresponding tables
+# and method bodies for the 7 fully-equivalent methods. The shared `ProtoStream*`
+# scaffolding (trampoline / yielder / context / runRequestStream) is canonical
+# in the hand-written file — the generated file references those types
+# instead of re-declaring its own private copies.
 #
 # Special cases:
 #   * `resolveRAGConfigurationDefaults` is optional-when-unsupported: returns
-#     `nil` instead of throwing when the symbol is missing.
+#     `nil` instead of throwing when the symbol is missing. Emitted as a
+#     top-level free function (its modality.extension == "").
 #   * Each `kind: stream` entry has its own terminal-event factory keyed by
 #     c_symbol (see STREAM_ON_ERROR_FACTORIES).
 #
@@ -105,20 +97,47 @@ STREAM_ON_ERROR_FACTORIES: dict[str, str] = {
             }""",
 }
 
-# Symbols that map a Swift facade method to a request-helper-build wrapper. The
-# hand-written facade builds the request proto out of audio/text + options
-# arguments before calling the C symbol. For codegen we keep the standard
-# `(_ request:)` shape -- callers compose the proto themselves -- so these
-# bullet notes from the manifest are informational only.
-
 # ----------------------------------------------------------------------------
 # Manifest helpers
 
 
 def is_codegen_eligible(method: dict[str, Any]) -> bool:
-    """Only invoke + stream kinds are emitted by this generator. The 18
-    `custom` methods stay hand-written."""
+    """Only invoke + stream kinds are candidates. `keep_handwritten: true`
+    is a sub-filter applied later — those methods are still tagged
+    invoke/stream so the manifest captures their ABI shape, but Swift
+    codegen skips them (they retain a hand-written facade in
+    CppBridge+ModalityProtoABI.swift)."""
     return method.get("kind") in {"invoke", "stream"}
+
+
+def should_emit(method: dict[str, Any]) -> bool:
+    """Emit only when codegen-eligible AND not flagged `keep_handwritten: true`."""
+    if not is_codegen_eligible(method):
+        return False
+    return not bool(method.get("keep_handwritten"))
+
+
+def first_arg_label(method: dict[str, Any]) -> str:
+    """Default `_` (positional/unlabeled first arg)."""
+    return method.get("swift_first_arg_label") or "_"
+
+
+def first_arg_name(method: dict[str, Any]) -> str:
+    """Default `request`."""
+    return method.get("swift_first_arg_name") or "request"
+
+
+def first_arg_clause(method: dict[str, Any], type_name: str) -> str:
+    """Render the first-arg declaration: `label name: Type` or `_ name: Type`."""
+    label = first_arg_label(method)
+    name = first_arg_name(method)
+    if label == name:
+        return f"{label}: {type_name}"
+    return f"{label} {name}: {type_name}"
+
+
+def visibility(method: dict[str, Any]) -> str:
+    return method.get("swift_visibility") or "public"
 
 
 def to_typealias_name(swift_name: str) -> str:
@@ -141,126 +160,20 @@ def render_header(modality_count: int, method_count: int) -> str:
 // Generated by idl/codegen/generate_swift_modality_abi.py from the manifest at
 // idl/codegen/swift-modality-abi.yaml.
 //
-// Covers {method_count} codegen-eligible invoke/stream methods across
-// {modality_count} modality entries. The 18 entries tagged `kind: custom` in
-// the manifest stay hand-written in CppBridge+ModalityProtoABI.swift.
+// Covers {method_count} codegen-emitted methods across {modality_count} modality
+// entries. The 18 entries tagged `kind: custom` stay hand-written in
+// CppBridge+ModalityProtoABI.swift.
 //
-// P4-T11: emit this file alongside the hand-written companion for shape
-// inspection. All methods are routed through a parallel `CppBridge_Generated`
-// namespace so the file COMPILES alongside the existing
-// `extension CppBridge.LLM` / `extension CppBridge.STT` / etc. without
-// duplicate-declaration errors.
-//
-// P4-T13: drop the `CppBridge_Generated` namespace wrapper, swap the file
-// into `extension CppBridge.<Modality>` and delete the hand-written copy.
+// Phase B (aggressive): emits proto-first APIs directly onto
+// `extension CppBridge.<Modality>`. Callers thread the handle (or request
+// proto) explicitly — no facade variants exist. Shared scaffolding types
+// (ProtoStreamYielder, protoStreamTrampoline, ProtoStreamContext,
+// runRequestStream) live in the hand-written `+ModalityProtoABI.swift` and
+// are reused here.
 
 import CRACommons
 import Foundation
 import SwiftProtobuf
-
-// MARK: - Top-level namespace for generated methods
-
-/// Parallel namespace that mirrors `CppBridge.<Modality>` so generated methods
-/// can coexist with the hand-written ones during P4-T11 validation. After
-/// P4-T13 the contents move into the corresponding `extension CppBridge.<Modality>`
-/// and this enum disappears.
-enum CppBridge_Generated {{
-    enum LLM {{}}
-    enum StructuredOutput {{}}
-    enum STT {{}}
-    enum TTS {{}}
-    enum VAD {{}}
-    enum VoiceAgent {{}}
-    enum VLM {{}}
-    enum EmbeddingsProto {{}}
-    enum RAG {{}}
-    enum LoraRegistry {{}}
-}}
-
-// MARK: - Shared scaffolding (generated copy)
-//
-// Local copies of the proto-stream callback shape and the
-// `ProtoStreamContext.runRequestStream` helper so this file compiles standalone
-// alongside the hand-written file (whose copies are `private`). P4-T13 drops
-// these and reuses the hand-written companions.
-
-private typealias ProtoStreamCallbackGenerated = @convention(c) (
-    UnsafePointer<UInt8>?,
-    Int,
-    UnsafeMutableRawPointer?
-) -> Void
-
-private protocol ProtoStreamYielderGenerated: AnyObject {{
-    func yield(bytes: UnsafePointer<UInt8>?, size: Int)
-}}
-
-private let protoStreamTrampolineGenerated: @convention(c) (
-    UnsafePointer<UInt8>?,
-    Int,
-    UnsafeMutableRawPointer?
-) -> Void = {{ bytes, size, userData in
-    guard let userData else {{ return }}
-    let yielder = Unmanaged<AnyObject>.fromOpaque(userData).takeUnretainedValue()
-    (yielder as? ProtoStreamYielderGenerated)?.yield(bytes: bytes, size: size)
-}}
-
-private final class ProtoStreamContextGenerated<Event: Message>: @unchecked Sendable, ProtoStreamYielderGenerated {{
-    let continuation: AsyncStream<Event>.Continuation
-    let logger: SDKLogger
-
-    init(continuation: AsyncStream<Event>.Continuation, category: String) {{
-        self.continuation = continuation
-        self.logger = SDKLogger(category: category)
-    }}
-
-    func yield(bytes: UnsafePointer<UInt8>?, size: Int) {{
-        guard let bytes, size > 0 else {{ return }}
-        do {{
-            let event = try Event(serializedBytes: Data(bytes: bytes, count: size))
-            continuation.yield(event)
-        }} catch {{
-            logger.warning("Failed to decode proto stream event: \\(error.localizedDescription)")
-        }}
-    }}
-
-    static func runRequestStream<Request: Message>(
-        request: Request,
-        category: String,
-        onError: (@Sendable (rac_result_t) -> Event?)? = nil,
-        body: @escaping @Sendable (
-            UnsafePointer<UInt8>?,
-            Int,
-            @convention(c) (UnsafePointer<UInt8>?, Int, UnsafeMutableRawPointer?) -> Void,
-            UnsafeMutableRawPointer
-        ) -> rac_result_t
-    ) throws -> AsyncStream<Event> {{
-        let requestData = try request.serializedData()
-        return AsyncStream {{ continuation in
-            let context = ProtoStreamContextGenerated<Event>(
-                continuation: continuation,
-                category: category
-            )
-            let contextPtr = Unmanaged.passRetained(context).toOpaque()
-            Task.detached {{
-                let rc = requestData.withUnsafeBytes {{ rawBuffer in
-                    body(
-                        rawBuffer.bindMemory(to: UInt8.self).baseAddress,
-                        rawBuffer.count,
-                        protoStreamTrampolineGenerated,
-                        contextPtr
-                    )
-                }}
-                Unmanaged<ProtoStreamContextGenerated<Event>>
-                    .fromOpaque(contextPtr)
-                    .release()
-                if rc != RAC_SUCCESS, let terminal = onError?(rc) {{
-                    continuation.yield(terminal)
-                }}
-                continuation.finish()
-            }}
-        }}
-    }}
-}}
 
 // MARK: - Generated C symbol tables
 
@@ -272,20 +185,26 @@ private final class ProtoStreamContextGenerated<Event: Message>: @unchecked Send
 
 
 def render_generated_enum(modality: dict[str, Any]) -> str:
-    """Emit a private dlsym table for one modality's invoke + stream entries.
+    """Emit a private dlsym table for one modality's emitted methods.
 
     Stream entries get a stream-shaped function-pointer typealias; invoke
     entries reuse the shared `NativeProtoABI.ProtoRequest` typealias for
     context-less calls or a fresh function-pointer typealias for
     context-threaded ones.
+
+    Returns "" if the modality has no emitted methods (e.g. all flagged
+    `keep_handwritten: true`).
     """
     name = modality["name"]
-    methods = [m for m in modality.get("methods", []) if is_codegen_eligible(m)]
+    methods = [m for m in modality.get("methods", []) if should_emit(m)]
     if not methods:
         return ""
 
-    suffix = "GeneratedProtoABIv2"
-    enum_name = f"{name}{suffix}"
+    enum_name = f"{name}GeneratedProtoABI"
+
+    # Special-case: resolveRAGConfigurationDefaults is optional-when-unsupported,
+    # so its dlsym load returns Optional<Fn>. The shared NativeProtoABI.load
+    # already returns Optional, so the typealias just reuses NativeProtoABI.ProtoRequest.
 
     lines: list[str] = []
     lines.append(f"private enum {enum_name} {{")
@@ -302,11 +221,13 @@ def render_generated_enum(modality: dict[str, Any]) -> str:
         type_alias = to_typealias_name(swift)
 
         if kind == "stream":
+            # Stream functions take (bytes, size, callback, userData) and
+            # use the canonical hand-written `@convention(c)` callback shape.
             type_lines.append(
                 f"    typealias {type_alias} = @convention(c) (\n"
                 f"        UnsafePointer<UInt8>?,\n"
                 f"        Int,\n"
-                f"        ProtoStreamCallbackGenerated?,\n"
+                f"        @convention(c) (UnsafePointer<UInt8>?, Int, UnsafeMutableRawPointer?) -> Void,\n"
                 f"        UnsafeMutableRawPointer?\n"
                 f"    ) -> rac_result_t"
             )
@@ -346,41 +267,45 @@ def render_generated_enum(modality: dict[str, Any]) -> str:
 
 def render_invoke_method(modality: dict[str, Any], method: dict[str, Any]) -> str:
     name = modality["name"]
-    enum_ref = f"{name}GeneratedProtoABIv2"
+    enum_ref = f"{name}GeneratedProtoABI"
     swift = method["swift_name"]
     c_symbol = method["c_symbol"]
     request_proto = method.get("request")
     response_proto = method.get("response")
     context = method.get("context")
     is_static = bool(method.get("static"))
-    async_handle = bool(method.get("async_handle"))
 
     # Special case: optional-when-unsupported (RAGFreeFunctions only).
     if c_symbol == "rac_rag_request_with_defaults_proto":
         return _render_optional_freefunc(enum_ref, swift, request_proto, response_proto)
 
-    # Function head. Generated methods accept the handle (if any) as an
-    # explicit first parameter so they're callable from outside the actor
-    # extensions. P4-T13 will replace this with `try getHandle()` inside the
-    # actor.
-    keyword = "static func" if is_static else "static func"
-    throws = "async throws" if async_handle else "throws"
+    # Visibility / static-ness. Methods without `static: true` become instance
+    # methods on the actor/enum extension (matching the hand-written shape).
+    vis = visibility(method)
+    keyword = f"{vis} static func" if is_static else f"{vis} func"
 
     if context:
+        # Context-threaded invocation: `(handle:, request:)` shape. The handle
+        # is always a leading labeled argument; the second arg respects
+        # `swift_first_arg_label` / `swift_first_arg_name` overrides.
+        second = first_arg_clause(method, request_proto)
         head = (
-            f"    {keyword} {swift}(handle: {context}, request: {request_proto}) "
-            f"{throws} -> {response_proto} {{"
+            f"    {keyword} {swift}(handle: {context}, {second}) "
+            f"throws -> {response_proto} {{"
         )
     else:
+        first = first_arg_clause(method, request_proto)
         head = (
-            f"    {keyword} {swift}(request: {request_proto}) "
-            f"{throws} -> {response_proto} {{"
+            f"    {keyword} {swift}({first}) "
+            f"throws -> {response_proto} {{"
         )
+
+    request_var = first_arg_name(method)
 
     body_lines: list[str] = []
     if context:
         body_lines.append("        return try NativeProtoABI.invoke(")
-        body_lines.append("            request,")
+        body_lines.append(f"            {request_var},")
         body_lines.append("            on: handle,")
         body_lines.append(f"            symbol: {enum_ref}.{swift},")
         body_lines.append(f"            symbolName: {enum_ref}.{swift}Name,")
@@ -388,7 +313,7 @@ def render_invoke_method(modality: dict[str, Any], method: dict[str, Any]) -> st
         body_lines.append("        )")
     else:
         body_lines.append("        return try NativeProtoABI.invoke(")
-        body_lines.append("            request,")
+        body_lines.append(f"            {request_var},")
         body_lines.append(f"            symbol: {enum_ref}.{swift},")
         body_lines.append(f"            symbolName: {enum_ref}.{swift}Name,")
         body_lines.append(f"            responseType: {response_proto}.self")
@@ -403,12 +328,11 @@ def _render_optional_freefunc(
 ) -> str:
     """Optional-when-unsupported free function: returns nil instead of throwing.
 
-    Mirrors the hand-written `resolveRAGConfigurationDefaults`. Suffixed with
-    `_generated` to avoid collision with the hand-written top-level function
-    of the same name.
+    Mirrors the hand-written `resolveRAGConfigurationDefaults`. Lives at file
+    scope (no extension).
     """
     return (
-        f"func {swift}_generated(_ request: {request_proto}) -> {response_proto}? {{\n"
+        f"func {swift}(_ request: {request_proto}) -> {response_proto}? {{\n"
         f"    guard let symbol = {enum_ref}.{swift} else {{\n"
         f"        return nil\n"
         f"    }}\n"
@@ -424,11 +348,12 @@ def _render_optional_freefunc(
 
 def render_stream_method(modality: dict[str, Any], method: dict[str, Any]) -> str:
     name = modality["name"]
-    enum_ref = f"{name}GeneratedProtoABIv2"
+    enum_ref = f"{name}GeneratedProtoABI"
     swift = method["swift_name"]
     c_symbol = method["c_symbol"]
     request_proto = method.get("request")
     response_proto = method.get("response")
+    is_static = bool(method.get("static"))
 
     factory = STREAM_ON_ERROR_FACTORIES.get(c_symbol)
     if factory is None:
@@ -436,21 +361,27 @@ def render_stream_method(modality: dict[str, Any], method: dict[str, Any]) -> st
     else:
         on_error_clause = f"\n            onError: {factory},"
 
-    keyword = "static func"
-    category = f"CppBridge.{name}.ProtoStreamGenerated"
+    vis = visibility(method)
+    keyword = f"{vis} static func" if is_static else f"{vis} func"
+    # Category mirrors the hand-written file: `CppBridge.<Name>.ProtoStream`
+    # (no `Generated` suffix anymore — the hand-written copy was deleted).
+    category = f"CppBridge.{name}.ProtoStream"
 
+    first = first_arg_clause(method, request_proto)
     head = (
-        f"    {keyword} {swift}(request: {request_proto}) throws "
+        f"    {keyword} {swift}({first}) throws "
         f"-> AsyncStream<{response_proto}> {{"
     )
+
+    request_var = first_arg_name(method)
 
     body = f"""
         let stream = try NativeProtoABI.require(
             {enum_ref}.{swift},
             named: {enum_ref}.{swift}Name
         )
-        return try ProtoStreamContextGenerated<{response_proto}>.runRequestStream(
-            request: request,
+        return try ProtoStreamContext<{response_proto}>.runRequestStream(
+            request: {request_var},
             category: "{category}",{on_error_clause}
             body: {{ bytes, size, trampoline, userData in
                 stream(bytes, size, trampoline, userData)
@@ -468,16 +399,9 @@ def render_stream_method(modality: dict[str, Any], method: dict[str, Any]) -> st
 def render_modality_methods(modality: dict[str, Any]) -> str:
     name = modality["name"]
     extension = modality.get("extension", "")
-    methods = [m for m in modality.get("methods", []) if is_codegen_eligible(m)]
+    methods = [m for m in modality.get("methods", []) if should_emit(m)]
     if not methods:
         return ""
-
-    # Decide which Generated sub-namespace to use. The YAML's `extension`
-    # field encodes the hand-written extension target (eg. `CppBridge.LLM`,
-    # `CppBridge.EmbeddingsProto`, or "" for top-level free functions).
-    # For the LoRA modality it's `CppBridge.LLM` -- so LoRA methods also
-    # live on `CppBridge_Generated.LLM`. For the empty string we emit
-    # file-level free functions.
 
     if extension == "":
         # File-level free functions (RAGFreeFunctions).
@@ -485,6 +409,10 @@ def render_modality_methods(modality: dict[str, Any]) -> str:
         for method in methods:
             if method["kind"] == "invoke":
                 rendered = render_invoke_method(modality, method)
+                # The free-function template already emits without leading
+                # indentation; render_invoke_method internally dispatches to
+                # _render_optional_freefunc for the one free-func today.
+                # For any other free-func, strip leading 4 spaces.
                 if rendered.startswith("    "):
                     rendered = "\n".join(
                         line[4:] if line.startswith("    ") else line
@@ -506,13 +434,9 @@ def render_modality_methods(modality: dict[str, Any]) -> str:
         out_lines.append("")
         return "\n".join(out_lines)
 
-    # Map `CppBridge.LLM` -> `CppBridge_Generated.LLM`, etc.
-    if not extension.startswith("CppBridge."):
-        # Shouldn't happen with the current YAML, but be defensive.
-        sub_namespace = extension
-    else:
-        sub_namespace = "CppBridge_Generated." + extension[len("CppBridge."):]
-
+    # Emit directly into the real `extension CppBridge.<Modality>`. The hand-
+    # written `+ModalityProtoABI.swift` has dropped its corresponding method
+    # bodies, so there is no longer a duplicate-declaration risk.
     rendered_methods: list[str] = []
     for method in methods:
         if method["kind"] == "invoke":
@@ -523,7 +447,7 @@ def render_modality_methods(modality: dict[str, Any]) -> str:
     out_lines = [
         f"// MARK: - {name}",
         "",
-        f"extension {sub_namespace} {{",
+        f"extension {extension} {{",
         "\n\n".join(rendered_methods),
         "}",
         "",
@@ -548,10 +472,10 @@ def main() -> int:
     enum_blocks: list[str] = []
     method_blocks: list[str] = []
     for modality in modalities:
-        eligible = [m for m in modality.get("methods", []) if is_codegen_eligible(m)]
-        if not eligible:
+        emitted = [m for m in modality.get("methods", []) if should_emit(m)]
+        if not emitted:
             continue
-        method_count += len(eligible)
+        method_count += len(emitted)
         enum_blocks.append(render_generated_enum(modality))
         method_blocks.append(render_modality_methods(modality))
 

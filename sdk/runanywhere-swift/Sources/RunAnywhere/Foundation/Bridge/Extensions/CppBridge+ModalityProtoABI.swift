@@ -2,7 +2,13 @@
 //  CppBridge+ModalityProtoABI.swift
 //  RunAnywhere SDK
 //
-//  Optional generated-proto ABI bindings for modality operations.
+//  Hand-written companion to `Generated/ModalityProtoABI+Generated.swift`.
+//
+//  Phase B (aggressive): the 24 codegen-eligible methods (7 fully-equivalent
+//  + 17 former facades) are now emitted by the generator. This file retains
+//  only the 18 `kind: custom` methods that cannot be expressed via the
+//  generator's invoke/stream templates, plus the shared C trampoline /
+//  AsyncStream scaffolding referenced by both files.
 //
 
 import CRACommons
@@ -10,98 +16,39 @@ import Foundation
 import os
 import SwiftProtobuf
 
-// MARK: - C symbol tables
+// MARK: - C symbol tables (custom methods only)
+//
+// Tables below own ONLY the dlsym entries for `kind: custom` methods. The
+// 24 codegen-eligible C symbols live in the generated file's tables.
 
-private enum LLMGeneratedProtoABI {
-    typealias StreamCallback = @convention(c) (
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutableRawPointer?
-    ) -> Void
-    typealias Stream = @convention(c) (
-        UnsafePointer<UInt8>?,
-        Int,
-        StreamCallback?,
-        UnsafeMutableRawPointer?
-    ) -> rac_result_t
+private enum LLMCancelProtoABI {
     typealias Cancel = @convention(c) (
         UnsafeMutablePointer<rac_proto_buffer_t>?
     ) -> rac_result_t
 
-    static let generateName = "rac_llm_generate_proto"
-    static let streamName = "rac_llm_generate_stream_proto"
     static let cancelName = "rac_llm_cancel_proto"
 
-    static let generate = NativeProtoABI.load(generateName, as: NativeProtoABI.ProtoRequest.self)
-    static let stream = NativeProtoABI.load(streamName, as: Stream.self)
     static let cancel = NativeProtoABI.load(cancelName, as: Cancel.self)
 }
 
-private enum STTGeneratedProtoABI {
-    // Lifecycle-owned transcribe: takes no handle parameter, uses the
-    // currently-loaded STT component from the commons lifecycle directly.
-    // Fixes the Swift-actor-handle-separate-from-lifecycle bug that made
-    // transcribe() throw "STT model not loaded" after RunAnywhere.loadModel()
-    // returned success. Mirrors LLM's handle-less rac_llm_generate_proto.
-    typealias Transcribe = @convention(c) (
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
-    ) -> rac_result_t
-    typealias StreamEventCallback = @convention(c) (
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutableRawPointer?
-    ) -> Void
-    typealias TranscribeStream = @convention(c) (
-        UnsafePointer<UInt8>?,
-        Int,
-        StreamEventCallback?,
-        UnsafeMutableRawPointer?
-    ) -> rac_result_t
-
-    static let transcribeName = "rac_stt_transcribe_lifecycle_proto"
-    static let streamName = "rac_stt_transcribe_stream_lifecycle_proto"
-
-    static let transcribe = NativeProtoABI.load(transcribeName, as: Transcribe.self)
-    static let stream = NativeProtoABI.load(streamName, as: TranscribeStream.self)
-}
-
-private enum TTSGeneratedProtoABI {
+private enum TTSListVoicesProtoABI {
     typealias VoiceCallback = @convention(c) (
         UnsafePointer<UInt8>?,
         Int,
         UnsafeMutableRawPointer?
     ) -> Void
-    typealias ChunkCallback = VoiceCallback
     typealias ListVoices = @convention(c) (
         rac_handle_t?,
         VoiceCallback?,
         UnsafeMutableRawPointer?
     ) -> rac_result_t
-    // Lifecycle-owned synthesize: takes no handle parameter.
-    typealias Synthesize = @convention(c) (
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
-    ) -> rac_result_t
-    typealias SynthesizeStream = @convention(c) (
-        UnsafePointer<UInt8>?,
-        Int,
-        ChunkCallback?,
-        UnsafeMutableRawPointer?
-    ) -> rac_result_t
 
     static let listVoicesName = "rac_tts_component_list_voices_proto"
-    static let synthesizeName = "rac_tts_synthesize_lifecycle_proto"
-    static let streamName = "rac_tts_synthesize_stream_lifecycle_proto"
 
     static let listVoices = NativeProtoABI.load(listVoicesName, as: ListVoices.self)
-    static let synthesize = NativeProtoABI.load(synthesizeName, as: Synthesize.self)
-    static let stream = NativeProtoABI.load(streamName, as: SynthesizeStream.self)
 }
 
-private enum VADGeneratedProtoABI {
+private enum VADComponentProtoABI {
     typealias Configure = @convention(c) (
         rac_handle_t?,
         UnsafePointer<UInt8>?,
@@ -144,41 +91,22 @@ private enum VADGeneratedProtoABI {
     )
 }
 
-private enum VADLifecycleProtoABI {
-    // Lifecycle-owned VAD operations: take no handle parameter, use the
-    // currently-loaded VAD component from the commons lifecycle directly.
-    // Fixes the Swift-actor-handle-separate-from-lifecycle bug (SWIFT-VAD-001)
-    // that made VAD never fire speech-start/end events. Mirrors the STT/TTS
-    // handle-less proto surfaces landed in Phase 6h.
-    typealias ProcessOrConfigure = @convention(c) (
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
-    ) -> rac_result_t
+private enum VADLifecycleStateProtoABI {
+    // State-only lifecycle entries: `(outBuffer*) -> rc`, no request bytes.
     typealias StateOnly = @convention(c) (
         UnsafeMutablePointer<rac_proto_buffer_t>?
     ) -> rac_result_t
 
-    static let processName = "rac_vad_process_lifecycle_proto"
-    static let configureName = "rac_vad_configure_lifecycle_proto"
     static let startName = "rac_vad_start_lifecycle_proto"
     static let stopName = "rac_vad_stop_lifecycle_proto"
     static let resetName = "rac_vad_reset_lifecycle_proto"
 
-    static let process = NativeProtoABI.load(processName, as: ProcessOrConfigure.self)
-    static let configure = NativeProtoABI.load(configureName, as: ProcessOrConfigure.self)
     static let start = NativeProtoABI.load(startName, as: StateOnly.self)
     static let stop = NativeProtoABI.load(stopName, as: StateOnly.self)
     static let reset = NativeProtoABI.load(resetName, as: StateOnly.self)
 }
 
-private enum VoiceAgentGeneratedProtoABI {
-    typealias Initialize = @convention(c) (
-        rac_voice_agent_handle_t?,
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
-    ) -> rac_result_t
+private enum VoiceAgentStateProtoABI {
     typealias States = @convention(c) (
         rac_voice_agent_handle_t?,
         UnsafeMutablePointer<rac_proto_buffer_t>?
@@ -190,11 +118,9 @@ private enum VoiceAgentGeneratedProtoABI {
         UnsafeMutablePointer<rac_proto_buffer_t>?
     ) -> rac_result_t
 
-    static let initializeName = "rac_voice_agent_initialize_proto"
     static let statesName = "rac_voice_agent_component_states_proto"
     static let processTurnName = "rac_voice_agent_process_voice_turn_proto"
 
-    static let initialize = NativeProtoABI.load(initializeName, as: Initialize.self)
     static let states = NativeProtoABI.load(statesName, as: States.self)
     static let processTurn = NativeProtoABI.load(processTurnName, as: ProcessTurn.self)
 }
@@ -234,31 +160,13 @@ private enum VLMGeneratedProtoABI {
     static let cancel = NativeProtoABI.load(cancelName, as: Cancel.self)
 }
 
-private enum EmbeddingsGeneratedProtoABI {
-    typealias EmbedBatch = @convention(c) (
-        rac_handle_t?,
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
-    ) -> rac_result_t
-
-    static let embedBatchName = "rac_embeddings_embed_batch_proto"
-    static let embedBatch = NativeProtoABI.load(embedBatchName, as: EmbedBatch.self)
-}
-
-private enum RAGGeneratedProtoABI {
+private enum RAGSessionProtoABI {
     typealias Create = @convention(c) (
         UnsafePointer<UInt8>?,
         Int,
         UnsafeMutablePointer<rac_handle_t?>?
     ) -> rac_result_t
     typealias Destroy = @convention(c) (rac_handle_t?) -> Void
-    typealias Request = @convention(c) (
-        rac_handle_t?,
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
-    ) -> rac_result_t
     typealias NoRequest = @convention(c) (
         rac_handle_t?,
         UnsafeMutablePointer<rac_proto_buffer_t>?
@@ -266,79 +174,13 @@ private enum RAGGeneratedProtoABI {
 
     static let createName = "rac_rag_session_create_proto"
     static let destroyName = "rac_rag_session_destroy_proto"
-    static let ingestName = "rac_rag_ingest_proto"
-    static let queryName = "rac_rag_query_proto"
     static let clearName = "rac_rag_clear_proto"
     static let statsName = "rac_rag_stats_proto"
-    static let requestWithDefaultsName = "rac_rag_request_with_defaults_proto"
 
     static let create = NativeProtoABI.load(createName, as: Create.self)
     static let destroy = NativeProtoABI.load(destroyName, as: Destroy.self)
-    static let ingest = NativeProtoABI.load(ingestName, as: Request.self)
-    static let query = NativeProtoABI.load(queryName, as: Request.self)
     static let clear = NativeProtoABI.load(clearName, as: NoRequest.self)
     static let stats = NativeProtoABI.load(statsName, as: NoRequest.self)
-    /// P2-T14: canonical RAGConfiguration defaults merge owned by commons.
-    static let requestWithDefaults = NativeProtoABI.load(
-        requestWithDefaultsName,
-        as: NativeProtoABI.ProtoRequest.self
-    )
-}
-
-private enum LoRAGeneratedProtoABI {
-    typealias RegistryRequest = @convention(c) (
-        rac_lora_registry_handle_t?,
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
-    ) -> rac_result_t
-    typealias LLMRequest = @convention(c) (
-        rac_handle_t?,
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutablePointer<rac_proto_buffer_t>?
-    ) -> rac_result_t
-    static let registerName = "rac_lora_register_proto"
-    static let catalogListName = "rac_lora_catalog_list_proto"
-    static let catalogQueryName = "rac_lora_catalog_query_proto"
-    static let catalogGetName = "rac_lora_catalog_get_proto"
-    static let catalogMarkDownloadCompletedName = "rac_lora_catalog_mark_download_completed_proto"
-    static let compatibilityName = "rac_lora_compatibility_proto"
-    static let applyName = "rac_lora_apply_proto"
-    static let removeName = "rac_lora_remove_proto"
-    static let listName = "rac_lora_list_proto"
-    static let stateName = "rac_lora_state_proto"
-
-    static let register = NativeProtoABI.load(registerName, as: RegistryRequest.self)
-    static let catalogList = NativeProtoABI.load(catalogListName, as: RegistryRequest.self)
-    static let catalogQuery = NativeProtoABI.load(catalogQueryName, as: RegistryRequest.self)
-    static let catalogGet = NativeProtoABI.load(catalogGetName, as: RegistryRequest.self)
-    static let catalogMarkDownloadCompleted = NativeProtoABI.load(
-        catalogMarkDownloadCompletedName,
-        as: RegistryRequest.self
-    )
-    static let compatibility = NativeProtoABI.load(compatibilityName, as: LLMRequest.self)
-    static let apply = NativeProtoABI.load(applyName, as: LLMRequest.self)
-    static let remove = NativeProtoABI.load(removeName, as: LLMRequest.self)
-    static let list = NativeProtoABI.load(listName, as: LLMRequest.self)
-    static let state = NativeProtoABI.load(stateName, as: LLMRequest.self)
-}
-
-private enum StructuredOutputStreamProtoABI {
-    typealias StreamCallback = @convention(c) (
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutableRawPointer?
-    ) -> Void
-    typealias Stream = @convention(c) (
-        UnsafePointer<UInt8>?,
-        Int,
-        StreamCallback?,
-        UnsafeMutableRawPointer?
-    ) -> rac_result_t
-
-    static let streamName = "rac_structured_output_generate_stream_proto"
-    static let stream = NativeProtoABI.load(streamName, as: Stream.self)
 }
 
 // MARK: - Callback contexts
@@ -347,14 +189,14 @@ private enum StructuredOutputStreamProtoABI {
 /// trampoline can only see non-generic types (Swift forbids generic captures
 /// in `@convention(c)` closures), so we bridge through this protocol and let
 /// dynamic dispatch reach the generic body in `ProtoStreamContext.yield`.
-private protocol ProtoStreamYielder: AnyObject {
+protocol ProtoStreamYielder: AnyObject {
     func yield(bytes: UnsafePointer<UInt8>?, size: Int)
 }
 
 /// Single shared C trampoline used by `ProtoStreamContext.runRequestStream`.
 /// Holds no generic state; recovers the yielder via `Unmanaged` and dispatches
 /// dynamically through `ProtoStreamYielder`.
-private let protoStreamTrampoline: @convention(c) (
+let protoStreamTrampoline: @convention(c) (
     UnsafePointer<UInt8>?,
     Int,
     UnsafeMutableRawPointer?
@@ -364,7 +206,7 @@ private let protoStreamTrampoline: @convention(c) (
     (yielder as? ProtoStreamYielder)?.yield(bytes: bytes, size: size)
 }
 
-private final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStreamYielder {
+final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStreamYielder {
     let continuation: AsyncStream<Event>.Continuation
     let logger: SDKLogger
 
@@ -504,166 +346,35 @@ private func decodeBuffer<Response: Message>(
 }
 
 func destroyRAGProtoSessionIfAvailable(_ session: rac_handle_t) {
-    RAGGeneratedProtoABI.destroy?(session)
+    RAGSessionProtoABI.destroy?(session)
 }
 
-/// P2-T14: Resolve canonical RAGConfiguration defaults via the commons ABI.
-/// Returns `nil` when the native symbol is not exported (e.g. RAG backend
-/// disabled in the linked binary); callers fall back to a zero-initialized
-/// proto so the public API surface keeps working without RAG support.
-func resolveRAGConfigurationDefaults(_ request: RARAGConfiguration) -> RARAGConfiguration? {
-    guard let symbol = RAGGeneratedProtoABI.requestWithDefaults else {
-        return nil
-    }
-    return try? NativeProtoABI.invoke(
-        request,
-        symbol: symbol,
-        symbolName: RAGGeneratedProtoABI.requestWithDefaultsName,
-        responseType: RARAGConfiguration.self
-    )
-}
-
-// MARK: - LLM
+// MARK: - LLM custom
 
 extension CppBridge.LLM {
-    public func generate(_ request: RALLMGenerateRequest) throws -> RALLMGenerationResult {
-        try NativeProtoABI.invoke(
-            request,
-            symbol: LLMGeneratedProtoABI.generate,
-            symbolName: LLMGeneratedProtoABI.generateName,
-            responseType: RALLMGenerationResult.self
-        )
-    }
-
-    public func generateStream(_ request: RALLMGenerateRequest) throws -> AsyncStream<RALLMStreamEvent> {
-        let stream = try NativeProtoABI.require(
-            LLMGeneratedProtoABI.stream,
-            named: LLMGeneratedProtoABI.streamName
-        )
-        return try ProtoStreamContext<RALLMStreamEvent>.runRequestStream(
-            request: request,
-            category: "CppBridge.LLM.ProtoStream",
-            onError: { rc in
-                let mapped = RASDKError.from(rcResult: rc)
-                var event = RALLMStreamEvent()
-                event.isFinal = true
-                event.finishReason = "error"
-                event.errorCode = rc
-                event.errorMessage = mapped?.message ?? "LLM stream failed: \(rc)"
-                return event
-            },
-            body: { bytes, size, trampoline, userData in
-                stream(bytes, size, trampoline, userData)
-            }
-        )
-    }
-
     @discardableResult
     public func cancelProto() throws -> RASDKEvent {
         let cancel = try NativeProtoABI.require(
-            LLMGeneratedProtoABI.cancel,
-            named: LLMGeneratedProtoABI.cancelName
+            LLMCancelProtoABI.cancel,
+            named: LLMCancelProtoABI.cancelName
         )
         return try decodeBuffer(
             responseType: RASDKEvent.self,
-            symbolName: LLMGeneratedProtoABI.cancelName
+            symbolName: LLMCancelProtoABI.cancelName
         ) { outBuffer in
             cancel(outBuffer)
         }
     }
 }
 
-// MARK: - StructuredOutput streaming
-
-extension CppBridge.StructuredOutput {
-    /// Streaming structured-output generation. Yields `RAStructuredOutputStreamEvent`
-    /// payloads (token, partial JSON, completed/error) as they arrive from
-    /// commons. Per-event seq, timestamp, and request_id are populated by C++.
-    static func generateStream(
-        _ request: RAStructuredOutputRequest
-    ) throws -> AsyncStream<RAStructuredOutputStreamEvent> {
-        let stream = try NativeProtoABI.require(
-            StructuredOutputStreamProtoABI.stream,
-            named: StructuredOutputStreamProtoABI.streamName
-        )
-        return try ProtoStreamContext<RAStructuredOutputStreamEvent>.runRequestStream(
-            request: request,
-            category: "CppBridge.StructuredOutput.ProtoStream",
-            onError: { rc in
-                var event = RAStructuredOutputStreamEvent()
-                event.kind = .error
-                event.errorMessage = "Structured output stream failed: \(rc)"
-                return event
-            },
-            body: { bytes, size, trampoline, userData in
-                stream(bytes, size, trampoline, userData)
-            }
-        )
-    }
-}
-
-// MARK: - STT
-
-extension CppBridge.STT {
-    public func transcribe(audioData: Data, options: RASTTOptions) throws -> RASTTOutput {
-        // Lifecycle-owned transcribe: binds to the currently-loaded STT
-        // model from the commons lifecycle directly (no Swift actor handle).
-        // Swift must now wrap audio + options into a STTTranscriptionRequest
-        // proto before calling; the lifecycle C API parses the proto and
-        // delegates to the lifecycle's STT service ops.
-        let transcribe = try NativeProtoABI.require(
-            STTGeneratedProtoABI.transcribe,
-            named: STTGeneratedProtoABI.transcribeName
-        )
-        var request = RASTTTranscriptionRequest()
-        var audioSource = RASTTAudioSource()
-        audioSource.audioData = audioData
-        request.audio = audioSource
-        request.options = options
-        return try decodeBuffer(
-            responseType: RASTTOutput.self,
-            symbolName: STTGeneratedProtoABI.transcribeName
-        ) { outBuffer in
-            try NativeProtoABI.withSerializedBytes(request) { bytes, size in
-                transcribe(bytes, size, outBuffer)
-            }
-        }
-    }
-
-    public func transcribeStream(audioData: Data, options: RASTTOptions) throws -> AsyncStream<RASTTPartialResult> {
-        let stream = try NativeProtoABI.require(
-            STTGeneratedProtoABI.stream,
-            named: STTGeneratedProtoABI.streamName
-        )
-        var request = RASTTTranscriptionRequest()
-        var audioSource = RASTTAudioSource()
-        audioSource.audioData = audioData
-        request.audio = audioSource
-        request.options = options
-        return try ProtoStreamContext<RASTTPartialResult>.runRequestStream(
-            request: request,
-            category: "CppBridge.STT.ProtoStream",
-            onError: { rc in
-                var final = RASTTPartialResult()
-                final.isFinal = true
-                final.text = "STT stream failed: \(rc)"
-                return final
-            },
-            body: { bytes, size, trampoline, userData in
-                stream(bytes, size, trampoline, userData)
-            }
-        )
-    }
-}
-
-// MARK: - TTS
+// MARK: - TTS custom
 
 extension CppBridge.TTS {
     public func listVoices() async throws -> [RATTSVoiceInfo] {
         let handle = try await getHandle()
         let listVoices = try NativeProtoABI.require(
-            TTSGeneratedProtoABI.listVoices,
-            named: TTSGeneratedProtoABI.listVoicesName
+            TTSListVoicesProtoABI.listVoices,
+            named: TTSListVoicesProtoABI.listVoicesName
         )
         let context = ProtoCollectingContext<RATTSVoiceInfo>(category: "CppBridge.TTS.ProtoVoices")
         let contextPtr = Unmanaged.passRetained(context).toOpaque()
@@ -682,62 +393,16 @@ extension CppBridge.TTS {
         }
         return context.values
     }
-
-    public func synthesize(text: String, options: RATTSOptions) throws -> RATTSOutput {
-        // Lifecycle-owned synthesize: binds to the TTS voice loaded in the
-        // commons lifecycle directly. Mirrors LLM's rac_llm_generate_proto
-        // pattern. The handle-based rac_tts_component_synthesize_proto was
-        // failing because Swift's CppBridge.TTS actor handle is a separate
-        // handle from the lifecycle-owned one (which is what gets loaded by
-        // RunAnywhere.loadModel()).
-        let synthesize = try NativeProtoABI.require(
-            TTSGeneratedProtoABI.synthesize,
-            named: TTSGeneratedProtoABI.synthesizeName
-        )
-        var request = RATTSSynthesisRequest()
-        request.text = text
-        request.options = options
-        return try decodeBuffer(
-            responseType: RATTSOutput.self,
-            symbolName: TTSGeneratedProtoABI.synthesizeName
-        ) { outBuffer in
-            try NativeProtoABI.withSerializedBytes(request) { bytes, size in
-                synthesize(bytes, size, outBuffer)
-            }
-        }
-    }
-
-    public func synthesizeStream(text: String, options: RATTSOptions) throws -> AsyncStream<RATTSOutput> {
-        let stream = try NativeProtoABI.require(
-            TTSGeneratedProtoABI.stream,
-            named: TTSGeneratedProtoABI.streamName
-        )
-        var request = RATTSSynthesisRequest()
-        request.text = text
-        request.options = options
-        return try ProtoStreamContext<RATTSOutput>.runRequestStream(
-            request: request,
-            category: "CppBridge.TTS.ProtoStream",
-            onError: { _ in
-                var output = RATTSOutput()
-                output.timestampMs = Int64(Date().timeIntervalSince1970 * 1000)
-                return output
-            },
-            body: { bytes, size, trampoline, userData in
-                stream(bytes, size, trampoline, userData)
-            }
-        )
-    }
 }
 
-// MARK: - VAD
+// MARK: - VAD custom
 
 extension CppBridge.VAD {
     public func configure(_ config: RAVADConfiguration) async throws {
         let handle = try await getHandle()
         let configure = try NativeProtoABI.require(
-            VADGeneratedProtoABI.configure,
-            named: VADGeneratedProtoABI.configureName
+            VADComponentProtoABI.configure,
+            named: VADComponentProtoABI.configureName
         )
         let rc = try NativeProtoABI.withSerializedBytes(config) { bytes, size in
             configure(handle, bytes, size)
@@ -750,12 +415,12 @@ extension CppBridge.VAD {
     public func process(samples: [Float], options: RAVADOptions) async throws -> RAVADResult {
         let handle = try await getHandle()
         let process = try NativeProtoABI.require(
-            VADGeneratedProtoABI.process,
-            named: VADGeneratedProtoABI.processName
+            VADComponentProtoABI.process,
+            named: VADComponentProtoABI.processName
         )
         return try decodeBuffer(
             responseType: RAVADResult.self,
-            symbolName: VADGeneratedProtoABI.processName
+            symbolName: VADComponentProtoABI.processName
         ) { outBuffer in
             try NativeProtoABI.withSerializedBytes(options) { optionBytes, optionSize in
                 samples.withUnsafeBufferPointer { sampleBuffer in
@@ -775,12 +440,12 @@ extension CppBridge.VAD {
     public func statisticsProto() async throws -> RAVADStatistics {
         let handle = try await getHandle()
         let statistics = try NativeProtoABI.require(
-            VADGeneratedProtoABI.statistics,
-            named: VADGeneratedProtoABI.statisticsName
+            VADComponentProtoABI.statistics,
+            named: VADComponentProtoABI.statisticsName
         )
         return try decodeBuffer(
             responseType: RAVADStatistics.self,
-            symbolName: VADGeneratedProtoABI.statisticsName
+            symbolName: VADComponentProtoABI.statisticsName
         ) { outBuffer in
             statistics(handle, outBuffer)
         }
@@ -789,8 +454,8 @@ extension CppBridge.VAD {
     public func setActivityCallbackProto(_ callback: @escaping (RASpeechActivityEvent) -> Void) async throws {
         let handle = try await getHandle()
         let setCallback = try NativeProtoABI.require(
-            VADGeneratedProtoABI.setActivityCallback,
-            named: VADGeneratedProtoABI.setActivityCallbackName
+            VADComponentProtoABI.setActivityCallback,
+            named: VADComponentProtoABI.setActivityCallbackName
         )
         let context = ProtoProgressContext<RASpeechActivityEvent>(
             category: "CppBridge.VAD.ProtoActivity"
@@ -814,38 +479,22 @@ extension CppBridge.VAD {
         }
     }
 
-    // MARK: - Lifecycle-proto surface (SWIFT-VAD-001)
+    // MARK: - Lifecycle-proto surface (SWIFT-VAD-001) — state-only
     //
-    // These four calls bind the Swift actor to the C++ lifecycle's VAD
+    // These three calls bind the Swift actor to the C++ lifecycle's VAD
     // component instead of the private `rac_vad_component_*` handle. Without
     // this, loading a VAD model through `RunAnywhere.loadModel(...)` (which
     // routes through the commons lifecycle) never connects to the handle the
     // VAD actor owned — VAD reported "not loaded" and never fired events.
-    // Mirrors the Phase 6h fix for STT/TTS.
-
-    public func configureLifecycle(_ config: RAVADConfiguration) throws -> RAVADServiceState {
-        let configure = try NativeProtoABI.require(
-            VADLifecycleProtoABI.configure,
-            named: VADLifecycleProtoABI.configureName
-        )
-        return try decodeBuffer(
-            responseType: RAVADServiceState.self,
-            symbolName: VADLifecycleProtoABI.configureName
-        ) { outBuffer in
-            try NativeProtoABI.withSerializedBytes(config) { bytes, size in
-                configure(bytes, size, outBuffer)
-            }
-        }
-    }
 
     public func startLifecycle() throws -> RAVADServiceState {
         let start = try NativeProtoABI.require(
-            VADLifecycleProtoABI.start,
-            named: VADLifecycleProtoABI.startName
+            VADLifecycleStateProtoABI.start,
+            named: VADLifecycleStateProtoABI.startName
         )
         return try decodeBuffer(
             responseType: RAVADServiceState.self,
-            symbolName: VADLifecycleProtoABI.startName
+            symbolName: VADLifecycleStateProtoABI.startName
         ) { outBuffer in
             start(outBuffer)
         }
@@ -853,12 +502,12 @@ extension CppBridge.VAD {
 
     public func stopLifecycle() throws -> RAVADServiceState {
         let stop = try NativeProtoABI.require(
-            VADLifecycleProtoABI.stop,
-            named: VADLifecycleProtoABI.stopName
+            VADLifecycleStateProtoABI.stop,
+            named: VADLifecycleStateProtoABI.stopName
         )
         return try decodeBuffer(
             responseType: RAVADServiceState.self,
-            symbolName: VADLifecycleProtoABI.stopName
+            symbolName: VADLifecycleStateProtoABI.stopName
         ) { outBuffer in
             stop(outBuffer)
         }
@@ -866,61 +515,30 @@ extension CppBridge.VAD {
 
     public func resetLifecycle() throws -> RAVADServiceState {
         let reset = try NativeProtoABI.require(
-            VADLifecycleProtoABI.reset,
-            named: VADLifecycleProtoABI.resetName
+            VADLifecycleStateProtoABI.reset,
+            named: VADLifecycleStateProtoABI.resetName
         )
         return try decodeBuffer(
             responseType: RAVADServiceState.self,
-            symbolName: VADLifecycleProtoABI.resetName
+            symbolName: VADLifecycleStateProtoABI.resetName
         ) { outBuffer in
             reset(outBuffer)
         }
     }
-
-    public func processLifecycle(request: RAVADProcessRequest) throws -> RAVADResult {
-        let process = try NativeProtoABI.require(
-            VADLifecycleProtoABI.process,
-            named: VADLifecycleProtoABI.processName
-        )
-        return try decodeBuffer(
-            responseType: RAVADResult.self,
-            symbolName: VADLifecycleProtoABI.processName
-        ) { outBuffer in
-            try NativeProtoABI.withSerializedBytes(request) { bytes, size in
-                process(bytes, size, outBuffer)
-            }
-        }
-    }
 }
 
-// MARK: - Voice Agent
+// MARK: - Voice Agent custom
 
 extension CppBridge.VoiceAgent {
-    public func initialize(_ config: RAVoiceAgentComposeConfig) async throws -> RAVoiceAgentComponentStates {
-        let handle = try await getHandle()
-        let initialize = try NativeProtoABI.require(
-            VoiceAgentGeneratedProtoABI.initialize,
-            named: VoiceAgentGeneratedProtoABI.initializeName
-        )
-        return try decodeBuffer(
-            responseType: RAVoiceAgentComponentStates.self,
-            symbolName: VoiceAgentGeneratedProtoABI.initializeName
-        ) { outBuffer in
-            try NativeProtoABI.withSerializedBytes(config) { bytes, size in
-                initialize(handle, bytes, size, outBuffer)
-            }
-        }
-    }
-
     public func componentStatesProto() throws -> RAVoiceAgentComponentStates {
         let handle = try requireExistingHandle()
         let states = try NativeProtoABI.require(
-            VoiceAgentGeneratedProtoABI.states,
-            named: VoiceAgentGeneratedProtoABI.statesName
+            VoiceAgentStateProtoABI.states,
+            named: VoiceAgentStateProtoABI.statesName
         )
         return try decodeBuffer(
             responseType: RAVoiceAgentComponentStates.self,
-            symbolName: VoiceAgentGeneratedProtoABI.statesName
+            symbolName: VoiceAgentStateProtoABI.statesName
         ) { outBuffer in
             states(handle, outBuffer)
         }
@@ -929,12 +547,12 @@ extension CppBridge.VoiceAgent {
     public func processVoiceTurnProto(_ audioData: Data) async throws -> RAVoiceAgentResult {
         let handle = try await getHandle()
         let processTurn = try NativeProtoABI.require(
-            VoiceAgentGeneratedProtoABI.processTurn,
-            named: VoiceAgentGeneratedProtoABI.processTurnName
+            VoiceAgentStateProtoABI.processTurn,
+            named: VoiceAgentStateProtoABI.processTurnName
         )
         return try decodeBuffer(
             responseType: RAVoiceAgentResult.self,
-            symbolName: VoiceAgentGeneratedProtoABI.processTurnName
+            symbolName: VoiceAgentStateProtoABI.processTurnName
         ) { outBuffer in
             audioData.withUnsafeBytes { audio in
                 processTurn(handle, audio.baseAddress, audioData.count, outBuffer)
@@ -943,7 +561,7 @@ extension CppBridge.VoiceAgent {
     }
 }
 
-// MARK: - VLM
+// MARK: - VLM custom
 
 extension CppBridge.VLM {
     public func process(image: RAVLMImage, options: RAVLMGenerationOptions) async throws -> RAVLMResult {
@@ -1035,34 +653,26 @@ extension CppBridge.VLM {
     }
 }
 
-// MARK: - Embeddings
+// MARK: - Embeddings namespace
+//
+// The generated file emits `static func embedBatch(handle:, request:)` into
+// `extension CppBridge.EmbeddingsProto`. We declare the empty namespace here
+// because Swift requires the outer enum to exist before generated extensions
+// can attach to it.
 
 extension CppBridge {
-    public enum EmbeddingsProto {
-        public static func embedBatch(handle: rac_handle_t, request: RAEmbeddingsRequest) throws -> RAEmbeddingsResult {
-            let embed = try NativeProtoABI.require(
-                EmbeddingsGeneratedProtoABI.embedBatch,
-                named: EmbeddingsGeneratedProtoABI.embedBatchName
-            )
-            return try decodeBuffer(
-                responseType: RAEmbeddingsResult.self,
-                symbolName: EmbeddingsGeneratedProtoABI.embedBatchName
-            ) { outBuffer in
-                try NativeProtoABI.withSerializedBytes(request) { bytes, size in
-                    embed(handle, bytes, size, outBuffer)
-                }
-            }
-        }
-    }
+    /// Embeddings proto namespace. Methods live in
+    /// `Generated/ModalityProtoABI+Generated.swift`.
+    public enum EmbeddingsProto {}
 }
 
-// MARK: - RAG
+// MARK: - RAG custom
 
 extension CppBridge.RAG {
     public func createPipeline(config: RARAGConfiguration) throws {
         let create = try NativeProtoABI.require(
-            RAGGeneratedProtoABI.create,
-            named: RAGGeneratedProtoABI.createName
+            RAGSessionProtoABI.create,
+            named: RAGSessionProtoABI.createName
         )
         var newSession: rac_handle_t?
         let rc = try NativeProtoABI.withSerializedBytes(config) { bytes, size in
@@ -1074,37 +684,15 @@ extension CppBridge.RAG {
         setProtoSession(newSession)
     }
 
-    public func ingest(_ document: RARAGDocument) throws -> RARAGStatistics {
-        let session = try requireProtoSession()
-        return try NativeProtoABI.invoke(
-            document,
-            on: session,
-            symbol: RAGGeneratedProtoABI.ingest,
-            symbolName: RAGGeneratedProtoABI.ingestName,
-            responseType: RARAGStatistics.self
-        )
-    }
-
-    public func query(_ options: RARAGQueryOptions) throws -> RARAGResult {
-        let session = try requireProtoSession()
-        return try NativeProtoABI.invoke(
-            options,
-            on: session,
-            symbol: RAGGeneratedProtoABI.query,
-            symbolName: RAGGeneratedProtoABI.queryName,
-            responseType: RARAGResult.self
-        )
-    }
-
     public func clearProto() throws -> RARAGStatistics {
         let session = try requireProtoSession()
         let clear = try NativeProtoABI.require(
-            RAGGeneratedProtoABI.clear,
-            named: RAGGeneratedProtoABI.clearName
+            RAGSessionProtoABI.clear,
+            named: RAGSessionProtoABI.clearName
         )
         return try decodeBuffer(
             responseType: RARAGStatistics.self,
-            symbolName: RAGGeneratedProtoABI.clearName
+            symbolName: RAGSessionProtoABI.clearName
         ) { outBuffer in
             clear(session, outBuffer)
         }
@@ -1113,147 +701,14 @@ extension CppBridge.RAG {
     public func statsProto() throws -> RARAGStatistics {
         let session = try requireProtoSession()
         let stats = try NativeProtoABI.require(
-            RAGGeneratedProtoABI.stats,
-            named: RAGGeneratedProtoABI.statsName
+            RAGSessionProtoABI.stats,
+            named: RAGSessionProtoABI.statsName
         )
         return try decodeBuffer(
             responseType: RARAGStatistics.self,
-            symbolName: RAGGeneratedProtoABI.statsName
+            symbolName: RAGSessionProtoABI.statsName
         ) { outBuffer in
             stats(session, outBuffer)
         }
     }
-
 }
-
-// MARK: - LoRA
-
-extension CppBridge.LLM {
-    public func applyLoraAdapters(_ request: RALoRAApplyRequest) async throws -> RALoRAApplyResult {
-        let handle = try await getHandle()
-        return try NativeProtoABI.invoke(
-            request,
-            on: handle,
-            symbol: LoRAGeneratedProtoABI.apply,
-            symbolName: LoRAGeneratedProtoABI.applyName,
-            responseType: RALoRAApplyResult.self
-        )
-    }
-
-    public func removeLoraAdapters(_ request: RALoRARemoveRequest) async throws -> RALoRAState {
-        let handle = try await getHandle()
-        return try NativeProtoABI.invoke(
-            request,
-            on: handle,
-            symbol: LoRAGeneratedProtoABI.remove,
-            symbolName: LoRAGeneratedProtoABI.removeName,
-            responseType: RALoRAState.self
-        )
-    }
-
-    public func listLoraAdapters() async throws -> RALoRAState {
-        let handle = try await getHandle()
-        return try NativeProtoABI.invoke(
-            RALoRAState(),
-            on: handle,
-            symbol: LoRAGeneratedProtoABI.list,
-            symbolName: LoRAGeneratedProtoABI.listName,
-            responseType: RALoRAState.self
-        )
-    }
-
-    public func getLoraState() async throws -> RALoRAState {
-        let handle = try await getHandle()
-        return try NativeProtoABI.invoke(
-            RALoRAState(),
-            on: handle,
-            symbol: LoRAGeneratedProtoABI.state,
-            symbolName: LoRAGeneratedProtoABI.stateName,
-            responseType: RALoRAState.self
-        )
-    }
-
-    public func checkLoraCompatibility(_ config: RALoRAAdapterConfig) async throws -> RALoraCompatibilityResult {
-        let handle = try await getHandle()
-        return try NativeProtoABI.invoke(
-            config,
-            on: handle,
-            symbol: LoRAGeneratedProtoABI.compatibility,
-            symbolName: LoRAGeneratedProtoABI.compatibilityName,
-            responseType: RALoraCompatibilityResult.self
-        )
-    }
-}
-
-extension CppBridge.LoraRegistry {
-    public func register(_ entry: RALoraAdapterCatalogEntry) throws -> RALoraAdapterCatalogEntry {
-        let handle = try requireRegistryHandle()
-        return try NativeProtoABI.invoke(
-            entry,
-            on: handle,
-            symbol: LoRAGeneratedProtoABI.register,
-            symbolName: LoRAGeneratedProtoABI.registerName,
-            responseType: RALoraAdapterCatalogEntry.self
-        )
-    }
-
-    public func listCatalog(
-        _ request: RALoraAdapterCatalogListRequest
-    ) throws -> RALoraAdapterCatalogListResult {
-        let handle = try requireRegistryHandle()
-        return try NativeProtoABI.invoke(
-            request,
-            on: handle,
-            symbol: LoRAGeneratedProtoABI.catalogList,
-            symbolName: LoRAGeneratedProtoABI.catalogListName,
-            responseType: RALoraAdapterCatalogListResult.self
-        )
-    }
-
-    public func queryCatalog(
-        _ query: RALoraAdapterCatalogQuery
-    ) throws -> RALoraAdapterCatalogListResult {
-        let handle = try requireRegistryHandle()
-        return try NativeProtoABI.invoke(
-            query,
-            on: handle,
-            symbol: LoRAGeneratedProtoABI.catalogQuery,
-            symbolName: LoRAGeneratedProtoABI.catalogQueryName,
-            responseType: RALoraAdapterCatalogListResult.self
-        )
-    }
-
-    public func getCatalogEntry(
-        _ request: RALoraAdapterCatalogGetRequest
-    ) throws -> RALoraAdapterCatalogGetResult {
-        let handle = try requireRegistryHandle()
-        return try NativeProtoABI.invoke(
-            request,
-            on: handle,
-            symbol: LoRAGeneratedProtoABI.catalogGet,
-            symbolName: LoRAGeneratedProtoABI.catalogGetName,
-            responseType: RALoraAdapterCatalogGetResult.self
-        )
-    }
-
-    public func markDownloadCompleted(
-        _ request: RALoraAdapterDownloadCompletedRequest
-    ) throws -> RALoraAdapterDownloadCompletedResult {
-        let handle = try requireRegistryHandle()
-        return try NativeProtoABI.invoke(
-            request,
-            on: handle,
-            symbol: LoRAGeneratedProtoABI.catalogMarkDownloadCompleted,
-            symbolName: LoRAGeneratedProtoABI.catalogMarkDownloadCompletedName,
-            responseType: RALoraAdapterDownloadCompletedResult.self
-        )
-    }
-
-    private func requireRegistryHandle() throws -> rac_lora_registry_handle_t {
-        guard let handle = rac_get_lora_registry() else {
-            throw SDKException(code: .initializationFailed, message: "LoRA registry not initialized", category: .internal)
-        }
-        return handle
-    }
-}
-
