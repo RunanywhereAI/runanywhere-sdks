@@ -7,8 +7,8 @@
 //  Generic scaffolding (handle creation, isLoaded, unload, destroy)
 //  lives in `CppBridge.ComponentActor`. STT-specific surfaces kept here:
 //  `supportsStreaming`, the `framework:`-aware `loadModel(...)` variant
-//  (which configures the component before loading), the same-model
-//  fast-path, and the `loadModel(from:)` lifecycle adapter.
+//  (which configures the component before loading), and the same-model
+//  fast-path.
 //
 
 import CRACommons
@@ -93,48 +93,6 @@ extension CppBridge {
 
             try await inner.loadModel(path: modelPath, id: modelId, name: modelName)
             loadedModelId = modelId
-        }
-
-        /// Load an STT model from a `RAModelLoadResult` returned by the proto-backed
-        /// lifecycle API. Mirrors `CppBridge.VLM.loadModel(from:)` so the Swift
-        /// component actor's `isLoaded` flag tracks the lifecycle service's state
-        /// after `RunAnywhere.loadModel(...)` returns `success=true`.
-        func loadModel(from result: RAModelLoadResult, modelName: String? = nil) async throws {
-            if loadedModelId == result.modelID {
-                return
-            }
-            guard result.success else {
-                throw SDKException(
-                    code: .modelLoadFailed,
-                    message: result.errorMessage.isEmpty ? "STT lifecycle load failed" : result.errorMessage,
-                    category: .component
-                )
-            }
-
-            let framework: rac_inference_framework_t
-            switch result.framework {
-            case .onnx:
-                framework = RAC_FRAMEWORK_ONNX
-            case .sherpa:
-                framework = RAC_FRAMEWORK_SHERPA
-            default:
-                framework = RAC_FRAMEWORK_UNKNOWN
-            }
-
-            // `rac_stt_create` (called via the component's lifecycle service
-            // create callback) performs a registry lookup on the first arg.
-            // It tries (a) `rac_get_model(arg)` as a model-id lookup, then
-            // (b) `rac_get_model_by_path(arg)`, then (c) basename extraction.
-            // Passing the **model id** is the most reliable — the registry
-            // already knows the resolved path via local_path since the
-            // lifecycle load (commons) already succeeded for the same model.
-            // This matches what LLM/VLM do via the lifecycle service layer.
-            try await loadModel(
-                result.modelID,
-                modelId: result.modelID,
-                modelName: modelName ?? result.modelID,
-                framework: framework
-            )
         }
 
         /// Unload the current model

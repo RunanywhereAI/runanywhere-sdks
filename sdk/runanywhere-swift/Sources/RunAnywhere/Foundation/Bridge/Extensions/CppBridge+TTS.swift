@@ -6,8 +6,8 @@
 //
 //  Generic scaffolding (handle creation, unload, destroy) lives in
 //  `CppBridge.ComponentActor`. TTS-specific surfaces kept here:
-//  the `loadVoice` voice-terminology wrapper, the `loadVoice(from:)`
-//  lifecycle adapter, and `stop()` to interrupt synthesis.
+//  the `loadVoice` voice-terminology wrapper and `stop()` to interrupt
+//  synthesis.
 //  The public `isLoaded` accessor was removed in Wave 6C (T13) — call
 //  sites now query `RunAnywhere.currentModel(category: .speechSynthesis)`
 //  on the lifecycle as the single source of truth.
@@ -54,33 +54,6 @@ extension CppBridge {
         /// Load a TTS voice
         public func loadVoice(_ voicePath: String, voiceId: String, voiceName: String) async throws {
             try await inner.loadModel(path: voicePath, id: voiceId, name: voiceName)
-        }
-
-        /// Load a TTS voice from a `RAModelLoadResult` returned by the proto-backed
-        /// lifecycle API. Mirrors `CppBridge.VLM.loadModel(from:)` so the Swift
-        /// component actor's `isLoaded` flag tracks the lifecycle service's state
-        /// after `RunAnywhere.loadModel(...)` returns `success=true`.
-        func loadVoice(from result: RAModelLoadResult, voiceName: String? = nil) async throws {
-            if await inner.currentAssetId == result.modelID {
-                return
-            }
-            guard result.success else {
-                throw SDKException(
-                    code: .modelLoadFailed,
-                    message: result.errorMessage.isEmpty ? "TTS lifecycle load failed" : result.errorMessage,
-                    category: .component
-                )
-            }
-
-            // Pass model id (not resolved path) so `rac_tts_create` registry
-            // lookup resolves the canonical local path. Same pattern as the
-            // STT loadModel(from:) method — the lifecycle load (commons)
-            // has already populated the registry entry's local_path.
-            try await loadVoice(
-                result.modelID,
-                voiceId: result.modelID,
-                voiceName: voiceName ?? result.modelID
-            )
         }
 
         /// Unload the current voice

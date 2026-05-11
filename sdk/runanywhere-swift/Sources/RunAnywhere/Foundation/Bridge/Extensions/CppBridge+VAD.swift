@@ -99,34 +99,6 @@ extension CppBridge {
             logger.info("VAD model unloaded")
         }
 
-        /// Load a VAD model from a `RAModelLoadResult` returned by the proto-backed
-        /// lifecycle API. Mirrors `CppBridge.STT.loadModel(from:)` / `CppBridge.TTS.loadVoice(from:)`
-        /// so the Swift component actor's `isLoaded` mirror tracks the lifecycle
-        /// service's state after `RunAnywhere.loadModel(...)` returns `success=true`.
-        /// Without this, VAD never connects to the lifecycle-loaded Silero model
-        /// (SWIFT-VAD-001).
-        func loadModel(from result: RAModelLoadResult, modelName: String? = nil) async throws {
-            if loadedModelId == result.modelID {
-                return
-            }
-            guard result.success else {
-                throw SDKException(
-                    code: .modelLoadFailed,
-                    message: result.errorMessage.isEmpty ? "VAD lifecycle load failed" : result.errorMessage,
-                    category: .component
-                )
-            }
-            // Pass the model id — `rac_vad_component_load_model` resolves through
-            // `rac_get_model(arg)` → `rac_get_model_by_path(arg)` → basename,
-            // and the registry already knows the resolved path from the lifecycle
-            // load that just succeeded. Matches STT/TTS pattern.
-            try await loadModel(
-                result.modelID,
-                modelId: result.modelID,
-                modelName: modelName ?? result.modelID
-            )
-        }
-
         // MARK: - Lifecycle
 
         /// Initialize VAD — binds to the commons lifecycle VAD service.

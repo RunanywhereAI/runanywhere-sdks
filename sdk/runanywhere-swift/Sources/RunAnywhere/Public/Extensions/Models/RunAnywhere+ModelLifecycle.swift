@@ -23,20 +23,17 @@ public extension RunAnywhere {
         guard result.success else {
             return result
         }
-        // VLM still needs Swift-side actor sync because its process/stream API
-        // reads from CppBridge.VLM.shared.handle, which is distinct from the
-        // lifecycle's internal handle.
-        //
-        // STT + TTS sync removed in Phase 6h: the re-load through
-        // CppBridge.STT/TTS.shared.loadModel(from:) triggered duplicate
-        // sherpa backend state (second SherpaOnnxCreateOfflineRecognizer
-        // from the Swift actor's handle clashed with the lifecycle-owned one
-        // and returned RAC_ERROR_MODEL_LOAD_FAILED). The consequence is that
-        // CppBridge.STT/TTS.shared.isLoaded returns false after loadModel(),
-        // so transcribe() / synthesize() guards throw notInitialized. The
-        // proper fix is for the Swift actor to reuse the lifecycle's handle
-        // rather than creating its own via rac_stt_component_create; that's
-        // a cross-SDK architectural change out of scope for this phase.
+        // The lifecycle service is the canonical source of truth for
+        // "is this modality loaded". Inference paths (voice_agent.cpp and
+        // every rac_*_proto entry point) consult it via acquire_lifecycle_*;
+        // Swift readiness checks (TTS/VLM isLoaded) consult it via
+        // RACurrentModelRequest. Per-component Swift actor handles
+        // (CppBridge.{STT,TTS,VAD,VLM}.shared) remain only for legacy
+        // direct-handle ops still on rac_*_component_* (cancel,
+        // supports_streaming, etc.) and are not consulted for inference
+        // or compose-readiness. See gaps/gaps/inconsistencies/swift.md
+        // SWIFT-VOICE-AGENT-001 (closed in 4dc98989a) and the
+        // rac_vlm_process_proto precedent from Phase 6j.
         if result.category.isVLMCategory {
             return await synchronizeVLMComponentLoad(result)
         }
