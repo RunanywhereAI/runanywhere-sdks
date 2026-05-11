@@ -350,6 +350,14 @@ private struct StoredModelRow: View {
     @State private var showingDeleteConfirmation = false
     @State private var isDeleting = false
 
+    /// Display label for `model.format`. Returns nil when the format is
+    /// unknown/unspecified so callers can suppress the badge instead of
+    /// surfacing the raw `MODEL_FORMAT_UNKNOWN` proto enum name.
+    private var formatLabel: String? {
+        guard model.format != .unknown else { return nil }
+        return model.format.wireString.uppercased()
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.smallMedium) {
             HStack {
@@ -358,12 +366,14 @@ private struct StoredModelRow: View {
                         .font(AppTypography.subheadlineMedium)
 
                     HStack(spacing: AppSpacing.smallMedium) {
-                        Text(model.format.wireString.uppercased())
-                            .font(AppTypography.caption2)
-                            .padding(.horizontal, AppSpacing.small)
-                            .padding(.vertical, AppSpacing.xxSmall)
-                            .background(AppColors.badgePrimary)
-                            .cornerRadius(AppSpacing.cornerRadiusSmall)
+                        if let formatLabel {
+                            Text(formatLabel)
+                                .font(AppTypography.caption2)
+                                .padding(.horizontal, AppSpacing.small)
+                                .padding(.vertical, AppSpacing.xxSmall)
+                                .background(AppColors.badgePrimary)
+                                .cornerRadius(AppSpacing.cornerRadiusSmall)
+                        }
 
                         if let framework = model.framework {
                             Text(framework.displayName)
@@ -417,7 +427,7 @@ private struct StoredModelRow: View {
                     HStack {
                         Text("Format:")
                             .font(AppTypography.caption2Medium)
-                        Text(model.format.wireString.uppercased())
+                        Text(formatLabel ?? "—")
                             .font(AppTypography.caption2)
                             .foregroundColor(AppColors.textSecondary)
                     }

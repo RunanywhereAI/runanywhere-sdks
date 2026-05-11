@@ -48,8 +48,11 @@ class StorageViewModel: ObservableObject {
         availableSpace = storageInfo.deviceStorage.freeBytes
         modelStorageSize = storageInfo.totalModelsSize
 
-        // Use RAStoredModel directly from SDK
-        storedModels = storageInfo.storedModels
+        // Filter out registry-only / pseudo-model entries that have no on-disk
+        // artifact (Apple system models, built-in pseudo-models, etc.). These
+        // entries leak into the disk view but report `size == 0`, producing
+        // "Zero KB" rows that aren't actually using storage.
+        storedModels = storageInfo.storedModels.filter { $0.size > 0 }
 
         isLoading = false
     }

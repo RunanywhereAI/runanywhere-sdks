@@ -180,6 +180,9 @@ struct ToolSettingsSection: View {
                         }
                     }
                     .foregroundColor(AppColors.primaryAccent)
+                    // Keep tap target clear of the bottom tab bar so the
+                    // centre of the button doesn't register a tab-switch tap.
+                    .padding(.bottom, 50)
                 } else {
                     ForEach(viewModel.registeredTools, id: \.name) { tool in
                         ToolRow(tool: tool)
@@ -191,6 +194,8 @@ struct ToolSettingsSection: View {
                         }
                     }
                     .foregroundColor(AppColors.primaryRed)
+                    // Same tab-bar overlap mitigation as the demo-tools button.
+                    .padding(.bottom, 50)
                 }
             }
         } header: {
