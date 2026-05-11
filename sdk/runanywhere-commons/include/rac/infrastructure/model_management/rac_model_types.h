@@ -912,6 +912,167 @@ RAC_API rac_bool_t rac_path_is_non_empty_directory(const char* path);
 // runanywhere.v1.ModelInfo. Output is the same `runanywhere.v1.ExpectedModelFiles`
 // shape every SDK already consumes.
 
+// =============================================================================
+// PROTO ENUM ↔ C ENUM MAPPERS (T15a / SWIFT-DUP-MODELTYPES-COMPUTED)
+// =============================================================================
+//
+// Bidirectional mappers between the proto-wire `int32` enum values declared in
+// `idl/model_types.proto` and the corresponding `rac_*_t` C enum values.
+//
+// Background: Pre-IDL, every platform SDK hand-wrote a per-language switch
+// table to convert between proto enum cases and the SDK's own enum
+// representation. Most C enums in `rac_model_types.h` were defined long before
+// the proto schema, so their numeric values DO NOT match the proto integers
+// 1:1 (proto reserves 0 for UNSPECIFIED; some C enums skip UNSPECIFIED, others
+// use 99 for UNKNOWN, etc.). These mappers centralize the translation so SDKs
+// can call a single C ABI rather than re-implement the switch table per
+// language.
+//
+// Mapping conventions:
+//   - proto.UNSPECIFIED → C "UNKNOWN" (or first defined value when no UNKNOWN
+//     exists). All mappers accept UNSPECIFIED as a valid input that round-trips
+//     back to UNSPECIFIED via `_to_proto`.
+//   - Unknown / out-of-range proto values → RAC_ERROR_INVALID_ARGUMENT.
+//   - Unknown / out-of-range C values → RAC_ERROR_INVALID_ARGUMENT.
+//   - NULL `out` → RAC_ERROR_NULL_POINTER.
+//
+// Note on `rac_model_format_t`: the C enum values are already 1:1 with
+// `runanywhere.v1.ModelFormat` (via the shared `RAC_MODEL_FORMAT_ID_*`
+// constants in `rac_model_format_ids.h`). The mapper is still provided for
+// type safety so callers cannot accidentally mix `int32_t` proto values and
+// `rac_model_format_t` values without going through a validated entry point.
+
+/**
+ * @brief Convert a proto `runanywhere.v1.InferenceFramework` int32 value to a
+ *        `rac_inference_framework_t` value.
+ *
+ * @param proto_value Proto enum integer (0..23).
+ * @param out         Output: parsed inference framework. Set to
+ *                    RAC_FRAMEWORK_UNKNOWN on failure.
+ * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the proto
+ *         value is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
+ */
+RAC_API rac_result_t rac_inference_framework_from_proto(int32_t proto_value,
+                                                        rac_inference_framework_t* out);
+
+/**
+ * @brief Convert a `rac_inference_framework_t` value to the proto
+ *        `runanywhere.v1.InferenceFramework` int32 value.
+ *
+ * @param value Inference framework.
+ * @param out   Output: proto enum integer. Set to 0 (UNSPECIFIED) on failure.
+ * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the C value
+ *         is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
+ */
+RAC_API rac_result_t rac_inference_framework_to_proto(rac_inference_framework_t value,
+                                                      int32_t* out);
+
+/**
+ * @brief Convert a proto `runanywhere.v1.ModelCategory` int32 value to a
+ *        `rac_model_category_t` value.
+ *
+ * @param proto_value Proto enum integer (0..9).
+ * @param out         Output: parsed model category. Set to
+ *                    RAC_MODEL_CATEGORY_UNKNOWN on failure.
+ * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the proto
+ *         value is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
+ */
+RAC_API rac_result_t rac_model_category_from_proto(int32_t proto_value,
+                                                   rac_model_category_t* out);
+
+/**
+ * @brief Convert a `rac_model_category_t` value to the proto
+ *        `runanywhere.v1.ModelCategory` int32 value.
+ *
+ * @param value Model category.
+ * @param out   Output: proto enum integer. Set to 0 (UNSPECIFIED) on failure.
+ * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the C value
+ *         is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
+ */
+RAC_API rac_result_t rac_model_category_to_proto(rac_model_category_t value, int32_t* out);
+
+/**
+ * @brief Convert a proto `runanywhere.v1.ModelFormat` int32 value to a
+ *        `rac_model_format_t` value.
+ *
+ * Note: `rac_model_format_t` values are already 1:1 with the proto
+ * integers via `RAC_MODEL_FORMAT_ID_*` so the mapping is the identity for
+ * known values; this wrapper is provided for type safety / validation.
+ *
+ * @param proto_value Proto enum integer (0..15).
+ * @param out         Output: parsed model format. Set to
+ *                    RAC_MODEL_FORMAT_UNSPECIFIED on failure.
+ * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the proto
+ *         value is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
+ */
+RAC_API rac_result_t rac_model_format_from_proto(int32_t proto_value, rac_model_format_t* out);
+
+/**
+ * @brief Convert a `rac_model_format_t` value to the proto
+ *        `runanywhere.v1.ModelFormat` int32 value.
+ *
+ * @param value Model format.
+ * @param out   Output: proto enum integer. Set to 0 (UNSPECIFIED) on failure.
+ * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the C value
+ *         is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
+ */
+RAC_API rac_result_t rac_model_format_to_proto(rac_model_format_t value, int32_t* out);
+
+/**
+ * @brief Convert a proto `runanywhere.v1.ModelSource` int32 value to a
+ *        `rac_model_source_t` value.
+ *
+ * Note: `rac_model_source_t` only has REMOTE and LOCAL today; proto's
+ * BUILT_IN (=3) is mapped to RAC_MODEL_SOURCE_LOCAL to match commons'
+ * Apple platform handling (built-in models are surfaced as local on the
+ * C-struct path; the proto envelope keeps the original BUILT_IN value).
+ *
+ * @param proto_value Proto enum integer (0..3).
+ * @param out         Output: parsed model source. Set to
+ *                    RAC_MODEL_SOURCE_REMOTE on failure.
+ * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the proto
+ *         value is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
+ */
+RAC_API rac_result_t rac_model_source_from_proto(int32_t proto_value, rac_model_source_t* out);
+
+/**
+ * @brief Convert a `rac_model_source_t` value to the proto
+ *        `runanywhere.v1.ModelSource` int32 value.
+ *
+ * @param value Model source.
+ * @param out   Output: proto enum integer. Set to 0 (UNSPECIFIED) on failure.
+ * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the C value
+ *         is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
+ */
+RAC_API rac_result_t rac_model_source_to_proto(rac_model_source_t value, int32_t* out);
+
+/**
+ * @brief Convert a proto `runanywhere.v1.ArchiveType` int32 value to a
+ *        `rac_archive_type_t` value.
+ *
+ * Note: proto's ARCHIVE_TYPE_UNSPECIFIED (=0) maps to the C
+ * RAC_ARCHIVE_TYPE_NONE (=-1) which represents the "no archive / direct
+ * file" sentinel.
+ *
+ * @param proto_value Proto enum integer (0..4).
+ * @param out         Output: parsed archive type. Set to
+ *                    RAC_ARCHIVE_TYPE_NONE on failure.
+ * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the proto
+ *         value is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
+ */
+RAC_API rac_result_t rac_archive_type_from_proto(int32_t proto_value, rac_archive_type_t* out);
+
+/**
+ * @brief Convert a `rac_archive_type_t` value to the proto
+ *        `runanywhere.v1.ArchiveType` int32 value.
+ *
+ * @param value Archive type.
+ * @param out   Output: proto enum integer. Set to 0 (UNSPECIFIED) on failure.
+ * @return RAC_SUCCESS on success, RAC_ERROR_INVALID_ARGUMENT if the C value
+ *         is unrecognized, RAC_ERROR_NULL_POINTER if `out` is NULL.
+ */
+RAC_API rac_result_t rac_archive_type_to_proto(rac_archive_type_t value, int32_t* out);
+
 /**
  * @brief Compute the canonical ExpectedModelFiles manifest for a ModelInfo.
  *

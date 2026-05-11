@@ -712,6 +712,20 @@ rac_link_archive_deps(test_model_string_accessors)
 target_compile_features(test_model_string_accessors PRIVATE cxx_std_17)
 add_test(NAME model_string_accessors_tests COMMAND test_model_string_accessors)
 
+# --- Proto enum ↔ C enum mapper parity tests (T15a) --------------------------
+# Exercises rac_inference_framework_from/to_proto, rac_model_category_*,
+# rac_model_format_*, rac_model_source_* and rac_archive_type_*. Pure C ABI,
+# no protobuf required.
+add_executable(test_model_types_mappers test_model_types_mappers.cpp)
+target_include_directories(test_model_types_mappers PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_model_types_mappers PRIVATE rac_commons)
+rac_link_archive_deps(test_model_types_mappers)
+target_compile_features(test_model_types_mappers PRIVATE cxx_std_17)
+add_test(NAME model_types_mappers_tests COMMAND test_model_types_mappers)
+
 # --- Model lifecycle proto-byte ABI tests ------------------------------------
 # Exercises ModelLoad/Unload/CurrentModel and ComponentLifecycleSnapshot over
 # serialized generated proto bytes. SKIP-style fallback when Protobuf is
