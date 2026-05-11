@@ -293,6 +293,11 @@ const char* framework_to_plugin_name(InferenceFramework framework,
             }
             return "llamacpp";
         case runanywhere::v1::INFERENCE_FRAMEWORK_ONNX:
+            if (primitive == RAC_PRIMITIVE_DETECT_VOICE ||
+                primitive == RAC_PRIMITIVE_TRANSCRIBE ||
+                primitive == RAC_PRIMITIVE_SYNTHESIZE) {
+                return "sherpa";
+            }
             return "onnx";
         case runanywhere::v1::INFERENCE_FRAMEWORK_SHERPA:
             return "sherpa";

@@ -181,5 +181,7 @@
 #include "rac_plugin_entry_platform.h"  // Phase 5b: platform plugin (Apple FM / System TTS / CoreML Diffusion)
 #include "rac_routing_hints.h"
 #include "rac_route.h"
+#include "rac_runtime_registry.h"  // SWIFT-IOS-008: explicit-module mode requirement
+#include "rac_runtime_vtable.h"
 
 #endif /* CRACOMMONS_H */

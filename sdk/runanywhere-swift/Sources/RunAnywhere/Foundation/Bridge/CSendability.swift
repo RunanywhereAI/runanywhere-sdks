@@ -34,6 +34,3 @@
 
 import Foundation
 
-extension OpaquePointer: @retroactive @unchecked Sendable {}
-extension UnsafeMutableRawPointer: @retroactive @unchecked Sendable {}
-extension UnsafeRawPointer: @retroactive @unchecked Sendable {}
