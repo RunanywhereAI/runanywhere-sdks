@@ -1,25 +1,134 @@
 # Swift / iOS SDK — Current Inconsistencies
 
-Updated: 2026-05-09
-Branch: `feat/v2-architecture` @ `b336248b3`
+Updated: 2026-05-10
+Branch: `feat/v2-architecture`
+
+## E2E Validation Findings (run 20260510-160835)
+
+### Test summary
+
+- **Date**: 2026-05-10
+- **Simulator**: iPhone 17 Pro, iOS 26.1, UDID `67528025-0DD2-4B5B-AB6D-585C5FB2EB8E`
+- **App**: `com.runanywhere.RunAnywhere` @ commit `992e9f0c7` (post-Phase 5)
+- **Test workflow**: `test_workflows/instructions/swift/README.md`
+- **Run folder**: `test_workflows/logs/20260510-160835-swift-e2e/02_ios_swift/`
+
+### Modality results
+
+| Modality | Status | Notes |
+| --- | --- | --- |
+| LLM chat (Qwen 2.5 0.5B) | PASS | streamed 103 tok/s |
+| LLM chat (Qwen3 0.6B) | FAIL | SWIFT-IOS-005: main-thread hang |
+| VLM (LFM2-VL) | PASS | photo library fixture |
+| TTS (platform / AVSpeech) | PASS | iOS system synthesizer |
+| Embeddings (MiniLM L6 v2) | PASS | loaded |
+| VAD (Silero, ONNX) | FAIL | SWIFT-IOS-001: VAD route mismatch — see RCA |
+| STT (Sherpa Whisper Tiny) | BLOCKED | model downloaded + loaded; no mic input on sim; no file fallback in UI |
+| Voice agent | BLOCKED (DEGRADED) | components ready, VAD falls back to energy; mic-blocked anyway |
+| RAG (Document Q&A) | BLOCKED | requires PDF/JSON file; no bundled fixture |
+| Tool calling | PASS (newly unblocked) | "Add Demo Tools" in Settings → registers via `RunAnywhere.registerTool(...)` |
+| Hardware / Settings / Storage / Lifecycle / Telemetry | PASS | deep coverage |
+| Structured output, Diffusion, LoRA | N/A | not exposed in iOS example |
+
+### Failure inventory
+
+#### SWIFT-IOS-001 (HIGH) — VAD route mismatch (cross-platform C++ root cause)
+
+- **Symptom**: `RunAnywhere.loadModel(silero-vad)` returns `success=false` with `errorMessage = "no backend route supports requested model for framework onnx"`. Voice agent falls back to energy VAD; speech-start / speech-end events never fire.
+- **Root cause**: `framework_to_plugin_name()` returns `"onnx"` for ONNX VAD, but the only engine that actually owns `vad_ops` is named `"sherpa"`. The lifecycle path pins the route by name with `no_fallback=true`, so the router hard-rejects the Sherpa engine on pin-name mismatch.
+- **Fix**: ~6-line change in `sdk/runanywhere-commons/src/core/model_lifecycle.cpp:287-312` to special-case speech primitives (`DETECT_VOICE`, `TRANSCRIBE`, `SYNTHESIZE`) when framework is `INFERENCE_FRAMEWORK_ONNX` to return `"sherpa"`. Mirrors the existing `LLAMA_CPP + VLM → "llamacpp_vlm"` special-case in the same function.
+- **Cross-platform**: Swift + Kotlin + Flutter + RN all affected (shared C++ lifecycle path).
+- **Full RCA**: `gaps/gaps/inconsistencies/SWIFT-IOS-001-vad-route.md`.
+
+#### SWIFT-IOS-005 (HIGH) — Qwen3 0.6B Q4_K_M LLM inference hangs main thread on simulator
+
+- **Symptom**: Model load banner ("'Qwen3 0.6B Q4_K_M' is loaded") appears, but submitting a prompt produces no tokens after 4+ minutes. Mobile MCP WDA becomes unresponsive (`context deadline exceeded`).
+- **Diagnostic**: `xcrun simctl spawn booted log show --predicate 'process == "RunAnywhereAI"'` shows repeated `XCTAS Error … Code=6 "Unable to perform work on main run loop, process main thread busy for 30.0s"` cycles every 30s.
+- **Recovery**: requires app force-quit (`xcrun simctl terminate` + relaunch).
+- **Asymmetry**: Other LLMs (Qwen 2.5 0.5B Q6_K) work fine at 103 tok/s — regression unique to Qwen3 family.
+- **Hypothesis**: Likely backend/format issue (Qwen3 Q4_K_M generation extremely slow OR inference loop synchronous on main thread).
+- **Next**: Reproduce on physical device (not simulator) and gate the model with a streaming-progress indicator + cancel/timeout affordance.
+- **Evidence**: `screenshots/103_llm_switched_qwen3.png` (model loaded), `screenshots/108_after_long_wait.png` (no response after 4 min).
+
+#### SWIFT-IOS-006 (MEDIUM) — Storage view shows phantom Zero-KB models + `MODEL_FORMAT_UNKNOWN` tags
+
+- **Symptom**: Storage tab lists 9 Downloaded Models totalling 1.88 GB, but only 6 actually consume disk. The other 3 (`coreml-diffusion`, `foundation-models-default`, `system-tts`) report "Zero KB". All 9 also display `MODEL_FORMAT_UNKNOWN` tag.
+- **Root cause**: Registry-only entries (registered modules with no on-disk weights) leak into the disk view; the storage UI is not reading the model's proto-defined format from registry.
+- **Fix**: distinguish "registered but not downloaded" from "downloaded" in the Storage view; consult the format enum via proto-generated type rather than printing `MODEL_FORMAT_UNKNOWN`.
+- **Evidence**: `screenshots/120_storage_view.png`, `screenshots/121_storage_scroll1.png`, `screenshots/124_after_delete.png`.
+
+#### SWIFT-IOS-007 (MEDIUM / UX) — Tap target overlap: "Add Demo Tools" overlaps Voice tab nav bar
+
+- **Symptom**: Settings → Tool Calling → "Add Demo Tools" button at y=788–840 overlaps the bottom tab bar at y=795–849. Centre-of-button taps register the Voice tab instead of the action.
+- **Reproduction**: 3× — Settings → scroll to Tool Calling → tap centre of "Add Demo Tools" → land on Voice Assistant Setup screen instead of seeing Registered Tools count change.
+- **Fix**: add safe-area-insets bottom padding so the button is fully above the tab bar.
+- **Evidence**: `screenshots/142_tool_section_view.png` (button position), `screenshots/145_voice_setup_no_file_input.png` (accidental nav).
+
+#### SWIFT-IOS-008 (MEDIUM) — `CRACommons.h` umbrella header missing `rac_runtime_registry.h` include
+
+- **Symptom**: `Sources/RunAnywhere/CRACommons/include/CRACommons.h` does not include `rac_runtime_registry.h`. Works today via textual headers but breaks strict explicit-module mode (Swift 6 / `-strict-concurrency=complete` future tightening).
+- **Fix**: 1-line addition to the umbrella header.
+- **Scope**: XS.
+
+#### SWIFT-IOS-009 (LOW) — SwiftPM `unhandled files` warnings
+
+- **Symptom**: SwiftPM emits "unhandled files" warnings during build:
+  - `Sources/LlamaCPPRuntime/README.md` and `Sources/ONNXRuntime/README.md` not classified as resources.
+  - Vendored DeviceKit `.gyb` / `Info.plist` files in dependency path.
+- **Fix**: Add `exclude:` entries in `Package.swift` for the affected targets. Cosmetic — no functional impact.
+- **Scope**: XS.
+
+#### SWIFT-IOS-010 (LOW) — Example app Swift 6 warnings (5 sites)
+
+- `examples/ios/RunAnywhereAI/.../VLMViewModel.swift:39` — `nonisolated(unsafe)` has no effect.
+- `examples/ios/RunAnywhereAI/.../STTViewModel.swift:312` — `await` with no async operation.
+- `examples/ios/RunAnywhereAI/.../STTViewModel.swift:314` — `await` with no async operation.
+- `examples/ios/RunAnywhereAI/.../FlowSessionManager.swift:408` — `await` with no async operation.
+- `examples/ios/RunAnywhereAI/.../FlowSessionManager.swift:416` — `await` with no async operation.
+- `examples/ios/RunAnywhereAI/.../ConversationStore.swift:378` — unused result.
+- **Fix**: Drop redundant `await` / `nonisolated(unsafe)` annotations; use `_ =` for intentionally unused results.
+
+#### SWIFT-IOS-011 (LOW) — `CSendability.swift` retroactive `@unchecked Sendable` conformances are now redundant
+
+- **File**: `Sources/RunAnywhere/Foundation/Concurrency/CSendability.swift:37-39`.
+- **Symptom**: Swift 6 ships built-in unavailable `Sendable` conformances for the affected C-bridged opaque pointer types. Our retroactive `extension ... : @unchecked Sendable {}` declarations trigger "retroactive conformance" warnings.
+- **Fix**: Delete the retroactive conformances; rely on the standard-library / Swift 6 defaults.
+
+### Confirmed-not-issues (positive findings)
+
+- All 4 Phase 0-3 deleted files (`CommonsErrorMapping`, `DeviceIdentity`, `ComponentProtocols`, `SystemTTSModule`) — zero runtime references in the captured logs; build correctly removes stale `.o` files.
+- No `dyld` / `dlsym` failures.
+- No Swift fatal errors / preconditions / forced unwraps observed.
+- No proto decode/encode warnings.
+- SDK init: 70 ms cold.
+- No memory warnings during 30-minute test session.
+- No crash reports.
+
+### Cross-references
+
+- Run folder: `test_workflows/logs/20260510-160835-swift-e2e/02_ios_swift/`
+- Detailed RCA: `gaps/gaps/inconsistencies/SWIFT-IOS-001-vad-route.md`
+- Canonical Swift status doc (simplification report + residual open items): `gaps/gaps/simplification/SWIFT_REMAINING.md`
+
+---
 
 ## Current modality state (physical iPhone 17 Pro Max)
 
 | Modality | Status |
 |---|---|
-| LLM Chat | ✅ PASS |
-| VLM (LFM2-VL 450M) | ✅ PASS |
-| STT (Sherpa Whisper Tiny, single-shot) | ✅ PASS |
-| TTS (Platform + Sherpa Piper) | ✅ PASS |
-| Tool Calling | ✅ PASS |
-| RAG ingest + query | ✅ PASS |
-| Document storage + retrieval | ✅ PASS |
-| Archive extraction → canonical path | ✅ PASS |
-| Model persistence across relaunch | ✅ PASS |
-| Settings / Hardware / Permissions | ✅ PASS |
-| VAD | ❌ BROKEN — `SWIFT-VAD-001` |
-| Voice Agent (end-to-end pipeline) | ❌ BROKEN — `SWIFT-VOICE-AGENT-001` |
-| Solutions | 🟡 UNTESTED — `SWIFT-SOLUTIONS-UNTESTED` |
+| LLM Chat | PASS |
+| VLM (LFM2-VL 450M) | PASS |
+| STT (Sherpa Whisper Tiny, single-shot) | PASS |
+| TTS (Platform + Sherpa Piper) | PASS |
+| Tool Calling | PASS |
+| RAG ingest + query | PASS |
+| Document storage + retrieval | PASS |
+| Archive extraction → canonical path | PASS |
+| Model persistence across relaunch | PASS |
+| Settings / Hardware / Permissions | PASS |
+| VAD | BROKEN — `SWIFT-VAD-001` (same as SWIFT-IOS-001) |
+| Voice Agent (end-to-end pipeline) | BROKEN — `SWIFT-VOICE-AGENT-001` (blocked by SWIFT-VAD-001) |
+| Solutions | UNTESTED — `SWIFT-SOLUTIONS-UNTESTED` |
 
 ## Deferred backend Swift bindings (do not file bugs)
 
@@ -37,19 +146,18 @@ No Genie or WhisperCPP Swift bindings exist.
 
 # Part 1 — Runtime correctness issues
 
-## SWIFT-VAD-001: Voice Activity Detection is broken (HIGH)
+## SWIFT-VAD-001: Voice Activity Detection is broken (HIGH) — C++ ROUTER ROOT CAUSE
 
-- **Symptom**: VAD does not fire speech-start / speech-end events. Silero VAD registered but never commits.
-- **Evidence**: `logs3.txt:2350` shows `Model states synced - VAD: false` immediately after `Initializing voice agent...`.
-- **Root cause**: `CppBridge+VAD.swift` still manages lifecycle through direct handle-based calls (`rac_vad_component_initialize`, `rac_vad_component_start/stop/reset/load_model`). STT and TTS migrated to lifecycle-proto in Phase 6h; VAD did not.
-- **Fix path (confirmed by Foundation audit)**: Commons already exposes the required handle-less surface in `sdk/runanywhere-commons/include/rac/features/vad/rac_vad_service.h:244-279`:
-  - `rac_vad_process_lifecycle_proto`
-  - `rac_vad_configure_lifecycle_proto`
-  - `rac_vad_start_lifecycle_proto`
-  - `rac_vad_stop_lifecycle_proto`
-  - `rac_vad_reset_lifecycle_proto`
-  Add a `VADLifecycleProtoABI` private enum in `CppBridge+ModalityProtoABI.swift` parallel to `STTGeneratedProtoABI`/`TTSGeneratedProtoABI`, load the five symbols via `dlsym`, and have `CppBridge+VAD.swift` delegate `initialize/start/stop/reset` through it. Add a `loadModel(from: RAModelLoadResult)` adapter mirroring the STT/TTS pattern.
-- **Scope**: M.
+> **Attribution corrected 2026-05-10**: This was previously attributed to a Swift bridge gap (`VADLifecycleProtoABI` missing). Deep RCA during the 20260510-160835 E2E run identified the actual root cause as a C++ router misroute. See `gaps/gaps/inconsistencies/SWIFT-IOS-001-vad-route.md` for the full evidence chain.
+
+- **Symptom**: `RunAnywhere.loadModel(silero-vad)` returns `success=false` with `errorMessage = "no backend route supports requested model for framework onnx"`. VAD does not fire speech-start / speech-end events; voice agent falls back to energy-based VAD silently. `Model states synced - VAD: false` immediately after `Initializing voice agent...`.
+- **Evidence (this run)**: `examples/ios/RunAnywhereAI/.../VoiceAgentViewModel.swift:471-483` auto-load returns success=false; warning surfaces only as a `logger.warning` line at `:481`.
+- **Root cause (C++, not Swift)**: `sdk/runanywhere-commons/src/core/model_lifecycle.cpp:287-312` — `framework_to_plugin_name(INFERENCE_FRAMEWORK_ONNX, DETECT_VOICE)` returns the string `"onnx"`. The lifecycle path then sets `hints.preferred_engine_name = "onnx"` and `hints.no_fallback = true` (`model_lifecycle.cpp:1407-1411`). The router (`sdk/runanywhere-commons/src/router/rac_engine_router.cpp:167-180`) does case-sensitive equality against `vt.metadata.name`. The `"onnx"` engine has `vad_ops = nullptr` (it serves embeddings only — see `engines/onnx/rac_plugin_entry_onnx.cpp:46-78`). The engine that owns `vad_ops` is named `"sherpa"` (`engines/sherpa/rac_plugin_entry_sherpa.cpp:65,138`), but the pin name mismatch causes hard-rejection. Result: no candidate plugin survives; router returns `RAC_ERROR_NOT_FOUND`.
+- **Why STT/TTS work**: They are registered with `framework: .sherpa` in `examples/ios/RunAnywhereAI/.../App/RunAnywhereAIApp.swift:378-410`, which resolves to plugin name `"sherpa"` and matches. Only the VAD model is registered with `framework: .onnx` (line 412-420), making it the lone failing modality. Same asymmetry exists in Kotlin Android (`ModelBootstrap.kt:383-393`).
+- **Fix (Option A, recommended)**: ~6-line change in `framework_to_plugin_name` in `sdk/runanywhere-commons/src/core/model_lifecycle.cpp:287-312` — special-case speech primitives (`DETECT_VOICE`, `TRANSCRIBE`, `SYNTHESIZE`) when framework is `INFERENCE_FRAMEWORK_ONNX` to return `"sherpa"`. Mirrors the existing `LLAMA_CPP + VLM → "llamacpp_vlm"` special-case in the same function. No example-app churn. No proto changes.
+- **Fix (Option B, cleaner)**: Update every model registration that says `framework: .onnx` for speech models to say `framework: .sherpa` (iOS, Kotlin, Flutter, RN). Honest about which engine runs the model; more cross-SDK alignment work.
+- **Cross-platform implication**: One C++ change fixes Swift, Kotlin, Flutter, and RN simultaneously — they all share the C++ lifecycle path.
+- **Scope**: XS (Option A, single C++ file).
 
 ## SWIFT-VOICE-AGENT-001: End-to-end Voice Agent pipeline is broken (HIGH)
 
@@ -81,73 +189,26 @@ No Genie or WhisperCPP Swift bindings exist.
 
 # Part 2 — Swift/C++ duplication gaps (2026-05-09 audit)
 
-Cross-module audit across 8 Swift module subtrees found systematic duplication of logic that belongs in the C++ commons layer, plus generated-proto types being hand-re-wrapped. Each gap below is independently actionable. Deletion plan is conservative — every item has been traced to confirm zero live callers.
+Cross-module audit across 8 Swift module subtrees found systematic duplication of logic that belongs in the C++ commons layer. **Most items have been resolved through the 5-phase simplification work** — only OPEN entries are listed below. For the full historical catalog see git history of this file or the pre-execution audit docs under `gaps/gaps/simplification/swift-*-duplication.md`.
 
-## SWIFT-DUP-CANHANDLE: `canHandle*` methods are dead code across runtime modules (MEDIUM)
+## RESOLVED (Phase 0–5, deletion-only or moved-to-commons)
 
-Three places re-implement C++ plugin-router format matching in Swift. The C++ `rac_plugin_route()` in `sdk/runanywhere-commons/src/router/` is the only routing authority; these Swift methods are never called by the dispatch path.
+The following have been DELETED or migrated and are no longer present in the codebase:
 
-- `Sources/LlamaCPPRuntime/LlamaCPP.swift:155-159` — `canHandle(modelId:)` matches `.gguf`. Misses `.ggml`/`.bin` that C++ accepts.
-- `Sources/ONNXRuntime/ONNX.swift:169-190` — `canHandleSTT/TTS/VAD` substring matches `whisper`, `zipformer`, `paraformer`, `piper`, `vits`. Duplicates routing hints in C++ vtable.
-- `Sources/RunAnywhere/Features/LLM/System/SystemFoundationModelsModule.swift:89-104` and `Features/TTS/System/SystemTTSModule.swift:49-60` — `canHandle(modelId:/voiceId:)` duplicates the `can_handle` closures already registered in `CppBridge+Platform.swift:122-143` and `:243-255`.
+- `SWIFT-DUP-CANHANDLE` — DONE. 5 `canHandle*` methods removed across `LlamaCPPRuntime`, `ONNXRuntime`, `SystemFoundationModelsModule`, `SystemTTSModule`. (`2c4b8b599`)
+- `SWIFT-DUP-MODULE-METADATA` — DONE. `RunAnywhereModule.swift` protocol deleted, 4 module conformances removed. (`bf0cd5d7f`)
+- `SWIFT-DUP-RUNTIME-HEADERS` — DONE. 16 duplicate C headers removed from `LlamaCPPRuntime` and `ONNXRuntime`. (`30039099b`)
+- `SWIFT-DUP-CRACOMMONS-PHANTOM` — DONE. 5 phantom CRACommons headers deleted (`rac_llm_events.h`, `rac_stt_events.h`, `rac_tts_events.h`, `rac_vad_events.h`, `rac_rag_pipeline.h`). (`f83ca88ec`)
+- `SWIFT-DUP-RACTYPES-CPPBRIDGE-DEAD` — DONE. 8 orphaned C-struct marshaling initializers/methods deleted in `RALLMTypes+CppBridge.swift`, `RASTTTypes+CppBridge.swift`, `RATTSTypes+CppBridge.swift`, `RAVADTypes+CppBridge.swift`. (`8df0036da`)
+- `SWIFT-DUP-LIFECYCLE-STATE` — DONE. `SystemFoundationModelsService.swift` lifecycle state mirror removed. (`96ef9e45f`)
+- `SWIFT-DUP-FACTORY-BYPASS` — DONE. `createService()` factories deleted on `SystemFoundationModelsModule` and `SystemTTSModule`. (`bf0cd5d7f`)
+- `SWIFT-DUP-COMPONENT-PROTOCOLS` — DONE. `Foundation/Core/ComponentProtocols.swift` deleted; `displayName` moved to `RASDKComponent+DisplayName.swift`.
+- `SWIFT-DUP-CRACOMMONS-STRUCTURED-OUTPUT-MISSING` — DONE (different file split). The proto-byte structured-output API is now exposed via `CRACommons/include/rac_llm_schema_to_json.h` rather than retrofitting `rac_llm_structured_output.h`.
+- Various LOW items (`SWIFT-DUP-COMPONENT-PROTOCOLS`, partial `SWIFT-DUP-STORAGE-ALIASES`, partial `SWIFT-DUP-HTTP-ADAPTER-MISLOCATED`, partial `SWIFT-DUP-ERROR-CABI`) — see `gaps/gaps/simplification/SWIFT_REMAINING.md` for the residual sliver in each.
 
-**Fix**: Delete all 5 `canHandle*` implementations.
-**Scope**: XS.
+## OPEN
 
-## SWIFT-DUP-MODULE-METADATA: `RunAnywhereModule` protocol metadata is never read polymorphically (MEDIUM)
-
-The `RunAnywhereModule` protocol in `Core/Module/RunAnywhereModule.swift` requires `moduleId`, `moduleName`, `capabilities`, `defaultPriority`, `inferenceFramework`. A grep of the Swift SDK confirms these properties are never iterated over the protocol existentially — the protocol is never used as a type constraint. All consumers read the same values from the C-returned `rac_module_info_t` inside `CppBridge+Services.swift:82-143`.
-
-The metadata is already canonical in C++: `rac_plugin_entry_llamacpp.cpp`, `rac_plugin_entry_sherpa.cpp`, `rac_plugin_entry_platform.cpp` all populate `rac_engine_vtable_t.metadata`. Having a second declaration on the Swift enum side creates drift risk.
-
-- `Sources/RunAnywhere/Core/Module/RunAnywhereModule.swift:40-55` — delete the entire file.
-- `Sources/LlamaCPPRuntime/LlamaCPP.swift:66-73` — remove conformance + metadata properties. Keep only `register()`, `registerVLM()`, `unregister()`.
-- `Sources/ONNXRuntime/ONNX.swift:55-62` — same.
-- `Sources/RunAnywhere/Features/LLM/System/SystemFoundationModelsModule.swift:58-64` — same.
-- `Sources/RunAnywhere/Features/TTS/System/SystemTTSModule.swift:40-45` — same.
-
-**Scope**: S.
-
-## SWIFT-DUP-RUNTIME-HEADERS: LlamaCPPRuntime and ONNXRuntime duplicate CRACommons headers (HIGH + latent bug)
-
-Both runtime modules ship local `include/` directories that copy types already exposed through CRACommons. One copy has already drifted.
-
-**LlamaCPPRuntime (`Sources/LlamaCPPRuntime/include/`)** — 4 duplicates of CRACommons headers:
-- `rac_error.h`, `rac_types.h`, `rac_llm.h`, `rac_llm_types.h` — byte-for-byte identical to `Sources/RunAnywhere/CRACommons/include/rac_*.h` equivalents.
-
-**ONNXRuntime (`Sources/ONNXRuntime/include/`)** — 12 duplicates:
-- `rac_error.h`, `rac_types.h`
-- `rac_stt.h`, `rac_tts.h`, `rac_vad.h`
-- `rac_stt_types.h`, `rac_tts_types.h`, `rac_vad_types.h`
-- `rac_stt_onnx.h`, `rac_tts_onnx.h`, `rac_vad_onnx.h`
-- (functions in all three `rac_*_onnx.h` are never called from Swift)
-
-**LATENT BUG — enum divergence**: `Sources/ONNXRuntime/include/rac_stt_types.h:44` defines `RAC_AUDIO_FORMAT_FLAC = 4`. Canonical `sdk/runanywhere-commons/include/rac/features/stt/rac_stt_types.h:76` defines `RAC_AUDIO_FORMAT_AAC = 4, RAC_AUDIO_FORMAT_FLAC = 5`. Any Swift code importing `ONNXBackend` and passing these constants to C++ will silently send the wrong audio-format integer.
-
-**Fix**:
-1. Delete all 16 duplicate headers above.
-2. Add `#include "rac_llm_llamacpp.h"` to `Sources/RunAnywhere/CRACommons/include/CRACommons.h` (mirrors the existing `rac_vlm_llamacpp.h` include at line 84) so `rac_backend_llamacpp_register` becomes reachable from CRACommons. Then delete the `LlamaCPPBackend` Clang module entirely (module.modulemap, umbrella, shim.c).
-3. Similarly collapse ONNXBackend — only `rac_plugin_entry_sherpa.h` (forward-decl of the plugin entry) and the ONNXRuntime Swift source need stay.
-4. Migrate the `module.modulemap` `link framework "Metal"` / `"MetalKit"` / `"MetalPerformanceShaders"` directives into `Package.swift` linker settings on the `RunAnywhere` target.
-
-**Scope**: M. Blocks cleanup of runtime modules entirely.
-
-## SWIFT-DUP-CRACOMMONS-PHANTOM: 5 CRACommons headers declare non-existent C++ symbols (HIGH)
-
-The following headers under `Sources/RunAnywhere/CRACommons/include/` declare `RAC_API` functions that have NO implementation in `sdk/runanywhere-commons/` and NO entry in `sdk/runanywhere-commons/exports/RACommons.exports`:
-
-- `rac_llm_events.h` — `rac_llm_event_*` publishing functions
-- `rac_stt_events.h` — `rac_stt_event_*` publishing functions
-- `rac_tts_events.h` — `rac_tts_event_*` publishing functions
-- `rac_vad_events.h` — `rac_vad_event_*` publishing functions
-- `rac_rag_pipeline.h` — the entire `rac_rag_pipeline_create/add_document/query` family; superseded by `rac_rag_session_create_proto` etc. in `rac_modality_proto_abi.h`.
-
-They currently link under the static xcframework (static archives ignore exports lists) but will break any dynamic-library build.
-
-**Fix**: Delete all 5 headers + their `#include` lines in `CRACommons.h`.
-**Scope**: XS.
-
-## SWIFT-DUP-CRACOMMONS-THINKING-DRIFT: `rac_llm_thinking.h` regressed the SWF-THINKING-MIGRATE cleanup (MEDIUM)
+### SWIFT-DUP-CRACOMMONS-THINKING-DRIFT: `rac_llm_thinking.h` regressed the SWF-THINKING-MIGRATE cleanup (MEDIUM)
 
 `Sources/RunAnywhere/CRACommons/include/rac_llm_thinking.h:52-88` still declares three functions with `RAC_API`:
 - `rac_llm_extract_thinking`
@@ -159,81 +220,17 @@ Canonical commons `sdk/runanywhere-commons/include/rac/features/llm/rac_llm_thin
 **Fix**: Either (a) restore `RAC_API` + exports entries in commons if Swift actually needs these (audit `CppBridge+LLMThinking.swift` call sites), or (b) delete the Swift wrappers and migrate thinking extraction to the proto-field-based API on `RALLMGenerationResult`.
 **Scope**: S.
 
-## SWIFT-DUP-CRACOMMONS-STRUCTURED-OUTPUT-MISSING: `rac_llm_structured_output.h` missing 5 proto-byte overloads (MEDIUM)
+### SWIFT-DUP-HTTP-ADAPTER-MISLOCATED: `HTTPClientAdapter` is in the wrong directory (MEDIUM)
 
-`Sources/RunAnywhere/CRACommons/include/rac_llm_structured_output.h` contains only legacy struct-based APIs. The canonical commons header adds:
-- `rac_structured_output_parse_proto`
-- `rac_structured_output_generate_proto`
-- `rac_structured_output_generate_stream_proto`
-- `rac_structured_output_prepare_prompt_proto`
-- `rac_structured_output_validate_proto`
-- type `rac_structured_output_parse_result_t`
+`Sources/RunAnywhere/Adapters/HTTPClientAdapter.swift` is named like an IoC platform adapter but is mislocated. Phase 3 already absorbed most of the business logic (Supabase upsert injection, auth retry loop, `parseHTTPError` status-code→`SDKException` classification — now in C++ via `rac_api_error_from_response`, `rac_http_request_set_upsert_mode`, `rac_http_default_headers`).
 
-All five `_proto` variants ARE in `RACommons.exports`. Swift cannot see them because the CRACommons mirror is stale.
+The remaining items:
+1. Move `HTTPClientAdapter.swift` from `Adapters/` to `Foundation/Bridge/` or `Data/Network/` (file is still 338 LOC).
+2. Review `Data/Network/Protocols/NetworkService.swift` — a second Swift protocol layer over `rac_http_transport_ops_t`. If nothing uses it, delete.
 
-**Fix**: Update the CRACommons header to match the canonical commons copy.
-**Scope**: XS.
-
-## SWIFT-DUP-RACTYPES-CPPBRIDGE-DEAD: Post-Phase-6h the C-struct bridge code is orphaned (HIGH)
-
-Phase 6h migrated STT/TTS/VLM/LLM to the proto-byte ABI (`rac_*_lifecycle_proto` / `rac_*_component_*_proto`). The C-struct marshaling layer in `Sources/RunAnywhere/Foundation/Bridge/Extensions/` is now unreachable:
-
-- `RALLMTypes+CppBridge.swift:57-73` — `RALLMGenerationOptions.withCOptions<T>` builds `rac_llm_options_t`; no caller.
-- `RALLMTypes+CppBridge.swift:116-129` — `RALLMGenerationResult.init(from cResult: rac_llm_result_t, ...)`; no caller.
-- `RALLMTypes+CppBridge.swift:130-145` — `RALLMGenerationResult.init(from cStreamResult: rac_llm_stream_result_t, ...)`; no caller.
-- `RASTTTypes+CppBridge.swift:78-92` — `RASTTOptions.withCOptions<T>`; no caller.
-- `RASTTTypes+CppBridge.swift:101-147` — `RASTTOutput.init(from cOutput: rac_stt_output_t)`; no caller.
-- `RATTSTypes+CppBridge.swift:56-77` — `RATTSOptions.withCOptions<T>`; no caller.
-- `RATTSTypes+CppBridge.swift:86-120` — `RATTSOutput.init(from cOutput: rac_tts_output_t)`; no caller.
-- `RAVADTypes+CppBridge.swift:20-29` — `RAVADStatistics.init(from cStats: rac_energy_vad_stats_t)`; no caller (stats now come via `statisticsProto()`).
-
-**Fix**: Delete the 8 listed initializers + methods. Keep the remaining convenience extensions (`.defaults()`, `.validate()`, computed aliases) in the same files — those have public-API callers.
 **Scope**: S.
 
-## SWIFT-DUP-LIFECYCLE-STATE: `SystemFoundationModelsService` re-implements LifecycleManager (MEDIUM)
-
-`Sources/RunAnywhere/Features/LLM/System/SystemFoundationModelsService.swift`:
-- Lines 22-23, 36-37, 55-82, 128, 172, 180 — `_isReady` / `_currentModel` guards mirror the `IDLE → LOADING → LOADED` state machine in `sdk/runanywhere-commons/src/core/capabilities/lifecycle_manager.cpp`.
-- Line 41 — `contextLength: Int? { 4096 }` hard-codes a value already set in `rac_backend_platform_register.cpp:119` via `out_info->context_length = 4096`.
-
-**Fix**: Remove `_isReady`/`_currentModel` state; rely on C++ lifecycle via `rac_model_lifecycle_current_model_proto`. Delete `contextLength` override.
-**Scope**: S.
-
-## SWIFT-DUP-FACTORY-BYPASS: `createService()` module factories bypass the C++ plugin system (MEDIUM)
-
-- `SystemFoundationModelsModule.swift:106-114` — `createService()` public factory.
-- `SystemTTSModule.swift:64-68` — `createService()` public factory.
-
-Both return a service instance directly, skipping `rac_plugin_route` and the whole component lifecycle. This is a second back door around the architecture. The comment at `SystemFoundationModelsModule.swift:106` explicitly advertises the bypass: "Use this for direct access without going through the service registry."
-
-**Fix**: Delete both factory methods. All access must go through `CppBridge.LLM`/`CppBridge.TTS` which route via the plugin registry.
-**Scope**: XS.
-
-## SWIFT-DUP-COMPONENT-PROTOCOLS: `ComponentProtocols.swift` is over-specified (LOW)
-
-`Sources/RunAnywhere/Foundation/Core/ComponentProtocols.swift`:
-- Line 17 — `ComponentConfiguration.validate()` is a protocol requirement with zero call sites and zero real implementations.
-- Lines 14-18 — `modelId` and `preferredFramework` are fine (consumed by concrete request types).
-- Lines 51-66 — `RASDKComponent.analyticsKey` hand-codes strings (`"llm"`, `"stt"`, ...) that C++ `rac_analytics_events.h` already owns for event categorization. If these diverge, analytics buckets will mismatch across logs.
-
-**Fix**: Delete `validate()` requirement and `analyticsKey` extension. Keep `displayName` (UI-facing, no C++ equivalent).
-**Scope**: XS.
-
-## SWIFT-DUP-ERROR-CABI: Proto factory reconstructs `cAbiCode` (LOW)
-
-`Sources/RunAnywhere/Foundation/Errors/RASDKError+Helpers.swift:34-36`:
-```swift
-let raw = code.rawValue
-if raw > 0 && raw <= 899 { p.cAbiCode = -Int32(raw) }
-```
-This re-derives the proto-enum → C-integer mapping that `CommonsErrorMapping` already performs canonically. Two places deriving the same relationship will drift.
-
-`CommonsErrorMapping.swift:48-91` — `categoryFor(_:)` 44-case switch from `RAErrorCode` to `RAErrorCategory`. C++ already has `rac_error_category_t` and `rac_error_category_name()`; the mapping should be queried from C rather than hand-maintained in Swift.
-
-**Fix**: Delete the `cAbiCode` lines from `RASDKError.make()`. Replace `CommonsErrorMapping.categoryFor` with a call to `rac_error_get_category_proto` (or add that symbol if missing) so there's one authority.
-**Scope**: S.
-
-## SWIFT-DUP-MODELTYPES-COMPUTED: `RAModelCategory` Swift computed properties duplicate C functions (LOW)
+### SWIFT-DUP-MODELTYPES-COMPUTED: `RAModelCategory` Swift computed properties duplicate C functions (LOW)
 
 `Sources/RunAnywhere/Public/Extensions/Models/ModelTypes.swift:176-195` — comments on `RAModelCategory.requiresContextLength` and `.supportsThinking` explicitly say "Matches `rac_model_category_requires_context_length()` on the C side." The C functions are the source of truth; the Swift duplicates will drift.
 
@@ -242,66 +239,56 @@ This re-derives the proto-enum → C-integer mapping that `CommonsErrorMapping` 
 **Fix**: Call the C functions directly. For `toCFramework`/`fromCFramework`, add a proto → rac_inference_framework_t helper in commons (e.g. `rac_inference_framework_from_proto(int32_t)`) and delete the Swift switches.
 **Scope**: S.
 
-## SWIFT-DUP-STORAGE-ALIASES: Storage field aliases shadow canonical proto names (LOW)
+### SWIFT-DUP-STORAGE-ALIASES: Storage field aliases shadow canonical proto names (LOW)
 
 `Sources/RunAnywhere/Public/Extensions/Storage/StorageProto+Helpers.swift`:
 - Lines 24-33 — `RADeviceStorageInfo.totalSpace/freeSpace/usedSpace/usedPercent` alias the canonical proto fields `totalBytes/freeBytes/usedBytes`.
 - Lines 56-74 — `RAAppStorageInfo.documentsSize/cacheSize/appSupportSize/totalSize` alias existing proto fields.
 
-These aliases create two names for each field, divorcing Swift callers from the wire representation. App developers get a Swift-flavored API; wire format stays proto-native.
+These aliases create two names for each field, divorcing Swift callers from the wire representation.
 
 **Fix**: Delete the aliases. Callers should use the proto field names directly. Keep the `usedPercent` computation as a utility (it's a derived value, not an alias).
 **Scope**: XS.
 
-## SWIFT-DUP-DEAD-LIFECYCLE-HELPERS: Dead component-sync helpers (LOW)
+### SWIFT-DUP-DEAD-LIFECYCLE-HELPERS: Dead component-sync helpers (LOW)
 
 `Sources/RunAnywhere/Public/Extensions/Models/RunAnywhere+ModelLifecycle.swift:96-134` — `synchronizeSTTComponentLoad` and `synchronizeTTSComponentLoad` private functions are never called. The file's own comment at lines 38-43 explicitly says STT+TTS sync was removed in Phase 6h; the helpers weren't cleaned up.
 
 **Fix**: Delete both functions.
 **Scope**: XS.
 
-## SWIFT-DUP-HTTP-ADAPTER-MISLOCATED: `HTTPClientAdapter` has business logic and is in the wrong directory (MEDIUM)
+### SWIFT-DUP-ERROR-CABI: Proto factory reconstructs `cAbiCode` (LOW)
 
-`Sources/RunAnywhere/Adapters/HTTPClientAdapter.swift` is named like an IoC platform adapter but holds feature-layer logic:
-- Lines 85-98 — Supabase UPSERT semantics (`on_conflict=device_id` query param, `Prefer: resolution=merge-duplicates` header) hard-coded into the transport.
-- Lines 191-209 — auth retry loop (`resolveToken` → `CppBridge.Auth.refreshToken()` → retry).
-- Lines 438-469 — `parseHTTPError` status-code→`SDKException` classification.
-- Lines 211-230 — non-trivial URL construction.
+`Sources/RunAnywhere/Foundation/Errors/RASDKError+Helpers.swift:34-36`:
+```swift
+let raw = code.rawValue
+if raw > 0 && raw <= 899 { p.cAbiCode = -Int32(raw) }
+```
+This re-derives the proto-enum → C-integer mapping. Phase 3 deleted `CommonsErrorMapping.swift` and now uses `rac_result_to_proto_error` for translation, but `RASDKError+Helpers.swift` still has this dangling lines block.
 
-The `Adapters/` directory should hold IoC shims that populate the `rac_platform_adapter_t` vtable. The three files in there today are actually:
-- `LLMStreamAdapter.swift` / `VoiceAgentStreamAdapter.swift` — correct fan-out multiplexers (keep).
-- `HTTPClientAdapter.swift` — mislocated feature-layer HTTP service.
+**Fix**: Delete the 3 lines from `RASDKError.make()`. (Optionally add `rac_error_get_category_proto` as a unified entry point.)
+**Scope**: XS.
 
-**Fix**:
-1. Move `HTTPClientAdapter.swift` to `Foundation/Bridge/` or `Data/Network/`.
-2. Extract Supabase UPSERT injection into the device-registration call site (`CppBridge+Device.swift`).
-3. Extract the auth retry loop into `CppBridge.Auth`.
-4. Move `parseHTTPError` into `Foundation/Errors/CommonsErrorMapping.swift`.
-5. Move `parseLogMetadata` (`CppBridge+PlatformAdapter.swift:123-163`) and `createSDKErrorFromCppError` (`:456-483`) into `CommonsErrorMapping.swift`.
-6. Review `Data/Network/Protocols/NetworkService.swift` — it's a second Swift protocol layer over the C `rac_http_transport_ops_t`. If nothing uses it, delete.
+### SWIFT-DUP-UNUSED-PROTO-TYPES: Generated proto types with zero Swift callers (LOW)
 
-**Scope**: M.
-
-## SWIFT-DUP-UNUSED-PROTO-TYPES: Generated proto types with zero Swift callers (LOW)
-
-Spot-grep of Generated/ finds proto types with no consumer in the Swift SDK. These don't cost much (just compilation), but they indicate either unfinished features or types that should move to a separate module:
+Spot-grep of Generated/ finds proto types with no consumer in the Swift SDK:
 
 - `router.pb.swift` — `RARouterStrategy`, `RARouterConfig`, `RARouterState`. Zero callers.
-- `pipeline.pb.swift` — `RADeviceAffinity`, `RAPipelineNodeSpec`, `RAPipelineSpec`, `RAPipelineConfig`. Only consumed internally by `solutions.pb.swift`.
+- `pipeline.pb.swift` — only consumed internally by `solutions.pb.swift`.
 - `solutions.pb.swift` — consumed only by `RunAnywhere+Solutions.swift`, which is itself stub-level and doesn't call through to CppBridge.
 - `diffusion_options.pb.swift` — consumed by nothing (the Diffusion deferred-backend CppBridge extension was removed).
 
 **Fix**: Exclude these from the Swift SPM target's `sources` until consumers land. They're generated from `idl/` unconditionally but the Swift target doesn't have to compile them.
 **Scope**: XS (Package.swift exclude list).
 
-## SWIFT-DUP-TTS-LISTVOICES-HANDLE: `listVoices` still requires the actor handle (LOW)
+### SWIFT-DUP-TTS-LISTVOICES-HANDLE: `listVoices` still requires the actor handle (LOW)
 
 `CppBridge+ModalityProtoABI.swift:531-553` — `CppBridge.TTS.listVoices()` passes a `rac_handle_t` from `getHandle()` to `rac_tts_component_list_voices_proto`. All other post-Phase-6h TTS ops use the handle-less lifecycle-proto path. This is the one inconsistent call on the TTS actor.
 
 **Fix (requires C++ change)**: Add `rac_tts_list_voices_lifecycle_proto` in commons; switch Swift to the lifecycle variant. Low priority — it works as-is.
 **Scope**: S.
 
-## SWIFT-DUP-ISLOADED-INCONSISTENCY: STT/TTS/VLM use divergent "is-loaded" checks (LOW)
+### SWIFT-DUP-ISLOADED-INCONSISTENCY: STT/TTS/VLM use divergent "is-loaded" checks (LOW)
 
 - `RunAnywhere+STT.swift:30-34` — queries `RunAnywhere.currentModel(...)` via `RACurrentModelRequest`.
 - `RunAnywhere+TTS.swift:34-37` — same pattern.
@@ -315,27 +302,8 @@ The mismatch is because bridge actors hold their own handles while the lifecycle
 
 ---
 
-## Summary of recommended deletions (v1 cleanup)
+## Summary
 
-| Severity | Gap ID | Files/lines | Net LOC removed |
-|---|---|---|---|
-| HIGH | SWIFT-DUP-RUNTIME-HEADERS | 16 duplicate C headers + 2 entire runtime Clang modules | ~2,500 (after fold) |
-| HIGH | SWIFT-DUP-RACTYPES-CPPBRIDGE-DEAD | 8 initializers/methods | ~220 |
-| HIGH | SWIFT-DUP-CRACOMMONS-PHANTOM | 5 phantom headers | ~600 |
-| MEDIUM | SWIFT-DUP-HTTP-ADAPTER-MISLOCATED | 1 file moved + 4 functions extracted | ~150 relocated, not deleted |
-| MEDIUM | SWIFT-DUP-MODULE-METADATA | 1 file + 4 conformance blocks | ~120 |
-| MEDIUM | SWIFT-DUP-LIFECYCLE-STATE | state vars + guards + contextLength | ~40 |
-| MEDIUM | SWIFT-DUP-CANHANDLE | 5 methods | ~40 |
-| MEDIUM | SWIFT-DUP-FACTORY-BYPASS | 2 factories | ~20 |
-| LOW | SWIFT-DUP-MODELTYPES-COMPUTED | 2 computed props + 2 switches | ~60 |
-| LOW | SWIFT-DUP-STORAGE-ALIASES | 2 alias blocks | ~30 |
-| LOW | SWIFT-DUP-DEAD-LIFECYCLE-HELPERS | 2 private functions | ~40 |
-| LOW | SWIFT-DUP-COMPONENT-PROTOCOLS | 1 protocol req + 1 extension | ~25 |
-| LOW | SWIFT-DUP-ERROR-CABI | 3 lines + switch helper | ~50 |
-| LOW | SWIFT-DUP-UNUSED-PROTO-TYPES | 4 .pb.swift files excluded | 0 (exclude, not delete) |
+For a consolidated cross-reference of completed work, residual open items, and PR-review explainer see [`gaps/gaps/simplification/SWIFT_REMAINING.md`](../simplification/SWIFT_REMAINING.md).
 
-Approximate gross deletion: **~3,900 LOC** (dominated by header duplication).
-
-## Rules followed in the audit
-
-Per repo convention: **DELETE, don't deprecate**. No compat shims, no `@available` gates, no `#if false`. Per `CLAUDE.md`: business logic lives in C++; proto types from `idl/*.proto` are canonical; Swift should be a thin bridge. Every "must stay" justification in the raw audit reports traces to a legitimate Apple-platform-only concern (microphone capture, Keychain, AVAudioSession, UIImage → RGB) or a Swift-native idiom with no C equivalent (AsyncStream, actor isolation, `DispatchGroup`-bridged Foundation Models call).
+Per repo convention: **DELETE, don't deprecate**. No compat shims, no `@available` gates, no `#if false`. Per `CLAUDE.md`: business logic lives in C++; proto types from `idl/*.proto` are canonical; Swift should be a thin bridge.
