@@ -67,10 +67,10 @@ extension CppBridge.ComponentVTable {
     /// LLM component vtable — `rac_llm_component_*` family.
     public static let llm = CppBridge.ComponentVTable(
         component: .llm,
-        create:    { rac_llm_component_create($0) },
-        isLoaded:  { rac_llm_component_is_loaded($0) },
-        cleanup:   { _ = rac_llm_component_cleanup($0) },
-        destroy:   { rac_llm_component_destroy($0) },
+        create: { rac_llm_component_create($0) },
+        isLoaded: { rac_llm_component_is_loaded($0) },
+        cleanup: { _ = rac_llm_component_cleanup($0) },
+        destroy: { rac_llm_component_destroy($0) },
         loadModel: { handle, path, id, name in
             rac_llm_component_load_model(handle, path, id, name)
         }
@@ -79,10 +79,10 @@ extension CppBridge.ComponentVTable {
     /// STT component vtable — `rac_stt_component_*` family.
     public static let stt = CppBridge.ComponentVTable(
         component: .stt,
-        create:    { rac_stt_component_create($0) },
-        isLoaded:  { rac_stt_component_is_loaded($0) },
-        cleanup:   { _ = rac_stt_component_cleanup($0) },
-        destroy:   { rac_stt_component_destroy($0) },
+        create: { rac_stt_component_create($0) },
+        isLoaded: { rac_stt_component_is_loaded($0) },
+        cleanup: { _ = rac_stt_component_cleanup($0) },
+        destroy: { rac_stt_component_destroy($0) },
         loadModel: { handle, path, id, name in
             rac_stt_component_load_model(handle, path, id, name)
         }
@@ -92,10 +92,10 @@ extension CppBridge.ComponentVTable {
     /// The "model" generic name aliases TTS's "voice" terminology at the C ABI.
     public static let tts = CppBridge.ComponentVTable(
         component: .tts,
-        create:    { rac_tts_component_create($0) },
-        isLoaded:  { rac_tts_component_is_loaded($0) },
-        cleanup:   { _ = rac_tts_component_cleanup($0) },
-        destroy:   { rac_tts_component_destroy($0) },
+        create: { rac_tts_component_create($0) },
+        isLoaded: { rac_tts_component_is_loaded($0) },
+        cleanup: { _ = rac_tts_component_cleanup($0) },
+        destroy: { rac_tts_component_destroy($0) },
         loadModel: { handle, path, id, name in
             rac_tts_component_load_voice(handle, path, id, name)
         }
@@ -104,10 +104,10 @@ extension CppBridge.ComponentVTable {
     /// VAD component vtable — `rac_vad_component_*` family.
     public static let vad = CppBridge.ComponentVTable(
         component: .vad,
-        create:    { rac_vad_component_create($0) },
-        isLoaded:  { rac_vad_component_is_loaded($0) },
-        cleanup:   { _ = rac_vad_component_cleanup($0) },
-        destroy:   { rac_vad_component_destroy($0) },
+        create: { rac_vad_component_create($0) },
+        isLoaded: { rac_vad_component_is_loaded($0) },
+        cleanup: { _ = rac_vad_component_cleanup($0) },
+        destroy: { rac_vad_component_destroy($0) },
         loadModel: { handle, path, id, name in
             rac_vad_component_load_model(handle, path, id, name)
         }
@@ -123,10 +123,10 @@ extension CppBridge.ComponentVTable {
     /// reasonable generalization here.
     public static let vlm = CppBridge.ComponentVTable(
         component: .vlm,
-        create:    { rac_vlm_component_create($0) },
-        isLoaded:  { rac_vlm_component_is_loaded($0) },
-        cleanup:   { _ = rac_vlm_component_cleanup($0) },
-        destroy:   { rac_vlm_component_destroy($0) },
+        create: { rac_vlm_component_create($0) },
+        isLoaded: { rac_vlm_component_is_loaded($0) },
+        cleanup: { _ = rac_vlm_component_cleanup($0) },
+        destroy: { rac_vlm_component_destroy($0) },
         loadModel: { handle, path, id, name in
             // Passing nil for vision_projector_path covers single-artifact
             // VLMs; the multi-artifact VLM path stays on the modality
