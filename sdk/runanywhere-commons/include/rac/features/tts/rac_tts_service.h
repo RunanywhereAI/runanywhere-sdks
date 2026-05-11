@@ -246,6 +246,24 @@ RAC_API rac_result_t rac_tts_synthesize_stream_lifecycle_proto(
  */
 RAC_API rac_result_t rac_tts_stop_lifecycle_proto(rac_proto_buffer_t* out_result);
 
+/**
+ * @brief Enumerate voices available on the lifecycle-loaded TTS voice/model.
+ *
+ * Lifecycle-driven variant of rac_tts_component_list_voices_proto. Uses the
+ * currently lifecycle-loaded TTS service directly — no handle threading
+ * required. Returns serialized runanywhere.v1.TTSVoiceList bytes containing
+ * zero or more runanywhere.v1.TTSVoiceInfo entries.
+ *
+ * @param out Owned proto buffer with serialized runanywhere.v1.TTSVoiceList.
+ *            Caller MUST release with rac_proto_buffer_free().
+ *
+ * @retval RAC_SUCCESS                      Voices serialized successfully.
+ * @retval RAC_ERROR_NULL_POINTER           out is NULL.
+ * @retval RAC_ERROR_FEATURE_NOT_AVAILABLE  Commons built without Protobuf.
+ * @retval RAC_ERROR_NOT_INITIALIZED        No TTS lifecycle voice is loaded.
+ */
+RAC_API rac_result_t rac_tts_list_voices_lifecycle_proto(rac_proto_buffer_t* out);
+
 // =============================================================================
 // CANONICAL DEFAULTS (P2-T14)
 // =============================================================================

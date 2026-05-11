@@ -24,23 +24,6 @@ import SwiftProtobuf
 // codegen-eligible C symbols (incl. all Phase C migrations) live in the
 // generated file's tables.
 
-private enum TTSListVoicesProtoABI {
-    typealias VoiceCallback = @convention(c) (
-        UnsafePointer<UInt8>?,
-        Int,
-        UnsafeMutableRawPointer?
-    ) -> Void
-    typealias ListVoices = @convention(c) (
-        rac_handle_t?,
-        VoiceCallback?,
-        UnsafeMutableRawPointer?
-    ) -> rac_result_t
-
-    static let listVoicesName = "rac_tts_component_list_voices_proto"
-
-    static let listVoices = NativeProtoABI.load(listVoicesName, as: ListVoices.self)
-}
-
 private enum VADComponentProtoABI {
     typealias Process = @convention(c) (
         rac_handle_t?,
@@ -223,27 +206,6 @@ final class ProtoStreamContext<Event: Message>: @unchecked Sendable, ProtoStream
     }
 }
 
-private final class ProtoCollectingContext<Event: Message>: @unchecked Sendable {
-    private let lock = OSAllocatedUnfairLock(initialState: [Event]())
-    let logger: SDKLogger
-
-    init(category: String) {
-        self.logger = SDKLogger(category: category)
-    }
-
-    var values: [Event] { lock.withLock { $0 } }
-
-    func append(bytes: UnsafePointer<UInt8>?, size: Int) {
-        guard let bytes, size > 0 else { return }
-        do {
-            let event = try Event(serializedBytes: Data(bytes: bytes, count: size))
-            lock.withLock { $0.append(event) }
-        } catch {
-            logger.warning("Failed to decode collected proto event: \(error.localizedDescription)")
-        }
-    }
-}
-
 private final class ProtoProgressContext<Event: Message>: @unchecked Sendable {
     let callback: (Event) -> Bool
     let logger: SDKLogger
@@ -288,34 +250,6 @@ private func decodeBuffer<Response: Message>(
 
 func destroyRAGProtoSessionIfAvailable(_ session: rac_handle_t) {
     RAGSessionProtoABI.destroy?(session)
-}
-
-// MARK: - TTS custom
-
-extension CppBridge.TTS {
-    public func listVoices() async throws -> [RATTSVoiceInfo] {
-        let handle = try await getHandle()
-        let listVoices = try NativeProtoABI.require(
-            TTSListVoicesProtoABI.listVoices,
-            named: TTSListVoicesProtoABI.listVoicesName
-        )
-        let context = ProtoCollectingContext<RATTSVoiceInfo>(category: "CppBridge.TTS.ProtoVoices")
-        let contextPtr = Unmanaged.passRetained(context).toOpaque()
-        let rc = listVoices(handle, { bytes, size, userData in
-            guard let userData else { return }
-            Unmanaged<ProtoCollectingContext<RATTSVoiceInfo>>
-                .fromOpaque(userData)
-                .takeUnretainedValue()
-                .append(bytes: bytes, size: size)
-        }, contextPtr)
-        Unmanaged<ProtoCollectingContext<RATTSVoiceInfo>>
-            .fromOpaque(contextPtr)
-            .release()
-        guard rc == RAC_SUCCESS else {
-            throw SDKException(code: .processingFailed, message: "TTS voice listing failed: \(rc)", category: .internal)
-        }
-        return context.values
-    }
 }
 
 // MARK: - VAD custom

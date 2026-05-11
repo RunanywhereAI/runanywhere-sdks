@@ -372,6 +372,25 @@ public struct RAToolValueObject: Sendable {
 }
 
 /// ---------------------------------------------------------------------------
+/// String wrapper used by the rac_tool_value_to_json_proto /
+/// rac_tool_value_from_json_proto ABIs. Carries either the JSON text rendered
+/// from a ToolValue, or the JSON text that should be parsed back into a
+/// ToolValue. Defined here (rather than reusing a stand-alone wrapper) so the
+/// tool-calling round-trip stays self-contained in this proto.
+/// ---------------------------------------------------------------------------
+public struct RAToolValueJSON: Sendable {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  public var json: String = String()
+
+  public var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  public init() {}
+}
+
+/// ---------------------------------------------------------------------------
 /// A single parameter definition for a tool.
 /// ---------------------------------------------------------------------------
 public struct RAToolParameter: Sendable {
@@ -1373,6 +1392,36 @@ extension RAToolValueObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
 
   public static func ==(lhs: RAToolValueObject, rhs: RAToolValueObject) -> Bool {
     if lhs.fields != rhs.fields {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension RAToolValueJSON: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  public static let protoMessageName: String = _protobuf_package + ".ToolValueJSON"
+  public static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}json\0")
+
+  public mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularStringField(value: &self.json) }()
+      default: break
+      }
+    }
+  }
+
+  public func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.json.isEmpty {
+      try visitor.visitSingularStringField(value: self.json, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  public static func ==(lhs: RAToolValueJSON, rhs: RAToolValueJSON) -> Bool {
+    if lhs.json != rhs.json {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

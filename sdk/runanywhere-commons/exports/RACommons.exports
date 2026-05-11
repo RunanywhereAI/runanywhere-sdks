@@ -167,6 +167,11 @@ _rac_tool_call_parse_proto
 _rac_tool_call_validate_proto
 _rac_tool_call_format_prompt_proto
 
+# G3: ToolValue <-> JSON proto-byte ABI (replaces per-SDK hand-written
+# JSON walks over the ToolValue oneof tree).
+_rac_tool_value_to_json_proto
+_rac_tool_value_from_json_proto
+
 # Wave D-4: Tool-calling session state machine (collapses per-SDK
 # 200-400 LOC orchestration loop into one native session).
 _rac_tool_calling_session_create_proto
@@ -285,6 +290,7 @@ _rac_stt_configuration_defaults_proto
 _rac_tts_synthesize_lifecycle_proto
 _rac_tts_synthesize_stream_lifecycle_proto
 _rac_tts_stop_lifecycle_proto
+_rac_tts_list_voices_lifecycle_proto
 _rac_tts_component_list_voices_proto
 _rac_tts_component_synthesize_proto
 _rac_tts_component_synthesize_stream_proto
@@ -769,5 +775,6 @@ _rac_error_is_expected
 _rac_error_message
 _rac_error_set_details
 
-# Audio utilities — WAV header helpers used by Swift TTS shim.
+# Audio utilities — WAV header helpers used by Swift TTS shim and level-meter DSP.
 _rac_audio_float32_to_wav
+_rac_audio_compute_level_db

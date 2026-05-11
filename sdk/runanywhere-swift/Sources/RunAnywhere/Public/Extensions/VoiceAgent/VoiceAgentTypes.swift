@@ -43,22 +43,9 @@ public extension RAVoiceSessionConfig {
 // MARK: - RAVoiceSessionError: LocalizedError
 
 extension RAVoiceSessionError: LocalizedError {
-    public var errorDescription: String? {
-        if !message.isEmpty { return message }
-        // IDL-08: VoiceSessionError.code is now the canonical RAErrorCode.
-        switch code {
-        case .microphonePermissionDenied:
-            return "Microphone permission denied"
-        case .componentNotReady:
-            return "Voice agent not ready. Load VAD, STT, LLM, and TTS models first."
-        case .serviceBusy:
-            return "Voice session already running"
-        case .processingFailed:
-            return failedComponent.isEmpty
-                ? "Voice agent component failed"
-                : "Voice agent component failed: \(failedComponent)"
-        default:
-            return "Voice session error"
-        }
-    }
+    // Commons populates `message` via `rac_error_message(code)` at the
+    // emission site (voice_agent.cpp::emit_component_failure). Falling back
+    // to the empty string keeps `LocalizedError` honest when message is
+    // unset.
+    public var errorDescription: String? { message.isEmpty ? nil : message }
 }

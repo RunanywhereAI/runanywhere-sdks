@@ -98,6 +98,20 @@ rac_link_archive_deps(test_log_redact)
 target_compile_features(test_log_redact PRIVATE cxx_std_17)
 add_test(NAME log_redact_tests COMMAND test_log_redact --run-all)
 
+# --- G6: audio level-meter DSP parity tests ---------------------------------
+# Validates rac_audio_compute_level_db() — the centralised RMS->dB DSP that
+# replaces the hand-rolled level meters in Swift AudioCaptureManager.swift
+# (and equivalents in Kotlin/Flutter/RN/Web). No backend dependency.
+add_executable(test_audio_compute_level_db test_audio_compute_level_db.cpp)
+target_include_directories(test_audio_compute_level_db PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_audio_compute_level_db PRIVATE rac_commons)
+rac_link_archive_deps(test_audio_compute_level_db)
+target_compile_features(test_audio_compute_level_db PRIVATE cxx_std_17)
+add_test(NAME audio_compute_level_db_tests COMMAND test_audio_compute_level_db --run-all)
+
 # --- P2-T13: persistent device-id resolution chain --------------------------
 # Validates rac_device_get_or_create_persistent_id() against a mocked
 # rac_platform_adapter_t (secure_get / secure_set / get_vendor_id). Replaces
@@ -221,6 +235,20 @@ rac_link_archive_deps(test_tool_calling)
 target_compile_features(test_tool_calling PRIVATE cxx_std_17)
 rac_test_define_have_protobuf(test_tool_calling)
 add_test(NAME tool_calling_tests COMMAND test_tool_calling)
+
+# --- G3: ToolValue <-> JSON proto-byte ABI parity tests --------------------
+# Validates the 5 oneof branches (string/number/bool/array/object) that
+# Swift/Kotlin/Dart/RN/Web previously hand-rolled. Single source of truth.
+add_executable(test_tool_value_json test_tool_value_json.cpp)
+target_include_directories(test_tool_value_json PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(test_tool_value_json PRIVATE rac_commons)
+rac_link_archive_deps(test_tool_value_json)
+target_compile_features(test_tool_value_json PRIVATE cxx_std_17)
+rac_test_define_have_protobuf(test_tool_value_json)
+add_test(NAME tool_value_json_tests COMMAND test_tool_value_json)
 
 # --- Wave D-4: tool-calling session state machine ---------------------------
 add_executable(test_tool_calling_session_proto test_tool_calling_session_proto.cpp)

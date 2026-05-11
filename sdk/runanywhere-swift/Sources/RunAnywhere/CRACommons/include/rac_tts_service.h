@@ -198,6 +198,18 @@ RAC_API rac_result_t rac_tts_get_languages(rac_handle_t handle, char** out_json)
 RAC_API rac_result_t rac_tts_configuration_defaults_proto(
     rac_proto_buffer_t* out_RATTSConfiguration);
 
+/**
+ * @brief Enumerate voices available on the lifecycle-loaded TTS voice/model.
+ *
+ * Lifecycle-driven variant of the legacy handle-based listVoices ABI. Uses the
+ * currently lifecycle-loaded TTS service — no handle threading required.
+ * Returns serialized runanywhere.v1.TTSVoiceList bytes.
+ *
+ * @param out Owned proto buffer with serialized runanywhere.v1.TTSVoiceList.
+ *            Caller MUST release with rac_proto_buffer_free().
+ */
+RAC_API rac_result_t rac_tts_list_voices_lifecycle_proto(rac_proto_buffer_t* out);
+
 #ifdef __cplusplus
 }
 #endif

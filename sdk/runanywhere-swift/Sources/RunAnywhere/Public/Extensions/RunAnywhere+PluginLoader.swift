@@ -128,60 +128,15 @@ public extension RunAnywhere {
 
         // MARK: - Private helpers
 
+        /// Delegate plugin-error classification to the commons ABI
+        /// (`rac_result_to_proto_error`) via `SDKException.from(rcResult:)`,
+        /// then enrich the message with the operation context so logs still
+        /// say "(pluginLoader.load: /path/x.dylib)".
         private func throwIfFailed(_ rc: rac_result_t, op: String, context: String) throws {
-            guard rc != RAC_SUCCESS else { return }
-            let suffix = " (pluginLoader.\(op): \(context))"
-            switch rc {
-            case RAC_ERROR_NULL_POINTER:
-                throw SDKException(code: .invalidConfiguration, message: "Null path/name" + suffix, category: .internal)
-            case RAC_ERROR_PLUGIN_LOAD_FAILED:
-                throw SDKException(
-                    code: .invalidConfiguration,
-                    message: "dlopen / dlsym failed" + suffix,
-                    category: .internal
-                )
-            case RAC_ERROR_ABI_VERSION_MISMATCH:
-                throw SDKException(
-                    code: .invalidModelFormat,
-                    message: "Plugin built against a different RAC_PLUGIN_API_VERSION " +
-                                           "(host = \(apiVersion))" + suffix,
-                    category: .internal
-                )
-            case RAC_ERROR_CAPABILITY_UNSUPPORTED:
-                throw SDKException(
-                    code: .unsupportedModality,
-                    message: "Plugin capability_check() declined" + suffix,
-                    category: .internal
-                )
-            case RAC_ERROR_PLUGIN_DUPLICATE:
-                throw SDKException(
-                    code: .alreadyInitialized,
-                    message: "Plugin name already registered with higher priority" + suffix,
-                    category: .internal
-                )
-            case RAC_ERROR_FEATURE_NOT_AVAILABLE:
-                throw SDKException(
-                    code: .featureNotAvailable,
-                    message: "Dynamic plugin loading not available — host built with " +
-                                           "RAC_STATIC_PLUGINS=ON (typically iOS / WASM). Bundle the " +
-                                           "engine at compile time instead." + suffix,
-                    category: .internal
-                )
-            case RAC_ERROR_NOT_FOUND:
-                throw SDKException(code: .modelNotFound, message: "Plugin not registered" + suffix, category: .internal)
-            case RAC_ERROR_PLUGIN_BUSY:
-                throw SDKException(
-                    code: .notImplemented,
-                    message: "Plugin held by an active session" + suffix,
-                    category: .internal
-                )
-            default:
-                throw SDKException(
-                    code: .unknown,
-                    message: "rac_registry_\(op)_plugin returned \(rc)" + suffix,
-                    category: .internal
-                )
-            }
+            guard let exception = SDKException.from(rcResult: rc) else { return }
+            var proto = exception.proto
+            proto.message = "\(proto.message) (pluginLoader.\(op): \(context))"
+            throw SDKException(proto: proto, underlying: exception.underlying)
         }
     }
 }

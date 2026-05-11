@@ -47,7 +47,6 @@
 #include "rac_llm_analytics.h"
 #include "rac_llm_structured_output.h"
 #include "rac_llm_schema_to_json.h"  // P2-T15: rac_structured_output_schema_to_json_proto
-#include "rac_llm_thinking.h"
 // v2 close-out Phase G-2: proto-byte LLM stream ABI.
 #include "rac_llm_stream.h"
 #include "rac_tool_calling.h"

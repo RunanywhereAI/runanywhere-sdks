@@ -2,11 +2,15 @@
 //  ToolCallingTypes.swift — Swift-side helpers for generated tool-calling protos.
 //
 //  Keep: closures (`ToolExecutor`, `RegisteredTool`), JSON bridge for
-//  `argumentsJson` / `resultJson` (IDL-13 oneof tree, no C ABI equivalent),
-//  and tight RA* convenience inits/getters consumed by the example app or
-//  SDK internals. Do not grow without a real caller.
+//  `argumentsJson` / `resultJson` (IDL-13 oneof tree), and tight RA*
+//  convenience inits/getters consumed by the example app or SDK internals.
+//
+//  G3: the recursive ToolValue <-> JSON walk now lives in commons behind
+//  `rac_tool_value_to_json_proto` / `rac_tool_value_from_json_proto`. Swift
+//  no longer hand-rolls it. Public API shape is preserved.
 //
 
+import CRACommons
 import Foundation
 
 // MARK: - Tool Executor Types
@@ -18,6 +22,16 @@ public typealias ToolExecutor = @Sendable ([String: RAToolValue]) async throws -
 internal struct RegisteredTool: Sendable {
     let definition: RAToolDefinition
     let executor: ToolExecutor
+}
+
+// MARK: - ToolValue JSON ABI symbols
+
+private enum ToolValueJSONABI {
+    static let toJSONName = "rac_tool_value_to_json_proto"
+    static let fromJSONName = "rac_tool_value_from_json_proto"
+
+    static let toJSON = NativeProtoABI.load(toJSONName, as: NativeProtoABI.ProtoRequest.self)
+    static let fromJSON = NativeProtoABI.load(fromJSONName, as: NativeProtoABI.ProtoRequest.self)
 }
 
 // MARK: - RAToolValue Helpers
@@ -47,51 +61,42 @@ public extension RAToolValue {
 
     // JSON bridge — required by IDL-13 (`argumentsJson` / `resultJson`).
     // Swift consumers see `[String: RAToolValue]`; the wire shape is JSON.
+    // The recursive walk lives in commons (G3); Swift only marshals bytes.
 
     func toJSONString(pretty: Bool = false) -> String? {
-        let opts: JSONSerialization.WritingOptions = pretty ? [.prettyPrinted, .sortedKeys] : [.sortedKeys]
-        guard JSONSerialization.isValidJSONObject(jsonObject),
-              let data = try? JSONSerialization.data(withJSONObject: jsonObject, options: opts) else { return nil }
-        return String(data: data, encoding: .utf8)
+        guard let wrapper: RAToolValueJSON = try? NativeProtoABI.invoke(
+            self,
+            symbol: ToolValueJSONABI.toJSON,
+            symbolName: ToolValueJSONABI.toJSONName,
+            responseType: RAToolValueJSON.self
+        ) else { return nil }
+        guard pretty else { return wrapper.json }
+        // Pretty-print is a presentation concern; let Foundation render the
+        // already-canonical JSON text to preserve the legacy public API.
+        guard let data = wrapper.json.data(using: .utf8),
+              let parsed = try? JSONSerialization.jsonObject(with: data),
+              let pretty = try? JSONSerialization.data(
+                  withJSONObject: parsed,
+                  options: [.prettyPrinted, .sortedKeys]) else {
+            return wrapper.json
+        }
+        return String(data: pretty, encoding: .utf8) ?? wrapper.json
     }
 
     static func parseObjectJSON(_ json: String) -> [String: RAToolValue] {
-        guard let data = json.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return [:] }
-        return object.mapValues(RAToolValue.fromJSONObject(_:))
+        var wrapper = RAToolValueJSON(); wrapper.json = json
+        guard let value: RAToolValue = try? NativeProtoABI.invoke(
+            wrapper,
+            symbol: ToolValueJSONABI.fromJSON,
+            symbolName: ToolValueJSONABI.fromJSONName,
+            responseType: RAToolValue.self
+        ) else { return [:] }
+        if case .objectValue(let obj)? = value.kind { return obj.fields }
+        return [:]
     }
 
     static func jsonString(from object: [String: RAToolValue]) -> String {
-        let json = object.mapValues(\.jsonObject)
-        guard JSONSerialization.isValidJSONObject(json),
-              let data = try? JSONSerialization.data(withJSONObject: json, options: [.sortedKeys]),
-              let str = String(data: data, encoding: .utf8) else { return "{}" }
-        return str
-    }
-
-    private var jsonObject: Any {
-        switch kind {
-        case .stringValue(let v): return v
-        case .numberValue(let v): return v
-        case .boolValue(let v): return v
-        case .arrayValue(let v): return v.values.map(\.jsonObject)
-        case .objectValue(let v): return v.fields.mapValues(\.jsonObject)
-        case .nullValue, .none: return NSNull()
-        }
-    }
-
-    private static func fromJSONObject(_ object: Any) -> RAToolValue {
-        switch object {
-        case let v as Bool: return RAToolValue(v)
-        case let v as Int: return RAToolValue(v)
-        case let v as Double: return RAToolValue(v)
-        case let v as NSNumber: return RAToolValue(v.doubleValue)
-        case let v as String: return RAToolValue(v)
-        case let v as [Any]: return .array(v.map(RAToolValue.fromJSONObject(_:)))
-        case let v as [String: Any]: return .object(v.mapValues(RAToolValue.fromJSONObject(_:)))
-        default:
-            var value = RAToolValue(); value.nullValue = true; return value
-        }
+        return RAToolValue.object(object).toJSONString() ?? "{}"
     }
 }
 

@@ -45,16 +45,19 @@ const char descriptor_table_protodef_rac_5foptions_2eproto[] ABSL_ATTRIBUTE_SECT
     "\001(\t:5\n\014rac_required\022\035.google.protobuf.Fi"
     "eldOptions\030\322\206\003 \001(\010:0\n\007rac_min\022\035.google.p"
     "rotobuf.FieldOptions\030\324\206\003 \001(\005:0\n\007rac_max\022"
-    "\035.google.protobuf.FieldOptions\030\325\206\003 \001(\005:="
-    "\n\020rac_display_name\022!.google.protobuf.Enu"
-    "mValueOptions\030\332\206\003 \001(\t:>\n\021rac_analytics_k"
-    "ey\022!.google.protobuf.EnumValueOptions\030\333\206"
-    "\003 \001(\t:<\n\017rac_wire_string\022!.google.protob"
-    "uf.EnumValueOptions\030\334\206\003 \001(\tB\212\001\n\027ai.runan"
-    "ywhere.proto.v1B\017RacOptionsProtoP\001Z<gith"
-    "ub.com/runanywhere/runanywhere-sdks/idl/"
-    "v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere"
-    ".V1\272\002\002RAb\006proto3"
+    "\035.google.protobuf.FieldOptions\030\325\206\003 \001(\005:6"
+    "\n\rrac_min_float\022\035.google.protobuf.FieldO"
+    "ptions\030\326\206\003 \001(\001:6\n\rrac_max_float\022\035.google"
+    ".protobuf.FieldOptions\030\327\206\003 \001(\001:=\n\020rac_di"
+    "splay_name\022!.google.protobuf.EnumValueOp"
+    "tions\030\332\206\003 \001(\t:>\n\021rac_analytics_key\022!.goo"
+    "gle.protobuf.EnumValueOptions\030\333\206\003 \001(\t:<\n"
+    "\017rac_wire_string\022!.google.protobuf.EnumV"
+    "alueOptions\030\334\206\003 \001(\tB\212\001\n\027ai.runanywhere.p"
+    "roto.v1B\017RacOptionsProtoP\001Z<github.com/r"
+    "unanywhere/runanywhere-sdks/idl/v1;runan"
+    "ywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RA"
+    "b\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
     descriptor_table_rac_5foptions_2eproto_deps[1] = {
@@ -64,7 +67,7 @@ static ::absl::once_flag descriptor_table_rac_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_rac_5foptions_2eproto = {
     false,
     false,
-    616,
+    728,
     descriptor_table_protodef_rac_5foptions_2eproto,
     "rac_options.proto",
     &descriptor_table_rac_5foptions_2eproto_once,
@@ -96,6 +99,14 @@ PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY2 ::_pbi::ExtensionIdentifier<
         ::google::protobuf::FieldOptions, ::_pbi::PrimitiveTypeTraits< ::int32_t >, 5, false>
         rac_max(kRacMaxFieldNumber, 0);
+PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY2 ::_pbi::ExtensionIdentifier<
+        ::google::protobuf::FieldOptions, ::_pbi::PrimitiveTypeTraits< double >, 1, false>
+        rac_min_float(kRacMinFloatFieldNumber, 0);
+PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY2 ::_pbi::ExtensionIdentifier<
+        ::google::protobuf::FieldOptions, ::_pbi::PrimitiveTypeTraits< double >, 1, false>
+        rac_max_float(kRacMaxFloatFieldNumber, 0);
 const std::string rac_display_name_default("");
 PROTOBUF_CONSTINIT
     PROTOBUF_ATTRIBUTE_INIT_PRIORITY2 ::_pbi::ExtensionIdentifier<
@@ -133,6 +144,12 @@ PROTOBUF_ATTRIBUTE_INIT_PRIORITY2 static ::std::false_type
             false, false, /*is_utf8=*/false),
         ::_pbi::ExtensionSet::RegisterExtension(
             &::google::protobuf::FieldOptions::default_instance(), 50005, 5,
+            false, false, /*is_utf8=*/false),
+        ::_pbi::ExtensionSet::RegisterExtension(
+            &::google::protobuf::FieldOptions::default_instance(), 50006, 1,
+            false, false, /*is_utf8=*/false),
+        ::_pbi::ExtensionSet::RegisterExtension(
+            &::google::protobuf::FieldOptions::default_instance(), 50007, 1,
             false, false, /*is_utf8=*/false),
         ::_pbi::ExtensionSet::RegisterExtension(
             &::google::protobuf::EnumValueOptions::default_instance(), 50010, 9,

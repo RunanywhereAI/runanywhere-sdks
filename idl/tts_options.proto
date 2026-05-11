@@ -356,6 +356,13 @@ message TTSVoiceInfo {
     repeated string supported_styles = 9;
 }
 
+// Wire envelope returned by rac_tts_list_voices_lifecycle_proto. Replaces the
+// per-voice callback pattern used by the legacy handle-based ABI so the
+// lifecycle-driven listing call returns a single serialized message.
+message TTSVoiceList {
+    repeated TTSVoiceInfo voices = 1;
+}
+
 enum TTSStreamEventKind {
     TTS_STREAM_EVENT_KIND_UNSPECIFIED = 0;
     TTS_STREAM_EVENT_KIND_STARTED = 1;

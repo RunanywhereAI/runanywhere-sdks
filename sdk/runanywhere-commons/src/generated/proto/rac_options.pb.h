@@ -83,6 +83,14 @@ inline constexpr int kRacMaxFieldNumber = 50005;
 extern ::google::protobuf::internal::ExtensionIdentifier<
     ::google::protobuf::FieldOptions, ::google::protobuf::internal::PrimitiveTypeTraits< ::int32_t >, 5, false>
     rac_max;
+inline constexpr int kRacMinFloatFieldNumber = 50006;
+extern ::google::protobuf::internal::ExtensionIdentifier<
+    ::google::protobuf::FieldOptions, ::google::protobuf::internal::PrimitiveTypeTraits< double >, 1, false>
+    rac_min_float;
+inline constexpr int kRacMaxFloatFieldNumber = 50007;
+extern ::google::protobuf::internal::ExtensionIdentifier<
+    ::google::protobuf::FieldOptions, ::google::protobuf::internal::PrimitiveTypeTraits< double >, 1, false>
+    rac_max_float;
 inline constexpr int kRacDisplayNameFieldNumber = 50010;
 extern ::google::protobuf::internal::ExtensionIdentifier<
     ::google::protobuf::EnumValueOptions, ::google::protobuf::internal::StringTypeTraits, 9, false>

@@ -316,19 +316,12 @@ public class AudioCaptureManager: ObservableObject, @unchecked Sendable {
 
     private func updateAudioLevel(buffer: AVAudioPCMBuffer) {
         guard let channelData = buffer.floatChannelData else { return }
-
-        let channelDataPointer = channelData.pointee
         let frames = Int(buffer.frameLength)
+        guard frames > 0 else { return }
 
-        // Calculate RMS (root mean square) for audio level
-        var sum: Float = 0.0
-        for i in 0..<frames {
-            let sample = channelDataPointer[i]
-            sum += sample * sample
-        }
-
-        let rms = sqrt(sum / Float(frames))
-        let dbLevel = 20 * log10(rms + 0.0001) // Add small value to avoid log(0)
+        // RMS->dB DSP centralised in commons (rac_audio_compute_level_db).
+        var dbLevel: Float = -100
+        _ = rac_audio_compute_level_db(channelData.pointee, frames, &dbLevel)
 
         // Normalize to 0-1 range (-60dB to 0dB)
         let normalizedLevel = max(0, min(1, (dbLevel + 60) / 60))

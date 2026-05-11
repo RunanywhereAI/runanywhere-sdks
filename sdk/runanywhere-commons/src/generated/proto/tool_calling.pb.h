@@ -156,6 +156,10 @@ class ToolValueArray;
 struct ToolValueArrayDefaultTypeInternal;
 extern ToolValueArrayDefaultTypeInternal _ToolValueArray_default_instance_;
 extern const ::google::protobuf::internal::ClassDataFull ToolValueArray_class_data_;
+class ToolValueJSON;
+struct ToolValueJSONDefaultTypeInternal;
+extern ToolValueJSONDefaultTypeInternal _ToolValueJSON_default_instance_;
+extern const ::google::protobuf::internal::ClassDataFull ToolValueJSON_class_data_;
 class ToolValueObject;
 struct ToolValueObjectDefaultTypeInternal;
 extern ToolValueObjectDefaultTypeInternal _ToolValueObject_default_instance_;
@@ -366,6 +370,207 @@ template <>
 // ===================================================================
 
 
+// -------------------------------------------------------------------
+
+class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolValueJSON final : public ::google::protobuf::Message
+/* @@protoc_insertion_point(class_definition:runanywhere.v1.ToolValueJSON) */ {
+ public:
+  inline ToolValueJSON() : ToolValueJSON(nullptr) {}
+  ~ToolValueJSON() PROTOBUF_FINAL;
+
+#if defined(PROTOBUF_CUSTOM_VTABLE)
+  void operator delete(ToolValueJSON* PROTOBUF_NONNULL msg, ::std::destroying_delete_t) {
+    SharedDtor(*msg);
+    ::google::protobuf::internal::SizedDelete(msg, sizeof(ToolValueJSON));
+  }
+#endif
+
+  template <typename = void>
+  explicit constexpr ToolValueJSON(::google::protobuf::internal::ConstantInitialized);
+
+  inline ToolValueJSON(const ToolValueJSON& from) : ToolValueJSON(nullptr, from) {}
+  inline ToolValueJSON(ToolValueJSON&& from) noexcept
+      : ToolValueJSON(nullptr, ::std::move(from)) {}
+  inline ToolValueJSON& operator=(const ToolValueJSON& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline ToolValueJSON& operator=(ToolValueJSON&& from) noexcept {
+    if (this == &from) return *this;
+    if (::google::protobuf::internal::CanMoveWithInternalSwap(GetArena(), from.GetArena())) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  [[nodiscard]] inline const ::google::protobuf::UnknownFieldSet& unknown_fields() const
+      ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.unknown_fields<::google::protobuf::UnknownFieldSet>(::google::protobuf::UnknownFieldSet::default_instance);
+  }
+  [[nodiscard]] inline ::google::protobuf::UnknownFieldSet* PROTOBUF_NONNULL
+  mutable_unknown_fields() ABSL_ATTRIBUTE_LIFETIME_BOUND {
+    return _internal_metadata_.mutable_unknown_fields<::google::protobuf::UnknownFieldSet>();
+  }
+
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL descriptor() {
+    return GetDescriptor();
+  }
+  [[nodiscard]] static const ::google::protobuf::Descriptor* PROTOBUF_NONNULL
+  GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  [[nodiscard]] static const ::google::protobuf::Reflection* PROTOBUF_NONNULL GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  [[nodiscard]] static const ToolValueJSON& default_instance() {
+    return *reinterpret_cast<const ToolValueJSON*>(
+        &_ToolValueJSON_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages = 4;
+  friend void swap(ToolValueJSON& a, ToolValueJSON& b) { a.Swap(&b); }
+  inline void Swap(ToolValueJSON* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    if (::google::protobuf::internal::CanUseInternalSwap(GetArena(), other->GetArena())) {
+      InternalSwap(other);
+    } else {
+      ::google::protobuf::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(ToolValueJSON* PROTOBUF_NONNULL other) {
+    if (other == this) return;
+    ABSL_DCHECK(GetArena() == other->GetArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  [[nodiscard]] ToolValueJSON* PROTOBUF_NONNULL
+  New(::google::protobuf::Arena* PROTOBUF_NULLABLE arena = nullptr) const {
+    return ::google::protobuf::Message::DefaultConstruct<ToolValueJSON>(arena);
+  }
+  using ::google::protobuf::Message::CopyFrom;
+  void CopyFrom(const ToolValueJSON& from);
+  using ::google::protobuf::Message::MergeFrom;
+  void MergeFrom(const ToolValueJSON& from) { ToolValueJSON::MergeImpl(*this, from); }
+
+  private:
+  static void MergeImpl(::google::protobuf::MessageLite& to_msg,
+                        const ::google::protobuf::MessageLite& from_msg);
+
+  public:
+  [[nodiscard]] bool IsInitialized() const {
+    return true;
+  }
+  ABSL_ATTRIBUTE_REINITIALIZES void Clear() PROTOBUF_FINAL;
+  #if defined(PROTOBUF_CUSTOM_VTABLE)
+  private:
+  [[nodiscard]] static ::size_t ByteSizeLong(const ::google::protobuf::MessageLite& msg);
+  [[nodiscard]] static ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      const ::google::protobuf::MessageLite& msg, ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream);
+
+  public:
+  [[nodiscard]] ::size_t ByteSizeLong() const { return ByteSizeLong(*this); }
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const {
+    return _InternalSerialize(*this, target, stream);
+  }
+  #else   // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] ::size_t ByteSizeLong() const final;
+  [[nodiscard]] ::uint8_t* PROTOBUF_NONNULL _InternalSerialize(
+      ::uint8_t* PROTOBUF_NONNULL target,
+      ::google::protobuf::io::EpsCopyOutputStream* PROTOBUF_NONNULL stream) const final;
+  #endif  // PROTOBUF_CUSTOM_VTABLE
+  [[nodiscard]] int GetCachedSize() const {
+    return _impl_._cached_size_.Get();
+  }
+
+  private:
+  void SharedCtor(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static void SharedDtor(MessageLite& self);
+  void InternalSwap(ToolValueJSON* PROTOBUF_NONNULL other);
+ private:
+  template <typename T>
+  friend ::absl::string_view(::google::protobuf::internal::GetAnyMessageName)();
+  static ::absl::string_view FullMessageName() { return "runanywhere.v1.ToolValueJSON"; }
+
+  explicit ToolValueJSON(::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  ToolValueJSON(::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const ToolValueJSON& from);
+  ToolValueJSON(
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, ToolValueJSON&& from) noexcept
+      : ToolValueJSON(arena) {
+    *this = ::std::move(from);
+  }
+  const ::google::protobuf::internal::ClassData* PROTOBUF_NONNULL GetClassData() const PROTOBUF_FINAL;
+  static void* PROTOBUF_NONNULL PlacementNew_(
+      const void* PROTOBUF_NONNULL, void* PROTOBUF_NONNULL mem,
+      ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+  static constexpr auto InternalNewImpl_();
+
+ public:
+  static constexpr auto InternalGenerateClassData_();
+
+  [[nodiscard]] ::google::protobuf::Metadata GetMetadata() const;
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+  enum : int {
+    kJsonFieldNumber = 1,
+  };
+  // string json = 1;
+  void clear_json() ;
+  [[nodiscard]] const ::std::string& json() const;
+  template <typename Arg_ = const ::std::string&, typename... Args_>
+  void set_json(Arg_&& arg, Args_... args);
+  ::std::string* PROTOBUF_NONNULL mutable_json();
+  [[nodiscard]] ::std::string* PROTOBUF_NULLABLE release_json();
+  void set_allocated_json(::std::string* PROTOBUF_NULLABLE value);
+
+  private:
+  const ::std::string& _internal_json() const;
+  PROTOBUF_ALWAYS_INLINE void _internal_set_json(const ::std::string& value);
+  ::std::string* PROTOBUF_NONNULL _internal_mutable_json();
+
+  public:
+  // @@protoc_insertion_point(class_scope:runanywhere.v1.ToolValueJSON)
+ private:
+  class _Internal;
+  friend class ::google::protobuf::internal::TcParser;
+  static const ::google::protobuf::internal::TcParseTable<0, 1,
+                                   0, 41,
+                                   2>
+      _table_;
+
+  friend class ::google::protobuf::MessageLite;
+  friend class ::google::protobuf::Arena;
+  friend ::google::protobuf::internal::PrivateAccess;
+  template <typename T>
+  friend class ::google::protobuf::Arena::InternalHelper;
+  using InternalArenaConstructable_ = void;
+  using DestructorSkippable_ = void;
+  struct Impl_ {
+    inline explicit constexpr Impl_(::google::protobuf::internal::InternalVisibility visibility,
+                                    ::google::protobuf::internal::ConstantInitialized) noexcept;
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena);
+    inline explicit Impl_(
+        ::google::protobuf::internal::InternalVisibility visibility,
+        ::google::protobuf::Arena* PROTOBUF_NULLABLE arena, const Impl_& from,
+        const ToolValueJSON& from_msg);
+    ::google::protobuf::internal::HasBits<1> _has_bits_;
+    ::google::protobuf::internal::CachedSize _cached_size_;
+    ::google::protobuf::internal::ArenaStringPtr json_;
+    PROTOBUF_TSAN_DECLARE_MEMBER
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_tool_5fcalling_2eproto;
+};
+
+extern const ::google::protobuf::internal::ClassDataFull ToolValueJSON_class_data_;
 // -------------------------------------------------------------------
 
 class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolValue final : public ::google::protobuf::Message
@@ -1183,7 +1388,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolResult final : public ::google:
     return *reinterpret_cast<const ToolResult*>(
         &_ToolResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 8;
+  static constexpr int kIndexInFileMessages = 9;
   friend void swap(ToolResult& a, ToolResult& b) { a.Swap(&b); }
   inline void Swap(ToolResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1492,7 +1697,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolPromptFormatResult final : publ
     return *reinterpret_cast<const ToolPromptFormatResult*>(
         &_ToolPromptFormatResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 14;
+  static constexpr int kIndexInFileMessages = 15;
   friend void swap(ToolPromptFormatResult& a, ToolPromptFormatResult& b) { a.Swap(&b); }
   inline void Swap(ToolPromptFormatResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -1792,7 +1997,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionStepWithResultReq
     return *reinterpret_cast<const ToolCallingSessionStepWithResultRequest*>(
         &_ToolCallingSessionStepWithResultRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 22;
+  static constexpr int kIndexInFileMessages = 23;
   friend void swap(ToolCallingSessionStepWithResultRequest& a, ToolCallingSessionStepWithResultRequest& b) { a.Swap(&b); }
   inline void Swap(ToolCallingSessionStepWithResultRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2041,7 +2246,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionDestroyRequest fi
     return *reinterpret_cast<const ToolCallingSessionDestroyRequest*>(
         &_ToolCallingSessionDestroyRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 23;
+  static constexpr int kIndexInFileMessages = 24;
   friend void swap(ToolCallingSessionDestroyRequest& a, ToolCallingSessionDestroyRequest& b) { a.Swap(&b); }
   inline void Swap(ToolCallingSessionDestroyRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2237,7 +2442,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateResult fina
     return *reinterpret_cast<const ToolCallingSessionCreateResult*>(
         &_ToolCallingSessionCreateResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 20;
+  static constexpr int kIndexInFileMessages = 21;
   friend void swap(ToolCallingSessionCreateResult& a, ToolCallingSessionCreateResult& b) { a.Swap(&b); }
   inline void Swap(ToolCallingSessionCreateResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2433,7 +2638,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCall final : public ::google::p
     return *reinterpret_cast<const ToolCall*>(
         &_ToolCall_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 7;
+  static constexpr int kIndexInFileMessages = 8;
   friend void swap(ToolCall& a, ToolCall& b) { a.Swap(&b); }
   inline void Swap(ToolCall* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -2735,7 +2940,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolParseResult final : public ::go
     return *reinterpret_cast<const ToolParseResult*>(
         &_ToolParseResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 12;
+  static constexpr int kIndexInFileMessages = 13;
   friend void swap(ToolParseResult& a, ToolParseResult& b) { a.Swap(&b); }
   inline void Swap(ToolParseResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3001,7 +3206,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolParameter final : public ::goog
     return *reinterpret_cast<const ToolParameter*>(
         &_ToolParameter_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 4;
+  static constexpr int kIndexInFileMessages = 5;
   friend void swap(ToolParameter& a, ToolParameter& b) { a.Swap(&b); }
   inline void Swap(ToolParameter* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3307,7 +3512,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingResult final : public ::
     return *reinterpret_cast<const ToolCallingResult*>(
         &_ToolCallingResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 10;
+  static constexpr int kIndexInFileMessages = 11;
   friend void swap(ToolCallingResult& a, ToolCallingResult& b) { a.Swap(&b); }
   inline void Swap(ToolCallingResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3643,7 +3848,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolDefinition final : public ::goo
     return *reinterpret_cast<const ToolDefinition*>(
         &_ToolDefinition_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 6;
+  static constexpr int kIndexInFileMessages = 7;
   friend void swap(ToolDefinition& a, ToolDefinition& b) { a.Swap(&b); }
   inline void Swap(ToolDefinition* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -3939,7 +4144,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingStreamEvent final : publ
     return *reinterpret_cast<const ToolCallingStreamEvent*>(
         &_ToolCallingStreamEvent_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 17;
+  static constexpr int kIndexInFileMessages = 18;
   friend void swap(ToolCallingStreamEvent& a, ToolCallingStreamEvent& b) { a.Swap(&b); }
   inline void Swap(ToolCallingStreamEvent* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -4285,7 +4490,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionEvent final : pub
     kErrorBytes = 4,
     KIND_NOT_SET = 0,
   };
-  static constexpr int kIndexInFileMessages = 21;
+  static constexpr int kIndexInFileMessages = 22;
   friend void swap(ToolCallingSessionEvent& a, ToolCallingSessionEvent& b) { a.Swap(&b); }
   inline void Swap(ToolCallingSessionEvent* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -4576,7 +4781,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolRegistrySnapshot final : public
     return *reinterpret_cast<const ToolRegistrySnapshot*>(
         &_ToolRegistrySnapshot_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 18;
+  static constexpr int kIndexInFileMessages = 19;
   friend void swap(ToolRegistrySnapshot& a, ToolRegistrySnapshot& b) { a.Swap(&b); }
   inline void Swap(ToolRegistrySnapshot* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -4794,7 +4999,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingSessionCreateRequest fin
     return *reinterpret_cast<const ToolCallingSessionCreateRequest*>(
         &_ToolCallingSessionCreateRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 19;
+  static constexpr int kIndexInFileMessages = 20;
   friend void swap(ToolCallingSessionCreateRequest& a, ToolCallingSessionCreateRequest& b) { a.Swap(&b); }
   inline void Swap(ToolCallingSessionCreateRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -5123,7 +5328,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallingOptions final : public :
     return *reinterpret_cast<const ToolCallingOptions*>(
         &_ToolCallingOptions_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 9;
+  static constexpr int kIndexInFileMessages = 10;
   friend void swap(ToolCallingOptions& a, ToolCallingOptions& b) { a.Swap(&b); }
   inline void Swap(ToolCallingOptions* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -5543,7 +5748,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallValidationResult final : pu
     return *reinterpret_cast<const ToolCallValidationResult*>(
         &_ToolCallValidationResult_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 16;
+  static constexpr int kIndexInFileMessages = 17;
   friend void swap(ToolCallValidationResult& a, ToolCallValidationResult& b) { a.Swap(&b); }
   inline void Swap(ToolCallValidationResult* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -5832,7 +6037,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolPromptFormatRequest final : pub
     return *reinterpret_cast<const ToolPromptFormatRequest*>(
         &_ToolPromptFormatRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 13;
+  static constexpr int kIndexInFileMessages = 14;
   friend void swap(ToolPromptFormatRequest& a, ToolPromptFormatRequest& b) { a.Swap(&b); }
   inline void Swap(ToolPromptFormatRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -6092,7 +6297,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolParseRequest final : public ::g
     return *reinterpret_cast<const ToolParseRequest*>(
         &_ToolParseRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 11;
+  static constexpr int kIndexInFileMessages = 12;
   friend void swap(ToolParseRequest& a, ToolParseRequest& b) { a.Swap(&b); }
   inline void Swap(ToolParseRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -6311,7 +6516,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED ToolCallValidationRequest final : p
     return *reinterpret_cast<const ToolCallValidationRequest*>(
         &_ToolCallValidationRequest_default_instance_);
   }
-  static constexpr int kIndexInFileMessages = 15;
+  static constexpr int kIndexInFileMessages = 16;
   friend void swap(ToolCallValidationRequest& a, ToolCallValidationRequest& b) { a.Swap(&b); }
   inline void Swap(ToolCallValidationRequest* PROTOBUF_NONNULL other) {
     if (other == this) return;
@@ -6937,6 +7142,75 @@ inline ::google::protobuf::Map<::std::string, ::runanywhere::v1::ToolValue>* PRO
   SetHasBitForRepeated(_impl_._has_bits_[0], 0x00000001U);
   // @@protoc_insertion_point(field_mutable_map:runanywhere.v1.ToolValueObject.fields)
   return _internal_mutable_fields();
+}
+
+// -------------------------------------------------------------------
+
+// ToolValueJSON
+
+// string json = 1;
+inline void ToolValueJSON::clear_json() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.json_.ClearToEmpty();
+  ClearHasBit(_impl_._has_bits_[0],
+                  0x00000001U);
+}
+inline const ::std::string& ToolValueJSON::json() const
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  // @@protoc_insertion_point(field_get:runanywhere.v1.ToolValueJSON.json)
+  return _internal_json();
+}
+template <typename Arg_, typename... Args_>
+PROTOBUF_ALWAYS_INLINE void ToolValueJSON::set_json(Arg_&& arg, Args_... args) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  _impl_.json_.Set(static_cast<Arg_&&>(arg), args..., GetArena());
+  // @@protoc_insertion_point(field_set:runanywhere.v1.ToolValueJSON.json)
+}
+inline ::std::string* PROTOBUF_NONNULL ToolValueJSON::mutable_json()
+    ABSL_ATTRIBUTE_LIFETIME_BOUND {
+  SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  ::std::string* _s = _internal_mutable_json();
+  // @@protoc_insertion_point(field_mutable:runanywhere.v1.ToolValueJSON.json)
+  return _s;
+}
+inline const ::std::string& ToolValueJSON::_internal_json() const {
+  ::google::protobuf::internal::TSanRead(&_impl_);
+  return _impl_.json_.Get();
+}
+inline void ToolValueJSON::_internal_set_json(const ::std::string& value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  _impl_.json_.Set(value, GetArena());
+}
+inline ::std::string* PROTOBUF_NONNULL ToolValueJSON::_internal_mutable_json() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  return _impl_.json_.Mutable( GetArena());
+}
+inline ::std::string* PROTOBUF_NULLABLE ToolValueJSON::release_json() {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  // @@protoc_insertion_point(field_release:runanywhere.v1.ToolValueJSON.json)
+  if (!CheckHasBit(_impl_._has_bits_[0], 0x00000001U)) {
+    return nullptr;
+  }
+  ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  auto* released = _impl_.json_.Release();
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString()) {
+    _impl_.json_.Set("", GetArena());
+  }
+  return released;
+}
+inline void ToolValueJSON::set_allocated_json(::std::string* PROTOBUF_NULLABLE value) {
+  ::google::protobuf::internal::TSanWrite(&_impl_);
+  if (value != nullptr) {
+    SetHasBit(_impl_._has_bits_[0], 0x00000001U);
+  } else {
+    ClearHasBit(_impl_._has_bits_[0], 0x00000001U);
+  }
+  _impl_.json_.SetAllocated(value, GetArena());
+  if (::google::protobuf::internal::DebugHardenForceCopyDefaultString() && _impl_.json_.IsDefault()) {
+    _impl_.json_.Set("", GetArena());
+  }
+  // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.ToolValueJSON.json)
 }
 
 // -------------------------------------------------------------------

@@ -59,6 +59,17 @@ message ToolValueObject {
 }
 
 // ---------------------------------------------------------------------------
+// String wrapper used by the rac_tool_value_to_json_proto /
+// rac_tool_value_from_json_proto ABIs. Carries either the JSON text rendered
+// from a ToolValue, or the JSON text that should be parsed back into a
+// ToolValue. Defined here (rather than reusing a stand-alone wrapper) so the
+// tool-calling round-trip stays self-contained in this proto.
+// ---------------------------------------------------------------------------
+message ToolValueJSON {
+    string json = 1;
+}
+
+// ---------------------------------------------------------------------------
 // Supported parameter types.
 // ---------------------------------------------------------------------------
 enum ToolParameterType {

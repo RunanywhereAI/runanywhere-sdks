@@ -163,16 +163,14 @@ modalities:
     extension: CppBridge.TTS
     methods:
       - swift_name: listVoices
-        c_symbol: rac_tts_component_list_voices_proto
+        c_symbol: rac_tts_list_voices_lifecycle_proto
         request: ~
-        response: RATTSVoiceInfo
-        kind: custom
-        context: rac_handle_t
-        custom_reason: |
-          Voice-collection callback pattern: C symbol invokes the per-voice
-          callback once per RATTSVoiceInfo, and Swift collects them into [..]
-          via ProtoCollectingContext. No request bytes; multiple response
-          decodes per call. Doesn't match invoke/stream/invokeRequestStream.
+        response: RATTSVoiceList
+        kind: invokeOutOnly
+        extension: CppBridge.TTS
+        # G2: lifecycle-driven listVoices. ABI: (outBuffer*) -> rc. Returns
+        # RATTSVoiceList with zero or more RATTSVoiceInfo entries gathered
+        # from the lifecycle-loaded TTS service.
 
       - swift_name: synthesize
         c_symbol: rac_tts_synthesize_lifecycle_proto

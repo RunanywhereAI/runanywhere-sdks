@@ -648,6 +648,8 @@ set(RAC_FEATURES_SOURCES
     # ThinkingContentParser; rac_llm_split_thinking_tokens C ABI)
     src/features/llm/rac_llm_thinking.cpp
     src/features/llm/tool_calling.cpp
+    # G3: ToolValue <-> JSON proto-byte ABI (replaces per-SDK ~80 LOC walks).
+    src/features/llm/rac_tool_value_json.cpp
     # Wave D-4: tool-calling session state machine (collapses per-SDK
     # 200-400 LOC orchestration loop into one native session).
     src/features/llm/tool_calling_session.cpp
@@ -984,6 +986,10 @@ set(_RAC_PROTO_GENERATED_SOURCES
     ${_RAC_PROTO_GEN_DIR}/lifecycle_service.pb.cc
     # P2-T9: two-phase SDK init request/result envelope.
     ${_RAC_PROTO_GEN_DIR}/sdk_init.pb.cc
+    # rac_options.proto — custom FieldOptions / EnumValueOptions extensions
+    # imported by codegen post-processors and several option protos. Required
+    # at link time by every .pb.cc that imports rac_options.proto.
+    ${_RAC_PROTO_GEN_DIR}/rac_options.pb.cc
 )
 set(RAC_PROTOBUF_COMPILE_OPTIONS "")
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")

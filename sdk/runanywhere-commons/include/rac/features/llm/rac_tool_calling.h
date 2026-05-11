@@ -511,6 +511,50 @@ rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_bool_t succ
                                          const char* error_message, char** out_json);
 
 // =============================================================================
+// TOOL VALUE JSON BRIDGE (G3) - Replaces hand-written per-SDK JSON serializers
+// =============================================================================
+//
+// SDKs treat ToolValue (the recursive JSON-typed carrier defined in
+// idl/tool_calling.proto) as JSON when crossing the user-facing surface:
+// arguments_json / result_json are JSON strings. Every SDK previously
+// reimplemented the recursive walk over the ToolValue oneof to/from JSON.
+// These two ABIs move that walk into commons.
+
+/**
+ * @brief Serialize a runanywhere.v1.ToolValue proto to its JSON string.
+ *
+ * Input bytes are a serialized runanywhere.v1.ToolValue. The output buffer
+ * carries a serialized runanywhere.v1.ToolValueJSON whose `json` field holds
+ * the canonical JSON text.
+ *
+ * @param in_tool_value_bytes Borrowed serialized ToolValue bytes.
+ * @param in_size             Size of in_tool_value_bytes.
+ * @param out_string_proto    Owned serialized ToolValueJSON on success.
+ * @return RAC_SUCCESS when out_string_proto carries a serialized result.
+ */
+RAC_API rac_result_t rac_tool_value_to_json_proto(
+    const uint8_t* in_tool_value_bytes,
+    size_t in_size,
+    rac_proto_buffer_t* out_string_proto);
+
+/**
+ * @brief Parse a JSON string into a runanywhere.v1.ToolValue proto.
+ *
+ * Input bytes are a serialized runanywhere.v1.ToolValueJSON whose `json`
+ * field carries the JSON text. The output buffer carries a serialized
+ * runanywhere.v1.ToolValue derived from that text.
+ *
+ * @param in_string_bytes  Borrowed serialized ToolValueJSON bytes.
+ * @param in_size          Size of in_string_bytes.
+ * @param out_tool_value   Owned serialized ToolValue on success.
+ * @return RAC_SUCCESS when out_tool_value carries a serialized result.
+ */
+RAC_API rac_result_t rac_tool_value_from_json_proto(
+    const uint8_t* in_string_bytes,
+    size_t in_size,
+    rac_proto_buffer_t* out_tool_value);
+
+// =============================================================================
 // TOOL CALLING SESSION (Wave D-4) - Native orchestration state machine
 // =============================================================================
 

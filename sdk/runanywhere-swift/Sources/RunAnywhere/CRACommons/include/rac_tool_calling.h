@@ -364,6 +364,34 @@ RAC_API rac_result_t rac_tool_call_result_to_json(const char* tool_name, rac_boo
                                                   const char* error_message, char** out_json);
 
 // =============================================================================
+// TOOL VALUE JSON BRIDGE (G3) - Replaces hand-written per-SDK JSON serializers
+// =============================================================================
+
+/**
+ * @brief Serialize a runanywhere.v1.ToolValue proto to its JSON string.
+ *
+ * Input bytes are a serialized runanywhere.v1.ToolValue. The output buffer
+ * carries a serialized runanywhere.v1.ToolValueJSON whose `json` field holds
+ * the canonical JSON text.
+ */
+RAC_API rac_result_t rac_tool_value_to_json_proto(
+    const uint8_t* in_tool_value_bytes,
+    size_t in_size,
+    rac_proto_buffer_t* out_string_proto);
+
+/**
+ * @brief Parse a JSON string into a runanywhere.v1.ToolValue proto.
+ *
+ * Input bytes are a serialized runanywhere.v1.ToolValueJSON whose `json`
+ * field carries the JSON text. The output buffer carries a serialized
+ * runanywhere.v1.ToolValue derived from that text.
+ */
+RAC_API rac_result_t rac_tool_value_from_json_proto(
+    const uint8_t* in_string_bytes,
+    size_t in_size,
+    rac_proto_buffer_t* out_tool_value);
+
+// =============================================================================
 // TOOL CALLING RUN LOOP (P2-T8) - Single-call native orchestration
 // =============================================================================
 //

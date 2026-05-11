@@ -35,8 +35,10 @@ struct RAGMessage: Identifiable {
 
     // MARK: - Think Tag Helpers
     //
-    // Thin pass-throughs to the SDK's canonical `ThinkingContentParser` so the
-    // app has a single source of truth for `<think>` tag handling.
+    // Thin pass-throughs to the app's `ThinkingContentParser` (raw-text helper).
+    // `RARAGResult.answer` carries `<think>` tags inline because the RAG proto
+    // result has no dedicated thinking_content field; this helper splits them
+    // out for separate rendering in the UI.
 
     /// Extract the content inside `<think>...</think>` tags.
     static func extractThinkingContent(from text: String) -> String? {

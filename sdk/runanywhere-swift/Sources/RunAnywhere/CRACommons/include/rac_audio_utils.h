@@ -81,6 +81,24 @@ RAC_API rac_result_t rac_audio_int16_to_wav(const void* pcm_data, size_t pcm_siz
  */
 RAC_API size_t rac_audio_wav_header_size(void);
 
+/**
+ * @brief Compute audio RMS level in dB.
+ *
+ * Computes the root-mean-square of the supplied Float32 PCM samples (range
+ * [-1.0, 1.0]) and returns the value converted to decibels. Centralises the
+ * level-meter DSP that used to be hand-rolled in each platform SDK
+ * (Swift AudioCaptureManager.updateAudioLevel, etc.).
+ *
+ * @param samples Pointer to float32 PCM samples in [-1.0, 1.0].
+ * @param count   Number of samples.
+ * @param out_db  Output decibel level (always negative or zero; -inf clamped
+ *                to -100.0 dB if the signal is silent / below threshold).
+ * @return RAC_SUCCESS on success, RAC_ERROR_NULL_POINTER on NULL inputs or
+ *         zero count.
+ */
+RAC_API rac_result_t rac_audio_compute_level_db(const float* samples, size_t count,
+                                                float* out_db);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1006,6 +1006,45 @@ rac_result_t rac_tts_stop_lifecycle_proto(rac_proto_buffer_t* out_result) {
 #endif
 }
 
+rac_result_t rac_tts_list_voices_lifecycle_proto(rac_proto_buffer_t* out) {
+    if (!out) return RAC_ERROR_NULL_POINTER;
+#if !defined(RAC_HAVE_PROTOBUF)
+    return feature_unavailable(out);
+#else
+    rac::lifecycle::LifecycleTtsRef ref;
+    rac_result_t rc = rac::lifecycle::acquire_lifecycle_tts(&ref);
+    if (rc != RAC_SUCCESS) {
+        return rac_proto_buffer_set_error(out, rc,
+                                          "TTS lifecycle voice/model is not loaded");
+    }
+
+    runanywhere::v1::TTSVoiceList list;
+    if (ref.ops && ref.ops->get_info) {
+        rac_tts_info_t info = {};
+        rac_result_t info_rc = ref.ops->get_info(ref.impl, &info);
+        if (info_rc == RAC_SUCCESS) {
+            for (size_t i = 0; i < info.num_voices; ++i) {
+                const char* id = info.available_voices ? info.available_voices[i] : nullptr;
+                if (!id) continue;
+                runanywhere::v1::TTSVoiceInfo* voice = list.add_voices();
+                voice->set_id(id);
+                voice->set_display_name(id);
+            }
+        }
+    }
+
+    if (list.voices_size() == 0 && ref.model_id) {
+        runanywhere::v1::TTSVoiceInfo* voice = list.add_voices();
+        voice->set_id(ref.model_id);
+        voice->set_display_name(ref.model_id);
+    }
+
+    rc = copy_proto(list, out);
+    rac::lifecycle::release_lifecycle_tts(&ref);
+    return rc;
+#endif
+}
+
 // ---------------------------------------------------------------------------
 // VAD lifecycle configure / start / stop / reset ABIs (FLT-12)
 // ---------------------------------------------------------------------------
