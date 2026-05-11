@@ -10,6 +10,16 @@ import CRACommons
 import Foundation
 import os
 
+// MARK: - Sendable Wrappers
+
+/// Wraps the opaque telemetry-manager pointer so it can cross
+/// closure/actor boundaries under Swift 6 strict concurrency.
+/// `OpaquePointer` itself is not `Sendable`; the C++ side owns the
+/// lifetime, so we explicitly opt in via `@unchecked Sendable`.
+private struct ManagerHandle: @unchecked Sendable {
+    let ptr: OpaquePointer
+}
+
 // MARK: - Events Bridge
 
 extension CppBridge {
@@ -70,9 +80,9 @@ extension CppBridge {
     public enum Telemetry {
 
         // Per CLAUDE.md: NSLock is forbidden — use `OSAllocatedUnfairLock`.
-        // The lock guards an opaque manager pointer; Swift `OpaquePointer` is
-        // a value type so the locked state holds it directly.
-        private static let manager = OSAllocatedUnfairLock<OpaquePointer?>(initialState: nil)
+        // The lock guards an opaque manager pointer wrapped in a Sendable shim;
+        // `OpaquePointer` itself is not Sendable under Swift 6.
+        private static let manager = OSAllocatedUnfairLock<ManagerHandle?>(initialState: nil)
         private static let activeEnvironment = OSAllocatedUnfairLock<SDKEnvironment?>(initialState: nil)
 
         /// Initialize telemetry manager
@@ -80,7 +90,7 @@ extension CppBridge {
             // Destroy existing if any
             let existing = manager.withLock { $0 }
             if let existing {
-                rac_telemetry_manager_destroy(existing)
+                rac_telemetry_manager_destroy(existing.ptr)
             }
 
             activeEnvironment.withLock { $0 = environment }
@@ -88,7 +98,7 @@ extension CppBridge {
             let deviceId = CppBridge.Device.persistentId
             let deviceInfo = DeviceInfo.current
 
-            let newManager: OpaquePointer? = deviceId.withCString { did in
+            let createdPtr: OpaquePointer? = deviceId.withCString { did in
                 SDKConstants.platform.withCString { plat in
                     SDKConstants.version.withCString { ver in
                         rac_telemetry_manager_create(Environment.toC(environment), did, plat, ver)
@@ -96,33 +106,34 @@ extension CppBridge {
                 }
             }
 
+            let newManager: ManagerHandle? = createdPtr.map { ManagerHandle(ptr: $0) }
             manager.withLock { $0 = newManager }
 
             // Set device info
             deviceInfo.deviceModel.withCString { model in
                 deviceInfo.osVersion.withCString { os in
-                    rac_telemetry_manager_set_device_info(newManager, model, os)
+                    rac_telemetry_manager_set_device_info(newManager?.ptr, model, os)
                 }
             }
 
             // Register HTTP callback - Swift provides HTTP transport for C++
             let userData = Unmanaged.passUnretained(Telemetry.self as AnyObject).toOpaque()
-            rac_telemetry_manager_set_http_callback(newManager, telemetryHttpCallback, userData)
+            rac_telemetry_manager_set_http_callback(newManager?.ptr, telemetryHttpCallback, userData)
         }
 
         /// Shutdown telemetry manager
         static func shutdown() {
             activeEnvironment.withLock { $0 = nil }
 
-            let mgr = manager.withLock { current -> OpaquePointer? in
+            let mgr = manager.withLock { current -> ManagerHandle? in
                 let snapshot = current
                 current = nil
                 return snapshot
             }
 
             if let mgr {
-                rac_telemetry_manager_flush(mgr)
-                rac_telemetry_manager_destroy(mgr)
+                rac_telemetry_manager_flush(mgr.ptr)
+                rac_telemetry_manager_destroy(mgr.ptr)
             }
         }
 
@@ -132,13 +143,13 @@ extension CppBridge {
             data: UnsafePointer<rac_analytics_event_data_t>
         ) {
             guard let mgr = manager.withLock({ $0 }) else { return }
-            rac_telemetry_manager_track_analytics(mgr, type, data)
+            rac_telemetry_manager_track_analytics(mgr.ptr, type, data)
         }
 
         /// Flush pending events
         public static func flush() {
             guard let mgr = manager.withLock({ $0 }) else { return }
-            rac_telemetry_manager_flush(mgr)
+            rac_telemetry_manager_flush(mgr.ptr)
         }
 
         static var environment: SDKEnvironment? {

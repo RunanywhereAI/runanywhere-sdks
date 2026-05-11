@@ -52,12 +52,24 @@ public extension RunAnywhere {
     ) -> AsyncStream<RATTSOutput> {
         AsyncStream { continuation in
             Task {
+                guard isInitialized else {
+                    continuation.finish()
+                    return
+                }
+                // Mirror synthesize(): query ModelLifecycle (the canonical
+                // source of truth) instead of the CppBridge.TTS actor's own
+                // handle, which is separate from the lifecycle's handle.
+                var currentRequest = RACurrentModelRequest()
+                currentRequest.category = .speechSynthesis
+                let current = RunAnywhere.currentModel(currentRequest)
+                guard current.found else {
+                    continuation.finish()
+                    return
+                }
                 var request = RATTSSynthesisRequest()
                 request.text = text
                 request.options = options
-                guard isInitialized,
-                      await CppBridge.TTS.shared.isLoaded,
-                      let stream = try? await CppBridge.TTS.shared.synthesizeStream(request) else {
+                guard let stream = try? await CppBridge.TTS.shared.synthesizeStream(request) else {
                     continuation.finish()
                     return
                 }

@@ -4,8 +4,8 @@
 //
 //  VLM component bridge - manages C++ VLM component lifecycle.
 //
-//  Generic scaffolding (handle creation, isLoaded, unload, destroy)
-//  lives in `CppBridge.ComponentActor`. VLM-specific surfaces kept here:
+//  Generic scaffolding (handle creation, unload, destroy) lives in
+//  `CppBridge.ComponentActor`. VLM-specific surfaces kept here:
 //   - 5-string `loadResolvedModel(...)` with an optional vision-projector
 //     artifact (the path-only variant on the generic actor would lose
 //     the projector slot)
@@ -13,6 +13,10 @@
 //     `RACurrentModelResult` (multi-artifact-aware)
 //   - `cancel()`, `supportsStreaming`, and `state` introspection
 //   - `currentModelPath` mirror used by the cross-actor lifecycle code.
+//
+//  The public `isLoaded` accessor was removed in Wave 6C (T13) — call
+//  sites now query `RunAnywhere.currentModel(category:)` on the lifecycle
+//  for both `.multimodal` and `.vision` as the single source of truth.
 //
 
 import CRACommons
@@ -55,11 +59,6 @@ extension CppBridge {
         }
 
         // MARK: - State
-
-        /// Check if a model is loaded
-        public var isLoaded: Bool {
-            get async { await inner.isLoaded }
-        }
 
         /// Get the currently loaded model ID
         public var currentModelId: String? { loadedModelId }

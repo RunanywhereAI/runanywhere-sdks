@@ -31,7 +31,13 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
-        guard await CppBridge.VLM.shared.isLoaded else {
+        // Query ModelLifecycle (the canonical source of truth) instead of
+        // the CppBridge.VLM actor's `isLoaded`, which queries the actor's
+        // separate handle. VLM accepts both `.multimodal` and `.vision`
+        // (see `isVLMCategory`) — try `.multimodal` first (the canonical
+        // category used by SDK consumers and example apps), fall back to
+        // `.vision` so models loaded under either category are honored.
+        guard isVLMModelLoaded() else {
             throw SDKException(code: .notInitialized, message: "VLM model not loaded", category: .component)
         }
 
@@ -53,11 +59,25 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
-        guard await CppBridge.VLM.shared.isLoaded else {
+        guard isVLMModelLoaded() else {
             throw SDKException(code: .notInitialized, message: "VLM model not loaded", category: .component)
         }
 
         return try await CppBridge.VLM.shared.processStream(image: image, options: options)
+    }
+
+    /// Returns true if a VLM model is loaded in the lifecycle under either
+    /// the `.multimodal` or `.vision` category. Mirrors `isVLMCategory` —
+    /// both categories collapse to `SDK_COMPONENT_VLM` in C++ commons.
+    private static func isVLMModelLoaded() -> Bool {
+        for category in [RAModelCategory.multimodal, RAModelCategory.vision] {
+            var request = RACurrentModelRequest()
+            request.category = category
+            if RunAnywhere.currentModel(request).found {
+                return true
+            }
+        }
+        return false
     }
 
     /// Cancel the current VLM generation.

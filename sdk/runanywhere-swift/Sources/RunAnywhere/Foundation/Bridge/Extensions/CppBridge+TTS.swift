@@ -4,10 +4,13 @@
 //
 //  TTS component bridge - manages C++ TTS component lifecycle.
 //
-//  Generic scaffolding (handle creation, isLoaded, unload, destroy)
-//  lives in `CppBridge.ComponentActor`. TTS-specific surfaces kept here:
+//  Generic scaffolding (handle creation, unload, destroy) lives in
+//  `CppBridge.ComponentActor`. TTS-specific surfaces kept here:
 //  the `loadVoice` voice-terminology wrapper, the `loadVoice(from:)`
 //  lifecycle adapter, and `stop()` to interrupt synthesis.
+//  The public `isLoaded` accessor was removed in Wave 6C (T13) — call
+//  sites now query `RunAnywhere.currentModel(category: .speechSynthesis)`
+//  on the lifecycle as the single source of truth.
 //
 
 import CRACommons
@@ -40,11 +43,6 @@ extension CppBridge {
         }
 
         // MARK: - State
-
-        /// Check if a voice is loaded
-        public var isLoaded: Bool {
-            get async { await inner.isLoaded }
-        }
 
         /// Get the currently loaded voice ID
         public var currentVoiceId: String? {

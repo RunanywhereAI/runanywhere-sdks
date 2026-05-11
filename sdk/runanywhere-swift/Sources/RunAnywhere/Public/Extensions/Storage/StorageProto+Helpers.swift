@@ -101,20 +101,9 @@ extension RAModelStorageMetrics {
         if let lastUsedMs { self.lastUsedMs = lastUsedMs }
     }
 
-    public var modelId: String {
-        get { modelID }
-        set { modelID = newValue }
-    }
-
-    public var sizeOnDisk: Int64 {
-        get { sizeOnDiskBytes }
-        set { sizeOnDiskBytes = newValue }
-    }
-
-    public var lastUsed: Date? {
-        guard hasLastUsedMs else { return nil }
-        return Date(timeIntervalSince1970: TimeInterval(lastUsedMs) / 1000.0)
-    }
+    // `modelId` / `sizeOnDisk` / `lastUsed` aliases removed — pure renames of
+    // canonical proto field names (`modelID`/`sizeOnDiskBytes`/`lastUsedMs`)
+    // with no consumer usage. Per swift.md SWIFT-DUP-STORAGE-ALIASES.
 }
 
 // MARK: - RAStoredModel
@@ -134,26 +123,18 @@ extension RAStoredModel: Identifiable {
         return Date(timeIntervalSince1970: TimeInterval(downloadedAtMs) / 1000.0)
     }
 
-    public var checksum: String? { nil }
-    public var format: ModelFormat { .unknown }
-    public var framework: InferenceFramework? { nil }
-    public var modelDescription: String? { nil }
+    // `checksum` / `format` / `framework` / `modelDescription` aliases removed —
+    // proto `StoredModel` (idl/storage_types.proto) has no such fields. These
+    // always returned `nil` / `.unknown`, leaking dead UI rows into consumers.
+    // Per swift.md SWIFT-DUP-STORAGE-ALIASES.
 }
 
 // MARK: - RAStorageAvailability
 
 extension RAStorageAvailability {
-    public var hasWarning: Bool { hasWarningMessage }
-
-    public var requiredSpace: Int64 {
-        get { requiredBytes }
-        set { requiredBytes = newValue }
-    }
-
-    public var availableSpace: Int64 {
-        get { availableBytes }
-        set { availableBytes = newValue }
-    }
+    // `hasWarning` / `requiredSpace` / `availableSpace` aliases removed — pure
+    // renames of canonical proto field names (`hasWarningMessage`/
+    // `requiredBytes`/`availableBytes`). Per swift.md SWIFT-DUP-STORAGE-ALIASES.
 
     public static func make(
         isAvailable: Bool,
