@@ -91,7 +91,8 @@ public extension RunAnywhere {
         }
 
         try await ensureServicesReady()
-        return try await CppBridge.VoiceAgent.shared.componentStatesProto()
+        let handle = try await CppBridge.VoiceAgent.shared.requireExistingHandle()
+        return try await CppBridge.VoiceAgent.shared.componentStatesProto(handle: handle)
     }
 
     /// Process a complete voice turn through the proto C++ ABI.

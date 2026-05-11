@@ -25,12 +25,41 @@
 #     runRequestStream helper (no current entries -- all four streaming methods
 #     today use the unified runRequestStream path and are tagged kind: stream).
 #
+# getWithContext  (Phase C — C1)
+#     Handle + out-buffer ABI returning a single proto. No request bytes.
+#     ABI signature:   rac_result_t fn(Ctx handle, rac_proto_buffer_t* out)
+#     Generated Swift: public func <name>(handle: Ctx) throws -> Response
+#     Used by: LLM/VLM/VAD/RAG GET-shaped state queries that already own a handle.
+#
+# voidCall  (Phase C — C1)
+#     Handle-only ABI returning rc only. No request bytes, no out-buffer.
+#     ABI signature:   rac_result_t fn(Ctx handle)
+#                  or  rac_result_t fn(Ctx handle, const uint8_t* bytes, size_t size)
+#                      when `request` is set (e.g. VAD.configure).
+#     Generated Swift: public func <name>(handle: Ctx) throws
+#                  or  public func <name>(handle: Ctx, request: Request) throws
+#     The optional `request` field selects between the two ABI shapes.
+#
+# createHandle  (Phase C — C1)
+#     Factory ABI: serialise request, run C, receive a fresh handle via an
+#     out-pointer. No response decode -- the new handle is returned directly.
+#     ABI signature:   rac_result_t fn(const uint8_t* bytes, size_t size, Ctx* out_handle)
+#     Generated Swift: public func <name>(request: Request) throws -> Ctx
+#     Used by: RAG.createPipeline.
+#
+# invokeOutOnly  (Phase C — C1)
+#     State-only / cancel-like ABI: no request bytes, no context handle, just
+#     an out-buffer that yields a proto response.
+#     ABI signature:   rac_result_t fn(rac_proto_buffer_t* out)
+#     Generated Swift: public func <name>() throws -> Response
+#     Used by: LLM.cancelProto, VAD lifecycle state queries (start/stop/reset).
+#
 # custom
-#     Cannot be expressed by the three helper variants above (extra raw-pointer
-#     args, callback-collection patterns, lifecycle-only state queries, handle
-#     creation/destruction, dual byte-buffer inputs, etc.). Codegen MUST leave
-#     these methods hand-written in CppBridge+ModalityProtoABI.swift; the field
-#     `custom_reason` documents why.
+#     Cannot be expressed by any of the helper variants above (extra raw-pointer
+#     args, callback-collection patterns, dual byte-buffer inputs, long-lived
+#     callback registration, etc.). Codegen MUST leave these methods hand-
+#     written in CppBridge+ModalityProtoABI.swift; the field `custom_reason`
+#     documents why.
 #
 # context
 #     Optional. Type of the opaque handle passed as the first argument of the
@@ -84,10 +113,8 @@ modalities:
         c_symbol: rac_llm_cancel_proto
         request: ~
         response: RASDKEvent
-        kind: custom
-        custom_reason: |
-          Out-buffer-only ABI: signature is (outBuffer*) -> rc with no request
-          bytes and no context handle. Decodes RASDKEvent from the buffer.
+        kind: invokeOutOnly
+        # ABI: (outBuffer*) -> rc, no request, no handle. Returns RASDKEvent.
 
   # --------------------------------------------------------------------------
   # StructuredOutput  (lives on CppBridge.StructuredOutput, static method)
@@ -175,12 +202,13 @@ modalities:
         c_symbol: rac_vad_component_configure_proto
         request: RAVADConfiguration
         response: ~
-        kind: custom
+        kind: voidCall
         context: rac_handle_t
-        custom_reason: |
-          Returns rc only (no out-buffer). Throws SDKException(.invalidConfiguration)
-          on failure. No response decode -- doesn't fit invoke (which always
-          decodes a Response).
+        # ABI: (handle, bytes, size) -> rc. Codegen wraps SDKException with
+        # .invalidConfiguration on failure (Phase C voidCall error category).
+        error_code: invalidConfiguration
+        error_category: component
+        error_message_prefix: "VAD configure proto failed"
 
       - swift_name: process
         c_symbol: rac_vad_component_process_proto
@@ -197,13 +225,9 @@ modalities:
         c_symbol: rac_vad_component_get_statistics_proto
         request: ~
         response: RAVADStatistics
-        kind: custom
+        kind: getWithContext
         context: rac_handle_t
-        custom_reason: |
-          GET-shaped: signature is (handle, outBuffer*) -> rc with no request
-          bytes. Doesn't fit invoke (which serialises a request). A future
-          codegen could add a "get_with_context" kind covering this pattern
-          (also used by RAG.clearProto / RAG.statsProto / VoiceAgent.componentStatesProto).
+        # ABI: (handle, outBuffer*) -> rc.
 
       - swift_name: setActivityCallbackProto
         c_symbol: rac_vad_component_set_activity_proto_callback
@@ -231,25 +255,20 @@ modalities:
         c_symbol: rac_vad_start_lifecycle_proto
         request: ~
         response: RAVADServiceState
-        kind: custom
-        custom_reason: |
-          State-only: signature is (outBuffer*) -> rc -- no request bytes,
-          no handle. Doesn't fit invoke. Could be modelled by a future
-          "state_only" kind shared with stop/reset lifecycle calls.
+        kind: invokeOutOnly
+        # ABI: (outBuffer*) -> rc, no request, no handle.
 
       - swift_name: stopLifecycle
         c_symbol: rac_vad_stop_lifecycle_proto
         request: ~
         response: RAVADServiceState
-        kind: custom
-        custom_reason: State-only (outBuffer*) -> rc, see startLifecycle.
+        kind: invokeOutOnly
 
       - swift_name: resetLifecycle
         c_symbol: rac_vad_reset_lifecycle_proto
         request: ~
         response: RAVADServiceState
-        kind: custom
-        custom_reason: State-only (outBuffer*) -> rc, see startLifecycle.
+        kind: invokeOutOnly
 
       - swift_name: processLifecycle
         c_symbol: rac_vad_process_lifecycle_proto
@@ -282,12 +301,10 @@ modalities:
         c_symbol: rac_voice_agent_component_states_proto
         request: ~
         response: RAVoiceAgentComponentStates
-        kind: custom
+        kind: getWithContext
         context: rac_voice_agent_handle_t
-        custom_reason: |
-          GET-shaped (handle, outBuffer*) -> rc, no request bytes. Uses
-          requireExistingHandle() (sync) instead of getHandle() (async),
-          unlike initialize/processVoiceTurnProto.
+        # ABI: (handle, outBuffer*) -> rc. Callers thread the handle in;
+        # the actor's requireExistingHandle() lives in the public API.
 
       - swift_name: processVoiceTurnProto
         c_symbol: rac_voice_agent_process_voice_turn_proto
@@ -333,11 +350,12 @@ modalities:
         c_symbol: rac_vlm_cancel_proto
         request: ~
         response: ~
-        kind: custom
+        kind: voidCall
         context: rac_handle_t
-        custom_reason: |
-          Handle-only signature (handle) -> rc with no request and no response.
-          Doesn't fit invoke or any other helper variant.
+        # ABI: (handle) -> rc. No request, no out-buffer.
+        error_code: cancelled
+        error_category: component
+        error_message_prefix: "VLM cancel proto failed"
 
   # --------------------------------------------------------------------------
   # Embeddings  (CppBridge.EmbeddingsProto namespace, static method)
@@ -368,11 +386,14 @@ modalities:
         c_symbol: rac_rag_session_create_proto
         request: RARAGConfiguration
         response: ~
-        kind: custom
-        custom_reason: |
-          Handle-creation primitive: signature is (bytes, size, outHandle*) -> rc.
-          Returns a fresh rac_handle_t via an out-pointer rather than decoding
-          a response Message; the new handle is stashed via setProtoSession().
+        kind: createHandle
+        # ABI: (bytes, size, outHandle*) -> rc. Returns a fresh rac_handle_t.
+        # Caller decides what to do with the handle (the RAG actor's facade
+        # stashes it via setProtoSession()).
+        output_handle: rac_handle_t
+        error_code: notInitialized
+        error_category: component
+        error_message_prefix: "RAG proto session create failed"
 
       - swift_name: ingest
         c_symbol: rac_rag_ingest_proto
@@ -393,17 +414,15 @@ modalities:
         c_symbol: rac_rag_clear_proto
         request: ~
         response: RARAGStatistics
-        kind: custom
+        kind: getWithContext
         context: rac_handle_t
-        custom_reason: GET-shaped (session, outBuffer*) -> rc, no request bytes.
 
       - swift_name: statsProto
         c_symbol: rac_rag_stats_proto
         request: ~
         response: RARAGStatistics
-        kind: custom
+        kind: getWithContext
         context: rac_handle_t
-        custom_reason: GET-shaped (session, outBuffer*) -> rc, no request bytes.
 
   # --------------------------------------------------------------------------
   # RAG -- top-level free functions (not on any extension)

@@ -62,7 +62,10 @@ public extension RunAnywhere {
         }
         try await ensureServicesReady()
 
-        try await CppBridge.RAG.shared.createPipeline(config: config)
+        // Generated `createPipeline(_:)` returns the fresh handle; the actor
+        // is responsible for stashing it as its proto session.
+        let newSession = try await CppBridge.RAG.shared.createPipeline(config)
+        await CppBridge.RAG.shared.setProtoSession(newSession)
     }
 
     /// Destroy the RAG pipeline and release all resources.
@@ -135,7 +138,8 @@ public extension RunAnywhere {
     ///
     /// - Returns: Number of indexed chunks in the pipeline, or 0 if not initialized.
     static func ragGetDocumentCount() async -> Int {
-        if let stats = try? await CppBridge.RAG.shared.statsProto() {
+        if let session = try? await CppBridge.RAG.shared.requireProtoSession(),
+           let stats = try? await CppBridge.RAG.shared.statsProto(handle: session) {
             return Int(stats.indexedChunks)
         }
         return await CppBridge.RAG.shared.documentCount
@@ -151,7 +155,8 @@ public extension RunAnywhere {
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
-        return try await CppBridge.RAG.shared.statsProto()
+        let session = try await CppBridge.RAG.shared.requireProtoSession()
+        return try await CppBridge.RAG.shared.statsProto(handle: session)
     }
 
     /// Clear all previously ingested documents from the pipeline.
@@ -161,7 +166,8 @@ public extension RunAnywhere {
         guard isInitialized else {
             throw SDKException(code: .notInitialized, message: "SDK not initialized", category: .internal)
         }
-        _ = try await CppBridge.RAG.shared.clearProto()
+        let session = try await CppBridge.RAG.shared.requireProtoSession()
+        _ = try await CppBridge.RAG.shared.clearProto(handle: session)
     }
 
     /// The current number of indexed document chunks in the pipeline.

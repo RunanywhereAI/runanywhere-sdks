@@ -102,12 +102,20 @@ STREAM_ON_ERROR_FACTORIES: dict[str, str] = {
 
 
 def is_codegen_eligible(method: dict[str, Any]) -> bool:
-    """Only invoke + stream kinds are candidates. `keep_handwritten: true`
-    is a sub-filter applied later — those methods are still tagged
-    invoke/stream so the manifest captures their ABI shape, but Swift
-    codegen skips them (they retain a hand-written facade in
-    CppBridge+ModalityProtoABI.swift)."""
-    return method.get("kind") in {"invoke", "stream"}
+    """Codegen handles every kind except `custom`. Phase C adds 4 new kinds
+    (getWithContext, voidCall, createHandle, invokeOutOnly) to the original
+    two (invoke, stream). `keep_handwritten: true` is a sub-filter applied
+    later — those methods are still tagged with a real kind so the manifest
+    captures their ABI shape, but Swift codegen skips them (they retain a
+    hand-written facade in CppBridge+ModalityProtoABI.swift)."""
+    return method.get("kind") in {
+        "invoke",
+        "stream",
+        "getWithContext",
+        "voidCall",
+        "createHandle",
+        "invokeOutOnly",
+    }
 
 
 def should_emit(method: dict[str, Any]) -> bool:
@@ -161,7 +169,7 @@ def render_header(modality_count: int, method_count: int) -> str:
 // idl/codegen/swift-modality-abi.yaml.
 //
 // Covers {method_count} codegen-emitted methods across {modality_count} modality
-// entries. The 18 entries tagged `kind: custom` stay hand-written in
+// entries. The remaining `kind: custom` entries stay hand-written in
 // CppBridge+ModalityProtoABI.swift.
 //
 // Phase B (aggressive): emits proto-first APIs directly onto
@@ -170,6 +178,11 @@ def render_header(modality_count: int, method_count: int) -> str:
 // (ProtoStreamYielder, protoStreamTrampoline, ProtoStreamContext,
 // runRequestStream) live in the hand-written `+ModalityProtoABI.swift` and
 // are reused here.
+//
+// Phase C: adds 4 new render kinds — getWithContext (handle+out -> proto),
+// voidCall (handle[+req] -> rc only), createHandle (req -> new handle),
+// invokeOutOnly (no req, no handle, out -> proto). Migrated 11 of the 18
+// former custom entries onto these new templates.
 
 import CRACommons
 import Foundation
@@ -245,6 +258,47 @@ def render_generated_enum(modality: dict[str, Any]) -> str:
                 type_lines.append(
                     f"    typealias {type_alias} = NativeProtoABI.ProtoRequest"
                 )
+        elif kind == "getWithContext":
+            # (Ctx handle, outBuffer*) -> rc
+            type_lines.append(
+                f"    typealias {type_alias} = @convention(c) (\n"
+                f"        {context}?,\n"
+                f"        UnsafeMutablePointer<rac_proto_buffer_t>?\n"
+                f"    ) -> rac_result_t"
+            )
+        elif kind == "voidCall":
+            # Two shapes:
+            #   - (Ctx handle) -> rc                                  [no request]
+            #   - (Ctx handle, const uint8_t* bytes, size_t size) -> rc [with request]
+            if method.get("request"):
+                type_lines.append(
+                    f"    typealias {type_alias} = @convention(c) (\n"
+                    f"        {context}?,\n"
+                    f"        UnsafePointer<UInt8>?,\n"
+                    f"        Int\n"
+                    f"    ) -> rac_result_t"
+                )
+            else:
+                type_lines.append(
+                    f"    typealias {type_alias} = @convention(c) ({context}?) -> rac_result_t"
+                )
+        elif kind == "createHandle":
+            # (bytes, size, outHandle*) -> rc
+            out_handle = method.get("output_handle", "rac_handle_t")
+            type_lines.append(
+                f"    typealias {type_alias} = @convention(c) (\n"
+                f"        UnsafePointer<UInt8>?,\n"
+                f"        Int,\n"
+                f"        UnsafeMutablePointer<{out_handle}?>?\n"
+                f"    ) -> rac_result_t"
+            )
+        elif kind == "invokeOutOnly":
+            # (outBuffer*) -> rc -- no request, no context
+            type_lines.append(
+                f"    typealias {type_alias} = @convention(c) (\n"
+                f"        UnsafeMutablePointer<rac_proto_buffer_t>?\n"
+                f"    ) -> rac_result_t"
+            )
 
         name_lines.append(f'    static let {swift}Name = "{c_symbol}"')
         load_lines.append(
@@ -393,6 +447,200 @@ def render_stream_method(modality: dict[str, Any], method: dict[str, Any]) -> st
 
 
 # ----------------------------------------------------------------------------
+# Phase C — 4 new render functions
+#
+# Each emits a method onto the modality's extension. None of these go through
+# the higher-level `NativeProtoABI.invoke` helpers because the ABI shapes
+# differ; the proto-buffer / handle / void dance is inlined directly using
+# only the primitive helpers (`require`, `withSerializedBytes`, `decode`,
+# `free`, `canReceiveProtoBuffer`, `missingSymbolMessage`).
+
+
+def render_get_with_context_method(
+    modality: dict[str, Any], method: dict[str, Any]
+) -> str:
+    """getWithContext: `(Ctx handle, outBuffer*) -> rc` -> Response.
+
+    Generated Swift signature:
+        public func <name>(handle: Ctx) throws -> Response
+    """
+    name = modality["name"]
+    enum_ref = f"{name}GeneratedProtoABI"
+    swift = method["swift_name"]
+    response_proto = method["response"]
+    context = method["context"]
+    is_static = bool(method.get("static"))
+    vis = visibility(method)
+    keyword = f"{vis} static func" if is_static else f"{vis} func"
+
+    head = (
+        f"    {keyword} {swift}(handle: {context}) "
+        f"throws -> {response_proto} {{"
+    )
+
+    body = f"""
+        let symbol = try NativeProtoABI.require(
+            {enum_ref}.{swift},
+            named: {enum_ref}.{swift}Name
+        )
+        var outBuffer = rac_proto_buffer_t()
+        defer {{ NativeProtoABI.free(&outBuffer) }}
+        let status = symbol(handle, &outBuffer)
+        guard status == RAC_SUCCESS else {{
+            let message = outBuffer.error_message.map {{ String(cString: $0) }}
+                ?? "Native proto request failed: \\({enum_ref}.{swift}Name) rc=\\(status)"
+            throw SDKException(code: .processingFailed, message: message, category: .internal)
+        }}
+        return try NativeProtoABI.decode({response_proto}.self, from: outBuffer)
+    }}"""
+
+    return head + body
+
+
+def render_void_call_method(
+    modality: dict[str, Any], method: dict[str, Any]
+) -> str:
+    """voidCall: `(Ctx handle) -> rc` or `(Ctx handle, bytes, size) -> rc`.
+
+    Generated Swift signature (no request):
+        public func <name>(handle: Ctx) throws
+    Generated Swift signature (with request):
+        public func <name>(handle: Ctx, request: Request) throws
+    """
+    name = modality["name"]
+    enum_ref = f"{name}GeneratedProtoABI"
+    swift = method["swift_name"]
+    request_proto = method.get("request")
+    context = method["context"]
+    is_static = bool(method.get("static"))
+    vis = visibility(method)
+    keyword = f"{vis} static func" if is_static else f"{vis} func"
+
+    error_code = method.get("error_code", "processingFailed")
+    error_category = method.get("error_category", "internal")
+    error_prefix = method.get("error_message_prefix", f"{swift} failed")
+
+    if request_proto:
+        # With request bytes
+        second = first_arg_clause(method, request_proto)
+        request_var = first_arg_name(method)
+        head = (
+            f"    {keyword} {swift}(handle: {context}, {second}) "
+            f"throws {{"
+        )
+        body = f"""
+        let symbol = try NativeProtoABI.require(
+            {enum_ref}.{swift},
+            named: {enum_ref}.{swift}Name
+        )
+        let status = try NativeProtoABI.withSerializedBytes({request_var}) {{ bytes, size in
+            symbol(handle, bytes, size)
+        }}
+        guard status == RAC_SUCCESS else {{
+            throw SDKException(code: .{error_code}, message: "{error_prefix}: \\(status)", category: .{error_category})
+        }}
+    }}"""
+    else:
+        # Handle-only
+        head = f"    {keyword} {swift}(handle: {context}) throws {{"
+        body = f"""
+        let symbol = try NativeProtoABI.require(
+            {enum_ref}.{swift},
+            named: {enum_ref}.{swift}Name
+        )
+        let status = symbol(handle)
+        guard status == RAC_SUCCESS else {{
+            throw SDKException(code: .{error_code}, message: "{error_prefix}: \\(status)", category: .{error_category})
+        }}
+    }}"""
+
+    return head + body
+
+
+def render_create_handle_method(
+    modality: dict[str, Any], method: dict[str, Any]
+) -> str:
+    """createHandle: `(bytes, size, outHandle*) -> rc` -> Ctx.
+
+    Generated Swift signature:
+        public func <name>(request: Request) throws -> OutputHandle
+    """
+    name = modality["name"]
+    enum_ref = f"{name}GeneratedProtoABI"
+    swift = method["swift_name"]
+    request_proto = method["request"]
+    out_handle = method.get("output_handle", "rac_handle_t")
+    is_static = bool(method.get("static"))
+    vis = visibility(method)
+    keyword = f"{vis} static func" if is_static else f"{vis} func"
+
+    error_code = method.get("error_code", "processingFailed")
+    error_category = method.get("error_category", "internal")
+    error_prefix = method.get("error_message_prefix", f"{swift} failed")
+
+    first = first_arg_clause(method, request_proto)
+    request_var = first_arg_name(method)
+
+    head = (
+        f"    {keyword} {swift}({first}) throws -> {out_handle} {{"
+    )
+    body = f"""
+        let symbol = try NativeProtoABI.require(
+            {enum_ref}.{swift},
+            named: {enum_ref}.{swift}Name
+        )
+        var newHandle: {out_handle}?
+        let status = try NativeProtoABI.withSerializedBytes({request_var}) {{ bytes, size in
+            symbol(bytes, size, &newHandle)
+        }}
+        guard status == RAC_SUCCESS, let newHandle else {{
+            throw SDKException(code: .{error_code}, message: "{error_prefix}: \\(status)", category: .{error_category})
+        }}
+        return newHandle
+    }}"""
+
+    return head + body
+
+
+def render_invoke_out_only_method(
+    modality: dict[str, Any], method: dict[str, Any]
+) -> str:
+    """invokeOutOnly: `(outBuffer*) -> rc` -> Response. No context, no request.
+
+    Generated Swift signature:
+        public func <name>() throws -> Response
+    """
+    name = modality["name"]
+    enum_ref = f"{name}GeneratedProtoABI"
+    swift = method["swift_name"]
+    response_proto = method["response"]
+    is_static = bool(method.get("static"))
+    vis = visibility(method)
+    keyword = f"{vis} static func" if is_static else f"{vis} func"
+
+    head = (
+        f"    {keyword} {swift}() throws -> {response_proto} {{"
+    )
+    body = f"""
+        let symbol = try NativeProtoABI.require(
+            {enum_ref}.{swift},
+            named: {enum_ref}.{swift}Name
+        )
+        var outBuffer = rac_proto_buffer_t()
+        defer {{ NativeProtoABI.free(&outBuffer) }}
+        let status = symbol(&outBuffer)
+        guard status == RAC_SUCCESS else {{
+            let message = outBuffer.error_message.map {{ String(cString: $0) }}
+                ?? "Native proto request failed: \\({enum_ref}.{swift}Name) rc=\\(status)"
+            throw SDKException(code: .processingFailed, message: message, category: .internal)
+        }}
+        return try NativeProtoABI.decode({response_proto}.self, from: outBuffer)
+    }}"""
+
+    return head + body
+
+
+# ----------------------------------------------------------------------------
 # Top-level rendering per modality
 
 
@@ -403,29 +651,35 @@ def render_modality_methods(modality: dict[str, Any]) -> str:
     if not methods:
         return ""
 
+    def dispatch(method: dict[str, Any]) -> str:
+        kind = method["kind"]
+        if kind == "invoke":
+            return render_invoke_method(modality, method)
+        if kind == "stream":
+            return render_stream_method(modality, method)
+        if kind == "getWithContext":
+            return render_get_with_context_method(modality, method)
+        if kind == "voidCall":
+            return render_void_call_method(modality, method)
+        if kind == "createHandle":
+            return render_create_handle_method(modality, method)
+        if kind == "invokeOutOnly":
+            return render_invoke_out_only_method(modality, method)
+        raise ValueError(f"unsupported kind: {kind} for {method.get('swift_name')!r}")
+
     if extension == "":
         # File-level free functions (RAGFreeFunctions).
         free_funcs: list[str] = []
         for method in methods:
-            if method["kind"] == "invoke":
-                rendered = render_invoke_method(modality, method)
-                # The free-function template already emits without leading
-                # indentation; render_invoke_method internally dispatches to
-                # _render_optional_freefunc for the one free-func today.
-                # For any other free-func, strip leading 4 spaces.
-                if rendered.startswith("    "):
-                    rendered = "\n".join(
-                        line[4:] if line.startswith("    ") else line
-                        for line in rendered.splitlines()
-                    )
-                free_funcs.append(rendered)
-            elif method["kind"] == "stream":  # pragma: no cover - none today
-                rendered = render_stream_method(modality, method)
+            rendered = dispatch(method)
+            # Strip the leading 4-space indentation that the extension renderers
+            # emit so the free-function reads at file scope.
+            if rendered.startswith("    "):
                 rendered = "\n".join(
                     line[4:] if line.startswith("    ") else line
                     for line in rendered.splitlines()
                 )
-                free_funcs.append(rendered)
+            free_funcs.append(rendered)
 
         out_lines: list[str] = []
         out_lines.append(f"// MARK: - {name}")
@@ -437,12 +691,7 @@ def render_modality_methods(modality: dict[str, Any]) -> str:
     # Emit directly into the real `extension CppBridge.<Modality>`. The hand-
     # written `+ModalityProtoABI.swift` has dropped its corresponding method
     # bodies, so there is no longer a duplicate-declaration risk.
-    rendered_methods: list[str] = []
-    for method in methods:
-        if method["kind"] == "invoke":
-            rendered_methods.append(render_invoke_method(modality, method))
-        elif method["kind"] == "stream":
-            rendered_methods.append(render_stream_method(modality, method))
+    rendered_methods: list[str] = [dispatch(method) for method in methods]
 
     out_lines = [
         f"// MARK: - {name}",
