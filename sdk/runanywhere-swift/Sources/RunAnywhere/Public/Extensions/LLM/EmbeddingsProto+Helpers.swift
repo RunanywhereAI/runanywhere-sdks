@@ -4,52 +4,13 @@
 //
 //  Ergonomic helpers for canonical Embeddings proto types.
 //
+//  defaults() / validate() factories live in
+//  Generated/RAConvenience.swift, emitted by
+//  idl/codegen/generate_swift_convenience.py from the rac_default /
+//  rac_required / rac_min annotations in idl/embeddings_options.proto.
+//
 
 import Foundation
-
-// MARK: - RAEmbeddingsConfiguration
-
-extension RAEmbeddingsConfiguration {
-    public static func defaults(
-        modelId: String,
-        embeddingDimension: Int32 = 384,
-        maxSequenceLength: Int32 = 512,
-        normalize: Bool = true
-    ) -> RAEmbeddingsConfiguration {
-        var c = RAEmbeddingsConfiguration()
-        c.modelID = modelId
-        c.embeddingDimension = embeddingDimension
-        c.maxSequenceLength = maxSequenceLength
-        c.normalize = normalize
-        return c
-    }
-
-    public func validate() throws {
-        guard !modelID.isEmpty else {
-            throw SDKException.validationFailed("Embeddings modelID is empty")
-        }
-        guard embeddingDimension > 0 else {
-            throw SDKException.validationFailed(
-                "Embedding dimension must be > 0 (got \(embeddingDimension))"
-            )
-        }
-        guard maxSequenceLength > 0 else {
-            throw SDKException.validationFailed(
-                "Max sequence length must be > 0 (got \(maxSequenceLength))"
-            )
-        }
-    }
-}
-
-// MARK: - RAEmbeddingsOptions
-
-extension RAEmbeddingsOptions {
-    public static func defaults(normalize: Bool = true) -> RAEmbeddingsOptions {
-        var o = RAEmbeddingsOptions()
-        o.normalize = normalize
-        return o
-    }
-}
 
 // MARK: - RAEmbeddingVector
 

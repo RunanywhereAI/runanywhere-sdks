@@ -10,10 +10,9 @@
 //   - .analyticsKey             (rac_analytics_key)
 //   - .wireString               (rac_wire_string)
 //   - .from(wireString:)        (reverse of rac_wire_string)
-//
-// FieldOptions-driven defaults() / validate() helpers will be added as
-// individual *Options messages adopt rac_default / rac_required / rac_min / rac_max
-// (Phase 4 of the Swift simplification plan, P4-T4..T9).
+//   - .defaults()               (rac_default)
+//   - .validate()               (rac_required / rac_min / rac_max /
+//                                rac_min_float / rac_max_float)
 
 import Foundation
 
@@ -178,6 +177,128 @@ extension RAArchiveStructure {
     }
 }
 
+extension RAEmbeddingsConfiguration {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RAEmbeddingsConfiguration {
+        var r = RAEmbeddingsConfiguration()
+        r.embeddingDimension = 384
+        r.maxSequenceLength = 512
+        r.normalize = true
+        return r
+    }
+}
+
+extension RAEmbeddingsConfiguration {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if modelID.isEmpty {
+            throw SDKException(
+                code: .invalidArgument,
+                message: "model_id is required",
+                category: .validation
+            )
+        }
+        if embeddingDimension < 1 {
+            throw SDKException(
+                code: .invalidArgument,
+                message: "embedding_dimension must be in >= 1 (got \(embeddingDimension))",
+                category: .validation
+            )
+        }
+        if maxSequenceLength < 1 {
+            throw SDKException(
+                code: .invalidArgument,
+                message: "max_sequence_length must be in >= 1 (got \(maxSequenceLength))",
+                category: .validation
+            )
+        }
+    }
+}
+
+extension RAEmbeddingsOptions {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RAEmbeddingsOptions {
+        var r = RAEmbeddingsOptions()
+        r.normalize = true
+        return r
+    }
+}
+
+extension RAVADConfiguration {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RAVADConfiguration {
+        var r = RAVADConfiguration()
+        r.sampleRate = 16000
+        r.frameLengthMs = 100
+        r.threshold = 0.015
+        return r
+    }
+}
+
+extension RAVADConfiguration {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if sampleRate < 1 || sampleRate > 48000 {
+            throw SDKException(
+                code: .invalidArgument,
+                message: "sample_rate must be in 1...48000 (got \(sampleRate))",
+                category: .validation
+            )
+        }
+        if frameLengthMs < 1 || frameLengthMs > 1000 {
+            throw SDKException(
+                code: .invalidArgument,
+                message: "frame_length_ms must be in 1...1000 (got \(frameLengthMs))",
+                category: .validation
+            )
+        }
+        if threshold < 0.0 || threshold > 1.0 {
+            throw SDKException(
+                code: .invalidArgument,
+                message: "threshold must be in 0.0...1.0 (got \(threshold))",
+                category: .validation
+            )
+        }
+    }
+}
+
+extension RARAGConfiguration {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RARAGConfiguration {
+        var r = RARAGConfiguration()
+        r.embeddingDimension = 384
+        r.topK = 5
+        r.similarityThreshold = 0.7
+        r.chunkSize = 512
+        r.chunkOverlap = 64
+        return r
+    }
+}
+
+extension RARAGConfiguration {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if similarityThreshold < 0.0 || similarityThreshold > 1.0 {
+            throw SDKException(
+                code: .invalidArgument,
+                message: "similarity_threshold must be in 0.0...1.0 (got \(similarityThreshold))",
+                category: .validation
+            )
+        }
+    }
+}
+
+extension RARAGQueryOptions {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RARAGQueryOptions {
+        var r = RARAGQueryOptions()
+        r.maxTokens = 512
+        r.temperature = 0.7
+        r.topP = 1.0
+        return r
+    }
+}
+
 extension RASTTLanguage {
     /// Generated from `(runanywhere.v1.rac_wire_string)` annotations in idl/.
     public var wireString: String {
@@ -220,5 +341,70 @@ extension RASTTLanguage {
         case "hi": return .hi
         default: return nil
         }
+    }
+}
+
+extension RASTTConfiguration {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RASTTConfiguration {
+        var r = RASTTConfiguration()
+        r.language = .en
+        r.sampleRate = 16000
+        r.enablePunctuation = true
+        r.enableWordTimestamps = true
+        return r
+    }
+}
+
+extension RASTTConfiguration {
+    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.
+    public func validate() throws {
+        if sampleRate < 8000 || sampleRate > 48000 {
+            throw SDKException(
+                code: .invalidArgument,
+                message: "sample_rate must be in 8000...48000 (got \(sampleRate))",
+                category: .validation
+            )
+        }
+    }
+}
+
+extension RASTTOptions {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RASTTOptions {
+        var r = RASTTOptions()
+        r.language = .en
+        r.enablePunctuation = true
+        r.enableWordTimestamps = true
+        return r
+    }
+}
+
+extension RATTSConfiguration {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RATTSConfiguration {
+        var r = RATTSConfiguration()
+        r.voice = "default"
+        r.languageCode = "en-US"
+        r.speakingRate = 1.0
+        r.pitch = 1.0
+        r.volume = 1.0
+        r.sampleRate = 22050
+        r.enableNeuralVoice = true
+        return r
+    }
+}
+
+extension RATTSOptions {
+    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.
+    public static func defaults() -> RATTSOptions {
+        var r = RATTSOptions()
+        r.languageCode = "en-US"
+        r.speakingRate = 1.0
+        r.pitch = 1.0
+        r.volume = 1.0
+        r.audioFormat = .pcm
+        r.sampleRate = 22050
+        return r
     }
 }

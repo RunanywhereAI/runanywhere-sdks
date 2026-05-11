@@ -57,6 +57,7 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "model_types.proto";
+import "rac_options.proto";
 
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
@@ -106,29 +107,29 @@ message TTSConfiguration {
 
     // Voice identifier to use for synthesis. For platform engines this is the
     // engine-specific voice id (e.g. "com.apple.ttsbundle.siri_female_en-US_compact").
-    string             voice               = 2;
+    string             voice               = 2 [(runanywhere.v1.rac_default) = "default"];
 
     // Language for synthesis (BCP-47, e.g. "en-US").
-    string             language_code       = 3;
+    string             language_code       = 3 [(runanywhere.v1.rac_default) = "en-US"];
 
     // Speaking rate (0.5 – 2.0; 1.0 is normal).
-    float              speaking_rate       = 4;
+    float              speaking_rate       = 4 [(runanywhere.v1.rac_default) = "1.0"];
 
     // Speech pitch (0.5 – 2.0; 1.0 is normal).
-    float              pitch               = 5;
+    float              pitch               = 5 [(runanywhere.v1.rac_default) = "1.0"];
 
     // Speech volume (0.0 – 1.0).
-    float              volume              = 6;
+    float              volume              = 6 [(runanywhere.v1.rac_default) = "1.0"];
 
     // Output audio format.
     runanywhere.v1.AudioFormat audio_format = 7;
 
     // Sample rate for output audio in Hz. 0 = engine default
     // (RAC_TTS_DEFAULT_SAMPLE_RATE = 22050).
-    int32              sample_rate         = 8;
+    int32              sample_rate         = 8 [(runanywhere.v1.rac_default) = "22050"];
 
     // Whether to use neural / premium voice if available.
-    bool               enable_neural_voice = 9;
+    bool               enable_neural_voice = 9 [(runanywhere.v1.rac_default) = "true"];
 
     // Whether to enable SSML markup support.
     bool               enable_ssml         = 10;
@@ -153,19 +154,19 @@ message TTSOptions {
     string             voice               = 1;
 
     // Language override (BCP-47). Empty = use component default.
-    string             language_code       = 2;
+    string             language_code       = 2 [(runanywhere.v1.rac_default) = "en-US"];
 
     // Speech rate (0.0 – 2.0; 1.0 is normal). Note Swift/Kotlin use the name
     // `rate`, Dart uses `rate`, RN uses `rate`. C ABI field is `rate`. We
     // canonicalize on `speaking_rate` to match TTSConfiguration; bindings
     // alias to `rate` where appropriate.
-    float              speaking_rate       = 3;
+    float              speaking_rate       = 3 [(runanywhere.v1.rac_default) = "1.0"];
 
     // Speech pitch (0.5 – 2.0; 1.0 is normal).
-    float              pitch               = 4;
+    float              pitch               = 4 [(runanywhere.v1.rac_default) = "1.0"];
 
     // Speech volume (0.0 – 1.0).
-    float              volume              = 5;
+    float              volume              = 5 [(runanywhere.v1.rac_default) = "1.0"];
 
     // Whether the input contains SSML markup. C ABI: `use_ssml`, Swift:
     // `useSSML`, Kotlin: `useSSML`, Dart: `useSSML`. Canonicalized to
@@ -173,11 +174,11 @@ message TTSOptions {
     bool               enable_ssml         = 6;
 
     // Output audio format.
-    runanywhere.v1.AudioFormat audio_format = 7;
+    runanywhere.v1.AudioFormat audio_format = 7 [(runanywhere.v1.rac_default) = "AUDIO_FORMAT_PCM"];
 
     // Output sample rate override in Hz. 0 = component/default sample rate.
     // Present in rac_tts_options_t and several SDK option structs.
-    int32              sample_rate         = 8;
+    int32              sample_rate         = 8 [(runanywhere.v1.rac_default) = "22050"];
 
     // Speaker index for multi-speaker voices. -1/0 = backend default
     // depending on model convention.

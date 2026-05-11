@@ -26,9 +26,13 @@
 //     rac_required     (50002, bool)   — when true, validate() rejects the
 //                                         field's proto3-zero value.
 //     rac_min          (50004, int32)  — inclusive numeric minimum used by
-//                                         validate() for numeric fields.
+//                                         validate() for integer fields.
 //     rac_max          (50005, int32)  — inclusive numeric maximum used by
-//                                         validate() for numeric fields.
+//                                         validate() for integer fields.
+//     rac_min_float    (50006, double) — inclusive numeric minimum used by
+//                                         validate() for float/double fields.
+//     rac_max_float    (50007, double) — inclusive numeric maximum used by
+//                                         validate() for float/double fields.
 //
 //   EnumValueOptions extensions (annotate individual enum constants):
 //     rac_display_name (50010, string) — human-readable label for UI / docs.
@@ -45,7 +49,7 @@
 //   50000–99999 is Google's documented field-number range for internal /
 //   organization-private extensions (extensions not registered in the
 //   protobuf-global extension registry). Numbers 50001–50012 are reserved
-//   here for RunAnywhere; gaps (50003, 50006-50009) are intentional and
+//   here for RunAnywhere; gaps (50003, 50008-50009) are intentional and
 //   left open for forward extension (e.g. rac_pattern, rac_alias, etc.).
 //
 // USAGE
@@ -191,7 +195,7 @@ extension SwiftProtobuf.Google_Protobuf_FieldOptions {
     clearExtensionValue(ext: RAExtensions_rac_required)
   }
 
-  /// Inclusive numeric minimum used by validate() for numeric fields.
+  /// Inclusive numeric minimum used by validate() for integer fields.
   public var RAracMin: Int32 {
     get {return getExtensionValue(ext: RAExtensions_rac_min) ?? 0}
     set {setExtensionValue(ext: RAExtensions_rac_min, value: newValue)}
@@ -207,7 +211,7 @@ extension SwiftProtobuf.Google_Protobuf_FieldOptions {
     clearExtensionValue(ext: RAExtensions_rac_min)
   }
 
-  /// Inclusive numeric maximum used by validate() for numeric fields.
+  /// Inclusive numeric maximum used by validate() for integer fields.
   public var RAracMax: Int32 {
     get {return getExtensionValue(ext: RAExtensions_rac_max) ?? 0}
     set {setExtensionValue(ext: RAExtensions_rac_max, value: newValue)}
@@ -223,6 +227,38 @@ extension SwiftProtobuf.Google_Protobuf_FieldOptions {
     clearExtensionValue(ext: RAExtensions_rac_max)
   }
 
+  /// Inclusive numeric minimum used by validate() for float/double fields.
+  public var RAracMinFloat: Double {
+    get {return getExtensionValue(ext: RAExtensions_rac_min_float) ?? 0}
+    set {setExtensionValue(ext: RAExtensions_rac_min_float, value: newValue)}
+  }
+  /// Returns true if extension `RAExtensions_rac_min_float`
+  /// has been explicitly set.
+  public var hasRAracMinFloat: Bool {
+    return hasExtensionValue(ext: RAExtensions_rac_min_float)
+  }
+  /// Clears the value of extension `RAExtensions_rac_min_float`.
+  /// Subsequent reads from it will return its default value.
+  public mutating func clearRAracMinFloat() {
+    clearExtensionValue(ext: RAExtensions_rac_min_float)
+  }
+
+  /// Inclusive numeric maximum used by validate() for float/double fields.
+  public var RAracMaxFloat: Double {
+    get {return getExtensionValue(ext: RAExtensions_rac_max_float) ?? 0}
+    set {setExtensionValue(ext: RAExtensions_rac_max_float, value: newValue)}
+  }
+  /// Returns true if extension `RAExtensions_rac_max_float`
+  /// has been explicitly set.
+  public var hasRAracMaxFloat: Bool {
+    return hasExtensionValue(ext: RAExtensions_rac_max_float)
+  }
+  /// Clears the value of extension `RAExtensions_rac_max_float`.
+  /// Subsequent reads from it will return its default value.
+  public mutating func clearRAracMaxFloat() {
+    clearExtensionValue(ext: RAExtensions_rac_max_float)
+  }
+
 }
 
 // MARK: - File's ExtensionMap: RARacOptions_Extensions
@@ -236,6 +272,8 @@ public let RARacOptions_Extensions: SwiftProtobuf.SimpleExtensionMap = [
   RAExtensions_rac_required,
   RAExtensions_rac_min,
   RAExtensions_rac_max,
+  RAExtensions_rac_min_float,
+  RAExtensions_rac_max_float,
   RAExtensions_rac_display_name,
   RAExtensions_rac_analytics_key,
   RAExtensions_rac_wire_string
@@ -259,16 +297,28 @@ public let RAExtensions_rac_required = SwiftProtobuf.MessageExtension<SwiftProto
   fieldName: "runanywhere.v1.rac_required"
 )
 
-/// Inclusive numeric minimum used by validate() for numeric fields.
+/// Inclusive numeric minimum used by validate() for integer fields.
 public let RAExtensions_rac_min = SwiftProtobuf.MessageExtension<SwiftProtobuf.OptionalExtensionField<SwiftProtobuf.ProtobufInt32>, SwiftProtobuf.Google_Protobuf_FieldOptions>(
   _protobuf_fieldNumber: 50004,
   fieldName: "runanywhere.v1.rac_min"
 )
 
-/// Inclusive numeric maximum used by validate() for numeric fields.
+/// Inclusive numeric maximum used by validate() for integer fields.
 public let RAExtensions_rac_max = SwiftProtobuf.MessageExtension<SwiftProtobuf.OptionalExtensionField<SwiftProtobuf.ProtobufInt32>, SwiftProtobuf.Google_Protobuf_FieldOptions>(
   _protobuf_fieldNumber: 50005,
   fieldName: "runanywhere.v1.rac_max"
+)
+
+/// Inclusive numeric minimum used by validate() for float/double fields.
+public let RAExtensions_rac_min_float = SwiftProtobuf.MessageExtension<SwiftProtobuf.OptionalExtensionField<SwiftProtobuf.ProtobufDouble>, SwiftProtobuf.Google_Protobuf_FieldOptions>(
+  _protobuf_fieldNumber: 50006,
+  fieldName: "runanywhere.v1.rac_min_float"
+)
+
+/// Inclusive numeric maximum used by validate() for float/double fields.
+public let RAExtensions_rac_max_float = SwiftProtobuf.MessageExtension<SwiftProtobuf.OptionalExtensionField<SwiftProtobuf.ProtobufDouble>, SwiftProtobuf.Google_Protobuf_FieldOptions>(
+  _protobuf_fieldNumber: 50007,
+  fieldName: "runanywhere.v1.rac_max_float"
 )
 
 /// Human-readable label for UI / documentation surfaces.

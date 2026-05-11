@@ -4,8 +4,12 @@
 //
 //  Ergonomic helpers for canonical STT proto types.
 //
+//  defaults() / validate() factories live in
+//  Generated/RAConvenience.swift, emitted by
+//  idl/codegen/generate_swift_convenience.py from the rac_default /
+//  rac_min / rac_max annotations in idl/stt_options.proto.
+//
 
-import CRACommons
 import Foundation
 
 // MARK: - RASTTLanguage
@@ -44,40 +48,6 @@ extension RASTTLanguage {
     /// or unrecognized values. Backed by `rac_wire_string` annotations in
     /// idl/stt_options.proto via the generated `wireString` accessor.
     public var bcp47Code: String { wireString }
-}
-
-// MARK: - RASTTConfiguration
-
-extension RASTTConfiguration {
-    /// Canonical defaults sourced from C++ commons (P2-T14).
-    public static func defaults() -> RASTTConfiguration {
-        var outBuffer = rac_proto_buffer_t()
-        defer { rac_proto_buffer_free(&outBuffer) }
-        guard rac_stt_configuration_defaults_proto(&outBuffer) == RAC_SUCCESS,
-              let data = outBuffer.data, outBuffer.size > 0,
-              let proto = try? RASTTConfiguration(
-                serializedBytes: Data(bytes: data, count: outBuffer.size)
-              )
-        else {
-            return RASTTConfiguration()
-        }
-        return proto
-    }
-}
-
-// MARK: - RASTTOptions
-
-extension RASTTOptions {
-    public static func defaults(language: RASTTLanguage = .en) -> RASTTOptions {
-        var o = RASTTOptions()
-        o.language = language
-        o.enablePunctuation = true
-        o.enableDiarization = false
-        o.enableWordTimestamps = true
-        o.maxSpeakers = 0
-        o.beamSize = 0
-        return o
-    }
 }
 
 // MARK: - RASTTOutput

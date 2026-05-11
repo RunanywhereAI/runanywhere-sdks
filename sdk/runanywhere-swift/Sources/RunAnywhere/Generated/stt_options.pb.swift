@@ -316,7 +316,6 @@ public struct RASTTConfiguration: Sendable {
 
   public var language: RASTTLanguage = .unspecified
 
-  /// Hz; default 16000
   public var sampleRate: Int32 = 0
 
   public var enableVad: Bool = false

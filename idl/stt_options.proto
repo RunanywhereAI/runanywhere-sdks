@@ -144,18 +144,22 @@ enum STTAudioEncoding {
 // ---------------------------------------------------------------------------
 message STTConfiguration {
     string      model_id     = 1;
-    STTLanguage language     = 2;
-    int32       sample_rate  = 3;   // Hz; default 16000
+    STTLanguage language     = 2 [(runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
+    int32       sample_rate  = 3 [
+        (runanywhere.v1.rac_default) = "16000",
+        (runanywhere.v1.rac_min) = 8000,
+        (runanywhere.v1.rac_max) = 48000
+    ];
     bool        enable_vad   = 4;
     AudioFormat audio_format = 5;
 
     // C ABI / legacy SDK config-level transcription defaults. These may be
     // mirrored into STTOptions by adapters for per-call overrides.
-    bool        enable_punctuation      = 6;
+    bool        enable_punctuation      = 6 [(runanywhere.v1.rac_default) = "true"];
     bool        enable_diarization      = 7;
     repeated string vocabulary_list     = 8;
     int32       max_alternatives        = 9;   // 0 = backend/default
-    bool        enable_word_timestamps  = 10;
+    bool        enable_word_timestamps  = 10 [(runanywhere.v1.rac_default) = "true"];
 
     // Preferred framework for the component. Absent = auto.
     optional InferenceFramework preferred_framework = 11;
@@ -182,12 +186,12 @@ message STTConfiguration {
 // STT_LANGUAGE_AUTO.
 // ---------------------------------------------------------------------------
 message STTOptions {
-    STTLanguage     language               = 1;
-    bool            enable_punctuation     = 2;
+    STTLanguage     language               = 1 [(runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
+    bool            enable_punctuation     = 2 [(runanywhere.v1.rac_default) = "true"];
     bool            enable_diarization     = 3;
     int32           max_speakers           = 4;   // 0 = auto / unset
     repeated string vocabulary_list        = 5;   // Custom vocabulary bias
-    bool            enable_word_timestamps = 6;
+    bool            enable_word_timestamps = 6 [(runanywhere.v1.rac_default) = "true"];
     int32           beam_size              = 7;   // 0 = backend default
 
     // Free-form BCP-47 language tag. When set, consumers should prefer this

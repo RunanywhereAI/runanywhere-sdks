@@ -4,51 +4,13 @@
 //
 //  Ergonomic helpers for canonical TTS proto types.
 //
+//  defaults() / validate() factories live in
+//  Generated/RAConvenience.swift, emitted by
+//  idl/codegen/generate_swift_convenience.py from the rac_default
+//  annotations in idl/tts_options.proto.
+//
 
-import CRACommons
 import Foundation
-
-// MARK: - RATTSConfiguration
-
-extension RATTSConfiguration {
-    /// Canonical defaults sourced from C++ commons (P2-T14).
-    public static func defaults(
-        modelId: String = "",
-        voice: String = "default",
-        languageCode: String = "en-US"
-    ) -> RATTSConfiguration {
-        var outBuffer = rac_proto_buffer_t()
-        defer { rac_proto_buffer_free(&outBuffer) }
-        guard rac_tts_configuration_defaults_proto(&outBuffer) == RAC_SUCCESS,
-              let data = outBuffer.data, outBuffer.size > 0,
-              var proto = try? RATTSConfiguration(
-                serializedBytes: Data(bytes: data, count: outBuffer.size)
-              )
-        else {
-            return RATTSConfiguration()
-        }
-        proto.modelID = modelId
-        proto.voice = voice
-        proto.languageCode = languageCode
-        return proto
-    }
-}
-
-// MARK: - RATTSOptions
-
-extension RATTSOptions {
-    public static func defaults() -> RATTSOptions {
-        var o = RATTSOptions()
-        o.languageCode = "en-US"
-        o.speakingRate = 1.0
-        o.pitch = 1.0
-        o.volume = 1.0
-        o.enableSsml = false
-        o.audioFormat = .pcm
-        o.sampleRate = 22_050
-        return o
-    }
-}
 
 // MARK: - RATTSOutput
 

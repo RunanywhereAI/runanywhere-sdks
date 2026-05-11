@@ -52,6 +52,7 @@ syntax = "proto3";
 package runanywhere.v1;
 
 import "model_types.proto";
+import "rac_options.proto";
 
 option cc_enable_arenas          = true;
 option java_multiple_files       = true;
@@ -82,20 +83,24 @@ message RAGConfiguration {
 
     // Embedding vector dimension — must match the embedding model.
     // Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
-    int32  embedding_dimension   = 3;
+    int32  embedding_dimension   = 3 [(runanywhere.v1.rac_default) = "384"];
 
     // Number of top chunks to retrieve per query.
-    int32  top_k                 = 4;
+    int32  top_k                 = 4 [(runanywhere.v1.rac_default) = "5"];
 
     // Minimum cosine similarity threshold (0.0–1.0). Chunks below this
     // score are discarded before being passed to the LLM as context.
-    float  similarity_threshold  = 5;
+    float  similarity_threshold  = 5 [
+        (runanywhere.v1.rac_default) = "0.7",
+        (runanywhere.v1.rac_min_float) = 0.0,
+        (runanywhere.v1.rac_max_float) = 1.0
+    ];
 
     // Tokens per chunk when splitting documents during ingestion.
-    int32  chunk_size            = 6;
+    int32  chunk_size            = 6 [(runanywhere.v1.rac_default) = "512"];
 
     // Overlap tokens between consecutive chunks. Must be < chunk_size.
-    int32  chunk_overlap         = 7;
+    int32  chunk_overlap         = 7 [(runanywhere.v1.rac_default) = "64"];
 
     // Maximum tokens of retrieved context passed to the LLM.
     int32  max_context_tokens    = 8;
@@ -161,13 +166,13 @@ message RAGQueryOptions {
     optional string system_prompt = 2;
 
     // Maximum tokens to generate in the answer.
-    int32  max_tokens            = 3;
+    int32  max_tokens            = 3 [(runanywhere.v1.rac_default) = "512"];
 
     // Sampling temperature. 0.0 = greedy, higher = more random.
-    float  temperature           = 4;
+    float  temperature           = 4 [(runanywhere.v1.rac_default) = "0.7"];
 
     // Nucleus (top-p) sampling parameter. 1.0 = disabled.
-    float  top_p                 = 5;
+    float  top_p                 = 5 [(runanywhere.v1.rac_default) = "1.0"];
 
     // Top-k sampling parameter. 0 = disabled.
     int32  top_k                 = 6;

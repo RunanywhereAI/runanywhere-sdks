@@ -48,11 +48,39 @@ RAC_DEFAULT_FIELD_NUM       = 50001
 RAC_REQUIRED_FIELD_NUM      = 50002
 RAC_MIN_FIELD_NUM           = 50004
 RAC_MAX_FIELD_NUM           = 50005
+RAC_MIN_FLOAT_FIELD_NUM     = 50006
+RAC_MAX_FLOAT_FIELD_NUM     = 50007
 RAC_DISPLAY_NAME_FIELD_NUM  = 50010
 RAC_ANALYTICS_KEY_FIELD_NUM = 50011
 RAC_WIRE_STRING_FIELD_NUM   = 50012
 
 SWIFT_PREFIX = "RA"
+
+# --- Proto wire type enums (mirror google/protobuf/descriptor.proto).
+TYPE_DOUBLE   = 1
+TYPE_FLOAT    = 2
+TYPE_INT64    = 3
+TYPE_UINT64   = 4
+TYPE_INT32    = 5
+TYPE_FIXED64  = 6
+TYPE_FIXED32  = 7
+TYPE_BOOL     = 8
+TYPE_STRING   = 9
+TYPE_MESSAGE  = 11
+TYPE_BYTES    = 12
+TYPE_UINT32   = 13
+TYPE_ENUM     = 14
+TYPE_SFIXED32 = 15
+TYPE_SFIXED64 = 16
+TYPE_SINT32   = 17
+TYPE_SINT64   = 18
+
+_INTEGER_TYPES = frozenset((
+    TYPE_INT32, TYPE_INT64, TYPE_UINT32, TYPE_UINT64,
+    TYPE_FIXED32, TYPE_FIXED64, TYPE_SFIXED32, TYPE_SFIXED64,
+    TYPE_SINT32, TYPE_SINT64,
+))
+_FLOAT_TYPES = frozenset((TYPE_DOUBLE, TYPE_FLOAT))
 
 
 def _camel_case_from_snake(s: str) -> str:
@@ -278,6 +306,36 @@ def _decode_int32_field(buf: bytes, field_num: int) -> int | None:
     return None
 
 
+def _decode_double_field(buf: bytes, field_num: int) -> float | None:
+    """Read a proto3 double (wire type 1 = fixed64) at `field_num`."""
+    import struct
+    # Rebuild a richer scanner since the shared one drops 64-bit payloads.
+    pos = 0
+    while pos < len(buf):
+        tag, pos = _read_varint(buf, pos)
+        wt = tag & 0x07
+        fn = tag >> 3
+        if wt == 1:
+            if fn == field_num:
+                return struct.unpack("<d", buf[pos:pos + 8])[0]
+            pos += 8
+        elif wt == 0:
+            _, pos = _read_varint(buf, pos)
+        elif wt == 2:
+            length, pos = _read_varint(buf, pos)
+            pos += length
+        elif wt == 5:
+            pos += 4
+        else:
+            pass
+    return None
+
+
+def _get_uninterpreted_double(opts, field_num: int) -> float | None:
+    raw = opts.SerializeToString()
+    return _decode_double_field(raw, field_num)
+
+
 # --- Descriptor-walking. ---------------------------------------------------
 
 def _collect_top_level_enums(file_desc: descriptor_pb2.FileDescriptorProto):
@@ -378,10 +436,241 @@ def _annotation_name(field_num: int) -> str:
         RAC_REQUIRED_FIELD_NUM:      "rac_required",
         RAC_MIN_FIELD_NUM:           "rac_min",
         RAC_MAX_FIELD_NUM:           "rac_max",
+        RAC_MIN_FLOAT_FIELD_NUM:     "rac_min_float",
+        RAC_MAX_FLOAT_FIELD_NUM:     "rac_max_float",
         RAC_DISPLAY_NAME_FIELD_NUM:  "rac_display_name",
         RAC_ANALYTICS_KEY_FIELD_NUM: "rac_analytics_key",
         RAC_WIRE_STRING_FIELD_NUM:   "rac_wire_string",
     }.get(field_num, f"unknown_{field_num}")
+
+
+# --- Message-level defaults() / validate() emitters. -----------------------
+
+def _proto_field_to_swift_name(field_name: str) -> str:
+    """Mirror swift-protobuf's struct-field name rule for proto fields.
+
+    Proto snake_case names map to lowerCamelCase via the same rules as enum
+    values (with first-word lowercase). Examples:
+      sample_rate                  -> sampleRate
+      enable_word_timestamps       -> enableWordTimestamps
+      embedding_dimension          -> embeddingDimension
+      max_sequence_length          -> maxSequenceLength
+      max_tokens                   -> maxTokens
+      model_id                     -> modelID    (swift-protobuf capitalizes ID)
+    swift-protobuf's special-case "id" -> "ID" suffix is handled by detecting
+    when the trailing word is exactly "id" and uppercasing it after camel
+    conversion. Other common acronyms used by RA protos (json, url, uri, …)
+    do NOT get this treatment by swift-protobuf and stay lowercase, so we
+    only special-case `id` here.
+    """
+    base = _camel_case_from_snake(field_name)
+    # swift-protobuf upper-cases trailing "Id" -> "ID".
+    if base.endswith("Id") and not base.endswith("UUID") and not base.endswith("Uid"):
+        return base[:-2] + "ID"
+    return base
+
+
+def _swift_default_literal(field, default_str: str, enum_swift_case: dict[str, str]) -> str | None:
+    """Translate the string form of rac_default into a Swift literal for the
+    given field. Returns None when the type isn't supported (skip emission)."""
+    t = field.type
+    if t == TYPE_STRING:
+        safe = default_str.replace("\\", "\\\\").replace("\"", "\\\"")
+        return f'"{safe}"'
+    if t == TYPE_BOOL:
+        s = default_str.strip().lower()
+        if s in ("true", "1"):
+            return "true"
+        if s in ("false", "0"):
+            return "false"
+        return None
+    if t in _INTEGER_TYPES:
+        try:
+            return str(int(default_str))
+        except ValueError:
+            return None
+    if t in _FLOAT_TYPES:
+        try:
+            v = float(default_str)
+        except ValueError:
+            return None
+        # Emit with explicit decimal so Swift sees a Float/Double literal.
+        text = repr(v)
+        if "." not in text and "e" not in text and "E" not in text:
+            text += ".0"
+        return text
+    if t == TYPE_ENUM:
+        # Resolve enum constant proto name -> swift case name.
+        # The annotation string MUST be the proto constant (e.g. "STT_LANGUAGE_EN").
+        enum_type = field.type_name.split(".")[-1]
+        full_key = f"{enum_type}.{default_str.strip()}"
+        return enum_swift_case.get(full_key)
+    return None
+
+
+def _collect_top_level_messages(file_desc: descriptor_pb2.FileDescriptorProto):
+    return [(m.name, m) for m in file_desc.message_type]
+
+
+def _build_enum_swift_case_map(fds: descriptor_pb2.FileDescriptorSet) -> dict[str, str]:
+    """Return a dict mapping "EnumName.ENUM_CONSTANT_NAME" -> ".swiftCase".
+
+    Walks every enum (top-level + nested) in every file with package
+    runanywhere.v1 so the message-default emitter can translate
+    `rac_default = "STT_LANGUAGE_EN"` into `.en` for an enum-typed field."""
+    out: dict[str, str] = {}
+    for file_desc in fds.file:
+        if file_desc.package != "runanywhere.v1":
+            continue
+        def _walk(enums, _prefix=""):
+            for e in enums:
+                for v in e.value:
+                    out[f"{e.name}.{v.name}"] = "." + _swift_case_name(e.name, v.name)
+        _walk(file_desc.enum_type)
+        for msg in file_desc.message_type:
+            _walk(msg.enum_type)
+    return out
+
+
+def _emit_message_defaults_factory(
+    proto_msg_name: str,
+    msg_desc: descriptor_pb2.DescriptorProto,
+    enum_swift_case: dict[str, str],
+) -> str | None:
+    """Emit `public static func defaults() -> RA<MessageName>` when at least
+    one field carries `rac_default`. Returns None when the message has no
+    relevant annotations."""
+    assignments: list[tuple[str, str]] = []
+    for field in msg_desc.field:
+        if not field.HasField("options"):
+            continue
+        default_str = _get_uninterpreted_string(field.options, RAC_DEFAULT_FIELD_NUM)
+        if default_str is None:
+            continue
+        literal = _swift_default_literal(field, default_str, enum_swift_case)
+        if literal is None:
+            continue
+        swift_field = _proto_field_to_swift_name(field.name)
+        assignments.append((swift_field, literal))
+
+    if not assignments:
+        return None
+
+    swift_type = f"{SWIFT_PREFIX}{proto_msg_name}"
+    lines: list[str] = []
+    lines.append(f"extension {swift_type} {{")
+    lines.append(f"    /// Generated from `(runanywhere.v1.rac_default)` annotations in idl/.")
+    lines.append(f"    public static func defaults() -> {swift_type} {{")
+    lines.append(f"        var r = {swift_type}()")
+    for swift_field, literal in assignments:
+        lines.append(f"        r.{swift_field} = {literal}")
+    lines.append("        return r")
+    lines.append("    }")
+    lines.append("}")
+    return "\n".join(lines)
+
+
+def _emit_message_validate(
+    proto_msg_name: str,
+    msg_desc: descriptor_pb2.DescriptorProto,
+) -> str | None:
+    """Emit `public func validate() throws` when at least one field carries
+    `rac_required`, `rac_min`, `rac_max`, `rac_min_float`, or `rac_max_float`.
+    Returns None when no relevant annotations are present."""
+    checks: list[str] = []
+    for field in msg_desc.field:
+        if not field.HasField("options"):
+            continue
+        swift_field = _proto_field_to_swift_name(field.name)
+
+        is_required = _get_uninterpreted_bool(field.options, RAC_REQUIRED_FIELD_NUM)
+        if is_required:
+            t = field.type
+            if t == TYPE_STRING:
+                checks.append(f"        if {swift_field}.isEmpty {{")
+                checks.append(f"            throw SDKException(")
+                checks.append(f"                code: .invalidArgument,")
+                checks.append(f'                message: "{field.name} is required",')
+                checks.append(f"                category: .validation")
+                checks.append(f"            )")
+                checks.append(f"        }}")
+            elif t in _INTEGER_TYPES:
+                checks.append(f"        if {swift_field} == 0 {{")
+                checks.append(f"            throw SDKException(")
+                checks.append(f"                code: .invalidArgument,")
+                checks.append(f'                message: "{field.name} is required",')
+                checks.append(f"                category: .validation")
+                checks.append(f"            )")
+                checks.append(f"        }}")
+            elif t in _FLOAT_TYPES:
+                checks.append(f"        if {swift_field} == 0 {{")
+                checks.append(f"            throw SDKException(")
+                checks.append(f"                code: .invalidArgument,")
+                checks.append(f'                message: "{field.name} is required",')
+                checks.append(f"                category: .validation")
+                checks.append(f"            )")
+                checks.append(f"        }}")
+
+        min_int = _get_uninterpreted_int32(field.options, RAC_MIN_FIELD_NUM)
+        max_int = _get_uninterpreted_int32(field.options, RAC_MAX_FIELD_NUM)
+        if (min_int is not None or max_int is not None) and field.type in _INTEGER_TYPES:
+            parts: list[str] = []
+            if min_int is not None:
+                parts.append(f"{swift_field} < {min_int}")
+            if max_int is not None:
+                parts.append(f"{swift_field} > {max_int}")
+            cond = " || ".join(parts)
+            range_desc = ""
+            if min_int is not None and max_int is not None:
+                range_desc = f"{min_int}...{max_int}"
+            elif min_int is not None:
+                range_desc = f">= {min_int}"
+            else:
+                range_desc = f"<= {max_int}"
+            checks.append(f"        if {cond} {{")
+            checks.append(f"            throw SDKException(")
+            checks.append(f"                code: .invalidArgument,")
+            checks.append(f'                message: "{field.name} must be in {range_desc} (got \\({swift_field}))",')
+            checks.append(f"                category: .validation")
+            checks.append(f"            )")
+            checks.append(f"        }}")
+
+        min_f = _get_uninterpreted_double(field.options, RAC_MIN_FLOAT_FIELD_NUM)
+        max_f = _get_uninterpreted_double(field.options, RAC_MAX_FLOAT_FIELD_NUM)
+        if (min_f is not None or max_f is not None) and field.type in _FLOAT_TYPES:
+            parts = []
+            if min_f is not None:
+                parts.append(f"{swift_field} < {min_f}")
+            if max_f is not None:
+                parts.append(f"{swift_field} > {max_f}")
+            cond = " || ".join(parts)
+            range_desc = ""
+            if min_f is not None and max_f is not None:
+                range_desc = f"{min_f}...{max_f}"
+            elif min_f is not None:
+                range_desc = f">= {min_f}"
+            else:
+                range_desc = f"<= {max_f}"
+            checks.append(f"        if {cond} {{")
+            checks.append(f"            throw SDKException(")
+            checks.append(f"                code: .invalidArgument,")
+            checks.append(f'                message: "{field.name} must be in {range_desc} (got \\({swift_field}))",')
+            checks.append(f"                category: .validation")
+            checks.append(f"            )")
+            checks.append(f"        }}")
+
+    if not checks:
+        return None
+
+    swift_type = f"{SWIFT_PREFIX}{proto_msg_name}"
+    lines: list[str] = []
+    lines.append(f"extension {swift_type} {{")
+    lines.append(f"    /// Generated from `(runanywhere.v1.rac_required / rac_min / rac_max / rac_min_float / rac_max_float)` annotations in idl/.")
+    lines.append(f"    public func validate() throws {{")
+    lines.extend(checks)
+    lines.append("    }")
+    lines.append("}")
+    return "\n".join(lines)
 
 
 # --- Top-level driver. -----------------------------------------------------
@@ -427,6 +716,10 @@ def main() -> int:
 
     blocks: list[str] = []
     annotated_enum_count = 0
+    annotated_message_defaults_count = 0
+    annotated_message_validate_count = 0
+
+    enum_swift_case = _build_enum_swift_case_map(fds)
 
     for file_desc in fds.file:
         # Skip protos we don't own (google/protobuf/descriptor.proto, etc.)
@@ -458,6 +751,22 @@ def main() -> int:
             if reverse_block is not None:
                 blocks.append(reverse_block)
 
+        # Phase E: per-message defaults() / validate() emitters from
+        # rac_default / rac_required / rac_min / rac_max / rac_min_float /
+        # rac_max_float field annotations.
+        for proto_msg_name, msg_desc in _collect_top_level_messages(file_desc):
+            defaults_block = _emit_message_defaults_factory(
+                proto_msg_name, msg_desc, enum_swift_case,
+            )
+            if defaults_block is not None:
+                blocks.append(defaults_block)
+                annotated_message_defaults_count += 1
+
+            validate_block = _emit_message_validate(proto_msg_name, msg_desc)
+            if validate_block is not None:
+                blocks.append(validate_block)
+                annotated_message_validate_count += 1
+
     header = [
         "// DO NOT EDIT.",
         "// swift-format-ignore-file",
@@ -471,10 +780,9 @@ def main() -> int:
         "//   - .analyticsKey             (rac_analytics_key)",
         "//   - .wireString               (rac_wire_string)",
         "//   - .from(wireString:)        (reverse of rac_wire_string)",
-        "//",
-        "// FieldOptions-driven defaults() / validate() helpers will be added as",
-        "// individual *Options messages adopt rac_default / rac_required / rac_min / rac_max",
-        "// (Phase 4 of the Swift simplification plan, P4-T4..T9).",
+        "//   - .defaults()               (rac_default)",
+        "//   - .validate()               (rac_required / rac_min / rac_max /",
+        "//                                rac_min_float / rac_max_float)",
         "",
         "import Foundation",
         "",
@@ -494,6 +802,8 @@ def main() -> int:
 
     print(f"✓ Swift convenience post-processor → {out_path}")
     print(f"  annotated enum-accessor blocks emitted: {annotated_enum_count}")
+    print(f"  message defaults() factories emitted: {annotated_message_defaults_count}")
+    print(f"  message validate() helpers emitted: {annotated_message_validate_count}")
     return 0
 
 
