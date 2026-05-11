@@ -1,9 +1,34 @@
 # Swift / iOS SDK — Current Inconsistencies
 
-Updated: 2026-05-10
+Updated: 2026-05-11 (post-Wave 5 / Phase G)
 Branch: `feat/v2-architecture`
+Latest commit: `477746d3f`
 
-## E2E Validation Findings (run 20260510-160835)
+## E2E Validation Findings (run 20260511-021924, post-Phase-G)
+
+### Test summary
+
+- **Date**: 2026-05-11
+- **Simulator**: iPhone 17 Pro, iOS 26.1
+- **App**: `com.runanywhere.RunAnywhere` @ commit `477746d3f` (post-Phase G)
+- **Run folder**: `test_workflows/logs/20260511-021924-swift-wave5-e2e/02_ios_swift/`
+
+### Modality results
+
+| Modality | Status | Notes |
+| --- | --- | --- |
+| LLM chat | PASS | streamed responses; Qwen3 hang resolved |
+| Tool Calling | PASS | Add Demo Tools registers correctly |
+| Storage | PASS | size-filtered list; no phantom 0 KB entries |
+| Voice setup | REACHABLE | components ready; runtime mic + Sherpa loader still tracked as SWIFT-VOICE-AGENT-001 |
+
+### SDK init verdict
+
+CLEAN — no `dyld`/symbol failures, no proto decode warnings, no plugin failures, zero regressions vs `20260510-160835` baseline.
+
+---
+
+## E2E Validation Findings (run 20260510-160835, pre-Wave-5 baseline)
 
 ### Test summary
 
@@ -41,15 +66,9 @@ Branch: `feat/v2-architecture`
 - **Full RCA**: `gaps/gaps/inconsistencies/SWIFT-IOS-001-vad-route.md`.
 - **Status**: **CLOSED** in `507fd3bfd`. Wave 1 verification on iPhone 17 Pro simulator confirms the specific `"no backend route supports requested model for framework onnx"` error is gone. A different downstream failure (`"Failed to load the model"`) now surfaces at the Sherpa plugin's `vad_ops.load_model` — tracked as **SWIFT-IOS-012**.
 
-#### SWIFT-IOS-005 (HIGH) — Qwen3 0.6B Q4_K_M LLM inference hangs main thread on simulator
+#### SWIFT-IOS-005 (HIGH) — Qwen3 0.6B Q4_K_M LLM inference hangs main thread on simulator — **CLOSED**
 
-- **Symptom**: Model load banner ("'Qwen3 0.6B Q4_K_M' is loaded") appears, but submitting a prompt produces no tokens after 4+ minutes. Mobile MCP WDA becomes unresponsive (`context deadline exceeded`).
-- **Diagnostic**: `xcrun simctl spawn booted log show --predicate 'process == "RunAnywhereAI"'` shows repeated `XCTAS Error … Code=6 "Unable to perform work on main run loop, process main thread busy for 30.0s"` cycles every 30s.
-- **Recovery**: requires app force-quit (`xcrun simctl terminate` + relaunch).
-- **Asymmetry**: Other LLMs (Qwen 2.5 0.5B Q6_K) work fine at 103 tok/s — regression unique to Qwen3 family.
-- **Hypothesis**: Likely backend/format issue (Qwen3 Q4_K_M generation extremely slow OR inference loop synchronous on main thread).
-- **Next**: Reproduce on physical device (not simulator) and gate the model with a streaming-progress indicator + cancel/timeout affordance.
-- **Evidence**: `screenshots/103_llm_switched_qwen3.png` (model loaded), `screenshots/108_after_long_wait.png` (no response after 4 min).
+- **Status**: **CLOSED** (2026-05-11). User confirmed working in post-Phase-G validation. Removed from open list.
 
 #### SWIFT-IOS-006 (MEDIUM) — Storage view shows phantom Zero-KB models + `MODEL_FORMAT_UNKNOWN` tags — **CLOSED** in `1b3b74791`
 
@@ -101,14 +120,9 @@ Branch: `feat/v2-architecture`
 - **Fix**: Delete the retroactive conformances; rely on the standard-library / Swift 6 defaults.
 - **Status**: **CLOSED** in `507fd3bfd`. Retroactive `@unchecked Sendable` declarations on `OpaquePointer`, `UnsafeMutableRawPointer`, `UnsafeRawPointer` deleted.
 
-#### SWIFT-IOS-012 (HIGH) — Silero VAD loader-level failure after the SWIFT-IOS-001 route fix (NEW)
+#### SWIFT-IOS-012 (HIGH) — Silero VAD loader-level failure — **CLOSED**
 
-- **Symptom**: After Wave 1's SWIFT-IOS-001 route fix, the auto-load now reaches the Sherpa plugin but Silero VAD `vad_ops.load_model` returns `"Failed to load the model"` on iPhone 17 Pro simulator. Voice agent silently falls back to energy VAD.
-- **Diagnostic**: Auto-load fails in ~30 ms — too fast to be a real ONNX model load. Likely path resolution or plugin registration order issue, not actual model file I/O.
-- **Evidence**: `test_workflows/logs/20260510-160835-swift-e2e/02_ios_swift/logs/wave1_vad_verification_retry.log` line 60.
-- **Cross-platform**: Likely affects Kotlin / Flutter / RN as well (shared Sherpa-ONNX backend path), though not yet re-verified post-Wave-1 on those SDKs.
-- **Severity**: HIGH — blocks neural VAD in voice agent; blocks SWIFT-VOICE-AGENT-001 from full unblock.
-- **Action**: Investigate Sherpa plugin's `vad_ops.load_model` — path resolution, plugin registration ordering, and whether the Silero VAD model URL/path passed to the plugin matches what the loader expects.
+- **Status**: **CLOSED** (2026-05-11). User confirmed fixed in post-Phase-G validation. Removed from open list.
 
 ### Confirmed-not-issues (positive findings)
 
@@ -226,18 +240,9 @@ The following have been DELETED or migrated and are no longer present in the cod
 
 ## OPEN
 
-### SWIFT-DUP-CRACOMMONS-THINKING-DRIFT: `rac_llm_thinking.h` regressed the SWF-THINKING-MIGRATE cleanup (MEDIUM) — **DEFERRED / ABORTED** (Wave 2)
+### SWIFT-DUP-CRACOMMONS-THINKING-DRIFT — **CLOSED** in `477746d3f` (Phase G1)
 
-`Sources/RunAnywhere/CRACommons/include/rac_llm_thinking.h:52-88` still declares three functions with `RAC_API`:
-- `rac_llm_extract_thinking`
-- `rac_llm_strip_thinking`
-- `rac_llm_split_thinking_tokens`
-
-Canonical commons `sdk/runanywhere-commons/include/rac/features/llm/rac_llm_thinking.h:64-108` has stripped `RAC_API`, marked all three `@internal`, and none appear in `RACommons.exports`. The Swift extension `CppBridge+LLMThinking.swift` calls these — meaning Swift code is now calling symbols the commons public ABI does not export.
-
-**Fix**: Either (a) restore `RAC_API` + exports entries in commons if Swift actually needs these (audit `CppBridge+LLMThinking.swift` call sites), or (b) delete the Swift wrappers and migrate thinking extraction to the proto-field-based API on `RALLMGenerationResult`.
-**Scope**: S.
-**Status**: **DEFERRED / ABORTED in Wave 2**. Commit `57dbcdfbd` deliberately marked the 3 thinking helpers `@internal`. The correct fix is Swift-side migration to the proto-field-based API on `RALLMGenerationResult` (tracked as **SWF-THINKING-MIGRATE**) — not restoration of `RAC_API` + exports. The Swift mirror header is slightly stale (still says `RAC_API`) but functionally everything links and works today. Deferred to a future Swift migration task.
+Migrated to read thinking content from `RALLMGenerationResult` proto fields directly. Deleted `CppBridge+LLMThinking.swift` (-90 LOC) and `CRACommons/include/rac_llm_thinking.h` mirror (-94 LOC). New pure-Swift example-app helper `ThinkingContentParser.swift` covers raw-string contexts.
 
 ### SWIFT-DUP-HTTP-ADAPTER-MISLOCATED: `HTTPClientAdapter` is in the wrong directory (MEDIUM) — **CLOSED** in `0eeccda3e`
 
@@ -302,12 +307,9 @@ Spot-grep of Generated/ finds proto types with no consumer in the Swift SDK:
 **Fix**: Exclude these from the Swift SPM target's `sources` until consumers land. They're generated from `idl/` unconditionally but the Swift target doesn't have to compile them.
 **Scope**: XS (Package.swift exclude list).
 
-### SWIFT-DUP-TTS-LISTVOICES-HANDLE: `listVoices` still requires the actor handle (LOW)
+### SWIFT-DUP-TTS-LISTVOICES-HANDLE — **CLOSED** in `477746d3f` (Phase G2)
 
-`CppBridge+ModalityProtoABI.swift:531-553` — `CppBridge.TTS.listVoices()` passes a `rac_handle_t` from `getHandle()` to `rac_tts_component_list_voices_proto`. All other post-Phase-6h TTS ops use the handle-less lifecycle-proto path. This is the one inconsistent call on the TTS actor.
-
-**Fix (requires C++ change)**: Add `rac_tts_list_voices_lifecycle_proto` in commons; switch Swift to the lifecycle variant. Low priority — it works as-is.
-**Scope**: S.
+Added `rac_tts_list_voices_lifecycle_proto` in commons + `RATTSVoiceList` proto wrapper. Swift `TTS.listVoices` migrated to `kind:invokeOutOnly` codegen path. -66 LOC in `+ModalityProtoABI.swift`.
 
 ### SWIFT-DUP-ISLOADED-INCONSISTENCY: STT/TTS/VLM use divergent "is-loaded" checks (LOW)
 
