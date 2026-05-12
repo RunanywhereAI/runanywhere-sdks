@@ -432,16 +432,25 @@ rac_result_t rac_backend_llamacpp_register(void) {
         return result;
     }
 
-    // ENG-LLAMA-02: plugin-registry wiring is owned exclusively by the
-    // static-register shim (rac_static_register_llamacpp.cpp) which calls
-    // RAC_STATIC_PLUGIN_REGISTER(llamacpp). On RAC_STATIC_PLUGINS=ON hosts
-    // (iOS, WASM) the ctor fires before main(); on dynamic hosts (Android,
-    // Linux, macOS dev) the ctor fires on .so load. The explicit
-    // rac_plugin_register() that used to live here duplicated that work and
-    // muddied the single-registration-path invariant.
+    // Android-fix: on dynamic-plugin hosts the static-register shim's ctor only
+    // fires if the carrier `librunanywhere_llamacpp.so` is dlopened — which
+    // Kotlin/JNI does not do (it loads `librac_backend_llamacpp_jni.so`, which
+    // links the backend directly). Register the plugin entry here so
+    // rac_plugin_route(framework=llamacpp) can find the LLM vtable. Mirrors
+    // the pattern in rac_backend_onnx_register.cpp.
+    extern const rac_engine_vtable_t* rac_plugin_entry_llamacpp(void);
+    const rac_engine_vtable_t* vt = rac_plugin_entry_llamacpp();
+    if (vt != nullptr) {
+        rac_result_t plugin_rc = rac_plugin_register(vt);
+        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+            RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
+        } else {
+            RAC_LOG_INFO(LOG_CAT, "rac_plugin_register succeeded for 'llamacpp'");
+        }
+    }
 
     state.registered = true;
-    RAC_LOG_INFO(LOG_CAT, "Backend registered successfully (module)");
+    RAC_LOG_INFO(LOG_CAT, "Backend registered successfully (module + plugin)");
     return RAC_SUCCESS;
 }
 

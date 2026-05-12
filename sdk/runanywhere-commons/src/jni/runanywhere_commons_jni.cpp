@@ -3583,7 +3583,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmProcessProto(
     (void)clazz;
     JByteArrayView image(env, imageProto);
     JByteArrayView options(env, optionsProto);
-    if (handle == 0L || !image.ok || !options.ok) return nullptr;
+    // VLM in Kotlin SDK runs handle==0 by design — the C function falls back
+    // to the lifecycle-owned VLM service. Only reject if image/options bytes
+    // failed to materialize.
+    if (!image.ok || !options.ok) return nullptr;
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
     rac_result_t rc = rac_vlm_process_proto(
@@ -3598,7 +3601,10 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmProcessStreamProt
     (void)clazz;
     JByteArrayView image(env, imageProto);
     JByteArrayView options(env, optionsProto);
-    if (handle == 0L || !image.ok || !options.ok) return nullptr;
+    // VLM in Kotlin SDK runs handle==0 by design — the C function falls back
+    // to the lifecycle-owned VLM service. Only reject if image/options bytes
+    // failed to materialize.
+    if (!image.ok || !options.ok) return nullptr;
 
     jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
     ProtoListenerUserData ctx{globalListener, "racVlmProcessStreamProto"};

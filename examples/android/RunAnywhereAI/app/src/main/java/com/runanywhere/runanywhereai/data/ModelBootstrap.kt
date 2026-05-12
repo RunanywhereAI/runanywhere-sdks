@@ -1,7 +1,11 @@
 package com.runanywhere.runanywhereai.data
 
+import ai.runanywhere.proto.v1.ArchiveArtifact
+import ai.runanywhere.proto.v1.ArchiveStructure
+import ai.runanywhere.proto.v1.ArchiveType
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
+import ai.runanywhere.proto.v1.ModelArtifactType
 import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelFileDescriptor
 import ai.runanywhere.proto.v1.ModelInfo
@@ -93,11 +97,11 @@ object ModelBootstrap {
         }
         for (m in STT_MODELS) {
             if (m.id in alreadyKnown) { skipped++; continue }
-            if (tryRegisterSingle(m)) registered++ else failed++
+            if (tryRegisterArchive(m)) registered++ else failed++
         }
         for (m in TTS_MODELS) {
             if (m.id in alreadyKnown) { skipped++; continue }
-            if (tryRegisterSingle(m)) registered++ else failed++
+            if (tryRegisterArchive(m)) registered++ else failed++
         }
         for (m in VAD_MODELS) {
             if (m.id in alreadyKnown) { skipped++; continue }
@@ -174,6 +178,43 @@ object ModelBootstrap {
         }
     }
 
+    /**
+     * Register an archive-based model (sherpa STT/TTS .tar.gz). Mirrors Swift's
+     * `registerModel(archive:structure:archive:...)` which sets the proto
+     * `archive_artifact` field so the C++ download orchestrator extracts the
+     * archive into a nested directory after download. Without this, the
+     * .tar.gz lands on disk unextracted and the sherpa backend fails to load.
+     */
+    private fun tryRegisterArchive(m: ArchiveModel): Boolean {
+        return try {
+            val artifactType = when (m.archiveType) {
+                ArchiveType.ARCHIVE_TYPE_TAR_GZ -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE
+                ArchiveType.ARCHIVE_TYPE_ZIP -> ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE
+                ArchiveType.ARCHIVE_TYPE_TAR_BZ2 -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE
+                ArchiveType.ARCHIVE_TYPE_TAR_XZ -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE
+                else -> ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE
+            }
+            val info = ModelInfo(
+                id = m.id,
+                name = m.name,
+                download_url = m.url,
+                framework = m.framework,
+                category = m.category,
+                memory_required_bytes = m.memoryBytes,
+                artifact_type = artifactType,
+                archive = ArchiveArtifact(
+                    type = m.archiveType,
+                    structure = m.structure,
+                ),
+            )
+            CppBridgeModelRegistry.save(info)
+            true
+        } catch (e: Exception) {
+            Timber.e(e, "tryRegisterArchive failed: ${m.id}")
+            false
+        }
+    }
+
     private fun tryRegisterMultiFile(m: MultiFileModel): Boolean {
         return try {
             val descriptors = m.files.mapIndexed { idx, (url, filename) ->
@@ -188,6 +229,12 @@ object ModelBootstrap {
                     },
                 )
             }
+            // Mirror Swift's RAModelInfo.setArtifact: when populating the
+            // multi_file oneof, also seed expected_files from the descriptors.
+            // The commons download planner only walks model.expected_files.files
+            // for the per-descriptor loop; without this, the download falls
+            // through to the single-URL branch and rejects with
+            // "model.download_url must be an http(s) URL".
             val info = ModelInfo(
                 id = m.id,
                 name = m.name,
@@ -195,6 +242,7 @@ object ModelBootstrap {
                 category = m.category,
                 memory_required_bytes = m.memoryBytes,
                 multi_file = MultiFileArtifact(files = descriptors),
+                expected_files = ai.runanywhere.proto.v1.ExpectedModelFiles(files = descriptors),
             )
             CppBridgeModelRegistry.save(info)
             true
@@ -254,6 +302,21 @@ object ModelBootstrap {
         val memoryBytes: Long,
         /** (url, filename) pairs. First entry is the primary model file. */
         val files: List<Pair<String, String>>,
+    )
+
+    /**
+     * Archive-based model (e.g. sherpa STT/TTS .tar.gz). Mirrors iOS's
+     * `registerModel(archive:structure:archive:...)` registration form.
+     */
+    private data class ArchiveModel(
+        val id: String,
+        val name: String,
+        val url: String,
+        val framework: InferenceFramework,
+        val category: ModelCategory,
+        val memoryBytes: Long,
+        val archiveType: ArchiveType,
+        val structure: ArchiveStructure,
     )
 
     // MARK: - Curated catalog
@@ -363,33 +426,39 @@ object ModelBootstrap {
 
     private val STT_MODELS =
         listOf(
-            SingleFileModel(
+            ArchiveModel(
                 id = "sherpa-onnx-whisper-tiny.en",
                 name = "Sherpa Whisper Tiny (ONNX)",
                 url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz",
                 framework = InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
                 category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
                 memoryBytes = 75_000_000,
+                archiveType = ArchiveType.ARCHIVE_TYPE_TAR_GZ,
+                structure = ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY,
             ),
         )
 
     private val TTS_MODELS =
         listOf(
-            SingleFileModel(
+            ArchiveModel(
                 id = "vits-piper-en_US-lessac-medium",
                 name = "Piper TTS (US English - Medium)",
                 url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-lessac-medium.tar.gz",
                 framework = InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
                 category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
                 memoryBytes = 65_000_000,
+                archiveType = ArchiveType.ARCHIVE_TYPE_TAR_GZ,
+                structure = ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY,
             ),
-            SingleFileModel(
+            ArchiveModel(
                 id = "vits-piper-en_GB-alba-medium",
                 name = "Piper TTS (British English)",
                 url = "https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_GB-alba-medium.tar.gz",
                 framework = InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
                 category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
                 memoryBytes = 65_000_000,
+                archiveType = ArchiveType.ARCHIVE_TYPE_TAR_GZ,
+                structure = ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY,
             ),
         )
 

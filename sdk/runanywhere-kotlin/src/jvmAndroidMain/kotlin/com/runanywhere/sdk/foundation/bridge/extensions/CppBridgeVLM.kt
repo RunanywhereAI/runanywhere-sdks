@@ -196,7 +196,7 @@ object CppBridgeVLM {
         decodeOrThrow(
             VLMResult.ADAPTER,
             RunAnywhereBridge.racVlmProcessProto(
-                requireHandle(),
+                handle,
                 VLMImage.ADAPTER.encode(image),
                 VLMGenerationOptions.ADAPTER.encode(options),
             ),
@@ -211,7 +211,7 @@ object CppBridgeVLM {
         decodeOrThrow(
             VLMResult.ADAPTER,
             RunAnywhereBridge.racVlmProcessStreamProto(
-                requireHandle(),
+                handle,
                 VLMImage.ADAPTER.encode(image),
                 VLMGenerationOptions.ADAPTER.encode(options),
                 NativeProtoProgressListener { bytes ->
@@ -220,7 +220,4 @@ object CppBridgeVLM {
             ),
             "racVlmProcessStreamProto",
         )
-
-    private fun requireHandle(): Long =
-        handle.takeIf { it != 0L } ?: throw SDKException.notInitialized("VLM service not loaded")
 }

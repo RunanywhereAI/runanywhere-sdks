@@ -230,12 +230,24 @@ rac_result_t rac_backend_llamacpp_vlm_register(void) {
         return result;
     }
 
-    // ENG-LLAMA-02: plugin-registry wiring for llamacpp-vlm rides the same
-    // static-register shim as the LLM side. The explicit
-    // rac_plugin_register() call previously here duplicated that work.
+    // Android-fix: same dynamic-plugin gap as the LLM side. The carrier
+    // librunanywhere_llamacpp.so is never dlopened by Kotlin, so its
+    // RAC_STATIC_PLUGIN_REGISTER ctor never fires. Register the VLM plugin
+    // entry here so rac_plugin_route(framework=llamacpp, primitive=vlm)
+    // resolves to this vtable.
+    extern const rac_engine_vtable_t* rac_plugin_entry_llamacpp_vlm(void);
+    const rac_engine_vtable_t* vt = rac_plugin_entry_llamacpp_vlm();
+    if (vt != nullptr) {
+        rac_result_t plugin_rc = rac_plugin_register(vt);
+        if (plugin_rc != RAC_SUCCESS && plugin_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
+            RAC_LOG_WARNING(LOG_CAT, "rac_plugin_register failed: %d", plugin_rc);
+        } else {
+            RAC_LOG_INFO(LOG_CAT, "rac_plugin_register succeeded for 'llamacpp_vlm'");
+        }
+    }
 
     state.registered = true;
-    RAC_LOG_INFO(LOG_CAT, "VLM backend registered successfully (module)");
+    RAC_LOG_INFO(LOG_CAT, "VLM backend registered successfully (module + plugin)");
     return RAC_SUCCESS;
 }
 
