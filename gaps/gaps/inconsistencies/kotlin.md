@@ -1,9 +1,9 @@
 # Kotlin / Android+JVM SDK — Open Inconsistencies
 
-Updated: 2026-05-11 (post-Wave 1..6 + Audit Waves V1+V2 + B9 deep audit + Wave C 8-agent audit)
+Updated: 2026-05-12 (post-Wave 1..6 + Audit Waves V1+V2 + B9 deep audit + Wave C 8-agent audit + Wave E2E physical-device pass)
 Branch: `feat/v2-architecture`
-Latest commit: `40c668d86` (Wave K1 file rename, drop `+` suffix)
-Working tree state: Waves 1..6 + V1+V2 applied uncommitted; B9 deep audit findings + Wave C 8-agent comprehensive audit (2026-05-11) added below (no deletions executed); build green.
+Latest commit: `4fb4caafa` (Wave E2E: VLM rotation + TTS Float32→Int16 + STT VAD gate + VAD screen + tool-call UI; pushed to origin)
+Working tree state: clean.
 
 This document lists ONLY what is still open. Closed items have been removed — see git log + `gaps/gaps/PR review/kotlin.md` for history.
 
@@ -619,6 +619,129 @@ Eight parallel audit agents (C1 through C8) executed today against the post-B9 w
 | **TOTAL** | **33** | **~1,150 LOC** | — |
 
 Plus 30 OBSOLETE-FALLBACK catch-blocks (KOTLIN-CATCH-THROWABLE-OBSOLETE) and 14 unused gradle catalog entries (KOTLIN-GRADLE-DEAD-CATALOG) for full sweep.
+
+---
+
+## Wave E2E (2026-05-12) — physical-device test pass on Pixel 8 Pro
+
+Goal: drive every modality through the Android example app, identify every gap vs iOS Swift behavior, fix what we can without leaving the SDK contract, and record what remains.
+
+### Modality verification matrix
+
+| Modality | Verified on device | Outcome |
+|---|---|---|
+| Chat / LLM (Qwen 2.5 0.5B Q8_0) | YES | "2 + 2 equals 4" @ ~10 tok/s. Streaming + thinking-content parser working. |
+| Vision / VLM (LFM2-VL 450M + mmproj) | PARTIAL | Loads, runs, returns text. Accuracy still imperfect — see KOTLIN-VLM-PREPROCESS-PARITY below. |
+| STT (Sherpa Whisper Tiny ONNX) | YES | VAD-gated live mode now matches iOS: 0.02 amplitude threshold, 1.5 s silence trigger, 16 KB min buffer. Whisper hallucinations on silence are now suppressed by the gate. |
+| TTS (Piper VITS en_GB / en_US) | YES | Float32 PCM @ 22050 Hz now converted to Int16 PCM and AudioTrack is configured with the proto's `sample_rate`. Audio is clean. |
+| VAD (Silero) | YES | New `presentation/vad/VADScreen.kt` + `VADViewModel.kt` mirroring iOS Features/Voice/VoiceActivityDetectionView. Wired into More tab between TTS and STT. |
+| RAG (MiniLM L6 v2 + Qwen 0.5B) | YES | Document ingested + queried; response generated end-to-end. |
+| Tool calling (LFM2 350M / 1.2B-Tool) | YES (UI) | Tool indicator + detail sheet renders; pretty-printed args + result JSON; `<think>` content stripped. See `KOTLIN-LFM2-TOOL-FORMAT-PARITY` for a follow-up: format detection returns `default` for base LFM2 (correct in both platforms), but the user should be steered to `lfm2-1.2b-tool-q4_k_m` for the LFM2 native format. |
+| Voice Agent (STT + LLM + TTS) | NOT TESTED | Pipeline initializes (`streamVoiceAgent()` started, `userSaid` flow active). End-to-end conversation not yet validated on physical device. |
+| LoRA (Abliterated Qwen 0.5B F16) | BROKEN | Download is intentionally disabled in `LoraViewModel.downloadAdapter()` with `RunAnywhere.downloadModel() was removed in the V2 storage-plan refactor`. See KOTLIN-LORA-DOWNLOAD-DISABLED below. |
+| Solutions (YAML pipeline) | NOT TESTED | Public surface present; demo not exercised on device. |
+| Benchmarks (LLM/STT/TTS/VLM/Diffusion) | NOT TESTED | UI renders; `Run All Benchmarks` not exercised with a selected model. |
+
+### Bugs fixed and committed during Wave E2E
+
+All landed on `feat/v2-architecture` and pushed to origin. iOS Swift is the source of truth for every change.
+
+| ID | Title | Files | Commit |
+|---|---|---|---|
+| Bug-1 | `ModelBootstrap.tryRegisterSingle` / `tryRegisterMultiFile` no-op stubs replaced with real `CppBridgeModelRegistry.save(info)` wiring | `examples/android/.../data/ModelBootstrap.kt` | `dbf1724b1` |
+| Bug-2 | `ModelSelectionViewModel.startDownload` no-op stub replaced with `RunAnywhere.downloadModel(model).collect { progress }` | `examples/android/.../presentation/models/ModelSelectionViewModel.kt` | `dbf1724b1` |
+| Bug-3 | Add `RunAnywhere.downloadModel(model: RAModelInfo): Flow<DownloadProgress>` mirroring Swift `RunAnywhere+Storage.swift:downloadModel(...)` — plan → start → poll → persist | `sdk/runanywhere-kotlin/src/{commonMain,jvmAndroidMain}/.../public/extensions/Storage/RunAnywhereDownload*.kt` | `dbf1724b1` |
+| Bug-4 | OkHttp transport JNI class-lookup mismatch (`com/runanywhere/sdk/foundation/http/OkHttpTransport` → `com/runanywhere/sdk/httptransport/OkHttpHttpTransport`); also fix `Java_*_deliverChunkNative` export symbol | `sdk/runanywhere-commons/src/jni/okhttp_transport_adapter.cpp` | `dbf1724b1` |
+| Bug-5 | LlamaCPP LLM + VLM plugin route registration on Android dynamic-plugin hosts — the carrier `librunanywhere_llamacpp.so` was never dlopened, so the static-register ctor never fired. Add explicit `rac_plugin_register(rac_plugin_entry_llamacpp{,_vlm}())` after module registration | `engines/llamacpp/rac_backend_llamacpp{,_vlm}_register.cpp` | `80feae082` |
+| Bug-6 | Multi-file model download rejected — C++ download planner only walks `model.expected_files.files`, not the `multi_file` artifact oneof. `ModelBootstrap.tryRegisterMultiFile` now seeds `expected_files` from descriptors (mirrors Swift `RAModelInfo.setArtifact`) | `examples/android/.../data/ModelBootstrap.kt` | `80feae082` |
+| Bug-7 | VLM `processStream` rejected `handle == 0` despite C lifecycle fallback. Removed Kotlin `requireHandle()` check in `CppBridgeVLM` | `sdk/runanywhere-kotlin/src/jvmAndroidMain/.../bridge/extensions/CppBridgeVLM.kt` | `80feae082` |
+| Bug-8 | `Java_*_racVlmProcess[Stream]Proto` JNI guards rejected `handle == 0` despite `rac_vlm_process[_stream]_proto` having lifecycle fallback (Phase 6j). Relaxed the JNI guard | `sdk/runanywhere-commons/src/jni/runanywhere_commons_jni.cpp` | `80feae082` |
+| Bug-9 | STT/TTS sherpa `.tar.gz` archive models registered as `SingleFileArtifact` — no extraction metadata. New `ArchiveModel` data class in `ModelBootstrap` sets `ArchiveArtifact{type=TAR_GZ, structure=NESTED_DIRECTORY}` + `artifact_type=TAR_GZ_ARCHIVE`. Verified: encoder.onnx + tokens.txt + test_wavs/ now extract correctly | `examples/android/.../data/ModelBootstrap.kt` | `80feae082` |
+| Bug-10 | Sherpa plugin missing from `rac_plugin_registry` on Android — ONNX JNI's `dlsym(RTLD_DEFAULT, "rac_backend_sherpa_register")` couldn't see symbols in `librac_backend_sherpa.so` (different Android linker namespace). Fix: explicit `dlopen("librac_backend_sherpa.so", RTLD_NOW \| RTLD_GLOBAL)` before dlsym. Plugin registry post-fix: `sherpa, onnx, llamacpp_vlm, llamacpp` (was missing `sherpa`). | `engines/onnx/jni/rac_backend_onnx_jni.cpp` | `ad03b541e` |
+| Bug-11 | Kotlin SDK STT/TTS used `rac_stt_component_transcribe_proto` and `rac_tts_component_synthesize_proto` (which require a handle with a loaded model). iOS Swift uses `rac_stt_transcribe_lifecycle_proto` and `rac_tts_synthesize_lifecycle_proto` (lifecycle-only, no handle). Added new JNI thunks + switched `CppBridgeSTT` / `CppBridgeTTS` to the lifecycle path. Swift parity restored. | `sdk/runanywhere-commons/src/jni/runanywhere_commons_jni.cpp`, `sdk/runanywhere-kotlin/src/jvmAndroidMain/.../bridge/extensions/CppBridge{STT,TTS}.kt`, `.../native/bridge/RunAnywhereBridge.kt` | `ad03b541e` |
+| Bug-11-cleanup | Deleted the now-dead component-handle JNI exports `Java_*_racSttComponentTranscribe[Stream]Proto` and `Java_*_racTtsComponent{ListVoices,Synthesize,SynthesizeStream}Proto` + the corresponding Kotlin `external fun` declarations. C++ `rac_*_component_*_proto` functions remain (still consumed by tests + WASM exports + iOS C ABI headers). | `sdk/runanywhere-commons/src/jni/runanywhere_commons_jni.cpp`, `sdk/runanywhere-kotlin/src/jvmAndroidMain/.../native/bridge/RunAnywhereBridge.kt` | `ad03b541e` |
+| Bug-12 | VLM camera frame not rotated. Android's `LifecycleCameraController` + `OUTPUT_IMAGE_FORMAT_RGBA_8888` returns the sensor's landscape buffer; `rotationDegrees` was reported via `ImageInfo` but never baked into pixels. LFM2-VL was being asked to describe a sideways frame. Fix: `Matrix.postRotate(imageInfo.rotationDegrees)` in `VLMViewModel.captureFrame()` before extracting RGB. iOS gets pre-rotated frames from AVCaptureSession for free. | `examples/android/.../presentation/vision/VLMViewModel.kt` | `4fb4caafa` |
+| Bug-13 | TTS noise on Piper. `TextToSpeechViewModel` was feeding raw Float32 PCM (4 bytes/sample @ 22050 Hz) into AudioTrack configured with `ENCODING_PCM_16BIT` → 4-byte float reinterpreted as two consecutive Int16 samples → double-speed garbled noise. Also never read `TTSOutput.sample_rate` from the proto. Fix: read proto sample_rate (three-tier fallback proto → options → 22050), convert Float32 → Int16 via clamped scaling (port of `rac_audio_float32_to_wav`'s `clamp(s × 32767, -32768, 32767)`), feed AudioTrack at the proto-reported rate. | `examples/android/.../presentation/tts/TextToSpeechViewModel.kt` | `4fb4caafa` |
+| Bug-14 | STT too sensitive — no VAD gating on live mode. Whisper hallucinated `[BLANK_AUDIO]` / `[SIDE CONVERSATION]` tokens on ambient noise. Fix: ported iOS `SpeechToTextViewModel`'s VAD gate exactly — 50 ms polling, 0.02 amplitude threshold, 1.5 s silence trigger, 16 KB min buffer, transcribe-then-clear. STT options now match `RASTTOptions.defaults()` (EN + punctuation + word timestamps). | `examples/android/.../presentation/stt/SpeechToTextViewModel.kt` | `4fb4caafa` |
+| Bug-15 | Tool calling: `ToolCallingOrchestrator.jvmAndroid.kt` referenced `kotlinx.coroutines.runBlocking` without an import → stale AAR, JNI tool-call callback silently no-op'd. Also `MessageBubbleView`'s `if (content.isNotEmpty())` guard hid the assistant bubble when the model only emitted a tool call. Fix: added import, populate `toolCallInfo` before content in `ChatViewModel`, fall back to `error_message` → synthesized "Ran <tool>" summary, run `ThinkingContentParser.extract()` on the tool-calling path, pretty-print args + result JSON. | `sdk/runanywhere-kotlin/src/jvmAndroidMain/.../public/extensions/LLM/ToolCallingOrchestrator.jvmAndroid.kt`, `examples/android/.../presentation/chat/ChatViewModel.kt` | `4fb4caafa` |
+| Bug-16 | `scripts/build-core-android.sh` invoked `cmake --preset android-arm64` without `cd`-ing to repo root. Gradle's `buildLocalJniLibs` task runs with `workingDir = sdk/runanywhere-kotlin/`, breaking CMake preset resolution. Fix: `cd "${REPO_ROOT}"` at top of script. | `scripts/build-core-android.sh` | `4fb4caafa` |
+| VAD-screen | No standalone VAD demo in Android example app. Added `presentation/vad/VADViewModel.kt` (30 ms polling, 1024-byte / 512 Int16 / 32 ms @ 16 kHz frames, calls `RunAnywhere.detectVoiceActivity`, 50-entry activity log) + `VADScreen.kt` (Compose UX mirroring iOS `VoiceActivityDetectionView.swift`). Wired into More tab between TTS and STT, new `NavigationRoute.VAD`. | `examples/android/.../presentation/vad/{VADViewModel,VADScreen}.kt`, `.../models/ModelSelectionContext.kt`, `.../navigation/{AppNavigation,MoreHubScreen}.kt`, `.../chat/components/ModelRequiredOverlay.kt` | `4fb4caafa` |
+
+### Open items from Wave E2E
+
+#### KOTLIN-VLM-PREPROCESS-PARITY (MED — VLM)
+
+VLM rotation fix (Bug-12) landed, but on-device output is still less accurate than iOS for the same model + scene. User report: pointed phone at a laptop, model still mentioned "people". Need a second pass comparing the Android image-preprocessing path to iOS byte-for-byte:
+
+1. **Color channel order** — RGBA → RGB extraction in `VLMImage.fromBitmap()` uses `Bitmap.getPixels()` and packs RGB. Verify the byte order matches what `rac_vlm_llamacpp_process_proto` / mtmd's CLIP preprocessor expects. iOS uses BGRA → RGB via Accelerate; subtle ARGB↔RGBA bit-shift mismatches are a common pitfall.
+2. **Stride / padding** — `Bitmap.getPixels()` returns tightly packed ints regardless of native stride, but `ImageProxy.toBitmap()` may produce a bitmap whose underlying buffer has row-stride padding. Validate that the bytes leaving Kotlin are width × height × 3 with no padding.
+3. **Resize policy** — iOS may downsample large camera frames before sending; mtmd CLIP-encoder has a 384×384 (or 448×448) native input. If Android sends a 1920×1440 frame and mtmd has to resize internally, the down-scaling kernel may differ from iOS's CoreImage path.
+4. **JPEG vs raw RGB path** — gallery-image flow uses `VLM_IMAGE_FORMAT_FILE_PATH` (mtmd decodes the JPEG container with EXIF rotation built in); camera flow uses raw RGB. Make sure both paths land at the same preprocessed tensor.
+5. **Auto-stream cadence** — auto-stream every 2.5 s (Android) vs iOS auto-stream interval — confirm both match.
+
+Acceptance: pick a fixed scene (laptop, mug, room), photograph it, run the SAME model on iOS and Android, and compare token outputs. They should be substantively similar.
+
+#### KOTLIN-LORA-DOWNLOAD-DISABLED (HIGH — LoRA)
+
+`LoraViewModel.downloadAdapter()` emits an error every time the Download button is tapped:
+
+```
+LoraViewModel$downloadAdapter: LoRA download is temporarily disabled:
+  RunAnywhere.downloadModel() was removed in the V2 storage-plan refactor (entry=abliterated-lora).
+```
+
+LoRA catalog entries register correctly (`lora-adapter:abliterated-lora` saved to C++ registry, listed in the manager UI), but the download path was deleted during the V2 storage-plan refactor and never re-wired. To unblock:
+
+1. Decide whether LoRA artifacts flow through (a) the new `downloadModel(RAModelInfo)` path with `RAModelInfo` synthesized from the `LoraAdapterCatalogEntry`, or (b) a dedicated `RunAnywhere.lora.download(entry)` SDK call. iOS Swift `RunAnywhere.lora.*` namespace is the reference — port whatever it does.
+2. Once download lands, verify `RunAnywhere.lora.apply(LoRAApplyRequest)` actually attaches the adapter to the loaded LLM and changes behavior (e.g. abliterated Qwen answers a prompt the base would refuse).
+3. UI: surface apply / remove / scale-slider controls already present in `LoraScreen.kt` — they're inert until download works.
+
+Files: `examples/android/.../presentation/lora/LoraViewModel.kt`, `sdk/runanywhere-kotlin/src/.../public/extensions/LLM/RunAnywhereLoRA.kt`.
+
+#### KOTLIN-VOICE-AGENT-E2E-UNTESTED (MED — Voice Agent)
+
+`VoiceAssistantViewModel.startSession()` invokes `RunAnywhere.streamVoiceAgent()` and the camera/audio pipeline initializes (`Voice session started — events flow from streamVoiceAgent()` in logs). Full STT → LLM → TTS round-trip with real speech has NOT been validated on device.
+
+Acceptance: load `sherpa-onnx-whisper-tiny.en` + `qwen2.5-0.5b-instruct-q8_0` + `vits-piper-en_US-lessac-medium`, tap Start, speak a question, verify (a) `userSaid` event with correct transcript, (b) `assistantToken` stream, (c) `audio` events playing through AudioTrack, (d) state transitions match iOS pipeline state machine (`IDLE → LISTENING → PROCESSING_SPEECH → GENERATING_RESPONSE → PLAYING_TTS → COOLDOWN → IDLE`).
+
+Known concern from earlier audit: `VoiceAssistantViewModel` uses an audio-level threshold of `0.1f` and 1500 ms silence; `STTViewModel` (Bug-14) uses `0.02f` / 1500 ms. The mismatch may produce different sensitivity in the two flows — verify against iOS `VoiceAgentViewModel.swift`.
+
+Files: `examples/android/.../presentation/voice/VoiceAssistantViewModel.kt`, `sdk/runanywhere-kotlin/src/.../public/extensions/VoiceAgent/RunAnywhereVoiceAgent.kt`.
+
+#### KOTLIN-SOLUTIONS-E2E-UNTESTED (LOW — Solutions)
+
+`RunAnywhere.solutions.run(yaml:)` API present; `presentation/solutions/SolutionsScreen.kt` renders the two iOS demo YAMLs (voice agent + RAG). Not exercised on device. Acceptance: submit each YAML, watch lifecycle events fire in order. Test with `assembleDebug` build + emulator/device.
+
+#### KOTLIN-BENCHMARKS-E2E-UNTESTED (LOW — Benchmarks)
+
+`BenchmarkScreen.kt` + `BenchmarkRunner` present. Tapping "Run All Benchmarks" without a model selected currently no-ops. Acceptance: select Qwen 2.5 0.5B for LLM, run benchmarks, verify TTFT + tok/s + decode-time appear in `BenchmarkStore` history and export-as-CSV/JSON works.
+
+#### KOTLIN-LFM2-TOOL-FORMAT-PARITY (LOW — Tool calling)
+
+`generateWithTools(...)` format detection returns `default` for any model whose name doesn't contain `"tool"`. For LFM2 base models (350M / 1.2B without "-Tool"), this is correct (matches iOS behavior). But the user expected the LFM2 *native* format. Two follow-ups:
+
+1. Make the model picker either (a) auto-pick `lfm2-1.2b-tool-q4_k_m` when the user enables Tools, or (b) show an in-UI warning that the base model may not produce reliable structured tool-call output.
+2. Verify against iOS `LLMViewModel+ToolCalling.swift` that the LFM2 family detection regex matches exactly (`lfm2-tool` vs `lfm2-1.2b-tool` vs `lfm2.*tool`).
+
+#### KOTLIN-VLM-CANCEL-LIFECYCLE-JNI (LOW — already tracked, recurring)
+
+The pre-existing `racVlmCancelLifecycleProto` JNI symbol is still missing in commons. Two stack traces in the Wave E2E logs:
+
+```
+No implementation found for byte[] com.runanywhere.sdk.native.bridge.RunAnywhereBridge.racVlmCancelLifecycleProto()
+```
+
+Tracked in `KOTLIN-VLM-CANCEL-LIFECYCLE-JNI` (LOW, pending commons JNI). Does not block VLM inference because `VLMViewModel.cancel()` swallows the `UnsatisfiedLinkError`; surfaces only on auto-stream coroutine cancellation.
+
+### Wave E2E summary
+
+| Category | Count |
+|---|---:|
+| Bugs fixed and committed (Bug-1 .. Bug-16 + VAD-screen) | 17 |
+| Open items from Wave E2E (KOTLIN-VLM-PREPROCESS-PARITY, KOTLIN-LORA-DOWNLOAD-DISABLED, KOTLIN-VOICE-AGENT-E2E-UNTESTED, KOTLIN-SOLUTIONS-E2E-UNTESTED, KOTLIN-BENCHMARKS-E2E-UNTESTED, KOTLIN-LFM2-TOOL-FORMAT-PARITY) | 6 |
+| Severity breakdown of open items | 1 HIGH (LoRA), 2 MED, 3 LOW |
+
+All Wave E2E commits pushed to `origin/feat/v2-architecture` at `4fb4caafa`. Working tree clean.
 
 ---
 
