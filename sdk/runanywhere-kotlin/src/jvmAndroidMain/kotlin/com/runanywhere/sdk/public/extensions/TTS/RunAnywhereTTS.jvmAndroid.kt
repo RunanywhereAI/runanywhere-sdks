@@ -17,6 +17,7 @@ import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RATTSOptions
 import com.runanywhere.sdk.public.types.RATTSOutput
@@ -26,13 +27,6 @@ import kotlinx.coroutines.flow.callbackFlow
 
 private val ttsLogger = SDKLogger.tts
 private val ttsAudioPlayback = TtsAudioPlayback
-
-private fun currentTtsVoiceIdFromLifecycle(): String? =
-    CppBridgeModelLifecycle
-        .currentModel(
-            CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS),
-        )?.model_id
-        ?.takeIf { it.isNotEmpty() }
 
 /**
  * Internal helper: list available TTS voices from the C ABI.
@@ -54,7 +48,19 @@ actual suspend fun RunAnywhere.synthesize(
         throw SDKException.notInitialized("SDK not initialized")
     }
 
-    val voiceId = currentTtsVoiceIdFromLifecycle() ?: "unknown"
+    // Lifecycle check: mirrors Swift's `synthesize(_:options:)` which queries
+    // `RunAnywhere.currentModel(category: .speechSynthesis)` and throws when
+    // no TTS voice is loaded. Querying the lifecycle (canonical source of
+    // truth) is required because `CppBridgeTTS` owns its own handle that is
+    // separate from the lifecycle's handle.
+    val current = CppBridgeModelLifecycle.currentModel(
+        CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS),
+    )
+    if (current?.found != true) {
+        throw SDKException.notInitialized("TTS voice not loaded")
+    }
+
+    val voiceId = current.model_id.takeIf { it.isNotEmpty() } ?: "unknown"
     ttsLogger.debug("Synthesizing text: ${text.take(50)}${if (text.length > 50) "..." else ""} (voice: $voiceId)")
 
     val result = CppBridgeTTS.synthesize(text, options)
@@ -64,16 +70,25 @@ actual suspend fun RunAnywhere.synthesize(
 
 actual fun RunAnywhere.synthesizeStream(
     text: String,
-    voiceId: String?,
+    options: RATTSOptions,
 ): Flow<RATTSOutput> =
     callbackFlow {
         if (!isInitialized) {
-            throw SDKException.notInitialized("SDK not initialized")
+            close()
+            return@callbackFlow
         }
 
-        val options =
-            voiceId?.takeIf { it.isNotBlank() }?.let { RATTSOptions(voice = it) }
-                ?: RATTSOptions()
+        // Mirror synthesize(): query ModelLifecycle (the canonical source of
+        // truth) instead of CppBridgeTTS's own handle. Swift's
+        // `synthesizeStream` finishes the stream silently when no voice is
+        // loaded; we mirror that by closing the Flow without emitting.
+        val current = CppBridgeModelLifecycle.currentModel(
+            CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS),
+        )
+        if (current?.found != true) {
+            close()
+            return@callbackFlow
+        }
 
         try {
             CppBridgeTTS.synthesizeStream(text, options) { output ->
@@ -87,8 +102,7 @@ actual fun RunAnywhere.synthesizeStream(
     }
 
 actual suspend fun RunAnywhere.stopSynthesis() {
-    // TTS generated-proto streaming is synchronous; cancellation is handled
-    // by the native generation call and collector closure.
+    CppBridgeTTS.stop()
 }
 
 actual suspend fun RunAnywhere.speak(
@@ -101,9 +115,20 @@ actual suspend fun RunAnywhere.speak(
 
     val output = synthesize(text, options)
 
-    if (output.audio_data.size > 0) {
+    // Convert Float32 PCM to WAV format using C++ utility (Swift parity).
+    // TTS backends output raw Float32 PCM; AudioPlaybackManager expects a
+    // complete WAV file (with header) for MediaPlayer / javax.sound.
+    val sampleRate =
+        when {
+            output.sample_rate > 0 -> output.sample_rate
+            options.sample_rate > 0 -> options.sample_rate
+            else -> 22_050
+        }
+    val wavData = convertPcmToWav(output.audio_data.toByteArray(), sampleRate)
+
+    if (wavData.isNotEmpty()) {
         try {
-            ttsAudioPlayback.play(output.audio_data.toByteArray())
+            ttsAudioPlayback.play(wavData)
             ttsLogger.debug("Audio playback completed")
         } catch (e: Exception) {
             ttsLogger.error("Audio playback failed: ${e.message}", throwable = e)
@@ -119,6 +144,19 @@ actual suspend fun RunAnywhere.speak(
         metadata = output.metadata,
         timestamp_ms = output.timestamp_ms,
     )
+}
+
+/**
+ * Convert Float32 PCM to WAV using the C++ audio utility (Swift parity).
+ *
+ * Mirrors Swift's `convertPCMToWAV(pcmData:sampleRate:)` which calls
+ * `rac_audio_float32_to_wav`. Returns an empty ByteArray for empty input
+ * and throws on conversion failure.
+ */
+private fun convertPcmToWav(pcmData: ByteArray, sampleRate: Int): ByteArray {
+    if (pcmData.isEmpty()) return ByteArray(0)
+    return RunAnywhereBridge.racAudioFloat32ToWav(pcmData, sampleRate)
+        ?: throw SDKException.tts("Failed to convert PCM to WAV")
 }
 
 actual val RunAnywhere.isSpeaking: Boolean

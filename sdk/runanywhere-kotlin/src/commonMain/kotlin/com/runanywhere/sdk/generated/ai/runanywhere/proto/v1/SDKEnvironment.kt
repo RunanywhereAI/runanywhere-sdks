@@ -27,9 +27,13 @@ import kotlin.Suppress
 public enum class SDKEnvironment(
   override val `value`: Int,
 ) : WireEnum {
+  @RacWireStringOption("unspecified")
   SDK_ENVIRONMENT_UNSPECIFIED(0),
+  @RacWireStringOption("development")
   SDK_ENVIRONMENT_DEVELOPMENT(1),
+  @RacWireStringOption("staging")
   SDK_ENVIRONMENT_STAGING(2),
+  @RacWireStringOption("production")
   SDK_ENVIRONMENT_PRODUCTION(3),
   ;
 

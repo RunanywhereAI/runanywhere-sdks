@@ -53,6 +53,7 @@ public class TTSOptions(
   /**
    * Language override (BCP-47). Empty = use component default.
    */
+  @RacDefaultOption("en-US")
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -67,6 +68,7 @@ public class TTSOptions(
    * canonicalize on `speaking_rate` to match TTSConfiguration; bindings
    * alias to `rate` where appropriate.
    */
+  @RacDefaultOption("1.0")
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -78,6 +80,7 @@ public class TTSOptions(
   /**
    * Speech pitch (0.5 – 2.0; 1.0 is normal).
    */
+  @RacDefaultOption("1.0")
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -88,6 +91,7 @@ public class TTSOptions(
   /**
    * Speech volume (0.0 – 1.0).
    */
+  @RacDefaultOption("1.0")
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -111,6 +115,7 @@ public class TTSOptions(
   /**
    * Output audio format.
    */
+  @RacDefaultOption("AUDIO_FORMAT_PCM")
   @field:WireField(
     tag = 7,
     adapter = "ai.runanywhere.proto.v1.AudioFormat#ADAPTER",
@@ -123,6 +128,7 @@ public class TTSOptions(
    * Output sample rate override in Hz. 0 = component/default sample rate.
    * Present in rac_tts_options_t and several SDK option structs.
    */
+  @RacDefaultOption("22050")
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",

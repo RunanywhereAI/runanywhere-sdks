@@ -21,11 +21,11 @@ import com.runanywhere.sdk.public.RunAnywhere
 /**
  * Descriptor for a plugin loaded at runtime.
  *
- * @param id Plugin name / identifier (without `librunanywhere_` prefix or extension)
+ * @param name Plugin name / library stem (without `lib` prefix or extension, e.g. "runanywhere_acmevoice")
  * @param path Absolute path to the shared library on disk, if known
  */
 data class PluginInfo(
-    val id: String,
+    val name: String,
     val path: String? = null,
 )
 
@@ -67,9 +67,9 @@ expect class PluginLoader {
     /**
      * Unregister a previously-loaded plugin.
      *
-     * @param id Plugin name (without `librunanywhere_` prefix or extension)
+     * @param name Plugin name (library stem, without `lib` prefix or extension)
      */
-    suspend fun unload(id: String)
+    suspend fun unload(name: String)
 
     /**
      * Names of all currently registered plugins.

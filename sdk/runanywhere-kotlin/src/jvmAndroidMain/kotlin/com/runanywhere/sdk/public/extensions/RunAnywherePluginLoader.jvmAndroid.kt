@@ -29,14 +29,15 @@ actual class PluginLoader {
             if (rc != RunAnywhereBridge.RAC_SUCCESS) {
                 throw SDKException.operation("rac_registry_load_plugin failed with rc=$rc")
             }
-            // Derive the plugin id from the last path component, stripping extension.
-            val name = path.substringAfterLast('/').substringBeforeLast('.')
-            PluginInfo(id = name, path = path)
+            // Derive the plugin name from the library stem, stripping `lib` prefix to match Swift.
+            // e.g. "/opt/plugins/librunanywhere_acmevoice.so" → "runanywhere_acmevoice"
+            val name = path.substringAfterLast('/').substringBeforeLast('.').removePrefix("lib")
+            PluginInfo(name = name, path = path)
         }
 
-    actual suspend fun unload(id: String) =
+    actual suspend fun unload(name: String) =
         withContext(Dispatchers.IO) {
-            val rc = RunAnywhereBridge.racRegistryUnloadPlugin(id)
+            val rc = RunAnywhereBridge.racRegistryUnloadPlugin(name)
             if (rc != RunAnywhereBridge.RAC_SUCCESS) {
                 throw SDKException.operation("rac_registry_unload_plugin failed with rc=$rc")
             }

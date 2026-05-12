@@ -13,7 +13,15 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
+import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
+import ai.runanywhere.proto.v1.InferenceFramework as ProtoInferenceFramework
+import ai.runanywhere.proto.v1.ModelDiscoveryRequest as ProtoModelDiscoveryRequest
+import ai.runanywhere.proto.v1.ModelDiscoveryResult as ProtoModelDiscoveryResult
+import ai.runanywhere.proto.v1.ModelImportRequest as ProtoModelImportRequest
+import ai.runanywhere.proto.v1.ModelImportResult as ProtoModelImportResult
 import ai.runanywhere.proto.v1.ModelInfo as ProtoModelInfo
 import ai.runanywhere.proto.v1.ModelInfoList as ProtoModelInfoList
 import ai.runanywhere.proto.v1.ModelQuery as ProtoModelQuery
@@ -88,6 +96,30 @@ object CppBridgeModelRegistry {
     }
 
     /**
+     * Update existing model metadata in the C++ registry.
+     *
+     * Mirrors Swift `CppBridge.ModelRegistry.update(_:)`.
+     *
+     * @param model The model info to update.
+     * @throws SDKException if the registry is unavailable or the model is not found.
+     */
+    fun update(model: ProtoModelInfo) {
+        val result =
+            updateProto(model)
+                ?: throw SDKException.make(
+                    code = ProtoErrorCode.ERROR_CODE_NOT_SUPPORTED,
+                    message = "$TAG: Native registry proto ABI unavailable for updateProto",
+                    category = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
+                )
+
+        if (result != RunAnywhereBridge.RAC_SUCCESS) {
+            throw SDKException.modelNotFound(model.id)
+        }
+
+        log(LogLevel.DEBUG, "Model updated via proto registry: ${model.id}")
+    }
+
+    /**
      * Get model info from C++ registry.
      *
      * @param modelId The model ID
@@ -110,6 +142,21 @@ object CppBridgeModelRegistry {
     fun getDownloaded(): List<ProtoModelInfo> = listDownloadedProto()?.models.orEmpty()
 
     /**
+     * Get models filtered to the requested inference frameworks.
+     *
+     * Mirrors Swift `CppBridge.ModelRegistry.getByFrameworks(_:)`. Derives from
+     * [getAll] + Kotlin-side filter (no dedicated JNI thunk).
+     *
+     * @param frameworks The frameworks to filter by. Empty list returns empty result.
+     * @return Models whose [ProtoModelInfo.framework] is contained in [frameworks].
+     */
+    fun getByFrameworks(frameworks: List<ProtoInferenceFramework>): List<ProtoModelInfo> {
+        if (frameworks.isEmpty()) return emptyList()
+        val frameworkSet = frameworks.toSet()
+        return getAll().filter { it.framework in frameworkSet }
+    }
+
+    /**
      * Query registered models using the generated ModelQuery proto.
      */
     fun query(query: ProtoModelQuery): ProtoModelInfoList =
@@ -126,6 +173,85 @@ object CppBridgeModelRegistry {
      */
     fun refresh(request: ProtoModelRegistryRefreshRequest): ProtoModelRegistryRefreshResult? =
         refreshProto(request)
+
+    /**
+     * Discover downloaded models on the file system and link them into the
+     * registry. Mirrors Swift `CppBridge.ModelRegistry.discoverDownloadedModels(_:)`.
+     *
+     * Uses the canonical [ProtoModelDiscoveryRequest] / [ProtoModelDiscoveryResult]
+     * proto ABI (`rac_model_registry_discover_proto`). On failure (native ABI
+     * unavailable, deserialization issue, etc.) returns a result with
+     * `success = false` and the failure reason in `error_message`.
+     *
+     * @param request The discovery request. Defaults to the same configuration
+     *                Swift uses for SDK-init discovery (recursive, link downloaded,
+     *                include user imports, downloaded-only query).
+     */
+    fun discoverDownloadedModels(
+        request: ProtoModelDiscoveryRequest = defaultDiscoveryRequest(),
+    ): ProtoModelDiscoveryResult {
+        val bytes =
+            callProtoBytes("discoverProto") {
+                RunAnywhereBridge.racModelRegistryDiscoverProto(
+                    ProtoModelDiscoveryRequest.ADAPTER.encode(request),
+                )
+            } ?: return ProtoModelDiscoveryResult(
+                success = false,
+                error_message = "Native registry proto ABI unavailable for discoverProto",
+            )
+
+        return try {
+            val result = ProtoModelDiscoveryResult.ADAPTER.decode(bytes)
+            log(
+                LogLevel.INFO,
+                "Discovery complete via proto: ${result.linked_count} models linked, ${result.scanned_count} scanned",
+            )
+            result
+        } catch (e: Exception) {
+            log(LogLevel.WARN, "Discovery proto decode failed: ${e.message}")
+            ProtoModelDiscoveryResult(
+                success = false,
+                error_message = "Failed to decode ModelDiscoveryResult proto: ${e.message}",
+            )
+        }
+    }
+
+    /**
+     * Import platform-normalized local model metadata through the generated
+     * registry import contract. Mirrors Swift
+     * `CppBridge.ModelRegistry.importModel(_:)`.
+     *
+     * Backed by `rac_model_registry_import_proto`. Kotlin supplies stable paths
+     * after download/file-picker work; commons owns the registry merge.
+     *
+     * @param request The import request describing the model and source path.
+     * @return The serialized import result from commons.
+     * @throws SDKException if the native ABI is unavailable or the response
+     *         cannot be decoded.
+     */
+    fun importModel(request: ProtoModelImportRequest): ProtoModelImportResult {
+        val bytes =
+            callProtoBytes("importProto") {
+                RunAnywhereBridge.racModelRegistryImportProto(
+                    ProtoModelImportRequest.ADAPTER.encode(request),
+                )
+            } ?: throw SDKException.make(
+                code = ProtoErrorCode.ERROR_CODE_NOT_SUPPORTED,
+                message = "$TAG: Native registry proto ABI unavailable for importProto",
+                category = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
+            )
+
+        return try {
+            ProtoModelImportResult.ADAPTER.decode(bytes)
+        } catch (e: Exception) {
+            throw SDKException.make(
+                code = ProtoErrorCode.ERROR_CODE_PROCESSING_FAILED,
+                message = "$TAG: Failed to decode ModelImportResult proto: ${e.message}",
+                category = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
+                cause = e,
+            )
+        }
+    }
 
     /**
      * Remove model from C++ registry.
@@ -160,6 +286,27 @@ object CppBridgeModelRegistry {
             log(LogLevel.WARN, "Proto download status update failed for $modelId: $protoResult")
         }
         return false
+    }
+
+    /**
+     * Update last-used timestamp and increment the usage counter for a model.
+     *
+     * Mirrors Swift `CppBridge.ModelRegistry.updateLastUsed(modelId:)`.
+     *
+     * @param modelId The model ID whose usage metadata should be touched.
+     * @throws SDKException if the model is not found in the registry.
+     */
+    fun updateLastUsed(modelId: String) {
+        val current =
+            getProto(modelId)
+                ?: throw SDKException.modelNotFound(modelId)
+
+        val updated =
+            current.copy(
+                last_used_at_unix_ms = System.currentTimeMillis(),
+                usage_count = (current.usage_count ?: 0) + 1,
+            )
+        update(updated)
     }
 
     // ========================================================================
@@ -269,6 +416,19 @@ object CppBridgeModelRegistry {
             log(LogLevel.DEBUG, "Native registry proto ABI unavailable for $operation: ${e.message}")
             null
         }
+
+    /**
+     * Default discovery request matching Swift's `defaultDiscoveryRequest()` —
+     * recursive scan that links downloaded models and includes user imports,
+     * filtered to downloaded-only entries.
+     */
+    private fun defaultDiscoveryRequest(): ProtoModelDiscoveryRequest =
+        ProtoModelDiscoveryRequest(
+            recursive = true,
+            link_downloaded = true,
+            include_user_imports = true,
+            query = ProtoModelQuery(downloaded_only = true),
+        )
 
     // ========================================================================
     // LOGGING

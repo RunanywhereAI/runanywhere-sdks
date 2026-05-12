@@ -36,6 +36,7 @@
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "model_types.pb.h"
+#include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -789,7 +790,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::go
   ::std::string* PROTOBUF_NONNULL _internal_mutable_system_prompt();
 
   public:
-  // int32 max_tokens = 3;
+  // int32 max_tokens = 3 [(.runanywhere.v1.rac_default) = "512"];
   void clear_max_tokens() ;
   [[nodiscard]] ::int32_t max_tokens() const;
   void set_max_tokens(::int32_t value);
@@ -799,7 +800,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::go
   void _internal_set_max_tokens(::int32_t value);
 
   public:
-  // float temperature = 4;
+  // float temperature = 4 [(.runanywhere.v1.rac_default) = "0.7"];
   void clear_temperature() ;
   [[nodiscard]] float temperature() const;
   void set_temperature(float value);
@@ -809,7 +810,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGQueryOptions final : public ::go
   void _internal_set_temperature(float value);
 
   public:
-  // float top_p = 5;
+  // float top_p = 5 [(.runanywhere.v1.rac_default) = "1.0"];
   void clear_top_p() ;
   [[nodiscard]] float top_p() const;
   void set_top_p(float value);
@@ -1260,7 +1261,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   ::std::string* PROTOBUF_NONNULL _internal_mutable_reranker_model_id();
 
   public:
-  // int32 embedding_dimension = 3;
+  // int32 embedding_dimension = 3 [(.runanywhere.v1.rac_default) = "384"];
   void clear_embedding_dimension() ;
   [[nodiscard]] ::int32_t embedding_dimension() const;
   void set_embedding_dimension(::int32_t value);
@@ -1270,7 +1271,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   void _internal_set_embedding_dimension(::int32_t value);
 
   public:
-  // int32 top_k = 4;
+  // int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5"];
   void clear_top_k() ;
   [[nodiscard]] ::int32_t top_k() const;
   void set_top_k(::int32_t value);
@@ -1280,7 +1281,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   void _internal_set_top_k(::int32_t value);
 
   public:
-  // float similarity_threshold = 5;
+  // float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   void clear_similarity_threshold() ;
   [[nodiscard]] float similarity_threshold() const;
   void set_similarity_threshold(float value);
@@ -1290,7 +1291,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   void _internal_set_similarity_threshold(float value);
 
   public:
-  // int32 chunk_size = 6;
+  // int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512"];
   void clear_chunk_size() ;
   [[nodiscard]] ::int32_t chunk_size() const;
   void set_chunk_size(::int32_t value);
@@ -1300,7 +1301,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED RAGConfiguration final : public ::g
   void _internal_set_chunk_size(::int32_t value);
 
   public:
-  // int32 chunk_overlap = 7;
+  // int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64"];
   void clear_chunk_overlap() ;
   [[nodiscard]] ::int32_t chunk_overlap() const;
   void set_chunk_overlap(::int32_t value);
@@ -3890,7 +3891,7 @@ inline void RAGConfiguration::set_allocated_llm_model_id(::std::string* PROTOBUF
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGConfiguration.llm_model_id)
 }
 
-// int32 embedding_dimension = 3;
+// int32 embedding_dimension = 3 [(.runanywhere.v1.rac_default) = "384"];
 inline void RAGConfiguration::clear_embedding_dimension() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.embedding_dimension_ = 0;
@@ -3915,7 +3916,7 @@ inline void RAGConfiguration::_internal_set_embedding_dimension(::int32_t value)
   _impl_.embedding_dimension_ = value;
 }
 
-// int32 top_k = 4;
+// int32 top_k = 4 [(.runanywhere.v1.rac_default) = "5"];
 inline void RAGConfiguration::clear_top_k() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.top_k_ = 0;
@@ -3940,7 +3941,7 @@ inline void RAGConfiguration::_internal_set_top_k(::int32_t value) {
   _impl_.top_k_ = value;
 }
 
-// float similarity_threshold = 5;
+// float similarity_threshold = 5 [(.runanywhere.v1.rac_default) = "0.7", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
 inline void RAGConfiguration::clear_similarity_threshold() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.similarity_threshold_ = 0;
@@ -3965,7 +3966,7 @@ inline void RAGConfiguration::_internal_set_similarity_threshold(float value) {
   _impl_.similarity_threshold_ = value;
 }
 
-// int32 chunk_size = 6;
+// int32 chunk_size = 6 [(.runanywhere.v1.rac_default) = "512"];
 inline void RAGConfiguration::clear_chunk_size() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.chunk_size_ = 0;
@@ -3990,7 +3991,7 @@ inline void RAGConfiguration::_internal_set_chunk_size(::int32_t value) {
   _impl_.chunk_size_ = value;
 }
 
-// int32 chunk_overlap = 7;
+// int32 chunk_overlap = 7 [(.runanywhere.v1.rac_default) = "64"];
 inline void RAGConfiguration::clear_chunk_overlap() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.chunk_overlap_ = 0;
@@ -5157,7 +5158,7 @@ inline void RAGQueryOptions::set_allocated_system_prompt(::std::string* PROTOBUF
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.RAGQueryOptions.system_prompt)
 }
 
-// int32 max_tokens = 3;
+// int32 max_tokens = 3 [(.runanywhere.v1.rac_default) = "512"];
 inline void RAGQueryOptions::clear_max_tokens() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_tokens_ = 0;
@@ -5182,7 +5183,7 @@ inline void RAGQueryOptions::_internal_set_max_tokens(::int32_t value) {
   _impl_.max_tokens_ = value;
 }
 
-// float temperature = 4;
+// float temperature = 4 [(.runanywhere.v1.rac_default) = "0.7"];
 inline void RAGQueryOptions::clear_temperature() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.temperature_ = 0;
@@ -5207,7 +5208,7 @@ inline void RAGQueryOptions::_internal_set_temperature(float value) {
   _impl_.temperature_ = value;
 }
 
-// float top_p = 5;
+// float top_p = 5 [(.runanywhere.v1.rac_default) = "1.0"];
 inline void RAGQueryOptions::clear_top_p() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.top_p_ = 0;

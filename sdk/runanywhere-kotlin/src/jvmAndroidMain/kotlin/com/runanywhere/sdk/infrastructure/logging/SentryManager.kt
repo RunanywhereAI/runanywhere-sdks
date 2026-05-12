@@ -12,13 +12,8 @@ import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.wireString
 import com.runanywhere.sdk.foundation.constants.SDKConstants
-import io.sentry.Breadcrumb
 import io.sentry.Sentry
-import io.sentry.SentryEvent
-import io.sentry.SentryLevel
 import io.sentry.SentryOptions
-import io.sentry.protocol.Message
-import io.sentry.protocol.User
 
 /**
  * Manages Sentry SDK initialization and configuration.
@@ -70,6 +65,16 @@ object SentryManager {
                 options.isAttachStacktrace = true
                 options.tracesSampleRate = 0.0 // Disable performance tracing
 
+                // Swift parity: matches enableCrashHandler / enableAutoBreadcrumbTracking /
+                // enableAppHangTracking / appHangTimeoutInterval on iOS. The Java core
+                // `io.sentry:sentry` lacks ANR + auto-breadcrumb-tracking flags — those live on
+                // `SentryAndroidOptions` from `sentry-android-core`. Because this file is in the
+                // `jvmAndroidMain` (shared JVM + Android) source set, we can't import the
+                // Android-only type without breaking the JVM target. Reflect them in so they
+                // apply on Android and no-op cleanly on JVM. ANR is Android-only;
+                // `enableUncaughtExceptionHandler` (default true) covers JVM crash reporting.
+                applyAndroidOnlyOptions(options)
+
                 // Add SDK info to all events
                 options.beforeSend =
                     SentryOptions.BeforeSendCallback { event, _ ->
@@ -97,110 +102,44 @@ object SentryManager {
         }
     }
 
-    // =============================================================================
-    // DIRECT API (for advanced use cases)
-    // =============================================================================
-
     /**
-     * Capture an error directly with Sentry.
+     * Apply Sentry options that only exist on `SentryAndroidOptions` (sentry-android-core):
+     *   - `enableAutoBreadcrumbTracking` — Swift's `options.enableAutoBreadcrumbTracking`
+     *   - `anrEnabled` / `anrTimeoutIntervalMillis` — Swift's `enableAppHangTracking` +
+     *     `appHangTimeoutInterval` (5000ms here vs Swift's 2000ms to align with Sentry-Android's
+     *     ANR-detection default and reduce false positives).
      *
-     * @param error The error to capture
-     * @param context Additional context as key-value pairs
+     * Reflection is used because this file is in the `jvmAndroidMain` shared source set and
+     * cannot reference the Android-only `SentryAndroidOptions` type without breaking the JVM
+     * target. On JVM the options object is plain `SentryOptions`, the setters are missing, and
+     * the calls no-op silently — which is correct, since ANR detection is meaningless off-Android.
      */
-    fun captureError(error: Throwable, context: Map<String, Any?>? = null) {
-        if (!_isInitialized) return
+    private fun applyAndroidOnlyOptions(options: SentryOptions) {
+        invokeBooleanSetter(options, "setEnableAutoBreadcrumbTracking", true)
+        invokeBooleanSetter(options, "setAnrEnabled", true)
+        invokeLongSetter(options, "setAnrTimeoutIntervalMillis", 5_000L)
+    }
 
-        Sentry.captureException(error) { scope ->
-            context?.forEach { (key, value) ->
-                scope.setExtra(key, value?.toString() ?: "null")
-            }
+    private fun invokeBooleanSetter(target: Any, methodName: String, value: Boolean) {
+        try {
+            val method = target.javaClass.getMethod(methodName, java.lang.Boolean.TYPE)
+            method.invoke(target, value)
+        } catch (_: NoSuchMethodException) {
+            // Expected on JVM: this setter exists only on SentryAndroidOptions.
+        } catch (_: Exception) {
+            // Defensive: never let a reflection failure break SDK init.
         }
     }
 
-    /**
-     * Capture an error message directly with Sentry.
-     *
-     * @param message The error message
-     * @param level Sentry level (defaults to ERROR)
-     * @param context Additional context as key-value pairs
-     */
-    fun captureMessage(
-        message: String,
-        level: SentryLevel = SentryLevel.ERROR,
-        context: Map<String, Any?>? = null,
-    ) {
-        if (!_isInitialized) return
-
-        val event =
-            SentryEvent().apply {
-                this.level = level
-                this.message =
-                    Message().apply {
-                        this.formatted = message
-                    }
-            }
-
-        context?.forEach { (key, value) ->
-            event.setExtra(key, value?.toString() ?: "null")
+    private fun invokeLongSetter(target: Any, methodName: String, value: Long) {
+        try {
+            val method = target.javaClass.getMethod(methodName, java.lang.Long.TYPE)
+            method.invoke(target, value)
+        } catch (_: NoSuchMethodException) {
+            // Expected on JVM: this setter exists only on SentryAndroidOptions.
+        } catch (_: Exception) {
+            // Defensive: never let a reflection failure break SDK init.
         }
-
-        Sentry.captureEvent(event)
-    }
-
-    /**
-     * Add a breadcrumb for context trail.
-     *
-     * @param category Category of the breadcrumb
-     * @param message Message for the breadcrumb
-     * @param level Log level
-     * @param data Additional data
-     */
-    fun addBreadcrumb(
-        category: String,
-        message: String,
-        level: SentryLevel = SentryLevel.INFO,
-        data: Map<String, String>? = null,
-    ) {
-        if (!_isInitialized) return
-
-        val breadcrumb =
-            Breadcrumb().apply {
-                this.category = category
-                this.message = message
-                this.level = level
-                data?.forEach { (key, value) ->
-                    this.setData(key, value)
-                }
-            }
-
-        Sentry.addBreadcrumb(breadcrumb)
-    }
-
-    /**
-     * Set user information for Sentry events.
-     *
-     * @param userId Unique user identifier
-     * @param email User email (optional)
-     * @param username Username (optional)
-     */
-    fun setUser(userId: String, email: String? = null, username: String? = null) {
-        if (!_isInitialized) return
-
-        val user =
-            User().apply {
-                this.id = userId
-                this.email = email
-                this.username = username
-            }
-        Sentry.setUser(user)
-    }
-
-    /**
-     * Clear user information.
-     */
-    fun clearUser() {
-        if (!_isInitialized) return
-        Sentry.setUser(null)
     }
 
     /**

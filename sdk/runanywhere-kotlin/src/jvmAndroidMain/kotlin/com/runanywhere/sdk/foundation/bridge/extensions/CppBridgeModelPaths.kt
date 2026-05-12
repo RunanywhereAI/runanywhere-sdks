@@ -11,6 +11,7 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.File
 
@@ -162,6 +163,154 @@ object CppBridgeModelPaths {
             }
         return File(File(File(base, "RunAnywhere"), "Models"), "$frameworkName${File.separator}$modelId").absolutePath
     }
+
+    // ========================================================================
+    // SWIFT-PARITY WRAPPERS (mirror CppBridge+ModelPaths.swift)
+    // ========================================================================
+    //
+    // Thin JNI passthroughs to the `rac_model_paths_*` C ABI. Paths are
+    // returned as `String` (Kotlin/JVM idiom) instead of Swift's `URL`.
+    // Framework ints are RAC_FRAMEWORK_* values (see [CppBridgeModelRegistry.Framework]).
+    // Format ints are rac_model_format_t values.
+
+    /**
+     * Set the base directory for model storage. Must be called during SDK
+     * initialization. Mirrors Swift `CppBridge.ModelPaths.setBaseDirectory(_:)`.
+     *
+     * @param baseDir Absolute path to the base directory.
+     * @throws SDKException with `ERROR_CODE_INITIALIZATION_FAILED` on failure.
+     */
+    fun setBaseDirectory(baseDir: String) {
+        val result = RunAnywhereBridge.racModelPathsSetBaseDirectory(baseDir)
+        if (result != 0) {
+            throw SDKException.make(
+                code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_INITIALIZATION_FAILED,
+                message = "Failed to set base directory",
+                category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_INTERNAL,
+                cAbiCode = result,
+            )
+        }
+        CppBridgePlatformAdapter.logCallback(
+            CppBridgePlatformAdapter.LogLevel.DEBUG,
+            TAG,
+            "Base directory set to: $baseDir",
+        )
+    }
+
+    /**
+     * Get the canonical models directory (`{base_dir}/RunAnywhere/Models/`).
+     * Mirrors Swift `CppBridge.ModelPaths.getModelsDirectory()`.
+     *
+     * @throws SDKException with `ERROR_CODE_INITIALIZATION_FAILED` if base dir is not configured.
+     */
+    fun getModelsDirectory(): String =
+        RunAnywhereBridge.racModelPathsGetModelsDirectory()
+            ?: throw SDKException.make(
+                code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_INITIALIZATION_FAILED,
+                message = "Base directory not configured",
+                category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_INTERNAL,
+            )
+
+    /**
+     * Get the framework-specific directory (`{base_dir}/RunAnywhere/Models/{framework}/`).
+     * Mirrors Swift `CppBridge.ModelPaths.getFrameworkDirectory(framework:)`.
+     *
+     * @param framework RAC_FRAMEWORK_* int (see [CppBridgeModelRegistry.Framework]).
+     * @throws SDKException with `ERROR_CODE_INITIALIZATION_FAILED` if base dir is not configured.
+     */
+    fun getFrameworkDirectory(framework: Int): String =
+        RunAnywhereBridge.racModelPathsGetFrameworkDirectory(framework)
+            ?: throw SDKException.make(
+                code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_INITIALIZATION_FAILED,
+                message = "Base directory not configured",
+                category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_INTERNAL,
+            )
+
+    /**
+     * Get the expected model path (folder for directory-based, file for single-file).
+     * Mirrors Swift `CppBridge.ModelPaths.getExpectedModelPath(modelId:framework:format:)`.
+     *
+     * @param modelId Model identifier.
+     * @param framework RAC_FRAMEWORK_* int (see [CppBridgeModelRegistry.Framework]).
+     * @param format rac_model_format_t int (matches proto `ModelFormat.value`).
+     * @throws SDKException with `ERROR_CODE_INITIALIZATION_FAILED` if base dir is not configured.
+     */
+    fun getExpectedModelPath(modelId: String, framework: Int, format: Int): String =
+        RunAnywhereBridge.racModelPathsGetExpectedModelPath(modelId, framework, format)
+            ?: throw SDKException.make(
+                code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_INITIALIZATION_FAILED,
+                message = "Base directory not configured",
+                category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_INTERNAL,
+            )
+
+    /**
+     * Get the cache directory.
+     * Mirrors Swift `CppBridge.ModelPaths.getCacheDirectory()`.
+     *
+     * @throws SDKException with `ERROR_CODE_INITIALIZATION_FAILED` if base dir is not configured.
+     */
+    fun getCacheDirectory(): String =
+        RunAnywhereBridge.racModelPathsGetCacheDirectory()
+            ?: throw SDKException.make(
+                code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_INITIALIZATION_FAILED,
+                message = "Base directory not configured",
+                category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_INTERNAL,
+            )
+
+    /**
+     * Get the downloads staging directory.
+     * Mirrors Swift `CppBridge.ModelPaths.getDownloadsDirectory()`.
+     *
+     * @throws SDKException with `ERROR_CODE_INITIALIZATION_FAILED` if base dir is not configured.
+     */
+    fun getDownloadsDirectory(): String =
+        RunAnywhereBridge.racModelPathsGetDownloadsDirectory()
+            ?: throw SDKException.make(
+                code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_INITIALIZATION_FAILED,
+                message = "Base directory not configured",
+                category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_INTERNAL,
+            )
+
+    /**
+     * Get the temp directory.
+     * Mirrors Swift `CppBridge.ModelPaths.getTempDirectory()`.
+     *
+     * @throws SDKException with `ERROR_CODE_INITIALIZATION_FAILED` if base dir is not configured.
+     */
+    fun getTempDirectory(): String =
+        RunAnywhereBridge.racModelPathsGetTempDirectory()
+            ?: throw SDKException.make(
+                code = ai.runanywhere.proto.v1.ErrorCode.ERROR_CODE_INITIALIZATION_FAILED,
+                message = "Base directory not configured",
+                category = ai.runanywhere.proto.v1.ErrorCategory.ERROR_CATEGORY_INTERNAL,
+            )
+
+    /**
+     * Extract the model ID from a canonical model path. Returns null if the
+     * path is not a recognized model path.
+     * Mirrors Swift `CppBridge.ModelPaths.extractModelId(from:)`.
+     */
+    fun extractModelId(path: String): String? =
+        RunAnywhereBridge.racModelPathsExtractModelId(path)
+
+    /**
+     * Extract the framework int from a canonical model path. Returns null if
+     * the path is not a recognized model path.
+     * Mirrors Swift `CppBridge.ModelPaths.extractFramework(from:)`.
+     *
+     * @return RAC_FRAMEWORK_* int (see [CppBridgeModelRegistry.Framework]), or null on failure.
+     */
+    fun extractFramework(path: String): Int? {
+        val fw = RunAnywhereBridge.racModelPathsExtractFramework(path)
+        return if (fw < 0) null else fw
+    }
+
+    /**
+     * Check if the given path is a canonical model path (i.e. is within the
+     * models directory). Mirrors Swift `CppBridge.ModelPaths.isModelPath(_:)`.
+     */
+    fun isModelPath(path: String): Boolean =
+        RunAnywhereBridge.racModelPathsIsModelPath(path)
 
     /**
      * Initialize the default base directory.

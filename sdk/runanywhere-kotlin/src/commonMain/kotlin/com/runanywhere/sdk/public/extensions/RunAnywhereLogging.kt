@@ -9,6 +9,9 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import com.runanywhere.sdk.infrastructure.logging.LogDestination
+import com.runanywhere.sdk.infrastructure.logging.Logging
+import com.runanywhere.sdk.infrastructure.logging.LoggingConfiguration
 import com.runanywhere.sdk.public.RunAnywhere
 
 // MARK: - Log Level
@@ -41,6 +44,24 @@ enum class LogLevel(
 // MARK: - Logging Configuration
 
 /**
+ * Configure logging with a predefined configuration.
+ *
+ * @param config The logging configuration to apply
+ */
+fun RunAnywhere.configureLogging(config: LoggingConfiguration) {
+    Logging.configure(config)
+}
+
+/**
+ * Enable or disable local console logging.
+ *
+ * @param enabled Whether to enable local logging
+ */
+fun RunAnywhere.setLocalLoggingEnabled(enabled: Boolean) {
+    Logging.setLocalLoggingEnabled(enabled)
+}
+
+/**
  * Set the SDK log level.
  *
  * @param level Log level to set
@@ -51,11 +72,41 @@ fun RunAnywhere.setLogLevel(level: LogLevel) {
 }
 
 /**
+ * Enable or disable Sentry error tracking.
+ *
+ * @param enabled Whether to enable Sentry logging
+ */
+fun RunAnywhere.setSentryLoggingEnabled(enabled: Boolean) {
+    Logging.setSentryLoggingEnabled(enabled)
+}
+
+/**
+ * Add a custom log destination.
+ *
+ * @param destination The destination to add
+ */
+fun RunAnywhere.addLogDestination(destination: LogDestination) {
+    Logging.addDestinationSync(destination)
+}
+
+// MARK: - Debugging Helpers
+
+/**
+ * Enable verbose debugging mode.
+ *
+ * @param enabled Whether to enable verbose mode
+ */
+fun RunAnywhere.setDebugMode(enabled: Boolean) {
+    setLogLevel(if (enabled) LogLevel.DEBUG else LogLevel.INFO)
+    setLocalLoggingEnabled(enabled)
+}
+
+/**
  * Internal function to set log level via CppBridge.
  */
 internal expect fun RunAnywhere.setLogLevelInternal(level: LogLevel)
 
 /**
- * Flush pending log messages.
+ * Force flush all pending logs to destinations.
  */
 expect fun RunAnywhere.flushLogs()

@@ -70,4 +70,6 @@ object CppBridgeModelLifecycle {
             RunAnywhereBridge.racComponentLifecycleSnapshotProto(component.value),
             "componentLifecycleSnapshot",
         )
+
+    fun reset(): Int = RunAnywhereBridge.racModelLifecycleReset()
 }

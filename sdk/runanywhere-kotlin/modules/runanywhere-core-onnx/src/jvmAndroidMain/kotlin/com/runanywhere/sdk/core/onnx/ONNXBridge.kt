@@ -109,20 +109,4 @@ internal object ONNXBridge {
      */
     @JvmStatic
     external fun nativeUnregister(): Int
-
-    /**
-     * Check if the ONNX backend is registered.
-     *
-     * @return true if registered
-     */
-    @JvmStatic
-    external fun nativeIsRegistered(): Boolean
-
-    /**
-     * Get the ONNX Runtime library version.
-     *
-     * @return Version string
-     */
-    @JvmStatic
-    external fun nativeGetVersion(): String
 }

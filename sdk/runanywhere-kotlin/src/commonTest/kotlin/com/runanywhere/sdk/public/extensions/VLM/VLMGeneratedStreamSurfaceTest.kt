@@ -4,6 +4,7 @@ import ai.runanywhere.proto.v1.SDKEvent
 import ai.runanywhere.proto.v1.VLMImage
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.processImageStream
+import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import kotlinx.coroutines.flow.Flow
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,4 +20,4 @@ class VLMGeneratedStreamSurfaceTest {
 
 @Suppress("unused")
 private fun vlmStreamSurface(image: VLMImage): Flow<SDKEvent> =
-    RunAnywhere.processImageStream(image, "Describe this")
+    RunAnywhere.processImageStream(image, RAVLMGenerationOptions())

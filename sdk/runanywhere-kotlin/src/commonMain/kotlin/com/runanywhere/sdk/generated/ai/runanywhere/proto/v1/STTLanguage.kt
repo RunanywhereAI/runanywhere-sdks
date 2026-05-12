@@ -26,6 +26,10 @@ import kotlin.Suppress
  * AUTO is the explicit "detect from audio" sentinel; UNSPECIFIED falls
  * back to the backend default (typically "en").
  * ---------------------------------------------------------------------------
+ * `rac_wire_string` annotations expose the BCP-47 base code for each value via
+ * the codegen-generated `wireString` accessor (see idl/rac_options.proto and
+ * idl/codegen/generate_swift_convenience.py). Swift SDK `bcp47Code` is sourced
+ * from this annotation; the unspecified case falls back to "" by default.
  */
 public enum class STTLanguage(
   override val `value`: Int,
@@ -34,18 +38,31 @@ public enum class STTLanguage(
   /**
    * Auto-detect from audio
    */
+  @RacWireStringOption("auto")
   STT_LANGUAGE_AUTO(1),
+  @RacWireStringOption("en")
   STT_LANGUAGE_EN(2),
+  @RacWireStringOption("es")
   STT_LANGUAGE_ES(3),
+  @RacWireStringOption("fr")
   STT_LANGUAGE_FR(4),
+  @RacWireStringOption("de")
   STT_LANGUAGE_DE(5),
+  @RacWireStringOption("zh")
   STT_LANGUAGE_ZH(6),
+  @RacWireStringOption("ja")
   STT_LANGUAGE_JA(7),
+  @RacWireStringOption("ko")
   STT_LANGUAGE_KO(8),
+  @RacWireStringOption("it")
   STT_LANGUAGE_IT(9),
+  @RacWireStringOption("pt")
   STT_LANGUAGE_PT(10),
+  @RacWireStringOption("ar")
   STT_LANGUAGE_AR(11),
+  @RacWireStringOption("ru")
   STT_LANGUAGE_RU(12),
+  @RacWireStringOption("hi")
   STT_LANGUAGE_HI(13),
   ;
 

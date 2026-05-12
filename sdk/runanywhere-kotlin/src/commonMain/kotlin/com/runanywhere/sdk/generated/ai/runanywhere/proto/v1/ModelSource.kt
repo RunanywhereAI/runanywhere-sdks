@@ -21,18 +21,22 @@ import kotlin.Suppress
 public enum class ModelSource(
   override val `value`: Int,
 ) : WireEnum {
+  @RacWireStringOption("unspecified")
   MODEL_SOURCE_UNSPECIFIED(0),
   /**
    * Downloaded from a URL
    */
+  @RacWireStringOption("remote")
   MODEL_SOURCE_REMOTE(1),
   /**
    * Bundled or user-imported
    */
+  @RacWireStringOption("local")
   MODEL_SOURCE_LOCAL(2),
   /**
    * Platform/system model with no portable download artifact
    */
+  @RacWireStringOption("built-in")
   MODEL_SOURCE_BUILT_IN(3),
   ;
 

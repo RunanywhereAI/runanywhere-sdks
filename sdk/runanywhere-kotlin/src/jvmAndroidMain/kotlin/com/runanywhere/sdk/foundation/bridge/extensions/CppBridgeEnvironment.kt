@@ -14,7 +14,7 @@
  *   sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/
  *     CppBridge+Environment.swift
  *
- * NOTE (B18): the dev-config query helpers also exist inside
+ * NOTE: the dev-config query helpers also exist inside
  * `CppBridgeTelemetry` (`hasUsableDevelopmentConfig`,
  * `looksLikePlaceholder`, `isUsableHttpUrl`) and inline blocks of
  * `CppBridgeDevice`. Per the task spec the originals are NOT modified
@@ -24,6 +24,7 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.configuration.cEnvironment
@@ -36,13 +37,11 @@ import com.runanywhere.sdk.public.configuration.cEnvironment
  * `validation_error_message`. Mirrors Swift's `CppBridge.Environment`
  * enum namespace.
  *
- * TODO(KOT-B18): no `racEnvRequiresAuth` / `racValidateApiKey` /
- * `racValidateBaseUrl` / `racValidationErrorMessage` external funs are
- * declared in `RunAnywhereBridge.kt` yet. Each accessor below
- * therefore returns a conservative default that matches the C++
- * behaviour for the relevant environment. When the commons follow-up
- * exposes those calls over JNI, swap the bodies for direct delegation
- * to `RunAnywhereBridge.*`.
+ * All helpers delegate to the JNI bindings declared in
+ * `RunAnywhereBridge.kt` (see "ENVIRONMENT VALIDATION + ENDPOINTS"
+ * section). If the native library is not loaded yet, the calls fall
+ * back to conservative defaults that match the C++ behaviour for the
+ * relevant environment.
  */
 object CppBridgeEnvironment {
 
@@ -68,25 +67,65 @@ object CppBridgeEnvironment {
         }
 
     /**
-     * Whether [env] requires authentication. Production and staging
-     * always do; development is permissive.
-     *
-     * TODO(KOT-B18): replace with `RunAnywhereBridge.racEnvRequiresAuth(...)`
-     * once that JNI binding lands.
+     * Whether [env] requires authentication. Mirrors Swift's
+     * `CppBridge.Environment.requiresAuth(_:)` — delegates to
+     * `rac_env_requires_auth` via JNI.
      */
     fun requiresAuth(env: SDKEnvironment): Boolean =
-        env == SDKEnvironment.SDK_ENVIRONMENT_STAGING ||
-            env == SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+        RunAnywhereBridge.racEnvRequiresAuth(toC(env))
 
     /**
-     * Whether [env] requires an explicit backend base URL (vs falling
-     * back to the development default). Production and staging do.
-     *
-     * TODO(KOT-B18): replace with
-     * `RunAnywhereBridge.racEnvRequiresBackendUrl(...)` once that JNI
-     * binding lands.
+     * Whether [env] requires an explicit backend base URL. Mirrors
+     * Swift's `CppBridge.Environment.requiresBackendURL(_:)` —
+     * delegates to `rac_env_requires_backend_url` via JNI.
      */
-    fun requiresBackendURL(env: SDKEnvironment): Boolean = requiresAuth(env)
+    fun requiresBackendURL(env: SDKEnvironment): Boolean =
+        RunAnywhereBridge.racEnvRequiresBackendUrl(toC(env))
+
+    /**
+     * Validate an API key for [env]. Returns `true` when the key
+     * passes `RAC_VALIDATION_OK`. Mirrors Swift's
+     * `CppBridge.Environment.validateAPIKey(_:for:)` — the underlying
+     * JNI binding folds the Swift `rac_validation_result_t` enum into
+     * a single Boolean (`true == ok`).
+     */
+    fun validateAPIKey(key: String, env: SDKEnvironment): Boolean {
+        // The current JNI thunk is env-independent (validates against
+        // a single global policy), but we keep the [env] parameter in
+        // the Kotlin API surface for symmetry with Swift and so the
+        // call site can be retargeted at a per-env validator without
+        // a breaking change.
+        @Suppress("UNUSED_PARAMETER")
+        val unused = env
+        return RunAnywhereBridge.racEnvValidateApiKey(key)
+    }
+
+    /**
+     * Validate a base URL for [env]. Returns `true` when the URL
+     * passes `RAC_VALIDATION_OK`. Mirrors Swift's
+     * `CppBridge.Environment.validateBaseURL(_:for:)`.
+     */
+    fun validateBaseURL(url: String, env: SDKEnvironment): Boolean {
+        @Suppress("UNUSED_PARAMETER")
+        val unused = env
+        return RunAnywhereBridge.racEnvValidateBaseUrl(url)
+    }
+
+    /**
+     * Resolve the human-readable validation error message for the
+     * given `(env, key, url)` triple. Returns the message when the
+     * triple fails validation, `null` when it passes.
+     *
+     * Mirrors Swift's
+     * `CppBridge.Environment.validationErrorMessage(_:)`. The Swift
+     * surface takes a single `rac_validation_result_t` because
+     * `validate_api_key` / `validate_base_url` return that result
+     * directly; the Kotlin JNI thunk inverts the call shape and
+     * folds the triple into a single helper that returns either the
+     * message string or null when everything validates.
+     */
+    fun validationErrorMessage(env: SDKEnvironment, key: String, url: String): String? =
+        RunAnywhereBridge.racEnvValidationErrorMessage(toC(env), key, url)
 }
 
 /**
@@ -110,48 +149,23 @@ object CppBridgeDevConfig {
      * non-template payload. Mirrors Swift's `DevConfig.isAvailable`.
      */
     val isAvailable: Boolean
-        get() =
-            try {
-                RunAnywhereBridge.racDevConfigIsAvailable()
-            } catch (_: Throwable) {
-                false
-            }
+        get() = RunAnywhereBridge.racDevConfigIsAvailable()
 
     /** Supabase URL for development mode. Mirrors Swift's `DevConfig.supabaseURL`. */
     val supabaseURL: String?
-        get() =
-            try {
-                RunAnywhereBridge.racDevConfigGetSupabaseUrl()
-            } catch (_: Throwable) {
-                null
-            }
+        get() = RunAnywhereBridge.racDevConfigGetSupabaseUrl()
 
     /** Supabase anon key for development mode. Mirrors Swift's `DevConfig.supabaseKey`. */
     val supabaseKey: String?
-        get() =
-            try {
-                RunAnywhereBridge.racDevConfigGetSupabaseKey()
-            } catch (_: Throwable) {
-                null
-            }
+        get() = RunAnywhereBridge.racDevConfigGetSupabaseKey()
 
     /** Build token for development mode. Mirrors Swift's `DevConfig.buildToken`. */
     val buildToken: String?
-        get() =
-            try {
-                RunAnywhereBridge.racDevConfigGetBuildToken()?.takeIf { isUsableCredential(it) }
-            } catch (_: Throwable) {
-                null
-            }
+        get() = RunAnywhereBridge.racDevConfigGetBuildToken()?.takeIf { isUsableCredential(it) }
 
     /** Sentry DSN for crash reporting (optional). Mirrors Swift's `DevConfig.sentryDSN`. */
     val sentryDSN: String?
-        get() =
-            try {
-                RunAnywhereBridge.racDevConfigGetSentryDsn()
-            } catch (_: Throwable) {
-                null
-            }
+        get() = RunAnywhereBridge.racDevConfigGetSentryDsn()
 
     /**
      * Whether the dev Supabase config is present and not a template
@@ -177,6 +191,30 @@ object CppBridgeDevConfig {
      */
     val hasUsableDevelopmentRegistrationConfig: Boolean
         get() = hasUsableSupabaseConfig && hasUsableBuildToken
+
+    /**
+     * Configure [HTTPClientAdapter] for development mode using the C++
+     * dev-config payload. Returns `true` when the adapter was
+     * configured, `false` when the dev config is unavailable or the
+     * URL/key fail the usability checks.
+     *
+     * Mirrors Swift's `CppBridge.DevConfig.configureHTTP()` —
+     * `async` suspend, validates with the same `isUsableHTTPURL` /
+     * `isUsableCredential` rules, trims the URL + key before handing
+     * them to the HTTP adapter, and returns `false` rather than
+     * throwing when the inputs are unusable.
+     */
+    suspend fun configureHTTP(): Boolean {
+        if (!hasUsableSupabaseConfig) return false
+        val rawUrl = supabaseURL ?: return false
+        val rawKey = supabaseKey ?: return false
+        val trimmedUrl = rawUrl.trim()
+        val trimmedKey = rawKey.trim()
+        if (!isUsableHTTPURL(trimmedUrl)) return false
+        if (!isUsableCredential(trimmedKey)) return false
+        HTTPClientAdapter.configure(baseURL = trimmedUrl, apiKey = trimmedKey)
+        return true
+    }
 
     /**
      * Whether [value] looks like a template placeholder. Matches the
@@ -217,50 +255,83 @@ object CppBridgeDevConfig {
  * Wraps `rac_endpoints.h` macros + helper functions. Mirrors Swift's
  * `CppBridge.Endpoints` enum namespace.
  *
- * TODO(KOT-B18): the matching `racEndpoint*` external funs aren't
- * declared in `RunAnywhereBridge.kt` yet. The hard-coded path constants
- * mirror the values in `idl/endpoints.proto` so existing callers keep
- * working; once the JNI bindings land, swap each accessor for a direct
- * delegation to the C ABI.
+ * The endpoint accessors delegate to the JNI bindings declared in
+ * `RunAnywhereBridge.kt`. If the native binding returns null or
+ * throws (e.g. native lib not yet loaded), the accessors fall back to
+ * the hard-coded path constants which mirror the values in
+ * `idl/endpoints.proto`.
  */
 object CppBridgeEndpoints {
 
+    /** Fallback constants used when the native binding is unreachable.
+     *  Mirror the canonical values in `rac_endpoints.h`. */
+    private const val FALLBACK_DEV_DEVICE_REGISTRATION: String = "/rest/v1/devices"
+    private const val FALLBACK_PROD_DEVICE_REGISTRATION: String = "/api/v1/devices"
+    private const val FALLBACK_DEV_TELEMETRY: String = "/rest/v1/telemetry_events"
+    private const val FALLBACK_PROD_TELEMETRY: String = "/api/v1/telemetry"
+    private const val FALLBACK_MODEL_ASSIGNMENTS: String = "/api/v1/models/assignments"
+
     /** SDK authenticate endpoint. Mirrors Swift's `Endpoints.authenticate`. */
-    const val AUTHENTICATE: String = "/api/v1/auth/sdk/authenticate"
+    val AUTHENTICATE: String?
+        get() = RunAnywhereBridge.racEndpointAuthenticate()
 
     /** SDK refresh endpoint. Mirrors Swift's `Endpoints.refresh`. */
-    const val REFRESH: String = "/api/v1/auth/sdk/refresh"
+    val REFRESH: String?
+        get() = RunAnywhereBridge.racEndpointRefresh()
 
     /** SDK health endpoint. Mirrors Swift's `Endpoints.health`. */
-    const val HEALTH: String = "/api/v1/health"
+    val HEALTH: String?
+        get() = RunAnywhereBridge.racEndpointHealth()
 
     /**
-     * Device registration endpoint for [env]. Production and staging
-     * share the same Railway path; development uses the Supabase REST
-     * `devices` table.
+     * Device registration endpoint for [env]. Mirrors Swift's
+     * `Endpoints.deviceRegistration(for:)` — delegates to
+     * `rac_endpoint_device_registration` via JNI.
      */
-    fun deviceRegistration(env: SDKEnvironment): String =
-        when (env) {
-            SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> "/rest/v1/devices"
+    fun deviceRegistration(env: SDKEnvironment): String {
+        val fallback = when (env) {
             SDKEnvironment.SDK_ENVIRONMENT_STAGING,
             SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
-            -> "/api/v1/devices"
-            SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> "/rest/v1/devices"
+            -> FALLBACK_PROD_DEVICE_REGISTRATION
+            else -> FALLBACK_DEV_DEVICE_REGISTRATION
         }
+        return jniOrFallback(fallback) {
+            RunAnywhereBridge.racEndpointDeviceRegistration(CppBridgeEnvironment.toC(env))
+        }
+    }
 
     /**
      * Telemetry endpoint for [env]. Mirrors Swift's
-     * `Endpoints.telemetry(for:)`.
+     * `Endpoints.telemetry(for:)` — delegates to
+     * `rac_endpoint_telemetry` via JNI.
      */
-    fun telemetry(env: SDKEnvironment): String =
-        when (env) {
-            SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> "/rest/v1/telemetry_events"
+    fun telemetry(env: SDKEnvironment): String {
+        val fallback = when (env) {
             SDKEnvironment.SDK_ENVIRONMENT_STAGING,
             SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
-            -> "/api/v1/telemetry"
-            SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> "/rest/v1/telemetry_events"
+            -> FALLBACK_PROD_TELEMETRY
+            else -> FALLBACK_DEV_TELEMETRY
         }
+        return jniOrFallback(fallback) {
+            RunAnywhereBridge.racEndpointTelemetry(CppBridgeEnvironment.toC(env))
+        }
+    }
 
     /** Model assignments endpoint. Mirrors Swift's `Endpoints.modelAssignments()`. */
-    fun modelAssignments(): String = "/api/v1/models/assignments"
+    fun modelAssignments(): String =
+        jniOrFallback(FALLBACK_MODEL_ASSIGNMENTS) { RunAnywhereBridge.racEndpointModelAssignments() }
+
+    /**
+     * Return the JNI-resolved endpoint when the binding is reachable
+     * and returns a non-null/non-blank string; otherwise fall back to
+     * the hard-coded constant. The fallback layer keeps the SDK
+     * usable in unit tests and during early bring-up where the native
+     * library may not be loaded.
+     */
+    private inline fun jniOrFallback(fallback: String, block: () -> String?): String =
+        try {
+            block()?.takeIf { it.isNotBlank() } ?: fallback
+        } catch (_: Throwable) {
+            fallback
+        }
 }

@@ -14,6 +14,7 @@
 
 package com.runanywhere.sdk.native.bridge
 
+import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 
 /*
@@ -58,6 +59,10 @@ object RunAnywhereBridge {
             try {
                 System.loadLibrary("runanywhere_jni")
                 nativeLibraryLoaded = true
+                // Route metadata-redaction policy through the canonical commons
+                // C ABI so Kotlin SDKLogger and the C++ logger share one
+                // sensitive-substring list (mirrors Swift's SDKLogger).
+                Logging.shouldRedactPolicy = { key -> racLogMetadataShouldRedact(key) }
                 logger.info("✅ Native library loaded successfully")
                 return true
             } catch (e: UnsatisfiedLinkError) {
@@ -86,23 +91,6 @@ object RunAnywhereBridge {
     external fun racIsInitialized(): Boolean
 
     // ========================================================================
-    // ERROR MAPPING (rac_error_proto.h)
-    // ========================================================================
-
-    /**
-     * Map a `rac_result_t` integer to the proto-serialized bytes of the
-     * canonical `SDKError`. Wraps the commons C ABI
-     * `rac_result_to_proto_error`, the single source of truth shared by
-     * every platform SDK.
-     *
-     * @param rcResult The `rac_result_t` integer returned by a native call.
-     * @return Wire-encoded `SDKError` bytes, or null on `RAC_SUCCESS` or on
-     *         a commons-side mapping error.
-     */
-    @JvmStatic
-    external fun racResultToProtoError(rcResult: Int): ByteArray?
-
-    // ========================================================================
     // PLATFORM ADAPTER (rac_platform_adapter.h)
     // ========================================================================
 
@@ -121,6 +109,18 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racLog(level: Int, tag: String, message: String)
+
+    /**
+     * Determine whether a metadata key should be redacted in logs, delegating
+     * to the canonical C++ policy `rac_log_metadata_should_redact`. Keeps
+     * Kotlin and C++ logs in sync without duplicating the substring list.
+     *
+     * @param key Metadata key to check (non-null).
+     * @return `true` if the key matches a sensitive substring and its value
+     *         should be redacted; `false` otherwise.
+     */
+    @JvmStatic
+    external fun racLogMetadataShouldRedact(key: String): Boolean
 
     // ========================================================================
     // MODEL PATHS (rac_model_paths.h) — Swift-canonical schema
@@ -351,55 +351,6 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racVlmDestroy(handle: Long)
-
-    // ========================================================================
-    // ARCHIVE EXTRACTION (rac_extraction.h)
-    // ========================================================================
-
-    /** Extract an archive (ZIP, TAR.GZ, TAR.BZ2, TAR.XZ) to destination directory.
-     *  Returns RAC_SUCCESS (0) on success, negative error code on failure. */
-    @JvmStatic
-    external fun nativeExtractArchive(archivePath: String, destinationDir: String): Int
-
-    /** Detect archive type from magic bytes. Returns rac_archive_type_t enum value, or -1 on failure. */
-    @JvmStatic
-    external fun nativeDetectArchiveType(filePath: String): Int
-
-    // ========================================================================
-    // DOWNLOAD ORCHESTRATOR (rac_download_orchestrator.h)
-    // ========================================================================
-
-    /** Find model path after extraction. Returns the actual model file/directory path.
-     *  Uses C++ rac_find_model_path_after_extraction() — consolidated from platform-specific logic.
-     *  @param extractedDir Directory where archive was extracted
-     *  @param structure Archive structure hint (rac_archive_structure_t enum ordinal)
-     *  @param framework Inference framework (rac_inference_framework_t enum ordinal)
-     *  @param format Model format (rac_model_format_t enum ordinal)
-     *  @return The found model path, or extractedDir as fallback */
-    @JvmStatic
-    external fun nativeFindModelPathAfterExtraction(
-        extractedDir: String,
-        structure: Int,
-        framework: Int,
-        format: Int,
-    ): String
-
-    /** Check if a download URL requires extraction.
-     *  Uses C++ rac_download_requires_extraction() — handles .tar.gz, .tar.bz2, .zip, etc.
-     *  @return true if URL points to an archive */
-    @JvmStatic
-    external fun nativeDownloadRequiresExtraction(url: String): Boolean
-
-    /** Compute download destination path.
-     *  Uses C++ rac_download_compute_destination().
-     *  @return Destination path, or null on failure */
-    @JvmStatic
-    external fun nativeComputeDownloadDestination(
-        modelId: String,
-        downloadUrl: String,
-        framework: Int,
-        format: Int,
-    ): String?
 
     // ========================================================================
     // BACKEND REGISTRATION
@@ -967,39 +918,10 @@ object RunAnywhereBridge {
     external fun nativeFileManagerRegisterCallbacks(callbacksObj: Any): Int
 
     @JvmStatic
-    external fun nativeFileManagerCreateDirectoryStructure(): Int
-
-    @JvmStatic
-    external fun nativeFileManagerCalculateDirSize(path: String): Long
-
-    @JvmStatic
-    external fun nativeFileManagerModelsStorageUsed(): Long
-
-    @JvmStatic
     external fun nativeFileManagerClearCache(): Int
 
     @JvmStatic
     external fun nativeFileManagerClearTemp(): Int
-
-    @JvmStatic
-    external fun nativeFileManagerCacheSize(): Long
-
-    @JvmStatic
-    external fun nativeFileManagerDeleteModel(modelId: String, framework: Int): Int
-
-    @JvmStatic
-    external fun nativeFileManagerCreateModelFolder(modelId: String, framework: Int): String?
-
-    @JvmStatic
-    external fun nativeFileManagerModelFolderExists(modelId: String, framework: Int): Boolean
-
-    /** Returns JSON: {isAvailable, requiredSpace, availableSpace, hasWarning, recommendation} */
-    @JvmStatic
-    external fun nativeFileManagerCheckStorage(requiredBytes: Long): String?
-
-    /** Returns JSON: {deviceTotal, deviceFree, modelsSize, cacheSize, tempSize, totalAppSize} */
-    @JvmStatic
-    external fun nativeFileManagerGetStorageInfo(): String?
 
     // ========================================================================
     // STORAGE PROTO ABI (rac_storage_analyzer.h)
@@ -1363,6 +1285,78 @@ object RunAnywhereBridge {
     ): NativeHttpResponse?
 
     // ========================================================================
+    // CANONICAL DEFAULT HEADERS + ERROR PARSING (Swift parity)
+    // ========================================================================
+    //
+    // Three thunks wrapping commons' shared HTTP policy helpers. Used by
+    // `HTTPClientAdapter` to converge on the same wire shape Swift uses
+    // (canonical header list, structured error parsing, Supabase upsert
+    // semantics) instead of inlining the policy on the Kotlin side.
+    //
+    // TODO: Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_*
+    //       C JNI thunks for these three entrypoints still need to be
+    //       authored in `runanywhere-commons/src/jni/runanywhere_commons_jni.cpp`.
+    //       The Kotlin adapter swallows the resulting UnsatisfiedLinkError
+    //       and falls back to inlined behavior until the thunks land.
+
+    /**
+     * Wrapper for `rac_http_default_headers`. Returns commons' canonical
+     * SDK header list as a flat alternating key/value array
+     * (`[k0, v0, k1, v1, ...]`). Returns null if the JNI thunk is not yet
+     * wired (graceful fallback during the rollout window).
+     *
+     * Commons currently emits four entries:
+     *   - "X-SDK-Client":  "RunAnywhereSDK"
+     *   - "X-SDK-Version": rac_get_version().string
+     *   - "Content-Type":  "application/json"
+     *   - "Accept":        "application/json"
+     *
+     * The "X-Platform" header is intentionally NOT included — its value
+     * is platform-specific and must be supplied per-request by the
+     * calling SDK.
+     */
+    // TODO: add Java_*_racHttpDefaultHeaders C JNI thunk in runanywhere_commons_jni.cpp.
+    @JvmStatic external fun racHttpDefaultHeaders(): Array<String>?
+
+    /**
+     * Wrapper for `rac_http_request_set_upsert_mode` + `rac_http_request_send`.
+     * Reissues the request with the Supabase upsert flag armed (URL gets
+     * `?on_conflict={field}` and Prefer header gets
+     * `resolution=merge-duplicates`). Returns a [NativeHttpResponse] just
+     * like [racHttpRequestExecute]; null when the JNI thunk is not yet
+     * bound.
+     *
+     * @param onConflictField Column name used as the conflict key (e.g.
+     *        "device_id"). Empty string disables upsert mode (equivalent
+     *        to plain [racHttpRequestExecute]).
+     */
+    // TODO: add Java_*_racHttpRequestExecuteWithUpsert C JNI thunk in runanywhere_commons_jni.cpp.
+    @JvmStatic external fun racHttpRequestExecuteWithUpsert(
+        method: String,
+        url: String,
+        headerKeys: Array<String>,
+        headerValues: Array<String>,
+        body: ByteArray?,
+        timeoutMs: Int,
+        followRedirects: Boolean,
+        onConflictField: String,
+    ): NativeHttpResponse?
+
+    /**
+     * Wrapper for `rac_api_error_from_response`. Parses a 4xx/5xx response
+     * body and returns a flat 3-string array `[message, code, requestUrl]`
+     * — any field may be empty if commons could not extract it. Returns
+     * null when the JNI thunk is not yet bound (callers fall back to a
+     * generic `"HTTP {status}"` message).
+     */
+    // TODO: add Java_*_racApiErrorFromResponse C JNI thunk in runanywhere_commons_jni.cpp.
+    @JvmStatic external fun racApiErrorFromResponse(
+        statusCode: Int,
+        body: String,
+        url: String,
+    ): Array<String>?
+
+    // ========================================================================
     // AUTH MANAGER (rac_auth_manager.h)
     // ========================================================================
     //
@@ -1480,6 +1474,292 @@ object RunAnywhereBridge {
      *  Output: serialized FrameworksForCapabilityResponse, or null on failure. */
     // PENDING — wired for future feature (capability → framework query not yet driven from Kotlin)
     @JvmStatic external fun racRouterFrameworksForCapabilityProto(requestProto: ByteArray): ByteArray?
+
+    // ========================================================================
+    // HARDWARE ACCELERATORS (Swift-alignment Phase 1 — Group A)
+    // ========================================================================
+    //
+    // Surface the lightweight accelerator list and preference setter that
+    // Swift's CppBridge+Hardware uses (rac_hardware_get_accelerators /
+    // rac_hardware_set_accelerator_preference). Different from
+    // racHardwareProfileGet, which returns the full HardwareProfileResult.
+
+    /** Get the accelerator list only (HardwareProfileResult with profile field empty).
+     *  Returns serialized HardwareProfileResult proto bytes, or null on failure. */
+    @JvmStatic external fun racHardwareGetAccelerators(): ByteArray?
+
+    /** Set the accelerator preference for subsequent inference calls.
+     *  @param bytes serialized AcceleratorPreference proto bytes (or single-byte enum).
+     *  @return rac_result_t (0 = success). */
+    @JvmStatic external fun racHardwareSetAcceleratorPreference(bytes: ByteArray): Int
+
+    // ========================================================================
+    // VAD COMPONENT METADATA (Swift-alignment Phase 1 — Group A)
+    // ========================================================================
+
+    /** Check if the VAD component is initialized. */
+    @JvmStatic external fun racVadComponentIsInitialized(handle: Long): Boolean
+
+    /** Unload the VAD model. Returns rac_result_t. */
+    @JvmStatic external fun racVadComponentUnload(handle: Long): Int
+
+    /** Cleanup the VAD component (release all resources). Returns rac_result_t. */
+    @JvmStatic external fun racVadComponentCleanup(handle: Long): Int
+
+    // ========================================================================
+    // VAD LIFECYCLE PROTO ABI (rac_vad_service.h — Swift-alignment Phase 1 — Group B)
+    //
+    // Handle-less lifecycle-owned VAD operations. Each routes through the
+    // commons VAD lifecycle to the currently-loaded VAD service. Mirrors
+    // Swift `VADGeneratedProtoABI.configureLifecycle/startLifecycle/...`.
+    //
+    // PENDING — needs Java_* export in librunanywhere_jni.so. The C ABI
+    // symbols (`rac_vad_configure_lifecycle_proto`, `rac_vad_start_lifecycle_proto`,
+    // `rac_vad_stop_lifecycle_proto`, `rac_vad_reset_lifecycle_proto`) exist
+    // in `rac_vad_service.h:256-279` but are not yet exposed through JNI.
+    // ========================================================================
+
+    /**
+     * Configure the lifecycle-loaded VAD with a VADConfiguration proto.
+     * Returns serialized VADServiceState proto bytes, or null on failure.
+     */
+    @JvmStatic external fun racVadConfigureLifecycleProto(configProto: ByteArray): ByteArray?
+
+    /**
+     * Start the lifecycle-loaded VAD processing session.
+     * Returns serialized VADServiceState proto bytes, or null on failure.
+     */
+    @JvmStatic external fun racVadStartLifecycleProto(): ByteArray?
+
+    /**
+     * Stop the lifecycle-loaded VAD processing session.
+     * Returns serialized VADServiceState proto bytes, or null on failure.
+     */
+    @JvmStatic external fun racVadStopLifecycleProto(): ByteArray?
+
+    /**
+     * Reset internal state on the lifecycle-loaded VAD.
+     * Returns serialized VADServiceState proto bytes, or null on failure.
+     */
+    @JvmStatic external fun racVadResetLifecycleProto(): ByteArray?
+
+    // ========================================================================
+    // VLM COMPONENT METADATA (Swift-alignment Phase 1 — Group A)
+    // ========================================================================
+
+    /** Check if the VLM component supports streaming. */
+    @JvmStatic external fun racVlmComponentSupportsStreaming(handle: Long): Boolean
+
+    /** Get current VLM lifecycle state. Returns rac_lifecycle_state_t enum value. */
+    @JvmStatic external fun racVlmComponentGetState(handle: Long): Int
+
+    // ========================================================================
+    // STT COMPONENT METADATA (Swift-alignment Phase 1 — Group A)
+    // ========================================================================
+
+    /** Check if the STT component supports streaming. */
+    @JvmStatic external fun racSttComponentSupportsStreaming(handle: Long): Boolean
+
+    /** Configure the STT component with a preferred framework int.
+     *  All other config fields use their RAC_STT_CONFIG_DEFAULT values.
+     *  Returns rac_result_t. */
+    @JvmStatic external fun racSttComponentConfigure(handle: Long, framework: Int): Int
+
+    // ========================================================================
+    // VOICE AGENT — COMPOSITE LIFECYCLE (Swift-alignment Phase 1 — Group B)
+    // ========================================================================
+
+    /** Create a voice-agent handle that wraps four already-created STT/LLM/TTS/VAD
+     *  component handles. Mirrors Swift's voice-agent composite constructor.
+     *  Returns 0 on failure. */
+    @JvmStatic external fun racVoiceAgentCreate(llm: Long, stt: Long, tts: Long, vad: Long): Long
+
+    /** Cleanup the voice-agent — unload child components but keep the handle alive.
+     *  Returns rac_result_t. */
+    @JvmStatic external fun racVoiceAgentCleanup(handle: Long): Int
+
+    // ========================================================================
+    // PROTO BRIDGES — Lifecycle/Registry/Structured Output (Group C)
+    // ========================================================================
+
+    /** Clear queued SDKEvents without removing subscriptions. Test helper.
+     *  Returns 0 on success. */
+    @JvmStatic external fun racSdkEventClearQueue(): Int
+
+    /** Reset model lifecycle tracking — unloads all tracked models. Test helper.
+     *  Returns 0 on success. */
+    @JvmStatic external fun racModelLifecycleReset(): Int
+
+    /** Run a model discovery against the registry from serialized
+     *  ModelDiscoveryRequest bytes. Returns serialized ModelDiscoveryResult bytes. */
+    @JvmStatic external fun racModelRegistryDiscoverProto(req: ByteArray): ByteArray?
+
+    /** Import an externally-managed model into the registry from serialized
+     *  ModelImportRequest bytes. Returns serialized ModelImportResult bytes. */
+    @JvmStatic external fun racModelRegistryImportProto(req: ByteArray): ByteArray?
+
+    /** Generate structured output (JSON-schema constrained) given serialized
+     *  StructuredOutputRequest bytes. Returns serialized StructuredOutputResult bytes.
+     *  Handle is reserved for forward compatibility — current C ABI is handle-less. */
+    @JvmStatic external fun racStructuredOutputGenerateProto(handle: Long, req: ByteArray): ByteArray?
+
+    // ========================================================================
+    // SDK STATE ACCESSORS (Swift-alignment Phase 1 — Group D)
+    // ========================================================================
+    //
+    // Mirrors Swift's CppBridge+State.swift. Reads the global SDK state
+    // populated by racSdkInit. Returns null/0 if SDK is not initialized.
+
+    /** Get current SDK environment (rac_environment_t enum value). */
+    @JvmStatic external fun racStateGetEnvironment(): Int
+
+    /** Get configured base URL, or null. */
+    @JvmStatic external fun racStateGetBaseUrl(): String?
+
+    /** Get configured API key, or null. */
+    @JvmStatic external fun racStateGetApiKey(): String?
+
+    /** Get configured device ID, or null. */
+    @JvmStatic external fun racStateGetDeviceId(): String?
+
+    /** Set the device-registered flag. Returns 0 on success. */
+    @JvmStatic external fun racStateSetDeviceRegistered(registered: Boolean): Int
+
+    /** Check whether the device-registered flag is set. */
+    @JvmStatic external fun racStateIsDeviceRegistered(): Boolean
+
+    /** Resolve or create the persistent device ID. Returns null on failure. */
+    @JvmStatic external fun racDeviceGetOrCreatePersistentId(): String?
+
+    // ========================================================================
+    // MODEL PATHS — FULL SURFACE (Swift-alignment Phase 1 — Group F)
+    // ========================================================================
+    //
+    // Mirrors Swift's CppBridge+ModelPaths. racModelPathsSetBaseDir +
+    // racModelPathsGetModelFolder already exist above — the rest of the
+    // canonical schema is exposed below.
+
+    /** Set the base directory used by model-path computations. Returns 0 on success. */
+    @JvmStatic external fun racModelPathsSetBaseDirectory(path: String): Int
+
+    /** Get the canonical models directory ({base}/RunAnywhere/Models). Null on error. */
+    @JvmStatic external fun racModelPathsGetModelsDirectory(): String?
+
+    /** Get the framework-specific directory ({base}/.../Models/{framework}). Null on error. */
+    @JvmStatic external fun racModelPathsGetFrameworkDirectory(framework: Int): String?
+
+    /** Get the canonical model file path for a (modelId, framework, format) triple. Null on error. */
+    @JvmStatic
+    external fun racModelPathsGetExpectedModelPath(modelId: String, framework: Int, format: Int): String?
+
+    /** Get the cache directory. Null on error. */
+    @JvmStatic external fun racModelPathsGetCacheDirectory(): String?
+
+    /** Get the downloads staging directory. Null on error. */
+    @JvmStatic external fun racModelPathsGetDownloadsDirectory(): String?
+
+    /** Get the temp directory. Null on error. */
+    @JvmStatic external fun racModelPathsGetTempDirectory(): String?
+
+    /** Extract the modelId from a canonical model path. Null if not a recognized model path. */
+    @JvmStatic external fun racModelPathsExtractModelId(path: String): String?
+
+    /** Extract the framework int from a canonical model path. -1 if not a recognized model path. */
+    @JvmStatic external fun racModelPathsExtractFramework(path: String): Int
+
+    /** Check if the given path is a canonical model path. */
+    @JvmStatic external fun racModelPathsIsModelPath(path: String): Boolean
+
+    // ========================================================================
+    // FILE MANAGER — FULL PROTO/STRUCTURED SURFACE (Group G)
+    // ========================================================================
+    //
+    // The racFileManager* bindings below provide the Swift-aligned naming for
+    // file-manager operations, including the model-folder-has-contents and
+    // proto-based variants Swift uses. Legacy nativeFileManager* thunks have
+    // been removed in favour of these racFileManager* equivalents; only
+    // nativeFileManagerRegisterCallbacks / ClearCache / ClearTemp remain.
+
+    /** Create the canonical models directory structure under rootPath. Returns 0 on success. */
+    @JvmStatic external fun racFileManagerCreateDirectoryStructure(rootPath: String): Int
+
+    /** Calculate the total size of a directory (bytes). Returns 0 on error. */
+    @JvmStatic external fun racFileManagerCalculateDirectorySize(path: String): Long
+
+    /** Compute total bytes used under the models directory. Returns 0 on error. */
+    @JvmStatic external fun racFileManagerModelsStorageUsed(): Long
+
+    /** Compute total bytes used under the cache directory. Returns 0 on error. */
+    @JvmStatic external fun racFileManagerCacheSize(): Long
+
+    /** Delete a model's on-disk folder. Returns rac_result_t. */
+    @JvmStatic external fun racFileManagerDeleteModel(modelId: String): Int
+
+    /** Check if a model's on-disk folder exists. */
+    @JvmStatic external fun racFileManagerModelFolderExists(modelId: String): Boolean
+
+    /** Check if a model's on-disk folder has any files inside. */
+    @JvmStatic external fun racFileManagerModelFolderHasContents(modelId: String): Boolean
+
+    /** Get storage info as serialized FileManagerStorageInfo bytes, or null on error. */
+    @JvmStatic external fun racFileManagerGetStorageInfo(): ByteArray?
+
+    /** Check if `required` bytes are available. Returns true if so. */
+    @JvmStatic external fun racFileManagerCheckStorage(required: Long): Boolean
+
+    // ========================================================================
+    // ENVIRONMENT VALIDATION + ENDPOINTS (Swift-alignment Phase 1 — Group H)
+    // ========================================================================
+
+    /** Check if an environment int requires API authentication. */
+    @JvmStatic external fun racEnvRequiresAuth(env: Int): Boolean
+
+    /** Check if an environment int requires a backend URL. */
+    @JvmStatic external fun racEnvRequiresBackendUrl(env: Int): Boolean
+
+    /** Validate an API key for the current environment. Returns true if RAC_VALIDATION_OK. */
+    @JvmStatic external fun racEnvValidateApiKey(key: String): Boolean
+
+    /** Validate a base URL for the current environment. Returns true if RAC_VALIDATION_OK. */
+    @JvmStatic external fun racEnvValidateBaseUrl(url: String): Boolean
+
+    /** Get the human-readable validation error message for the given (env, key, url) triple,
+     *  or null if validation succeeds. */
+    @JvmStatic external fun racEnvValidationErrorMessage(env: Int, key: String, url: String): String?
+
+    /** Get the authenticate endpoint path. */
+    @JvmStatic external fun racEndpointAuthenticate(): String?
+
+    /** Get the auth-refresh endpoint path. */
+    @JvmStatic external fun racEndpointRefresh(): String?
+
+    /** Get the health-check endpoint path. */
+    @JvmStatic external fun racEndpointHealth(): String?
+
+    /** Get the device-registration endpoint path for an environment. */
+    @JvmStatic external fun racEndpointDeviceRegistration(env: Int): String?
+
+    /** Get the telemetry endpoint path for an environment. */
+    @JvmStatic external fun racEndpointTelemetry(env: Int): String?
+
+    /** Get the model-assignments endpoint path (env-independent). */
+    @JvmStatic external fun racEndpointModelAssignments(): String?
+
+    // ========================================================================
+    // MODEL ASSIGNMENT (Swift-alignment Phase 1 — Group I)
+    // ========================================================================
+
+    /** Register the model-assignment callback bridge. Returns 0 on success. */
+    @JvmStatic external fun racModelAssignmentSetCallbacks(cb: Any): Int
+
+    /** Fetch model assignments from the backend. Returns rac_result_t. */
+    @JvmStatic external fun racModelAssignmentFetch(forceRefresh: Boolean): Int
+
+    /** Filter cached assignments by framework. Returns serialized ModelInfoList bytes, or null. */
+    @JvmStatic external fun racModelAssignmentGetByFramework(framework: Int): ByteArray?
+
+    /** Filter cached assignments by model category. Returns serialized ModelInfoList bytes, or null. */
+    @JvmStatic external fun racModelAssignmentGetByCategory(category: Int): ByteArray?
 
     // ========================================================================
     // CONSTANTS

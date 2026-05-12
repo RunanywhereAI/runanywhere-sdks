@@ -63,4 +63,6 @@ object CppBridgeSDKEventStream {
         recoverable: Boolean,
     ): Int =
         RunAnywhereBridge.racSdkEventPublishFailure(errorCode, message, component, operation, recoverable)
+
+    fun clearQueue(): Int = RunAnywhereBridge.racSdkEventClearQueue()
 }

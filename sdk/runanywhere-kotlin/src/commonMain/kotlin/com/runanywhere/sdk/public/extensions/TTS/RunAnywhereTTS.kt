@@ -35,15 +35,17 @@ expect suspend fun RunAnywhere.synthesize(
  * Stream audio chunks for long text synthesis.
  *
  * Mirrors Swift's `synthesizeStream(_:options:)` — yields generated [TTSOutput]
- * chunks as they are synthesized.
+ * chunks as they are synthesized. The voice is taken from [options].voice.
  *
  * @param text Text to synthesize
- * @param voiceId Optional override voice ID
+ * @param options Synthesis options (defaults to [TTSOptions.defaults]). The
+ *   `voice` field selects the voice; remaining fields control rate, pitch,
+ *   volume, sample rate, language, SSML, and audio format.
  * @return Flow of generated TTS output chunks
  */
 expect fun RunAnywhere.synthesizeStream(
     text: String,
-    voiceId: String? = null,
+    options: RATTSOptions = RATTSOptions(),
 ): Flow<RATTSOutput>
 
 /**

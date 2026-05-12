@@ -64,6 +64,9 @@ public class VADConfiguration(
   /**
    * PCM sample rate in Hz. Default 16000 (RAC_VAD_DEFAULT_SAMPLE_RATE).
    */
+  @RacDefaultOption("16000")
+  @RacMinOption(1)
+  @RacMaxOption(48_000)
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -76,6 +79,9 @@ public class VADConfiguration(
    * Frame length in milliseconds. Default 100 (Swift/Kotlin/Dart store
    * 0.1 seconds; we canonicalize to ms on the wire).
    */
+  @RacDefaultOption("100")
+  @RacMinOption(1)
+  @RacMaxOption(1_000)
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -88,6 +94,9 @@ public class VADConfiguration(
    * Energy threshold in \[0.0, 1.0\] for voice detection.
    * Recommended range 0.01–0.05; default 0.015 across SDKs.
    */
+  @RacDefaultOption("0.015")
+  @RacMinFloatOption(0.0)
+  @RacMaxFloatOption(1.0)
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",

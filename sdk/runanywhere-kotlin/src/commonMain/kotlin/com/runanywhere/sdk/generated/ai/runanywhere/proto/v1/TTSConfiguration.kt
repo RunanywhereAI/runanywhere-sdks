@@ -65,6 +65,7 @@ public class TTSConfiguration(
    * Voice identifier to use for synthesis. For platform engines this is the
    * engine-specific voice id (e.g. "com.apple.ttsbundle.siri_female_en-US_compact").
    */
+  @RacDefaultOption("default")
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -75,6 +76,7 @@ public class TTSConfiguration(
   /**
    * Language for synthesis (BCP-47, e.g. "en-US").
    */
+  @RacDefaultOption("en-US")
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -86,6 +88,7 @@ public class TTSConfiguration(
   /**
    * Speaking rate (0.5 – 2.0; 1.0 is normal).
    */
+  @RacDefaultOption("1.0")
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -97,6 +100,7 @@ public class TTSConfiguration(
   /**
    * Speech pitch (0.5 – 2.0; 1.0 is normal).
    */
+  @RacDefaultOption("1.0")
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -107,6 +111,7 @@ public class TTSConfiguration(
   /**
    * Speech volume (0.0 – 1.0).
    */
+  @RacDefaultOption("1.0")
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -129,6 +134,7 @@ public class TTSConfiguration(
    * Sample rate for output audio in Hz. 0 = engine default
    * (RAC_TTS_DEFAULT_SAMPLE_RATE = 22050).
    */
+  @RacDefaultOption("22050")
   @field:WireField(
     tag = 8,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -140,6 +146,7 @@ public class TTSConfiguration(
   /**
    * Whether to use neural / premium voice if available.
    */
+  @RacDefaultOption("true")
   @field:WireField(
     tag = 9,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

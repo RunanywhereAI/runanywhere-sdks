@@ -36,6 +36,7 @@
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "model_types.pb.h"
+#include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -671,7 +672,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsOptions final : public ::
     kPoolingFieldNumber = 5,
     kNThreadsFieldNumber = 6,
   };
-  // bool normalize = 1;
+  // bool normalize = 1 [(.runanywhere.v1.rac_default) = "true"];
   void clear_normalize() ;
   [[nodiscard]] bool normalize() const;
   void set_normalize(bool value);
@@ -1200,7 +1201,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
     kNormalizeModeFieldNumber = 7,
     kPoolingFieldNumber = 8,
   };
-  // string model_id = 1;
+  // string model_id = 1 [(.runanywhere.v1.rac_required) = true];
   void clear_model_id() ;
   [[nodiscard]] const ::std::string& model_id() const;
   template <typename Arg_ = const ::std::string&, typename... Args_>
@@ -1232,7 +1233,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
   ::std::string* PROTOBUF_NONNULL _internal_mutable_config_json();
 
   public:
-  // int32 embedding_dimension = 2;
+  // int32 embedding_dimension = 2 [(.runanywhere.v1.rac_default) = "384", (.runanywhere.v1.rac_min) = 1];
   void clear_embedding_dimension() ;
   [[nodiscard]] ::int32_t embedding_dimension() const;
   void set_embedding_dimension(::int32_t value);
@@ -1242,7 +1243,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
   void _internal_set_embedding_dimension(::int32_t value);
 
   public:
-  // int32 max_sequence_length = 3;
+  // int32 max_sequence_length = 3 [(.runanywhere.v1.rac_default) = "512", (.runanywhere.v1.rac_min) = 1];
   void clear_max_sequence_length() ;
   [[nodiscard]] ::int32_t max_sequence_length() const;
   void set_max_sequence_length(::int32_t value);
@@ -1252,7 +1253,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED EmbeddingsConfiguration final : pub
   void _internal_set_max_sequence_length(::int32_t value);
 
   public:
-  // optional bool normalize = 4;
+  // optional bool normalize = 4 [(.runanywhere.v1.rac_default) = "true"];
   [[nodiscard]] bool has_normalize()
       const;
   void clear_normalize() ;
@@ -2516,7 +2517,7 @@ extern const ::google::protobuf::internal::ClassDataFull EmbeddingsResult_class_
 
 // EmbeddingsConfiguration
 
-// string model_id = 1;
+// string model_id = 1 [(.runanywhere.v1.rac_required) = true];
 inline void EmbeddingsConfiguration::clear_model_id() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.model_id_.ClearToEmpty();
@@ -2581,7 +2582,7 @@ inline void EmbeddingsConfiguration::set_allocated_model_id(::std::string* PROTO
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.EmbeddingsConfiguration.model_id)
 }
 
-// int32 embedding_dimension = 2;
+// int32 embedding_dimension = 2 [(.runanywhere.v1.rac_default) = "384", (.runanywhere.v1.rac_min) = 1];
 inline void EmbeddingsConfiguration::clear_embedding_dimension() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.embedding_dimension_ = 0;
@@ -2606,7 +2607,7 @@ inline void EmbeddingsConfiguration::_internal_set_embedding_dimension(::int32_t
   _impl_.embedding_dimension_ = value;
 }
 
-// int32 max_sequence_length = 3;
+// int32 max_sequence_length = 3 [(.runanywhere.v1.rac_default) = "512", (.runanywhere.v1.rac_min) = 1];
 inline void EmbeddingsConfiguration::clear_max_sequence_length() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.max_sequence_length_ = 0;
@@ -2631,7 +2632,7 @@ inline void EmbeddingsConfiguration::_internal_set_max_sequence_length(::int32_t
   _impl_.max_sequence_length_ = value;
 }
 
-// optional bool normalize = 4;
+// optional bool normalize = 4 [(.runanywhere.v1.rac_default) = "true"];
 inline bool EmbeddingsConfiguration::has_normalize() const {
   bool value = CheckHasBit(_impl_._has_bits_[0], 0x00000010U);
   return value;
@@ -2837,7 +2838,7 @@ inline void EmbeddingsConfiguration::set_allocated_config_json(::std::string* PR
 
 // EmbeddingsOptions
 
-// bool normalize = 1;
+// bool normalize = 1 [(.runanywhere.v1.rac_default) = "true"];
 inline void EmbeddingsOptions::clear_normalize() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.normalize_ = false;

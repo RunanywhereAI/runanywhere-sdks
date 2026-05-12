@@ -54,6 +54,7 @@ public class STTConfiguration(
     schemaIndex = 0,
   )
   public val model_id: String = "",
+  @RacDefaultOption("STT_LANGUAGE_EN")
   @field:WireField(
     tag = 2,
     adapter = "ai.runanywhere.proto.v1.STTLanguage#ADAPTER",
@@ -61,9 +62,9 @@ public class STTConfiguration(
     schemaIndex = 1,
   )
   public val language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED,
-  /**
-   * Hz; default 16000
-   */
+  @RacDefaultOption("16000")
+  @RacMinOption(8_000)
+  @RacMaxOption(48_000)
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -92,6 +93,7 @@ public class STTConfiguration(
    * C ABI / legacy SDK config-level transcription defaults. These may be
    * mirrored into STTOptions by adapters for per-call overrides.
    */
+  @RacDefaultOption("true")
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -120,6 +122,7 @@ public class STTConfiguration(
     schemaIndex = 8,
   )
   public val max_alternatives: Int = 0,
+  @RacDefaultOption("true")
   @field:WireField(
     tag = 10,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

@@ -6,15 +6,12 @@
  * SDKError message (ai.runanywhere.proto.v1.SDKError). All code throws
  * SDKException; the embedded proto SDKError carries the wire-canonical
  * payload (code, category, message, context, c_abi_code, nested_message).
- *
- * Wave 2 KOTLIN: Legacy `SDKError` data class has been DELETED. SDKException
- * is now the only error type — all factories that existed on the legacy
- * SDKError (stt/tts/vad/vlm/llm/voiceAgent/network/storage/platform/etc.)
- * are mirrored here.
  */
 
 package com.runanywhere.sdk.foundation.errors
 
+import com.runanywhere.sdk.infrastructure.logging.Logging
+import com.runanywhere.sdk.public.extensions.LogLevel
 import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
 import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
 import ai.runanywhere.proto.v1.SDKError as ProtoSDKError
@@ -54,6 +51,41 @@ class SDKException(
 
     companion object {
         // ====================================================================
+        // GENERIC FACTORY (Swift parity: SDKException.make(...))
+        // ====================================================================
+
+        /**
+         * Generic factory; auto-logs unexpected errors unless [shouldLog] is
+         * false or the [code] is classified as expected (e.g.
+         * `ERROR_CODE_CANCELLED`, `ERROR_CODE_STREAM_CANCELLED`).
+         *
+         * Mirrors Swift's `SDKException.make(code:message:category:underlying:shouldLog:)`.
+         *
+         * @param code     The proto error code (positive magnitude of C ABI code).
+         * @param message  Human-readable, non-localized error message.
+         * @param category Coarse routing bucket. Defaults to
+         *                 [ProtoErrorCategory.ERROR_CATEGORY_COMPONENT].
+         * @param cAbiCode Optional negative `rac_result_t` integer from the C ABI.
+         * @param cause    Optional underlying [Throwable] cause.
+         * @param shouldLog When true (default), routes the exception through
+         *                  [Logging] unless the code is classified as expected.
+         */
+        fun make(
+            code: ProtoErrorCode,
+            message: String,
+            category: ProtoErrorCategory = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
+            cAbiCode: Int? = null,
+            cause: Throwable? = null,
+            shouldLog: Boolean = true,
+        ): SDKException {
+            val ex = of(code = code, category = category, message = message, cAbiCode = cAbiCode, cause = cause)
+            if (shouldLog && !code.isExpected) {
+                ex.log()
+            }
+            return ex
+        }
+
+        // ====================================================================
         // INITIALIZATION FACTORIES
         // ====================================================================
 
@@ -63,15 +95,6 @@ class SDKException(
                 category = ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION,
                 message = "$component is not initialized",
                 cAbiCode = -100,
-                cause = cause,
-            )
-
-        fun alreadyInitialized(component: String, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_ALREADY_INITIALIZED,
-                category = ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION,
-                message = "$component is already initialized",
-                cAbiCode = -101,
                 cause = cause,
             )
 
@@ -143,39 +166,8 @@ class SDKException(
             )
 
         // ====================================================================
-        // GENERATION FACTORIES (component lifecycle)
-        // ====================================================================
-
-        fun generationFailed(reason: String? = null, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_GENERATION_FAILED,
-                category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
-                message = if (reason != null) "Generation failed: $reason" else "Generation failed",
-                cAbiCode = -130,
-                cause = cause,
-            )
-
-        fun generationTimeout(cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_GENERATION_TIMEOUT,
-                category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
-                message = "Generation timed out",
-                cAbiCode = -131,
-                cause = cause,
-            )
-
-        // ====================================================================
         // NETWORK FACTORIES
         // ====================================================================
-
-        fun networkUnavailable(cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_NETWORK_UNAVAILABLE,
-                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
-                message = "Network is unavailable",
-                cAbiCode = -150,
-                cause = cause,
-            )
 
         fun networkError(message: String, cause: Throwable? = null) =
             of(
@@ -186,72 +178,9 @@ class SDKException(
                 cause = cause,
             )
 
-        fun timeout(operation: String, timeoutMs: Long? = null, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_TIMEOUT,
-                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
-                message = if (timeoutMs != null) "$operation timed out after ${timeoutMs}ms" else "$operation timed out",
-                cAbiCode = -155,
-                cause = cause,
-            )
-
-        fun downloadFailed(url: String, reason: String? = null, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
-                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
-                message = if (reason != null) "Download failed for $url: $reason" else "Download failed: $url",
-                cAbiCode = -153,
-                cause = cause,
-            )
-
-        // ====================================================================
-        // STORAGE / FILESYSTEM (IO)
-        // ====================================================================
-
-        fun insufficientStorage(requiredBytes: Long? = null, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_INSUFFICIENT_STORAGE,
-                category = ProtoErrorCategory.ERROR_CATEGORY_IO,
-                message =
-                    if (requiredBytes != null) {
-                        "Insufficient storage space. Required: ${requiredBytes / 1024 / 1024} MB"
-                    } else {
-                        "Insufficient storage space"
-                    },
-                cAbiCode = -180,
-                cause = cause,
-            )
-
-        fun fileNotFound(path: String, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_FILE_NOT_FOUND,
-                category = ProtoErrorCategory.ERROR_CATEGORY_IO,
-                message = "File not found: $path",
-                cAbiCode = -183,
-                cause = cause,
-            )
-
-        fun outOfMemory(operation: String, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_INSUFFICIENT_MEMORY,
-                category = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
-                message = "Out of memory during: $operation",
-                cAbiCode = -221,
-                cause = cause,
-            )
-
         // ====================================================================
         // COMPONENT FACTORIES
         // ====================================================================
-
-        fun componentNotReady(component: String, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_COMPONENT_NOT_READY,
-                category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
-                message = "Component not ready: $component",
-                cAbiCode = -230,
-                cause = cause,
-            )
 
         fun invalidState(message: String, cause: Throwable? = null) =
             of(
@@ -259,15 +188,6 @@ class SDKException(
                 category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
                 message = message,
                 cAbiCode = -231,
-                cause = cause,
-            )
-
-        fun cancelled(operation: String, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_CANCELLED,
-                category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
-                message = "$operation was cancelled",
-                cAbiCode = -380,
                 cause = cause,
             )
 
@@ -289,29 +209,11 @@ class SDKException(
                 cause = cause,
             )
 
-        fun unknown(message: String, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_UNKNOWN,
-                category = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
-                message = message,
-                cAbiCode = -804,
-                cause = cause,
-            )
-
         fun notImplemented(feature: String, cause: Throwable? = null) =
             of(
                 code = ProtoErrorCode.ERROR_CODE_NOT_IMPLEMENTED,
                 category = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
                 message = "Not implemented: $feature",
-                cAbiCode = -800,
-                cause = cause,
-            )
-
-        fun unsupportedOperation(message: String, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_NOT_IMPLEMENTED,
-                category = ProtoErrorCategory.ERROR_CATEGORY_INTERNAL,
-                message = message,
                 cAbiCode = -800,
                 cause = cause,
             )
@@ -323,15 +225,6 @@ class SDKException(
         // modality is recovered downstream from the c_abi_code numeric range.
         // ====================================================================
 
-        fun stt(message: String, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_GENERATION_FAILED,
-                category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
-                message = message,
-                cAbiCode = -440,
-                cause = cause,
-            )
-
         fun tts(message: String, cause: Throwable? = null) =
             of(
                 code = ProtoErrorCode.ERROR_CODE_GENERATION_FAILED,
@@ -341,30 +234,12 @@ class SDKException(
                 cause = cause,
             )
 
-        fun vad(message: String, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_GENERATION_FAILED,
-                category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
-                message = message,
-                cAbiCode = -480,
-                cause = cause,
-            )
-
         fun vlm(message: String, cause: Throwable? = null) =
             of(
                 code = ProtoErrorCode.ERROR_CODE_GENERATION_FAILED,
                 category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
                 message = message,
                 cAbiCode = -500,
-                cause = cause,
-            )
-
-        fun llm(message: String, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_GENERATION_FAILED,
-                category = ProtoErrorCategory.ERROR_CATEGORY_COMPONENT,
-                message = message,
-                cAbiCode = -420,
                 cause = cause,
             )
 
@@ -378,17 +253,8 @@ class SDKException(
             )
 
         // ====================================================================
-        // CATEGORY FACTORIES (network/storage/platform/download/model/security)
+        // CATEGORY FACTORIES (storage/platform/model/operation)
         // ====================================================================
-
-        fun network(message: String, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_NETWORK_ERROR,
-                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
-                message = message,
-                cAbiCode = -151,
-                cause = cause,
-            )
 
         fun storage(message: String, cause: Throwable? = null) =
             of(
@@ -408,30 +274,12 @@ class SDKException(
                 cause = cause,
             )
 
-        fun download(message: String, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
-                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
-                message = message,
-                cAbiCode = -153,
-                cause = cause,
-            )
-
         fun model(message: String, cause: Throwable? = null) =
             of(
                 code = ProtoErrorCode.ERROR_CODE_MODEL_NOT_LOADED,
                 category = ProtoErrorCategory.ERROR_CATEGORY_MODEL,
                 message = message,
                 cAbiCode = -116,
-                cause = cause,
-            )
-
-        fun securityError(message: String, cause: Throwable? = null) =
-            of(
-                code = ProtoErrorCode.ERROR_CODE_UNAUTHORIZED,
-                category = ProtoErrorCategory.ERROR_CATEGORY_AUTH,
-                message = message,
-                cAbiCode = -321,
                 cause = cause,
             )
 
@@ -443,68 +291,6 @@ class SDKException(
                 cAbiCode = -130,
                 cause = cause,
             )
-
-        // ====================================================================
-        // C-ABI INTEROP
-        // ====================================================================
-
-        /**
-         * Construct an SDKException from a raw C ABI rac_result_t code.
-         *
-         * @param cAbiCode The negative `rac_result_t` integer from the C ABI
-         * @param operation Optional operation name for context
-         * @param cause Optional underlying throwable cause
-         */
-        fun fromCAbiCode(
-            cAbiCode: Int,
-            operation: String? = null,
-            cause: Throwable? = null,
-        ): SDKException {
-            // Map negative C ABI code to positive proto enum value (absolute magnitude).
-            val absMagnitude = if (cAbiCode < 0) -cAbiCode else cAbiCode
-            val protoCode = ProtoErrorCode.fromValue(absMagnitude) ?: ProtoErrorCode.ERROR_CODE_UNKNOWN
-            val category = inferCategory(protoCode)
-            val baseMessage = operation?.let { "$it failed" } ?: "Operation failed"
-            val message = "$baseMessage (rac_result_t=$cAbiCode, code=${protoCode.name})"
-            return of(
-                code = protoCode,
-                category = category,
-                message = message,
-                cAbiCode = if (cAbiCode < 0) cAbiCode else null,
-                cause = cause,
-            )
-        }
-
-        /**
-         * Infer the proto ErrorCategory from a proto ErrorCode based on the
-         * numeric value range. Per errors.proto, modality codes (STT/TTS/LLM/
-         * VAD/VLM) are folded into ERROR_CATEGORY_COMPONENT — modality is
-         * recovered from the c_abi_code numeric range.
-         */
-        private fun inferCategory(code: ProtoErrorCode): ProtoErrorCategory {
-            return when (code.value) {
-                in 100..109 -> ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION
-                in 110..129 -> ProtoErrorCategory.ERROR_CATEGORY_MODEL
-                in 130..149 -> ProtoErrorCategory.ERROR_CATEGORY_COMPONENT
-                in 150..179 -> ProtoErrorCategory.ERROR_CATEGORY_NETWORK
-                in 180..219 -> ProtoErrorCategory.ERROR_CATEGORY_IO
-                in 220..229 -> ProtoErrorCategory.ERROR_CATEGORY_INTERNAL
-                in 230..249 -> ProtoErrorCategory.ERROR_CATEGORY_COMPONENT
-                in 250..279 -> ProtoErrorCategory.ERROR_CATEGORY_VALIDATION
-                in 280..299 -> ProtoErrorCategory.ERROR_CATEGORY_IO
-                in 300..319 -> ProtoErrorCategory.ERROR_CATEGORY_COMPONENT
-                in 320..329 -> ProtoErrorCategory.ERROR_CATEGORY_AUTH
-                in 330..349 -> ProtoErrorCategory.ERROR_CATEGORY_INTERNAL
-                in 350..369 -> ProtoErrorCategory.ERROR_CATEGORY_IO
-                in 370..379 -> ProtoErrorCategory.ERROR_CATEGORY_COMPONENT
-                in 380..389 -> ProtoErrorCategory.ERROR_CATEGORY_COMPONENT
-                in 400..499 -> ProtoErrorCategory.ERROR_CATEGORY_COMPONENT
-                in 500..599 -> ProtoErrorCategory.ERROR_CATEGORY_CONFIGURATION
-                in 600..699 -> ProtoErrorCategory.ERROR_CATEGORY_COMPONENT
-                in 700..799 -> ProtoErrorCategory.ERROR_CATEGORY_COMPONENT
-                else -> ProtoErrorCategory.ERROR_CATEGORY_INTERNAL
-            }
-        }
 
         /**
          * Internal helper to construct an SDKException with all fields set.
@@ -530,5 +316,74 @@ class SDKException(
     }
 }
 
-// Prefer `SDKException.fromCAbiCode(rac_result_t, operation)` for proto-canonical
-// conversion from a native result integer.
+// ============================================================================
+// ProtoErrorCode CLASSIFICATION HELPER (Swift parity: RAErrorCode.isExpected)
+// ============================================================================
+
+/**
+ * Whether this proto error code represents an expected/routine outcome that
+ * SHOULD NOT be logged as an error (e.g. user-initiated cancellation).
+ *
+ * Mirrors Swift's `RAErrorCode.isExpected` extension — returns true only for
+ * `ERROR_CODE_CANCELLED` and `ERROR_CODE_STREAM_CANCELLED`.
+ */
+val ProtoErrorCode.isExpected: Boolean
+    get() = when (this) {
+        ProtoErrorCode.ERROR_CODE_CANCELLED,
+        ProtoErrorCode.ERROR_CODE_STREAM_CANCELLED,
+        -> true
+        else -> false
+    }
+
+// ============================================================================
+// SDKException CONVENIENCE EXTENSIONS (Swift parity)
+// ============================================================================
+
+/**
+ * One-line failure-reason summary suitable for log metadata. Mirrors the
+ * Swift `failureReason` property.
+ */
+private val SDKException.failureReason: String
+    get() = "[${this.category.name}] ${this.code.name}"
+
+/**
+ * Log this exception to the central [Logging] service.
+ *
+ * Mirrors Swift's `SDKException.log(file:line:function:)`. The level is
+ * downgraded to [LogLevel.INFO] for [ProtoErrorCode.ERROR_CODE_CANCELLED];
+ * all other codes log at [LogLevel.ERROR]. Call sites should typically gate
+ * with `!code.isExpected` (the [SDKException.Companion.make] factory does
+ * this automatically).
+ *
+ * @param file     Source file (default empty — pass via call-site if available).
+ * @param line     Source line (default 0).
+ * @param function Source function (default empty).
+ */
+fun SDKException.log(
+    file: String = "",
+    line: Int = 0,
+    function: String = "",
+) {
+    val level: LogLevel = if (this.code == ProtoErrorCode.ERROR_CODE_CANCELLED) LogLevel.INFO else LogLevel.ERROR
+    val fileName = file.substringAfterLast('/')
+
+    val metadata = buildMap<String, Any?> {
+        put("error_code", this@log.code.name)
+        put("error_category", this@log.category.name)
+        if (fileName.isNotEmpty()) put("source_file", fileName)
+        if (line > 0) put("source_line", line)
+        if (function.isNotEmpty()) put("source_function", function)
+        this@log.cause?.let { put("underlying_error", it.toString()) }
+        put("failure_reason", this@log.failureReason)
+    }
+
+    Logging.log(
+        level = level,
+        category = this.category.name,
+        message = this.message ?: this.code.name,
+        metadata = metadata,
+        file = if (fileName.isNotEmpty()) fileName else null,
+        line = if (line > 0) line else null,
+        function = if (function.isNotEmpty()) function else null,
+    )
+}

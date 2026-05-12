@@ -10,16 +10,6 @@ plugins {
     signing
 }
 
-// GAP 01 Phase 3 note:
-// Wire-generated Kotlin bindings under
-// `src/commonMain/kotlin/com/runanywhere/sdk/generated/` are committed to git
-// and refreshed by `./idl/codegen/generate_kotlin.sh`. The CI drift-check
-// (`.github/workflows/idl-drift-check.yml`) runs the same script and fails on
-// any diff, so a Gradle Wire plugin is not required for correctness. Adding
-// the plugin here causes the Kotlin DSL to clash with `kotlin { jvm() }`
-// source-set resolution under the current `agp 8.11 / kotlin 2.1 / gradle 8.x`
-// combo; revisit once Wire 5.x ships with full KMP DSL support.
-
 // Detekt
 detekt {
     buildUponDefaultConfig = true
@@ -70,28 +60,10 @@ logger.lifecycle("RunAnywhere SDK version: $resolvedVersion (JitPack=$isJitPack)
 //   useLocalNatives=true  → locally built libs staged by ./scripts/build-core-android.sh
 //   useLocalNatives=false → download pre-built libs from GitHub releases
 // rootProject checked first to support composite builds (app's gradle.properties takes precedence).
-// Legacy name `runanywhere.testLocal` still works as a fallback — emit a
-// deprecation warning so people migrate to the new name over time.
 val useLocalNatives: Boolean =
-    run {
-        val newValue =
-            rootProject.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
-                ?: project.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
-        if (newValue != null) return@run newValue
-        val legacyValue =
-            rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
-                ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
-        if (legacyValue != null) {
-            logger.lifecycle(
-                "DEPRECATION: `runanywhere.testLocal` is deprecated; use " +
-                    "`runanywhere.useLocalNatives` instead (same values)",
-            )
-            return@run legacyValue
-        }
-        false
-    }
-// Alias kept so existing call sites below read the same value without churn.
-val testLocal: Boolean = useLocalNatives
+    rootProject.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
+        ?: project.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
+        ?: false
 
 // rebuildCommons=true → force rebuild of runanywhere-commons C++ code
 val rebuildCommons: Boolean =
@@ -99,13 +71,13 @@ val rebuildCommons: Boolean =
         ?: project.findProperty("runanywhere.rebuildCommons")?.toString()?.toBoolean()
         ?: false
 
-// Native lib version for GitHub release downloads (when testLocal=false)
+// Native lib version for GitHub release downloads (when useLocalNatives=false)
 val nativeLibVersion: String =
     rootProject.findProperty("runanywhere.nativeLibVersion")?.toString()
         ?: project.findProperty("runanywhere.nativeLibVersion")?.toString()
         ?: resolvedVersion // Default to SDK version
 
-logger.lifecycle("RunAnywhere SDK: testLocal=$testLocal, nativeLibVersion=$nativeLibVersion")
+logger.lifecycle("RunAnywhere SDK: useLocalNatives=$useLocalNatives, nativeLibVersion=$nativeLibVersion")
 
 val androidRuntimeAbis = listOf("arm64-v8a", "armeabi-v7a", "x86_64")
 
@@ -220,12 +192,6 @@ kotlin {
             }
         }
     }
-
-    // Native targets (temporarily disabled)
-    // linuxX64()
-    // macosX64()
-    // macosArm64()
-    // mingwX64()
 
     sourceSets {
         // Common source set
@@ -354,17 +320,17 @@ android {
 
 val buildCoreAndroidScript = projectDir.resolve("../../scripts/build-core-android.sh").canonicalFile
 
-// Build JNI libs locally (testLocal=true). Skips if libs exist unless rebuildCommons=true.
+// Build JNI libs locally (useLocalNatives=true). Skips if libs exist unless rebuildCommons=true.
 tasks.register<Exec>("buildLocalJniLibs") {
     group = "runanywhere"
-    description = "Build JNI libraries locally from the repo-root Android native build (when testLocal=true)"
+    description = "Build JNI libraries locally from the repo-root Android native build (when useLocalNatives=true)"
 
     val jniLibsDir = file("src/androidMain/jniLibs")
     val llamaCppJniLibsDir = file("modules/runanywhere-core-llamacpp/src/androidMain/jniLibs")
     val onnxJniLibsDir = file("modules/runanywhere-core-onnx/src/androidMain/jniLibs")
 
-    // Only enable this task when testLocal=true
-    onlyIf { testLocal }
+    // Only enable this task when useLocalNatives=true
+    onlyIf { useLocalNatives }
 
     workingDir = projectDir
 
@@ -377,7 +343,7 @@ tasks.register<Exec>("buildLocalJniLibs") {
     doFirst {
         logger.lifecycle("")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
-        logger.lifecycle(" RunAnywhere JNI Libraries (testLocal=true)")
+        logger.lifecycle(" RunAnywhere JNI Libraries (useLocalNatives=true)")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
         logger.lifecycle("")
 
@@ -435,7 +401,7 @@ tasks.register<Exec>("buildLocalJniLibs") {
         val llamaCppCount = countLibs(llamaCppJniLibsDir, "LlamaCPP Module")
         val onnxCount = countLibs(onnxJniLibsDir, "ONNX Module")
 
-        if (mainCount == 0 && testLocal) {
+        if (mainCount == 0 && useLocalNatives) {
             throw GradleException(
                 """
                 Local JNI build failed: No .so files found in $jniLibsDir
@@ -516,14 +482,14 @@ tasks.register<Exec>("rebuildCommons") {
     }
 }
 
-// Download commons JNI libs from GitHub releases (testLocal=false).
+// Download commons JNI libs from GitHub releases (useLocalNatives=false).
 // Backend libs are downloaded by their own modules.
 tasks.register("downloadJniLibs") {
     group = "runanywhere"
-    description = "Download commons JNI libraries from GitHub releases (when testLocal=false)"
+    description = "Download commons JNI libraries from GitHub releases (when useLocalNatives=false)"
 
     // Only run when NOT using local libs
-    onlyIf { !testLocal }
+    onlyIf { !useLocalNatives }
 
     val outputDir = file("src/androidMain/jniLibs")
     val nativeLibVersionMarker = file("$outputDir/.native_lib_version")
@@ -548,8 +514,8 @@ tasks.register("downloadJniLibs") {
     outputs.dir(outputDir)
 
     doLast {
-        if (testLocal) {
-            logger.lifecycle("Skipping JNI download: testLocal=true (using local libs)")
+        if (useLocalNatives) {
+            logger.lifecycle("Skipping JNI download: useLocalNatives=true (using local libs)")
             return@doLast
         }
 
@@ -579,7 +545,7 @@ tasks.register("downloadJniLibs") {
 
         logger.lifecycle("")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
-        logger.lifecycle(" Downloading commons JNI libraries (testLocal=false)")
+        logger.lifecycle(" Downloading commons JNI libraries (useLocalNatives=false)")
         logger.lifecycle("═══════════════════════════════════════════════════════════════")
         logger.lifecycle("")
         logger.lifecycle("Native lib version: v$nativeLibVersion")
@@ -659,7 +625,7 @@ tasks.register("syncAndroidRuntimeLibs") {
     group = "runanywhere"
     description = "Stage 16 KB-aligned Android NDK runtime libraries into commons JNI libs"
 
-    if (testLocal) {
+    if (useLocalNatives) {
         dependsOn("buildLocalJniLibs")
     } else {
         dependsOn("downloadJniLibs")

@@ -8,7 +8,10 @@
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
@@ -24,6 +27,30 @@ import kotlinx.coroutines.launch
 
 private val vlmLogger = SDKLogger("VLM")
 
+/**
+ * Returns true if a VLM model is loaded in the lifecycle under either the
+ * `MULTIMODAL` or `VISION` category. Mirrors Swift `isVLMModelLoaded()`.
+ *
+ * Both categories collapse to `SDK_COMPONENT_VLM` in C++ commons. We route
+ * through `ModelLifecycle` (the canonical source of truth) rather than the
+ * per-actor `CppBridgeVLM.isLoaded()` handle state so the check cannot
+ * disagree with what the lifecycle says is loaded.
+ */
+private fun isVLMModelLoaded(): Boolean {
+    for (category in arrayOf(
+        ProtoModelCategory.MODEL_CATEGORY_MULTIMODAL,
+        ProtoModelCategory.MODEL_CATEGORY_VISION,
+    )) {
+        val result = CppBridgeModelLifecycle.currentModel(
+            CurrentModelRequest(category = category),
+        )
+        if (result?.found == true) {
+            return true
+        }
+    }
+    return false
+}
+
 // MARK: - Inference
 
 actual suspend fun RunAnywhere.processImage(
@@ -36,7 +63,7 @@ actual suspend fun RunAnywhere.processImage(
 
     ensureServicesReady()
 
-    if (!CppBridgeVLM.isLoaded()) {
+    if (!isVLMModelLoaded()) {
         throw SDKException.vlm("VLM model not loaded")
     }
 
@@ -65,7 +92,7 @@ actual fun RunAnywhere.processImageStream(
 
         ensureServicesReady()
 
-        if (!CppBridgeVLM.isLoaded()) {
+        if (!isVLMModelLoaded()) {
             throw SDKException.vlm("VLM model not loaded")
         }
 

@@ -139,20 +139,6 @@ val ModelArtifactType.displayName: String
             ModelArtifactType.MODEL_ARTIFACT_TYPE_UNSPECIFIED -> "Unspecified"
         }
 
-val RAModelInfo.isDownloadedModel: Boolean
-    get() = is_downloaded ?: local_path.isNotEmpty() || built_in == true
-
-val RAModelInfo.isAvailableModel: Boolean
-    get() = is_available ?: isDownloadedModel
-
-val RAModelInfo.isBuiltInModel: Boolean
-    get() =
-        built_in == true ||
-            source == ai.runanywhere.proto.v1.ModelSource.MODEL_SOURCE_BUILT_IN ||
-            local_path.startsWith("builtin://") ||
-            framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
-            framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
-
 fun archiveTypeFromPath(path: String): ArchiveType? {
     val lowercased = path.lowercase()
     return when {

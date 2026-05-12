@@ -56,6 +56,7 @@ public class RAGQueryOptions(
   /**
    * Maximum tokens to generate in the answer.
    */
+  @RacDefaultOption("512")
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -67,6 +68,7 @@ public class RAGQueryOptions(
   /**
    * Sampling temperature. 0.0 = greedy, higher = more random.
    */
+  @RacDefaultOption("0.7")
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -77,6 +79,7 @@ public class RAGQueryOptions(
   /**
    * Nucleus (top-p) sampling parameter. 1.0 = disabled.
    */
+  @RacDefaultOption("1.0")
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",

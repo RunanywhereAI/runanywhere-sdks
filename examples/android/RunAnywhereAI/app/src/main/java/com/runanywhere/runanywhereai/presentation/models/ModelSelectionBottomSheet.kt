@@ -61,7 +61,7 @@ import com.runanywhere.runanywhereai.models.ModelSelectionContext
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import com.runanywhere.sdk.public.extensions.Models.displayName
-import com.runanywhere.sdk.public.extensions.Models.isDownloadedModel
+import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -185,7 +185,7 @@ fun ModelSelectionBottomSheet(
                             compareBy<RAModelInfo> {
                                 if (it.framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS) {
                                     0
-                                } else if (it.isDownloadedModel) {
+                                } else if (it.isDownloadedOnDisk) {
                                     1
                                 } else {
                                     2
@@ -197,7 +197,7 @@ fun ModelSelectionBottomSheet(
                         val isBuiltIn =
                             model.framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS ||
                                 model.framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS
-                        val isReady = isBuiltIn || model.isDownloadedModel
+                        val isReady = isBuiltIn || model.isDownloadedOnDisk
                         val isThisModelDownloading = uiState.isLoadingModel && uiState.selectedModelId == model.id
                         ModelCard(
                             model = toAIModel(model),
@@ -281,7 +281,7 @@ private fun toAIModel(m: RAModelInfo): AIModel {
         format = formatStr,
         formatColor = formatColor,
         size = sizeStr,
-        isDownloaded = m.isDownloadedModel || m.framework == InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS || m.framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS,
+        isDownloaded = m.isDownloadedOnDisk,
         supportsLora = m.supports_lora,
         isNpu = isGenie,
     )

@@ -162,14 +162,9 @@ object CppBridgePlatformAdapter {
                 return
             }
 
-            try {
-                val result = RunAnywhereBridge.racSetPlatformAdapter(this)
-                if (result != CommonsErrorCode.RAC_SUCCESS) {
-                    logCallback(LogLevel.ERROR, TAG, "Failed to set platform adapter: $result")
-                    return
-                }
-            } catch (e: UnsatisfiedLinkError) {
-                logCallback(LogLevel.ERROR, TAG, "Failed to register platform adapter: ${e.message}")
+            val result = RunAnywhereBridge.racSetPlatformAdapter(this)
+            if (result != CommonsErrorCode.RAC_SUCCESS) {
+                logCallback(LogLevel.ERROR, TAG, "Failed to set platform adapter: $result")
                 return
             }
 

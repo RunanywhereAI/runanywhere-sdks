@@ -245,6 +245,17 @@ object Logging {
         internal set
 
     /**
+     * Hook for delegating metadata redaction policy to the canonical C++
+     * implementation `rac_log_metadata_should_redact`. Set by the platform
+     * layer (jvmAndroidMain) once the native library is loaded, so Kotlin
+     * and C++ logs share the same sensitive-substring list. When unset
+     * (e.g. native library not yet loaded), `sanitizeMetadata` falls back
+     * to the hardcoded `sensitivePatterns` list below.
+     */
+    var shouldRedactPolicy: ((String) -> Boolean)? = null
+        internal set
+
+    /**
      * Set the bridge callback for forwarding logs to runanywhere-commons.
      * This enables integration with the C/C++ logging system.
      */
@@ -421,16 +432,42 @@ object Logging {
     // METADATA SANITIZATION
     // =============================================================================
 
+    // Fallback sensitive-substring list used when the canonical C++ policy
+    // (`rac_log_metadata_should_redact`) is not yet reachable — e.g. before
+    // the native library is loaded or in non-JNI test contexts. Keep in
+    // lockstep with `sdk/runanywhere-commons/src/infrastructure/logging/
+    // log_redact.cpp` (kSensitiveSubstrings) and Swift `SDKLogger.swift`.
     private val sensitivePatterns = listOf("key", "secret", "password", "token", "auth", "credential")
+
+    /**
+     * Determines whether a metadata key should be redacted. Delegates to the
+     * canonical C++ policy via [shouldRedactPolicy] when set; otherwise falls
+     * back to the hardcoded [sensitivePatterns] list. Any error thrown by the
+     * policy hook (e.g. `UnsatisfiedLinkError` if the native library is
+     * unavailable) is swallowed and the fallback list is used so logging never
+     * fails on metadata sanitization.
+     */
+    private fun shouldRedact(key: String): Boolean {
+        val policy = shouldRedactPolicy
+        if (policy != null) {
+            try {
+                return policy(key)
+            } catch (_: Throwable) {
+                // Fall through to hardcoded list — keeps logging resilient if
+                // the native bridge is unavailable.
+            }
+        }
+        val lowercasedKey = key.lowercase()
+        return sensitivePatterns.any { lowercasedKey.contains(it) }
+    }
 
     @Suppress("UNCHECKED_CAST")
     private fun sanitizeMetadata(metadata: Map<String, Any?>?): Map<String, String>? {
         if (metadata == null) return null
 
         return metadata.mapValues { (key, value) ->
-            val lowercasedKey = key.lowercase()
             when {
-                sensitivePatterns.any { lowercasedKey.contains(it) } -> "[REDACTED]"
+                shouldRedact(key) -> "[REDACTED]"
                 value is Map<*, *> -> sanitizeMetadata(value as? Map<String, Any?>)?.toString() ?: "{}"
                 else -> value?.toString() ?: "null"
             }
@@ -693,17 +730,8 @@ class SDKLogger(
         /** Logger for VAD (Voice Activity Detection) operations */
         val vad = SDKLogger("VAD")
 
-        /** Logger for VLM (Vision Language Model) operations */
-        val vlm = SDKLogger("VLM")
-
-        /** Logger for download operations */
-        val download = SDKLogger("Download")
-
         /** Logger for model management operations */
         val models = SDKLogger("Models")
-
-        /** Logger for core SDK operations */
-        val core = SDKLogger("Core")
 
         /** Logger for ONNX runtime operations */
         val onnx = SDKLogger("ONNX")
@@ -714,13 +742,7 @@ class SDKLogger(
         /** Logger for RAG (Retrieval-Augmented Generation) operations */
         val rag = SDKLogger("RAG")
 
-        /** Logger for Qualcomm Genie (NPU LLM) operations */
-        val genie = SDKLogger("Genie")
-
         /** Logger for VoiceAgent operations */
         val voiceAgent = SDKLogger("VoiceAgent")
-
-        /** Logger for network operations */
-        val network = SDKLogger("Network")
     }
 }

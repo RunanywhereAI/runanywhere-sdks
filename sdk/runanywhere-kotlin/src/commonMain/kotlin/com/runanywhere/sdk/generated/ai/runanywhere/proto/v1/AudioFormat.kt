@@ -27,21 +27,31 @@ import kotlin.Suppress
 public enum class AudioFormat(
   override val `value`: Int,
 ) : WireEnum {
+  @RacWireStringOption("unspecified")
   AUDIO_FORMAT_UNSPECIFIED(0),
+  @RacWireStringOption("pcm")
   AUDIO_FORMAT_PCM(1),
+  @RacWireStringOption("wav")
   AUDIO_FORMAT_WAV(2),
+  @RacWireStringOption("mp3")
   AUDIO_FORMAT_MP3(3),
+  @RacWireStringOption("opus")
   AUDIO_FORMAT_OPUS(4),
+  @RacWireStringOption("aac")
   AUDIO_FORMAT_AAC(5),
+  @RacWireStringOption("flac")
   AUDIO_FORMAT_FLAC(6),
+  @RacWireStringOption("ogg")
   AUDIO_FORMAT_OGG(7),
   /**
    * iOS / Dart, container of AAC
    */
+  @RacWireStringOption("m4a")
   AUDIO_FORMAT_M4A(8),
   /**
    * Android "pcm_16bit" — signed 16-bit LE PCM
    */
+  @RacWireStringOption("pcm_s16le")
   AUDIO_FORMAT_PCM_S16LE(9),
   ;
 

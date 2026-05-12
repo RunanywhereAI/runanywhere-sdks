@@ -4,42 +4,37 @@
  *
  * HTTPClientAdapter.kt
  *
- * W2-6: thin Kotlin bridge over the canonical `rac_http_client_*` C ABI.
- * Mirrors Swift's `Foundation/Bridge/HTTPClientAdapter.swift` (336 LOC).
+ * Thin Kotlin bridge over the canonical `rac_http_client_*` C ABI.
+ * Mirrors Swift's `Foundation/Bridge/HTTPClientAdapter.swift`.
  *
  * All cross-platform HTTP policy lives in commons:
  *   - `rac_http_default_headers`         → canonical SDK header list
  *   - `rac_http_request_set_upsert_mode` → Supabase upsert semantics
  *   - `rac_api_error_from_response`      → HTTP-status → SDKException
  *
- * SDK-level HTTP requests (auth, device registration, telemetry) should
- * route through this adapter rather than calling `RunAnywhereBridge.
- * racHttpRequestExecute` directly. Migration of existing call sites
- * (CppBridgeAuth, CppBridgeTelemetry, CppBridgeDevice) is a follow-up
- * task — this file only CREATES the adapter scaffold.
+ * SDK-level HTTP requests (auth, device registration, telemetry) route
+ * through this adapter rather than calling `RunAnywhereBridge.
+ * racHttpRequestExecute` directly. Each commons helper has a paired
+ * `expect`/`actual` thin Kotlin shim so commonMain doesn't depend on
+ * the JNI bridge types defined in jvmAndroidMain.
  *
  * Concurrency: Swift uses `actor` isolation. Kotlin uses `Mutex` to
  * guard the `baseURL` / `apiKey` configuration state and runs the
  * blocking JNI `racHttpRequestExecute` call on `Dispatchers.IO`.
- *
- * Platform plumbing: the JNI calls to `racHttpRequestExecute` and
- * `racAuthGetValidToken` live in jvmAndroidMain (they only exist in
- * the JNI bridge). The `expect` declarations below give commonMain a
- * platform-neutral entry point. See
- * `HTTPClientAdapter.jvmAndroid.kt` for the actual implementation.
  */
 
 package com.runanywhere.sdk.foundation.bridge
 
-import com.runanywhere.sdk.infrastructure.logging.SDKLogger
+import com.runanywhere.sdk.foundation.constants.SDKConstants
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
  * Outcome of a single platform HTTP request. Carries either:
  *   - the response body bytes plus a 2xx HTTP status (success path), or
- *   - a non-2xx HTTP status with the raw body for `mapAPIError` to read, or
+ *   - a non-2xx HTTP status with the raw body for `interpretResult` to read, or
  *   - a transport-level failure (DNS/TLS/timeout) flagged via [transportError].
  *
  * Kept as a plain data class so commonMain can interpret platform results
@@ -51,6 +46,17 @@ internal data class HttpExecutionResult(
     val body: ByteArray,
     /** Non-null when the JNI transport itself failed (rc != RAC_SUCCESS). */
     val transportError: String? = null,
+)
+
+/**
+ * Structured API error parsed from a 4xx/5xx response body via commons'
+ * `rac_api_error_from_response`. Any field may be empty when commons could
+ * not extract it from the JSON payload.
+ */
+internal data class ApiErrorInfo(
+    val message: String,
+    val code: String,
+    val requestUrl: String,
 )
 
 /**
@@ -67,6 +73,47 @@ internal expect suspend fun platformExecuteHttp(
     timeoutMs: Int,
     followRedirects: Boolean,
 ): HttpExecutionResult
+
+/**
+ * Platform hook — execute one HTTP request with Supabase upsert semantics
+ * armed via commons' `rac_http_request_set_upsert_mode`. The C side
+ * rewrites the URL (`?on_conflict={field}`) and Prefer header
+ * (`resolution=merge-duplicates`). When [onConflictField] is the empty
+ * string this is equivalent to [platformExecuteHttp].
+ *
+ * The actual in jvmAndroidMain catches `UnsatisfiedLinkError` and falls
+ * back to [platformExecuteHttp] when the corresponding JNI thunk has not
+ * yet landed — that fallback is functionally identical for non-Supabase
+ * paths.
+ */
+internal expect suspend fun platformExecuteHttpUpsert(
+    method: String,
+    url: String,
+    headerKeys: Array<String>,
+    headerValues: Array<String>,
+    body: ByteArray?,
+    timeoutMs: Int,
+    followRedirects: Boolean,
+    onConflictField: String,
+): HttpExecutionResult
+
+/**
+ * Platform hook — pull commons' canonical SDK header list via
+ * `rac_http_default_headers`. Returns null when the JNI thunk is not
+ * yet bound; callers fall back to an inlined header policy.
+ */
+internal expect fun platformDefaultHeaders(): List<Pair<String, String>>?
+
+/**
+ * Platform hook — parse a non-2xx HTTP body via commons'
+ * `rac_api_error_from_response`. Returns null when the JNI thunk is not
+ * yet bound; callers fall back to a generic `"HTTP {status}"` message.
+ */
+internal expect fun platformParseAPIError(
+    statusCode: Int,
+    body: String,
+    url: String,
+): ApiErrorInfo?
 
 /**
  * Platform hook — resolve the currently-valid auth token, refreshing if
@@ -91,10 +138,20 @@ public object HTTPClientAdapter {
 
     private const val DEFAULT_TIMEOUT_MS: Int = 30_000
 
-    /** Supabase device-registration endpoint marker (mirrors Swift's
-     *  `RAC_ENDPOINT_DEV_DEVICE_REGISTER`). Path-substring match
-     *  triggers the upsert-mode rewrite on the C side. */
-    private const val DEV_DEVICE_REGISTER_MARKER: String = "/rest/v1/devices"
+    /**
+     * Supabase device-registration endpoint marker (mirrors Swift's
+     * `RAC_ENDPOINT_DEV_DEVICE_REGISTER` =
+     * `"/rest/v1/sdk_devices"`). Path-substring match triggers the
+     * upsert-mode rewrite on the C side.
+     */
+    private const val DEV_DEVICE_REGISTER_MARKER: String = "/rest/v1/sdk_devices"
+
+    /**
+     * Conflict-key column for the device-registration upsert (mirrors
+     * Swift's `"device_id"` literal passed to
+     * `rac_http_request_set_upsert_mode`).
+     */
+    private const val DEV_DEVICE_REGISTER_UPSERT_FIELD: String = "device_id"
 
     private val logger = SDKLogger("HTTPClientAdapter")
     private val stateMutex = Mutex()
@@ -181,11 +238,12 @@ public object HTTPClientAdapter {
         url: String,
         timeoutMs: Int = DEFAULT_TIMEOUT_MS,
     ): ByteArray {
+        val headers = buildHeaders(apiKey = null, authToken = null, upsert = false)
         val result = platformExecuteHttp(
             method = "GET",
             url = url,
-            headerKeys = arrayOf("X-Platform"),
-            headerValues = arrayOf(SDK_PLATFORM),
+            headerKeys = headers.keys.toTypedArray(),
+            headerValues = headers.values.toTypedArray(),
             body = null,
             timeoutMs = timeoutMs,
             followRedirects = true,
@@ -214,15 +272,33 @@ public object HTTPClientAdapter {
             upsert = isUpsert,
         )
 
-        val result = platformExecuteHttp(
-            method = method,
-            url = url,
-            headerKeys = headers.keys.toTypedArray(),
-            headerValues = headers.values.toTypedArray(),
-            body = body,
-            timeoutMs = DEFAULT_TIMEOUT_MS,
-            followRedirects = true,
-        )
+        val headerKeys = headers.keys.toTypedArray()
+        val headerValues = headers.values.toTypedArray()
+
+        val result = if (isUpsert) {
+            // Supabase upsert path — defer URL + Prefer header rewrite
+            // to commons via `rac_http_request_set_upsert_mode`.
+            platformExecuteHttpUpsert(
+                method = method,
+                url = url,
+                headerKeys = headerKeys,
+                headerValues = headerValues,
+                body = body,
+                timeoutMs = DEFAULT_TIMEOUT_MS,
+                followRedirects = true,
+                onConflictField = DEV_DEVICE_REGISTER_UPSERT_FIELD,
+            )
+        } else {
+            platformExecuteHttp(
+                method = method,
+                url = url,
+                headerKeys = headerKeys,
+                headerValues = headerValues,
+                body = body,
+                timeoutMs = DEFAULT_TIMEOUT_MS,
+                followRedirects = true,
+            )
+        }
         return interpretResult(result, method = method, url = url)
     }
 
@@ -245,10 +321,10 @@ public object HTTPClientAdapter {
     /**
      * Translate a [HttpExecutionResult] into either the response body
      * bytes or a typed [SDKException]. Mirrors Swift's
-     * `mapAPIError(statusCode:body:url:)` minus the
-     * `rac_api_error_from_response` round-trip — that JNI thunk is
-     * Swift-only today (commons exposes it; Kotlin will gain the
-     * binding in a follow-up).
+     * `mapAPIError(statusCode:body:url:)` — on 4xx/5xx defers to commons'
+     * `rac_api_error_from_response` (via [platformParseAPIError]) for
+     * structured backend error messages, with a graceful fallback to a
+     * generic `"HTTP {status}"` string when the JNI thunk is not bound.
      */
     private fun interpretResult(
         result: HttpExecutionResult,
@@ -260,13 +336,32 @@ public object HTTPClientAdapter {
             throw SDKException.networkError("HTTP transport error: ${result.transportError}")
         }
         if (result.statusCode in 200..299) return result.body
-        val message = if (result.body.isEmpty()) {
-            "HTTP error ${result.statusCode}"
-        } else {
-            "HTTP ${result.statusCode}: ${result.body.decodeToString()}"
-        }
+
         logger.error("HTTP ${result.statusCode}: $method $url")
-        throw when (result.statusCode) {
+        throw mapAPIError(
+            statusCode = result.statusCode,
+            body = result.body,
+            url = url,
+        )
+    }
+
+    /**
+     * Map an HTTP error (status + body) to [SDKException]. Mirrors Swift's
+     * `mapAPIError(statusCode:body:url:)` — defers to commons'
+     * `rac_api_error_from_response` for the message and only categorizes
+     * the result on the Kotlin side.
+     */
+    private fun mapAPIError(
+        statusCode: Int,
+        body: ByteArray,
+        url: String,
+    ): SDKException {
+        val bodyString = if (body.isEmpty()) "" else body.decodeToString()
+        val parsed = platformParseAPIError(statusCode = statusCode, body = bodyString, url = url)
+        val message = parsed?.message?.takeIf { it.isNotEmpty() }
+            ?: "HTTP error $statusCode"
+
+        return when (statusCode) {
             401 -> SDKException.authenticationFailed(reason = message)
             403 -> SDKException.unauthorized(resource = url)
             in 500..599 -> SDKException.networkError(message)
@@ -279,11 +374,10 @@ public object HTTPClientAdapter {
     // ────────────────────────────────────────────────────────────────────
 
     /**
-     * Build the per-request header map. Commons' canonical header list
-     * (`rac_http_default_headers`) is not yet exposed to Kotlin — the
-     * adapter inlines the policy until the JNI thunk lands, matching
-     * what `CppBridgeAuth.postJson` and `CppBridgeTelemetry.sendTelemetry`
-     * already do.
+     * Build the per-request header map. Prefers commons' canonical header
+     * list (`rac_http_default_headers` via [platformDefaultHeaders]) over
+     * inlined values; falls back to the inlined "Content-Type / Accept"
+     * policy when the JNI thunk is not yet bound.
      */
     private fun buildHeaders(
         apiKey: String?,
@@ -291,39 +385,71 @@ public object HTTPClientAdapter {
         upsert: Boolean,
     ): LinkedHashMap<String, String> {
         val headers = LinkedHashMap<String, String>(8)
-        headers["Content-Type"] = "application/json"
-        headers["Accept"] = "application/json"
+        val canonical = platformDefaultHeaders()
+        if (canonical != null) {
+            for ((name, value) in canonical) {
+                headers[name] = value
+            }
+        } else {
+            // Pre-thunk fallback — keep the wire shape identical to Swift's
+            // `HTTPClientAdapter` so this branch is observationally equivalent
+            // to the canonical headers + X-SDK-Client/Version.
+            headers["X-SDK-Client"] = SDKConstants.SDK_NAME
+            headers["X-SDK-Version"] = SDKConstants.VERSION
+            headers["Content-Type"] = "application/json"
+            headers["Accept"] = "application/json"
+        }
+        // X-Platform is intentionally per-SDK — commons exposes the
+        // canonical list minus this header. Match Swift's
+        // `SDKConstants.platform` literal.
         headers["X-Platform"] = SDK_PLATFORM
         if (apiKey != null) {
             headers["apikey"] = apiKey
             // Supabase PostgREST: include the inserted/updated row in
             // the response body. Mirrors Swift's identical line.
-            headers["Prefer"] = "return=representation"
+            // For upserts, the commons-side `rac_http_request_set_upsert_mode`
+            // rewrites this header to add `resolution=merge-duplicates`.
+            if (!upsert) {
+                headers["Prefer"] = "return=representation"
+            }
         }
         if (authToken != null) {
             headers["Authorization"] = "Bearer $authToken"
-        }
-        if (upsert) {
-            // Supabase upsert mode. Swift hands this off to
-            // `rac_http_request_set_upsert_mode` so commons rewrites the
-            // URL + Prefer header. Kotlin doesn't have that thunk
-            // wired, so we apply the same Prefer-header rewrite locally.
-            headers["Prefer"] = "resolution=merge-duplicates,return=representation"
         }
         return headers
     }
 
     /**
-     * Join `base` + `path`. Mirrors Swift's `buildURL(base:path:)`:
-     *  - if `path` is already absolute, return it unchanged
-     *  - otherwise concatenate, taking care to leave at most one `/`
-     *    between the two parts
+     * Join `base` + `path`, preserving any query string on `path`. Returns
+     * `path` as-is when it is already absolute. Mirrors Swift's
+     * `buildURL(base:path:)` — uses explicit query-string splitting so
+     * paths like `/foo/bar?baz=qux` round-trip without double-encoding.
      */
     private fun buildURL(base: String, path: String): String {
         if (path.startsWith("http://") || path.startsWith("https://")) return path
         val trimmedBase = base.trimEnd('/')
         val normalizedPath = if (path.startsWith("/")) path else "/$path"
-        return trimmedBase + normalizedPath
+
+        // Split path into (rawPath, query) so the base URL's existing
+        // query string (if any) is preserved as the first segment.
+        val qIdx = normalizedPath.indexOf('?')
+        if (qIdx < 0) return trimmedBase + normalizedPath
+
+        val rawPath = normalizedPath.substring(0, qIdx)
+        val query = normalizedPath.substring(qIdx + 1)
+
+        // If base already carries a query string, join with '&'; otherwise
+        // append a fresh '?'. Swift's `URLComponents` does this implicitly
+        // — we replicate it explicitly here to avoid pulling in a URL
+        // parsing dependency from commonMain.
+        val baseQueryIdx = trimmedBase.indexOf('?')
+        return if (baseQueryIdx < 0) {
+            "$trimmedBase$rawPath?$query"
+        } else {
+            val baseStripped = trimmedBase.substring(0, baseQueryIdx)
+            val baseQuery = trimmedBase.substring(baseQueryIdx + 1)
+            "$baseStripped$rawPath?$baseQuery&$query"
+        }
     }
 
     // ────────────────────────────────────────────────────────────────────
@@ -343,10 +469,17 @@ public object HTTPClientAdapter {
     }
 
     /**
-     * `SDKConstants.platform` equivalent — Swift sets this to "iOS" /
-     * "macOS" at compile time. Kotlin uses a single "android" value
+     * `SDKConstants.platform` equivalent — Swift sets this to "ios" /
+     * "macos" at compile time. Kotlin uses a single "android" value
      * because the JVM target is the desktop development surface only.
-     * Mirrors the existing `CppBridgeAuth.authenticate` default.
+     * Mirrors the existing `CppBridgeAuth.authenticate` default
+     * (`platform: String = "android"`) and `CppBridgeState`/`CppBridge.kt`
+     * fingerprint payloads.
+     *
+     * TODO: lift this onto `SDKConstants` (e.g. `SDKConstants.PLATFORM`)
+     *       so all three sites (`HTTPClientAdapter`, `CppBridgeAuth`,
+     *       `CppBridgeState`) share one source of truth. Cannot do that
+     *       here without touching `SDKConstants.kt`.
      */
     private const val SDK_PLATFORM: String = "android"
 

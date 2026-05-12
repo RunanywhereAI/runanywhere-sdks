@@ -47,6 +47,7 @@ import okio.ByteString
  * ---------------------------------------------------------------------------
  */
 public class STTOptions(
+  @RacDefaultOption("STT_LANGUAGE_EN")
   @field:WireField(
     tag = 1,
     adapter = "ai.runanywhere.proto.v1.STTLanguage#ADAPTER",
@@ -54,6 +55,7 @@ public class STTOptions(
     schemaIndex = 0,
   )
   public val language: STTLanguage = STTLanguage.STT_LANGUAGE_UNSPECIFIED,
+  @RacDefaultOption("true")
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",
@@ -82,6 +84,7 @@ public class STTOptions(
   )
   public val max_speakers: Int = 0,
   vocabulary_list: List<String> = emptyList(),
+  @RacDefaultOption("true")
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

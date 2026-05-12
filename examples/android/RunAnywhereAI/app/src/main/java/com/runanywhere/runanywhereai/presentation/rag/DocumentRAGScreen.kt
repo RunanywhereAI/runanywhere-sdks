@@ -30,7 +30,7 @@ import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
-import com.runanywhere.sdk.public.extensions.Models.isDownloadedModel
+import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
 import com.runanywhere.sdk.public.types.RAModelInfo
 
 /**
@@ -64,8 +64,8 @@ fun DocumentRAGScreen(
 
     // RAG uses model ids; the SDK resolves registry descriptors for the native pipeline.
     val areModelsReady =
-        selectedEmbeddingModel?.isDownloadedModel == true &&
-            selectedLLMModel?.isDownloadedModel == true
+        selectedEmbeddingModel?.isDownloadedOnDisk == true &&
+            selectedLLMModel?.isDownloadedOnDisk == true
 
     // Show / hide error banner when error changes
     LaunchedEffect(uiState.error) {

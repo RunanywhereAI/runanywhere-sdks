@@ -36,6 +36,7 @@
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "model_types.pb.h"
+#include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -1303,7 +1304,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOptions final : public ::google:
   ::std::string* PROTOBUF_NONNULL _internal_mutable_language_code();
 
   public:
-  // .runanywhere.v1.STTLanguage language = 1;
+  // .runanywhere.v1.STTLanguage language = 1 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
   void clear_language() ;
   [[nodiscard]] ::runanywhere::v1::STTLanguage language() const;
   void set_language(::runanywhere::v1::STTLanguage value);
@@ -1323,7 +1324,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOptions final : public ::google:
   void _internal_set_max_speakers(::int32_t value);
 
   public:
-  // bool enable_punctuation = 2;
+  // bool enable_punctuation = 2 [(.runanywhere.v1.rac_default) = "true"];
   void clear_enable_punctuation() ;
   [[nodiscard]] bool enable_punctuation() const;
   void set_enable_punctuation(bool value);
@@ -1343,7 +1344,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTOptions final : public ::google:
   void _internal_set_enable_diarization(bool value);
 
   public:
-  // bool enable_word_timestamps = 6;
+  // bool enable_word_timestamps = 6 [(.runanywhere.v1.rac_default) = "true"];
   void clear_enable_word_timestamps() ;
   [[nodiscard]] bool enable_word_timestamps() const;
   void set_enable_word_timestamps(bool value);
@@ -1966,7 +1967,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTConfiguration final : public ::g
   ::std::string* PROTOBUF_NONNULL _internal_mutable_language_code();
 
   public:
-  // .runanywhere.v1.STTLanguage language = 2;
+  // .runanywhere.v1.STTLanguage language = 2 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
   void clear_language() ;
   [[nodiscard]] ::runanywhere::v1::STTLanguage language() const;
   void set_language(::runanywhere::v1::STTLanguage value);
@@ -1976,7 +1977,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTConfiguration final : public ::g
   void _internal_set_language(::runanywhere::v1::STTLanguage value);
 
   public:
-  // int32 sample_rate = 3;
+  // int32 sample_rate = 3 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
   void clear_sample_rate() ;
   [[nodiscard]] ::int32_t sample_rate() const;
   void set_sample_rate(::int32_t value);
@@ -2006,7 +2007,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTConfiguration final : public ::g
   void _internal_set_enable_vad(bool value);
 
   public:
-  // bool enable_punctuation = 6;
+  // bool enable_punctuation = 6 [(.runanywhere.v1.rac_default) = "true"];
   void clear_enable_punctuation() ;
   [[nodiscard]] bool enable_punctuation() const;
   void set_enable_punctuation(bool value);
@@ -2026,7 +2027,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED STTConfiguration final : public ::g
   void _internal_set_enable_diarization(bool value);
 
   public:
-  // bool enable_word_timestamps = 10;
+  // bool enable_word_timestamps = 10 [(.runanywhere.v1.rac_default) = "true"];
   void clear_enable_word_timestamps() ;
   [[nodiscard]] bool enable_word_timestamps() const;
   void set_enable_word_timestamps(bool value);
@@ -4085,7 +4086,7 @@ inline void STTConfiguration::set_allocated_model_id(::std::string* PROTOBUF_NUL
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.STTConfiguration.model_id)
 }
 
-// .runanywhere.v1.STTLanguage language = 2;
+// .runanywhere.v1.STTLanguage language = 2 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
 inline void STTConfiguration::clear_language() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.language_ = 0;
@@ -4110,7 +4111,7 @@ inline void STTConfiguration::_internal_set_language(::runanywhere::v1::STTLangu
   _impl_.language_ = value;
 }
 
-// int32 sample_rate = 3;
+// int32 sample_rate = 3 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
 inline void STTConfiguration::clear_sample_rate() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.sample_rate_ = 0;
@@ -4185,7 +4186,7 @@ inline void STTConfiguration::_internal_set_audio_format(::runanywhere::v1::Audi
   _impl_.audio_format_ = value;
 }
 
-// bool enable_punctuation = 6;
+// bool enable_punctuation = 6 [(.runanywhere.v1.rac_default) = "true"];
 inline void STTConfiguration::clear_enable_punctuation() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_punctuation_ = false;
@@ -4332,7 +4333,7 @@ inline void STTConfiguration::_internal_set_max_alternatives(::int32_t value) {
   _impl_.max_alternatives_ = value;
 }
 
-// bool enable_word_timestamps = 10;
+// bool enable_word_timestamps = 10 [(.runanywhere.v1.rac_default) = "true"];
 inline void STTConfiguration::clear_enable_word_timestamps() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_word_timestamps_ = false;
@@ -4459,7 +4460,7 @@ inline void STTConfiguration::set_allocated_language_code(::std::string* PROTOBU
 
 // STTOptions
 
-// .runanywhere.v1.STTLanguage language = 1;
+// .runanywhere.v1.STTLanguage language = 1 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
 inline void STTOptions::clear_language() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.language_ = 0;
@@ -4484,7 +4485,7 @@ inline void STTOptions::_internal_set_language(::runanywhere::v1::STTLanguage va
   _impl_.language_ = value;
 }
 
-// bool enable_punctuation = 2;
+// bool enable_punctuation = 2 [(.runanywhere.v1.rac_default) = "true"];
 inline void STTOptions::clear_enable_punctuation() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_punctuation_ = false;
@@ -4631,7 +4632,7 @@ STTOptions::_internal_mutable_vocabulary_list() {
   return &_impl_.vocabulary_list_;
 }
 
-// bool enable_word_timestamps = 6;
+// bool enable_word_timestamps = 6 [(.runanywhere.v1.rac_default) = "true"];
 inline void STTOptions::clear_enable_word_timestamps() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.enable_word_timestamps_ = false;

@@ -18,9 +18,12 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import ai.runanywhere.proto.v1.ErrorCategory as ProtoErrorCategory
+import ai.runanywhere.proto.v1.ErrorCode as ProtoErrorCode
 
 /** Backend-issued auth response. Kept for the public API contract; the
  *  4 call sites only read `accessToken`. The actual parse + state
@@ -129,8 +132,120 @@ object CppBridgeAuth {
         return jsonParser.decodeFromString(AuthenticationResponse.serializer(), response)
     }
 
-    /** Clear all auth state (logout). Delegates to native. */
-    fun reset() {
+    /**
+     * Refresh the access token. Mirrors Swift's `CppBridge.Auth.refreshToken()`.
+     *
+     * Builds a refresh request JSON via native (reads refresh_token + device_id
+     * from C++ auth state), POSTs it to the refresh endpoint, and hands the raw
+     * response back to native for parse + state update.
+     *
+     * @throws SDKException with [ProtoErrorCode.ERROR_CODE_INVALID_API_KEY] when
+     *   no refresh token is available, or
+     *   [ProtoErrorCode.ERROR_CODE_AUTHENTICATION_FAILED] when the response
+     *   handler rejects the body.
+     */
+    fun refreshToken() {
+        val baseUrl = activeBaseUrl
+            ?: throw SDKException.invalidConfiguration(
+                "$TAG: Token refresh skipped: no usable external config",
+            )
+
+        val body = RunAnywhereBridge.racAuthBuildRefreshRequest()
+            ?: throw SDKException.make(
+                code = ProtoErrorCode.ERROR_CODE_INVALID_API_KEY,
+                message = "$TAG: No refresh token",
+                category = ProtoErrorCategory.ERROR_CATEGORY_AUTH,
+            )
+
+        val response = postJson(baseUrl + ENDPOINT_REFRESH, body)
+        if (RunAnywhereBridge.racAuthHandleRefreshResponse(response) != 0) {
+            throw SDKException.authenticationFailed(
+                reason = "$TAG: rac_auth_handle_refresh_response rejected the body",
+            )
+        }
+    }
+
+    /**
+     * Parse a non-2xx HTTP response into a typed [SDKException]. Mirrors Swift's
+     * `CppBridge.Auth.parseAPIError(statusCode:body:url:)`.
+     *
+     * No native `rac_api_error_from_response` JNI thunk exists today, so this
+     * builds the exception directly from the status code + UTF-8 body using
+     * existing [SDKException] factories. The HTTP status code is mapped to a
+     * proto error code as follows:
+     *
+     * |  Status      |  Proto code                         |  Category  |
+     * |--------------|-------------------------------------|------------|
+     * | 401          | `ERROR_CODE_UNAUTHORIZED`           | AUTH       |
+     * | 403          | `ERROR_CODE_FORBIDDEN`              | AUTH       |
+     * | 404          | `ERROR_CODE_INVALID_RESPONSE`       | NETWORK    |
+     * | 408 / 504    | `ERROR_CODE_TIMEOUT`                | NETWORK    |
+     * | 422          | `ERROR_CODE_VALIDATION_FAILED`      | NETWORK    |
+     * | 400..499     | `ERROR_CODE_HTTP_ERROR`             | NETWORK    |
+     * | 500..599     | `ERROR_CODE_SERVER_ERROR`           | NETWORK    |
+     * | other        | `ERROR_CODE_UNKNOWN`                | NETWORK    |
+     *
+     * @param statusCode HTTP status code from the response.
+     * @param body Response body bytes (may be null).
+     * @param url Request URL — included in the rendered message for context.
+     */
+    fun parseAPIError(statusCode: Int, body: ByteArray?, url: String): SDKException {
+        val bodyString = body?.decodeToString().orEmpty()
+        val message =
+            if (bodyString.isNotEmpty()) "HTTP $statusCode: $bodyString" else "HTTP $statusCode"
+
+        return when (statusCode) {
+            401 -> SDKException.make(
+                code = ProtoErrorCode.ERROR_CODE_UNAUTHORIZED,
+                message = message,
+                category = ProtoErrorCategory.ERROR_CATEGORY_AUTH,
+            )
+            403 -> SDKException.make(
+                code = ProtoErrorCode.ERROR_CODE_FORBIDDEN,
+                message = message,
+                category = ProtoErrorCategory.ERROR_CATEGORY_AUTH,
+            )
+            404 -> SDKException.make(
+                code = ProtoErrorCode.ERROR_CODE_INVALID_RESPONSE,
+                message = message,
+                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
+            )
+            408, 504 -> SDKException.make(
+                code = ProtoErrorCode.ERROR_CODE_TIMEOUT,
+                message = message,
+                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
+            )
+            422 -> SDKException.make(
+                code = ProtoErrorCode.ERROR_CODE_VALIDATION_FAILED,
+                message = message,
+                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
+            )
+            in 400..499 -> SDKException.make(
+                code = ProtoErrorCode.ERROR_CODE_HTTP_ERROR,
+                message = "Client error $statusCode: $bodyString (url=$url)",
+                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
+            )
+            in 500..599 -> SDKException.make(
+                code = ProtoErrorCode.ERROR_CODE_SERVER_ERROR,
+                message = "Server error $statusCode: $bodyString (url=$url)",
+                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
+            )
+            else -> SDKException.make(
+                code = ProtoErrorCode.ERROR_CODE_UNKNOWN,
+                message = "$message (url=$url)",
+                category = ProtoErrorCategory.ERROR_CATEGORY_NETWORK,
+            )
+        }
+    }
+
+    /**
+     * Clear all auth state (logout). Delegates to native. Mirrors Swift's
+     * `CppBridge.Auth.clearAuth()`.
+     *
+     * Wipes the in-memory auth state — and, because [initialize] wires up the
+     * secure-storage vtable, also deletes the persisted tokens.
+     */
+    fun clearAuth() {
         RunAnywhereBridge.racAuthReset()
         activeBaseUrl = null
     }

@@ -104,45 +104,80 @@ internal object ToolCallingOrchestrator {
      * Execute a tool call through its registered executor. Used by the
      * public `executeTool` API for callers that handle tool calls manually
      * outside the native session loop.
+     *
+     * Mirrors Swift's `RunAnywhere.executeTool(_:)`:
+     *  1. Parse `toolCall.arguments_json` into a typed `Map<String, RAToolValue>`.
+     *  2. Invoke the registered `ToolExecutor` to get a result map.
+     *  3. Serialize the result map back to `result_json` on a `ToolResult` proto.
      */
     suspend fun executeTool(toolCall: ToolCall): ToolResult {
         val tool = ToolRegistry.get(toolCall.name)
-        val callId = toolCall.call_id ?: toolCall.id
+        val callId = toolCallIdentifier(toolCall)
         val startedAtMs = System.currentTimeMillis()
         if (tool == null) {
-            return ToolResult(
-                tool_call_id = callId,
+            return makeToolResult(
                 name = toolCall.name,
-                error = "Unknown tool: ${toolCall.name}",
                 success = false,
-                call_id = callId,
-                started_at_ms = startedAtMs,
-                completed_at_ms = System.currentTimeMillis(),
+                error = "Unknown tool: ${toolCall.name}",
+                toolCallId = callId,
+                startedAtMs = startedAtMs,
+                completedAtMs = System.currentTimeMillis(),
             )
         }
         return try {
-            val result = tool.executor(toolCall)
-            result.copy(
-                tool_call_id = result.tool_call_id.ifBlank { callId },
-                name = result.name.ifBlank { toolCall.name },
-                success = result.error.isNullOrBlank(),
-                call_id = result.call_id ?: callId,
-                started_at_ms = result.started_at_ms.takeIf { it > 0 } ?: startedAtMs,
-                completed_at_ms = result.completed_at_ms.takeIf { it > 0 } ?: System.currentTimeMillis(),
+            val args = RAToolValue.parseObjectJSON(toolCall.arguments_json)
+            val resultMap = tool.executor(args)
+            makeToolResult(
+                name = toolCall.name,
+                success = true,
+                result = resultMap,
+                toolCallId = callId,
+                startedAtMs = startedAtMs,
+                completedAtMs = System.currentTimeMillis(),
             )
         } catch (e: Exception) {
             logger.error("Tool execution failed: ${e.message}")
-            ToolResult(
-                tool_call_id = callId,
+            makeToolResult(
                 name = toolCall.name,
-                error = e.message ?: "Unknown error",
                 success = false,
-                call_id = callId,
-                started_at_ms = startedAtMs,
-                completed_at_ms = System.currentTimeMillis(),
+                error = e.message ?: "Unknown error",
+                toolCallId = callId,
+                startedAtMs = startedAtMs,
+                completedAtMs = System.currentTimeMillis(),
             )
         }
     }
+
+    /**
+     * Mirrors Swift's `toolCallIdentifier(_:)` helper: prefer `id`, fall back
+     * to `call_id`, otherwise an empty string.
+     */
+    private fun toolCallIdentifier(toolCall: ToolCall): String =
+        toolCall.id.ifBlank { toolCall.call_id?.ifBlank { null } ?: "" }
+
+    /**
+     * Build a `ToolResult` proto from a typed result map. Mirrors Swift's
+     * `makeToolResult(...)`: `result_json` is the canonical wire shape (the
+     * C++ tool-prompt formatter reads it directly).
+     */
+    private fun makeToolResult(
+        name: String,
+        success: Boolean,
+        result: Map<String, RAToolValue> = emptyMap(),
+        error: String? = null,
+        toolCallId: String,
+        startedAtMs: Long,
+        completedAtMs: Long,
+    ): ToolResult = ToolResult(
+        tool_call_id = toolCallId,
+        name = name,
+        result_json = RAToolValue.jsonString(from = result),
+        error = error,
+        success = success,
+        call_id = toolCallId.takeIf { it.isNotEmpty() },
+        started_at_ms = startedAtMs,
+        completed_at_ms = completedAtMs,
+    )
 
     // ========================================================================
     // GENERATE WITH TOOLS
@@ -280,22 +315,13 @@ internal object ToolCallingOrchestrator {
             )
         }
         return try {
-            val result = tool.executor(toolCall)
-            val resultJson = result.result_json.ifBlank { "{}" }
-            val error = result.error
-            if (!error.isNullOrBlank()) {
-                ToolCallingSessionStepWithResultRequest(
-                    session_handle = sessionHandle,
-                    tool_call_id = toolCallId,
-                    error = error,
-                )
-            } else {
-                ToolCallingSessionStepWithResultRequest(
-                    session_handle = sessionHandle,
-                    tool_call_id = toolCallId,
-                    result_json = resultJson,
-                )
-            }
+            val args = RAToolValue.parseObjectJSON(toolCall.arguments_json)
+            val resultMap = tool.executor(args)
+            ToolCallingSessionStepWithResultRequest(
+                session_handle = sessionHandle,
+                tool_call_id = toolCallId,
+                result_json = RAToolValue.jsonString(from = resultMap),
+            )
         } catch (e: Exception) {
             logger.error("Tool execution failed: ${e.message}")
             ToolCallingSessionStepWithResultRequest(

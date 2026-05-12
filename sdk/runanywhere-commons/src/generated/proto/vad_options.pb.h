@@ -36,6 +36,7 @@
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "model_types.pb.h"
+#include "rac_options.pb.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
@@ -1318,7 +1319,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
   ::std::string* PROTOBUF_NONNULL _internal_mutable_model_path();
 
   public:
-  // int32 sample_rate = 2;
+  // int32 sample_rate = 2 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 48000];
   void clear_sample_rate() ;
   [[nodiscard]] ::int32_t sample_rate() const;
   void set_sample_rate(::int32_t value);
@@ -1328,7 +1329,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
   void _internal_set_sample_rate(::int32_t value);
 
   public:
-  // int32 frame_length_ms = 3;
+  // int32 frame_length_ms = 3 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1000];
   void clear_frame_length_ms() ;
   [[nodiscard]] ::int32_t frame_length_ms() const;
   void set_frame_length_ms(::int32_t value);
@@ -1338,7 +1339,7 @@ class  PROTOBUF_FUTURE_ADD_EARLY_WARN_UNUSED VADConfiguration final : public ::g
   void _internal_set_frame_length_ms(::int32_t value);
 
   public:
-  // float threshold = 4;
+  // float threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
   void clear_threshold() ;
   [[nodiscard]] float threshold() const;
   void set_threshold(float value);
@@ -2976,7 +2977,7 @@ inline void VADConfiguration::set_allocated_model_id(::std::string* PROTOBUF_NUL
   // @@protoc_insertion_point(field_set_allocated:runanywhere.v1.VADConfiguration.model_id)
 }
 
-// int32 sample_rate = 2;
+// int32 sample_rate = 2 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 48000];
 inline void VADConfiguration::clear_sample_rate() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.sample_rate_ = 0;
@@ -3001,7 +3002,7 @@ inline void VADConfiguration::_internal_set_sample_rate(::int32_t value) {
   _impl_.sample_rate_ = value;
 }
 
-// int32 frame_length_ms = 3;
+// int32 frame_length_ms = 3 [(.runanywhere.v1.rac_default) = "100", (.runanywhere.v1.rac_min) = 1, (.runanywhere.v1.rac_max) = 1000];
 inline void VADConfiguration::clear_frame_length_ms() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.frame_length_ms_ = 0;
@@ -3026,7 +3027,7 @@ inline void VADConfiguration::_internal_set_frame_length_ms(::int32_t value) {
   _impl_.frame_length_ms_ = value;
 }
 
-// float threshold = 4;
+// float threshold = 4 [(.runanywhere.v1.rac_default) = "0.015", (.runanywhere.v1.rac_min_float) = 0, (.runanywhere.v1.rac_max_float) = 1];
 inline void VADConfiguration::clear_threshold() {
   ::google::protobuf::internal::TSanWrite(&_impl_);
   _impl_.threshold_ = 0;

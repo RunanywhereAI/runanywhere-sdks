@@ -46,11 +46,6 @@ private fun <M : Message<M, *>> decodeOrThrow(
  * `CppBridge+ModalityProtoABI.swift`). Wraps `rac_lora_*_proto` C ABI.
  */
 object CppBridgeLoraRegistry {
-    private fun nativeCatalogUnavailable(
-        operation: String,
-        cause: UnsatisfiedLinkError,
-    ): String = "$operation native JNI symbol is unavailable: ${cause.message.orEmpty()}"
-
     suspend fun apply(request: RALoRAApplyRequest): LoRAApplyResult =
         decodeOrThrow(
             LoRAApplyResult.ADAPTER,
@@ -109,70 +104,40 @@ object CppBridgeLoraRegistry {
         )
 
     fun listCatalog(request: LoraAdapterCatalogListRequest): LoraAdapterCatalogListResult =
-        try {
-            decodeOrThrow(
-                LoraAdapterCatalogListResult.ADAPTER,
-                RunAnywhereBridge.racLoraCatalogListProto(
-                    LoraAdapterCatalogListRequest.ADAPTER.encode(request),
-                ),
-                "racLoraCatalogListProto",
-            )
-        } catch (e: UnsatisfiedLinkError) {
-            LoraAdapterCatalogListResult(
-                success = false,
-                error_message = nativeCatalogUnavailable("racLoraCatalogListProto", e),
-            )
-        }
+        decodeOrThrow(
+            LoraAdapterCatalogListResult.ADAPTER,
+            RunAnywhereBridge.racLoraCatalogListProto(
+                LoraAdapterCatalogListRequest.ADAPTER.encode(request),
+            ),
+            "racLoraCatalogListProto",
+        )
 
     fun queryCatalog(query: LoraAdapterCatalogQuery): LoraAdapterCatalogListResult =
-        try {
-            decodeOrThrow(
-                LoraAdapterCatalogListResult.ADAPTER,
-                RunAnywhereBridge.racLoraCatalogQueryProto(
-                    LoraAdapterCatalogQuery.ADAPTER.encode(query),
-                ),
-                "racLoraCatalogQueryProto",
-            )
-        } catch (e: UnsatisfiedLinkError) {
-            LoraAdapterCatalogListResult(
-                success = false,
-                error_message = nativeCatalogUnavailable("racLoraCatalogQueryProto", e),
-            )
-        }
+        decodeOrThrow(
+            LoraAdapterCatalogListResult.ADAPTER,
+            RunAnywhereBridge.racLoraCatalogQueryProto(
+                LoraAdapterCatalogQuery.ADAPTER.encode(query),
+            ),
+            "racLoraCatalogQueryProto",
+        )
 
     fun getCatalogEntry(request: LoraAdapterCatalogGetRequest): LoraAdapterCatalogGetResult =
-        try {
-            decodeOrThrow(
-                LoraAdapterCatalogGetResult.ADAPTER,
-                RunAnywhereBridge.racLoraCatalogGetProto(
-                    LoraAdapterCatalogGetRequest.ADAPTER.encode(request),
-                ),
-                "racLoraCatalogGetProto",
-            )
-        } catch (e: UnsatisfiedLinkError) {
-            LoraAdapterCatalogGetResult(
-                found = false,
-                error_message = nativeCatalogUnavailable("racLoraCatalogGetProto", e),
-            )
-        }
+        decodeOrThrow(
+            LoraAdapterCatalogGetResult.ADAPTER,
+            RunAnywhereBridge.racLoraCatalogGetProto(
+                LoraAdapterCatalogGetRequest.ADAPTER.encode(request),
+            ),
+            "racLoraCatalogGetProto",
+        )
 
     fun markDownloadCompleted(
         request: LoraAdapterDownloadCompletedRequest,
     ): LoraAdapterDownloadCompletedResult =
-        try {
-            decodeOrThrow(
-                LoraAdapterDownloadCompletedResult.ADAPTER,
-                RunAnywhereBridge.racLoraCatalogMarkDownloadCompletedProto(
-                    LoraAdapterDownloadCompletedRequest.ADAPTER.encode(request),
-                ),
-                "racLoraCatalogMarkDownloadCompletedProto",
-            )
-        } catch (e: UnsatisfiedLinkError) {
-            LoraAdapterDownloadCompletedResult(
-                success = false,
-                persisted = false,
-                error_message =
-                    nativeCatalogUnavailable("racLoraCatalogMarkDownloadCompletedProto", e),
-            )
-        }
+        decodeOrThrow(
+            LoraAdapterDownloadCompletedResult.ADAPTER,
+            RunAnywhereBridge.racLoraCatalogMarkDownloadCompletedProto(
+                LoraAdapterDownloadCompletedRequest.ADAPTER.encode(request),
+            ),
+            "racLoraCatalogMarkDownloadCompletedProto",
+        )
 }

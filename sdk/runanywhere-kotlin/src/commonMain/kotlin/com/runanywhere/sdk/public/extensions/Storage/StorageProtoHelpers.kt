@@ -163,35 +163,7 @@ val StoredModel.path: String
 val StoredModel.createdDate: Long
     get() = downloaded_at_ms ?: 0L
 
-/** No SHA available on the canonical [StoredModel]; matches Swift `nil`. */
-val StoredModel.checksum: String?
-    get() = null
-
-/** Format is not carried on the canonical [StoredModel]; matches Swift `.unknown`. */
-val StoredModel.format: ai.runanywhere.proto.v1.ModelFormat
-    get() = ai.runanywhere.proto.v1.ModelFormat.MODEL_FORMAT_UNKNOWN
-
-/** Framework is not carried on the canonical [StoredModel]; matches Swift `nil`. */
-val StoredModel.framework: ai.runanywhere.proto.v1.InferenceFramework?
-    get() = null
-
-/** Description is not carried on the canonical [StoredModel]; matches Swift `nil`. */
-val StoredModel.modelDescription: String?
-    get() = null
-
 // MARK: - StorageAvailability
-
-/** True when a `warning_message` is present. Matches Swift `hasWarning`. */
-val StorageAvailability.hasWarning: Boolean
-    get() = !warning_message.isNullOrEmpty()
-
-/** Alias for `required_bytes` matching the Swift `requiredSpace` accessor. */
-val StorageAvailability.requiredSpace: Long
-    get() = required_bytes
-
-/** Alias for `available_bytes` matching the Swift `availableSpace` accessor. */
-val StorageAvailability.availableSpace: Long
-    get() = available_bytes
 
 /**
  * Build a [StorageAvailability] result. Mirrors Swift's

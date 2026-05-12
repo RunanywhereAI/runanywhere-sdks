@@ -67,6 +67,7 @@ public class RAGConfiguration(
    * Embedding vector dimension — must match the embedding model.
    * Common: 384 (all-MiniLM-L6-v2), 768 (bge-base), 1024 (bge-large).
    */
+  @RacDefaultOption("384")
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -78,6 +79,7 @@ public class RAGConfiguration(
   /**
    * Number of top chunks to retrieve per query.
    */
+  @RacDefaultOption("5")
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -90,6 +92,9 @@ public class RAGConfiguration(
    * Minimum cosine similarity threshold (0.0–1.0). Chunks below this
    * score are discarded before being passed to the LLM as context.
    */
+  @RacDefaultOption("0.7")
+  @RacMinFloatOption(0.0)
+  @RacMaxFloatOption(1.0)
   @field:WireField(
     tag = 5,
     adapter = "com.squareup.wire.ProtoAdapter#FLOAT",
@@ -101,6 +106,7 @@ public class RAGConfiguration(
   /**
    * Tokens per chunk when splitting documents during ingestion.
    */
+  @RacDefaultOption("512")
   @field:WireField(
     tag = 6,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -112,6 +118,7 @@ public class RAGConfiguration(
   /**
    * Overlap tokens between consecutive chunks. Must be < chunk_size.
    */
+  @RacDefaultOption("64")
   @field:WireField(
     tag = 7,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",

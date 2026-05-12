@@ -32,6 +32,7 @@
 #include "google/protobuf/generated_enum_reflection.h"
 #include "google/protobuf/unknown_field_set.h"
 #include "hardware_profile.pb.h"
+#include "rac_options.pb.h"
 #include "thinking_tag_pattern.pb.h"
 // @@protoc_insertion_point(includes)
 

@@ -43,7 +43,10 @@ import okhttp3.Request
 import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.time.Duration
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -87,6 +90,29 @@ object OkHttpHttpTransport {
     }
 
     /**
+     * Dedicated streaming OkHttp client. Mirrors the Swift adapter's per-call
+     * streaming session built with `timeoutIntervalForResource = 24 * 60 * 60`.
+     * A multi-GB GGUF download over a slow cellular link can legitimately run
+     * for hours, so the read timeout is bumped from the default 120s to 24h.
+     * Connect / write timeouts retain the default's tighter bounds because
+     * those phases still complete in seconds even on slow links.
+     *
+     * Built off of [defaultClient] (or a host-installed override) via
+     * `.newBuilder()` so any custom interceptors / cert pinners installed by
+     * [setHttpClient] are preserved on the streaming path.
+     */
+    private val streamingClient: OkHttpClient
+        get() {
+            val base = clientRef.get() ?: defaultClient
+            return base
+                .newBuilder()
+                .connectTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(Duration.ofHours(24))
+                .writeTimeout(60, TimeUnit.SECONDS)
+                .build()
+        }
+
+    /**
      * Active client reference. App teams can swap this via [setHttpClient] to
      * plug in their own interceptors (OkHttp Logging, Chucker), custom cert
      * pinners, DNS resolvers, or a WorkManager-friendly variant with longer
@@ -95,6 +121,22 @@ object OkHttpHttpTransport {
      * Reads are lock-free (AtomicReference); writes are atomic.
      */
     private val clientRef: AtomicReference<OkHttpClient?> = AtomicReference(null)
+
+    /**
+     * Monotonic counter for keying the in-flight stream registry. OkHttp's
+     * [Call] does not expose a stable identifier, so we mint our own.
+     */
+    private val streamIdCounter: AtomicLong = AtomicLong(0L)
+
+    /**
+     * Registry of in-flight streaming [Call] objects keyed by a monotonic id.
+     * Mirrors Swift's `StreamRegistry` (keyed by `URLSessionTask.taskIdentifier`).
+     * Used by [cancelAllStreams] to drive `Call.cancel()` on every active
+     * download during SDK teardown — the chunk-callback `return false` cancel
+     * contract still works per-call; this is the explicit teardown path when
+     * there is no callback on the stack to signal.
+     */
+    private val inFlightStreams: ConcurrentHashMap<Long, Call> = ConcurrentHashMap()
 
     /**
      * Registration state guard. `AtomicReference<Boolean>` is used instead of
@@ -152,6 +194,10 @@ object OkHttpHttpTransport {
      * Restore the default libcurl transport. Best-effort — any failure is
      * logged but does not throw. Mirrors Swift's
      * `URLSessionHttpTransport.unregister()`.
+     *
+     * Also drains the in-flight stream registry via [cancelAllStreams], so any
+     * downloads still in flight surface as cancelled rather than tripping
+     * mid-flight when the C++ vtable is yanked.
      */
     @JvmStatic
     fun unregister() {
@@ -159,11 +205,34 @@ object OkHttpHttpTransport {
         if (!wasRegistered) return
         try {
             RunAnywhereBridge.racHttpTransportUnregisterOkHttp()
+            cancelAllStreams()
             logger.info("OkHttp HTTP transport unregistered")
         } catch (_: UnsatisfiedLinkError) {
             // Symbol not present — nothing to do.
         } catch (e: Throwable) {
             logger.warn("OkHttp HTTP transport unregistration failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Cancel every in-flight streaming / resume call. Each pending chunk
+     * callback surfaces back to its caller with `cancelled = true` on the
+     * returned [StreamResponse] (because [okhttp3.Call.cancel] surfaces as an
+     * `IOException` that [drainBody] maps to a clean cancellation when
+     * `call.isCanceled()` is true). Complements the per-callback
+     * `return false` cancel contract — use this when the SDK is tearing down
+     * and there is no callback on the stack to signal.
+     *
+     * Mirrors Swift's `URLSessionHttpTransport.cancelAllStreams()`.
+     */
+    @JvmStatic
+    fun cancelAllStreams() {
+        // Snapshot under the iterator, drive cancel() outside — the cancel
+        // races back through drainBody's IOException path and attempts to
+        // remove(streamId).
+        val snapshot = inFlightStreams.values.toList()
+        for (call in snapshot) {
+            call.cancel()
         }
     }
 
@@ -352,11 +421,19 @@ object OkHttpHttpTransport {
         nativeUserData: Long,
         resumeFromByte: Long,
     ): StreamResponse {
+        val streamId = streamIdCounter.incrementAndGet()
+        var registered = false
         return try {
             val request = buildRequest(method, url, headersFlat, bodyBytes, resumeFromByte)
-            val clientForCall = resolveClient(timeoutMs)
+            // Streaming downloads use the dedicated streaming client with a
+            // 24-hour read timeout (multi-GB GGUFs over slow links can take
+            // hours); the default 120s would abort them mid-transfer.
+            val clientForCall = resolveStreamingClient(timeoutMs)
 
             val call = clientForCall.newCall(request)
+            inFlightStreams[streamId] = call
+            registered = true
+
             call.execute().use { resp ->
                 // Range-honored disclosure: surface a synthetic header so the
                 // C++ download manager can detect when the server ignored the
@@ -404,6 +481,10 @@ object OkHttpHttpTransport {
                 errorMessage = "${e.javaClass.simpleName}: ${e.message ?: "unknown"}",
                 cancelled = false,
             )
+        } finally {
+            if (registered) {
+                inFlightStreams.remove(streamId)
+            }
         }
     }
 
@@ -515,6 +596,24 @@ object OkHttpHttpTransport {
 
     private fun resolveClient(timeoutMs: Long): OkHttpClient {
         val base = clientRef.get() ?: defaultClient
+        return if (timeoutMs > 0) {
+            base
+                .newBuilder()
+                .callTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .build()
+        } else {
+            base
+        }
+    }
+
+    /**
+     * Streaming path uses [streamingClient] (24h read timeout) as the base.
+     * If the caller supplied an explicit per-request `timeoutMs`, layer it
+     * on as a `callTimeout` — that matches the request_send semantics and
+     * still lets the read timeout cap individual stalled reads at 24h.
+     */
+    private fun resolveStreamingClient(timeoutMs: Long): OkHttpClient {
+        val base = streamingClient
         return if (timeoutMs > 0) {
             base
                 .newBuilder()

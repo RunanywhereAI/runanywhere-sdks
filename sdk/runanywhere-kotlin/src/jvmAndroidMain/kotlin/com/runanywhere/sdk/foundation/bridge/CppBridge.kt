@@ -11,12 +11,18 @@ package com.runanywhere.sdk.foundation.bridge
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeAuth
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevConfig
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatform
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVAD
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVLM
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVoiceAgent
 import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.infrastructure.logging.SentryDestination
@@ -28,6 +34,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 
 /**
  * CppBridge is the central coordinator for all C++ interop via JNI.
@@ -395,8 +402,6 @@ object CppBridge {
         if (!_nativeLibraryLoaded) return
         try {
             RunAnywhereBridge.racHttpTransportUnregisterOkHttp()
-        } catch (_: UnsatisfiedLinkError) {
-            // Symbol not present — nothing to do.
         } catch (e: Throwable) {
             logger.warn("OkHttp HTTP transport unregistration failed: ${e.message}")
         }
@@ -584,10 +589,79 @@ object CppBridge {
     /**
      * Shutdown the SDK and release all resources.
      *
-     * Unregisters all extensions in reverse order of registration.
+     * Mirrors Swift `CppBridge.shutdown()` which is async because AI component
+     * destroy() methods are actor-isolated. The Kotlin entry point remains
+     * non-suspend to preserve the existing `expect fun shutdownPlatformBridge()`
+     * actual signature; the suspend body is awaited via `runBlocking`. Callers
+     * that already live in a coroutine context should prefer [shutdownSuspending].
+     *
+     * Order (matching Swift CppBridge.shutdown() exactly):
+     * 1. Destroy AI component bridges (LLM → STT → TTS → VAD → VoiceAgent → VLM)
+     * 2. Unregister Phase 2 services, Phase 1 core extensions in reverse order.
+     *
+     * Each component destroy is wrapped in try/catch so a failure in one
+     * component does not abort the rest of the shutdown sequence.
      */
     fun shutdown() {
+        runBlocking { shutdownSuspending() }
+    }
+
+    /**
+     * Suspending shutdown that matches Swift `CppBridge.shutdown() async`.
+     *
+     * Awaits AI component actor destruction sequentially before tearing down
+     * telemetry/events/platform adapter. Prefer this from already-suspending
+     * callers to avoid the `runBlocking` bridge in [shutdown].
+     */
+    suspend fun shutdownSuspending() {
+        // Snapshot initialization state under the lock without holding it
+        // across the suspend destroy calls below.
+        val wasInitialized =
+            synchronized(lock) {
+                if (!_isInitialized) {
+                    return
+                }
+                true
+            }
+        if (!wasInitialized) return
+
+        // Destroy AI components sequentially before tearing down Telemetry/Events.
+        // Each call is best-effort: a failure in one bridge must not block the rest.
+        // Matches Swift CppBridge.shutdown() ordering exactly:
+        //   LLM → STT → TTS → VAD → VoiceAgent → VLM
+        try {
+            CppBridgeLLM.destroy()
+        } catch (t: Throwable) {
+            logger.warn("CppBridgeLLM.destroy() failed during shutdown: ${t.message}")
+        }
+        try {
+            CppBridgeSTT.destroy()
+        } catch (t: Throwable) {
+            logger.warn("CppBridgeSTT.destroy() failed during shutdown: ${t.message}")
+        }
+        try {
+            CppBridgeTTS.destroy()
+        } catch (t: Throwable) {
+            logger.warn("CppBridgeTTS.destroy() failed during shutdown: ${t.message}")
+        }
+        try {
+            CppBridgeVAD.destroy()
+        } catch (t: Throwable) {
+            logger.warn("CppBridgeVAD.destroy() failed during shutdown: ${t.message}")
+        }
+        try {
+            CppBridgeVoiceAgent.destroy()
+        } catch (t: Throwable) {
+            logger.warn("CppBridgeVoiceAgent.destroy() failed during shutdown: ${t.message}")
+        }
+        try {
+            CppBridgeVLM.destroy()
+        } catch (t: Throwable) {
+            logger.warn("CppBridgeVLM.destroy() failed during shutdown: ${t.message}")
+        }
+
         synchronized(lock) {
+            // Re-check in case a concurrent shutdown already tore things down
             if (!_isInitialized) {
                 return
             }
@@ -632,11 +706,7 @@ object CppBridge {
      */
     fun isNativeInitialized(): Boolean {
         if (!_isInitialized || !isNativeLibraryLoaded) return false
-        return try {
-            RunAnywhereBridge.racIsInitialized()
-        } catch (_: Exception) {
-            _isInitialized
-        }
+        return RunAnywhereBridge.racIsInitialized()
     }
 
     // =============================================================================

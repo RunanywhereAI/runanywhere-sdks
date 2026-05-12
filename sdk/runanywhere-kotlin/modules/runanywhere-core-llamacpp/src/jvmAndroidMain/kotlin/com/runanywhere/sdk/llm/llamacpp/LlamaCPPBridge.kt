@@ -97,22 +97,6 @@ internal object LlamaCPPBridge {
     @JvmStatic
     external fun nativeUnregister(): Int
 
-    /**
-     * Check if the LlamaCPP backend is registered.
-     *
-     * @return true if registered
-     */
-    @JvmStatic
-    external fun nativeIsRegistered(): Boolean
-
-    /**
-     * Get the llama.cpp library version.
-     *
-     * @return Version string
-     */
-    @JvmStatic
-    external fun nativeGetVersion(): String
-
     // ==========================================================================
     // VLM Registration JNI Methods
     // ==========================================================================

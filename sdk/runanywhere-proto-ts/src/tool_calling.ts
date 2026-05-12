@@ -303,6 +303,19 @@ export interface ToolValueObject_FieldsEntry {
 
 /**
  * ---------------------------------------------------------------------------
+ * String wrapper used by the rac_tool_value_to_json_proto /
+ * rac_tool_value_from_json_proto ABIs. Carries either the JSON text rendered
+ * from a ToolValue, or the JSON text that should be parsed back into a
+ * ToolValue. Defined here (rather than reusing a stand-alone wrapper) so the
+ * tool-calling round-trip stays self-contained in this proto.
+ * ---------------------------------------------------------------------------
+ */
+export interface ToolValueJSON {
+  json: string;
+}
+
+/**
+ * ---------------------------------------------------------------------------
  * A single parameter definition for a tool.
  * ---------------------------------------------------------------------------
  */
@@ -971,6 +984,63 @@ export const ToolValueObject_FieldsEntry = {
     message.value = (object.value !== undefined && object.value !== null)
       ? ToolValue.fromPartial(object.value)
       : undefined;
+    return message;
+  },
+};
+
+function createBaseToolValueJSON(): ToolValueJSON {
+  return { json: "" };
+}
+
+export const ToolValueJSON = {
+  encode(message: ToolValueJSON, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.json !== "") {
+      writer.uint32(10).string(message.json);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): ToolValueJSON {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseToolValueJSON();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.json = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): ToolValueJSON {
+    return { json: isSet(object.json) ? globalThis.String(object.json) : "" };
+  },
+
+  toJSON(message: ToolValueJSON): unknown {
+    const obj: any = {};
+    if (message.json !== "") {
+      obj.json = message.json;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<ToolValueJSON>, I>>(base?: I): ToolValueJSON {
+    return ToolValueJSON.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<ToolValueJSON>, I>>(object: I): ToolValueJSON {
+    const message = createBaseToolValueJSON();
+    message.json = object.json ?? "";
     return message;
   },
 };

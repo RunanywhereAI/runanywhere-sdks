@@ -73,30 +73,23 @@ class ToolCallingProtoAdaptersTest {
     }
 
     @Test
-    fun `tool executor consumes and returns generated proto messages`() {
-        val executor: ToolExecutor = { call ->
-            ToolResult(
-                tool_call_id = call.id,
-                name = call.name,
-                result_json = call.arguments_json,
-                success = true,
+    fun `tool executor consumes and returns RAToolValue map`() {
+        val executor: ToolExecutor = { args ->
+            val input = args["value"]?.string
+            mapOf(
+                "echo" to RAToolValue.string(input ?: ""),
+                "ok" to RAToolValue.bool(true),
             )
         }
 
         kotlinx.coroutines.test.runTest {
             val result =
                 executor(
-                    ToolCall(
-                        id = "call_2",
-                        name = "echo",
-                        arguments_json = """{"value":1}""",
-                    ),
+                    mapOf("value" to RAToolValue.string("hello")),
                 )
 
-            assertEquals("call_2", result.tool_call_id)
-            assertEquals("echo", result.name)
-            assertEquals("""{"value":1}""", result.result_json)
-            assertTrue(result.success)
+            assertEquals("hello", result["echo"]?.string)
+            assertEquals(true, result["ok"]?.bool)
         }
     }
 }

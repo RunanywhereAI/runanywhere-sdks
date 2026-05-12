@@ -26,18 +26,28 @@ import kotlin.Suppress
 public enum class ModelCategory(
   override val `value`: Int,
 ) : WireEnum {
+  @RacWireStringOption("unspecified")
   MODEL_CATEGORY_UNSPECIFIED(0),
+  @RacWireStringOption("language")
   MODEL_CATEGORY_LANGUAGE(1),
+  @RacWireStringOption("speech-recognition")
   MODEL_CATEGORY_SPEECH_RECOGNITION(2),
+  @RacWireStringOption("speech-synthesis")
   MODEL_CATEGORY_SPEECH_SYNTHESIS(3),
+  @RacWireStringOption("vision")
   MODEL_CATEGORY_VISION(4),
+  @RacWireStringOption("image-generation")
   MODEL_CATEGORY_IMAGE_GENERATION(5),
+  @RacWireStringOption("multimodal")
   MODEL_CATEGORY_MULTIMODAL(6),
+  @RacWireStringOption("audio")
   MODEL_CATEGORY_AUDIO(7),
+  @RacWireStringOption("embedding")
   MODEL_CATEGORY_EMBEDDING(8),
   /**
    * present in Swift only pre-IDL
    */
+  @RacWireStringOption("voice-activity-detection")
   MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION(9),
   ;
 

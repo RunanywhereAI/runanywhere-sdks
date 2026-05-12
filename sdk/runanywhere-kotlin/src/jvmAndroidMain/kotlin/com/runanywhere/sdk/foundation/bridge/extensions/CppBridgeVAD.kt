@@ -17,13 +17,17 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import ai.runanywhere.proto.v1.SpeechActivityEvent
 import ai.runanywhere.proto.v1.VADConfiguration
 import ai.runanywhere.proto.v1.VADOptions
 import ai.runanywhere.proto.v1.VADResult
+import ai.runanywhere.proto.v1.VADServiceState
 import ai.runanywhere.proto.v1.VADStatistics
 import com.runanywhere.sdk.foundation.bridge.ComponentActor
 import com.runanywhere.sdk.foundation.bridge.ComponentVTable
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
+import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RAVADOptions
 import com.runanywhere.sdk.public.types.RAVADResult
@@ -57,6 +61,8 @@ object CppBridgeVAD {
     /** Generic scaffold (handle / isLoaded / loadModel / unload / destroy). */
     internal val actor = ComponentActor(ComponentVTable.vad)
 
+    private val logger = SDKLogger("CppBridge.VAD")
+
     // MARK: - Handle Management
 
     /** Get or create the VAD component handle. */
@@ -67,6 +73,18 @@ object CppBridgeVAD {
     /** Whether a model is loaded. */
     val isLoaded: Boolean
         get() = actor.isLoaded
+
+    /**
+     * Whether the VAD component is initialized (queries the component, not
+     * the model slot). Mirrors Swift's `isInitialized` property which calls
+     * `rac_vad_component_is_initialized`. Returns false if the handle has
+     * not been created.
+     */
+    suspend fun isInitialized(): Boolean {
+        val handle = actor.existingHandle()
+        if (handle == 0L) return false
+        return RunAnywhereBridge.racVadComponentIsInitialized(handle)
+    }
 
     /** Currently-loaded model id, or null. */
     val currentModelId: String?
@@ -82,6 +100,32 @@ object CppBridgeVAD {
     /** Unload the current VAD model (reverts to energy-based VAD). */
     suspend fun unload() {
         actor.unload()
+    }
+
+    /**
+     * Unload the current VAD model via `rac_vad_component_unload` (reverts
+     * to energy-based VAD). Mirrors Swift's `unloadModel()` which calls the
+     * dedicated VAD unload ABI distinct from the generic component cleanup.
+     * No-op if the handle has not been created.
+     */
+    suspend fun unloadModel() {
+        val handle = actor.existingHandle()
+        if (handle == 0L) return
+        RunAnywhereBridge.racVadComponentUnload(handle)
+        actor.markAssetLoaded(null)
+        logger.info("VAD model unloaded")
+    }
+
+    /**
+     * Cleanup VAD component (release all resources) via
+     * `rac_vad_component_cleanup`. Mirrors Swift's `cleanup()`. No-op if
+     * the handle has not been created.
+     */
+    suspend fun cleanup() {
+        val handle = actor.existingHandle()
+        if (handle == 0L) return
+        RunAnywhereBridge.racVadComponentCleanup(handle)
+        logger.info("VAD cleaned up")
     }
 
     // MARK: - Cleanup
@@ -107,6 +151,10 @@ object CppBridgeVAD {
     /**
      * Reset the VAD state for a new audio stream. No-op if the handle has
      * not been created.
+     *
+     * NOTE: This is the handle-based `rac_vad_component_reset` reset. For
+     * the lifecycle-owned reset returning [VADServiceState], use
+     * [resetLifecycle].
      */
     suspend fun reset() {
         val handle = actor.existingHandle()
@@ -147,5 +195,114 @@ object CppBridgeVAD {
             RunAnywhereBridge.racVadComponentGetStatisticsProto(handle),
             "racVadComponentGetStatisticsProto",
         )
+    }
+
+    /**
+     * Register a per-handle voice-activity callback that fires whenever the
+     * VAD component emits a [SpeechActivityEvent]. Mirrors Swift's
+     * `CppBridge.VAD.setActivityCallbackProto(_:)` which wraps
+     * `rac_vad_component_set_activity_proto_callback`.
+     *
+     * The supplied [callback] receives each decoded event; decode failures
+     * are logged and dropped (matching Swift behaviour). Pass `null` to
+     * clear the callback registration.
+     *
+     * @throws SDKException with category `component` when the C ABI returns
+     *   a non-success status.
+     */
+    suspend fun setActivityCallbackProto(callback: ((SpeechActivityEvent) -> Unit)?) {
+        val handle = actor.getHandle()
+        val listener: NativeProtoProgressListener? =
+            callback?.let { onEvent ->
+                NativeProtoProgressListener { bytes ->
+                    try {
+                        onEvent(SpeechActivityEvent.ADAPTER.decode(bytes))
+                    } catch (e: Exception) {
+                        logger.warn("Failed to decode SpeechActivityEvent: ${e.message}")
+                    }
+                    true
+                }
+            }
+        val rc = RunAnywhereBridge.racVadComponentSetActivityProtoCallback(handle, listener)
+        if (rc != RunAnywhereBridge.RAC_SUCCESS) {
+            throw SDKException.operation("VAD activity callback failed: rc=$rc")
+        }
+    }
+
+    // MARK: - Service Lifecycle (lifecycle-owned VAD service)
+    //
+    // Mirrors Swift's `initialize`/`start`/`stop`/`reset` actor methods on
+    // `CppBridge.VAD`, which forward to the `*Lifecycle` proto surface in
+    // `CppBridge+ModalityProtoABI.swift` (`configureLifecycle`,
+    // `startLifecycle`, `stopLifecycle`, `resetLifecycle`).
+    //
+    // Each routes through the commons VAD lifecycle to the currently-loaded
+    // VAD service (no handle threaded) and returns the canonical
+    // [VADServiceState] reflecting the post-call state.
+    //
+    // PENDING — needs Java_* export in librunanywhere_jni.so. The
+    // underlying C symbols exist in `rac_vad_service.h:256-279`
+    // (`rac_vad_configure_lifecycle_proto`, `rac_vad_start_lifecycle_proto`,
+    // `rac_vad_stop_lifecycle_proto`, `rac_vad_reset_lifecycle_proto`) but
+    // the JNI thunks declared in [RunAnywhereBridge] are not yet wired up
+    // on the commons side. Calls will throw `UnsatisfiedLinkError` until
+    // the JNI implementation lands.
+
+    /**
+     * Initialize VAD — binds to the commons lifecycle VAD service.
+     * Returns the post-configure service state. Mirrors Swift's
+     * `initialize(_:RAVADConfiguration)`.
+     */
+    suspend fun initialize(config: VADConfiguration = VADConfiguration()): VADServiceState {
+        val state = decodeOrThrow(
+            VADServiceState.ADAPTER,
+            RunAnywhereBridge.racVadConfigureLifecycleProto(
+                VADConfiguration.ADAPTER.encode(config),
+            ),
+            "racVadConfigureLifecycleProto",
+        )
+        logger.info("VAD initialized (lifecycle)")
+        return state
+    }
+
+    /**
+     * Start VAD processing on the lifecycle-loaded service. Returns the
+     * post-start service state. Mirrors Swift's `start()`.
+     */
+    suspend fun start(): VADServiceState =
+        decodeOrThrow(
+            VADServiceState.ADAPTER,
+            RunAnywhereBridge.racVadStartLifecycleProto(),
+            "racVadStartLifecycleProto",
+        )
+
+    /**
+     * Stop VAD processing on the lifecycle-loaded service. Returns the
+     * post-stop service state. Mirrors Swift's `stop()`.
+     */
+    suspend fun stop(): VADServiceState =
+        decodeOrThrow(
+            VADServiceState.ADAPTER,
+            RunAnywhereBridge.racVadStopLifecycleProto(),
+            "racVadStopLifecycleProto",
+        )
+
+    /**
+     * Reset VAD internal state on the lifecycle-loaded service (adaptive
+     * thresholds, speech segments, timing). Returns the post-reset service
+     * state. Mirrors Swift's `reset()` (which forwards to
+     * `resetLifecycle()`).
+     *
+     * Distinct from [reset], which uses the handle-based
+     * `rac_vad_component_reset` path.
+     */
+    suspend fun resetLifecycle(): VADServiceState {
+        val state = decodeOrThrow(
+            VADServiceState.ADAPTER,
+            RunAnywhereBridge.racVadResetLifecycleProto(),
+            "racVadResetLifecycleProto",
+        )
+        logger.info("VAD state reset (lifecycle)")
+        return state
     }
 }

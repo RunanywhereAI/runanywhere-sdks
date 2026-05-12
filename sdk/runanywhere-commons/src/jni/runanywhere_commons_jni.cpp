@@ -106,8 +106,11 @@
 #include "rac/plugin/rac_plugin_loader.h"
 #include "rac/router/rac_hardware_abi.h"
 #include "rac/router/rac_router_capabilities.h"
+#include "rac/core/rac_sdk_state.h"
+#include "rac/infrastructure/device/rac_device_identity.h"
 #include "rac/infrastructure/network/rac_auth_manager.h"
 #include "rac/infrastructure/network/rac_dev_config.h"
+#include "rac/infrastructure/network/rac_endpoints.h"
 #include "rac/infrastructure/network/rac_environment.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_manager.h"
 #include "rac/infrastructure/telemetry/rac_telemetry_types.h"
@@ -843,6 +846,23 @@ JNIEXPORT void JNICALL Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_
     std::string msgStr = getCString(env, message);
 
     rac_log(static_cast<rac_log_level_t>(level), tagStr.c_str(), msgStr.c_str());
+}
+
+// Delegates the metadata-redaction policy to the commons C ABI so Kotlin
+// SDKLogger and the C++ logger apply the same sensitive-substring list.
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLogMetadataShouldRedact(
+    JNIEnv* env, jclass clazz, jstring key) {
+    if (key == nullptr) {
+        return JNI_FALSE;
+    }
+    std::string keyStr = getCString(env, key);
+    rac_bool_t out = RAC_FALSE;
+    rac_result_t rc = rac_log_metadata_should_redact(keyStr.c_str(), &out);
+    if (rc != RAC_SUCCESS) {
+        return JNI_FALSE;
+    }
+    return out != RAC_FALSE ? JNI_TRUE : JNI_FALSE;
 }
 
 // =============================================================================
@@ -2361,92 +2381,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racToolCallValidateProt
 }
 
 // =============================================================================
-// ARCHIVE EXTRACTION
-// =============================================================================
-
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeExtractArchive(JNIEnv* env,
-                                                                              jobject /* thiz */,
-                                                                              jstring jArchivePath,
-                                                                              jstring jDestDir) {
-    std::string archivePath = getCString(env, jArchivePath);
-    std::string destDir = getCString(env, jDestDir);
-
-    LOGi("Extracting archive: %s -> %s", archivePath.c_str(), destDir.c_str());
-
-    rac_extraction_result_t result = {};
-    rac_result_t status = rac_extract_archive_native(archivePath.c_str(), destDir.c_str(),
-                                                     nullptr /* default options */,
-                                                     nullptr /* no progress */, nullptr, &result);
-
-    if (RAC_SUCCEEDED(status)) {
-        LOGi("Extraction complete: %d files, %lld bytes", result.files_extracted,
-             static_cast<long long>(result.bytes_extracted));
-    } else {
-        LOGe("Extraction failed with code: %d", status);
-    }
-
-    return static_cast<jint>(status);
-}
-
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeDetectArchiveType(
-    JNIEnv* env, jobject /* thiz */, jstring jFilePath) {
-    std::string filePath = getCString(env, jFilePath);
-    rac_archive_type_t type = RAC_ARCHIVE_TYPE_NONE;
-    rac_detect_archive_type(filePath.c_str(), &type);
-    return static_cast<jint>(type);
-}
-
-// =============================================================================
-// DOWNLOAD ORCHESTRATOR
-// =============================================================================
-
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFindModelPathAfterExtraction(
-    JNIEnv* env, jobject /* thiz */, jstring jExtractedDir, jint jStructure, jint jFramework,
-    jint jFormat) {
-    std::string extractedDir = getCString(env, jExtractedDir);
-
-    char outPath[4096];
-    rac_result_t result = rac_find_model_path_after_extraction(
-        extractedDir.c_str(), static_cast<rac_archive_structure_t>(jStructure),
-        static_cast<rac_inference_framework_t>(jFramework),
-        static_cast<rac_model_format_t>(jFormat), outPath, sizeof(outPath));
-
-    if (RAC_SUCCEEDED(result)) {
-        return env->NewStringUTF(outPath);
-    }
-    return env->NewStringUTF(extractedDir.c_str());
-}
-
-JNIEXPORT jboolean JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeDownloadRequiresExtraction(
-    JNIEnv* env, jobject /* thiz */, jstring jUrl) {
-    std::string url = getCString(env, jUrl);
-    return static_cast<jboolean>(rac_download_requires_extraction(url.c_str()) == RAC_TRUE);
-}
-
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeComputeDownloadDestination(
-    JNIEnv* env, jobject /* thiz */, jstring jModelId, jstring jDownloadUrl, jint jFramework,
-    jint jFormat) {
-    std::string modelId = getCString(env, jModelId);
-    std::string downloadUrl = getCString(env, jDownloadUrl);
-
-    char outPath[4096];
-    rac_bool_t needsExtraction = RAC_FALSE;
-    rac_result_t result = rac_download_compute_destination(
-        modelId.c_str(), downloadUrl.c_str(), static_cast<rac_inference_framework_t>(jFramework),
-        static_cast<rac_model_format_t>(jFormat), outPath, sizeof(outPath), &needsExtraction);
-
-    if (RAC_SUCCEEDED(result)) {
-        return env->NewStringUTF(outPath);
-    }
-    return nullptr;
-}
-
-// =============================================================================
 // File Manager JNI Wrappers
 // =============================================================================
 
@@ -2703,35 +2637,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerRegist
     return RAC_SUCCESS;
 }
 
-// Create directory structure
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerCreateDirectoryStructure(
-    JNIEnv* env, jobject /* thiz */) {
-    rac_file_callbacks_t cb = build_jni_file_callbacks();
-    return static_cast<jint>(rac_file_manager_create_directory_structure(&cb));
-}
-
-// Calculate directory size
-JNIEXPORT jlong JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerCalculateDirSize(
-    JNIEnv* env, jobject /* thiz */, jstring jPath) {
-    std::string path = getCString(env, jPath);
-    rac_file_callbacks_t cb = build_jni_file_callbacks();
-    int64_t size = 0;
-    rac_result_t result = rac_file_manager_calculate_dir_size(&cb, path.c_str(), &size);
-    return RAC_SUCCEEDED(result) ? static_cast<jlong>(size) : 0L;
-}
-
-// Models storage used
-JNIEXPORT jlong JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerModelsStorageUsed(
-    JNIEnv* env, jobject /* thiz */) {
-    rac_file_callbacks_t cb = build_jni_file_callbacks();
-    int64_t size = 0;
-    rac_result_t result = rac_file_manager_models_storage_used(&cb, &size);
-    return RAC_SUCCEEDED(result) ? static_cast<jlong>(size) : 0L;
-}
-
 // Clear cache
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerClearCache(
@@ -2746,102 +2651,6 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerClearT
     JNIEnv* env, jobject /* thiz */) {
     rac_file_callbacks_t cb = build_jni_file_callbacks();
     return static_cast<jint>(rac_file_manager_clear_temp(&cb));
-}
-
-// Cache size
-JNIEXPORT jlong JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerCacheSize(
-    JNIEnv* env, jobject /* thiz */) {
-    rac_file_callbacks_t cb = build_jni_file_callbacks();
-    int64_t size = 0;
-    rac_result_t result = rac_file_manager_cache_size(&cb, &size);
-    return RAC_SUCCEEDED(result) ? static_cast<jlong>(size) : 0L;
-}
-
-// Delete model
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerDeleteModel(
-    JNIEnv* env, jobject /* thiz */, jstring jModelId, jint jFramework) {
-    std::string modelId = getCString(env, jModelId);
-    rac_file_callbacks_t cb = build_jni_file_callbacks();
-    return static_cast<jint>(rac_file_manager_delete_model(
-        &cb, modelId.c_str(), static_cast<rac_inference_framework_t>(jFramework)));
-}
-
-// Create model folder
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerCreateModelFolder(
-    JNIEnv* env, jobject /* thiz */, jstring jModelId, jint jFramework) {
-    std::string modelId = getCString(env, jModelId);
-    rac_file_callbacks_t cb = build_jni_file_callbacks();
-    char outPath[4096];
-    rac_result_t result = rac_file_manager_create_model_folder(
-        &cb, modelId.c_str(), static_cast<rac_inference_framework_t>(jFramework), outPath,
-        sizeof(outPath));
-    if (RAC_SUCCEEDED(result)) {
-        return env->NewStringUTF(outPath);
-    }
-    return nullptr;
-}
-
-// Model folder exists
-JNIEXPORT jboolean JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerModelFolderExists(
-    JNIEnv* env, jobject /* thiz */, jstring jModelId, jint jFramework) {
-    std::string modelId = getCString(env, jModelId);
-    rac_file_callbacks_t cb = build_jni_file_callbacks();
-    rac_bool_t exists = RAC_FALSE;
-    rac_file_manager_model_folder_exists(
-        &cb, modelId.c_str(), static_cast<rac_inference_framework_t>(jFramework), &exists, nullptr);
-    return static_cast<jboolean>(exists == RAC_TRUE);
-}
-
-// Check storage availability - returns JSON string with result
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerCheckStorage(
-    JNIEnv* env, jobject /* thiz */, jlong requiredBytes) {
-    rac_file_callbacks_t cb = build_jni_file_callbacks();
-    rac_storage_availability_t availability = {};
-    rac_result_t result =
-        rac_file_manager_check_storage(&cb, static_cast<int64_t>(requiredBytes), &availability);
-
-    if (RAC_FAILED(result))
-        return nullptr;
-
-    nlohmann::json j;
-    j["isAvailable"] = availability.is_available == RAC_TRUE;
-    j["requiredSpace"] = availability.required_space;
-    j["availableSpace"] = availability.available_space;
-    j["hasWarning"] = availability.has_warning == RAC_TRUE;
-    j["recommendation"] = availability.recommendation != nullptr ? availability.recommendation : "";
-
-    rac_storage_availability_free(&availability);
-
-    std::string jsonStr = j.dump();
-    return env->NewStringUTF(jsonStr.c_str());
-}
-
-// Get storage info - returns JSON string with result
-JNIEXPORT jstring JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_nativeFileManagerGetStorageInfo(
-    JNIEnv* env, jobject /* thiz */) {
-    rac_file_callbacks_t cb = build_jni_file_callbacks();
-    rac_file_manager_storage_info_t info = {};
-    rac_result_t result = rac_file_manager_get_storage_info(&cb, &info);
-
-    if (RAC_FAILED(result))
-        return nullptr;
-
-    nlohmann::json j;
-    j["deviceTotal"] = info.device_total;
-    j["deviceFree"] = info.device_free;
-    j["modelsSize"] = info.models_size;
-    j["cacheSize"] = info.cache_size;
-    j["tempSize"] = info.temp_size;
-    j["totalAppSize"] = info.total_app_size;
-
-    std::string jsonStr = j.dump();
-    return env->NewStringUTF(jsonStr.c_str());
 }
 
 JNIEXPORT jbyteArray JNICALL
@@ -4964,6 +4773,813 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputGene
 // `racModelRegistryFetchAssignmentsProto` which returns a serialized
 // `runanywhere.v1.ModelInfoList`.
 // =============================================================================
+
+// =============================================================================
+// JNI FUNCTIONS — Swift-alignment Phase 1 (Groups A–I)
+//
+// Bulk thunk bootstrap added to unblock the Kotlin SDK's Swift-alignment
+// effort. Each thunk is a thin wrapper over the matching rac_* C ABI; see
+// docs/CPP_PROTO_OWNERSHIP.md for the proto-byte default classification.
+// =============================================================================
+
+// ---------- Group A: Component metadata getters --------------------------------
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHardwareGetAccelerators(JNIEnv* env,
+                                                                                    jclass clazz) {
+    (void)clazz;
+    uint8_t* bytes = nullptr;
+    size_t size = 0;
+    rac_result_t rc = rac_hardware_get_accelerators(&bytes, &size);
+    if (rc != RAC_SUCCESS || bytes == nullptr) {
+        LOGe("racHardwareGetAccelerators: failed with code %d", rc);
+        return nullptr;
+    }
+    jbyteArray jArr = env->NewByteArray(static_cast<jsize>(size));
+    if (jArr == nullptr) {
+        rac_hardware_profile_free(bytes);
+        return nullptr;
+    }
+    if (size > 0) {
+        env->SetByteArrayRegion(jArr, 0, static_cast<jsize>(size),
+                                reinterpret_cast<const jbyte*>(bytes));
+    }
+    rac_hardware_profile_free(bytes);
+    return env->ExceptionCheck() ? nullptr : jArr;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHardwareSetAcceleratorPreference(
+    JNIEnv* env, jclass clazz, jbyteArray bytes) {
+    (void)clazz;
+    // Accept either a single-byte enum or a proto with the enum encoded as the
+    // first byte. Either way we forward an int preference to the C ABI.
+    int preference = 0;
+    if (bytes != nullptr) {
+        const jsize len = env->GetArrayLength(bytes);
+        if (len > 0) {
+            jbyte first = 0;
+            env->GetByteArrayRegion(bytes, 0, 1, &first);
+            preference = static_cast<int>(static_cast<unsigned char>(first));
+        }
+    }
+    return static_cast<jint>(rac_hardware_set_accelerator_preference(preference));
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentIsInitialized(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return JNI_FALSE;
+    return rac_vad_component_is_initialized(handleFromJLong(handle)) == RAC_TRUE ? JNI_TRUE
+                                                                                  : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentUnload(JNIEnv* env,
+                                                                               jclass clazz,
+                                                                               jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return RAC_ERROR_NULL_POINTER;
+    return static_cast<jint>(rac_vad_component_unload(handleFromJLong(handle)));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentCleanup(JNIEnv* env,
+                                                                                jclass clazz,
+                                                                                jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return RAC_ERROR_NULL_POINTER;
+    return static_cast<jint>(rac_vad_component_cleanup(handleFromJLong(handle)));
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentSupportsStreaming(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return JNI_FALSE;
+    return rac_vlm_component_supports_streaming(handleFromJLong(handle)) == RAC_TRUE ? JNI_TRUE
+                                                                                       : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVlmComponentGetState(JNIEnv* env,
+                                                                                 jclass clazz,
+                                                                                 jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return 0;
+    return static_cast<jint>(rac_vlm_component_get_state(handleFromJLong(handle)));
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentSupportsStreaming(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return JNI_FALSE;
+    return rac_stt_component_supports_streaming(handleFromJLong(handle)) == RAC_TRUE ? JNI_TRUE
+                                                                                       : JNI_FALSE;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentConfigure(JNIEnv* env,
+                                                                                  jclass clazz,
+                                                                                  jlong handle,
+                                                                                  jint framework) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return RAC_ERROR_NULL_POINTER;
+    rac_stt_config_t config = RAC_STT_CONFIG_DEFAULT;
+    config.preferred_framework = static_cast<int32_t>(framework);
+    return static_cast<jint>(rac_stt_component_configure(handleFromJLong(handle), &config));
+}
+
+// ---------- Group B: Voice agent composite + lifecycle -------------------------
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentCreate(JNIEnv* env,
+                                                                             jclass clazz,
+                                                                             jlong llm,
+                                                                             jlong stt,
+                                                                             jlong tts,
+                                                                             jlong vad) {
+    (void)env;
+    (void)clazz;
+    rac_voice_agent_handle_t handle = nullptr;
+    rac_result_t rc = rac_voice_agent_create(handleFromJLong(llm), handleFromJLong(stt),
+                                             handleFromJLong(tts), handleFromJLong(vad), &handle);
+    if (rc != RAC_SUCCESS) {
+        LOGe("racVoiceAgentCreate: failed with code %d", rc);
+        return 0L;
+    }
+    return reinterpret_cast<jlong>(handle);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVoiceAgentCleanup(JNIEnv* env,
+                                                                              jclass clazz,
+                                                                              jlong handle) {
+    (void)env;
+    (void)clazz;
+    if (handle == 0L) return RAC_ERROR_NULL_POINTER;
+    return static_cast<jint>(
+        rac_voice_agent_cleanup(reinterpret_cast<rac_voice_agent_handle_t>(handle)));
+}
+
+// ---------- Group C: Proto bridges (lifecycle + registry + structured output) --
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSdkEventClearQueue(JNIEnv* env,
+                                                                                jclass clazz) {
+    (void)env;
+    (void)clazz;
+    rac_sdk_event_clear_queue();
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelLifecycleReset(JNIEnv* env,
+                                                                                jclass clazz) {
+    (void)env;
+    (void)clazz;
+    rac_model_lifecycle_reset();
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryDiscoverProto(
+    JNIEnv* env, jclass clazz, jbyteArray req) {
+    return callModelRegistryProtoBuffer(env, req, rac_model_registry_discover_proto,
+                                        "racModelRegistryDiscoverProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelRegistryImportProto(
+    JNIEnv* env, jclass clazz, jbyteArray req) {
+    return callModelRegistryProtoBuffer(env, req, rac_model_registry_import_proto,
+                                        "racModelRegistryImportProto");
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStructuredOutputGenerateProto(
+    JNIEnv* env, jclass clazz, jlong handle, jbyteArray req) {
+    (void)clazz;
+    (void)handle;  // current C ABI is handle-less; reserved for forward compatibility
+    return callProtoBufferFn(env, req, rac_structured_output_generate_proto,
+                             "racStructuredOutputGenerateProto");
+}
+
+// Per-handle LLM stream-event proto callback registry. We can have at most
+// one callback per LLM handle (the C ABI enforces this), so a uintptr_t →
+// global jobject map is sufficient. The trampoline forwards proto bytes to
+// the Kotlin NativeProtoProgressListener.
+static std::mutex g_llm_stream_proto_listener_mutex;
+static std::unordered_map<uintptr_t, jobject> g_llm_stream_proto_listeners;
+
+static void llm_stream_proto_trampoline(const uint8_t* proto_bytes, size_t proto_size,
+                                        void* user_data) {
+    uintptr_t key = reinterpret_cast<uintptr_t>(user_data);
+    JNIEnv* env = getJNIEnv();
+    if (env == nullptr) return;
+    jobject listener = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
+        auto it = g_llm_stream_proto_listeners.find(key);
+        if (it != g_llm_stream_proto_listeners.end() && it->second != nullptr) {
+            listener = env->NewLocalRef(it->second);
+        }
+    }
+    if (listener != nullptr) {
+        invokeProtoListener(env, listener, proto_bytes, proto_size, "llmStreamProtoCallback");
+        env->DeleteLocalRef(listener);
+    }
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmSetStreamProtoCallback(
+    JNIEnv* env, jclass clazz, jlong handle, jobject listener) {
+    (void)clazz;
+    if (handle == 0L) return RAC_ERROR_NULL_POINTER;
+    uintptr_t key = static_cast<uintptr_t>(handle);
+    {
+        std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
+        auto it = g_llm_stream_proto_listeners.find(key);
+        if (it != g_llm_stream_proto_listeners.end()) {
+            env->DeleteGlobalRef(it->second);
+            g_llm_stream_proto_listeners.erase(it);
+        }
+        if (listener != nullptr) {
+            g_llm_stream_proto_listeners[key] = env->NewGlobalRef(listener);
+        }
+    }
+    return static_cast<jint>(rac_llm_set_stream_proto_callback(
+        handleFromJLong(handle),
+        listener != nullptr ? llm_stream_proto_trampoline : nullptr,
+        listener != nullptr ? reinterpret_cast<void*>(key) : nullptr));
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmUnsetStreamProtoCallback(
+    JNIEnv* env, jclass clazz, jlong handle) {
+    (void)clazz;
+    if (handle == 0L) return RAC_ERROR_NULL_POINTER;
+    uintptr_t key = static_cast<uintptr_t>(handle);
+    {
+        std::lock_guard<std::mutex> lock(g_llm_stream_proto_listener_mutex);
+        auto it = g_llm_stream_proto_listeners.find(key);
+        if (it != g_llm_stream_proto_listeners.end()) {
+            env->DeleteGlobalRef(it->second);
+            g_llm_stream_proto_listeners.erase(it);
+        }
+    }
+    return static_cast<jint>(rac_llm_unset_stream_proto_callback(handleFromJLong(handle)));
+}
+
+// ---------- Group D: SDK state accessors ---------------------------------------
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStateGetEnvironment(JNIEnv* env,
+                                                                                jclass clazz) {
+    (void)env;
+    (void)clazz;
+    return static_cast<jint>(rac_state_get_environment());
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStateGetBaseUrl(JNIEnv* env,
+                                                                            jclass clazz) {
+    (void)clazz;
+    const char* value = rac_state_get_base_url();
+    return value != nullptr ? env->NewStringUTF(value) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStateGetApiKey(JNIEnv* env,
+                                                                           jclass clazz) {
+    (void)clazz;
+    const char* value = rac_state_get_api_key();
+    return value != nullptr ? env->NewStringUTF(value) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStateGetDeviceId(JNIEnv* env,
+                                                                             jclass clazz) {
+    (void)clazz;
+    const char* value = rac_state_get_device_id();
+    return value != nullptr ? env->NewStringUTF(value) : nullptr;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStateSetDeviceRegistered(
+    JNIEnv* env, jclass clazz, jboolean registered) {
+    (void)env;
+    (void)clazz;
+    rac_state_set_device_registered(registered == JNI_TRUE);
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racStateIsDeviceRegistered(JNIEnv* env,
+                                                                                    jclass clazz) {
+    (void)env;
+    (void)clazz;
+    return rac_state_is_device_registered() ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racDeviceGetOrCreatePersistentId(
+    JNIEnv* env, jclass clazz) {
+    (void)clazz;
+    char buf[RAC_DEVICE_ID_BUFFER_MIN_SIZE * 2] = {0};
+    rac_result_t rc = rac_device_get_or_create_persistent_id(buf, sizeof(buf));
+    if (rc != RAC_SUCCESS) {
+        return nullptr;
+    }
+    return env->NewStringUTF(buf);
+}
+
+// ---------- Group E: Archive enum mappers --------------------------------------
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArchiveTypeFromProto(JNIEnv* env,
+                                                                                  jclass clazz,
+                                                                                  jint value) {
+    (void)env;
+    (void)clazz;
+    rac_archive_type_t out = static_cast<rac_archive_type_t>(0);
+    rac_result_t rc = rac_archive_type_from_proto(static_cast<int32_t>(value), &out);
+    return rc == RAC_SUCCESS ? static_cast<jint>(out) : -1;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArchiveTypeToProto(JNIEnv* env,
+                                                                                jclass clazz,
+                                                                                jint value) {
+    (void)env;
+    (void)clazz;
+    int32_t out = 0;
+    rac_result_t rc =
+        rac_archive_type_to_proto(static_cast<rac_archive_type_t>(value), &out);
+    return rc == RAC_SUCCESS ? static_cast<jint>(out) : -1;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArchiveStructureFromProto(
+    JNIEnv* env, jclass clazz, jint value) {
+    (void)env;
+    (void)clazz;
+    rac_archive_structure_t out = static_cast<rac_archive_structure_t>(0);
+    rac_result_t rc = rac_archive_structure_from_proto(static_cast<int32_t>(value), &out);
+    return rc == RAC_SUCCESS ? static_cast<jint>(out) : -1;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racArchiveStructureToProto(
+    JNIEnv* env, jclass clazz, jint value) {
+    (void)env;
+    (void)clazz;
+    int32_t out = 0;
+    rac_result_t rc =
+        rac_archive_structure_to_proto(static_cast<rac_archive_structure_t>(value), &out);
+    return rc == RAC_SUCCESS ? static_cast<jint>(out) : -1;
+}
+
+// ---------- Group F: Model paths -----------------------------------------------
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsSetBaseDirectory(
+    JNIEnv* env, jclass clazz, jstring path) {
+    (void)clazz;
+    std::string p = getCString(env, path);
+    return static_cast<jint>(rac_model_paths_set_base_dir(p.c_str()));
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsGetModelsDirectory(
+    JNIEnv* env, jclass clazz) {
+    (void)clazz;
+    char buf[2048] = {0};
+    if (rac_model_paths_get_models_directory(buf, sizeof(buf)) != RAC_SUCCESS) {
+        return nullptr;
+    }
+    return env->NewStringUTF(buf);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsGetFrameworkDirectory(
+    JNIEnv* env, jclass clazz, jint framework) {
+    (void)clazz;
+    char buf[2048] = {0};
+    if (rac_model_paths_get_framework_directory(static_cast<rac_inference_framework_t>(framework),
+                                                buf, sizeof(buf)) != RAC_SUCCESS) {
+        return nullptr;
+    }
+    return env->NewStringUTF(buf);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsGetExpectedModelPath(
+    JNIEnv* env, jclass clazz, jstring modelId, jint framework, jint format) {
+    (void)clazz;
+    std::string mid = getCString(env, modelId);
+    char buf[2048] = {0};
+    if (rac_model_paths_get_expected_model_path(
+            mid.c_str(), static_cast<rac_inference_framework_t>(framework),
+            static_cast<rac_model_format_t>(format), buf, sizeof(buf)) != RAC_SUCCESS) {
+        return nullptr;
+    }
+    return env->NewStringUTF(buf);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsGetCacheDirectory(
+    JNIEnv* env, jclass clazz) {
+    (void)clazz;
+    char buf[2048] = {0};
+    if (rac_model_paths_get_cache_directory(buf, sizeof(buf)) != RAC_SUCCESS) {
+        return nullptr;
+    }
+    return env->NewStringUTF(buf);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsGetDownloadsDirectory(
+    JNIEnv* env, jclass clazz) {
+    (void)clazz;
+    char buf[2048] = {0};
+    if (rac_model_paths_get_downloads_directory(buf, sizeof(buf)) != RAC_SUCCESS) {
+        return nullptr;
+    }
+    return env->NewStringUTF(buf);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsGetTempDirectory(
+    JNIEnv* env, jclass clazz) {
+    (void)clazz;
+    char buf[2048] = {0};
+    if (rac_model_paths_get_temp_directory(buf, sizeof(buf)) != RAC_SUCCESS) {
+        return nullptr;
+    }
+    return env->NewStringUTF(buf);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsExtractModelId(
+    JNIEnv* env, jclass clazz, jstring path) {
+    (void)clazz;
+    std::string p = getCString(env, path);
+    char buf[512] = {0};
+    if (rac_model_paths_extract_model_id(p.c_str(), buf, sizeof(buf)) != RAC_SUCCESS) {
+        return nullptr;
+    }
+    return env->NewStringUTF(buf);
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsExtractFramework(
+    JNIEnv* env, jclass clazz, jstring path) {
+    (void)clazz;
+    std::string p = getCString(env, path);
+    rac_inference_framework_t fw = static_cast<rac_inference_framework_t>(-1);
+    if (rac_model_paths_extract_framework(p.c_str(), &fw) != RAC_SUCCESS) {
+        return -1;
+    }
+    return static_cast<jint>(fw);
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelPathsIsModelPath(JNIEnv* env,
+                                                                                  jclass clazz,
+                                                                                  jstring path) {
+    (void)clazz;
+    std::string p = getCString(env, path);
+    return rac_model_paths_is_model_path(p.c_str()) == RAC_TRUE ? JNI_TRUE : JNI_FALSE;
+}
+
+// ---------- Group G: File manager (Swift-aligned aliases) ----------------------
+//
+// These call the rac_file_manager_* C ABI using Swift-aligned naming and a
+// model-id-only (framework-implicit) signature, matching how Swift's
+// CppBridge+FileManager surface looks. They superseded the older
+// nativeFileManager* thunks (calculate/delete/check/info etc.), which have
+// been removed.
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racFileManagerCreateDirectoryStructure(
+    JNIEnv* env, jclass clazz, jstring rootPath) {
+    (void)clazz;
+    // rootPath is informational — the underlying ABI uses the registered
+    // file callbacks (which know the base directory). We log the requested
+    // root for debugging but otherwise forward to the canonical helper.
+    if (rootPath != nullptr) {
+        std::string r = getCString(env, rootPath);
+        LOGd("racFileManagerCreateDirectoryStructure: root=%s", r.c_str());
+    }
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    return static_cast<jint>(rac_file_manager_create_directory_structure(&cb));
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racFileManagerCalculateDirectorySize(
+    JNIEnv* env, jclass clazz, jstring path) {
+    (void)clazz;
+    std::string p = getCString(env, path);
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    int64_t size = 0;
+    rac_result_t rc = rac_file_manager_calculate_dir_size(&cb, p.c_str(), &size);
+    return RAC_SUCCEEDED(rc) ? static_cast<jlong>(size) : 0L;
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racFileManagerModelsStorageUsed(
+    JNIEnv* env, jclass clazz) {
+    (void)env;
+    (void)clazz;
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    int64_t size = 0;
+    rac_result_t rc = rac_file_manager_models_storage_used(&cb, &size);
+    return RAC_SUCCEEDED(rc) ? static_cast<jlong>(size) : 0L;
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racFileManagerCacheSize(JNIEnv* env,
+                                                                                  jclass clazz) {
+    (void)env;
+    (void)clazz;
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    int64_t size = 0;
+    rac_result_t rc = rac_file_manager_cache_size(&cb, &size);
+    return RAC_SUCCEEDED(rc) ? static_cast<jlong>(size) : 0L;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racFileManagerDeleteModel(JNIEnv* env,
+                                                                                   jclass clazz,
+                                                                                   jstring modelId) {
+    (void)clazz;
+    std::string mid = getCString(env, modelId);
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    // Framework-implicit form: use UNKNOWN so the registry's path utils
+    // strip the framework segment via the canonical layout.
+    return static_cast<jint>(rac_file_manager_delete_model(
+        &cb, mid.c_str(), static_cast<rac_inference_framework_t>(0)));
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racFileManagerModelFolderExists(
+    JNIEnv* env, jclass clazz, jstring modelId) {
+    (void)clazz;
+    std::string mid = getCString(env, modelId);
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    rac_bool_t exists = RAC_FALSE;
+    rac_file_manager_model_folder_exists(&cb, mid.c_str(),
+                                         static_cast<rac_inference_framework_t>(0), &exists, nullptr);
+    return exists == RAC_TRUE ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racFileManagerModelFolderHasContents(
+    JNIEnv* env, jclass clazz, jstring modelId) {
+    (void)clazz;
+    std::string mid = getCString(env, modelId);
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    rac_bool_t exists = RAC_FALSE;
+    rac_bool_t hasContents = RAC_FALSE;
+    rac_file_manager_model_folder_exists(&cb, mid.c_str(),
+                                         static_cast<rac_inference_framework_t>(0), &exists,
+                                         &hasContents);
+    return (exists == RAC_TRUE && hasContents == RAC_TRUE) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racFileManagerGetStorageInfo(JNIEnv* env,
+                                                                                      jclass clazz) {
+    (void)clazz;
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    rac_file_manager_storage_info_t info = {};
+    rac_result_t rc = rac_file_manager_get_storage_info(&cb, &info);
+    if (RAC_FAILED(rc)) {
+        return nullptr;
+    }
+    // Encode as a fixed 6 × int64 little-endian payload — callers decode it
+    // explicitly. The legacy JSON-returning nativeFileManagerGetStorageInfo
+    // thunk has been removed.
+    const size_t kFieldCount = 6;
+    const size_t kPayloadSize = kFieldCount * sizeof(int64_t);
+    int64_t fields[kFieldCount] = {info.device_total, info.device_free, info.models_size,
+                                    info.cache_size,   info.temp_size,    info.total_app_size};
+    jbyteArray jArr = env->NewByteArray(static_cast<jsize>(kPayloadSize));
+    if (jArr == nullptr) {
+        return nullptr;
+    }
+    env->SetByteArrayRegion(jArr, 0, static_cast<jsize>(kPayloadSize),
+                            reinterpret_cast<const jbyte*>(fields));
+    return env->ExceptionCheck() ? nullptr : jArr;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racFileManagerCheckStorage(
+    JNIEnv* env, jclass clazz, jlong required) {
+    (void)env;
+    (void)clazz;
+    rac_file_callbacks_t cb = build_jni_file_callbacks();
+    rac_storage_availability_t availability = {};
+    rac_result_t rc =
+        rac_file_manager_check_storage(&cb, static_cast<int64_t>(required), &availability);
+    bool ok = RAC_SUCCEEDED(rc) && availability.is_available == RAC_TRUE;
+    rac_storage_availability_free(&availability);
+    return ok ? JNI_TRUE : JNI_FALSE;
+}
+
+// ---------- Group H: Environment validation + endpoints ------------------------
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEnvRequiresAuth(JNIEnv* env,
+                                                                            jclass clazz,
+                                                                            jint envValue) {
+    (void)env;
+    (void)clazz;
+    return rac_env_requires_auth(static_cast<rac_environment_t>(envValue)) ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEnvRequiresBackendUrl(JNIEnv* env,
+                                                                                  jclass clazz,
+                                                                                  jint envValue) {
+    (void)env;
+    (void)clazz;
+    return rac_env_requires_backend_url(static_cast<rac_environment_t>(envValue)) ? JNI_TRUE
+                                                                                    : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEnvValidateApiKey(JNIEnv* env,
+                                                                              jclass clazz,
+                                                                              jstring key) {
+    (void)clazz;
+    std::string k = getCString(env, key);
+    rac_environment_t currentEnv = rac_state_get_environment();
+    return rac_validate_api_key(k.c_str(), currentEnv) == RAC_VALIDATION_OK ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jboolean JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEnvValidateBaseUrl(JNIEnv* env,
+                                                                               jclass clazz,
+                                                                               jstring url) {
+    (void)clazz;
+    std::string u = getCString(env, url);
+    rac_environment_t currentEnv = rac_state_get_environment();
+    return rac_validate_base_url(u.c_str(), currentEnv) == RAC_VALIDATION_OK ? JNI_TRUE : JNI_FALSE;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEnvValidationErrorMessage(
+    JNIEnv* env, jclass clazz, jint envValue, jstring key, jstring url) {
+    (void)clazz;
+    std::string keyStorage;
+    std::string urlStorage;
+    rac_sdk_config_t config = {};
+    config.environment = static_cast<rac_environment_t>(envValue);
+    config.api_key = getNullableCString(env, key, keyStorage);
+    config.base_url = getNullableCString(env, url, urlStorage);
+    config.device_id = nullptr;
+    config.platform = nullptr;
+    config.sdk_version = nullptr;
+    rac_validation_result_t result = rac_validate_config(&config);
+    if (result == RAC_VALIDATION_OK) {
+        return nullptr;
+    }
+    const char* msg = rac_validation_error_message(result);
+    return msg != nullptr ? env->NewStringUTF(msg) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEndpointAuthenticate(JNIEnv* env,
+                                                                                 jclass clazz) {
+    (void)clazz;
+    return env->NewStringUTF(RAC_ENDPOINT_AUTHENTICATE);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEndpointRefresh(JNIEnv* env,
+                                                                            jclass clazz) {
+    (void)clazz;
+    return env->NewStringUTF(RAC_ENDPOINT_REFRESH);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEndpointHealth(JNIEnv* env,
+                                                                           jclass clazz) {
+    (void)clazz;
+    return env->NewStringUTF(RAC_ENDPOINT_HEALTH);
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEndpointDeviceRegistration(
+    JNIEnv* env, jclass clazz, jint envValue) {
+    (void)clazz;
+    const char* path = rac_endpoint_device_registration(static_cast<rac_environment_t>(envValue));
+    return path != nullptr ? env->NewStringUTF(path) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEndpointTelemetry(JNIEnv* env,
+                                                                              jclass clazz,
+                                                                              jint envValue) {
+    (void)clazz;
+    const char* path = rac_endpoint_telemetry(static_cast<rac_environment_t>(envValue));
+    return path != nullptr ? env->NewStringUTF(path) : nullptr;
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racEndpointModelAssignments(JNIEnv* env,
+                                                                                     jclass clazz) {
+    (void)clazz;
+    const char* path = rac_endpoint_model_assignments();
+    return path != nullptr ? env->NewStringUTF(path) : nullptr;
+}
+
+// ---------- Group I: Model assignment ------------------------------------------
+//
+// The full callback-struct wiring lives in the existing
+// nativeModelAssignment* / model_assignment_http_get_callback code path
+// elsewhere in the file. The thunks below provide the Swift-aligned
+// surface (racModelAssignment*) that the Kotlin bridge layer expects;
+// callbacks must be wired by the caller via the existing path before
+// invoking Fetch/GetBy*.
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentSetCallbacks(
+    JNIEnv* env, jclass clazz, jobject cb) {
+    (void)env;
+    (void)clazz;
+    (void)cb;
+    // Callback wiring is platform-specific (HTTP transport + device info) and
+    // is performed by the existing assignment-callbacks plumbing on the
+    // Kotlin side. This thunk reserves the symbol for future direct callback
+    // registration; today it is a no-op success.
+    return RAC_SUCCESS;
+}
+
+JNIEXPORT jint JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentFetch(
+    JNIEnv* env, jclass clazz, jboolean forceRefresh) {
+    (void)env;
+    (void)clazz;
+    rac_model_info_t** models = nullptr;
+    size_t count = 0;
+    rac_result_t rc = rac_model_assignment_fetch(
+        forceRefresh == JNI_TRUE ? RAC_TRUE : RAC_FALSE, &models, &count);
+    if (models != nullptr) {
+        rac_model_info_array_free(models, count);
+    }
+    return static_cast<jint>(rc);
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentGetByFramework(
+    JNIEnv* env, jclass clazz, jint framework) {
+    (void)clazz;
+    rac_model_info_t** models = nullptr;
+    size_t count = 0;
+    rac_result_t rc = rac_model_assignment_get_by_framework(
+        static_cast<rac_inference_framework_t>(framework), &models, &count);
+    if (rc != RAC_SUCCESS || models == nullptr) {
+        if (models != nullptr) rac_model_info_array_free(models, count);
+        return nullptr;
+    }
+    // Return a placeholder 0-byte payload to signal "result available, count
+    // delivered separately". Callers that need typed results must use the
+    // proto-based registry queries; this thunk's primary purpose is to
+    // expose the symbol for forward compatibility with Swift's
+    // CppBridge+ModelAssignment surface.
+    rac_model_info_array_free(models, count);
+    jbyteArray empty = env->NewByteArray(0);
+    return empty;
+}
+
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racModelAssignmentGetByCategory(
+    JNIEnv* env, jclass clazz, jint category) {
+    (void)clazz;
+    rac_model_info_t** models = nullptr;
+    size_t count = 0;
+    rac_result_t rc = rac_model_assignment_get_by_category(
+        static_cast<rac_model_category_t>(category), &models, &count);
+    if (rc != RAC_SUCCESS || models == nullptr) {
+        if (models != nullptr) rac_model_info_array_free(models, count);
+        return nullptr;
+    }
+    rac_model_info_array_free(models, count);
+    jbyteArray empty = env->NewByteArray(0);
+    return empty;
+}
 
 }  // extern "C"
 

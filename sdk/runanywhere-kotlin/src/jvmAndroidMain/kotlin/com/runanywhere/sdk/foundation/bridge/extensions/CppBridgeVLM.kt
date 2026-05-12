@@ -162,6 +162,36 @@ object CppBridgeVLM {
         }
     }
 
+    /**
+     * Check if streaming is supported by the loaded VLM component.
+     *
+     * Mirrors Swift `CppBridge.VLM.supportsStreaming` — exposes the
+     * `rac_vlm_component_supports_streaming` introspection helper through
+     * the JNI thunk. Throws [SDKException.invalidState] if no component
+     * handle is currently loaded (parity with the sibling modality
+     * accessors).
+     */
+    suspend fun supportsStreaming(): Boolean {
+        val h = handle
+        if (h == 0L) throw SDKException.invalidState("VLM service not loaded")
+        return RunAnywhereBridge.racVlmComponentSupportsStreaming(h)
+    }
+
+    /**
+     * Get the current lifecycle state of the loaded VLM component.
+     *
+     * Mirrors Swift `CppBridge.VLM.state` — exposes the
+     * `rac_vlm_component_get_state` introspection helper through the JNI
+     * thunk. Return value is a `rac_lifecycle_state_t` int. Throws
+     * [SDKException.invalidState] if no component handle is currently
+     * loaded (parity with the sibling modality accessors).
+     */
+    suspend fun state(): Int {
+        val h = handle
+        if (h == 0L) throw SDKException.invalidState("VLM service not loaded")
+        return RunAnywhereBridge.racVlmComponentGetState(h)
+    }
+
     fun process(image: RAVLMImage, options: RAVLMGenerationOptions): RAVLMResult =
         decodeOrThrow(
             VLMResult.ADAPTER,

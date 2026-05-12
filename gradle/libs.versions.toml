@@ -17,7 +17,7 @@ lifecycleViewModelCompose = "2.8.7"
 activityCompose = "1.9.3"
 
 # ============================================================================
-# Jetpack Composeios h
+# Jetpack Compose
 # ============================================================================
 composeBom = "2025.08.01"
 
@@ -37,14 +37,11 @@ wire = "4.9.9"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
-mockito = "6.0.0"
 mockk = "1.13.14"
 
 # ============================================================================
 # Logging
 # ============================================================================
-slf4j = "2.0.16"
-logback = "1.5.12"
 timber = "5.0.1"
 
 # ============================================================================
@@ -76,17 +73,6 @@ detekt = "1.23.8"
 ktlint = "12.1.2"
 
 # ============================================================================
-# IDE Plugin Development
-# ============================================================================
-intellij = "1.17.4"
-
-# ============================================================================
-# Dependency Injection
-# ============================================================================
-hilt = "2.52"
-hiltNavigationCompose = "1.2.0"
-
-# ============================================================================
 # Background Processing
 # ============================================================================
 workManager = "2.10.0"
@@ -95,7 +81,6 @@ workManager = "2.10.0"
 # File Management
 # ============================================================================
 commonsIo = "2.18.0"
-commonsCompress = "1.27.1"
 okio = "3.9.0"
 
 # ============================================================================
@@ -114,19 +99,9 @@ androidVad = "2.0.10"
 prdownloader = "1.0.2"
 
 # ============================================================================
-# Android Core
-# ============================================================================
-androidCore = "4.1.1.4"
-
-# ============================================================================
 # Database - Room
 # ============================================================================
 room = "2.6.1"
-
-# ============================================================================
-# Database - SQLDelight (Cross-platform)
-# ============================================================================
-sqldelight = "2.0.1"
 
 # ============================================================================
 # Security
@@ -211,8 +186,6 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 # ----------------------------------------------------------------------------
 # Logging
 # ----------------------------------------------------------------------------
-slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
-logback-classic = { group = "ch.qos.logback", name = "logback-classic", version.ref = "logback" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 
 # ----------------------------------------------------------------------------
@@ -233,11 +206,8 @@ retrofit-gson = { group = "com.squareup.retrofit2", name = "converter-gson", ver
 # ----------------------------------------------------------------------------
 ktor-client-core = { group = "io.ktor", name = "ktor-client-core", version.ref = "ktor" }
 ktor-client-content-negotiation = { group = "io.ktor", name = "ktor-client-content-negotiation", version.ref = "ktor" }
-ktor-client-serialization = { group = "io.ktor", name = "ktor-client-serialization", version.ref = "ktor" }
 ktor-client-logging = { group = "io.ktor", name = "ktor-client-logging", version.ref = "ktor" }
 ktor-serialization-kotlinx-json = { group = "io.ktor", name = "ktor-serialization-kotlinx-json", version.ref = "ktor" }
-ktor-client-okhttp = { group = "io.ktor", name = "ktor-client-okhttp", version.ref = "ktor" }
-ktor-client-darwin = { group = "io.ktor", name = "ktor-client-darwin", version.ref = "ktor" }
 
 # ----------------------------------------------------------------------------
 # JSON
@@ -245,7 +215,7 @@ ktor-client-darwin = { group = "io.ktor", name = "ktor-client-darwin", version.r
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 
 # ----------------------------------------------------------------------------
-# PDF 
+# PDF
 # ----------------------------------------------------------------------------
 pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version.ref = "pdfbox" }
 
@@ -255,15 +225,7 @@ pdfbox-android = { group = "com.tom-roush", name = "pdfbox-android", version.ref
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
-mockito-kotlin = { group = "org.mockito.kotlin", name = "mockito-kotlin", version.ref = "mockito" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
-
-# ----------------------------------------------------------------------------
-# Dependency Injection - Hilt
-# ----------------------------------------------------------------------------
-hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
-hilt-android-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.ref = "hilt" }
-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
 
 # ----------------------------------------------------------------------------
 # Background Processing - WorkManager
@@ -274,7 +236,6 @@ androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx"
 # File Management
 # ----------------------------------------------------------------------------
 commons-io = { group = "commons-io", name = "commons-io", version.ref = "commonsIo" }
-commons-compress = { group = "org.apache.commons", name = "commons-compress", version.ref = "commonsCompress" }
 okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
 okio-fakefilesystem = { group = "com.squareup.okio", name = "okio-fakefilesystem", version.ref = "okio" }
 
@@ -299,30 +260,10 @@ android-vad-webrtc = { group = "com.github.gkonovalov.android-vad", name = "webr
 prdownloader = { group = "com.github.amitshekhariitbhu", name = "PRDownloader", version.ref = "prdownloader" }
 
 # ----------------------------------------------------------------------------
-# Android Core
-# ----------------------------------------------------------------------------
-android-core = { group = "com.google.android", name = "android", version.ref = "androidCore" }
-
-# ----------------------------------------------------------------------------
-# Kotlin Standard Library
-# ----------------------------------------------------------------------------
-kotlin-stdlib = { group = "org.jetbrains.kotlin", name = "kotlin-stdlib", version.ref = "kotlin" }
-
-# ----------------------------------------------------------------------------
 # Database - Room
 # ----------------------------------------------------------------------------
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
-androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
-
-# ----------------------------------------------------------------------------
-# Database - SQLDelight (Cross-platform)
-# ----------------------------------------------------------------------------
-sqldelight-runtime = { group = "app.cash.sqldelight", name = "runtime", version.ref = "sqldelight" }
-sqldelight-coroutines-extensions = { group = "app.cash.sqldelight", name = "coroutines-extensions", version.ref = "sqldelight" }
-sqldelight-sqlite-driver = { group = "app.cash.sqldelight", name = "sqlite-driver", version.ref = "sqldelight" }
-sqldelight-android-driver = { group = "app.cash.sqldelight", name = "android-driver", version.ref = "sqldelight" }
-sqldelight-native-driver = { group = "app.cash.sqldelight", name = "native-driver", version.ref = "sqldelight" }
 
 # ----------------------------------------------------------------------------
 # Security
@@ -378,13 +319,3 @@ kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", versi
 # ----------------------------------------------------------------------------
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
-
-# ----------------------------------------------------------------------------
-# IDE Plugin Development
-# ----------------------------------------------------------------------------
-intellij = { id = "org.jetbrains.intellij", version.ref = "intellij" }
-
-# ----------------------------------------------------------------------------
-# IDL / Codegen (see idl/codegen/generate_kotlin.sh)
-# ----------------------------------------------------------------------------
-wire = { id = "com.squareup.wire", version.ref = "wire" }

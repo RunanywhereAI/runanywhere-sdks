@@ -37,9 +37,16 @@ RABackendONNX.xcframework.
   s.dependency 'runanywhere'
 
   # =============================================================================
-  # Vendored xcframework (built by scripts/build-core-xcframework.sh)
+  # Vendored xcframeworks (built by scripts/build-core-xcframework.sh)
   # =============================================================================
-  s.vendored_frameworks = 'Frameworks/RABackendONNX.xcframework'
+  # RABackendONNX provides the ONNX Runtime engine.
+  # RABackendSherpa provides STT/TTS/VAD via sherpa-onnx — its plugin entry
+  # symbol (_rac_plugin_entry_sherpa) is referenced from RACommons, so without
+  # vendoring this xcframework the linker fails with an Undefined symbol error.
+  s.vendored_frameworks = [
+    'Frameworks/RABackendONNX.xcframework',
+    'Frameworks/RABackendSherpa.xcframework'
+  ]
   s.preserve_paths = 'Frameworks/**/*'
 
   # Required frameworks

@@ -50,6 +50,23 @@ object CppBridgeStructuredOutput {
         )
 
     /**
+     * Full structured-output generation: commons handles prompt preparation,
+     * LLM generation, thinking-tag stripping, JSON extraction, and schema
+     * validation. Returns the canonical [RAStructuredOutputResult].
+     *
+     * Mirrors Swift `CppBridge.StructuredOutput.generate(_:)`.
+     */
+    suspend fun generate(handle: Long, request: StructuredOutputRequest): RAStructuredOutputResult =
+        decodeOrThrow(
+            StructuredOutputResult.ADAPTER,
+            RunAnywhereBridge.racStructuredOutputGenerateProto(
+                handle,
+                StructuredOutputRequest.ADAPTER.encode(request),
+            ),
+            "racStructuredOutputGenerateProto",
+        )
+
+    /**
      * Stream native structured-output generation. Commons emits one typed
      * [StructuredOutputStreamEvent] per callback invocation (TOKEN /
      * PARTIAL_JSON / COMPLETED / ERROR). The Kotlin layer simply decodes and

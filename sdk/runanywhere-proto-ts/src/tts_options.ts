@@ -418,6 +418,15 @@ export interface TTSVoiceInfo {
   supportedStyles: string[];
 }
 
+/**
+ * Wire envelope returned by rac_tts_list_voices_lifecycle_proto. Replaces the
+ * per-voice callback pattern used by the legacy handle-based ABI so the
+ * lifecycle-driven listing call returns a single serialized message.
+ */
+export interface TTSVoiceList {
+  voices: TTSVoiceInfo[];
+}
+
 export interface TTSStreamEvent {
   seq: number;
   timestampUs: number;
@@ -1943,6 +1952,65 @@ export const TTSVoiceInfo = {
     message.isSystem = object.isSystem ?? false;
     message.sampleRate = object.sampleRate ?? 0;
     message.supportedStyles = object.supportedStyles?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseTTSVoiceList(): TTSVoiceList {
+  return { voices: [] };
+}
+
+export const TTSVoiceList = {
+  encode(message: TTSVoiceList, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    for (const v of message.voices) {
+      TTSVoiceInfo.encode(v!, writer.uint32(10).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): TTSVoiceList {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseTTSVoiceList();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.voices.push(TTSVoiceInfo.decode(reader, reader.uint32()));
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): TTSVoiceList {
+    return {
+      voices: globalThis.Array.isArray(object?.voices) ? object.voices.map((e: any) => TTSVoiceInfo.fromJSON(e)) : [],
+    };
+  },
+
+  toJSON(message: TTSVoiceList): unknown {
+    const obj: any = {};
+    if (message.voices?.length) {
+      obj.voices = message.voices.map((e) => TTSVoiceInfo.toJSON(e));
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<TTSVoiceList>, I>>(base?: I): TTSVoiceList {
+    return TTSVoiceList.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<TTSVoiceList>, I>>(object: I): TTSVoiceList {
+    const message = createBaseTTSVoiceList();
+    message.voices = object.voices?.map((e) => TTSVoiceInfo.fromPartial(e)) || [];
     return message;
   },
 };

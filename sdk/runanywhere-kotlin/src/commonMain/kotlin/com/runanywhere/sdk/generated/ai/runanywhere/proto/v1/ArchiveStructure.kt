@@ -16,10 +16,15 @@ import kotlin.Suppress
 public enum class ArchiveStructure(
   override val `value`: Int,
 ) : WireEnum {
+  @RacWireStringOption("unspecified")
   ARCHIVE_STRUCTURE_UNSPECIFIED(0),
+  @RacWireStringOption("singleFileNested")
   ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED(1),
+  @RacWireStringOption("directoryBased")
   ARCHIVE_STRUCTURE_DIRECTORY_BASED(2),
+  @RacWireStringOption("nestedDirectory")
   ARCHIVE_STRUCTURE_NESTED_DIRECTORY(3),
+  @RacWireStringOption("unknown")
   ARCHIVE_STRUCTURE_UNKNOWN(4),
   ;
 

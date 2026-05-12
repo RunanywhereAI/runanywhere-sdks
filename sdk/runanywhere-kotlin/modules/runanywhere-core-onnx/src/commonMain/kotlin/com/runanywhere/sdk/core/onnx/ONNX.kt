@@ -47,9 +47,6 @@ object ONNX : RunAnywhereModule {
     /** ONNX Runtime library version (underlying C library) */
     const val onnxRuntimeVersion = "1.23.2"
 
-    /** Default priority used when callers do not specify one. */
-    const val defaultPriority: Int = 100
-
     // MARK: - RunAnywhereModule Conformance
 
     override val moduleName: String = "ONNX"
@@ -81,24 +78,6 @@ object ONNX : RunAnywhereModule {
         unregisterNative()
         isRegistered = false
         logger.info("ONNX backend unregistered")
-    }
-
-    /**
-     * Backwards-compatible non-suspend registration entry point.
-     *
-     * Apps that bootstrap on the main thread (e.g. `Application.onCreate`)
-     * call `ONNX.register(priority = 100)`. The `priority` argument is
-     * ignored — the C++ plugin registry assigns priority internally.
-     *
-     * No default value is set here so that the no-arg suspend [register]
-     * override remains unambiguous on the call site.
-     *
-     * @param priority Ignored (C++ uses its own priority system).
-     */
-    @Suppress("UNUSED_PARAMETER")
-    @JvmStatic
-    fun register(priority: Int) {
-        registerInternal()
     }
 
     private fun registerInternal() {

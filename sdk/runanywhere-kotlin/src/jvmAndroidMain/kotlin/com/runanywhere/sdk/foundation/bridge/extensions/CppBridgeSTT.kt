@@ -23,6 +23,7 @@ import ai.runanywhere.proto.v1.STTStreamEvent
 import com.runanywhere.sdk.foundation.bridge.ComponentActor
 import com.runanywhere.sdk.foundation.bridge.ComponentVTable
 import com.runanywhere.sdk.foundation.errors.SDKException
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RASTTOptions
@@ -57,6 +58,8 @@ object CppBridgeSTT {
     /** Generic scaffold (handle / isLoaded / loadModel / unload / destroy). */
     private val inner = ComponentActor(ComponentVTable.stt)
 
+    private val logger = SDKLogger("CppBridge.STT")
+
     // MARK: - Handle Management
 
     /** Get or create the STT component handle. */
@@ -72,10 +75,47 @@ object CppBridgeSTT {
     val currentModelId: String?
         get() = inner.currentAssetId
 
+    /**
+     * Whether the STT component supports streaming transcription.
+     *
+     * Returns `false` if the underlying C handle has not yet been created.
+     * Mirrors Swift's `var supportsStreaming: Bool` computed property on
+     * `CppBridge.STT`.
+     */
+    suspend fun supportsStreaming(): Boolean {
+        val handle = inner.existingHandle()
+        if (handle == 0L) return false
+        return RunAnywhereBridge.racSttComponentSupportsStreaming(handle)
+    }
+
     // MARK: - Model Lifecycle
 
-    /** Load an STT model. Routes through the canonical lifecycle proto path. */
-    suspend fun loadModel(modelPath: String, modelId: String, modelName: String) {
+    /**
+     * Load an STT model. Routes through the canonical lifecycle proto path.
+     *
+     * When [framework] is not [CppBridgeModelRegistry.Framework.UNKNOWN], the
+     * component is configured with that preferred framework before the
+     * lifecycle load — so telemetry events carry the real framework value
+     * instead of "unknown". Mirrors Swift's
+     * `loadModel(_:modelId:modelName:framework:)`.
+     *
+     * @param framework The `rac_inference_framework_t` int (see
+     *   [CppBridgeModelRegistry.Framework]). Defaults to `UNKNOWN`, which
+     *   skips the configure step entirely.
+     */
+    suspend fun loadModel(
+        modelPath: String,
+        modelId: String,
+        modelName: String,
+        framework: Int = CppBridgeModelRegistry.Framework.UNKNOWN,
+    ) {
+        if (framework != CppBridgeModelRegistry.Framework.UNKNOWN) {
+            val handle = inner.getHandle()
+            val rc = RunAnywhereBridge.racSttComponentConfigure(handle, framework)
+            if (rc != RunAnywhereBridge.RAC_SUCCESS) {
+                logger.warning("Failed to configure STT framework: rc=$rc")
+            }
+        }
         inner.loadModel(path = modelPath, id = modelId, name = modelName)
     }
 

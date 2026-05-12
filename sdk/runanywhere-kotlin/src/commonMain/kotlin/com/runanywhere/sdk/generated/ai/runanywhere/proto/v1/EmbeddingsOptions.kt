@@ -37,6 +37,7 @@ public class EmbeddingsOptions(
    * form is unambiguous on the most common knob; backends may still defer
    * to model defaults at load time.
    */
+  @RacDefaultOption("true")
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

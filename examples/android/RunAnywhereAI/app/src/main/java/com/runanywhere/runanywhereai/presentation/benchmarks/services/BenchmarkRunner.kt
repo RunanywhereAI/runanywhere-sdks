@@ -9,8 +9,8 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkSce
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.ComponentModelInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.Models.isBuiltInModel
-import com.runanywhere.sdk.public.extensions.Models.isDownloadedModel
+import com.runanywhere.sdk.public.extensions.Models.isBuiltIn
+import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
 import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlin.coroutines.coroutineContext
@@ -87,7 +87,7 @@ class BenchmarkRunner {
             }
             val models =
                 allModels.filter {
-                    it.category == category.modelCategory && it.isDownloadedModel && !it.isBuiltInModel
+                    it.category == category.modelCategory && it.isDownloadedOnDisk && !it.isBuiltIn
                 }
             if (models.isEmpty()) {
                 skipped.add(category)

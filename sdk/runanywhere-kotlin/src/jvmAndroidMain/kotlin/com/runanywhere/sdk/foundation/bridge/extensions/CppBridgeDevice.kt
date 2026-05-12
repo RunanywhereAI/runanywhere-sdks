@@ -31,14 +31,18 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.util.Locale
 import java.util.UUID
+import kotlinx.coroutines.runBlocking
 
 object CppBridgeDevice {
 
     private const val TAG = "CppBridgeDevice"
-    private const val DEVICE_ID_KEY = "runanywhere_device_id"
+    // Note: device_id persistence now owned by commons via
+    // `rac_device_get_or_create_persistent_id` (mirrors Swift). Only the
+    // registration-status flag is still persisted Kotlin-side.
     private const val REGISTRATION_STATUS_KEY = "runanywhere_device_registered"
 
     @Volatile
@@ -319,104 +323,49 @@ object CppBridgeDevice {
      * HTTP POST callback used by `rac_device_manager_register_if_needed`.
      * Mirrors Swift's `callbacks.http_post = { ... CppBridge.HTTP.shared.postRaw(...) }`.
      *
-     * Commons hands us a relative endpoint path; we resolve dev-vs-prod
-     * base URL, auth header, and Supabase UPSERT mode using the existing
-     * extensions (`CppBridgeEnvironment` / `CppBridgeDevConfig` /
-     * `CppBridgeTelemetry`). The returned int is the HTTP status code
-     * (or `-1` for transport/configuration failure).
+     * Routes through the canonical [HTTPClientAdapter] — same path used
+     * by auth and telemetry. The adapter handles base-URL resolution,
+     * auth header injection, and Supabase upsert detection from the
+     * endpoint path. The JNI caller is synchronous, so we bridge to the
+     * adapter's `suspend` API with `runBlocking` (mirrors Swift's
+     * `DispatchSemaphore.wait()` in `CppBridge+Device.swift`).
+     *
+     * @return HTTP status code on response (200/201/409 are success-ish),
+     *         or `-1` for transport/configuration failure.
      */
     @JvmStatic
-    fun httpPostCallback(endpoint: String, body: String, @Suppress("UNUSED_PARAMETER") requiresAuth: Boolean): Int {
-        val env = CppBridgeTelemetry.currentEnvironment
-        val baseUrl: String?
-        val headers = mutableMapOf(
-            "Content-Type" to "application/json",
-            "Accept" to "application/json",
-        )
-
-        if (env == 0) {
-            baseUrl = CppBridgeDevConfig.supabaseURL
-            if (!CppBridgeDevConfig.isUsableHTTPURL(baseUrl)) {
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.DEBUG,
-                    TAG,
-                    "Skipping dev device registration: Supabase URL missing/placeholder",
-                )
-                return -1
-            }
-            headers["Prefer"] = "resolution=merge-duplicates"
-            CppBridgeDevConfig.supabaseKey
-                ?.takeIf { CppBridgeDevConfig.isUsableCredential(it) }
-                ?.let { headers["apikey"] = it }
-        } else {
-            baseUrl = CppBridgeTelemetry.getBaseUrl()
-            if (!CppBridgeDevConfig.isUsableHTTPURL(baseUrl)) {
-                CppBridgePlatformAdapter.logCallback(
-                    CppBridgePlatformAdapter.LogLevel.DEBUG,
-                    TAG,
-                    "Skipping device registration: base URL missing/placeholder",
-                )
-                return -1
-            }
-            val token = CppBridgeAuth.getValidToken()
-            val authValue = if (!token.isNullOrEmpty()) token else CppBridgeTelemetry.getApiKey()
-            if (!authValue.isNullOrEmpty()) {
-                headers["Authorization"] = "Bearer $authValue"
-            }
-        }
-
-        if (baseUrl.isNullOrEmpty()) {
+    fun httpPostCallback(endpoint: String, body: String, requiresAuth: Boolean): Int {
+        if (!HTTPClientAdapter.isConfigured) {
             CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.ERROR,
+                CppBridgePlatformAdapter.LogLevel.DEBUG,
                 TAG,
-                "No base URL configured for device registration (env=$env)",
+                "Skipping device registration: HTTPClientAdapter not configured",
             )
             return -1
         }
-
-        val finalEndpoint = if (env == 0) {
-            if (endpoint.contains("?")) "$endpoint&on_conflict=device_id" else "$endpoint?on_conflict=device_id"
-        } else {
-            endpoint
-        }
-        val fullUrl = baseUrl.trimEnd('/') + finalEndpoint
-
-        // Synchronous POST via the native curl-backed client. We deliberately
-        // bypass HTTPClientAdapter here because commons hands us a
-        // pre-resolved endpoint + auth header set and the JNI caller is
-        // synchronous (no coroutine context). All callers of this Kotlin
-        // shim are inside `rac_device_manager_register_if_needed`.
-        val resp = RunAnywhereBridge.racHttpRequestExecute(
-            method = "POST",
-            url = fullUrl,
-            headerKeys = headers.keys.toTypedArray(),
-            headerValues = headers.values.toTypedArray(),
-            body = body.encodeToByteArray(),
-            timeoutMs = 30_000,
-            followRedirects = true,
-        )
-        val statusCode = resp?.statusCode ?: -1
-        val response = resp?.bodyAsString()
-        if (resp?.errorMessage != null) {
-            CppBridgePlatformAdapter.logCallback(
-                CppBridgePlatformAdapter.LogLevel.ERROR,
-                TAG,
-                "Device registration transport error for $fullUrl: ${resp.errorMessage}",
-            )
-        } else if (statusCode in 200..299 || statusCode == 409) {
+        return try {
+            runBlocking {
+                HTTPClientAdapter.postRaw(
+                    path = endpoint,
+                    payload = body.encodeToByteArray(),
+                    requiresAuth = requiresAuth,
+                )
+            }
+            // HTTPClientAdapter throws on non-2xx; reaching here implies success.
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.INFO,
                 TAG,
-                "Device registration POST $fullUrl → $statusCode",
+                "Device registration POST $endpoint → success",
             )
-        } else {
+            200
+        } catch (e: Exception) {
             CppBridgePlatformAdapter.logCallback(
                 CppBridgePlatformAdapter.LogLevel.ERROR,
                 TAG,
-                "Device registration POST $fullUrl → $statusCode body=$response",
+                "Device registration POST $endpoint failed: ${e.message}",
             )
+            -1
         }
-        return statusCode
     }
 
     // ========================================================================
@@ -426,29 +375,34 @@ object CppBridgeDevice {
     /**
      * Initialise or load the persistent device id.
      *
-     * TODO(KOT-W5-DEVICE-IDJNI): Swift delegates to
-     * `rac_device_get_or_create_persistent_id` for a canonical
-     * Keychain → vendor-id → UUID resolution chain. Kotlin has no
-     * matching JNI thunk today, so we keep the local UUID +
-     * secure-storage resolver. Wire the JNI binding when commons
-     * exposes it and replace this with a single `racDeviceGetOrCreatePersistentId`.
+     * Mirrors Swift's `CppBridge.Device.persistentId` — delegates to
+     * commons' `rac_device_get_or_create_persistent_id`, which walks the
+     * canonical chain inside C++:
+     *   1. secure_get("device_id") via the platform adapter
+     *   2. get_vendor_id callback (vendor id on iOS; unset on Android)
+     *   3. freshly synthesized RFC-4122 v4 UUID (then persisted)
+     *
+     * On the rare resolver failure (e.g. platform adapter not yet
+     * registered) we synthesize a transient UUID locally so callers
+     * always receive a stable, non-empty string for the SDK lifetime.
      */
     private fun initializeDeviceId() {
         if (deviceId != null) return
 
-        val stored = CppBridgePlatformAdapter.secureGetCallback(DEVICE_ID_KEY)
-        if (stored != null) {
-            deviceId = String(stored, Charsets.UTF_8)
+        val resolved = RunAnywhereBridge.racDeviceGetOrCreatePersistentId()
+        if (!resolved.isNullOrEmpty()) {
+            deviceId = resolved
             return
         }
 
-        val newId = UUID.randomUUID().toString()
-        deviceId = newId
-        CppBridgePlatformAdapter.secureSetCallback(DEVICE_ID_KEY, newId.toByteArray(Charsets.UTF_8))
+        // Fallback: commons resolver unavailable. Synthesize a UUID so
+        // callers never see an empty string. Non-persistent for this run.
+        val fallback = UUID.randomUUID().toString()
+        deviceId = fallback
         CppBridgePlatformAdapter.logCallback(
-            CppBridgePlatformAdapter.LogLevel.INFO,
+            CppBridgePlatformAdapter.LogLevel.WARN,
             TAG,
-            "Generated new device ID: $newId",
+            "racDeviceGetOrCreatePersistentId failed; using transient UUID: $fallback",
         )
     }
 

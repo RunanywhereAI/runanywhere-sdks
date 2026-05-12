@@ -37,6 +37,7 @@ public class EmbeddingsConfiguration(
   /**
    * Model identifier (registry id or local path). Required.
    */
+  @RacRequiredOption(true)
   @field:WireField(
     tag = 1,
     adapter = "com.squareup.wire.ProtoAdapter#STRING",
@@ -49,6 +50,8 @@ public class EmbeddingsConfiguration(
    * Output vector dimension. Must match the loaded model's hidden size
    * (e.g. 384 for all-MiniLM-L6-v2, 768 for bge-base, 1024 for bge-large).
    */
+  @RacDefaultOption("384")
+  @RacMinOption(1)
   @field:WireField(
     tag = 2,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -61,6 +64,8 @@ public class EmbeddingsConfiguration(
    * Maximum tokens per input. Truncation/sliding window is backend-decided
    * when an input exceeds this length. C ABI default: 512.
    */
+  @RacDefaultOption("512")
+  @RacMinOption(1)
   @field:WireField(
     tag = 3,
     adapter = "com.squareup.wire.ProtoAdapter#INT32",
@@ -73,6 +78,7 @@ public class EmbeddingsConfiguration(
    * Default L2 normalization for produced vectors. When unset the backend
    * applies its default (RAC_EMBEDDINGS_NORMALIZE_L2 in the C ABI).
    */
+  @RacDefaultOption("true")
   @field:WireField(
     tag = 4,
     adapter = "com.squareup.wire.ProtoAdapter#BOOL",

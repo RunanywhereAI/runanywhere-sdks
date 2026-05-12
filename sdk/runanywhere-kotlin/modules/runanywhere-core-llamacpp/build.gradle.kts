@@ -24,20 +24,10 @@ plugins {
     signing
 }
 
-// `useLocalNatives` is the canonical property name (matches Swift/Flutter/RN);
-// `testLocal` still works as a legacy fallback.
 val useLocalNatives: Boolean =
-    run {
-        val newValue =
-            rootProject.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
-                ?: project.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
-        if (newValue != null) return@run newValue
-        rootProject.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
-            ?: project.findProperty("runanywhere.testLocal")?.toString()?.toBoolean()
-            ?: false
-    }
-// Alias kept so existing references in this file keep working.
-val testLocal: Boolean = useLocalNatives
+    rootProject.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
+        ?: project.findProperty("runanywhere.useLocalNatives")?.toString()?.toBoolean()
+        ?: false
 
 logger.lifecycle("LlamaCPP Module: useLocalNatives=$useLocalNatives")
 
@@ -217,12 +207,12 @@ val nativeLibVersion: String =
         ?: project.findProperty("runanywhere.nativeLibVersion")?.toString()
         ?: (System.getenv("SDK_VERSION")?.removePrefix("v") ?: "0.1.5-SNAPSHOT")
 
-// Download LlamaCPP backend libs from GitHub releases (testLocal=false)
+// Download LlamaCPP backend libs from GitHub releases (useLocalNatives=false)
 tasks.register("downloadJniLibs") {
     group = "runanywhere"
     description = "Download LlamaCPP backend JNI libraries from GitHub releases"
 
-    onlyIf { !testLocal }
+    onlyIf { !useLocalNatives }
 
     val outputDir = file("src/androidMain/jniLibs")
     val tempDir = file("${layout.buildDirectory.get()}/jni-temp")
@@ -301,7 +291,7 @@ tasks.register("syncAndroidRuntimeLibs") {
     group = "runanywhere"
     description = "Stage 16 KB-aligned Android NDK libc++ into LlamaCPP JNI libs"
 
-    if (!testLocal) dependsOn("downloadJniLibs")
+    if (!useLocalNatives) dependsOn("downloadJniLibs")
 
     val outputDir = file("src/androidMain/jniLibs")
     outputs.dirs(androidRuntimeAbis.map { file("$outputDir/$it") })

@@ -21,7 +21,7 @@ import com.runanywhere.runanywhereai.domain.models.ToolCallInfo
 import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
-import com.runanywhere.sdk.public.extensions.Models.isDownloadedModel
+import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
 import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.cancelGeneration
 import com.runanywhere.sdk.public.extensions.currentModel
@@ -807,10 +807,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 val allModels = RunAnywhere.availableModels()
                 val chatModel =
                     allModels.firstOrNull { model ->
-                        model.category == ModelCategory.MODEL_CATEGORY_LANGUAGE && model.isDownloadedModel &&
+                        model.category == ModelCategory.MODEL_CATEGORY_LANGUAGE && model.isDownloadedOnDisk &&
                             model.framework == InferenceFramework.INFERENCE_FRAMEWORK_GENIE
                     } ?: allModels.firstOrNull { model ->
-                        model.category == ModelCategory.MODEL_CATEGORY_LANGUAGE && model.isDownloadedModel
+                        model.category == ModelCategory.MODEL_CATEGORY_LANGUAGE && model.isDownloadedOnDisk
                     }
 
                 if (chatModel != null) {

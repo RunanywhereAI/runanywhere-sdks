@@ -843,135 +843,142 @@ static const ::_pb::Message* PROTOBUF_NONNULL const file_default_instances[] = {
 const char descriptor_table_protodef_stt_5foptions_2eproto[] ABSL_ATTRIBUTE_SECTION_VARIABLE(
     protodesc_cold) = {
     "\n\021stt_options.proto\022\016runanywhere.v1\032\021mod"
-    "el_types.proto\"\306\003\n\020STTConfiguration\022\020\n\010m"
-    "odel_id\030\001 \001(\t\022-\n\010language\030\002 \001(\0162\033.runany"
-    "where.v1.STTLanguage\022\023\n\013sample_rate\030\003 \001("
-    "\005\022\022\n\nenable_vad\030\004 \001(\010\0221\n\014audio_format\030\005 "
-    "\001(\0162\033.runanywhere.v1.AudioFormat\022\032\n\022enab"
-    "le_punctuation\030\006 \001(\010\022\032\n\022enable_diarizati"
-    "on\030\007 \001(\010\022\027\n\017vocabulary_list\030\010 \003(\t\022\030\n\020max"
-    "_alternatives\030\t \001(\005\022\036\n\026enable_word_times"
-    "tamps\030\n \001(\010\022D\n\023preferred_framework\030\013 \001(\016"
-    "2\".runanywhere.v1.InferenceFrameworkH\000\210\001"
-    "\001\022\032\n\rlanguage_code\030\014 \001(\tH\001\210\001\001B\026\n\024_prefer"
-    "red_frameworkB\020\n\016_language_code\"\354\003\n\nSTTO"
-    "ptions\022-\n\010language\030\001 \001(\0162\033.runanywhere.v"
-    "1.STTLanguage\022\032\n\022enable_punctuation\030\002 \001("
-    "\010\022\032\n\022enable_diarization\030\003 \001(\010\022\024\n\014max_spe"
-    "akers\030\004 \001(\005\022\027\n\017vocabulary_list\030\005 \003(\t\022\036\n\026"
-    "enable_word_timestamps\030\006 \001(\010\022\021\n\tbeam_siz"
-    "e\030\007 \001(\005\022\032\n\rlanguage_code\030\010 \001(\tH\000\210\001\001\022\027\n\017d"
-    "etect_language\030\t \001(\010\0221\n\014audio_format\030\n \001"
-    "(\0162\033.runanywhere.v1.AudioFormat\022\023\n\013sampl"
-    "e_rate\030\013 \001(\005\022\030\n\020max_alternatives\030\014 \001(\005\022\031"
-    "\n\021chunk_duration_ms\030\r \001(\005\022\033\n\023endpoint_si"
-    "lence_ms\030\016 \001(\005\022\026\n\016suppress_blank\030\017 \001(\010\022\034"
-    "\n\024translate_to_english\030\020 \001(\010B\020\n\016_languag"
-    "e_code\"\232\002\n\016STTAudioSource\022\024\n\naudio_data\030"
-    "\001 \001(\014H\000\022\022\n\010file_uri\030\002 \001(\tH\000\022\030\n\016adapter_h"
-    "andle\030\003 \001(\tH\000\0222\n\010encoding\030\004 \001(\0162 .runany"
-    "where.v1.STTAudioEncoding\0221\n\014audio_forma"
-    "t\030\005 \001(\0162\033.runanywhere.v1.AudioFormat\022\023\n\013"
-    "sample_rate\030\006 \001(\005\022\020\n\010channels\030\007 \001(\005\022\027\n\017b"
-    "its_per_sample\030\010 \001(\005\022\023\n\013duration_ms\030\t \001("
-    "\003B\010\n\006source\"\243\002\n\027STTTranscriptionRequest\022"
-    "\022\n\nrequest_id\030\001 \001(\t\0222\n\005audio\030\002 \001(\0132\036.run"
-    "anywhere.v1.STTAudioSourceH\000\210\001\001\0220\n\007optio"
-    "ns\030\003 \001(\0132\032.runanywhere.v1.STTOptionsH\001\210\001"
-    "\001\022G\n\010metadata\030\004 \003(\01325.runanywhere.v1.STT"
-    "TranscriptionRequest.MetadataEntry\032/\n\rMe"
-    "tadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:"
-    "\0028\001B\010\n\006_audioB\n\n\010_options\"{\n\rWordTimesta"
-    "mp\022\014\n\004word\030\001 \001(\t\022\020\n\010start_ms\030\002 \001(\003\022\016\n\006en"
-    "d_ms\030\003 \001(\003\022\022\n\nconfidence\030\004 \001(\002\022\027\n\nspeake"
-    "r_id\030\005 \001(\tH\000\210\001\001B\r\n\013_speaker_id\"j\n\030Transc"
-    "riptionAlternative\022\014\n\004text\030\001 \001(\t\022\022\n\nconf"
-    "idence\030\002 \001(\002\022,\n\005words\030\003 \003(\0132\035.runanywher"
-    "e.v1.WordTimestamp\"x\n\025TranscriptionMetad"
-    "ata\022\020\n\010model_id\030\001 \001(\t\022\032\n\022processing_time"
-    "_ms\030\002 \001(\003\022\027\n\017audio_length_ms\030\003 \001(\003\022\030\n\020re"
-    "al_time_factor\030\004 \001(\002\"\312\003\n\tSTTOutput\022\014\n\004te"
-    "xt\030\001 \001(\t\022-\n\010language\030\002 \001(\0162\033.runanywhere"
-    ".v1.STTLanguage\022\022\n\nconfidence\030\003 \001(\002\022,\n\005w"
-    "ords\030\004 \003(\0132\035.runanywhere.v1.WordTimestam"
-    "p\022>\n\014alternatives\030\005 \003(\0132(.runanywhere.v1"
-    ".TranscriptionAlternative\0227\n\010metadata\030\006 "
-    "\001(\0132%.runanywhere.v1.TranscriptionMetada"
-    "ta\022\032\n\rlanguage_code\030\007 \001(\tH\000\210\001\001\022\024\n\014timest"
-    "amp_ms\030\010 \001(\003\022\023\n\013duration_ms\030\t \001(\003\022\023\n\013spe"
-    "aker_ids\030\n \003(\t\022\032\n\rerror_message\030\013 \001(\tH\001\210"
-    "\001\001\022\022\n\nerror_code\030\014 \001(\005\022\025\n\rsegment_index\030"
-    "\r \001(\005B\020\n\016_language_codeB\020\n\016_error_messag"
-    "e\"\254\003\n\020STTPartialResult\022\014\n\004text\030\001 \001(\t\022\020\n\010"
-    "is_final\030\002 \001(\010\022\021\n\tstability\030\003 \001(\002\022\022\n\ncon"
-    "fidence\030\004 \001(\002\022-\n\010language\030\005 \001(\0162\033.runany"
-    "where.v1.STTLanguage\022\024\n\014timestamp_ms\030\006 \001"
-    "(\003\022>\n\014alternatives\030\007 \003(\0132(.runanywhere.v"
-    "1.TranscriptionAlternative\022\032\n\rlanguage_c"
-    "ode\030\010 \001(\tH\000\210\001\001\022\022\n\nrequest_id\030\t \001(\t\022\025\n\rse"
-    "gment_index\030\n \001(\005\022\026\n\016audio_start_ms\030\013 \001("
-    "\003\022\024\n\014audio_end_ms\030\014 \001(\003\0224\n\014final_output\030"
-    "\r \001(\0132\031.runanywhere.v1.STTOutputH\001\210\001\001B\020\n"
-    "\016_language_codeB\017\n\r_final_output\"\306\002\n\016STT"
-    "StreamEvent\022\013\n\003seq\030\001 \001(\004\022\024\n\014timestamp_us"
-    "\030\002 \001(\003\022\022\n\nrequest_id\030\003 \001(\t\0220\n\004kind\030\004 \001(\016"
-    "2\".runanywhere.v1.STTStreamEventKind\0226\n\007"
-    "partial\030\005 \001(\0132 .runanywhere.v1.STTPartia"
-    "lResultH\000\210\001\001\0224\n\014final_output\030\006 \001(\0132\031.run"
-    "anywhere.v1.STTOutputH\001\210\001\001\022\032\n\rerror_mess"
-    "age\030\007 \001(\tH\002\210\001\001\022\022\n\nerror_code\030\010 \001(\005B\n\n\010_p"
-    "artialB\017\n\r_final_outputB\020\n\016_error_messag"
-    "e\"\321\001\n\017STTServiceState\022\020\n\010is_ready\030\001 \001(\010\022"
-    "\032\n\rcurrent_model\030\002 \001(\tH\000\210\001\001\022\032\n\022supports_"
-    "streaming\030\003 \001(\010\022 \n\030supported_language_co"
-    "des\030\004 \003(\t\022\032\n\rerror_message\030\005 \001(\tH\001\210\001\001\022\022\n"
-    "\nerror_code\030\006 \001(\005B\020\n\016_current_modelB\020\n\016_"
-    "error_message\"\243\001\n\032STTLanguageDetectionRe"
-    "sult\022-\n\010language\030\001 \001(\0162\033.runanywhere.v1."
-    "STTLanguage\022\032\n\rlanguage_code\030\002 \001(\tH\000\210\001\001\022"
-    "\022\n\nconfidence\030\003 \001(\002\022\024\n\014alternatives\030\004 \003("
-    "\tB\020\n\016_language_code*\276\002\n\013STTLanguage\022\034\n\030S"
-    "TT_LANGUAGE_UNSPECIFIED\020\000\022\025\n\021STT_LANGUAG"
-    "E_AUTO\020\001\022\023\n\017STT_LANGUAGE_EN\020\002\022\023\n\017STT_LAN"
-    "GUAGE_ES\020\003\022\023\n\017STT_LANGUAGE_FR\020\004\022\023\n\017STT_L"
-    "ANGUAGE_DE\020\005\022\023\n\017STT_LANGUAGE_ZH\020\006\022\023\n\017STT"
-    "_LANGUAGE_JA\020\007\022\023\n\017STT_LANGUAGE_KO\020\010\022\023\n\017S"
-    "TT_LANGUAGE_IT\020\t\022\023\n\017STT_LANGUAGE_PT\020\n\022\023\n"
-    "\017STT_LANGUAGE_AR\020\013\022\023\n\017STT_LANGUAGE_RU\020\014\022"
-    "\023\n\017STT_LANGUAGE_HI\020\r*\236\001\n\020STTAudioEncodin"
-    "g\022\"\n\036STT_AUDIO_ENCODING_UNSPECIFIED\020\000\022!\n"
-    "\035STT_AUDIO_ENCODING_PCM_S16_LE\020\001\022!\n\035STT_"
-    "AUDIO_ENCODING_PCM_F32_LE\020\002\022 \n\034STT_AUDIO"
-    "_ENCODING_CONTAINER\020\003*\347\001\n\022STTStreamEvent"
-    "Kind\022%\n!STT_STREAM_EVENT_KIND_UNSPECIFIE"
-    "D\020\000\022!\n\035STT_STREAM_EVENT_KIND_STARTED\020\001\022!"
-    "\n\035STT_STREAM_EVENT_KIND_PARTIAL\020\002\022\037\n\033STT"
-    "_STREAM_EVENT_KIND_FINAL\020\003\022\"\n\036STT_STREAM"
-    "_EVENT_KIND_ENDPOINT\020\004\022\037\n\033STT_STREAM_EVE"
-    "NT_KIND_ERROR\020\0052\254\001\n\003STT\022P\n\nTranscribe\022\'."
-    "runanywhere.v1.STTTranscriptionRequest\032\031"
-    ".runanywhere.v1.STTOutput\022S\n\006Stream\022\'.ru"
-    "nanywhere.v1.STTTranscriptionRequest\032\036.r"
-    "unanywhere.v1.STTStreamEvent0\001B\212\001\n\027ai.ru"
-    "nanywhere.proto.v1B\017SttOptionsProtoP\001Z<g"
-    "ithub.com/runanywhere/runanywhere-sdks/i"
-    "dl/v1;runanywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywh"
-    "ere.V1\272\002\002RAb\006proto3"
+    "el_types.proto\032\021rac_options.proto\"\205\004\n\020ST"
+    "TConfiguration\022\020\n\010model_id\030\001 \001(\t\022B\n\010lang"
+    "uage\030\002 \001(\0162\033.runanywhere.v1.STTLanguageB"
+    "\023\212\265\030\017STT_LANGUAGE_EN\022)\n\013sample_rate\030\003 \001("
+    "\005B\024\212\265\030\00516000\240\265\030\300>\250\265\030\200\367\002\022\022\n\nenable_vad\030\004 "
+    "\001(\010\0221\n\014audio_format\030\005 \001(\0162\033.runanywhere."
+    "v1.AudioFormat\022$\n\022enable_punctuation\030\006 \001"
+    "(\010B\010\212\265\030\004true\022\032\n\022enable_diarization\030\007 \001(\010"
+    "\022\027\n\017vocabulary_list\030\010 \003(\t\022\030\n\020max_alterna"
+    "tives\030\t \001(\005\022(\n\026enable_word_timestamps\030\n "
+    "\001(\010B\010\212\265\030\004true\022D\n\023preferred_framework\030\013 \001"
+    "(\0162\".runanywhere.v1.InferenceFrameworkH\000"
+    "\210\001\001\022\032\n\rlanguage_code\030\014 \001(\tH\001\210\001\001B\026\n\024_pref"
+    "erred_frameworkB\020\n\016_language_code\"\225\004\n\nST"
+    "TOptions\022B\n\010language\030\001 \001(\0162\033.runanywhere"
+    ".v1.STTLanguageB\023\212\265\030\017STT_LANGUAGE_EN\022$\n\022"
+    "enable_punctuation\030\002 \001(\010B\010\212\265\030\004true\022\032\n\022en"
+    "able_diarization\030\003 \001(\010\022\024\n\014max_speakers\030\004"
+    " \001(\005\022\027\n\017vocabulary_list\030\005 \003(\t\022(\n\026enable_"
+    "word_timestamps\030\006 \001(\010B\010\212\265\030\004true\022\021\n\tbeam_"
+    "size\030\007 \001(\005\022\032\n\rlanguage_code\030\010 \001(\tH\000\210\001\001\022\027"
+    "\n\017detect_language\030\t \001(\010\0221\n\014audio_format\030"
+    "\n \001(\0162\033.runanywhere.v1.AudioFormat\022\023\n\013sa"
+    "mple_rate\030\013 \001(\005\022\030\n\020max_alternatives\030\014 \001("
+    "\005\022\031\n\021chunk_duration_ms\030\r \001(\005\022\033\n\023endpoint"
+    "_silence_ms\030\016 \001(\005\022\026\n\016suppress_blank\030\017 \001("
+    "\010\022\034\n\024translate_to_english\030\020 \001(\010B\020\n\016_lang"
+    "uage_code\"\232\002\n\016STTAudioSource\022\024\n\naudio_da"
+    "ta\030\001 \001(\014H\000\022\022\n\010file_uri\030\002 \001(\tH\000\022\030\n\016adapte"
+    "r_handle\030\003 \001(\tH\000\0222\n\010encoding\030\004 \001(\0162 .run"
+    "anywhere.v1.STTAudioEncoding\0221\n\014audio_fo"
+    "rmat\030\005 \001(\0162\033.runanywhere.v1.AudioFormat\022"
+    "\023\n\013sample_rate\030\006 \001(\005\022\020\n\010channels\030\007 \001(\005\022\027"
+    "\n\017bits_per_sample\030\010 \001(\005\022\023\n\013duration_ms\030\t"
+    " \001(\003B\010\n\006source\"\243\002\n\027STTTranscriptionReque"
+    "st\022\022\n\nrequest_id\030\001 \001(\t\0222\n\005audio\030\002 \001(\0132\036."
+    "runanywhere.v1.STTAudioSourceH\000\210\001\001\0220\n\007op"
+    "tions\030\003 \001(\0132\032.runanywhere.v1.STTOptionsH"
+    "\001\210\001\001\022G\n\010metadata\030\004 \003(\01325.runanywhere.v1."
+    "STTTranscriptionRequest.MetadataEntry\032/\n"
+    "\rMetadataEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001"
+    "(\t:\0028\001B\010\n\006_audioB\n\n\010_options\"{\n\rWordTime"
+    "stamp\022\014\n\004word\030\001 \001(\t\022\020\n\010start_ms\030\002 \001(\003\022\016\n"
+    "\006end_ms\030\003 \001(\003\022\022\n\nconfidence\030\004 \001(\002\022\027\n\nspe"
+    "aker_id\030\005 \001(\tH\000\210\001\001B\r\n\013_speaker_id\"j\n\030Tra"
+    "nscriptionAlternative\022\014\n\004text\030\001 \001(\t\022\022\n\nc"
+    "onfidence\030\002 \001(\002\022,\n\005words\030\003 \003(\0132\035.runanyw"
+    "here.v1.WordTimestamp\"x\n\025TranscriptionMe"
+    "tadata\022\020\n\010model_id\030\001 \001(\t\022\032\n\022processing_t"
+    "ime_ms\030\002 \001(\003\022\027\n\017audio_length_ms\030\003 \001(\003\022\030\n"
+    "\020real_time_factor\030\004 \001(\002\"\312\003\n\tSTTOutput\022\014\n"
+    "\004text\030\001 \001(\t\022-\n\010language\030\002 \001(\0162\033.runanywh"
+    "ere.v1.STTLanguage\022\022\n\nconfidence\030\003 \001(\002\022,"
+    "\n\005words\030\004 \003(\0132\035.runanywhere.v1.WordTimes"
+    "tamp\022>\n\014alternatives\030\005 \003(\0132(.runanywhere"
+    ".v1.TranscriptionAlternative\0227\n\010metadata"
+    "\030\006 \001(\0132%.runanywhere.v1.TranscriptionMet"
+    "adata\022\032\n\rlanguage_code\030\007 \001(\tH\000\210\001\001\022\024\n\014tim"
+    "estamp_ms\030\010 \001(\003\022\023\n\013duration_ms\030\t \001(\003\022\023\n\013"
+    "speaker_ids\030\n \003(\t\022\032\n\rerror_message\030\013 \001(\t"
+    "H\001\210\001\001\022\022\n\nerror_code\030\014 \001(\005\022\025\n\rsegment_ind"
+    "ex\030\r \001(\005B\020\n\016_language_codeB\020\n\016_error_mes"
+    "sage\"\254\003\n\020STTPartialResult\022\014\n\004text\030\001 \001(\t\022"
+    "\020\n\010is_final\030\002 \001(\010\022\021\n\tstability\030\003 \001(\002\022\022\n\n"
+    "confidence\030\004 \001(\002\022-\n\010language\030\005 \001(\0162\033.run"
+    "anywhere.v1.STTLanguage\022\024\n\014timestamp_ms\030"
+    "\006 \001(\003\022>\n\014alternatives\030\007 \003(\0132(.runanywher"
+    "e.v1.TranscriptionAlternative\022\032\n\rlanguag"
+    "e_code\030\010 \001(\tH\000\210\001\001\022\022\n\nrequest_id\030\t \001(\t\022\025\n"
+    "\rsegment_index\030\n \001(\005\022\026\n\016audio_start_ms\030\013"
+    " \001(\003\022\024\n\014audio_end_ms\030\014 \001(\003\0224\n\014final_outp"
+    "ut\030\r \001(\0132\031.runanywhere.v1.STTOutputH\001\210\001\001"
+    "B\020\n\016_language_codeB\017\n\r_final_output\"\306\002\n\016"
+    "STTStreamEvent\022\013\n\003seq\030\001 \001(\004\022\024\n\014timestamp"
+    "_us\030\002 \001(\003\022\022\n\nrequest_id\030\003 \001(\t\0220\n\004kind\030\004 "
+    "\001(\0162\".runanywhere.v1.STTStreamEventKind\022"
+    "6\n\007partial\030\005 \001(\0132 .runanywhere.v1.STTPar"
+    "tialResultH\000\210\001\001\0224\n\014final_output\030\006 \001(\0132\031."
+    "runanywhere.v1.STTOutputH\001\210\001\001\022\032\n\rerror_m"
+    "essage\030\007 \001(\tH\002\210\001\001\022\022\n\nerror_code\030\010 \001(\005B\n\n"
+    "\010_partialB\017\n\r_final_outputB\020\n\016_error_mes"
+    "sage\"\321\001\n\017STTServiceState\022\020\n\010is_ready\030\001 \001"
+    "(\010\022\032\n\rcurrent_model\030\002 \001(\tH\000\210\001\001\022\032\n\022suppor"
+    "ts_streaming\030\003 \001(\010\022 \n\030supported_language"
+    "_codes\030\004 \003(\t\022\032\n\rerror_message\030\005 \001(\tH\001\210\001\001"
+    "\022\022\n\nerror_code\030\006 \001(\005B\020\n\016_current_modelB\020"
+    "\n\016_error_message\"\243\001\n\032STTLanguageDetectio"
+    "nResult\022-\n\010language\030\001 \001(\0162\033.runanywhere."
+    "v1.STTLanguage\022\032\n\rlanguage_code\030\002 \001(\tH\000\210"
+    "\001\001\022\022\n\nconfidence\030\003 \001(\002\022\024\n\014alternatives\030\004"
+    " \003(\tB\020\n\016_language_code*\250\003\n\013STTLanguage\022\034"
+    "\n\030STT_LANGUAGE_UNSPECIFIED\020\000\022\037\n\021STT_LANG"
+    "UAGE_AUTO\020\001\032\010\342\265\030\004auto\022\033\n\017STT_LANGUAGE_EN"
+    "\020\002\032\006\342\265\030\002en\022\033\n\017STT_LANGUAGE_ES\020\003\032\006\342\265\030\002es\022"
+    "\033\n\017STT_LANGUAGE_FR\020\004\032\006\342\265\030\002fr\022\033\n\017STT_LANG"
+    "UAGE_DE\020\005\032\006\342\265\030\002de\022\033\n\017STT_LANGUAGE_ZH\020\006\032\006"
+    "\342\265\030\002zh\022\033\n\017STT_LANGUAGE_JA\020\007\032\006\342\265\030\002ja\022\033\n\017S"
+    "TT_LANGUAGE_KO\020\010\032\006\342\265\030\002ko\022\033\n\017STT_LANGUAGE"
+    "_IT\020\t\032\006\342\265\030\002it\022\033\n\017STT_LANGUAGE_PT\020\n\032\006\342\265\030\002"
+    "pt\022\033\n\017STT_LANGUAGE_AR\020\013\032\006\342\265\030\002ar\022\033\n\017STT_L"
+    "ANGUAGE_RU\020\014\032\006\342\265\030\002ru\022\033\n\017STT_LANGUAGE_HI\020"
+    "\r\032\006\342\265\030\002hi*\236\001\n\020STTAudioEncoding\022\"\n\036STT_AU"
+    "DIO_ENCODING_UNSPECIFIED\020\000\022!\n\035STT_AUDIO_"
+    "ENCODING_PCM_S16_LE\020\001\022!\n\035STT_AUDIO_ENCOD"
+    "ING_PCM_F32_LE\020\002\022 \n\034STT_AUDIO_ENCODING_C"
+    "ONTAINER\020\003*\347\001\n\022STTStreamEventKind\022%\n!STT"
+    "_STREAM_EVENT_KIND_UNSPECIFIED\020\000\022!\n\035STT_"
+    "STREAM_EVENT_KIND_STARTED\020\001\022!\n\035STT_STREA"
+    "M_EVENT_KIND_PARTIAL\020\002\022\037\n\033STT_STREAM_EVE"
+    "NT_KIND_FINAL\020\003\022\"\n\036STT_STREAM_EVENT_KIND"
+    "_ENDPOINT\020\004\022\037\n\033STT_STREAM_EVENT_KIND_ERR"
+    "OR\020\0052\254\001\n\003STT\022P\n\nTranscribe\022\'.runanywhere"
+    ".v1.STTTranscriptionRequest\032\031.runanywher"
+    "e.v1.STTOutput\022S\n\006Stream\022\'.runanywhere.v"
+    "1.STTTranscriptionRequest\032\036.runanywhere."
+    "v1.STTStreamEvent0\001B\212\001\n\027ai.runanywhere.p"
+    "roto.v1B\017SttOptionsProtoP\001Z<github.com/r"
+    "unanywhere/runanywhere-sdks/idl/v1;runan"
+    "ywherev1\370\001\001\242\002\004RAV1\252\002\016Runanywhere.V1\272\002\002RA"
+    "b\006proto3"
 };
 static const ::_pbi::DescriptorTable* PROTOBUF_NONNULL const
-    descriptor_table_stt_5foptions_2eproto_deps[1] = {
+    descriptor_table_stt_5foptions_2eproto_deps[2] = {
         &::descriptor_table_model_5ftypes_2eproto,
+        &::descriptor_table_rac_5foptions_2eproto,
 };
 static ::absl::once_flag descriptor_table_stt_5foptions_2eproto_once;
 PROTOBUF_CONSTINIT const ::_pbi::DescriptorTable descriptor_table_stt_5foptions_2eproto = {
     false,
     false,
-    4579,
+    4808,
     descriptor_table_protodef_stt_5foptions_2eproto,
     "stt_options.proto",
     &descriptor_table_stt_5foptions_2eproto_once,
     descriptor_table_stt_5foptions_2eproto_deps,
-    1,
+    2,
     13,
     schemas,
     file_default_instances,
@@ -1188,11 +1195,11 @@ STTConfiguration::_table_ = {
     {::_pbi::TcParser::FastUS1,
      {10, 1, 0,
       PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.model_id_)}},
-    // .runanywhere.v1.STTLanguage language = 2;
+    // .runanywhere.v1.STTLanguage language = 2 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTConfiguration, _impl_.language_), 3>(),
      {16, 3, 0,
       PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.language_)}},
-    // int32 sample_rate = 3;
+    // int32 sample_rate = 3 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTConfiguration, _impl_.sample_rate_), 4>(),
      {24, 4, 0,
       PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.sample_rate_)}},
@@ -1204,7 +1211,7 @@ STTConfiguration::_table_ = {
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTConfiguration, _impl_.audio_format_), 5>(),
      {40, 5, 0,
       PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.audio_format_)}},
-    // bool enable_punctuation = 6;
+    // bool enable_punctuation = 6 [(.runanywhere.v1.rac_default) = "true"];
     {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTConfiguration, _impl_.enable_punctuation_), 7>(),
      {48, 7, 0,
       PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.enable_punctuation_)}},
@@ -1220,7 +1227,7 @@ STTConfiguration::_table_ = {
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTConfiguration, _impl_.max_alternatives_), 10>(),
      {72, 10, 0,
       PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.max_alternatives_)}},
-    // bool enable_word_timestamps = 10;
+    // bool enable_word_timestamps = 10 [(.runanywhere.v1.rac_default) = "true"];
     {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTConfiguration, _impl_.enable_word_timestamps_), 9>(),
      {80, 9, 0,
       PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.enable_word_timestamps_)}},
@@ -1240,15 +1247,15 @@ STTConfiguration::_table_ = {
   }}, {{
     // string model_id = 1;
     {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.model_id_), _Internal::kHasBitsOffset + 1, 0, (0 | ::_fl::kFcOptional | ::_fl::kUtf8String | ::_fl::kRepAString)},
-    // .runanywhere.v1.STTLanguage language = 2;
+    // .runanywhere.v1.STTLanguage language = 2 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
     {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.language_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-    // int32 sample_rate = 3;
+    // int32 sample_rate = 3 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
     {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.sample_rate_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
     // bool enable_vad = 4;
     {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.enable_vad_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // .runanywhere.v1.AudioFormat audio_format = 5;
     {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.audio_format_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-    // bool enable_punctuation = 6;
+    // bool enable_punctuation = 6 [(.runanywhere.v1.rac_default) = "true"];
     {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.enable_punctuation_), _Internal::kHasBitsOffset + 7, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // bool enable_diarization = 7;
     {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.enable_diarization_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
@@ -1256,7 +1263,7 @@ STTConfiguration::_table_ = {
     {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.vocabulary_list_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
     // int32 max_alternatives = 9;
     {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.max_alternatives_), _Internal::kHasBitsOffset + 10, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
-    // bool enable_word_timestamps = 10;
+    // bool enable_word_timestamps = 10 [(.runanywhere.v1.rac_default) = "true"];
     {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.enable_word_timestamps_), _Internal::kHasBitsOffset + 9, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // optional .runanywhere.v1.InferenceFramework preferred_framework = 11;
     {PROTOBUF_FIELD_OFFSET(STTConfiguration, _impl_.preferred_framework_), _Internal::kHasBitsOffset + 11, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
@@ -1334,7 +1341,7 @@ PROTOBUF_NOINLINE void STTConfiguration::Clear() {
     }
   }
 
-  // .runanywhere.v1.STTLanguage language = 2;
+  // .runanywhere.v1.STTLanguage language = 2 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
   if (CheckHasBit(cached_has_bits, 0x00000008U)) {
     if (this_._internal_language() != 0) {
       target = stream->EnsureSpace(target);
@@ -1343,7 +1350,7 @@ PROTOBUF_NOINLINE void STTConfiguration::Clear() {
     }
   }
 
-  // int32 sample_rate = 3;
+  // int32 sample_rate = 3 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
   if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_sample_rate() != 0) {
       target =
@@ -1370,7 +1377,7 @@ PROTOBUF_NOINLINE void STTConfiguration::Clear() {
     }
   }
 
-  // bool enable_punctuation = 6;
+  // bool enable_punctuation = 6 [(.runanywhere.v1.rac_default) = "true"];
   if (CheckHasBit(cached_has_bits, 0x00000080U)) {
     if (this_._internal_enable_punctuation() != 0) {
       target = stream->EnsureSpace(target);
@@ -1407,7 +1414,7 @@ PROTOBUF_NOINLINE void STTConfiguration::Clear() {
     }
   }
 
-  // bool enable_word_timestamps = 10;
+  // bool enable_word_timestamps = 10 [(.runanywhere.v1.rac_default) = "true"];
   if (CheckHasBit(cached_has_bits, 0x00000200U)) {
     if (this_._internal_enable_word_timestamps() != 0) {
       target = stream->EnsureSpace(target);
@@ -1478,14 +1485,14 @@ PROTOBUF_NOINLINE void STTConfiguration::Clear() {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_language_code());
     }
-    // .runanywhere.v1.STTLanguage language = 2;
+    // .runanywhere.v1.STTLanguage language = 2 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
     if (CheckHasBit(cached_has_bits, 0x00000008U)) {
       if (this_._internal_language() != 0) {
         total_size += 1 +
                       ::_pbi::WireFormatLite::EnumSize(this_._internal_language());
       }
     }
-    // int32 sample_rate = 3;
+    // int32 sample_rate = 3 [(.runanywhere.v1.rac_default) = "16000", (.runanywhere.v1.rac_min) = 8000, (.runanywhere.v1.rac_max) = 48000];
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_sample_rate() != 0) {
         total_size += ::_pbi::WireFormatLite::Int32SizePlusOne(
@@ -1505,7 +1512,7 @@ PROTOBUF_NOINLINE void STTConfiguration::Clear() {
         total_size += 2;
       }
     }
-    // bool enable_punctuation = 6;
+    // bool enable_punctuation = 6 [(.runanywhere.v1.rac_default) = "true"];
     if (CheckHasBit(cached_has_bits, 0x00000080U)) {
       if (this_._internal_enable_punctuation() != 0) {
         total_size += 2;
@@ -1519,7 +1526,7 @@ PROTOBUF_NOINLINE void STTConfiguration::Clear() {
         total_size += 2;
       }
     }
-    // bool enable_word_timestamps = 10;
+    // bool enable_word_timestamps = 10 [(.runanywhere.v1.rac_default) = "true"];
     if (CheckHasBit(cached_has_bits, 0x00000200U)) {
       if (this_._internal_enable_word_timestamps() != 0) {
         total_size += 2;
@@ -1836,11 +1843,11 @@ STTOptions::_table_ = {
     {::_pbi::TcParser::FastV8S2,
      {384, 15, 0,
       PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.translate_to_english_)}},
-    // .runanywhere.v1.STTLanguage language = 1;
+    // .runanywhere.v1.STTLanguage language = 1 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
     {::_pbi::TcParser::SingularVarintNoZag1<::uint32_t, offsetof(STTOptions, _impl_.language_), 2>(),
      {8, 2, 0,
       PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.language_)}},
-    // bool enable_punctuation = 2;
+    // bool enable_punctuation = 2 [(.runanywhere.v1.rac_default) = "true"];
     {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTOptions, _impl_.enable_punctuation_), 4>(),
      {16, 4, 0,
       PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.enable_punctuation_)}},
@@ -1856,7 +1863,7 @@ STTOptions::_table_ = {
     {::_pbi::TcParser::FastUR1,
      {42, 0, 0,
       PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.vocabulary_list_)}},
-    // bool enable_word_timestamps = 6;
+    // bool enable_word_timestamps = 6 [(.runanywhere.v1.rac_default) = "true"];
     {::_pbi::TcParser::SingularVarintNoZag1<bool, offsetof(STTOptions, _impl_.enable_word_timestamps_), 6>(),
      {48, 6, 0,
       PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.enable_word_timestamps_)}},
@@ -1899,9 +1906,9 @@ STTOptions::_table_ = {
   }}, {{
     65535, 65535
   }}, {{
-    // .runanywhere.v1.STTLanguage language = 1;
+    // .runanywhere.v1.STTLanguage language = 1 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
     {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.language_), _Internal::kHasBitsOffset + 2, 0, (0 | ::_fl::kFcOptional | ::_fl::kOpenEnum)},
-    // bool enable_punctuation = 2;
+    // bool enable_punctuation = 2 [(.runanywhere.v1.rac_default) = "true"];
     {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.enable_punctuation_), _Internal::kHasBitsOffset + 4, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // bool enable_diarization = 3;
     {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.enable_diarization_), _Internal::kHasBitsOffset + 5, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
@@ -1909,7 +1916,7 @@ STTOptions::_table_ = {
     {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.max_speakers_), _Internal::kHasBitsOffset + 3, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
     // repeated string vocabulary_list = 5;
     {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.vocabulary_list_), _Internal::kHasBitsOffset + 0, 0, (0 | ::_fl::kFcRepeated | ::_fl::kUtf8String | ::_fl::kRepSString)},
-    // bool enable_word_timestamps = 6;
+    // bool enable_word_timestamps = 6 [(.runanywhere.v1.rac_default) = "true"];
     {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.enable_word_timestamps_), _Internal::kHasBitsOffset + 6, 0, (0 | ::_fl::kFcOptional | ::_fl::kBool)},
     // int32 beam_size = 7;
     {PROTOBUF_FIELD_OFFSET(STTOptions, _impl_.beam_size_), _Internal::kHasBitsOffset + 8, 0, (0 | ::_fl::kFcOptional | ::_fl::kInt32)},
@@ -1989,7 +1996,7 @@ PROTOBUF_NOINLINE void STTOptions::Clear() {
   (void)cached_has_bits;
 
   cached_has_bits = this_._impl_._has_bits_[0];
-  // .runanywhere.v1.STTLanguage language = 1;
+  // .runanywhere.v1.STTLanguage language = 1 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
   if (CheckHasBit(cached_has_bits, 0x00000004U)) {
     if (this_._internal_language() != 0) {
       target = stream->EnsureSpace(target);
@@ -1998,7 +2005,7 @@ PROTOBUF_NOINLINE void STTOptions::Clear() {
     }
   }
 
-  // bool enable_punctuation = 2;
+  // bool enable_punctuation = 2 [(.runanywhere.v1.rac_default) = "true"];
   if (CheckHasBit(cached_has_bits, 0x00000010U)) {
     if (this_._internal_enable_punctuation() != 0) {
       target = stream->EnsureSpace(target);
@@ -2035,7 +2042,7 @@ PROTOBUF_NOINLINE void STTOptions::Clear() {
     }
   }
 
-  // bool enable_word_timestamps = 6;
+  // bool enable_word_timestamps = 6 [(.runanywhere.v1.rac_default) = "true"];
   if (CheckHasBit(cached_has_bits, 0x00000040U)) {
     if (this_._internal_enable_word_timestamps() != 0) {
       target = stream->EnsureSpace(target);
@@ -2173,7 +2180,7 @@ PROTOBUF_NOINLINE void STTOptions::Clear() {
       total_size += 1 + ::google::protobuf::internal::WireFormatLite::StringSize(
                                       this_._internal_language_code());
     }
-    // .runanywhere.v1.STTLanguage language = 1;
+    // .runanywhere.v1.STTLanguage language = 1 [(.runanywhere.v1.rac_default) = "STT_LANGUAGE_EN"];
     if (CheckHasBit(cached_has_bits, 0x00000004U)) {
       if (this_._internal_language() != 0) {
         total_size += 1 +
@@ -2187,7 +2194,7 @@ PROTOBUF_NOINLINE void STTOptions::Clear() {
             this_._internal_max_speakers());
       }
     }
-    // bool enable_punctuation = 2;
+    // bool enable_punctuation = 2 [(.runanywhere.v1.rac_default) = "true"];
     if (CheckHasBit(cached_has_bits, 0x00000010U)) {
       if (this_._internal_enable_punctuation() != 0) {
         total_size += 2;
@@ -2199,7 +2206,7 @@ PROTOBUF_NOINLINE void STTOptions::Clear() {
         total_size += 2;
       }
     }
-    // bool enable_word_timestamps = 6;
+    // bool enable_word_timestamps = 6 [(.runanywhere.v1.rac_default) = "true"];
     if (CheckHasBit(cached_has_bits, 0x00000040U)) {
       if (this_._internal_enable_word_timestamps() != 0) {
         total_size += 2;

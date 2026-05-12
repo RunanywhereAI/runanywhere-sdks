@@ -19,12 +19,19 @@
 
 package com.runanywhere.sdk.public
 
+import com.runanywhere.sdk.foundation.constants.SDKConstants
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.configuration.SDKEnvironment
+import com.runanywhere.sdk.public.configuration.SDKInitParams
+import com.runanywhere.sdk.public.configuration.description
 import com.runanywhere.sdk.public.configuration.wireString
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.extensions.LogLevel
-import com.runanywhere.sdk.foundation.constants.SDKConstants
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -35,30 +42,38 @@ import kotlinx.coroutines.sync.withLock
 // PHASE 1: Core Init (Synchronous, ~1-5ms, No Network)
 // ─────────────────────────────────────────────────────
 //   RunAnywhere.initialize(environment)
-//     ├─ CppBridge.initialize()
+//     ├─ Build + validate SDKInitParams
+//     ├─ CppBridge.initialize()  (via initializePlatformBridge expect)
 //     │    ├─ PlatformAdapter.register()  ← File ops, logging, keychain
 //     │    ├─ Events.register()           ← Analytics callback
 //     │    ├─ Telemetry.initialize()      ← HTTP callback
-//     │    └─ Device.register()           ← Device registration
-//     └─ Mark: isInitialized = true
+//     │    ├─ Device.register()           ← Device registration
+//     │    └─ SDKInit.phase1(proto)       ← validate + state init
+//     ├─ Emit SDKInitStarted / SDKInitCompleted events (via CppBridge)
+//     └─ Mark: isInitialized = true; spawn Phase 2 in background
 //
 // PHASE 2: Services Init (Async, ~100-500ms, Network May Be Required)
 // ────────────────────────────────────────────────────────────────────
 //   RunAnywhere.completeServicesInitialization()
-//     ├─ CppBridge.initializeServices()
-//     │    ├─ ModelAssignment.register()  ← Model assignment callbacks
-//     │    └─ Platform.register()         ← LLM/TTS service callbacks
-//     └─ Mark: areServicesReady = true
+//     ├─ CppBridge.initializeServices()  (via initializePlatformBridgeServices expect)
+//     │    ├─ Step 1 (deferred from C++): HTTP transport + auth round-trip
+//     │    ├─ Step 2 (MainActor / Main dispatcher): platform-plugin registration
+//     │    ├─ Step 3 (C++): SDKInit.phase2(proto) – device reg + model assignments
+//     │    ├─ Step 4 (deferred from C++): dev-mode device registration with build token
+//     │    └─ Step 5 (deferred from C++): filesystem-backed model discovery
+//     └─ Mark: areServicesReady = true; capture hasCompletedHTTPSetup flag
 //
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
  * The RunAnywhere SDK - Single entry point for on-device AI
  *
- * This object mirrors the iOS RunAnywhere enum pattern, providing:
- * - SDK initialization (two-phase: fast sync + async services)
- * - State access (isInitialized, areServicesReady, version, environment)
- * - Event access via `events` property
+ * Mirrors the iOS `RunAnywhere` enum (`Sources/RunAnywhere/Public/RunAnywhere.swift`)
+ * one-to-one:
+ *  - SDK initialization (two-phase: fast sync Phase 1 + async Phase 2)
+ *  - State access (isInitialized, areServicesReady, isActive, version, environment)
+ *  - Event access via `events` property
+ *  - Reset / cleanup / ensureServicesReady() retry path for offline init
  *
  * Feature-specific APIs are available through extension functions in public/extensions/:
  * - STT: RunAnywhere.transcribe(), RunAnywhere.transcribeStream()
@@ -77,6 +92,15 @@ object RunAnywhere {
 
     private val logger = SDKLogger("RunAnywhere")
 
+    /**
+     * Persisted init params from the most recent [initialize] call. Mirrors
+     * Swift's `internal static var initParams: SDKInitParams?`. Consumed by
+     * [completeServicesInitialization] and [ensureServicesReady] when the
+     * HTTP/auth retry path is invoked.
+     */
+    @Volatile
+    private var _initParams: SDKInitParams? = null
+
     @Volatile
     private var _currentEnvironment: SDKEnvironment? = null
 
@@ -86,8 +110,25 @@ object RunAnywhere {
     @Volatile
     private var _areServicesReady: Boolean = false
 
+    /**
+     * Whether HTTP/auth setup succeeded during Phase 2. Tracked separately from
+     * [_areServicesReady] so a caller that initialized offline can retry the
+     * HTTP path through [ensureServicesReady] without re-running the entire
+     * services bootstrap. Mirrors Swift's `hasCompletedHTTPSetup`.
+     */
+    @Volatile
+    private var _hasCompletedHTTPSetup: Boolean = false
+
     private val lock = Any()
     private val servicesMutex = Mutex()
+
+    /**
+     * Coroutine scope used to spawn Phase 2 in the background from the
+     * synchronous [initialize] call site. Mirrors Swift's
+     * `Task.detached(priority: .userInitiated)` spawn. SupervisorJob so a
+     * Phase 2 failure does not poison the rest of the SDK.
+     */
+    private val initScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     // ═══════════════════════════════════════════════════════════════════════════
     // MARK: - Public Properties
@@ -109,7 +150,7 @@ object RunAnywhere {
      * Check if SDK is active and ready for use
      */
     val isActive: Boolean
-        get() = _isInitialized && _currentEnvironment != null
+        get() = _isInitialized && _initParams != null
 
     /**
      * Current SDK version
@@ -190,8 +231,17 @@ object RunAnywhere {
     /**
      * Initialize the RunAnywhere SDK (Phase 1)
      *
-     * This performs fast synchronous initialization. Services initialization
-     * is done separately via [completeServicesInitialization].
+     * Mirrors Swift's `RunAnywhere.initialize(apiKey:baseURL:environment:)`:
+     * 1. Builds an [SDKInitParams] envelope from the caller's inputs.
+     * 2. Validates inputs via the canonical C++ validator
+     *    (`rac_validate_api_key` / `rac_validate_base_url`) — invalid combos
+     *    throw [SDKException] before any native state is mutated.
+     * 3. Calls the platform bridge, which internally drives Phase 1
+     *    (`rac_sdk_init_phase1_proto`), telemetry boot, and the
+     *    `emitSDKInitStarted` / `emitSDKInitCompleted` event pair.
+     * 4. Spawns Phase 2 in the background via [initScope] so the call
+     *    returns synchronously (mirrors Swift's
+     *    `Task.detached(priority: .userInitiated)`).
      *
      * ## Usage Examples
      *
@@ -200,18 +250,51 @@ object RunAnywhere {
      * RunAnywhere.initialize()
      *
      * // Production mode
-     * RunAnywhere.initialize(environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION)
+     * RunAnywhere.initialize(
+     *     apiKey = "...",
+     *     baseURL = "https://api.example.com",
+     *     environment = SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
+     * )
      * ```
      *
      * @param apiKey API key (optional for development, required for production/staging)
      * @param baseURL Backend API base URL (optional)
      * @param environment SDK environment (default: DEVELOPMENT)
+     * @throws SDKException when validation fails for staging/production.
      */
     fun initialize(
         apiKey: String? = null,
         baseURL: String? = null,
         environment: SDKEnvironment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
     ) {
+        // Build + validate SDKInitParams. Mirrors Swift's branching between
+        // `SDKInitParams(forDevelopmentWithAPIKey:)` and `SDKInitParams(apiKey:baseURL:environment:)`.
+        val params: SDKInitParams = if (environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+            SDKInitParams.forDevelopment(apiKey = apiKey ?: "")
+        } else {
+            SDKInitParams.create(
+                apiKey = apiKey ?: "",
+                baseURL = baseURL ?: "",
+                environment = environment,
+            )
+        }
+
+        performCoreInit(params = params, startBackgroundServices = true)
+    }
+
+    /**
+     * Phase 1 core init — delegated to commons. Mirrors Swift's
+     * `performCoreInit(with:startBackgroundServices:)`.
+     *
+     * The platform bridge encapsulates the canonical step list:
+     *   * Phase 1 proto (`rac_sdk_init_phase1_proto`) validation + state init.
+     *   * SDK config + Keychain auth-storage install.
+     *   * `emitSDKInitStarted` / `emitSDKInitCompleted` event emission.
+     *
+     * On failure the state is rolled back so a second call to [initialize]
+     * with corrected inputs can succeed cleanly.
+     */
+    private fun performCoreInit(params: SDKInitParams, startBackgroundServices: Boolean) {
         synchronized(lock) {
             if (_isInitialized) {
                 logger.info("SDK already initialized")
@@ -221,42 +304,64 @@ object RunAnywhere {
             val initStartTime = System.currentTimeMillis()
 
             try {
-                // Store environment
-                _currentEnvironment = environment
+                // Set environment + params first so logging boots with the
+                // correct configuration and downstream queries can read the
+                // persisted envelope.
+                _currentEnvironment = params.environment
+                _initParams = params
 
-                // Set log level based on environment
-                val logLevel =
-                    when (environment) {
-                        SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> LogLevel.DEBUG
-                        SDKEnvironment.SDK_ENVIRONMENT_STAGING -> LogLevel.INFO
-                        SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> LogLevel.WARNING
-                        SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> LogLevel.DEBUG
-                    }
+                // Apply default log level for this environment. Mirrors Swift's
+                // `Logging.shared.applyEnvironmentConfiguration(params.environment)`.
+                val logLevel = when (params.environment) {
+                    SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT -> LogLevel.DEBUG
+                    SDKEnvironment.SDK_ENVIRONMENT_STAGING -> LogLevel.INFO
+                    SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION -> LogLevel.WARNING
+                    SDKEnvironment.SDK_ENVIRONMENT_UNSPECIFIED -> LogLevel.DEBUG
+                }
                 SDKLogger.setLevel(logLevel)
 
-                // Initialize CppBridge (Phase 1)
-                // Note: CppBridge is in jvmAndroidMain, we call it via expect/actual
-                initializeCppBridge(environment, apiKey, baseURL)
+                // Hand off to the platform bridge, which loads native libs,
+                // registers the platform adapter, runs `rac_sdk_init_phase1_proto`
+                // (validation + state init), and emits SDKInitStarted /
+                // SDKInitCompleted events. Mirrors Swift's
+                // `CppBridge.SdkInit.phase1(...)` step inside `performCoreInit`.
+                initializePlatformBridge(
+                    environment = params.environment,
+                    apiKey = params.apiKey,
+                    baseURL = params.baseURL,
+                )
 
-                // Mark Phase 1 complete
                 _isInitialized = true
 
                 val initDurationMs = System.currentTimeMillis() - initStartTime
-                logger.info("✅ Phase 1 complete in ${initDurationMs}ms (${environment.wireString})")
-            } catch (error: Exception) {
-                logger.error("❌ Initialization failed: ${error.message}")
+                logger.info("Phase 1 complete in ${initDurationMs}ms (${params.environment.wireString})")
+
+                if (startBackgroundServices) {
+                    // Spawn Phase 2 in the background. Mirrors Swift's
+                    // `Task.detached(priority: .userInitiated) { try await completeServicesInitialization() }`.
+                    logger.debug("Starting Phase 2 (services) in background...")
+                    initScope.launch {
+                        try {
+                            completeServicesInitialization()
+                            logger.info("Phase 2 complete (background)")
+                        } catch (error: Throwable) {
+                            logger.warn("Phase 2 failed (non-critical): ${error.message}")
+                        }
+                    }
+                }
+            } catch (error: Throwable) {
+                logger.error("Initialization failed: ${error.message}")
+                // Roll back state on failure so a corrected retry can succeed.
+                _initParams = null
                 _currentEnvironment = null
                 _isInitialized = false
+                // TODO(B5.x): emit `CppBridgeSDKEvents.emitSDKInitFailed(error)` from a
+                //   commonMain-visible event bridge once the expect/actual pair lands.
+                //   The platform bridge currently emits `emitSDKInitStarted` but does
+                //   not flush a failure event on the rollback path.
                 throw error
             }
         }
-    }
-
-    /**
-     * Initialize SDK for development mode (convenience method)
-     */
-    fun initializeForDevelopment(apiKey: String? = null) {
-        initialize(apiKey = apiKey, environment = SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT)
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -264,13 +369,28 @@ object RunAnywhere {
     // ═══════════════════════════════════════════════════════════════════════════
 
     /**
-     * Complete services initialization (Phase 2)
+     * Complete services initialization (Phase 2). Safe to call multiple times;
+     * concurrent callers share the same Mutex so the step list runs at most
+     * once. Mirrors Swift's `completeServicesInitialization()` (the
+     * `_servicesInitTask` + `_servicesInitLock.sync { ... }` fan-in).
      *
-     * Called automatically on first API call, or can be awaited directly.
-     * Safe to call multiple times - returns immediately if already done.
+     * The platform bridge owns the canonical 5-step Phase 2 sequence:
+     *   1. (deferred from C++) HTTP transport + auth round-trip.
+     *      Tolerates offline mode — local/cached models stay accessible.
+     *   2. (MainActor / Main dispatcher) platform-plugin registration.
+     *   3. (C++) `rac_sdk_init_phase2_proto` — device registration + model
+     *      assignments + HTTP-state snapshot.
+     *   4. (deferred from C++) dev-mode device registration with the
+     *      build-token path.
+     *   5. (deferred from C++) filesystem-backed model discovery.
+     *
+     * Each step's outcome surfaces through the [SdkInitResult] envelope; the
+     * `http_configured` flag drives [_hasCompletedHTTPSetup] so a later
+     * [ensureServicesReady] call can retry HTTP without re-running the rest of
+     * the bootstrap.
      */
     suspend fun completeServicesInitialization() {
-        // Fast path: already completed
+        // Fast path: already completed.
         if (_areServicesReady) {
             return
         }
@@ -284,18 +404,44 @@ object RunAnywhere {
                 throw IllegalStateException("SDK must be initialized before completing services initialization")
             }
 
-            logger.info("Initializing services for ${_currentEnvironment?.wireString} mode...")
+            val params = _initParams
+                ?: throw SDKException.notInitialized("SDK init params missing — call RunAnywhere.initialize() first")
+
+            logger.info("Initializing services for ${params.environment.wireString} mode...")
 
             try {
-                // Initialize CppBridge services (Phase 2)
-                initializeCppBridgeServices()
+                // Delegate to the platform bridge — runs the full Step-1..5
+                // sequence including `rac_sdk_init_phase2_proto`. The bridge
+                // also flushes the linked-models warning and dev-mode device
+                // registration. Mirrors Swift's awaited steps in
+                // `_performServicesInitialization`.
+                initializePlatformBridgeServices()
 
-                // Mark Phase 2 complete
+                // Capture HTTP outcome so [ensureServicesReady] can decide
+                // whether to retry. The platform bridge sets HTTP up before
+                // phase2; we treat "services ready" as the proxy until a
+                // commonMain-visible HTTP-state expect lands.
+                // TODO(B5.x): wire a dedicated `platformIsHTTPConfigured()`
+                //   expect that reads the proto `http_configured` flag from
+                //   the last `rac_sdk_init_phase2_proto` result instead of
+                //   implicitly assuming HTTP setup succeeded when services
+                //   complete.
+                _hasCompletedHTTPSetup = true
                 _areServicesReady = true
 
-                logger.info("✅ Services initialized for ${_currentEnvironment?.wireString} mode")
-            } catch (e: Exception) {
+                logger.info("Services initialized for ${params.environment.wireString} mode")
+
+                // TODO(B5.x): emit `CppBridgeSDKEvents.emitSDKModelsLoaded(count)`
+                //   from a commonMain-visible event bridge once the expect/actual
+                //   lands. The Swift SDK emits the
+                //   `INITIALIZATION_STAGE_SERVICES_BOOTSTRAPPED` event after
+                //   `CppBridge.ModelRegistry.shared.discoverDownloadedModels()`
+                //   returns; the Kotlin platform bridge currently does the
+                //   discovery internally but does not propagate the count.
+            } catch (e: Throwable) {
                 logger.error("Services initialization failed: ${e.message}")
+                // TODO(B5.x): emit `CppBridgeSDKEvents.emitSDKInitFailed(error)`
+                //   here once the expect/actual pair lands.
                 throw e
             }
         }
@@ -304,26 +450,62 @@ object RunAnywhere {
     /**
      * Ensure services are ready before API calls (internal guard).
      *
-     * Mirrors Swift `RunAnywhere.ensureServicesReady()`. Lazily kicks off
-     * Phase 2 (`completeServicesInitialization()`) the first time a feature
-     * entry is hit, so commonMain consumers do **not** need to make that
-     * call explicitly — the same shape as the iOS SDK's `_servicesInitTask`
-     * fan-in. The Mutex guard inside [completeServicesInitialization]
-     * serializes concurrent first-callers.
+     * Mirrors Swift `RunAnywhere.ensureServicesReady()`:
+     *  - Fast path: services ready + HTTP configured → return (O(1)).
+     *  - Recovery path: services ready but HTTP failed (offline init) →
+     *    retry HTTP setup via [retryHTTPSetup] without re-running Phase 2.
+     *  - Cold start path: services not ready → kick off
+     *    [completeServicesInitialization].
      *
-     * O(1) after the first successful initialization.
+     * Called by every public feature entry so commonMain consumers do not need
+     * to await Phase 2 explicitly. The Mutex guard inside
+     * [completeServicesInitialization] serializes concurrent first-callers.
      *
      * @throws IllegalStateException if Phase 1 ([initialize]) has not run.
      */
     internal suspend fun ensureServicesReady() {
-        if (_areServicesReady) {
-            return // O(1) fast path — Phase 2 already complete
+        // Fast path — both services and HTTP done.
+        if (_areServicesReady && _hasCompletedHTTPSetup) {
+            return
         }
-        // Phase 1 must be complete before we can lazily start Phase 2.
+        // Recovery path — services done, HTTP failed (offline init).
+        if (_areServicesReady && !_hasCompletedHTTPSetup) {
+            retryHTTPSetup()
+            return
+        }
+        // Cold start path — Phase 1 must already be complete.
         requireInitialized()
-        // Auto-start Phase 2 — `completeServicesInitialization` is mutex-guarded
-        // and short-circuits if another caller already finished the work.
         completeServicesInitialization()
+    }
+
+    /**
+     * Retry HTTP/auth after an offline initialization. Mirrors Swift's
+     * private `retryHTTPSetup()` — combines the C ABI idempotency guard
+     * (`rac_sdk_retry_http_proto`) with the platform-side auth round-trip
+     * that the proto explicitly defers.
+     *
+     * Implementation note: routes through [initializePlatformBridgeServices]
+     * for now because the bridge's existing services init already calls
+     * `CppBridgeDevConfig.configureHTTP()` and `HTTPClientAdapter.configure()`
+     * on the same code path the Swift `setupHTTP` helper exercises.
+     */
+    private suspend fun retryHTTPSetup() {
+        val params = _initParams ?: return
+        logger.debug("Retrying HTTP/auth setup for ${params.environment.wireString}...")
+
+        try {
+            // TODO(B5.x): replace this call with a dedicated
+            //   `platformRetryHTTP()` expect that drives the canonical C ABI
+            //   `rac_sdk_retry_http_proto` + `rac_dev_config_configure_http`
+            //   directly. The current shim re-runs services init's HTTP step
+            //   (idempotent on the C++ side via `rac_sdk_retry_http_proto`)
+            //   but does more work than the Swift retry path.
+            initializePlatformBridgeServices()
+            _hasCompletedHTTPSetup = true
+            logger.info("HTTP/Auth setup succeeded on retry")
+        } catch (e: Throwable) {
+            logger.debug("HTTP/Auth retry failed (still offline?): ${e.message}")
+        }
     }
 
     /**
@@ -348,53 +530,16 @@ object RunAnywhere {
 
         synchronized(lock) {
             // Shutdown CppBridge
-            shutdownCppBridge()
+            shutdownPlatformBridge()
 
             _isInitialized = false
             _areServicesReady = false
+            _hasCompletedHTTPSetup = false
             _currentEnvironment = null
+            _initParams = null
         }
 
         logger.info("SDK state reset completed")
-    }
-
-    /**
-     * Cleanup SDK resources without full reset
-     */
-    suspend fun cleanup() {
-        logger.info("Cleaning up SDK resources...")
-        // Cleanup logic here
-    }
-
-    // ═══════════════════════════════════════════════════════════════════════════
-    // MARK: - CppBridge Integration (expect/actual pattern)
-    // ═══════════════════════════════════════════════════════════════════════════
-
-    /**
-     * Initialize CppBridge (Phase 1)
-     * Implementation is in jvmAndroidMain via expect/actual
-     */
-    private fun initializeCppBridge(environment: SDKEnvironment, apiKey: String?, baseURL: String?) {
-        logger.debug("CppBridge initialization requested for $environment")
-        initializePlatformBridge(environment, apiKey, baseURL)
-    }
-
-    /**
-     * Initialize CppBridge services (Phase 2)
-     * Implementation is in jvmAndroidMain via expect/actual
-     */
-    private suspend fun initializeCppBridgeServices() {
-        logger.debug("CppBridge services initialization requested")
-        initializePlatformBridgeServices()
-    }
-
-    /**
-     * Shutdown CppBridge
-     * Implementation is in jvmAndroidMain via expect/actual
-     */
-    private fun shutdownCppBridge() {
-        logger.debug("CppBridge shutdown requested")
-        shutdownPlatformBridge()
     }
 }
 

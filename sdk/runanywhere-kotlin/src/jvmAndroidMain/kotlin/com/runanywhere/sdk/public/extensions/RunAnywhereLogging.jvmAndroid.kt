@@ -7,21 +7,13 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import com.runanywhere.sdk.infrastructure.logging.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.Logging
 import com.runanywhere.sdk.public.RunAnywhere
 
-// Internal log level state
-@Volatile
-private var currentLogLevel: LogLevel = LogLevel.INFO
-
-private val logger = SDKLogger.shared
-
 internal actual fun RunAnywhere.setLogLevelInternal(level: LogLevel) {
-    currentLogLevel = level
-    logger.debug("Log level set to ${level.name}")
+    Logging.setMinLogLevel(level)
 }
 
 actual fun RunAnywhere.flushLogs() {
-    // Logs are written immediately via platform adapter, no buffering
-    logger.debug("Logs flushed")
+    Logging.flush()
 }

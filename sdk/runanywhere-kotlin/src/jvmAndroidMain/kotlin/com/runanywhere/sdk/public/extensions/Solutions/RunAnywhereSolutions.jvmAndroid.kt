@@ -29,6 +29,16 @@ actual class SolutionHandle internal constructor(
     actual val isAlive: Boolean
         get() = handleRef.get() != 0L
 
+    actual suspend fun start() {
+        val h = requireHandle()
+        withContext(Dispatchers.IO) {
+            val rc = RunAnywhereBridge.racSolutionStart(h)
+            if (rc != RunAnywhereBridge.RAC_SUCCESS) {
+                throw SDKException.operation("rac_solution_start failed with rc=$rc")
+            }
+        }
+    }
+
     actual suspend fun stop() {
         val h = requireHandle()
         withContext(Dispatchers.IO) {
@@ -55,6 +65,16 @@ actual class SolutionHandle internal constructor(
             val rc = RunAnywhereBridge.racSolutionFeed(h, input)
             if (rc != RunAnywhereBridge.RAC_SUCCESS) {
                 throw SDKException.operation("rac_solution_feed failed with rc=$rc")
+            }
+        }
+    }
+
+    actual suspend fun closeInput() {
+        val h = requireHandle()
+        withContext(Dispatchers.IO) {
+            val rc = RunAnywhereBridge.racSolutionCloseInput(h)
+            if (rc != RunAnywhereBridge.RAC_SUCCESS) {
+                throw SDKException.operation("rac_solution_close_input failed with rc=$rc")
             }
         }
     }

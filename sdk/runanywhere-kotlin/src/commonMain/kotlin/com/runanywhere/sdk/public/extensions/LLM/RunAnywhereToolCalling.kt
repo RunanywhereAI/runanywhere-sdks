@@ -21,12 +21,13 @@
 package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.LLM.RAToolCallingOptions
+import com.runanywhere.sdk.public.extensions.LLM.RAToolCallingResult
 import com.runanywhere.sdk.public.extensions.LLM.ToolCall
 import com.runanywhere.sdk.public.extensions.LLM.ToolDefinition
 import com.runanywhere.sdk.public.extensions.LLM.ToolExecutor
 import com.runanywhere.sdk.public.extensions.LLM.ToolResult
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
-import com.runanywhere.sdk.public.types.RALLMGenerationResult
 
 // =============================================================================
 // TOOL REGISTRATION
@@ -54,18 +55,18 @@ import com.runanywhere.sdk.public.types.RALLMGenerationResult
  *             ),
  *         ),
  *     ),
- * ) { call ->
- *     ToolResult(
- *         tool_call_id = call.id,
- *         name = call.name,
- *         result_json = "{\"temperature\":72,\"condition\":\"Sunny\"}",
- *         success = true,
+ * ) { args ->
+ *     val location = args["location"]?.string ?: "Unknown"
+ *     mapOf(
+ *         "temperature" to RAToolValue.int(72),
+ *         "condition" to RAToolValue.string("Sunny"),
  *     )
  * }
  * ```
  *
  * @param definition Tool definition (name, description, parameters)
- * @param executor Suspend closure that executes the tool
+ * @param executor Suspend closure that executes the tool with a typed argument
+ *   map and returns a typed result map.
  */
 expect suspend fun RunAnywhere.registerTool(
     definition: ToolDefinition,
@@ -108,19 +109,28 @@ expect suspend fun RunAnywhere.executeTool(toolCall: ToolCall): ToolResult
 /**
  * Generates a response with tool-calling support.
  *
- * Orchestrates a generate -> parse -> execute -> loop cycle:
- * 1. Builds a system prompt describing available tools (via C++ bridge).
- * 2. Generates LLM response.
- * 3. Parses output for `<tool_call>` tags (via C++ bridge).
- * 4. If a tool call is found and auto-execution is enabled, executes and continues.
- * 5. Repeats until no more tool calls or the iteration limit is reached.
+ * Orchestrates a generate -> parse -> execute -> loop cycle entirely in C++:
+ * 1. Builds a system prompt describing available tools.
+ * 2. Generates the LLM response.
+ * 3. Parses output for tool calls.
+ * 4. If a tool call is found and auto-execution is enabled, executes and
+ *    continues until completion or [RAToolCallingOptions.max_iterations].
+ *
+ * Mirrors Swift's
+ * `generateWithTools(prompt:options:toolOptions:) -> RAToolCallingResult`:
+ *
+ *  - `options.tool_calling` is consulted when `toolOptions` is null,
+ *  - otherwise [RAToolCallingOptions.defaults] is used.
  *
  * @param prompt The user's prompt
- * @param options LLM generation options (tool definitions passed via
- *   [LLMGenerationOptions.tool_calling] field when set by the caller)
- * @return [LLMGenerationResult] with the final text response
+ * @param options LLM generation options (optional)
+ * @param toolOptions Tool-calling specific options. When non-null this
+ *   overrides any `options.tool_calling` payload.
+ * @return [RAToolCallingResult] with the final text, tool calls, and any
+ *   executed tool results (matches the Swift surface).
  */
 expect suspend fun RunAnywhere.generateWithTools(
     prompt: String,
     options: RALLMGenerationOptions? = null,
-): RALLMGenerationResult
+    toolOptions: RAToolCallingOptions? = null,
+): RAToolCallingResult

@@ -3,8 +3,10 @@ package com.runanywhere.sdk.public.extensions.STT
 import ai.runanywhere.proto.v1.STTStreamEvent
 import ai.runanywhere.proto.v1.STTStreamEventKind
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.RASTTPartialResult
 import com.runanywhere.sdk.public.extensions.transcribeStream
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -21,5 +23,5 @@ class STTGeneratedStreamSurfaceTest {
 }
 
 @Suppress("unused")
-private fun sttStreamSurface(): Flow<STTStreamEvent> =
-    RunAnywhere.transcribeStream(ByteArray(0))
+private fun sttStreamSurface(): Flow<RASTTPartialResult> =
+    RunAnywhere.transcribeStream(audio = emptyFlow())

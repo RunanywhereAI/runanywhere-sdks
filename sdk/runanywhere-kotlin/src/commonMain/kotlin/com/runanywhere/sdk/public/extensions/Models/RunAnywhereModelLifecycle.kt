@@ -29,10 +29,6 @@ expect suspend fun RunAnywhere.currentModel(request: CurrentModelRequest = Curre
 
 expect suspend fun RunAnywhere.componentLifecycleSnapshot(component: SDKComponent): ComponentLifecycleSnapshot
 
-// MARK: - Model Loading
-
-expect suspend fun RunAnywhere.loadModel(modelId: String)
-
 // MARK: - Model Assignments
 // `fetchModelAssignments` was deleted in the dead-code wave (KOT-DEAD).
 // The legacy path was a JSON adapter over `racModelAssignmentFetch`.
