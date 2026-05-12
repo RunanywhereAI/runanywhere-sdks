@@ -22,11 +22,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 
 /**
@@ -197,6 +195,11 @@ class ModelSelectionViewModel(
                     .currentModel(CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS))
                     .model_id
                     .takeIf { it.isNotEmpty() }
+            ModelSelectionContext.VAD ->
+                RunAnywhere
+                    .currentModel(CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION))
+                    .model_id
+                    .takeIf { it.isNotEmpty() }
             ModelSelectionContext.VOICE -> null
             ModelSelectionContext.RAG_EMBEDDING,
             ModelSelectionContext.RAG_LLM,
@@ -220,6 +223,7 @@ class ModelSelectionViewModel(
             ModelSelectionContext.LLM -> category == ModelCategory.MODEL_CATEGORY_LANGUAGE
             ModelSelectionContext.STT -> category == ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
             ModelSelectionContext.TTS -> category == ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+            ModelSelectionContext.VAD -> category == ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
             ModelSelectionContext.VOICE ->
                 category in
                     listOf(
@@ -281,12 +285,13 @@ class ModelSelectionViewModel(
                 )
             }
 
-            val model = try {
-                RunAnywhere.listModels(ai.runanywhere.proto.v1.ModelListRequest())
-                    .models?.models?.firstOrNull { it.id == modelId }
-            } catch (_: Throwable) {
-                null
-            }
+            val model =
+                try {
+                    RunAnywhere.listModels(ai.runanywhere.proto.v1.ModelListRequest())
+                        .models?.models?.firstOrNull { it.id == modelId }
+                } catch (_: Throwable) {
+                    null
+                }
 
             if (model == null) {
                 _uiState.update {
@@ -356,32 +361,35 @@ class ModelSelectionViewModel(
             }
 
             // Context-aware model loading - matches iOS exactly
-            val loadCategory = when (context) {
-                ModelSelectionContext.LLM -> ModelCategory.MODEL_CATEGORY_LANGUAGE
-                ModelSelectionContext.STT -> ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-                ModelSelectionContext.TTS -> ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-                ModelSelectionContext.VLM -> ModelCategory.MODEL_CATEGORY_VISION
-                ModelSelectionContext.VOICE -> {
-                    val model = _uiState.value.models.find { it.id == modelId }
-                    when (model?.category) {
-                        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION ->
-                            ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-                        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS ->
-                            ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-                        else -> ModelCategory.MODEL_CATEGORY_LANGUAGE
+            val loadCategory =
+                when (context) {
+                    ModelSelectionContext.LLM -> ModelCategory.MODEL_CATEGORY_LANGUAGE
+                    ModelSelectionContext.STT -> ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+                    ModelSelectionContext.TTS -> ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+                    ModelSelectionContext.VAD -> ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
+                    ModelSelectionContext.VLM -> ModelCategory.MODEL_CATEGORY_VISION
+                    ModelSelectionContext.VOICE -> {
+                        val model = _uiState.value.models.find { it.id == modelId }
+                        when (model?.category) {
+                            ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION ->
+                                ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+                            ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS ->
+                                ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+                            else -> ModelCategory.MODEL_CATEGORY_LANGUAGE
+                        }
                     }
+                    ModelSelectionContext.RAG_EMBEDDING,
+                    ModelSelectionContext.RAG_LLM,
+                    -> null
                 }
-                ModelSelectionContext.RAG_EMBEDDING,
-                ModelSelectionContext.RAG_LLM,
-                -> null
-            }
 
             if (loadCategory == null) {
                 Timber.d("ℹ️ RAG context: selecting model by reference only (no load): $modelId")
             } else {
-                val result = RunAnywhere.loadModel(
-                    RAModelLoadRequest(model_id = modelId, category = loadCategory),
-                )
+                val result =
+                    RunAnywhere.loadModel(
+                        RAModelLoadRequest(model_id = modelId, category = loadCategory),
+                    )
                 if (!result.success) {
                     val errMsg = result.error_message.ifBlank { "unknown load error" }
                     Timber.e("❌ Model load FAILED for $modelId (category=$loadCategory): $errMsg")

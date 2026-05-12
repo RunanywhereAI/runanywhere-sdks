@@ -1,5 +1,7 @@
 package com.runanywhere.runanywhereai.presentation.chat
 
+import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.ModelCategory
 import android.app.Application
 import android.content.ClipData
 import android.os.Build
@@ -66,8 +68,6 @@ import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
-import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.currentModel
 import kotlinx.coroutines.launch

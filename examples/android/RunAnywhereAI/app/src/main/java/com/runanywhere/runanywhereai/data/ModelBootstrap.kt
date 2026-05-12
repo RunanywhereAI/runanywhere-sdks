@@ -39,7 +39,9 @@ object ModelBootstrap {
             RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty().forEach { m ->
                 Timber.d("📋 ${m.id}: is_downloaded=${m.is_downloaded} local_path='${m.local_path}'")
             }
-        } catch (_: Throwable) { /* dev diag only */ }
+        } catch (_: Throwable) {
+            // dev diag only
+        }
     }
 
     /**
@@ -66,10 +68,11 @@ object ModelBootstrap {
         // registry. Helps debug "no backend route" issues by surfacing exactly
         // which plugin names made it past rac_plugin_register.
         try {
-            val names = com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-                .racRegistryGetRegisteredNames()
-                ?.toList()
-                .orEmpty()
+            val names =
+                com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+                    .racRegistryGetRegisteredNames()
+                    ?.toList()
+                    .orEmpty()
             Timber.i("🔌 Plugins registered (count=${names.size}): ${names.joinToString()}")
         } catch (e: Throwable) {
             Timber.w(e, "Plugin diagnostic listing failed")
@@ -96,31 +99,52 @@ object ModelBootstrap {
         var failed = 0
 
         for (m in LLM_MODELS) {
-            if (m.id in alreadyKnown) { skipped++; continue }
+            if (m.id in alreadyKnown) {
+                skipped++
+                continue
+            }
             if (tryRegisterSingle(m)) registered++ else failed++
         }
         for (m in VLM_MULTIFILE_MODELS) {
-            if (m.id in alreadyKnown) { skipped++; continue }
+            if (m.id in alreadyKnown) {
+                skipped++
+                continue
+            }
             if (tryRegisterMultiFile(m)) registered++ else failed++
         }
         for (m in VLM_SINGLE_MODELS) {
-            if (m.id in alreadyKnown) { skipped++; continue }
+            if (m.id in alreadyKnown) {
+                skipped++
+                continue
+            }
             if (tryRegisterSingle(m)) registered++ else failed++
         }
         for (m in STT_MODELS) {
-            if (m.id in alreadyKnown) { skipped++; continue }
+            if (m.id in alreadyKnown) {
+                skipped++
+                continue
+            }
             if (tryRegisterArchive(m)) registered++ else failed++
         }
         for (m in TTS_MODELS) {
-            if (m.id in alreadyKnown) { skipped++; continue }
+            if (m.id in alreadyKnown) {
+                skipped++
+                continue
+            }
             if (tryRegisterArchive(m)) registered++ else failed++
         }
         for (m in VAD_MODELS) {
-            if (m.id in alreadyKnown) { skipped++; continue }
+            if (m.id in alreadyKnown) {
+                skipped++
+                continue
+            }
             if (tryRegisterSingle(m)) registered++ else failed++
         }
         for (m in EMBEDDING_MULTIFILE_MODELS) {
-            if (m.id in alreadyKnown) { skipped++; continue }
+            if (m.id in alreadyKnown) {
+                skipped++
+                continue
+            }
             if (tryRegisterMultiFile(m)) registered++ else failed++
         }
 
@@ -171,17 +195,18 @@ object ModelBootstrap {
 
     private fun tryRegisterSingle(m: SingleFileModel): Boolean {
         return try {
-            val info = ModelInfo(
-                id = m.id,
-                name = m.name,
-                download_url = m.url,
-                framework = m.framework,
-                category = m.category,
-                memory_required_bytes = m.memoryBytes,
-                supports_lora = m.supportsLora,
-                supports_thinking = m.supportsThinking,
-                single_file = SingleFileArtifact(),
-            )
+            val info =
+                ModelInfo(
+                    id = m.id,
+                    name = m.name,
+                    download_url = m.url,
+                    framework = m.framework,
+                    category = m.category,
+                    memory_required_bytes = m.memoryBytes,
+                    supports_lora = m.supportsLora,
+                    supports_thinking = m.supportsThinking,
+                    single_file = SingleFileArtifact(),
+                )
             CppBridgeModelRegistry.save(info)
             true
         } catch (e: Exception) {
@@ -199,26 +224,29 @@ object ModelBootstrap {
      */
     private fun tryRegisterArchive(m: ArchiveModel): Boolean {
         return try {
-            val artifactType = when (m.archiveType) {
-                ArchiveType.ARCHIVE_TYPE_TAR_GZ -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE
-                ArchiveType.ARCHIVE_TYPE_ZIP -> ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE
-                ArchiveType.ARCHIVE_TYPE_TAR_BZ2 -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE
-                ArchiveType.ARCHIVE_TYPE_TAR_XZ -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE
-                else -> ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE
-            }
-            val info = ModelInfo(
-                id = m.id,
-                name = m.name,
-                download_url = m.url,
-                framework = m.framework,
-                category = m.category,
-                memory_required_bytes = m.memoryBytes,
-                artifact_type = artifactType,
-                archive = ArchiveArtifact(
-                    type = m.archiveType,
-                    structure = m.structure,
-                ),
-            )
+            val artifactType =
+                when (m.archiveType) {
+                    ArchiveType.ARCHIVE_TYPE_TAR_GZ -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE
+                    ArchiveType.ARCHIVE_TYPE_ZIP -> ModelArtifactType.MODEL_ARTIFACT_TYPE_ZIP_ARCHIVE
+                    ArchiveType.ARCHIVE_TYPE_TAR_BZ2 -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_BZ2_ARCHIVE
+                    ArchiveType.ARCHIVE_TYPE_TAR_XZ -> ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_XZ_ARCHIVE
+                    else -> ModelArtifactType.MODEL_ARTIFACT_TYPE_ARCHIVE
+                }
+            val info =
+                ModelInfo(
+                    id = m.id,
+                    name = m.name,
+                    download_url = m.url,
+                    framework = m.framework,
+                    category = m.category,
+                    memory_required_bytes = m.memoryBytes,
+                    artifact_type = artifactType,
+                    archive =
+                        ArchiveArtifact(
+                            type = m.archiveType,
+                            structure = m.structure,
+                        ),
+                )
             CppBridgeModelRegistry.save(info)
             true
         } catch (e: Exception) {
@@ -229,33 +257,36 @@ object ModelBootstrap {
 
     private fun tryRegisterMultiFile(m: MultiFileModel): Boolean {
         return try {
-            val descriptors = m.files.mapIndexed { idx, (url, filename) ->
-                ModelFileDescriptor(
-                    url = url,
-                    filename = filename,
-                    is_required = true,
-                    role = if (idx == 0) {
-                        ai.runanywhere.proto.v1.ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
-                    } else {
-                        ai.runanywhere.proto.v1.ModelFileRole.MODEL_FILE_ROLE_COMPANION
-                    },
-                )
-            }
+            val descriptors =
+                m.files.mapIndexed { idx, (url, filename) ->
+                    ModelFileDescriptor(
+                        url = url,
+                        filename = filename,
+                        is_required = true,
+                        role =
+                            if (idx == 0) {
+                                ai.runanywhere.proto.v1.ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
+                            } else {
+                                ai.runanywhere.proto.v1.ModelFileRole.MODEL_FILE_ROLE_COMPANION
+                            },
+                    )
+                }
             // Mirror Swift's RAModelInfo.setArtifact: when populating the
             // multi_file oneof, also seed expected_files from the descriptors.
             // The commons download planner only walks model.expected_files.files
             // for the per-descriptor loop; without this, the download falls
             // through to the single-URL branch and rejects with
             // "model.download_url must be an http(s) URL".
-            val info = ModelInfo(
-                id = m.id,
-                name = m.name,
-                framework = m.framework,
-                category = m.category,
-                memory_required_bytes = m.memoryBytes,
-                multi_file = MultiFileArtifact(files = descriptors),
-                expected_files = ai.runanywhere.proto.v1.ExpectedModelFiles(files = descriptors),
-            )
+            val info =
+                ModelInfo(
+                    id = m.id,
+                    name = m.name,
+                    framework = m.framework,
+                    category = m.category,
+                    memory_required_bytes = m.memoryBytes,
+                    multi_file = MultiFileArtifact(files = descriptors),
+                    expected_files = ai.runanywhere.proto.v1.ExpectedModelFiles(files = descriptors),
+                )
             CppBridgeModelRegistry.save(info)
             true
         } catch (e: Exception) {

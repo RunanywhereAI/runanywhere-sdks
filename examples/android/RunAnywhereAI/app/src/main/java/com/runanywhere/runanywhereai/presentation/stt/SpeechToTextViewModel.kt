@@ -1,8 +1,10 @@
 package com.runanywhere.runanywhereai.presentation.stt
 
 import ai.runanywhere.proto.v1.ComponentLifecycleState
+import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_STT
 import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelEventKind
 import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.STTLanguage
@@ -16,30 +18,28 @@ import com.runanywhere.runanywhereai.domain.services.AudioCaptureService
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.events.ModelEvent
-import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.componentLifecycleSnapshot
 import com.runanywhere.sdk.public.extensions.currentModel
 import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.transcribe
-import com.runanywhere.sdk.public.extensions.transcribeStream
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RASTTOptions
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.io.ByteArrayOutputStream
 import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.min
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import timber.log.Timber
 
 /**
  * STT Recording Mode
@@ -110,6 +110,16 @@ data class STTUiState(
 class SpeechToTextViewModel : ViewModel() {
     companion object {
         private const val SAMPLE_RATE = 16000 // 16kHz for Whisper/ONNX STT models
+
+        // VAD-gated live transcription (mirrors iOS STTViewModel.swift)
+        // iOS uses speechThreshold=0.02 (normalized dB level) and silenceDuration=1.5s.
+        private const val SPEECH_THRESHOLD = 0.02f
+        private const val SILENCE_DURATION_MS = 1500L
+        private const val VAD_POLL_INTERVAL_MS = 50L
+
+        // Minimum audio bytes before transcribing (~0.5s at 16kHz mono 16-bit).
+        // Mirrors iOS: `if audioBuffer.count > 16000`.
+        private const val MIN_TRANSCRIBE_BYTES = 16000
     }
 
     private val _uiState = MutableStateFlow(STTUiState())
@@ -121,6 +131,11 @@ class SpeechToTextViewModel : ViewModel() {
     // Audio recording state
     private var recordingJob: Job? = null
     private val audioBuffer = ByteArrayOutputStream()
+
+    // VAD state for live mode (iOS parity: STTViewModel.swift)
+    private var vadJob: Job? = null
+    private var isSpeechActive = false
+    private var lastSpeechTimeMs: Long = 0L
 
     // SDK event subscription
     private var eventSubscriptionJob: Job? = null
@@ -395,6 +410,9 @@ class SpeechToTextViewModel : ViewModel() {
             )
         }
         audioBuffer.reset()
+        // Reset VAD state (iOS parity: STTViewModel.swift startRecording())
+        isSpeechActive = false
+        lastSpeechTimeMs = 0L
 
         val audioCapture =
             audioCaptureService ?: run {
@@ -443,68 +461,40 @@ class SpeechToTextViewModel : ViewModel() {
     }
 
     /**
-     * Start live streaming recording - transcribe in chunks
-     * iOS Reference: Live mode in startRecording() with liveTranscribe
+     * Start live streaming recording — VAD-gated batch transcription.
      *
-     * Note: The SDK's transcribeStream API takes a ByteArray, not a Flow.
-     * For live mode, we collect audio chunks and transcribe them incrementally.
+     * iOS Reference: STTViewModel.swift `startVADMonitoring()` + `checkSpeechState()` +
+     * `performLiveTranscription()`.
+     *
+     * Behaviour parity:
+     *  - Continuously captures audio into `audioBuffer`.
+     *  - A separate VAD polling task (50ms interval) watches the normalized audio level.
+     *  - When level > 0.02 (≈ -58.8dB normalized) we mark speech as active.
+     *  - Once 1.5s of silence elapses after speech, the accumulated buffer is sent to
+     *    `RunAnywhere.transcribe` (batch), the buffer is cleared, and recording continues
+     *    for the next utterance.
+     *  - If the accumulated buffer is below 16000 bytes (~0.5s) at the point of silence
+     *    we discard it rather than transcribing — this prevents Whisper from
+     *    hallucinating "[BLANK_AUDIO]" / "[SIDE CONVERSATION]" tokens on near-empty
+     *    buffers.
+     *
+     * This replaces the previous fixed-interval (~1s) chunk transcription that fed
+     * Whisper noisy ambient audio regardless of whether speech was present, which
+     * matched the user-reported symptom of Android STT being "too sensitive".
      */
     private fun startLiveRecording(audioCapture: AudioCaptureService) {
+        // Audio capture coroutine: accumulate every chunk into audioBuffer and
+        // mirror iOS's `audioBuffer.append(audioData)` callback.
         recordingJob =
             viewModelScope.launch {
                 try {
-                    val chunkBuffer = ByteArrayOutputStream()
-                    var lastTranscription = ""
-
                     audioCapture.startCapture().collect { audioData ->
-                        // Update audio level
+                        withContext(Dispatchers.IO) {
+                            audioBuffer.write(audioData)
+                        }
                         val rms = audioCapture.calculateRMS(audioData)
                         val normalizedLevel = normalizeAudioLevel(rms)
                         _uiState.update { it.copy(audioLevel = normalizedLevel) }
-
-                        // Append to chunk buffer
-                        chunkBuffer.write(audioData)
-
-                        // Transcribe every ~1 second of audio (16000 samples * 2 bytes = 32000 bytes)
-                        if (chunkBuffer.size() >= 32000) {
-                            val chunkData = chunkBuffer.toByteArray()
-                            chunkBuffer.reset()
-
-                            // Transcribe in background
-                            withContext(Dispatchers.IO) {
-                                try {
-                                    val options = RASTTOptions(language = sttLanguageFromBcp47(_uiState.value.language))
-                                    var finalText = ""
-                                    RunAnywhere.transcribeStream(
-                                        audio = flowOf(chunkData),
-                                        options = options,
-                                    ).collect { partial ->
-                                        // RASTTPartialResult always carries a partial transcript; on the
-                                        // terminal event `is_final=true` and `final_output` is populated.
-                                        val streamText = partial.final_output?.text?.takeIf { it.isNotBlank() }
-                                            ?: partial.text
-                                        if (streamText.isNotBlank()) {
-                                            val newText = lastTranscription + " " + streamText
-                                            withContext(Dispatchers.Main) {
-                                                handleSTTStreamText(newText.trim())
-                                            }
-                                            if (partial.is_final) {
-                                                finalText = streamText
-                                            }
-                                        }
-                                    }
-                                    // Update with final result
-                                    if (finalText.isNotBlank()) {
-                                        lastTranscription = (lastTranscription + " " + finalText).trim()
-                                        withContext(Dispatchers.Main) {
-                                            handleSTTStreamText(lastTranscription)
-                                        }
-                                    }
-                                } catch (e: Exception) {
-                                    Timber.w("Chunk transcription error: ${e.message}")
-                                }
-                            }
-                        }
                     }
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     Timber.d("Live recording cancelled (expected when stopping)")
@@ -519,25 +509,104 @@ class SpeechToTextViewModel : ViewModel() {
                     }
                 }
             }
+
+        // VAD monitor coroutine: poll audio level every 50ms and trigger an
+        // accumulated-buffer transcription when 1.5s of silence follows speech.
+        // Mirrors iOS `startVADMonitoring()` + `checkSpeechState()`.
+        vadJob =
+            viewModelScope.launch {
+                Timber.i("Starting VAD monitoring for live transcription")
+                while (isActive && _uiState.value.recordingState == RecordingState.RECORDING) {
+                    val level = _uiState.value.audioLevel
+                    checkSpeechState(level)
+                    delay(VAD_POLL_INTERVAL_MS)
+                }
+            }
     }
 
     /**
-     * Handle STT stream text during live transcription
+     * VAD state machine: tracks speech onset/offset and auto-transcribes on silence.
+     * iOS reference: STTViewModel.swift `checkSpeechState(level:)`.
      */
-    private fun handleSTTStreamText(text: String) {
-        if (text.isNotBlank() && text != "...") {
-            val wordCount = text.trim().split("\\s+".toRegex()).filter { it.isNotEmpty() }.size
+    private suspend fun checkSpeechState(level: Float) {
+        if (_uiState.value.recordingState != RecordingState.RECORDING ||
+            _uiState.value.mode != STTMode.LIVE
+        ) {
+            return
+        }
+
+        val nowMs = System.currentTimeMillis()
+        if (level > SPEECH_THRESHOLD) {
+            if (!isSpeechActive) {
+                Timber.d("Speech started")
+                isSpeechActive = true
+            }
+            lastSpeechTimeMs = nowMs
+        } else if (isSpeechActive) {
+            val silenceElapsed = nowMs - lastSpeechTimeMs
+            if (silenceElapsed > SILENCE_DURATION_MS) {
+                Timber.d("Silence detected — auto-transcribing")
+                isSpeechActive = false
+
+                val bufferedBytes =
+                    withContext(Dispatchers.IO) {
+                        audioBuffer.size()
+                    }
+                if (bufferedBytes > MIN_TRANSCRIBE_BYTES) {
+                    performLiveTranscription()
+                } else {
+                    // Discard short / noise-only buffers to avoid Whisper hallucinations
+                    withContext(Dispatchers.IO) {
+                        audioBuffer.reset()
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Transcribe the accumulated buffer for a single utterance and append to the
+     * running transcript. Mirrors iOS `performLiveTranscription()`.
+     */
+    private suspend fun performLiveTranscription() {
+        val audioBytes =
+            withContext(Dispatchers.IO) {
+                val bytes = audioBuffer.toByteArray()
+                audioBuffer.reset()
+                bytes
+            }
+        if (audioBytes.isEmpty()) return
+
+        Timber.i("Live transcription of ${audioBytes.size} bytes")
+        _uiState.update { it.copy(isTranscribing = true) }
+        try {
+            withContext(Dispatchers.IO) {
+                val output = RunAnywhere.transcribe(audioBytes, defaultSttOptions())
+                withContext(Dispatchers.Main) {
+                    val existing = _uiState.value.transcription
+                    val appended =
+                        if (existing.isBlank()) {
+                            output.text
+                        } else {
+                            existing + "\n" + output.text
+                        }
+                    _uiState.update {
+                        it.copy(
+                            transcription = appended,
+                            isTranscribing = false,
+                        )
+                    }
+                }
+                Timber.i("Live transcription result: ${output.text}")
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Live transcription failed: ${e.message}")
             _uiState.update {
                 it.copy(
-                    transcription = text,
-                    metrics =
-                        TranscriptionMetrics(
-                            confidence = 0f,
-                            wordCount = wordCount,
-                        ),
+                    errorMessage = "Transcription failed: ${e.message}",
+                    isTranscribing = false,
                 )
             }
-            Timber.d("Stream transcription: $text")
         }
     }
 
@@ -547,6 +616,13 @@ class SpeechToTextViewModel : ViewModel() {
      */
     private suspend fun stopRecording() {
         Timber.i("Stopping recording in ${_uiState.value.mode} mode")
+
+        // Stop VAD monitor first so it doesn't trigger a final transcription
+        // mid-stop. Mirrors iOS `silenceCheckTask?.cancel()`.
+        vadJob?.cancel()
+        vadJob = null
+        isSpeechActive = false
+        lastSpeechTimeMs = 0L
 
         // Stop audio capture
         audioCaptureService?.stopCapture()
@@ -604,8 +680,12 @@ class SpeechToTextViewModel : ViewModel() {
                 // Calculate audio duration: bytes / (sample_rate * 2 bytes per sample) * 1000 ms
                 val audioDurationMs = (audioBytes.size.toDouble() / (SAMPLE_RATE * 2)) * 1000
 
-                // Use SDK's transcribe extension function
-                val transcriptionOutput = RunAnywhere.transcribe(audioBytes, RASTTOptions())
+                // Use SDK's transcribe extension function with iOS-default options
+                // (language=EN, punctuation+word-timestamps enabled) — mirrors
+                // Swift `RASTTOptions.defaults()`. Default `RASTTOptions()`
+                // would send STT_LANGUAGE_UNSPECIFIED which Whisper can
+                // misinterpret as auto-detect.
+                val transcriptionOutput = RunAnywhere.transcribe(audioBytes, defaultSttOptions())
                 val result = transcriptionOutput.text
 
                 val inferenceTimeMs = System.currentTimeMillis() - startTime
@@ -664,6 +744,10 @@ class SpeechToTextViewModel : ViewModel() {
      */
     fun cleanup() {
         recordingJob?.cancel()
+        vadJob?.cancel()
+        vadJob = null
+        isSpeechActive = false
+        lastSpeechTimeMs = 0L
         eventSubscriptionJob?.cancel()
         audioCaptureService?.release()
 
@@ -687,6 +771,27 @@ class SpeechToTextViewModel : ViewModel() {
     private fun normalizeAudioLevel(rms: Float): Float {
         val dbLevel = 20 * log10(rms + 0.0001f)
         return max(0f, min(1f, (dbLevel + 60) / 60))
+    }
+
+    /**
+     * Build the iOS-equivalent default `RASTTOptions` (mirrors Swift
+     * `RASTTOptions.defaults()`): English language, punctuation on,
+     * word timestamps on. Falls back to the user-selected language from UI
+     * state when not English.
+     */
+    private fun defaultSttOptions(): RASTTOptions {
+        val parsed = sttLanguageFromBcp47(_uiState.value.language)
+        val lang =
+            if (parsed == STTLanguage.STT_LANGUAGE_UNSPECIFIED) {
+                STTLanguage.STT_LANGUAGE_EN
+            } else {
+                parsed
+            }
+        return RASTTOptions(
+            language = lang,
+            enable_punctuation = true,
+            enable_word_timestamps = true,
+        )
     }
 }
 

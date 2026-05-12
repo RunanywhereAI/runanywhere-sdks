@@ -259,6 +259,7 @@ private fun getModalityIcon(modality: ModelSelectionContext): ImageVector {
         ModelSelectionContext.LLM -> Icons.Default.AutoAwesome
         ModelSelectionContext.STT -> Icons.Default.GraphicEq
         ModelSelectionContext.TTS -> Icons.AutoMirrored.Filled.VolumeUp
+        ModelSelectionContext.VAD -> Icons.Default.GraphicEq
         ModelSelectionContext.VOICE -> Icons.Default.Mic
         ModelSelectionContext.RAG_EMBEDDING,
         ModelSelectionContext.RAG_LLM,
@@ -272,6 +273,7 @@ private fun getModalityColor(modality: ModelSelectionContext): Color {
         ModelSelectionContext.LLM -> AppColors.primaryAccent
         ModelSelectionContext.STT -> AppColors.primaryGreen
         ModelSelectionContext.TTS -> AppColors.primaryPurple
+        ModelSelectionContext.VAD -> Color(0xFF00BCD4) // Cyan, mirrors iOS .cyan
         ModelSelectionContext.VOICE -> AppColors.primaryAccent
         ModelSelectionContext.RAG_EMBEDDING,
         ModelSelectionContext.RAG_LLM,
@@ -285,6 +287,7 @@ private fun getModalityTitle(modality: ModelSelectionContext): String {
         ModelSelectionContext.LLM -> "Welcome!"
         ModelSelectionContext.STT -> "Voice to Text"
         ModelSelectionContext.TTS -> "Read Aloud"
+        ModelSelectionContext.VAD -> "Voice Activity Detection"
         ModelSelectionContext.VOICE -> "Voice Assistant"
         ModelSelectionContext.RAG_EMBEDDING -> "Document Search"
         ModelSelectionContext.RAG_LLM -> "Document Chat"
@@ -300,6 +303,8 @@ private fun getModalityDescription(modality: ModelSelectionContext): String {
             "Transcribe your speech to text with powerful on-device voice recognition."
         ModelSelectionContext.TTS ->
             "Have any text read aloud with natural-sounding voices."
+        ModelSelectionContext.VAD ->
+            "Detect speech activity in real-time using an on-device VAD model."
         ModelSelectionContext.VOICE ->
             "Talk naturally with your AI assistant. Let's set up the components together."
         ModelSelectionContext.RAG_EMBEDDING ->

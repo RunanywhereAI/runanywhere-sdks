@@ -625,4 +625,3 @@ private fun Badge(
         )
     }
 }
-

@@ -26,6 +26,7 @@ enum class ModelSelectionContext(
     LLM("llm"),
     STT("stt"),
     TTS("tts"),
+    VAD("vad"),
     VOICE("voice"),
     RAG_EMBEDDING("ragEmbedding"),
     RAG_LLM("ragLLM"),
@@ -38,6 +39,7 @@ enum class ModelSelectionContext(
                 LLM -> "Select LLM Model"
                 STT -> "Select STT Model"
                 TTS -> "Select TTS Voice"
+                VAD -> "Select VAD Model"
                 VOICE -> "Select Voice Models"
                 RAG_EMBEDDING -> "Select Embedding Model"
                 RAG_LLM -> "Select LLM Model"
@@ -49,6 +51,7 @@ enum class ModelSelectionContext(
             LLM -> category == ModelCategory.MODEL_CATEGORY_LANGUAGE
             STT -> category == ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
             TTS -> category == ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+            VAD -> category == ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION
             VOICE ->
                 category == ModelCategory.MODEL_CATEGORY_LANGUAGE ||
                     category == ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION ||
@@ -72,6 +75,7 @@ enum class ModelSelectionContext(
                 framework == InferenceFramework.INFERENCE_FRAMEWORK_ONNX ||
                     framework == InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS ||
                     framework == InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO
+            VAD -> framework == InferenceFramework.INFERENCE_FRAMEWORK_ONNX
             VOICE -> LLM.isFrameworkRelevant(framework) || STT.isFrameworkRelevant(framework) || TTS.isFrameworkRelevant(framework)
             RAG_EMBEDDING -> framework == InferenceFramework.INFERENCE_FRAMEWORK_ONNX
             RAG_LLM -> framework == InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP

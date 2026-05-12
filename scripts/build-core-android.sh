@@ -19,6 +19,13 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# Anchor cwd to the repo root so CMake presets resolve correctly regardless
+# of where the script is invoked from (e.g., Gradle's buildLocalJniLibs task
+# runs with `workingDir = sdk/runanywhere-kotlin/`, which would otherwise
+# break `cmake --preset android-arm64` because CMakePresets.json lives at
+# the repo root, not in the Kotlin module dir).
+cd "${REPO_ROOT}"
+
 # Kotlin + React Native destinations (existing).
 KOTLIN_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/src/androidMain/jniLibs"
 KOTLIN_LLAMA_JNI_DEST="${REPO_ROOT}/sdk/runanywhere-kotlin/modules/runanywhere-core-llamacpp/src/androidMain/jniLibs"

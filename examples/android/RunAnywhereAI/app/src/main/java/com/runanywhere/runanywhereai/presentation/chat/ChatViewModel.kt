@@ -34,7 +34,6 @@ import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.lora
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
-import kotlin.math.ceil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -45,6 +44,7 @@ import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import kotlin.math.ceil
 
 /**
  * Enhanced ChatUiState  functionality
@@ -236,8 +236,20 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Generate with tool calling support
-     * Matches iOS generateWithToolCalling pattern
+     * Generate with tool calling support.
+     *
+     * Mirrors iOS `LLMViewModel+ToolCalling.generateWithToolCalling`:
+     *  1. Detect format hint per loaded model name.
+     *  2. Call `RunAnywhere.generateWithTools(...)`.
+     *  3. Split `<think>...</think>` from the response so the thinking section
+     *     renders independently of the final text (iOS uses
+     *     ThinkingContentParser.extract).
+     *  4. Populate `toolCallInfo` from the first executed tool call so the
+     *     assistant bubble shows a "Tool" indicator the user can tap to see
+     *     arguments + return value (matches iOS ToolCallIndicator /
+     *     ToolCallDetailSheet).
+     *  5. Surface SDK-level errors (`result.error_message`) as the message
+     *     content so the chain never dies silently.
      */
     private suspend fun generateWithToolCalling(
         prompt: String,
@@ -275,32 +287,53 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 )
             val endTime = System.currentTimeMillis()
 
-            // Update the assistant message with the result
-            val response = result.text
-            updateAssistantMessage(messageId, response, null)
-
-            // Log tool calls and create tool call info
+            // Log tool calls + populate ToolCallInfo FIRST, so the indicator
+            // shows even if the final text is empty (e.g. when the model
+            // calls a tool but produces no follow-up text). Matches iOS
+            // MessageBubbleView's `if hasToolCall { toolCallSection }` block.
+            var toolCallInfo: ToolCallInfo? = null
             if (result.tool_calls.isNotEmpty()) {
                 Timber.i("🔧 Tool calls made: ${result.tool_calls.map { it.name }}")
                 result.tool_results.forEach { toolResult ->
-                    Timber.i("📋 Tool result: ${toolResult.name} - success: ${toolResult.error.isNullOrBlank()}")
+                    Timber.i(
+                        "📋 Tool result: ${toolResult.name} - success: ${toolResult.error.isNullOrBlank()}",
+                    )
                 }
 
-                // Create ToolCallInfo from the first tool call and result
                 val firstToolCall = result.tool_calls.first()
-                val firstToolResult = result.tool_results.firstOrNull { it.name == firstToolCall.name }
+                val firstToolResult =
+                    result.tool_results.firstOrNull { it.name == firstToolCall.name }
 
-                val toolCallInfo =
+                toolCallInfo =
                     ToolCallInfo(
                         toolName = firstToolCall.name,
-                        arguments = firstToolCall.arguments_json,
-                        result = firstToolResult?.result_json,
+                        arguments = prettyJson(firstToolCall.arguments_json),
+                        result = firstToolResult?.result_json?.let { prettyJson(it) },
                         success = firstToolResult != null && firstToolResult.error.isNullOrBlank(),
                         error = firstToolResult?.error,
                     )
 
                 updateAssistantMessageWithToolCallInfo(messageId, toolCallInfo)
             }
+
+            // Extract `<think>...</think>` from the final text. iOS does this via
+            // ThinkingContentParser so the thinking block renders separately and
+            // the SDK-supplied thinking content is not silently dropped on the
+            // tool-calling path.
+            val (displayText, thinkingContent) = extractThinking(result.text)
+
+            // Choose the user-visible content: prefer the model's final text,
+            // fall back to an SDK error message, then to a synthesized
+            // tool-summary so the bubble is never empty when tools ran.
+            val errorMessage = result.error_message
+            val content =
+                when {
+                    displayText.isNotBlank() -> displayText
+                    !errorMessage.isNullOrBlank() -> "⚠️ Tool calling failed: $errorMessage"
+                    toolCallInfo != null -> synthesizeToolSummary(toolCallInfo)
+                    else -> "(no response)"
+                }
+            updateAssistantMessage(messageId, content, thinkingContent)
 
             // Create analytics
             val analytics =
@@ -311,18 +344,68 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     thinkingStartTime = null,
                     thinkingEndTime = null,
                     inputText = prompt,
-                    outputText = response,
-                    thinkingText = null,
+                    outputText = content,
+                    thinkingText = thinkingContent,
                     wasInterrupted = false,
                 )
 
             updateAssistantMessageWithAnalytics(messageId, analytics)
+            syncCurrentConversationToStore()
         } catch (e: Exception) {
             Timber.e(e, "Tool calling failed")
             throw e
         } finally {
             _uiState.value = _uiState.value.copy(isGenerating = false)
         }
+    }
+
+    /**
+     * Split `<think>...</think>` from a model response.
+     *
+     * Mirrors iOS `ThinkingContentParser.extract`. Returns the user-facing
+     * display text (with the think block removed) and the captured thinking
+     * content (null when there's no `<think>` block).
+     */
+    private fun extractThinking(rawText: String): Pair<String, String?> {
+        val thinkStart = rawText.indexOf("<think>")
+        if (thinkStart < 0) return rawText.trim() to null
+        val thinkEnd = rawText.indexOf("</think>")
+        if (thinkEnd < 0) {
+            // Unterminated think block — strip the opening tag, leave the rest.
+            return rawText.replace("<think>", "").trim() to null
+        }
+        val thinking = rawText.substring(thinkStart + "<think>".length, thinkEnd).trim()
+        val display =
+            (rawText.substring(0, thinkStart) + rawText.substring(thinkEnd + "</think>".length))
+                .trim()
+        return display to thinking.takeIf { it.isNotEmpty() }
+    }
+
+    /**
+     * Pretty-print a JSON string so the tool-detail sheet shows readable
+     * arguments / results, matching iOS `RAToolValue.toJSONString(pretty: true)`.
+     * Falls back to the raw string when parsing fails so we never throw on
+     * a non-JSON payload.
+     */
+    private fun prettyJson(raw: String): String {
+        if (raw.isBlank()) return raw
+        return runCatching {
+            val element = PRETTY_JSON.parseToJsonElement(raw)
+            PRETTY_JSON.encodeToString(kotlinx.serialization.json.JsonElement.serializer(), element)
+        }.getOrDefault(raw)
+    }
+
+    /**
+     * When the model produces no follow-up text after running a tool, render
+     * a one-line natural-language summary so the chat doesn't appear stuck.
+     * The user can still tap the tool indicator for the full arguments +
+     * return value.
+     */
+    private fun synthesizeToolSummary(info: ToolCallInfo): String {
+        if (!info.success) {
+            return "Tool `${info.toolName}` failed${info.error?.let { ": $it" } ?: ""}."
+        }
+        return "Ran `${info.toolName}` — tap the tool indicator above to see the result."
     }
 
     /**
@@ -974,5 +1057,15 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             temperature = temperature,
             system_prompt = systemPrompt,
         )
+    }
+
+    private companion object {
+        /**
+         * Shared pretty-printer for tool-call arguments / results. iOS uses
+         * `RAToolValue.toJSONString(pretty: true)`; we mirror the indented
+         * shape so the tool-detail sheet renders the same payload format.
+         */
+        val PRETTY_JSON: kotlinx.serialization.json.Json =
+            kotlinx.serialization.json.Json { prettyPrint = true }
     }
 }

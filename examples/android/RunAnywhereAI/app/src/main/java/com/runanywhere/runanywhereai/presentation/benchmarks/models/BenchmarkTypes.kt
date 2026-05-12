@@ -9,9 +9,9 @@ import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.types.RAModelInfo
-import java.util.UUID
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.util.UUID
 
 // -- Benchmark Category --
 

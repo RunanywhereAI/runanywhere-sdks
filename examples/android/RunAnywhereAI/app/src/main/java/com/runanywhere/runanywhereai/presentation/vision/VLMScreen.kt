@@ -1,5 +1,7 @@
 package com.runanywhere.runanywhereai.presentation.vision
 
+import ai.runanywhere.proto.v1.ComponentLifecycleState
+import ai.runanywhere.proto.v1.SDKComponent
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
@@ -69,8 +71,6 @@ import com.runanywhere.runanywhereai.presentation.chat.components.ModelRequiredO
 import com.runanywhere.runanywhereai.presentation.components.ConfigureCustomTopBar
 import com.runanywhere.runanywhereai.presentation.models.ModelSelectionBottomSheet
 import com.runanywhere.runanywhereai.ui.theme.AppColors
-import ai.runanywhere.proto.v1.ComponentLifecycleState
-import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.componentLifecycleSnapshot
 import kotlinx.coroutines.launch

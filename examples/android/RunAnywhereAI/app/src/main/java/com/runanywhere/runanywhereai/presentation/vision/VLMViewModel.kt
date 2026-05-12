@@ -6,6 +6,8 @@ import ai.runanywhere.proto.v1.VLMImageFormat
 import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.net.Uri
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -25,9 +27,6 @@ import com.runanywhere.sdk.public.extensions.processImageStream
 import com.runanywhere.sdk.public.types.RASDKEvent
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
-import java.io.File
-import java.io.FileOutputStream
-import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -39,6 +38,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okio.ByteString.Companion.toByteString
 import timber.log.Timber
+import java.io.File
+import java.io.FileOutputStream
+import java.util.concurrent.Executors
 
 /**
  * UI state for VLM screen.
@@ -184,18 +186,29 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
      * Capture the latest camera frame as RGB bytes.
      * Mirrors iOS captureOutput delegate that stores currentFrame (CVPixelBuffer).
      *
-     * KOT-VLM-001 fix: route through `VLMImage.Companion.fromBitmap` so that
-     * Android handles `rowStride` / `pixelStride` internally via
-     * `Bitmap.getPixels`. The previous hand-rolled loop assumed
-     * `pixelStride == 4` and ignored row padding, which produced misaligned
-     * RGB / horizontal-shift artifacts on devices where the RGBA_8888 plane
-     * carries trailing row bytes. We still cache the packed RGB byte buffer
-     * (plus dimensions) because `describeCurrentFrame*` reuses it without
-     * re-reading the camera plane.
+     * Rotation: apply `imageProxy.imageInfo.rotationDegrees` before extracting
+     * pixels. With `LifecycleCameraController` + `OUTPUT_IMAGE_FORMAT_RGBA_8888`,
+     * `imageProxy.toBitmap()` returns the buffer in the sensor's native
+     * (landscape) orientation regardless of how the phone is being held — the
+     * rotation is reported separately on `ImageInfo` and is NOT baked into the
+     * pixel data. Skipping this step ships a 90/180/270-degree rotated frame
+     * to the VLM model, which then produces nonsense descriptions (e.g.
+     * "people" when pointing at a laptop). On iOS, `AVCaptureSession` already
+     * delivers BGRA frames aligned to the device orientation, so the iOS path
+     * needs no equivalent step. This brings Android into parity with that
+     * behavior.
+     *
+     * Stride safety: we then route through `VLMImage.Companion.fromBitmap`,
+     * which uses `Bitmap.getPixels()` — Android handles `rowStride` /
+     * `pixelStride` internally so the resulting RGB buffer is tightly packed
+     * (KOT-VLM-001).
      */
     private fun captureFrame(imageProxy: ImageProxy) {
         try {
-            val bitmap = imageProxy.toBitmap()
+            val raw = imageProxy.toBitmap()
+            val rotation = imageProxy.imageInfo.rotationDegrees
+            val bitmap = if (rotation == 0) raw else rotateBitmap(raw, rotation)
+
             val image = RAVLMImage.fromBitmap(bitmap)
             val rgb = image.raw_rgb?.toByteArray() ?: return
 
@@ -204,11 +217,27 @@ class VLMViewModel(application: Application) : AndroidViewModel(application) {
                 currentFrameWidth = bitmap.width
                 currentFrameHeight = bitmap.height
             }
+
+            if (bitmap !== raw) {
+                raw.recycle()
+            }
         } catch (e: Exception) {
             Timber.e("Frame capture failed: ${e.message}")
         } finally {
             imageProxy.close()
         }
+    }
+
+    /**
+     * Rotate a [Bitmap] by `degrees` (typically 90 / 180 / 270 as reported by
+     * CameraX's [ImageProxy.getImageInfo].rotationDegrees).
+     */
+    private fun rotateBitmap(
+        source: Bitmap,
+        degrees: Int,
+    ): Bitmap {
+        val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
+        return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
     }
 
     // DESCRIBE - Mirrors iOS describeCurrentFrame / describeImage

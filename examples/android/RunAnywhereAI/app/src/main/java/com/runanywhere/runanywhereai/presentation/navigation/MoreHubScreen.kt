@@ -31,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+
 import androidx.compose.ui.unit.dp
 import com.runanywhere.runanywhereai.presentation.components.ConfigureTopBar
 import com.runanywhere.runanywhereai.ui.theme.AppColors
@@ -38,12 +39,13 @@ import com.runanywhere.runanywhereai.ui.theme.Dimensions
 
 /**
  * More Hub Screen — matches iOS MoreHubView.
- * Contains additional utility features: STT, TTS, RAG.
+ * Contains additional utility features: STT, TTS, VAD, RAG.
  */
 @Composable
 fun MoreHubScreen(
     onNavigateToSTT: () -> Unit,
     onNavigateToTTS: () -> Unit,
+    onNavigateToVAD: () -> Unit,
     onNavigateToRAG: () -> Unit,
     onNavigateToBenchmarks: () -> Unit,
     onNavigateToLoraManager: () -> Unit = {},
@@ -67,21 +69,31 @@ fun MoreHubScreen(
         )
 
         MoreFeatureCard(
-            icon = Icons.Filled.GraphicEq,
-            iconColor = AppColors.featureBlue,
-            title = "Speech to Text",
-            subtitle = "Transcribe audio to text using on-device models",
-            onClick = onNavigateToSTT,
-        )
-
-        Spacer(modifier = Modifier.height(Dimensions.smallMedium))
-
-        MoreFeatureCard(
             icon = Icons.AutoMirrored.Filled.VolumeUp,
             iconColor = AppColors.featureGreen,
             title = "Text to Speech",
             subtitle = "Convert text to natural-sounding speech",
             onClick = onNavigateToTTS,
+        )
+
+        Spacer(modifier = Modifier.height(Dimensions.smallMedium))
+
+        MoreFeatureCard(
+            icon = Icons.Filled.GraphicEq,
+            iconColor = Color(0xFF00BCD4),
+            title = "Voice Activity Detection",
+            subtitle = "Detect speech activity in real-time on-device",
+            onClick = onNavigateToVAD,
+        )
+
+        Spacer(modifier = Modifier.height(Dimensions.smallMedium))
+
+        MoreFeatureCard(
+            icon = Icons.Filled.GraphicEq,
+            iconColor = AppColors.featureBlue,
+            title = "Speech to Text",
+            subtitle = "Transcribe audio to text using on-device models",
+            onClick = onNavigateToSTT,
         )
 
         Spacer(modifier = Modifier.height(Dimensions.xxLarge))

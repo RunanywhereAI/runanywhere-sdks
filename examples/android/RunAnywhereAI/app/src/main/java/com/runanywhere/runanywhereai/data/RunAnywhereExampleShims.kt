@@ -40,9 +40,7 @@ suspend fun RunAnywhere.getRegisteredFrameworks(): List<InferenceFramework> {
  * Calls the existing JNI surface
  * `RunAnywhereBridge.racRouterFrameworksForCapabilityProto` directly.
  */
-suspend fun RunAnywhere.getFrameworksForCapability(
-    capability: SDKComponent,
-): List<InferenceFramework> {
+suspend fun RunAnywhere.getFrameworksForCapability(capability: SDKComponent): List<InferenceFramework> {
     check(isInitialized) { "SDK not initialized" }
 
     val request = FrameworksForCapabilityRequest(component = capability)

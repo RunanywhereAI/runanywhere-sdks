@@ -26,9 +26,6 @@ import com.runanywhere.sdk.public.extensions.stopSynthesis
 import com.runanywhere.sdk.public.extensions.synthesize
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RATTSOptions
-import java.util.Locale
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,6 +38,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.util.Locale
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 private const val SYSTEM_TTS_MODEL_ID = "system-tts"
 
@@ -429,10 +431,23 @@ class TextToSpeechViewModel(
                             )
                         }
                     } else {
-                        // ONNX/Piper TTS returns audio data for playback
-                        Timber.i("✅ Speech generation complete: ${result.audio_data.toByteArray().size} bytes, duration: ${(result.duration_ms / 1000.0)}s")
+                        // ONNX/Piper TTS returns RAW FLOAT32 PCM (not WAV). The
+                        // proto's `sample_rate` field is the source of truth —
+                        // Piper VITS reports 22050 Hz; the WhisperKit/sherpa
+                        // backends may differ. iOS reads `output.sampleRate`
+                        // and feeds it into `rac_audio_float32_to_wav` (see
+                        // sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/TTS/RunAnywhere+TTS.swift#speak).
+                        val audioBytes = result.audio_data.toByteArray()
+                        val protoSampleRate =
+                            result.sample_rate.takeIf { it > 0 }
+                                ?: options.sample_rate.takeIf { it > 0 }
+                                ?: 22050
+                        Timber.i(
+                            "✅ Speech generation complete: ${audioBytes.size} bytes (float32 PCM), " +
+                                "sample_rate=$protoSampleRate Hz, duration=${(result.duration_ms / 1000.0)}s",
+                        )
 
-                        generatedAudioData = result.audio_data.toByteArray()
+                        generatedAudioData = audioBytes
 
                         _uiState.update {
                             it.copy(
@@ -440,8 +455,8 @@ class TextToSpeechViewModel(
                                 isSpeaking = false,
                                 hasGeneratedAudio = true,
                                 audioDuration = (result.duration_ms / 1000.0),
-                                audioSize = result.audio_data.toByteArray().size,
-                                sampleRate = null,
+                                audioSize = audioBytes.size,
+                                sampleRate = protoSampleRate,
                                 processingTimeMs = processingTime,
                             )
                         }
@@ -489,7 +504,13 @@ class TextToSpeechViewModel(
         playbackJob =
             viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    // Parse WAV header to extract actual audio parameters
+                    // Detect whether `audioData` is a complete WAV file or raw
+                    // PCM. The SDK's `RunAnywhere.synthesize()` returns RAW
+                    // FLOAT32 PCM (no header) — iOS converts that via
+                    // `rac_audio_float32_to_wav` before handing it to
+                    // AVAudioPlayer. We do the equivalent here: detect WAV
+                    // (legacy), else assume Float32 PCM at the proto-reported
+                    // sample rate, then convert to Int16 PCM for AudioTrack.
                     val isWav =
                         audioData.size > 44 &&
                             audioData[0] == 'R'.code.toByte() &&
@@ -498,7 +519,7 @@ class TextToSpeechViewModel(
                             audioData[3] == 'F'.code.toByte()
 
                     val sampleRate: Int
-                    val pcmOffset: Int
+                    val pcmData: ByteArray
 
                     if (isWav) {
                         // WAV header: bytes 24-27 = sample rate (little-endian uint32)
@@ -524,17 +545,24 @@ class TextToSpeechViewModel(
                             }
                             offset += 8 + chunkSize
                         }
-                        pcmOffset = if (dataStart > 0) dataStart else 44 // fallback for malformed files
+                        val pcmOffset = if (dataStart > 0) dataStart else 44
+                        pcmData = audioData.copyOfRange(pcmOffset, audioData.size)
                         Timber.i("WAV header: sampleRate=$sampleRate, pcmOffset=$pcmOffset")
                     } else {
+                        // Raw Float32 PCM straight from the SDK. The proto's
+                        // `sample_rate` (captured into uiState during synthesis)
+                        // is REQUIRED here — Piper VITS = 22050 Hz, sherpa
+                        // English voices may report different rates.
                         sampleRate = _uiState.value.sampleRate ?: 22050
-                        pcmOffset = 0
+                        pcmData = float32PcmToInt16Pcm(audioData)
+                        Timber.i(
+                            "Raw PCM: sampleRate=$sampleRate Hz, " +
+                                "float32 bytes=${audioData.size}, int16 bytes=${pcmData.size}",
+                        )
                     }
 
                     val channelConfig = AudioFormat.CHANNEL_OUT_MONO
                     val audioFormat = AudioFormat.ENCODING_PCM_16BIT
-
-                    val pcmData = audioData.copyOfRange(pcmOffset, audioData.size)
 
                     val bufferSize = AudioTrack.getMinBufferSize(sampleRate, channelConfig, audioFormat)
 
@@ -599,6 +627,32 @@ class TextToSpeechViewModel(
                     }
                 }
             }
+    }
+
+    /**
+     * Convert raw Float32 PCM bytes (little-endian, range [-1.0, 1.0]) to
+     * Int16 PCM bytes (little-endian) for AudioTrack `ENCODING_PCM_16BIT`.
+     *
+     * Mirrors the Float32→Int16 conversion done by
+     * `rac_audio_float32_to_wav` in
+     * `sdk/runanywhere-commons/src/core/rac_audio_utils.cpp` — same scaling
+     * (× 32767), same clamp range, same little-endian output layout. iOS uses
+     * that C helper directly via `convertPCMToWAV()`; on Android we do the
+     * conversion in Kotlin so the example app does not depend on internal
+     * SDK bridge symbols.
+     */
+    private fun float32PcmToInt16Pcm(floatBytes: ByteArray): ByteArray {
+        if (floatBytes.isEmpty()) return ByteArray(0)
+        val sampleCount = floatBytes.size / 4
+        val inBuf = ByteBuffer.wrap(floatBytes).order(ByteOrder.LITTLE_ENDIAN)
+        val out = ByteArray(sampleCount * 2)
+        val outBuf = ByteBuffer.wrap(out).order(ByteOrder.LITTLE_ENDIAN)
+        for (i in 0 until sampleCount) {
+            val sample = inBuf.float
+            val scaled = (sample * 32767.0f).coerceIn(-32768.0f, 32767.0f)
+            outBuf.putShort(scaled.toInt().toShort())
+        }
+        return out
     }
 
     /**

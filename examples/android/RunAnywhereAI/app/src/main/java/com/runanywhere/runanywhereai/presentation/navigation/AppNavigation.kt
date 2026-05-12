@@ -44,6 +44,7 @@ import com.runanywhere.runanywhereai.presentation.settings.SettingsScreen
 import com.runanywhere.runanywhereai.presentation.solutions.SolutionsScreen
 import com.runanywhere.runanywhereai.presentation.stt.SpeechToTextScreen
 import com.runanywhere.runanywhereai.presentation.tts.TextToSpeechScreen
+import com.runanywhere.runanywhereai.presentation.vad.VADScreen
 import com.runanywhere.runanywhereai.presentation.vision.VLMScreen
 import com.runanywhere.runanywhereai.presentation.vision.VisionHubScreen
 import com.runanywhere.runanywhereai.presentation.voice.VoiceAssistantScreen
@@ -171,6 +172,9 @@ fun AppNavigation() {
                         onNavigateToTTS = {
                             navController.navigate(NavigationRoute.TTS)
                         },
+                        onNavigateToVAD = {
+                            navController.navigate(NavigationRoute.VAD)
+                        },
                         onNavigateToRAG = {
                             navController.navigate(NavigationRoute.RAG)
                         },
@@ -194,6 +198,12 @@ fun AppNavigation() {
 
                 composable(NavigationRoute.TTS) {
                     TextToSpeechScreen(
+                        onBack = { navController.popBackStack() },
+                    )
+                }
+
+                composable(NavigationRoute.VAD) {
+                    VADScreen(
                         onBack = { navController.popBackStack() },
                     )
                 }
@@ -253,6 +263,7 @@ private fun routeToBottomNavTab(route: String?): BottomNavTab {
                 NavigationRoute.MORE,
                 NavigationRoute.STT,
                 NavigationRoute.TTS,
+                NavigationRoute.VAD,
                 NavigationRoute.RAG,
                 NavigationRoute.BENCHMARKS,
                 NavigationRoute.LORA_MANAGER,
@@ -281,6 +292,7 @@ object NavigationRoute {
     const val MORE = "more"
     const val STT = "stt"
     const val TTS = "tts"
+    const val VAD = "vad"
     const val RAG = "rag"
     const val BENCHMARKS = "benchmarks"
     const val BENCHMARK_DETAIL = "benchmark_detail"
