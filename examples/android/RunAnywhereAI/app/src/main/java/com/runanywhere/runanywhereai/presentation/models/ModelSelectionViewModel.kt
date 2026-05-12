@@ -13,6 +13,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.currentModel
+import com.runanywhere.sdk.public.extensions.downloadModel
 import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.types.RAModelInfo
@@ -258,70 +259,78 @@ class ModelSelectionViewModel(
     }
 
     /**
-     * Download model with progress
+     * Download a model via the proto-canonical SDK API:
      *
-     * TODO(B10-storage-cleanup): `RunAnywhere.downloadModel(id)` was removed in the
-     * B10 storage cleanup wave. The Kotlin SDK no longer exposes a public download
-     * extension — the iOS-parity `RunAnywhere+Storage.swift` surface (download
-     * planning/start/progress) has not yet been re-introduced on Kotlin. For now
-     * we listen for SDK-driven `MODEL_EVENT_KIND_DOWNLOAD_*` events (already wired
-     * via [subscribeToDownloadEvents]) but cannot kick off a download from here.
-     * Restore this call site once the storage-aligned download API ships.
+     *  1. `CppBridgeDownload.start(DownloadStartRequest)` kicks off the C++ download.
+     *  2. The SDK emits `MODEL_EVENT_KIND_DOWNLOAD_PROGRESS` / `_COMPLETED` events
+     *     which our [subscribeToDownloadEvents] handler updates the UI from.
+     *  3. On `DOWNLOAD_COMPLETED`, refresh the registry so the row flips to
+     *     "Downloaded".
+     *
+     * Mirrors the iOS path which calls `RunAnywhere.downloadModel(...)`. Kotlin's
+     * legacy `RunAnywhere.downloadModel(id)` convenience was deleted in B10; the
+     * canonical replacement is the proto API exposed via `CppBridgeDownload`.
      */
     fun startDownload(modelId: String) {
         viewModelScope.launch {
-            Timber.e(
-                "❌ startDownload($modelId) is a no-op: SDK download API removed " +
-                    "in B10 storage cleanup. Awaiting storage-aligned re-introduction.",
-            )
-
             _uiState.update {
                 it.copy(
                     selectedModelId = modelId,
                     isLoadingModel = true,
-                    loadingProgress = "Waiting for download…",
+                    loadingProgress = "Starting download…",
                 )
             }
 
-            // KOT-DOWNLOAD-001: Even without a kick-off API we can still observe
-            // the SDK's MODEL_EVENT_KIND_DOWNLOAD_COMPLETED event in case another
-            // surface starts the download. A 30s timeout falls through to a
-            // graceful UI reset so the spinner does not hang forever.
-            val completed =
-                withTimeoutOrNull(30_000L) {
-                    EventBus.events
-                        .mapNotNull { it.model }
-                        .filter {
-                            it.model_id == modelId &&
-                                it.kind == ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED
-                        }
-                        .first()
-                }
-            if (completed == null) {
-                Timber.w(
-                    "⏱️ No DOWNLOAD_COMPLETED event for $modelId within 30s — the " +
-                        "Kotlin SDK no longer has a public download trigger.",
-                )
+            val model = try {
+                RunAnywhere.listModels(ai.runanywhere.proto.v1.ModelListRequest())
+                    .models?.models?.firstOrNull { it.id == modelId }
+            } catch (_: Throwable) {
+                null
+            }
+
+            if (model == null) {
                 _uiState.update {
                     it.copy(
                         isLoadingModel = false,
                         selectedModelId = null,
                         loadingProgress = "",
-                        error = "Download API unavailable in this build",
+                        error = "Model not in registry: $modelId",
                     )
                 }
                 return@launch
             }
 
-            // Reload models after download completes
-            loadModelsAndFrameworks()
-
-            _uiState.update {
-                it.copy(
-                    isLoadingModel = false,
-                    selectedModelId = null,
-                    loadingProgress = "",
-                )
+            try {
+                RunAnywhere.downloadModel(model).collect { progress ->
+                    val pct =
+                        if (progress.total_bytes > 0) {
+                            (progress.bytes_downloaded.toDouble() / progress.total_bytes * 100).toInt()
+                        } else {
+                            ((progress.stage_progress).coerceIn(0f, 1f) * 100).toInt()
+                        }
+                    _uiState.update {
+                        it.copy(loadingProgress = "Downloading… $pct%")
+                    }
+                }
+                Timber.i("✅ Download complete for $modelId")
+                loadModelsAndFrameworks()
+                _uiState.update {
+                    it.copy(
+                        isLoadingModel = false,
+                        selectedModelId = null,
+                        loadingProgress = "",
+                    )
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "❌ Download failed for $modelId")
+                _uiState.update {
+                    it.copy(
+                        isLoadingModel = false,
+                        selectedModelId = null,
+                        loadingProgress = "",
+                        error = e.message ?: "Download failed",
+                    )
+                }
             }
         }
     }

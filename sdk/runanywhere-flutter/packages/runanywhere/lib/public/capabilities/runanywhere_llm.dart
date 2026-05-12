@@ -325,6 +325,18 @@ class RunAnywhereLLM {
           callback!.nativeFunction,
           ffi.nullptr,
         );
+        // FLUTTER-IOS-001 fix: `rac_llm_generate_stream_proto` is a blocking
+        // synchronous FFI call. While it runs, the main isolate's event loop
+        // is frozen, so `NativeCallable.listener` invocations queue up but do
+        // not execute. The terminal event (`event.isFinal`) — which closes the
+        // controller — therefore arrives ASYNCHRONOUSLY after `fn()` returns.
+        // We must yield to the event loop here to let those queued callbacks
+        // drain before deciding whether to force-close the controller. Without
+        // this, the controller is closed before any tokens reach subscribers
+        // (manifesting as a silent stream hang on the example app).
+        for (var i = 0; i < 4 && !sawTerminalEvent; i++) {
+          await Future<void>.delayed(Duration.zero);
+        }
         if (rc != RacResultCode.success && !controller.isClosed) {
           controller.addError(StateError(
             'rac_llm_generate_stream_proto failed: '

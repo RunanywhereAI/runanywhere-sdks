@@ -554,7 +554,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
 
     // Look up the Kotlin class + method we need to call.
     jclass local_cls =
-        env->FindClass("com/runanywhere/sdk/foundation/http/OkHttpTransport");
+        env->FindClass("com/runanywhere/sdk/httptransport/OkHttpHttpTransport");
     if (local_cls == nullptr) {
         LOGe("racHttpTransportRegisterOkHttp: OkHttpTransport class not found");
         if (env->ExceptionCheck()) env->ExceptionClear();
@@ -568,11 +568,11 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
     }
 
     // Signature: (Ljava/lang/String; Ljava/lang/String; [Ljava/lang/String; [B J)
-    //            Lcom/runanywhere/sdk/foundation/http/OkHttpTransport$HttpResponse;
+    //            Lcom/runanywhere/sdk/httptransport/OkHttpHttpTransport$HttpResponse;
     g.execute_request_mid = env->GetStaticMethodID(
         g.transport_cls, "executeRequest",
         "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[BJ)"
-        "Lcom/runanywhere/sdk/foundation/http/OkHttpTransport$HttpResponse;");
+        "Lcom/runanywhere/sdk/httptransport/OkHttpHttpTransport$HttpResponse;");
     if (g.execute_request_mid == nullptr) {
         LOGe("racHttpTransportRegisterOkHttp: executeRequest method not found");
         if (env->ExceptionCheck()) env->ExceptionClear();
@@ -586,7 +586,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
     g.execute_streaming_request_mid = env->GetStaticMethodID(
         g.transport_cls, "executeStreamingRequest",
         "(Ljava/lang/String;Ljava/lang/String;[Ljava/lang/String;[BJJJ)"
-        "Lcom/runanywhere/sdk/foundation/http/OkHttpTransport$StreamResponse;");
+        "Lcom/runanywhere/sdk/httptransport/OkHttpHttpTransport$StreamResponse;");
     if (g.execute_streaming_request_mid == nullptr) {
         LOGe("racHttpTransportRegisterOkHttp: executeStreamingRequest method not found");
         if (env->ExceptionCheck()) env->ExceptionClear();
@@ -598,7 +598,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
 
     // Cache the HttpResponse class + field IDs.
     jclass local_resp_cls =
-        env->FindClass("com/runanywhere/sdk/foundation/http/OkHttpTransport$HttpResponse");
+        env->FindClass("com/runanywhere/sdk/httptransport/OkHttpHttpTransport$HttpResponse");
     if (local_resp_cls == nullptr) {
         LOGe("racHttpTransportRegisterOkHttp: HttpResponse class not found");
         if (env->ExceptionCheck()) env->ExceptionClear();
@@ -631,7 +631,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportRegiste
 
     // Cache the StreamResponse class + field IDs (R3: streaming path).
     jclass local_sr_cls =
-        env->FindClass("com/runanywhere/sdk/foundation/http/OkHttpTransport$StreamResponse");
+        env->FindClass("com/runanywhere/sdk/httptransport/OkHttpHttpTransport$StreamResponse");
     if (local_sr_cls == nullptr) {
         LOGe("racHttpTransportRegisterOkHttp: StreamResponse class not found");
         if (env->ExceptionCheck()) env->ExceptionClear();
@@ -711,7 +711,7 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racHttpTransportUnregis
 // forward the bytes. Return false to tell Kotlin to cancel the call.
 // -----------------------------------------------------------------------------
 JNIEXPORT jboolean JNICALL
-Java_com_runanywhere_sdk_foundation_http_OkHttpTransport_deliverChunkNative(
+Java_com_runanywhere_sdk_httptransport_OkHttpHttpTransport_deliverChunkNative(
     JNIEnv* env, jclass /*clazz*/, jlong native_callback, jlong native_user_data,
     jbyteArray chunk, jint chunk_len, jlong total_written, jlong content_length) {
     if (native_callback == 0 || chunk == nullptr || chunk_len <= 0) {

@@ -3,8 +3,13 @@ package com.runanywhere.runanywhereai.data
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelFileDescriptor
+import ai.runanywhere.proto.v1.ModelInfo
 import ai.runanywhere.proto.v1.ModelListRequest
+import ai.runanywhere.proto.v1.MultiFileArtifact
+import ai.runanywhere.proto.v1.SingleFileArtifact
 import com.runanywhere.sdk.core.onnx.ONNX
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.listModels
@@ -149,39 +154,54 @@ object ModelBootstrap {
     }
 
     private fun tryRegisterSingle(m: SingleFileModel): Boolean {
-        val modelId = m.id
-        Timber.w("registerModel disabled (B10 cleanup): $modelId — relying on C++ registry self-discovery")
-        // TODO(B10): registerModel/registerMultiFileModel APIs were removed; the C++ commons
-        // registry now self-discovers models via racModelRegistryDiscoverProto at SDK init.
-        // Original arguments preserved here in case explicit seeding is ever restored:
-        //   RunAnywhere.registerModel(
-        //       id = m.id,
-        //       name = m.name,
-        //       url = m.url,
-        //       framework = m.framework,
-        //       modality = m.category,
-        //       memoryRequirement = m.memoryBytes,
-        //       supportsLora = m.supportsLora,
-        //       supportsThinking = m.supportsThinking,
-        //   )
-        return true
+        return try {
+            val info = ModelInfo(
+                id = m.id,
+                name = m.name,
+                download_url = m.url,
+                framework = m.framework,
+                category = m.category,
+                memory_required_bytes = m.memoryBytes,
+                supports_lora = m.supportsLora,
+                supports_thinking = m.supportsThinking,
+                single_file = SingleFileArtifact(),
+            )
+            CppBridgeModelRegistry.save(info)
+            true
+        } catch (e: Exception) {
+            Timber.e(e, "tryRegisterSingle failed: ${m.id}")
+            false
+        }
     }
 
     private fun tryRegisterMultiFile(m: MultiFileModel): Boolean {
-        val modelId = m.id
-        Timber.w("registerModel disabled (B10 cleanup): $modelId — relying on C++ registry self-discovery")
-        // TODO(B10): registerMultiFileModel API was removed; the C++ commons registry now
-        // self-discovers models via racModelRegistryDiscoverProto at SDK init.
-        // Original arguments preserved here in case explicit seeding is ever restored:
-        //   RunAnywhere.registerMultiFileModel(
-        //       id = m.id,
-        //       name = m.name,
-        //       files = m.files.map { ModelFileDescriptor(url = it.first, filename = it.second) },
-        //       framework = m.framework,
-        //       modality = m.category,
-        //       memoryRequirement = m.memoryBytes,
-        //   )
-        return true
+        return try {
+            val descriptors = m.files.mapIndexed { idx, (url, filename) ->
+                ModelFileDescriptor(
+                    url = url,
+                    filename = filename,
+                    is_required = true,
+                    role = if (idx == 0) {
+                        ai.runanywhere.proto.v1.ModelFileRole.MODEL_FILE_ROLE_PRIMARY_MODEL
+                    } else {
+                        ai.runanywhere.proto.v1.ModelFileRole.MODEL_FILE_ROLE_COMPANION
+                    },
+                )
+            }
+            val info = ModelInfo(
+                id = m.id,
+                name = m.name,
+                framework = m.framework,
+                category = m.category,
+                memory_required_bytes = m.memoryBytes,
+                multi_file = MultiFileArtifact(files = descriptors),
+            )
+            CppBridgeModelRegistry.save(info)
+            true
+        } catch (e: Exception) {
+            Timber.e(e, "tryRegisterMultiFile failed: ${m.id}")
+            false
+        }
     }
 
     private fun refreshNativeCatalog() {

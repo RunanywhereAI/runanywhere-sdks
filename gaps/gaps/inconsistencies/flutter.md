@@ -10,7 +10,7 @@ Structurally the Flutter SDK is clean post-Wave-4 + Wave-B: 4 directory renames,
 
 Skip scope: `runanywhere_genie` package is deferred; do not file items about it being incomplete.
 
-## A. Open R2 e2e bugs (2 remaining of 4 original)
+## A. Open R2 e2e bugs (post 20260511-215717-flutter-e2e)
 
 <table>
 <tr><th>ID</th><th>Severity</th><th>Lane</th><th>Summary</th><th>Root cause</th><th>Fix owner</th></tr>
@@ -18,17 +18,33 @@ Skip scope: `runanywhere_genie` package is deferred; do not file items about it 
   <td><code>FLT-E2E-R2-002</code></td>
   <td>HIGH</td>
   <td>05 Flutter Android</td>
-  <td><code>DartBridge</code> emits 7 783 <code>InvalidProtocolBufferException</code> while decoding <code>DownloadProgress</code>; UI stalls at 91 %.</td>
+  <td><code>DartBridge</code> emits 7 783 <code>InvalidProtocolBufferException</code> while decoding <code>DownloadProgress</code>; UI stalls at 91 %. Still open.</td>
   <td>C++ ring-slot lifetime in <code>download_orchestrator.cpp:475-504</code> — <code>std::string&amp;</code> is overwritten before the Dart callback finishes serializing. NOT a Dart-side bug; wire format is bit-exact.</td>
   <td>C++ commons team (tracked as CPP-E2E-R2-004)</td>
 </tr>
 <tr>
-  <td><code>FLT-E2E-R2-003</code></td>
+  <td><code>FLUTTER-IOS-001</code></td>
   <td>HIGH</td>
   <td>06 Flutter iOS</td>
-  <td><code>rac_model_format_from_url_proto</code> and <code>rac_artifact_infer_from_url_proto</code> miss <code>dlsym</code> on every catalog entry.</td>
-  <td>Shipped xcframeworks timestamped May 4 17:15 predate commit <code>7ac5db254</code> (May 4 23:06) which landed the <code>.cpp</code> implementations. Rebuild via <code>./scripts/build-core-xcframework.sh</code>.</td>
-  <td>Build pipeline</td>
+  <td>LLM streaming hang — LFM2-350M loads cleanly but <code>generateStream</code> emits zero tokens for 5+ minutes at 0% CPU. Reproduced twice in this E2E run.</td>
+  <td>TBD — likely Dart-side callback registration ordering OR iOS XCFramework missing <code>rac_llm_set_stream_proto_callback</code> export.</td>
+  <td>Flutter Dart (or Flutter+commons)</td>
+</tr>
+<tr>
+  <td><code>FLUTTER-IOS-002</code> / <code>FLUTTER-ANDROID-002</code></td>
+  <td>HIGH</td>
+  <td>both lanes (05 + 06)</td>
+  <td>System TTS load fails: <code>no backend route supports requested model for framework platform</code>. Cross-SDK commons-side gap.</td>
+  <td>C++ router does not register a route for <code>framework=platform</code> despite the platform adapter being initialized.</td>
+  <td>Commons (cross-SDK)</td>
+</tr>
+<tr>
+  <td><code>FLUTTER-IOS-003</code></td>
+  <td>HIGH</td>
+  <td>06 Flutter iOS</td>
+  <td>Piper TTS download succeeds, but app process terminates silently immediately after <code>Loading TTS voice: vits-piper-en_US-lessac-medium</code>. No Apple DiagnosticReport produced.</td>
+  <td>Likely silent C++ abort inside sherpa-onnx (Piper integration).</td>
+  <td>sherpa-onnx / commons</td>
 </tr>
 </table>
 
@@ -47,6 +63,12 @@ Skip scope: `runanywhere_genie` package is deferred; do not file items about it 
   <td>W2 example-app workaround still live (500 ms post-download wait).</td>
   <td><code>examples/flutter/RunAnywhereAI/lib/app/runanywhere_ai_app.dart:145</code></td>
   <td>Deferred per user — example-app only, not SDK code.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><code>FLUTTER-ANDROID-001</code> / <code>FLUTTER-ANDROID-003</code> — Android <code>librac_commons.so</code> is <strong>stale</strong> relative to current Dart code: missing <code>rac_sdk_init_phase{1,2}_proto</code> symbols (Dart falls back to legacy <code>rac_sdk_init</code> gracefully); commons router rejects <code>framework=llamacpp</code> + <code>framework=platform</code> despite <code>rac_backend_llamacpp_register()</code> returning Success.</td>
+  <td><code>packages/runanywhere{,_llamacpp,_onnx}/android/src/main/jniLibs/{abi}/librac_commons.so</code></td>
+  <td>Run <code>./scripts/build-core-android.sh</code> + re-stage <code>.so</code> into <code>packages/*/android/src/main/jniLibs/</code>.</td>
 </tr>
 </table>
 
@@ -87,7 +109,7 @@ For audit trail. All items below are CLOSED on the working tree (uncommitted).
 - **T6** — `DartBridge.initialize()` migrated to proto path (`rac_sdk_init_phase1_proto` + `phase2_proto`); legacy `rac_sdk_init` + `RacSdkConfigStruct` init path deleted from `dart_bridge.dart` (−43 LOC + new proto envelope logging).
 - **T7** — `dart_bridge_model_registry.dart` discovery migrated to `rac_model_registry_discover_proto`; legacy struct + 5 callbacks deleted (−185 LOC).
 - **T8** — `extractStructuredOutput` moved to `RunAnywhereLLM` instance method (matches Swift §5.4.1.4); `runanywhere_thinking_utils.dart` slimmed 107→74 LOC; kept thinking-token parsers.
-- **W6** — iOS `protoAvailable()` forced-false workaround — not found in source code; already resolved in an earlier wave.
+- **W6** — iOS `protoAvailable()` forced-false workaround — not found in source code; already resolved in an earlier wave. Re-confirmed by 20260511-215717-flutter-e2e (see Bug fixes (R2) below).
 
 ### File renames (4)
 
@@ -158,7 +180,10 @@ For audit trail. All items below are CLOSED on the working tree (uncommitted).
 ### Bug fixes (R2)
 
 - `FLT-E2E-R2-001`: NDK fallback bumped 25.2.9519653 → 27.0.12077973 in all 4 `android/build.gradle` files. CLOSED.
-- `FLT-E2E-R2-004`: `HttpClientException` now wrapped in `SDKException.authenticationFailed` in `dart_bridge_auth.dart`. CLOSED.
+- `FLT-E2E-R2-003`: Confirmed resolved by 20260511-215717-flutter-e2e — symbols `rac_model_format_from_url_proto` and `rac_artifact_infer_from_url_proto` are present in the current iOS xcframework. Evidence: no "unavailable" warnings observed in `test_workflows/logs/20260511-215717-flutter-e2e/06_flutter_ios/logs/ios_live.log`. CLOSED.
+- `FLT-E2E-R2-004`: `HttpClientException` now wrapped in `SDKException.authenticationFailed` in `dart_bridge_auth.dart`. Confirmed working in 20260511-215717-flutter-e2e — HTTP `-151` errors are surfaced via `SDKException.authenticationFailed`. Evidence: log line `[WARNING] [RunAnywhere.Init] Authentication error (non-critical): SDKException(ERROR_CODE_AUTHENTICATION_FAILED)` at 22:02:28 in both lanes. CLOSED.
+- `FLUTTER-IOS-005`: `RABackendSherpa.xcframework` added to `runanywhere_onnx.podspec` `vendored_frameworks` during 20260511-215717-flutter-e2e. Working-tree fix, uncommitted. CLOSED.
+- `W6` (confirmed): iOS `protoAvailable()` forced-false workaround verified absent in source code (re-checked during this E2E run). CLOSED.
 
 ### Native plumbing alignment
 
