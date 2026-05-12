@@ -8,9 +8,12 @@
 
 package com.runanywhere.sdk.public
 
-import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.CppBridge
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
+import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.public.configuration.SDKEnvironment
 import com.runanywhere.sdk.public.events.EventBus
 
 private const val TAG = "PlatformBridge"
@@ -82,3 +85,19 @@ internal actual fun shutdownPlatformBridge() {
 fun configureTelemetryBaseUrl(baseUrl: String) {
     CppBridgeTelemetry.setBaseUrl(baseUrl)
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Auth + device-state actuals — route directly through `rac_auth_*` and
+// CppBridgeDevice thunks. No Kotlin-side cache.
+// ═══════════════════════════════════════════════════════════════════════════
+
+internal actual fun platformGetUserId(): String? = RunAnywhereBridge.racAuthGetUserId()
+
+internal actual fun platformGetOrganizationId(): String? = RunAnywhereBridge.racAuthGetOrganizationId()
+
+internal actual fun platformIsAuthenticated(): Boolean = RunAnywhereBridge.racAuthIsAuthenticated()
+
+internal actual fun platformIsDeviceRegistered(): Boolean = CppBridgeDevice.isRegistered()
+
+internal actual fun platformDeviceId(): String =
+    CppBridgeDevice.getDeviceId() ?: RunAnywhereBridge.racAuthGetDeviceId() ?: ""

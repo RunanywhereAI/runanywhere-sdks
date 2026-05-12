@@ -16,13 +16,15 @@ import com.runanywhere.runanywhereai.domain.services.AudioCaptureService
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.events.ModelEvent
+import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.componentLifecycleSnapshot
-import com.runanywhere.sdk.public.extensions.currentSTTModel
-import com.runanywhere.sdk.public.extensions.currentSTTModelId
-import com.runanywhere.sdk.public.extensions.loadSTTModel
+import com.runanywhere.sdk.public.extensions.currentModel
+import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.transcribe
 import com.runanywhere.sdk.public.extensions.transcribeStream
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RASTTOptions
 import java.io.ByteArrayOutputStream
 import kotlin.math.log10
@@ -100,7 +102,7 @@ data class STTUiState(
  * iOS Reference: STTViewModel in STTViewModel.swift
  *
  * This ViewModel manages:
- * - Model loading via RunAnywhere.loadSTTModel()
+ * - Model loading via RunAnywhere.loadModel(RAModelLoadRequest)
  * - Recording state management with AudioCaptureService
  * - Transcription via RunAnywhere.transcribe()
  * - Audio level monitoring for UI visualization
@@ -251,9 +253,12 @@ class SpeechToTextViewModel : ViewModel() {
             sttSnapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
                 sttSnapshot.model_id.isNotEmpty()
         if (isLoaded) {
-            val currentModel = RunAnywhere.currentSTTModel()
-            val modelId = RunAnywhere.currentSTTModelId
-            val displayName = currentModel?.name ?: modelId
+            val currentSTT =
+                RunAnywhere.currentModel(
+                    CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION),
+                )
+            val modelId = currentSTT.model_id.takeIf { it.isNotEmpty() }
+            val displayName = currentSTT.model?.name ?: modelId
             _uiState.update {
                 it.copy(
                     isModelLoaded = true,
@@ -324,8 +329,13 @@ class SpeechToTextViewModel : ViewModel() {
             try {
                 Timber.i("Loading STT model: $modelName (id: $modelId)")
 
-                // Use SDK's loadSTTModel extension function
-                RunAnywhere.loadSTTModel(modelId)
+                // Use SDK's canonical proto-backed loadModel API
+                RunAnywhere.loadModel(
+                    RAModelLoadRequest(
+                        model_id = modelId,
+                        category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+                    ),
+                )
 
                 _uiState.update {
                     it.copy(

@@ -11,7 +11,7 @@
 package com.runanywhere.sdk.public.extensions
 
 import ai.runanywhere.proto.v1.SolutionConfig
-import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
@@ -28,16 +28,6 @@ actual class SolutionHandle internal constructor(
 
     actual val isAlive: Boolean
         get() = handleRef.get() != 0L
-
-    actual suspend fun start() {
-        val h = requireHandle()
-        withContext(Dispatchers.IO) {
-            val rc = RunAnywhereBridge.racSolutionStart(h)
-            if (rc != RunAnywhereBridge.RAC_SUCCESS) {
-                throw SDKException.operation("rac_solution_start failed with rc=$rc")
-            }
-        }
-    }
 
     actual suspend fun stop() {
         val h = requireHandle()
@@ -65,16 +55,6 @@ actual class SolutionHandle internal constructor(
             val rc = RunAnywhereBridge.racSolutionFeed(h, input)
             if (rc != RunAnywhereBridge.RAC_SUCCESS) {
                 throw SDKException.operation("rac_solution_feed failed with rc=$rc")
-            }
-        }
-    }
-
-    actual suspend fun closeInput() {
-        val h = requireHandle()
-        withContext(Dispatchers.IO) {
-            val rc = RunAnywhereBridge.racSolutionCloseInput(h)
-            if (rc != RunAnywhereBridge.RAC_SUCCESS) {
-                throw SDKException.operation("rac_solution_close_input failed with rc=$rc")
             }
         }
     }

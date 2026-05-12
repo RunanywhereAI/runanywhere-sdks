@@ -8,10 +8,11 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkMet
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkScenario
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.loadSTTModel
+import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.transcribe
 import com.runanywhere.sdk.public.extensions.unloadModel
 import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RASTTOptions
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -38,7 +39,12 @@ class STTBenchmarkProvider : BenchmarkScenarioProvider {
 
         // Load
         val loadStart = System.nanoTime()
-        RunAnywhere.loadSTTModel(model.id)
+        RunAnywhere.loadModel(
+            RAModelLoadRequest(
+                model_id = model.id,
+                category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+            ),
+        )
         val loadTimeMs = (System.nanoTime() - loadStart) / 1_000_000.0
 
         try {

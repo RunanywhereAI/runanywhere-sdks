@@ -12,12 +12,9 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.StructuredOutputMode
 import ai.runanywhere.proto.v1.StructuredOutputOptions
 import ai.runanywhere.proto.v1.StructuredOutputParseRequest
-import ai.runanywhere.proto.v1.StructuredOutputPromptResult
 import ai.runanywhere.proto.v1.StructuredOutputRequest
 import ai.runanywhere.proto.v1.StructuredOutputStreamEvent
 import ai.runanywhere.proto.v1.StructuredOutputStreamEventKind
-import ai.runanywhere.proto.v1.StructuredOutputValidation
-import ai.runanywhere.proto.v1.StructuredOutputValidationRequest
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeStructuredOutput
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
@@ -66,13 +63,15 @@ actual suspend fun RunAnywhere.generateWithStructuredOutput(
         )
     if (structuredOutput.include_schema_in_prompt) {
         val promptResult =
-            prepareStructuredOutputPrompt(
-                StructuredOutputRequest(
-                    request_id = UUID.randomUUID().toString(),
-                    prompt = prompt,
-                    options = structuredOutput,
-                ),
-            )
+            withContext(Dispatchers.IO) {
+                CppBridgeStructuredOutput.preparePrompt(
+                    StructuredOutputRequest(
+                        request_id = UUID.randomUUID().toString(),
+                        prompt = prompt,
+                        options = structuredOutput,
+                    ),
+                )
+            }
         if (promptResult.error_code != 0) {
             throw SDKException.operation(
                 promptResult.error_message
@@ -148,24 +147,6 @@ actual fun RunAnywhere.generateStructuredStream(
     }.flowOn(Dispatchers.IO)
 }
 
-actual suspend fun RunAnywhere.prepareStructuredOutputPrompt(
-    request: StructuredOutputRequest,
-): StructuredOutputPromptResult {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    return withContext(Dispatchers.IO) {
-        CppBridgeStructuredOutput.preparePrompt(request)
-    }
-}
-
-actual suspend fun RunAnywhere.validateStructuredOutput(
-    request: StructuredOutputValidationRequest,
-): StructuredOutputValidation {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    return withContext(Dispatchers.IO) {
-        CppBridgeStructuredOutput.validate(request)
-    }
-}
-
 private data class StructuredGenerationPlan(
     val prompt: String,
     val structuredOptions: StructuredOutputOptions,
@@ -186,13 +167,15 @@ private suspend fun RunAnywhere.prepareGeneration(
             mode = StructuredOutputMode.STRUCTURED_OUTPUT_MODE_JSON_SCHEMA,
         )
     val promptResult =
-        prepareStructuredOutputPrompt(
-            StructuredOutputRequest(
-                request_id = requestId,
-                prompt = prompt,
-                options = initialStructuredOptions,
-            ),
-        )
+        withContext(Dispatchers.IO) {
+            CppBridgeStructuredOutput.preparePrompt(
+                StructuredOutputRequest(
+                    request_id = requestId,
+                    prompt = prompt,
+                    options = initialStructuredOptions,
+                ),
+            )
+        }
     if (promptResult.error_code != 0) {
         throw SDKException.operation(
             promptResult.error_message

@@ -14,18 +14,8 @@ package com.runanywhere.sdk.public.extensions
 import ai.runanywhere.proto.v1.STTStreamEvent
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RASTTOptions
-import com.runanywhere.sdk.public.types.RATranscriptionResult
+import com.runanywhere.sdk.public.types.RASTTOutput
 import kotlinx.coroutines.flow.Flow
-
-// MARK: - Model Loading
-
-/**
- * Get the currently loaded STT model ID.
- *
- * This is a synchronous property that returns the ID of the currently loaded STT model,
- * or null if no model is loaded.
- */
-expect val RunAnywhere.currentSTTModelId: String?
 
 // MARK: - Transcription
 
@@ -39,7 +29,7 @@ expect val RunAnywhere.currentSTTModelId: String?
 expect suspend fun RunAnywhere.transcribe(
     audio: ByteArray,
     options: RASTTOptions = RASTTOptions(),
-): RATranscriptionResult
+): RASTTOutput
 
 // MARK: - Streaming Transcription
 

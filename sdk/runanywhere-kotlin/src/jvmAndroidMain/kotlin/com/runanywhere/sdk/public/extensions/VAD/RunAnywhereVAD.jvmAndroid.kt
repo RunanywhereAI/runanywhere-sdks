@@ -7,21 +7,15 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
-import ai.runanywhere.proto.v1.ModelUnloadRequest
-import ai.runanywhere.proto.v1.VADConfiguration
 import ai.runanywhere.proto.v1.VADOptions
-import ai.runanywhere.proto.v1.VADStatistics
 import ai.runanywhere.proto.v1.VADStreamEvent
 import ai.runanywhere.proto.v1.VADStreamEventKind
-import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeVAD
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RAVADOptions
 import com.runanywhere.sdk.public.types.RAVADResult
 import kotlinx.coroutines.channels.trySendBlocking
@@ -56,7 +50,7 @@ actual suspend fun RunAnywhere.detectVoiceActivity(
 actual fun RunAnywhere.streamVAD(
     audioSamples: Flow<FloatArray>,
     options: RAVADOptions,
-): Flow<VADStreamEvent> =
+): Flow<RAVADResult> =
     channelFlow {
         if (!isInitialized) {
             throw SDKException.notInitialized("SDK not initialized")
@@ -65,7 +59,8 @@ actual fun RunAnywhere.streamVAD(
         // Ensure the native VAD component exists; the stream callback is
         // registered per-handle and C++ drives the event envelope (seq,
         // timestamp_us, request_id, kind) via dispatch_vad_stream_event.
-        CppBridgeVAD.create()
+        // We surface only the per-frame VADResult to match Swift
+        // `streamVAD(audio:)` which yields one RAVADResult per chunk.
         val handle = CppBridgeVAD.getHandle()
 
         val listener =
@@ -77,11 +72,13 @@ actual fun RunAnywhere.streamVAD(
                         close(t)
                         return@NativeProtoProgressListener false
                     }
-                event.statistics?.let { vadStatisticsCallback?.invoke(it) }
-                    ?: event.result?.let {
-                        vadStatisticsCallback?.invoke(VADStatistics(current_energy = it.energy))
-                    }
-                trySendBlocking(event)
+                // Only forward FRAME envelopes that carry a VADResult;
+                // STARTED/STOPPED/STATISTICS/ERROR transitions are
+                // internal stream lifecycle and not surfaced through the
+                // RAVADResult contract.
+                if (event.kind == VADStreamEventKind.VAD_STREAM_EVENT_KIND_FRAME) {
+                    event.result?.let { trySendBlocking(it) }
+                }
                 true
             }
 
@@ -104,7 +101,6 @@ actual fun RunAnywhere.streamVAD(
 
         try {
             audioSamples.collect { samples ->
-                vadAudioBufferCallback?.invoke(samples)
                 val pcmBytes = samples.toPcm16LeBytes()
                 val feedRc =
                     RunAnywhereBridge.racVadStreamFeedAudioProto(sessionId, pcmBytes)
@@ -122,13 +118,6 @@ actual fun RunAnywhere.streamVAD(
             RunAnywhereBridge.racVadSetStreamProtoCallback(handle, null)
         }
     }
-
-actual suspend fun RunAnywhere.calibrateVAD(ambientAudioData: ByteArray) {
-    if (!isInitialized) {
-        throw SDKException.notInitialized("SDK not initialized")
-    }
-    CppBridgeVAD.process(ambientAudioData.toFloatArray(), RAVADOptions())
-}
 
 actual suspend fun RunAnywhere.resetVAD() {
     if (!isInitialized) {
@@ -166,111 +155,4 @@ private fun FloatArray.toPcm16LeBytes(): ByteArray {
         byteIndex += 2
     }
     return bytes
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Phase 4a — VAD lifecycle parity with Swift's RunAnywhere+VAD.swift
-// Backed by CppBridgeVAD (which owns the native handle + state).
-// ─────────────────────────────────────────────────────────────────────────────
-
-@Volatile private var vadAudioBufferCallback: ((FloatArray) -> Unit)? = null
-
-@Volatile private var vadSpeechActivityCallback: ((VADStreamEventKind) -> Unit)? = null
-
-/**
- * Internal helper: initialize VAD with optional configuration.
- *
- * Per Swift parity, public API does not expose initializeVAD; the VAD
- * component is created lazily on first use. This helper is kept for callers
- * inside the SDK that need to seed configuration eagerly.
- */
-internal suspend fun RunAnywhere.initializeVADInternal(configuration: VADConfiguration? = null) {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    // Ensure native VAD component exists. CppBridgeVAD.create is idempotent.
-    CppBridgeVAD.create()
-    if (configuration != null) {
-        CppBridgeVAD.configure(configuration)
-    }
-}
-
-actual suspend fun RunAnywhere.isVADReady(): Boolean {
-    if (!isInitialized) return false
-    return CppBridgeVAD.isReady
-}
-
-actual suspend fun RunAnywhere.startVAD() {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    // No explicit start verb in CppBridgeVAD — readiness is "loaded model";
-    // mirror Swift behaviour (start() forwards to C++ which is a no-op when
-    // already ready).
-    CppBridgeVAD.create()
-}
-
-actual suspend fun RunAnywhere.stopVAD() {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    CppBridgeVAD.cancel()
-}
-
-actual suspend fun RunAnywhere.setVADSpeechActivityCallback(
-    callback: (VADStreamEventKind) -> Unit,
-) {
-    vadSpeechActivityCallback = callback
-    // Keep the Swift-parity setter until commons exposes a native
-    // VADStreamEvent stream ABI; the current JNI activity callback emits only
-    // SpeechActivityEvent bytes, not the public stream envelope.
-}
-
-actual suspend fun RunAnywhere.setVADAudioBufferCallback(callback: (FloatArray) -> Unit) {
-    vadAudioBufferCallback = callback
-}
-
-actual suspend fun RunAnywhere.cleanupVAD() {
-    if (!isInitialized) return
-    unloadModel(ModelUnloadRequest(category = ProtoModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION))
-    vadAudioBufferCallback = null
-    vadSpeechActivityCallback = null
-}
-
-actual suspend fun RunAnywhere.loadVADModel(modelId: String) {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    val model = model(modelId) ?: throw SDKException.modelNotFound(modelId)
-    val localPath = model.local_path.takeIf { it.isNotEmpty() } ?: throw SDKException.modelNotLoaded(modelId)
-    val result =
-        loadModel(
-            RAModelLoadRequest(
-                model_id = modelId,
-                category = ProtoModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
-                framework = model.framework,
-            ),
-        )
-    if (!result.success) {
-        throw SDKException.modelLoadFailed(
-            modelId,
-            result.error_message.ifBlank { "Failed to load VAD model from $localPath" },
-        )
-    }
-}
-
-actual suspend fun RunAnywhere.currentVADModelId(): String? =
-    currentModel(
-        CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION),
-    ).model_id.takeIf { it.isNotEmpty() }
-
-actual suspend fun RunAnywhere.detectSpeech(audioData: ByteArray): Boolean {
-    val result = detectVoiceActivity(audioData)
-    vadStatisticsCallback?.invoke(
-        VADStatistics(
-            current_energy = result.energy,
-            ambient_level = 0f,
-            recent_avg = 0f,
-            recent_max = 0f,
-        ),
-    )
-    return result.is_speech
-}
-
-@Volatile private var vadStatisticsCallback: ((VADStatistics) -> Unit)? = null
-
-actual fun RunAnywhere.setVADStatisticsCallback(callback: (VADStatistics) -> Unit) {
-    vadStatisticsCallback = callback
 }

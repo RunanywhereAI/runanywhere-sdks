@@ -1,6 +1,20 @@
 /*
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * CppBridgeTTS.kt
+ *
+ * TTS component bridge — manages C++ TTS component lifecycle and the
+ * proto-canonical `rac_tts_*_proto` C ABI.
+ *
+ * All generic scaffolding (handle creation, isLoaded, loadVoice, unload,
+ * destroy) lives in [ComponentActor]; this object only adds the
+ * TTS-specific surfaces (`voices`, `synthesize`, `synthesizeStream`,
+ * `stop`) on top. The vtable's `loadModel` slot is the C ABI's
+ * `rac_tts_component_load_voice` — TTS calls it "voice", the actor calls
+ * it "asset" — semantically identical.
+ *
+ * Mirrors Swift `Foundation/Bridge/Extensions/CppBridge+TTS.swift` (W3-3).
  */
 
 package com.runanywhere.sdk.foundation.bridge.extensions
@@ -8,7 +22,8 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 import ai.runanywhere.proto.v1.TTSOptions
 import ai.runanywhere.proto.v1.TTSOutput
 import ai.runanywhere.proto.v1.TTSVoiceInfo
-import com.runanywhere.sdk.foundation.bridge.CppBridge
+import com.runanywhere.sdk.foundation.bridge.ComponentActor
+import com.runanywhere.sdk.foundation.bridge.ComponentVTable
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -37,61 +52,63 @@ private fun checkRc(rc: Int, operation: String) {
 }
 
 /**
- * Mirrors Swift CppBridge+TTS.swift. Wraps `rac_tts_*_proto` C ABI.
+ * Mirrors Swift `Foundation/Bridge/Extensions/CppBridge+TTS.swift`. Wraps
+ * `rac_tts_*_proto` C ABI. Handle lifecycle lives in [inner].
  */
 object CppBridgeTTS {
-    @Volatile
-    private var handle: Long = 0L
+    /** Generic scaffold (handle / isLoaded / loadVoice / unload / destroy). */
+    internal val inner = ComponentActor(ComponentVTable.tts)
 
-    private val lock = Any()
+    // MARK: - Handle Management
 
-    @Throws(SDKException::class)
-    fun getHandle(): Long {
-        synchronized(lock) {
-            if (handle == 0L) create()
-            if (handle == 0L) {
-                throw SDKException.notInitialized("TTS component not created")
-            }
-            return handle
-        }
+    /** Get or create the TTS component handle. */
+    suspend fun getHandle(): Long = inner.getHandle()
+
+    // MARK: - State
+
+    /** Currently-loaded voice id, or null. */
+    val currentVoiceId: String?
+        get() = inner.currentAssetId
+
+    // MARK: - Voice Lifecycle
+
+    /**
+     * Load a TTS voice. Routes through the canonical lifecycle proto path
+     * (the vtable's `loadModel` slot is the C ABI's
+     * `rac_tts_component_load_voice`).
+     */
+    suspend fun loadVoice(voicePath: String, voiceId: String, voiceName: String) {
+        inner.loadModel(path = voicePath, id = voiceId, name = voiceName)
     }
 
-    fun create(): Int {
-        synchronized(lock) {
-            if (handle != 0L) return 0
-            if (!CppBridge.isNativeLibraryLoaded) {
-                throw SDKException.notInitialized(
-                    "Native library not available. Please ensure the native libraries are bundled in your APK.",
-                )
-            }
-            val result =
-                try {
-                    RunAnywhereBridge.racTtsComponentCreate()
-                } catch (e: UnsatisfiedLinkError) {
-                    throw SDKException.notInitialized(
-                        "TTS native library not available: ${e.message}",
-                    )
-                }
-            if (result == 0L) return -1
-            handle = result
-            return 0
-        }
+    /** Unload the current voice. */
+    suspend fun unload() {
+        inner.unload()
     }
 
-    fun destroy() {
-        synchronized(lock) {
-            if (handle == 0L) return
-            RunAnywhereBridge.racTtsComponentDestroy(handle)
-            handle = 0L
-        }
+    // MARK: - Cleanup
+
+    /** Destroy the component. */
+    suspend fun destroy() {
+        inner.destroy()
     }
 
-    fun voices(): List<TTSVoiceInfo> {
-        create()
+    // MARK: - TTS-specific operations
+
+    /** Stop any in-flight synthesis. No-op if the handle is not created. */
+    suspend fun stop() {
+        val handle = inner.existingHandle()
+        if (handle == 0L) return
+        RunAnywhereBridge.racTtsComponentCancel(handle)
+    }
+
+    /** Enumerate the voices available to the loaded TTS backend. */
+    suspend fun voices(): List<TTSVoiceInfo> {
+        val handle = inner.getHandle()
         val voices = mutableListOf<TTSVoiceInfo>()
         val rc =
             RunAnywhereBridge.racTtsComponentListVoicesProto(
-                getHandle(),
+                handle,
                 NativeProtoProgressListener { bytes ->
                     voices += TTSVoiceInfo.ADAPTER.decode(bytes)
                     true
@@ -101,12 +118,13 @@ object CppBridgeTTS {
         return voices
     }
 
-    fun synthesize(text: String, options: RATTSOptions): RATTSOutput {
-        create()
+    /** One-shot synthesis. */
+    suspend fun synthesize(text: String, options: RATTSOptions): RATTSOutput {
+        val handle = inner.getHandle()
         return decodeOrThrow(
             TTSOutput.ADAPTER,
             RunAnywhereBridge.racTtsComponentSynthesizeProto(
-                getHandle(),
+                handle,
                 text,
                 TTSOptions.ADAPTER.encode(options),
             ),
@@ -114,15 +132,19 @@ object CppBridgeTTS {
         )
     }
 
-    fun synthesizeStream(
+    /**
+     * Streaming synthesis. Native emits canonical [TTSOutput] envelopes;
+     * Kotlin simply decodes and forwards.
+     */
+    suspend fun synthesizeStream(
         text: String,
         options: RATTSOptions,
         onChunk: (RATTSOutput) -> Boolean,
     ) {
-        create()
+        val handle = inner.getHandle()
         val rc =
             RunAnywhereBridge.racTtsComponentSynthesizeStreamProto(
-                getHandle(),
+                handle,
                 text,
                 TTSOptions.ADAPTER.encode(options),
                 NativeProtoProgressListener { bytes ->

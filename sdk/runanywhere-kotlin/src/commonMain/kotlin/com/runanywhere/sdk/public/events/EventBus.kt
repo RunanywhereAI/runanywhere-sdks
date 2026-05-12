@@ -19,7 +19,7 @@ import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_RAG
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_SDK
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_STT
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_TTS
-import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow

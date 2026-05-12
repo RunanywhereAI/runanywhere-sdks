@@ -13,8 +13,8 @@ package com.runanywhere.sdk.public.extensions
 
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.LLM.RunAnywhereToolCalling
 import com.runanywhere.sdk.public.extensions.LLM.ToolCall
+import com.runanywhere.sdk.public.extensions.LLM.ToolCallingOrchestrator
 import com.runanywhere.sdk.public.extensions.LLM.ToolDefinition
 import com.runanywhere.sdk.public.extensions.LLM.ToolExecutor
 import com.runanywhere.sdk.public.extensions.LLM.ToolResult
@@ -24,22 +24,22 @@ import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RALLMGenerationResult
 
 actual suspend fun RunAnywhere.registerTool(definition: ToolDefinition, executor: ToolExecutor) {
-    RunAnywhereToolCalling.registerTool(definition, executor)
+    ToolCallingOrchestrator.registerTool(definition, executor)
 }
 
 actual suspend fun RunAnywhere.unregisterTool(toolName: String) {
-    RunAnywhereToolCalling.unregisterTool(toolName)
+    ToolCallingOrchestrator.unregisterTool(toolName)
 }
 
 actual suspend fun RunAnywhere.getRegisteredTools(): List<ToolDefinition> =
-    RunAnywhereToolCalling.getRegisteredTools()
+    ToolCallingOrchestrator.getRegisteredTools()
 
 actual suspend fun RunAnywhere.clearTools() {
-    RunAnywhereToolCalling.clearTools()
+    ToolCallingOrchestrator.clearTools()
 }
 
 actual suspend fun RunAnywhere.executeTool(toolCall: ToolCall): ToolResult =
-    RunAnywhereToolCalling.executeTool(toolCall)
+    ToolCallingOrchestrator.executeTool(toolCall)
 
 actual suspend fun RunAnywhere.generateWithTools(
     prompt: String,
@@ -47,6 +47,6 @@ actual suspend fun RunAnywhere.generateWithTools(
 ): RALLMGenerationResult {
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     val toolOptions = options.toToolCallingOptions()
-    val toolResult = RunAnywhereToolCalling.generateWithTools(prompt, toolOptions)
+    val toolResult = ToolCallingOrchestrator.generateWithTools(prompt, toolOptions)
     return toolResult.toLLMGenerationResult()
 }

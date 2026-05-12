@@ -9,7 +9,7 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeLLM
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 private val llmLogger = SDKLogger.llm
 
@@ -62,11 +63,11 @@ actual fun RunAnywhere.generateStream(
             }
         awaitClose {
             driver.cancel()
-            CppBridgeLLM.cancel()
+            runBlocking { CppBridgeLLM.cancel() }
         }
     }.flowOn(Dispatchers.IO)
 }
 
 actual fun RunAnywhere.cancelGeneration() {
-    CppBridgeLLM.cancel()
+    runBlocking { CppBridgeLLM.cancel() }
 }

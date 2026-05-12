@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.core.onnx
 
-import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhereModule
 
 /**

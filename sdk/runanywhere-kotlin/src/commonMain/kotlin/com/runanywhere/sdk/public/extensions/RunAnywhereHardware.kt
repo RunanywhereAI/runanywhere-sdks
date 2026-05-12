@@ -5,13 +5,19 @@
  * Public API for hardware profile — namespaced as `RunAnywhere.hardware.*`
  * per CANONICAL_API.md §14.
  *
- * Round 2 KOTLIN: Implements the hardware namespace that was CPP-BLOCKED in
- * Round 1. The C++ round 1 fix added `rac_hardware_profile_get` and
- * hardware_profile.proto — this file wires the Kotlin surface.
+ * Mirrors Swift `RunAnywhere+Hardware.swift` exactly:
+ *   - getProfile()              -> HardwareProfileResult
+ *   - getAccelerators()         -> List<AcceleratorInfo>
+ *   - setAcceleratorPreference(pref)
+ *
+ * Apple-only / Android-only chip / NPU / acceleration-mode probes live in
+ * `CppBridgeHardware` (platform fallbacks) and are not part of the public
+ * surface — they were removed in W1-K2-6 to match Swift's narrow API.
  */
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.AcceleratorInfo
 import ai.runanywhere.proto.v1.AccelerationPreference
 import ai.runanywhere.proto.v1.HardwareProfileResult
 import com.runanywhere.sdk.public.RunAnywhere
@@ -28,8 +34,9 @@ import com.runanywhere.sdk.public.RunAnywhere
  * Example:
  * ```kotlin
  * val hw = RunAnywhere.hardware
- * println("Chip: ${hw.getChip()}")
- * if (hw.hasNeuralEngine) println("NPU available")
+ * val profile = hw.getProfile()
+ * val accelerators = hw.getAccelerators()
+ * hw.setAcceleratorPreference(AccelerationPreference.ACCELERATION_PREFERENCE_GPU)
  * ```
  */
 expect class Hardware {
@@ -41,23 +48,23 @@ expect class Hardware {
     fun getProfile(): HardwareProfileResult
 
     /**
-     * Short chip / SoC name (e.g. "Apple M4 Pro", "Snapdragon 8 Gen 3").
+     * Get available accelerators as generated proto data.
      *
-     * @return Chip name string, or "Unknown" if not available
+     * Mirrors Swift `RunAnywhere.hardware.getAccelerators()`.
+     *
+     * @return list of [AcceleratorInfo] entries for the current device.
      */
-    fun getChip(): String
+    suspend fun getAccelerators(): List<AcceleratorInfo>
 
     /**
-     * Whether the device has a dedicated neural processing unit.
-     */
-    val hasNeuralEngine: Boolean
-
-    /**
-     * Active hardware acceleration mode.
+     * Set the preferred accelerator for subsequent routing / inference calls.
      *
-     * @return Mode string (e.g. "NPU", "GPU", "CPU", "Unknown")
+     * Mirrors Swift `RunAnywhere.hardware.setAcceleratorPreference(_:)`.
+     *
+     * @param pref The [AccelerationPreference] to apply to future engine
+     *             routing decisions.
      */
-    val accelerationMode: String
+    suspend fun setAcceleratorPreference(pref: AccelerationPreference)
 }
 
 // ---------------------------------------------------------------------------
@@ -68,24 +75,3 @@ expect class Hardware {
  * Namespace accessor for hardware profile operations.
  */
 expect val RunAnywhere.hardware: Hardware
-
-// ---------------------------------------------------------------------------
-// Top-level accelerator probe — mirrors Swift `Hardware.supportsAccelerator`
-// ---------------------------------------------------------------------------
-
-/**
- * Check whether the device exposes the requested hardware accelerator.
- *
- * Reads the current [HardwareProfileResult] via [Hardware.getProfile] and
- * returns `true` when an [ai.runanywhere.proto.v1.AcceleratorInfo] entry
- * matches both the requested [accelerator] type and is reported as
- * `available`.
- *
- * Mirrors Swift's accelerator-probe surface; the canonical
- * [AccelerationPreference] enum (defined in `hardware_profile.proto`) is
- * shared across SDKs.
- *
- * @param accelerator The accelerator type to probe (NPU, GPU, METAL, …).
- * @return `true` when the requested accelerator is present and available.
- */
-expect suspend fun RunAnywhere.supportsAccelerator(accelerator: AccelerationPreference): Boolean

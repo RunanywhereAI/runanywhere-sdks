@@ -14,7 +14,7 @@
 
 package com.runanywhere.sdk.llm.llamacpp
 
-import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 
 /**
  * Native bridge for LlamaCPP backend registration.

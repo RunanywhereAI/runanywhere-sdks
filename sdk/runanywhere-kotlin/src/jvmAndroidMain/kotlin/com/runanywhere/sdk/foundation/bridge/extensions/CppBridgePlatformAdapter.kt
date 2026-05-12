@@ -10,7 +10,7 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
-import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.errors.CommonsErrorCode
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import java.io.File
@@ -49,7 +49,8 @@ object CppBridgePlatformAdapter {
 
     /**
      * Platform-specific storage delegate. MUST be set before any secure-storage
-     * callback is invoked. On Android, use [setContext] which installs an
+     * callback is invoked. On Android, use `setContext` (defined in
+     * `com.runanywhere.sdk.foundation.security`) which installs an
      * AndroidKeyStore-backed implementation.
      */
     @Volatile
@@ -66,7 +67,7 @@ object CppBridgePlatformAdapter {
      * reference to a jvmMain-only class.
      */
     private const val JVM_SECURE_STORAGE_CLASS =
-        "com.runanywhere.sdk.foundation.bridge.extensions.JvmSecureStorage"
+        "com.runanywhere.sdk.foundation.security.JvmKeychainManager"
 
     /**
      * Android runtime marker class; used to detect whether the SDK is running
@@ -117,7 +118,7 @@ object CppBridgePlatformAdapter {
             val instance = ctor.newInstance()
             instance as? PlatformSecureStorage
         } catch (e: Throwable) {
-            logCallback(LogLevel.DEBUG, TAG, "JvmSecureStorage auto-install skipped: ${e.message}")
+            logCallback(LogLevel.DEBUG, TAG, "JvmKeychainManager auto-install skipped: ${e.message}")
             null
         }
     }
@@ -138,7 +139,7 @@ object CppBridgePlatformAdapter {
 
     /**
      * Set the platform-specific storage implementation.
-     * On Android, this should be called with an AndroidSecureStorage instance.
+     * On Android, this should be called with an AndroidKeychainManager instance.
      *
      * @param storage The platform storage implementation
      */

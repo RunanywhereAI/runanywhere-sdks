@@ -14,7 +14,7 @@
 
 package com.runanywhere.sdk.native.bridge
 
-import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 
 /*
  * Transport DTOs/listeners used by native HTTP bindings live in
@@ -86,6 +86,23 @@ object RunAnywhereBridge {
     external fun racIsInitialized(): Boolean
 
     // ========================================================================
+    // ERROR MAPPING (rac_error_proto.h)
+    // ========================================================================
+
+    /**
+     * Map a `rac_result_t` integer to the proto-serialized bytes of the
+     * canonical `SDKError`. Wraps the commons C ABI
+     * `rac_result_to_proto_error`, the single source of truth shared by
+     * every platform SDK.
+     *
+     * @param rcResult The `rac_result_t` integer returned by a native call.
+     * @return Wire-encoded `SDKError` bytes, or null on `RAC_SUCCESS` or on
+     *         a commons-side mapping error.
+     */
+    @JvmStatic
+    external fun racResultToProtoError(rcResult: Int): ByteArray?
+
+    // ========================================================================
     // PLATFORM ADAPTER (rac_platform_adapter.h)
     // ========================================================================
 
@@ -138,6 +155,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racLlmComponentDestroy(handle: Long)
 
+    // PENDING — wired for future feature (lifecycle-style cancel; Kotlin currently routes through racLlmCancelProto)
     @JvmStatic
     external fun racLlmComponentCancel(handle: Long): Int
 
@@ -260,6 +278,7 @@ object RunAnywhereBridge {
     @JvmStatic
     external fun racVadComponentGetStatisticsProto(handle: Long): ByteArray?
 
+    // CALLBACK_TARGET — invoked from C++ via JNI (per-handle voice-activity callback registration)
     @JvmStatic
     external fun racVadComponentSetActivityProtoCallback(
         handle: Long,
@@ -315,6 +334,20 @@ object RunAnywhereBridge {
 
     @JvmStatic
     external fun racVlmCancelProto(handle: Long): Int
+
+    /**
+     * Lifecycle-style cancel (Wave 7 / T23, mirrors Swift's
+     * `rac_vlm_cancel_lifecycle_proto`). The lifecycle ABI acquires the
+     * lifecycle-owned VLM service internally and emits canonical
+     * `CANCELLATION_EVENT_KIND_*` SDKEvents — no handle threaded.
+     *
+     * Returns the encoded `SDKEvent` proto on success, or `null` on
+     * failure (e.g. no lifecycle VLM loaded). Symbol may not yet be
+     * implemented in `librunanywhere_jni.so`; callers must catch
+     * `UnsatisfiedLinkError` and fall back to the handle-based path.
+     */
+    @JvmStatic
+    external fun racVlmCancelLifecycleProto(): ByteArray?
 
     @JvmStatic
     external fun racVlmDestroy(handle: Long)
@@ -511,6 +544,7 @@ object RunAnywhereBridge {
      * @param sampleRate Sample rate in Hz (e.g., 22050 for Piper TTS)
      * @return WAV file data as ByteArray, or null on error
      */
+    // UTILITY — used from JNI helpers but not directly from Kotlin
     @JvmStatic
     external fun racAudioFloat32ToWav(pcmData: ByteArray, sampleRate: Int): ByteArray?
 
@@ -521,6 +555,7 @@ object RunAnywhereBridge {
      * @param sampleRate Sample rate in Hz
      * @return WAV file data as ByteArray, or null on error
      */
+    // UTILITY — used from JNI helpers but not directly from Kotlin
     @JvmStatic
     external fun racAudioInt16ToWav(pcmData: ByteArray, sampleRate: Int): ByteArray?
 
@@ -529,6 +564,7 @@ object RunAnywhereBridge {
      *
      * @return WAV header size (always 44 bytes for standard PCM WAV)
      */
+    // UTILITY — used from JNI helpers but not directly from Kotlin
     @JvmStatic
     external fun racAudioWavHeaderSize(): Int
 
@@ -546,6 +582,7 @@ object RunAnywhereBridge {
      * - setRegistered(registered: Boolean)
      * - httpPost(endpoint: String, body: String, requiresAuth: Boolean): Int (status code)
      */
+    // CALLBACK_TARGET — invoked from C++ via JNI (device-manager callback registration)
     @JvmStatic
     external fun racDeviceManagerSetCallbacks(callbacks: Any): Int
 
@@ -560,18 +597,21 @@ object RunAnywhereBridge {
     /**
      * Check if device is registered.
      */
+    // PENDING — wired for future feature (no current Kotlin caller; covered by racDeviceManagerSetCallbacks state)
     @JvmStatic
     external fun racDeviceManagerIsRegistered(): Boolean
 
     /**
      * Clear device registration status.
      */
+    // PENDING — wired for future feature (no current Kotlin caller)
     @JvmStatic
     external fun racDeviceManagerClearRegistration()
 
     /**
      * Get the current device ID.
      */
+    // PENDING — wired for future feature (Kotlin uses CppBridgeDevice.getDeviceId / racAuthGetDeviceId)
     @JvmStatic
     external fun racDeviceManagerGetDeviceId(): String?
 
@@ -634,6 +674,7 @@ object RunAnywhereBridge {
      *                        Pass 0 to unregister the callback
      * @return RAC_SUCCESS or error code
      */
+    // CALLBACK_TARGET — invoked from C++ via JNI (analytics → telemetry callback registration)
     @JvmStatic
     external fun racAnalyticsEventsSetCallback(telemetryHandle: Long): Int
 
@@ -641,6 +682,7 @@ object RunAnywhereBridge {
      * Emit a download/extraction event.
      * Maps to rac_analytics_model_download_t struct in C++.
      */
+    // CALLBACK_TARGET — invoked from C++ via JNI (telemetry emission entry point)
     @JvmStatic
     external fun racAnalyticsEventEmitDownload(
         eventType: Int,
@@ -659,6 +701,7 @@ object RunAnywhereBridge {
      * Emit an SDK lifecycle event.
      * Maps to rac_analytics_sdk_lifecycle_t struct in C++.
      */
+    // CALLBACK_TARGET — invoked from C++ via JNI (telemetry emission entry point)
     @JvmStatic
     external fun racAnalyticsEventEmitSdkLifecycle(
         eventType: Int,
@@ -672,6 +715,7 @@ object RunAnywhereBridge {
      * Emit a storage event.
      * Maps to rac_analytics_storage_t struct in C++.
      */
+    // CALLBACK_TARGET — invoked from C++ via JNI (telemetry emission entry point)
     @JvmStatic
     external fun racAnalyticsEventEmitStorage(
         eventType: Int,
@@ -684,6 +728,7 @@ object RunAnywhereBridge {
      * Emit a device event.
      * Maps to rac_analytics_device_t struct in C++.
      */
+    // CALLBACK_TARGET — invoked from C++ via JNI (telemetry emission entry point)
     @JvmStatic
     external fun racAnalyticsEventEmitDevice(
         eventType: Int,
@@ -696,6 +741,7 @@ object RunAnywhereBridge {
      * Emit an SDK error event.
      * Maps to rac_analytics_sdk_error_t struct in C++.
      */
+    // CALLBACK_TARGET — invoked from C++ via JNI (telemetry emission entry point)
     @JvmStatic
     external fun racAnalyticsEventEmitSdkError(
         eventType: Int,
@@ -709,6 +755,7 @@ object RunAnywhereBridge {
      * Emit a network event.
      * Maps to rac_analytics_network_t struct in C++.
      */
+    // CALLBACK_TARGET — invoked from C++ via JNI (telemetry emission entry point)
     @JvmStatic
     external fun racAnalyticsEventEmitNetwork(
         eventType: Int,
@@ -719,6 +766,7 @@ object RunAnywhereBridge {
      * Emit an LLM generation event.
      * Maps to rac_analytics_llm_generation_t struct in C++.
      */
+    // CALLBACK_TARGET — invoked from C++ via JNI (telemetry emission entry point)
     @JvmStatic
     external fun racAnalyticsEventEmitLlmGeneration(
         eventType: Int,
@@ -743,6 +791,7 @@ object RunAnywhereBridge {
      * Emit an LLM model event.
      * Maps to rac_analytics_llm_model_t struct in C++.
      */
+    // CALLBACK_TARGET — invoked from C++ via JNI (telemetry emission entry point)
     @JvmStatic
     external fun racAnalyticsEventEmitLlmModel(
         eventType: Int,
@@ -759,6 +808,7 @@ object RunAnywhereBridge {
      * Emit an STT transcription event.
      * Maps to rac_analytics_stt_transcription_t struct in C++.
      */
+    // CALLBACK_TARGET — invoked from C++ via JNI (telemetry emission entry point)
     @JvmStatic
     external fun racAnalyticsEventEmitSttTranscription(
         eventType: Int,
@@ -784,6 +834,7 @@ object RunAnywhereBridge {
      * Emit a TTS synthesis event.
      * Maps to rac_analytics_tts_synthesis_t struct in C++.
      */
+    // CALLBACK_TARGET — invoked from C++ via JNI (telemetry emission entry point)
     @JvmStatic
     external fun racAnalyticsEventEmitTtsSynthesis(
         eventType: Int,
@@ -805,6 +856,7 @@ object RunAnywhereBridge {
      * Emit a VAD event.
      * Maps to rac_analytics_vad_t struct in C++.
      */
+    // CALLBACK_TARGET — invoked from C++ via JNI (telemetry emission entry point)
     @JvmStatic
     external fun racAnalyticsEventEmitVad(
         eventType: Int,
@@ -884,12 +936,14 @@ object RunAnywhereBridge {
     // Mirrors Swift SDK's CppBridge+ToolCalling.swift
     // ========================================================================
 
+    // PENDING — wired for future feature (parser exposed for downstream tool-call UX work)
     @JvmStatic
     external fun racToolCallParseProto(requestProto: ByteArray): ByteArray?
 
     @JvmStatic
     external fun racToolCallFormatPromptProto(requestProto: ByteArray): ByteArray?
 
+    // PENDING — wired for future feature (schema validation exposed for downstream tool-call UX work)
     @JvmStatic
     external fun racToolCallValidateProto(requestProto: ByteArray): ByteArray?
 
@@ -1050,6 +1104,7 @@ object RunAnywhereBridge {
      * metadata, audio_data + encoding) and emits a canonical VoiceEvent
      * stream through the listener. Returns rac_result_t.
      */
+    // PENDING — wired for future feature (Kotlin currently uses racVoiceAgentProcessVoiceTurnProto)
     @JvmStatic
     external fun racVoiceAgentProcessTurnProto(
         handle: Long,
@@ -1061,6 +1116,7 @@ object RunAnywhereBridge {
      * Wave D-7 / KOT-11: Transcribe via the voice-agent's STT component.
      * Accepts serialized VoiceAgentTranscribeRequest; returns VoiceAgentTranscribeResult bytes.
      */
+    // PENDING — wired for future feature (Kotlin currently routes through STT component thunks)
     @JvmStatic
     external fun racVoiceAgentTranscribeProto(handle: Long, requestBytes: ByteArray): ByteArray?
 
@@ -1068,6 +1124,7 @@ object RunAnywhereBridge {
      * Wave D-7 / KOT-11: Synthesize via the voice-agent's TTS component.
      * Accepts serialized VoiceAgentSynthesizeSpeechRequest; returns VoiceAgentSynthesizeSpeechResult bytes.
      */
+    // PENDING — wired for future feature (Kotlin currently routes through TTS component thunks)
     @JvmStatic
     external fun racVoiceAgentSynthesizeSpeechProto(handle: Long, requestBytes: ByteArray): ByteArray?
 
@@ -1124,6 +1181,7 @@ object RunAnywhereBridge {
     @JvmStatic external fun racSolutionCreateFromYaml(yamlText: String): Long
 
     /** Start the underlying scheduler (non-blocking). Returns rac_result_t. */
+    // PENDING — wired for future feature (solution scheduler not yet driven from Kotlin)
     @JvmStatic external fun racSolutionStart(handle: Long): Int
 
     /** Request a graceful shutdown (non-blocking). Returns rac_result_t. */
@@ -1136,6 +1194,7 @@ object RunAnywhereBridge {
     @JvmStatic external fun racSolutionFeed(handle: Long, item: String): Int
 
     /** Close the root input edge (signal end-of-stream). Returns rac_result_t. */
+    // PENDING — wired for future feature (no current Kotlin caller)
     @JvmStatic external fun racSolutionCloseInput(handle: Long): Int
 
     /** Cancel, join, and destroy the solution. Always safe; null handle is a no-op. */
@@ -1147,10 +1206,12 @@ object RunAnywhereBridge {
 
     @JvmStatic external fun racEmbeddingsCreate(modelId: String): Long
 
+    // PENDING — wired for future feature (Kotlin currently uses racEmbeddingsCreate only)
     @JvmStatic external fun racEmbeddingsCreateWithConfig(modelId: String, configJson: String?): Long
 
     @JvmStatic external fun racEmbeddingsEmbedBatchProto(handle: Long, requestProto: ByteArray): ByteArray?
 
+    // PENDING — wired for future feature (no explicit destroy call from Kotlin yet)
     @JvmStatic external fun racEmbeddingsDestroy(handle: Long)
 
     // ========================================================================
@@ -1174,32 +1235,6 @@ object RunAnywhereBridge {
 
     /** Get serialized RAGStatistics proto bytes. Null on error. */
     @JvmStatic external fun racRagStatsProto(handle: Long): ByteArray?
-
-    // ========================================================================
-    // DIFFUSION GENERATED-PROTO ABI (rac_diffusion_service.h)
-    // ========================================================================
-
-    @JvmStatic external fun racDiffusionCreate(modelIdOrPath: String): Long
-
-    @JvmStatic external fun racDiffusionInitialize(handle: Long, modelPath: String): Int
-
-    /** Generate an image. Returns serialized DiffusionResult proto bytes, or null on error. */
-    @JvmStatic external fun racDiffusionGenerateProto(handle: Long, optionsBytes: ByteArray): ByteArray?
-
-    /** Generate an image with serialized DiffusionProgress callbacks. */
-    @JvmStatic external fun racDiffusionGenerateWithProgressProto(
-        handle: Long,
-        optionsBytes: ByteArray,
-        listener: NativeProtoProgressListener?,
-    ): ByteArray?
-
-    /** Cancel ongoing image generation. */
-    @JvmStatic external fun racDiffusionCancelProto(handle: Long): Int
-
-    @JvmStatic external fun racDiffusionDestroy(handle: Long)
-
-    /** Get the service capability bitmask; no generated-proto getter exists yet. */
-    @JvmStatic external fun racDiffusionGetCapabilitiesMask(handle: Long): Int
 
     // ========================================================================
     // LORA GENERATED-PROTO ABI (rac_lora_service.h)
@@ -1346,13 +1381,16 @@ object RunAnywhereBridge {
     @JvmStatic external fun racAuthReset()
 
     /** Clear all auth state including secure storage (if wired). */
+    // PENDING — wired for future feature (no current Kotlin caller; covered by racAuthReset for in-memory state)
     @JvmStatic external fun racAuthClear()
 
     /** Restore tokens from secure storage. Returns 0 on success, -1 if
      *  not found or storage callbacks not wired. */
+    // PENDING — wired for future feature (secure-storage rehydration path; not yet wired in Kotlin)
     @JvmStatic external fun racAuthLoadStoredTokens(): Int
 
     /** Persist current tokens to secure storage. Returns 0 on success. */
+    // PENDING — wired for future feature (secure-storage persistence path; not yet wired in Kotlin)
     @JvmStatic external fun racAuthSaveTokens(): Int
 
     @JvmStatic external fun racAuthIsAuthenticated(): Boolean
@@ -1440,6 +1478,7 @@ object RunAnywhereBridge {
     /** Resolve the ordered list of frameworks that can serve a given SDKComponent.
      *  Input: serialized FrameworksForCapabilityRequest.
      *  Output: serialized FrameworksForCapabilityResponse, or null on failure. */
+    // PENDING — wired for future feature (capability → framework query not yet driven from Kotlin)
     @JvmStatic external fun racRouterFrameworksForCapabilityProto(requestProto: ByteArray): ByteArray?
 
     // ========================================================================

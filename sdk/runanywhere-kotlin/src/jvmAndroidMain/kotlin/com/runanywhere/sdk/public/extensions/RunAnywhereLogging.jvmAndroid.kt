@@ -7,35 +7,18 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.public.RunAnywhere
 
 // Internal log level state
 @Volatile
 private var currentLogLevel: LogLevel = LogLevel.INFO
 
-// File logging state
-@Volatile
-private var fileLoggingEnabled: Boolean = false
-
-@Volatile
-private var fileLoggingPath: String? = null
-
 private val logger = SDKLogger.shared
 
 internal actual fun RunAnywhere.setLogLevelInternal(level: LogLevel) {
     currentLogLevel = level
     logger.debug("Log level set to ${level.name}")
-}
-
-actual fun RunAnywhere.setFileLogging(enabled: Boolean, path: String?) {
-    fileLoggingEnabled = enabled
-    fileLoggingPath = path
-    logger.debug("File logging ${if (enabled) "enabled" else "disabled"}${path?.let { " at $it" } ?: ""}")
-}
-
-actual fun RunAnywhere.getLogLevel(): LogLevel {
-    return currentLogLevel
 }
 
 actual fun RunAnywhere.flushLogs() {

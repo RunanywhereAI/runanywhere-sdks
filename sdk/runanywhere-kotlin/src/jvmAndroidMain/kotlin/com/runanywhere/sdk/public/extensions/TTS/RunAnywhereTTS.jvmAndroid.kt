@@ -8,21 +8,16 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.ComponentLifecycleState
 import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
-import ai.runanywhere.proto.v1.ModelUnloadRequest
-import ai.runanywhere.proto.v1.SDKComponent
 import ai.runanywhere.proto.v1.TTSSpeakResult
 import ai.runanywhere.proto.v1.TTSVoiceInfo
-import com.runanywhere.sdk.features.tts.TtsAudioPlayback
-import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.features.TTS.Services.TtsAudioPlayback
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelRegistry
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTTS
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RATTSOptions
 import com.runanywhere.sdk.public.types.RATTSOutput
 import kotlinx.coroutines.channels.awaitClose
@@ -50,56 +45,6 @@ private fun currentTtsVoiceIdFromLifecycle(): String? =
 internal suspend fun RunAnywhere.availableTTSVoicesInternal(): List<TTSVoiceInfo> {
     return CppBridgeTTS.voices()
 }
-
-actual suspend fun RunAnywhere.loadTTSVoice(voiceId: String) {
-    if (!isInitialized) {
-        throw SDKException.notInitialized("SDK not initialized")
-    }
-
-    ttsLogger.debug("Loading TTS voice: $voiceId")
-
-    val modelInfo =
-        CppBridgeModelRegistry.get(voiceId)
-            ?: throw SDKException.tts("Voice '$voiceId' not found in registry")
-
-    val localPath =
-        modelInfo.local_path.takeIf { it.isNotEmpty() }
-            ?: throw SDKException.tts("Voice '$voiceId' is not downloaded")
-
-    val result =
-        loadModel(
-            RAModelLoadRequest(
-                model_id = voiceId,
-                category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-                framework = modelInfo.framework,
-            ),
-        )
-    if (!result.success) {
-        val message = result.error_message.ifBlank { "Failed to load TTS voice '$voiceId' from $localPath" }
-        ttsLogger.error(message)
-        throw SDKException.tts(message)
-    }
-    ttsLogger.info("TTS voice loaded: $voiceId")
-}
-
-actual suspend fun RunAnywhere.unloadTTSVoice() {
-    if (!isInitialized) {
-        throw SDKException.notInitialized("SDK not initialized")
-    }
-    unloadModel(ModelUnloadRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS))
-}
-
-actual val RunAnywhere.isTTSVoiceLoaded: Boolean
-    get() =
-        CppBridgeModelLifecycle
-            .snapshot(SDKComponent.SDK_COMPONENT_TTS)
-            ?.let {
-                it.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
-                    it.model_id.isNotEmpty()
-            } ?: false
-
-actual val RunAnywhere.currentTTSVoiceId: String?
-    get() = currentTtsVoiceIdFromLifecycle()
 
 actual suspend fun RunAnywhere.synthesize(
     text: String,

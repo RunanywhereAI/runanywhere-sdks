@@ -11,13 +11,13 @@
 package com.runanywhere.sdk.foundation.bridge
 
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
-import com.runanywhere.sdk.foundation.bridge.extensions.JvmSecureStorage
-import com.runanywhere.sdk.foundation.bridge.extensions.installJvmSecureStorage
+import com.runanywhere.sdk.foundation.security.JvmKeychainManager
+import com.runanywhere.sdk.foundation.security.installJvmSecureStorage
 import java.io.File
 
 /**
  * JVM-specific context holder. Optional on JVM — [CppBridgePlatformAdapter]
- * will auto-install [JvmSecureStorage] on first secure-storage access if no
+ * will auto-install [JvmKeychainManager] on first secure-storage access if no
  * explicit configuration happens — but consumers may call [initialize] during
  * app startup to surface any permission/filesystem issues eagerly rather than
  * on the first C++ callback.
@@ -32,7 +32,7 @@ object JvmPlatformContext {
      *
      * Safe to call multiple times; subsequent calls are no-ops.
      */
-    fun initialize(baseDirectory: File = JvmSecureStorage.defaultBaseDirectory()) {
+    fun initialize(baseDirectory: File = JvmKeychainManager.defaultBaseDirectory()) {
         if (initialized) {
             return
         }

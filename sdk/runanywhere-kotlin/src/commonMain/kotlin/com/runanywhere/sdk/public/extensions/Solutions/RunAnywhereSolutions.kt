@@ -24,15 +24,11 @@ import com.runanywhere.sdk.public.RunAnywhere
  * Owns the underlying C handle and guarantees `rac_solution_destroy`
  * runs at most once. Lifecycle verbs are forwarded one-to-one to the C ABI.
  *
- * Per canonical §11: every method `start, stop, cancel, feed, closeInput,
- * destroy` exists, plus `isAlive` query.
+ * Mirrors Swift SolutionHandle: stop, cancel, feed, destroy, plus isAlive.
  */
 expect class SolutionHandle {
     /** Whether the handle still owns a live C-side solution. */
     val isAlive: Boolean
-
-    /** Start the underlying scheduler. Non-blocking. */
-    suspend fun start()
 
     /** Request a graceful shutdown. Non-blocking. */
     suspend fun stop()
@@ -42,9 +38,6 @@ expect class SolutionHandle {
 
     /** Feed a single UTF-8 item into the root input edge. */
     suspend fun feed(input: String)
-
-    /** Signal end-of-stream on the root input edge. */
-    suspend fun closeInput()
 
     /** Cancel, join, and destroy the solution. Idempotent. */
     suspend fun destroy()

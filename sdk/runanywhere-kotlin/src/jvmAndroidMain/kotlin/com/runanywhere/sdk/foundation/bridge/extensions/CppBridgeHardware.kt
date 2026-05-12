@@ -104,7 +104,7 @@ object CppBridgeHardware {
      * Get default total memory from system.
      *
      * On Android, uses ActivityManager to get actual device RAM.
-     * Falls back to /proc/meminfo via [com.runanywhere.sdk.foundation.device.PhysicalMemoryProbe].
+     * Falls back to /proc/meminfo via [com.runanywhere.sdk.infrastructure.device.models.domain.PhysicalMemoryProbe].
      *
      * G-DV20: Never trust `Runtime.maxMemory()` alone on Android — it returns
      * the JVM heap cap (~512 MB), not physical RAM.
@@ -145,7 +145,7 @@ object CppBridgeHardware {
         }
 
         // Fallback: parse /proc/meminfo, then Runtime.maxMemory() as last resort.
-        return com.runanywhere.sdk.foundation.device.PhysicalMemoryProbe
+        return com.runanywhere.sdk.infrastructure.device.models.domain.PhysicalMemoryProbe
             .totalPhysicalMemoryBytes()
     }
 

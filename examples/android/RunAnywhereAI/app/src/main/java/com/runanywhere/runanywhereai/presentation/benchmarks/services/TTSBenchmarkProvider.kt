@@ -1,15 +1,18 @@
 package com.runanywhere.runanywhereai.presentation.benchmarks.services
 
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelUnloadRequest
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkCategory
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkDeviceInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkMetrics
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkScenario
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.loadTTSVoice
+import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.synthesize
-import com.runanywhere.sdk.public.extensions.unloadTTSVoice
+import com.runanywhere.sdk.public.extensions.unloadModel
 import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RATTSOptions
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
@@ -41,9 +44,15 @@ class TTSBenchmarkProvider : BenchmarkScenarioProvider {
 
         val memBefore = SyntheticInputGenerator.availableMemoryBytes()
 
-        // Load (TTS uses "voice" API on Kotlin)
+        // Load TTS voice via the canonical lifecycle API.
         val loadStart = System.nanoTime()
-        RunAnywhere.loadTTSVoice(model.id)
+        RunAnywhere.loadModel(
+            RAModelLoadRequest(
+                model_id = model.id,
+                category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+                framework = model.framework,
+            ),
+        )
         val loadTimeMs = (System.nanoTime() - loadStart) / 1_000_000.0
 
         try {
@@ -65,7 +74,9 @@ class TTSBenchmarkProvider : BenchmarkScenarioProvider {
         } finally {
             withContext(NonCancellable) {
                 try {
-                    RunAnywhere.unloadTTSVoice()
+                    RunAnywhere.unloadModel(
+                        ModelUnloadRequest(category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS),
+                    )
                 } catch (_: Exception) {
                 }
             }

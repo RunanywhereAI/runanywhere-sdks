@@ -10,18 +10,9 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.AudioEncoding
 import ai.runanywhere.proto.v1.VoiceAgentConfig
-import ai.runanywhere.proto.v1.VoiceAgentResult
-import ai.runanywhere.proto.v1.VoiceAgentTurnRequest
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.types.RATTSOutput
-import com.runanywhere.sdk.public.types.RATranscriptionResult
 import com.runanywhere.sdk.public.types.RAVoiceAgentComponentStates
-import okio.ByteString.Companion.toByteString
-// v3.1: VoiceAgentResult / VoiceSessionEvent imports removed — the
-// expect declarations that used them (processVoice / startVoiceSession /
-// streamVoiceSession) were deleted.
 
 /**
  * Canonical alias: the proto `VoiceAgentComponentStates` is the `ComponentStates`
@@ -49,13 +40,6 @@ expect suspend fun RunAnywhere.initializeVoiceAgent(config: VoiceAgentConfig)
 expect suspend fun RunAnywhere.getVoiceAgentComponentStates(): ComponentStates
 
 /**
- * Check if the voice agent is fully ready (all components loaded).
- *
- * @return True if ready
- */
-expect suspend fun RunAnywhere.isVoiceAgentReady(): Boolean
-
-/**
  * Initialize the voice agent with currently loaded models.
  *
  * This function checks that STT, LLM, and TTS models are loaded,
@@ -69,116 +53,6 @@ expect suspend fun RunAnywhere.isVoiceAgentReady(): Boolean
  * @throws SDKException if VoiceAgent initialization fails
  */
 expect suspend fun RunAnywhere.initializeVoiceAgentWithLoadedModels()
-
-// v3.1: processVoice / startVoiceSession / streamVoiceSession expect
-// declarations DELETED. Replacements:
-//   - Streaming: CppBridgeVoiceAgent.getHandle() + VoiceAgentStreamAdapter(handle)
-//   - One-shot:  process generated VoiceAgentTurnRequest through C++ voice agent
-//                where the native ABI exists; Android currently supports the
-//                audio-only subset.
-
-/**
- * Stop the current voice session.
- */
-expect suspend fun RunAnywhere.stopVoiceSession()
-
-/**
- * Check if a voice session is active.
- *
- * @return True if a session is running
- */
-expect suspend fun RunAnywhere.isVoiceSessionActive(): Boolean
-
-// MARK: - Conversation History
-
-/**
- * Clear the voice agent conversation history.
- */
-expect suspend fun RunAnywhere.clearVoiceConversation()
-
-/**
- * Set the system prompt for LLM responses.
- *
- * @param prompt System prompt text
- */
-expect suspend fun RunAnywhere.setVoiceSystemPrompt(prompt: String)
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Phase 4a — VoiceAgent processing parity with Swift's
-// RunAnywhere+VoiceAgent.swift (`processVoiceTurn`, `voiceAgentTranscribe`,
-// `voiceAgentGenerateResponse`, `voiceAgentSynthesizeSpeech`,
-// `cleanupVoiceAgent`).
-//
-// These are *one-shot* helpers that compose the individual
-// STT/LLM/TTS bridges. They live here so cross-platform consumers can
-// migrate from Swift's API one-to-one. New code should still prefer the
-// streaming `VoiceAgentStreamAdapter` in
-// `com.runanywhere.sdk.adapters.VoiceAgentStreamAdapter`.
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Process a complete voice turn: audio -> transcription -> LLM response ->
- * synthesized speech.
- *
- * Mirrors Swift's generated voice-turn result surface.
- *
- * @param request Generated voice-turn request. Current Android JNI supports
- *        audio bytes plus the raw PCM format fields only; session metadata and
- *        generated session_config require the native generated request ABI.
- * @return [VoiceAgentResult] with the transcript, response, and audio.
- */
-expect suspend fun RunAnywhere.processVoiceTurn(
-    request: VoiceAgentTurnRequest,
-): VoiceAgentResult
-
-/**
- * Convenience wrapper for the current audio-only JNI path.
- */
-suspend fun RunAnywhere.processVoiceTurn(
-    audioData: ByteArray,
-): VoiceAgentResult = processVoiceTurn(audioData.toVoiceAgentTurnRequest())
-
-/**
- * Build the generated one-shot voice-turn request for raw PCM microphone
- * buffers. Leave correlation/session fields unset unless the native generated
- * request ABI is available; Android currently transmits audio bytes only.
- */
-fun ByteArray.toVoiceAgentTurnRequest(
-    sampleRateHz: Int = 0,
-    channels: Int = 0,
-    encoding: AudioEncoding = AudioEncoding.AUDIO_ENCODING_UNSPECIFIED,
-): VoiceAgentTurnRequest =
-    VoiceAgentTurnRequest(
-        audio_data = toByteString(),
-        sample_rate_hz = sampleRateHz,
-        channels = channels,
-        encoding = encoding,
-    )
-
-/**
- * Transcribe audio using the voice-agent's STT component.
- *
- * Mirrors Swift's `RunAnywhere.voiceAgentTranscribe(_ audioData:)`.
- *
- * @return [STTOutput] proto with transcription text and metadata
- */
-expect suspend fun RunAnywhere.voiceAgentTranscribe(audioData: ByteArray): RATranscriptionResult
-
-/**
- * Generate an LLM response using the voice-agent's LLM component.
- *
- * Mirrors Swift's `RunAnywhere.voiceAgentGenerateResponse(_ prompt:)`.
- */
-expect suspend fun RunAnywhere.voiceAgentGenerateResponse(prompt: String): String
-
-/**
- * Synthesize speech using the voice-agent's TTS component.
- *
- * Mirrors Swift's `RunAnywhere.voiceAgentSynthesizeSpeech(_ text:)`.
- *
- * @return [TTSOutput] proto with audio data and metadata
- */
-expect suspend fun RunAnywhere.voiceAgentSynthesizeSpeech(text: String): RATTSOutput
 
 /**
  * Cleanup voice-agent resources.

@@ -23,7 +23,7 @@
 package com.runanywhere.sdk.foundation.bridge.extensions
 
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.public.SDKEnvironment
+import com.runanywhere.sdk.public.configuration.SDKEnvironment
 
 /**
  * Shared SDK initialisation state used by `CppBridge`.

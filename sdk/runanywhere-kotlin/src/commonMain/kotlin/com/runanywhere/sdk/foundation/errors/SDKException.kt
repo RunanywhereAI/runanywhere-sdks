@@ -102,6 +102,15 @@ class SDKException(
                 cause = cause,
             )
 
+        fun validationFailed(message: String, cause: Throwable? = null) =
+            of(
+                code = ProtoErrorCode.ERROR_CODE_VALIDATION_FAILED,
+                category = ProtoErrorCategory.ERROR_CATEGORY_VALIDATION,
+                message = message,
+                cAbiCode = -250,
+                cause = cause,
+            )
+
         // ====================================================================
         // MODEL FACTORIES
         // ====================================================================

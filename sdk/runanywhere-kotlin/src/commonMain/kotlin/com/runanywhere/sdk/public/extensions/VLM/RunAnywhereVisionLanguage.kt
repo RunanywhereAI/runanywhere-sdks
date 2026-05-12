@@ -54,19 +54,6 @@ expect fun RunAnywhere.processImageStream(
     options: RAVLMGenerationOptions = RAVLMGenerationOptions(),
 ): Flow<RASDKEvent>
 
-// MARK: - Model Management
-
-/**
- * Load a VLM model by ID using the generated model lifecycle.
- *
- * The native lifecycle returns concrete primary and vision-projector artifacts
- * in `ModelLoadResult.resolved_artifacts`; Kotlin consumes those generated
- * role-tagged artifacts directly.
- *
- * @param modelId Model identifier (must be registered in the global model registry)
- */
-expect suspend fun RunAnywhere.loadVLMModel(modelId: String)
-
 // MARK: - Generation Control
 
 /**

@@ -56,21 +56,6 @@ fun RunAnywhere.setLogLevel(level: LogLevel) {
 internal expect fun RunAnywhere.setLogLevelInternal(level: LogLevel)
 
 /**
- * Enable or disable file logging.
- *
- * @param enabled Whether to enable file logging
- * @param path Optional path for log file
- */
-expect fun RunAnywhere.setFileLogging(enabled: Boolean, path: String? = null)
-
-/**
- * Get the current log level.
- *
- * @return Current log level
- */
-expect fun RunAnywhere.getLogLevel(): LogLevel
-
-/**
  * Flush pending log messages.
  */
 expect fun RunAnywhere.flushLogs()

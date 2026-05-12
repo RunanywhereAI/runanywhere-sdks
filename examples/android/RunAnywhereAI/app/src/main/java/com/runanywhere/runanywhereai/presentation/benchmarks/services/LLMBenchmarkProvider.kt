@@ -1,5 +1,7 @@
 package com.runanywhere.runanywhereai.presentation.benchmarks.services
 
+import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelUnloadRequest
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkCategory
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkDeviceInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkMetrics
@@ -7,10 +9,11 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkSce
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.generateStream
-import com.runanywhere.sdk.public.extensions.loadLLMModel
-import com.runanywhere.sdk.public.extensions.unloadLLMModel
+import com.runanywhere.sdk.public.extensions.loadModel
+import com.runanywhere.sdk.public.extensions.unloadModel
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.withContext
@@ -40,7 +43,18 @@ class LLMBenchmarkProvider : BenchmarkScenarioProvider {
 
         // Load
         val loadStart = System.nanoTime()
-        RunAnywhere.loadLLMModel(model.id)
+        val loadResult =
+            RunAnywhere.loadModel(
+                RAModelLoadRequest(
+                    model_id = model.id,
+                    category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+                ),
+            )
+        if (!loadResult.success) {
+            throw IllegalStateException(
+                loadResult.error_message.ifBlank { "Failed to load LLM model '${model.id}'" },
+            )
+        }
         val loadTimeMs = (System.nanoTime() - loadStart) / 1_000_000.0
 
         try {
@@ -96,7 +110,9 @@ class LLMBenchmarkProvider : BenchmarkScenarioProvider {
         } finally {
             withContext(NonCancellable) {
                 try {
-                    RunAnywhere.unloadLLMModel()
+                    RunAnywhere.unloadModel(
+                        ModelUnloadRequest(category = ModelCategory.MODEL_CATEGORY_LANGUAGE),
+                    )
                 } catch (_: Exception) {
                 }
             }

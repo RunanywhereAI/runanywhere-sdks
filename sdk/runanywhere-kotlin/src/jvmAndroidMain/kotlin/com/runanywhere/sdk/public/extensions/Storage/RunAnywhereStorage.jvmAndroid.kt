@@ -4,18 +4,11 @@
  *
  * JVM/Android actual implementations for storage operations.
  *
- * Mirrors Swift `RunAnywhere+Storage.swift`. The legacy Kotlin-only names
- * (`storageInfo`, `storageDeletePlan`, plus the `requiredBytes` /
- * `requiredBytes + safetyMargin` overloads of `checkStorageAvailability`)
- * have been removed in favour of the canonical Swift surface.
+ * Mirrors Swift `RunAnywhere+Storage.swift`.
  */
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.StorageAvailabilityRequest
-import ai.runanywhere.proto.v1.StorageAvailabilityResult
-import ai.runanywhere.proto.v1.StorageDeletePlan
-import ai.runanywhere.proto.v1.StorageDeletePlanRequest
 import ai.runanywhere.proto.v1.StorageDeleteRequest
 import ai.runanywhere.proto.v1.StorageDeleteResult
 import ai.runanywhere.proto.v1.StorageInfoRequest
@@ -47,20 +40,6 @@ actual suspend fun RunAnywhere.getStorageInfo(request: StorageInfoRequest): Stor
     requireStorageInitialized(this)
     return CppBridgeStorage.info(request)
         ?: throw SDKException.storage("Native storage info proto API unavailable")
-}
-
-actual suspend fun RunAnywhere.checkStorageAvailability(
-    request: StorageAvailabilityRequest,
-): StorageAvailabilityResult {
-    requireStorageInitialized(this)
-    return CppBridgeStorage.availability(request)
-        ?: throw SDKException.storage("Native storage availability proto API unavailable")
-}
-
-actual suspend fun RunAnywhere.planStorageDelete(request: StorageDeletePlanRequest): StorageDeletePlan {
-    requireStorageInitialized(this)
-    return CppBridgeStorage.deletePlan(request)
-        ?: throw SDKException.storage("Native storage delete plan proto API unavailable")
 }
 
 actual suspend fun RunAnywhere.deleteStorage(request: StorageDeleteRequest): StorageDeleteResult {

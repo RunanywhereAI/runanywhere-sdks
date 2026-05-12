@@ -1,59 +1,51 @@
 /*
  * VoiceAgentStreamAdapter.kt
  *
- * GAP 09 Phase 17 — see v2_gap_specs/GAP_09_STREAMING_CONSISTENCY.md.
+ * Mirror of Swift's `Sources/RunAnywhere/Adapters/VoiceAgentStreamAdapter.swift`.
  *
- * Wraps the C++ proto-byte voice agent ABI (`rac_voice_agent_set_proto_callback`,
- * GAP 09 Phase 15) as a Kotlin `Flow<VoiceEvent>`. `VoiceEvent` is the
- * Wire-generated type from `idl/voice_events.proto` (GAP 01).
+ * Was ~244 LOC of duplicated fan-out machinery (per-handle registry,
+ * synchronized collector list, JNI lambda trampoline) — bit-for-bit
+ * identical to `LLMStreamAdapter` except for the proto event type and
+ * the C register/unregister symbols. Phase W2-5 extracted that
+ * machinery into the generic `HandleStreamAdapter<Handle, Event>` in
+ * `commonMain/adapters/HandleStreamAdapter.kt`; this file is now a thin
+ * specialization that wires the voice-agent-specific JNI symbols.
  *
- * Public API:
+ * Why this class stays in `jvmAndroidMain` (not `commonMain`):
+ *   The C JNI thunks in `runanywhere_commons_jni.cpp` mangle into
+ *   `Java_com_runanywhere_sdk_adapters_VoiceAgentStreamAdapter_00024JniBridge_*`,
+ *   so the `JniBridge` inner object MUST live under exactly this class
+ *   path. Moving the class to `commonMain` (where `external fun` is
+ *   forbidden) would orphan those symbols and the runtime would throw
+ *   `UnsatisfiedLinkError`. The generic itself lives in `commonMain`;
+ *   this file is the platform-side wiring.
+ *
+ * Public API (preserved):
  *     val flow: Flow<VoiceEvent> = VoiceAgentStreamAdapter(handle).stream()
  *     flow.collect { event -> handle(event) }
  *
- * Multi-collector fan-out (B29):
- *   The underlying C ABI exposes a SINGLE proto-callback slot per handle.
- *   Without fan-out, a second `stream()` collector silently replaces the
- *   first. To preserve the `Flow` contract (every collector observes every
- *   event) we keep a per-handle broadcaster that installs ONE C callback
- *   lazily for the first subscriber, and tears it down when the last
- *   subscriber cancels.
+ * Voice events fan out forever (no terminal-event predicate); consumers
+ * exit the stream by cancelling their collector.
  */
 
 package com.runanywhere.sdk.adapters
 
-// Wire-generated from idl/voice_events.proto — see GAP 01. Real Kotlin
-// package emitted by Wire is ai.runanywhere.proto.v1 (the files live
-// physically under src/commonMain/.../com/runanywhere/sdk/generated/
-// but their `package` declaration matches the proto java_package).
 import ai.runanywhere.proto.v1.VoiceEvent
 import com.runanywhere.sdk.public.types.RAVoiceEvent
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.CopyOnWriteArrayList
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.channels.SendChannel
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.channels.trySendBlocking
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
 
 /**
- * Streams [VoiceEvent]s from a C++ voice agent handle.
+ * Streams [RAVoiceEvent]s from a C++ voice agent handle.
  *
  * The adapter holds onto the handle but does NOT own its lifecycle —
  * callers create the handle elsewhere (typically via
- * `RunAnywhere.voiceAgent.create(...)`) and pass it in.
+ * `CppBridgeVoiceAgent.getHandle()`) and pass it in.
  *
- * Backpressure: each collector gets its own buffered channel (capacity ~64
- * with DROP_OLDEST overflow) so a slow consumer drops the oldest event
- * rather than blocking the C++ dispatcher. This matches the spec's
- * recommendation that audio/event streams favor liveness over completeness
- * for late subscribers.
- *
- * Thread safety: [HandleFanOut.broadcast] fans each decoded event out to
- * every active collector. Installation/teardown of the C callback is
- * serialized per handle via an internal monitor so the "first subscriber
- * registers, last subscriber unregisters" transition is atomic.
+ * Fan-out semantics: the underlying C ABI exposes a SINGLE
+ * proto-callback slot per handle. The generic [HandleStreamAdapter]
+ * installs one C-side registration lazily for the first subscriber and
+ * tears it down when the last subscriber detaches, fanning each
+ * decoded event out to every active collector.
  */
 class VoiceAgentStreamAdapter internal constructor(
     private val handle: Long,
@@ -62,37 +54,41 @@ class VoiceAgentStreamAdapter internal constructor(
     /** Public primary constructor: wire to the real JNI bridge. */
     constructor(handle: Long) : this(handle, JniBridge)
 
+    // Bridge identity is folded into the streamKey so multiple
+    // adapters that share a handle but use different bridges (the
+    // production JNI vs. a test fake) get isolated fan-out state.
+    // Production uses the JniBridge singleton so this collapses to a
+    // single stable key under normal use.
+    private val streamKey: String = "voice-agent#${System.identityHashCode(bridge)}"
+
+    private val delegate: HandleStreamAdapter<Long, VoiceEvent> =
+        HandleStreamAdapter(
+            handle = handle,
+            streamKey = streamKey,
+            register = { h, cb -> bridge.registerCallback(h, cb) },
+            unregister = { h, id -> bridge.unregisterCallback(h, id) },
+            decodeEvent = { bytes -> VoiceEvent.ADAPTER.decode(bytes) },
+            // Voice agents have no terminal event — collectors detach
+            // explicitly. Mirrors Swift's VoiceAgent convenience init.
+            isTerminalEvent = null,
+        )
+
     /**
      * Open a new event subscription. Multiple collectors on the same
-     * handle share a single C callback registration and each receives the
-     * full decoded event sequence.
+     * handle share a single C callback registration and each receives
+     * the full decoded event sequence.
      */
-    fun stream(): Flow<RAVoiceEvent> =
-        callbackFlow<RAVoiceEvent> {
-            val fanOut = fanOutFor(handle, bridge)
-            val channel: SendChannel<RAVoiceEvent> = channel
-            val added = fanOut.attach(channel)
-            if (!added) {
-                close(
-                    IllegalStateException(
-                        "rac_voice_agent_set_proto_callback failed (Protobuf may not be linked)",
-                    ),
-                )
-                return@callbackFlow
-            }
-
-            awaitClose { fanOut.detach(channel) }
-        }
+    fun stream(): Flow<RAVoiceEvent> = delegate.stream()
 
     /**
-     * SPI seam that lets tests substitute a fake producer in place of the
-     * JNI trampoline. Production code uses [JniBridge]; tests use a fake
-     * that invokes the supplied callback directly.
+     * SPI seam that lets tests substitute a fake producer in place of
+     * the JNI trampoline. Production code uses [JniBridge]; tests use a
+     * fake that invokes the supplied callback directly.
      */
     internal interface NativeBridge {
         /**
-         * Install [cb] as the proto-byte callback for [handle]. Returns a
-         * non-zero opaque id on success, or [INVALID_CALLBACK_ID] on
+         * Install [cb] as the proto-byte callback for [handle]. Returns
+         * a non-zero opaque id on success, or [INVALID_CALLBACK_ID] on
          * failure.
          */
         fun registerCallback(handle: Long, cb: (ByteArray) -> Unit): Long
@@ -101,105 +97,56 @@ class VoiceAgentStreamAdapter internal constructor(
         fun unregisterCallback(handle: Long, callbackId: Long)
     }
 
-    /**
-     * Broadcaster that owns the single C-side registration for a specific
-     * voice-agent handle and fans out decoded events to every attached
-     * collector.
-     */
-    internal class HandleFanOut(
-        private val handle: Long,
-        private val bridge: NativeBridge,
-        private val onTornDown: () -> Unit,
-    ) {
-        private val lock = Any()
-        private val collectors = CopyOnWriteArrayList<SendChannel<RAVoiceEvent>>()
-
-        @Volatile
-        private var callbackId: Long = INVALID_CALLBACK_ID
-
-        /**
-         * Attach a collector. Returns `true` on success; returns `false`
-         * (and leaves the fan-out state unchanged) if this was the first
-         * subscriber AND the C-side registration failed, so the caller
-         * can propagate the error to its own flow.
-         */
-        fun attach(channel: SendChannel<RAVoiceEvent>): Boolean {
-            synchronized(lock) {
-                if (collectors.isEmpty()) {
-                    val id = bridge.registerCallback(handle) { bytes -> broadcast(bytes) }
-                    if (id == INVALID_CALLBACK_ID) return false
-                    callbackId = id
-                }
-                collectors.add(channel)
-                return true
-            }
-        }
-
-        fun detach(channel: SendChannel<RAVoiceEvent>) {
-            synchronized(lock) {
-                collectors.remove(channel)
-                if (collectors.isEmpty() && callbackId != INVALID_CALLBACK_ID) {
-                    bridge.unregisterCallback(handle, callbackId)
-                    callbackId = INVALID_CALLBACK_ID
-                    onTornDown()
-                }
-            }
-        }
-
-        /** Visible for testing: number of attached collectors. */
-        internal fun collectorCount(): Int = collectors.size
-
-        /** Visible for testing: whether the C callback is currently installed. */
-        internal fun isRegistered(): Boolean = callbackId != INVALID_CALLBACK_ID
-
-        private fun broadcast(bytes: ByteArray) {
-            val event =
-                try {
-                    VoiceEvent.ADAPTER.decode(bytes)
-                } catch (t: Throwable) {
-                    // Malformed frame: close each collector with the decode error.
-                    // Broadcasting garbage is worse than surfacing the failure.
-                    for (c in collectors) c.close(t)
-                    return
-                }
-            // Each channel enforces its own backpressure policy (DROP_OLDEST
-            // with capacity 64); a slow collector never blocks the C++
-            // dispatcher or starves its peers.
-            for (c in collectors) c.trySendBlocking(event)
-        }
-    }
-
     internal companion object {
-        internal const val INVALID_CALLBACK_ID: Long = 0L
+        /** Mirrors the generic's sentinel so test bridges can return it. */
+        internal const val INVALID_CALLBACK_ID: Long = HandleStreamAdapter.INVALID_CALLBACK_ID
 
         /**
-         * Per-handle fan-out state. Keyed by the raw native handle; each
-         * entry owns at most one C callback registration at a time.
-         *
-         * The map is keyed by `Pair<Long, NativeBridge>` so two adapters
-         * backed by different bridges (production JNI vs. a test fake)
-         * never cross-contaminate, even if they happen to share a handle
-         * value.
+         * Visible-for-testing accessor: total number of live fan-outs
+         * across every `(streamKey, handle)` pair. Used by the
+         * `VoiceAgentStreamAdapterFanOutTest` reset loop to detect leaks.
          */
-        private val fanOuts = ConcurrentHashMap<Pair<Long, NativeBridge>, HandleFanOut>()
+        internal fun activeFanOutCount(): Int = HandleStreamAdapter.activeFanOutCount()
 
-        internal fun fanOutFor(handle: Long, bridge: NativeBridge): HandleFanOut {
-            val key = handle to bridge
-            return fanOuts.computeIfAbsent(key) {
-                HandleFanOut(handle, bridge) { fanOuts.remove(key) }
-            }
+        /**
+         * Visible-for-testing accessor that returns a live view of the
+         * fan-out for a `(handle, bridge)` pair. The returned view
+         * re-resolves the underlying [HandleStreamAdapter.HandleFanOut]
+         * on every method call, so polling loops in tests
+         * (`awaitCollectorCount`) can observe registration appearing
+         * after a collector subscribes without first asserting
+         * non-null.
+         */
+        internal fun fanOutFor(
+            handle: Long,
+            bridge: NativeBridge,
+        ): FanOutView {
+            val key = "voice-agent#${System.identityHashCode(bridge)}"
+            return FanOutView(key, handle)
         }
 
-        /** Visible for testing. */
-        internal fun activeFanOutCount(): Int = fanOuts.size
+        /**
+         * Live view onto a (streamKey, handle) fan-out slot. Methods
+         * return a snapshot of the current state — `0` / `false` when
+         * no subscribers have attached yet. Returning a value-based
+         * view (rather than the underlying mutable
+         * [HandleStreamAdapter.HandleFanOut]) keeps the generic's
+         * internal class out of the public test surface.
+         */
+        internal class FanOutView(
+            private val streamKey: String,
+            private val handle: Long,
+        ) {
+            internal fun collectorCount(): Int {
+                val fanOut = HandleStreamAdapter.fanOutForTesting<VoiceEvent>(streamKey, handle)
+                return fanOut?.collectorCount() ?: 0
+            }
 
-        // Expose the backpressure policy for the fan-out channel so tests
-        // can mirror production capacity when injecting fake producers.
-        @Suppress("unused")
-        internal const val STREAM_BUFFER_CAPACITY = 64
-
-        @Suppress("unused")
-        internal val STREAM_BUFFER_OVERFLOW = BufferOverflow.DROP_OLDEST
+            internal fun isRegistered(): Boolean {
+                val fanOut = HandleStreamAdapter.fanOutForTesting<VoiceEvent>(streamKey, handle)
+                return fanOut?.isRegistered() == true
+            }
+        }
     }
 
     /**
@@ -219,18 +166,14 @@ class VoiceAgentStreamAdapter internal constructor(
             nativeUnregisterCallback(handle, callbackId)
 
         /**
-         * JNI bridge: registers a Kotlin lambda as the proto-byte callback
-         * for [handle]. The thunk stores the lambda in a global ref +
-         * context object, then calls `rac_voice_agent_set_proto_callback`
+         * JNI bridge: registers a Kotlin lambda as the proto-byte
+         * callback for [handle]. The thunk stores the lambda in a global
+         * ref + context object, then calls `rac_voice_agent_set_proto_callback`
          * with a C trampoline that re-dispatches bytes back to the JVM.
          *
-         * Returns an opaque `callbackId` (the context pointer cast to jlong);
-         * [nativeUnregisterCallback] uses it to null the C callback and
-         * release the global ref. Returns 0 on failure.
-         *
-         * Per-handle fan-out is handled entirely on the JVM side (see
-         * [HandleFanOut]); the ABI still exposes exactly one callback slot
-         * per handle.
+         * Returns an opaque `callbackId` (the context pointer cast to
+         * jlong); [nativeUnregisterCallback] uses it to null the C
+         * callback and release the global ref. Returns 0 on failure.
          */
         @JvmStatic
         private external fun nativeRegisterCallback(

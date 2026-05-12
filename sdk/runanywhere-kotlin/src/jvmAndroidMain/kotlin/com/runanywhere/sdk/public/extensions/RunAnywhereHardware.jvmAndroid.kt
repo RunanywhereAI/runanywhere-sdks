@@ -4,47 +4,51 @@
  *
  * JVM/Android actual for the hardware profile namespace.
  *
- * Wave 3a KOT-HARDWARE-FALLBACK: Delegates exclusively to
- * `rac_hardware_profile_get` via the `racHardwareProfileGet` JNI thunk.
- * The previous Kotlin-side `Runtime.exec("getprop ro.board.platform")`
- * fallback is gone — chip/accelerator detection lives entirely in the
- * C++ `rac_hardware_abi.cpp` implementation, which already reads
- * `ro.hardware.chipname` / `ro.board.platform` via `__system_property_get`
- * on Android and populates core count / architecture / platform.
+ * Wiring:
+ *  - `getProfile()`            -> `rac_hardware_profile_get` via `CppBridgeHardware.getProfile()`.
+ *  - `getAccelerators()`       -> TODO. Commons exposes `rac_hardware_get_accelerators`
+ *                                  but no JNI thunk is bound on this branch (no commons
+ *                                  C++ changes permitted by W1-16/17). Throws
+ *                                  `SDKException.notImplemented`.
+ *  - `setAcceleratorPreference()` -> TODO. Commons exposes
+ *                                  `rac_hardware_set_accelerator_preference` but the
+ *                                  JNI thunk is not yet wired (same constraint as above).
+ *                                  Throws `SDKException.notImplemented`.
  */
 
 package com.runanywhere.sdk.public.extensions
 
+import ai.runanywhere.proto.v1.AcceleratorInfo
 import ai.runanywhere.proto.v1.AccelerationPreference
 import ai.runanywhere.proto.v1.HardwareProfileResult
-import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeHardware
+import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 
 actual class Hardware {
-    actual fun getProfile(): HardwareProfileResult {
-        val bytes = RunAnywhereBridge.racHardwareProfileGet()
-        return if (bytes != null && bytes.isNotEmpty()) {
-            HardwareProfileResult.ADAPTER.decode(bytes)
-        } else {
-            HardwareProfileResult()
-        }
+    actual fun getProfile(): HardwareProfileResult = CppBridgeHardware.getProfile()
+
+    actual suspend fun getAccelerators(): List<AcceleratorInfo> {
+        // TODO: Wire `rac_hardware_get_accelerators` once a JNI thunk
+        //       (`racHardwareGetAccelerators`) is bound in
+        //       sdk/runanywhere-commons/src/jni/runanywhere_commons_jni.cpp.
+        //       Until then the Kotlin surface matches Swift's "not supported"
+        //       fallback behaviour (rac_result_t == RAC_ERROR_NOT_SUPPORTED).
+        throw SDKException.notImplemented("Hardware.getAccelerators")
     }
 
-    actual fun getChip(): String = getProfile().profile?.chip?.ifBlank { "Unknown" } ?: "Unknown"
-
-    actual val hasNeuralEngine: Boolean
-        get() = getProfile().profile?.has_neural_engine ?: false
-
-    actual val accelerationMode: String
-        get() = getProfile().profile?.acceleration_mode?.ifBlank { "cpu" } ?: "cpu"
+    actual suspend fun setAcceleratorPreference(pref: AccelerationPreference) {
+        // TODO: Wire `rac_hardware_set_accelerator_preference(pref.value)`
+        //       once a JNI thunk (`racHardwareSetAcceleratorPreference`) is
+        //       bound in
+        //       sdk/runanywhere-commons/src/jni/runanywhere_commons_jni.cpp.
+        //       Until then the Kotlin surface matches Swift's "not supported"
+        //       fallback behaviour (rac_result_t == RAC_ERROR_NOT_SUPPORTED).
+        throw SDKException.notImplemented("Hardware.setAcceleratorPreference")
+    }
 }
 
 private val hardwareInstance = Hardware()
 
 actual val RunAnywhere.hardware: Hardware
     get() = hardwareInstance
-
-actual suspend fun RunAnywhere.supportsAccelerator(accelerator: AccelerationPreference): Boolean {
-    val profile = hardwareInstance.getProfile()
-    return profile.accelerators.any { it.type == accelerator && it.available }
-}

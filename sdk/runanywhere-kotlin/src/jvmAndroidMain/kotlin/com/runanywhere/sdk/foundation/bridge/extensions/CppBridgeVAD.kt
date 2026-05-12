@@ -1,6 +1,18 @@
 /*
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
+ *
+ * CppBridgeVAD.kt
+ *
+ * VAD component bridge — manages C++ VAD component lifecycle and the
+ * proto-canonical `rac_vad_*_proto` C ABI.
+ *
+ * All generic scaffolding (handle creation, isLoaded, loadModel, unload,
+ * destroy) lives in [ComponentActor]; this object only adds the
+ * VAD-specific surfaces (`configure`, `process`, `statistics`, `cancel`,
+ * `reset`) on top.
+ *
+ * Mirrors Swift `Foundation/Bridge/Extensions/CppBridge+VAD.swift` (W3-4).
  */
 
 package com.runanywhere.sdk.foundation.bridge.extensions
@@ -9,7 +21,8 @@ import ai.runanywhere.proto.v1.VADConfiguration
 import ai.runanywhere.proto.v1.VADOptions
 import ai.runanywhere.proto.v1.VADResult
 import ai.runanywhere.proto.v1.VADStatistics
-import com.runanywhere.sdk.foundation.bridge.CppBridge
+import com.runanywhere.sdk.foundation.bridge.ComponentActor
+import com.runanywhere.sdk.foundation.bridge.ComponentVTable
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 import com.runanywhere.sdk.public.types.RAVADOptions
@@ -17,101 +30,108 @@ import com.runanywhere.sdk.public.types.RAVADResult
 import com.squareup.wire.Message
 import com.squareup.wire.ProtoAdapter
 
+private fun <M : Message<M, *>> decodeOrThrow(
+    adapter: ProtoAdapter<M>,
+    bytes: ByteArray?,
+    operation: String,
+): M {
+    val payload = bytes ?: throw SDKException.operation("$operation returned null")
+    return try {
+        adapter.decode(payload)
+    } catch (e: Exception) {
+        throw SDKException.operation("Failed to decode $operation result: ${e.message}")
+    }
+}
+
+private fun checkRc(rc: Int, operation: String) {
+    if (rc != RunAnywhereBridge.RAC_SUCCESS) {
+        throw SDKException.operation("$operation failed with rc=$rc")
+    }
+}
+
 /**
- * Mirrors Swift CppBridge+VAD.swift. Wraps `rac_vad_*_proto` C ABI.
+ * Mirrors Swift `Foundation/Bridge/Extensions/CppBridge+VAD.swift`. Wraps
+ * `rac_vad_*_proto` C ABI. Handle lifecycle lives in [inner].
  */
 object CppBridgeVAD {
-    @Volatile
-    private var handle: Long = 0L
+    /** Generic scaffold (handle / isLoaded / loadModel / unload / destroy). */
+    internal val actor = ComponentActor(ComponentVTable.vad)
 
-    private val lock = Any()
+    // MARK: - Handle Management
 
-    /**
-     * Whether the underlying native component has been created.
-     * Replaces the legacy isReady/isLoaded — readiness should be queried
-     * through `CppBridgeModelLifecycle.snapshot(SDK_COMPONENT_VAD)`.
-     */
-    val isReady: Boolean
-        get() = handle != 0L
+    /** Get or create the VAD component handle. */
+    suspend fun getHandle(): Long = actor.getHandle()
 
-    @Throws(SDKException::class)
-    fun getHandle(): Long {
-        synchronized(lock) {
-            if (handle == 0L) create()
-            if (handle == 0L) {
-                throw SDKException.notInitialized("VAD component not created")
-            }
-            return handle
-        }
+    // MARK: - State
+
+    /** Whether a model is loaded. */
+    val isLoaded: Boolean
+        get() = actor.isLoaded
+
+    /** Currently-loaded model id, or null. */
+    val currentModelId: String?
+        get() = actor.currentAssetId
+
+    // MARK: - Model Lifecycle
+
+    /** Load a VAD model (e.g., Silero VAD via ONNX backend). */
+    suspend fun loadModel(modelPath: String, modelId: String, modelName: String) {
+        actor.loadModel(path = modelPath, id = modelId, name = modelName)
     }
 
-    fun create(): Int {
-        synchronized(lock) {
-            if (handle != 0L) return 0
-            if (!CppBridge.isNativeLibraryLoaded) {
-                throw SDKException.notInitialized(
-                    "Native library not available. Please ensure the native libraries are bundled in your APK.",
-                )
-            }
-            val result =
-                try {
-                    RunAnywhereBridge.racVadComponentCreate()
-                } catch (e: UnsatisfiedLinkError) {
-                    throw SDKException.notInitialized(
-                        "VAD native library not available: ${e.message}",
-                    )
-                }
-            if (result == 0L) return -1
-            handle = result
-            return 0
-        }
+    /** Unload the current VAD model (reverts to energy-based VAD). */
+    suspend fun unload() {
+        actor.unload()
     }
 
+    // MARK: - Cleanup
+
+    /** Destroy the component. */
+    suspend fun destroy() {
+        actor.destroy()
+    }
+
+    // MARK: - VAD-specific operations
+
     /**
-     * Cancel the current detection. Native ABI is the source of truth;
-     * the previous Kotlin-side `isCancelled` flag was deleted.
+     * Cancel the current detection. Native ABI is the source of truth; no
+     * Kotlin-side `isCancelled` flag is maintained. No-op if the handle has
+     * not been created.
      */
-    fun cancel() {
-        synchronized(lock) {
-            if (handle == 0L) return
-            RunAnywhereBridge.racVadComponentCancel(handle)
-        }
+    suspend fun cancel() {
+        val handle = actor.existingHandle()
+        if (handle == 0L) return
+        RunAnywhereBridge.racVadComponentCancel(handle)
     }
 
     /**
-     * Reset the VAD state for a new audio stream.
+     * Reset the VAD state for a new audio stream. No-op if the handle has
+     * not been created.
      */
-    fun reset() {
-        synchronized(lock) {
-            if (handle == 0L) return
-            RunAnywhereBridge.racVadComponentReset(handle)
-        }
+    suspend fun reset() {
+        val handle = actor.existingHandle()
+        if (handle == 0L) return
+        RunAnywhereBridge.racVadComponentReset(handle)
     }
 
-    fun destroy() {
-        synchronized(lock) {
-            if (handle == 0L) return
-            RunAnywhereBridge.racVadComponentDestroy(handle)
-            handle = 0L
-        }
-    }
-
-    fun configure(configuration: VADConfiguration) {
-        create()
+    /** Configure the VAD component with a [VADConfiguration] proto. */
+    suspend fun configure(configuration: VADConfiguration) {
+        val handle = actor.getHandle()
         val rc =
             RunAnywhereBridge.racVadComponentConfigureProto(
-                getHandle(),
+                handle,
                 VADConfiguration.ADAPTER.encode(configuration),
             )
         checkRc(rc, "racVadComponentConfigureProto")
     }
 
-    fun process(samples: FloatArray, options: RAVADOptions = RAVADOptions()): RAVADResult {
-        create()
+    /** Run a single VAD detection pass on the supplied audio samples. */
+    suspend fun process(samples: FloatArray, options: RAVADOptions = RAVADOptions()): RAVADResult {
+        val handle = actor.getHandle()
         return decodeOrThrow(
             VADResult.ADAPTER,
             RunAnywhereBridge.racVadComponentProcessProto(
-                getHandle(),
+                handle,
                 samples,
                 VADOptions.ADAPTER.encode(options),
             ),
@@ -119,31 +139,13 @@ object CppBridgeVAD {
         )
     }
 
-    fun statistics(): VADStatistics {
-        create()
+    /** Read the current VAD statistics snapshot. */
+    suspend fun statistics(): VADStatistics {
+        val handle = actor.getHandle()
         return decodeOrThrow(
             VADStatistics.ADAPTER,
-            RunAnywhereBridge.racVadComponentGetStatisticsProto(getHandle()),
+            RunAnywhereBridge.racVadComponentGetStatisticsProto(handle),
             "racVadComponentGetStatisticsProto",
         )
-    }
-
-    private fun <M : Message<M, *>> decodeOrThrow(
-        adapter: ProtoAdapter<M>,
-        bytes: ByteArray?,
-        operation: String,
-    ): M {
-        val payload = bytes ?: throw SDKException.operation("$operation returned null")
-        return try {
-            adapter.decode(payload)
-        } catch (e: Exception) {
-            throw SDKException.operation("Failed to decode $operation result: ${e.message}")
-        }
-    }
-
-    private fun checkRc(rc: Int, operation: String) {
-        if (rc != RunAnywhereBridge.RAC_SUCCESS) {
-            throw SDKException.operation("$operation failed with rc=$rc")
-        }
     }
 }

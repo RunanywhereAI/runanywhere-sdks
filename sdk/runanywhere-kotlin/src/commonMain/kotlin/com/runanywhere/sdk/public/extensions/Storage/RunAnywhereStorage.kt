@@ -6,18 +6,12 @@
  *
  * Mirrors Swift `RunAnywhere+Storage.swift` exactly:
  *   - `getStorageInfo()` (replaces the legacy `storageInfo()` accessor)
- *   - `checkStorageAvailability(request)` returning the proto result
- *   - `planStorageDelete(request)` returning the C++-owned plan
  *   - `deleteStorage(request)` executing or dry-running deletion
  *   - `clearCache()` / `cleanTempFiles()` forwarding to the FileManager bridge
  */
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.StorageAvailabilityRequest
-import ai.runanywhere.proto.v1.StorageAvailabilityResult
-import ai.runanywhere.proto.v1.StorageDeletePlan
-import ai.runanywhere.proto.v1.StorageDeletePlanRequest
 import ai.runanywhere.proto.v1.StorageDeleteRequest
 import ai.runanywhere.proto.v1.StorageDeleteResult
 import ai.runanywhere.proto.v1.StorageInfoRequest
@@ -43,25 +37,7 @@ expect suspend fun RunAnywhere.getStorageInfo(): RAStorageInfo
  */
 expect suspend fun RunAnywhere.getStorageInfo(request: StorageInfoRequest): StorageInfoResult
 
-// MARK: - Storage Availability
-
-/**
- * Check storage availability through the canonical generated proto API.
- *
- * Mirrors Swift `RunAnywhere.checkStorageAvailability(_:)`.
- */
-expect suspend fun RunAnywhere.checkStorageAvailability(
-    request: StorageAvailabilityRequest,
-): StorageAvailabilityResult
-
 // MARK: - Storage Deletion
-
-/**
- * Build a C++-owned safe delete plan.
- *
- * Mirrors Swift `RunAnywhere.planStorageDelete(_:)`.
- */
-expect suspend fun RunAnywhere.planStorageDelete(request: StorageDeletePlanRequest): StorageDeletePlan
 
 /**
  * Execute or dry-run a C++-planned storage delete.

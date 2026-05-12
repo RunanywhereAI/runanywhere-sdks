@@ -13,16 +13,11 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.extensions.Models.displayName
 import com.runanywhere.sdk.public.extensions.availableModels
-import com.runanywhere.sdk.public.extensions.currentLLMModel
 import com.runanywhere.sdk.public.extensions.currentModel
-import com.runanywhere.sdk.public.extensions.currentSTTModelId
-import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
 import com.runanywhere.sdk.public.extensions.downloadModel
-import com.runanywhere.sdk.public.extensions.loadLLMModel
-import com.runanywhere.sdk.public.extensions.loadSTTModel
-import com.runanywhere.sdk.public.extensions.loadTTSVoice
-import com.runanywhere.sdk.public.extensions.loadVLMModel
+import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -187,10 +182,21 @@ class ModelSelectionViewModel(
      */
     private suspend fun getCurrentLoadedModelIdForContext(): String? {
         return when (context) {
-            // Round 3 KOTLIN: currentLLMModel is now a sync val property.
-            ModelSelectionContext.LLM -> RunAnywhere.currentLLMModel?.id
-            ModelSelectionContext.STT -> RunAnywhere.currentSTTModelId
-            ModelSelectionContext.TTS -> RunAnywhere.currentTTSVoiceId
+            ModelSelectionContext.LLM ->
+                RunAnywhere
+                    .currentModel(CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_LANGUAGE))
+                    .model_id
+                    .takeIf { it.isNotEmpty() }
+            ModelSelectionContext.STT ->
+                RunAnywhere
+                    .currentModel(CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION))
+                    .model_id
+                    .takeIf { it.isNotEmpty() }
+            ModelSelectionContext.TTS ->
+                RunAnywhere
+                    .currentModel(CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS))
+                    .model_id
+                    .takeIf { it.isNotEmpty() }
             ModelSelectionContext.VOICE -> null
             ModelSelectionContext.RAG_EMBEDDING,
             ModelSelectionContext.RAG_LLM,
@@ -358,20 +364,53 @@ class ModelSelectionViewModel(
             // Context-aware model loading - matches iOS exactly
             when (context) {
                 ModelSelectionContext.LLM -> {
-                    RunAnywhere.loadLLMModel(modelId)
+                    RunAnywhere.loadModel(
+                        RAModelLoadRequest(
+                            model_id = modelId,
+                            category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+                        ),
+                    )
                 }
                 ModelSelectionContext.STT -> {
-                    RunAnywhere.loadSTTModel(modelId)
+                    RunAnywhere.loadModel(
+                        RAModelLoadRequest(
+                            model_id = modelId,
+                            category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+                        ),
+                    )
                 }
                 ModelSelectionContext.TTS -> {
-                    RunAnywhere.loadTTSVoice(modelId)
+                    RunAnywhere.loadModel(
+                        RAModelLoadRequest(
+                            model_id = modelId,
+                            category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+                        ),
+                    )
                 }
                 ModelSelectionContext.VOICE -> {
                     val model = _uiState.value.models.find { it.id == modelId }
                     when (model?.category) {
-                        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION -> RunAnywhere.loadSTTModel(modelId)
-                        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS -> RunAnywhere.loadTTSVoice(modelId)
-                        else -> RunAnywhere.loadLLMModel(modelId)
+                        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION ->
+                            RunAnywhere.loadModel(
+                                RAModelLoadRequest(
+                                    model_id = modelId,
+                                    category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+                                ),
+                            )
+                        ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS ->
+                            RunAnywhere.loadModel(
+                                RAModelLoadRequest(
+                                    model_id = modelId,
+                                    category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+                                ),
+                            )
+                        else ->
+                            RunAnywhere.loadModel(
+                                RAModelLoadRequest(
+                                    model_id = modelId,
+                                    category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+                                ),
+                            )
                     }
                 }
                 ModelSelectionContext.RAG_EMBEDDING,
@@ -381,7 +420,12 @@ class ModelSelectionViewModel(
                     Timber.d("ℹ️ RAG context: selecting model by reference only (no load): $modelId")
                 }
                 ModelSelectionContext.VLM -> {
-                    RunAnywhere.loadVLMModel(modelId)
+                    RunAnywhere.loadModel(
+                        RAModelLoadRequest(
+                            model_id = modelId,
+                            category = ModelCategory.MODEL_CATEGORY_VISION,
+                        ),
+                    )
                 }
             }
 

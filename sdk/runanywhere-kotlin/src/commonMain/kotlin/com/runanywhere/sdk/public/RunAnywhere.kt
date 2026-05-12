@@ -2,18 +2,29 @@
  * Copyright 2026 RunAnywhere SDK
  * SPDX-License-Identifier: Apache-2.0
  *
- * Main entry point for the RunAnywhere SDK.
- * Thin wrapper that delegates to CppBridge for C++ interop.
- *
- * This file mirrors the iOS SDK's RunAnywhere.swift structure.
+ * The main entry point for the RunAnywhere SDK.
+ * Two-phase initialization is owned by commons (rac_sdk_init.h, P2-T9):
+ *   * Phase 1 → rac_sdk_init_phase1_proto (validate + state init)
+ *   * Phase 2 → rac_sdk_init_phase2_proto (device registration, model
+ *     assignments, HTTP-state snapshot)
+ *   * HTTP retry → rac_sdk_retry_http_proto
+ * Kotlin retains only the parts that cannot move into C++:
+ *   * Coroutine Mutex + servicesMutex concurrency primitive
+ *   * EncryptedSharedPreferences / file-backed SDK params persistence
+ *   * JNI platform-plugin registration on JVM/Android main thread
+ *   * HTTP authentication round-trip via OkHttp (deferred per
+ *     sdk_init.cpp file header)
+ *   * Telemetry flush + model discovery (deferred — handles owned by SDK)
  */
 
 package com.runanywhere.sdk.public
 
-import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
+import com.runanywhere.sdk.public.configuration.SDKEnvironment
+import com.runanywhere.sdk.public.configuration.wireString
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.extensions.LogLevel
-import com.runanywhere.sdk.utils.SDKConstants
+import com.runanywhere.sdk.foundation.constants.SDKConstants
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -50,8 +61,8 @@ import kotlinx.coroutines.sync.withLock
  * - Event access via `events` property
  *
  * Feature-specific APIs are available through extension functions in public/extensions/:
- * - STT: RunAnywhere.transcribe(), RunAnywhere.loadSTTModel()
- * - TTS: RunAnywhere.synthesize(), RunAnywhere.loadTTSVoice()
+ * - STT: RunAnywhere.transcribe(), RunAnywhere.transcribeStream()
+ * - TTS: RunAnywhere.synthesize(), RunAnywhere.loadModel(RAModelLoadRequest)
  * - LLM: RunAnywhere.generate(), RunAnywhere.generateStream()
  * - VAD: RunAnywhere.detectSpeech()
  * - VoiceAgent: VoiceAgentStreamAdapter(handle).stream() (v3.1)
@@ -86,12 +97,6 @@ object RunAnywhere {
      * Check if SDK is initialized (Phase 1 complete)
      */
     val isInitialized: Boolean
-        get() = _isInitialized
-
-    /**
-     * Alias for isInitialized for compatibility
-     */
-    val isSDKInitialized: Boolean
         get() = _isInitialized
 
     /**
@@ -134,6 +139,49 @@ object RunAnywhere {
      */
     val events: EventBus
         get() = EventBus
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // MARK: - Authentication Info (Production/Staging only)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * Get the current user ID from authentication state.
+     *
+     * @return User ID if authenticated, `null` otherwise.
+     */
+    fun getUserId(): String? = platformGetUserId()
+
+    /**
+     * Get the current organization ID from authentication state.
+     *
+     * @return Organization ID if authenticated, `null` otherwise.
+     */
+    fun getOrganizationId(): String? = platformGetOrganizationId()
+
+    /**
+     * Check if the SDK is currently authenticated with a valid token.
+     *
+     * Equivalent to Swift's `RunAnywhere.isAuthenticated` static var.
+     */
+    val isAuthenticated: Boolean
+        get() = platformIsAuthenticated()
+
+    /**
+     * Check if this device is registered with the backend.
+     *
+     * @return true if the device-registration handshake completed successfully.
+     */
+    fun isDeviceRegistered(): Boolean = platformIsDeviceRegistered()
+
+    /**
+     * The persistent device ID. Survives reinstalls (stored in keychain on
+     * Apple platforms / EncryptedSharedPreferences on Android).
+     *
+     * Resolved by commons via the device-identity chain
+     * (secure_get → vendor ID → freshly synthesized UUID).
+     */
+    val deviceId: String
+        get() = platformDeviceId()
 
     // ═══════════════════════════════════════════════════════════════════════════
     // MARK: - Phase 1: Core Initialization (Synchronous)
@@ -375,3 +423,26 @@ internal expect suspend fun initializePlatformBridgeServices()
  * On JVM/Android, this calls CppBridge.shutdown().
  */
 internal expect fun shutdownPlatformBridge()
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Platform-specific auth/device state accessors (expect/actual pattern)
+// ═══════════════════════════════════════════════════════════════════════════
+
+/** JVM/Android actual routes to `RunAnywhereBridge.racAuthGetUserId()`. */
+internal expect fun platformGetUserId(): String?
+
+/** JVM/Android actual routes to `RunAnywhereBridge.racAuthGetOrganizationId()`. */
+internal expect fun platformGetOrganizationId(): String?
+
+/** JVM/Android actual routes to `RunAnywhereBridge.racAuthIsAuthenticated()`. */
+internal expect fun platformIsAuthenticated(): Boolean
+
+/** JVM/Android actual routes to `CppBridgeDevice.isRegistered()`. */
+internal expect fun platformIsDeviceRegistered(): Boolean
+
+/**
+ * JVM/Android actual routes to `CppBridgeDevice.getDeviceId()` →
+ * `RunAnywhereBridge.racAuthGetDeviceId()` chain, returning empty string when
+ * the device hasn't been registered yet.
+ */
+internal expect fun platformDeviceId(): String

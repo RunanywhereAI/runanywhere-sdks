@@ -15,8 +15,7 @@ import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.RAGDocument
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
-import ai.runanywhere.proto.v1.RAGSearchResult
-import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeRAG
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
@@ -155,38 +154,6 @@ actual suspend fun RunAnywhere.ragQuery(
     if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
     return withContext(Dispatchers.IO) {
         CppBridgeRAG.query((options ?: RAGQueryOptions.defaults(question)).copy(question = question))
-    }
-}
-
-actual suspend fun RunAnywhere.ragQueryWithContext(
-    query: String,
-    systemPrompt: String?,
-    options: RAGQueryOptions,
-): RAGResult {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    val merged = options.copy(question = query, system_prompt = systemPrompt ?: options.system_prompt)
-    return withContext(Dispatchers.IO) {
-        CppBridgeRAG.query(merged)
-    }
-}
-
-actual suspend fun RunAnywhere.ragSearch(
-    query: String,
-    topK: Int,
-    threshold: Float,
-): List<RAGSearchResult> {
-    if (!isInitialized) throw SDKException.notInitialized("SDK not initialized")
-    val searchOptions =
-        RAGQueryOptions.defaults(query).copy(
-            question = query,
-            top_k = topK,
-            similarity_threshold = threshold,
-            // Suppress LLM generation by zeroing max_tokens; the C++ ABI still
-            // populates retrieved_chunks from vector retrieval before stopping.
-            max_tokens = 0,
-        )
-    return withContext(Dispatchers.IO) {
-        CppBridgeRAG.query(searchOptions).retrieved_chunks
     }
 }
 

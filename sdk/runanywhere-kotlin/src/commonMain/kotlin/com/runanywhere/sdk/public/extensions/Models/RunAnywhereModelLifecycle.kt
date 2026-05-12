@@ -16,7 +16,6 @@ import ai.runanywhere.proto.v1.ModelUnloadRequest
 import ai.runanywhere.proto.v1.ModelUnloadResult
 import ai.runanywhere.proto.v1.SDKComponent
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RAModelLoadResult
 
@@ -33,18 +32,6 @@ expect suspend fun RunAnywhere.componentLifecycleSnapshot(component: SDKComponen
 // MARK: - Model Loading
 
 expect suspend fun RunAnywhere.loadModel(modelId: String)
-
-expect suspend fun RunAnywhere.loadLLMModel(modelId: String)
-
-expect suspend fun RunAnywhere.unloadLLMModel()
-
-expect val RunAnywhere.isLLMModelLoaded: Boolean
-
-expect val RunAnywhere.currentLLMModel: RAModelInfo?
-
-expect suspend fun RunAnywhere.currentSTTModel(): RAModelInfo?
-
-expect suspend fun RunAnywhere.loadSTTModel(modelId: String)
 
 // MARK: - Model Assignments
 // `fetchModelAssignments` was deleted in the dead-code wave (KOT-DEAD).

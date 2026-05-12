@@ -1,5 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.chat
 
+import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.GenerationEvent
 import ai.runanywhere.proto.v1.GenerationEventKind
 import ai.runanywhere.proto.v1.InferenceFramework
@@ -23,15 +24,15 @@ import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedModel
 import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.cancelGeneration
-import com.runanywhere.sdk.public.extensions.currentLLMModel
+import com.runanywhere.sdk.public.extensions.currentModel
 import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.generateWithTools
 import com.runanywhere.sdk.public.extensions.getRegisteredTools
-import com.runanywhere.sdk.public.extensions.isLLMModelLoaded
-import com.runanywhere.sdk.public.extensions.loadLLMModel
+import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.lora
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import kotlin.math.ceil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -782,15 +783,19 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         try {
             if (app.isSDKReady()) {
                 // Check if LLM is already loaded via SDK
-                if (RunAnywhere.isLLMModelLoaded) {
-                    val currentModel = RunAnywhere.currentLLMModel
-                    val displayName = currentModel?.name ?: currentModel?.id
+                val currentLLM =
+                    RunAnywhere.currentModel(
+                        CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_LANGUAGE),
+                    )
+                if (currentLLM.found && currentLLM.model_id.isNotEmpty()) {
+                    val loadedModel = currentLLM.model
+                    val displayName = loadedModel?.name ?: currentLLM.model_id
                     Timber.i("✅ LLM model already loaded: $displayName")
                     _uiState.value =
                         _uiState.value.copy(
                             isModelLoaded = true,
                             loadedModelName = displayName,
-                            currentModelSupportsLora = currentModel?.supports_lora == true,
+                            currentModelSupportsLora = loadedModel?.supports_lora == true,
                         )
                     refreshLoraState()
                     addSystemMessageIfNeeded()
@@ -812,7 +817,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                     Timber.i("📦 Found downloaded chat model: ${chatModel.name}, loading...")
 
                     try {
-                        RunAnywhere.loadLLMModel(chatModel.id)
+                        val loadResult =
+                            RunAnywhere.loadModel(
+                                RAModelLoadRequest(
+                                    model_id = chatModel.id,
+                                    category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
+                                ),
+                            )
+                        if (!loadResult.success) {
+                            throw IllegalStateException(
+                                loadResult.error_message.ifBlank { "Failed to load LLM model '${chatModel.id}'" },
+                            )
+                        }
 
                         _uiState.value =
                             _uiState.value.copy(

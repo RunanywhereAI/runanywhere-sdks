@@ -16,7 +16,6 @@ import ai.runanywhere.proto.v1.RAGConfig
 import ai.runanywhere.proto.v1.RAGConfiguration
 import ai.runanywhere.proto.v1.RAGQueryOptions
 import ai.runanywhere.proto.v1.RAGResult
-import ai.runanywhere.proto.v1.RAGSearchResult
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RAModelInfo
@@ -159,29 +158,6 @@ expect suspend fun RunAnywhere.ragQuery(
     question: String,
     options: RAGQueryOptions? = null,
 ): RAGResult
-
-/**
- * Query the RAG pipeline while overriding the system prompt for this turn.
- *
- * Convenience wrapper around [ragQuery] that sets [RAGQueryOptions.system_prompt]
- * before delegating to the C++ ABI.
- */
-expect suspend fun RunAnywhere.ragQueryWithContext(
-    query: String,
-    systemPrompt: String? = null,
-    options: RAGQueryOptions = RAGQueryOptions.defaults(query),
-): RAGResult
-
-/**
- * Vector-only retrieval: returns the top-K chunks ranked by cosine
- * similarity without invoking the LLM. Implemented by issuing a
- * zero-token [ragQuery] and surfacing the [RAGResult.retrieved_chunks].
- */
-expect suspend fun RunAnywhere.ragSearch(
-    query: String,
-    topK: Int = 5,
-    threshold: Float = 0.0f,
-): List<RAGSearchResult>
 
 // D-6: resolveRAGConfiguration deleted.  Commons now owns model-id ->
 // path resolution, so the Kotlin SDK no longer re-implements lookup +

@@ -14,7 +14,7 @@
 
 package com.runanywhere.sdk.core.onnx
 
-import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 
 /**
  * Native bridge for ONNX backend registration.

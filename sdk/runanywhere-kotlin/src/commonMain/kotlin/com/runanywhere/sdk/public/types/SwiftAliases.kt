@@ -18,6 +18,8 @@ public typealias RALLMGenerationOptions = ai.runanywhere.proto.v1.LLMGenerationO
 public typealias RALLMGenerationResult = ai.runanywhere.proto.v1.LLMGenerationResult
 public typealias RALLMGenerateRequest = ai.runanywhere.proto.v1.LLMGenerateRequest
 public typealias RALLMStreamEvent = ai.runanywhere.proto.v1.LLMStreamEvent
+public typealias RAThinkingTagPattern = ai.runanywhere.proto.v1.ThinkingTagPattern
+public typealias RAExecutionTarget = ai.runanywhere.proto.v1.ExecutionTarget
 public typealias RAToolDefinition = ai.runanywhere.proto.v1.ToolDefinition
 public typealias RAToolCall = ai.runanywhere.proto.v1.ToolCall
 public typealias RAToolResult = ai.runanywhere.proto.v1.ToolResult
@@ -31,7 +33,7 @@ public typealias RALoRAAdapterConfig = ai.runanywhere.proto.v1.LoRAAdapterConfig
 
 // ─── Audio (STT / TTS / VAD) ────────────────────────────────────────────────
 
-public typealias RATranscriptionResult = ai.runanywhere.proto.v1.STTOutput
+public typealias RASTTOutput = ai.runanywhere.proto.v1.STTOutput
 public typealias RASTTOptions = ai.runanywhere.proto.v1.STTOptions
 public typealias RATTSOptions = ai.runanywhere.proto.v1.TTSOptions
 public typealias RATTSOutput = ai.runanywhere.proto.v1.TTSOutput
@@ -58,7 +60,15 @@ public typealias RARAGDocument = ai.runanywhere.proto.v1.RAGDocument
 public typealias RAModelInfo = ai.runanywhere.proto.v1.ModelInfo
 public typealias RAModelLoadRequest = ai.runanywhere.proto.v1.ModelLoadRequest
 public typealias RAModelLoadResult = ai.runanywhere.proto.v1.ModelLoadResult
+public typealias RAModelCategory = ai.runanywhere.proto.v1.ModelCategory
+public typealias RAModelFormat = ai.runanywhere.proto.v1.ModelFormat
+public typealias RAModelSource = ai.runanywhere.proto.v1.ModelSource
+public typealias RAInferenceFramework = ai.runanywhere.proto.v1.InferenceFramework
+public typealias RAArchiveType = ai.runanywhere.proto.v1.ArchiveType
+public typealias RAArchiveStructure = ai.runanywhere.proto.v1.ArchiveStructure
 public typealias RAStorageInfo = ai.runanywhere.proto.v1.StorageInfo
 public typealias RAHardwareProfile = ai.runanywhere.proto.v1.HardwareProfile
+public typealias RAAcceleratorInfo = ai.runanywhere.proto.v1.AcceleratorInfo
+public typealias RAAccelerationPreference = ai.runanywhere.proto.v1.AccelerationPreference
 public typealias RASDKError = ai.runanywhere.proto.v1.SDKError
 public typealias RASDKEvent = ai.runanywhere.proto.v1.SDKEvent

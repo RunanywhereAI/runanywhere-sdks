@@ -66,8 +66,10 @@ import com.runanywhere.runanywhereai.ui.theme.AppColors
 import com.runanywhere.runanywhereai.ui.theme.AppTypography
 import com.runanywhere.runanywhereai.ui.theme.Dimensions
 import com.runanywhere.runanywhereai.util.getModelLogoResIdForName
+import ai.runanywhere.proto.v1.CurrentModelRequest
+import ai.runanywhere.proto.v1.ModelCategory
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.currentLLMModel
+import com.runanywhere.sdk.public.extensions.currentModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -116,8 +118,14 @@ fun ChatScreen(
                 onInfoClick = { showingChatDetails = true },
                 onModelClick = { showingModelSelection = true },
                 onLoraClick = {
-                    RunAnywhere.currentLLMModel?.id?.let { modelId ->
-                        loraViewModel.refreshForModel(modelId)
+                    scope.launch {
+                        val current =
+                            RunAnywhere.currentModel(
+                                CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_LANGUAGE),
+                            )
+                        current.model_id.takeIf { it.isNotEmpty() }?.let { modelId ->
+                            loraViewModel.refreshForModel(modelId)
+                        }
                     }
                     showingLoraAdapterPicker = true
                 },

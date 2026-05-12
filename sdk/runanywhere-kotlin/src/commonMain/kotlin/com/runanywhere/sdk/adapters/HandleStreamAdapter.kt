@@ -1,0 +1,363 @@
+/*
+ * HandleStreamAdapter.kt
+ *
+ * Kotlin port of Swift's `Sources/RunAnywhere/Adapters/HandleStreamAdapter.swift`.
+ *
+ * Generic `Flow`-based wrapper over a proto-byte streaming C ABI of the
+ * shape `(handle, callback, userData) -> int`. Replaces the duplicated
+ * fan-out machinery that would otherwise repeat across LLMStreamAdapter
+ * and VoiceAgentStreamAdapter (and any future per-handle stream).
+ *
+ * The C ABI exposes a SINGLE proto-callback slot per handle, so a naive
+ * adapter would silently let one collector clobber another. This generic
+ * installs ONE C-side registration lazily on the first subscriber and
+ * tears it down when the last subscriber detaches, fanning each decoded
+ * event out to every active `Flow` collector.
+ *
+ * Semantics (matched to Swift's HandleStreamAdapter exactly):
+ *   * The first subscriber installs one C callback registration.
+ *   * Subsequent subscribers fan out from the same registration — all
+ *     share the single registered trampoline.
+ *   * On the last subscriber unsubscribing the registration is torn
+ *     down and the per-handle fan-out is removed from the static map.
+ *   * If the caller supplies `isTerminalEvent`, an event satisfying
+ *     the predicate finishes every collector and tears down the
+ *     registration immediately (the LLM `is_final` semantics). When the
+ *     predicate is omitted (the VoiceAgent case) events fan out
+ *     forever until consumers detach.
+ *
+ * Concurrency:
+ *   * Per-handle state is guarded by `synchronized(lock)`. State ops
+ *     happen inside both suspend (collector attach/detach) and
+ *     non-suspend (C callback trampoline) contexts, so a coroutine
+ *     `Mutex` cannot be used uniformly.
+ *   * The per-handle registry is a `MutableMap` guarded by its own
+ *     monitor — KMP commonMain has no `ConcurrentHashMap`, but the
+ *     critical sections are O(1) and contention is low.
+ *
+ * Public API:
+ *     val adapter = HandleStreamAdapter<Long, LLMStreamEvent>(
+ *         handle = handle,
+ *         streamKey = "llm",
+ *         register = { h, cb -> bridge.registerCallback(h, cb) },
+ *         unregister = { h, id -> bridge.unregisterCallback(h, id) },
+ *         decodeEvent = { bytes -> LLMStreamEvent.ADAPTER.decode(bytes) },
+ *         isTerminalEvent = { it.is_final },
+ *     )
+ *     adapter.stream().collect { event -> ... }
+ *
+ * Cancellation: standard `Flow` cancellation (collector cancelled,
+ * `take(N)` completes, etc.) fires `awaitClose`, which detaches the
+ * channel. When the last channel detaches the C registration is torn
+ * down.
+ */
+
+package com.runanywhere.sdk.adapters
+
+import com.squareup.wire.Message
+import kotlinx.coroutines.channels.SendChannel
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.channels.trySendBlocking
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+
+/**
+ * Generic Flow wrapper for proto-byte streaming C ABIs that follow the
+ * `(handle, callback) -> callbackId` shape.
+ *
+ * @param Handle Native handle type. Kept abstract so per-component
+ *   handle wrappers (`Long` for LLM/VoiceAgent today; future opaque
+ *   wrappers tomorrow) can plug in without changing the generic.
+ * @param Event Proto event type. Must extend Wire's [Message] so the
+ *   adapter can statically narrow the [decodeEvent] return type. The
+ *   decode closure itself is injected, mirroring Swift's `Event(serializedBytes:)`
+ *   indirection (Wire's `ADAPTER` lives on the companion of each generated
+ *   class — Kotlin generics cannot reach it without reflection).
+ *
+ * @param handle The native handle the C registration targets.
+ * @param streamKey Identifier that partitions the global fan-out store
+ *   by adapter kind. Two adapter instances that share the same `Handle`
+ *   type but call different `register` symbols must use distinct
+ *   `streamKey` values; otherwise their fan-outs collide. Pass a stable
+ *   string such as `"llm"` or `"voice-agent"`.
+ * @param register Closure that installs the C-side callback for [handle].
+ *   Must return a non-zero callback id on success or
+ *   [INVALID_CALLBACK_ID] (0) on failure.
+ * @param unregister Closure that tears down the C-side registration
+ *   identified by `callbackId`. Pass a no-op id-less closure if your ABI
+ *   uses a NULL-callback re-installation pattern (mirror Swift's
+ *   VoiceAgent specialization).
+ * @param decodeEvent Closure that parses one proto-byte payload into
+ *   an [Event]. Typically `{ bytes -> Event.ADAPTER.decode(bytes) }`.
+ * @param isTerminalEvent Optional predicate that classifies an event
+ *   as terminal. When non-null and an event satisfies it, every
+ *   collector is closed and the C registration is torn down. Omit to
+ *   get pure fan-out semantics (events flow until subscribers detach).
+ */
+class HandleStreamAdapter<Handle : Any, Event : Message<*, *>>(
+    private val handle: Handle,
+    private val streamKey: String,
+    private val register: (Handle, (ByteArray) -> Unit) -> Long,
+    private val unregister: (Handle, Long) -> Unit,
+    private val decodeEvent: (ByteArray) -> Event,
+    private val isTerminalEvent: ((Event) -> Boolean)? = null,
+) {
+
+    /**
+     * Start a new subscription. The returned [Flow] emits one decoded
+     * [Event] per byte payload delivered by the C callback.
+     *
+     * Calling `stream()` twice attaches two collectors to the same
+     * per-handle native callback registration. Each collector observes
+     * every event in order, with its own bounded channel for
+     * backpressure (drops the oldest event on overflow rather than
+     * blocking the C dispatcher).
+     */
+    fun stream(): Flow<Event> =
+        callbackFlow<Event> {
+            val fanOut = fanOutFor(streamKey, handle, register, unregister, decodeEvent, isTerminalEvent)
+            val channel: SendChannel<Event> = channel
+            val added = fanOut.attach(channel)
+            if (!added) {
+                close(
+                    IllegalStateException(
+                        "HandleStreamAdapter[$streamKey]: register() returned " +
+                            "INVALID_CALLBACK_ID — C-side registration failed.",
+                    ),
+                )
+                return@callbackFlow
+            }
+
+            awaitClose { fanOut.detach(channel) }
+        }
+
+    /**
+     * Force-tear down the per-handle registration regardless of
+     * outstanding subscribers. Subscribers' flows complete normally.
+     * Intended for use during component destruction; ordinary
+     * cancellation should rely on the collector being cancelled.
+     */
+    fun tearDown() {
+        val key = StoreKey(streamKey, handle)
+        val fanOut =
+            synchronized(fanOutsLock) {
+                @Suppress("UNCHECKED_CAST")
+                fanOuts[key] as HandleFanOut<Event>?
+            }
+        fanOut?.forceTearDown()
+    }
+
+    // -----------------------------------------------------------------
+    // Per-handle fan-out
+    // -----------------------------------------------------------------
+
+    /**
+     * Owns the single C-side registration for a specific (streamKey,
+     * handle) pair and fans decoded events out to every attached
+     * collector. Mirrors Swift's `HandleFanOut` inner class.
+     */
+    internal class HandleFanOut<Event : Message<*, *>>(
+        private val handle: Any,
+        private val storeKey: StoreKey,
+        private val register: (Any, (ByteArray) -> Unit) -> Long,
+        private val unregister: (Any, Long) -> Unit,
+        private val decodeEvent: (ByteArray) -> Event,
+        private val isTerminalEvent: ((Event) -> Boolean)?,
+    ) {
+        private val lock = Any()
+        private val collectors = mutableListOf<SendChannel<Event>>()
+
+        // Volatile so the C callback thread can read the latest id
+        // without taking the lock for every dispatch.
+        @Volatile
+        private var callbackId: Long = INVALID_CALLBACK_ID
+
+        /**
+         * Attach a collector. Returns `true` on success; returns `false`
+         * (and leaves the fan-out state unchanged) if this was the
+         * first subscriber AND the C-side registration failed, so the
+         * caller can propagate the error to its own flow.
+         */
+        fun attach(channel: SendChannel<Event>): Boolean {
+            synchronized(lock) {
+                if (collectors.isEmpty()) {
+                    val id = register(handle) { bytes -> broadcast(bytes) }
+                    if (id == INVALID_CALLBACK_ID) return false
+                    callbackId = id
+                }
+                collectors.add(channel)
+                return true
+            }
+        }
+
+        /**
+         * Detach a collector. When the last collector detaches the C
+         * registration is torn down and this fan-out is removed from
+         * the global registry.
+         */
+        fun detach(channel: SendChannel<Event>) {
+            synchronized(lock) {
+                collectors.remove(channel)
+                if (collectors.isEmpty() && callbackId != INVALID_CALLBACK_ID) {
+                    unregister(handle, callbackId)
+                    callbackId = INVALID_CALLBACK_ID
+                    removeFanOut(storeKey)
+                }
+            }
+        }
+
+        /** Force teardown ignoring outstanding collectors. */
+        fun forceTearDown() {
+            val snapshot: List<SendChannel<Event>>
+            synchronized(lock) {
+                if (callbackId != INVALID_CALLBACK_ID) {
+                    unregister(handle, callbackId)
+                    callbackId = INVALID_CALLBACK_ID
+                }
+                snapshot = collectors.toList()
+                collectors.clear()
+                removeFanOut(storeKey)
+            }
+            for (c in snapshot) c.close()
+        }
+
+        /** Visible for testing: number of attached collectors. */
+        internal fun collectorCount(): Int = synchronized(lock) { collectors.size }
+
+        /** Visible for testing: whether the C callback is currently installed. */
+        internal fun isRegistered(): Boolean = callbackId != INVALID_CALLBACK_ID
+
+        private fun broadcast(bytes: ByteArray) {
+            val event =
+                try {
+                    decodeEvent(bytes)
+                } catch (t: Throwable) {
+                    // Malformed frame: surface the decode failure to every
+                    // collector and tear down — broadcasting garbage is
+                    // strictly worse than failing fast (matches Swift's
+                    // `finishAll()` on decode failure).
+                    val snapshot: List<SendChannel<Event>>
+                    synchronized(lock) {
+                        snapshot = collectors.toList()
+                        collectors.clear()
+                        if (callbackId != INVALID_CALLBACK_ID) {
+                            unregister(handle, callbackId)
+                            callbackId = INVALID_CALLBACK_ID
+                            removeFanOut(storeKey)
+                        }
+                    }
+                    for (c in snapshot) c.close(t)
+                    return
+                }
+
+            val isFinal = isTerminalEvent?.invoke(event) ?: false
+
+            // Snapshot collectors under the lock so concurrent attach /
+            // detach can't observe a torn list mid-broadcast.
+            val snapshot: List<SendChannel<Event>>
+            synchronized(lock) {
+                snapshot = collectors.toList()
+                if (isFinal) {
+                    collectors.clear()
+                    if (callbackId != INVALID_CALLBACK_ID) {
+                        unregister(handle, callbackId)
+                        callbackId = INVALID_CALLBACK_ID
+                        removeFanOut(storeKey)
+                    }
+                }
+            }
+
+            for (c in snapshot) {
+                c.trySendBlocking(event)
+                if (isFinal) c.close()
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Global per-handle fan-out registry
+    // -----------------------------------------------------------------
+
+    companion object {
+        /**
+         * Sentinel returned by [register] when the C-side installation
+         * fails. Mirrors Swift's `result != RAC_SUCCESS` branch which
+         * leaves no native registration in place.
+         */
+        const val INVALID_CALLBACK_ID: Long = 0L
+
+        // Backed by a `MutableMap` + monitor rather than
+        // `ConcurrentHashMap` so the generic stays in `commonMain`
+        // (KMP commonMain has no java.util.concurrent). Critical
+        // sections are O(1) and contention is low.
+        private val fanOutsLock = Any()
+        private val fanOuts = mutableMapOf<StoreKey, Any>()
+
+        /**
+         * Look up (or lazily create) the fan-out for a `(streamKey, handle)`
+         * pair. The cast at the call site is guarded by streamKey, which
+         * partitions the map across all generic specializations.
+         */
+        private fun <H : Any, E : Message<*, *>> fanOutFor(
+            streamKey: String,
+            handle: H,
+            register: (H, (ByteArray) -> Unit) -> Long,
+            unregister: (H, Long) -> Unit,
+            decodeEvent: (ByteArray) -> E,
+            isTerminalEvent: ((E) -> Boolean)?,
+        ): HandleFanOut<E> {
+            val key = StoreKey(streamKey, handle)
+            synchronized(fanOutsLock) {
+                val existing = fanOuts[key]
+                if (existing != null) {
+                    @Suppress("UNCHECKED_CAST")
+                    return existing as HandleFanOut<E>
+                }
+                // Erase the Handle param through `Any` so the registry
+                // can hold heterogeneous specializations under one map.
+                // streamKey partitions, so the cast inside the fan-out
+                // is sound.
+                @Suppress("UNCHECKED_CAST")
+                val fanOut =
+                    HandleFanOut<E>(
+                        handle = handle,
+                        storeKey = key,
+                        register = register as (Any, (ByteArray) -> Unit) -> Long,
+                        unregister = unregister as (Any, Long) -> Unit,
+                        decodeEvent = decodeEvent,
+                        isTerminalEvent = isTerminalEvent,
+                    )
+                fanOuts[key] = fanOut
+                return fanOut
+            }
+        }
+
+        internal fun removeFanOut(key: StoreKey) {
+            synchronized(fanOutsLock) { fanOuts.remove(key) }
+        }
+
+        /** Visible for testing: total number of live fan-outs. */
+        internal fun activeFanOutCount(): Int = synchronized(fanOutsLock) { fanOuts.size }
+
+        /** Visible for testing: look up an existing fan-out by key components. */
+        internal fun <E : Message<*, *>> fanOutForTesting(streamKey: String, handle: Any): HandleFanOut<E>? {
+            synchronized(fanOutsLock) {
+                @Suppress("UNCHECKED_CAST")
+                return fanOuts[StoreKey(streamKey, handle)] as HandleFanOut<E>?
+            }
+        }
+    }
+
+    /**
+     * Composite key partitioning the global fan-out registry. The
+     * `streamKey` distinguishes adapters that share the same handle
+     * type but address different C registration ABIs (e.g. an LLM
+     * stream and a future tool-call stream that share a `Long`
+     * handle but use different register/unregister symbols).
+     *
+     * Equality on `handle` uses its native `equals` — for `Long` that
+     * is value equality, which is what we want for native handles
+     * received from C as opaque integer ids.
+     */
+    internal data class StoreKey(val streamKey: String, val handle: Any)
+}

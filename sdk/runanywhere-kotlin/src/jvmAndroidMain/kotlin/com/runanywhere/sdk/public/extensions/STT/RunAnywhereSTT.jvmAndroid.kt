@@ -8,16 +8,13 @@
 
 package com.runanywhere.sdk.public.extensions
 
-import ai.runanywhere.proto.v1.CurrentModelRequest
-import ai.runanywhere.proto.v1.ModelCategory as ProtoModelCategory
 import ai.runanywhere.proto.v1.STTStreamEvent
-import com.runanywhere.sdk.foundation.SDKLogger
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelLifecycle
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSTT
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.types.RASTTOptions
-import com.runanywhere.sdk.public.types.RATranscriptionResult
+import com.runanywhere.sdk.public.types.RASTTOutput
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -26,20 +23,10 @@ import kotlinx.coroutines.launch
 
 private val sttLogger = SDKLogger.stt
 
-private fun currentSttModelIdFromLifecycle(): String? =
-    CppBridgeModelLifecycle
-        .currentModel(
-            CurrentModelRequest(category = ProtoModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION),
-        )?.model_id
-        ?.takeIf { it.isNotEmpty() }
-
-actual val RunAnywhere.currentSTTModelId: String?
-    get() = currentSttModelIdFromLifecycle()
-
 actual suspend fun RunAnywhere.transcribe(
     audio: ByteArray,
     options: RASTTOptions,
-): RATranscriptionResult {
+): RASTTOutput {
     if (!isInitialized) {
         throw SDKException.notInitialized("SDK not initialized")
     }

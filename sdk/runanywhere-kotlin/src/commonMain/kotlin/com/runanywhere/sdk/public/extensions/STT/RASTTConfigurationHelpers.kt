@@ -20,7 +20,7 @@ import ai.runanywhere.proto.v1.TranscriptionMetadata
 import ai.runanywhere.proto.v1.WordTimestamp
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.public.types.RASTTOptions
-import com.runanywhere.sdk.public.types.RATranscriptionResult
+import com.runanywhere.sdk.public.types.RASTTOutput
 
 // MARK: - STTLanguage
 
@@ -116,7 +116,7 @@ fun STTOptions.Companion.defaults(
  * Convenience alias for the detected language enum on the output.
  * Mirrors Swift `RASTTOutput.detectedLanguageCode`.
  */
-val RATranscriptionResult.detectedLanguageCode: STTLanguage
+val RASTTOutput.detectedLanguageCode: STTLanguage
     get() = language
 
 // MARK: - WordTimestamp

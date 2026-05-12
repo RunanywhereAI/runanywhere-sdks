@@ -8,21 +8,22 @@
 
 package com.runanywhere.sdk.foundation.bridge
 
-import com.runanywhere.sdk.foundation.Logging
-import com.runanywhere.sdk.foundation.SDKLogger
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeAuth
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevConfig
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeDevice
-import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeEvents
+import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeSDKEvents
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeFileManager
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeModelPaths
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatform
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgePlatformAdapter
 import com.runanywhere.sdk.foundation.bridge.extensions.CppBridgeTelemetry
-import com.runanywhere.sdk.foundation.logging.SentryDestination
-import com.runanywhere.sdk.foundation.logging.SentryManager
+import com.runanywhere.sdk.infrastructure.logging.Logging
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.SentryDestination
+import com.runanywhere.sdk.infrastructure.logging.SentryManager
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
-import com.runanywhere.sdk.public.SDKEnvironment
-import com.runanywhere.sdk.public.cEnvironment
+import com.runanywhere.sdk.public.configuration.SDKEnvironment
+import com.runanywhere.sdk.public.configuration.cEnvironment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -182,7 +183,7 @@ object CppBridge {
                 }
                 logger.debug("Production/staging mode: authentication will occur in Phase 2 (initializeServices)")
             } else {
-                if (CppBridgeTelemetry.hasUsableDevelopmentConfig()) {
+                if (CppBridgeDevConfig.hasUsableSupabaseConfig) {
                     logger.debug("Development mode: using Supabase URL from C++ dev config")
                 } else {
                     logger.debug("Development mode: no usable Supabase config; external telemetry/auth/device registration disabled")
@@ -205,9 +206,9 @@ object CppBridge {
             // This routes C++ events (LLM/STT/TTS) to telemetry for batching and HTTP transport
             val telemetryHandle = CppBridgeTelemetry.getTelemetryHandle()
             if (telemetryHandle != 0L) {
-                CppBridgeEvents.register(telemetryHandle)
+                CppBridgeSDKEvents.register(telemetryHandle)
                 // Emit SDK init started event (mirroring Swift SDK)
-                CppBridgeEvents.emitSDKInitStarted()
+                CppBridgeSDKEvents.emitSDKInitStarted()
             } else {
                 logger.warn("Telemetry handle not available, analytics events will not be tracked")
             }
@@ -233,7 +234,7 @@ object CppBridge {
 
             // Emit SDK init completed event with duration
             val initDurationMs = System.currentTimeMillis() - initStartTime
-            CppBridgeEvents.emitSDKInitCompleted(initDurationMs.toDouble())
+            CppBridgeSDKEvents.emitSDKInitCompleted(initDurationMs.toDouble())
             logger.info("✅ Phase 1 complete in ${initDurationMs}ms ($environment)")
         }
     }
@@ -265,7 +266,7 @@ object CppBridge {
             val provider = CppBridgeDevice.deviceInfoProvider
             val deviceModel = provider?.getDeviceModel() ?: getDefaultDeviceModel()
             val osVersion = provider?.getOSVersion() ?: getDefaultOsVersion()
-            val sdkVersion = com.runanywhere.sdk.utils.SDKConstants.VERSION
+            val sdkVersion = com.runanywhere.sdk.foundation.constants.SDKConstants.VERSION
 
             logger.info("Initializing telemetry manager: device=$deviceId, model=$deviceModel, os=$osVersion")
 
@@ -300,7 +301,7 @@ object CppBridge {
         try {
             val deviceId = CppBridgeDevice.getDeviceIdCallback()
             val platform = "android"
-            val sdkVersion = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION
+            val sdkVersion = com.runanywhere.sdk.foundation.constants.SDKConstants.SDK_VERSION
 
             logger.info("Initializing SDK config: version=$sdkVersion, platform=$platform, env=$environment")
             if (!apiKey.isNullOrEmpty()) {
@@ -449,6 +450,26 @@ object CppBridge {
         }
 
         try {
+            // Step 0: Configure HTTPClientAdapter for SDK-level HTTP (auth,
+            // device registration, telemetry). Mirrors Swift's
+            // `await CppBridge.HTTP.shared.configure(baseURL:apiKey:)` call
+            // in `completeServicesInitialization`. In development mode the
+            // Supabase URL + anon key come from the C++ dev config.
+            run {
+                val baseUrl: String?
+                val apiKey: String?
+                if (_environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+                    baseUrl = CppBridgeDevConfig.supabaseURL
+                    apiKey = CppBridgeDevConfig.supabaseKey
+                } else {
+                    baseUrl = CppBridgeTelemetry.getBaseUrl()
+                    apiKey = CppBridgeTelemetry.getApiKey()
+                }
+                if (!baseUrl.isNullOrEmpty() && !apiKey.isNullOrEmpty()) {
+                    com.runanywhere.sdk.foundation.bridge.HTTPClientAdapter.configure(baseUrl, apiKey)
+                }
+            }
+
             // Step 1: Authenticate with backend for production/staging mode
             // This is done in Phase 2 (not Phase 1) to avoid blocking main thread
             // Mirrors Swift SDK's CppBridge.Auth.authenticate() in completeServicesInitialization()
@@ -465,7 +486,7 @@ object CppBridge {
                             baseUrl = baseUrl,
                             deviceId = deviceId,
                             platform = "android",
-                            sdkVersion = com.runanywhere.sdk.utils.SDKConstants.SDK_VERSION,
+                            sdkVersion = com.runanywhere.sdk.foundation.constants.SDKConstants.SDK_VERSION,
                         )
                         logger.info("Authentication successful")
                     } catch (e: Exception) {
@@ -536,7 +557,7 @@ object CppBridge {
                 if (success) {
                     logger.info("✅ Device registration triggered")
                     // Emit device registered event
-                    CppBridgeEvents.emitDeviceRegistered(deviceId)
+                    CppBridgeSDKEvents.emitDeviceRegistered(deviceId)
                 } else {
                     logger.warn("Device registration not triggered (may already be registered)")
                 }
@@ -544,7 +565,7 @@ object CppBridge {
                 // Non-critical failure - device registration is best-effort
                 logger.warn("Device registration failed (non-critical): ${e.message}")
                 // Emit device registration failed event
-                CppBridgeEvents.emitDeviceRegistrationFailed(e.message ?: "Unknown error")
+                CppBridgeSDKEvents.emitDeviceRegistrationFailed(e.message ?: "Unknown error")
             }
 
             synchronized(lock) {
@@ -582,7 +603,7 @@ object CppBridge {
             // Unregister Phase 1 core extensions (reverse order)
             CppBridgeDevice.unregister()
             CppBridgeTelemetry.unregister()
-            CppBridgeEvents.unregister()
+            CppBridgeSDKEvents.unregister()
 
             // v2 close-out Phase H4: release the OkHttp transport before the
             // platform adapter, so any final rac_http_request_* inside shutdown

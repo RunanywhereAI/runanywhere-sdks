@@ -1,8 +1,12 @@
 package com.runanywhere.runanywhereai.presentation.tts
 
+import ai.runanywhere.proto.v1.ComponentLifecycleState
+import ai.runanywhere.proto.v1.CurrentModelRequest
 import ai.runanywhere.proto.v1.EventCategory.EVENT_CATEGORY_TTS
 import ai.runanywhere.proto.v1.InferenceFramework
+import ai.runanywhere.proto.v1.ModelCategory
 import ai.runanywhere.proto.v1.ModelEventKind
+import ai.runanywhere.proto.v1.SDKComponent
 import android.app.Application
 import android.media.AudioAttributes
 import android.media.AudioFormat
@@ -15,11 +19,12 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.events.ModelEvent
 import com.runanywhere.sdk.public.extensions.Models.displayName
-import com.runanywhere.sdk.public.extensions.currentTTSVoiceId
-import com.runanywhere.sdk.public.extensions.isTTSVoiceLoaded
-import com.runanywhere.sdk.public.extensions.loadTTSVoice
+import com.runanywhere.sdk.public.extensions.componentLifecycleSnapshot
+import com.runanywhere.sdk.public.extensions.currentModel
+import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.stopSynthesis
 import com.runanywhere.sdk.public.extensions.synthesize
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RATTSOptions
 import java.util.Locale
 import kotlin.coroutines.resume
@@ -136,7 +141,7 @@ data class TTSUiState(
  *
  * Architecture matches iOS:
  * - Uses RunAnywhere SDK extension functions directly
- * - Model loading via RunAnywhere.loadTTSVoice()
+ * - Model loading via RunAnywhere.loadModel(RAModelLoadRequest)
  * - Event subscription via RunAnywhere.events.events
  */
 class TextToSpeechViewModel(
@@ -168,7 +173,7 @@ class TextToSpeechViewModel(
         }
 
         // Check initial TTS state
-        updateTTSState()
+        viewModelScope.launch { updateTTSState() }
     }
 
     /**
@@ -217,11 +222,18 @@ class TextToSpeechViewModel(
     }
 
     /**
-     * Update TTS state from SDK
+     * Update TTS state from SDK via the canonical lifecycle / current-model API.
      */
-    private fun updateTTSState() {
-        val isLoaded = RunAnywhere.isTTSVoiceLoaded
-        val voiceId = RunAnywhere.currentTTSVoiceId
+    private suspend fun updateTTSState() {
+        val snapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_TTS)
+        val isLoaded =
+            snapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+                snapshot.model_id.isNotEmpty()
+        val voiceId =
+            RunAnywhere
+                .currentModel(CurrentModelRequest(category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS))
+                .model_id
+                .takeIf { it.isNotEmpty() }
 
         _uiState.update {
             it.copy(
@@ -240,7 +252,12 @@ class TextToSpeechViewModel(
         viewModelScope.launch {
             try {
                 Timber.i("Loading TTS voice: $voiceId")
-                RunAnywhere.loadTTSVoice(voiceId)
+                RunAnywhere.loadModel(
+                    RAModelLoadRequest(
+                        model_id = voiceId,
+                        category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+                    ),
+                )
                 updateTTSState()
             } catch (e: Exception) {
                 Timber.e(e, "Failed to load TTS voice: ${e.message}")
@@ -285,7 +302,7 @@ class TextToSpeechViewModel(
      */
     fun initialize() {
         Timber.i("Initializing TTS ViewModel...")
-        updateTTSState()
+        viewModelScope.launch { updateTTSState() }
     }
 
     /**
@@ -342,7 +359,11 @@ class TextToSpeechViewModel(
             if (text.isEmpty()) return@launch
 
             val isSystem = _uiState.value.isSystemTTS
-            if (!isSystem && !RunAnywhere.isTTSVoiceLoaded) {
+            val ttsSnapshot = RunAnywhere.componentLifecycleSnapshot(SDKComponent.SDK_COMPONENT_TTS)
+            val isTtsLoaded =
+                ttsSnapshot.state == ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_READY &&
+                    ttsSnapshot.model_id.isNotEmpty()
+            if (!isSystem && !isTtsLoaded) {
                 _uiState.update {
                     it.copy(errorMessage = "No TTS model loaded. Please select a voice first.")
                 }

@@ -1,6 +1,6 @@
 package com.runanywhere.sdk.llm.llamacpp
 
-import com.runanywhere.sdk.foundation.SDKLogger
+import com.runanywhere.sdk.infrastructure.logging.SDKLogger
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
 
 private val logger = SDKLogger.llamacpp

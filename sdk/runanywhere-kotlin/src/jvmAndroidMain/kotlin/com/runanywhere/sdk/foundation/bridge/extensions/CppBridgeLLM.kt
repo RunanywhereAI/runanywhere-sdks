@@ -1,11 +1,17 @@
 /*
+ * Copyright 2026 RunAnywhere SDK
+ * SPDX-License-Identifier: Apache-2.0
+ *
  * CppBridgeLLM.kt
  *
- * Per-domain split of CppBridgeModalityProto.kt — owns the LLM facade
- * over the rac_llm_*_proto C ABI. Mirrors Swift's
- * Foundation/Bridge/Extensions/CppBridge+LLM.swift one-to-one; logic is
- * copied verbatim, only the enclosing object name changes from
- * the legacy `Proto` suffix to the canonical `CppBridgeLLM` name.
+ * LLM component bridge — manages C++ LLM component lifecycle and the
+ * proto-canonical `rac_llm_*_proto` C ABI.
+ *
+ * All generic scaffolding (handle creation, isLoaded, loadModel, unload,
+ * destroy) lives in [ComponentActor]; this object only adds the
+ * LLM-specific surfaces (`generate`, `generateStream`, `cancel`) on top.
+ *
+ * Mirrors Swift `Foundation/Bridge/Extensions/CppBridge+LLM.swift` (W3-1).
  */
 
 package com.runanywhere.sdk.foundation.bridge.extensions
@@ -14,7 +20,8 @@ import ai.runanywhere.proto.v1.LLMGenerateRequest
 import ai.runanywhere.proto.v1.LLMGenerationResult
 import ai.runanywhere.proto.v1.LLMStreamEvent
 import ai.runanywhere.proto.v1.SDKEvent
-import com.runanywhere.sdk.foundation.bridge.CppBridge
+import com.runanywhere.sdk.foundation.bridge.ComponentActor
+import com.runanywhere.sdk.foundation.bridge.ComponentVTable
 import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.native.bridge.NativeProtoProgressListener
 import com.runanywhere.sdk.native.bridge.RunAnywhereBridge
@@ -69,65 +76,59 @@ private fun RALLMGenerationOptions?.toGenerateRequest(
 }
 
 /**
- * Mirrors Swift `Foundation/Bridge/Extensions/CppBridge+LLM.swift`. Wraps `rac_llm_*_proto` C ABI.
+ * Mirrors Swift `Foundation/Bridge/Extensions/CppBridge+LLM.swift`. Wraps
+ * `rac_llm_*_proto` C ABI. Handle lifecycle lives in [inner].
  */
 object CppBridgeLLM {
-    @Volatile
-    private var handle: Long = 0L
+    /** Generic scaffold (handle / isLoaded / loadModel / unload / destroy). */
+    internal val inner = ComponentActor(ComponentVTable.llm)
 
-    private val lock = Any()
+    // MARK: - Handle Management
 
-    /**
-     * Get the current native handle, creating the component if needed.
-     */
-    @Throws(SDKException::class)
-    fun getHandle(): Long {
-        synchronized(lock) {
-            if (handle == 0L) create()
-            if (handle == 0L) {
-                throw SDKException.notInitialized("LLM component not created")
-            }
-            return handle
-        }
+    /** Get or create the LLM component handle. */
+    suspend fun getHandle(): Long = inner.getHandle()
+
+    // MARK: - State
+
+    /** Whether a model is loaded. */
+    val isLoaded: Boolean
+        get() = inner.isLoaded
+
+    /** Currently-loaded model id, or null. */
+    val currentModelId: String?
+        get() = inner.currentAssetId
+
+    // MARK: - Model Lifecycle
+
+    /** Load an LLM model. */
+    suspend fun loadModel(modelPath: String, modelId: String, modelName: String) {
+        inner.loadModel(path = modelPath, id = modelId, name = modelName)
     }
 
-    /**
-     * Idempotently create the LLM component. Returns 0 on success.
-     */
-    fun create(): Int {
-        synchronized(lock) {
-            if (handle != 0L) return 0
-            if (!CppBridge.isNativeLibraryLoaded) {
-                throw SDKException.notInitialized(
-                    "Native library not available. Please ensure the native libraries are bundled in your APK.",
-                )
-            }
-            val result =
-                try {
-                    RunAnywhereBridge.racLlmComponentCreate()
-                } catch (e: UnsatisfiedLinkError) {
-                    throw SDKException.notInitialized(
-                        "LLM native library not available: ${e.message}",
-                    )
-                }
-            if (result == 0L) return -1
-            handle = result
-            return 0
-        }
+    /** Unload the current model. */
+    suspend fun unload() {
+        inner.unload()
     }
 
-    /**
-     * Destroy the native component and release the handle.
-     */
-    fun destroy() {
-        synchronized(lock) {
-            if (handle == 0L) return
-            RunAnywhereBridge.racLlmComponentDestroy(handle)
-            handle = 0L
-        }
+    // MARK: - Cleanup
+
+    /** Destroy the component. */
+    suspend fun destroy() {
+        inner.destroy()
     }
 
-    fun generate(prompt: String, options: RALLMGenerationOptions?): RALLMGenerationResult {
+    // MARK: - LLM-specific operations
+
+    /** Cancel any in-flight generation. No-op if the handle is not created. */
+    suspend fun cancel(): RASDKEvent? {
+        val handle = inner.existingHandle()
+        if (handle == 0L) return null
+        return RunAnywhereBridge.racLlmCancelProto()?.let(SDKEvent.ADAPTER::decode)
+    }
+
+    /** One-shot generation. */
+    suspend fun generate(prompt: String, options: RALLMGenerationOptions?): RALLMGenerationResult {
+        inner.getHandle()
         val request = options.toGenerateRequest(prompt, streaming = false)
         return decodeOrThrow(
             LLMGenerationResult.ADAPTER,
@@ -136,11 +137,61 @@ object CppBridgeLLM {
         )
     }
 
-    fun generateStream(
+    /**
+     * Streaming generation. Native emits canonical [LLMStreamEvent]
+     * envelopes. Kotlin simply decodes and forwards.
+     *
+     * **Streaming model — divergence note (W3-7):**
+     *
+     * Kotlin uses the *single-call* streaming path
+     * (`rac_llm_generate_stream_proto`), where the per-request listener
+     * is passed alongside the request bytes. Each new call installs its
+     * own callback; there is no per-handle `set/unset` lifecycle.
+     *
+     * Swift's `CppBridge.LLM.generateStream` follows the same shape:
+     * it calls into the generated `ProtoStreamContext` single-call path
+     * (`Sources/RunAnywhere/Generated/ModalityProtoABI+Generated.swift`)
+     * rather than registering once via
+     * `rac_llm_set_stream_proto_callback` / `rac_llm_unset_stream_proto_callback`.
+     * Both SDKs keep a `LLMStreamAdapter` typealias around
+     * ([com.runanywhere.sdk.adapters.LLMStreamAdapter] /
+     * `Sources/RunAnywhere/Adapters/LLMStreamAdapter.swift`) as a
+     * future-migration shape over the per-handle ABI, but neither wires
+     * the public API to it today.
+     *
+     * The C ABI symbols `rac_llm_set_stream_proto_callback` /
+     * `rac_llm_unset_stream_proto_callback` exist in
+     * `sdk/runanywhere-commons/include/rac/features/llm/rac_llm_stream.h`,
+     * but the Kotlin JNI bridge in
+     * [com.runanywhere.sdk.native.bridge.RunAnywhereBridge] intentionally
+     * does **not** expose `racLlmSetStreamProtoCallback` /
+     * `racLlmUnsetStreamProtoCallback`. Adding them is the prerequisite
+     * for migrating callers to the fan-out [LLMStreamAdapter] from W2-4
+     * (which already specializes the generic [HandleStreamAdapter] fan-out
+     * for `RALLMStreamEvent` + the `is_final` terminal-event predicate).
+     *
+     * TODO(KOT-W3-7-FOLLOWUP): When the JNI thunks for
+     * `racLlmSetStreamProtoCallback` / `racLlmUnsetStreamProtoCallback`
+     * land, switch this method (and
+     * [com.runanywhere.sdk.public.extensions.generateStream]) over to
+     * `llmStreamAdapter(handle, register=..., unregister=...).stream()`
+     * to gain multi-collector fan-out (same change Swift would make in
+     * `RunAnywhere+TextGeneration.swift`).
+     *
+     * The current single-callback model is functionally complete: the
+     * caller-supplied `onEvent` predicate stops streaming when it returns
+     * `false` (typically on `event.is_final`), and the `callbackFlow`
+     * wrapper in `RunAnywhereTextGeneration.jvmAndroid.kt` cancels the
+     * driver coroutine + tears down via [cancel] on collector
+     * cancellation. The only thing missing is multi-Flow-collector
+     * fan-out, which is rare in practice for LLM streams.
+     */
+    suspend fun generateStream(
         prompt: String,
         options: RALLMGenerationOptions?,
         onEvent: (RALLMStreamEvent) -> Boolean,
     ) {
+        inner.getHandle()
         val request = options.toGenerateRequest(prompt, streaming = true)
         val rc =
             RunAnywhereBridge.racLlmGenerateStreamProto(
@@ -151,7 +202,4 @@ object CppBridgeLLM {
             )
         checkRc(rc, "racLlmGenerateStreamProto")
     }
-
-    fun cancel(): RASDKEvent? =
-        RunAnywhereBridge.racLlmCancelProto()?.let(SDKEvent.ADAPTER::decode)
 }

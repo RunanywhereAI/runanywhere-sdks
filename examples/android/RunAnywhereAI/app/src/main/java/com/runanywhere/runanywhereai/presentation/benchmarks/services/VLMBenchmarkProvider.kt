@@ -9,10 +9,11 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkMet
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkScenario
 import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.SyntheticInputGenerator
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.loadVLMModel
+import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.processImage
 import com.runanywhere.sdk.public.extensions.unloadModel
 import com.runanywhere.sdk.public.types.RAModelInfo
+import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import com.runanywhere.sdk.public.types.RAVLMGenerationOptions
 import com.runanywhere.sdk.public.types.RAVLMImage
 import kotlinx.coroutines.NonCancellable
@@ -41,7 +42,12 @@ class VLMBenchmarkProvider : BenchmarkScenarioProvider {
 
         // Load
         val loadStart = System.nanoTime()
-        RunAnywhere.loadVLMModel(model.id)
+        RunAnywhere.loadModel(
+            RAModelLoadRequest(
+                model_id = model.id,
+                category = ModelCategory.MODEL_CATEGORY_VISION,
+            ),
+        )
         val loadTimeMs = (System.nanoTime() - loadStart) / 1_000_000.0
 
         try {

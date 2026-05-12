@@ -17,36 +17,6 @@ import com.runanywhere.sdk.public.types.RATTSOptions
 import com.runanywhere.sdk.public.types.RATTSOutput
 import kotlinx.coroutines.flow.Flow
 
-// MARK: - Voice Loading
-
-/**
- * Load a TTS voice.
- *
- * @param voiceId The voice identifier
- * @throws Error if loading fails
- */
-expect suspend fun RunAnywhere.loadTTSVoice(voiceId: String)
-
-/**
- * Unload the currently loaded TTS voice.
- */
-expect suspend fun RunAnywhere.unloadTTSVoice()
-
-/**
- * Check if a TTS voice is loaded.
- *
- * Sync property — reads cached state from the component layer without suspension.
- */
-expect val RunAnywhere.isTTSVoiceLoaded: Boolean
-
-/**
- * Get the currently loaded TTS voice ID.
- *
- * This is a synchronous property that returns the ID of the currently loaded TTS voice,
- * or null if no voice is loaded.
- */
-expect val RunAnywhere.currentTTSVoiceId: String?
-
 // MARK: - Synthesis
 
 /**
