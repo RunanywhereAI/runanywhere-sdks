@@ -17,9 +17,11 @@
 
 package com.runanywhere.sdk.foundation.bridge.extensions
 
+import ai.runanywhere.proto.v1.STTAudioSource
 import ai.runanywhere.proto.v1.STTOptions
 import ai.runanywhere.proto.v1.STTOutput
 import ai.runanywhere.proto.v1.STTStreamEvent
+import ai.runanywhere.proto.v1.STTTranscriptionRequest
 import com.runanywhere.sdk.foundation.bridge.ComponentActor
 import com.runanywhere.sdk.foundation.bridge.ComponentVTable
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -140,41 +142,51 @@ object CppBridgeSTT {
         RunAnywhereBridge.racSttComponentCancel(handle)
     }
 
-    /** One-shot transcription. */
+    /**
+     * One-shot transcription via lifecycle-loaded STT model.
+     *
+     * Mirrors iOS Swift's `RunAnywhere.transcribe(...)` which builds an
+     * `RASTTTranscriptionRequest` and calls `rac_stt_transcribe_lifecycle_proto`.
+     * The component handle is intentionally unused — the lifecycle is the
+     * source of truth for "is an STT model loaded".
+     */
     suspend fun transcribe(audioData: ByteArray, options: RASTTOptions): RASTTOutput {
-        val handle = inner.getHandle()
+        val request = STTTranscriptionRequest(
+            audio = STTAudioSource(audio_data = okio.ByteString.of(*audioData)),
+            options = options,
+        )
         return decodeOrThrow(
             STTOutput.ADAPTER,
-            RunAnywhereBridge.racSttComponentTranscribeProto(
-                handle,
-                audioData,
-                STTOptions.ADAPTER.encode(options),
+            RunAnywhereBridge.racSttTranscribeLifecycleProto(
+                STTTranscriptionRequest.ADAPTER.encode(request),
             ),
-            "racSttComponentTranscribeProto",
+            "racSttTranscribeLifecycleProto",
         )
     }
 
     /**
-     * Streaming transcription. Native emits canonical [STTStreamEvent]
-     * envelopes (STARTED / PARTIAL / FINAL / ERROR with monotonically-
-     * increasing seq and timestamp_us). Kotlin simply decodes and
-     * forwards.
+     * Streaming transcription via lifecycle-loaded STT model. Native emits
+     * canonical [STTStreamEvent] envelopes (STARTED / PARTIAL / FINAL / ERROR
+     * with monotonically-increasing seq and timestamp_us). Kotlin simply
+     * decodes and forwards. Mirrors Swift's
+     * `rac_stt_transcribe_stream_lifecycle_proto` call site.
      */
     suspend fun transcribeStream(
         audioData: ByteArray,
         options: RASTTOptions,
         onEvent: (STTStreamEvent) -> Boolean,
     ) {
-        val handle = inner.getHandle()
+        val request = STTTranscriptionRequest(
+            audio = STTAudioSource(audio_data = okio.ByteString.of(*audioData)),
+            options = options,
+        )
         val rc =
-            RunAnywhereBridge.racSttComponentTranscribeStreamProto(
-                handle,
-                audioData,
-                STTOptions.ADAPTER.encode(options),
+            RunAnywhereBridge.racSttTranscribeStreamLifecycleProto(
+                STTTranscriptionRequest.ADAPTER.encode(request),
                 NativeProtoProgressListener { bytes ->
                     onEvent(STTStreamEvent.ADAPTER.decode(bytes))
                 },
             )
-        checkRc(rc, "racSttComponentTranscribeStreamProto")
+        checkRc(rc, "racSttTranscribeStreamLifecycleProto")
     }
 }

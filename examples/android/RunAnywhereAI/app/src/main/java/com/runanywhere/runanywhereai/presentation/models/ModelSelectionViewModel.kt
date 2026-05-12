@@ -356,71 +356,40 @@ class ModelSelectionViewModel(
             }
 
             // Context-aware model loading - matches iOS exactly
-            when (context) {
-                ModelSelectionContext.LLM -> {
-                    RunAnywhere.loadModel(
-                        RAModelLoadRequest(
-                            model_id = modelId,
-                            category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
-                        ),
-                    )
-                }
-                ModelSelectionContext.STT -> {
-                    RunAnywhere.loadModel(
-                        RAModelLoadRequest(
-                            model_id = modelId,
-                            category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-                        ),
-                    )
-                }
-                ModelSelectionContext.TTS -> {
-                    RunAnywhere.loadModel(
-                        RAModelLoadRequest(
-                            model_id = modelId,
-                            category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-                        ),
-                    )
-                }
+            val loadCategory = when (context) {
+                ModelSelectionContext.LLM -> ModelCategory.MODEL_CATEGORY_LANGUAGE
+                ModelSelectionContext.STT -> ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
+                ModelSelectionContext.TTS -> ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+                ModelSelectionContext.VLM -> ModelCategory.MODEL_CATEGORY_VISION
                 ModelSelectionContext.VOICE -> {
                     val model = _uiState.value.models.find { it.id == modelId }
                     when (model?.category) {
                         ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION ->
-                            RunAnywhere.loadModel(
-                                RAModelLoadRequest(
-                                    model_id = modelId,
-                                    category = ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
-                                ),
-                            )
+                            ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
                         ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS ->
-                            RunAnywhere.loadModel(
-                                RAModelLoadRequest(
-                                    model_id = modelId,
-                                    category = ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
-                                ),
-                            )
-                        else ->
-                            RunAnywhere.loadModel(
-                                RAModelLoadRequest(
-                                    model_id = modelId,
-                                    category = ModelCategory.MODEL_CATEGORY_LANGUAGE,
-                                ),
-                            )
+                            ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
+                        else -> ModelCategory.MODEL_CATEGORY_LANGUAGE
                     }
                 }
                 ModelSelectionContext.RAG_EMBEDDING,
                 ModelSelectionContext.RAG_LLM,
-                -> {
-                    // RAG models are referenced by file path only
-                    Timber.d("ℹ️ RAG context: selecting model by reference only (no load): $modelId")
-                }
-                ModelSelectionContext.VLM -> {
-                    RunAnywhere.loadModel(
-                        RAModelLoadRequest(
-                            model_id = modelId,
-                            category = ModelCategory.MODEL_CATEGORY_VISION,
-                        ),
+                -> null
+            }
+
+            if (loadCategory == null) {
+                Timber.d("ℹ️ RAG context: selecting model by reference only (no load): $modelId")
+            } else {
+                val result = RunAnywhere.loadModel(
+                    RAModelLoadRequest(model_id = modelId, category = loadCategory),
+                )
+                if (!result.success) {
+                    val errMsg = result.error_message.ifBlank { "unknown load error" }
+                    Timber.e("❌ Model load FAILED for $modelId (category=$loadCategory): $errMsg")
+                    throw com.runanywhere.sdk.foundation.errors.SDKException.model(
+                        "Model load failed: $errMsg",
                     )
                 }
+                Timber.i("✅ Model load succeeded for $modelId (category=$loadCategory)")
             }
 
             Timber.d("✅ Model selected successfully: $modelId")

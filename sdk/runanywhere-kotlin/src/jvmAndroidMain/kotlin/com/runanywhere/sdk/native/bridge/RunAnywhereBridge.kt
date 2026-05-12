@@ -189,21 +189,20 @@ object RunAnywhereBridge {
     external fun racSttComponentCancel(handle: Long): Int
 
     // ========================================================================
-    // STT GENERATED-PROTO ABI (rac_stt_component.h)
+    // STT LIFECYCLE-PROTO ABI (rac_stt_transcribe_*_lifecycle_proto)
+    // Swift-aligned: mirrors iOS's `rac_stt_transcribe_lifecycle_proto`.
+    // Takes a serialized STTTranscriptionRequest (with audio + options
+    // bundled) and resolves the lifecycle-loaded STT model internally.
+    // The legacy `racSttComponentTranscribe[Stream]Proto` were deleted in
+    // favour of these lifecycle variants — no component-handle threading.
     // ========================================================================
 
     @JvmStatic
-    external fun racSttComponentTranscribeProto(
-        handle: Long,
-        audioData: ByteArray,
-        optionsProto: ByteArray?,
-    ): ByteArray?
+    external fun racSttTranscribeLifecycleProto(requestProto: ByteArray): ByteArray?
 
     @JvmStatic
-    external fun racSttComponentTranscribeStreamProto(
-        handle: Long,
-        audioData: ByteArray,
-        optionsProto: ByteArray?,
+    external fun racSttTranscribeStreamLifecycleProto(
+        requestProto: ByteArray,
         listener: NativeProtoProgressListener?,
     ): Int
 
@@ -221,29 +220,26 @@ object RunAnywhereBridge {
     external fun racTtsComponentCancel(handle: Long): Int
 
     // ========================================================================
-    // TTS GENERATED-PROTO ABI (rac_tts_component.h)
+    // TTS LIFECYCLE-PROTO ABI (rac_tts_{synthesize,synthesize_stream,
+    // list_voices}_lifecycle_proto).
+    // Swift-aligned: mirrors iOS's lifecycle-proto path. Takes a serialized
+    // TTSSynthesisRequest (text + options bundled) and resolves the
+    // lifecycle-loaded TTS voice internally. The legacy
+    // `racTtsComponent{Synthesize,SynthesizeStream,ListVoices}Proto` JNI
+    // exports were deleted — Kotlin SDK is lifecycle-only.
     // ========================================================================
 
     @JvmStatic
-    external fun racTtsComponentListVoicesProto(
-        handle: Long,
-        listener: NativeProtoProgressListener,
-    ): Int
+    external fun racTtsSynthesizeLifecycleProto(requestProto: ByteArray): ByteArray?
 
     @JvmStatic
-    external fun racTtsComponentSynthesizeProto(
-        handle: Long,
-        text: String,
-        optionsProto: ByteArray?,
-    ): ByteArray?
-
-    @JvmStatic
-    external fun racTtsComponentSynthesizeStreamProto(
-        handle: Long,
-        text: String,
-        optionsProto: ByteArray?,
+    external fun racTtsSynthesizeStreamLifecycleProto(
+        requestProto: ByteArray,
         listener: NativeProtoProgressListener?,
     ): Int
+
+    @JvmStatic
+    external fun racTtsListVoicesLifecycleProto(): ByteArray?
 
     // ========================================================================
     // VAD COMPONENT (rac_vad_component.h)

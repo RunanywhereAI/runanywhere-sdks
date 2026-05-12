@@ -21,7 +21,9 @@ package com.runanywhere.sdk.foundation.bridge.extensions
 
 import ai.runanywhere.proto.v1.TTSOptions
 import ai.runanywhere.proto.v1.TTSOutput
+import ai.runanywhere.proto.v1.TTSSynthesisRequest
 import ai.runanywhere.proto.v1.TTSVoiceInfo
+import ai.runanywhere.proto.v1.TTSVoiceList
 import com.runanywhere.sdk.foundation.bridge.ComponentActor
 import com.runanywhere.sdk.foundation.bridge.ComponentVTable
 import com.runanywhere.sdk.foundation.errors.SDKException
@@ -102,55 +104,54 @@ object CppBridgeTTS {
         RunAnywhereBridge.racTtsComponentCancel(handle)
     }
 
-    /** Enumerate the voices available to the loaded TTS backend. */
+    /**
+     * Enumerate the voices available to the loaded TTS backend.
+     *
+     * Mirrors iOS Swift's `rac_tts_list_voices_lifecycle_proto` call site —
+     * the lifecycle is the source of truth, no handle is threaded.
+     */
     suspend fun voices(): List<TTSVoiceInfo> {
-        val handle = inner.getHandle()
-        val voices = mutableListOf<TTSVoiceInfo>()
-        val rc =
-            RunAnywhereBridge.racTtsComponentListVoicesProto(
-                handle,
-                NativeProtoProgressListener { bytes ->
-                    voices += TTSVoiceInfo.ADAPTER.decode(bytes)
-                    true
-                },
-            )
-        checkRc(rc, "racTtsComponentListVoicesProto")
-        return voices
+        val bytes = RunAnywhereBridge.racTtsListVoicesLifecycleProto()
+            ?: throw SDKException.operation("racTtsListVoicesLifecycleProto returned null")
+        return TTSVoiceList.ADAPTER.decode(bytes).voices
     }
 
-    /** One-shot synthesis. */
+    /**
+     * One-shot synthesis via lifecycle-loaded TTS model.
+     *
+     * Mirrors iOS Swift's `rac_tts_synthesize_lifecycle_proto` which takes a
+     * serialized `TTSSynthesisRequest` and resolves the lifecycle-loaded TTS
+     * model internally — no component handle required.
+     */
     suspend fun synthesize(text: String, options: RATTSOptions): RATTSOutput {
-        val handle = inner.getHandle()
+        val request = TTSSynthesisRequest(text = text, options = options)
         return decodeOrThrow(
             TTSOutput.ADAPTER,
-            RunAnywhereBridge.racTtsComponentSynthesizeProto(
-                handle,
-                text,
-                TTSOptions.ADAPTER.encode(options),
+            RunAnywhereBridge.racTtsSynthesizeLifecycleProto(
+                TTSSynthesisRequest.ADAPTER.encode(request),
             ),
-            "racTtsComponentSynthesizeProto",
+            "racTtsSynthesizeLifecycleProto",
         )
     }
 
     /**
      * Streaming synthesis. Native emits canonical [TTSOutput] envelopes;
-     * Kotlin simply decodes and forwards.
+     * Kotlin simply decodes and forwards. Routes through
+     * `rac_tts_synthesize_stream_lifecycle_proto`, mirroring iOS.
      */
     suspend fun synthesizeStream(
         text: String,
         options: RATTSOptions,
         onChunk: (RATTSOutput) -> Boolean,
     ) {
-        val handle = inner.getHandle()
+        val request = TTSSynthesisRequest(text = text, options = options)
         val rc =
-            RunAnywhereBridge.racTtsComponentSynthesizeStreamProto(
-                handle,
-                text,
-                TTSOptions.ADAPTER.encode(options),
+            RunAnywhereBridge.racTtsSynthesizeStreamLifecycleProto(
+                TTSSynthesisRequest.ADAPTER.encode(request),
                 NativeProtoProgressListener { bytes ->
                     onChunk(TTSOutput.ADAPTER.decode(bytes))
                 },
             )
-        checkRc(rc, "racTtsComponentSynthesizeStreamProto")
+        checkRc(rc, "racTtsSynthesizeStreamLifecycleProto")
     }
 }

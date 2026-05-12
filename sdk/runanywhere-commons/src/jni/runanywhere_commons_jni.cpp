@@ -74,7 +74,9 @@
 #include "rac/features/lora/rac_lora_service.h"
 #include "rac/features/rag/rac_rag.h"
 #include "rac/features/stt/rac_stt_component.h"
+#include "rac/features/stt/rac_stt_service.h"
 #include "rac/features/tts/rac_tts_component.h"
+#include "rac/features/tts/rac_tts_service.h"
 #include "rac/features/vad/rac_vad_component.h"
 #include "rac/features/vlm/rac_vlm_component.h"
 #include "rac/features/vlm/rac_vlm_service.h"
@@ -3292,34 +3294,35 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racLlmCancelProto(
     return makeProtoCallResult(env, rc, &result, "racLlmCancelProto");
 }
 
+// Swift-aligned (Kotlin Bug-11): mirror iOS Swift which uses
+// rac_stt_transcribe_lifecycle_proto (no handle, lifecycle-only) for STT
+// transcription. Takes a serialized STTTranscriptionRequest and returns
+// STTOutput bytes. Resolves the lifecycle-loaded STT model internally.
+// The legacy component-handle variants (rac_stt_component_transcribe_proto +
+// _stream) are no longer exposed via JNI — Kotlin SDK is lifecycle-only,
+// matching Swift.
 JNIEXPORT jbyteArray JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscribeProto(
-    JNIEnv* env, jclass clazz, jlong handle, jbyteArray audioData, jbyteArray optionsProto) {
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttTranscribeLifecycleProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
     (void)clazz;
-    JByteArrayView audio(env, audioData);
-    JByteArrayView options(env, optionsProto, true);
-    if (handle == 0L || !audio.ok || !options.ok) return nullptr;
-
+    JByteArrayView req(env, requestProto);
+    if (!req.ok) return nullptr;
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
-    rac_result_t rc = rac_stt_component_transcribe_proto(
-        handleFromJLong(handle), audio.data(), audio.size(), options.u8(), options.size(), &result);
-    return makeProtoCallResult(env, rc, &result, "racSttComponentTranscribeProto");
+    rac_result_t rc = rac_stt_transcribe_lifecycle_proto(req.u8(), req.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racSttTranscribeLifecycleProto");
 }
 
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscribeStreamProto(
-    JNIEnv* env, jclass clazz, jlong handle, jbyteArray audioData, jbyteArray optionsProto,
-    jobject listener) {
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttTranscribeStreamLifecycleProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto, jobject listener) {
     (void)clazz;
-    JByteArrayView audio(env, audioData);
-    JByteArrayView options(env, optionsProto, true);
-    if (handle == 0L || !audio.ok || !options.ok) return RAC_ERROR_NULL_POINTER;
-
+    JByteArrayView req(env, requestProto);
+    if (!req.ok) return RAC_ERROR_NULL_POINTER;
     jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
-    ProtoListenerUserData ctx{globalListener, "racSttComponentTranscribeStreamProto"};
-    rac_result_t rc = rac_stt_component_transcribe_stream_proto(
-        handleFromJLong(handle), audio.data(), audio.size(), options.u8(), options.size(),
+    ProtoListenerUserData ctx{globalListener, "racSttTranscribeStreamLifecycleProto"};
+    rac_result_t rc = rac_stt_transcribe_stream_lifecycle_proto(
+        req.u8(), req.size(),
         globalListener != nullptr ? proto_void_callback : nullptr,
         globalListener != nullptr ? &ctx : nullptr);
     if (globalListener != nullptr) {
@@ -3328,50 +3331,40 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racSttComponentTranscri
     return static_cast<jint>(rc);
 }
 
-JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentListVoicesProto(
-    JNIEnv* env, jclass clazz, jlong handle, jobject listener) {
+// Swift-aligned: mirror iOS Swift which uses rac_tts_synthesize_lifecycle_proto
+// (no handle, lifecycle-only) for TTS synthesis.
+JNIEXPORT jbyteArray JNICALL
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsSynthesizeLifecycleProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto) {
     (void)clazz;
-    if (handle == 0L || listener == nullptr) return RAC_ERROR_NULL_POINTER;
-
-    jobject globalListener = env->NewGlobalRef(listener);
-    ProtoListenerUserData ctx{globalListener, "racTtsComponentListVoicesProto"};
-    rac_result_t rc = rac_tts_component_list_voices_proto(
-        handleFromJLong(handle), proto_void_callback, &ctx);
-    env->DeleteGlobalRef(globalListener);
-    return static_cast<jint>(rc);
+    JByteArrayView req(env, requestProto);
+    if (!req.ok) return nullptr;
+    rac_proto_buffer_t result = {};
+    rac_proto_buffer_init(&result);
+    rac_result_t rc = rac_tts_synthesize_lifecycle_proto(req.u8(), req.size(), &result);
+    return makeProtoCallResult(env, rc, &result, "racTtsSynthesizeLifecycleProto");
 }
 
 JNIEXPORT jbyteArray JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentSynthesizeProto(
-    JNIEnv* env, jclass clazz, jlong handle, jstring text, jbyteArray optionsProto) {
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsListVoicesLifecycleProto(
+    JNIEnv* env, jclass clazz) {
     (void)clazz;
-    if (handle == 0L || text == nullptr) return nullptr;
-    std::string textStorage = getCString(env, text);
-    JByteArrayView options(env, optionsProto, true);
-    if (!options.ok) return nullptr;
-
     rac_proto_buffer_t result = {};
     rac_proto_buffer_init(&result);
-    rac_result_t rc = rac_tts_component_synthesize_proto(
-        handleFromJLong(handle), textStorage.c_str(), options.u8(), options.size(), &result);
-    return makeProtoCallResult(env, rc, &result, "racTtsComponentSynthesizeProto");
+    rac_result_t rc = rac_tts_list_voices_lifecycle_proto(&result);
+    return makeProtoCallResult(env, rc, &result, "racTtsListVoicesLifecycleProto");
 }
 
 JNIEXPORT jint JNICALL
-Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentSynthesizeStreamProto(
-    JNIEnv* env, jclass clazz, jlong handle, jstring text, jbyteArray optionsProto,
-    jobject listener) {
+Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsSynthesizeStreamLifecycleProto(
+    JNIEnv* env, jclass clazz, jbyteArray requestProto, jobject listener) {
     (void)clazz;
-    if (handle == 0L || text == nullptr) return RAC_ERROR_NULL_POINTER;
-    std::string textStorage = getCString(env, text);
-    JByteArrayView options(env, optionsProto, true);
-    if (!options.ok) return RAC_ERROR_NULL_POINTER;
-
+    JByteArrayView req(env, requestProto);
+    if (!req.ok) return RAC_ERROR_NULL_POINTER;
     jobject globalListener = listener != nullptr ? env->NewGlobalRef(listener) : nullptr;
-    ProtoListenerUserData ctx{globalListener, "racTtsComponentSynthesizeStreamProto"};
-    rac_result_t rc = rac_tts_component_synthesize_stream_proto(
-        handleFromJLong(handle), textStorage.c_str(), options.u8(), options.size(),
+    ProtoListenerUserData ctx{globalListener, "racTtsSynthesizeStreamLifecycleProto"};
+    rac_result_t rc = rac_tts_synthesize_stream_lifecycle_proto(
+        req.u8(), req.size(),
         globalListener != nullptr ? proto_void_callback : nullptr,
         globalListener != nullptr ? &ctx : nullptr);
     if (globalListener != nullptr) {
@@ -3379,6 +3372,11 @@ Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racTtsComponentSynthesi
     }
     return static_cast<jint>(rc);
 }
+
+// Swift-aligned: rac_tts_component_{list_voices,synthesize,synthesize_stream}
+// _proto JNI thunks deleted — Kotlin SDK uses the lifecycle proto path
+// (rac_tts_{list_voices,synthesize,synthesize_stream}_lifecycle_proto)
+// matching iOS Swift. C++ functions remain for tests / other consumers.
 
 JNIEXPORT jint JNICALL
 Java_com_runanywhere_sdk_native_bridge_RunAnywhereBridge_racVadComponentConfigureProto(

@@ -62,6 +62,18 @@ object ModelBootstrap {
         } catch (e: Exception) {
             Timber.e(e, "Failed to register core backends")
         }
+        // Diagnostic: list all plugins registered with the unified plugin
+        // registry. Helps debug "no backend route" issues by surfacing exactly
+        // which plugin names made it past rac_plugin_register.
+        try {
+            val names = com.runanywhere.sdk.native.bridge.RunAnywhereBridge
+                .racRegistryGetRegisteredNames()
+                ?.toList()
+                .orEmpty()
+            Timber.i("🔌 Plugins registered (count=${names.size}): ${names.joinToString()}")
+        } catch (e: Throwable) {
+            Timber.w(e, "Plugin diagnostic listing failed")
+        }
     }
 
     /**

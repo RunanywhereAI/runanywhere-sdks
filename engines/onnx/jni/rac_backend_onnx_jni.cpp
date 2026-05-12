@@ -62,16 +62,24 @@ JNIEXPORT jint JNICALL Java_com_runanywhere_sdk_core_onnx_ONNXBridge_nativeRegis
     }
 
     // ENG-SHERPA-03: opportunistically call rac_backend_sherpa_register() when
-    // librac_backend_sherpa.so is present in-process (ONNXBridge.kt /
-    // equivalent platform loaders dlopen it before this JNI entry runs). The
-    // former ELF `__attribute__((constructor))` block in
-    // rac_plugin_entry_sherpa.cpp has been deleted, so the registration now
-    // flows through this explicit call on dynamic hosts. Static hosts
-    // (RAC_STATIC_PLUGINS=ON) still go through RAC_STATIC_PLUGIN_REGISTER
-    // from rac_static_register_sherpa.cpp.
+    // librac_backend_sherpa.so is present in-process. On Android, libraries
+    // loaded by System.loadLibrary from a non-bootclassloader live in a
+    // per-class-loader linker namespace, so `dlsym(RTLD_DEFAULT, …)` cannot
+    // see symbols in `librac_backend_sherpa.so` even though Kotlin's
+    // ONNXBridge already System.loadLibrary'd it. Fix: dlopen the .so by
+    // name explicitly, which returns a handle into the current namespace,
+    // then dlsym from that handle. Static hosts (RAC_STATIC_PLUGINS=ON) still
+    // go through RAC_STATIC_PLUGIN_REGISTER from rac_static_register_sherpa.cpp.
     using rac_backend_sherpa_register_fn = rac_result_t (*)(void);
+    void* sherpa_handle = dlopen("librac_backend_sherpa.so", RTLD_NOW | RTLD_GLOBAL);
+    if (sherpa_handle == nullptr) {
+        // Fall back to RTLD_DEFAULT in case the .so is already global (iOS / WASM).
+        LOGw("dlopen(librac_backend_sherpa.so) failed (%s); falling back to RTLD_DEFAULT",
+             dlerror() ? dlerror() : "no error");
+    }
     auto* sherpa_register = reinterpret_cast<rac_backend_sherpa_register_fn>(
-        dlsym(RTLD_DEFAULT, "rac_backend_sherpa_register"));
+        sherpa_handle != nullptr ? dlsym(sherpa_handle, "rac_backend_sherpa_register")
+                                 : dlsym(RTLD_DEFAULT, "rac_backend_sherpa_register"));
     if (sherpa_register != nullptr) {
         rac_result_t sherpa_rc = sherpa_register();
         if (sherpa_rc != RAC_SUCCESS && sherpa_rc != RAC_ERROR_MODULE_ALREADY_REGISTERED) {
