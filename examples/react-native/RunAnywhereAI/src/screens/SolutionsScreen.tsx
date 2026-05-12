@@ -14,8 +14,8 @@ import {
   Button,
   ScrollView,
   StyleSheet,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { RunAnywhere } from '@runanywhere/core';
 
 const VOICE_AGENT_YAML = `voice_agent:

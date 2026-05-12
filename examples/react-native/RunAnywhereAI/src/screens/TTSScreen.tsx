@@ -12,7 +12,7 @@
  * - System TTS fallback
  *
  * Architecture:
- * - Model loading via RunAnywhere.loadModel(id, ModelCategory.SPEECH_SYNTHESIS)
+ * - Model loading via RunAnywhere.loadModel(ModelLoadRequest)
  * - Speech synthesis via RunAnywhere.synthesize()
  * - Audio playback via native audio player
  * - Supports ONNX-based Piper TTS models
@@ -26,7 +26,6 @@ import {
   Text,
   TextInput,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   Alert,
@@ -35,7 +34,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Slider from '@react-native-community/slider';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
 
@@ -112,11 +111,11 @@ import {
   RunAnywhere,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/core';
-import { AudioFormat, ModelFormat } from '@runanywhere/proto-ts/model_types';
+import { AudioFormat, ModelFormat, ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
 
-// Canonical SDK methods (Swift / Kotlin / Flutter / Web parity).
-const getAvailableModels = RunAnywhere.getAvailableModels;
-const loadModelById = RunAnywhere.loadModel;
+// Canonical SDK methods (Swift parity).
+const listModels = async (): Promise<SDKModelInfo[]> => (await RunAnywhere.listModels()).models?.models ?? [];
+const loadModelWithRequest = RunAnywhere.loadModel;
 
 export const TTSScreen: React.FC = () => {
   // State
@@ -211,7 +210,7 @@ export const TTSScreen: React.FC = () => {
   const loadModels = useCallback(async () => {
     try {
       // Get available TTS models from catalog
-      const allModels = await getAvailableModels();
+      const allModels = await listModels();
       // Filter by category (speech-synthesis) matching SDK's ModelCategory
       const ttsModels = allModels.filter(
         (m: SDKModelInfo) =>
@@ -319,7 +318,7 @@ export const TTSScreen: React.FC = () => {
           return;
         }
 
-        if (!model.isDownloaded) {
+        if (!model.isDownloaded && !model.localPath) {
           Alert.alert(
             'Error',
             'Model has not been downloaded. Open the model picker to download it first.'
@@ -344,14 +343,18 @@ export const TTSScreen: React.FC = () => {
         // Path-first loading was removed in V2 — model ID is the canonical
         // handle and the native registry resolves the artifact path.
         console.warn(
-          `[TTSScreen] Calling loadModelById(${model.id}) for TTS`
+          `[TTSScreen] Calling RunAnywhere.loadModel(${model.id}) for TTS`
         );
-        const success = await loadModelById(
-          model.id,
-          ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+        const result = await loadModelWithRequest(
+          ModelLoadRequest.fromPartial({
+            modelId: model.id,
+            category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+            forceReload: false,
+            validateAvailability: true,
+          })
         );
 
-        if (success) {
+        if (result.success) {
           const isLoaded = await RunAnywhere.isTTSModelLoaded();
           if (isLoaded) {
             // Set model with framework so ModelStatusBanner shows it properly
@@ -373,9 +376,9 @@ export const TTSScreen: React.FC = () => {
             );
           }
         } else {
-          const error = await RunAnywhere.getLastError();
+          const error = result.errorMessage || await RunAnywhere.getLastError();
           console.error(
-            '[TTSScreen] loadModelById returned false, error:',
+            '[TTSScreen] RunAnywhere.loadModel returned failure:',
             error
           );
           Alert.alert(

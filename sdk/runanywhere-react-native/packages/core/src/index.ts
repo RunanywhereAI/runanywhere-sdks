@@ -51,8 +51,8 @@ export {
   SDKException,
   isSDKException,
   asSDKException,
-} from './Foundation/ErrorTypes';
-export type { ErrorContext } from './Foundation/ErrorTypes';
+} from './Foundation/Errors';
+export type { ErrorContext } from './Foundation/Errors';
 
 // =============================================================================
 // Foundation - Initialization
@@ -157,7 +157,7 @@ export type {
 export { VoiceAgentStreamAdapter } from './Adapters/VoiceAgentStreamAdapter';
 
 // Canonical public streaming method for voice agent (§10 spec).
-export { streamVoiceAgent } from './Public/Extensions/RunAnywhere+VoiceAgent';
+export { streamVoiceAgent } from './Public/Extensions/VoiceAgent/RunAnywhere+VoiceAgent';
 
 // proto-stream LLMStreamAdapter (canonical path) — mirrors Web's adapter.
 export { LLMStreamAdapter } from './Adapters/LLMStreamAdapter';
@@ -186,18 +186,17 @@ export type {
 // =============================================================================
 
 export {
-  checkStorageAvailability,
   deleteStorage,
   getStorageInfoProto,
-  planStorageDelete,
-} from './Public/Extensions/RunAnywhere+Storage';
+  cleanTempFiles,
+} from './Public/Extensions/Storage/RunAnywhere+Storage';
 
 export {
   pollSDKEvent,
   publishSDKEvent,
   publishSDKFailure,
   subscribeSDKEvents,
-} from './Public/Extensions/RunAnywhere+Events';
+} from './Public/Events/RunAnywhere+SDKEvents';
 
 export {
   getComponentLifecycleSnapshot,
@@ -206,7 +205,23 @@ export {
   loadModelLifecycle,
   resolveVLMArtifactsFromLifecycleResult,
   unloadModelLifecycle,
-} from './Public/Extensions/RunAnywhere+Lifecycle';
+} from './Public/Extensions/Models/RunAnywhere+ModelLifecycle';
+
+export {
+  configureLogging,
+  setLocalLoggingEnabled,
+  setLogLevel,
+  setSentryLoggingEnabled,
+  addLogDestination,
+  setDebugMode,
+  flushLogs,
+} from './Public/Extensions/RunAnywhere+Logging';
+
+export { pluginLoader } from './Public/Extensions/RunAnywhere+PluginLoader';
+export type {
+  PluginInfo,
+  PluginLoaderCapability,
+} from './Public/Extensions/RunAnywhere+PluginLoader';
 
 // =============================================================================
 // Hardware Profile (CANONICAL_API §14)
@@ -231,17 +246,20 @@ export type { AcceleratorInfo, HardwareProfileResult } from './Public/Extensions
 export {
   registerModel,
   registerMultiFileModel,
-  getAvailableModels,
-  getDownloadedModels,
+  listModels,
+  queryModels,
+  getModel,
+  downloadedModels,
+  importModel,
   downloadModel,
   cancelDownload,
   deleteModel,
   loadModel,
-} from './Public/Extensions/RunAnywhere+ModelManagement';
+} from './Public/Extensions/Models/RunAnywhere+ModelRegistry';
 export type {
   RegisterModelInput,
   RegisterMultiFileModelInput,
-} from './Public/Extensions/RunAnywhere+ModelManagement';
+} from './Public/Extensions/Models/RunAnywhere+ModelRegistry';
 
 // =============================================================================
 // Proto byte helpers (re-export from internal services/ProtoBytes.ts)
@@ -265,7 +283,7 @@ export {
   ragClearDocuments,
   ragGetDocumentCount,
   ragGetStatistics,
-} from './Public/Extensions/RunAnywhere+RAG';
+} from './Public/Extensions/RAG/RunAnywhere+RAG';
 
 // =============================================================================
 // Vision Language Model
@@ -282,13 +300,13 @@ export {
   processImage,
   processImageStream,
   cancelVLMGeneration,
-} from './Public/Extensions/RunAnywhere+VisionLanguage';
+} from './Public/Extensions/VLM/RunAnywhere+VisionLanguage';
 
 // =============================================================================
 // LoRA Adapter Management — canonical `RunAnywhere.lora.*` namespace
 // =============================================================================
 
-export { lora } from './Public/Extensions/RunAnywhere+LoRA';
+export { lora } from './Public/Extensions/LLM/RunAnywhere+LoRA';
 
 export type {
   LoRAAdapterConfig,
@@ -323,18 +341,18 @@ export type { LiveTranscriptionListener } from './Public/Sessions/LiveTranscript
 // Streaming type re-exports for newly aligned AsyncIterable shapes
 // =============================================================================
 
-export type { STTStreamingResult } from './Public/Extensions/RunAnywhere+STT';
-export type { TTSStreamingResult } from './Public/Extensions/RunAnywhere+TTS';
+export type { STTStreamingResult } from './Public/Extensions/STT/RunAnywhere+STT';
+export type { TTSStreamingResult } from './Public/Extensions/TTS/RunAnywhere+TTS';
 export type {
   VLMBackendProvider,
   VLMStreamingResult,
-} from './Public/Extensions/RunAnywhere+VisionLanguage';
+} from './Public/Extensions/VLM/RunAnywhere+VisionLanguage';
 
 // =============================================================================
 // VLM model overload (mirrors Swift +VLMModels)
 // =============================================================================
 
-export { loadVLMModel as loadVLMModelByInfo } from './Public/Extensions/RunAnywhere+VLMModels';
+export { loadVLMModel as loadVLMModelByInfo } from './Public/Extensions/VLM/RunAnywhere+VLMModels';
 
 // =============================================================================
 // Phase C-prime ergonomic helpers — proto factory defaults + predicates

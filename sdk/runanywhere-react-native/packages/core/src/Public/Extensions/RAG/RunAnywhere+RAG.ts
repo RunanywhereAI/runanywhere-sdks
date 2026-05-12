@@ -7,9 +7,9 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/RAG/RunAnywhere+RAG.swift
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '../../native';
-import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
+import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../../Foundation/Errors/SDKException';
 import type {
   RAGConfiguration,
   RAGQueryOptions,
@@ -26,7 +26,7 @@ import {
 import {
   arrayBufferToBytes,
   bytesToArrayBuffer,
-} from '../../services/ProtoBytes';
+} from '../../../services/ProtoBytes';
 
 const logger = new SDKLogger('RunAnywhere.RAG');
 

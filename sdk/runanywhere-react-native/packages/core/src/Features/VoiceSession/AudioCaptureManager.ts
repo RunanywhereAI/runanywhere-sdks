@@ -12,34 +12,34 @@ import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 
 const logger = new SDKLogger('AudioCaptureManager');
 
-// Lazy-load EventBus to avoid circular dependency issues during module initialization
-// The circular dependency: AudioCaptureManager -> EventBus -> SDKLogger -> ... -> AudioCaptureManager
+// Lazy-load AudioEventSink to avoid circular dependency issues during module initialization
+// The circular dependency: AudioCaptureManager -> AudioEventSink -> SDKLogger -> ... -> AudioCaptureManager
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _eventBus: any = null;
-function getEventBus() {
-  if (!_eventBus) {
+let _audioEventSink: any = null;
+function getAudioEventSink() {
+  if (!_audioEventSink) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
-      _eventBus = require('../../Internal/Events').EventBus;
+      _audioEventSink = require('../../Internal/Events').AudioEventSink;
     } catch {
-      logger.warning('EventBus not available');
+      logger.warning('AudioEventSink not available');
     }
   }
-  return _eventBus;
+  return _audioEventSink;
 }
 
 /**
- * Safely publish an event to the EventBus
- * Handles cases where EventBus may not be fully initialized
+ * Safely publish an event to the AudioEventSink
+ * Handles cases where AudioEventSink may not be fully initialized
  */
 function safePublish(eventType: string, event: Record<string, unknown>): void {
   try {
-    const eventBus = getEventBus();
-    if (eventBus?.publish) {
-      eventBus.publish(eventType, event);
+    const audioEventSink = getAudioEventSink();
+    if (audioEventSink?.publish) {
+      audioEventSink.publish(eventType, event);
     }
   } catch {
-    // Ignore EventBus errors - events are non-critical for audio functionality
+    // Ignore AudioEventSink errors - events are non-critical for audio functionality
   }
 }
 

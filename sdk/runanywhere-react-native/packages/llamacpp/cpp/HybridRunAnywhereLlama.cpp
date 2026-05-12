@@ -16,6 +16,10 @@ extern "C" {
 #include "rac_vlm_llamacpp.h"
 }
 
+#include "rac/core/rac_error.h"
+#include "rac/plugin/rac_plugin_entry.h"
+#include "rac/plugin/rac_plugin_entry_llamacpp.h"
+
 // Unified logging via rac_logger.h
 #include "rac_logger.h"
 
@@ -27,6 +31,16 @@ extern "C" {
 #define VLM_LOG_CATEGORY "VLM.LlamaCpp"
 
 namespace margelo::nitro::runanywhere::llama {
+
+namespace {
+
+bool isRegistrationSuccess(rac_result_t result) {
+  return result == RAC_SUCCESS ||
+         result == RAC_ERROR_MODULE_ALREADY_REGISTERED ||
+         result == RAC_ERROR_PLUGIN_DUPLICATE;
+}
+
+} // namespace
 
 // ============================================================================
 // Constructor / Destructor
@@ -49,15 +63,23 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::registerBackend() {
     RAC_LOG_DEBUG(LOG_CATEGORY, "Registering LlamaCPP backend with C++ registry");
 
     rac_result_t result = rac_backend_llamacpp_register();
-    // RAC_SUCCESS (0) or RAC_ERROR_MODULE_ALREADY_REGISTERED (-4) are both OK
-    if (result == RAC_SUCCESS || result == -4) {
-      RAC_LOG_INFO(LOG_CATEGORY, "LlamaCPP backend registered successfully");
-      isRegistered_ = true;
-      return true;
-    } else {
+    if (!isRegistrationSuccess(result)) {
       RAC_LOG_ERROR(LOG_CATEGORY, "LlamaCPP registration failed with code: %d", result);
       throw std::runtime_error("LlamaCPP registration failed with error: " + std::to_string(result));
     }
+
+    // Android loads the backend as a dynamic shared library. Unlike iOS static
+    // linking, the plugin auto-registration shim intentionally does not run in
+    // that mode, so the RN host must register the unified router vtable here.
+    result = rac_plugin_register(rac_plugin_entry_llamacpp());
+    if (!isRegistrationSuccess(result)) {
+      RAC_LOG_ERROR(LOG_CATEGORY, "LlamaCPP plugin registration failed with code: %d", result);
+      throw std::runtime_error("LlamaCPP plugin registration failed with error: " + std::to_string(result));
+    }
+
+    RAC_LOG_INFO(LOG_CATEGORY, "LlamaCPP backend registered successfully");
+    isRegistered_ = true;
+    return true;
   });
 }
 
@@ -90,15 +112,20 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereLlama::registerVLMBackend() {
     RAC_LOG_DEBUG(VLM_LOG_CATEGORY, "Registering LlamaCPP VLM backend with C++ registry");
 
     rac_result_t result = rac_backend_llamacpp_vlm_register();
-    // RAC_SUCCESS (0) or RAC_ERROR_MODULE_ALREADY_REGISTERED (-4) are both OK
-    if (result == RAC_SUCCESS || result == -4) {
-      RAC_LOG_INFO(VLM_LOG_CATEGORY, "LlamaCPP VLM backend registered successfully");
-      isVLMRegistered_ = true;
-      return true;
-    } else {
+    if (!isRegistrationSuccess(result)) {
       RAC_LOG_ERROR(VLM_LOG_CATEGORY, "LlamaCPP VLM registration failed with code: %d", result);
       throw std::runtime_error("LlamaCPP VLM registration failed with error: " + std::to_string(result));
     }
+
+    result = rac_plugin_register(rac_plugin_entry_llamacpp_vlm());
+    if (!isRegistrationSuccess(result)) {
+      RAC_LOG_ERROR(VLM_LOG_CATEGORY, "LlamaCPP VLM plugin registration failed with code: %d", result);
+      throw std::runtime_error("LlamaCPP VLM plugin registration failed with error: " + std::to_string(result));
+    }
+
+    RAC_LOG_INFO(VLM_LOG_CATEGORY, "LlamaCPP VLM backend registered successfully");
+    isVLMRegistered_ = true;
+    return true;
   });
 }
 

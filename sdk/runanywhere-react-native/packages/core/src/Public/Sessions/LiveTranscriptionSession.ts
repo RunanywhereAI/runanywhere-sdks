@@ -19,7 +19,7 @@
 
 import { AudioCaptureManager } from '../../Features/VoiceSession/AudioCaptureManager';
 import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { transcribeStream } from '../Extensions/RunAnywhere+STT';
+import { transcribeStream } from '../Extensions/STT/RunAnywhere+STT';
 import type { STTPartialResult } from '@runanywhere/proto-ts/stt_options';
 import {
   STTOptions,

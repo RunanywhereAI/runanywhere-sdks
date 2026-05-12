@@ -22,10 +22,10 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeModules } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { pick as documentPick } from '@react-native-documents/picker';

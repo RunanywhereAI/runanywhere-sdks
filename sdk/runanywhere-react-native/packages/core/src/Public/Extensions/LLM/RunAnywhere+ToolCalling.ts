@@ -14,13 +14,13 @@
  * round-trip through proto — are declared inline below.
  */
 
-import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
+import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
 import { generateStream, generate } from './RunAnywhere+TextGeneration';
 import {
   requireNativeModule,
   isNativeModuleAvailable,
-} from '../../native';
-import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
+} from '../../../native';
+import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
   ToolParameterType,
   ToolCall,
@@ -43,7 +43,7 @@ import {
 import {
   arrayBufferToBytes,
   bytesToArrayBuffer,
-} from '../../services/ProtoBytes';
+} from '../../../services/ProtoBytes';
 
 const logger = new SDKLogger('RunAnywhere.ToolCalling');
 

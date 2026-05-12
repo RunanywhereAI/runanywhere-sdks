@@ -99,33 +99,33 @@ enum SDKEnvironment {
 ```typescript
 // Development mode (no API key needed)
 await RunAnywhere.initialize({
-  environment: SDKEnvironment.Development,
+  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
 });
 
 // Production mode
 await RunAnywhere.initialize({
   apiKey: 'your-api-key',
   baseURL: 'https://api.runanywhere.ai',
-  environment: SDKEnvironment.Production,
+  environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
 });
 ```
 
 ---
 
-#### `RunAnywhere.isInitialized()`
+#### `RunAnywhere.isInitialized`
 
 Check if the SDK is initialized.
 
 ```typescript
-await RunAnywhere.isInitialized(): Promise<boolean>
+RunAnywhere.isInitialized: boolean
 ```
 
-**Returns:** `Promise<boolean>` - `true` if SDK is initialized
+**Returns:** `boolean` - `true` if SDK is initialized
 
 **Example:**
 
 ```typescript
-const isReady = await RunAnywhere.isInitialized();
+const isReady = RunAnywhere.isInitialized;
 if (!isReady) {
   await RunAnywhere.initialize({ ... });
 }
@@ -162,30 +162,34 @@ await RunAnywhere.destroy(): Promise<void>
 
 ### Text Generation
 
-#### `RunAnywhere.loadModel(modelPath)`
+#### `RunAnywhere.loadModel(request)`
 
-Load an LLM model into memory.
+Load a registered model into memory through the same proto request shape used by the Swift SDK.
 
 ```typescript
-await RunAnywhere.loadModel(modelPath: string): Promise<boolean>
+await RunAnywhere.loadModel(request: ModelLoadRequest): Promise<ModelLoadResult>
 ```
 
 **Parameters:**
-- `modelPath` - Absolute path to the model file (.gguf)
+- `request.modelId` - Registered model ID
+- `request.category` - Model category to load
 
-**Returns:** `Promise<boolean>` - `true` if model loaded successfully
+**Returns:** `Promise<ModelLoadResult>` - success flag plus native lifecycle details
 
 **Throws:** `SDKError` with codes:
 - `notInitialized` - SDK not initialized
-- `modelNotFound` - Model file not found at path
+- `modelNotFound` - Model ID not found in the registry
 - `modelLoadFailed` - Failed to load model (memory, format, etc.)
 
 **Example:**
 
 ```typescript
-const modelInfo = await RunAnywhere.getModelInfo('smollm2-360m-q8_0');
-if (modelInfo?.localPath) {
-  await RunAnywhere.loadModel(modelInfo.localPath);
+const result = await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+  modelId: 'smollm2-360m-q8_0',
+  category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+}));
+if (!result.success) {
+  throw new Error(result.errorMessage || 'Model load failed');
 }
 ```
 
@@ -412,28 +416,27 @@ await RunAnywhere.cancelGeneration(): Promise<void>
 
 ### Speech-to-Text
 
-#### `RunAnywhere.loadSTTModel(modelPath, modelType?)`
+#### `RunAnywhere.loadModel(request)` for STT
 
-Load a Speech-to-Text model.
+Load a Speech-to-Text model with the Swift-canonical model lifecycle request.
 
 ```typescript
-await RunAnywhere.loadSTTModel(
-  modelPath: string,
-  modelType?: string
-): Promise<boolean>
+await RunAnywhere.loadModel(request: ModelLoadRequest): Promise<ModelLoadResult>
 ```
 
 **Parameters:**
-- `modelPath` - Path to the STT model directory
-- `modelType` - Model type identifier (default: 'whisper')
+- `request.modelId` - Registered STT model ID
+- `request.category` - `ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION`
 
-**Returns:** `Promise<boolean>` - `true` if loaded successfully
+**Returns:** `Promise<ModelLoadResult>` - success flag plus native lifecycle details
 
 **Example:**
 
 ```typescript
-const sttModel = await RunAnywhere.getModelInfo('sherpa-onnx-whisper-tiny.en');
-await RunAnywhere.loadSTTModel(sttModel.localPath, 'whisper');
+await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+  modelId: 'sherpa-onnx-whisper-tiny.en',
+  category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+}));
 ```
 
 ---
@@ -566,26 +569,25 @@ await RunAnywhere.transcribeBuffer(
 
 ### Text-to-Speech
 
-#### `RunAnywhere.loadTTSModel(modelPath, modelType?)`
+#### `RunAnywhere.loadModel(request)` for TTS
 
-Load a Text-to-Speech model.
+Load a Text-to-Speech model with the Swift-canonical model lifecycle request.
 
 ```typescript
-await RunAnywhere.loadTTSModel(
-  modelPath: string,
-  modelType?: string
-): Promise<boolean>
+await RunAnywhere.loadModel(request: ModelLoadRequest): Promise<ModelLoadResult>
 ```
 
 **Parameters:**
-- `modelPath` - Path to the TTS model directory
-- `modelType` - Model type identifier (default: 'piper')
+- `request.modelId` - Registered TTS model ID
+- `request.category` - `ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS`
 
 **Example:**
 
 ```typescript
-const ttsModel = await RunAnywhere.getModelInfo('vits-piper-en_US-lessac-medium');
-await RunAnywhere.loadTTSModel(ttsModel.localPath, 'piper');
+await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+  modelId: 'vits-piper-en_US-lessac-medium',
+  category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+}));
 ```
 
 ---
@@ -933,67 +935,55 @@ await RunAnywhere.startVoiceSession(
 
 ### Model Management
 
-#### `RunAnywhere.getAvailableModels()`
+#### `RunAnywhere.listModels()`
 
 Get list of all available models (registered + downloaded).
 
 ```typescript
-await RunAnywhere.getAvailableModels(): Promise<ModelInfo[]>
+await RunAnywhere.listModels(): Promise<ModelListResult>
 ```
 
-**Returns:** Array of `ModelInfo` objects
+**Returns:** `ModelListResult` with `models.models`
 
 **Example:**
 
 ```typescript
-const models = await RunAnywhere.getAvailableModels();
-const llmModels = models.filter(m => m.category === ModelCategory.Language);
+const result = await RunAnywhere.listModels();
+const models = result.models?.models ?? [];
+const llmModels = models.filter(m => m.category === ModelCategory.MODEL_CATEGORY_LANGUAGE);
 const downloadedModels = models.filter(m => m.isDownloaded);
 ```
 
 ---
 
-#### `RunAnywhere.getModelInfo(modelId)`
+#### `RunAnywhere.getModel(request)`
 
 Get information about a specific model.
 
 ```typescript
-await RunAnywhere.getModelInfo(modelId: string): Promise<ModelInfo | null>
+await RunAnywhere.getModel(request: ModelGetRequest): Promise<ModelGetResult>
 ```
 
-**Returns:** `ModelInfo` or `null` if not found
+**Returns:** `ModelGetResult` with `found` and `model`
 
 ---
 
-#### `RunAnywhere.getDownloadedModels()`
+#### `RunAnywhere.downloadedModels()`
 
-Get list of downloaded model IDs.
+Get downloaded models.
 
 ```typescript
-await RunAnywhere.getDownloadedModels(): Promise<string[]>
+await RunAnywhere.downloadedModels(): Promise<ModelListResult>
 ```
 
 ---
 
-#### `RunAnywhere.isModelDownloaded(modelId)`
-
-Check if a model is downloaded.
-
-```typescript
-await RunAnywhere.isModelDownloaded(modelId: string): Promise<boolean>
-```
-
----
-
-#### `RunAnywhere.downloadModel(modelId, onProgress?)`
+#### `RunAnywhere.downloadModel(modelId)`
 
 Download a model with progress tracking.
 
 ```typescript
-await RunAnywhere.downloadModel(
-  modelId: string,
-  onProgress?: (progress: DownloadProgress) => void
-): Promise<void>
+RunAnywhere.downloadModel(modelId: string): AsyncIterable<DownloadProgress>
 ```
 
 **Parameters:**
@@ -1029,14 +1019,18 @@ enum DownloadState {
 **Example:**
 
 ```typescript
-await RunAnywhere.downloadModel('smollm2-360m-q8_0', (progress) => {
+const iterator = RunAnywhere.downloadModel('smollm2-360m-q8_0')[Symbol.asyncIterator]();
+let next = await iterator.next();
+while (!next.done) {
+  const progress = next.value;
   const percent = (progress.progress * 100).toFixed(1);
   console.log(`Downloading: ${percent}%`);
 
-  if (progress.state === DownloadState.Extracting) {
+  if (progress.stage === DownloadStage.DOWNLOAD_STAGE_EXTRACTING) {
     console.log('Extracting archive...');
   }
-});
+  next = await iterator.next();
+}
 ```
 
 ---
@@ -1227,26 +1221,29 @@ LlamaCPP.register();
 
 ---
 
-### `LlamaCPP.addModel(options)`
+### `RunAnywhere.registerModel(options)` for LlamaCPP
 
-Add a GGUF model to the registry.
+Register a GGUF model through the Swift-canonical model registry surface.
 
 ```typescript
-await LlamaCPP.addModel(options: LlamaCPPModelOptions): Promise<ModelInfo>
+await RunAnywhere.registerModel(options: RegisterModelInput): Promise<boolean>
 ```
 
 **Parameters:**
 
 ```typescript
-interface LlamaCPPModelOptions {
-  /** Unique model ID. If not provided, generated from URL filename */
-  id?: string;
+interface RegisterModelInput {
+  /** Unique model ID */
+  id: string;
 
   /** Display name for the model */
   name: string;
 
   /** Download URL for the model */
   url: string;
+
+  /** Native backend framework */
+  framework: InferenceFramework;
 
   /** Model category (defaults to Language) */
   modality?: ModelCategory;
@@ -1262,18 +1259,20 @@ interface LlamaCPPModelOptions {
 **Example:**
 
 ```typescript
-await LlamaCPP.addModel({
+await RunAnywhere.registerModel({
   id: 'smollm2-360m-q8_0',
   name: 'SmolLM2 360M Q8_0',
   url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
+  framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
   memoryRequirement: 500_000_000,
 });
 
 // Model with thinking support
-await LlamaCPP.addModel({
+await RunAnywhere.registerModel({
   id: 'qwen2.5-0.5b-instruct',
   name: 'Qwen 2.5 0.5B Instruct',
   url: 'https://huggingface.co/.../qwen2.5-0.5b-instruct-q6_k.gguf',
+  framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
   memoryRequirement: 600_000_000,
   supportsThinking: true,
 });
@@ -1294,7 +1293,7 @@ LlamaCppProvider.register(): void
 ## ONNX Module
 
 ```typescript
-import { ONNX, ONNXProvider, ModelArtifactType } from '@runanywhere/onnx';
+import { ONNX, ONNXProvider } from '@runanywhere/onnx';
 ```
 
 ### `ONNX.register()`
@@ -1307,26 +1306,29 @@ ONNX.register(): void
 
 ---
 
-### `ONNX.addModel(options)`
+### `RunAnywhere.registerModel(options)` for ONNX
 
-Add an ONNX model (STT or TTS) to the registry.
+Register an ONNX model (STT or TTS) through the Swift-canonical model registry surface.
 
 ```typescript
-await ONNX.addModel(options: ONNXModelOptions): Promise<ModelInfo>
+await RunAnywhere.registerModel(options: RegisterModelInput): Promise<boolean>
 ```
 
 **Parameters:**
 
 ```typescript
-interface ONNXModelOptions {
-  /** Unique model ID. If not provided, generated from URL filename */
-  id?: string;
+interface RegisterModelInput {
+  /** Unique model ID */
+  id: string;
 
   /** Display name for the model */
   name: string;
 
   /** Download URL for the model */
   url: string;
+
+  /** Native backend framework */
+  framework: InferenceFramework;
 
   /** Model category (SpeechRecognition or SpeechSynthesis) */
   modality: ModelCategory;
@@ -1337,35 +1339,30 @@ interface ONNXModelOptions {
   /** Memory requirement in bytes */
   memoryRequirement?: number;
 }
-
-enum ModelArtifactType {
-  SingleFile = 'singleFile',
-  TarGzArchive = 'tarGzArchive',
-  TarBz2Archive = 'tarBz2Archive',
-  ZipArchive = 'zipArchive',
-}
 ```
 
 **Example:**
 
 ```typescript
 // STT Model
-await ONNX.addModel({
+await RunAnywhere.registerModel({
   id: 'sherpa-onnx-whisper-tiny.en',
   name: 'Sherpa Whisper Tiny (English)',
   url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/.../sherpa-onnx-whisper-tiny.en.tar.gz',
-  modality: ModelCategory.SpeechRecognition,
-  artifactType: ModelArtifactType.TarGzArchive,
+  framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+  artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
   memoryRequirement: 75_000_000,
 });
 
 // TTS Model
-await ONNX.addModel({
+await RunAnywhere.registerModel({
   id: 'vits-piper-en_US-lessac-medium',
   name: 'Piper TTS (US English)',
   url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/.../vits-piper-en_US-lessac-medium.tar.gz',
-  modality: ModelCategory.SpeechSynthesis,
-  artifactType: ModelArtifactType.TarGzArchive,
+  framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+  artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
   memoryRequirement: 65_000_000,
 });
 ```

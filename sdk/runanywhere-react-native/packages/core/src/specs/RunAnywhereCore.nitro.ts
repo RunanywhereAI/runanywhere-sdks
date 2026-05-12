@@ -156,6 +156,13 @@ export interface RunAnywhereCore extends HybridObject<{
   getDownloadedModelsProto(): Promise<ArrayBuffer>;
 
   /**
+   * Import a platform-normalized local model path into the registry.
+   * Takes serialized runanywhere.v1.ModelImportRequest bytes and returns
+   * serialized runanywhere.v1.ModelImportResult bytes.
+   */
+  importModelProto(requestBytes: ArrayBuffer): Promise<ArrayBuffer>;
+
+  /**
    * Refresh the model registry — T4.9 unified cross-SDK surface.
    *
    * Routes to `rac_model_registry_refresh` in commons. Each flag is
@@ -469,50 +476,6 @@ export interface RunAnywhereCore extends HybridObject<{
     onEventBytes: (eventBytes: ArrayBuffer) => void
   ): Promise<void>;
   llmCancelProto(): Promise<ArrayBuffer>;
-
-  // ============================================================================
-  // LLM Thinking (<think>...</think> parsing)
-  // Matches Swift: ThinkingContentParser + CppBridge+LLMThinking.swift
-  // Kotlin: CppBridgeLlmThinking / Dart: LlmThinking
-  // Wraps rac_llm_thinking.h — byte-for-byte identical across all 5 SDKs.
-  // v3-readiness Phase A10 / GAP 08 #6.
-  // ============================================================================
-
-  /**
-   * Split a full LLM response into (response, thinking) on the FIRST
-   * `<think>...</think>` block.
-   *
-   * @param text Full LLM response text
-   * @returns JSON: `{ "response": string, "thinking": string | null }`.
-   *   Response is never null (empty string when input is only a think
-   *   block). Returns an empty JSON object `"{}"` on error.
-   */
-  llmExtractThinking(text: string): Promise<string>;
-
-  /**
-   * Remove ALL `<think>...</think>` blocks (and trailing unclosed
-   * `<think>`) from text.
-   *
-   * @param text Full LLM response text
-   * @returns The trimmed remainder. Empty string on error.
-   */
-  llmStripThinking(text: string): Promise<string>;
-
-  /**
-   * Apportion a total token count between thinking + response segments
-   * proportionally by character length.
-   *
-   * @param totalCompletionTokens Total tokens reported by the LLM
-   * @param responseText Pass empty string when absent
-   * @param thinkingText Pass empty string when absent (returns (0, total))
-   * @returns JSON: `{ "thinking": int, "response": int }`. Guarantees
-   *   `thinking + response == total` on success.
-   */
-  llmSplitThinkingTokens(
-    totalCompletionTokens: number,
-    responseText: string,
-    thinkingText: string
-  ): Promise<string>;
 
   // ============================================================================
   // STT Capability (Backend-Agnostic)

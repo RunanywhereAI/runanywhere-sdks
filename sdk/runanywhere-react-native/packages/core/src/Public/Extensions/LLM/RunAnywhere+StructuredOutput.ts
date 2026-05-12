@@ -11,9 +11,9 @@
 import {
   isNativeModuleAvailable,
   requireNativeModule,
-} from '../../native';
-import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
+} from '../../../native';
+import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
   generate as generateText,
   generateStream,
@@ -35,7 +35,7 @@ import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
 import {
   arrayBufferToBytes,
   bytesToArrayBuffer,
-} from '../../services/ProtoBytes';
+} from '../../../services/ProtoBytes';
 
 // ============================================================================
 // Types re-exported for callers

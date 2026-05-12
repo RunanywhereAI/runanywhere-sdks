@@ -56,7 +56,7 @@ if [ "${RUN_IOS}" = "1" ]; then
 
     log "Building iOS simulator app"
     xcodebuild \
-        -project ios/RunAnywhereAI.xcodeproj \
+        -workspace ios/RunAnywhereAI.xcworkspace \
         -scheme RunAnywhereAI \
         -configuration Debug \
         -sdk iphonesimulator \

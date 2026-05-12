@@ -13,7 +13,7 @@
  *
  * Architecture:
  * - Uses native audio recording (AudioService)
- * - Model loading via RunAnywhere.loadModel(id, ModelCategory.SPEECH_TO_TEXT)
+ * - Model loading via RunAnywhere.loadModel(ModelLoadRequest)
  * - Transcription via RunAnywhere.transcribeFile() (file-based) or streaming primitives
  * - Supports ONNX-based Whisper models
  *
@@ -25,7 +25,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   Alert,
@@ -35,7 +34,7 @@ import {
   Linking,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
@@ -58,10 +57,11 @@ import {
   STTLanguage,
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/core';
+import { ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
 
-// Canonical SDK methods (Swift / Kotlin / Flutter / Web parity).
-const getAvailableModels = RunAnywhere.getAvailableModels;
-const loadModelById = RunAnywhere.loadModel;
+// Canonical SDK methods (Swift parity).
+const listModels = async (): Promise<SDKModelInfo[]> => (await RunAnywhere.listModels()).models?.models ?? [];
+const loadModelWithRequest = RunAnywhere.loadModel;
 
 // STT Model IDs (kept for reference, uses SDK model registry)
 const _STT_MODEL_IDS = ['whisper-tiny-en', 'whisper-base-en'];
@@ -152,7 +152,7 @@ export const STTScreen: React.FC = () => {
   const loadModels = useCallback(async () => {
     try {
       // Get available STT models from catalog
-      const allModels = await getAvailableModels();
+      const allModels = await listModels();
       // Filter by category (speech-recognition) matching SDK's ModelCategory
       const sttModels = allModels.filter(
         (m: SDKModelInfo) =>
@@ -243,7 +243,7 @@ export const STTScreen: React.FC = () => {
         `[STTScreen] Loading model: ${model.id} (registry will resolve path)`
       );
 
-      if (!model.isDownloaded) {
+      if (!model.isDownloaded && !model.localPath) {
         Alert.alert(
           'Error',
           'Model has not been downloaded. Open the model picker to download it first.'
@@ -251,12 +251,16 @@ export const STTScreen: React.FC = () => {
         return;
       }
 
-      const success = await loadModelById(
-        model.id,
-        ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+      const result = await loadModelWithRequest(
+        ModelLoadRequest.fromPartial({
+          modelId: model.id,
+          category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+          forceReload: false,
+          validateAvailability: true,
+        })
       );
 
-      if (success) {
+      if (result.success) {
         const isLoaded = await RunAnywhere.isSTTModelLoaded();
         if (isLoaded) {
           // Set model with framework so ModelStatusBanner shows it properly
@@ -274,7 +278,7 @@ export const STTScreen: React.FC = () => {
           );
         }
       } else {
-        const error = await RunAnywhere.getLastError();
+        const error = result.errorMessage || await RunAnywhere.getLastError();
         Alert.alert(
           'Error',
           `Failed to load model: ${error || 'Unknown error'}`

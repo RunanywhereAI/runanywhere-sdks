@@ -10,7 +10,9 @@
  *   import { SDKLogger, LoggingManager, SDKEnvironment, SentryDestination } from '@runanywhere/core';
  *
  *   // Configure for production
- *   LoggingManager.shared.applyEnvironmentConfiguration(SDKEnvironment.Production);
+ *   LoggingManager.shared.applyEnvironmentConfiguration(
+ *     SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+ *   );
  *
  *   // Add Sentry destination (optional)
  *   LoggingManager.shared.addDestination(new SentryDestination(Sentry));
@@ -33,17 +35,14 @@ export {
   stagingConfig,
   productionConfig,
   getConfigurationForEnvironment,
-  createLoggingConfiguration,
 } from './Models/LoggingConfiguration';
 
 // Logging manager with destinations
 export {
   LoggingManager,
   ConsoleLogDestination,
-  EventLogDestination,
   type LogDestination,
   type LogEntry,
-  type LogEventCallback,
 } from './Services/LoggingManager';
 
 // Sentry destination

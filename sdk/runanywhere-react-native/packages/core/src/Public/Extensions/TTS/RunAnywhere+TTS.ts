@@ -4,15 +4,15 @@
  * Text-to-Speech extension for RunAnywhere SDK. Aligned to proto-canonical
  * TTS shapes (`@runanywhere/proto-ts/tts_options`). Path-first loading and
  * registry path probing have been removed — voice loading goes through
- * `loadModelLifecycle` in `RunAnywhere+Lifecycle.ts`.
+ * `loadModelLifecycle` in `Models/RunAnywhere+ModelLifecycle.ts`.
  *
  * Matches Swift: `Public/Extensions/TTS/RunAnywhere+TTS.swift`.
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '../../native';
-import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
-import { AudioPlaybackManager } from '../../Features/VoiceSession/AudioPlaybackManager';
+import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../../Foundation/Errors/SDKException';
+import { AudioPlaybackManager } from '../../../Features/VoiceSession/AudioPlaybackManager';
 import {
   type TTSOptions,
   type TTSOutput,
@@ -29,7 +29,7 @@ import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 import {
   arrayBufferToBytes,
   bytesToArrayBuffer,
-} from '../../services/ProtoBytes';
+} from '../../../services/ProtoBytes';
 
 const logger = new SDKLogger('RunAnywhere.TTS');
 
@@ -295,7 +295,10 @@ export async function speak(
   const output = await synthesize(text, options);
   if (output.audioData && output.audioData.byteLength > 0) {
     const playback = getAudioPlayback();
-    await playback.play(bytesToBase64(output.audioData));
+    await playback.play(
+      bytesToBase64(output.audioData),
+      output.sampleRate || options?.sampleRate || 22050
+    );
   }
 
   return TTSSpeakResultMessage.fromPartial({

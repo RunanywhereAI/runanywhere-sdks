@@ -13,18 +13,18 @@ import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
 const logger = new SDKLogger('AudioPlaybackManager');
 
 /**
- * Safely publish an event to the EventBus
+ * Safely publish an event to the AudioEventSink
  * Uses lazy loading to avoid circular dependency issues during module initialization
  */
 function safePublish(eventType: string, event: Record<string, unknown>): void {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { EventBus } = require('../../Internal/Events');
-    if (EventBus?.publish) {
-      EventBus.publish(eventType, event);
+    const { AudioEventSink } = require('../../Internal/Events');
+    if (AudioEventSink?.publish) {
+      AudioEventSink.publish(eventType, event);
     }
   } catch {
-    // Ignore EventBus errors - events are non-critical for playback functionality
+    // Ignore AudioEventSink errors - events are non-critical for playback functionality
   }
 }
 

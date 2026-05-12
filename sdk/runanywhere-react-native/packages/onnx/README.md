@@ -32,6 +32,7 @@ Host apps that capture audio still need the platform microphone permission.
 
 ```typescript
 import { RunAnywhere, InferenceFramework, ModelCategory } from '@runanywhere/core';
+import { ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
 import { ONNX } from '@runanywhere/onnx';
 
 await RunAnywhere.initialize();
@@ -45,11 +46,16 @@ await RunAnywhere.registerModel({
   id: 'sherpa-onnx-whisper-tiny.en',
   name: 'Sherpa Whisper Tiny English',
   framework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
-  category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+  modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
   url: 'https://example.invalid/model.tar.gz',
 });
 
-await RunAnywhere.downloadModel('sherpa-onnx-whisper-tiny.en');
+const download = RunAnywhere.downloadModel('sherpa-onnx-whisper-tiny.en')[Symbol.asyncIterator]();
+while (!(await download.next()).done) {}
+await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+  modelId: 'sherpa-onnx-whisper-tiny.en',
+  category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+}));
 
 // Use @runanywhere/core for model lifecycle and STT/TTS/VAD/voice APIs.
 ```

@@ -20,6 +20,7 @@ jmethodID g_secureGetMethod = nullptr;
 jmethodID g_secureDeleteMethod = nullptr;
 jmethodID g_secureExistsMethod = nullptr;
 jmethodID g_getPersistentDeviceUUIDMethod = nullptr;
+jmethodID g_getModelBaseDirectoryMethod = nullptr;
 jmethodID g_getDeviceModelMethod = nullptr;
 jmethodID g_getOSVersionMethod = nullptr;
 jmethodID g_getChipNameMethod = nullptr;
@@ -50,6 +51,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       g_secureDeleteMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "secureDelete", "(Ljava/lang/String;)Z");
       g_secureExistsMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "secureExists", "(Ljava/lang/String;)Z");
       g_getPersistentDeviceUUIDMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getPersistentDeviceUUID", "()Ljava/lang/String;");
+      g_getModelBaseDirectoryMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getModelBaseDirectory", "()Ljava/lang/String;");
       g_getDeviceModelMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getDeviceModel", "()Ljava/lang/String;");
       g_getOSVersionMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getOSVersion", "()Ljava/lang/String;");
       g_getChipNameMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "getChipName", "()Ljava/lang/String;");
@@ -63,6 +65,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
       g_httpDownloadCancelMethod = env->GetStaticMethodID(g_platformAdapterBridgeClass, "httpDownloadCancel", "(Ljava/lang/String;)Z");
 
       if (g_secureSetMethod && g_secureGetMethod && g_getPersistentDeviceUUIDMethod &&
+          g_getModelBaseDirectoryMethod &&
           g_getDeviceModelMethod && g_getOSVersionMethod && g_getChipNameMethod &&
           g_getTotalMemoryMethod && g_getAvailableMemoryMethod && g_getCoreCountMethod &&
           g_getArchitectureMethod && g_getGPUFamilyMethod && g_isTabletMethod &&
@@ -80,6 +83,7 @@ JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void*) {
         env->ExceptionClear();
       }
     }
+
   }
 
   return margelo::nitro::runanywhere::initialize(vm);

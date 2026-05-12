@@ -8,7 +8,7 @@ APP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${APP_ROOT}"
 
 echo "==> Checking React Native SDK call coverage"
-grep -R -E "RunAnywhere\.(initialize|getAvailableModels|downloadModel|loadModel|generateStream|generate\(|loadSTTModel|transcribeFile|loadTTSModel|synthesize|deleteModel|clearCache|getStorageInfo)" \
+grep -R -E "RunAnywhere\.(initialize|listModels|downloadedModels|downloadModel|importModel|loadModel|generateStream|generate\(|transcribeFile|synthesize|deleteModel|cleanTempFiles|getStorageInfo)" \
     App.tsx src >/dev/null
 
 grep -R -E "VoiceAgentStreamAdapter|initializeVoiceAgentWithLoadedModels|getVoiceAgentHandle" src >/dev/null

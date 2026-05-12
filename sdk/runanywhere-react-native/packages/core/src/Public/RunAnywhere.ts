@@ -13,11 +13,9 @@ import { SDKEnvironment } from '../types';
 import { ServiceContainer } from '../Foundation/DependencyInjection/ServiceContainer';
 import { SDKLogger } from '../Foundation/Logging/Logger/SDKLogger';
 import { SDKConstants } from '../Foundation/Constants';
-import { SecureStorageService } from '../Foundation/Security/SecureStorageService';
 import { TelemetryService } from '../services/Network';
 import {
   DEFAULT_BASE_URL,
-  hasUsableBackendConfig,
   hasUsableSupabaseConfig,
   isUsableCredential,
 } from '../services/Network/NetworkConfiguration';
@@ -44,27 +42,27 @@ import { EventCategory } from '@runanywhere/proto-ts/component_types';
 import { ErrorSeverity } from '@runanywhere/proto-ts/errors';
 
 // Import extensions
-import * as TextGeneration from './Extensions/RunAnywhere+TextGeneration';
-import type { ThinkingExtractionResult } from './Extensions/RunAnywhere+TextGeneration';
-import * as STT from './Extensions/RunAnywhere+STT';
-import * as TTS from './Extensions/RunAnywhere+TTS';
-import * as VAD from './Extensions/RunAnywhere+VAD';
-import * as Storage from './Extensions/RunAnywhere+Storage';
-import * as SDKEvents from './Extensions/RunAnywhere+Events';
-import * as Lifecycle from './Extensions/RunAnywhere+Lifecycle';
+import * as TextGeneration from './Extensions/LLM/RunAnywhere+TextGeneration';
+import * as STT from './Extensions/STT/RunAnywhere+STT';
+import * as TTS from './Extensions/TTS/RunAnywhere+TTS';
+import * as VAD from './Extensions/VAD/RunAnywhere+VAD';
+import * as Storage from './Extensions/Storage/RunAnywhere+Storage';
+import * as SDKEvents from './Events/RunAnywhere+SDKEvents';
+import * as Lifecycle from './Extensions/Models/RunAnywhere+ModelLifecycle';
 import * as Logging from './Extensions/RunAnywhere+Logging';
-import * as VoiceAgent from './Extensions/RunAnywhere+VoiceAgent';
+import { pluginLoader as PluginLoaderCapability } from './Extensions/RunAnywhere+PluginLoader';
+import * as VoiceAgent from './Extensions/VoiceAgent/RunAnywhere+VoiceAgent';
 // v3.1: RunAnywhere+VoiceSession.ts deleted — use VoiceAgentStreamAdapter.
-import * as StructuredOutput from './Extensions/RunAnywhere+StructuredOutput';
+import * as StructuredOutput from './Extensions/LLM/RunAnywhere+StructuredOutput';
 import * as Audio from './Extensions/RunAnywhere+Audio';
-import * as ToolCalling from './Extensions/RunAnywhere+ToolCalling';
-import * as RAG from './Extensions/RunAnywhere+RAG';
-import * as VLM from './Extensions/RunAnywhere+VisionLanguage';
-import { lora as LoRACapability } from './Extensions/RunAnywhere+LoRA';
-import { solutions as SolutionsCapability } from './Extensions/RunAnywhere+Solutions';
+import * as ToolCalling from './Extensions/LLM/RunAnywhere+ToolCalling';
+import * as RAG from './Extensions/RAG/RunAnywhere+RAG';
+import * as VLM from './Extensions/VLM/RunAnywhere+VisionLanguage';
+import { lora as LoRACapability } from './Extensions/LLM/RunAnywhere+LoRA';
+import { solutions as SolutionsCapability } from './Extensions/Solutions/RunAnywhere+Solutions';
 import { startLiveTranscription } from './Sessions/LiveTranscriptionSession';
-import * as VLMModels from './Extensions/RunAnywhere+VLMModels';
-import * as ModelManagement from './Extensions/RunAnywhere+ModelManagement';
+import * as VLMModels from './Extensions/VLM/RunAnywhere+VLMModels';
+import * as ModelManagement from './Extensions/Models/RunAnywhere+ModelRegistry';
 import { Hardware as HardwareNamespace } from './Extensions/RunAnywhere+Hardware';
 
 const logger = new SDKLogger('RunAnywhere');
@@ -75,6 +73,7 @@ const logger = new SDKLogger('RunAnywhere');
 
 let initState: InitializationState = createInitialState();
 let cachedDeviceId: string = '';
+let servicesInitPromise: Promise<void> | null = null;
 
 const sdkEventSurface = {
   subscribe: SDKEvents.subscribeSDKEvents,
@@ -154,7 +153,7 @@ export const RunAnywhere = {
   // SDK State
   // ============================================================================
 
-  get isSDKInitialized(): boolean {
+  get isInitialized(): boolean {
     return initState.isCoreInitialized;
   },
 
@@ -162,7 +161,7 @@ export const RunAnywhere = {
     return initState.hasCompletedServicesInit;
   },
 
-  get currentEnvironment(): SDKEnvironment | null {
+  get environment(): SDKEnvironment | null {
     return initState.environment;
   },
 
@@ -174,25 +173,12 @@ export const RunAnywhere = {
   // SDK Initialization
   // ============================================================================
 
-  async initialize(options: SDKInitOptions): Promise<void> {
-    const environment = options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
+  async initialize(options: SDKInitOptions = {}): Promise<void> {
+    const environment = options.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
     const effectiveBaseURL = options.baseURL?.trim() || DEFAULT_BASE_URL;
     const effectiveApiKey = isUsableCredential(options.apiKey)
       ? options.apiKey!.trim()
       : '';
-
-    // Fail fast: API key is required for production/staging environments
-    // Development mode uses C++ dev config (Supabase credentials) instead
-    if (
-      environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT &&
-      !hasUsableBackendConfig({ baseURL: effectiveBaseURL, apiKey: effectiveApiKey })
-    ) {
-      const envName = environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging' : 'production';
-      throw new Error(
-        `Usable API key and baseURL are required for ${envName} environment. ` +
-        'Pass real apiKey/baseURL values or use SDKEnvironment.Development for local testing.'
-      );
-    }
 
     const initParams: SDKInitParams = {
       apiKey: effectiveApiKey,
@@ -284,32 +270,30 @@ export const RunAnywhere = {
       }
 
       // Resolve build token: explicit option wins over RUNANYWHERE_BUILD_TOKEN.
-      // For production/staging we require a real token (either source). Native
-      // C++ has a baked-in dev fallback used only when environment === development,
-      // so dev mode may proceed with an undefined token.
+      // Swift only performs the extra build-token registration retry for
+      // development; production/staging phase 2 is handled by native state.
       const resolvedBuildToken = this._resolveBuildToken(options.buildToken);
-      if (!resolvedBuildToken && environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
-        const envName = environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging' : 'production';
-        throw new Error(
-          `Usable build token is required for ${envName} environment. ` +
-          'Pass `buildToken` in initialize() options or set the ' +
-          '`RUNANYWHERE_BUILD_TOKEN` environment variable at build time.'
-        );
-      }
 
-      // Trigger device registration (non-blocking, best-effort)
-      // This matches Swift SDK's CppBridge.Device.registerIfNeeded(environment:)
-      // Uses native C++ → platform HTTP (exactly like Swift)
-      this._registerDeviceIfNeeded(environment, options.supabaseKey, resolvedBuildToken).catch(err => {
-        logger.warning(`Device registration failed (non-fatal): ${err.message}`);
-      });
+      if (environment === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+        this._registerDeviceIfNeeded(environment, options.supabaseKey, resolvedBuildToken).catch(err => {
+          logger.warning(`Development device registration failed (non-fatal): ${err.message}`);
+        });
+      }
 
       ServiceContainer.shared.markInitialized();
       initState = markCoreInitialized(initState, initParams, 'core');
-      initState = markServicesInitialized(initState);
 
       logger.info('SDK initialized successfully');
       publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_COMPLETED);
+
+      servicesInitPromise = null;
+      void this.completeServicesInitialization().catch(err => {
+        logger.warning(
+          `Phase 2 services initialization failed (non-fatal): ${
+            err instanceof Error ? err.message : String(err)
+          }`
+        );
+      });
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error(`SDK initialization failed: ${msg}`);
@@ -366,16 +350,6 @@ export const RunAnywhere = {
         return false;
       }
 
-      try {
-        await SecureStorageService.storeAuthTokens(
-          authResponse.access_token,
-          authResponse.refresh_token,
-          authResponse.expires_in,
-        );
-      } catch (storageErr) {
-        logger.warning(`Failed to persist tokens: ${storageErr}`);
-      }
-
       logger.info(`Authentication successful! Token expires in ${authResponse.expires_in}s`);
       return true;
     } catch (error) {
@@ -388,8 +362,7 @@ export const RunAnywhere = {
   /**
    * Resolve the build token from explicit option or environment variable.
    * Returns `undefined` when no token is available — callers must decide
-   * whether that is acceptable (only `SDKEnvironment.Development` is, via the
-   * native C++ baked-in dev fallback).
+   * whether that is useful. Only development performs the JS-triggered retry.
    * @internal
    */
   _resolveBuildToken(explicit?: string): string | undefined {
@@ -416,9 +389,12 @@ export const RunAnywhere = {
       : environment === SDKEnvironment.SDK_ENVIRONMENT_STAGING ? 'staging'
         : 'production';
 
-    // Defensive: non-dev must have a token (initialize() already enforces this,
-    // but guard here too so we never silently register with an empty token).
-    if (!buildToken && environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+    if (environment !== SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+      logger.debug('Skipping JS device registration: native phase 2 owns non-development registration');
+      return;
+    }
+
+    if (!buildToken) {
       logger.debug('Skipping telemetry/device registration: no usable config');
       return;
     }
@@ -459,25 +435,20 @@ export const RunAnywhere = {
     }
     ServiceContainer.shared.reset();
     initState = resetState();
+    servicesInitPromise = null;
   },
 
   async reset(): Promise<void> {
     await this.destroy();
   },
 
-  async isInitialized(): Promise<boolean> {
-    if (!isNativeModuleAvailable()) return false;
-    const native = requireNativeModule();
-    return native.isInitialized();
-  },
-
   /**
-   * Whether the SDK is fully active (core initialised AND services ready).
+   * Whether the SDK has completed core initialization.
    *
    * Matches Swift: `RunAnywhere.isActive`.
    */
   get isActive(): boolean {
-    return initState.isCoreInitialized && initState.hasCompletedServicesInit;
+    return initState.isCoreInitialized && initState.environment !== null;
   },
 
   /**
@@ -498,23 +469,21 @@ export const RunAnywhere = {
       return;
     }
 
+    if (servicesInitPromise) {
+      return servicesInitPromise;
+    }
+
     if (!isNativeModuleAvailable()) {
       throw new Error('Native module not available');
     }
 
-    try {
+    servicesInitPromise = (async () => {
       const native = requireNativeModule();
 
-      // Best-effort device registration retry. Build token resolution is
-      // identical to the original `initialize()` path.
-      const env = initState.environment ?? SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION;
+      const env = initState.environment ?? SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT;
       const buildToken = this._resolveBuildToken();
-      try {
+      if (env === SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
         await this._registerDeviceIfNeeded(env, undefined, buildToken);
-      } catch (e) {
-        logger.warning(
-          `Device registration retry failed (non-fatal): ${e instanceof Error ? e.message : String(e)}`
-        );
       }
 
       ServiceContainer.shared.markInitialized();
@@ -523,6 +492,10 @@ export const RunAnywhere = {
       void native.isInitialized();
       logger.info('Services initialisation completed.');
       publishInitializationEvent(InitializationStage.INITIALIZATION_STAGE_COMPLETED);
+    })();
+
+    try {
+      await servicesInitPromise;
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       logger.error(`Services initialisation failed: ${msg}`);
@@ -531,6 +504,8 @@ export const RunAnywhere = {
         msg
       );
       throw error;
+    } finally {
+      servicesInitPromise = null;
     }
   },
 
@@ -603,7 +578,19 @@ export const RunAnywhere = {
   // Logging (Delegated to Extension)
   // ============================================================================
 
+  configureLogging: Logging.configureLogging,
+  setLocalLoggingEnabled: Logging.setLocalLoggingEnabled,
   setLogLevel: Logging.setLogLevel,
+  setSentryLoggingEnabled: Logging.setSentryLoggingEnabled,
+  addLogDestination: Logging.addLogDestination,
+  setDebugMode: Logging.setDebugMode,
+  flushLogs: Logging.flushLogs,
+
+  // ============================================================================
+  // Plugin Loader — canonical RunAnywhere.pluginLoader namespace
+  // ============================================================================
+
+  pluginLoader: PluginLoaderCapability,
 
   // ============================================================================
   // Text Generation - LLM (Delegated to Extension)
@@ -623,10 +610,6 @@ export const RunAnywhere = {
   cancelGeneration: TextGeneration.cancelGeneration,
   // Introspection — canonical: `currentLLMModel()` only.
   currentLLMModel: TextGeneration.currentLLMModel,
-  // Thinking token utilities (§3)
-  extractThinkingTokens: TextGeneration.extractThinkingTokens,
-  stripThinkingTokens: TextGeneration.stripThinkingTokens,
-  splitThinkingAndResponse: TextGeneration.splitThinkingAndResponse,
 
   // ============================================================================
   // Speech-to-Text (Delegated to Extension)
@@ -771,13 +754,16 @@ export const RunAnywhere = {
   solutions: SolutionsCapability,
 
   // ============================================================================
-  // Model Management (Delegated to Extension) — Swift / Kotlin / Flutter / Web parity
+  // Model Management (Delegated to Extension) — Swift parity
   // ============================================================================
 
   registerModel: ModelManagement.registerModel,
   registerMultiFileModel: ModelManagement.registerMultiFileModel,
-  getAvailableModels: ModelManagement.getAvailableModels,
-  getDownloadedModels: ModelManagement.getDownloadedModels,
+  listModels: ModelManagement.listModels,
+  queryModels: ModelManagement.queryModels,
+  getModel: ModelManagement.getModel,
+  downloadedModels: ModelManagement.downloadedModels,
+  importModel: ModelManagement.importModel,
   downloadModel: ModelManagement.downloadModel,
   cancelDownload: ModelManagement.cancelDownload,
   deleteModel: ModelManagement.deleteModel,
@@ -795,10 +781,9 @@ export const RunAnywhere = {
 
   getStorageInfo: Storage.getStorageInfo,
   getStorageInfoProto: Storage.getStorageInfoProto,
-  checkStorageAvailability: Storage.checkStorageAvailability,
-  planStorageDelete: Storage.planStorageDelete,
   deleteStorage: Storage.deleteStorage,
   clearCache: Storage.clearCache,
+  cleanTempFiles: Storage.cleanTempFiles,
 
   // ============================================================================
   // Canonical SDK Events / Lifecycle (proto-byte native truth)
@@ -850,15 +835,6 @@ export const RunAnywhere = {
       // Ignore errors - these methods may not be available
     }
     return caps;
-  },
-
-  /**
-   * Clean temporary files
-   */
-  async cleanTempFiles(): Promise<boolean> {
-    // Delegate to storage clearCache for now
-    await this.clearCache();
-    return true;
   },
 
   // ============================================================================

@@ -9,15 +9,13 @@
  *
  * Usage:
  *   // Configure for environment
- *   LoggingManager.shared.configure({ environment: SDKEnvironment.Production });
+ *   LoggingManager.shared.applyEnvironmentConfiguration(
+ *     SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION
+ *   );
  *
  *   // Add Sentry destination
  *   LoggingManager.shared.addDestination(new SentryDestination(Sentry));
  *
- *   // Subscribe to log events (for custom handling)
- *   const unsubscribe = LoggingManager.shared.onLog((entry) => {
- *     // Forward to your analytics, etc.
- *   });
  */
 
 import { LogLevel } from '../Models/LogLevel';
@@ -26,6 +24,7 @@ import {
   SDKEnvironment,
   getConfigurationForEnvironment,
 } from '../Models/LoggingConfiguration';
+import { SentryDestination } from '../Destinations/SentryDestination';
 
 // ============================================================================
 // Log Entry
@@ -59,8 +58,6 @@ export interface LogEntry {
 export interface LogDestination {
   /** Unique identifier for this destination */
   identifier: string;
-  /** Human-readable name */
-  name: string;
   /** Whether destination is available */
   isAvailable: boolean;
   /** Write a log entry */
@@ -113,52 +110,6 @@ export class ConsoleLogDestination implements LogDestination {
 }
 
 // ============================================================================
-// Event Destination (for public exposure)
-// ============================================================================
-
-/**
- * Log event callback type
- */
-export type LogEventCallback = (entry: LogEntry) => void;
-
-/**
- * Event-based log destination for public log exposure
- * Allows external consumers to subscribe to log events
- */
-export class EventLogDestination implements LogDestination {
-  readonly identifier = 'event';
-  readonly name = 'Event Emitter';
-  readonly isAvailable = true;
-
-  private callbacks: Set<LogEventCallback> = new Set();
-
-  /**
-   * Subscribe to log events
-   * @returns Unsubscribe function
-   */
-  subscribe(callback: LogEventCallback): () => void {
-    this.callbacks.add(callback);
-    return () => {
-      this.callbacks.delete(callback);
-    };
-  }
-
-  write(entry: LogEntry): void {
-    for (const callback of this.callbacks) {
-      try {
-        callback(entry);
-      } catch {
-        // Ignore callback errors
-      }
-    }
-  }
-
-  flush(): void {
-    // No buffering
-  }
-}
-
-// ============================================================================
 // Logging Manager
 // ============================================================================
 
@@ -175,16 +126,15 @@ export class LoggingManager {
 
   // Default destinations
   private readonly consoleDestination = new ConsoleLogDestination();
-  private readonly eventDestination = new EventLogDestination();
 
   private constructor() {
     // Initialize with default development config
-    this.config = getConfigurationForEnvironment(SDKEnvironment.Development);
+    this.config = getConfigurationForEnvironment(
+      SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT
+    );
 
     // Add default console destination
     this.addDestination(this.consoleDestination);
-    // Add event destination for public log exposure
-    this.addDestination(this.eventDestination);
   }
 
   // ============================================================================
@@ -202,22 +152,22 @@ export class LoggingManager {
    * Configure the logging system.
    * Matches iOS: Logging.configure(_ config: LoggingConfiguration)
    *
-   * @param config - Partial configuration to apply
+   * @param config - Configuration to apply
    */
-  public configure(config: Partial<LoggingConfiguration>): void {
-    // If environment is specified, get defaults for that environment
-    if (config.environment && !config.minLogLevel) {
-      const envConfig = getConfigurationForEnvironment(config.environment);
-      this.config = { ...envConfig, ...config };
-    } else {
-      this.config = { ...this.config, ...config };
-    }
+  public configure(config: LoggingConfiguration): void {
+    this.config = { ...config };
 
     // Update console destination based on enableLocalLogging
     if (!this.config.enableLocalLogging) {
-      this.removeDestination(this.consoleDestination.identifier);
+      this.removeDestinationByIdentifier(this.consoleDestination.identifier);
     } else if (!this.hasDestination(this.consoleDestination.identifier)) {
       this.addDestination(this.consoleDestination);
+    }
+
+    // React Native apps provide the concrete Sentry instance via
+    // addLogDestination(...), so disabling removes that destination.
+    if (!this.config.enableSentryLogging) {
+      this.removeDestinationByIdentifier(SentryDestination.DESTINATION_ID);
     }
   }
 
@@ -239,7 +189,7 @@ export class LoggingManager {
   public setLocalLoggingEnabled(enabled: boolean): void {
     this.config.enableLocalLogging = enabled;
     if (!enabled) {
-      this.removeDestination(this.consoleDestination.identifier);
+      this.removeDestinationByIdentifier(this.consoleDestination.identifier);
     } else if (!this.hasDestination(this.consoleDestination.identifier)) {
       this.addDestination(this.consoleDestination);
     }
@@ -262,6 +212,17 @@ export class LoggingManager {
   }
 
   /**
+   * Set Sentry logging enabled.
+   * Matches iOS: Logging.setSentryLoggingEnabled(_ enabled:)
+   */
+  public setSentryLoggingEnabled(enabled: boolean): void {
+    this.config.enableSentryLogging = enabled;
+    if (!enabled) {
+      this.removeDestinationByIdentifier(SentryDestination.DESTINATION_ID);
+    }
+  }
+
+  /**
    * Get shared instance
    */
   public static get shared(): LoggingManager {
@@ -270,9 +231,6 @@ export class LoggingManager {
     }
     return LoggingManager.sharedInstance;
   }
-
-  // v3.1: getLogLevel() DELETED. Read `config.minLogLevel` directly (or
-  // access the `configuration` getter if that exists on the public surface).
 
   // ============================================================================
   // Destination Management (matches iOS)
@@ -288,10 +246,10 @@ export class LoggingManager {
 
   /**
    * Remove a log destination
-   * Matches iOS: removeDestination(_ identifier: String)
+   * Matches iOS: removeDestination(_ destination: LogDestination)
    */
-  public removeDestination(identifier: string): void {
-    this.destinations.delete(identifier);
+  public removeDestination(destination: LogDestination): void {
+    this.removeDestinationByIdentifier(destination.identifier);
   }
 
   /**
@@ -301,27 +259,12 @@ export class LoggingManager {
     return Array.from(this.destinations.values());
   }
 
-  /**
-   * Check if a destination is registered
-   */
-  public hasDestination(identifier: string): boolean {
+  private hasDestination(identifier: string): boolean {
     return this.destinations.has(identifier);
   }
 
-  // ============================================================================
-  // Public Log Event Subscription
-  // ============================================================================
-
-  /**
-   * Subscribe to all log events (for public exposure)
-   * This allows consumers to receive log events for their own logging infrastructure.
-   * Matches iOS pattern of exposing log events.
-   *
-   * @param callback - Function called for each log entry
-   * @returns Unsubscribe function
-   */
-  public onLog(callback: LogEventCallback): () => void {
-    return this.eventDestination.subscribe(callback);
+  private removeDestinationByIdentifier(identifier: string): void {
+    this.destinations.delete(identifier);
   }
 
   // ============================================================================
@@ -344,8 +287,7 @@ export class LoggingManager {
     }
 
     // Check if logging is enabled at all
-    if (!this.config.enableLocalLogging && this.destinations.size <= 1) {
-      // Only event destination, check if there are subscribers
+    if (!this.config.enableLocalLogging && !this.config.enableSentryLogging) {
       return;
     }
 

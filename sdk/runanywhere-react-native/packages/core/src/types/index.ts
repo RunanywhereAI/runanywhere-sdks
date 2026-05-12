@@ -412,4 +412,4 @@ export {
 export type {
   RegisteredTool,
   ToolExecutor,
-} from '../Public/Extensions/RunAnywhere+ToolCalling';
+} from '../Public/Extensions/LLM/RunAnywhere+ToolCalling';

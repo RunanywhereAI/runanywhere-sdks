@@ -9,7 +9,7 @@
 export { SDKConstants } from './Constants';
 
 // Error Types
-export * from './ErrorTypes';
+export * from './Errors';
 
 // Initialization
 export * from './Initialization';

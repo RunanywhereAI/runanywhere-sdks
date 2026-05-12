@@ -12,12 +12,7 @@ export {
   generate,
   generateStream,
   cancelGeneration,
-  // Thinking token utilities (§3)
-  extractThinkingTokens,
-  stripThinkingTokens,
-  splitThinkingAndResponse,
-} from './RunAnywhere+TextGeneration';
-export type { ThinkingExtractionResult } from './RunAnywhere+TextGeneration';
+} from './LLM/RunAnywhere+TextGeneration';
 
 // Speech-to-Text
 export {
@@ -29,7 +24,7 @@ export {
   transcribeStream,
   transcribeFile,
   currentSTTModel,
-} from './RunAnywhere+STT';
+} from './STT/RunAnywhere+STT';
 
 // Text-to-Speech
 export {
@@ -47,7 +42,7 @@ export {
   stopSynthesis,
   cancelTTS,
   cleanupTTS,
-} from './RunAnywhere+TTS';
+} from './TTS/RunAnywhere+TTS';
 
 // Voice Activity Detection
 export {
@@ -63,7 +58,7 @@ export {
   streamVAD,
   // VAD statistics (§6)
   getVADStatistics,
-} from './RunAnywhere+VAD';
+} from './VAD/RunAnywhere+VAD';
 
 // Voice Agent
 export {
@@ -76,7 +71,7 @@ export {
   voiceAgentTranscribe,
   voiceAgentSynthesizeSpeech,
   cleanupVoiceAgent,
-} from './RunAnywhere+VoiceAgent';
+} from './VoiceAgent/RunAnywhere+VoiceAgent';
 
 // v3.1: Voice Session exports DELETED. Use VoiceAgentStreamAdapter from
 // the package root (`@runanywhere/core`) for streaming voice events.
@@ -91,7 +86,7 @@ export {
   generate as generateStructuredType,
   extractEntities,
   classify,
-} from './RunAnywhere+StructuredOutput';
+} from './LLM/RunAnywhere+StructuredOutput';
 
 // Hardware Profile (CANONICAL_API §14)
 export {
@@ -110,7 +105,22 @@ export type {
 } from './RunAnywhere+Hardware';
 
 // Logging
-export { setLogLevel } from './RunAnywhere+Logging';
+export {
+  configureLogging,
+  setLocalLoggingEnabled,
+  setLogLevel,
+  setSentryLoggingEnabled,
+  addLogDestination,
+  setDebugMode,
+  flushLogs,
+} from './RunAnywhere+Logging';
+
+// Plugin Loader
+export { pluginLoader } from './RunAnywhere+PluginLoader';
+export type {
+  PluginInfo,
+  PluginLoaderCapability,
+} from './RunAnywhere+PluginLoader';
 
 // Canonical SDK event stream
 export {
@@ -118,7 +128,7 @@ export {
   publishSDKEvent,
   publishSDKFailure,
   subscribeSDKEvents,
-} from './RunAnywhere+Events';
+} from '../Events/RunAnywhere+SDKEvents';
 
 // Canonical model/component lifecycle (commons-driven loading)
 export {
@@ -128,17 +138,16 @@ export {
   loadModelLifecycle,
   resolveVLMArtifactsFromLifecycleResult,
   unloadModelLifecycle,
-} from './RunAnywhere+Lifecycle';
+} from './Models/RunAnywhere+ModelLifecycle';
 
 // Storage
 export {
-  checkStorageAvailability,
   clearCache,
+  cleanTempFiles,
   deleteStorage,
   getStorageInfo,
   getStorageInfoProto,
-  planStorageDelete,
-} from './RunAnywhere+Storage';
+} from './Storage/RunAnywhere+Storage';
 
 // Audio Utilities
 export {
@@ -177,7 +186,7 @@ export {
   formatToolsForPromptAsync,
   generateWithTools,
   continueWithToolResult,
-} from './RunAnywhere+ToolCalling';
+} from './LLM/RunAnywhere+ToolCalling';
 
 // RAG Pipeline
 export {
@@ -189,11 +198,11 @@ export {
   ragClearDocuments,
   ragGetDocumentCount,
   ragGetStatistics,
-} from './RunAnywhere+RAG';
+} from './RAG/RunAnywhere+RAG';
 
 // Solutions Runtime (T4.7 / T4.8)
-export { solutions, SolutionHandle } from './RunAnywhere+Solutions';
-export type { SolutionRunArgs } from './RunAnywhere+Solutions';
+export { solutions, SolutionHandle } from './Solutions/RunAnywhere+Solutions';
+export type { SolutionRunArgs } from './Solutions/RunAnywhere+Solutions';
 
 // Vision Language Model
 export {
@@ -207,21 +216,24 @@ export {
   processImage,
   processImageStream,
   cancelVLMGeneration,
-} from './RunAnywhere+VisionLanguage';
-export type { VLMBackendProvider } from './RunAnywhere+VisionLanguage';
+} from './VLM/RunAnywhere+VisionLanguage';
+export type { VLMBackendProvider } from './VLM/RunAnywhere+VisionLanguage';
 
 // Model Management — register / list / download / delete / load (Swift parity)
 export {
   registerModel,
   registerMultiFileModel,
-  getAvailableModels,
-  getDownloadedModels,
+  listModels,
+  queryModels,
+  getModel,
+  downloadedModels,
+  importModel,
   downloadModel,
   cancelDownload,
   deleteModel,
   loadModel,
-} from './RunAnywhere+ModelManagement';
+} from './Models/RunAnywhere+ModelRegistry';
 export type {
   RegisterModelInput,
   RegisterMultiFileModelInput,
-} from './RunAnywhere+ModelManagement';
+} from './Models/RunAnywhere+ModelRegistry';

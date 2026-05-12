@@ -72,6 +72,7 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<bool>> removeModelProto(const std::string& modelId) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> queryModelsProto(const std::shared_ptr<ArrayBuffer>& queryBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getDownloadedModelsProto() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> importModelProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<bool>> refreshModelRegistry(bool includeRemoteCatalog, bool rescanLocal, bool pruneOrphans) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadPlanProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> downloadStartProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
@@ -111,9 +112,6 @@ namespace margelo::nitro::runanywhere {
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> llmGenerateProto(const std::shared_ptr<ArrayBuffer>& requestBytes) = 0;
       virtual std::shared_ptr<Promise<void>> llmGenerateStreamProto(const std::shared_ptr<ArrayBuffer>& requestBytes, const std::function<void(const std::shared_ptr<ArrayBuffer>& /* eventBytes */)>& onEventBytes) = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> llmCancelProto() = 0;
-      virtual std::shared_ptr<Promise<std::string>> llmExtractThinking(const std::string& text) = 0;
-      virtual std::shared_ptr<Promise<std::string>> llmStripThinking(const std::string& text) = 0;
-      virtual std::shared_ptr<Promise<std::string>> llmSplitThinkingTokens(double totalCompletionTokens, const std::string& responseText, const std::string& thinkingText) = 0;
       virtual std::shared_ptr<Promise<bool>> isSTTModelLoaded() = 0;
       virtual std::shared_ptr<Promise<bool>> unloadSTTModel() = 0;
       virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> sttTranscribeProto(const std::shared_ptr<ArrayBuffer>& audioBytes, const std::shared_ptr<ArrayBuffer>& optionsBytes) = 0;

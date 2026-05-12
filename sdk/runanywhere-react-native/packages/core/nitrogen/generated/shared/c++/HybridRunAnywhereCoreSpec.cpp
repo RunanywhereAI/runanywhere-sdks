@@ -32,6 +32,7 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("removeModelProto", &HybridRunAnywhereCoreSpec::removeModelProto);
       prototype.registerHybridMethod("queryModelsProto", &HybridRunAnywhereCoreSpec::queryModelsProto);
       prototype.registerHybridMethod("getDownloadedModelsProto", &HybridRunAnywhereCoreSpec::getDownloadedModelsProto);
+      prototype.registerHybridMethod("importModelProto", &HybridRunAnywhereCoreSpec::importModelProto);
       prototype.registerHybridMethod("refreshModelRegistry", &HybridRunAnywhereCoreSpec::refreshModelRegistry);
       prototype.registerHybridMethod("downloadPlanProto", &HybridRunAnywhereCoreSpec::downloadPlanProto);
       prototype.registerHybridMethod("downloadStartProto", &HybridRunAnywhereCoreSpec::downloadStartProto);
@@ -71,9 +72,6 @@ namespace margelo::nitro::runanywhere {
       prototype.registerHybridMethod("llmGenerateProto", &HybridRunAnywhereCoreSpec::llmGenerateProto);
       prototype.registerHybridMethod("llmGenerateStreamProto", &HybridRunAnywhereCoreSpec::llmGenerateStreamProto);
       prototype.registerHybridMethod("llmCancelProto", &HybridRunAnywhereCoreSpec::llmCancelProto);
-      prototype.registerHybridMethod("llmExtractThinking", &HybridRunAnywhereCoreSpec::llmExtractThinking);
-      prototype.registerHybridMethod("llmStripThinking", &HybridRunAnywhereCoreSpec::llmStripThinking);
-      prototype.registerHybridMethod("llmSplitThinkingTokens", &HybridRunAnywhereCoreSpec::llmSplitThinkingTokens);
       prototype.registerHybridMethod("isSTTModelLoaded", &HybridRunAnywhereCoreSpec::isSTTModelLoaded);
       prototype.registerHybridMethod("unloadSTTModel", &HybridRunAnywhereCoreSpec::unloadSTTModel);
       prototype.registerHybridMethod("sttTranscribeProto", &HybridRunAnywhereCoreSpec::sttTranscribeProto);

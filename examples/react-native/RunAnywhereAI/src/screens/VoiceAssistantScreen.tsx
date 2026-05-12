@@ -16,13 +16,12 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   ScrollView,
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -43,13 +42,14 @@ import {
   type ModelInfo as SDKModelInfo,
   VoiceAgentStreamAdapter,
 } from '@runanywhere/core';
+import { ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
 import { PipelineState as VoiceEventPipelineState } from '@runanywhere/proto-ts/voice_events';
 import { VADStreamEventKind } from '@runanywhere/proto-ts/vad_options';
 import type { VoiceEvent } from '@runanywhere/proto-ts/voice_events';
 
-// Canonical SDK methods (Swift / Kotlin / Flutter / Web parity).
-const getAvailableModels = RunAnywhere.getAvailableModels;
-const loadModelById = RunAnywhere.loadModel;
+// Canonical SDK methods (Swift parity).
+const listModels = async (): Promise<SDKModelInfo[]> => (await RunAnywhere.listModels()).models?.models ?? [];
+const loadModelWithRequest = RunAnywhere.loadModel;
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -106,7 +106,7 @@ export const VoiceAssistantScreen: React.FC = () => {
    */
   const loadAvailableModels = async () => {
     try {
-      const models = await getAvailableModels();
+      const models = await listModels();
       setAvailableModels(models);
     } catch (error) {
       console.warn('[VoiceAssistant] Error loading models:', error);
@@ -358,7 +358,7 @@ export const VoiceAssistantScreen: React.FC = () => {
       try {
         // Path-first loading was removed in V2 — model ID is the canonical
         // handle and the native registry resolves the artifact path.
-        if (!model.isDownloaded) {
+        if (!model.isDownloaded && !model.localPath) {
           Alert.alert(
             'Error',
             'Model has not been downloaded. Open the model picker to download it first.',
@@ -367,43 +367,61 @@ export const VoiceAssistantScreen: React.FC = () => {
         }
         switch (activeSelectionContext) {
           case ModelSelectionContext.STT: {
-            const ok = await loadModelById(
-              model.id,
-              ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+            const result = await loadModelWithRequest(
+              ModelLoadRequest.fromPartial({
+                modelId: model.id,
+                category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+                forceReload: false,
+                validateAvailability: true,
+              })
             );
-            if (ok) {
+            if (result.success) {
               setSTTModel({
                 ...model,
                 preferredFramework: InferenceFramework.INFERENCE_FRAMEWORK_ONNX,
               });
+            } else {
+              Alert.alert('Error', `Failed to load model: ${result.errorMessage || 'Unknown error'}`);
             }
             break;
           }
           case ModelSelectionContext.LLM: {
-            const ok = await loadModelById(
-              model.id,
-              ModelCategory.MODEL_CATEGORY_LANGUAGE,
+            const result = await loadModelWithRequest(
+              ModelLoadRequest.fromPartial({
+                modelId: model.id,
+                category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+                forceReload: false,
+                validateAvailability: true,
+              })
             );
-            if (ok) {
+            if (result.success) {
               setLLMModel({
                 ...model,
                 preferredFramework:
                   InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
               });
+            } else {
+              Alert.alert('Error', `Failed to load model: ${result.errorMessage || 'Unknown error'}`);
             }
             break;
           }
           case ModelSelectionContext.TTS: {
-            const ok = await loadModelById(
-              model.id,
-              ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+            const result = await loadModelWithRequest(
+              ModelLoadRequest.fromPartial({
+                modelId: model.id,
+                category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+                forceReload: false,
+                validateAvailability: true,
+              })
             );
-            if (ok) {
+            if (result.success) {
               setTTSModel({
                 ...model,
                 preferredFramework:
                   InferenceFramework.INFERENCE_FRAMEWORK_PIPER_TTS,
               });
+            } else {
+              Alert.alert('Error', `Failed to load model: ${result.errorMessage || 'Unknown error'}`);
             }
             break;
           }

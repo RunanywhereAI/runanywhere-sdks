@@ -5,5 +5,5 @@
  * Public streaming surfaces moved to native proto streams.
  */
 
-export { EventBus } from './EventBus';
-export type { EventBusImpl } from './EventBus';
+export { AudioEventSink } from './AudioEventSink';
+export type { AudioEventSinkImpl } from './AudioEventSink';

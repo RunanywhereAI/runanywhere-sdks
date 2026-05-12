@@ -96,17 +96,19 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
         // Set SDK version from TypeScript SDKConstants (centralized version)
         InitBridge::shared().setSdkVersion(sdkVersionFromConfig);
 
-        // 2. Set base directory for model paths (mirrors Swift's CppBridge.ModelPaths.setBaseDirectory)
-        // This must be called before using model path utilities
-        std::string documentsPath = extractStringValue(configJson, "documentsPath");
-        if (!documentsPath.empty()) {
-            result = InitBridge::shared().setBaseDirectory(documentsPath);
+        // 2. Set base directory for model paths before model registry/download
+        // setup. Match Swift SDK: native Documents on iOS, app filesDir on
+        // Android, without relying on a JS-provided documentsPath.
+        std::string modelBaseDirectory = config::trim(InitBridge::shared().getDefaultModelBaseDirectory());
+
+        if (!modelBaseDirectory.empty()) {
+            result = InitBridge::shared().setBaseDirectory(modelBaseDirectory);
             if (result != RAC_SUCCESS) {
                 LOGE("Failed to set base directory: %d", result);
                 // Continue - not fatal, but model paths may not work correctly
             }
         } else {
-            LOGE("documentsPath not provided in config - model paths may not work correctly!");
+            LOGE("Unable to resolve model base directory - model paths may not work correctly!");
         }
 
         // 3. Initialize model registry
@@ -169,10 +171,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
             // Continue - not fatal
         }
 
-        // 6. Register for events
-        EventBridge::shared().registerForEvents();
-
-        // 7. Configure HTTP only for deployable backend configs. Development
+        // 6. Configure HTTP only for deployable backend configs. Development
         // mode uses the C++ dev config directly in telemetry/device callbacks.
         if (env != SDKEnvironment::Development &&
             config::isUsableHttpUrl(baseURL) &&
@@ -182,7 +181,7 @@ std::shared_ptr<Promise<bool>> HybridRunAnywhereCore::initialize(
             LOGI("HTTPBridge not configured: no usable external config");
         }
 
-        // 8. Initialize telemetry (matches Swift's CppBridge.Telemetry.initialize)
+        // 7. Initialize telemetry (matches Swift's CppBridge.Telemetry.initialize)
         // This creates the C++ telemetry manager and registers HTTP callback
         {
             std::string persistentDeviceId = InitBridge::shared().getPersistentDeviceUUID();
@@ -282,7 +281,6 @@ std::shared_ptr<Promise<void>> HybridRunAnywhereCore::destroy() {
 
         // Cleanup in reverse order
         TelemetryBridge::shared().shutdown();  // Flush and destroy telemetry first
-        EventBridge::shared().unregisterFromEvents();
         DownloadBridge::shared().shutdown();
         FileManagerBridge::shared().shutdown();
         StorageBridge::shared().shutdown();

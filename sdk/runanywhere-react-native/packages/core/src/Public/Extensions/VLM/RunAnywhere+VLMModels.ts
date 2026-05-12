@@ -8,8 +8,8 @@
  * File resolution is handled by commons lifecycle resolved artifacts.
  */
 
-import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
+import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../../Foundation/Errors/SDKException';
 import { ModelCategory } from '@runanywhere/proto-ts/model_types';
 import type { ModelInfo } from '@runanywhere/proto-ts/model_types';
 import {

@@ -25,6 +25,8 @@
 
 #include <stdexcept>
 
+#include "rac/features/llm/rac_llm_service.h"
+
 namespace margelo::nitro::runanywhere {
 
 using namespace ::runanywhere::bridges;
@@ -258,12 +260,7 @@ std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::llmGenerateProto(const std::shared_ptr<ArrayBuffer>& requestBytes) {
     auto bytes = copyVoiceArrayBufferBytes(requestBytes);
     return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() {
-        auto fn = proto_compat::symbol<proto_compat::LLMGenerateProtoFn>(
-            "rac_llm_generate_proto");
-        if (!fn) {
-            LOGE("llmGenerateProto: rac_llm_generate_proto unavailable");
-            return emptyVoiceProtoBuffer();
-        }
+        auto fn = &rac_llm_generate_proto;
         rac_proto_buffer_t out;
         proto_compat::initBuffer(&out);
         const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
@@ -283,12 +280,7 @@ HybridRunAnywhereCore::llmGenerateStreamProto(
     const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) {
     auto bytes = copyVoiceArrayBufferBytes(requestBytes);
     return Promise<void>::async([bytes = std::move(bytes), onEventBytes]() {
-        auto fn = proto_compat::symbol<proto_compat::LLMGenerateStreamProtoFn>(
-            "rac_llm_generate_stream_proto");
-        if (!fn) {
-            LOGE("llmGenerateStreamProto: rac_llm_generate_stream_proto unavailable");
-            return;
-        }
+        auto fn = &rac_llm_generate_stream_proto;
         const uint8_t* data = bytes.empty() ? nullptr : bytes.data();
         // BUG-RN-IOS-004: heap-allocate the std::function so its address is
         // stable for the entire C callback window, even if a future async
@@ -313,12 +305,7 @@ HybridRunAnywhereCore::llmGenerateStreamProto(
 std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
 HybridRunAnywhereCore::llmCancelProto() {
     return Promise<std::shared_ptr<ArrayBuffer>>::async([]() {
-        auto fn = proto_compat::symbol<proto_compat::LLMCancelProtoFn>(
-            "rac_llm_cancel_proto");
-        if (!fn) {
-            LOGE("llmCancelProto: rac_llm_cancel_proto unavailable");
-            return emptyVoiceProtoBuffer();
-        }
+        auto fn = &rac_llm_cancel_proto;
         rac_proto_buffer_t out;
         proto_compat::initBuffer(&out);
         rac_result_t rc = fn(&out);
@@ -444,107 +431,6 @@ HybridRunAnywhereCore::loraCatalogMarkDownloadCompletedProto(
             bytes,
             "rac_lora_catalog_mark_download_completed_proto",
             "loraCatalogMarkDownloadCompletedProto");
-    });
-}
-
-// ============================================================================
-// LLM Thinking (rac_llm_thinking.h) — v3 Phase A10 / GAP 08 #6
-//
-// Returns JSON so the TS side gets a single, schema-stable value per
-// RPC (simpler than fighting Nitro's tuple-return syntax). The TS
-// `LlmThinking` class (Phase A10 facade) does the trivial JSON.parse.
-// ============================================================================
-
-static std::string jsonEscape(const std::string& s) {
-    std::string out;
-    out.reserve(s.size() + 8);
-    for (char c : s) {
-        switch (c) {
-            case '"':  out += "\\\""; break;
-            case '\\': out += "\\\\"; break;
-            case '\n': out += "\\n"; break;
-            case '\r': out += "\\r"; break;
-            case '\t': out += "\\t"; break;
-            default:
-                if (static_cast<unsigned char>(c) < 0x20) {
-                    char buf[8];
-                    std::snprintf(buf, sizeof(buf), "\\u%04x", c);
-                    out += buf;
-                } else {
-                    out += c;
-                }
-        }
-    }
-    return out;
-}
-
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::llmExtractThinking(
-    const std::string& text) {
-    return Promise<std::string>::async([text]() -> std::string {
-        const char* out_response      = nullptr;
-        size_t      out_response_len  = 0;
-        const char* out_thinking      = nullptr;
-        size_t      out_thinking_len  = 0;
-        rac_result_t rc = rac_llm_extract_thinking(
-            text.c_str(),
-            &out_response, &out_response_len,
-            &out_thinking, &out_thinking_len);
-        if (rc != RAC_SUCCESS) {
-            return std::string("{}");
-        }
-        std::string response = out_response
-            ? std::string(out_response, out_response_len) : std::string();
-        std::string result;
-        result.reserve(response.size() + (out_thinking ? out_thinking_len : 0) + 32);
-        result += "{\"response\":\"";
-        result += jsonEscape(response);
-        if (out_thinking) {
-            std::string thinking(out_thinking, out_thinking_len);
-            result += "\",\"thinking\":\"";
-            result += jsonEscape(thinking);
-            result += "\"}";
-        } else {
-            result += "\",\"thinking\":null}";
-        }
-        return result;
-    });
-}
-
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::llmStripThinking(
-    const std::string& text) {
-    return Promise<std::string>::async([text]() -> std::string {
-        const char* out_stripped     = nullptr;
-        size_t      out_stripped_len = 0;
-        rac_result_t rc = rac_llm_strip_thinking(
-            text.c_str(), &out_stripped, &out_stripped_len);
-        if (rc != RAC_SUCCESS || !out_stripped) {
-            return std::string();
-        }
-        return std::string(out_stripped, out_stripped_len);
-    });
-}
-
-std::shared_ptr<Promise<std::string>> HybridRunAnywhereCore::llmSplitThinkingTokens(
-    double totalCompletionTokens,
-    const std::string& responseText,
-    const std::string& thinkingText) {
-    return Promise<std::string>::async([totalCompletionTokens, responseText,
-                                        thinkingText]() -> std::string {
-        int32_t thinking_tokens = 0;
-        int32_t response_tokens = 0;
-        rac_result_t rc = rac_llm_split_thinking_tokens(
-            static_cast<int32_t>(totalCompletionTokens),
-            responseText.empty() ? nullptr : responseText.c_str(),
-            thinkingText.empty() ? nullptr : thinkingText.c_str(),
-            &thinking_tokens, &response_tokens);
-        if (rc != RAC_SUCCESS) {
-            return std::string("{\"thinking\":0,\"response\":0}");
-        }
-        char buf[96];
-        std::snprintf(buf, sizeof(buf),
-                      "{\"thinking\":%d,\"response\":%d}",
-                      thinking_tokens, response_tokens);
-        return std::string(buf);
     });
 }
 

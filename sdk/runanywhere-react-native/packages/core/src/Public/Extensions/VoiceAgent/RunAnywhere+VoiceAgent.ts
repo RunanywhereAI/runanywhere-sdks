@@ -9,9 +9,9 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/VoiceAgent/RunAnywhere+VoiceAgent.swift
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '../../native';
-import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
+import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../../Foundation/Errors/SDKException';
 import type {
   VoiceAgentResult,
   VoiceSessionConfig,
@@ -31,11 +31,11 @@ import {
   type STTOutput as STTOutputType,
 } from '@runanywhere/proto-ts/stt_options';
 import { TTSOutput } from '@runanywhere/proto-ts/tts_options';
-import { VoiceAgentStreamAdapter } from '../../Adapters/VoiceAgentStreamAdapter';
+import { VoiceAgentStreamAdapter } from '../../../Adapters/VoiceAgentStreamAdapter';
 import {
   arrayBufferToBytes,
   bytesToArrayBuffer,
-} from '../../services/ProtoBytes';
+} from '../../../services/ProtoBytes';
 
 const logger = new SDKLogger('RunAnywhere.VoiceAgent');
 

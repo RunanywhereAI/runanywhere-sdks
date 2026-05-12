@@ -9,13 +9,13 @@
  *   const current = await RunAnywhere.lora.list()
  *   const state = await RunAnywhere.lora.state()
  *   const compat = await RunAnywhere.lora.checkCompatibility(config)
- *   const entry = await RunAnywhere.lora.catalog.register(entry)
- *   const catalog = await RunAnywhere.lora.catalog.list(request)
+ *   const entry = await RunAnywhere.lora.register(entry)
+ *   const catalog = await RunAnywhere.lora.listCatalog(request)
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '../../native';
-import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
+import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../../Foundation/Errors/SDKException';
 import type {
   LoRAAdapterConfig,
   LoRAApplyRequest,
@@ -51,7 +51,7 @@ import {
 import {
   arrayBufferToBytes,
   bytesToArrayBuffer,
-} from '../../services/ProtoBytes';
+} from '../../../services/ProtoBytes';
 
 const logger = new SDKLogger('RunAnywhere.LoRA');
 
@@ -229,7 +229,7 @@ async function checkCompatibility(
 // Catalog Operations
 // ============================================================================
 
-async function registerCatalogEntry(
+async function register(
   entry: LoraAdapterCatalogEntry
 ): Promise<LoraAdapterCatalogEntry> {
   const native = ensureNative();
@@ -242,7 +242,7 @@ async function registerCatalogEntry(
   return result;
 }
 
-async function listCatalogEntries(
+async function listCatalog(
   request?: LoraAdapterCatalogListRequest
 ): Promise<LoraAdapterCatalogListResult> {
   const native = ensureNative();
@@ -253,7 +253,7 @@ async function listCatalogEntries(
   );
 }
 
-async function queryCatalogEntries(
+async function queryCatalog(
   query: LoraAdapterCatalogQuery
 ): Promise<LoraAdapterCatalogListResult> {
   const native = ensureNative();
@@ -275,7 +275,7 @@ async function getCatalogEntry(
   );
 }
 
-async function markCatalogDownloadCompleted(
+async function markDownloadCompleted(
   request: LoraAdapterDownloadCompletedRequest
 ): Promise<LoraAdapterDownloadCompletedResult> {
   const native = ensureNative();
@@ -301,11 +301,9 @@ export const lora = {
   list,
   state,
   checkCompatibility,
-  catalog: {
-    register: registerCatalogEntry,
-    list: listCatalogEntries,
-    query: queryCatalogEntries,
-    get: getCatalogEntry,
-    markDownloadCompleted: markCatalogDownloadCompleted,
-  },
+  register,
+  listCatalog,
+  queryCatalog,
+  getCatalogEntry,
+  markDownloadCompleted,
 };

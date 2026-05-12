@@ -1,99 +1,135 @@
-# React Native SDK — Current Inconsistencies
+# React Native SDK - Swift Alignment Inconsistencies
 
-Updated: 2026-05-06
-Branch: `feat/v2-architecture` @ `bb63158d6`
+Updated: 2026-05-11
+Scope: `sdk/runanywhere-react-native/`
+Source of truth: `sdk/runanywhere-swift/Sources/RunAnywhere/`
 
-## Typecheck status
+This is the current React Native backlog for matching Swift end to end. Each item is intended to be small enough for one implementation agent. Agents may split their item further, but must not touch Kotlin, Flutter, or unrelated work from other agents.
 
-| Package | Result |
-|---------|--------|
-| `@runanywhere/core` | PASS (`tsc --noEmit`) |
-| `@runanywhere/llamacpp` | PASS (`tsc --noEmit`) |
-| `@runanywhere/onnx` | PASS (`tsc --noEmit`) |
+## Baseline
 
-## Deferred backend RN packages (stub or exclude OK)
+Current React Native TypeScript baseline before this alignment work:
 
-Genie / MetalRT / WhisperKit / WhisperKit-CoreML / WhisperCPP / Diffusion — no RN package exists for any of these under `sdk/runanywhere-react-native/packages/`. Only `core`, `llamacpp`, `onnx` ship. No work tracked here for deferred-backend RN surfaces.
+| Package | Command | Status |
+|---|---|---|
+| `@runanywhere/core` | `yarn workspace @runanywhere/core typecheck` | PASS |
+| `@runanywhere/llamacpp` | `yarn workspace @runanywhere/llamacpp typecheck` | PASS |
+| `@runanywhere/onnx` | `yarn workspace @runanywhere/onnx typecheck` | PASS |
+| RN example | `yarn workspace runanywhere-ai-example typecheck` | PASS |
 
-## Open inconsistencies
+Run workspace commands from the monorepo root. Running `yarn typecheck` inside `sdk/runanywhere-react-native/` is not the canonical check because the root workspace owns the Yarn project.
 
-### RN-E2E-R2-001: Every model download fails — `rac_model_paths_get_model_folder` non-SUCCESS (HIGH)
+## High-Priority Inconsistencies
 
-Every RN Android model download (LlamaCPP + Sherpa, framework-agnostic) fails with:
+### RN-SWIFT-001: Gap docs are stale
 
-> `rac_model_paths_get_model_folder returned non-SUCCESS → failed to compute model storage path`
+The RN gap docs still describe PR-review state and point fixes. Update file organization, inconsistencies, and PR review docs before code changes. Verify by direct file reads because `gaps/` is gitignored.
 
-Origin: `sdk/runanywhere-commons/src/infrastructure/download/download_orchestrator.cpp:1265`.
+### RN-SWIFT-002: Public folder layout does not mirror Swift
 
-Root cause (confirmed): RN TypeScript `initialize()` never passes `documentsPath` in its configJson, so the C++ bridge's `InitBridge::setBaseDirectory()` call is skipped and `rac_model_paths_set_base_dir` is never invoked. The C++ bridge at `sdk/runanywhere-react-native/packages/core/cpp/HybridRunAnywhereCore.cpp:99-103` reads `extractStringValue(configJson, "documentsPath")` and bails silently when empty.
+React Native still uses a flat `Public/Extensions/RunAnywhere+*.ts` layout. Move capability files into Swift-mirrored folders and update barrels/imports.
 
-**Next action**: edit `sdk/runanywhere-react-native/packages/core/src/Public/RunAnywhere.ts` `initialize()` (the `configJson` assembly around line 243) to include a `documentsPath` field resolved from the platform (iOS: `NSDocumentDirectory`; Android: `Context.getFilesDir()`). Likely need a new Nitro spec method `getDocumentsPath()` on `RunAnywhereCore.nitro.ts` that returns the platform documents dir, or populate it in the C++ bridge side via the platform adapter before falling back on the JSON field. Mirror the Swift path in `sdk/runanywhere-swift/.../CppBridge+ModelPaths.swift`.
+### RN-SWIFT-003: Environment default differs from Swift
 
-### RN-E2E-R2-002: iOS LLM "Get" button never transitions to Ready/Use/Loaded (MEDIUM)
+React Native initialization defaults to production-like behavior in places where Swift defaults to development. Align `SDKEnvironment` and initialization defaults to Swift.
 
-On RN iOS sim, tapping "Get" on an LLM card shrinks the button into a progress indicator but never transitions to Ready/Use/Loaded within a 90+s observation window. Model names are also missing from the accessibility tree, so the test harness can't inspect state.
+### RN-SWIFT-004: Initialization is not Swift two-phase SDK init
 
-Could be a11y-only (state present but unreachable by AX queries) OR an actual download hang. Fix: add model name + state to a11y labels in `examples/react-native/RunAnywhereAI/`; instrument the Nitro ModelManagement download progress callback on iOS simulator to confirm progress events arrive.
+Swift uses native phase 1 and phase 2 initialization through `rac_sdk_init_*`. RN still performs too much JS orchestration. Add native phase methods, serialize phase 2 readiness, and require services-ready for model/inference paths.
 
-### RN-E2E-R2-003: Test instruction doc lists wrong iOS bundle ID (LOW)
+### RN-SWIFT-005: Model storage base directory is not reliably set
 
-`test_workflows/instructions/react_native/ios.md` lists `org.reactjs.native.example.RunAnywhereAI`; the actual installed app bundle ID is `com.runanywhere.runanywhereai`. Update the instruction doc. (`test_workflows/` is gitignored, noted here for context.)
+RN model downloads can fail when `documentsPath` is absent and `rac_model_paths_set_base_dir` is skipped. Add native document-directory resolution and set model paths before registry/discovery.
 
-### RN-THINKING-MIGRATE: `LlmThinking` + C++ bridge bind 3 now-internal helpers (MEDIUM)
+### RN-SWIFT-006: Auth state is duplicated in JS and native
 
-- **TS facade**: `packages/core/src/Features/LLM/LlmThinking.ts` still calls Nitro RPCs `llmExtractThinking` / `llmStripThinking` / `llmSplitThinkingTokens`.
-- **C++ bridge**: `packages/core/cpp/HybridRunAnywhereCore+Voice.cpp:481,513,527` implements those 3 RPCs via `rac_llm_extract_thinking`, `rac_llm_strip_thinking`, `rac_llm_split_thinking_tokens`.
-- **Nitro spec**: `packages/core/src/specs/RunAnywhereCore.nitro.ts:490,499,511`.
-- **Callers**: `packages/core/src/Public/Extensions/RunAnywhere+TextGeneration.ts:301,314`.
+Swift routes auth through native commons-backed auth state. RN still has duplicate JS token persistence and stale bridge behavior. Native should own token/auth state, with TS exposing typed status methods only.
 
-These 3 C helpers were downgraded from `RAC_API` to `@internal` under CPP-05 and removed from `exports/RACommons.exports`. The next `RACommons.xcframework` rebuild will break the Apple link of `HybridRunAnywhereCore+Voice.cpp`. Commons now populates `LLMGenerationResult.thinking_content` / `.thinking_tokens` / `.response_tokens` / `.text` in proto generate + stream, so the TS layer can read them off `LLMGenerationResult` / `LLMStreamEvent` proto bytes.
+### RN-SWIFT-007: Device registration is JS-fire-and-forget
 
-Fix steps:
-1. Delete `packages/core/src/Features/LLM/LlmThinking.ts`.
-2. Delete the three RPC blocks in `HybridRunAnywhereCore+Voice.cpp` + `HybridRunAnywhereCore.hpp:233-237` + `RunAnywhereCore.nitro.ts:490-522`.
-3. Regenerate nitrogen (`yarn core:nitrogen`).
-4. Update `RunAnywhere+TextGeneration.ts` callers to read `thinkingContent` / `text` off the proto-typed `generate()` result.
-5. Sync header copy at `packages/core/cpp/`.
+Move registration into native phase 2, use platform device callbacks, and match Swift build-token/dev-mode semantics.
 
-Scope: S (~200 LOC delete across TS + C++ + Nitro spec + 2 TS call-site edits).
+### RN-SWIFT-008: Model registry names are RN-specific
 
-### RN-TEST-HARNESS-RELAND: Re-introduce RN streaming-parity harness (LOW — future wave)
+Current RN work is deleting the old `getAvailableModels` / `getDownloadedModels` surface and keeping the Swift-canonical `listModels`, `queryModels`, `getModel`, `downloadedModels`, `registerModel`, `importModel`, and `loadModel(ModelLoadRequest)` names.
 
-Wave 3d Row 6 deleted the phantom Jest harness (`test` script + `jest`/`ts-jest`/`@types/jest` devDeps) from `packages/core/package.json`. No `jest.config.*` + no `tests/streaming/*.rn.test.ts` fixtures exist — pure dead weight currently.
+### RN-SWIFT-009: Download completion does not mirror Swift import flow
 
-**Acceptance (future)**: rebuild `tests/streaming/*.rn.test.ts` consuming the shared C++ golden fixtures (`tests/streaming/cancel_parity/`, `tests/streaming/perf_bench/`) to match Swift/Kotlin/Flutter/Web parity. Re-add `jest` + `ts-jest` + `@types/jest` devDeps + root-level `jest.config.js` with `--passWithNoTests`.
+RN should plan/start/poll/cancel like Swift and explicitly import completed artifacts with the same managed-storage flags. Remove implicit registry update assumptions.
 
-### RN-JSON-PROTO-MIGRATE: Migrate 7 JSON-string Nitro surfaces to proto (LOW — future iteration)
+### RN-SWIFT-010: `deleteModel` encodes the wrong proto requests
 
-Documented as canonical cross-SDK exception in `docs/CPP_PROTO_OWNERSHIP.md` ("JSON String Surfaces (Cross-SDK)", classification `compat`). All 7 surfaces round-trip through `JSON.parse` on the TS side and carry identical JSON shape across Swift/Kotlin/Flutter/RN/Web — no cross-SDK drift today, only a violation of the "all wire types are proto" rule.
+`deleteModel` must encode `ModelUnloadRequest` for unload and `StorageDeleteRequest` for storage delete. Add native delete-path support so files are actually removed.
 
-**Surfaces** (all on `RunAnywhereCore.nitro.ts`):
-- `initialize(configJson)` (line 48)
-- `registerDevice(environmentJson)` (line 97)
-- `httpRequest(method, url, headersJson, bodyJson, timeoutMs)` (line 371)
-- `authAuthenticate(apiKey, baseURL, deviceId, platform, sdkVersion)` (line 390)
-- `authRefreshToken(baseURL)` (line 405)
-- `getBackendInfo()` (line 63)
-- `getDeviceCapabilities()` (line 427)
+### RN-SWIFT-011: Hardware fallback behavior hides native failures
 
-**Acceptance**: add proto messages under `idl/` (`SDKInitConfig`, `DeviceRegisterRequest`, `HTTPRequestEnvelope`/`HTTPResponseEnvelope`, `AuthRequest`/`AuthResponse`, `BackendInfo`, `DeviceCapabilities`) and migrate each surface end-to-end across all 5 SDKs in the same iteration. Scope: L.
+Swift surfaces typed errors for unavailable hardware paths. RN should remove silent fallback behavior unless Swift has the same fallback.
 
-## Example app (RN) inconsistencies
+### RN-SWIFT-012: Events do not match Swift naming or ownership
 
-| Issue | Files | Notes |
-|-------|-------|-------|
-| Local `STTMode` / `VoicePipelineStatus` enums | `examples/react-native/RunAnywhereAI/src/types/voice.ts:7,12` | UI-side state machines; `VoicePipelineStatus` overlaps `VoiceEventKind`. Low priority. |
-| Local `GenerationSettings` / `AppSettings` | `examples/react-native/RunAnywhereAI/src/types/settings.ts:23,40` | Fields overlap with `LLMGenerationOptions` — consider `Pick<LLMGenerationOptions, ...>`. Low priority. |
+Rename RN event extension toward `SDKEvents`/`EventBus` vocabulary and delete dormant legacy event bridge code once the proto SDK event path owns the surface.
 
-## Cross-SDK naming alignment
+### RN-SWIFT-013: Logging surface is incomplete and has a method mismatch
 
-| Concern | Swift | Kotlin | Flutter | Web | **React Native** | Drift? |
-|---------|-------|--------|---------|-----|------------------|--------|
-| Entry | `enum RunAnywhere` | `object RunAnywhere` | `RunAnywhereSDK.instance` | `RunAnywhere` object | `const RunAnywhere` object | OK |
-| Init | two-phase | same | same | same | same | OK |
-| LLM stream | `AsyncStream` | `Flow` | `Stream` | `AsyncIterable` | `AsyncIterable` (manual `iterator.next()` for Hermes) | OK |
-| Errors | `SDKException` proto-backed | same | same | same | same | OK |
-| Hardware preference setter | `setAcceleratorPreference(_:)` | same | — | — | `setAcceleratorPreference(p)` | OK |
-| NPU chip resolver | `NPUChipDetector.chip() -> NPUChip` | Android structured chip ID | — | — | `Hardware.getNPUChip() -> NPUChip` | OK |
-| `initialize(config)` wire | proto/plist | proto | proto | JSON string | JSON string (RN-JSON-PROTO-MIGRATE) | Consistent with Web |
-| HTTP transport | URLSession | OkHttp | URLSession/OkHttp | `emscripten_fetch` | URLSession/OkHttp | OK |
+RN facade calls `setLogLevel`, while the manager exposes `setMinLogLevel`. Expose Swift-equivalent logging controls and route native logs through the RN logging bridge.
+
+### RN-SWIFT-014: Error folder and mapping do not match Swift
+
+Rename `Foundation/ErrorTypes` to `Foundation/Errors`. Map native `rac_result_t`/proto errors into `SDKException` instead of boolean/last-error flows.
+
+### RN-SWIFT-015: LLM API still exposes old thinking helpers
+
+Delete `LlmThinking.ts`, Nitro thinking helper RPCs, and C++ helper methods. Read `thinkingContent`, `thinkingTokens`, `responseTokens`, and `text` from proto generation results/events.
+
+### RN-SWIFT-016: Structured output orchestration still lives in JS
+
+Swift delegates structured-output orchestration to native commons. RN should expose native proto methods and keep JS as encode/decode only.
+
+### RN-SWIFT-017: Tool-calling run loop still lives in JS
+
+Swift uses native run-loop orchestration. RN should keep JS tool executors but move parse/format/validate/follow-up orchestration to native.
+
+### RN-SWIFT-018: RAG lacks Swift resolved-configuration parity
+
+Add resolved configuration helpers and model-info/model-id overloads. Remove duplicated helper defaults where generated proto defaults exist.
+
+### RN-SWIFT-019: TTS playback/cancellation does not match Swift
+
+TTS `speak` should use generated synthesis output, convert/play WAV with returned format, and wire cancellation/stop to native where available.
+
+### RN-SWIFT-020: STT/VAD/VLM readiness and streaming differ from Swift
+
+Align readiness with lifecycle current model/category, use Swift-like streaming semantics, and surface invalid/unavailable states as typed errors.
+
+### RN-SWIFT-021: VoiceAgent accepts a higher-level RN config instead of Swift compose config
+
+Expose full Swift-equivalent compose config as canonical. Convenience config may remain only as a thin wrapper.
+
+### RN-SWIFT-022: LoRA public API is nested and RN-specific
+
+Flatten LoRA to Swift names for apply/remove/list/state/compatibility/catalog/import/download completion APIs.
+
+### RN-SWIFT-023: Solutions overloads are not Swift-shaped
+
+Add Swift-style `run(configBytes)`, `run(config)`, and `run(yaml)` overloads while keeping handle cleanup idempotent.
+
+### RN-SWIFT-024: Plugin loader is missing
+
+Add `RunAnywhere+PluginLoader.ts`. If dynamic loading is not supported on mobile RN, throw the same typed unavailable error Swift uses.
+
+### RN-SWIFT-025: Docs and workflows are stale after API movement
+
+Update RN `CLAUDE.md`, SDK docs, architecture docs, example docs, and React Native workflow instructions after code moves. Fix the iOS bundle id in workflow docs.
+
+## Verification Requirements
+
+Minimum static gates:
+
+```bash
+yarn workspace @runanywhere/core typecheck
+yarn workspace @runanywhere/llamacpp typecheck
+yarn workspace @runanywhere/onnx typecheck
+yarn workspace runanywhere-ai-example typecheck
+```
+
+Full pass requires clean install, logs, model download, model load, real inference, screenshots, and log review for React Native Android and iOS. Build/install/launch alone is smoke validation only.

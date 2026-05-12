@@ -10,6 +10,8 @@
 #include "HybridRunAnywhereCore+Common.hpp"
 #include "HybridRunAnywhereCore+ProtoCompat.hpp"
 
+#include <cstring>
+
 #include "rac/infrastructure/download/rac_download_orchestrator.h"
 
 namespace margelo::nitro::runanywhere {
@@ -41,6 +43,25 @@ std::shared_ptr<ArrayBuffer> emptyDownloadProtoBuffer() {
     return ArrayBuffer::allocate(0);
 }
 
+proto_compat::ProtoBufferCallFn downloadProtoSymbol(const char* symbolName) {
+    if (std::strcmp(symbolName, "rac_download_plan_proto") == 0) {
+        return &rac_download_plan_proto;
+    }
+    if (std::strcmp(symbolName, "rac_download_start_proto") == 0) {
+        return &rac_download_start_proto;
+    }
+    if (std::strcmp(symbolName, "rac_download_cancel_proto") == 0) {
+        return &rac_download_cancel_proto;
+    }
+    if (std::strcmp(symbolName, "rac_download_resume_proto") == 0) {
+        return &rac_download_resume_proto;
+    }
+    if (std::strcmp(symbolName, "rac_download_progress_poll_proto") == 0) {
+        return &rac_download_progress_poll_proto;
+    }
+    return proto_compat::symbol<proto_compat::ProtoBufferCallFn>(symbolName);
+}
+
 std::shared_ptr<ArrayBuffer> copyDownloadProtoBuffer(rac_proto_buffer_t& protoBuffer) {
     if (protoBuffer.status != RAC_SUCCESS) {
         if (protoBuffer.error_message) {
@@ -63,7 +84,7 @@ std::shared_ptr<ArrayBuffer> copyDownloadProtoBuffer(rac_proto_buffer_t& protoBu
 std::shared_ptr<ArrayBuffer> callDownloadProto(const std::vector<uint8_t>& requestBytes,
                                                const char* symbolName,
                                                const char* operation) {
-    auto fn = proto_compat::symbol<proto_compat::ProtoBufferCallFn>(symbolName);
+    auto fn = downloadProtoSymbol(symbolName);
     if (!fn) {
         LOGE("%s: %s unavailable", operation, symbolName);
         return emptyDownloadProtoBuffer();
@@ -177,9 +198,7 @@ HybridRunAnywhereCore::setDownloadProgressCallbackProto(
             g_downloadProtoCallback = onProgressBytes;
         }
 
-        auto setCallback =
-            proto_compat::symbol<proto_compat::DownloadSetProgressProtoCallbackFn>(
-                "rac_download_set_progress_proto_callback");
+        auto setCallback = &rac_download_set_progress_proto_callback;
         if (!setCallback) {
             std::lock_guard<std::mutex> lock(g_downloadProtoCallbackMutex);
             g_downloadProtoCallback = nullptr;
@@ -209,9 +228,7 @@ HybridRunAnywhereCore::clearDownloadProgressCallbackProto() {
             g_downloadProtoCallback = nullptr;
         }
 
-        auto setCallback =
-            proto_compat::symbol<proto_compat::DownloadSetProgressProtoCallbackFn>(
-                "rac_download_set_progress_proto_callback");
+        auto setCallback = &rac_download_set_progress_proto_callback;
         if (!setCallback) {
             LOGE("clearDownloadProgressCallbackProto: rac_download_set_progress_proto_callback unavailable");
             return false;

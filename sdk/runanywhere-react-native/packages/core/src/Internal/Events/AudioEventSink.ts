@@ -17,7 +17,7 @@ type EventPayload = unknown;
  * No subscribers, no native fan-out — publish is a no-op façade today,
  * kept as an integration seam for future audio-internal consumers.
  */
-class EventBusImpl {
+class AudioEventSinkImpl {
   /**
    * Publish an event locally.
    * Currently a no-op — there are no in-process subscribers.
@@ -29,14 +29,14 @@ class EventBusImpl {
 }
 
 // Singleton instance
-const instance: EventBusImpl = new EventBusImpl();
+const instance: AudioEventSinkImpl = new AudioEventSinkImpl();
 
 /**
- * Singleton EventBus exposing only the `publish` method.
+ * Singleton AudioEventSink exposing only the `publish` method.
  */
-export const EventBus = {
+export const AudioEventSink = {
   publish: instance.publish.bind(instance),
 } as const;
 
-// Export type for the EventBus (kept for import stability)
-export type { EventBusImpl };
+// Export type for the AudioEventSink (kept for import stability)
+export type { AudioEventSinkImpl };

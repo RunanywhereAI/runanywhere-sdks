@@ -60,11 +60,11 @@ import { RunAnywhere, SDKEnvironment } from '@runanywhere/core';
 
 // Initialize SDK
 await RunAnywhere.initialize({
-  environment: SDKEnvironment.Development,
+  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
 });
 
 // Check initialization
-const isReady = await RunAnywhere.isInitialized();
+const isReady = RunAnywhere.isInitialized;
 console.log('SDK ready:', isReady);
 
 // Get SDK version
@@ -126,7 +126,7 @@ await RunAnywhere.initialize({
 });
 
 // Check status
-const isInit = await RunAnywhere.isInitialized();
+const isInit = RunAnywhere.isInitialized;
 const isActive = RunAnywhere.isSDKInitialized;
 
 // Reset SDK
@@ -148,18 +148,22 @@ await RunAnywhere.reset();
 
 ```typescript
 // Get available models
-const models = await RunAnywhere.getAvailableModels();
+const models = await RunAnywhere.listModels();
 
 // Get specific model info
-const model = await RunAnywhere.getModelInfo('model-id');
+const model = await RunAnywhere.getModel(ModelGetRequest.fromPartial({ modelId: 'model-id' }));
 
-// Check if downloaded
-const isDownloaded = await RunAnywhere.isModelDownloaded('model-id');
+// List downloaded models
+const downloaded = await RunAnywhere.downloadedModels();
 
 // Download with progress
-await RunAnywhere.downloadModel('model-id', (progress) => {
+const iterator = RunAnywhere.downloadModel('model-id')[Symbol.asyncIterator]();
+let next = await iterator.next();
+while (!next.done) {
+  const progress = next.value;
   console.log(`${(progress.progress * 100).toFixed(1)}%`);
-});
+  next = await iterator.next();
+}
 
 // Delete model
 await RunAnywhere.deleteModel('model-id');
@@ -381,60 +385,31 @@ by the audio managers — it has no `on*` subscribers. Consumers must use
 
 ---
 
-### ModelRegistry
+### Model Registry And Downloads
 
-Manage model metadata and discovery.
+The public registry surface lives on `RunAnywhere` and mirrors Swift naming:
+`registerModel`, `listModels`, `queryModels`, `getModel`, `downloadedModels`,
+`importModel`, `downloadModel`, `cancelDownload`, `deleteModel`, and
+`loadModel(ModelLoadRequest)`.
 
 ```typescript
-import { ModelRegistry } from '@runanywhere/core';
-
-// Initialize (called automatically)
-await ModelRegistry.initialize();
-
-// Register a model
-await ModelRegistry.registerModel({
+await RunAnywhere.registerModel({
   id: 'my-model',
   name: 'My Model',
-  category: ModelCategory.Language,
-  format: ModelFormat.GGUF,
-  downloadURL: 'https://...',
-  // ...
+  framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
+  url: 'https://...',
 });
 
-// Get model
-const model = await ModelRegistry.getModel('my-model');
+const models = await RunAnywhere.listModels();
+const downloaded = await RunAnywhere.downloadedModels();
+const model = await RunAnywhere.getModel(ModelGetRequest.fromPartial({ modelId: 'my-model' }));
 
-// List models by category
-const llmModels = await ModelRegistry.getModelsByCategory(ModelCategory.Language);
-
-// Update model
-await ModelRegistry.updateModel('my-model', { isDownloaded: true });
-```
-
----
-
-### DownloadService
-
-Download models with progress tracking.
-
-```typescript
-import { DownloadService, DownloadState } from '@runanywhere/core';
-
-// Create download task
-const task = await DownloadService.downloadModel(
-  'model-id',
-  'https://download-url.com/model.gguf',
-  (progress) => {
-    console.log(`Progress: ${progress.progress * 100}%`);
-    console.log(`State: ${progress.state}`);
-  }
-);
-
-// Cancel download
-await DownloadService.cancelDownload('model-id');
-
-// Get active downloads
-const activeDownloads = DownloadService.getActiveDownloads();
+const iterator = RunAnywhere.downloadModel('my-model')[Symbol.asyncIterator]();
+let next = await iterator.next();
+while (!next.done) {
+  console.log(`Progress: ${next.value.progress * 100}%`);
+  next = await iterator.next();
+}
 ```
 
 ---
@@ -588,13 +563,13 @@ packages/core/
 │   │   ├── Events/
 │   │   │   └── EventBus.ts         # Event pub/sub
 │   │   └── Extensions/             # API method implementations
-│   │       ├── RunAnywhere+TextGeneration.ts
-│   │       ├── RunAnywhere+ToolCalling.ts
-│   │       ├── RunAnywhere+StructuredOutput.ts
-│   │       ├── RunAnywhere+STT.ts
-│   │       ├── RunAnywhere+TTS.ts
-│   │       ├── RunAnywhere+VAD.ts
-│   │       ├── RunAnywhere+VoiceAgent.ts
+│   │       ├── LLM/RunAnywhere+TextGeneration.ts
+│   │       ├── LLM/RunAnywhere+ToolCalling.ts
+│   │       ├── LLM/RunAnywhere+StructuredOutput.ts
+│   │       ├── STT/RunAnywhere+STT.ts
+│   │       ├── TTS/RunAnywhere+TTS.ts
+│   │       ├── VAD/RunAnywhere+VAD.ts
+│   │       ├── VoiceAgent/RunAnywhere+VoiceAgent.ts
 │   │       └── ...
 │   ├── Foundation/
 │   │   ├── ErrorTypes/             # SDK errors

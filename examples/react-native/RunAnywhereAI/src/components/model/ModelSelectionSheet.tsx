@@ -18,11 +18,10 @@ import {
   Modal,
   StyleSheet,
   TouchableOpacity,
-  Pressable,
   ScrollView,
   ActivityIndicator,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../../theme/colors';
 import { Typography, FontWeight } from '../../theme/typography';
@@ -53,9 +52,9 @@ import {
 import { ModelFormat } from '@runanywhere/proto-ts/model_types';
 import type { HardwareProfile } from '@runanywhere/proto-ts/hardware_profile';
 
-// Canonical SDK methods (Swift / Kotlin / Flutter / Web parity).
+// Canonical SDK methods (Swift parity).
 const downloadModelHelper = RunAnywhere.downloadModel;
-const getAvailableModels = RunAnywhere.getAvailableModels;
+const listModels = async (): Promise<SDKModelInfo[]> => (await RunAnywhere.listModels()).models?.models ?? [];
 
 /**
  * Context for filtering frameworks and models based on the current experience/modality
@@ -243,7 +242,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     setIsLoading(true);
     try {
       // Load models from SDK
-      const allModels = await getAvailableModels();
+      const allModels = await listModels();
       const categoryFilter = getCategoryForContext(context);
 
       // Filter models based on context (using category field)
@@ -414,7 +413,8 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
    * Handle model selection
    */
   const handleSelectModel = async (model: SDKModelInfo) => {
-    if (!model.isDownloaded) {
+    console.warn('[ModelSelectionSheet] Select tapped:', model.id);
+    if (!model.isDownloaded && !model.localPath) {
       return;
     }
 
@@ -709,6 +709,83 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
     const downloadProgress = downloadingModels[model.id] ?? 0;
     const isSelected = selectedModelId === model.id;
     const canSelect = model.isDownloaded || model.localPath;
+    const modelInfoContent = (
+      <>
+        <Text
+          style={[styles.modelName, isSelected && styles.modelNameSelected]}
+        >
+          {model.name}
+        </Text>
+
+        <View style={styles.modelMeta}>
+          {getModelDownloadSizeBytes(model) > 0 && (
+            <View style={styles.sizeTag}>
+              <Icon
+                name="server-outline"
+                size={12}
+                color={Colors.textSecondary}
+              />
+              <Text style={styles.sizeText}>
+                {formatBytes(getModelDownloadSizeBytes(model))}
+              </Text>
+            </View>
+          )}
+
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>
+              {getModelFormatLabel(model.format)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Download/Status indicator */}
+        <View style={styles.statusRow}>
+          {isDownloading ? (
+            <View style={styles.downloadProgressContainer}>
+              <View style={styles.downloadProgressRow}>
+                <ActivityIndicator size="small" color={Colors.primaryBlue} />
+                <Text style={styles.statusText}>
+                  Downloading... {Math.round(downloadProgress * 100)}%
+                </Text>
+              </View>
+              {/* Progress bar */}
+              <View style={styles.progressBarBackground}>
+                <View
+                  style={[
+                    styles.progressBarFill,
+                    { width: `${Math.round(downloadProgress * 100)}%` },
+                  ]}
+                />
+              </View>
+            </View>
+          ) : canSelect ? (
+            <>
+              <Icon
+                name="checkmark-circle"
+                size={14}
+                color={Colors.statusGreen}
+              />
+              <Text
+                style={[styles.statusText, { color: Colors.statusGreen }]}
+              >
+                Downloaded
+              </Text>
+            </>
+          ) : (
+            <>
+              <Icon
+                name="cloud-download-outline"
+                size={14}
+                color={Colors.statusBlue}
+              />
+              <Text style={[styles.statusText, { color: Colors.statusBlue }]}>
+                Available for download
+              </Text>
+            </>
+          )}
+        </View>
+      </>
+    );
 
     return (
       <View
@@ -718,81 +795,18 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
           isLoadingModel && !isSelected && styles.dimmed,
         ]}
       >
-        <View style={styles.modelInfo}>
-          <Text
-            style={[styles.modelName, isSelected && styles.modelNameSelected]}
+        {canSelect ? (
+          <TouchableOpacity
+            style={styles.modelInfo}
+            onPress={() => handleSelectModel(model)}
+            disabled={isLoadingModel || isSelected}
+            accessible={false}
           >
-            {model.name}
-          </Text>
-
-          <View style={styles.modelMeta}>
-            {getModelDownloadSizeBytes(model) > 0 && (
-              <View style={styles.sizeTag}>
-                <Icon
-                  name="server-outline"
-                  size={12}
-                  color={Colors.textSecondary}
-                />
-                <Text style={styles.sizeText}>
-                  {formatBytes(getModelDownloadSizeBytes(model))}
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {getModelFormatLabel(model.format)}
-              </Text>
-            </View>
-          </View>
-
-          {/* Download/Status indicator */}
-          <View style={styles.statusRow}>
-            {isDownloading ? (
-              <View style={styles.downloadProgressContainer}>
-                <View style={styles.downloadProgressRow}>
-                  <ActivityIndicator size="small" color={Colors.primaryBlue} />
-                  <Text style={styles.statusText}>
-                    Downloading... {Math.round(downloadProgress * 100)}%
-                  </Text>
-                </View>
-                {/* Progress bar */}
-                <View style={styles.progressBarBackground}>
-                  <View
-                    style={[
-                      styles.progressBarFill,
-                      { width: `${Math.round(downloadProgress * 100)}%` },
-                    ]}
-                  />
-                </View>
-              </View>
-            ) : canSelect ? (
-              <>
-                <Icon
-                  name="checkmark-circle"
-                  size={14}
-                  color={Colors.statusGreen}
-                />
-                <Text
-                  style={[styles.statusText, { color: Colors.statusGreen }]}
-                >
-                  Downloaded
-                </Text>
-              </>
-            ) : (
-              <>
-                <Icon
-                  name="cloud-download-outline"
-                  size={14}
-                  color={Colors.statusBlue}
-                />
-                <Text style={[styles.statusText, { color: Colors.statusBlue }]}>
-                  Available for download
-                </Text>
-              </>
-            )}
-          </View>
-        </View>
+            {modelInfoContent}
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.modelInfo}>{modelInfoContent}</View>
+        )}
 
         {/* Action button */}
         <View style={styles.actionButtons}>
@@ -801,7 +815,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
               <ActivityIndicator size="small" color={Colors.primaryBlue} />
             </View>
           ) : canSelect ? (
-            <Pressable
+            <TouchableOpacity
               style={[
                 styles.selectButton,
                 (isLoadingModel || isSelected) && styles.buttonDisabled,
@@ -813,7 +827,7 @@ export const ModelSelectionSheet: React.FC<ModelSelectionSheetProps> = ({
               accessibilityRole="button"
             >
               <Text style={styles.selectButtonText}>Select</Text>
-            </Pressable>
+            </TouchableOpacity>
           ) : (
             // B-RN-3-002: Removed `disabled={isLoadingModel}` — concurrent
             // downloads are supported (each model has its own progress entry

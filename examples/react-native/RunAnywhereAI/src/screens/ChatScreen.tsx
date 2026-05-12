@@ -14,7 +14,7 @@
  * Architecture:
  * - Uses ConversationStore for state management (matches iOS)
  * - Separates UI from business logic (View + ViewModel pattern)
- * - Model loading via RunAnywhere.loadModel(id, category?)
+ * - Model loading via RunAnywhere.loadModel(ModelLoadRequest)
  * - Text generation via RunAnywhere.generate(prompt, options?)
  *   and RunAnywhere.generateStream(prompt, options?) (proto-canonical signatures)
  *
@@ -27,7 +27,6 @@ import {
   Text,
   FlatList,
   StyleSheet,
-  SafeAreaView,
   TouchableOpacity,
   Alert,
   Modal,
@@ -35,7 +34,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, IconSize } from '../theme/spacing';
@@ -70,13 +69,14 @@ import {
   type ModelInfo as SDKModelInfo,
 } from '@runanywhere/core';
 import { LLMGenerationOptions } from '@runanywhere/proto-ts/llm_options';
+import { ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
 import { ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
 import { safeEvaluateExpression } from '../utils/mathParser';
 import { logDiagnostic } from '../utils/diagnostics';
 
-// Canonical SDK methods (Swift / Kotlin / Flutter / Web parity).
-const getAvailableModels = RunAnywhere.getAvailableModels;
-const loadModelById = RunAnywhere.loadModel;
+// Canonical SDK methods (Swift parity).
+const listModels = async (): Promise<SDKModelInfo[]> => (await RunAnywhere.listModels()).models?.models ?? [];
+const loadModelWithRequest = RunAnywhere.loadModel;
 
 // Generate unique ID
 const generateId = () => Math.random().toString(36).substring(2, 15);
@@ -343,7 +343,7 @@ export const ChatScreen: React.FC = () => {
    */
   const loadAvailableModels = async () => {
     try {
-      const allModels = await getAvailableModels();
+      const allModels = await listModels();
       const llmModels = allModels.filter(
         (m: SDKModelInfo) => m.category === ModelCategory.MODEL_CATEGORY_LANGUAGE
       );
@@ -352,7 +352,7 @@ export const ChatScreen: React.FC = () => {
         '[ChatScreen] Available LLM models:',
         llmModels.map(
           (m: SDKModelInfo) =>
-            `${m.id} (${m.isDownloaded ? 'downloaded' : 'not downloaded'})`
+            `${m.id} (${m.isDownloaded || m.localPath ? 'downloaded' : 'not downloaded'})`
         )
       );
     } catch (error) {
@@ -407,7 +407,7 @@ export const ChatScreen: React.FC = () => {
         `[ChatScreen] Loading model: ${model.id} (registry will resolve path)`
       );
 
-      if (!model.isDownloaded) {
+      if (!model.isDownloaded && !model.localPath) {
         Alert.alert(
           'Error',
           'Model has not been downloaded. Open the model picker to download it first.'
@@ -415,12 +415,16 @@ export const ChatScreen: React.FC = () => {
         return;
       }
 
-      const success = await loadModelById(
-        model.id,
-        ModelCategory.MODEL_CATEGORY_LANGUAGE,
+      const result = await loadModelWithRequest(
+        ModelLoadRequest.fromPartial({
+          modelId: model.id,
+          category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+          forceReload: false,
+          validateAvailability: true,
+        })
       );
 
-      if (success) {
+      if (result.success) {
         // Set the model info preserving the actual framework from the SDK model
         const fw = getPrimaryFramework(
           model,
@@ -449,7 +453,7 @@ export const ChatScreen: React.FC = () => {
         setRegisteredToolCount(tools.length);
         logDiagnostic('[ChatScreen] Tools registered:', tools.length, 'tools');
       } else {
-        const lastError = await RunAnywhere.getLastError();
+        const lastError = result.errorMessage || await RunAnywhere.getLastError();
         Alert.alert(
           'Error',
           `Failed to load model: ${lastError || 'Unknown error'}`

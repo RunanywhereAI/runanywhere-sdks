@@ -27,6 +27,7 @@
 @interface PlatformAdapter : NSObject
 + (PlatformAdapter * _Nonnull)shared;
 - (NSString * _Nonnull)getPersistentDeviceUUID;
+- (NSString * _Nullable)getModelBaseDirectory;
 @end
 #endif
 
@@ -396,6 +397,40 @@ bool PlatformAdapter_getPersistentDeviceUUID(char** outValue) {
             return *outValue != NULL;
         } @catch (NSException *exception) {
             NSLog(@"[PlatformAdapterBridge] getPersistentDeviceUUID exception: %@", exception);
+            return false;
+        }
+    }
+}
+
+// ============================================================================
+// Native Directories
+// ============================================================================
+
+bool PlatformAdapter_getModelBaseDirectory(char** outValue) {
+    @autoreleasepool {
+        if (outValue == NULL) {
+            return false;
+        }
+
+        *outValue = NULL;
+
+        @try {
+            NSString* path = [[PlatformAdapter shared] getModelBaseDirectory];
+            if (path == nil || path.length == 0) {
+                NSLog(@"[PlatformAdapterBridge] getModelBaseDirectory: Documents directory unavailable");
+                return false;
+            }
+
+            const char* utf8Value = [path UTF8String];
+            if (utf8Value == NULL) {
+                return false;
+            }
+
+            *outValue = strdup(utf8Value);
+            NSLog(@"[PlatformAdapterBridge] getModelBaseDirectory: %@", path);
+            return *outValue != NULL;
+        } @catch (NSException* exception) {
+            NSLog(@"[PlatformAdapterBridge] getModelBaseDirectory exception: %@", exception);
             return false;
         }
     }

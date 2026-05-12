@@ -16,10 +16,10 @@
  *
  * Reference: sdk/runanywhere-swift/.../Public/Extensions/Solutions/
  */
-import { requireNativeModule, isNativeModuleAvailable } from '../../native';
+import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import { SolutionConfig } from '@runanywhere/proto-ts/solutions';
-import { bytesToArrayBuffer } from '../../services/ProtoBytes';
-import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
+import { bytesToArrayBuffer } from '../../../services/ProtoBytes';
+import { SDKException } from '../../../Foundation/Errors/SDKException';
 
 function ensureNative() {
   if (!isNativeModuleAvailable()) {

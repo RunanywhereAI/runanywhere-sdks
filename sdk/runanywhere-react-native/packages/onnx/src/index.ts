@@ -8,6 +8,7 @@
  *
  * ```typescript
  * import { RunAnywhere, ModelCategory, InferenceFramework, ModelArtifactType } from '@runanywhere/core';
+ * import { ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
  * import { ONNX } from '@runanywhere/onnx';
  *
  * // Initialize core SDK
@@ -28,8 +29,12 @@
  * });
  *
  * // Download and use
- * await RunAnywhere.downloadModel('sherpa-onnx-whisper-tiny.en');
- * await RunAnywhere.loadSTTModel('sherpa-onnx-whisper-tiny.en');
+ * const download = RunAnywhere.downloadModel('sherpa-onnx-whisper-tiny.en')[Symbol.asyncIterator]();
+ * while (!(await download.next()).done) {}
+ * await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+ *   modelId: 'sherpa-onnx-whisper-tiny.en',
+ *   category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+ * }));
  * const result = await RunAnywhere.transcribeFile('/path/to/audio.wav');
  * ```
  *

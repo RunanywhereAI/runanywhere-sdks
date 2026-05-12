@@ -11,9 +11,9 @@
  * Matches Swift: `Public/Extensions/STT/RunAnywhere+STT.swift`.
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '../../native';
-import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
+import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
   STTLanguage,
   type STTOptions,
@@ -29,8 +29,8 @@ import { AudioFormat } from '@runanywhere/proto-ts/model_types';
 import {
   arrayBufferToBytes,
   bytesToArrayBuffer,
-} from '../../services/ProtoBytes';
-import { readAudioFileAsBuffer } from '../../Internal/AudioFileReader';
+} from '../../../services/ProtoBytes';
+import { readAudioFileAsBuffer } from '../../../Internal/AudioFileReader';
 
 const logger = new SDKLogger('RunAnywhere.STT');
 

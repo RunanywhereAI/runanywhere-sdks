@@ -7,7 +7,7 @@
  * - Two-phase SDK initialization (matching iOS pattern)
  * - All model registration uses the canonical SDK methods
  *   (`RunAnywhere.registerModel(...)` / `RunAnywhere.registerMultiFileModel(...)`)
- *   which mirror the Swift / Kotlin / Flutter / Web SDKs.
+ *   which mirror the Swift SDK.
  * - Tab-based navigation with 5 tabs (Chat, Transcribe, Speak, Voice, Settings)
  * - Tool calling settings are in Settings tab (matching iOS)
  *
@@ -47,7 +47,7 @@ import {
   hasUsableBackendConfig,
 } from '@runanywhere/core';
 
-// Canonical SDK methods (Swift / Kotlin / Flutter / Web parity).
+// Canonical SDK methods (Swift parity).
 const { registerModel, registerMultiFileModel } = RunAnywhere;
 
 /**
@@ -461,7 +461,7 @@ const App: React.FC = () => {
       await registerModulesAndModels();
 
       const initTime = Date.now() - startTime;
-      const isInit = await RunAnywhere.isInitialized();
+      const isInit = await RunAnywhere.isInitialized;
       const version = RunAnywhere.version;
       const backendInfo = await RunAnywhere.getBackendInfo();
 

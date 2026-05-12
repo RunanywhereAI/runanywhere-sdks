@@ -101,6 +101,11 @@ using RegistryQueryProtoFn = rac_result_t (*)(
     size_t,
     uint8_t**,
     size_t*);
+using RegistryRequestProtoFn = rac_result_t (*)(
+    rac_model_registry_handle_t,
+    const uint8_t*,
+    size_t,
+    rac_proto_buffer_t*);
 using RegistryRemoveProtoFn = rac_result_t (*)(
     rac_model_registry_handle_t,
     const char*);

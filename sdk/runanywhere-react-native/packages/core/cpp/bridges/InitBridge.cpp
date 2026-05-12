@@ -44,6 +44,7 @@ extern jmethodID g_secureGetMethod;
 extern jmethodID g_secureDeleteMethod;
 extern jmethodID g_secureExistsMethod;
 extern jmethodID g_getPersistentDeviceUUIDMethod;
+extern jmethodID g_getModelBaseDirectoryMethod;
 extern jmethodID g_getDeviceModelMethod;
 extern jmethodID g_getOSVersionMethod;
 extern jmethodID g_getChipNameMethod;
@@ -184,6 +185,37 @@ namespace AndroidBridge {
         
         LOGD("getPersistentDeviceUUID (Android): %s", uuid.c_str());
         return uuid;
+    }
+
+    std::string getModelBaseDirectory() {
+        JNIEnv* env = getJNIEnv();
+        if (!env) return "";
+
+        if (!g_platformAdapterBridgeClass || !g_getModelBaseDirectoryMethod) {
+            LOGE("PlatformAdapterBridge class or getModelBaseDirectory method not cached");
+            return "";
+        }
+
+        jstring result = (jstring)env->CallStaticObjectMethod(
+            g_platformAdapterBridgeClass,
+            g_getModelBaseDirectoryMethod
+        );
+        if (env->ExceptionCheck()) {
+            env->ExceptionClear();
+            LOGE("Exception in PlatformAdapterBridge.getModelBaseDirectory");
+            return "";
+        }
+        if (!result) return "";
+
+        const char* str = env->GetStringUTFChars(result, nullptr);
+        std::string path = str ? str : "";
+        if (str) {
+            env->ReleaseStringUTFChars(result, str);
+        }
+        env->DeleteLocalRef(result);
+
+        LOGD("getModelBaseDirectory (Android): %s", path.c_str());
+        return path;
     }
 
     // Device info methods - use cached references from JNI_OnLoad
@@ -426,6 +458,7 @@ extern "C" {
     // Device type detection
     bool PlatformAdapter_isTablet(void);
     bool PlatformAdapter_getPersistentDeviceUUID(char** outValue);
+    bool PlatformAdapter_getModelBaseDirectory(char** outValue);
     
     // Device info (synchronous)
     bool PlatformAdapter_getDeviceModel(char** outValue);
@@ -1074,20 +1107,36 @@ rac_result_t InitBridge::initialize(
     return RAC_SUCCESS;
 }
 
-rac_result_t InitBridge::setBaseDirectory(const std::string& documentsPath) {
-    if (documentsPath.empty()) {
+rac_result_t InitBridge::setBaseDirectory(const std::string& baseDirectory) {
+    if (baseDirectory.empty()) {
         LOGE("Base directory path is empty");
         return RAC_ERROR_NULL_POINTER;
     }
 
-    rac_result_t result = rac_model_paths_set_base_dir(documentsPath.c_str());
+    rac_result_t result = rac_model_paths_set_base_dir(baseDirectory.c_str());
     if (result == RAC_SUCCESS) {
-        LOGI("Model paths base directory set to: %s", documentsPath.c_str());
+        LOGI("Model paths base directory set to: %s", baseDirectory.c_str());
     } else {
         LOGE("Failed to set model paths base directory: %d", result);
     }
 
     return result;
+}
+
+std::string InitBridge::getDefaultModelBaseDirectory() {
+#if defined(__APPLE__)
+    char* value = nullptr;
+    if (PlatformAdapter_getModelBaseDirectory(&value) && value) {
+        std::string result(value);
+        free(value);
+        return result;
+    }
+    return "";
+#elif defined(ANDROID) || defined(__ANDROID__)
+    return AndroidBridge::getModelBaseDirectory();
+#else
+    return "";
+#endif
 }
 
 void InitBridge::shutdown() {

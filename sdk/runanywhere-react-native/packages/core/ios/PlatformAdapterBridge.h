@@ -57,6 +57,18 @@ bool PlatformAdapter_secureExists(const char* key);
 bool PlatformAdapter_getPersistentDeviceUUID(char** outValue);
 
 // ============================================================================
+// Native Directories
+// ============================================================================
+
+/**
+ * Get the native model base directory.
+ * iOS returns the app Documents directory.
+ * @param outValue Pointer to store the result (must be freed by caller with free())
+ * @return true if successful
+ */
+bool PlatformAdapter_getModelBaseDirectory(char** outValue);
+
+// ============================================================================
 // Device Info (Synchronous)
 // ============================================================================
 

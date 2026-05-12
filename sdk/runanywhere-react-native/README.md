@@ -133,32 +133,51 @@ No additional setup required. Native libraries are automatically downloaded duri
 ### 1. Initialize the SDK
 
 ```typescript
-import { RunAnywhere, SDKEnvironment, ModelCategory } from '@runanywhere/core';
+import {
+  RunAnywhere,
+  SDKEnvironment,
+  ModelCategory,
+  InferenceFramework,
+  ModelArtifactType,
+} from '@runanywhere/core';
+import { ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
 import { LlamaCPP } from '@runanywhere/llamacpp';
-import { ONNX, ModelArtifactType } from '@runanywhere/onnx';
+import { ONNX } from '@runanywhere/onnx';
 
 // Initialize SDK (development mode - no API key needed)
 await RunAnywhere.initialize({
-  environment: SDKEnvironment.Development,
+  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
 });
+
+async function drainModelDownload(modelId: string): Promise<void> {
+  const iterator = RunAnywhere.downloadModel(modelId)[Symbol.asyncIterator]();
+  let next = await iterator.next();
+  while (!next.done) {
+    const progress = next.value;
+    console.log(`${modelId}: ${(progress.progress * 100).toFixed(1)}%`);
+    next = await iterator.next();
+  }
+}
 
 // Register LlamaCpp module and add LLM models
 LlamaCPP.register();
-await LlamaCPP.addModel({
+await RunAnywhere.registerModel({
   id: 'smollm2-360m-q8_0',
   name: 'SmolLM2 360M Q8_0',
   url: 'https://huggingface.co/prithivMLmods/SmolLM2-360M-GGUF/resolve/main/SmolLM2-360M.Q8_0.gguf',
+  framework: InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP,
   memoryRequirement: 500_000_000,
 });
 
 // Register ONNX module and add STT/TTS models
 ONNX.register();
-await ONNX.addModel({
+await RunAnywhere.registerModel({
   id: 'sherpa-onnx-whisper-tiny.en',
   name: 'Sherpa Whisper Tiny (ONNX)',
   url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
-  modality: ModelCategory.SpeechRecognition,
-  artifactType: ModelArtifactType.TarGzArchive,
+  framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+  artifactType: ModelArtifactType.MODEL_ARTIFACT_TYPE_TAR_GZ_ARCHIVE,
   memoryRequirement: 75_000_000,
 });
 
@@ -169,14 +188,15 @@ console.log('SDK initialized');
 
 ```typescript
 // Download model with progress tracking
-await RunAnywhere.downloadModel('smollm2-360m-q8_0', (progress) => {
-  console.log(`Download: ${(progress.progress * 100).toFixed(1)}%`);
-});
+await drainModelDownload('smollm2-360m-q8_0');
 
 // Load model into memory
-const modelInfo = await RunAnywhere.getModelInfo('smollm2-360m-q8_0');
-if (modelInfo?.localPath) {
-  await RunAnywhere.loadModel(modelInfo.localPath);
+const loadResult = await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+  modelId: 'smollm2-360m-q8_0',
+  category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+}));
+if (!loadResult.success) {
+  throw new Error(loadResult.errorMessage || 'Model load failed');
 }
 
 // Check if model is loaded
@@ -235,9 +255,11 @@ console.log('\nSpeed:', metrics.performanceMetrics.tokensPerSecond, 'tok/s');
 
 ```typescript
 // Download and load STT model
-await RunAnywhere.downloadModel('sherpa-onnx-whisper-tiny.en');
-const sttModel = await RunAnywhere.getModelInfo('sherpa-onnx-whisper-tiny.en');
-await RunAnywhere.loadSTTModel(sttModel.localPath, 'whisper');
+await drainModelDownload('sherpa-onnx-whisper-tiny.en');
+await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+  modelId: 'sherpa-onnx-whisper-tiny.en',
+  category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+}));
 
 // Transcribe audio file
 const result = await RunAnywhere.transcribeFile(audioFilePath, {
@@ -252,9 +274,11 @@ console.log('Confidence:', result.confidence);
 
 ```typescript
 // Download and load TTS model
-await RunAnywhere.downloadModel('vits-piper-en_US-lessac-medium');
-const ttsModel = await RunAnywhere.getModelInfo('vits-piper-en_US-lessac-medium');
-await RunAnywhere.loadTTSModel(ttsModel.localPath, 'piper');
+await drainModelDownload('vits-piper-en_US-lessac-medium');
+await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+  modelId: 'vits-piper-en_US-lessac-medium',
+  category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+}));
 
 // Synthesize speech
 const output = await RunAnywhere.synthesize(
@@ -365,14 +389,14 @@ The RunAnywhere SDK follows a modular, provider-based architecture with a shared
 ```typescript
 // Development mode (default) - no API key needed
 await RunAnywhere.initialize({
-  environment: SDKEnvironment.Development,
+  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
 });
 
 // Production mode - requires API key
 await RunAnywhere.initialize({
   apiKey: '<YOUR_API_KEY>',
   baseURL: 'https://api.runanywhere.ai',
-  environment: SDKEnvironment.Production,
+  environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
 });
 ```
 
@@ -567,7 +591,7 @@ await RunAnywhere.cleanTempFiles();
 **Symptoms:** `modelNotFound` error even though download completed
 
 **Solutions:**
-1. Refresh model registry: `await RunAnywhere.getAvailableModels()`
+1. Refresh model registry: `await RunAnywhere.listModels()`
 2. Check model path in storage
 3. Delete and re-download the model
 

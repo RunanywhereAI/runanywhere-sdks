@@ -345,6 +345,7 @@ import {
   InferenceFramework,
   ModelArtifactType,
 } from '@runanywhere/core';
+import { ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
 import { LlamaCPP } from '@runanywhere/llamacpp';
 import { ONNX } from '@runanywhere/onnx';
 
@@ -352,7 +353,7 @@ import { ONNX } from '@runanywhere/onnx';
 await RunAnywhere.initialize({
   apiKey: '',  // Empty in development mode
   baseURL: 'https://api.runanywhere.ai',
-  environment: SDKEnvironment.Development,
+  environment: SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT,
 });
 
 // Phase 2: Register optional backends and proto-described models
@@ -389,8 +390,14 @@ while (!downloadResult.done) {
   downloadResult = await downloadIter.next();
 }
 
-// Load LLM model into memory (model-id-driven, matches iOS/Kotlin/Flutter/Web)
-const success = await RunAnywhere.loadModel(modelId, ModelCategory.MODEL_CATEGORY_TEXT_GENERATION);
+// Load LLM model into memory (proto request, matches iOS Swift)
+const loadResult = await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+  modelId,
+  category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+}));
+if (!loadResult.success) {
+  throw new Error(loadResult.errorMessage || 'Model load failed');
+}
 
 // Check if model is loaded
 const isLoaded = await RunAnywhere.isModelLoaded();
@@ -444,11 +451,11 @@ console.log('Model:', result.modelUsed);
 ### Speech-to-Text
 
 ```typescript
-// Load STT model by id (model-id-driven lifecycle, matches iOS/Kotlin/Flutter/Web)
-await RunAnywhere.loadModel(
+// Load STT model by id (proto request, matches iOS Swift)
+await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
   modelId,
-  ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION
-);
+  category: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+}));
 
 // Check if loaded
 const isLoaded = await RunAnywhere.isSTTModelLoaded();
@@ -468,10 +475,10 @@ console.log('Confidence:', result.confidence);
 import { AudioFormat } from '@runanywhere/proto-ts';
 
 // Load TTS voice model by id
-await RunAnywhere.loadModel(
+await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
   modelId,
-  ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS
-);
+  category: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+}));
 
 // Synthesize speech (proto-canonical TTSOptions)
 const result = await RunAnywhere.synthesize(text, {
@@ -516,8 +523,8 @@ const ttsResult = await RunAnywhere.synthesize(llmResult.text);
 
 ```typescript
 // Get available models
-const models = await RunAnywhere.getAvailableModels();
-const downloaded = await RunAnywhere.getDownloadedModels();
+const models = await RunAnywhere.listModels();
+const downloaded = await RunAnywhere.downloadedModels();
 
 // Get storage info
 const storage = await RunAnywhere.getStorageInfo();
@@ -547,9 +554,9 @@ await RunAnywhere.cleanTempFiles();
 
 **Key SDK APIs:**
 - `RunAnywhere.generateStream(prompt, LLMGenerationOptions)` — Streaming generation
-- `RunAnywhere.loadModel(id, ModelCategory)` — Load LLM model
+- `RunAnywhere.loadModel(ModelLoadRequest)` — Load LLM model
 - `RunAnywhere.isModelLoaded()` — Check model status
-- `RunAnywhere.getAvailableModels()` — List models
+- `RunAnywhere.listModels()` — List models
 
 ### 2. Speech-to-Text Screen (`STTScreen.tsx`)
 
@@ -561,7 +568,7 @@ await RunAnywhere.cleanTempFiles();
 - Microphone permission handling
 
 **Key SDK APIs:**
-- `RunAnywhere.loadModel(id, ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION)` — Load Whisper model
+- `RunAnywhere.loadModel(ModelLoadRequest)` — Load Whisper model
 - `RunAnywhere.isSTTModelLoaded()` — Check STT model status
 - `RunAnywhere.transcribeFile()` — Transcribe audio file
 - Native audio recording via `AudioService`
@@ -576,7 +583,7 @@ await RunAnywhere.cleanTempFiles();
 - WAV file generation from float32 PCM
 
 **Key SDK APIs:**
-- `RunAnywhere.loadModel(id, ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS)` — Load TTS model
+- `RunAnywhere.loadModel(ModelLoadRequest)` — Load TTS model
 - `RunAnywhere.isTTSModelLoaded()` — Check TTS model status
 - `RunAnywhere.synthesize()` — Generate speech audio
 - Native audio playback via `NativeAudioModule` (iOS)
@@ -605,8 +612,8 @@ await RunAnywhere.cleanTempFiles();
 - SDK version and backend information
 
 **Key SDK APIs:**
-- `RunAnywhere.getAvailableModels()` — List all models
-- `RunAnywhere.getDownloadedModels()` — List downloaded models
+- `RunAnywhere.listModels()` — List all models
+- `RunAnywhere.downloadedModels()` — List downloaded models
 - `RunAnywhere.downloadModel()` — Download with progress
 - `RunAnywhere.deleteModel()` — Remove model
 - `RunAnywhere.getStorageInfo()` — Storage metrics

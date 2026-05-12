@@ -10,7 +10,9 @@
 
 package com.margelo.nitro.runanywhere
 
+import android.content.Context
 import android.util.Log
+import com.margelo.nitro.NitroModules
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
@@ -54,12 +56,20 @@ object PlatformAdapterBridge {
             }
         }
 
+    private fun applicationContext(): Context? {
+        SecureStorageManager.getContext()?.let { return it }
+        val context = NitroModules.applicationContext ?: return null
+        SecureStorageManager.initialize(context.applicationContext)
+        return SecureStorageManager.getContext()
+    }
+
     /**
      * Called from C++ to set a secure value
      */
     @JvmStatic
     fun secureSet(key: String, value: String): Boolean {
         Log.d(TAG, "secureSet key=$key")
+        applicationContext()
         return SecureStorageManager.set(key, value)
     }
 
@@ -69,6 +79,7 @@ object PlatformAdapterBridge {
     @JvmStatic
     fun secureGet(key: String): String? {
         Log.d(TAG, "secureGet key=$key")
+        applicationContext()
         return SecureStorageManager.get(key)
     }
 
@@ -78,6 +89,7 @@ object PlatformAdapterBridge {
     @JvmStatic
     fun secureDelete(key: String): Boolean {
         Log.d(TAG, "secureDelete key=$key")
+        applicationContext()
         return SecureStorageManager.delete(key)
     }
 
@@ -86,6 +98,7 @@ object PlatformAdapterBridge {
      */
     @JvmStatic
     fun secureExists(key: String): Boolean {
+        applicationContext()
         return SecureStorageManager.exists(key)
     }
 
@@ -95,7 +108,19 @@ object PlatformAdapterBridge {
     @JvmStatic
     fun getPersistentDeviceUUID(): String {
         Log.d(TAG, "getPersistentDeviceUUID")
+        applicationContext()
         return SecureStorageManager.getPersistentDeviceUUID()
+    }
+
+    /**
+     * Return the native app files directory used as the model-path base.
+     */
+    @JvmStatic
+    fun getModelBaseDirectory(): String? {
+        val context = applicationContext()
+        val path = context?.filesDir?.absolutePath
+        Log.d(TAG, "getModelBaseDirectory path=$path")
+        return path
     }
 
     // ========================================================================

@@ -12,9 +12,9 @@
 import {
   requireNativeModule,
   isNativeModuleAvailable,
-} from '../../native';
-import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
+} from '../../../native';
+import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../../Foundation/Errors/SDKException';
 import type {
   LLMGenerationOptions,
   LLMGenerationResult,
@@ -31,11 +31,10 @@ import {
   type LLMStreamEvent as LLMStreamEventType,
 } from '@runanywhere/proto-ts/llm_service';
 import { inferenceFrameworkToJSON } from '@runanywhere/proto-ts/model_types';
-import { LlmThinking } from '../../Features/LLM/LlmThinking';
 import {
   arrayBufferToBytes,
   bytesToArrayBuffer,
-} from '../../services/ProtoBytes';
+} from '../../../services/ProtoBytes';
 
 const logger = new SDKLogger('RunAnywhere.TextGeneration');
 
@@ -96,7 +95,7 @@ function decodeLLMGenerationResult(buffer: ArrayBuffer): LLMGenerationResult {
  * Matches iOS: `RunAnywhere.isModelLoaded`
  *
  * Loading models is handled by `loadModelLifecycle` in
- * `RunAnywhere+Lifecycle.ts`, which resolves a `modelId` through the
+ * `Models/RunAnywhere+ModelLifecycle.ts`, which resolves a `modelId` through the
  * native commons registry and then drives the LLM component lifecycle.
  */
 export async function isModelLoaded(): Promise<boolean> {
@@ -276,58 +275,6 @@ export function cancelGeneration(): void {
 interface LLMIntrospectionNativeModule {
   getCurrentLLMModelId?: () => Promise<string>;
   currentLLMModel?: () => Promise<string>;
-}
-
-// ============================================================================
-// Thinking Token Utilities (§3 — delegated to C++ rac_llm_thinking)
-// ============================================================================
-
-/** Result of extracting thinking tokens from text. */
-export interface ThinkingExtractionResult {
-  /** All thinking blocks extracted from the text, in order. */
-  thinkingBlocks: string[];
-  /** The text with all thinking blocks removed. */
-  responseText: string;
-}
-
-/**
- * Extract thinking content from `text` using the shared C++ parser.
- *
- * Returns a `ThinkingExtractionResult` containing the raw thinking content
- * and the text with thinking content removed.
- *
- * Matches Swift SDK: `RunAnywhere.extractThinkingTokens(_:)`.
- */
-export async function extractThinkingTokens(text: string): Promise<ThinkingExtractionResult> {
-  const result = await LlmThinking.extract(text);
-  return {
-    thinkingBlocks: result.thinking ? [result.thinking] : [],
-    responseText: result.response,
-  };
-}
-
-/**
- * Remove all thinking blocks from `text` using the shared C++ parser.
- *
- * Matches Swift SDK: `RunAnywhere.stripThinkingTokens(_:)`.
- */
-export async function stripThinkingTokens(text: string): Promise<string> {
-  return LlmThinking.strip(text);
-}
-
-/**
- * Split `text` into a `(thinking, response)` pair using shared C++ behavior.
- *
- * Matches Swift SDK: `RunAnywhere.splitThinkingAndResponse(_:)`.
- */
-export async function splitThinkingAndResponse(
-  text: string
-): Promise<{ thinking: string; response: string }> {
-  const result = await LlmThinking.extract(text);
-  return {
-    thinking: result.thinking ?? '',
-    response: result.response,
-  };
 }
 
 // ============================================================================

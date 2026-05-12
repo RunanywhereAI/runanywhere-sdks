@@ -142,7 +142,7 @@ while (!result.done) {
 
 ### Extension Module Pattern
 
-Each AI capability is a standalone module in `Public/Extensions/` (e.g., `RunAnywhere+TextGeneration.ts`, `RunAnywhere+STT.ts`). The `RunAnywhere` object imports these via namespace imports and delegates each property/method to the corresponding extension function. This keeps the facade thin while each extension manages its own state.
+Each AI capability is a standalone module in `Public/Extensions/` (e.g., `LLM/RunAnywhere+TextGeneration.ts`, `STT/RunAnywhere+STT.ts`). The `RunAnywhere` object imports these via namespace imports and delegates each property/method to the corresponding extension function. This keeps the facade thin while each extension manages its own state.
 
 ### Type System
 
@@ -230,7 +230,7 @@ The inner `sdk/runanywhere-react-native/package.json` also declares workspaces (
 | `packages/core/src/Public/Events/EventBus.ts` | Event system with NativeEventEmitter integration |
 | `packages/core/src/Adapters/LLMStreamAdapter.ts` | Proto-byte → AsyncIterable adapter for LLM tokens |
 | `packages/core/src/Adapters/VoiceAgentStreamAdapter.ts` | Proto-byte → AsyncIterable adapter for voice events |
-| `packages/core/src/Foundation/ErrorTypes/SDKException.ts` | Sole throwable type with static factories |
+| `packages/core/src/Foundation/Errors/SDKException.ts` | Sole throwable type with static factories |
 | `packages/core/cpp/HybridRunAnywhereCore.cpp` | C++ implementation (split into +Extension files) |
 | `packages/core/ios/PlatformAdapterBridge.m` | iOS C ABI → Swift bridge for secure storage, device info, HTTP |
 | `packages/core/ios/URLSessionHttpTransport.mm` | iOS HTTP transport vtable implementation |

@@ -108,6 +108,8 @@ public:
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> queryModelsProto(
     const std::shared_ptr<ArrayBuffer>& queryBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> getDownloadedModelsProto() override;
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> importModelProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) override;
   std::shared_ptr<Promise<bool>> refreshModelRegistry(
     bool includeRemoteCatalog,
     bool rescanLocal,
@@ -155,7 +157,7 @@ public:
     const std::shared_ptr<ArrayBuffer>& requestBytes) override;
 
   // ============================================================================
-  // Events - Delegates to EventBridge
+  // Events - Native SDK event proto bridge
   // ============================================================================
 
   std::shared_ptr<Promise<double>> subscribeSDKEventsProto(
@@ -226,18 +228,6 @@ public:
     const std::shared_ptr<ArrayBuffer>& requestBytes,
     const std::function<void(const std::shared_ptr<ArrayBuffer>&)>& onEventBytes) override;
   std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> llmCancelProto() override;
-
-  // ============================================================================
-  // LLM Thinking (rac_llm_thinking.h) — v3 Phase A10 / GAP 08 #6
-  // ============================================================================
-  std::shared_ptr<Promise<std::string>> llmExtractThinking(
-    const std::string& text);
-  std::shared_ptr<Promise<std::string>> llmStripThinking(
-    const std::string& text);
-  std::shared_ptr<Promise<std::string>> llmSplitThinkingTokens(
-    double totalCompletionTokens,
-    const std::string& responseText,
-    const std::string& thinkingText);
 
   // ============================================================================
   // STT Capability (Backend-Agnostic)

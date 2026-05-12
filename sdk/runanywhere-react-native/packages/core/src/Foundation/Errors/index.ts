@@ -1,5 +1,5 @@
 /**
- * Foundation/ErrorTypes
+ * Foundation/Errors
  *
  * Wave 2 cleanup: legacy `SDKError` / `ErrorCode` / `ErrorCategory` /
  * `ErrorContext` modules have been deleted. The canonical proto-encoded

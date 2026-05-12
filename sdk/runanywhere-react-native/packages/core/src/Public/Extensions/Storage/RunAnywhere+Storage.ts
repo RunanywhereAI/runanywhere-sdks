@@ -7,13 +7,9 @@
  * Reference: sdk/runanywhere-swift/Sources/RunAnywhere/Public/Extensions/Storage/RunAnywhere+Storage.swift
  */
 
-import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { requireNativeModule, isNativeModuleAvailable } from '../../native';
+import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
+import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import {
-  StorageAvailabilityRequest,
-  StorageAvailabilityResult as StorageAvailabilityResultCodec,
-  StorageDeletePlan as StorageDeletePlanCodec,
-  StorageDeletePlanRequest,
   StorageDeleteRequest,
   StorageDeleteResult as StorageDeleteResultCodec,
   StorageInfoRequest,
@@ -21,22 +17,15 @@ import {
 } from '@runanywhere/proto-ts/storage_types';
 import type {
   StorageInfo,
-  StorageAvailabilityResult,
-  StorageDeletePlan,
   StorageDeleteResult,
   StorageInfoResult,
 } from '@runanywhere/proto-ts/storage_types';
-import { arrayBufferToBytes, bytesToArrayBuffer } from '../../services/ProtoBytes';
+import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
 
 const logger = new SDKLogger('RunAnywhere.Storage');
 
 export type {
-  StorageAvailability,
-  StorageAvailabilityRequest,
-  StorageAvailabilityResult,
   StorageDeleteCandidate,
-  StorageDeletePlan,
-  StorageDeletePlanRequest,
   StorageDeleteRequest,
   StorageDeleteResult,
   StorageInfo,
@@ -89,62 +78,6 @@ export async function getStorageInfoProto(
     StorageInfoResultCodec.fromPartial({
       success: false,
       errorMessage: 'storageInfoProto returned an empty result',
-    })
-  );
-}
-
-/**
- * Check storage availability using the canonical generated request/result.
- */
-export async function checkStorageAvailability(
-  request: StorageAvailabilityRequest
-): Promise<StorageAvailabilityResult> {
-  if (!isNativeModuleAvailable()) {
-    return StorageAvailabilityResultCodec.fromPartial({
-      success: false,
-      errorMessage: 'Native module not available',
-    });
-  }
-
-  const native = requireNativeModule();
-  const buffer = await native.storageAvailabilityProto(
-    encode(request, StorageAvailabilityRequest)
-  );
-  return decode(
-    buffer,
-    StorageAvailabilityResultCodec,
-    StorageAvailabilityResultCodec.fromPartial({
-      success: false,
-      errorMessage: 'storageAvailabilityProto returned an empty result',
-    })
-  );
-}
-
-/**
- * Build a native storage delete plan.
- */
-export async function planStorageDelete(
-  request: StorageDeletePlanRequest
-): Promise<StorageDeletePlan> {
-  if (!isNativeModuleAvailable()) {
-    return StorageDeletePlanCodec.fromPartial({
-      canReclaimRequiredBytes: false,
-      requiredBytes: request.requiredBytes,
-      errorMessage: 'Native module not available',
-    });
-  }
-
-  const native = requireNativeModule();
-  const buffer = await native.storageDeletePlanProto(
-    encode(request, StorageDeletePlanRequest)
-  );
-  return decode(
-    buffer,
-    StorageDeletePlanCodec,
-    StorageDeletePlanCodec.fromPartial({
-      canReclaimRequiredBytes: false,
-      requiredBytes: request.requiredBytes,
-      errorMessage: 'storageDeletePlanProto returned an empty result',
     })
   );
 }
@@ -206,4 +139,14 @@ export async function clearCache(): Promise<void> {
   }
 
   logger.info('Cache cleared');
+}
+
+/**
+ * Clean temporary files.
+ * Uses the currently exposed native cache cleanup hook until a temp-specific
+ * Nitro method is available.
+ */
+export async function cleanTempFiles(): Promise<boolean> {
+  await clearCache();
+  return true;
 }

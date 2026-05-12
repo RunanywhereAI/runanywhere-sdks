@@ -26,7 +26,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Alert,
@@ -35,7 +34,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme/colors';
 import { Typography } from '../theme/typography';
 import { Spacing, Padding, BorderRadius } from '../theme/spacing';
@@ -66,12 +65,12 @@ import {
 } from '@runanywhere/core';
 import { ToolDefinition } from '@runanywhere/proto-ts/tool_calling';
 
-// Canonical SDK methods (Swift / Kotlin / Flutter / Web parity).
+// Canonical SDK methods (Swift parity).
 const cancelDownloadHelper = RunAnywhere.cancelDownload;
 const deleteModelHelper = RunAnywhere.deleteModel;
 const downloadModelHelper = RunAnywhere.downloadModel;
-const getAvailableModels = RunAnywhere.getAvailableModels;
-const getDownloadedModels = RunAnywhere.getDownloadedModels;
+const listModels = async (): Promise<ModelInfo[]> => (await RunAnywhere.listModels()).models?.models ?? [];
+const listDownloadedModels = async (): Promise<ModelInfo[]> => (await RunAnywhere.downloadedModels()).models?.models ?? [];
 
 // Storage keys for API configuration
 const STORAGE_KEYS = {
@@ -518,7 +517,7 @@ export const SettingsScreen: React.FC = () => {
       const version = RunAnywhere.version;
       setSdkVersion(version); // Check if SDK is initialized first
 
-      const isInit = await RunAnywhere.isInitialized();
+      const isInit = await RunAnywhere.isInitialized;
       // eslint-disable-next-line no-console -- demo settings diagnostic
       console.log('[Settings] SDK isInitialized:', isInit); // Get backend info for storage data
 
@@ -561,7 +560,7 @@ export const SettingsScreen: React.FC = () => {
       ); // Get available models from catalog
 
       try {
-        const available = await getAvailableModels();
+        const available = await listModels();
         console.warn('[Settings] Available models:', available);
         setAvailableModels(available);
       } catch (err) {
@@ -569,7 +568,7 @@ export const SettingsScreen: React.FC = () => {
       } // Get downloaded models
 
       try {
-        const downloaded = await getDownloadedModels();
+        const downloaded = await listDownloadedModels();
         console.warn('[Settings] Downloaded models:', downloaded);
         setDownloadedModels(downloaded);
       } catch (err) {

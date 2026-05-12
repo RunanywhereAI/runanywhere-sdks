@@ -1,55 +1,73 @@
 /**
- * RunAnywhere+ModelManagement.ts
+ * RunAnywhere+ModelRegistry.ts
  *
  * Canonical model registration / discovery / download / delete / load surface,
- * matching the Swift / Kotlin / Flutter / Web SDKs.
+ * matching the Swift SDK.
  *
  * Wraps the proto-byte ABI on the core Nitro HybridObject:
  *   - registerModelProto              - register / registerMultiFile
- *   - getAvailableModelsProto         - getAvailableModels
- *   - getDownloadedModelsProto        - getDownloadedModels
+ *   - getAvailableModelsProto         - listModels
+ *   - getDownloadedModelsProto        - downloadedModels
  *   - downloadPlanProto               - downloadModel (plan)
  *   - downloadStartProto              - downloadModel (start)
  *   - setDownloadProgressCallbackProto - downloadModel (stream)
  *   - downloadCancelProto             - cancelDownload
  *   - storageDeleteProto              - deleteModel
  *   - modelLifecycleUnloadProto       - deleteModel (release handles first)
- *   - modelLifecycleLoadProto         - loadModel (sugar overload)
+ *   - modelLifecycleLoadProto         - loadModel
  *
  * Hermes constraint: download streaming returns an `AsyncIterable<DownloadProgress>`
  * that callers MUST drive with manual `iterator.next()` loops (see CLAUDE.md).
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '../../native';
-import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
+import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
+import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
   ModelArtifactType,
   ModelCategory,
-  ModelDeleteRequest,
-  ModelDeleteResult,
   ModelFileRole,
   ModelFormat,
   type ModelInfo,
   ModelInfo as ModelInfoCodec,
   ModelInfoList,
+  ModelGetRequest,
+  ModelGetResult,
+  ModelImportRequest,
+  ModelImportResult,
+  ModelListRequest,
+  ModelListResult,
   ModelLoadRequest,
   ModelLoadResult,
+  ModelQuery,
+  ModelUnloadRequest,
   type InferenceFramework,
+  type ModelLoadRequest as ModelLoadRequestMessage,
+  type ModelLoadResult as ModelLoadResultMessage,
 } from '@runanywhere/proto-ts/model_types';
+import {
+  StorageDeleteRequest,
+  StorageDeleteResult,
+} from '@runanywhere/proto-ts/storage_types';
 import {
   DownloadCancelRequest,
   DownloadCancelResult,
   DownloadPlanRequest,
   DownloadPlanResult,
+  DownloadStage,
+  DownloadState,
   type DownloadProgress,
   DownloadProgress as DownloadProgressCodec,
   DownloadStartRequest,
   DownloadStartResult,
 } from '@runanywhere/proto-ts/download_service';
-import { arrayBufferToBytes, bytesToArrayBuffer } from '../../services/ProtoBytes';
+import {
+  ErrorCategory,
+  ErrorCode,
+} from '@runanywhere/proto-ts/errors';
+import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
 
 // ---------------------------------------------------------------------------
-// Public types — match the Swift / Kotlin signatures.
+// Public types — match the Swift signatures.
 // ---------------------------------------------------------------------------
 
 /**
@@ -63,7 +81,7 @@ export interface RegisterModelInput {
   framework: InferenceFramework;
   /** Estimated runtime RAM, used for compatibility checks. */
   memoryRequirement?: number;
-  /** Optional model category (defaults to LANGUAGE for back-compat). */
+  /** Optional model category (Swift shorthand defaults to LANGUAGE). */
   modality?: ModelCategory;
   /** Optional artifact archive type hint. */
   artifactType?: ModelArtifactType;
@@ -149,28 +167,139 @@ export async function registerMultiFileModel(
 // ---------------------------------------------------------------------------
 
 /**
- * Get all registered models. Mirrors Swift's `RunAnywhere.getAvailableModels()`.
+ * Get all registered models. Mirrors Swift's `RunAnywhere.listModels(_:)`.
  */
-export async function getAvailableModels(): Promise<ModelInfo[]> {
-  if (!isNativeModuleAvailable()) return [];
+export async function listModels(
+  _request: ModelListRequest = ModelListRequest.fromPartial({
+    includeCounts: true,
+  })
+): Promise<ModelListResult> {
+  if (!isNativeModuleAvailable()) {
+    return ModelListResult.fromPartial({
+      success: false,
+      errorMessage: 'Native module not available',
+    });
+  }
   const native = requireNativeModule();
   const buffer = await native.getAvailableModelsProto();
   const bytes = arrayBufferToBytes(buffer);
-  if (bytes.byteLength === 0) return [];
-  return ModelInfoList.decode(bytes).models;
+  if (bytes.byteLength === 0) {
+    return ModelListResult.fromPartial({
+      success: false,
+      errorMessage: 'getAvailableModelsProto returned an empty result',
+    });
+  }
+  return modelListResult(ModelInfoList.decode(bytes));
 }
 
 /**
- * Get only the models the registry believes have been successfully downloaded.
- * Mirrors Swift's `RunAnywhere.getDownloadedModels()`.
+ * Query registered models. Mirrors Swift's `RunAnywhere.queryModels(_:)`.
  */
-export async function getDownloadedModels(): Promise<ModelInfo[]> {
-  if (!isNativeModuleAvailable()) return [];
+export async function queryModels(query: ModelQuery): Promise<ModelListResult> {
+  if (!isNativeModuleAvailable()) {
+    return ModelListResult.fromPartial({
+      success: false,
+      errorMessage: 'Native module not available',
+    });
+  }
+  const native = requireNativeModule();
+  const buffer = await native.queryModelsProto(
+    bytesToArrayBuffer(ModelQuery.encode(query).finish())
+  );
+  const bytes = arrayBufferToBytes(buffer);
+  if (bytes.byteLength === 0) {
+    return ModelListResult.fromPartial({
+      success: false,
+      errorMessage: 'queryModelsProto returned an empty result',
+    });
+  }
+  return modelListResult(ModelInfoList.decode(bytes));
+}
+
+/**
+ * Get one registered model. Mirrors Swift's `RunAnywhere.getModel(_:)`.
+ */
+export async function getModel(request: ModelGetRequest): Promise<ModelGetResult> {
+  if (!isNativeModuleAvailable()) {
+    return ModelGetResult.fromPartial({
+      found: false,
+      errorMessage: 'Native module not available',
+    });
+  }
+  const native = requireNativeModule();
+  const buffer = await native.getModelInfoProto(request.modelId);
+  const bytes = arrayBufferToBytes(buffer);
+  if (bytes.byteLength === 0) {
+    return ModelGetResult.fromPartial({
+      found: false,
+      errorMessage: `Model not found: ${request.modelId}`,
+    });
+  }
+  return ModelGetResult.fromPartial({
+    found: true,
+    model: ModelInfoCodec.decode(bytes),
+  });
+}
+
+/**
+ * Get downloaded models. Mirrors Swift's `RunAnywhere.downloadedModels()`.
+ */
+export async function downloadedModels(): Promise<ModelListResult> {
+  if (!isNativeModuleAvailable()) {
+    return ModelListResult.fromPartial({
+      success: false,
+      errorMessage: 'Native module not available',
+    });
+  }
   const native = requireNativeModule();
   const buffer = await native.getDownloadedModelsProto();
   const bytes = arrayBufferToBytes(buffer);
-  if (bytes.byteLength === 0) return [];
-  return ModelInfoList.decode(bytes).models;
+  if (bytes.byteLength === 0) {
+    return ModelListResult.fromPartial({
+      success: false,
+      errorMessage: 'getDownloadedModelsProto returned an empty result',
+    });
+  }
+  return modelListResult(ModelInfoList.decode(bytes));
+}
+
+/**
+ * Import a stable, platform-normalized local model path into the native
+ * registry. Mirrors Swift's `RunAnywhere.importModel(_:)`.
+ */
+export async function importModel(
+  request: ModelImportRequest
+): Promise<ModelImportResult> {
+  if (!isNativeModuleAvailable()) {
+    return ModelImportResult.fromPartial({
+      success: false,
+      errorMessage: 'Native module not available',
+    });
+  }
+
+  const native = requireNativeModule();
+  const buffer = await native.importModelProto(
+    bytesToArrayBuffer(ModelImportRequest.encode(request).finish())
+  );
+  const bytes = arrayBufferToBytes(buffer);
+  if (bytes.byteLength === 0) {
+    return ModelImportResult.fromPartial({
+      success: false,
+      errorMessage: 'importModelProto returned an empty result',
+    });
+  }
+  return ModelImportResult.decode(bytes);
+}
+
+function modelListResult(models: ModelInfoList): ModelListResult {
+  return ModelListResult.fromPartial({
+    success: true,
+    models,
+    totalCount: models.models.length,
+    downloadedCount: models.models.filter((model) => model.isDownloaded).length,
+    availableCount: models.models.filter((model) => model.isAvailable).length,
+    filteredCount: models.models.length,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -179,10 +308,72 @@ export async function getDownloadedModels(): Promise<ModelInfo[]> {
 
 function isTerminalProgress(progress: DownloadProgress): boolean {
   return (
-    progress.state === 5 || // DOWNLOAD_STATE_COMPLETED
-    progress.state === 6 || // DOWNLOAD_STATE_FAILED
-    progress.state === 7 // DOWNLOAD_STATE_CANCELLED
+    progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED ||
+    progress.state === DownloadState.DOWNLOAD_STATE_FAILED ||
+    progress.state === DownloadState.DOWNLOAD_STATE_CANCELLED ||
+    progress.stage === DownloadStage.DOWNLOAD_STAGE_COMPLETED
   );
+}
+
+function isCompletedProgress(progress: DownloadProgress): boolean {
+  if (progress.state === DownloadState.DOWNLOAD_STATE_FAILED) {
+    throw SDKException.of(
+      ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+      progress.errorMessage || 'Download failed',
+      { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
+    );
+  }
+  if (progress.state === DownloadState.DOWNLOAD_STATE_CANCELLED) {
+    throw SDKException.of(
+      ErrorCode.ERROR_CODE_CANCELLED,
+      'Download cancelled',
+      { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
+    );
+  }
+  return (
+    progress.state === DownloadState.DOWNLOAD_STATE_COMPLETED ||
+    progress.stage === DownloadStage.DOWNLOAD_STAGE_COMPLETED
+  );
+}
+
+async function persistDownloadCompletion(
+  model: ModelInfo,
+  progress: DownloadProgress
+): Promise<void> {
+  const localPath = progress.localPath || model.localPath;
+  if (!localPath) {
+    throw SDKException.of(
+      ErrorCode.ERROR_CODE_INVALID_STATE,
+      'Download completed without a local_path; cannot import completion into the model registry',
+      { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
+    );
+  }
+
+  const importedModel = ModelInfoCodec.fromPartial({
+    ...model,
+    localPath,
+    isDownloaded: true,
+    isAvailable: true,
+    updatedAtUnixMs: Date.now(),
+  });
+  const result = await importModel(
+    ModelImportRequest.fromPartial({
+      model: importedModel,
+      sourcePath: localPath,
+      overwriteExisting: true,
+      copyIntoManagedStorage: false,
+      validateBeforeRegister: false,
+      files: importedModel.multiFile?.files ?? [],
+    })
+  );
+
+  if (!result.success) {
+    throw SDKException.of(
+      ErrorCode.ERROR_CODE_DOWNLOAD_FAILED,
+      result.errorMessage || 'Downloaded model could not be imported into the registry',
+      { category: ErrorCategory.ERROR_CATEGORY_NETWORK }
+    );
+  }
 }
 
 /**
@@ -211,6 +402,8 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
       let started = false;
       let completed = false;
       let activeTaskId: string | undefined;
+      let modelForImport: ModelInfo | undefined;
+      let completionImported = false;
       const queue: DownloadProgress[] = [];
       let resolver:
         | ((value: IteratorResult<DownloadProgress>) => void)
@@ -260,6 +453,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
             return;
           }
           const model = ModelInfoCodec.decode(modelBytes);
+          modelForImport = model;
           const planRequest = DownloadPlanRequest.fromPartial({
             modelId,
             model,
@@ -279,7 +473,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
           const startRequest = DownloadStartRequest.fromPartial({
             modelId,
             plan,
-            updateRegistryOnCompletion: true,
+            updateRegistryOnCompletion: false,
           });
           const startBytes = await native.downloadStartProto(
             bytesToArrayBuffer(
@@ -298,11 +492,25 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
             return;
           }
           activeTaskId = startResult.taskId;
+          if (startResult.initialProgress) {
+            queue.push(startResult.initialProgress);
+          }
         } catch (err) {
           streamError = err instanceof Error ? err : new Error(String(err));
           await native.clearDownloadProgressCallbackProto().catch(() => {});
           finish();
         }
+      };
+
+      const handleProgress = async (
+        progress: DownloadProgress
+      ): Promise<void> => {
+        if (!isCompletedProgress(progress) || completionImported) return;
+        if (!modelForImport) {
+          throw SDKException.modelNotFound(modelId);
+        }
+        await persistDownloadCompletion(modelForImport, progress);
+        completionImported = true;
       };
 
       return {
@@ -311,6 +519,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
           if (queue.length > 0) {
             const value = queue.shift()!;
             if (isTerminalProgress(value)) {
+              await handleProgress(value);
               finish();
               await native.clearDownloadProgressCallbackProto().catch(() => {});
             }
@@ -328,6 +537,7 @@ export function downloadModel(modelId: string): AsyncIterable<DownloadProgress> 
           }).then(async (result) => {
             if (streamError) throw streamError;
             if (!result.done && isTerminalProgress(result.value)) {
+              await handleProgress(result.value);
               finish();
               await native.clearDownloadProgressCallbackProto().catch(() => {});
             }
@@ -398,63 +608,63 @@ export async function deleteModel(modelId: string): Promise<boolean> {
   await native
     .modelLifecycleUnloadProto(
       bytesToArrayBuffer(
-        ModelLoadRequest.encode(
-          ModelLoadRequest.fromPartial({
+        ModelUnloadRequest.encode(
+          ModelUnloadRequest.fromPartial({
             modelId,
-            forceReload: false,
-            validateAvailability: false,
+            unloadAll: false,
           })
         ).finish()
       )
     )
     .catch(() => new ArrayBuffer(0));
 
-  const request = ModelDeleteRequest.fromPartial({
-    modelId,
+  const request = StorageDeleteRequest.fromPartial({
+    modelIds: [modelId],
     deleteFiles: true,
-    unregister: false,
+    clearRegistryPaths: true,
     unloadIfLoaded: true,
+    allowPlatformDelete: true,
   });
   const buffer = await native
     .storageDeleteProto(
-      bytesToArrayBuffer(ModelDeleteRequest.encode(request).finish())
+      bytesToArrayBuffer(StorageDeleteRequest.encode(request).finish())
     )
     .catch(() => new ArrayBuffer(0));
   const bytes = arrayBufferToBytes(buffer);
   if (bytes.byteLength === 0) return false;
-  const result = ModelDeleteResult.decode(bytes);
+  const result = StorageDeleteResult.decode(bytes);
   return result.success;
 }
 
 // ---------------------------------------------------------------------------
-// Sugar overload for model loading by id (mirrors Swift `RunAnywhere.loadModel`).
+// Model lifecycle entrypoint (mirrors Swift `RunAnywhere.loadModel(_:)`).
 // ---------------------------------------------------------------------------
 
-/**
- * Load a model by its registered id. Sugar overload over
- * `loadModelLifecycle(request)` — mirrors Swift's `RunAnywhere.loadModel(_:)`.
- *
- * @param modelId  registered model identifier
- * @param category optional category hint forwarded to the lifecycle request
- * @returns true if the model loaded successfully
- */
 export async function loadModel(
-  modelId: string,
-  category?: ModelCategory
-): Promise<boolean> {
-  if (!isNativeModuleAvailable()) return false;
+  request: ModelLoadRequestMessage
+): Promise<ModelLoadResultMessage> {
+  if (!isNativeModuleAvailable()) {
+    return ModelLoadResult.fromPartial({
+      success: false,
+      modelId: request.modelId,
+      category: request.category,
+      framework: request.framework,
+      errorMessage: 'Native module not available',
+    });
+  }
   const native = requireNativeModule();
-  const request = ModelLoadRequest.fromPartial({
-    modelId,
-    category,
-    forceReload: false,
-    validateAvailability: true,
-  });
   const buffer = await native.modelLifecycleLoadProto(
     bytesToArrayBuffer(ModelLoadRequest.encode(request).finish())
   );
   const bytes = arrayBufferToBytes(buffer);
-  if (bytes.byteLength === 0) return false;
-  const result = ModelLoadResult.decode(bytes);
-  return result.success;
+  if (bytes.byteLength === 0) {
+    return ModelLoadResult.fromPartial({
+      success: false,
+      modelId: request.modelId,
+      category: request.category,
+      framework: request.framework,
+      errorMessage: 'modelLifecycleLoadProto returned an empty result',
+    });
+  }
+  return ModelLoadResult.decode(bytes);
 }

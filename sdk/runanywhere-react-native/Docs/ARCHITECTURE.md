@@ -35,7 +35,7 @@ The RunAnywhere React Native SDK is a modular, multi-package SDK for on-device A
 2. **Privacy-First** — All inference runs on-device by default
 3. **Performance** — JSI/Nitro for synchronous native calls, C++ for inference
 4. **Cross-Platform** — Single TypeScript API for iOS and Android
-5. **Consistency** — API matches Swift and Kotlin SDKs
+5. **Consistency** — API matches the Swift SDK where business logic is shared
 
 ---
 
@@ -192,7 +192,7 @@ The SDK follows a layered architecture with clear separation of concerns:
 ```
 User calls RunAnywhere.generate(prompt, options)
     │
-    ├─► [TypeScript] RunAnywhere+TextGeneration.ts
+    ├─► [TypeScript] LLM/RunAnywhere+TextGeneration.ts
     │       • Validates input, checks model loaded
     │       • Builds generation config JSON
     │
@@ -222,7 +222,7 @@ User calls RunAnywhere.generate(prompt, options)
 ```
 User calls RunAnywhere.transcribeFile(audioPath, options)
     │
-    ├─► [TypeScript] RunAnywhere+STT.ts
+    ├─► [TypeScript] STT/RunAnywhere+STT.ts
     │       • Validates audio file exists
     │       • Checks STT model loaded
     │
@@ -425,10 +425,14 @@ await RunAnywhere.unloadModel();
 
 // Check available memory before loading large models
 const storage = await RunAnywhere.getStorageInfo();
-const modelInfo = await RunAnywhere.getModelInfo(modelId);
+const modelResult = await RunAnywhere.getModel(ModelGetRequest.fromPartial({ modelId }));
+const modelInfo = modelResult.model;
 
 if (storage.freeSpace > (modelInfo?.memoryRequired ?? 0)) {
-  await RunAnywhere.loadModel(modelInfo.localPath);
+  await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+    modelId,
+    category: modelInfo.category,
+  }));
 }
 ```
 
@@ -487,7 +491,7 @@ App terminated      → Download state persisted, resume on launch
 // Production mode authentication flow
 await RunAnywhere.initialize({
   apiKey: '<YOUR_API_KEY>',
-  environment: SDKEnvironment.Production,
+  environment: SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION,
 });
 
 // SDK authenticates with backend
@@ -593,7 +597,7 @@ try {
     switch (error.code) {
       case SDKErrorCode.modelNotLoaded:
         // Load model and retry
-        await RunAnywhere.loadModel(modelPath);
+        await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({ modelId, category }));
         return RunAnywhere.generate(prompt);
 
       case SDKErrorCode.insufficientMemory:
@@ -621,17 +625,17 @@ packages/core/src/
 │   ├── Events/
 │   │   └── EventBus.ts              # Event pub/sub
 │   └── Extensions/
-│       ├── RunAnywhere+TextGeneration.ts
-│       ├── RunAnywhere+STT.ts
-│       ├── RunAnywhere+TTS.ts
-│       ├── RunAnywhere+VAD.ts
-│       ├── RunAnywhere+ModelManagement.ts
-│       ├── RunAnywhere+Storage.ts
-│       ├── RunAnywhere+VoiceAgent.ts
-│       ├── RunAnywhere+VisionLanguage.ts
-│       ├── RunAnywhere+RAG.ts
-│       ├── RunAnywhere+Solutions.ts
-│       ├── RunAnywhere+StructuredOutput.ts
+│       ├── LLM/RunAnywhere+TextGeneration.ts
+│       ├── STT/RunAnywhere+STT.ts
+│       ├── TTS/RunAnywhere+TTS.ts
+│       ├── VAD/RunAnywhere+VAD.ts
+│       ├── Models/RunAnywhere+ModelRegistry.ts
+│       ├── Storage/RunAnywhere+Storage.ts
+│       ├── VoiceAgent/RunAnywhere+VoiceAgent.ts
+│       ├── VLM/RunAnywhere+VisionLanguage.ts
+│       ├── RAG/RunAnywhere+RAG.ts
+│       ├── Solutions/RunAnywhere+Solutions.ts
+│       ├── LLM/RunAnywhere+StructuredOutput.ts
 │       └── RunAnywhere+Logging.ts
 ├── Foundation/
 │   ├── ErrorTypes/                  # SDKError, error codes

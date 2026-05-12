@@ -5,7 +5,7 @@
  * directly as generated proto-ts request/result types.
  */
 
-import { requireNativeModule, isNativeModuleAvailable } from '../../native';
+import { requireNativeModule, isNativeModuleAvailable } from '../../../native';
 import {
   CurrentModelRequest,
   CurrentModelResult,
@@ -31,7 +31,7 @@ import {
 import type {
   ComponentLifecycleSnapshot as ComponentLifecycleSnapshotMessage,
 } from '@runanywhere/proto-ts/sdk_events';
-import { arrayBufferToBytes, bytesToArrayBuffer } from '../../services/ProtoBytes';
+import { arrayBufferToBytes, bytesToArrayBuffer } from '../../../services/ProtoBytes';
 
 export type {
   CurrentModelRequest,

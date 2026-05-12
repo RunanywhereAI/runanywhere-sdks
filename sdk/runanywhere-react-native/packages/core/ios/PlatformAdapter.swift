@@ -73,6 +73,11 @@ import Foundation
             return false
         }
     }
+
+    /// Get the app Documents directory path for model storage.
+    @objc public func getModelBaseDirectory() -> String? {
+        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.path
+    }
     
     // MARK: - Device UUID
     
@@ -97,4 +102,3 @@ import Foundation
         return newUUID
     }
 }
-

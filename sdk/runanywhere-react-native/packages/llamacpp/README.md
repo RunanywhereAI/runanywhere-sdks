@@ -31,7 +31,8 @@ Android native libraries are packaged by the React Native package.
 ## Usage
 
 ```typescript
-import { RunAnywhere, InferenceFramework } from '@runanywhere/core';
+import { RunAnywhere, InferenceFramework, ModelCategory } from '@runanywhere/core';
+import { ModelLoadRequest } from '@runanywhere/proto-ts/model_types';
 import { LlamaCPP } from '@runanywhere/llamacpp';
 
 await RunAnywhere.initialize();
@@ -48,8 +49,12 @@ await RunAnywhere.registerModel({
   url: 'https://example.invalid/model.gguf',
 });
 
-await RunAnywhere.downloadModel('smollm2-360m-q8_0');
-await RunAnywhere.loadModel('smollm2-360m-q8_0');
+const download = RunAnywhere.downloadModel('smollm2-360m-q8_0')[Symbol.asyncIterator]();
+while (!(await download.next()).done) {}
+await RunAnywhere.loadModel(ModelLoadRequest.fromPartial({
+  modelId: 'smollm2-360m-q8_0',
+  category: ModelCategory.MODEL_CATEGORY_LANGUAGE,
+}));
 
 const result = await RunAnywhere.generate('Write one sentence about local AI.');
 console.log(result.text);

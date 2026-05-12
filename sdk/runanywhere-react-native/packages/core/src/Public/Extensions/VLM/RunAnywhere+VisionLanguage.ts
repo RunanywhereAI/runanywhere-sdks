@@ -10,16 +10,16 @@
  * lifecycle/process surface.
  */
 
-import { SDKLogger } from '../../Foundation/Logging/Logger/SDKLogger';
-import { SDKException } from '../../Foundation/ErrorTypes/SDKException';
+import { SDKLogger } from '../../../Foundation/Logging/Logger/SDKLogger';
+import { SDKException } from '../../../Foundation/Errors/SDKException';
 import {
   requireNativeModule,
   isNativeModuleAvailable,
-} from '../../native';
+} from '../../../native';
 import {
   arrayBufferToBytes,
   bytesToArrayBuffer,
-} from '../../services/ProtoBytes';
+} from '../../../services/ProtoBytes';
 import {
   VLMGenerationOptions as VLMGenerationOptionsMessage,
   VLMImage as VLMImageMessage,
@@ -44,7 +44,7 @@ import {
   loadModelLifecycle,
   resolveVLMArtifactsFromLifecycleResult,
   type VLMResolvedLifecycleArtifacts,
-} from './RunAnywhere+Lifecycle';
+} from '../Models/RunAnywhere+ModelLifecycle';
 
 const logger = new SDKLogger('RunAnywhere.VisionLanguage');
 

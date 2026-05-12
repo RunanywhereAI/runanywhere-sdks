@@ -12,6 +12,8 @@
  *     resolution (`#if defined(__APPLE__)` direct call vs proto_compat
  *     dlsym lookup on Android) is the only logic and is required because
  *     Apple links commons statically.
+ *   - importModelProto mirrors Swift's RAModelImportRequest route for
+ *     platform-normalized local paths after downloads or file-picker flows.
  *   - Needs migration: refreshModelRegistry(includeRemoteCatalog,
  *     rescanLocal, pruneOrphans) builds `rac_model_registry_refresh_opts_t`
  *     and calls the non-proto `rac_model_registry_refresh` despite the
@@ -205,6 +207,36 @@ rac_result_t registryListDownloadedProto(
 #endif
 }
 
+rac_result_t registryRequestProto(
+    const char* operation,
+    const char* symbolName,
+    rac_model_registry_handle_t registryHandle,
+    const uint8_t* bytes,
+    size_t size,
+    rac_proto_buffer_t* outResult) {
+#if defined(__APPLE__)
+    if (std::strcmp(symbolName, "rac_model_registry_import_proto") == 0) {
+        return rac_model_registry_import_proto(
+            registryHandle,
+            bytes,
+            size,
+            outResult);
+    }
+    LOGE("%s: unsupported Apple registry request symbol %s",
+         operation,
+         symbolName);
+    return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+#else
+    auto requestProto =
+        proto_compat::symbol<proto_compat::RegistryRequestProtoFn>(symbolName);
+    if (!requestProto) {
+        LOGE("%s: %s unavailable", operation, symbolName);
+        return RAC_ERROR_FEATURE_NOT_AVAILABLE;
+    }
+    return requestProto(registryHandle, bytes, size, outResult);
+#endif
+}
+
 std::shared_ptr<ArrayBuffer> ownedProtoBuffer(uint8_t* protoBytes, size_t protoSize) {
     if (!protoBytes || protoSize == 0) {
         freeRegistryProtoBytes(protoBytes);
@@ -213,6 +245,27 @@ std::shared_ptr<ArrayBuffer> ownedProtoBuffer(uint8_t* protoBytes, size_t protoS
 
     auto buffer = ArrayBuffer::copy(protoBytes, protoSize);
     freeRegistryProtoBytes(protoBytes);
+    return buffer;
+}
+
+std::shared_ptr<ArrayBuffer> ownedRegistryBuffer(
+    const char* operation,
+    rac_proto_buffer_t& protoBuffer) {
+    if (protoBuffer.status != RAC_SUCCESS) {
+        if (protoBuffer.error_message) {
+            LOGE("%s proto error: %s", operation, protoBuffer.error_message);
+        }
+        proto_compat::freeBuffer(&protoBuffer);
+        return emptyProtoBuffer();
+    }
+
+    if (!protoBuffer.data || protoBuffer.size == 0) {
+        proto_compat::freeBuffer(&protoBuffer);
+        return emptyProtoBuffer();
+    }
+
+    auto buffer = ArrayBuffer::copy(protoBuffer.data, protoBuffer.size);
+    proto_compat::freeBuffer(&protoBuffer);
     return buffer;
 }
 
@@ -397,6 +450,40 @@ HybridRunAnywhereCore::getDownloadedModelsProto() {
         }
 
         return ownedProtoBuffer(protoBytes, protoSize);
+    });
+}
+
+std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+HybridRunAnywhereCore::importModelProto(
+    const std::shared_ptr<ArrayBuffer>& requestBytes) {
+    auto bytes = copyArrayBufferBytes(requestBytes);
+    return Promise<std::shared_ptr<ArrayBuffer>>::async([bytes = std::move(bytes)]() -> std::shared_ptr<ArrayBuffer> {
+        auto registryHandle = ModelRegistryBridge::shared().getHandle();
+        if (!registryHandle) {
+            LOGE("importModelProto: registry not initialized");
+            return emptyProtoBuffer();
+        }
+        if (bytes.empty()) {
+            LOGE("importModelProto: empty payload");
+            return emptyProtoBuffer();
+        }
+
+        rac_proto_buffer_t out;
+        proto_compat::initBuffer(&out);
+        rac_result_t rc = registryRequestProto(
+            "importModelProto",
+            "rac_model_registry_import_proto",
+            registryHandle,
+            bytes.data(),
+            bytes.size(),
+            &out);
+        if (rc != RAC_SUCCESS) {
+            LOGE("importModelProto: rc=%d", rc);
+            proto_compat::freeBuffer(&out);
+            return emptyProtoBuffer();
+        }
+
+        return ownedRegistryBuffer("importModelProto", out);
     });
 }
 

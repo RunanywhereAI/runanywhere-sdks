@@ -102,10 +102,19 @@ public:
      * Must be called after initialize() and before using model path utilities.
      * Mirrors Swift's CppBridge.ModelPaths.setBaseDirectory().
      *
-     * @param documentsPath Path to Documents directory
+     * @param baseDirectory Native model base directory
      * @return RAC_SUCCESS or error code
      */
-    rac_result_t setBaseDirectory(const std::string& documentsPath);
+    rac_result_t setBaseDirectory(const std::string& baseDirectory);
+
+    /**
+     * @brief Resolve the native default model base directory
+     *
+     * iOS returns the app Documents directory. Android returns app filesDir.
+     *
+     * @return Absolute directory path, or empty string if unavailable
+     */
+    std::string getDefaultModelBaseDirectory();
 
     /**
      * @brief Shutdown the SDK
