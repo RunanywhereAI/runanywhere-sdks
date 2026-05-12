@@ -319,7 +319,7 @@ class VLMViewModel extends ChangeNotifier {
 
   /// Cancel ongoing VLM generation
   Future<void> cancelGeneration() async {
-    unawaited(sdk.RunAnywhereSDK.instance.vlm.cancel());
+    unawaited(sdk.RunAnywhereSDK.instance.vlm.cancelVLMGeneration());
     debugPrint('🛑 VLM generation cancelled');
   }
 

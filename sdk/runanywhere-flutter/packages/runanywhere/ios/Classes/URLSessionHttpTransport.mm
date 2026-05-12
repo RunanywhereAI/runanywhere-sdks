@@ -10,32 +10,80 @@
  * xcframework's `ios-arm64/Headers` path to HEADER_SEARCH_PATHS and uses
  * `-all_load`/`-ObjC` so the transport register symbol resolves at link.
  *
- * Exposes two C entry points:
- *   - ra_flutter_register_urlsession_transport()   — idempotent, installs the
- *     vtable so subsequent rac_http_request_* calls route through URLSession.
- *   - ra_flutter_unregister_urlsession_transport() — detaches the vtable
- *     (primarily useful in tests).
+ * Exposes four C entry points:
+ *   - ra_flutter_register_urlsession_transport()        — idempotent; installs
+ *     the vtable so subsequent rac_http_request_* calls route through URLSession.
+ *   - ra_flutter_unregister_urlsession_transport()      — detaches the vtable
+ *     and cancels all in-flight streams (primarily useful in tests).
+ *   - ra_flutter_set_streaming_session(NSURLSession*)   — host override for the
+ *     streaming session (`.background(...)` configs, custom retry policies).
+ *   - ra_flutter_cancel_all_streams()                   — abort every live
+ *     streaming / resume task (used when the SDK is tearing down).
  *
  * Called from the Swift façade in URLSessionHttpTransport.swift during
  * RunAnywherePlugin.register(with:).
+ *
+ * Parity matrix vs the Swift reference:
+ *   - Per-stream registry + `cancelAllStreams()`                  ✓
+ *   - Host-provided streaming session override                    ✓
+ *   - `X-RAC-Range-Honored` synthetic response header on resume   ✓
+ *   - 24h `timeoutIntervalForResource` on streaming sessions      ✓
+ *   - `resumeFromByte` baked into `didReceiveResponse` totals     ✓
+ *   - `os_log` on com.runanywhere subsystem (visible via
+ *     `log stream --predicate 'subsystem CONTAINS "com.runanywhere"'`) ✓
+ *   - `waitsForConnectivity=YES` on streaming sessions            ✓
  */
 
 #import <Foundation/Foundation.h>
 
 #include <mach/clock.h>
 #include <mach/mach.h>
+#include <os/log.h>
 
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "rac/core/rac_error.h"
 #include "rac/core/rac_types.h"
 #include "rac/infrastructure/http/rac_http_client.h"
 #include "rac/infrastructure/http/rac_http_transport.h"
+
+// =============================================================================
+// Logging — route through os_log so messages surface via
+// `log stream --predicate 'subsystem CONTAINS "com.runanywhere"'`, matching
+// every other RunAnywhere SDK and the Swift reference adapter.
+// =============================================================================
+namespace {
+
+inline os_log_t ra_http_log() {
+    static os_log_t logger = nullptr;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        logger = os_log_create("com.runanywhere", "URLSessionHttpTransport");
+    });
+    return logger;
+}
+
+}  // namespace
+
+#define RA_HTTP_LOG_INFO(fmt, ...)  os_log_info(ra_http_log(), fmt, ##__VA_ARGS__)
+#define RA_HTTP_LOG_DEBUG(fmt, ...) os_log_debug(ra_http_log(), fmt, ##__VA_ARGS__)
+#define RA_HTTP_LOG_ERROR(fmt, ...) os_log_error(ra_http_log(), fmt, ##__VA_ARGS__)
+
+// Forward decls so the registry can hold references. The
+// `cancelFromExternal` selector is declared here too so the helper
+// `cancelAllStreams()` (which sits above the @interface) can dispatch it
+// through a typed object pointer without needing the full @interface.
+@class RAFlutterURLSessionStreamDelegate;
+@protocol RAFlutterURLSessionStreamDelegateCancellable <NSObject>
+- (void)cancelFromExternal;
+@end
 
 // =============================================================================
 // State
@@ -45,6 +93,31 @@ namespace {
 static std::atomic<bool> sRegistered{false};
 static std::mutex sRegistrationMutex;
 static rac_http_transport_ops_t sOps{};
+
+// Caller-provided override for the streaming session. When non-nil,
+// `request_stream` / `request_resume` use this session instead of building a
+// per-call one. Hosts that want a `.background(...)` session (handled by their
+// `AppDelegate handleEventsForBackgroundURLSession`) or custom retry/backoff
+// plug it in via `ra_flutter_set_streaming_session`.
+static std::mutex sStreamingSessionMutex;
+static NSURLSession* sStreamingSessionOverride = nil;
+
+// -----------------------------------------------------------------------------
+// Stream registry — one entry per in-flight streaming/resume task. Keyed by
+// `URLSessionTask.taskIdentifier`. Lives only long enough to keep a strong
+// reference to the delegate (URLSession holds it weakly via the session's
+// delegate property after `finishTasksAndInvalidate`) and to back
+// `cancelAllStreams()`.
+// -----------------------------------------------------------------------------
+struct StreamRegistry {
+    std::mutex mutex;
+    std::unordered_map<NSUInteger, RAFlutterURLSessionStreamDelegate*> entries;
+};
+
+static StreamRegistry& streamRegistry() {
+    static StreamRegistry registry;
+    return registry;
+}
 
 // -----------------------------------------------------------------------------
 // Request snapshot — materialize the caller-owned C struct into ObjC types.
@@ -208,7 +281,7 @@ static rac_result_t mapTransportError(NSError* error) {
 }
 
 // -----------------------------------------------------------------------------
-// Shared session (for request_send) and streaming delegate (per-call).
+// Shared session (for request_send). Single-shot calls reuse one tuned session.
 // -----------------------------------------------------------------------------
 static NSURLSession* sharedSession() {
     static NSURLSession* session = nil;
@@ -226,12 +299,37 @@ static NSURLSession* sharedSession() {
     return session;
 }
 
+// Helper used by the unregister path AND by external callers via
+// `ra_flutter_cancel_all_streams`. Defined here so it can sit before the
+// concrete @interface — we route through the cancel protocol so the
+// forward-declared @class is enough for the compiler.
+static void cancelAllStreams() {
+    std::vector<id<RAFlutterURLSessionStreamDelegateCancellable>> snapshot;
+    {
+        std::lock_guard<std::mutex> lock(streamRegistry().mutex);
+        snapshot.reserve(streamRegistry().entries.size());
+        for (auto& kv : streamRegistry().entries) {
+            snapshot.push_back((id<RAFlutterURLSessionStreamDelegateCancellable>)kv.second);
+        }
+    }
+    // Cancel outside the lock — `URLSessionTask.cancel()` races back through
+    // didCompleteWithError on the delegate queue, which removes the entry.
+    for (id<RAFlutterURLSessionStreamDelegateCancellable> delegate : snapshot) {
+        [delegate cancelFromExternal];
+    }
+}
+
 }  // namespace
 
 // -----------------------------------------------------------------------------
 // StreamDelegate — proxies didReceive into the C chunk callback.
+//
+// Hosts a strong reference to its `task` while live so `cancelAllStreams()`
+// can drive `[task cancel]` regardless of where in the URLSession state
+// machine we are.
 // -----------------------------------------------------------------------------
-@interface RAFlutterURLSessionStreamDelegate : NSObject <NSURLSessionDataDelegate>
+@interface RAFlutterURLSessionStreamDelegate : NSObject <NSURLSessionDataDelegate,
+                                                          RAFlutterURLSessionStreamDelegateCancellable>
 @property(nonatomic, assign) rac_http_body_chunk_fn chunkFn;
 @property(nonatomic, assign) void* chunkUserData;
 @property(nonatomic, strong) dispatch_semaphore_t completion;
@@ -240,11 +338,16 @@ static NSURLSession* sharedSession() {
 @property(nonatomic, assign) uint64_t totalBytesReceived;
 @property(nonatomic, assign) uint64_t contentLength;
 @property(nonatomic, assign) BOOL cancelled;
+@property(nonatomic, assign) uint64_t resumeFromByte;
+@property(nonatomic, weak, nullable) NSURLSessionTask* task;
+- (void)cancelFromExternal;
 @end
 
 @implementation RAFlutterURLSessionStreamDelegate
 
-- (instancetype)initWithChunkFn:(rac_http_body_chunk_fn)fn userData:(void*)data {
+- (instancetype)initWithChunkFn:(rac_http_body_chunk_fn)fn
+                       userData:(void*)data
+                 resumeFromByte:(uint64_t)resumeFromByte {
     self = [super init];
     if (self) {
         _chunkFn = fn;
@@ -253,6 +356,7 @@ static NSURLSession* sharedSession() {
         _totalBytesReceived = 0;
         _contentLength = 0;
         _cancelled = NO;
+        _resumeFromByte = resumeFromByte;
     }
     return self;
 }
@@ -262,9 +366,22 @@ static NSURLSession* sharedSession() {
 didReceiveResponse:(NSURLResponse*)response
  completionHandler:(void (^)(NSURLSessionResponseDisposition))completionHandler {
     if ([response isKindOfClass:[NSHTTPURLResponse class]]) {
-        self.response = (NSHTTPURLResponse*)response;
+        NSHTTPURLResponse* httpResp = (NSHTTPURLResponse*)response;
+        self.response = httpResp;
         if (response.expectedContentLength > 0) {
             self.contentLength = (uint64_t)response.expectedContentLength;
+        }
+        // Resume accounting: when the server actually honored the Range (206),
+        // `expectedContentLength` is only the *remaining* bytes — add the
+        // resume offset so the chunk callback sees a monotonic `total_written`
+        // that tracks absolute file position. For 200 responses the server
+        // ignored the range and is replaying the full file, so we leave the
+        // counter at 0 (the caller will truncate).
+        if (httpResp.statusCode == 206 && self.resumeFromByte > 0) {
+            self.totalBytesReceived = self.resumeFromByte;
+            if (self.contentLength > 0) {
+                self.contentLength += self.resumeFromByte;
+            }
         }
     }
     completionHandler(NSURLSessionResponseAllow);
@@ -294,6 +411,11 @@ didCompleteWithError:(NSError*)error {
         self.error = error;
     }
     dispatch_semaphore_signal(self.completion);
+}
+
+- (void)cancelFromExternal {
+    self.cancelled = YES;
+    [self.task cancel];
 }
 
 @end
@@ -361,23 +483,68 @@ rac_result_t urlsession_request_stream_impl(const rac_http_request_t* req,
     NSMutableURLRequest* urlRequest = snap.makeURLRequest(resumeFromByte);
     uint64_t startNs = monotonicNs();
 
-    NSURLSessionConfiguration* config = [NSURLSessionConfiguration defaultSessionConfiguration];
-    config.timeoutIntervalForRequest = snap.timeoutMs > 0
-        ? (NSTimeInterval)snap.timeoutMs / 1000.0
-        : 60;
-    config.timeoutIntervalForResource = MAX(config.timeoutIntervalForRequest, 600);
-    config.URLCache = nil;
-    config.requestCachePolicy = NSURLRequestReloadIgnoringLocalAndRemoteCacheData;
-
     RAFlutterURLSessionStreamDelegate* delegate =
-        [[RAFlutterURLSessionStreamDelegate alloc] initWithChunkFn:cb userData:cb_user_data];
-    NSURLSession* session = [NSURLSession sessionWithConfiguration:config
-                                                          delegate:delegate
-                                                     delegateQueue:nil];
+        [[RAFlutterURLSessionStreamDelegate alloc] initWithChunkFn:cb
+                                                          userData:cb_user_data
+                                                    resumeFromByte:resumeFromByte];
+
+    // Prefer a host-provided streaming session (useful for apps that need
+    // `.background(...)` or custom retry policy); fall back to a per-call
+    // session tuned for multi-GB transfers.
+    NSURLSession* session = nil;
+    BOOL ownsSession = NO;
+    {
+        std::lock_guard<std::mutex> lock(sStreamingSessionMutex);
+        if (sStreamingSessionOverride != nil) {
+            session = sStreamingSessionOverride;
+            ownsSession = NO;
+        }
+    }
+    if (session == nil) {
+        NSURLSessionConfiguration* config =
+            [NSURLSessionConfiguration defaultSessionConfiguration];
+        config.timeoutIntervalForRequest = snap.timeoutMs > 0
+            ? (NSTimeInterval)snap.timeoutMs / 1000.0
+            : 60;
+        // Resource timeout covers the whole transfer; a 10 GB GGUF over a slow
+        // cellular link can legitimately run for hours. Matches the Swift
+        // reference (24h ceiling rather than 600s).
+        config.timeoutIntervalForResource = 24 * 60 * 60;
+        config.URLCache = nil;
+        config.requestCachePolicy = NSURLRequestReloadIgnoringLocalAndRemoteCacheData;
+        // Streaming downloads benefit from NSURLSession queuing a retry when
+        // connectivity returns rather than failing fast.
+        config.waitsForConnectivity = YES;
+        session = [NSURLSession sessionWithConfiguration:config
+                                                delegate:delegate
+                                           delegateQueue:nil];
+        ownsSession = YES;
+    }
+
     NSURLSessionDataTask* task = [session dataTaskWithRequest:urlRequest];
+    if (!ownsSession) {
+        // Host-provided sessions carry their own delegate. Bind the callbacks
+        // directly onto the task via the task-delegate API (iOS 15+).
+        task.delegate = delegate;
+    }
+    delegate.task = task;
+    {
+        std::lock_guard<std::mutex> lock(streamRegistry().mutex);
+        streamRegistry().entries[task.taskIdentifier] = delegate;
+    }
+
     [task resume];
     dispatch_semaphore_wait(delegate.completion, DISPATCH_TIME_FOREVER);
-    [session finishTasksAndInvalidate];
+
+    // Tear down per-call sessions so URLSession releases the delegate reference
+    // and flushes pending sockets. Host-owned sessions are left untouched.
+    if (ownsSession) {
+        [session finishTasksAndInvalidate];
+    }
+    {
+        std::lock_guard<std::mutex> lock(streamRegistry().mutex);
+        streamRegistry().entries.erase(task.taskIdentifier);
+    }
 
     uint64_t elapsed = elapsedMsSince(startNs);
     if (delegate.cancelled) return RAC_ERROR_CANCELLED;
@@ -389,6 +556,17 @@ rac_result_t urlsession_request_stream_impl(const rac_http_request_t* req,
     NSString* redirected = nil;
     if (finalURL && ![finalURL isEqualToString:snap.originalUrlString]) {
         redirected = finalURL;
+    }
+
+    // Range-honored disclosure: when the caller asked for a partial
+    // (`resumeFromByte > 0`) but the server answered with 200 (full file)
+    // instead of 206, the C++ download manager needs to know so it can
+    // truncate the destination before replaying bytes. libcurl surfaces this
+    // by reporting the HTTP status directly; we mirror that and add an
+    // explicit marker header to save the caller a second status-code check.
+    if (resumeFromByte > 0) {
+        bool honored = (delegate.response.statusCode == 206);
+        headers.emplace_back("X-RAC-Range-Honored", honored ? "true" : "false");
     }
 
     writeResponse((int32_t)delegate.response.statusCode, /*bodyBytes=*/nil, headers, redirected,
@@ -425,7 +603,7 @@ void ra_flutter_register_urlsession_transport(void) {
     std::lock_guard<std::mutex> lock(sRegistrationMutex);
     bool expected = false;
     if (!sRegistered.compare_exchange_strong(expected, true)) {
-        NSLog(@"[URLSessionHttpTransport] already registered (skipping)");
+        RA_HTTP_LOG_DEBUG("URLSession HTTP transport already registered (skipping)");
         return;
     }
     sOps.request_send = urlsession_request_send;
@@ -436,10 +614,10 @@ void ra_flutter_register_urlsession_transport(void) {
 
     rac_result_t rc = rac_http_transport_register(&sOps, nullptr);
     if (rc == RAC_SUCCESS) {
-        NSLog(@"[URLSessionHttpTransport] URLSession HTTP transport registered");
+        RA_HTTP_LOG_INFO("URLSession HTTP transport registered");
     } else {
         sRegistered.store(false);
-        NSLog(@"[URLSessionHttpTransport] failed to register (rc=%d)", rc);
+        RA_HTTP_LOG_ERROR("Failed to register URLSession HTTP transport (rc=%{public}d)", rc);
     }
 }
 
@@ -450,7 +628,50 @@ void ra_flutter_unregister_urlsession_transport(void) {
         return;
     }
     rac_http_transport_register(nullptr, nullptr);
-    NSLog(@"[URLSessionHttpTransport] URLSession HTTP transport unregistered");
+    // Cancel every in-flight stream BEFORE clearing — otherwise live
+    // delegates would survive past unregister and could still fire chunk
+    // callbacks into a Dart isolate that's been torn down.
+    cancelAllStreams();
+    {
+        std::lock_guard<std::mutex> sessionLock(sStreamingSessionMutex);
+        sStreamingSessionOverride = nil;
+    }
+    RA_HTTP_LOG_INFO("URLSession HTTP transport unregistered");
+}
+
+/// Install a custom NSURLSession for streaming downloads (model GGUFs,
+/// resume). Passing nil restores the built-in per-call session. Hosts that
+/// need a true iOS background session — `URLSessionConfiguration.background(...)`
+/// — supply one here and wire `handleEventsForBackgroundURLSession` in their
+/// `AppDelegate`, since that hook can only live in the application layer.
+///
+/// The override is consulted per call; there is no ownership transfer.
+/// Thread-safe.
+///
+/// Exposed as a plain C function so the Swift façade can forward
+/// `URLSessionHttpTransport.register(streamingSession:)` without needing a
+/// module-mapped header.
+void ra_flutter_set_streaming_session(void* session) {
+    std::lock_guard<std::mutex> lock(sStreamingSessionMutex);
+    sStreamingSessionOverride = (__bridge NSURLSession*)session;
+    if (sStreamingSessionOverride != nil) {
+        NSString* identifier =
+            sStreamingSessionOverride.configuration.identifier ?: @"<default-config>";
+        RA_HTTP_LOG_INFO("Streaming session override installed (config=%{public}s)",
+                         identifier.UTF8String);
+    } else {
+        RA_HTTP_LOG_INFO("Streaming session override cleared");
+    }
+}
+
+/// Cancel every in-flight streaming / resume task. Each pending chunk
+/// callback returns to its caller with `RAC_ERROR_CANCELLED` (because
+/// `URLSessionTask.cancel()` surfaces as an `NSURLErrorCancelled` which
+/// `mapTransportError` maps accordingly). Complements the per-callback
+/// `return RAC_FALSE` cancel contract — use this when the SDK is tearing
+/// down and there is no callback on the stack to signal.
+void ra_flutter_cancel_all_streams(void) {
+    cancelAllStreams();
 }
 
 }  // extern "C"

@@ -7,7 +7,7 @@ import 'dart:async';
 
 import 'package:fixnum/fixnum.dart';
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
-import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart' show ComponentLifecycleState;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
@@ -16,12 +16,10 @@ import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/tts_options.pb.dart';
-import 'package:runanywhere/internal/sdk_event_factories.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_tts.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_models.dart';
-import 'package:runanywhere/public/events/event_bus.dart';
 
 /// TTS (text-to-speech) capability surface.
 ///
@@ -79,8 +77,7 @@ class RunAnywhereTTS {
     final logger = SDKLogger('RunAnywhere.LoadTTSVoice');
     logger.info('Loading TTS voice: $voiceId');
 
-    EventBus.shared.publish(SdkEventFactory.modelLoadStarted(voiceId));
-
+    // C++ commons auto-emits TTS voice load started/completed/failed events.
     try {
       final result = await RunAnywhereModelLifecycle.shared.load(
         model_pb.ModelLoadRequest(
@@ -99,11 +96,9 @@ class RunAnywhereTTS {
         );
       }
 
-      EventBus.shared.publish(SdkEventFactory.modelLoadCompleted(voiceId));
       logger.info('TTS voice loaded: $voiceId');
     } catch (e) {
       logger.error('Failed to load TTS voice: $e');
-      EventBus.shared.publish(SdkEventFactory.modelLoadFailed(voiceId, e));
       rethrow;
     }
   }
@@ -121,7 +116,7 @@ class RunAnywhereTTS {
             .modelId;
     if (voiceId.isEmpty) return;
 
-    EventBus.shared.publish(SdkEventFactory.modelUnloadStarted(voiceId));
+    // C++ commons auto-emits TTS voice unload started/completed events.
     final result = await RunAnywhereModelLifecycle.shared.unload(
       model_pb.ModelUnloadRequest(
         modelId: voiceId,
@@ -136,7 +131,6 @@ class RunAnywhereTTS {
       );
     }
     _isSpeaking = false;
-    EventBus.shared.publish(SdkEventFactory.modelUnloadCompleted(voiceId));
   }
 
   /// Synthesize speech from [text]. Returns proto [TTSOutput].

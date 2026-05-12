@@ -8,8 +8,8 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/generated/rag.pb.dart';
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 typedef _RagRegisterNative = ffi.Int32 Function();
 typedef _RagRegisterDart = int Function();

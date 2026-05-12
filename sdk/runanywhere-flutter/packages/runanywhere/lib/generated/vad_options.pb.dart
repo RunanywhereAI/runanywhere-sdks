@@ -15,7 +15,7 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'model_types.pbenum.dart' as $0;
+import 'model_types.pbenum.dart' as $3;
 import 'vad_options.pbenum.dart';
 
 export 'vad_options.pbenum.dart';
@@ -47,7 +47,7 @@ class VADConfiguration extends $pb.GeneratedMessage {
     $core.double? threshold,
     $core.bool? enableAutoCalibration,
     $core.double? calibrationMultiplier,
-    $0.InferenceFramework? preferredFramework,
+    $3.InferenceFramework? preferredFramework,
     $core.String? modelPath,
     $core.int? windowSizeSamples,
     $core.int? maxSpeechDurationMs,
@@ -96,7 +96,7 @@ class VADConfiguration extends $pb.GeneratedMessage {
     ..a<$core.double>(4, _omitFieldNames ? '' : 'threshold', $pb.PbFieldType.OF)
     ..aOB(5, _omitFieldNames ? '' : 'enableAutoCalibration')
     ..a<$core.double>(6, _omitFieldNames ? '' : 'calibrationMultiplier', $pb.PbFieldType.OF)
-    ..e<$0.InferenceFramework>(7, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $0.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $0.InferenceFramework.valueOf, enumValues: $0.InferenceFramework.values)
+    ..e<$3.InferenceFramework>(7, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $3.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $3.InferenceFramework.valueOf, enumValues: $3.InferenceFramework.values)
     ..aOS(8, _omitFieldNames ? '' : 'modelPath')
     ..a<$core.int>(9, _omitFieldNames ? '' : 'windowSizeSamples', $pb.PbFieldType.O3)
     ..a<$core.int>(10, _omitFieldNames ? '' : 'maxSpeechDurationMs', $pb.PbFieldType.O3)
@@ -192,9 +192,9 @@ class VADConfiguration extends $pb.GeneratedMessage {
 
   /// Preferred framework for VAD. Absent = auto.
   @$pb.TagNumber(7)
-  $0.InferenceFramework get preferredFramework => $_getN(6);
+  $3.InferenceFramework get preferredFramework => $_getN(6);
   @$pb.TagNumber(7)
-  set preferredFramework($0.InferenceFramework v) { setField(7, v); }
+  set preferredFramework($3.InferenceFramework v) { setField(7, v); }
   @$pb.TagNumber(7)
   $core.bool hasPreferredFramework() => $_has(6);
   @$pb.TagNumber(7)

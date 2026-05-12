@@ -10,7 +10,7 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart' show calloc;
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
 import 'package:runanywhere/core/native/rac_native.dart';
-import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart' show ComponentLifecycleState;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
@@ -19,13 +19,11 @@ import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/stt_options.pb.dart';
-import 'package:runanywhere/generated/stt_options_helpers.dart';
-import 'package:runanywhere/internal/sdk_event_factories.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/dart_bridge_stt.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
-import 'package:runanywhere/public/events/event_bus.dart';
+import 'package:runanywhere/public/extensions/stt/stt_options_helpers.dart';
 
 /// STT (speech-to-text) capability surface.
 ///
@@ -91,8 +89,8 @@ class RunAnywhereSTT {
     final logger = SDKLogger('RunAnywhere.LoadSTTModel');
     logger.info('Loading STT model: $modelId');
 
-    EventBus.shared.publish(SdkEventFactory.modelLoadStarted(modelId));
-
+    // C++ commons auto-emits STT model load started/completed/failed events
+    // via `stt_component.cpp`; Dart does not re-emit duplicates.
     try {
       final result = await RunAnywhereModelLifecycle.shared.load(
         model_pb.ModelLoadRequest(
@@ -111,11 +109,9 @@ class RunAnywhereSTT {
         );
       }
 
-      EventBus.shared.publish(SdkEventFactory.modelLoadCompleted(modelId));
       logger.info('STT model loaded: $modelId');
     } catch (e) {
       logger.error('Failed to load STT model: $e');
-      EventBus.shared.publish(SdkEventFactory.modelLoadFailed(modelId, e));
       rethrow;
     }
   }
@@ -133,7 +129,7 @@ class RunAnywhereSTT {
             .modelId;
     if (modelId.isEmpty) return;
 
-    EventBus.shared.publish(SdkEventFactory.modelUnloadStarted(modelId));
+    // C++ commons auto-emits STT model unload started/completed events.
     final result = await RunAnywhereModelLifecycle.shared.unload(
       model_pb.ModelUnloadRequest(
         modelId: modelId,
@@ -148,7 +144,6 @@ class RunAnywhereSTT {
       );
     }
     _isStreaming = false;
-    EventBus.shared.publish(SdkEventFactory.modelUnloadCompleted(modelId));
   }
 
   /// Transcribe audio data to a proto [STTOutput].

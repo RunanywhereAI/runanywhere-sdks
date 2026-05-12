@@ -20,8 +20,8 @@ import 'package:runanywhere/generated/tts_options.pb.dart'
         TTSSynthesisRequest,
         TTSVoiceInfo;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 /// TTS component bridge for C++ interop.
 ///

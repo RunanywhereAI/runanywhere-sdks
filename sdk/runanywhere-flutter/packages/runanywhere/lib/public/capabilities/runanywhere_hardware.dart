@@ -18,13 +18,22 @@ class RunAnywhereHardware {
   static RunAnywhereHardware get shared => _instance;
 
   /// Aggregate generated hardware profile from commons.
+  ///
+  /// Mirrors Swift `RunAnywhere.hardware.getProfile()`.
   Future<HardwareProfileResult> getProfile() async {
     final nativeProfile = DartBridgeHardware.getProfile();
     return nativeProfile ?? HardwareProfileResult();
   }
 
+  /// Get available accelerators as generated proto data.
+  ///
+  /// Mirrors Swift `RunAnywhere.hardware.getAccelerators()`.
+  List<AcceleratorInfo> getAccelerators() =>
+      DartBridgeHardware.getAccelerators();
+
   /// Set the C++ routing preference for future accelerator-aware operations.
   ///
+  /// Mirrors Swift `RunAnywhere.hardware.setAcceleratorPreference(_:)`.
   /// Returns false when the bundled native library does not expose the hardware
   /// ABI yet.
   bool setAcceleratorPreference(AccelerationPreference preference) =>

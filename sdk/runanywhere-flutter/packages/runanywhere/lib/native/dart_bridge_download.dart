@@ -8,8 +8,7 @@ import 'package:protobuf/protobuf.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/download_service.pb.dart' as download_pb;
-import 'package:runanywhere/native/ffi_types.dart';
-
+import 'package:runanywhere/native/types/basic_types.dart';
 /// Download bridge for the stable generated-proto download ABI.
 ///
 /// Commons owns download planning, state, progress, cancel/resume semantics,

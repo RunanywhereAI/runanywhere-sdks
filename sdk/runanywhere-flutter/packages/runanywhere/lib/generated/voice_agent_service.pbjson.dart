@@ -13,9 +13,9 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
-import 'stt_options.pbjson.dart' as $2;
-import 'tts_options.pbjson.dart' as $1;
-import 'voice_events.pbjson.dart' as $0;
+import 'stt_options.pbjson.dart' as $21;
+import 'tts_options.pbjson.dart' as $22;
+import 'voice_events.pbjson.dart' as $14;
 
 @$core.Deprecated('Use voiceAgentRequestDescriptor instead')
 const VoiceAgentRequest$json = {
@@ -314,41 +314,41 @@ const $core.Map<$core.String, $core.dynamic> VoiceAgentServiceBase$json = {
 @$core.Deprecated('Use voiceAgentServiceDescriptor instead')
 const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> VoiceAgentServiceBase$messageJson = {
   '.runanywhere.v1.VoiceAgentRequest': VoiceAgentRequest$json,
-  '.runanywhere.v1.VoiceEvent': $0.VoiceEvent$json,
-  '.runanywhere.v1.UserSaidEvent': $0.UserSaidEvent$json,
-  '.runanywhere.v1.AssistantTokenEvent': $0.AssistantTokenEvent$json,
-  '.runanywhere.v1.AudioFrameEvent': $0.AudioFrameEvent$json,
-  '.runanywhere.v1.VADEvent': $0.VADEvent$json,
-  '.runanywhere.v1.InterruptedEvent': $0.InterruptedEvent$json,
-  '.runanywhere.v1.StateChangeEvent': $0.StateChangeEvent$json,
-  '.runanywhere.v1.ErrorEvent': $0.ErrorEvent$json,
-  '.runanywhere.v1.MetricsEvent': $0.MetricsEvent$json,
-  '.runanywhere.v1.VoiceAgentComponentStates': $0.VoiceAgentComponentStates$json,
-  '.runanywhere.v1.VoiceSessionError': $0.VoiceSessionError$json,
-  '.runanywhere.v1.SessionStartedEvent': $0.SessionStartedEvent$json,
-  '.runanywhere.v1.SessionStoppedEvent': $0.SessionStoppedEvent$json,
-  '.runanywhere.v1.AgentResponseStartedEvent': $0.AgentResponseStartedEvent$json,
-  '.runanywhere.v1.AgentResponseCompletedEvent': $0.AgentResponseCompletedEvent$json,
-  '.runanywhere.v1.SpeechTurnDetectionEvent': $0.SpeechTurnDetectionEvent$json,
-  '.runanywhere.v1.TurnLifecycleEvent': $0.TurnLifecycleEvent$json,
-  '.runanywhere.v1.WakeWordDetectedEvent': $0.WakeWordDetectedEvent$json,
-  '.runanywhere.v1.AudioLevelEvent': $0.AudioLevelEvent$json,
-  '.runanywhere.v1.ComponentProgressEvent': $0.ComponentProgressEvent$json,
-  '.runanywhere.v1.VoiceEvent.MetadataEntry': $0.VoiceEvent_MetadataEntry$json,
+  '.runanywhere.v1.VoiceEvent': $14.VoiceEvent$json,
+  '.runanywhere.v1.UserSaidEvent': $14.UserSaidEvent$json,
+  '.runanywhere.v1.AssistantTokenEvent': $14.AssistantTokenEvent$json,
+  '.runanywhere.v1.AudioFrameEvent': $14.AudioFrameEvent$json,
+  '.runanywhere.v1.VADEvent': $14.VADEvent$json,
+  '.runanywhere.v1.InterruptedEvent': $14.InterruptedEvent$json,
+  '.runanywhere.v1.StateChangeEvent': $14.StateChangeEvent$json,
+  '.runanywhere.v1.ErrorEvent': $14.ErrorEvent$json,
+  '.runanywhere.v1.MetricsEvent': $14.MetricsEvent$json,
+  '.runanywhere.v1.VoiceAgentComponentStates': $14.VoiceAgentComponentStates$json,
+  '.runanywhere.v1.VoiceSessionError': $14.VoiceSessionError$json,
+  '.runanywhere.v1.SessionStartedEvent': $14.SessionStartedEvent$json,
+  '.runanywhere.v1.SessionStoppedEvent': $14.SessionStoppedEvent$json,
+  '.runanywhere.v1.AgentResponseStartedEvent': $14.AgentResponseStartedEvent$json,
+  '.runanywhere.v1.AgentResponseCompletedEvent': $14.AgentResponseCompletedEvent$json,
+  '.runanywhere.v1.SpeechTurnDetectionEvent': $14.SpeechTurnDetectionEvent$json,
+  '.runanywhere.v1.TurnLifecycleEvent': $14.TurnLifecycleEvent$json,
+  '.runanywhere.v1.WakeWordDetectedEvent': $14.WakeWordDetectedEvent$json,
+  '.runanywhere.v1.AudioLevelEvent': $14.AudioLevelEvent$json,
+  '.runanywhere.v1.ComponentProgressEvent': $14.ComponentProgressEvent$json,
+  '.runanywhere.v1.VoiceEvent.MetadataEntry': $14.VoiceEvent_MetadataEntry$json,
   '.runanywhere.v1.VoiceAgentTurnRequest': VoiceAgentTurnRequest$json,
   '.runanywhere.v1.VoiceSessionConfig': VoiceSessionConfig$json,
   '.runanywhere.v1.VoiceAgentTurnRequest.MetadataEntry': VoiceAgentTurnRequest_MetadataEntry$json,
   '.runanywhere.v1.VoiceAgentResult': VoiceAgentResult$json,
   '.runanywhere.v1.VoiceAgentTranscribeProtoRequest': VoiceAgentTranscribeProtoRequest$json,
-  '.runanywhere.v1.STTOutput': $2.STTOutput$json,
-  '.runanywhere.v1.WordTimestamp': $2.WordTimestamp$json,
-  '.runanywhere.v1.TranscriptionAlternative': $2.TranscriptionAlternative$json,
-  '.runanywhere.v1.TranscriptionMetadata': $2.TranscriptionMetadata$json,
+  '.runanywhere.v1.STTOutput': $21.STTOutput$json,
+  '.runanywhere.v1.WordTimestamp': $21.WordTimestamp$json,
+  '.runanywhere.v1.TranscriptionAlternative': $21.TranscriptionAlternative$json,
+  '.runanywhere.v1.TranscriptionMetadata': $21.TranscriptionMetadata$json,
   '.runanywhere.v1.VoiceAgentSynthesizeSpeechProtoRequest': VoiceAgentSynthesizeSpeechProtoRequest$json,
-  '.runanywhere.v1.TTSOptions': $1.TTSOptions$json,
-  '.runanywhere.v1.TTSOutput': $1.TTSOutput$json,
-  '.runanywhere.v1.TTSPhonemeTimestamp': $1.TTSPhonemeTimestamp$json,
-  '.runanywhere.v1.TTSSynthesisMetadata': $1.TTSSynthesisMetadata$json,
+  '.runanywhere.v1.TTSOptions': $22.TTSOptions$json,
+  '.runanywhere.v1.TTSOutput': $22.TTSOutput$json,
+  '.runanywhere.v1.TTSPhonemeTimestamp': $22.TTSPhonemeTimestamp$json,
+  '.runanywhere.v1.TTSSynthesisMetadata': $22.TTSSynthesisMetadata$json,
   '.runanywhere.v1.VoiceAgentComposeConfig': VoiceAgentComposeConfig$json,
   '.runanywhere.v1.AudioPipelineConfig': AudioPipelineConfig$json,
 };

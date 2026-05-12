@@ -362,6 +362,44 @@ final $typed_data.Uint8List vLMServiceStateDescriptor = $convert.base64Decode(
     'cl9jb2RlGAggASgFUgllcnJvckNvZGVCEAoOX2N1cnJlbnRfbW9kZWxCFgoUX3Zpc2lvbl9lbm'
     'NvZGVyX3R5cGVCEAoOX2Vycm9yX21lc3NhZ2U=');
 
+@$core.Deprecated('Use vLMLoadResolvedArtifactsRequestDescriptor instead')
+const VLMLoadResolvedArtifactsRequest$json = {
+  '1': 'VLMLoadResolvedArtifactsRequest',
+  '2': [
+    {'1': 'model_id', '3': 1, '4': 1, '5': 9, '10': 'modelId'},
+    {'1': 'primary_model_path', '3': 2, '4': 1, '5': 9, '10': 'primaryModelPath'},
+    {'1': 'mmproj_path', '3': 3, '4': 1, '5': 9, '9': 0, '10': 'mmprojPath', '17': true},
+  ],
+  '8': [
+    {'1': '_mmproj_path'},
+  ],
+};
+
+/// Descriptor for `VLMLoadResolvedArtifactsRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List vLMLoadResolvedArtifactsRequestDescriptor = $convert.base64Decode(
+    'Ch9WTE1Mb2FkUmVzb2x2ZWRBcnRpZmFjdHNSZXF1ZXN0EhkKCG1vZGVsX2lkGAEgASgJUgdtb2'
+    'RlbElkEiwKEnByaW1hcnlfbW9kZWxfcGF0aBgCIAEoCVIQcHJpbWFyeU1vZGVsUGF0aBIkCgtt'
+    'bXByb2pfcGF0aBgDIAEoCUgAUgptbXByb2pQYXRoiAEBQg4KDF9tbXByb2pfcGF0aA==');
+
+@$core.Deprecated('Use vLMLoadResolvedArtifactsResponseDescriptor instead')
+const VLMLoadResolvedArtifactsResponse$json = {
+  '1': 'VLMLoadResolvedArtifactsResponse',
+  '2': [
+    {'1': 'handle', '3': 1, '4': 1, '5': 4, '10': 'handle'},
+    {'1': 'result_code', '3': 2, '4': 1, '5': 5, '10': 'resultCode'},
+    {'1': 'error_message', '3': 3, '4': 1, '5': 9, '9': 0, '10': 'errorMessage', '17': true},
+  ],
+  '8': [
+    {'1': '_error_message'},
+  ],
+};
+
+/// Descriptor for `VLMLoadResolvedArtifactsResponse`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List vLMLoadResolvedArtifactsResponseDescriptor = $convert.base64Decode(
+    'CiBWTE1Mb2FkUmVzb2x2ZWRBcnRpZmFjdHNSZXNwb25zZRIWCgZoYW5kbGUYASABKARSBmhhbm'
+    'RsZRIfCgtyZXN1bHRfY29kZRgCIAEoBVIKcmVzdWx0Q29kZRIoCg1lcnJvcl9tZXNzYWdlGAMg'
+    'ASgJSABSDGVycm9yTWVzc2FnZYgBAUIQCg5fZXJyb3JfbWVzc2FnZQ==');
+
 const $core.Map<$core.String, $core.dynamic> VLMServiceBase$json = {
   '1': 'VLM',
   '2': [

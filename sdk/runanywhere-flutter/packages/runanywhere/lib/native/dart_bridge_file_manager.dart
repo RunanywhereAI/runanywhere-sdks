@@ -5,8 +5,9 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
+import 'package:runanywhere/native/types/tools_storage_types.dart';
 
 // =============================================================================
 // Exception Return Constants (must be compile-time constants for FFI)
@@ -210,6 +211,35 @@ class DartBridgeFileManager {
     } finally {
       calloc.free(modelIdPtr);
       calloc.free(existsPtr);
+    }
+  }
+
+  /// Check if a model folder exists AND has contents.
+  ///
+  /// Mirrors Swift `CppBridge.FileManager.modelFolderHasContents(modelId:framework:)`
+  /// by passing both out-parameters to `rac_file_manager_model_folder_exists`
+  /// and returning true only when both `exists` and `hasContents` are
+  /// `RAC_TRUE`.
+  static bool modelFolderHasContents(String modelId, int framework) {
+    final lib = _lib();
+    if (lib == null || _callbacksPtr == null) return false;
+    final fn = lib.lookupFunction<
+        Int32 Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, Int32,
+            Pointer<Int32>, Pointer<Int32>),
+        int Function(Pointer<RacFileCallbacksStruct>, Pointer<Utf8>, int,
+            Pointer<Int32>, Pointer<Int32>)>(
+        'rac_file_manager_model_folder_exists');
+
+    final modelIdPtr = modelId.toNativeUtf8();
+    final existsPtr = calloc<Int32>();
+    final hasContentsPtr = calloc<Int32>();
+    try {
+      fn(_callbacksPtr!, modelIdPtr, framework, existsPtr, hasContentsPtr);
+      return existsPtr.value == RAC_TRUE && hasContentsPtr.value == RAC_TRUE;
+    } finally {
+      calloc.free(modelIdPtr);
+      calloc.free(existsPtr);
+      calloc.free(hasContentsPtr);
     }
   }
 

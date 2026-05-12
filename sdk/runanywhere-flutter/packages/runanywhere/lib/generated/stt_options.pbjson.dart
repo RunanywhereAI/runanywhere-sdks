@@ -18,30 +18,32 @@ const STTLanguage$json = {
   '1': 'STTLanguage',
   '2': [
     {'1': 'STT_LANGUAGE_UNSPECIFIED', '2': 0},
-    {'1': 'STT_LANGUAGE_AUTO', '2': 1},
-    {'1': 'STT_LANGUAGE_EN', '2': 2},
-    {'1': 'STT_LANGUAGE_ES', '2': 3},
-    {'1': 'STT_LANGUAGE_FR', '2': 4},
-    {'1': 'STT_LANGUAGE_DE', '2': 5},
-    {'1': 'STT_LANGUAGE_ZH', '2': 6},
-    {'1': 'STT_LANGUAGE_JA', '2': 7},
-    {'1': 'STT_LANGUAGE_KO', '2': 8},
-    {'1': 'STT_LANGUAGE_IT', '2': 9},
-    {'1': 'STT_LANGUAGE_PT', '2': 10},
-    {'1': 'STT_LANGUAGE_AR', '2': 11},
-    {'1': 'STT_LANGUAGE_RU', '2': 12},
-    {'1': 'STT_LANGUAGE_HI', '2': 13},
+    {'1': 'STT_LANGUAGE_AUTO', '2': 1, '3': {}},
+    {'1': 'STT_LANGUAGE_EN', '2': 2, '3': {}},
+    {'1': 'STT_LANGUAGE_ES', '2': 3, '3': {}},
+    {'1': 'STT_LANGUAGE_FR', '2': 4, '3': {}},
+    {'1': 'STT_LANGUAGE_DE', '2': 5, '3': {}},
+    {'1': 'STT_LANGUAGE_ZH', '2': 6, '3': {}},
+    {'1': 'STT_LANGUAGE_JA', '2': 7, '3': {}},
+    {'1': 'STT_LANGUAGE_KO', '2': 8, '3': {}},
+    {'1': 'STT_LANGUAGE_IT', '2': 9, '3': {}},
+    {'1': 'STT_LANGUAGE_PT', '2': 10, '3': {}},
+    {'1': 'STT_LANGUAGE_AR', '2': 11, '3': {}},
+    {'1': 'STT_LANGUAGE_RU', '2': 12, '3': {}},
+    {'1': 'STT_LANGUAGE_HI', '2': 13, '3': {}},
   ],
 };
 
 /// Descriptor for `STTLanguage`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List sTTLanguageDescriptor = $convert.base64Decode(
-    'CgtTVFRMYW5ndWFnZRIcChhTVFRfTEFOR1VBR0VfVU5TUEVDSUZJRUQQABIVChFTVFRfTEFOR1'
-    'VBR0VfQVVUTxABEhMKD1NUVF9MQU5HVUFHRV9FThACEhMKD1NUVF9MQU5HVUFHRV9FUxADEhMK'
-    'D1NUVF9MQU5HVUFHRV9GUhAEEhMKD1NUVF9MQU5HVUFHRV9ERRAFEhMKD1NUVF9MQU5HVUFHRV'
-    '9aSBAGEhMKD1NUVF9MQU5HVUFHRV9KQRAHEhMKD1NUVF9MQU5HVUFHRV9LTxAIEhMKD1NUVF9M'
-    'QU5HVUFHRV9JVBAJEhMKD1NUVF9MQU5HVUFHRV9QVBAKEhMKD1NUVF9MQU5HVUFHRV9BUhALEh'
-    'MKD1NUVF9MQU5HVUFHRV9SVRAMEhMKD1NUVF9MQU5HVUFHRV9ISRAN');
+    'CgtTVFRMYW5ndWFnZRIcChhTVFRfTEFOR1VBR0VfVU5TUEVDSUZJRUQQABIfChFTVFRfTEFOR1'
+    'VBR0VfQVVUTxABGgjitRgEYXV0bxIbCg9TVFRfTEFOR1VBR0VfRU4QAhoG4rUYAmVuEhsKD1NU'
+    'VF9MQU5HVUFHRV9FUxADGgbitRgCZXMSGwoPU1RUX0xBTkdVQUdFX0ZSEAQaBuK1GAJmchIbCg'
+    '9TVFRfTEFOR1VBR0VfREUQBRoG4rUYAmRlEhsKD1NUVF9MQU5HVUFHRV9aSBAGGgbitRgCemgS'
+    'GwoPU1RUX0xBTkdVQUdFX0pBEAcaBuK1GAJqYRIbCg9TVFRfTEFOR1VBR0VfS08QCBoG4rUYAm'
+    'tvEhsKD1NUVF9MQU5HVUFHRV9JVBAJGgbitRgCaXQSGwoPU1RUX0xBTkdVQUdFX1BUEAoaBuK1'
+    'GAJwdBIbCg9TVFRfTEFOR1VBR0VfQVIQCxoG4rUYAmFyEhsKD1NUVF9MQU5HVUFHRV9SVRAMGg'
+    'bitRgCcnUSGwoPU1RUX0xBTkdVQUdFX0hJEA0aBuK1GAJoaQ==');
 
 @$core.Deprecated('Use sTTAudioEncodingDescriptor instead')
 const STTAudioEncoding$json = {
@@ -86,15 +88,15 @@ const STTConfiguration$json = {
   '1': 'STTConfiguration',
   '2': [
     {'1': 'model_id', '3': 1, '4': 1, '5': 9, '10': 'modelId'},
-    {'1': 'language', '3': 2, '4': 1, '5': 14, '6': '.runanywhere.v1.STTLanguage', '10': 'language'},
-    {'1': 'sample_rate', '3': 3, '4': 1, '5': 5, '10': 'sampleRate'},
+    {'1': 'language', '3': 2, '4': 1, '5': 14, '6': '.runanywhere.v1.STTLanguage', '8': {}, '10': 'language'},
+    {'1': 'sample_rate', '3': 3, '4': 1, '5': 5, '8': {}, '10': 'sampleRate'},
     {'1': 'enable_vad', '3': 4, '4': 1, '5': 8, '10': 'enableVad'},
     {'1': 'audio_format', '3': 5, '4': 1, '5': 14, '6': '.runanywhere.v1.AudioFormat', '10': 'audioFormat'},
-    {'1': 'enable_punctuation', '3': 6, '4': 1, '5': 8, '10': 'enablePunctuation'},
+    {'1': 'enable_punctuation', '3': 6, '4': 1, '5': 8, '8': {}, '10': 'enablePunctuation'},
     {'1': 'enable_diarization', '3': 7, '4': 1, '5': 8, '10': 'enableDiarization'},
     {'1': 'vocabulary_list', '3': 8, '4': 3, '5': 9, '10': 'vocabularyList'},
     {'1': 'max_alternatives', '3': 9, '4': 1, '5': 5, '10': 'maxAlternatives'},
-    {'1': 'enable_word_timestamps', '3': 10, '4': 1, '5': 8, '10': 'enableWordTimestamps'},
+    {'1': 'enable_word_timestamps', '3': 10, '4': 1, '5': 8, '8': {}, '10': 'enableWordTimestamps'},
     {'1': 'preferred_framework', '3': 11, '4': 1, '5': 14, '6': '.runanywhere.v1.InferenceFramework', '9': 0, '10': 'preferredFramework', '17': true},
     {'1': 'language_code', '3': 12, '4': 1, '5': 9, '9': 1, '10': 'languageCode', '17': true},
   ],
@@ -106,29 +108,30 @@ const STTConfiguration$json = {
 
 /// Descriptor for `STTConfiguration`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List sTTConfigurationDescriptor = $convert.base64Decode(
-    'ChBTVFRDb25maWd1cmF0aW9uEhkKCG1vZGVsX2lkGAEgASgJUgdtb2RlbElkEjcKCGxhbmd1YW'
-    'dlGAIgASgOMhsucnVuYW55d2hlcmUudjEuU1RUTGFuZ3VhZ2VSCGxhbmd1YWdlEh8KC3NhbXBs'
-    'ZV9yYXRlGAMgASgFUgpzYW1wbGVSYXRlEh0KCmVuYWJsZV92YWQYBCABKAhSCWVuYWJsZVZhZB'
-    'I+CgxhdWRpb19mb3JtYXQYBSABKA4yGy5ydW5hbnl3aGVyZS52MS5BdWRpb0Zvcm1hdFILYXVk'
-    'aW9Gb3JtYXQSLQoSZW5hYmxlX3B1bmN0dWF0aW9uGAYgASgIUhFlbmFibGVQdW5jdHVhdGlvbh'
-    'ItChJlbmFibGVfZGlhcml6YXRpb24YByABKAhSEWVuYWJsZURpYXJpemF0aW9uEicKD3ZvY2Fi'
-    'dWxhcnlfbGlzdBgIIAMoCVIOdm9jYWJ1bGFyeUxpc3QSKQoQbWF4X2FsdGVybmF0aXZlcxgJIA'
-    'EoBVIPbWF4QWx0ZXJuYXRpdmVzEjQKFmVuYWJsZV93b3JkX3RpbWVzdGFtcHMYCiABKAhSFGVu'
-    'YWJsZVdvcmRUaW1lc3RhbXBzElgKE3ByZWZlcnJlZF9mcmFtZXdvcmsYCyABKA4yIi5ydW5hbn'
-    'l3aGVyZS52MS5JbmZlcmVuY2VGcmFtZXdvcmtIAFIScHJlZmVycmVkRnJhbWV3b3JriAEBEigK'
-    'DWxhbmd1YWdlX2NvZGUYDCABKAlIAVIMbGFuZ3VhZ2VDb2RliAEBQhYKFF9wcmVmZXJyZWRfZn'
-    'JhbWV3b3JrQhAKDl9sYW5ndWFnZV9jb2Rl');
+    'ChBTVFRDb25maWd1cmF0aW9uEhkKCG1vZGVsX2lkGAEgASgJUgdtb2RlbElkEkwKCGxhbmd1YW'
+    'dlGAIgASgOMhsucnVuYW55d2hlcmUudjEuU1RUTGFuZ3VhZ2VCE4q1GA9TVFRfTEFOR1VBR0Vf'
+    'RU5SCGxhbmd1YWdlEjUKC3NhbXBsZV9yYXRlGAMgASgFQhSKtRgFMTYwMDCgtRjAPqi1GID3Al'
+    'IKc2FtcGxlUmF0ZRIdCgplbmFibGVfdmFkGAQgASgIUgllbmFibGVWYWQSPgoMYXVkaW9fZm9y'
+    'bWF0GAUgASgOMhsucnVuYW55d2hlcmUudjEuQXVkaW9Gb3JtYXRSC2F1ZGlvRm9ybWF0EjcKEm'
+    'VuYWJsZV9wdW5jdHVhdGlvbhgGIAEoCEIIirUYBHRydWVSEWVuYWJsZVB1bmN0dWF0aW9uEi0K'
+    'EmVuYWJsZV9kaWFyaXphdGlvbhgHIAEoCFIRZW5hYmxlRGlhcml6YXRpb24SJwoPdm9jYWJ1bG'
+    'FyeV9saXN0GAggAygJUg52b2NhYnVsYXJ5TGlzdBIpChBtYXhfYWx0ZXJuYXRpdmVzGAkgASgF'
+    'Ug9tYXhBbHRlcm5hdGl2ZXMSPgoWZW5hYmxlX3dvcmRfdGltZXN0YW1wcxgKIAEoCEIIirUYBH'
+    'RydWVSFGVuYWJsZVdvcmRUaW1lc3RhbXBzElgKE3ByZWZlcnJlZF9mcmFtZXdvcmsYCyABKA4y'
+    'Ii5ydW5hbnl3aGVyZS52MS5JbmZlcmVuY2VGcmFtZXdvcmtIAFIScHJlZmVycmVkRnJhbWV3b3'
+    'JriAEBEigKDWxhbmd1YWdlX2NvZGUYDCABKAlIAVIMbGFuZ3VhZ2VDb2RliAEBQhYKFF9wcmVm'
+    'ZXJyZWRfZnJhbWV3b3JrQhAKDl9sYW5ndWFnZV9jb2Rl');
 
 @$core.Deprecated('Use sTTOptionsDescriptor instead')
 const STTOptions$json = {
   '1': 'STTOptions',
   '2': [
-    {'1': 'language', '3': 1, '4': 1, '5': 14, '6': '.runanywhere.v1.STTLanguage', '10': 'language'},
-    {'1': 'enable_punctuation', '3': 2, '4': 1, '5': 8, '10': 'enablePunctuation'},
+    {'1': 'language', '3': 1, '4': 1, '5': 14, '6': '.runanywhere.v1.STTLanguage', '8': {}, '10': 'language'},
+    {'1': 'enable_punctuation', '3': 2, '4': 1, '5': 8, '8': {}, '10': 'enablePunctuation'},
     {'1': 'enable_diarization', '3': 3, '4': 1, '5': 8, '10': 'enableDiarization'},
     {'1': 'max_speakers', '3': 4, '4': 1, '5': 5, '10': 'maxSpeakers'},
     {'1': 'vocabulary_list', '3': 5, '4': 3, '5': 9, '10': 'vocabularyList'},
-    {'1': 'enable_word_timestamps', '3': 6, '4': 1, '5': 8, '10': 'enableWordTimestamps'},
+    {'1': 'enable_word_timestamps', '3': 6, '4': 1, '5': 8, '8': {}, '10': 'enableWordTimestamps'},
     {'1': 'beam_size', '3': 7, '4': 1, '5': 5, '10': 'beamSize'},
     {'1': 'language_code', '3': 8, '4': 1, '5': 9, '9': 0, '10': 'languageCode', '17': true},
     {'1': 'detect_language', '3': 9, '4': 1, '5': 8, '10': 'detectLanguage'},
@@ -147,20 +150,21 @@ const STTOptions$json = {
 
 /// Descriptor for `STTOptions`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List sTTOptionsDescriptor = $convert.base64Decode(
-    'CgpTVFRPcHRpb25zEjcKCGxhbmd1YWdlGAEgASgOMhsucnVuYW55d2hlcmUudjEuU1RUTGFuZ3'
-    'VhZ2VSCGxhbmd1YWdlEi0KEmVuYWJsZV9wdW5jdHVhdGlvbhgCIAEoCFIRZW5hYmxlUHVuY3R1'
-    'YXRpb24SLQoSZW5hYmxlX2RpYXJpemF0aW9uGAMgASgIUhFlbmFibGVEaWFyaXphdGlvbhIhCg'
-    'xtYXhfc3BlYWtlcnMYBCABKAVSC21heFNwZWFrZXJzEicKD3ZvY2FidWxhcnlfbGlzdBgFIAMo'
-    'CVIOdm9jYWJ1bGFyeUxpc3QSNAoWZW5hYmxlX3dvcmRfdGltZXN0YW1wcxgGIAEoCFIUZW5hYm'
-    'xlV29yZFRpbWVzdGFtcHMSGwoJYmVhbV9zaXplGAcgASgFUghiZWFtU2l6ZRIoCg1sYW5ndWFn'
-    'ZV9jb2RlGAggASgJSABSDGxhbmd1YWdlQ29kZYgBARInCg9kZXRlY3RfbGFuZ3VhZ2UYCSABKA'
-    'hSDmRldGVjdExhbmd1YWdlEj4KDGF1ZGlvX2Zvcm1hdBgKIAEoDjIbLnJ1bmFueXdoZXJlLnYx'
-    'LkF1ZGlvRm9ybWF0UgthdWRpb0Zvcm1hdBIfCgtzYW1wbGVfcmF0ZRgLIAEoBVIKc2FtcGxlUm'
-    'F0ZRIpChBtYXhfYWx0ZXJuYXRpdmVzGAwgASgFUg9tYXhBbHRlcm5hdGl2ZXMSKgoRY2h1bmtf'
-    'ZHVyYXRpb25fbXMYDSABKAVSD2NodW5rRHVyYXRpb25NcxIuChNlbmRwb2ludF9zaWxlbmNlX2'
-    '1zGA4gASgFUhFlbmRwb2ludFNpbGVuY2VNcxIlCg5zdXBwcmVzc19ibGFuaxgPIAEoCFINc3Vw'
-    'cHJlc3NCbGFuaxIwChR0cmFuc2xhdGVfdG9fZW5nbGlzaBgQIAEoCFISdHJhbnNsYXRlVG9Fbm'
-    'dsaXNoQhAKDl9sYW5ndWFnZV9jb2Rl');
+    'CgpTVFRPcHRpb25zEkwKCGxhbmd1YWdlGAEgASgOMhsucnVuYW55d2hlcmUudjEuU1RUTGFuZ3'
+    'VhZ2VCE4q1GA9TVFRfTEFOR1VBR0VfRU5SCGxhbmd1YWdlEjcKEmVuYWJsZV9wdW5jdHVhdGlv'
+    'bhgCIAEoCEIIirUYBHRydWVSEWVuYWJsZVB1bmN0dWF0aW9uEi0KEmVuYWJsZV9kaWFyaXphdG'
+    'lvbhgDIAEoCFIRZW5hYmxlRGlhcml6YXRpb24SIQoMbWF4X3NwZWFrZXJzGAQgASgFUgttYXhT'
+    'cGVha2VycxInCg92b2NhYnVsYXJ5X2xpc3QYBSADKAlSDnZvY2FidWxhcnlMaXN0Ej4KFmVuYW'
+    'JsZV93b3JkX3RpbWVzdGFtcHMYBiABKAhCCIq1GAR0cnVlUhRlbmFibGVXb3JkVGltZXN0YW1w'
+    'cxIbCgliZWFtX3NpemUYByABKAVSCGJlYW1TaXplEigKDWxhbmd1YWdlX2NvZGUYCCABKAlIAF'
+    'IMbGFuZ3VhZ2VDb2RliAEBEicKD2RldGVjdF9sYW5ndWFnZRgJIAEoCFIOZGV0ZWN0TGFuZ3Vh'
+    'Z2USPgoMYXVkaW9fZm9ybWF0GAogASgOMhsucnVuYW55d2hlcmUudjEuQXVkaW9Gb3JtYXRSC2'
+    'F1ZGlvRm9ybWF0Eh8KC3NhbXBsZV9yYXRlGAsgASgFUgpzYW1wbGVSYXRlEikKEG1heF9hbHRl'
+    'cm5hdGl2ZXMYDCABKAVSD21heEFsdGVybmF0aXZlcxIqChFjaHVua19kdXJhdGlvbl9tcxgNIA'
+    'EoBVIPY2h1bmtEdXJhdGlvbk1zEi4KE2VuZHBvaW50X3NpbGVuY2VfbXMYDiABKAVSEWVuZHBv'
+    'aW50U2lsZW5jZU1zEiUKDnN1cHByZXNzX2JsYW5rGA8gASgIUg1zdXBwcmVzc0JsYW5rEjAKFH'
+    'RyYW5zbGF0ZV90b19lbmdsaXNoGBAgASgIUhJ0cmFuc2xhdGVUb0VuZ2xpc2hCEAoOX2xhbmd1'
+    'YWdlX2NvZGU=');
 
 @$core.Deprecated('Use sTTAudioSourceDescriptor instead')
 const STTAudioSource$json = {

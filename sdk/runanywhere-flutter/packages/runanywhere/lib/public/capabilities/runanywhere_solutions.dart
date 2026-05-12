@@ -24,7 +24,7 @@
 
 import 'dart:typed_data';
 
-import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/solutions.pb.dart' as proto;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_solutions.dart';

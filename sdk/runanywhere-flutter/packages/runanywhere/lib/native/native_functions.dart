@@ -10,8 +10,8 @@ library native_functions;
 import 'dart:ffi';
 
 import 'package:ffi/ffi.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 /// Cached native function pointers for the RACommons library.
 ///
@@ -37,14 +37,6 @@ abstract class NativeFunctions {
   static final int Function(RacHandle) llmSupportsStreaming =
       _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
           'rac_llm_component_supports_streaming');
-
-  static final int Function(
-          RacHandle, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>) llmLoadModel =
-      _lib.lookupFunction<
-          Int32 Function(
-              RacHandle, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
-          int Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_llm_component_load_model');
 
   static final int Function(RacHandle) llmCleanup =
       _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
@@ -74,18 +66,6 @@ abstract class NativeFunctions {
       _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
           'rac_stt_component_supports_streaming');
 
-  static final int Function(
-          RacHandle, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>) sttLoadModel =
-      _lib.lookupFunction<
-          Int32 Function(
-              RacHandle, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
-          int Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_stt_component_load_model');
-
-  static final int Function(RacHandle) sttCleanup =
-      _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
-          'rac_stt_component_cleanup');
-
   // Note: rac_stt_result_free is intentionally NOT cached here. The STT
   // transcription path runs inside Isolate.run(...), which cannot access
   // main-isolate static state — `_transcribeInIsolate` in dart_bridge_stt.dart
@@ -107,18 +87,6 @@ abstract class NativeFunctions {
   static final int Function(RacHandle) ttsIsLoaded =
       _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
           'rac_tts_component_is_loaded');
-
-  static final int Function(
-          RacHandle, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>) ttsLoadVoice =
-      _lib.lookupFunction<
-          Int32 Function(
-              RacHandle, Pointer<Utf8>, Pointer<Utf8>, Pointer<Utf8>),
-          int Function(RacHandle, Pointer<Utf8>, Pointer<Utf8>,
-              Pointer<Utf8>)>('rac_tts_component_load_voice');
-
-  static final int Function(RacHandle) ttsCleanup =
-      _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
-          'rac_tts_component_cleanup');
 
   static final int Function(RacHandle) ttsStop =
       _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
@@ -154,45 +122,6 @@ abstract class NativeFunctions {
           int Function(
               RacHandle, double)>('rac_vad_component_set_energy_threshold');
 
-  static final int Function(RacHandle) vadInitialize =
-      _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
-          'rac_vad_component_initialize');
-
-  static final int Function(RacHandle) vadStart =
-      _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
-          'rac_vad_component_start');
-
-  static final int Function(RacHandle) vadStop =
-      _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
-          'rac_vad_component_stop');
-
-  static final int Function(RacHandle) vadReset =
-      _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
-          'rac_vad_component_reset');
-
-  static final int Function(RacHandle) vadCleanup =
-      _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
-          'rac_vad_component_cleanup');
-
-  static final int Function(
-    RacHandle,
-    Pointer<Float>,
-    int,
-    Pointer<RacVadResultStruct>,
-  ) vadProcess = _lib.lookupFunction<
-      Int32 Function(
-        RacHandle,
-        Pointer<Float>,
-        IntPtr,
-        Pointer<RacVadResultStruct>,
-      ),
-      int Function(
-        RacHandle,
-        Pointer<Float>,
-        int,
-        Pointer<RacVadResultStruct>,
-      )>('rac_vad_component_process');
-
   static final void Function(RacHandle) vadDestroy =
       _lib.lookupFunction<Void Function(RacHandle), void Function(RacHandle)>(
           'rac_vad_component_destroy');
@@ -200,28 +129,6 @@ abstract class NativeFunctions {
   // ---------------------------------------------------------------------------
   // VoiceAgent Component
   // ---------------------------------------------------------------------------
-
-  static final int Function(
-    RacHandle,
-    RacHandle,
-    RacHandle,
-    RacHandle,
-    Pointer<RacHandle>,
-  ) voiceAgentCreate = _lib.lookupFunction<
-      Int32 Function(
-        RacHandle,
-        RacHandle,
-        RacHandle,
-        RacHandle,
-        Pointer<RacHandle>,
-      ),
-      int Function(
-        RacHandle,
-        RacHandle,
-        RacHandle,
-        RacHandle,
-        Pointer<RacHandle>,
-      )>('rac_voice_agent_create');
 
   static final int Function(RacHandle, Pointer<Int32>) voiceAgentIsReady =
       _lib.lookupFunction<Int32 Function(RacHandle, Pointer<Int32>),
@@ -267,27 +174,11 @@ abstract class NativeFunctions {
       _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(
           'rac_voice_agent_initialize_with_loaded_models');
 
-  static final int Function(
-          RacHandle, Pointer<Void>, int, Pointer<Pointer<Utf8>>)
-      voiceAgentTranscribe = _lib.lookupFunction<
-          Int32 Function(
-              RacHandle, Pointer<Void>, IntPtr, Pointer<Pointer<Utf8>>),
-          int Function(RacHandle, Pointer<Void>, int,
-              Pointer<Pointer<Utf8>>)>('rac_voice_agent_transcribe');
-
   static final int Function(RacHandle, Pointer<Utf8>, Pointer<Pointer<Utf8>>)
       voiceAgentGenerateResponse = _lib.lookupFunction<
           Int32 Function(RacHandle, Pointer<Utf8>, Pointer<Pointer<Utf8>>),
           int Function(RacHandle, Pointer<Utf8>,
               Pointer<Pointer<Utf8>>)>('rac_voice_agent_generate_response');
-
-  static final int Function(
-          RacHandle, Pointer<Utf8>, Pointer<Pointer<Void>>, Pointer<IntPtr>)
-      voiceAgentSynthesizeSpeech = _lib.lookupFunction<
-          Int32 Function(RacHandle, Pointer<Utf8>, Pointer<Pointer<Void>>,
-              Pointer<IntPtr>),
-          int Function(RacHandle, Pointer<Utf8>, Pointer<Pointer<Void>>,
-              Pointer<IntPtr>)>('rac_voice_agent_synthesize_speech');
 
   static final int Function(RacHandle) voiceAgentCleanup =
       _lib.lookupFunction<Int32 Function(RacHandle), int Function(RacHandle)>(

@@ -27,8 +27,8 @@ Add both the core SDK and this backend to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  runanywhere: ^0.15.11
-  runanywhere_onnx: ^0.15.11
+  runanywhere: ^0.19.13
+  runanywhere_onnx: ^0.19.13
 ```
 
 Then run:
@@ -45,7 +45,7 @@ flutter pub get
 
 | Platform | Minimum Version | Requirements |
 |----------|-----------------|--------------|
-| iOS      | 14.0+           | Microphone permission |
+| iOS      | 15.1+           | Microphone permission |
 | Android  | API 24+         | RECORD_AUDIO permission |
 
 ---
@@ -57,7 +57,7 @@ flutter pub get
 Update `ios/Podfile`:
 
 ```ruby
-platform :ios, '14.0'
+platform :ios, '15.1'
 
 target 'Runner' do
   use_frameworks! :linkage => :static  # Required!
@@ -94,34 +94,38 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialize SDK
-  await RunAnywhere.initialize();
+  await RunAnywhereSDK.instance.initialize();
 
-  // Register ONNX backend
+  // Register ONNX backend (auto-registers STT/TTS/VAD via Sherpa)
   await Onnx.register();
 
   runApp(MyApp());
 }
 ```
 
-### 2. Add Models
+### 2. Register Models
+
+Models are registered through the core SDK registry (backends do not own catalogs).
 
 ```dart
 // STT Model (Whisper)
-Onnx.addModel(
+RunAnywhereSDK.instance.models.register(
   id: 'whisper-tiny-en',
   name: 'Whisper Tiny English',
-  url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz',
-  modality: ModelCategory.speechRecognition,
-  memoryRequirement: 75000000,  // ~75MB
+  url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/sherpa-onnx-whisper-tiny.en.tar.gz'),
+  framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+  memoryRequirement: 75000000,  // ~75 MB
 );
 
 // TTS Model (Piper)
-Onnx.addModel(
+RunAnywhereSDK.instance.models.register(
   id: 'piper-amy-medium',
   name: 'Piper Amy (English)',
-  url: 'https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-amy-medium.tar.gz',
-  modality: ModelCategory.speechSynthesis,
-  memoryRequirement: 50000000,  // ~50MB
+  url: Uri.parse('https://github.com/RunanywhereAI/sherpa-onnx/releases/download/runanywhere-models-v1/vits-piper-en_US-amy-medium.tar.gz'),
+  framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  modality: ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS,
+  memoryRequirement: 50000000,  // ~50 MB
 );
 ```
 
@@ -129,44 +133,39 @@ Onnx.addModel(
 
 ```dart
 // Download and load STT model
-await for (final p in RunAnywhere.downloadModel('whisper-tiny-en')) {
-  if (p.state.isCompleted) break;
+final stream = RunAnywhereSDK.instance.downloads.start('whisper-tiny-en');
+await for (final p in stream) {
+  if (p.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) break;
 }
-await RunAnywhere.loadSTTModel('whisper-tiny-en');
+await RunAnywhereSDK.instance.stt.load('whisper-tiny-en');
 
-// Transcribe audio (PCM16 @ 16kHz mono)
-final text = await RunAnywhere.transcribe(audioData);
-print('Transcription: $text');
-
-// With detailed result
-final result = await RunAnywhere.transcribeWithResult(audioData);
+// Transcribe audio (PCM16 @ 16 kHz mono)
+final result = await RunAnywhereSDK.instance.stt.transcribe(audioData);
 print('Text: ${result.text}');
 print('Confidence: ${result.confidence}');
-print('Language: ${result.language}');
+print('Detected language: ${result.detectedLanguage}');
 ```
 
 ### 4. Text-to-Speech
 
 ```dart
-// Download and load TTS model
-await for (final p in RunAnywhere.downloadModel('piper-amy-medium')) {
-  if (p.state.isCompleted) break;
+// Download and load TTS voice
+final stream = RunAnywhereSDK.instance.downloads.start('piper-amy-medium');
+await for (final p in stream) {
+  if (p.stage == DownloadStage.DOWNLOAD_STAGE_COMPLETED) break;
 }
-await RunAnywhere.loadTTSVoice('piper-amy-medium');
+await RunAnywhereSDK.instance.tts.loadVoice('piper-amy-medium');
 
 // Synthesize speech
-final result = await RunAnywhere.synthesize(
+final result = await RunAnywhereSDK.instance.tts.synthesize(
   'Hello! Welcome to RunAnywhere.',
-  rate: 1.0,   // Speech rate
-  pitch: 1.0,  // Speech pitch
+  TTSOptions(rate: 1.0, pitch: 1.0),
 );
 
-print('Duration: ${result.durationSeconds}s');
 print('Sample rate: ${result.sampleRate} Hz');
-print('Samples: ${result.samples.length}');
+print('Audio bytes: ${result.audio.length}');
 
-// Play with audioplayers package
-// await audioPlayer.play(BytesSource(wavBytes));
+// `result.audio` is PCM16 Uint8List; wrap in a WAV header for playback.
 ```
 
 ---
@@ -186,26 +185,23 @@ static Future<void> register({int priority = 100})
 **Parameters:**
 - `priority` – Backend priority (higher = preferred). Default: 100.
 
-#### `addModel()`
+#### Registering models
 
-Add an ONNX model to the registry.
+The `Onnx` module does not own a model catalog. Register Sherpa/ONNX/Piper
+models through the core SDK registry after calling `Onnx.register()`:
 
 ```dart
-static void addModel({
-  required String id,
-  required String name,
-  required String url,
-  required ModelCategory modality,
-  int memoryRequirement = 0,
-})
+RunAnywhereSDK.instance.models.register(
+  id: 'my-stt-model',
+  name: 'My STT Model',
+  url: Uri.parse('https://.../whisper.tar.gz'),
+  framework: InferenceFramework.INFERENCE_FRAMEWORK_SHERPA,
+  modality: ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION,
+);
 ```
 
-**Parameters:**
-- `id` – Unique model identifier
-- `name` – Human-readable model name
-- `url` – Download URL (supports .tar.gz, .tar.bz2, .zip)
-- `modality` – Model category (`speechRecognition`, `speechSynthesis`)
-- `memoryRequirement` – Estimated memory usage in bytes
+Archive downloads (`.tar.gz`, `.tar.bz2`, `.zip`) are auto-extracted by the
+Sherpa download strategy.
 
 ---
 
@@ -246,30 +242,28 @@ import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 
 // Initialize all backends
-await RunAnywhere.initialize();
+await RunAnywhereSDK.instance.initialize();
 await Onnx.register();
 await LlamaCpp.register();
 
 // Load all models
-await RunAnywhere.loadSTTModel('whisper-tiny-en');
-await RunAnywhere.loadModel('smollm2-360m');
-await RunAnywhere.loadTTSVoice('piper-amy-medium');
+await RunAnywhereSDK.instance.stt.load('whisper-tiny-en');
+await RunAnywhereSDK.instance.llm.load('smollm2-360m');
+await RunAnywhereSDK.instance.tts.loadVoice('piper-amy-medium');
 
-// Check voice agent readiness
-print('Voice agent ready: ${RunAnywhere.isVoiceAgentReady}');
+// Initialize the voice pipeline with currently loaded models
+await RunAnywhereSDK.instance.voice.initializeWithLoadedModels();
 
-// Start voice session
-if (RunAnywhere.isVoiceAgentReady) {
-  final session = await RunAnywhere.startVoiceSession();
+// Subscribe to voice events (proto-typed VoiceEvent stream)
+final sub = RunAnywhereSDK.instance.voice.eventStream().listen((event) {
+  if (event.hasUserSaid())       print('User: ${event.userSaid.text}');
+  if (event.hasAssistantToken()) stdout.write(event.assistantToken.text);
+});
 
-  session.events.listen((event) {
-    if (event is VoiceSessionTranscribed) {
-      print('User: ${event.text}');
-    } else if (event is VoiceSessionResponded) {
-      print('AI: ${event.text}');
-    }
-  });
-}
+await RunAnywhereSDK.instance.voice.start();
+// ... later
+await RunAnywhereSDK.instance.voice.stop();
+await sub.cancel();
 ```
 
 ---
@@ -339,14 +333,14 @@ if (RunAnywhere.isVoiceAgentReady) {
 
 ```dart
 // Unload STT model to free memory
-await RunAnywhere.unloadSTTModel();
+await RunAnywhereSDK.instance.stt.unload();
 
 // Unload TTS voice
-await RunAnywhere.unloadTTSVoice();
+await RunAnywhereSDK.instance.tts.unloadVoice();
 
 // Check current loaded models
-print('STT loaded: ${RunAnywhere.isSTTModelLoaded}');
-print('TTS loaded: ${RunAnywhere.isTTSVoiceLoaded}');
+print('STT loaded: ${RunAnywhereSDK.instance.isSTTModelLoaded}');
+print('TTS loaded: ${RunAnywhereSDK.instance.isTTSVoiceLoaded}');
 ```
 
 ---

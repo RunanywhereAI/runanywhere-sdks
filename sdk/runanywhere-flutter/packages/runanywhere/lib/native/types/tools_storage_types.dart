@@ -24,6 +24,9 @@ base class RacToolCallStruct extends Struct {
 
   @Int64()
   external int callId;
+
+  @Int32()
+  external int format;
 }
 
 /// Tool calling options - matches rac_tool_calling_options_t

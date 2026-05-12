@@ -9,7 +9,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
-import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart' show ComponentLifecycleState;
 import 'package:runanywhere/generated/llm_options.pb.dart'
@@ -21,12 +21,13 @@ import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;
 import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot, SDKEvent;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
-import 'package:runanywhere/internal/sdk_event_factories.dart';
+import 'package:runanywhere/generated/structured_output.pb.dart'
+    show JSONSchema, StructuredOutputResult;
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
-import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/dart_bridge_structured_output.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
-import 'package:runanywhere/public/events/event_bus.dart';
 
 /// LLM (text generation) capability surface.
 ///
@@ -78,8 +79,8 @@ class RunAnywhereLLM {
     final logger = SDKLogger('RunAnywhere.LoadModel');
     logger.info('Loading model: $modelId');
 
-    EventBus.shared.publish(SdkEventFactory.modelLoadStarted(modelId));
-
+    // C++ commons auto-emits model load started/completed/failed events
+    // via `llm_component.cpp`; Dart does not re-emit duplicates.
     try {
       final lifecycleResult = await RunAnywhereModelLifecycle.shared.load(
         model_pb.ModelLoadRequest(
@@ -99,11 +100,8 @@ class RunAnywhereLLM {
       }
 
       logger.info('Model loaded successfully: $modelId');
-
-      EventBus.shared.publish(SdkEventFactory.modelLoadCompleted(modelId));
     } catch (e) {
       logger.error('Failed to load model: $e');
-      EventBus.shared.publish(SdkEventFactory.modelLoadFailed(modelId, e));
       rethrow;
     }
   }
@@ -117,7 +115,7 @@ class RunAnywhereLLM {
     if (modelId == null) return;
 
     logger.info('Unloading model: $modelId');
-    EventBus.shared.publish(SdkEventFactory.modelUnloadStarted(modelId));
+    // C++ commons auto-emits model unload started/completed events.
     final result = await RunAnywhereModelLifecycle.shared.unload(
       model_pb.ModelUnloadRequest(
         modelId: modelId,
@@ -131,7 +129,6 @@ class RunAnywhereLLM {
             : 'LLM lifecycle unload failed',
       );
     }
-    EventBus.shared.publish(SdkEventFactory.modelUnloadCompleted(modelId));
     logger.info('Model unloaded');
   }
 
@@ -235,8 +232,28 @@ class RunAnywhereLLM {
   }
 
   /// Cancel any in-flight LLM generation.
-  Future<void> cancel() async {
+  ///
+  /// Mirrors Swift `RunAnywhere.cancelGeneration()`.
+  Future<void> cancelGeneration() async {
     _cancelProto();
+  }
+
+  /// Extract structured output from arbitrary [text] using the provided JSON
+  /// [schema]. Delegates to the generated structured-output parse proto ABI
+  /// so commons owns extraction, canonicalization, and schema validation.
+  ///
+  /// Mirrors Swift's `RunAnywhere.extractStructuredOutput(text:schema:)` in
+  /// `RunAnywhere+TextGeneration.swift`.
+  StructuredOutputResult extractStructuredOutput({
+    required String text,
+    required JSONSchema schema,
+  }) {
+    return DartBridgeStructuredOutput.shared.parse(
+      DartBridgeStructuredOutput.shared.makeParseRequest(
+        text: text,
+        schema: schema,
+      ),
+    );
   }
 
   ComponentLifecycleSnapshot? get _lifecycleSnapshot =>

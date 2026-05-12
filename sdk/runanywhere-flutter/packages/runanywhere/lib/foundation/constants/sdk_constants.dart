@@ -37,4 +37,11 @@ class SDKConstants {
 
   /// SDK name
   static const String name = 'RunAnywhere Flutter SDK';
+
+  /// User agent string
+  /// Matches Swift: `"{name}/{version} (Swift)"` → here `"... (Flutter)"`.
+  static String get userAgent => '$name/$version (Flutter)';
+
+  /// Minimum log level in production (string form — mirrors Swift constant).
+  static const String productionLogLevel = 'error';
 }

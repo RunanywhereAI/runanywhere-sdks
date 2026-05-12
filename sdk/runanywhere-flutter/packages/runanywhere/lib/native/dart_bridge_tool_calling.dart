@@ -26,7 +26,9 @@ import 'package:runanywhere/generated/tool_calling.pb.dart'
         ToolParseRequest,
         ToolParseResult,
         ToolPromptFormatRequest,
-        ToolPromptFormatResult;
+        ToolPromptFormatResult,
+        ToolValue,
+        ToolValueJSON;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 
 /// Thin C ABI bridge for tool-calling parse / format / validate and the
@@ -79,6 +81,39 @@ class DartBridgeToolCalling {
       invoke: fn,
       decode: ToolCallValidationResult.fromBuffer,
       symbol: 'rac_tool_call_validate_proto',
+    );
+  }
+
+  /// Serialize a [ToolValue] to its canonical JSON string. Recursive walk
+  /// lives in commons (`rac_tool_value_to_json_proto`); Dart only marshals
+  /// bytes.
+  String toolValueToJson(ToolValue value) {
+    final fn = RacNative.bindings.rac_tool_value_to_json_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_tool_value_to_json_proto is unavailable');
+    }
+    final wrapper = DartBridgeProtoUtils.callRequest<ToolValueJSON>(
+      request: value,
+      invoke: fn,
+      decode: ToolValueJSON.fromBuffer,
+      symbol: 'rac_tool_value_to_json_proto',
+    );
+    return wrapper.json;
+  }
+
+  /// Parse a JSON string back into a [ToolValue]. Recursive walk lives in
+  /// commons (`rac_tool_value_from_json_proto`); Dart only marshals bytes.
+  ToolValue toolValueFromJson(String json) {
+    final fn = RacNative.bindings.rac_tool_value_from_json_proto;
+    if (fn == null) {
+      throw UnsupportedError('rac_tool_value_from_json_proto is unavailable');
+    }
+    final wrapper = ToolValueJSON(json: json);
+    return DartBridgeProtoUtils.callRequest<ToolValue>(
+      request: wrapper,
+      invoke: fn,
+      decode: ToolValue.fromBuffer,
+      symbol: 'rac_tool_value_from_json_proto',
     );
   }
 

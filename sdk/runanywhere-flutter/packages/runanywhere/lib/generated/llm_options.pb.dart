@@ -16,8 +16,8 @@ import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'llm_options.pbenum.dart';
 import 'model_types.pbenum.dart' as $3;
-import 'structured_output.pb.dart' as $2;
-import 'thinking_tag_pattern.pb.dart' as $1;
+import 'structured_output.pb.dart' as $4;
+import 'thinking_tag_pattern.pb.dart' as $2;
 import 'tool_calling.pb.dart' as $0;
 
 export 'llm_options.pbenum.dart';
@@ -41,9 +41,9 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     $3.InferenceFramework? preferredFramework,
     $core.String? systemPrompt,
     $core.String? jsonSchema,
-    $1.ThinkingTagPattern? thinkingPattern,
+    $2.ThinkingTagPattern? thinkingPattern,
     ExecutionTarget? executionTarget,
-    $2.StructuredOutputOptions? structuredOutput,
+    $4.StructuredOutputOptions? structuredOutput,
     $core.bool? enableRealTimeTracking,
     $fixnum.Int64? seed,
     $core.double? frequencyPenalty,
@@ -146,9 +146,9 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
     ..e<$3.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $3.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $3.InferenceFramework.valueOf, enumValues: $3.InferenceFramework.values)
     ..aOS(9, _omitFieldNames ? '' : 'systemPrompt')
     ..aOS(10, _omitFieldNames ? '' : 'jsonSchema')
-    ..aOM<$1.ThinkingTagPattern>(11, _omitFieldNames ? '' : 'thinkingPattern', subBuilder: $1.ThinkingTagPattern.create)
+    ..aOM<$2.ThinkingTagPattern>(11, _omitFieldNames ? '' : 'thinkingPattern', subBuilder: $2.ThinkingTagPattern.create)
     ..e<ExecutionTarget>(12, _omitFieldNames ? '' : 'executionTarget', $pb.PbFieldType.OE, defaultOrMaker: ExecutionTarget.EXECUTION_TARGET_UNSPECIFIED, valueOf: ExecutionTarget.valueOf, enumValues: ExecutionTarget.values)
-    ..aOM<$2.StructuredOutputOptions>(13, _omitFieldNames ? '' : 'structuredOutput', subBuilder: $2.StructuredOutputOptions.create)
+    ..aOM<$4.StructuredOutputOptions>(13, _omitFieldNames ? '' : 'structuredOutput', subBuilder: $4.StructuredOutputOptions.create)
     ..aOB(14, _omitFieldNames ? '' : 'enableRealTimeTracking')
     ..aInt64(15, _omitFieldNames ? '' : 'seed')
     ..a<$core.double>(16, _omitFieldNames ? '' : 'frequencyPenalty', $pb.PbFieldType.OF)
@@ -285,15 +285,15 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   /// Optional thinking-tag pattern for extracting reasoning content from
   /// models like Qwen3 / LFM2 that emit <think>...</think> blocks.
   @$pb.TagNumber(11)
-  $1.ThinkingTagPattern get thinkingPattern => $_getN(10);
+  $2.ThinkingTagPattern get thinkingPattern => $_getN(10);
   @$pb.TagNumber(11)
-  set thinkingPattern($1.ThinkingTagPattern v) { setField(11, v); }
+  set thinkingPattern($2.ThinkingTagPattern v) { setField(11, v); }
   @$pb.TagNumber(11)
   $core.bool hasThinkingPattern() => $_has(10);
   @$pb.TagNumber(11)
   void clearThinkingPattern() => clearField(11);
   @$pb.TagNumber(11)
-  $1.ThinkingTagPattern ensureThinkingPattern() => $_ensure(10);
+  $2.ThinkingTagPattern ensureThinkingPattern() => $_ensure(10);
 
   /// Routing hint: where this generation should run (on-device, cloud, or
   /// SDK-decided AUTO). Mirrors the Web SDK ExecutionTarget knob.
@@ -310,15 +310,15 @@ class LLMGenerationOptions extends $pb.GeneratedMessage {
   /// structured_output.proto so the schema/format details aren't duplicated
   /// here. When set, supersedes the simpler `json_schema` string above.
   @$pb.TagNumber(13)
-  $2.StructuredOutputOptions get structuredOutput => $_getN(12);
+  $4.StructuredOutputOptions get structuredOutput => $_getN(12);
   @$pb.TagNumber(13)
-  set structuredOutput($2.StructuredOutputOptions v) { setField(13, v); }
+  set structuredOutput($4.StructuredOutputOptions v) { setField(13, v); }
   @$pb.TagNumber(13)
   $core.bool hasStructuredOutput() => $_has(12);
   @$pb.TagNumber(13)
   void clearStructuredOutput() => clearField(13);
   @$pb.TagNumber(13)
-  $2.StructuredOutputOptions ensureStructuredOutput() => $_ensure(12);
+  $4.StructuredOutputOptions ensureStructuredOutput() => $_ensure(12);
 
   /// Enable per-token/cost dashboard tracking for SDKs that surface live
   /// generation telemetry. No-op for backends without a telemetry sink.
@@ -456,7 +456,7 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     $core.String? jsonOutput,
     PerformanceMetrics? performance,
     ExecutionTarget? executedOn,
-    $2.StructuredOutputValidation? structuredOutputValidation,
+    $4.StructuredOutputValidation? structuredOutputValidation,
     $core.int? totalTokens,
     $core.String? errorMessage,
     $core.int? errorCode,
@@ -561,7 +561,7 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
     ..aOS(13, _omitFieldNames ? '' : 'jsonOutput')
     ..aOM<PerformanceMetrics>(14, _omitFieldNames ? '' : 'performance', subBuilder: PerformanceMetrics.create)
     ..e<ExecutionTarget>(15, _omitFieldNames ? '' : 'executedOn', $pb.PbFieldType.OE, defaultOrMaker: ExecutionTarget.EXECUTION_TARGET_UNSPECIFIED, valueOf: ExecutionTarget.valueOf, enumValues: ExecutionTarget.values)
-    ..aOM<$2.StructuredOutputValidation>(16, _omitFieldNames ? '' : 'structuredOutputValidation', subBuilder: $2.StructuredOutputValidation.create)
+    ..aOM<$4.StructuredOutputValidation>(16, _omitFieldNames ? '' : 'structuredOutputValidation', subBuilder: $4.StructuredOutputValidation.create)
     ..a<$core.int>(17, _omitFieldNames ? '' : 'totalTokens', $pb.PbFieldType.O3)
     ..aOS(18, _omitFieldNames ? '' : 'errorMessage')
     ..a<$core.int>(19, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
@@ -755,15 +755,15 @@ class LLMGenerationResult extends $pb.GeneratedMessage {
   /// Structured-output validation details, when a structured-output request
   /// was used. Mirrors the Swift/RN validation payload.
   @$pb.TagNumber(16)
-  $2.StructuredOutputValidation get structuredOutputValidation => $_getN(15);
+  $4.StructuredOutputValidation get structuredOutputValidation => $_getN(15);
   @$pb.TagNumber(16)
-  set structuredOutputValidation($2.StructuredOutputValidation v) { setField(16, v); }
+  set structuredOutputValidation($4.StructuredOutputValidation v) { setField(16, v); }
   @$pb.TagNumber(16)
   $core.bool hasStructuredOutputValidation() => $_has(15);
   @$pb.TagNumber(16)
   void clearStructuredOutputValidation() => clearField(16);
   @$pb.TagNumber(16)
-  $2.StructuredOutputValidation ensureStructuredOutputValidation() => $_ensure(15);
+  $4.StructuredOutputValidation ensureStructuredOutputValidation() => $_ensure(15);
 
   /// Total tokens consumed (prompt + completion). Some C ABI paths expose
   /// this directly; consumers may also compute it from the per-field counts.

@@ -16,7 +16,7 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'diffusion_options.pbenum.dart';
-import 'model_types.pbenum.dart' as $0;
+import 'model_types.pbenum.dart' as $3;
 
 export 'diffusion_options.pbenum.dart';
 
@@ -135,7 +135,7 @@ class DiffusionConfiguration extends $pb.GeneratedMessage {
     $core.bool? enableSafetyChecker,
     $core.int? maxMemoryMb,
     $core.String? modelId,
-    $0.InferenceFramework? preferredFramework,
+    $3.InferenceFramework? preferredFramework,
     $core.bool? reduceMemory,
   }) {
     final $result = create();
@@ -172,7 +172,7 @@ class DiffusionConfiguration extends $pb.GeneratedMessage {
     ..aOB(3, _omitFieldNames ? '' : 'enableSafetyChecker')
     ..a<$core.int>(4, _omitFieldNames ? '' : 'maxMemoryMb', $pb.PbFieldType.O3)
     ..aOS(5, _omitFieldNames ? '' : 'modelId')
-    ..e<$0.InferenceFramework>(6, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $0.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $0.InferenceFramework.valueOf, enumValues: $0.InferenceFramework.values)
+    ..e<$3.InferenceFramework>(6, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $3.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $3.InferenceFramework.valueOf, enumValues: $3.InferenceFramework.values)
     ..aOB(7, _omitFieldNames ? '' : 'reduceMemory')
     ..hasRequiredFields = false
   ;
@@ -256,9 +256,9 @@ class DiffusionConfiguration extends $pb.GeneratedMessage {
   void clearModelId() => clearField(5);
 
   @$pb.TagNumber(6)
-  $0.InferenceFramework get preferredFramework => $_getN(5);
+  $3.InferenceFramework get preferredFramework => $_getN(5);
   @$pb.TagNumber(6)
-  set preferredFramework($0.InferenceFramework v) { setField(6, v); }
+  set preferredFramework($3.InferenceFramework v) { setField(6, v); }
   @$pb.TagNumber(6)
   $core.bool hasPreferredFramework() => $_has(5);
   @$pb.TagNumber(6)

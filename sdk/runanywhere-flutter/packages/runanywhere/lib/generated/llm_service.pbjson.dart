@@ -37,23 +37,6 @@ final $typed_data.Uint8List lLMStreamEventKindDescriptor = $convert.base64Decode
     'SU5EX1BST0dSRVNTEAUSIwofTExNX1NUUkVBTV9FVkVOVF9LSU5EX0NPTVBMRVRFRBAGEh8KG0'
     'xMTV9TVFJFQU1fRVZFTlRfS0lORF9FUlJPUhAH');
 
-@$core.Deprecated('Use lLMTokenKindDescriptor instead')
-const LLMTokenKind$json = {
-  '1': 'LLMTokenKind',
-  '2': [
-    {'1': 'LLM_TOKEN_KIND_UNSPECIFIED', '2': 0},
-    {'1': 'LLM_TOKEN_KIND_ANSWER', '2': 1},
-    {'1': 'LLM_TOKEN_KIND_THOUGHT', '2': 2},
-    {'1': 'LLM_TOKEN_KIND_TOOL_CALL', '2': 3},
-  ],
-};
-
-/// Descriptor for `LLMTokenKind`. Decode as a `google.protobuf.EnumDescriptorProto`.
-final $typed_data.Uint8List lLMTokenKindDescriptor = $convert.base64Decode(
-    'CgxMTE1Ub2tlbktpbmQSHgoaTExNX1RPS0VOX0tJTkRfVU5TUEVDSUZJRUQQABIZChVMTE1fVE'
-    '9LRU5fS0lORF9BTlNXRVIQARIaChZMTE1fVE9LRU5fS0lORF9USE9VR0hUEAISHAoYTExNX1RP'
-    'S0VOX0tJTkRfVE9PTF9DQUxMEAM=');
-
 @$core.Deprecated('Use lLMGenerateRequestDescriptor instead')
 const LLMGenerateRequest$json = {
   '1': 'LLMGenerateRequest',
@@ -162,7 +145,7 @@ const LLMStreamEvent$json = {
     {'1': 'timestamp_us', '3': 2, '4': 1, '5': 3, '10': 'timestampUs'},
     {'1': 'token', '3': 3, '4': 1, '5': 9, '10': 'token'},
     {'1': 'is_final', '3': 4, '4': 1, '5': 8, '10': 'isFinal'},
-    {'1': 'kind', '3': 5, '4': 1, '5': 14, '6': '.runanywhere.v1.LLMTokenKind', '10': 'kind'},
+    {'1': 'kind', '3': 5, '4': 1, '5': 14, '6': '.runanywhere.v1.TokenKind', '10': 'kind'},
     {'1': 'token_id', '3': 6, '4': 1, '5': 13, '10': 'tokenId'},
     {'1': 'logprob', '3': 7, '4': 1, '5': 2, '10': 'logprob'},
     {'1': 'finish_reason', '3': 8, '4': 1, '5': 9, '10': 'finishReason'},
@@ -185,17 +168,17 @@ const LLMStreamEvent$json = {
 final $typed_data.Uint8List lLMStreamEventDescriptor = $convert.base64Decode(
     'Cg5MTE1TdHJlYW1FdmVudBIQCgNzZXEYASABKARSA3NlcRIhCgx0aW1lc3RhbXBfdXMYAiABKA'
     'NSC3RpbWVzdGFtcFVzEhQKBXRva2VuGAMgASgJUgV0b2tlbhIZCghpc19maW5hbBgEIAEoCFIH'
-    'aXNGaW5hbBIwCgRraW5kGAUgASgOMhwucnVuYW55d2hlcmUudjEuTExNVG9rZW5LaW5kUgRraW'
-    '5kEhkKCHRva2VuX2lkGAYgASgNUgd0b2tlbklkEhgKB2xvZ3Byb2IYByABKAJSB2xvZ3Byb2IS'
-    'IwoNZmluaXNoX3JlYXNvbhgIIAEoCVIMZmluaXNoUmVhc29uEiMKDWVycm9yX21lc3NhZ2UYCS'
-    'ABKAlSDGVycm9yTWVzc2FnZRJBCgZyZXN1bHQYCiABKAsyJC5ydW5hbnl3aGVyZS52MS5MTE1T'
-    'dHJlYW1GaW5hbFJlc3VsdEgAUgZyZXN1bHSIAQESHQoKZXJyb3JfY29kZRgLIAEoBVIJZXJyb3'
-    'JDb2RlEkEKCmV2ZW50X2tpbmQYDCABKA4yIi5ydW5hbnl3aGVyZS52MS5MTE1TdHJlYW1FdmVu'
-    'dEtpbmRSCWV2ZW50S2luZBIdCgpyZXF1ZXN0X2lkGA0gASgJUglyZXF1ZXN0SWQSJwoPY29udm'
-    'Vyc2F0aW9uX2lkGA4gASgJUg5jb252ZXJzYXRpb25JZBI2Chdwcm9tcHRfdG9rZW5zX3Byb2Nl'
-    'c3NlZBgPIAEoBVIVcHJvbXB0VG9rZW5zUHJvY2Vzc2VkEj4KG2NvbXBsZXRpb25fdG9rZW5zX2'
-    'dlbmVyYXRlZBgQIAEoBVIZY29tcGxldGlvblRva2Vuc0dlbmVyYXRlZBIdCgplbGFwc2VkX21z'
-    'GBEgASgDUgllbGFwc2VkTXNCCQoHX3Jlc3VsdA==');
+    'aXNGaW5hbBItCgRraW5kGAUgASgOMhkucnVuYW55d2hlcmUudjEuVG9rZW5LaW5kUgRraW5kEh'
+    'kKCHRva2VuX2lkGAYgASgNUgd0b2tlbklkEhgKB2xvZ3Byb2IYByABKAJSB2xvZ3Byb2ISIwoN'
+    'ZmluaXNoX3JlYXNvbhgIIAEoCVIMZmluaXNoUmVhc29uEiMKDWVycm9yX21lc3NhZ2UYCSABKA'
+    'lSDGVycm9yTWVzc2FnZRJBCgZyZXN1bHQYCiABKAsyJC5ydW5hbnl3aGVyZS52MS5MTE1TdHJl'
+    'YW1GaW5hbFJlc3VsdEgAUgZyZXN1bHSIAQESHQoKZXJyb3JfY29kZRgLIAEoBVIJZXJyb3JDb2'
+    'RlEkEKCmV2ZW50X2tpbmQYDCABKA4yIi5ydW5hbnl3aGVyZS52MS5MTE1TdHJlYW1FdmVudEtp'
+    'bmRSCWV2ZW50S2luZBIdCgpyZXF1ZXN0X2lkGA0gASgJUglyZXF1ZXN0SWQSJwoPY29udmVyc2'
+    'F0aW9uX2lkGA4gASgJUg5jb252ZXJzYXRpb25JZBI2Chdwcm9tcHRfdG9rZW5zX3Byb2Nlc3Nl'
+    'ZBgPIAEoBVIVcHJvbXB0VG9rZW5zUHJvY2Vzc2VkEj4KG2NvbXBsZXRpb25fdG9rZW5zX2dlbm'
+    'VyYXRlZBgQIAEoBVIZY29tcGxldGlvblRva2Vuc0dlbmVyYXRlZBIdCgplbGFwc2VkX21zGBEg'
+    'ASgDUgllbGFwc2VkTXNCCQoHX3Jlc3VsdA==');
 
 const $core.Map<$core.String, $core.dynamic> LLMServiceBase$json = {
   '1': 'LLM',

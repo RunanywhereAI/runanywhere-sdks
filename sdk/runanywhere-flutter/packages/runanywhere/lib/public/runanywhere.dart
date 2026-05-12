@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 //
-// runanywhere_v4.dart — RunAnywhere SDK singleton entry point.
-//
-// Phase C of the v2 close-out moved the implementation OUT of the
-// legacy static `RunAnywhere` class and INTO the capability classes
-// under `lib/public/capabilities/`. This singleton now owns the
-// lifecycle surface (initialize / reset / version / events /
-// environment) and exposes every capability as a lazy property.
+// runanywhere.dart — RunAnywhere SDK singleton entry point.
 //
 // Usage:
 //   final ra = RunAnywhereSDK.instance;
@@ -17,9 +11,9 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
-import 'package:runanywhere/foundation/dependency_injection/service_container.dart';
-import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
+import 'package:runanywhere/adapters/http_client_adapter.dart';
+import 'package:runanywhere/foundation/constants/sdk_constants.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/llm_options.pb.dart'
     show LLMGenerationOptions, LLMGenerationResult;
@@ -40,9 +34,6 @@ import 'package:runanywhere/generated/stt_options.pb.dart'
 import 'package:runanywhere/generated/tts_options.pb.dart'
     show TTSOptions, TTSOutput, TTSSpeakResult, TTSVoiceInfo;
 import 'package:runanywhere/generated/voice_events.pb.dart' show VoiceEvent;
-import 'package:runanywhere/internal/sdk_event_factories.dart';
-import 'package:runanywhere/internal/sdk_init.dart';
-import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
@@ -65,7 +56,6 @@ import 'package:runanywhere/public/capabilities/runanywhere_tools.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_tts.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_vad.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_vlm.dart';
-import 'package:runanywhere/public/capabilities/runanywhere_vlm_models.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_voice.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_voice_agent.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
@@ -148,6 +138,12 @@ class RunAnywhereSDK {
   // Dart accessor for callers that want the original Uri / apiKey shape.
   SDKInitParams? _cachedInitParams;
 
+  // One-shot Dart-only flag: has the lazy filesystem discovery pass run?
+  // Anything cross-platform (initialized / environment / params) lives in
+  // commons and is read through DartBridge. Only Dart scheduling state
+  // belongs here.
+  bool _hasRunDiscovery = false;
+
   /// SDK semver string (e.g. "4.0.0").
   String get version => SDKConstants.version;
 
@@ -217,7 +213,8 @@ class RunAnywhereSDK {
     if (DartBridge.isInitialized) return;
 
     final logger = SDKLogger('RunAnywhere.Init');
-    EventBus.shared.publish(SdkEventFactory.initializationStarted());
+    // C++ commons auto-emits INITIALIZATION_STAGE_STARTED via
+    // `event_publisher.cpp:531`; Dart does not re-emit a duplicate.
 
     try {
       _cachedInitParams = params;
@@ -234,20 +231,41 @@ class RunAnywhereSDK {
 
       await DartBridge.modelPaths.setBaseDirectory();
 
-      await ServiceContainer.shared.setupLocalServices(
+      // Configure the shared HTTP client. Mirrors Swift's inlined HTTP
+      // setup inside `RunAnywhere.performCoreInit()` (no DI container).
+      HTTPClientAdapter.shared.configure(
+        baseURL: params.baseURL.toString(),
         apiKey: params.apiKey,
-        baseURL: params.baseURL,
         environment: params.environment,
+      );
+      if (params.environment == SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT) {
+        final supabaseConfig = SupabaseConfig.configuration(params.environment);
+        if (supabaseConfig != null) {
+          HTTPClientAdapter.shared.configureDev(
+            supabaseURL: supabaseConfig.projectURL.toString(),
+            supabaseKey: supabaseConfig.anonKey,
+          );
+        }
+      }
+
+      // Commons-owned telemetry: sync init + async device-info wiring.
+      DartBridgeTelemetry.initializeSync(environment: params.environment);
+      final telemetryDeviceId = await DartBridgeDevice.instance.getDeviceId();
+      await DartBridgeTelemetry.initialize(
+        environment: params.environment,
+        deviceId: telemetryDeviceId,
+        baseURL: HTTPClientAdapter.shared.isConfigured
+            ? params.baseURL.toString()
+            : null,
       );
 
       await DartBridgeModelRegistry.instance.initialize();
 
       logger.info('SDK initialized (${params.environment.description})');
-      EventBus.shared.publish(SdkEventFactory.initializationCompleted());
 
-      // Commons auto-emits RAC_EVENT_SDK_INITIALIZED from the C++ init path,
-      // so Dart does not re-emit a duplicate SDK-init event. Keeping this
-      // call site documented for parity with Swift's behavior only.
+      // Commons auto-emits RAC_EVENT_SDK_INITIALIZED and the
+      // INITIALIZATION_STAGE_COMPLETED SDKEvent from the C++ init path
+      // (`event_publisher.cpp:544`), so Dart does not re-emit duplicates.
       unawaited(DartBridgeTelemetry.instance.emitSDKInitialized(
         durationMs: 0,
         environment: params.environment.name,
@@ -260,10 +278,10 @@ class RunAnywhereSDK {
     } catch (e) {
       logger.error('SDK initialization failed: $e');
       _cachedInitParams = null;
-      SdkState.shared.reset();
-      EventBus.shared.publish(SdkEventFactory.initializationFailed(e));
-      // Failure path intentionally left un-emitted: commons owns the
-      // canonical SDK-init failure telemetry path via structured errors.
+      _hasRunDiscovery = false;
+      // Commons auto-emits INITIALIZATION_STAGE_FAILED via
+      // `event_publisher.cpp:557`; failure telemetry flows through
+      // structured errors. Dart does not re-emit a duplicate.
       rethrow;
     }
   }
@@ -276,12 +294,93 @@ class RunAnywhereSDK {
     SDKLogger logger,
   ) async {
     try {
-      await registerDeviceIfNeeded(params, logger);
-      await authenticateWithBackend(params, logger);
+      await _registerDeviceIfNeeded(params, logger);
+      await _authenticateWithBackend(params, logger);
       logger.debug('Background services completed');
     } catch (e) {
       logger.warning('Background services failed (non-critical): $e');
     }
+  }
+
+  /// Register device with backend. Mirrors Swift
+  /// `CppBridge.Device.registerIfNeeded(environment:)`. The C++ device
+  /// manager owns gating (skip-on-development, already-registered
+  /// short-circuit). Dart's only job is to install the HTTP/secure
+  /// callbacks and invoke the C ABI; failures are logged and swallowed
+  /// so offline inference still works.
+  Future<void> _registerDeviceIfNeeded(
+    SDKInitParams params,
+    SDKLogger logger,
+  ) async {
+    try {
+      await DartBridgeDevice.register(
+        environment: params.environment,
+        baseURL: params.baseURL.toString(),
+      );
+      await DartBridgeDevice.instance.registerIfNeeded();
+      logger.debug('Device registration check completed');
+    } catch (e) {
+      logger.warning('Device registration failed (non-critical): $e');
+    }
+  }
+
+  /// Authenticate with backend. Mirrors Swift
+  /// `CppBridge.Auth.authenticate(apiKey:)`. The commons auth manager
+  /// owns environment / placeholder / URL gating; if commons rejects
+  /// the config it returns a non-success result and we just log it.
+  /// On success we forward the access token to `HTTPClientAdapter` so
+  /// subsequent requests carry it.
+  Future<void> _authenticateWithBackend(
+    SDKInitParams params,
+    SDKLogger logger,
+  ) async {
+    try {
+      await DartBridgeAuth.initialize(
+        environment: params.environment,
+        baseURL: params.baseURL.toString(),
+      );
+
+      final deviceId = await DartBridgeDevice.instance.getDeviceId();
+      final result = await DartBridgeAuth.instance.authenticate(
+        apiKey: params.apiKey,
+        deviceId: deviceId,
+      );
+
+      if (result.isSuccess) {
+        logger.info('Authenticated for ${params.environment.description}');
+        final token = result.data?.accessToken;
+        if (token != null) {
+          HTTPClientAdapter.shared.setToken(token);
+        }
+      } else {
+        logger.debug(
+          'Authentication skipped or failed: ${result.error}',
+          metadata: {'environment': params.environment.name},
+        );
+      }
+    } catch (e) {
+      logger.warning(
+        'Authentication error (non-critical): $e',
+        metadata: {'environment': params.environment.name},
+      );
+    }
+  }
+
+  /// One-shot filesystem discovery of downloaded models. Called lazily
+  /// on first `models.available()` so apps can register their catalog
+  /// first. Safe to call repeatedly — the [_hasRunDiscovery] flag
+  /// short-circuits after the first successful pass.
+  Future<void> runDiscoveryIfNeeded() async {
+    if (_hasRunDiscovery) return;
+    final logger = SDKLogger('RunAnywhere.Discovery');
+    final result =
+        await DartBridgeModelRegistry.instance.discoverDownloadedModels();
+    if (result.discoveredModels.isNotEmpty) {
+      logger.info(
+        'Discovered ${result.discoveredModels.length} downloaded models',
+      );
+    }
+    _hasRunDiscovery = true;
   }
 
   /// Reset all SDK state; clears registered models, cached
@@ -290,10 +389,10 @@ class RunAnywhereSDK {
     DartBridgeTelemetry.flush();
 
     DartBridge.modelLifecycle.reset();
-    SdkState.shared.reset();
+    _hasRunDiscovery = false;
     _cachedInitParams = null;
     DartBridgeModelRegistry.instance.shutdown();
-    ServiceContainer.shared.reset();
+    HTTPClientAdapter.shared.resetForTesting();
   }
 
   // --- Capability surfaces -------------------------------------------------
@@ -317,9 +416,6 @@ class RunAnywhereSDK {
 
   /// VisionLanguage namespace (Swift parity). Identical to [vlm].
   RunAnywhereVLM get visionLanguage => RunAnywhereVLM.shared;
-
-  /// VLMModels — filtered catalog for vision/multimodal models.
-  RunAnywhereVLMModels get vlmModels => RunAnywhereVLMModels.shared;
 
   /// Voice Agent (full STT → LLM → TTS pipeline) — initialize,
   /// cleanup, isReady, eventStream. Symmetric with `llm.generateStream`:
@@ -439,7 +535,8 @@ class RunAnywhereSDK {
 
   /// Canonical flat method — cancel any in-flight LLM generation.
   /// Mirrors Swift / RN / Web `RunAnywhere.cancelGeneration()`.
-  Future<void> cancelGeneration() async => RunAnywhereLLM.shared.cancel();
+  Future<void> cancelGeneration() async =>
+      RunAnywhereLLM.shared.cancelGeneration();
 
   /// True when an LLM model is currently loaded. Mirrors Swift's
   /// `isLLMModelLoaded: Bool` property.

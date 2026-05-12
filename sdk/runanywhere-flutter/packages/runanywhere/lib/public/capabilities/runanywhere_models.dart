@@ -8,14 +8,13 @@ import 'dart:async';
 
 import 'package:fixnum/fixnum.dart' as fixnum;
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
-import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart';
-import 'package:runanywhere/internal/sdk_init.dart';
-import 'package:runanywhere/internal/sdk_state.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_model_format.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
+import 'package:runanywhere/public/runanywhere.dart';
 
 /// Model registry capability surface.
 ///
@@ -35,10 +34,7 @@ class RunAnywhereModels {
       throw SDKException.notInitialized();
     }
 
-    if (!SdkState.shared.hasRunDiscovery) {
-      await runDiscovery();
-      SdkState.shared.hasRunDiscovery = true;
-    }
+    await RunAnywhereSDK.instance.runDiscoveryIfNeeded();
 
     final cppModels =
         await DartBridgeModelRegistry.instance.getAllProtoModels();
@@ -61,7 +57,33 @@ class RunAnywhereModels {
   }
 
   /// Generated-proto registry query surface.
-  Future<ModelListResult> query(ModelQuery query) => list(query: query);
+  ///
+  /// Mirrors Swift `RunAnywhere.queryModels(_:)`.
+  Future<ModelListResult> queryModels(ModelQuery query) => list(query: query);
+
+  /// Generated-proto registry query surface. Backwards-compatible shim that
+  /// forwards to [queryModels]; prefer [queryModels] for new code.
+  Future<ModelListResult> query(ModelQuery query) => queryModels(query);
+
+  /// Generated-proto registry get-by-id surface.
+  ///
+  /// Mirrors Swift `RunAnywhere.getModel(_:)`.
+  Future<ModelGetResult> getModel(ModelGetRequest request) async {
+    if (!DartBridge.isInitialized) {
+      return ModelGetResult(found: false, errorMessage: 'SDK not initialized');
+    }
+    final model =
+        await DartBridgeModelRegistry.instance.getProtoModel(request.modelId);
+    if (model == null) {
+      return ModelGetResult(found: false);
+    }
+    return ModelGetResult(found: true, model: model);
+  }
+
+  /// All downloaded models. Mirrors Swift `RunAnywhere.downloadedModels()`.
+  Future<ModelListResult> downloadedModels() async {
+    return queryModels(ModelQuery(downloadedOnly: true));
+  }
 
   /// Generated-proto downloaded-model registry surface.
   Future<ModelListResult> listDownloaded() async {

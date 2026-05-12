@@ -20,7 +20,13 @@ class GeniePlugin : FlutterPlugin, MethodCallHandler {
 
     companion object {
         private const val CHANNEL_NAME = "runanywhere_genie"
-        private const val BACKEND_VERSION = "0.1.6"
+
+        /**
+         * Native backend version. Matches `Genie.genieNativeVersion` in
+         * `lib/genie.dart` and `genieVersion` in `binary_config.gradle`
+         * (the single source of truth for the Qualcomm Genie native binary).
+         */
+        private const val BACKEND_VERSION = "0.3.0"
         private const val BACKEND_NAME = "Genie"
 
         /**

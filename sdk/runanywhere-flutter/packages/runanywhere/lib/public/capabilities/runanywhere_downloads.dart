@@ -3,7 +3,7 @@
 // runanywhere_downloads.dart — v4 Downloads capability. Owns model
 // download lifecycle, delete, and storage inspection.
 
-import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/download_service.pb.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' show ModelInfo;

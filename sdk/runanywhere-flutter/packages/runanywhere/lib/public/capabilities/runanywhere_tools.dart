@@ -53,27 +53,35 @@ class RunAnywhereTools {
 
   // -- registration ---------------------------------------------------------
 
-  /// Register a tool the LLM can call. `executor` runs when the LLM
-  /// emits a matching tool-call in `generateWithTools`.
-  void register(ToolDefinition definition, ToolExecutor executor) {
+  /// Register a tool that the LLM can use.
+  ///
+  /// Mirrors Swift `RunAnywhere.registerTool(_:executor:)`. Tools are stored
+  /// in-memory and available for all subsequent `generateWithTools` calls.
+  void registerTool(ToolDefinition definition, ToolExecutor executor) {
     _toolDefinitions[definition.name] = definition;
     _toolExecutors[definition.name] = executor;
     _logger.info('Registered tool: ${definition.name}');
   }
 
   /// Unregister a tool by name.
-  void unregister(String toolName) {
+  ///
+  /// Mirrors Swift `RunAnywhere.unregisterTool(_:)`.
+  void unregisterTool(String toolName) {
     _toolDefinitions.remove(toolName);
     _toolExecutors.remove(toolName);
     _logger.info('Unregistered tool: $toolName');
   }
 
-  /// Snapshot of every currently-registered tool definition.
-  List<ToolDefinition> registeredTools() =>
+  /// Get all registered tool definitions.
+  ///
+  /// Mirrors Swift `RunAnywhere.getRegisteredTools()`.
+  List<ToolDefinition> getRegisteredTools() =>
       List.unmodifiable(_toolDefinitions.values.toList());
 
-  /// Clear every registered tool.
-  void clear() {
+  /// Clear all registered tools.
+  ///
+  /// Mirrors Swift `RunAnywhere.clearTools()`.
+  void clearTools() {
     _toolDefinitions.clear();
     _toolExecutors.clear();
     _logger.info('Cleared all registered tools');
@@ -134,7 +142,7 @@ class RunAnywhereTools {
     ToolCallingOptions? options,
   }) async {
     final opts = options ?? ToolCallingOptions();
-    final tools = opts.tools.isNotEmpty ? opts.tools : registeredTools();
+    final tools = opts.tools.isNotEmpty ? opts.tools : getRegisteredTools();
     final autoExecute = opts.hasAutoExecute() ? opts.autoExecute : true;
 
     final request = ToolCallingSessionCreateRequest(
@@ -261,7 +269,7 @@ class RunAnywhereTools {
 
   /// Format the registered tools into a system-prompt snippet using commons.
   String formatToolsForPrompt([List<ToolDefinition>? tools]) {
-    final toolList = tools ?? registeredTools();
+    final toolList = tools ?? getRegisteredTools();
     if (toolList.isEmpty) return '';
     final result = DartBridgeToolCalling.shared.formatPrompt(
       ToolPromptFormatRequest(

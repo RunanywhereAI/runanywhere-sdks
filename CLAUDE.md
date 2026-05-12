@@ -491,7 +491,7 @@ Manually configured (no `applyDefaultHierarchyTemplate`). Use `expect/actual` on
 | Two-phase init | `initialize()` + `completeServicesInitialization()` | Same | Same | Same | Same |
 | Bridge layer | `CppBridge` enum + extensions | `CppBridge` object + extensions | `DartBridge` + `DartBridge*.dart` | `HybridRunAnywhereCore` (Nitro) | `LlamaCppBridge` + `SherpaONNXBridge` |
 | Streaming | `AsyncStream` | `Flow` | `Stream` (via `StreamController`) | `AsyncIterable` (manual iteration) | `AsyncIterable` |
-| Events | `EventBus` (Combine) | `EventBus` (SharedFlow) | `EventBus` (rxdart) | `EventBus` (NativeEventEmitter) | `EventBus` (custom pub/sub) |
+| Events | `EventBus` (Combine) | `EventBus` (SharedFlow) | `EventBus` (custom pub/sub via dart:async broadcast StreamController) | `EventBus` (NativeEventEmitter) | `EventBus` (custom pub/sub) |
 | Error type | `SDKException` (proto-backed) | `SDKException` (proto-backed) | `SDKException` | `SDKException` | `SDKException` |
 | Secure storage | Keychain | EncryptedSharedPrefs (Android), AES files (JVM) | flutter_secure_storage + cache | Keychain (iOS), EncryptedSharedPrefs (Android) | localStorage |
 | HTTP transport | URLSession | OkHttp | OkHttp (Android), URLSession (iOS) | OkHttp (Android), URLSession (iOS) | emscripten_fetch / fetch() |
@@ -533,9 +533,8 @@ Configured hooks: gitleaks (secrets), trailing-whitespace, end-of-file-fixer, ch
 
 ## Active Issues (`thoughts/shared/issues/`)
 
-On `feat/v2-architecture` branch, 5 tracked regressions relative to `main`:
+On `feat/v2-architecture` branch, 4 tracked regressions relative to `main`:
 - **001/002/005** (HIGH): Swift, Kotlin, and Web SDKs collapsed backends into monolithic artifacts, losing per-backend selective linking.
 - **003** (MEDIUM): React Native backend packages are TypeScript-only, missing native plumbing.
-- **004** (LOW): Flutter is currently a symlink to main branch.
 
 Live state document: `thoughts/shared/plans/sdk_current_state.md`

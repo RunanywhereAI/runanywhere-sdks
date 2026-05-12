@@ -13,9 +13,9 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
-import 'llm_options.pbjson.dart' as $4;
-import 'structured_output.pbjson.dart' as $2;
-import 'thinking_tag_pattern.pbjson.dart' as $1;
+import 'llm_options.pbjson.dart' as $5;
+import 'structured_output.pbjson.dart' as $4;
+import 'thinking_tag_pattern.pbjson.dart' as $2;
 import 'tool_calling.pbjson.dart' as $0;
 
 @$core.Deprecated('Use messageRoleDescriptor instead')
@@ -342,13 +342,13 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> ChatServic
   '.runanywhere.v1.ChatMessage.MetadataEntry': ChatMessage_MetadataEntry$json,
   '.runanywhere.v1.ChatAttachment': ChatAttachment$json,
   '.runanywhere.v1.ChatAttachment.MetadataEntry': ChatAttachment_MetadataEntry$json,
-  '.runanywhere.v1.LLMGenerationOptions': $4.LLMGenerationOptions$json,
-  '.runanywhere.v1.ThinkingTagPattern': $1.ThinkingTagPattern$json,
-  '.runanywhere.v1.StructuredOutputOptions': $2.StructuredOutputOptions$json,
-  '.runanywhere.v1.JSONSchema': $2.JSONSchema$json,
-  '.runanywhere.v1.JSONSchema.PropertiesEntry': $2.JSONSchema_PropertiesEntry$json,
-  '.runanywhere.v1.JSONSchemaProperty': $2.JSONSchemaProperty$json,
-  '.runanywhere.v1.JSONSchema.DefinitionsEntry': $2.JSONSchema_DefinitionsEntry$json,
+  '.runanywhere.v1.LLMGenerationOptions': $5.LLMGenerationOptions$json,
+  '.runanywhere.v1.ThinkingTagPattern': $2.ThinkingTagPattern$json,
+  '.runanywhere.v1.StructuredOutputOptions': $4.StructuredOutputOptions$json,
+  '.runanywhere.v1.JSONSchema': $4.JSONSchema$json,
+  '.runanywhere.v1.JSONSchema.PropertiesEntry': $4.JSONSchema_PropertiesEntry$json,
+  '.runanywhere.v1.JSONSchemaProperty': $4.JSONSchemaProperty$json,
+  '.runanywhere.v1.JSONSchema.DefinitionsEntry': $4.JSONSchema_DefinitionsEntry$json,
   '.runanywhere.v1.ToolCallingOptions': $0.ToolCallingOptions$json,
   '.runanywhere.v1.ToolDefinition': $0.ToolDefinition$json,
   '.runanywhere.v1.ToolParameter': $0.ToolParameter$json,
@@ -359,9 +359,9 @@ const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> ChatServic
   '.runanywhere.v1.ToolDefinition.MetadataEntry': $0.ToolDefinition_MetadataEntry$json,
   '.runanywhere.v1.ChatGenerationRequest.MetadataEntry': ChatGenerationRequest_MetadataEntry$json,
   '.runanywhere.v1.ChatGenerationResult': ChatGenerationResult$json,
-  '.runanywhere.v1.LLMGenerationResult': $4.LLMGenerationResult$json,
-  '.runanywhere.v1.PerformanceMetrics': $4.PerformanceMetrics$json,
-  '.runanywhere.v1.StructuredOutputValidation': $2.StructuredOutputValidation$json,
+  '.runanywhere.v1.LLMGenerationResult': $5.LLMGenerationResult$json,
+  '.runanywhere.v1.PerformanceMetrics': $5.PerformanceMetrics$json,
+  '.runanywhere.v1.StructuredOutputValidation': $4.StructuredOutputValidation$json,
   '.runanywhere.v1.ChatStreamEvent': ChatStreamEvent$json,
 };
 

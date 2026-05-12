@@ -15,16 +15,16 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'component_types.pbenum.dart' as $11;
-import 'download_service.pb.dart' as $7;
-import 'errors.pb.dart' as $9;
-import 'errors.pbenum.dart' as $9;
-import 'hardware_profile.pb.dart' as $8;
-import 'model_types.pb.dart' as $0;
-import 'model_types.pbenum.dart' as $0;
+import 'component_types.pbenum.dart' as $12;
+import 'download_service.pb.dart' as $8;
+import 'errors.pb.dart' as $13;
+import 'errors.pbenum.dart' as $13;
+import 'hardware_profile.pb.dart' as $1;
+import 'model_types.pb.dart' as $3;
+import 'model_types.pbenum.dart' as $3;
 import 'sdk_events.pbenum.dart';
-import 'storage_types.pb.dart' as $5;
-import 'voice_events.pb.dart' as $10;
+import 'storage_types.pb.dart' as $10;
+import 'voice_events.pb.dart' as $14;
 
 export 'sdk_events.pbenum.dart';
 
@@ -2013,8 +2013,8 @@ class ComponentInitializationEvent extends $pb.GeneratedMessage {
     $core.bool? initSuccess,
     $core.int? readyCount,
     $core.int? failedCount,
-    $11.ComponentLifecycleState? previousLifecycleState,
-    $11.ComponentLifecycleState? currentLifecycleState,
+    $12.ComponentLifecycleState? previousLifecycleState,
+    $12.ComponentLifecycleState? currentLifecycleState,
   }) {
     final $result = create();
     if (kind != null) {
@@ -2086,8 +2086,8 @@ class ComponentInitializationEvent extends $pb.GeneratedMessage {
     ..aOB(12, _omitFieldNames ? '' : 'initSuccess')
     ..a<$core.int>(13, _omitFieldNames ? '' : 'readyCount', $pb.PbFieldType.O3)
     ..a<$core.int>(14, _omitFieldNames ? '' : 'failedCount', $pb.PbFieldType.O3)
-    ..e<$11.ComponentLifecycleState>(15, _omitFieldNames ? '' : 'previousLifecycleState', $pb.PbFieldType.OE, defaultOrMaker: $11.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $11.ComponentLifecycleState.valueOf, enumValues: $11.ComponentLifecycleState.values)
-    ..e<$11.ComponentLifecycleState>(16, _omitFieldNames ? '' : 'currentLifecycleState', $pb.PbFieldType.OE, defaultOrMaker: $11.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $11.ComponentLifecycleState.valueOf, enumValues: $11.ComponentLifecycleState.values)
+    ..e<$12.ComponentLifecycleState>(15, _omitFieldNames ? '' : 'previousLifecycleState', $pb.PbFieldType.OE, defaultOrMaker: $12.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $12.ComponentLifecycleState.valueOf, enumValues: $12.ComponentLifecycleState.values)
+    ..e<$12.ComponentLifecycleState>(16, _omitFieldNames ? '' : 'currentLifecycleState', $pb.PbFieldType.OE, defaultOrMaker: $12.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $12.ComponentLifecycleState.valueOf, enumValues: $12.ComponentLifecycleState.values)
     ..hasRequiredFields = false
   ;
 
@@ -2234,18 +2234,18 @@ class ComponentInitializationEvent extends $pb.GeneratedMessage {
   /// Typed equivalents of old_state/new_state for SDKs that want generated
   /// enum-backed component lifecycle state instead of parsing strings.
   @$pb.TagNumber(15)
-  $11.ComponentLifecycleState get previousLifecycleState => $_getN(14);
+  $12.ComponentLifecycleState get previousLifecycleState => $_getN(14);
   @$pb.TagNumber(15)
-  set previousLifecycleState($11.ComponentLifecycleState v) { setField(15, v); }
+  set previousLifecycleState($12.ComponentLifecycleState v) { setField(15, v); }
   @$pb.TagNumber(15)
   $core.bool hasPreviousLifecycleState() => $_has(14);
   @$pb.TagNumber(15)
   void clearPreviousLifecycleState() => clearField(15);
 
   @$pb.TagNumber(16)
-  $11.ComponentLifecycleState get currentLifecycleState => $_getN(15);
+  $12.ComponentLifecycleState get currentLifecycleState => $_getN(15);
   @$pb.TagNumber(16)
-  set currentLifecycleState($11.ComponentLifecycleState v) { setField(16, v); }
+  set currentLifecycleState($12.ComponentLifecycleState v) { setField(16, v); }
   @$pb.TagNumber(16)
   $core.bool hasCurrentLifecycleState() => $_has(15);
   @$pb.TagNumber(16)
@@ -2256,15 +2256,15 @@ class ComponentInitializationEvent extends $pb.GeneratedMessage {
 class ComponentLifecycleSnapshot extends $pb.GeneratedMessage {
   factory ComponentLifecycleSnapshot({
     SDKComponent? component,
-    $11.ComponentLifecycleState? state,
+    $12.ComponentLifecycleState? state,
     $core.String? modelId,
     $fixnum.Int64? updatedAtMs,
     $core.String? errorMessage,
-    $0.ModelCategory? category,
-    $0.InferenceFramework? framework,
+    $3.ModelCategory? category,
+    $3.InferenceFramework? framework,
     $core.String? resolvedPath,
     $fixnum.Int64? loadedAtUnixMs,
-    $0.ModelInfo? model,
+    $3.ModelInfo? model,
   }) {
     final $result = create();
     if (component != null) {
@@ -2305,15 +2305,15 @@ class ComponentLifecycleSnapshot extends $pb.GeneratedMessage {
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ComponentLifecycleSnapshot', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..e<SDKComponent>(1, _omitFieldNames ? '' : 'component', $pb.PbFieldType.OE, defaultOrMaker: SDKComponent.SDK_COMPONENT_UNSPECIFIED, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values)
-    ..e<$11.ComponentLifecycleState>(2, _omitFieldNames ? '' : 'state', $pb.PbFieldType.OE, defaultOrMaker: $11.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $11.ComponentLifecycleState.valueOf, enumValues: $11.ComponentLifecycleState.values)
+    ..e<$12.ComponentLifecycleState>(2, _omitFieldNames ? '' : 'state', $pb.PbFieldType.OE, defaultOrMaker: $12.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $12.ComponentLifecycleState.valueOf, enumValues: $12.ComponentLifecycleState.values)
     ..aOS(3, _omitFieldNames ? '' : 'modelId')
     ..aInt64(4, _omitFieldNames ? '' : 'updatedAtMs')
     ..aOS(5, _omitFieldNames ? '' : 'errorMessage')
-    ..e<$0.ModelCategory>(6, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: $0.ModelCategory.MODEL_CATEGORY_UNSPECIFIED, valueOf: $0.ModelCategory.valueOf, enumValues: $0.ModelCategory.values)
-    ..e<$0.InferenceFramework>(7, _omitFieldNames ? '' : 'framework', $pb.PbFieldType.OE, defaultOrMaker: $0.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $0.InferenceFramework.valueOf, enumValues: $0.InferenceFramework.values)
+    ..e<$3.ModelCategory>(6, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: $3.ModelCategory.MODEL_CATEGORY_UNSPECIFIED, valueOf: $3.ModelCategory.valueOf, enumValues: $3.ModelCategory.values)
+    ..e<$3.InferenceFramework>(7, _omitFieldNames ? '' : 'framework', $pb.PbFieldType.OE, defaultOrMaker: $3.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $3.InferenceFramework.valueOf, enumValues: $3.InferenceFramework.values)
     ..aOS(8, _omitFieldNames ? '' : 'resolvedPath')
     ..aInt64(9, _omitFieldNames ? '' : 'loadedAtUnixMs')
-    ..aOM<$0.ModelInfo>(10, _omitFieldNames ? '' : 'model', subBuilder: $0.ModelInfo.create)
+    ..aOM<$3.ModelInfo>(10, _omitFieldNames ? '' : 'model', subBuilder: $3.ModelInfo.create)
     ..hasRequiredFields = false
   ;
 
@@ -2348,9 +2348,9 @@ class ComponentLifecycleSnapshot extends $pb.GeneratedMessage {
   void clearComponent() => clearField(1);
 
   @$pb.TagNumber(2)
-  $11.ComponentLifecycleState get state => $_getN(1);
+  $12.ComponentLifecycleState get state => $_getN(1);
   @$pb.TagNumber(2)
-  set state($11.ComponentLifecycleState v) { setField(2, v); }
+  set state($12.ComponentLifecycleState v) { setField(2, v); }
   @$pb.TagNumber(2)
   $core.bool hasState() => $_has(1);
   @$pb.TagNumber(2)
@@ -2384,18 +2384,18 @@ class ComponentLifecycleSnapshot extends $pb.GeneratedMessage {
   void clearErrorMessage() => clearField(5);
 
   @$pb.TagNumber(6)
-  $0.ModelCategory get category => $_getN(5);
+  $3.ModelCategory get category => $_getN(5);
   @$pb.TagNumber(6)
-  set category($0.ModelCategory v) { setField(6, v); }
+  set category($3.ModelCategory v) { setField(6, v); }
   @$pb.TagNumber(6)
   $core.bool hasCategory() => $_has(5);
   @$pb.TagNumber(6)
   void clearCategory() => clearField(6);
 
   @$pb.TagNumber(7)
-  $0.InferenceFramework get framework => $_getN(6);
+  $3.InferenceFramework get framework => $_getN(6);
   @$pb.TagNumber(7)
-  set framework($0.InferenceFramework v) { setField(7, v); }
+  set framework($3.InferenceFramework v) { setField(7, v); }
   @$pb.TagNumber(7)
   $core.bool hasFramework() => $_has(6);
   @$pb.TagNumber(7)
@@ -2420,15 +2420,15 @@ class ComponentLifecycleSnapshot extends $pb.GeneratedMessage {
   void clearLoadedAtUnixMs() => clearField(9);
 
   @$pb.TagNumber(10)
-  $0.ModelInfo get model => $_getN(9);
+  $3.ModelInfo get model => $_getN(9);
   @$pb.TagNumber(10)
-  set model($0.ModelInfo v) { setField(10, v); }
+  set model($3.ModelInfo v) { setField(10, v); }
   @$pb.TagNumber(10)
   $core.bool hasModel() => $_has(9);
   @$pb.TagNumber(10)
   void clearModel() => clearField(10);
   @$pb.TagNumber(10)
-  $0.ModelInfo ensureModel() => $_ensure(9);
+  $3.ModelInfo ensureModel() => $_ensure(9);
 }
 
 class ComponentLifecycleSnapshotRequest extends $pb.GeneratedMessage {
@@ -2586,19 +2586,19 @@ enum ComponentLifecycleEvent_Payload {
 class ComponentLifecycleEvent extends $pb.GeneratedMessage {
   factory ComponentLifecycleEvent({
     SDKComponent? component,
-    $11.ComponentLifecycleState? previousState,
-    $11.ComponentLifecycleState? currentState,
+    $12.ComponentLifecycleState? previousState,
+    $12.ComponentLifecycleState? currentState,
     $core.String? modelId,
     $fixnum.Int64? timestampMs,
-    $0.ModelLoadResult? modelLoadResult,
-    $0.ModelUnloadResult? modelUnloadResult,
-    $0.ModelDeleteResult? modelDeleteResult,
-    $7.DownloadProgress? downloadProgress,
-    $5.StorageAvailabilityResult? storageAvailability,
-    $5.StorageDeleteResult? storageDeleteResult,
+    $3.ModelLoadResult? modelLoadResult,
+    $3.ModelUnloadResult? modelUnloadResult,
+    $3.ModelDeleteResult? modelDeleteResult,
+    $8.DownloadProgress? downloadProgress,
+    $10.StorageAvailabilityResult? storageAvailability,
+    $10.StorageDeleteResult? storageDeleteResult,
     ComponentLifecycleSnapshot? snapshot,
     ComponentLifecycleSnapshotResult? snapshotResult,
-    $5.StorageDeletePlan? storageDeletePlan,
+    $10.StorageDeletePlan? storageDeletePlan,
   }) {
     final $result = create();
     if (component != null) {
@@ -2664,19 +2664,19 @@ class ComponentLifecycleEvent extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ComponentLifecycleEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18])
     ..e<SDKComponent>(1, _omitFieldNames ? '' : 'component', $pb.PbFieldType.OE, defaultOrMaker: SDKComponent.SDK_COMPONENT_UNSPECIFIED, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values)
-    ..e<$11.ComponentLifecycleState>(2, _omitFieldNames ? '' : 'previousState', $pb.PbFieldType.OE, defaultOrMaker: $11.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $11.ComponentLifecycleState.valueOf, enumValues: $11.ComponentLifecycleState.values)
-    ..e<$11.ComponentLifecycleState>(3, _omitFieldNames ? '' : 'currentState', $pb.PbFieldType.OE, defaultOrMaker: $11.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $11.ComponentLifecycleState.valueOf, enumValues: $11.ComponentLifecycleState.values)
+    ..e<$12.ComponentLifecycleState>(2, _omitFieldNames ? '' : 'previousState', $pb.PbFieldType.OE, defaultOrMaker: $12.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $12.ComponentLifecycleState.valueOf, enumValues: $12.ComponentLifecycleState.values)
+    ..e<$12.ComponentLifecycleState>(3, _omitFieldNames ? '' : 'currentState', $pb.PbFieldType.OE, defaultOrMaker: $12.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $12.ComponentLifecycleState.valueOf, enumValues: $12.ComponentLifecycleState.values)
     ..aOS(4, _omitFieldNames ? '' : 'modelId')
     ..aInt64(5, _omitFieldNames ? '' : 'timestampMs')
-    ..aOM<$0.ModelLoadResult>(10, _omitFieldNames ? '' : 'modelLoadResult', subBuilder: $0.ModelLoadResult.create)
-    ..aOM<$0.ModelUnloadResult>(11, _omitFieldNames ? '' : 'modelUnloadResult', subBuilder: $0.ModelUnloadResult.create)
-    ..aOM<$0.ModelDeleteResult>(12, _omitFieldNames ? '' : 'modelDeleteResult', subBuilder: $0.ModelDeleteResult.create)
-    ..aOM<$7.DownloadProgress>(13, _omitFieldNames ? '' : 'downloadProgress', subBuilder: $7.DownloadProgress.create)
-    ..aOM<$5.StorageAvailabilityResult>(14, _omitFieldNames ? '' : 'storageAvailability', subBuilder: $5.StorageAvailabilityResult.create)
-    ..aOM<$5.StorageDeleteResult>(15, _omitFieldNames ? '' : 'storageDeleteResult', subBuilder: $5.StorageDeleteResult.create)
+    ..aOM<$3.ModelLoadResult>(10, _omitFieldNames ? '' : 'modelLoadResult', subBuilder: $3.ModelLoadResult.create)
+    ..aOM<$3.ModelUnloadResult>(11, _omitFieldNames ? '' : 'modelUnloadResult', subBuilder: $3.ModelUnloadResult.create)
+    ..aOM<$3.ModelDeleteResult>(12, _omitFieldNames ? '' : 'modelDeleteResult', subBuilder: $3.ModelDeleteResult.create)
+    ..aOM<$8.DownloadProgress>(13, _omitFieldNames ? '' : 'downloadProgress', subBuilder: $8.DownloadProgress.create)
+    ..aOM<$10.StorageAvailabilityResult>(14, _omitFieldNames ? '' : 'storageAvailability', subBuilder: $10.StorageAvailabilityResult.create)
+    ..aOM<$10.StorageDeleteResult>(15, _omitFieldNames ? '' : 'storageDeleteResult', subBuilder: $10.StorageDeleteResult.create)
     ..aOM<ComponentLifecycleSnapshot>(16, _omitFieldNames ? '' : 'snapshot', subBuilder: ComponentLifecycleSnapshot.create)
     ..aOM<ComponentLifecycleSnapshotResult>(17, _omitFieldNames ? '' : 'snapshotResult', subBuilder: ComponentLifecycleSnapshotResult.create)
-    ..aOM<$5.StorageDeletePlan>(18, _omitFieldNames ? '' : 'storageDeletePlan', subBuilder: $5.StorageDeletePlan.create)
+    ..aOM<$10.StorageDeletePlan>(18, _omitFieldNames ? '' : 'storageDeletePlan', subBuilder: $10.StorageDeletePlan.create)
     ..hasRequiredFields = false
   ;
 
@@ -2714,18 +2714,18 @@ class ComponentLifecycleEvent extends $pb.GeneratedMessage {
   void clearComponent() => clearField(1);
 
   @$pb.TagNumber(2)
-  $11.ComponentLifecycleState get previousState => $_getN(1);
+  $12.ComponentLifecycleState get previousState => $_getN(1);
   @$pb.TagNumber(2)
-  set previousState($11.ComponentLifecycleState v) { setField(2, v); }
+  set previousState($12.ComponentLifecycleState v) { setField(2, v); }
   @$pb.TagNumber(2)
   $core.bool hasPreviousState() => $_has(1);
   @$pb.TagNumber(2)
   void clearPreviousState() => clearField(2);
 
   @$pb.TagNumber(3)
-  $11.ComponentLifecycleState get currentState => $_getN(2);
+  $12.ComponentLifecycleState get currentState => $_getN(2);
   @$pb.TagNumber(3)
-  set currentState($11.ComponentLifecycleState v) { setField(3, v); }
+  set currentState($12.ComponentLifecycleState v) { setField(3, v); }
   @$pb.TagNumber(3)
   $core.bool hasCurrentState() => $_has(2);
   @$pb.TagNumber(3)
@@ -2750,70 +2750,70 @@ class ComponentLifecycleEvent extends $pb.GeneratedMessage {
   void clearTimestampMs() => clearField(5);
 
   @$pb.TagNumber(10)
-  $0.ModelLoadResult get modelLoadResult => $_getN(5);
+  $3.ModelLoadResult get modelLoadResult => $_getN(5);
   @$pb.TagNumber(10)
-  set modelLoadResult($0.ModelLoadResult v) { setField(10, v); }
+  set modelLoadResult($3.ModelLoadResult v) { setField(10, v); }
   @$pb.TagNumber(10)
   $core.bool hasModelLoadResult() => $_has(5);
   @$pb.TagNumber(10)
   void clearModelLoadResult() => clearField(10);
   @$pb.TagNumber(10)
-  $0.ModelLoadResult ensureModelLoadResult() => $_ensure(5);
+  $3.ModelLoadResult ensureModelLoadResult() => $_ensure(5);
 
   @$pb.TagNumber(11)
-  $0.ModelUnloadResult get modelUnloadResult => $_getN(6);
+  $3.ModelUnloadResult get modelUnloadResult => $_getN(6);
   @$pb.TagNumber(11)
-  set modelUnloadResult($0.ModelUnloadResult v) { setField(11, v); }
+  set modelUnloadResult($3.ModelUnloadResult v) { setField(11, v); }
   @$pb.TagNumber(11)
   $core.bool hasModelUnloadResult() => $_has(6);
   @$pb.TagNumber(11)
   void clearModelUnloadResult() => clearField(11);
   @$pb.TagNumber(11)
-  $0.ModelUnloadResult ensureModelUnloadResult() => $_ensure(6);
+  $3.ModelUnloadResult ensureModelUnloadResult() => $_ensure(6);
 
   @$pb.TagNumber(12)
-  $0.ModelDeleteResult get modelDeleteResult => $_getN(7);
+  $3.ModelDeleteResult get modelDeleteResult => $_getN(7);
   @$pb.TagNumber(12)
-  set modelDeleteResult($0.ModelDeleteResult v) { setField(12, v); }
+  set modelDeleteResult($3.ModelDeleteResult v) { setField(12, v); }
   @$pb.TagNumber(12)
   $core.bool hasModelDeleteResult() => $_has(7);
   @$pb.TagNumber(12)
   void clearModelDeleteResult() => clearField(12);
   @$pb.TagNumber(12)
-  $0.ModelDeleteResult ensureModelDeleteResult() => $_ensure(7);
+  $3.ModelDeleteResult ensureModelDeleteResult() => $_ensure(7);
 
   @$pb.TagNumber(13)
-  $7.DownloadProgress get downloadProgress => $_getN(8);
+  $8.DownloadProgress get downloadProgress => $_getN(8);
   @$pb.TagNumber(13)
-  set downloadProgress($7.DownloadProgress v) { setField(13, v); }
+  set downloadProgress($8.DownloadProgress v) { setField(13, v); }
   @$pb.TagNumber(13)
   $core.bool hasDownloadProgress() => $_has(8);
   @$pb.TagNumber(13)
   void clearDownloadProgress() => clearField(13);
   @$pb.TagNumber(13)
-  $7.DownloadProgress ensureDownloadProgress() => $_ensure(8);
+  $8.DownloadProgress ensureDownloadProgress() => $_ensure(8);
 
   @$pb.TagNumber(14)
-  $5.StorageAvailabilityResult get storageAvailability => $_getN(9);
+  $10.StorageAvailabilityResult get storageAvailability => $_getN(9);
   @$pb.TagNumber(14)
-  set storageAvailability($5.StorageAvailabilityResult v) { setField(14, v); }
+  set storageAvailability($10.StorageAvailabilityResult v) { setField(14, v); }
   @$pb.TagNumber(14)
   $core.bool hasStorageAvailability() => $_has(9);
   @$pb.TagNumber(14)
   void clearStorageAvailability() => clearField(14);
   @$pb.TagNumber(14)
-  $5.StorageAvailabilityResult ensureStorageAvailability() => $_ensure(9);
+  $10.StorageAvailabilityResult ensureStorageAvailability() => $_ensure(9);
 
   @$pb.TagNumber(15)
-  $5.StorageDeleteResult get storageDeleteResult => $_getN(10);
+  $10.StorageDeleteResult get storageDeleteResult => $_getN(10);
   @$pb.TagNumber(15)
-  set storageDeleteResult($5.StorageDeleteResult v) { setField(15, v); }
+  set storageDeleteResult($10.StorageDeleteResult v) { setField(15, v); }
   @$pb.TagNumber(15)
   $core.bool hasStorageDeleteResult() => $_has(10);
   @$pb.TagNumber(15)
   void clearStorageDeleteResult() => clearField(15);
   @$pb.TagNumber(15)
-  $5.StorageDeleteResult ensureStorageDeleteResult() => $_ensure(10);
+  $10.StorageDeleteResult ensureStorageDeleteResult() => $_ensure(10);
 
   @$pb.TagNumber(16)
   ComponentLifecycleSnapshot get snapshot => $_getN(11);
@@ -2838,15 +2838,15 @@ class ComponentLifecycleEvent extends $pb.GeneratedMessage {
   ComponentLifecycleSnapshotResult ensureSnapshotResult() => $_ensure(12);
 
   @$pb.TagNumber(18)
-  $5.StorageDeletePlan get storageDeletePlan => $_getN(13);
+  $10.StorageDeletePlan get storageDeletePlan => $_getN(13);
   @$pb.TagNumber(18)
-  set storageDeletePlan($5.StorageDeletePlan v) { setField(18, v); }
+  set storageDeletePlan($10.StorageDeletePlan v) { setField(18, v); }
   @$pb.TagNumber(18)
   $core.bool hasStorageDeletePlan() => $_has(13);
   @$pb.TagNumber(18)
   void clearStorageDeletePlan() => clearField(18);
   @$pb.TagNumber(18)
-  $5.StorageDeletePlan ensureStorageDeletePlan() => $_ensure(13);
+  $10.StorageDeletePlan ensureStorageDeletePlan() => $_ensure(13);
 }
 
 /// SDK session lifecycle independent of voice-agent turn sessions.
@@ -3107,16 +3107,16 @@ class ModelRegistryEvent extends $pb.GeneratedMessage {
     $core.String? modelId,
     $core.String? assignmentId,
     SDKComponent? assignedComponent,
-    $0.InferenceFramework? framework,
+    $3.InferenceFramework? framework,
     $core.String? sourcePath,
     $core.String? error,
-    $0.ModelRegistryRefreshResult? refreshResult,
-    $0.ModelListResult? listResult,
-    $0.ModelGetResult? getResult,
-    $0.ModelImportResult? importResult,
-    $0.ModelDiscoveryResult? discoveryResult,
-    $0.ModelCompatibilityResult? compatibilityResult,
-    $0.CurrentModelResult? currentModelResult,
+    $3.ModelRegistryRefreshResult? refreshResult,
+    $3.ModelListResult? listResult,
+    $3.ModelGetResult? getResult,
+    $3.ModelImportResult? importResult,
+    $3.ModelDiscoveryResult? discoveryResult,
+    $3.ModelCompatibilityResult? compatibilityResult,
+    $3.CurrentModelResult? currentModelResult,
   }) {
     final $result = create();
     if (kind != null) {
@@ -3183,16 +3183,16 @@ class ModelRegistryEvent extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'modelId')
     ..aOS(3, _omitFieldNames ? '' : 'assignmentId')
     ..e<SDKComponent>(4, _omitFieldNames ? '' : 'assignedComponent', $pb.PbFieldType.OE, defaultOrMaker: SDKComponent.SDK_COMPONENT_UNSPECIFIED, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values)
-    ..e<$0.InferenceFramework>(5, _omitFieldNames ? '' : 'framework', $pb.PbFieldType.OE, defaultOrMaker: $0.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $0.InferenceFramework.valueOf, enumValues: $0.InferenceFramework.values)
+    ..e<$3.InferenceFramework>(5, _omitFieldNames ? '' : 'framework', $pb.PbFieldType.OE, defaultOrMaker: $3.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $3.InferenceFramework.valueOf, enumValues: $3.InferenceFramework.values)
     ..aOS(6, _omitFieldNames ? '' : 'sourcePath')
     ..aOS(7, _omitFieldNames ? '' : 'error')
-    ..aOM<$0.ModelRegistryRefreshResult>(20, _omitFieldNames ? '' : 'refreshResult', subBuilder: $0.ModelRegistryRefreshResult.create)
-    ..aOM<$0.ModelListResult>(21, _omitFieldNames ? '' : 'listResult', subBuilder: $0.ModelListResult.create)
-    ..aOM<$0.ModelGetResult>(22, _omitFieldNames ? '' : 'getResult', subBuilder: $0.ModelGetResult.create)
-    ..aOM<$0.ModelImportResult>(23, _omitFieldNames ? '' : 'importResult', subBuilder: $0.ModelImportResult.create)
-    ..aOM<$0.ModelDiscoveryResult>(24, _omitFieldNames ? '' : 'discoveryResult', subBuilder: $0.ModelDiscoveryResult.create)
-    ..aOM<$0.ModelCompatibilityResult>(25, _omitFieldNames ? '' : 'compatibilityResult', subBuilder: $0.ModelCompatibilityResult.create)
-    ..aOM<$0.CurrentModelResult>(26, _omitFieldNames ? '' : 'currentModelResult', subBuilder: $0.CurrentModelResult.create)
+    ..aOM<$3.ModelRegistryRefreshResult>(20, _omitFieldNames ? '' : 'refreshResult', subBuilder: $3.ModelRegistryRefreshResult.create)
+    ..aOM<$3.ModelListResult>(21, _omitFieldNames ? '' : 'listResult', subBuilder: $3.ModelListResult.create)
+    ..aOM<$3.ModelGetResult>(22, _omitFieldNames ? '' : 'getResult', subBuilder: $3.ModelGetResult.create)
+    ..aOM<$3.ModelImportResult>(23, _omitFieldNames ? '' : 'importResult', subBuilder: $3.ModelImportResult.create)
+    ..aOM<$3.ModelDiscoveryResult>(24, _omitFieldNames ? '' : 'discoveryResult', subBuilder: $3.ModelDiscoveryResult.create)
+    ..aOM<$3.ModelCompatibilityResult>(25, _omitFieldNames ? '' : 'compatibilityResult', subBuilder: $3.ModelCompatibilityResult.create)
+    ..aOM<$3.CurrentModelResult>(26, _omitFieldNames ? '' : 'currentModelResult', subBuilder: $3.CurrentModelResult.create)
     ..hasRequiredFields = false
   ;
 
@@ -3257,9 +3257,9 @@ class ModelRegistryEvent extends $pb.GeneratedMessage {
   void clearAssignedComponent() => clearField(4);
 
   @$pb.TagNumber(5)
-  $0.InferenceFramework get framework => $_getN(4);
+  $3.InferenceFramework get framework => $_getN(4);
   @$pb.TagNumber(5)
-  set framework($0.InferenceFramework v) { setField(5, v); }
+  set framework($3.InferenceFramework v) { setField(5, v); }
   @$pb.TagNumber(5)
   $core.bool hasFramework() => $_has(4);
   @$pb.TagNumber(5)
@@ -3284,81 +3284,81 @@ class ModelRegistryEvent extends $pb.GeneratedMessage {
   void clearError() => clearField(7);
 
   @$pb.TagNumber(20)
-  $0.ModelRegistryRefreshResult get refreshResult => $_getN(7);
+  $3.ModelRegistryRefreshResult get refreshResult => $_getN(7);
   @$pb.TagNumber(20)
-  set refreshResult($0.ModelRegistryRefreshResult v) { setField(20, v); }
+  set refreshResult($3.ModelRegistryRefreshResult v) { setField(20, v); }
   @$pb.TagNumber(20)
   $core.bool hasRefreshResult() => $_has(7);
   @$pb.TagNumber(20)
   void clearRefreshResult() => clearField(20);
   @$pb.TagNumber(20)
-  $0.ModelRegistryRefreshResult ensureRefreshResult() => $_ensure(7);
+  $3.ModelRegistryRefreshResult ensureRefreshResult() => $_ensure(7);
 
   @$pb.TagNumber(21)
-  $0.ModelListResult get listResult => $_getN(8);
+  $3.ModelListResult get listResult => $_getN(8);
   @$pb.TagNumber(21)
-  set listResult($0.ModelListResult v) { setField(21, v); }
+  set listResult($3.ModelListResult v) { setField(21, v); }
   @$pb.TagNumber(21)
   $core.bool hasListResult() => $_has(8);
   @$pb.TagNumber(21)
   void clearListResult() => clearField(21);
   @$pb.TagNumber(21)
-  $0.ModelListResult ensureListResult() => $_ensure(8);
+  $3.ModelListResult ensureListResult() => $_ensure(8);
 
   @$pb.TagNumber(22)
-  $0.ModelGetResult get getResult => $_getN(9);
+  $3.ModelGetResult get getResult => $_getN(9);
   @$pb.TagNumber(22)
-  set getResult($0.ModelGetResult v) { setField(22, v); }
+  set getResult($3.ModelGetResult v) { setField(22, v); }
   @$pb.TagNumber(22)
   $core.bool hasGetResult() => $_has(9);
   @$pb.TagNumber(22)
   void clearGetResult() => clearField(22);
   @$pb.TagNumber(22)
-  $0.ModelGetResult ensureGetResult() => $_ensure(9);
+  $3.ModelGetResult ensureGetResult() => $_ensure(9);
 
   @$pb.TagNumber(23)
-  $0.ModelImportResult get importResult => $_getN(10);
+  $3.ModelImportResult get importResult => $_getN(10);
   @$pb.TagNumber(23)
-  set importResult($0.ModelImportResult v) { setField(23, v); }
+  set importResult($3.ModelImportResult v) { setField(23, v); }
   @$pb.TagNumber(23)
   $core.bool hasImportResult() => $_has(10);
   @$pb.TagNumber(23)
   void clearImportResult() => clearField(23);
   @$pb.TagNumber(23)
-  $0.ModelImportResult ensureImportResult() => $_ensure(10);
+  $3.ModelImportResult ensureImportResult() => $_ensure(10);
 
   @$pb.TagNumber(24)
-  $0.ModelDiscoveryResult get discoveryResult => $_getN(11);
+  $3.ModelDiscoveryResult get discoveryResult => $_getN(11);
   @$pb.TagNumber(24)
-  set discoveryResult($0.ModelDiscoveryResult v) { setField(24, v); }
+  set discoveryResult($3.ModelDiscoveryResult v) { setField(24, v); }
   @$pb.TagNumber(24)
   $core.bool hasDiscoveryResult() => $_has(11);
   @$pb.TagNumber(24)
   void clearDiscoveryResult() => clearField(24);
   @$pb.TagNumber(24)
-  $0.ModelDiscoveryResult ensureDiscoveryResult() => $_ensure(11);
+  $3.ModelDiscoveryResult ensureDiscoveryResult() => $_ensure(11);
 
   @$pb.TagNumber(25)
-  $0.ModelCompatibilityResult get compatibilityResult => $_getN(12);
+  $3.ModelCompatibilityResult get compatibilityResult => $_getN(12);
   @$pb.TagNumber(25)
-  set compatibilityResult($0.ModelCompatibilityResult v) { setField(25, v); }
+  set compatibilityResult($3.ModelCompatibilityResult v) { setField(25, v); }
   @$pb.TagNumber(25)
   $core.bool hasCompatibilityResult() => $_has(12);
   @$pb.TagNumber(25)
   void clearCompatibilityResult() => clearField(25);
   @$pb.TagNumber(25)
-  $0.ModelCompatibilityResult ensureCompatibilityResult() => $_ensure(12);
+  $3.ModelCompatibilityResult ensureCompatibilityResult() => $_ensure(12);
 
   @$pb.TagNumber(26)
-  $0.CurrentModelResult get currentModelResult => $_getN(13);
+  $3.CurrentModelResult get currentModelResult => $_getN(13);
   @$pb.TagNumber(26)
-  set currentModelResult($0.CurrentModelResult v) { setField(26, v); }
+  set currentModelResult($3.CurrentModelResult v) { setField(26, v); }
   @$pb.TagNumber(26)
   $core.bool hasCurrentModelResult() => $_has(13);
   @$pb.TagNumber(26)
   void clearCurrentModelResult() => clearField(26);
   @$pb.TagNumber(26)
-  $0.CurrentModelResult ensureCurrentModelResult() => $_ensure(13);
+  $3.CurrentModelResult ensureCurrentModelResult() => $_ensure(13);
 }
 
 enum DownloadEvent_Payload {
@@ -3376,11 +3376,11 @@ class DownloadEvent extends $pb.GeneratedMessage {
     $core.String? modelId,
     $core.String? taskId,
     $core.String? error,
-    $7.DownloadPlanResult? planResult,
-    $7.DownloadStartResult? startResult,
-    $7.DownloadProgress? progress,
-    $7.DownloadCancelResult? cancelResult,
-    $7.DownloadResumeResult? resumeResult,
+    $8.DownloadPlanResult? planResult,
+    $8.DownloadStartResult? startResult,
+    $8.DownloadProgress? progress,
+    $8.DownloadCancelResult? cancelResult,
+    $8.DownloadResumeResult? resumeResult,
   }) {
     final $result = create();
     if (kind != null) {
@@ -3430,11 +3430,11 @@ class DownloadEvent extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'modelId')
     ..aOS(3, _omitFieldNames ? '' : 'taskId')
     ..aOS(4, _omitFieldNames ? '' : 'error')
-    ..aOM<$7.DownloadPlanResult>(20, _omitFieldNames ? '' : 'planResult', subBuilder: $7.DownloadPlanResult.create)
-    ..aOM<$7.DownloadStartResult>(21, _omitFieldNames ? '' : 'startResult', subBuilder: $7.DownloadStartResult.create)
-    ..aOM<$7.DownloadProgress>(22, _omitFieldNames ? '' : 'progress', subBuilder: $7.DownloadProgress.create)
-    ..aOM<$7.DownloadCancelResult>(23, _omitFieldNames ? '' : 'cancelResult', subBuilder: $7.DownloadCancelResult.create)
-    ..aOM<$7.DownloadResumeResult>(24, _omitFieldNames ? '' : 'resumeResult', subBuilder: $7.DownloadResumeResult.create)
+    ..aOM<$8.DownloadPlanResult>(20, _omitFieldNames ? '' : 'planResult', subBuilder: $8.DownloadPlanResult.create)
+    ..aOM<$8.DownloadStartResult>(21, _omitFieldNames ? '' : 'startResult', subBuilder: $8.DownloadStartResult.create)
+    ..aOM<$8.DownloadProgress>(22, _omitFieldNames ? '' : 'progress', subBuilder: $8.DownloadProgress.create)
+    ..aOM<$8.DownloadCancelResult>(23, _omitFieldNames ? '' : 'cancelResult', subBuilder: $8.DownloadCancelResult.create)
+    ..aOM<$8.DownloadResumeResult>(24, _omitFieldNames ? '' : 'resumeResult', subBuilder: $8.DownloadResumeResult.create)
     ..hasRequiredFields = false
   ;
 
@@ -3499,59 +3499,59 @@ class DownloadEvent extends $pb.GeneratedMessage {
   void clearError() => clearField(4);
 
   @$pb.TagNumber(20)
-  $7.DownloadPlanResult get planResult => $_getN(4);
+  $8.DownloadPlanResult get planResult => $_getN(4);
   @$pb.TagNumber(20)
-  set planResult($7.DownloadPlanResult v) { setField(20, v); }
+  set planResult($8.DownloadPlanResult v) { setField(20, v); }
   @$pb.TagNumber(20)
   $core.bool hasPlanResult() => $_has(4);
   @$pb.TagNumber(20)
   void clearPlanResult() => clearField(20);
   @$pb.TagNumber(20)
-  $7.DownloadPlanResult ensurePlanResult() => $_ensure(4);
+  $8.DownloadPlanResult ensurePlanResult() => $_ensure(4);
 
   @$pb.TagNumber(21)
-  $7.DownloadStartResult get startResult => $_getN(5);
+  $8.DownloadStartResult get startResult => $_getN(5);
   @$pb.TagNumber(21)
-  set startResult($7.DownloadStartResult v) { setField(21, v); }
+  set startResult($8.DownloadStartResult v) { setField(21, v); }
   @$pb.TagNumber(21)
   $core.bool hasStartResult() => $_has(5);
   @$pb.TagNumber(21)
   void clearStartResult() => clearField(21);
   @$pb.TagNumber(21)
-  $7.DownloadStartResult ensureStartResult() => $_ensure(5);
+  $8.DownloadStartResult ensureStartResult() => $_ensure(5);
 
   @$pb.TagNumber(22)
-  $7.DownloadProgress get progress => $_getN(6);
+  $8.DownloadProgress get progress => $_getN(6);
   @$pb.TagNumber(22)
-  set progress($7.DownloadProgress v) { setField(22, v); }
+  set progress($8.DownloadProgress v) { setField(22, v); }
   @$pb.TagNumber(22)
   $core.bool hasProgress() => $_has(6);
   @$pb.TagNumber(22)
   void clearProgress() => clearField(22);
   @$pb.TagNumber(22)
-  $7.DownloadProgress ensureProgress() => $_ensure(6);
+  $8.DownloadProgress ensureProgress() => $_ensure(6);
 
   @$pb.TagNumber(23)
-  $7.DownloadCancelResult get cancelResult => $_getN(7);
+  $8.DownloadCancelResult get cancelResult => $_getN(7);
   @$pb.TagNumber(23)
-  set cancelResult($7.DownloadCancelResult v) { setField(23, v); }
+  set cancelResult($8.DownloadCancelResult v) { setField(23, v); }
   @$pb.TagNumber(23)
   $core.bool hasCancelResult() => $_has(7);
   @$pb.TagNumber(23)
   void clearCancelResult() => clearField(23);
   @$pb.TagNumber(23)
-  $7.DownloadCancelResult ensureCancelResult() => $_ensure(7);
+  $8.DownloadCancelResult ensureCancelResult() => $_ensure(7);
 
   @$pb.TagNumber(24)
-  $7.DownloadResumeResult get resumeResult => $_getN(8);
+  $8.DownloadResumeResult get resumeResult => $_getN(8);
   @$pb.TagNumber(24)
-  set resumeResult($7.DownloadResumeResult v) { setField(24, v); }
+  set resumeResult($8.DownloadResumeResult v) { setField(24, v); }
   @$pb.TagNumber(24)
   $core.bool hasResumeResult() => $_has(8);
   @$pb.TagNumber(24)
   void clearResumeResult() => clearField(24);
   @$pb.TagNumber(24)
-  $7.DownloadResumeResult ensureResumeResult() => $_ensure(8);
+  $8.DownloadResumeResult ensureResumeResult() => $_ensure(8);
 }
 
 enum StorageLifecycleEvent_Result {
@@ -3569,10 +3569,10 @@ class StorageLifecycleEvent extends $pb.GeneratedMessage {
     $core.String? cacheKey,
     $fixnum.Int64? bytes,
     $core.String? error,
-    $5.StorageInfoResult? infoResult,
-    $5.StorageAvailabilityResult? availabilityResult,
-    $5.StorageDeletePlan? deletePlan,
-    $5.StorageDeleteResult? deleteResult,
+    $10.StorageInfoResult? infoResult,
+    $10.StorageAvailabilityResult? availabilityResult,
+    $10.StorageDeletePlan? deletePlan,
+    $10.StorageDeleteResult? deleteResult,
   }) {
     final $result = create();
     if (kind != null) {
@@ -3622,10 +3622,10 @@ class StorageLifecycleEvent extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'cacheKey')
     ..aInt64(4, _omitFieldNames ? '' : 'bytes')
     ..aOS(5, _omitFieldNames ? '' : 'error')
-    ..aOM<$5.StorageInfoResult>(20, _omitFieldNames ? '' : 'infoResult', subBuilder: $5.StorageInfoResult.create)
-    ..aOM<$5.StorageAvailabilityResult>(21, _omitFieldNames ? '' : 'availabilityResult', subBuilder: $5.StorageAvailabilityResult.create)
-    ..aOM<$5.StorageDeletePlan>(22, _omitFieldNames ? '' : 'deletePlan', subBuilder: $5.StorageDeletePlan.create)
-    ..aOM<$5.StorageDeleteResult>(23, _omitFieldNames ? '' : 'deleteResult', subBuilder: $5.StorageDeleteResult.create)
+    ..aOM<$10.StorageInfoResult>(20, _omitFieldNames ? '' : 'infoResult', subBuilder: $10.StorageInfoResult.create)
+    ..aOM<$10.StorageAvailabilityResult>(21, _omitFieldNames ? '' : 'availabilityResult', subBuilder: $10.StorageAvailabilityResult.create)
+    ..aOM<$10.StorageDeletePlan>(22, _omitFieldNames ? '' : 'deletePlan', subBuilder: $10.StorageDeletePlan.create)
+    ..aOM<$10.StorageDeleteResult>(23, _omitFieldNames ? '' : 'deleteResult', subBuilder: $10.StorageDeleteResult.create)
     ..hasRequiredFields = false
   ;
 
@@ -3699,60 +3699,60 @@ class StorageLifecycleEvent extends $pb.GeneratedMessage {
   void clearError() => clearField(5);
 
   @$pb.TagNumber(20)
-  $5.StorageInfoResult get infoResult => $_getN(5);
+  $10.StorageInfoResult get infoResult => $_getN(5);
   @$pb.TagNumber(20)
-  set infoResult($5.StorageInfoResult v) { setField(20, v); }
+  set infoResult($10.StorageInfoResult v) { setField(20, v); }
   @$pb.TagNumber(20)
   $core.bool hasInfoResult() => $_has(5);
   @$pb.TagNumber(20)
   void clearInfoResult() => clearField(20);
   @$pb.TagNumber(20)
-  $5.StorageInfoResult ensureInfoResult() => $_ensure(5);
+  $10.StorageInfoResult ensureInfoResult() => $_ensure(5);
 
   @$pb.TagNumber(21)
-  $5.StorageAvailabilityResult get availabilityResult => $_getN(6);
+  $10.StorageAvailabilityResult get availabilityResult => $_getN(6);
   @$pb.TagNumber(21)
-  set availabilityResult($5.StorageAvailabilityResult v) { setField(21, v); }
+  set availabilityResult($10.StorageAvailabilityResult v) { setField(21, v); }
   @$pb.TagNumber(21)
   $core.bool hasAvailabilityResult() => $_has(6);
   @$pb.TagNumber(21)
   void clearAvailabilityResult() => clearField(21);
   @$pb.TagNumber(21)
-  $5.StorageAvailabilityResult ensureAvailabilityResult() => $_ensure(6);
+  $10.StorageAvailabilityResult ensureAvailabilityResult() => $_ensure(6);
 
   @$pb.TagNumber(22)
-  $5.StorageDeletePlan get deletePlan => $_getN(7);
+  $10.StorageDeletePlan get deletePlan => $_getN(7);
   @$pb.TagNumber(22)
-  set deletePlan($5.StorageDeletePlan v) { setField(22, v); }
+  set deletePlan($10.StorageDeletePlan v) { setField(22, v); }
   @$pb.TagNumber(22)
   $core.bool hasDeletePlan() => $_has(7);
   @$pb.TagNumber(22)
   void clearDeletePlan() => clearField(22);
   @$pb.TagNumber(22)
-  $5.StorageDeletePlan ensureDeletePlan() => $_ensure(7);
+  $10.StorageDeletePlan ensureDeletePlan() => $_ensure(7);
 
   @$pb.TagNumber(23)
-  $5.StorageDeleteResult get deleteResult => $_getN(8);
+  $10.StorageDeleteResult get deleteResult => $_getN(8);
   @$pb.TagNumber(23)
-  set deleteResult($5.StorageDeleteResult v) { setField(23, v); }
+  set deleteResult($10.StorageDeleteResult v) { setField(23, v); }
   @$pb.TagNumber(23)
   $core.bool hasDeleteResult() => $_has(8);
   @$pb.TagNumber(23)
   void clearDeleteResult() => clearField(23);
   @$pb.TagNumber(23)
-  $5.StorageDeleteResult ensureDeleteResult() => $_ensure(8);
+  $10.StorageDeleteResult ensureDeleteResult() => $_ensure(8);
 }
 
 class HardwareRoutingEvent extends $pb.GeneratedMessage {
   factory HardwareRoutingEvent({
     HardwareRoutingEventKind? kind,
     SDKComponent? component,
-    $0.InferenceFramework? framework,
+    $3.InferenceFramework? framework,
     $core.String? capability,
     $core.String? route,
     $core.String? reason,
     $core.String? error,
-    $8.HardwareProfileResult? hardwareProfile,
+    $1.HardwareProfileResult? hardwareProfile,
   }) {
     final $result = create();
     if (kind != null) {
@@ -3788,12 +3788,12 @@ class HardwareRoutingEvent extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'HardwareRoutingEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..e<HardwareRoutingEventKind>(1, _omitFieldNames ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: HardwareRoutingEventKind.HARDWARE_ROUTING_EVENT_KIND_UNSPECIFIED, valueOf: HardwareRoutingEventKind.valueOf, enumValues: HardwareRoutingEventKind.values)
     ..e<SDKComponent>(2, _omitFieldNames ? '' : 'component', $pb.PbFieldType.OE, defaultOrMaker: SDKComponent.SDK_COMPONENT_UNSPECIFIED, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values)
-    ..e<$0.InferenceFramework>(3, _omitFieldNames ? '' : 'framework', $pb.PbFieldType.OE, defaultOrMaker: $0.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $0.InferenceFramework.valueOf, enumValues: $0.InferenceFramework.values)
+    ..e<$3.InferenceFramework>(3, _omitFieldNames ? '' : 'framework', $pb.PbFieldType.OE, defaultOrMaker: $3.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $3.InferenceFramework.valueOf, enumValues: $3.InferenceFramework.values)
     ..aOS(4, _omitFieldNames ? '' : 'capability')
     ..aOS(5, _omitFieldNames ? '' : 'route')
     ..aOS(6, _omitFieldNames ? '' : 'reason')
     ..aOS(7, _omitFieldNames ? '' : 'error')
-    ..aOM<$8.HardwareProfileResult>(20, _omitFieldNames ? '' : 'hardwareProfile', subBuilder: $8.HardwareProfileResult.create)
+    ..aOM<$1.HardwareProfileResult>(20, _omitFieldNames ? '' : 'hardwareProfile', subBuilder: $1.HardwareProfileResult.create)
     ..hasRequiredFields = false
   ;
 
@@ -3837,9 +3837,9 @@ class HardwareRoutingEvent extends $pb.GeneratedMessage {
   void clearComponent() => clearField(2);
 
   @$pb.TagNumber(3)
-  $0.InferenceFramework get framework => $_getN(2);
+  $3.InferenceFramework get framework => $_getN(2);
   @$pb.TagNumber(3)
-  set framework($0.InferenceFramework v) { setField(3, v); }
+  set framework($3.InferenceFramework v) { setField(3, v); }
   @$pb.TagNumber(3)
   $core.bool hasFramework() => $_has(2);
   @$pb.TagNumber(3)
@@ -3882,15 +3882,15 @@ class HardwareRoutingEvent extends $pb.GeneratedMessage {
   void clearError() => clearField(7);
 
   @$pb.TagNumber(20)
-  $8.HardwareProfileResult get hardwareProfile => $_getN(7);
+  $1.HardwareProfileResult get hardwareProfile => $_getN(7);
   @$pb.TagNumber(20)
-  set hardwareProfile($8.HardwareProfileResult v) { setField(20, v); }
+  set hardwareProfile($1.HardwareProfileResult v) { setField(20, v); }
   @$pb.TagNumber(20)
   $core.bool hasHardwareProfile() => $_has(7);
   @$pb.TagNumber(20)
   void clearHardwareProfile() => clearField(20);
   @$pb.TagNumber(20)
-  $8.HardwareProfileResult ensureHardwareProfile() => $_ensure(7);
+  $1.HardwareProfileResult ensureHardwareProfile() => $_ensure(7);
 }
 
 class CapabilityOperationEvent extends $pb.GeneratedMessage {
@@ -4279,7 +4279,7 @@ class FailureEvent extends $pb.GeneratedMessage {
   factory FailureEvent({
     SDKComponent? component,
     $core.String? operation,
-    $9.SDKError? error,
+    $13.SDKError? error,
     $core.bool? recoverable,
   }) {
     final $result = create();
@@ -4304,7 +4304,7 @@ class FailureEvent extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'FailureEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..e<SDKComponent>(1, _omitFieldNames ? '' : 'component', $pb.PbFieldType.OE, defaultOrMaker: SDKComponent.SDK_COMPONENT_UNSPECIFIED, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values)
     ..aOS(2, _omitFieldNames ? '' : 'operation')
-    ..aOM<$9.SDKError>(3, _omitFieldNames ? '' : 'error', subBuilder: $9.SDKError.create)
+    ..aOM<$13.SDKError>(3, _omitFieldNames ? '' : 'error', subBuilder: $13.SDKError.create)
     ..aOB(4, _omitFieldNames ? '' : 'recoverable')
     ..hasRequiredFields = false
   ;
@@ -4349,15 +4349,15 @@ class FailureEvent extends $pb.GeneratedMessage {
   void clearOperation() => clearField(2);
 
   @$pb.TagNumber(3)
-  $9.SDKError get error => $_getN(2);
+  $13.SDKError get error => $_getN(2);
   @$pb.TagNumber(3)
-  set error($9.SDKError v) { setField(3, v); }
+  set error($13.SDKError v) { setField(3, v); }
   @$pb.TagNumber(3)
   $core.bool hasError() => $_has(2);
   @$pb.TagNumber(3)
   void clearError() => clearField(3);
   @$pb.TagNumber(3)
-  $9.SDKError ensureError() => $_ensure(2);
+  $13.SDKError ensureError() => $_ensure(2);
 
   @$pb.TagNumber(4)
   $core.bool get recoverable => $_getBF(3);
@@ -4409,7 +4409,7 @@ enum SDKEvent_Event {
 class SDKEvent extends $pb.GeneratedMessage {
   factory SDKEvent({
     $fixnum.Int64? timestampMs,
-    $9.ErrorSeverity? severity,
+    $13.ErrorSeverity? severity,
     InitializationEvent? initialization,
     ConfigurationEvent? configuration,
     GenerationEvent? generation,
@@ -4425,11 +4425,11 @@ class SDKEvent extends $pb.GeneratedMessage {
     EventDestination? destination,
     $core.Map<$core.String, $core.String>? properties,
     VoiceLifecycleEvent? voice,
-    $10.VoiceEvent? voicePipeline,
+    $14.VoiceEvent? voicePipeline,
     ComponentLifecycleEvent? componentLifecycle,
-    $11.EventCategory? category,
+    $12.EventCategory? category,
     SDKComponent? component,
-    $9.SDKError? error,
+    $13.SDKError? error,
     SessionEvent? session,
     AuthEvent? auth,
     ModelRegistryEvent? modelRegistry,
@@ -4589,7 +4589,7 @@ class SDKEvent extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'SDKEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..oo(0, [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 17, 18, 19, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32])
     ..aInt64(1, _omitFieldNames ? '' : 'timestampMs')
-    ..e<$9.ErrorSeverity>(2, _omitFieldNames ? '' : 'severity', $pb.PbFieldType.OE, defaultOrMaker: $9.ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED, valueOf: $9.ErrorSeverity.valueOf, enumValues: $9.ErrorSeverity.values)
+    ..e<$13.ErrorSeverity>(2, _omitFieldNames ? '' : 'severity', $pb.PbFieldType.OE, defaultOrMaker: $13.ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED, valueOf: $13.ErrorSeverity.valueOf, enumValues: $13.ErrorSeverity.values)
     ..aOM<InitializationEvent>(3, _omitFieldNames ? '' : 'initialization', subBuilder: InitializationEvent.create)
     ..aOM<ConfigurationEvent>(4, _omitFieldNames ? '' : 'configuration', subBuilder: ConfigurationEvent.create)
     ..aOM<GenerationEvent>(5, _omitFieldNames ? '' : 'generation', subBuilder: GenerationEvent.create)
@@ -4605,11 +4605,11 @@ class SDKEvent extends $pb.GeneratedMessage {
     ..e<EventDestination>(15, _omitFieldNames ? '' : 'destination', $pb.PbFieldType.OE, defaultOrMaker: EventDestination.EVENT_DESTINATION_UNSPECIFIED, valueOf: EventDestination.valueOf, enumValues: EventDestination.values)
     ..m<$core.String, $core.String>(16, _omitFieldNames ? '' : 'properties', entryClassName: 'SDKEvent.PropertiesEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
     ..aOM<VoiceLifecycleEvent>(17, _omitFieldNames ? '' : 'voice', subBuilder: VoiceLifecycleEvent.create)
-    ..aOM<$10.VoiceEvent>(18, _omitFieldNames ? '' : 'voicePipeline', subBuilder: $10.VoiceEvent.create)
+    ..aOM<$14.VoiceEvent>(18, _omitFieldNames ? '' : 'voicePipeline', subBuilder: $14.VoiceEvent.create)
     ..aOM<ComponentLifecycleEvent>(19, _omitFieldNames ? '' : 'componentLifecycle', subBuilder: ComponentLifecycleEvent.create)
-    ..e<$11.EventCategory>(20, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: $11.EventCategory.EVENT_CATEGORY_UNSPECIFIED, valueOf: $11.EventCategory.valueOf, enumValues: $11.EventCategory.values)
+    ..e<$12.EventCategory>(20, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: $12.EventCategory.EVENT_CATEGORY_UNSPECIFIED, valueOf: $12.EventCategory.valueOf, enumValues: $12.EventCategory.values)
     ..e<SDKComponent>(21, _omitFieldNames ? '' : 'component', $pb.PbFieldType.OE, defaultOrMaker: SDKComponent.SDK_COMPONENT_UNSPECIFIED, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values)
-    ..aOM<$9.SDKError>(22, _omitFieldNames ? '' : 'error', subBuilder: $9.SDKError.create)
+    ..aOM<$13.SDKError>(22, _omitFieldNames ? '' : 'error', subBuilder: $13.SDKError.create)
     ..aOM<SessionEvent>(23, _omitFieldNames ? '' : 'session', subBuilder: SessionEvent.create)
     ..aOM<AuthEvent>(24, _omitFieldNames ? '' : 'auth', subBuilder: AuthEvent.create)
     ..aOM<ModelRegistryEvent>(25, _omitFieldNames ? '' : 'modelRegistry', subBuilder: ModelRegistryEvent.create)
@@ -4662,9 +4662,9 @@ class SDKEvent extends $pb.GeneratedMessage {
   void clearTimestampMs() => clearField(1);
 
   @$pb.TagNumber(2)
-  $9.ErrorSeverity get severity => $_getN(1);
+  $13.ErrorSeverity get severity => $_getN(1);
   @$pb.TagNumber(2)
-  set severity($9.ErrorSeverity v) { setField(2, v); }
+  set severity($13.ErrorSeverity v) { setField(2, v); }
   @$pb.TagNumber(2)
   $core.bool hasSeverity() => $_has(1);
   @$pb.TagNumber(2)
@@ -4830,15 +4830,15 @@ class SDKEvent extends $pb.GeneratedMessage {
   VoiceLifecycleEvent ensureVoice() => $_ensure(16);
 
   @$pb.TagNumber(18)
-  $10.VoiceEvent get voicePipeline => $_getN(17);
+  $14.VoiceEvent get voicePipeline => $_getN(17);
   @$pb.TagNumber(18)
-  set voicePipeline($10.VoiceEvent v) { setField(18, v); }
+  set voicePipeline($14.VoiceEvent v) { setField(18, v); }
   @$pb.TagNumber(18)
   $core.bool hasVoicePipeline() => $_has(17);
   @$pb.TagNumber(18)
   void clearVoicePipeline() => clearField(18);
   @$pb.TagNumber(18)
-  $10.VoiceEvent ensureVoicePipeline() => $_ensure(17);
+  $14.VoiceEvent ensureVoicePipeline() => $_ensure(17);
 
   @$pb.TagNumber(19)
   ComponentLifecycleEvent get componentLifecycle => $_getN(18);
@@ -4852,9 +4852,9 @@ class SDKEvent extends $pb.GeneratedMessage {
   ComponentLifecycleEvent ensureComponentLifecycle() => $_ensure(18);
 
   @$pb.TagNumber(20)
-  $11.EventCategory get category => $_getN(19);
+  $12.EventCategory get category => $_getN(19);
   @$pb.TagNumber(20)
-  set category($11.EventCategory v) { setField(20, v); }
+  set category($12.EventCategory v) { setField(20, v); }
   @$pb.TagNumber(20)
   $core.bool hasCategory() => $_has(19);
   @$pb.TagNumber(20)
@@ -4872,15 +4872,15 @@ class SDKEvent extends $pb.GeneratedMessage {
   /// Typed failure details for any failed event. When the event itself is
   /// only an error notification, use the failure oneof arm below.
   @$pb.TagNumber(22)
-  $9.SDKError get error => $_getN(21);
+  $13.SDKError get error => $_getN(21);
   @$pb.TagNumber(22)
-  set error($9.SDKError v) { setField(22, v); }
+  set error($13.SDKError v) { setField(22, v); }
   @$pb.TagNumber(22)
   $core.bool hasError() => $_has(21);
   @$pb.TagNumber(22)
   void clearError() => clearField(22);
   @$pb.TagNumber(22)
-  $9.SDKError ensureError() => $_ensure(21);
+  $13.SDKError ensureError() => $_ensure(21);
 
   @$pb.TagNumber(23)
   SessionEvent get session => $_getN(22);
@@ -5045,10 +5045,10 @@ class SDKEvent extends $pb.GeneratedMessage {
 /// above without interpreting payload-specific data.
 class SDKEventFilter extends $pb.GeneratedMessage {
   factory SDKEventFilter({
-    $core.Iterable<$11.EventCategory>? categories,
+    $core.Iterable<$12.EventCategory>? categories,
     $core.Iterable<SDKComponent>? components,
     $core.Iterable<EventDestination>? destinations,
-    $9.ErrorSeverity? minimumSeverity,
+    $13.ErrorSeverity? minimumSeverity,
     $core.String? sessionId,
     $core.String? operationId,
     $core.String? correlationId,
@@ -5090,10 +5090,10 @@ class SDKEventFilter extends $pb.GeneratedMessage {
   factory SDKEventFilter.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'SDKEventFilter', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..pc<$11.EventCategory>(1, _omitFieldNames ? '' : 'categories', $pb.PbFieldType.KE, valueOf: $11.EventCategory.valueOf, enumValues: $11.EventCategory.values, defaultEnumValue: $11.EventCategory.EVENT_CATEGORY_UNSPECIFIED)
+    ..pc<$12.EventCategory>(1, _omitFieldNames ? '' : 'categories', $pb.PbFieldType.KE, valueOf: $12.EventCategory.valueOf, enumValues: $12.EventCategory.values, defaultEnumValue: $12.EventCategory.EVENT_CATEGORY_UNSPECIFIED)
     ..pc<SDKComponent>(2, _omitFieldNames ? '' : 'components', $pb.PbFieldType.KE, valueOf: SDKComponent.valueOf, enumValues: SDKComponent.values, defaultEnumValue: SDKComponent.SDK_COMPONENT_UNSPECIFIED)
     ..pc<EventDestination>(3, _omitFieldNames ? '' : 'destinations', $pb.PbFieldType.KE, valueOf: EventDestination.valueOf, enumValues: EventDestination.values, defaultEnumValue: EventDestination.EVENT_DESTINATION_UNSPECIFIED)
-    ..e<$9.ErrorSeverity>(4, _omitFieldNames ? '' : 'minimumSeverity', $pb.PbFieldType.OE, defaultOrMaker: $9.ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED, valueOf: $9.ErrorSeverity.valueOf, enumValues: $9.ErrorSeverity.values)
+    ..e<$13.ErrorSeverity>(4, _omitFieldNames ? '' : 'minimumSeverity', $pb.PbFieldType.OE, defaultOrMaker: $13.ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED, valueOf: $13.ErrorSeverity.valueOf, enumValues: $13.ErrorSeverity.values)
     ..aOS(5, _omitFieldNames ? '' : 'sessionId')
     ..aOS(6, _omitFieldNames ? '' : 'operationId')
     ..aOS(7, _omitFieldNames ? '' : 'correlationId')
@@ -5124,7 +5124,7 @@ class SDKEventFilter extends $pb.GeneratedMessage {
   static SDKEventFilter? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $core.List<$11.EventCategory> get categories => $_getList(0);
+  $core.List<$12.EventCategory> get categories => $_getList(0);
 
   @$pb.TagNumber(2)
   $core.List<SDKComponent> get components => $_getList(1);
@@ -5133,9 +5133,9 @@ class SDKEventFilter extends $pb.GeneratedMessage {
   $core.List<EventDestination> get destinations => $_getList(2);
 
   @$pb.TagNumber(4)
-  $9.ErrorSeverity get minimumSeverity => $_getN(3);
+  $13.ErrorSeverity get minimumSeverity => $_getN(3);
   @$pb.TagNumber(4)
-  set minimumSeverity($9.ErrorSeverity v) { setField(4, v); }
+  set minimumSeverity($13.ErrorSeverity v) { setField(4, v); }
   @$pb.TagNumber(4)
   $core.bool hasMinimumSeverity() => $_has(3);
   @$pb.TagNumber(4)
@@ -5262,7 +5262,7 @@ class SDKEventPublishResult extends $pb.GeneratedMessage {
     $core.String? eventId,
     SDKEvent? normalizedEvent,
     $core.String? errorMessage,
-    $9.SDKError? error,
+    $13.SDKError? error,
   }) {
     final $result = create();
     if (accepted != null) {
@@ -5291,7 +5291,7 @@ class SDKEventPublishResult extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'eventId')
     ..aOM<SDKEvent>(3, _omitFieldNames ? '' : 'normalizedEvent', subBuilder: SDKEvent.create)
     ..aOS(4, _omitFieldNames ? '' : 'errorMessage')
-    ..aOM<$9.SDKError>(5, _omitFieldNames ? '' : 'error', subBuilder: $9.SDKError.create)
+    ..aOM<$13.SDKError>(5, _omitFieldNames ? '' : 'error', subBuilder: $13.SDKError.create)
     ..hasRequiredFields = false
   ;
 
@@ -5358,15 +5358,15 @@ class SDKEventPublishResult extends $pb.GeneratedMessage {
   void clearErrorMessage() => clearField(4);
 
   @$pb.TagNumber(5)
-  $9.SDKError get error => $_getN(4);
+  $13.SDKError get error => $_getN(4);
   @$pb.TagNumber(5)
-  set error($9.SDKError v) { setField(5, v); }
+  set error($13.SDKError v) { setField(5, v); }
   @$pb.TagNumber(5)
   $core.bool hasError() => $_has(4);
   @$pb.TagNumber(5)
   void clearError() => clearField(5);
   @$pb.TagNumber(5)
-  $9.SDKError ensureError() => $_ensure(4);
+  $13.SDKError ensureError() => $_ensure(4);
 }
 
 class SDKEventSubscribeRequest extends $pb.GeneratedMessage {

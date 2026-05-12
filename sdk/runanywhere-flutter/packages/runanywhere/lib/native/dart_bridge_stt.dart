@@ -13,8 +13,8 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/stt_options.pb.dart'
     show STTAudioSource_Source, STTOptions, STTOutput, STTTranscriptionRequest;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 /// STT component bridge for C++ interop.
 ///

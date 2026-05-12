@@ -11,8 +11,8 @@ import 'dart:typed_data';
 import 'package:ffi/ffi.dart';
 
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 /// Opaque handle wrapper — capability code never sees the underlying
 /// `Pointer`. The bridge dereferences this back into a native

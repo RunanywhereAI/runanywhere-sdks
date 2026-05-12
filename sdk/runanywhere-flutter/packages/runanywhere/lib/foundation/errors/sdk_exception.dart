@@ -367,6 +367,70 @@ class SDKException implements Exception {
         message: message ?? 'VLM generation was cancelled.',
       );
 
+  // ---------------------------------------------------------------------------
+  // Swift-parity helpers
+  // ---------------------------------------------------------------------------
+
+  /// Generic factory (mirrors Swift `SDKException.make`).
+  ///
+  /// `category` defaults to COMPONENT to match Swift's default. Useful when the
+  /// specific factories above don't cover the desired (code, category) pair.
+  static SDKException make({
+    required pb_enum.ErrorCode code,
+    required String message,
+    pb_enum.ErrorCategory category =
+        pb_enum.ErrorCategory.ERROR_CATEGORY_COMPONENT,
+    Object? underlyingError,
+  }) =>
+      _build(
+        code: code,
+        category: category,
+        message: message,
+        underlyingError: underlyingError,
+      );
+
+  /// Common shortcut: cancelled (mirrors Swift `SDKException.cancelled`).
+  static SDKException cancelled([String message = 'Operation cancelled']) =>
+      _build(
+        code: pb_enum.ErrorCode.ERROR_CODE_CANCELLED,
+        category: pb_enum.ErrorCategory.ERROR_CATEGORY_INTERNAL,
+        message: message,
+      );
+
+  /// Common shortcut: unknown (mirrors Swift wrapping path for arbitrary
+  /// non-SDK errors).
+  static SDKException unknown([String? message]) => _build(
+        code: pb_enum.ErrorCode.ERROR_CODE_UNSPECIFIED,
+        category: pb_enum.ErrorCategory.ERROR_CATEGORY_INTERNAL,
+        message: message ?? 'Unknown error',
+      );
+
+  /// Convert any error into an `SDKException` (mirrors Swift `from(_:)`).
+  ///
+  /// If [error] is already an `SDKException`, returns it unchanged. Otherwise
+  /// wraps the underlying value in a generic INTERNAL-category exception so
+  /// call sites can propagate uniformly.
+  static SDKException from(
+    Object? error, {
+    pb_enum.ErrorCategory category =
+        pb_enum.ErrorCategory.ERROR_CATEGORY_INTERNAL,
+  }) {
+    if (error is SDKException) return error;
+    if (error == null) {
+      return _build(
+        code: pb_enum.ErrorCode.ERROR_CODE_UNSPECIFIED,
+        category: category,
+        message: 'Unknown error',
+      );
+    }
+    return _build(
+      code: pb_enum.ErrorCode.ERROR_CODE_UNSPECIFIED,
+      category: category,
+      message: error.toString(),
+      underlyingError: error,
+    );
+  }
+
   static String _formatBytes(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
@@ -375,4 +439,13 @@ class SDKException implements Exception {
     }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
+}
+
+/// Mirrors Swift `RAErrorCode.isExpected`. Used by the logging pipeline to
+/// suppress noisy entries for routine cancellation paths.
+extension ErrorCodeClassification on pb_enum.ErrorCode {
+  /// Whether this error is expected/routine and shouldn't be logged as error.
+  bool get isExpected =>
+      this == pb_enum.ErrorCode.ERROR_CODE_CANCELLED ||
+      this == pb_enum.ErrorCode.ERROR_CODE_STREAM_CANCELLED;
 }

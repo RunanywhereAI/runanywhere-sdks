@@ -15,45 +15,45 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'model_types.pb.dart' as $2;
+import 'model_types.pb.dart' as $3;
 import 'model_types.pbjson.dart';
 
 export 'model_types.pb.dart';
 
 abstract class ModelRegistryServiceBase extends $pb.GeneratedService {
-  $async.Future<$2.ModelInfo> register($pb.ServerContext ctx, $2.ModelInfo request);
-  $async.Future<$2.ModelInfo> update($pb.ServerContext ctx, $2.ModelInfo request);
-  $async.Future<$2.ModelGetResult> get($pb.ServerContext ctx, $2.ModelGetRequest request);
-  $async.Future<$2.ModelListResult> list($pb.ServerContext ctx, $2.ModelListRequest request);
-  $async.Future<$2.ModelDeleteResult> remove($pb.ServerContext ctx, $2.ModelDeleteRequest request);
-  $async.Future<$2.ModelImportResult> import($pb.ServerContext ctx, $2.ModelImportRequest request);
-  $async.Future<$2.ModelDiscoveryResult> discover($pb.ServerContext ctx, $2.ModelDiscoveryRequest request);
-  $async.Future<$2.ModelRegistryRefreshResult> refresh($pb.ServerContext ctx, $2.ModelRegistryRefreshRequest request);
+  $async.Future<$3.ModelInfo> register($pb.ServerContext ctx, $3.ModelInfo request);
+  $async.Future<$3.ModelInfo> update($pb.ServerContext ctx, $3.ModelInfo request);
+  $async.Future<$3.ModelGetResult> get($pb.ServerContext ctx, $3.ModelGetRequest request);
+  $async.Future<$3.ModelListResult> list($pb.ServerContext ctx, $3.ModelListRequest request);
+  $async.Future<$3.ModelDeleteResult> remove($pb.ServerContext ctx, $3.ModelDeleteRequest request);
+  $async.Future<$3.ModelImportResult> import($pb.ServerContext ctx, $3.ModelImportRequest request);
+  $async.Future<$3.ModelDiscoveryResult> discover($pb.ServerContext ctx, $3.ModelDiscoveryRequest request);
+  $async.Future<$3.ModelRegistryRefreshResult> refresh($pb.ServerContext ctx, $3.ModelRegistryRefreshRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
-      case 'Register': return $2.ModelInfo();
-      case 'Update': return $2.ModelInfo();
-      case 'Get': return $2.ModelGetRequest();
-      case 'List': return $2.ModelListRequest();
-      case 'Remove': return $2.ModelDeleteRequest();
-      case 'Import': return $2.ModelImportRequest();
-      case 'Discover': return $2.ModelDiscoveryRequest();
-      case 'Refresh': return $2.ModelRegistryRefreshRequest();
+      case 'Register': return $3.ModelInfo();
+      case 'Update': return $3.ModelInfo();
+      case 'Get': return $3.ModelGetRequest();
+      case 'List': return $3.ModelListRequest();
+      case 'Remove': return $3.ModelDeleteRequest();
+      case 'Import': return $3.ModelImportRequest();
+      case 'Discover': return $3.ModelDiscoveryRequest();
+      case 'Refresh': return $3.ModelRegistryRefreshRequest();
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }
 
   $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx, $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
-      case 'Register': return this.register(ctx, request as $2.ModelInfo);
-      case 'Update': return this.update(ctx, request as $2.ModelInfo);
-      case 'Get': return this.get(ctx, request as $2.ModelGetRequest);
-      case 'List': return this.list(ctx, request as $2.ModelListRequest);
-      case 'Remove': return this.remove(ctx, request as $2.ModelDeleteRequest);
-      case 'Import': return this.import(ctx, request as $2.ModelImportRequest);
-      case 'Discover': return this.discover(ctx, request as $2.ModelDiscoveryRequest);
-      case 'Refresh': return this.refresh(ctx, request as $2.ModelRegistryRefreshRequest);
+      case 'Register': return this.register(ctx, request as $3.ModelInfo);
+      case 'Update': return this.update(ctx, request as $3.ModelInfo);
+      case 'Get': return this.get(ctx, request as $3.ModelGetRequest);
+      case 'List': return this.list(ctx, request as $3.ModelListRequest);
+      case 'Remove': return this.remove(ctx, request as $3.ModelDeleteRequest);
+      case 'Import': return this.import(ctx, request as $3.ModelImportRequest);
+      case 'Discover': return this.discover(ctx, request as $3.ModelDiscoveryRequest);
+      case 'Refresh': return this.refresh(ctx, request as $3.ModelRegistryRefreshRequest);
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }

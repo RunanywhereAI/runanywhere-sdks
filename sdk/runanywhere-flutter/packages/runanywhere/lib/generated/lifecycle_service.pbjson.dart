@@ -13,8 +13,8 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
-import 'model_types.pbjson.dart' as $0;
-import 'sdk_events.pbjson.dart' as $1;
+import 'model_types.pbjson.dart' as $3;
+import 'sdk_events.pbjson.dart' as $15;
 import 'thinking_tag_pattern.pbjson.dart' as $2;
 
 const $core.Map<$core.String, $core.dynamic> LifecycleServiceBase$json = {
@@ -29,24 +29,24 @@ const $core.Map<$core.String, $core.dynamic> LifecycleServiceBase$json = {
 
 @$core.Deprecated('Use lifecycleServiceDescriptor instead')
 const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> LifecycleServiceBase$messageJson = {
-  '.runanywhere.v1.ModelLoadRequest': $0.ModelLoadRequest$json,
-  '.runanywhere.v1.ModelLoadResult': $0.ModelLoadResult$json,
-  '.runanywhere.v1.ModelFileDescriptor': $0.ModelFileDescriptor$json,
-  '.runanywhere.v1.ModelUnloadRequest': $0.ModelUnloadRequest$json,
-  '.runanywhere.v1.ModelUnloadResult': $0.ModelUnloadResult$json,
-  '.runanywhere.v1.CurrentModelRequest': $0.CurrentModelRequest$json,
-  '.runanywhere.v1.CurrentModelResult': $0.CurrentModelResult$json,
-  '.runanywhere.v1.ModelInfo': $0.ModelInfo$json,
+  '.runanywhere.v1.ModelLoadRequest': $3.ModelLoadRequest$json,
+  '.runanywhere.v1.ModelLoadResult': $3.ModelLoadResult$json,
+  '.runanywhere.v1.ModelFileDescriptor': $3.ModelFileDescriptor$json,
+  '.runanywhere.v1.ModelUnloadRequest': $3.ModelUnloadRequest$json,
+  '.runanywhere.v1.ModelUnloadResult': $3.ModelUnloadResult$json,
+  '.runanywhere.v1.CurrentModelRequest': $3.CurrentModelRequest$json,
+  '.runanywhere.v1.CurrentModelResult': $3.CurrentModelResult$json,
+  '.runanywhere.v1.ModelInfo': $3.ModelInfo$json,
   '.runanywhere.v1.ThinkingTagPattern': $2.ThinkingTagPattern$json,
-  '.runanywhere.v1.ModelInfoMetadata': $0.ModelInfoMetadata$json,
-  '.runanywhere.v1.SingleFileArtifact': $0.SingleFileArtifact$json,
-  '.runanywhere.v1.ExpectedModelFiles': $0.ExpectedModelFiles$json,
-  '.runanywhere.v1.ArchiveArtifact': $0.ArchiveArtifact$json,
-  '.runanywhere.v1.MultiFileArtifact': $0.MultiFileArtifact$json,
-  '.runanywhere.v1.ModelRuntimeCompatibility': $0.ModelRuntimeCompatibility$json,
-  '.runanywhere.v1.ComponentLifecycleSnapshotRequest': $1.ComponentLifecycleSnapshotRequest$json,
-  '.runanywhere.v1.ComponentLifecycleSnapshotResult': $1.ComponentLifecycleSnapshotResult$json,
-  '.runanywhere.v1.ComponentLifecycleSnapshot': $1.ComponentLifecycleSnapshot$json,
+  '.runanywhere.v1.ModelInfoMetadata': $3.ModelInfoMetadata$json,
+  '.runanywhere.v1.SingleFileArtifact': $3.SingleFileArtifact$json,
+  '.runanywhere.v1.ExpectedModelFiles': $3.ExpectedModelFiles$json,
+  '.runanywhere.v1.ArchiveArtifact': $3.ArchiveArtifact$json,
+  '.runanywhere.v1.MultiFileArtifact': $3.MultiFileArtifact$json,
+  '.runanywhere.v1.ModelRuntimeCompatibility': $3.ModelRuntimeCompatibility$json,
+  '.runanywhere.v1.ComponentLifecycleSnapshotRequest': $15.ComponentLifecycleSnapshotRequest$json,
+  '.runanywhere.v1.ComponentLifecycleSnapshotResult': $15.ComponentLifecycleSnapshotResult$json,
+  '.runanywhere.v1.ComponentLifecycleSnapshot': $15.ComponentLifecycleSnapshot$json,
 };
 
 /// Descriptor for `Lifecycle`. Decode as a `google.protobuf.ServiceDescriptorProto`.

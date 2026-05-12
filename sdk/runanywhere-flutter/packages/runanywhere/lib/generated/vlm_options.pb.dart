@@ -15,7 +15,7 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'model_types.pbenum.dart' as $0;
+import 'model_types.pbenum.dart' as $3;
 import 'vlm_options.pbenum.dart';
 
 export 'vlm_options.pbenum.dart';
@@ -345,7 +345,7 @@ class VLMConfiguration extends $pb.GeneratedMessage {
     $core.double? temperature,
     $core.String? systemPrompt,
     $core.bool? streamingEnabled,
-    $0.InferenceFramework? preferredFramework,
+    $3.InferenceFramework? preferredFramework,
   }) {
     final $result = create();
     if (modelId != null) {
@@ -386,7 +386,7 @@ class VLMConfiguration extends $pb.GeneratedMessage {
     ..a<$core.double>(5, _omitFieldNames ? '' : 'temperature', $pb.PbFieldType.OF)
     ..aOS(6, _omitFieldNames ? '' : 'systemPrompt')
     ..aOB(7, _omitFieldNames ? '' : 'streamingEnabled')
-    ..e<$0.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $0.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $0.InferenceFramework.valueOf, enumValues: $0.InferenceFramework.values)
+    ..e<$3.InferenceFramework>(8, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $3.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $3.InferenceFramework.valueOf, enumValues: $3.InferenceFramework.values)
     ..hasRequiredFields = false
   ;
 
@@ -477,9 +477,9 @@ class VLMConfiguration extends $pb.GeneratedMessage {
   void clearStreamingEnabled() => clearField(7);
 
   @$pb.TagNumber(8)
-  $0.InferenceFramework get preferredFramework => $_getN(7);
+  $3.InferenceFramework get preferredFramework => $_getN(7);
   @$pb.TagNumber(8)
-  set preferredFramework($0.InferenceFramework v) { setField(8, v); }
+  set preferredFramework($3.InferenceFramework v) { setField(8, v); }
   @$pb.TagNumber(8)
   $core.bool hasPreferredFramework() => $_has(7);
   @$pb.TagNumber(8)
@@ -1488,6 +1488,172 @@ class VLMServiceState extends $pb.GeneratedMessage {
   $core.bool hasErrorCode() => $_has(7);
   @$pb.TagNumber(8)
   void clearErrorCode() => clearField(8);
+}
+
+///  ---------------------------------------------------------------------------
+///  VLM load-resolved-artifacts request / response.
+///
+///  Replaces the legacy trio `rac_vlm_create` + `rac_vlm_initialize` +
+///  `rac_vlm_destroy` (on error) with a single proto-backed call. Consumers
+///  pass the already-resolved model paths (primary model + optional mmproj
+///  vision projector) together with an optional model_id for telemetry. The
+///  response carries the resulting native handle as an opaque uint64; callers
+///  store the handle and use it for subsequent process/cancel/destroy calls.
+///  ---------------------------------------------------------------------------
+class VLMLoadResolvedArtifactsRequest extends $pb.GeneratedMessage {
+  factory VLMLoadResolvedArtifactsRequest({
+    $core.String? modelId,
+    $core.String? primaryModelPath,
+    $core.String? mmprojPath,
+  }) {
+    final $result = create();
+    if (modelId != null) {
+      $result.modelId = modelId;
+    }
+    if (primaryModelPath != null) {
+      $result.primaryModelPath = primaryModelPath;
+    }
+    if (mmprojPath != null) {
+      $result.mmprojPath = mmprojPath;
+    }
+    return $result;
+  }
+  VLMLoadResolvedArtifactsRequest._() : super();
+  factory VLMLoadResolvedArtifactsRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory VLMLoadResolvedArtifactsRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VLMLoadResolvedArtifactsRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'modelId')
+    ..aOS(2, _omitFieldNames ? '' : 'primaryModelPath')
+    ..aOS(3, _omitFieldNames ? '' : 'mmprojPath')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  VLMLoadResolvedArtifactsRequest clone() => VLMLoadResolvedArtifactsRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  VLMLoadResolvedArtifactsRequest copyWith(void Function(VLMLoadResolvedArtifactsRequest) updates) => super.copyWith((message) => updates(message as VLMLoadResolvedArtifactsRequest)) as VLMLoadResolvedArtifactsRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VLMLoadResolvedArtifactsRequest create() => VLMLoadResolvedArtifactsRequest._();
+  VLMLoadResolvedArtifactsRequest createEmptyInstance() => create();
+  static $pb.PbList<VLMLoadResolvedArtifactsRequest> createRepeated() => $pb.PbList<VLMLoadResolvedArtifactsRequest>();
+  @$core.pragma('dart2js:noInline')
+  static VLMLoadResolvedArtifactsRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VLMLoadResolvedArtifactsRequest>(create);
+  static VLMLoadResolvedArtifactsRequest? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get modelId => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set modelId($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasModelId() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearModelId() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.String get primaryModelPath => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set primaryModelPath($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasPrimaryModelPath() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearPrimaryModelPath() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get mmprojPath => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set mmprojPath($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasMmprojPath() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearMmprojPath() => clearField(3);
+}
+
+class VLMLoadResolvedArtifactsResponse extends $pb.GeneratedMessage {
+  factory VLMLoadResolvedArtifactsResponse({
+    $fixnum.Int64? handle,
+    $core.int? resultCode,
+    $core.String? errorMessage,
+  }) {
+    final $result = create();
+    if (handle != null) {
+      $result.handle = handle;
+    }
+    if (resultCode != null) {
+      $result.resultCode = resultCode;
+    }
+    if (errorMessage != null) {
+      $result.errorMessage = errorMessage;
+    }
+    return $result;
+  }
+  VLMLoadResolvedArtifactsResponse._() : super();
+  factory VLMLoadResolvedArtifactsResponse.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory VLMLoadResolvedArtifactsResponse.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VLMLoadResolvedArtifactsResponse', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'handle', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
+    ..a<$core.int>(2, _omitFieldNames ? '' : 'resultCode', $pb.PbFieldType.O3)
+    ..aOS(3, _omitFieldNames ? '' : 'errorMessage')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  VLMLoadResolvedArtifactsResponse clone() => VLMLoadResolvedArtifactsResponse()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  VLMLoadResolvedArtifactsResponse copyWith(void Function(VLMLoadResolvedArtifactsResponse) updates) => super.copyWith((message) => updates(message as VLMLoadResolvedArtifactsResponse)) as VLMLoadResolvedArtifactsResponse;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static VLMLoadResolvedArtifactsResponse create() => VLMLoadResolvedArtifactsResponse._();
+  VLMLoadResolvedArtifactsResponse createEmptyInstance() => create();
+  static $pb.PbList<VLMLoadResolvedArtifactsResponse> createRepeated() => $pb.PbList<VLMLoadResolvedArtifactsResponse>();
+  @$core.pragma('dart2js:noInline')
+  static VLMLoadResolvedArtifactsResponse getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<VLMLoadResolvedArtifactsResponse>(create);
+  static VLMLoadResolvedArtifactsResponse? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $fixnum.Int64 get handle => $_getI64(0);
+  @$pb.TagNumber(1)
+  set handle($fixnum.Int64 v) { $_setInt64(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasHandle() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearHandle() => clearField(1);
+
+  @$pb.TagNumber(2)
+  $core.int get resultCode => $_getIZ(1);
+  @$pb.TagNumber(2)
+  set resultCode($core.int v) { $_setSignedInt32(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasResultCode() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearResultCode() => clearField(2);
+
+  @$pb.TagNumber(3)
+  $core.String get errorMessage => $_getSZ(2);
+  @$pb.TagNumber(3)
+  set errorMessage($core.String v) { $_setString(2, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasErrorMessage() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearErrorMessage() => clearField(3);
 }
 
 class VLMApi {

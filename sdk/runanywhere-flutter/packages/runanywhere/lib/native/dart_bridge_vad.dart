@@ -14,8 +14,8 @@ import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/vad_options.pb.dart' as vad_pb;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 /// VAD component bridge for C++ interop.
 ///

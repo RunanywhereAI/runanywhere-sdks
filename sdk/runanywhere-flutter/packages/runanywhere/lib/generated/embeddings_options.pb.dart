@@ -16,7 +16,7 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'embeddings_options.pbenum.dart';
-import 'model_types.pbenum.dart' as $0;
+import 'model_types.pbenum.dart' as $3;
 
 export 'embeddings_options.pbenum.dart';
 
@@ -31,7 +31,7 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
     $core.int? embeddingDimension,
     $core.int? maxSequenceLength,
     $core.bool? normalize,
-    $0.InferenceFramework? preferredFramework,
+    $3.InferenceFramework? preferredFramework,
     $core.int? maxTokens,
     EmbeddingsNormalizeMode? normalizeMode,
     EmbeddingsPoolingStrategy? pooling,
@@ -76,7 +76,7 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
     ..a<$core.int>(2, _omitFieldNames ? '' : 'embeddingDimension', $pb.PbFieldType.O3)
     ..a<$core.int>(3, _omitFieldNames ? '' : 'maxSequenceLength', $pb.PbFieldType.O3)
     ..aOB(4, _omitFieldNames ? '' : 'normalize')
-    ..e<$0.InferenceFramework>(5, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $0.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $0.InferenceFramework.valueOf, enumValues: $0.InferenceFramework.values)
+    ..e<$3.InferenceFramework>(5, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $3.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $3.InferenceFramework.valueOf, enumValues: $3.InferenceFramework.values)
     ..a<$core.int>(6, _omitFieldNames ? '' : 'maxTokens', $pb.PbFieldType.O3)
     ..e<EmbeddingsNormalizeMode>(7, _omitFieldNames ? '' : 'normalizeMode', $pb.PbFieldType.OE, defaultOrMaker: EmbeddingsNormalizeMode.EMBEDDINGS_NORMALIZE_MODE_UNSPECIFIED, valueOf: EmbeddingsNormalizeMode.valueOf, enumValues: EmbeddingsNormalizeMode.values)
     ..e<EmbeddingsPoolingStrategy>(8, _omitFieldNames ? '' : 'pooling', $pb.PbFieldType.OE, defaultOrMaker: EmbeddingsPoolingStrategy.EMBEDDINGS_POOLING_STRATEGY_UNSPECIFIED, valueOf: EmbeddingsPoolingStrategy.valueOf, enumValues: EmbeddingsPoolingStrategy.values)
@@ -150,9 +150,9 @@ class EmbeddingsConfiguration extends $pb.GeneratedMessage {
 
   /// Preferred framework for the component. Absent = auto.
   @$pb.TagNumber(5)
-  $0.InferenceFramework get preferredFramework => $_getN(4);
+  $3.InferenceFramework get preferredFramework => $_getN(4);
   @$pb.TagNumber(5)
-  set preferredFramework($0.InferenceFramework v) { setField(5, v); }
+  set preferredFramework($3.InferenceFramework v) { setField(5, v); }
   @$pb.TagNumber(5)
   $core.bool hasPreferredFramework() => $_has(4);
   @$pb.TagNumber(5)

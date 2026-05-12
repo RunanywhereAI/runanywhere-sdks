@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:ffi' as ffi;
 import 'dart:typed_data';
+import 'package:ffi/ffi.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:record/record.dart';
+import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 
 /// Manages audio capture from microphone for STT services.
@@ -191,30 +194,37 @@ class AudioCaptureManager {
     }
   }
 
-  /// Update audio level for visualization
+  /// Update audio level for visualization.
   ///
   /// This would be called from platform-specific audio buffer callbacks.
-  /// Calculates RMS (root mean square) and normalizes to 0-1 range.
+  /// The RMS→dB DSP is centralised in commons (`rac_audio_compute_level_db`);
+  /// this method only normalises the dB reading to 0-1 for UI consumption.
   ///
-  /// [buffer] Float audio samples
+  /// [buffer] Float audio samples in [-1.0, 1.0].
   void updateAudioLevel(Float32List buffer) {
     if (buffer.isEmpty) return;
 
-    // Calculate RMS (root mean square) for audio level
-    double sum = 0.0;
-    for (final sample in buffer) {
-      sum += sample * sample;
+    final compute = RacNative.bindings.rac_audio_compute_level_db;
+    if (compute == null) {
+      throw UnsupportedError('rac_audio_compute_level_db is unavailable');
     }
 
-    final rms = _sqrt(sum / buffer.length);
-    final dbLevel =
-        20 * _log10(rms + 0.0001); // Add small value to avoid log(0)
+    final samples = calloc<ffi.Float>(buffer.length);
+    final outDb = calloc<ffi.Float>();
+    try {
+      samples.asTypedList(buffer.length).setAll(0, buffer);
+      compute(samples, buffer.length, outDb);
+      final dbLevel = outDb.value;
 
-    // Normalize to 0-1 range (-60dB to 0dB)
-    final normalizedLevel = (dbLevel + 60) / 60;
-    _audioLevel = normalizedLevel.clamp(0.0, 1.0);
+      // Normalize to 0-1 range (-60dB to 0dB).
+      final normalizedLevel = (dbLevel + 60) / 60;
+      _audioLevel = normalizedLevel.clamp(0.0, 1.0);
 
-    _audioLevelController.add(_audioLevel);
+      _audioLevelController.add(_audioLevel);
+    } finally {
+      calloc.free(samples);
+      calloc.free(outDb);
+    }
   }
 
   /// Convert audio buffer to PCM data
@@ -253,46 +263,6 @@ class AudioCaptureManager {
     unawaited(stopRecording());
     unawaited(_recordingStateController.close());
     unawaited(_audioLevelController.close());
-  }
-
-  // MARK: - Private Math Helpers
-
-  /// Square root helper
-  double _sqrt(double x) {
-    if (x <= 0) return 0.0;
-    // Use Newton's method for square root approximation
-    double guess = x / 2;
-    for (int i = 0; i < 10; i++) {
-      guess = (guess + x / guess) / 2;
-    }
-    return guess;
-  }
-
-  /// Base-10 logarithm helper
-  double _log10(double x) {
-    if (x <= 0) return -60.0; // Return minimum dB level
-    // Use natural log and convert to log10
-    // log10(x) = ln(x) / ln(10)
-    return _ln(x) / 2.302585092994046; // ln(10)
-  }
-
-  /// Natural logarithm helper (using Taylor series)
-  double _ln(double x) {
-    if (x <= 0) return double.negativeInfinity;
-    if (x == 1) return 0.0;
-
-    // For better convergence, use ln(x) = 2 * atanh((x-1)/(x+1))
-    final y = (x - 1) / (x + 1);
-    double result = 0.0;
-    double term = y;
-    const maxIterations = 20;
-
-    for (int i = 0; i < maxIterations; i++) {
-      result += term / (2 * i + 1);
-      term *= y * y;
-    }
-
-    return 2 * result;
   }
 }
 

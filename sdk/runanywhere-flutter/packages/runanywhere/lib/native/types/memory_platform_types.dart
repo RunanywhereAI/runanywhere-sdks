@@ -149,6 +149,34 @@ typedef RacHttpDownloadCancelCallbackNative = Int32 Function(
   Pointer<Void> userData,
 );
 
+/// File list directory callback:
+/// rac_result_t (*file_list_directory)(const char* dir_path,
+///     rac_directory_entry_t* out_entries, size_t* in_out_count, void* user_data)
+///
+/// Two-call semantics: pass NULL `out_entries` to query capacity (writes total
+/// entry count to *in_out_count), then allocate and call again with non-NULL
+/// `out_entries` to receive up to *in_out_count entries. See
+/// `rac_file_list_directory_fn` in rac_platform_adapter.h for full semantics.
+typedef RacFileListDirectoryCallbackNative = Int32 Function(
+  Pointer<Utf8> dirPath,
+  Pointer<Void> outEntries,
+  Pointer<IntPtr> inOutCount,
+  Pointer<Void> userData,
+);
+
+/// Is non-empty directory callback: rac_bool_t (*is_non_empty_directory)(const char* path, void* user_data)
+typedef RacIsNonEmptyDirectoryCallbackNative = Int32 Function(
+  Pointer<Utf8> path,
+  Pointer<Void> userData,
+);
+
+/// Get vendor ID callback: rac_result_t (*get_vendor_id)(char* out_buffer, size_t buffer_size, void* user_data)
+typedef RacGetVendorIdCallbackNative = Int32 Function(
+  Pointer<Utf8> outBuffer,
+  IntPtr bufferSize,
+  Pointer<Void> userData,
+);
+
 // =============================================================================
 // Structs (using FFI Struct for native memory layout)
 // =============================================================================
@@ -172,6 +200,11 @@ base class RacPlatformAdapterStruct extends Struct {
   external Pointer<Void> httpDownload;
   external Pointer<Void> httpDownloadCancel;
   external Pointer<Void> extractArchive;
+  external Pointer<NativeFunction<RacFileListDirectoryCallbackNative>>
+      fileListDirectory;
+  external Pointer<NativeFunction<RacIsNonEmptyDirectoryCallbackNative>>
+      isNonEmptyDirectory;
+  external Pointer<NativeFunction<RacGetVendorIdCallbackNative>> getVendorId;
   external Pointer<Void> userData;
 }
 

@@ -10,8 +10,8 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/adapters/http_client_adapter.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_auth.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 
 // =============================================================================

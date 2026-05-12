@@ -11,6 +11,8 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart';
+import 'package:runanywhere/public/capabilities/runanywhere_plugin_loader.dart'
+    show PluginInfo;
 
 /// Result of loading a plugin: registered name + return code (0 ok).
 class PluginLoadResult {
@@ -124,5 +126,16 @@ class DartBridgePluginLoader {
     } finally {
       calloc.free(namePtr);
     }
+  }
+
+  /// Snapshot of all currently-loaded plugins as [PluginInfo].
+  ///
+  /// Mirrors Swift `CppBridge.PluginLoader.listLoaded()`. The C registry does
+  /// not persist the original load path, so each entry returns the plugin
+  /// name with an empty `path` (matching Swift behaviour).
+  static List<PluginInfo> listLoaded() {
+    return registeredNames()
+        .map((name) => PluginInfo(name: name, path: ''))
+        .toList(growable: false);
   }
 }

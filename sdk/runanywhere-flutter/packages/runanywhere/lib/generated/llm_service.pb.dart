@@ -16,6 +16,7 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'llm_service.pbenum.dart';
+import 'voice_events.pbenum.dart' as $14;
 
 export 'llm_service.pbenum.dart';
 
@@ -628,7 +629,7 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     $fixnum.Int64? timestampUs,
     $core.String? token,
     $core.bool? isFinal,
-    LLMTokenKind? kind,
+    $14.TokenKind? kind,
     $core.int? tokenId,
     $core.double? logprob,
     $core.String? finishReason,
@@ -705,7 +706,7 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
     ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
     ..aOS(3, _omitFieldNames ? '' : 'token')
     ..aOB(4, _omitFieldNames ? '' : 'isFinal')
-    ..e<LLMTokenKind>(5, _omitFieldNames ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: LLMTokenKind.LLM_TOKEN_KIND_UNSPECIFIED, valueOf: LLMTokenKind.valueOf, enumValues: LLMTokenKind.values)
+    ..e<$14.TokenKind>(5, _omitFieldNames ? '' : 'kind', $pb.PbFieldType.OE, defaultOrMaker: $14.TokenKind.TOKEN_KIND_UNSPECIFIED, valueOf: $14.TokenKind.valueOf, enumValues: $14.TokenKind.values)
     ..a<$core.int>(6, _omitFieldNames ? '' : 'tokenId', $pb.PbFieldType.OU3)
     ..a<$core.double>(7, _omitFieldNames ? '' : 'logprob', $pb.PbFieldType.OF)
     ..aOS(8, _omitFieldNames ? '' : 'finishReason')
@@ -785,11 +786,12 @@ class LLMStreamEvent extends $pb.GeneratedMessage {
   @$pb.TagNumber(4)
   void clearIsFinal() => clearField(4);
 
-  /// Token semantic category (answer / thought / tool-call).
+  /// Token semantic category (answer / thought / tool-call). IDL-06:
+  /// canonical TokenKind from voice_events.proto.
   @$pb.TagNumber(5)
-  LLMTokenKind get kind => $_getN(4);
+  $14.TokenKind get kind => $_getN(4);
   @$pb.TagNumber(5)
-  set kind(LLMTokenKind v) { setField(5, v); }
+  set kind($14.TokenKind v) { setField(5, v); }
   @$pb.TagNumber(5)
   $core.bool hasKind() => $_has(4);
   @$pb.TagNumber(5)

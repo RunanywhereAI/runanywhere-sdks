@@ -8,7 +8,7 @@
 // `lib/native/dart_bridge_plugin_loader.dart`; this capability calls
 // into that bridge.
 
-import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_plugin_loader.dart';
 import 'package:runanywhere/native/types/basic_types.dart' show RacResultCode;
@@ -29,7 +29,16 @@ class RunAnywherePluginLoaderCapability {
   int get registeredCount => DartBridgePluginLoader.registeredCount();
 
   /// Snapshot of currently-registered plugin names.
+  ///
+  /// Mirrors Swift `RunAnywhere.pluginLoader.registeredNames()`.
   List<String> registeredNames() => DartBridgePluginLoader.registeredNames();
+
+  /// Snapshot of all currently-loaded plugins.
+  ///
+  /// Mirrors Swift `RunAnywhere.pluginLoader.listLoaded()`. The C registry
+  /// does not persist the original load path, so returned `PluginInfo` entries
+  /// carry only the plugin name with an empty path.
+  List<PluginInfo> listLoaded() => DartBridgePluginLoader.listLoaded();
 
   /// Load a shared library at [path] and register the
   /// `rac_plugin_entry_<stem>` it exposes with the in-process plugin

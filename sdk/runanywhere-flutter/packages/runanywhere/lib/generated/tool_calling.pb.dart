@@ -262,6 +262,63 @@ class ToolValueObject extends $pb.GeneratedMessage {
 }
 
 /// ---------------------------------------------------------------------------
+/// String wrapper used by the rac_tool_value_to_json_proto /
+/// rac_tool_value_from_json_proto ABIs. Carries either the JSON text rendered
+/// from a ToolValue, or the JSON text that should be parsed back into a
+/// ToolValue. Defined here (rather than reusing a stand-alone wrapper) so the
+/// tool-calling round-trip stays self-contained in this proto.
+/// ---------------------------------------------------------------------------
+class ToolValueJSON extends $pb.GeneratedMessage {
+  factory ToolValueJSON({
+    $core.String? json,
+  }) {
+    final $result = create();
+    if (json != null) {
+      $result.json = json;
+    }
+    return $result;
+  }
+  ToolValueJSON._() : super();
+  factory ToolValueJSON.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ToolValueJSON.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ToolValueJSON', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'json')
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ToolValueJSON clone() => ToolValueJSON()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ToolValueJSON copyWith(void Function(ToolValueJSON) updates) => super.copyWith((message) => updates(message as ToolValueJSON)) as ToolValueJSON;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ToolValueJSON create() => ToolValueJSON._();
+  ToolValueJSON createEmptyInstance() => create();
+  static $pb.PbList<ToolValueJSON> createRepeated() => $pb.PbList<ToolValueJSON>();
+  @$core.pragma('dart2js:noInline')
+  static ToolValueJSON getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ToolValueJSON>(create);
+  static ToolValueJSON? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.String get json => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set json($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasJson() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearJson() => clearField(1);
+}
+
+/// ---------------------------------------------------------------------------
 /// A single parameter definition for a tool.
 /// ---------------------------------------------------------------------------
 class ToolParameter extends $pb.GeneratedMessage {

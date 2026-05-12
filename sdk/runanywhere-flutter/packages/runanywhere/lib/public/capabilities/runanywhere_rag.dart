@@ -3,13 +3,16 @@
 // runanywhere_rag.dart — v4 RAG (Retrieval-Augmented Generation)
 // capability. Owns pipeline lifecycle, document management,
 // statistics, and querying. Mirrors Swift `RunAnywhere+RAG.swift`.
+//
+// Note: All RAG SDKEvents are auto-published by C++ commons
+// (rac_rag_proto_abi.cpp). Dart does not re-emit duplicates;
+// consumers subscribe via `EventBus.shared.stream` which surfaces
+// commons-emitted events through `rac_sdk_event_subscribe`.
 
-import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/rag.pb.dart';
-import 'package:runanywhere/internal/sdk_event_factories.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_rag.dart';
-import 'package:runanywhere/public/events/event_bus.dart';
 
 /// RAG (Retrieval-Augmented Generation) capability surface.
 ///
@@ -22,7 +25,7 @@ class RunAnywhereRAG {
   // -- pipeline lifecycle ---------------------------------------------------
 
   /// Create the RAG pipeline. Throws `SDKError.invalidState` if
-  /// creation fails. Publishes a generated RAG SDKEvent on success.
+  /// creation fails. C++ commons auto-publishes the RAG SDKEvent.
   Future<void> createPipeline(RAGConfiguration config) async {
     if (!DartBridge.isInitialized) {
       throw SDKException.notInitialized();
@@ -30,9 +33,7 @@ class RunAnywhereRAG {
 
     try {
       await DartBridgeRAG.shared.createPipelineAsync(config);
-      EventBus.shared.publish(SdkEventFactory.ragPipelineCreated());
     } catch (e) {
-      EventBus.shared.publish(SdkEventFactory.ragFailed(e));
       throw SDKException.invalidState('RAG pipeline creation failed: $e');
     }
   }
@@ -43,7 +44,6 @@ class RunAnywhereRAG {
       throw SDKException.notInitialized();
     }
     DartBridgeRAG.shared.destroyPipeline();
-    EventBus.shared.publish(SdkEventFactory.ragPipelineDestroyed());
   }
 
   // -- document management --------------------------------------------------
@@ -54,27 +54,10 @@ class RunAnywhereRAG {
       throw SDKException.notInitialized();
     }
 
-    EventBus.shared.publish(
-      SdkEventFactory.ragIngestionStarted(text.length),
-    );
-
-    final stopwatch = Stopwatch()..start();
-
     try {
       await DartBridgeRAG.shared
           .addDocumentAsync(text, metadataJson: metadataJSON);
-      stopwatch.stop();
-
-      final chunkCount = DartBridgeRAG.shared.documentCount;
-      EventBus.shared.publish(
-        SdkEventFactory.ragIngestionCompleted(
-          chunkCount: chunkCount,
-          durationMs: stopwatch.elapsedMilliseconds.toDouble(),
-        ),
-      );
     } catch (e) {
-      stopwatch.stop();
-      EventBus.shared.publish(SdkEventFactory.ragFailed(e));
       throw SDKException.invalidState('RAG ingestion failed: $e');
     }
   }
@@ -86,29 +69,9 @@ class RunAnywhereRAG {
       throw SDKException.notInitialized();
     }
 
-    final totalLength =
-        documents.fold<int>(0, (sum, d) => sum + (d['text']?.length ?? 0));
-
-    EventBus.shared.publish(
-      SdkEventFactory.ragIngestionStarted(totalLength),
-    );
-
-    final stopwatch = Stopwatch()..start();
-
     try {
       await DartBridgeRAG.shared.addDocumentsBatchAsync(documents);
-      stopwatch.stop();
-
-      final chunkCount = DartBridgeRAG.shared.documentCount;
-      EventBus.shared.publish(
-        SdkEventFactory.ragIngestionCompleted(
-          chunkCount: chunkCount,
-          durationMs: stopwatch.elapsedMilliseconds.toDouble(),
-        ),
-      );
     } catch (e) {
-      stopwatch.stop();
-      EventBus.shared.publish(SdkEventFactory.ragFailed(e));
       throw SDKException.invalidState('RAG batch ingestion failed: $e');
     }
   }
@@ -159,10 +122,6 @@ class RunAnywhereRAG {
       throw SDKException.notInitialized();
     }
 
-    EventBus.shared.publish(
-      SdkEventFactory.ragQueryStarted(question.length),
-    );
-
     try {
       final queryOptions = options ?? RAGQueryOptions(question: question);
 
@@ -177,21 +136,8 @@ class RunAnywhereRAG {
               topK: queryOptions.topK,
             );
 
-      final result = await DartBridgeRAG.shared.queryAsync(effectiveOptions);
-
-      EventBus.shared.publish(
-        SdkEventFactory.ragQueryCompleted(
-          answerLength: result.answer.length,
-          chunksRetrieved: result.retrievedChunks.length,
-          retrievalTimeMs: result.retrievalTimeMs.toDouble(),
-          generationTimeMs: result.generationTimeMs.toDouble(),
-          totalTimeMs: result.totalTimeMs.toDouble(),
-        ),
-      );
-
-      return result;
+      return await DartBridgeRAG.shared.queryAsync(effectiveOptions);
     } catch (e) {
-      EventBus.shared.publish(SdkEventFactory.ragFailed(e));
       throw SDKException.generationFailed('RAG query failed: $e');
     }
   }

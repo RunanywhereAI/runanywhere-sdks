@@ -51,10 +51,10 @@ final $typed_data.Uint8List embeddingsPoolingStrategyDescriptor = $convert.base6
 const EmbeddingsConfiguration$json = {
   '1': 'EmbeddingsConfiguration',
   '2': [
-    {'1': 'model_id', '3': 1, '4': 1, '5': 9, '10': 'modelId'},
-    {'1': 'embedding_dimension', '3': 2, '4': 1, '5': 5, '10': 'embeddingDimension'},
-    {'1': 'max_sequence_length', '3': 3, '4': 1, '5': 5, '10': 'maxSequenceLength'},
-    {'1': 'normalize', '3': 4, '4': 1, '5': 8, '9': 0, '10': 'normalize', '17': true},
+    {'1': 'model_id', '3': 1, '4': 1, '5': 9, '8': {}, '10': 'modelId'},
+    {'1': 'embedding_dimension', '3': 2, '4': 1, '5': 5, '8': {}, '10': 'embeddingDimension'},
+    {'1': 'max_sequence_length', '3': 3, '4': 1, '5': 5, '8': {}, '10': 'maxSequenceLength'},
+    {'1': 'normalize', '3': 4, '4': 1, '5': 8, '8': {}, '9': 0, '10': 'normalize', '17': true},
     {'1': 'preferred_framework', '3': 5, '4': 1, '5': 14, '6': '.runanywhere.v1.InferenceFramework', '9': 1, '10': 'preferredFramework', '17': true},
     {'1': 'max_tokens', '3': 6, '4': 1, '5': 5, '10': 'maxTokens'},
     {'1': 'normalize_mode', '3': 7, '4': 1, '5': 14, '6': '.runanywhere.v1.EmbeddingsNormalizeMode', '10': 'normalizeMode'},
@@ -70,22 +70,23 @@ const EmbeddingsConfiguration$json = {
 
 /// Descriptor for `EmbeddingsConfiguration`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List embeddingsConfigurationDescriptor = $convert.base64Decode(
-    'ChdFbWJlZGRpbmdzQ29uZmlndXJhdGlvbhIZCghtb2RlbF9pZBgBIAEoCVIHbW9kZWxJZBIvCh'
-    'NlbWJlZGRpbmdfZGltZW5zaW9uGAIgASgFUhJlbWJlZGRpbmdEaW1lbnNpb24SLgoTbWF4X3Nl'
-    'cXVlbmNlX2xlbmd0aBgDIAEoBVIRbWF4U2VxdWVuY2VMZW5ndGgSIQoJbm9ybWFsaXplGAQgAS'
-    'gISABSCW5vcm1hbGl6ZYgBARJYChNwcmVmZXJyZWRfZnJhbWV3b3JrGAUgASgOMiIucnVuYW55'
-    'd2hlcmUudjEuSW5mZXJlbmNlRnJhbWV3b3JrSAFSEnByZWZlcnJlZEZyYW1ld29ya4gBARIdCg'
-    'ptYXhfdG9rZW5zGAYgASgFUgltYXhUb2tlbnMSTgoObm9ybWFsaXplX21vZGUYByABKA4yJy5y'
-    'dW5hbnl3aGVyZS52MS5FbWJlZGRpbmdzTm9ybWFsaXplTW9kZVINbm9ybWFsaXplTW9kZRJDCg'
-    'dwb29saW5nGAggASgOMikucnVuYW55d2hlcmUudjEuRW1iZWRkaW5nc1Bvb2xpbmdTdHJhdGVn'
-    'eVIHcG9vbGluZxIkCgtjb25maWdfanNvbhgJIAEoCUgCUgpjb25maWdKc29uiAEBQgwKCl9ub3'
-    'JtYWxpemVCFgoUX3ByZWZlcnJlZF9mcmFtZXdvcmtCDgoMX2NvbmZpZ19qc29u');
+    'ChdFbWJlZGRpbmdzQ29uZmlndXJhdGlvbhIfCghtb2RlbF9pZBgBIAEoCUIEkLUYAVIHbW9kZW'
+    'xJZBI8ChNlbWJlZGRpbmdfZGltZW5zaW9uGAIgASgFQguKtRgDMzg0oLUYAVISZW1iZWRkaW5n'
+    'RGltZW5zaW9uEjsKE21heF9zZXF1ZW5jZV9sZW5ndGgYAyABKAVCC4q1GAM1MTKgtRgBUhFtYX'
+    'hTZXF1ZW5jZUxlbmd0aBIrCglub3JtYWxpemUYBCABKAhCCIq1GAR0cnVlSABSCW5vcm1hbGl6'
+    'ZYgBARJYChNwcmVmZXJyZWRfZnJhbWV3b3JrGAUgASgOMiIucnVuYW55d2hlcmUudjEuSW5mZX'
+    'JlbmNlRnJhbWV3b3JrSAFSEnByZWZlcnJlZEZyYW1ld29ya4gBARIdCgptYXhfdG9rZW5zGAYg'
+    'ASgFUgltYXhUb2tlbnMSTgoObm9ybWFsaXplX21vZGUYByABKA4yJy5ydW5hbnl3aGVyZS52MS'
+    '5FbWJlZGRpbmdzTm9ybWFsaXplTW9kZVINbm9ybWFsaXplTW9kZRJDCgdwb29saW5nGAggASgO'
+    'MikucnVuYW55d2hlcmUudjEuRW1iZWRkaW5nc1Bvb2xpbmdTdHJhdGVneVIHcG9vbGluZxIkCg'
+    'tjb25maWdfanNvbhgJIAEoCUgCUgpjb25maWdKc29uiAEBQgwKCl9ub3JtYWxpemVCFgoUX3By'
+    'ZWZlcnJlZF9mcmFtZXdvcmtCDgoMX2NvbmZpZ19qc29u');
 
 @$core.Deprecated('Use embeddingsOptionsDescriptor instead')
 const EmbeddingsOptions$json = {
   '1': 'EmbeddingsOptions',
   '2': [
-    {'1': 'normalize', '3': 1, '4': 1, '5': 8, '10': 'normalize'},
+    {'1': 'normalize', '3': 1, '4': 1, '5': 8, '8': {}, '10': 'normalize'},
     {'1': 'truncate', '3': 2, '4': 1, '5': 8, '9': 0, '10': 'truncate', '17': true},
     {'1': 'batch_size', '3': 3, '4': 1, '5': 5, '9': 1, '10': 'batchSize', '17': true},
     {'1': 'normalize_mode', '3': 4, '4': 1, '5': 14, '6': '.runanywhere.v1.EmbeddingsNormalizeMode', '10': 'normalizeMode'},
@@ -100,12 +101,13 @@ const EmbeddingsOptions$json = {
 
 /// Descriptor for `EmbeddingsOptions`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List embeddingsOptionsDescriptor = $convert.base64Decode(
-    'ChFFbWJlZGRpbmdzT3B0aW9ucxIcCglub3JtYWxpemUYASABKAhSCW5vcm1hbGl6ZRIfCgh0cn'
-    'VuY2F0ZRgCIAEoCEgAUgh0cnVuY2F0ZYgBARIiCgpiYXRjaF9zaXplGAMgASgFSAFSCWJhdGNo'
-    'U2l6ZYgBARJOCg5ub3JtYWxpemVfbW9kZRgEIAEoDjInLnJ1bmFueXdoZXJlLnYxLkVtYmVkZG'
-    'luZ3NOb3JtYWxpemVNb2RlUg1ub3JtYWxpemVNb2RlEkMKB3Bvb2xpbmcYBSABKA4yKS5ydW5h'
-    'bnl3aGVyZS52MS5FbWJlZGRpbmdzUG9vbGluZ1N0cmF0ZWd5Ugdwb29saW5nEhsKCW5fdGhyZW'
-    'FkcxgGIAEoBVIIblRocmVhZHNCCwoJX3RydW5jYXRlQg0KC19iYXRjaF9zaXpl');
+    'ChFFbWJlZGRpbmdzT3B0aW9ucxImCglub3JtYWxpemUYASABKAhCCIq1GAR0cnVlUglub3JtYW'
+    'xpemUSHwoIdHJ1bmNhdGUYAiABKAhIAFIIdHJ1bmNhdGWIAQESIgoKYmF0Y2hfc2l6ZRgDIAEo'
+    'BUgBUgliYXRjaFNpemWIAQESTgoObm9ybWFsaXplX21vZGUYBCABKA4yJy5ydW5hbnl3aGVyZS'
+    '52MS5FbWJlZGRpbmdzTm9ybWFsaXplTW9kZVINbm9ybWFsaXplTW9kZRJDCgdwb29saW5nGAUg'
+    'ASgOMikucnVuYW55d2hlcmUudjEuRW1iZWRkaW5nc1Bvb2xpbmdTdHJhdGVneVIHcG9vbGluZx'
+    'IbCgluX3RocmVhZHMYBiABKAVSCG5UaHJlYWRzQgsKCV90cnVuY2F0ZUINCgtfYmF0Y2hfc2l6'
+    'ZQ==');
 
 @$core.Deprecated('Use embeddingVectorDescriptor instead')
 const EmbeddingVector$json = {

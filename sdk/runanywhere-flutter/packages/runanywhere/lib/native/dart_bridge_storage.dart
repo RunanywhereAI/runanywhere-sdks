@@ -10,8 +10,8 @@ import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/storage_types.pb.dart' as storage_pb;
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 /// Storage bridge for C++ storage operations.
 /// Matches Swift's `CppBridge+Storage.swift`.

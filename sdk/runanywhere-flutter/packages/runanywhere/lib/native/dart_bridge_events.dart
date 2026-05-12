@@ -7,7 +7,8 @@ import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/sdk_events.pb.dart' as event_pb;
-import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 /// Native bridge for the stable SDKEvent proto-byte stream.
 class DartBridgeEvents {
@@ -105,6 +106,24 @@ class DartBridgeEvents {
     } finally {
       bindings.rac_proto_buffer_free(out);
       calloc.free(out);
+    }
+  }
+
+  /// Clear all queued SDK events without affecting active subscriptions.
+  ///
+  /// Mirrors Swift `CppBridge.SDKEvents.clearQueue()`. Returns `true` when the
+  /// commons symbol `rac_sdk_event_clear_queue` was located and invoked.
+  bool clearQueue() {
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final fn = lib.lookupFunction<Void Function(), void Function()>(
+        'rac_sdk_event_clear_queue',
+      );
+      fn();
+      return true;
+    } catch (e) {
+      _logger.debug('rac_sdk_event_clear_queue unavailable: $e');
+      return false;
     }
   }
 

@@ -15,27 +15,27 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'chat.pb.dart' as $5;
+import 'chat.pb.dart' as $6;
 import 'chat.pbjson.dart';
 
 export 'chat.pb.dart';
 
 abstract class ChatServiceBase extends $pb.GeneratedService {
-  $async.Future<$5.ChatGenerationResult> generate($pb.ServerContext ctx, $5.ChatGenerationRequest request);
-  $async.Future<$5.ChatStreamEvent> stream($pb.ServerContext ctx, $5.ChatGenerationRequest request);
+  $async.Future<$6.ChatGenerationResult> generate($pb.ServerContext ctx, $6.ChatGenerationRequest request);
+  $async.Future<$6.ChatStreamEvent> stream($pb.ServerContext ctx, $6.ChatGenerationRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
-      case 'Generate': return $5.ChatGenerationRequest();
-      case 'Stream': return $5.ChatGenerationRequest();
+      case 'Generate': return $6.ChatGenerationRequest();
+      case 'Stream': return $6.ChatGenerationRequest();
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }
 
   $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx, $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
-      case 'Generate': return this.generate(ctx, request as $5.ChatGenerationRequest);
-      case 'Stream': return this.stream(ctx, request as $5.ChatGenerationRequest);
+      case 'Generate': return this.generate(ctx, request as $6.ChatGenerationRequest);
+      case 'Stream': return this.stream(ctx, request as $6.ChatGenerationRequest);
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }

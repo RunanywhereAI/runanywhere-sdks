@@ -13,7 +13,7 @@
 //     blocking file download (`rac_http_download_execute`). These
 //     replace the per-SDK hand-rolled HTTP transports.
 //
-// Structure: a private `_RacBindings` class holds FFI lookups as final
+// Structure: the public `RacBindings` class holds FFI lookups as final
 // fields; `RacNative.bindings` is the shared singleton wrapping
 // `PlatformLoader.loadCommons()`.
 
@@ -388,61 +388,6 @@ typedef RacHandleCapabilitiesNative = ffi.Uint32 Function(
   ffi.Pointer<ffi.Void>,
 );
 typedef RacHandleCapabilitiesDart = int Function(ffi.Pointer<ffi.Void>);
-
-typedef RacVlmInitializeNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<Utf8>,
-);
-typedef RacVlmInitializeDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<Utf8>,
-  ffi.Pointer<Utf8>,
-);
-
-typedef RacVlmProcessProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacVlmProcessProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<RacProtoBuffer>,
-);
-
-typedef RacVlmStreamProtoCallbackNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Void>,
-);
-
-typedef RacVlmProcessStreamProtoNative = ffi.Int32 Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.Uint8>,
-  ffi.Size,
-  ffi.Pointer<ffi.NativeFunction<RacVlmStreamProtoCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<RacProtoBuffer>,
-);
-typedef RacVlmProcessStreamProtoDart = int Function(
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<ffi.Uint8>,
-  int,
-  ffi.Pointer<ffi.NativeFunction<RacVlmStreamProtoCallbackNative>>,
-  ffi.Pointer<ffi.Void>,
-  ffi.Pointer<RacProtoBuffer>,
-);
 
 typedef RacDiffusionInitializeNative = ffi.Int32 Function(
   ffi.Pointer<ffi.Void>,
@@ -1129,6 +1074,24 @@ typedef RacSdkEventPublishFailureDart = int Function(
 );
 
 // ============================================================================
+// Audio utils (Phase G — rac_audio_utils.h)
+// ============================================================================
+
+/// Matches `rac_audio_compute_level_db(const float*, size_t, float*)` →
+/// `rac_result_t`. Centralises the RMS→dB DSP that used to be hand-rolled in
+/// each platform SDK.
+typedef RacAudioComputeLevelDbNative = ffi.Int32 Function(
+  ffi.Pointer<ffi.Float>,
+  ffi.Size,
+  ffi.Pointer<ffi.Float>,
+);
+typedef RacAudioComputeLevelDbDart = int Function(
+  ffi.Pointer<ffi.Float>,
+  int,
+  ffi.Pointer<ffi.Float>,
+);
+
+// ============================================================================
 // Bindings facade
 // ============================================================================
 
@@ -1311,32 +1274,9 @@ class RacBindings {
             'rac_voice_agent_process_voice_turn_proto',
           ),
         ),
-        rac_vlm_create = _lookupOptional<RacCreateWithModelDart>(
-          () => lib.lookupFunction<RacCreateWithModelNative,
-              RacCreateWithModelDart>('rac_vlm_create'),
-        ),
-        rac_vlm_initialize = _lookupOptional<RacVlmInitializeDart>(
-          () =>
-              lib.lookupFunction<RacVlmInitializeNative, RacVlmInitializeDart>(
-                  'rac_vlm_initialize'),
-        ),
-        rac_vlm_destroy = _lookupOptional<RacDestroyHandleDart>(
-          () =>
-              lib.lookupFunction<RacDestroyHandleNative, RacDestroyHandleDart>(
-                  'rac_vlm_destroy'),
-        ),
-        rac_vlm_process_proto = _lookupOptional<RacVlmProcessProtoDart>(
-          () => lib.lookupFunction<RacVlmProcessProtoNative,
-              RacVlmProcessProtoDart>('rac_vlm_process_proto'),
-        ),
-        rac_vlm_process_stream_proto =
-            _lookupOptional<RacVlmProcessStreamProtoDart>(
-          () => lib.lookupFunction<RacVlmProcessStreamProtoNative,
-              RacVlmProcessStreamProtoDart>('rac_vlm_process_stream_proto'),
-        ),
-        rac_vlm_cancel_proto = _lookupOptional<RacHandleStatusDart>(
-          () => lib.lookupFunction<RacHandleStatusNative, RacHandleStatusDart>(
-            'rac_vlm_cancel_proto',
+        rac_vlm_cancel_lifecycle_proto = _lookupOptional<RacOutOnlyProtoDart>(
+          () => lib.lookupFunction<RacOutOnlyProtoNative, RacOutOnlyProtoDart>(
+            'rac_vlm_cancel_lifecycle_proto',
           ),
         ),
         rac_embeddings_create = _lookupOptional<RacCreateWithModelDart>(
@@ -1572,6 +1512,13 @@ class RacBindings {
             'rac_model_registry_proto_free',
           ),
         ),
+        rac_model_registry_discover_proto =
+            _lookupOptional<RacHandleBytesToProtoDart>(
+          () => lib.lookupFunction<RacHandleBytesToProtoNative,
+              RacHandleBytesToProtoDart>(
+            'rac_model_registry_discover_proto',
+          ),
+        ),
         rac_model_lifecycle_load_proto =
             _lookupOptional<RacModelLifecycleLoadProtoDart>(
           () => lib.lookupFunction<RacModelLifecycleLoadProtoNative,
@@ -1800,6 +1747,35 @@ class RacBindings {
               RacLifecycleRequestProtoDart>(
             'rac_structured_output_parse_proto',
           ),
+        ),
+        rac_structured_output_generate_proto =
+            _lookupOptional<RacLifecycleRequestProtoDart>(
+          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart>(
+            'rac_structured_output_generate_proto',
+          ),
+        ),
+        rac_structured_output_prepare_prompt_proto =
+            _lookupOptional<RacLifecycleRequestProtoDart>(
+          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart>(
+            'rac_structured_output_prepare_prompt_proto',
+          ),
+        ),
+        rac_audio_compute_level_db =
+            _lookupOptional<RacAudioComputeLevelDbDart>(
+          () => lib.lookupFunction<RacAudioComputeLevelDbNative,
+              RacAudioComputeLevelDbDart>('rac_audio_compute_level_db'),
+        ),
+        rac_tool_value_to_json_proto =
+            _lookupOptional<RacLifecycleRequestProtoDart>(
+          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart>('rac_tool_value_to_json_proto'),
+        ),
+        rac_tool_value_from_json_proto =
+            _lookupOptional<RacLifecycleRequestProtoDart>(
+          () => lib.lookupFunction<RacLifecycleRequestProtoNative,
+              RacLifecycleRequestProtoDart>('rac_tool_value_from_json_proto'),
         );
 
   // Shared proto buffers -----------------------------------------------------
@@ -1871,17 +1847,10 @@ class RacBindings {
   final RacVoiceAgentProcessTurnProtoDart?
       rac_voice_agent_process_voice_turn_proto;
 
-  final RacCreateWithModelDart? rac_vlm_create;
-
-  final RacVlmInitializeDart? rac_vlm_initialize;
-
-  final RacDestroyHandleDart? rac_vlm_destroy;
-
-  final RacVlmProcessProtoDart? rac_vlm_process_proto;
-
-  final RacVlmProcessStreamProtoDart? rac_vlm_process_stream_proto;
-
-  final RacHandleStatusDart? rac_vlm_cancel_proto;
+  /// `rac_vlm_cancel_lifecycle_proto` — cancel lifecycle-owned VLM
+  /// generation and return a serialized SDKEvent describing the
+  /// cancellation. Null when the commons binary predates Wave 7B.
+  final RacOutOnlyProtoDart? rac_vlm_cancel_lifecycle_proto;
 
   final RacCreateWithModelDart? rac_embeddings_create;
 
@@ -1987,6 +1956,8 @@ class RacBindings {
 
   final RacModelRegistryProtoFreeDart? rac_model_registry_proto_free;
 
+  final RacHandleBytesToProtoDart? rac_model_registry_discover_proto;
+
   // Model lifecycle proto-byte API ------------------------------------------
 
   final RacModelLifecycleLoadProtoDart? rac_model_lifecycle_load_proto;
@@ -2089,6 +2060,38 @@ class RacBindings {
   /// returns a `StructuredOutputResult`. Null when the commons binary predates
   /// the proto-byte structured-output API.
   final RacLifecycleRequestProtoDart? rac_structured_output_parse_proto;
+
+  /// `rac_structured_output_generate_proto` — runs full structured-output
+  /// generation against the lifecycle-owned LLM. Takes a serialized
+  /// `StructuredOutputRequest` and returns a `StructuredOutputResult`.
+  /// Null when the commons binary predates the proto-byte API.
+  final RacLifecycleRequestProtoDart? rac_structured_output_generate_proto;
+
+  /// `rac_structured_output_prepare_prompt_proto` — builds the
+  /// schema-instrumented prompt for structured output. Takes a serialized
+  /// `StructuredOutputRequest` and returns a `StructuredOutputPromptResult`.
+  /// Null when the commons binary predates the proto-byte API.
+  final RacLifecycleRequestProtoDart?
+      rac_structured_output_prepare_prompt_proto;
+
+  // Audio utils (Phase G — rac_audio_utils.h) -------------------------------
+
+  /// `rac_audio_compute_level_db` — RMS→dB DSP for level meters. Centralises
+  /// the hand-rolled DSP that used to live in each platform SDK's audio
+  /// capture manager. Null when the commons binary predates the export.
+  final RacAudioComputeLevelDbDart? rac_audio_compute_level_db;
+
+  // Tool value ↔ JSON proto APIs (Phase G — rac_tool_calling.h) -------------
+
+  /// `rac_tool_value_to_json_proto` — serializes a `ToolValue` proto into a
+  /// `ToolValueJSON` wrapper carrying the canonical JSON text. Null when the
+  /// commons binary predates the export.
+  final RacLifecycleRequestProtoDart? rac_tool_value_to_json_proto;
+
+  /// `rac_tool_value_from_json_proto` — parses a `ToolValueJSON` wrapper back
+  /// into a `ToolValue` proto. Null when the commons binary predates the
+  /// export.
+  final RacLifecycleRequestProtoDart? rac_tool_value_from_json_proto;
 }
 
 /// Entry point for the typed commons FFI bindings.

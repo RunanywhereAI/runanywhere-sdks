@@ -8,8 +8,9 @@ import 'dart:isolate';
 import 'package:ffi/ffi.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
+import 'package:runanywhere/native/types/memory_platform_types.dart';
 
 // =============================================================================
 // Exception Return Constants (must be compile-time constants for FFI)
@@ -38,6 +39,11 @@ typedef _SysctlByNameDart = int Function(
   Pointer<Uint64>,
   Pointer<Void>,
   int,
+);
+
+typedef _PlatformServiceAvailabilityCallbackNative = Int32 Function(
+  Int32 service,
+  Pointer<Void> userData,
 );
 
 // =============================================================================
@@ -81,6 +87,21 @@ class DartBridgePlatform {
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
+
+  // ---------------------------------------------------------------------------
+  // Platform Services (Foundation Models + System TTS/STT) state
+  // ---------------------------------------------------------------------------
+
+  /// Whether platform services availability callback has been registered.
+  static bool _servicesRegistered = false;
+
+  /// Persistent pointer for the platform services availability callback.
+  static Pointer<NativeFunction<_PlatformServiceAvailabilityCallbackNative>>?
+      _servicesAvailabilityCallback;
+
+  static const int _serviceFoundationModels = 1;
+  static const int _serviceSystemTts = 2;
+  static const int _serviceSystemStt = 3;
 
   /// Register platform adapter with C++.
   /// Must be called FIRST during SDK init (before any C++ operations).
@@ -141,10 +162,18 @@ class DartBridgePlatform {
         _exceptionalReturnInt32,
       );
 
-      // Clock — leave null so C++ falls back to std::chrono.
-      // Pointer.fromFunction is not thread-safe and rac_get_current_time_ms
-      // is called from C++ worker threads (download orchestrator, OkHttp
-      // transport) that are not attached to the Dart VM isolate.
+      // Clock — intentionally null. C++ falls back to std::chrono::system_clock
+      // in rac_time.cpp. This is the correct design for Dart FFI, not a
+      // workaround:
+      //   - Pointer.fromFunction trampolines are tied to the registering
+      //     isolate and crash (SIGABRT) when invoked from non-Dart threads.
+      //   - NativeCallable.listener is one-way/async and cannot return an
+      //     Int64 synchronously.
+      //   - rac_get_current_time_ms is called from C++ worker threads
+      //     (download orchestrator std::thread, OkHttp transport pool) with
+      //     no isolate affinity.
+      // std::chrono::system_clock yields equivalent ms timestamps to Swift's
+      // Foundation Date() callback, so no platform override is needed.
       adapter.ref.nowMs = nullptr;
 
       // Memory info callback
@@ -217,6 +246,71 @@ class DartBridgePlatform {
 
   /// Check if the adapter is registered.
   static bool get isRegistered => _isRegistered;
+
+  // ---------------------------------------------------------------------------
+  // Platform Services Registration (Foundation Models + System TTS/STT)
+  // ---------------------------------------------------------------------------
+
+  /// Whether platform services availability callback has been registered.
+  static bool get servicesRegistered => _servicesRegistered;
+
+  /// Register the platform services availability callback with C++.
+  /// Matches Swift's `CppBridge.Platform.register()` callback wiring for
+  /// Foundation Models / System TTS / System STT availability checks.
+  static Future<void> registerServices() async {
+    if (_servicesRegistered) return;
+
+    try {
+      final lib = PlatformLoader.load();
+
+      final registerCallback = lib.lookupFunction<
+          Int32 Function(
+              Pointer<NativeFunction<Int32 Function(Int32, Pointer<Void>)>>),
+          int Function(
+              Pointer<NativeFunction<Int32 Function(Int32, Pointer<Void>)>>)>(
+        'rac_platform_services_register_availability_callback',
+      );
+
+      _servicesAvailabilityCallback ??=
+          Pointer.fromFunction<_PlatformServiceAvailabilityCallbackNative>(
+        _platformServiceAvailabilityCallback,
+        _exceptionalReturnFalse,
+      );
+
+      final result = registerCallback(_servicesAvailabilityCallback!);
+      if (result != RacResultCode.success) {
+        _logger.warning(
+          'Failed to register platform services availability callback',
+          metadata: {'error_code': result},
+        );
+        return;
+      }
+
+      _servicesRegistered = true;
+      _logger.debug('Platform services registered');
+    } catch (e) {
+      // librac_commons.so may not export
+      // rac_platform_services_register_availability_callback in some
+      // configurations (B-FL-1-002). Log at warning so it's visible in
+      // non-debug builds, then mark as registered to avoid retry.
+      _logger.warning('Platform services registration not available: $e');
+      _servicesRegistered = true;
+    }
+  }
+}
+
+/// Platform service availability callback (Foundation Models / System TTS/STT).
+/// Matches Swift's `CppBridge.Platform.register()` availability replies.
+int _platformServiceAvailabilityCallback(int service, Pointer<Void> userData) {
+  switch (service) {
+    case DartBridgePlatform._serviceFoundationModels:
+      return 0;
+    case DartBridgePlatform._serviceSystemTts:
+    case DartBridgePlatform._serviceSystemStt:
+      return 1;
+    default:
+      return 0;
+  }
 }
 
 // =============================================================================

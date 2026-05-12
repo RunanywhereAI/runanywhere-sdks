@@ -15,30 +15,30 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'hardware_profile.pb.dart' as $0;
+import 'hardware_profile.pb.dart' as $1;
 import 'hardware_profile.pbjson.dart';
 
 export 'hardware_profile.pb.dart';
 
 abstract class HardwareServiceBase extends $pb.GeneratedService {
-  $async.Future<$0.HardwareProfileResult> getProfile($pb.ServerContext ctx, $0.HardwareProfileRequest request);
-  $async.Future<$0.HardwareProfileResult> getAccelerators($pb.ServerContext ctx, $0.HardwareAcceleratorsRequest request);
-  $async.Future<$0.HardwareAcceleratorPreferenceResult> setAcceleratorPreference($pb.ServerContext ctx, $0.HardwareAcceleratorPreferenceRequest request);
+  $async.Future<$1.HardwareProfileResult> getProfile($pb.ServerContext ctx, $1.HardwareProfileRequest request);
+  $async.Future<$1.HardwareProfileResult> getAccelerators($pb.ServerContext ctx, $1.HardwareAcceleratorsRequest request);
+  $async.Future<$1.HardwareAcceleratorPreferenceResult> setAcceleratorPreference($pb.ServerContext ctx, $1.HardwareAcceleratorPreferenceRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
-      case 'GetProfile': return $0.HardwareProfileRequest();
-      case 'GetAccelerators': return $0.HardwareAcceleratorsRequest();
-      case 'SetAcceleratorPreference': return $0.HardwareAcceleratorPreferenceRequest();
+      case 'GetProfile': return $1.HardwareProfileRequest();
+      case 'GetAccelerators': return $1.HardwareAcceleratorsRequest();
+      case 'SetAcceleratorPreference': return $1.HardwareAcceleratorPreferenceRequest();
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }
 
   $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx, $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
-      case 'GetProfile': return this.getProfile(ctx, request as $0.HardwareProfileRequest);
-      case 'GetAccelerators': return this.getAccelerators(ctx, request as $0.HardwareAcceleratorsRequest);
-      case 'SetAcceleratorPreference': return this.setAcceleratorPreference(ctx, request as $0.HardwareAcceleratorPreferenceRequest);
+      case 'GetProfile': return this.getProfile(ctx, request as $1.HardwareProfileRequest);
+      case 'GetAccelerators': return this.getAccelerators(ctx, request as $1.HardwareAcceleratorsRequest);
+      case 'SetAcceleratorPreference': return this.setAcceleratorPreference(ctx, request as $1.HardwareAcceleratorPreferenceRequest);
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }

@@ -10,7 +10,8 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:runanywhere/adapters/http_client_adapter.dart';
-import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
+import 'package:runanywhere/foundation/constants/sdk_constants.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/platform_loader.dart';
@@ -184,6 +185,15 @@ class DartBridgeAuth {
         final errorMsg = _parseAPIError(response.body, response.statusCode);
         return AuthResult.failure(errorMsg);
       }
+    } on HttpClientException catch (e) {
+      // FLT-E2E-R2-004: HTTP transport failures must surface as SDKException
+      // so callers (and EventBus subscribers) can observe auth outages rather
+      // than seeing a silently-failed AuthResult.
+      _logger.error('Authentication HTTP error',
+          metadata: {'error': e.toString(), 'status': '${e.statusCode}'});
+      throw SDKException.authenticationFailed(
+        'HTTP error rc=${e.statusCode} status=${e.statusCode}: ${e.message}',
+      );
     } catch (e) {
       _logger.error('Authentication error', metadata: {'error': e.toString()});
       return AuthResult.failure(e.toString());
@@ -276,6 +286,14 @@ class DartBridgeAuth {
         _logger.warning('Token refresh failed: $errorMsg');
         return AuthResult.failure(errorMsg);
       }
+    } on HttpClientException catch (e) {
+      // FLT-E2E-R2-004: surface HTTP transport failures as SDKException so
+      // refresh outages don't disappear as silent AuthResult.failure.
+      _logger.error('Token refresh HTTP error',
+          metadata: {'error': e.toString(), 'status': '${e.statusCode}'});
+      throw SDKException.authenticationFailed(
+        'HTTP error rc=${e.statusCode} status=${e.statusCode}: ${e.message}',
+      );
     } catch (e) {
       _logger.error('Token refresh error', metadata: {'error': e.toString()});
       return AuthResult.failure(e.toString());

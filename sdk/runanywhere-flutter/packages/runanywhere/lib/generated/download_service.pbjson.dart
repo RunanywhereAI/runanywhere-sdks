@@ -13,8 +13,8 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
-import 'model_types.pbjson.dart' as $7;
-import 'thinking_tag_pattern.pbjson.dart' as $8;
+import 'model_types.pbjson.dart' as $3;
+import 'thinking_tag_pattern.pbjson.dart' as $2;
 
 @$core.Deprecated('Use downloadStageDescriptor instead')
 const DownloadStage$json = {
@@ -341,15 +341,15 @@ const $core.Map<$core.String, $core.dynamic> DownloadServiceBase$json = {
 @$core.Deprecated('Use downloadServiceDescriptor instead')
 const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> DownloadServiceBase$messageJson = {
   '.runanywhere.v1.DownloadPlanRequest': DownloadPlanRequest$json,
-  '.runanywhere.v1.ModelInfo': $7.ModelInfo$json,
-  '.runanywhere.v1.ThinkingTagPattern': $8.ThinkingTagPattern$json,
-  '.runanywhere.v1.ModelInfoMetadata': $7.ModelInfoMetadata$json,
-  '.runanywhere.v1.SingleFileArtifact': $7.SingleFileArtifact$json,
-  '.runanywhere.v1.ExpectedModelFiles': $7.ExpectedModelFiles$json,
-  '.runanywhere.v1.ModelFileDescriptor': $7.ModelFileDescriptor$json,
-  '.runanywhere.v1.ArchiveArtifact': $7.ArchiveArtifact$json,
-  '.runanywhere.v1.MultiFileArtifact': $7.MultiFileArtifact$json,
-  '.runanywhere.v1.ModelRuntimeCompatibility': $7.ModelRuntimeCompatibility$json,
+  '.runanywhere.v1.ModelInfo': $3.ModelInfo$json,
+  '.runanywhere.v1.ThinkingTagPattern': $2.ThinkingTagPattern$json,
+  '.runanywhere.v1.ModelInfoMetadata': $3.ModelInfoMetadata$json,
+  '.runanywhere.v1.SingleFileArtifact': $3.SingleFileArtifact$json,
+  '.runanywhere.v1.ExpectedModelFiles': $3.ExpectedModelFiles$json,
+  '.runanywhere.v1.ModelFileDescriptor': $3.ModelFileDescriptor$json,
+  '.runanywhere.v1.ArchiveArtifact': $3.ArchiveArtifact$json,
+  '.runanywhere.v1.MultiFileArtifact': $3.MultiFileArtifact$json,
+  '.runanywhere.v1.ModelRuntimeCompatibility': $3.ModelRuntimeCompatibility$json,
   '.runanywhere.v1.DownloadPlanResult': DownloadPlanResult$json,
   '.runanywhere.v1.DownloadFilePlan': DownloadFilePlan$json,
   '.runanywhere.v1.DownloadStartRequest': DownloadStartRequest$json,

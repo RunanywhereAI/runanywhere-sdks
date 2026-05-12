@@ -20,8 +20,8 @@ import 'package:runanywhere/generated/llm_service.pb.dart'
     show LLMGenerateRequest, LLMStreamEvent;
 import 'package:runanywhere/generated/sdk_events.pb.dart' as sdk_events_pb;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 /// LLM component bridge for C++ interop.
 ///

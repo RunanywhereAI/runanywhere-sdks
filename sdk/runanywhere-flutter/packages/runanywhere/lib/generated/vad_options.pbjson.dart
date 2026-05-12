@@ -76,9 +76,9 @@ const VADConfiguration$json = {
   '1': 'VADConfiguration',
   '2': [
     {'1': 'model_id', '3': 1, '4': 1, '5': 9, '10': 'modelId'},
-    {'1': 'sample_rate', '3': 2, '4': 1, '5': 5, '10': 'sampleRate'},
-    {'1': 'frame_length_ms', '3': 3, '4': 1, '5': 5, '10': 'frameLengthMs'},
-    {'1': 'threshold', '3': 4, '4': 1, '5': 2, '10': 'threshold'},
+    {'1': 'sample_rate', '3': 2, '4': 1, '5': 5, '8': {}, '10': 'sampleRate'},
+    {'1': 'frame_length_ms', '3': 3, '4': 1, '5': 5, '8': {}, '10': 'frameLengthMs'},
+    {'1': 'threshold', '3': 4, '4': 1, '5': 2, '8': {}, '10': 'threshold'},
     {'1': 'enable_auto_calibration', '3': 5, '4': 1, '5': 8, '10': 'enableAutoCalibration'},
     {'1': 'calibration_multiplier', '3': 6, '4': 1, '5': 2, '10': 'calibrationMultiplier'},
     {'1': 'preferred_framework', '3': 7, '4': 1, '5': 14, '6': '.runanywhere.v1.InferenceFramework', '9': 0, '10': 'preferredFramework', '17': true},
@@ -94,16 +94,17 @@ const VADConfiguration$json = {
 
 /// Descriptor for `VADConfiguration`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List vADConfigurationDescriptor = $convert.base64Decode(
-    'ChBWQURDb25maWd1cmF0aW9uEhkKCG1vZGVsX2lkGAEgASgJUgdtb2RlbElkEh8KC3NhbXBsZV'
-    '9yYXRlGAIgASgFUgpzYW1wbGVSYXRlEiYKD2ZyYW1lX2xlbmd0aF9tcxgDIAEoBVINZnJhbWVM'
-    'ZW5ndGhNcxIcCgl0aHJlc2hvbGQYBCABKAJSCXRocmVzaG9sZBI2ChdlbmFibGVfYXV0b19jYW'
-    'xpYnJhdGlvbhgFIAEoCFIVZW5hYmxlQXV0b0NhbGlicmF0aW9uEjUKFmNhbGlicmF0aW9uX211'
-    'bHRpcGxpZXIYBiABKAJSFWNhbGlicmF0aW9uTXVsdGlwbGllchJYChNwcmVmZXJyZWRfZnJhbW'
-    'V3b3JrGAcgASgOMiIucnVuYW55d2hlcmUudjEuSW5mZXJlbmNlRnJhbWV3b3JrSABSEnByZWZl'
-    'cnJlZEZyYW1ld29ya4gBARIiCgptb2RlbF9wYXRoGAggASgJSAFSCW1vZGVsUGF0aIgBARIuCh'
-    'N3aW5kb3dfc2l6ZV9zYW1wbGVzGAkgASgFUhF3aW5kb3dTaXplU2FtcGxlcxIzChZtYXhfc3Bl'
-    'ZWNoX2R1cmF0aW9uX21zGAogASgFUhNtYXhTcGVlY2hEdXJhdGlvbk1zQhYKFF9wcmVmZXJyZW'
-    'RfZnJhbWV3b3JrQg0KC19tb2RlbF9wYXRo');
+    'ChBWQURDb25maWd1cmF0aW9uEhkKCG1vZGVsX2lkGAEgASgJUgdtb2RlbElkEjQKC3NhbXBsZV'
+    '9yYXRlGAIgASgFQhOKtRgFMTYwMDCgtRgBqLUYgPcCUgpzYW1wbGVSYXRlEjgKD2ZyYW1lX2xl'
+    'bmd0aF9tcxgDIAEoBUIQirUYAzEwMKC1GAGotRjoB1INZnJhbWVMZW5ndGhNcxI9Cgl0aHJlc2'
+    'hvbGQYBCABKAJCH4q1GAUwLjAxNbG1GAAAAAAAAAAAubUYAAAAAAAA8D9SCXRocmVzaG9sZBI2'
+    'ChdlbmFibGVfYXV0b19jYWxpYnJhdGlvbhgFIAEoCFIVZW5hYmxlQXV0b0NhbGlicmF0aW9uEj'
+    'UKFmNhbGlicmF0aW9uX211bHRpcGxpZXIYBiABKAJSFWNhbGlicmF0aW9uTXVsdGlwbGllchJY'
+    'ChNwcmVmZXJyZWRfZnJhbWV3b3JrGAcgASgOMiIucnVuYW55d2hlcmUudjEuSW5mZXJlbmNlRn'
+    'JhbWV3b3JrSABSEnByZWZlcnJlZEZyYW1ld29ya4gBARIiCgptb2RlbF9wYXRoGAggASgJSAFS'
+    'CW1vZGVsUGF0aIgBARIuChN3aW5kb3dfc2l6ZV9zYW1wbGVzGAkgASgFUhF3aW5kb3dTaXplU2'
+    'FtcGxlcxIzChZtYXhfc3BlZWNoX2R1cmF0aW9uX21zGAogASgFUhNtYXhTcGVlY2hEdXJhdGlv'
+    'bk1zQhYKFF9wcmVmZXJyZWRfZnJhbWV3b3JrQg0KC19tb2RlbF9wYXRo');
 
 @$core.Deprecated('Use vADOptionsDescriptor instead')
 const VADOptions$json = {

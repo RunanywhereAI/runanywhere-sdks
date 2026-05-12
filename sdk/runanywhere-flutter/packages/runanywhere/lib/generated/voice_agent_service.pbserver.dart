@@ -15,39 +15,39 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'stt_options.pb.dart' as $2;
-import 'tts_options.pb.dart' as $1;
-import 'voice_agent_service.pb.dart' as $5;
+import 'stt_options.pb.dart' as $21;
+import 'tts_options.pb.dart' as $22;
+import 'voice_agent_service.pb.dart' as $24;
 import 'voice_agent_service.pbjson.dart';
-import 'voice_events.pb.dart' as $0;
+import 'voice_events.pb.dart' as $14;
 
 export 'voice_agent_service.pb.dart';
 
 abstract class VoiceAgentServiceBase extends $pb.GeneratedService {
-  $async.Future<$0.VoiceEvent> stream($pb.ServerContext ctx, $5.VoiceAgentRequest request);
-  $async.Future<$5.VoiceAgentResult> processTurn($pb.ServerContext ctx, $5.VoiceAgentTurnRequest request);
-  $async.Future<$2.STTOutput> transcribe($pb.ServerContext ctx, $5.VoiceAgentTranscribeProtoRequest request);
-  $async.Future<$1.TTSOutput> synthesizeSpeech($pb.ServerContext ctx, $5.VoiceAgentSynthesizeSpeechProtoRequest request);
-  $async.Future<$5.VoiceAgentResult> configure($pb.ServerContext ctx, $5.VoiceAgentComposeConfig request);
+  $async.Future<$14.VoiceEvent> stream($pb.ServerContext ctx, $24.VoiceAgentRequest request);
+  $async.Future<$24.VoiceAgentResult> processTurn($pb.ServerContext ctx, $24.VoiceAgentTurnRequest request);
+  $async.Future<$21.STTOutput> transcribe($pb.ServerContext ctx, $24.VoiceAgentTranscribeProtoRequest request);
+  $async.Future<$22.TTSOutput> synthesizeSpeech($pb.ServerContext ctx, $24.VoiceAgentSynthesizeSpeechProtoRequest request);
+  $async.Future<$24.VoiceAgentResult> configure($pb.ServerContext ctx, $24.VoiceAgentComposeConfig request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
-      case 'Stream': return $5.VoiceAgentRequest();
-      case 'ProcessTurn': return $5.VoiceAgentTurnRequest();
-      case 'Transcribe': return $5.VoiceAgentTranscribeProtoRequest();
-      case 'SynthesizeSpeech': return $5.VoiceAgentSynthesizeSpeechProtoRequest();
-      case 'Configure': return $5.VoiceAgentComposeConfig();
+      case 'Stream': return $24.VoiceAgentRequest();
+      case 'ProcessTurn': return $24.VoiceAgentTurnRequest();
+      case 'Transcribe': return $24.VoiceAgentTranscribeProtoRequest();
+      case 'SynthesizeSpeech': return $24.VoiceAgentSynthesizeSpeechProtoRequest();
+      case 'Configure': return $24.VoiceAgentComposeConfig();
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }
 
   $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx, $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
-      case 'Stream': return this.stream(ctx, request as $5.VoiceAgentRequest);
-      case 'ProcessTurn': return this.processTurn(ctx, request as $5.VoiceAgentTurnRequest);
-      case 'Transcribe': return this.transcribe(ctx, request as $5.VoiceAgentTranscribeProtoRequest);
-      case 'SynthesizeSpeech': return this.synthesizeSpeech(ctx, request as $5.VoiceAgentSynthesizeSpeechProtoRequest);
-      case 'Configure': return this.configure(ctx, request as $5.VoiceAgentComposeConfig);
+      case 'Stream': return this.stream(ctx, request as $24.VoiceAgentRequest);
+      case 'ProcessTurn': return this.processTurn(ctx, request as $24.VoiceAgentTurnRequest);
+      case 'Transcribe': return this.transcribe(ctx, request as $24.VoiceAgentTranscribeProtoRequest);
+      case 'SynthesizeSpeech': return this.synthesizeSpeech(ctx, request as $24.VoiceAgentSynthesizeSpeechProtoRequest);
+      case 'Configure': return this.configure(ctx, request as $24.VoiceAgentComposeConfig);
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }

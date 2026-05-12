@@ -8,9 +8,9 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart' as model_enum;
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
 import 'package:runanywhere/native/type_conversions/model_types_cpp_bridge.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 base class RacResolvedModelFileStruct extends Struct {
   external Pointer<Utf8> relativePath;
@@ -449,19 +449,11 @@ class DartBridgeModelPaths {
     final archiveType = model.hasArchive()
         ? model.archive.type
         : _archiveTypeFromArtifactType(model.artifactType);
-    switch (archiveType) {
-      case model_enum.ArchiveType.ARCHIVE_TYPE_ZIP:
-        return 0;
-      case model_enum.ArchiveType.ARCHIVE_TYPE_TAR_BZ2:
-        return 1;
-      case model_enum.ArchiveType.ARCHIVE_TYPE_TAR_GZ:
-        return 2;
-      case model_enum.ArchiveType.ARCHIVE_TYPE_TAR_XZ:
-        return 3;
-      case model_enum.ArchiveType.ARCHIVE_TYPE_UNSPECIFIED:
-      default:
-        return -1;
-    }
+    // Delegates to commons' `rac_archive_type_from_proto` via the
+    // `ProtoArchiveTypeCppBridge.toC()` extension. Returns
+    // `RAC_ARCHIVE_TYPE_NONE` (-1) on UNSPECIFIED / unrecognized inputs,
+    // matching the prior hand-written switch.
+    return archiveType.toC();
   }
 
   model_enum.ArchiveType _archiveTypeFromArtifactType(
@@ -481,18 +473,11 @@ class DartBridgeModelPaths {
     final structure = model.hasArchive()
         ? model.archive.structure
         : model_enum.ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN;
-    switch (structure) {
-      case model_enum.ArchiveStructure.ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED:
-        return 0;
-      case model_enum.ArchiveStructure.ARCHIVE_STRUCTURE_DIRECTORY_BASED:
-        return 1;
-      case model_enum.ArchiveStructure.ARCHIVE_STRUCTURE_NESTED_DIRECTORY:
-        return 2;
-      case model_enum.ArchiveStructure.ARCHIVE_STRUCTURE_UNSPECIFIED:
-      case model_enum.ArchiveStructure.ARCHIVE_STRUCTURE_UNKNOWN:
-      default:
-        return 99;
-    }
+    // Delegates to commons' `rac_archive_structure_from_proto` via the
+    // `ProtoArchiveStructureCppBridge.toC()` extension. Falls back to
+    // `RAC_ARCHIVE_STRUCTURE_UNKNOWN` (99) for UNSPECIFIED / unrecognized,
+    // matching the prior hand-written switch.
+    return structure.toC();
   }
 
   ModelPathResolution _copyResolution(RacModelPathResolutionStruct resolution) {

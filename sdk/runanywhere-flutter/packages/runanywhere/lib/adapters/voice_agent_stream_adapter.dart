@@ -36,8 +36,11 @@ class VoiceAgentStreamAdapter {
 
   final ffi.Pointer<ffi.Void> _handle;
 
-  /// Open a new event subscription. The returned broadcast stream emits
-  /// one [VoiceEvent] per agent event until cancelled or the agent ends.
+  /// Open a new event subscription. The returned stream emits one
+  /// [VoiceEvent] per agent event until cancelled or the agent ends.
+  /// Each call produces a fresh single-subscription stream; multiple
+  /// streams attached to the same native handle fan out from one C
+  /// callback registration via [_VoiceFanOutRegistry].
   Stream<VoiceEvent> stream() {
     final fanOut = _VoiceFanOutRegistry.fanOutFor(_handle);
     late StreamController<VoiceEvent> controller;

@@ -3,16 +3,12 @@
 import 'dart:async';
 import 'dart:ffi';
 
-import 'package:ffi/ffi.dart';
-import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
-import 'package:runanywhere/native/dart_bridge_auth.dart'
-    hide RacSdkConfigStruct;
+import 'package:runanywhere/generated/sdk_init.pb.dart';
+import 'package:runanywhere/native/dart_bridge_auth.dart';
 import 'package:runanywhere/native/dart_bridge_device.dart';
 import 'package:runanywhere/native/dart_bridge_download.dart';
 import 'package:runanywhere/native/dart_bridge_embeddings.dart';
-import 'package:runanywhere/native/dart_bridge_environment.dart'
-    show RacSdkConfigStruct;
 import 'package:runanywhere/native/dart_bridge_events.dart';
 import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_http.dart';
@@ -23,8 +19,8 @@ import 'package:runanywhere/native/dart_bridge_model_lifecycle.dart';
 import 'package:runanywhere/native/dart_bridge_model_paths.dart';
 import 'package:runanywhere/native/dart_bridge_model_registry.dart';
 import 'package:runanywhere/native/dart_bridge_platform.dart';
-import 'package:runanywhere/native/dart_bridge_platform_services.dart';
 import 'package:runanywhere/native/dart_bridge_rag.dart';
+import 'package:runanywhere/native/dart_bridge_sdk_init.dart';
 import 'package:runanywhere/native/dart_bridge_state.dart';
 import 'package:runanywhere/native/dart_bridge_storage.dart';
 import 'package:runanywhere/native/dart_bridge_stt.dart';
@@ -92,7 +88,8 @@ class DartBridge {
   /// 1. Load native library
   /// 2. Register platform adapter FIRST (file ops, logging, keychain)
   /// 3. Configure C++ logging level (rac_configure_logging)
-  /// 4. Initialize SDK config (rac_sdk_init) - sets platform, version
+  /// 4. Drive Phase 1 of SDK init through `rac_sdk_init_phase1_proto`
+  ///    (validates inputs + runs `rac_state_initialize` inside commons)
   /// 5. Register events callback (analytics routing)
   /// 6. Initialize telemetry manager
   /// 7. Register device callbacks
@@ -126,11 +123,26 @@ class DartBridge {
     _configureLogging(environment);
     _logger.debug('C++ logging configured');
 
-    // Step 4: Initialize SDK with configuration
-    // Matches Swift: rac_sdk_init(&sdkConfig) in CppBridge.State.initialize()
-    // This is CRITICAL - the LlamaCPP backend needs this to be set
-    _initializeSdkConfig(environment);
-    _logger.debug('SDK config initialized');
+    // Step 4: Initialize SDK with configuration (Phase 1 proto-based path)
+    // Matches Swift: CppBridge.SdkInit.phase1(...) in
+    // sdk/runanywhere-swift/Sources/RunAnywhere/Foundation/Bridge/Extensions/CppBridge+SdkInit.swift
+    // Routes through rac_sdk_init_phase1_proto in commons; supersedes the
+    // legacy struct-based rac_sdk_init entry point.
+    try {
+      DartBridgeSdkInit.phase1(SdkInitPhase1Request(
+        environment: _toSdkInitEnvironment(environment),
+        // apiKey/baseUrl/deviceId are wired in Phase 2 once they're resolved
+        // (Keychain lookup + caller params). Phase 1 only sets the runtime
+        // environment + platform/version metadata that commons can derive
+        // internally.
+      ));
+      _logger.debug('SDK Phase 1 (proto) initialized');
+    } catch (e) {
+      // Non-fatal in Phase 1: log and continue. Phase 2 will surface a hard
+      // failure if the C++ state really cannot be initialized. This mirrors
+      // the legacy behaviour where rac_sdk_init failures were warning-level.
+      _logger.warning('SDK Phase 1 proto init error: $e');
+    }
 
     // Step 5: Register events callback (analytics routing)
     // Matches Swift: Events.register()
@@ -205,6 +217,26 @@ class DartBridge {
     );
     _logger.debug('C++ state initialized');
 
+    // Step 2b: Drive the canonical Phase 2 step-list inside commons.
+    // Matches Swift: CppBridge.SdkInit.phase2() — runs auth + device
+    // registration + model-assignment fetch + telemetry flush inside C++.
+    // Soft failures (offline mode, missing creds) come back as
+    // success=true + warning; hard failures throw.
+    try {
+      final result = DartBridgeSdkInit.phase2(SdkInitPhase2Request());
+      _logger.debug('SDK Phase 2 (proto) complete', metadata: {
+        'httpConfigured': result.httpConfigured,
+        'deviceRegistered': result.deviceRegistered,
+        'linkedModelsCount': result.linkedModelsCount,
+        'durationMs': result.durationMs.toInt(),
+        if (result.hasWarning()) 'warning': result.warning,
+      });
+    } catch (e) {
+      // Non-fatal: services init may still succeed via the per-bridge
+      // registrations below even when the C++ step-list reports an error.
+      _logger.warning('SDK Phase 2 proto error: $e');
+    }
+
     // Step 3: Initialize service bridges
     // Matches Swift: CppBridge.initializeServices()
 
@@ -220,7 +252,7 @@ class DartBridge {
         'Model assignment callbacks registered (autoFetch: $shouldAutoFetch)');
 
     // Step 3b: Platform services (Foundation Models, System TTS)
-    await DartBridgePlatformServices.register();
+    await DartBridgePlatform.registerServices();
     _logger.debug('Platform services registered');
 
     // Step 4: Flush telemetry (if any queued events)
@@ -295,12 +327,9 @@ class DartBridge {
   static DartBridgeModelLifecycle get modelLifecycle =>
       DartBridgeModelLifecycle.instance;
 
-  /// Platform bridge
+  /// Platform bridge (also exposes Foundation Models / System TTS/STT
+  /// availability callbacks via `DartBridgePlatform.registerServices()`).
   static DartBridgePlatform get platform => DartBridgePlatform.instance;
-
-  /// Platform services bridge
-  static DartBridgePlatformServices get platformServices =>
-      DartBridgePlatformServices.instance;
 
   /// State bridge
   static DartBridgeState get state => DartBridgeState.instance;
@@ -368,51 +397,18 @@ class DartBridge {
     }
   }
 
-  /// Initialize SDK configuration in C++ (matches Swift's rac_sdk_init call)
-  /// This is critical for the LlamaCPP backend to function correctly.
-  static void _initializeSdkConfig(SDKEnvironment environment) {
-    try {
-      final sdkInit = lib.lookupFunction<
-          Int32 Function(Pointer<RacSdkConfigStruct>),
-          int Function(Pointer<RacSdkConfigStruct>)>('rac_sdk_init');
-
-      final config = calloc<RacSdkConfigStruct>();
-      final platformPtr = 'flutter'.toNativeUtf8();
-      final sdkVersionPtr = SDKConstants.version.toNativeUtf8();
-
-      try {
-        config.ref.environment = _environmentToInt(environment);
-        config.ref.apiKey = nullptr; // Set later if available
-        config.ref.baseURL = nullptr; // Set later if available
-        config.ref.deviceId = nullptr; // Set later if available
-        config.ref.platform = platformPtr;
-        config.ref.sdkVersion = sdkVersionPtr;
-
-        final result = sdkInit(config);
-        if (result != 0) {
-          _logger.warning('rac_sdk_init returned: $result');
-        }
-      } finally {
-        calloc.free(platformPtr);
-        calloc.free(sdkVersionPtr);
-        calloc.free(config);
-      }
-    } catch (e) {
-      _logger.debug('rac_sdk_init not available: $e');
-    }
-  }
-
-  /// Convert environment to C int value
-  static int _environmentToInt(SDKEnvironment env) {
+  /// Map the public Dart [SDKEnvironment] to the proto-generated
+  /// [SdkInitEnvironment] consumed by `rac_sdk_init_phase1_proto`. Mirrors
+  /// Swift's `CppBridge.SdkInit.mapEnvironment`.
+  static SdkInitEnvironment _toSdkInitEnvironment(SDKEnvironment env) {
     switch (env) {
-      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
-        return 0;
       case SDKEnvironment.SDK_ENVIRONMENT_STAGING:
-        return 1;
+        return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_STAGING;
       case SDKEnvironment.SDK_ENVIRONMENT_PRODUCTION:
-        return 2;
+        return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_PRODUCTION;
+      case SDKEnvironment.SDK_ENVIRONMENT_DEVELOPMENT:
       default:
-        return 0;
+        return SdkInitEnvironment.SDK_INIT_ENVIRONMENT_DEVELOPMENT;
     }
   }
 }

@@ -14,9 +14,9 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'component_types.pbenum.dart' as $3;
-import 'errors.pbenum.dart' as $4;
-import 'vad_options.pbenum.dart' as $5;
+import 'component_types.pbenum.dart' as $12;
+import 'errors.pbenum.dart' as $13;
+import 'vad_options.pbenum.dart' as $11;
 import 'voice_events.pbenum.dart';
 
 export 'voice_events.pbenum.dart';
@@ -51,8 +51,8 @@ class VoiceEvent extends $pb.GeneratedMessage {
   factory VoiceEvent({
     $fixnum.Int64? seq,
     $fixnum.Int64? timestampUs,
-    $3.EventCategory? category,
-    $4.ErrorSeverity? severity,
+    $12.EventCategory? category,
+    $13.ErrorSeverity? severity,
     VoicePipelineComponent? component,
     UserSaidEvent? userSaid,
     AssistantTokenEvent? assistantToken,
@@ -195,8 +195,8 @@ class VoiceEvent extends $pb.GeneratedMessage {
     ..oo(0, [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28])
     ..a<$fixnum.Int64>(1, _omitFieldNames ? '' : 'seq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
     ..aInt64(2, _omitFieldNames ? '' : 'timestampUs')
-    ..e<$3.EventCategory>(3, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: $3.EventCategory.EVENT_CATEGORY_UNSPECIFIED, valueOf: $3.EventCategory.valueOf, enumValues: $3.EventCategory.values)
-    ..e<$4.ErrorSeverity>(4, _omitFieldNames ? '' : 'severity', $pb.PbFieldType.OE, defaultOrMaker: $4.ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED, valueOf: $4.ErrorSeverity.valueOf, enumValues: $4.ErrorSeverity.values)
+    ..e<$12.EventCategory>(3, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: $12.EventCategory.EVENT_CATEGORY_UNSPECIFIED, valueOf: $12.EventCategory.valueOf, enumValues: $12.EventCategory.values)
+    ..e<$13.ErrorSeverity>(4, _omitFieldNames ? '' : 'severity', $pb.PbFieldType.OE, defaultOrMaker: $13.ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED, valueOf: $13.ErrorSeverity.valueOf, enumValues: $13.ErrorSeverity.values)
     ..e<VoicePipelineComponent>(5, _omitFieldNames ? '' : 'component', $pb.PbFieldType.OE, defaultOrMaker: VoicePipelineComponent.VOICE_PIPELINE_COMPONENT_UNSPECIFIED, valueOf: VoicePipelineComponent.valueOf, enumValues: VoicePipelineComponent.values)
     ..aOM<UserSaidEvent>(10, _omitFieldNames ? '' : 'userSaid', subBuilder: UserSaidEvent.create)
     ..aOM<AssistantTokenEvent>(11, _omitFieldNames ? '' : 'assistantToken', subBuilder: AssistantTokenEvent.create)
@@ -271,18 +271,18 @@ class VoiceEvent extends $pb.GeneratedMessage {
   void clearTimestampUs() => clearField(2);
 
   @$pb.TagNumber(3)
-  $3.EventCategory get category => $_getN(2);
+  $12.EventCategory get category => $_getN(2);
   @$pb.TagNumber(3)
-  set category($3.EventCategory v) { setField(3, v); }
+  set category($12.EventCategory v) { setField(3, v); }
   @$pb.TagNumber(3)
   $core.bool hasCategory() => $_has(2);
   @$pb.TagNumber(3)
   void clearCategory() => clearField(3);
 
   @$pb.TagNumber(4)
-  $4.ErrorSeverity get severity => $_getN(3);
+  $13.ErrorSeverity get severity => $_getN(3);
   @$pb.TagNumber(4)
-  set severity($4.ErrorSeverity v) { setField(4, v); }
+  set severity($13.ErrorSeverity v) { setField(4, v); }
   @$pb.TagNumber(4)
   $core.bool hasSeverity() => $_has(3);
   @$pb.TagNumber(4)
@@ -944,7 +944,7 @@ class AudioFrameEvent extends $pb.GeneratedMessage {
 /// vad_options.proto (the hand-rolled VADEventType was deleted).
 class VADEvent extends $pb.GeneratedMessage {
   factory VADEvent({
-    $5.VADStreamEventKind? type,
+    $11.VADStreamEventKind? type,
     $fixnum.Int64? frameOffsetUs,
     $core.double? confidence,
     $core.bool? isSpeech,
@@ -981,7 +981,7 @@ class VADEvent extends $pb.GeneratedMessage {
   factory VADEvent.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VADEvent', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..e<$5.VADStreamEventKind>(1, _omitFieldNames ? '' : 'type', $pb.PbFieldType.OE, defaultOrMaker: $5.VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED, valueOf: $5.VADStreamEventKind.valueOf, enumValues: $5.VADStreamEventKind.values)
+    ..e<$11.VADStreamEventKind>(1, _omitFieldNames ? '' : 'type', $pb.PbFieldType.OE, defaultOrMaker: $11.VADStreamEventKind.VAD_STREAM_EVENT_KIND_UNSPECIFIED, valueOf: $11.VADStreamEventKind.valueOf, enumValues: $11.VADStreamEventKind.values)
     ..aInt64(2, _omitFieldNames ? '' : 'frameOffsetUs')
     ..a<$core.double>(3, _omitFieldNames ? '' : 'confidence', $pb.PbFieldType.OF)
     ..aOB(4, _omitFieldNames ? '' : 'isSpeech')
@@ -1013,9 +1013,9 @@ class VADEvent extends $pb.GeneratedMessage {
   static VADEvent? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $5.VADStreamEventKind get type => $_getN(0);
+  $11.VADStreamEventKind get type => $_getN(0);
   @$pb.TagNumber(1)
-  set type($5.VADStreamEventKind v) { setField(1, v); }
+  set type($11.VADStreamEventKind v) { setField(1, v); }
   @$pb.TagNumber(1)
   $core.bool hasType() => $_has(0);
   @$pb.TagNumber(1)
@@ -1739,13 +1739,13 @@ class ComponentProgressEvent extends $pb.GeneratedMessage {
 ///  `COMPONENT_LIFECYCLE_STATE_READY`.
 class VoiceAgentComponentStates extends $pb.GeneratedMessage {
   factory VoiceAgentComponentStates({
-    $3.ComponentLifecycleState? sttState,
-    $3.ComponentLifecycleState? llmState,
-    $3.ComponentLifecycleState? ttsState,
-    $3.ComponentLifecycleState? vadState,
+    $12.ComponentLifecycleState? sttState,
+    $12.ComponentLifecycleState? llmState,
+    $12.ComponentLifecycleState? ttsState,
+    $12.ComponentLifecycleState? vadState,
     $core.bool? ready,
     $core.bool? anyLoading,
-    $3.ComponentLifecycleState? wakewordState,
+    $12.ComponentLifecycleState? wakewordState,
     $core.String? errorMessage,
   }) {
     final $result = create();
@@ -1780,13 +1780,13 @@ class VoiceAgentComponentStates extends $pb.GeneratedMessage {
   factory VoiceAgentComponentStates.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceAgentComponentStates', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..e<$3.ComponentLifecycleState>(1, _omitFieldNames ? '' : 'sttState', $pb.PbFieldType.OE, defaultOrMaker: $3.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $3.ComponentLifecycleState.valueOf, enumValues: $3.ComponentLifecycleState.values)
-    ..e<$3.ComponentLifecycleState>(2, _omitFieldNames ? '' : 'llmState', $pb.PbFieldType.OE, defaultOrMaker: $3.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $3.ComponentLifecycleState.valueOf, enumValues: $3.ComponentLifecycleState.values)
-    ..e<$3.ComponentLifecycleState>(3, _omitFieldNames ? '' : 'ttsState', $pb.PbFieldType.OE, defaultOrMaker: $3.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $3.ComponentLifecycleState.valueOf, enumValues: $3.ComponentLifecycleState.values)
-    ..e<$3.ComponentLifecycleState>(4, _omitFieldNames ? '' : 'vadState', $pb.PbFieldType.OE, defaultOrMaker: $3.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $3.ComponentLifecycleState.valueOf, enumValues: $3.ComponentLifecycleState.values)
+    ..e<$12.ComponentLifecycleState>(1, _omitFieldNames ? '' : 'sttState', $pb.PbFieldType.OE, defaultOrMaker: $12.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $12.ComponentLifecycleState.valueOf, enumValues: $12.ComponentLifecycleState.values)
+    ..e<$12.ComponentLifecycleState>(2, _omitFieldNames ? '' : 'llmState', $pb.PbFieldType.OE, defaultOrMaker: $12.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $12.ComponentLifecycleState.valueOf, enumValues: $12.ComponentLifecycleState.values)
+    ..e<$12.ComponentLifecycleState>(3, _omitFieldNames ? '' : 'ttsState', $pb.PbFieldType.OE, defaultOrMaker: $12.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $12.ComponentLifecycleState.valueOf, enumValues: $12.ComponentLifecycleState.values)
+    ..e<$12.ComponentLifecycleState>(4, _omitFieldNames ? '' : 'vadState', $pb.PbFieldType.OE, defaultOrMaker: $12.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $12.ComponentLifecycleState.valueOf, enumValues: $12.ComponentLifecycleState.values)
     ..aOB(5, _omitFieldNames ? '' : 'ready')
     ..aOB(6, _omitFieldNames ? '' : 'anyLoading')
-    ..e<$3.ComponentLifecycleState>(7, _omitFieldNames ? '' : 'wakewordState', $pb.PbFieldType.OE, defaultOrMaker: $3.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $3.ComponentLifecycleState.valueOf, enumValues: $3.ComponentLifecycleState.values)
+    ..e<$12.ComponentLifecycleState>(7, _omitFieldNames ? '' : 'wakewordState', $pb.PbFieldType.OE, defaultOrMaker: $12.ComponentLifecycleState.COMPONENT_LIFECYCLE_STATE_UNSPECIFIED, valueOf: $12.ComponentLifecycleState.valueOf, enumValues: $12.ComponentLifecycleState.values)
     ..aOS(8, _omitFieldNames ? '' : 'errorMessage')
     ..hasRequiredFields = false
   ;
@@ -1813,36 +1813,36 @@ class VoiceAgentComponentStates extends $pb.GeneratedMessage {
   static VoiceAgentComponentStates? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $3.ComponentLifecycleState get sttState => $_getN(0);
+  $12.ComponentLifecycleState get sttState => $_getN(0);
   @$pb.TagNumber(1)
-  set sttState($3.ComponentLifecycleState v) { setField(1, v); }
+  set sttState($12.ComponentLifecycleState v) { setField(1, v); }
   @$pb.TagNumber(1)
   $core.bool hasSttState() => $_has(0);
   @$pb.TagNumber(1)
   void clearSttState() => clearField(1);
 
   @$pb.TagNumber(2)
-  $3.ComponentLifecycleState get llmState => $_getN(1);
+  $12.ComponentLifecycleState get llmState => $_getN(1);
   @$pb.TagNumber(2)
-  set llmState($3.ComponentLifecycleState v) { setField(2, v); }
+  set llmState($12.ComponentLifecycleState v) { setField(2, v); }
   @$pb.TagNumber(2)
   $core.bool hasLlmState() => $_has(1);
   @$pb.TagNumber(2)
   void clearLlmState() => clearField(2);
 
   @$pb.TagNumber(3)
-  $3.ComponentLifecycleState get ttsState => $_getN(2);
+  $12.ComponentLifecycleState get ttsState => $_getN(2);
   @$pb.TagNumber(3)
-  set ttsState($3.ComponentLifecycleState v) { setField(3, v); }
+  set ttsState($12.ComponentLifecycleState v) { setField(3, v); }
   @$pb.TagNumber(3)
   $core.bool hasTtsState() => $_has(2);
   @$pb.TagNumber(3)
   void clearTtsState() => clearField(3);
 
   @$pb.TagNumber(4)
-  $3.ComponentLifecycleState get vadState => $_getN(3);
+  $12.ComponentLifecycleState get vadState => $_getN(3);
   @$pb.TagNumber(4)
-  set vadState($3.ComponentLifecycleState v) { setField(4, v); }
+  set vadState($12.ComponentLifecycleState v) { setField(4, v); }
   @$pb.TagNumber(4)
   $core.bool hasVadState() => $_has(3);
   @$pb.TagNumber(4)
@@ -1872,9 +1872,9 @@ class VoiceAgentComponentStates extends $pb.GeneratedMessage {
   void clearAnyLoading() => clearField(6);
 
   @$pb.TagNumber(7)
-  $3.ComponentLifecycleState get wakewordState => $_getN(6);
+  $12.ComponentLifecycleState get wakewordState => $_getN(6);
   @$pb.TagNumber(7)
-  set wakewordState($3.ComponentLifecycleState v) { setField(7, v); }
+  set wakewordState($12.ComponentLifecycleState v) { setField(7, v); }
   @$pb.TagNumber(7)
   $core.bool hasWakewordState() => $_has(6);
   @$pb.TagNumber(7)
@@ -1892,7 +1892,7 @@ class VoiceAgentComponentStates extends $pb.GeneratedMessage {
 
 class VoiceSessionError extends $pb.GeneratedMessage {
   factory VoiceSessionError({
-    $4.ErrorCode? code,
+    $13.ErrorCode? code,
     $core.String? message,
     $core.String? failedComponent,
     $core.int? cAbiCode,
@@ -1921,7 +1921,7 @@ class VoiceSessionError extends $pb.GeneratedMessage {
   factory VoiceSessionError.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceSessionError', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..e<$4.ErrorCode>(1, _omitFieldNames ? '' : 'code', $pb.PbFieldType.OE, defaultOrMaker: $4.ErrorCode.ERROR_CODE_UNSPECIFIED, valueOf: $4.ErrorCode.valueOf, enumValues: $4.ErrorCode.values)
+    ..e<$13.ErrorCode>(1, _omitFieldNames ? '' : 'code', $pb.PbFieldType.OE, defaultOrMaker: $13.ErrorCode.ERROR_CODE_UNSPECIFIED, valueOf: $13.ErrorCode.valueOf, enumValues: $13.ErrorCode.values)
     ..aOS(2, _omitFieldNames ? '' : 'message')
     ..aOS(3, _omitFieldNames ? '' : 'failedComponent')
     ..a<$core.int>(4, _omitFieldNames ? '' : 'cAbiCode', $pb.PbFieldType.O3)
@@ -1951,9 +1951,9 @@ class VoiceSessionError extends $pb.GeneratedMessage {
   static VoiceSessionError? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $4.ErrorCode get code => $_getN(0);
+  $13.ErrorCode get code => $_getN(0);
   @$pb.TagNumber(1)
-  set code($4.ErrorCode v) { setField(1, v); }
+  set code($13.ErrorCode v) { setField(1, v); }
   @$pb.TagNumber(1)
   $core.bool hasCode() => $_has(0);
   @$pb.TagNumber(1)

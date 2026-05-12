@@ -2,7 +2,6 @@
 
 import 'dart:async';
 import 'dart:ffi';
-import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
@@ -10,15 +9,9 @@ import 'package:runanywhere/core/native/rac_native.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/native/dart_bridge_model_format.dart';
-import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
 import 'package:runanywhere/native/platform_loader.dart';
-
-// =============================================================================
-// Exception Return Constants
-// =============================================================================
-
-const int _exceptionalReturnInt32 = -1;
-const int _exceptionalReturnFalse = 0;
+import 'package:runanywhere/native/types/basic_types.dart';
 
 // =============================================================================
 // Model Registry Bridge
@@ -43,9 +36,6 @@ class DartBridgeModelRegistry {
 
   /// Native global registry handle for other proto-byte bridge surfaces.
   Pointer<Void>? get nativeHandle => _registryHandle;
-
-  /// Discovery callbacks pointer
-  static Pointer<RacDiscoveryCallbacksStruct>? _discoveryCallbacksPtr;
 
   // ============================================================================
   // Lifecycle
@@ -495,187 +485,57 @@ class DartBridgeModelRegistry {
   // Model Discovery
   // ============================================================================
 
-  /// Discover downloaded models by scanning filesystem
-  Future<model_pb.ModelDiscoveryResult> discoverDownloadedModels() async {
-    if (_registryHandle == null) {
+  /// Discover downloaded models via the proto-bytes ABI.
+  ///
+  /// Mirrors Swift's
+  /// `CppBridge.ModelRegistry.discoverDownloadedModels(_:)`. Platform
+  /// filesystem traversal is owned by commons through the registered
+  /// `rac_platform_adapter_t`; the SDK only ships a serialized
+  /// `ModelDiscoveryRequest` and decodes the returned
+  /// `ModelDiscoveryResult` proto.
+  Future<model_pb.ModelDiscoveryResult> discoverDownloadedModels([
+    model_pb.ModelDiscoveryRequest? request,
+  ]) async {
+    final handle = _registryHandle;
+    if (handle == null) {
       return model_pb.ModelDiscoveryResult(success: false);
     }
 
+    final discoverFn = RacNative.bindings.rac_model_registry_discover_proto;
+    if (discoverFn == null) {
+      _logger.debug('rac_model_registry_discover_proto unavailable');
+      return model_pb.ModelDiscoveryResult(
+        success: false,
+        errorMessage: 'rac_model_registry_discover_proto unavailable',
+      );
+    }
+
+    final discoveryRequest = request ?? _defaultDiscoveryRequest();
     try {
-      final lib = PlatformLoader.loadCommons();
-      final discoverFn =
-          lib.lookupFunction<
-                  Int32 Function(
-                      Pointer<Void>,
-                      Pointer<RacDiscoveryCallbacksStruct>,
-                      Pointer<RacDiscoveryResultStruct>),
-                  int Function(
-                      Pointer<Void>,
-                      Pointer<RacDiscoveryCallbacksStruct>,
-                      Pointer<RacDiscoveryResultStruct>)>(
-              'rac_model_registry_discover_downloaded');
-
-      // Set up callbacks
-      _discoveryCallbacksPtr = calloc<RacDiscoveryCallbacksStruct>();
-      _discoveryCallbacksPtr!.ref.listDirectory =
-          Pointer.fromFunction<RacListDirectoryCallbackNative>(
-              _listDirectoryCallback, _exceptionalReturnInt32);
-      _discoveryCallbacksPtr!.ref.freeEntries =
-          Pointer.fromFunction<RacFreeEntriesCallbackNative>(
-              _freeEntriesCallback);
-      _discoveryCallbacksPtr!.ref.isDirectory =
-          Pointer.fromFunction<RacIsDirectoryCallbackNative>(
-              _isDirectoryCallback, _exceptionalReturnFalse);
-      _discoveryCallbacksPtr!.ref.pathExists =
-          Pointer.fromFunction<RacPathExistsCallbackNative>(
-              _pathExistsCallback, _exceptionalReturnFalse);
-      _discoveryCallbacksPtr!.ref.isModelFile =
-          Pointer.fromFunction<RacIsModelFileCallbackNative>(
-              _isModelFileCallback, _exceptionalReturnFalse);
-      _discoveryCallbacksPtr!.ref.userData = nullptr;
-
-      final resultStruct = calloc<RacDiscoveryResultStruct>();
-
-      try {
-        final result =
-            discoverFn(_registryHandle!, _discoveryCallbacksPtr!, resultStruct);
-
-        if (result != RacResultCode.success) {
-          return model_pb.ModelDiscoveryResult(
-            success: false,
-            errorMessage: RacResultCode.getMessage(result),
-          );
-        }
-
-        // Parse result
-        final discoveredModels = <model_pb.DiscoveredModel>[];
-        final discoveredCount = resultStruct.ref.discoveredCount;
-
-        for (var i = 0; i < discoveredCount; i++) {
-          final modelPtr = resultStruct.ref.discoveredModels + i;
-          discoveredModels.add(model_pb.DiscoveredModel(
-            modelId: modelPtr.ref.modelId.toDartString(),
-            localPath: modelPtr.ref.localPath.toDartString(),
-          ));
-        }
-
-        final unregisteredCount = resultStruct.ref.unregisteredCount;
-
-        // Free result
-        final freeResultFn = lib.lookupFunction<
-                Void Function(Pointer<RacDiscoveryResultStruct>),
-                void Function(Pointer<RacDiscoveryResultStruct>)>(
-            'rac_discovery_result_free');
-        freeResultFn(resultStruct);
-
-        return model_pb.ModelDiscoveryResult(
-          success: true,
-          discoveredModels: discoveredModels,
-          scannedCount: discoveredCount,
-          purgedCount: unregisteredCount,
-        );
-      } finally {
-        calloc.free(_discoveryCallbacksPtr!);
-        _discoveryCallbacksPtr = null;
-        calloc.free(resultStruct);
-      }
+      return DartBridgeProtoUtils.callRequestWithHandle<
+          model_pb.ModelDiscoveryResult>(
+        handle: handle,
+        request: discoveryRequest,
+        invoke: discoverFn,
+        decode: model_pb.ModelDiscoveryResult.fromBuffer,
+        symbol: 'rac_model_registry_discover_proto',
+      );
     } catch (e) {
-      _logger.debug('rac_model_registry_discover_downloaded error: $e');
+      _logger.debug('rac_model_registry_discover_proto error: $e');
       return model_pb.ModelDiscoveryResult(
         success: false,
         errorMessage: e.toString(),
       );
     }
   }
-}
 
-// =============================================================================
-// Discovery Callbacks
-// =============================================================================
-
-int _listDirectoryCallback(
-    Pointer<Utf8> path,
-    Pointer<Pointer<Pointer<Utf8>>> outEntries,
-    Pointer<IntPtr> outCount,
-    Pointer<Void> userData) {
-  try {
-    final pathStr = path.toDartString();
-    final dir = Directory(pathStr);
-
-    if (!dir.existsSync()) {
-      outCount.value = 0;
-      return RacResultCode.success;
-    }
-
-    final entries = dir.listSync().map((e) => e.path.split('/').last).toList();
-    outCount.value = entries.length;
-
-    if (entries.isEmpty) return RacResultCode.success;
-
-    // Allocate array of string pointers
-    final entriesPtr = calloc<Pointer<Utf8>>(entries.length);
-    for (var i = 0; i < entries.length; i++) {
-      entriesPtr[i] = entries[i].toNativeUtf8();
-    }
-    outEntries.value = entriesPtr;
-
-    return RacResultCode.success;
-  } catch (e) {
-    return RacResultCode.errorFileReadFailed;
-  }
-}
-
-void _freeEntriesCallback(
-    Pointer<Pointer<Utf8>> entries, int count, Pointer<Void> userData) {
-  for (var i = 0; i < count; i++) {
-    if (entries[i] != nullptr) malloc.free(entries[i]);
-  }
-  malloc.free(entries);
-}
-
-int _isDirectoryCallback(Pointer<Utf8> path, Pointer<Void> userData) {
-  try {
-    return Directory(path.toDartString()).existsSync() ? RAC_TRUE : RAC_FALSE;
-  } catch (e) {
-    return RAC_FALSE;
-  }
-}
-
-int _pathExistsCallback(Pointer<Utf8> path, Pointer<Void> userData) {
-  try {
-    final pathStr = path.toDartString();
-    return (File(pathStr).existsSync() || Directory(pathStr).existsSync())
-        ? RAC_TRUE
-        : RAC_FALSE;
-  } catch (e) {
-    return RAC_FALSE;
-  }
-}
-
-int _isModelFileCallback(
-    Pointer<Utf8> path, int framework, Pointer<Void> userData) {
-  try {
-    final pathStr = path.toDartString();
-    final ext = pathStr.split('.').last.toLowerCase();
-
-    // Check extension based on framework
-    // RAC_FRAMEWORK values: 0=ONNX, 1=LlamaCpp (matches Swift)
-    switch (framework) {
-      case 0: // RAC_FRAMEWORK_ONNX
-        return (ext == 'onnx' || ext == 'ort') ? RAC_TRUE : RAC_FALSE;
-      case 1: // RAC_FRAMEWORK_LLAMACPP
-        return (ext == 'gguf' || ext == 'bin') ? RAC_TRUE : RAC_FALSE;
-      case 2: // RAC_FRAMEWORK_FOUNDATION_MODELS
-      case 3: // RAC_FRAMEWORK_SYSTEM_TTS
-        return RAC_TRUE; // Built-in models don't need file check
-      default:
-        // Generic check for any model file
-        return (ext == 'gguf' || ext == 'onnx' || ext == 'bin' || ext == 'ort')
-            ? RAC_TRUE
-            : RAC_FALSE;
-    }
-  } catch (e) {
-    return RAC_FALSE;
+  static model_pb.ModelDiscoveryRequest _defaultDiscoveryRequest() {
+    return model_pb.ModelDiscoveryRequest(
+      linkDownloaded: true,
+      recursive: true,
+      includeUserImports: true,
+      query: model_pb.ModelQuery(downloadedOnly: true),
+    );
   }
 }
 
@@ -818,44 +678,3 @@ base class RacModelInfoStruct extends Struct {
   external Pointer<Utf8> version;
 }
 
-/// Discovery callbacks struct
-typedef RacListDirectoryCallbackNative = Int32 Function(Pointer<Utf8>,
-    Pointer<Pointer<Pointer<Utf8>>>, Pointer<IntPtr>, Pointer<Void>);
-typedef RacFreeEntriesCallbackNative = Void Function(
-    Pointer<Pointer<Utf8>>, IntPtr, Pointer<Void>);
-typedef RacIsDirectoryCallbackNative = Int32 Function(
-    Pointer<Utf8>, Pointer<Void>);
-typedef RacPathExistsCallbackNative = Int32 Function(
-    Pointer<Utf8>, Pointer<Void>);
-typedef RacIsModelFileCallbackNative = Int32 Function(
-    Pointer<Utf8>, Int32, Pointer<Void>);
-
-base class RacDiscoveryCallbacksStruct extends Struct {
-  external Pointer<NativeFunction<RacListDirectoryCallbackNative>>
-      listDirectory;
-  external Pointer<NativeFunction<RacFreeEntriesCallbackNative>> freeEntries;
-  external Pointer<NativeFunction<RacIsDirectoryCallbackNative>> isDirectory;
-  external Pointer<NativeFunction<RacPathExistsCallbackNative>> pathExists;
-  external Pointer<NativeFunction<RacIsModelFileCallbackNative>> isModelFile;
-  external Pointer<Void> userData;
-}
-
-/// Discovered model struct
-base class RacDiscoveredModelStruct extends Struct {
-  external Pointer<Utf8> modelId;
-  external Pointer<Utf8> localPath;
-
-  @Int32()
-  external int framework;
-}
-
-/// Discovery result struct
-base class RacDiscoveryResultStruct extends Struct {
-  @IntPtr()
-  external int discoveredCount;
-
-  external Pointer<RacDiscoveredModelStruct> discoveredModels;
-
-  @IntPtr()
-  external int unregisteredCount;
-}

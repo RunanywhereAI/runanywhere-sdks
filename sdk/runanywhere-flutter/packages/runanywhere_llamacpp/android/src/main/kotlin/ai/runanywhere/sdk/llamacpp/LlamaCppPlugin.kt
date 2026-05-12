@@ -17,36 +17,38 @@ class LlamaCppPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
 
     companion object {
+        private const val TAG = "LlamaCpp"
         private const val CHANNEL_NAME = "runanywhere_llamacpp"
         private const val BACKEND_VERSION = "0.19.13"
         private const val BACKEND_NAME = "LlamaCPP"
 
-        private fun loadFirstAvailable(vararg names: String) {
-            var lastError: UnsatisfiedLinkError? = null
-            for (name in names) {
-                try {
-                    System.loadLibrary(name)
-                    return
-                } catch (e: UnsatisfiedLinkError) {
-                    lastError = e
-                }
-            }
-            if (lastError != null) {
-                throw lastError
-            }
-        }
-
         init {
-            // Load LlamaCPP backend native libraries
+            // Load LlamaCPP backend native libraries.
+            //
+            // Mirror OnnxPlugin.kt: load each library with an individual
+            // `System.loadLibrary` so we surface a precise diagnostic instead of
+            // swallowing the intermediate `UnsatisfiedLinkError` chain that
+            // `loadFirstAvailable` produced. The previous helper hid the real
+            // failing dependency, which made debugging Android linker failures
+            // significantly harder.
+            //
+            // Load order matches the JNI dependency graph:
+            //   1. `librac_backend_llamacpp.so`     — core llama.cpp engine + RAC vtable.
+            //   2. `librac_backend_llamacpp_jni.so` — Android JNI shim that registers
+            //      the engine and the VLM plugin with the C++ registry.
+            // Either may be absent depending on how the engines CMake was built
+            // (RAC_BUILD_SHARED gates the JNI suffix), so each load failure is
+            // logged independently but is never fatal — `Llamacpp.register()` on
+            // the Dart side falls back to FFI-only registration if needed.
             try {
-                loadFirstAvailable(
-                    "rac_backend_llamacpp",
-                    "rac_backend_llamacpp_jni",
-                    "runanywhere_llamacpp",
-                )
+                System.loadLibrary("rac_backend_llamacpp")
             } catch (e: UnsatisfiedLinkError) {
-                // Library may not be available in all configurations
-                android.util.Log.w("LlamaCpp", "Failed to load LlamaCpp backend libraries: ${e.message}")
+                android.util.Log.w(TAG, "librac_backend_llamacpp.so unavailable: ${e.message}")
+            }
+            try {
+                System.loadLibrary("rac_backend_llamacpp_jni")
+            } catch (e: UnsatisfiedLinkError) {
+                android.util.Log.w(TAG, "librac_backend_llamacpp_jni.so unavailable: ${e.message}")
             }
         }
     }

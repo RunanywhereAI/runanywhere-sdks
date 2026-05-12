@@ -40,24 +40,5 @@ class LLMStreamEventKind extends $pb.ProtobufEnum {
   const LLMStreamEventKind._($core.int v, $core.String n) : super(v, n);
 }
 
-class LLMTokenKind extends $pb.ProtobufEnum {
-  static const LLMTokenKind LLM_TOKEN_KIND_UNSPECIFIED = LLMTokenKind._(0, _omitEnumNames ? '' : 'LLM_TOKEN_KIND_UNSPECIFIED');
-  static const LLMTokenKind LLM_TOKEN_KIND_ANSWER = LLMTokenKind._(1, _omitEnumNames ? '' : 'LLM_TOKEN_KIND_ANSWER');
-  static const LLMTokenKind LLM_TOKEN_KIND_THOUGHT = LLMTokenKind._(2, _omitEnumNames ? '' : 'LLM_TOKEN_KIND_THOUGHT');
-  static const LLMTokenKind LLM_TOKEN_KIND_TOOL_CALL = LLMTokenKind._(3, _omitEnumNames ? '' : 'LLM_TOKEN_KIND_TOOL_CALL');
-
-  static const $core.List<LLMTokenKind> values = <LLMTokenKind> [
-    LLM_TOKEN_KIND_UNSPECIFIED,
-    LLM_TOKEN_KIND_ANSWER,
-    LLM_TOKEN_KIND_THOUGHT,
-    LLM_TOKEN_KIND_TOOL_CALL,
-  ];
-
-  static final $core.Map<$core.int, LLMTokenKind> _byValue = $pb.ProtobufEnum.initByValue(values);
-  static LLMTokenKind? valueOf($core.int value) => _byValue[value];
-
-  const LLMTokenKind._($core.int v, $core.String n) : super(v, n);
-}
-
 
 const _omitEnumNames = $core.bool.fromEnvironment('protobuf.omit_enum_names');

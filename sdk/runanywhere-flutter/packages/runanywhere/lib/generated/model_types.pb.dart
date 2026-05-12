@@ -18,7 +18,7 @@ import 'package:protobuf/protobuf.dart' as $pb;
 import 'hardware_profile.pb.dart' as $1;
 import 'hardware_profile.pbenum.dart' as $1;
 import 'model_types.pbenum.dart';
-import 'thinking_tag_pattern.pb.dart' as $0;
+import 'thinking_tag_pattern.pb.dart' as $2;
 
 export 'model_types.pbenum.dart';
 
@@ -210,7 +210,7 @@ class ModelInfo extends $pb.GeneratedMessage {
     $fixnum.Int64? updatedAtUnixMs,
     $fixnum.Int64? memoryRequiredBytes,
     $core.String? checksumSha256,
-    $0.ThinkingTagPattern? thinkingPattern,
+    $2.ThinkingTagPattern? thinkingPattern,
     ModelInfoMetadata? metadata,
     SingleFileArtifact? singleFile,
     ArchiveArtifact? archive,
@@ -376,7 +376,7 @@ class ModelInfo extends $pb.GeneratedMessage {
     ..aInt64(15, _omitFieldNames ? '' : 'updatedAtUnixMs')
     ..aInt64(16, _omitFieldNames ? '' : 'memoryRequiredBytes')
     ..aOS(17, _omitFieldNames ? '' : 'checksumSha256')
-    ..aOM<$0.ThinkingTagPattern>(18, _omitFieldNames ? '' : 'thinkingPattern', subBuilder: $0.ThinkingTagPattern.create)
+    ..aOM<$2.ThinkingTagPattern>(18, _omitFieldNames ? '' : 'thinkingPattern', subBuilder: $2.ThinkingTagPattern.create)
     ..aOM<ModelInfoMetadata>(19, _omitFieldNames ? '' : 'metadata', subBuilder: ModelInfoMetadata.create)
     ..aOM<SingleFileArtifact>(20, _omitFieldNames ? '' : 'singleFile', subBuilder: SingleFileArtifact.create)
     ..aOM<ArchiveArtifact>(21, _omitFieldNames ? '' : 'archive', subBuilder: ArchiveArtifact.create)
@@ -591,15 +591,15 @@ class ModelInfo extends $pb.GeneratedMessage {
   /// Thinking/reasoning metadata. `supports_thinking` remains the boolean
   /// capability flag; this optional pattern declares model-specific tags.
   @$pb.TagNumber(18)
-  $0.ThinkingTagPattern get thinkingPattern => $_getN(17);
+  $2.ThinkingTagPattern get thinkingPattern => $_getN(17);
   @$pb.TagNumber(18)
-  set thinkingPattern($0.ThinkingTagPattern v) { setField(18, v); }
+  set thinkingPattern($2.ThinkingTagPattern v) { setField(18, v); }
   @$pb.TagNumber(18)
   $core.bool hasThinkingPattern() => $_has(17);
   @$pb.TagNumber(18)
   void clearThinkingPattern() => clearField(18);
   @$pb.TagNumber(18)
-  $0.ThinkingTagPattern ensureThinkingPattern() => $_ensure(17);
+  $2.ThinkingTagPattern ensureThinkingPattern() => $_ensure(17);
 
   /// Structured public catalog metadata. `description` (field 12) is kept for
   /// backward compatibility and should mirror metadata.description when both
@@ -1513,148 +1513,6 @@ class ModelQuery extends $pb.GeneratedMessage {
   $core.bool hasRegistryStatus() => $_has(10);
   @$pb.TagNumber(11)
   void clearRegistryStatus() => clearField(11);
-}
-
-class ModelCompatibilityResult extends $pb.GeneratedMessage {
-  factory ModelCompatibilityResult({
-    $core.bool? isCompatible,
-    $core.bool? canRun,
-    $core.bool? canFit,
-    $fixnum.Int64? requiredMemoryBytes,
-    $fixnum.Int64? availableMemoryBytes,
-    $fixnum.Int64? requiredStorageBytes,
-    $fixnum.Int64? availableStorageBytes,
-    $core.Iterable<$core.String>? reasons,
-  }) {
-    final $result = create();
-    if (isCompatible != null) {
-      $result.isCompatible = isCompatible;
-    }
-    if (canRun != null) {
-      $result.canRun = canRun;
-    }
-    if (canFit != null) {
-      $result.canFit = canFit;
-    }
-    if (requiredMemoryBytes != null) {
-      $result.requiredMemoryBytes = requiredMemoryBytes;
-    }
-    if (availableMemoryBytes != null) {
-      $result.availableMemoryBytes = availableMemoryBytes;
-    }
-    if (requiredStorageBytes != null) {
-      $result.requiredStorageBytes = requiredStorageBytes;
-    }
-    if (availableStorageBytes != null) {
-      $result.availableStorageBytes = availableStorageBytes;
-    }
-    if (reasons != null) {
-      $result.reasons.addAll(reasons);
-    }
-    return $result;
-  }
-  ModelCompatibilityResult._() : super();
-  factory ModelCompatibilityResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
-  factory ModelCompatibilityResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
-
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ModelCompatibilityResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOB(1, _omitFieldNames ? '' : 'isCompatible')
-    ..aOB(2, _omitFieldNames ? '' : 'canRun')
-    ..aOB(3, _omitFieldNames ? '' : 'canFit')
-    ..aInt64(4, _omitFieldNames ? '' : 'requiredMemoryBytes')
-    ..aInt64(5, _omitFieldNames ? '' : 'availableMemoryBytes')
-    ..aInt64(6, _omitFieldNames ? '' : 'requiredStorageBytes')
-    ..aInt64(7, _omitFieldNames ? '' : 'availableStorageBytes')
-    ..pPS(8, _omitFieldNames ? '' : 'reasons')
-    ..hasRequiredFields = false
-  ;
-
-  @$core.Deprecated(
-  'Using this can add significant overhead to your binary. '
-  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
-  'Will be removed in next major version')
-  ModelCompatibilityResult clone() => ModelCompatibilityResult()..mergeFromMessage(this);
-  @$core.Deprecated(
-  'Using this can add significant overhead to your binary. '
-  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
-  'Will be removed in next major version')
-  ModelCompatibilityResult copyWith(void Function(ModelCompatibilityResult) updates) => super.copyWith((message) => updates(message as ModelCompatibilityResult)) as ModelCompatibilityResult;
-
-  $pb.BuilderInfo get info_ => _i;
-
-  @$core.pragma('dart2js:noInline')
-  static ModelCompatibilityResult create() => ModelCompatibilityResult._();
-  ModelCompatibilityResult createEmptyInstance() => create();
-  static $pb.PbList<ModelCompatibilityResult> createRepeated() => $pb.PbList<ModelCompatibilityResult>();
-  @$core.pragma('dart2js:noInline')
-  static ModelCompatibilityResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ModelCompatibilityResult>(create);
-  static ModelCompatibilityResult? _defaultInstance;
-
-  @$pb.TagNumber(1)
-  $core.bool get isCompatible => $_getBF(0);
-  @$pb.TagNumber(1)
-  set isCompatible($core.bool v) { $_setBool(0, v); }
-  @$pb.TagNumber(1)
-  $core.bool hasIsCompatible() => $_has(0);
-  @$pb.TagNumber(1)
-  void clearIsCompatible() => clearField(1);
-
-  @$pb.TagNumber(2)
-  $core.bool get canRun => $_getBF(1);
-  @$pb.TagNumber(2)
-  set canRun($core.bool v) { $_setBool(1, v); }
-  @$pb.TagNumber(2)
-  $core.bool hasCanRun() => $_has(1);
-  @$pb.TagNumber(2)
-  void clearCanRun() => clearField(2);
-
-  @$pb.TagNumber(3)
-  $core.bool get canFit => $_getBF(2);
-  @$pb.TagNumber(3)
-  set canFit($core.bool v) { $_setBool(2, v); }
-  @$pb.TagNumber(3)
-  $core.bool hasCanFit() => $_has(2);
-  @$pb.TagNumber(3)
-  void clearCanFit() => clearField(3);
-
-  @$pb.TagNumber(4)
-  $fixnum.Int64 get requiredMemoryBytes => $_getI64(3);
-  @$pb.TagNumber(4)
-  set requiredMemoryBytes($fixnum.Int64 v) { $_setInt64(3, v); }
-  @$pb.TagNumber(4)
-  $core.bool hasRequiredMemoryBytes() => $_has(3);
-  @$pb.TagNumber(4)
-  void clearRequiredMemoryBytes() => clearField(4);
-
-  @$pb.TagNumber(5)
-  $fixnum.Int64 get availableMemoryBytes => $_getI64(4);
-  @$pb.TagNumber(5)
-  set availableMemoryBytes($fixnum.Int64 v) { $_setInt64(4, v); }
-  @$pb.TagNumber(5)
-  $core.bool hasAvailableMemoryBytes() => $_has(4);
-  @$pb.TagNumber(5)
-  void clearAvailableMemoryBytes() => clearField(5);
-
-  @$pb.TagNumber(6)
-  $fixnum.Int64 get requiredStorageBytes => $_getI64(5);
-  @$pb.TagNumber(6)
-  set requiredStorageBytes($fixnum.Int64 v) { $_setInt64(5, v); }
-  @$pb.TagNumber(6)
-  $core.bool hasRequiredStorageBytes() => $_has(5);
-  @$pb.TagNumber(6)
-  void clearRequiredStorageBytes() => clearField(6);
-
-  @$pb.TagNumber(7)
-  $fixnum.Int64 get availableStorageBytes => $_getI64(6);
-  @$pb.TagNumber(7)
-  set availableStorageBytes($fixnum.Int64 v) { $_setInt64(6, v); }
-  @$pb.TagNumber(7)
-  $core.bool hasAvailableStorageBytes() => $_has(6);
-  @$pb.TagNumber(7)
-  void clearAvailableStorageBytes() => clearField(7);
-
-  @$pb.TagNumber(8)
-  $core.List<$core.String> get reasons => $_getList(7);
 }
 
 class ModelRegistryRefreshRequest extends $pb.GeneratedMessage {
@@ -4053,8 +3911,8 @@ class ModelCompatibilityRequest extends $pb.GeneratedMessage {
   void clearPreferredFramework() => clearField(6);
 }
 
-class ModelCompatibilityCheckResult extends $pb.GeneratedMessage {
-  factory ModelCompatibilityCheckResult({
+class ModelCompatibilityResult extends $pb.GeneratedMessage {
+  factory ModelCompatibilityResult({
     $core.bool? isCompatible,
     $core.bool? canRun,
     $core.bool? canFit,
@@ -4107,11 +3965,11 @@ class ModelCompatibilityCheckResult extends $pb.GeneratedMessage {
     }
     return $result;
   }
-  ModelCompatibilityCheckResult._() : super();
-  factory ModelCompatibilityCheckResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
-  factory ModelCompatibilityCheckResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+  ModelCompatibilityResult._() : super();
+  factory ModelCompatibilityResult.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ModelCompatibilityResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
-  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ModelCompatibilityCheckResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ModelCompatibilityResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..aOB(1, _omitFieldNames ? '' : 'isCompatible')
     ..aOB(2, _omitFieldNames ? '' : 'canRun')
     ..aOB(3, _omitFieldNames ? '' : 'canFit')
@@ -4131,22 +3989,22 @@ class ModelCompatibilityCheckResult extends $pb.GeneratedMessage {
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
   'Will be removed in next major version')
-  ModelCompatibilityCheckResult clone() => ModelCompatibilityCheckResult()..mergeFromMessage(this);
+  ModelCompatibilityResult clone() => ModelCompatibilityResult()..mergeFromMessage(this);
   @$core.Deprecated(
   'Using this can add significant overhead to your binary. '
   'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
   'Will be removed in next major version')
-  ModelCompatibilityCheckResult copyWith(void Function(ModelCompatibilityCheckResult) updates) => super.copyWith((message) => updates(message as ModelCompatibilityCheckResult)) as ModelCompatibilityCheckResult;
+  ModelCompatibilityResult copyWith(void Function(ModelCompatibilityResult) updates) => super.copyWith((message) => updates(message as ModelCompatibilityResult)) as ModelCompatibilityResult;
 
   $pb.BuilderInfo get info_ => _i;
 
   @$core.pragma('dart2js:noInline')
-  static ModelCompatibilityCheckResult create() => ModelCompatibilityCheckResult._();
-  ModelCompatibilityCheckResult createEmptyInstance() => create();
-  static $pb.PbList<ModelCompatibilityCheckResult> createRepeated() => $pb.PbList<ModelCompatibilityCheckResult>();
+  static ModelCompatibilityResult create() => ModelCompatibilityResult._();
+  ModelCompatibilityResult createEmptyInstance() => create();
+  static $pb.PbList<ModelCompatibilityResult> createRepeated() => $pb.PbList<ModelCompatibilityResult>();
   @$core.pragma('dart2js:noInline')
-  static ModelCompatibilityCheckResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ModelCompatibilityCheckResult>(create);
-  static ModelCompatibilityCheckResult? _defaultInstance;
+  static ModelCompatibilityResult getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ModelCompatibilityResult>(create);
+  static ModelCompatibilityResult? _defaultInstance;
 
   /// Mirrors the existing struct fields so SDKs can keep using the same
   /// field names; populated from rac_model_compatibility_result_t.
@@ -4785,6 +4643,253 @@ class ModelRegistryFetchAssignmentsResult extends $pb.GeneratedMessage {
   $core.bool hasErrorMessage() => $_has(5);
   @$pb.TagNumber(6)
   void clearErrorMessage() => clearField(6);
+}
+
+/// ---------------------------------------------------------------------------
+/// Inputs for the canonical RAModelInfo factory (P2-T4). Replaces Swift's
+/// `RAModelInfo.make(...)` ~370 LOC of field-defaulting and artifact-inference
+/// logic with a commons-owned implementation. Commons fills 18 ModelInfo fields
+/// (id, name, category/format/framework defaults, context-length defaults,
+/// thinking gating + default pattern, artifact inference, source mark,
+/// timestamps, and is_downloaded probe).
+/// ---------------------------------------------------------------------------
+class ModelInfoMakeRequest extends $pb.GeneratedMessage {
+  factory ModelInfoMakeRequest({
+    $core.String? url,
+    $core.String? name,
+    InferenceFramework? framework,
+    ModelCategory? category,
+    ModelSource? source,
+  }) {
+    final $result = create();
+    if (url != null) {
+      $result.url = url;
+    }
+    if (name != null) {
+      $result.name = name;
+    }
+    if (framework != null) {
+      $result.framework = framework;
+    }
+    if (category != null) {
+      $result.category = category;
+    }
+    if (source != null) {
+      $result.source = source;
+    }
+    return $result;
+  }
+  ModelInfoMakeRequest._() : super();
+  factory ModelInfoMakeRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory ModelInfoMakeRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ModelInfoMakeRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'url')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..e<InferenceFramework>(3, _omitFieldNames ? '' : 'framework', $pb.PbFieldType.OE, defaultOrMaker: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: InferenceFramework.valueOf, enumValues: InferenceFramework.values)
+    ..e<ModelCategory>(4, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: ModelCategory.MODEL_CATEGORY_UNSPECIFIED, valueOf: ModelCategory.valueOf, enumValues: ModelCategory.values)
+    ..e<ModelSource>(5, _omitFieldNames ? '' : 'source', $pb.PbFieldType.OE, defaultOrMaker: ModelSource.MODEL_SOURCE_UNSPECIFIED, valueOf: ModelSource.valueOf, enumValues: ModelSource.values)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  ModelInfoMakeRequest clone() => ModelInfoMakeRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  ModelInfoMakeRequest copyWith(void Function(ModelInfoMakeRequest) updates) => super.copyWith((message) => updates(message as ModelInfoMakeRequest)) as ModelInfoMakeRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static ModelInfoMakeRequest create() => ModelInfoMakeRequest._();
+  ModelInfoMakeRequest createEmptyInstance() => create();
+  static $pb.PbList<ModelInfoMakeRequest> createRepeated() => $pb.PbList<ModelInfoMakeRequest>();
+  @$core.pragma('dart2js:noInline')
+  static ModelInfoMakeRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<ModelInfoMakeRequest>(create);
+  static ModelInfoMakeRequest? _defaultInstance;
+
+  /// Required. Download URL or file path. Used both as the metadata field
+  /// and as input to artifact-type inference (zip/tar.gz/tgz/... → archive,
+  /// anything else → single_file).
+  @$pb.TagNumber(1)
+  $core.String get url => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set url($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasUrl() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUrl() => clearField(1);
+
+  /// Optional human-readable name. When empty commons derives it from the
+  /// URL via rac_model_generate_name() (replaces underscores/dashes with
+  /// spaces).
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => clearField(2);
+
+  /// Optional inference framework. UNSPECIFIED triggers detection from the
+  /// URL extension; commons looks up the format and maps to a default
+  /// framework via rac_model_detect_framework_from_format().
+  @$pb.TagNumber(3)
+  InferenceFramework get framework => $_getN(2);
+  @$pb.TagNumber(3)
+  set framework(InferenceFramework v) { setField(3, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasFramework() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFramework() => clearField(3);
+
+  /// Optional category. UNSPECIFIED falls back to the framework default
+  /// (rac_model_category_from_framework()).
+  @$pb.TagNumber(4)
+  ModelCategory get category => $_getN(3);
+  @$pb.TagNumber(4)
+  set category(ModelCategory v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasCategory() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCategory() => clearField(4);
+
+  /// Optional source. UNSPECIFIED is treated as MODEL_SOURCE_REMOTE.
+  @$pb.TagNumber(5)
+  ModelSource get source => $_getN(4);
+  @$pb.TagNumber(5)
+  set source(ModelSource v) { setField(5, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasSource() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSource() => clearField(5);
+}
+
+/// ---------------------------------------------------------------------------
+/// Inputs for the canonical "register a model from a URL" entry point (P2-T6).
+/// Composes ModelInfoMakeRequest (P2-T4) with the existing registry save path
+/// so SDKs replace ~60 LOC of build-and-save glue with a single ABI call.
+/// Produces the saved ModelInfo (matches rac_model_registry_register_proto_buffer
+/// shape).
+/// ---------------------------------------------------------------------------
+class RegisterModelFromUrlRequest extends $pb.GeneratedMessage {
+  factory RegisterModelFromUrlRequest({
+    $core.String? url,
+    $core.String? name,
+    InferenceFramework? framework,
+    ModelCategory? category,
+    ModelSource? source,
+  }) {
+    final $result = create();
+    if (url != null) {
+      $result.url = url;
+    }
+    if (name != null) {
+      $result.name = name;
+    }
+    if (framework != null) {
+      $result.framework = framework;
+    }
+    if (category != null) {
+      $result.category = category;
+    }
+    if (source != null) {
+      $result.source = source;
+    }
+    return $result;
+  }
+  RegisterModelFromUrlRequest._() : super();
+  factory RegisterModelFromUrlRequest.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory RegisterModelFromUrlRequest.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'RegisterModelFromUrlRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..aOS(1, _omitFieldNames ? '' : 'url')
+    ..aOS(2, _omitFieldNames ? '' : 'name')
+    ..e<InferenceFramework>(3, _omitFieldNames ? '' : 'framework', $pb.PbFieldType.OE, defaultOrMaker: InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: InferenceFramework.valueOf, enumValues: InferenceFramework.values)
+    ..e<ModelCategory>(4, _omitFieldNames ? '' : 'category', $pb.PbFieldType.OE, defaultOrMaker: ModelCategory.MODEL_CATEGORY_UNSPECIFIED, valueOf: ModelCategory.valueOf, enumValues: ModelCategory.values)
+    ..e<ModelSource>(5, _omitFieldNames ? '' : 'source', $pb.PbFieldType.OE, defaultOrMaker: ModelSource.MODEL_SOURCE_UNSPECIFIED, valueOf: ModelSource.valueOf, enumValues: ModelSource.values)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  RegisterModelFromUrlRequest clone() => RegisterModelFromUrlRequest()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  RegisterModelFromUrlRequest copyWith(void Function(RegisterModelFromUrlRequest) updates) => super.copyWith((message) => updates(message as RegisterModelFromUrlRequest)) as RegisterModelFromUrlRequest;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static RegisterModelFromUrlRequest create() => RegisterModelFromUrlRequest._();
+  RegisterModelFromUrlRequest createEmptyInstance() => create();
+  static $pb.PbList<RegisterModelFromUrlRequest> createRepeated() => $pb.PbList<RegisterModelFromUrlRequest>();
+  @$core.pragma('dart2js:noInline')
+  static RegisterModelFromUrlRequest getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<RegisterModelFromUrlRequest>(create);
+  static RegisterModelFromUrlRequest? _defaultInstance;
+
+  /// Required. Download URL or file path. Routed straight into
+  /// ModelInfoMakeRequest.url; format/artifact inference and id/name
+  /// generation reuse the same factory semantics.
+  @$pb.TagNumber(1)
+  $core.String get url => $_getSZ(0);
+  @$pb.TagNumber(1)
+  set url($core.String v) { $_setString(0, v); }
+  @$pb.TagNumber(1)
+  $core.bool hasUrl() => $_has(0);
+  @$pb.TagNumber(1)
+  void clearUrl() => clearField(1);
+
+  /// Optional human-readable name. Empty → derived from URL.
+  @$pb.TagNumber(2)
+  $core.String get name => $_getSZ(1);
+  @$pb.TagNumber(2)
+  set name($core.String v) { $_setString(1, v); }
+  @$pb.TagNumber(2)
+  $core.bool hasName() => $_has(1);
+  @$pb.TagNumber(2)
+  void clearName() => clearField(2);
+
+  /// Optional inference framework. UNSPECIFIED triggers detection from the
+  /// URL extension (rac_model_detect_framework_from_format).
+  @$pb.TagNumber(3)
+  InferenceFramework get framework => $_getN(2);
+  @$pb.TagNumber(3)
+  set framework(InferenceFramework v) { setField(3, v); }
+  @$pb.TagNumber(3)
+  $core.bool hasFramework() => $_has(2);
+  @$pb.TagNumber(3)
+  void clearFramework() => clearField(3);
+
+  /// Optional category. UNSPECIFIED falls back to the framework default.
+  @$pb.TagNumber(4)
+  ModelCategory get category => $_getN(3);
+  @$pb.TagNumber(4)
+  set category(ModelCategory v) { setField(4, v); }
+  @$pb.TagNumber(4)
+  $core.bool hasCategory() => $_has(3);
+  @$pb.TagNumber(4)
+  void clearCategory() => clearField(4);
+
+  /// Optional source. UNSPECIFIED is treated as MODEL_SOURCE_REMOTE.
+  @$pb.TagNumber(5)
+  ModelSource get source => $_getN(4);
+  @$pb.TagNumber(5)
+  set source(ModelSource v) { setField(5, v); }
+  @$pb.TagNumber(5)
+  $core.bool hasSource() => $_has(4);
+  @$pb.TagNumber(5)
+  void clearSource() => clearField(5);
 }
 
 class ModelRegistryApi {

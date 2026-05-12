@@ -8,7 +8,8 @@
 //   register / listCatalog / queryCatalog / getCatalogEntry /
 //   markDownloadCompleted / adaptersForModel / allRegistered
 
-import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
+import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/lora_options.pb.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/native/dart_bridge_lora.dart';
@@ -123,6 +124,21 @@ class RunAnywhereLoRACapability {
       throw SDKException.notInitialized();
     }
     return DartBridgeLoraRegistry.shared.markDownloadCompleted(request);
+  }
+
+  /// Record native-reported LoRA adapter import completion in commons.
+  ///
+  /// Mirrors Swift `RunAnywhere.lora.markImportCompleted(_:)`. Uses the
+  /// generated download-completed message with `imported = true`, matching the
+  /// IDL contract for platform file-picker/import completion.
+  Future<LoraAdapterDownloadCompletedResult> markImportCompleted(
+    LoraAdapterDownloadCompletedRequest request,
+  ) async {
+    final importRequest = request.deepCopy()..imported = true;
+    if (importRequest.statusMessage.isEmpty) {
+      importRequest.statusMessage = 'import completed';
+    }
+    return markDownloadCompleted(importRequest);
   }
 
   /// All registered LoRA adapters compatible with [modelId].

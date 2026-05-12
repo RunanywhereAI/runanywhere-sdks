@@ -8,9 +8,8 @@ library runanywhere;
 export 'adapters/model_download_adapter.dart' show ModelDownloadService;
 export 'adapters/voice_agent_stream_adapter.dart' show VoiceAgentStreamAdapter;
 export 'core/module/runanywhere_module.dart';
-export 'data/network/network.dart';
-export 'foundation/configuration/sdk_constants.dart';
-export 'foundation/error_types/sdk_exception.dart';
+export 'foundation/constants/sdk_constants.dart';
+export 'foundation/errors/sdk_exception.dart';
 export 'foundation/logging/sdk_logger.dart';
 export 'generated/component_types.pbenum.dart'
     show ComponentLifecycleState, EventCategory;
@@ -185,7 +184,6 @@ export 'generated/stt_options.pb.dart'
         TranscriptionMetadata,
         WordTimestamp;
 export 'generated/stt_options.pbenum.dart' show STTLanguage;
-export 'generated/stt_options_helpers.dart';
 export 'generated/tool_calling.pb.dart'
     show
         ToolCall,
@@ -254,8 +252,6 @@ export 'public/capabilities/runanywhere_tools.dart'
 export 'public/capabilities/runanywhere_tts.dart' show RunAnywhereTTS;
 export 'public/capabilities/runanywhere_vad.dart' show RunAnywhereVAD;
 export 'public/capabilities/runanywhere_vlm.dart' show RunAnywhereVLM;
-export 'public/capabilities/runanywhere_vlm_models.dart'
-    show RunAnywhereVLMModels;
 export 'public/capabilities/runanywhere_voice.dart' show RunAnywhereVoice;
 export 'public/capabilities/runanywhere_voice_agent.dart'
     show RunAnywhereVoiceAgent;
@@ -268,4 +264,5 @@ export 'public/extensions/runanywhere_structured_output.dart'
     show RunAnywhereStructuredOutput;
 export 'public/extensions/runanywhere_thinking_utils.dart'
     show RunAnywhereThinkingUtils, ThinkingExtractionResult;
-export 'public/runanywhere_v4.dart' show RunAnywhereSDK;
+export 'public/extensions/stt/stt_options_helpers.dart';
+export 'public/runanywhere.dart' show RunAnywhereSDK;

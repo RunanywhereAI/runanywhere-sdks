@@ -2,8 +2,6 @@
 
 import 'dart:ffi';
 
-import 'package:ffi/ffi.dart';
-
 
 /// STT ONNX config struct matching rac_stt_onnx_config_t
 base class RacSttOnnxConfigStruct extends Struct {
@@ -29,65 +27,25 @@ base class RacTtsOnnxConfigStruct extends Struct {
   external int sampleRate;
 }
 
-/// STT ONNX result struct matching rac_stt_onnx_result_t
-base class RacSttOnnxResultStruct extends Struct {
-  external Pointer<Utf8> text;
-
-  @Float()
-  external double confidence;
-
-  external Pointer<Utf8> language;
-
-  @Int32()
-  external int durationMs;
-}
-
-/// TTS ONNX result struct matching rac_tts_onnx_result_t
-base class RacTtsOnnxResultStruct extends Struct {
-  external Pointer<Float> audioSamples;
-
-  @Int32()
-  external int numSamples;
-
-  @Int32()
-  external int sampleRate;
-
-  @Int32()
-  external int durationMs;
-}
-
-/// VAD ONNX config struct matching rac_vad_onnx_config_t
+/// VAD ONNX config struct matching rac_vad_onnx_config_t.
+///
+/// Field order MUST match the C declaration in
+/// `include/rac/backends/rac_vad_onnx.h`:
+///   int32_t sample_rate;
+///   float   energy_threshold;
+///   float   frame_length;
+///   int32_t num_threads;
 base class RacVadOnnxConfigStruct extends Struct {
   @Int32()
-  external int numThreads;
-
-  @Int32()
   external int sampleRate;
 
-  @Int32()
-  external int windowSizeMs;
+  @Float()
+  external double energyThreshold;
 
   @Float()
-  external double threshold;
+  external double frameLength;
+
+  @Int32()
+  external int numThreads;
 }
 
-/// VAD ONNX result struct matching rac_vad_onnx_result_t
-base class RacVadOnnxResultStruct extends Struct {
-  @Int32()
-  external int isSpeech;
-
-  @Float()
-  external double probability;
-}
-
-/// VAD result struct matching rac_vad_result_t
-base class RacVadResultStruct extends Struct {
-  @Int32()
-  external int isSpeech;
-
-  @Float()
-  external double energy;
-
-  @Float()
-  external double speechProbability;
-}

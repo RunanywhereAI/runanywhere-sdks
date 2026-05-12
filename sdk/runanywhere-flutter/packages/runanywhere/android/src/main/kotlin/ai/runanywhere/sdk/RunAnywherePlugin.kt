@@ -36,7 +36,7 @@ class RunAnywherePlugin : FlutterPlugin, MethodCallHandler {
             // `librac_commons.so` transitively.
             try {
                 val rc = RunAnywhereBridge.racHttpTransportRegisterOkHttp()
-                if (rc == 0) {
+                if (rc == RunAnywhereBridge.RAC_SUCCESS) {
                     Log.i(TAG, "OkHttp HTTP transport registered")
                 } else {
                     Log.w(TAG, "OkHttp HTTP transport registration returned rc=$rc")

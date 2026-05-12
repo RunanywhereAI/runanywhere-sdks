@@ -1,21 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 //
 // runanywhere_thinking_utils.dart — Pure Dart utilities for thinking-token
-// extraction, plus structured-output parsing via commons proto bytes.
-//
-// Thinking-token helpers remain in Dart (simple regex); structured-output
-// extraction routes through `rac_structured_output_parse_proto` so SDKs do
-// not duplicate commons-owned JSON extraction logic.
-
-import 'package:runanywhere/core/native/rac_native.dart';
-import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
-import 'package:runanywhere/generated/structured_output.pb.dart'
-    show
-        JSONSchema,
-        StructuredOutputOptions,
-        StructuredOutputParseRequest,
-        StructuredOutputResult;
-import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
+// extraction. Structured-output parsing now lives on
+// `RunAnywhereSDK.instance.llm.extractStructuredOutput(...)` to mirror
+// Swift's `RunAnywhere.extractStructuredOutput(text:schema:)`.
 
 /// Canonical result of `extractThinkingTokens` (§3).
 class ThinkingExtractionResult {
@@ -36,8 +24,8 @@ class ThinkingExtractionResult {
   });
 }
 
-/// Pure-Dart utilities for thinking-token parsing and structured output
-/// extraction. Exposed as a static helper class.
+/// Pure-Dart utilities for thinking-token parsing. Exposed as a static helper
+/// class. Swift has no equivalent surface — these helpers are Dart-only.
 class RunAnywhereThinkingUtils {
   RunAnywhereThinkingUtils._();
 
@@ -46,10 +34,6 @@ class RunAnywhereThinkingUtils {
     r'<think>([\s\S]*?)</think>',
     caseSensitive: false,
   );
-
-  // ---------------------------------------------------------------------------
-  // Thinking-token helpers
-  // ---------------------------------------------------------------------------
 
   /// Extract `<think>…</think>` tokens from [text], returning a
   /// [ThinkingExtractionResult] with the thinking content and the clean
@@ -84,39 +68,5 @@ class RunAnywhereThinkingUtils {
   ) {
     final result = extractThinkingTokens(text);
     return (thinking: result.thinking, response: result.response);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Structured output helpers
-  // ---------------------------------------------------------------------------
-
-  /// Extract structured output from raw [text] against [schema].
-  ///
-  /// Routes through commons `rac_structured_output_parse_proto`, which runs
-  /// the canonical JSON extractor + schema validator in C++ and returns a
-  /// [StructuredOutputResult]. Thinking tokens are stripped first so the
-  /// parser sees the visible response only.
-  static Future<StructuredOutputResult> extractStructuredOutput(
-    String text,
-    JSONSchema schema,
-  ) async {
-    final fn = RacNative.bindings.rac_structured_output_parse_proto;
-    if (fn == null) {
-      throw SDKException.featureNotAvailable(
-        'rac_structured_output_parse_proto is unavailable',
-      );
-    }
-
-    final cleanText = stripThinkingTokens(text);
-    final request = StructuredOutputParseRequest()
-      ..text = cleanText
-      ..options = StructuredOutputOptions(schema: schema);
-
-    return DartBridgeProtoUtils.callRequest<StructuredOutputResult>(
-      request: request,
-      invoke: fn,
-      decode: StructuredOutputResult.fromBuffer,
-      symbol: 'rac_structured_output_parse_proto',
-    );
   }
 }

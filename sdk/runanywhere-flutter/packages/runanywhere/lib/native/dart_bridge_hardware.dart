@@ -68,4 +68,45 @@ class DartBridgeHardware {
       return false;
     }
   }
+
+  /// Query the commons accelerator list as the `accelerators` slice of a
+  /// HardwareProfileResult.
+  ///
+  /// Mirrors Swift `CppBridge.Hardware.getAccelerators()`. Returns an empty
+  /// list when the commons symbol is unavailable or the call fails.
+  static List<AcceleratorInfo> getAccelerators() {
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final getAccel = lib.lookupFunction<
+          Int32 Function(Pointer<Pointer<Uint8>>, Pointer<IntPtr>),
+          int Function(Pointer<Pointer<Uint8>>, Pointer<IntPtr>)>(
+        'rac_hardware_get_accelerators',
+      );
+      final freeProfile = lib.lookupFunction<Void Function(Pointer<Uint8>),
+          void Function(Pointer<Uint8>)>(
+        'rac_hardware_profile_free',
+      );
+
+      final outBytes = calloc<Pointer<Uint8>>();
+      final outSize = calloc<IntPtr>();
+      try {
+        final result = getAccel(outBytes, outSize);
+        if (result != RAC_SUCCESS || outBytes.value == nullptr) {
+          return const <AcceleratorInfo>[];
+        }
+        final bytes =
+            Uint8List.fromList(outBytes.value.asTypedList(outSize.value));
+        final profile = HardwareProfileResult.fromBuffer(bytes);
+        return List<AcceleratorInfo>.unmodifiable(profile.accelerators);
+      } finally {
+        if (outBytes.value != nullptr) {
+          freeProfile(outBytes.value);
+        }
+        calloc.free(outBytes);
+        calloc.free(outSize);
+      }
+    } catch (_) {
+      return const <AcceleratorInfo>[];
+    }
+  }
 }

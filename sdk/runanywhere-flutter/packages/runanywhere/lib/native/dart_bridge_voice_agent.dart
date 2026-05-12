@@ -26,8 +26,8 @@ import 'package:runanywhere/generated/voice_agent_service.pb.dart'
     as voice_agent_pb;
 import 'package:runanywhere/generated/voice_events.pb.dart' as voice_events_pb;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/native_functions.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 /// VoiceAgent component bridge for the commons C ABI.
 ///

@@ -15,7 +15,7 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'model_types.pbenum.dart' as $0;
+import 'model_types.pbenum.dart' as $3;
 import 'stt_options.pbenum.dart';
 
 export 'stt_options.pbenum.dart';
@@ -41,13 +41,13 @@ class STTConfiguration extends $pb.GeneratedMessage {
     STTLanguage? language,
     $core.int? sampleRate,
     $core.bool? enableVad,
-    $0.AudioFormat? audioFormat,
+    $3.AudioFormat? audioFormat,
     $core.bool? enablePunctuation,
     $core.bool? enableDiarization,
     $core.Iterable<$core.String>? vocabularyList,
     $core.int? maxAlternatives,
     $core.bool? enableWordTimestamps,
-    $0.InferenceFramework? preferredFramework,
+    $3.InferenceFramework? preferredFramework,
     $core.String? languageCode,
   }) {
     final $result = create();
@@ -98,13 +98,13 @@ class STTConfiguration extends $pb.GeneratedMessage {
     ..e<STTLanguage>(2, _omitFieldNames ? '' : 'language', $pb.PbFieldType.OE, defaultOrMaker: STTLanguage.STT_LANGUAGE_UNSPECIFIED, valueOf: STTLanguage.valueOf, enumValues: STTLanguage.values)
     ..a<$core.int>(3, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
     ..aOB(4, _omitFieldNames ? '' : 'enableVad')
-    ..e<$0.AudioFormat>(5, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $0.AudioFormat.valueOf, enumValues: $0.AudioFormat.values)
+    ..e<$3.AudioFormat>(5, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $3.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $3.AudioFormat.valueOf, enumValues: $3.AudioFormat.values)
     ..aOB(6, _omitFieldNames ? '' : 'enablePunctuation')
     ..aOB(7, _omitFieldNames ? '' : 'enableDiarization')
     ..pPS(8, _omitFieldNames ? '' : 'vocabularyList')
     ..a<$core.int>(9, _omitFieldNames ? '' : 'maxAlternatives', $pb.PbFieldType.O3)
     ..aOB(10, _omitFieldNames ? '' : 'enableWordTimestamps')
-    ..e<$0.InferenceFramework>(11, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $0.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $0.InferenceFramework.valueOf, enumValues: $0.InferenceFramework.values)
+    ..e<$3.InferenceFramework>(11, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $3.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $3.InferenceFramework.valueOf, enumValues: $3.InferenceFramework.values)
     ..aOS(12, _omitFieldNames ? '' : 'languageCode')
     ..hasRequiredFields = false
   ;
@@ -167,9 +167,9 @@ class STTConfiguration extends $pb.GeneratedMessage {
   void clearEnableVad() => clearField(4);
 
   @$pb.TagNumber(5)
-  $0.AudioFormat get audioFormat => $_getN(4);
+  $3.AudioFormat get audioFormat => $_getN(4);
   @$pb.TagNumber(5)
-  set audioFormat($0.AudioFormat v) { setField(5, v); }
+  set audioFormat($3.AudioFormat v) { setField(5, v); }
   @$pb.TagNumber(5)
   $core.bool hasAudioFormat() => $_has(4);
   @$pb.TagNumber(5)
@@ -218,9 +218,9 @@ class STTConfiguration extends $pb.GeneratedMessage {
 
   /// Preferred framework for the component. Absent = auto.
   @$pb.TagNumber(11)
-  $0.InferenceFramework get preferredFramework => $_getN(10);
+  $3.InferenceFramework get preferredFramework => $_getN(10);
   @$pb.TagNumber(11)
-  set preferredFramework($0.InferenceFramework v) { setField(11, v); }
+  set preferredFramework($3.InferenceFramework v) { setField(11, v); }
   @$pb.TagNumber(11)
   $core.bool hasPreferredFramework() => $_has(10);
   @$pb.TagNumber(11)
@@ -265,7 +265,7 @@ class STTOptions extends $pb.GeneratedMessage {
     $core.int? beamSize,
     $core.String? languageCode,
     $core.bool? detectLanguage,
-    $0.AudioFormat? audioFormat,
+    $3.AudioFormat? audioFormat,
     $core.int? sampleRate,
     $core.int? maxAlternatives,
     $core.int? chunkDurationMs,
@@ -338,7 +338,7 @@ class STTOptions extends $pb.GeneratedMessage {
     ..a<$core.int>(7, _omitFieldNames ? '' : 'beamSize', $pb.PbFieldType.O3)
     ..aOS(8, _omitFieldNames ? '' : 'languageCode')
     ..aOB(9, _omitFieldNames ? '' : 'detectLanguage')
-    ..e<$0.AudioFormat>(10, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $0.AudioFormat.valueOf, enumValues: $0.AudioFormat.values)
+    ..e<$3.AudioFormat>(10, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $3.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $3.AudioFormat.valueOf, enumValues: $3.AudioFormat.values)
     ..a<$core.int>(11, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
     ..a<$core.int>(12, _omitFieldNames ? '' : 'maxAlternatives', $pb.PbFieldType.O3)
     ..a<$core.int>(13, _omitFieldNames ? '' : 'chunkDurationMs', $pb.PbFieldType.O3)
@@ -450,9 +450,9 @@ class STTOptions extends $pb.GeneratedMessage {
 
   /// Per-call input audio hints mirrored from rac_stt_options_t.
   @$pb.TagNumber(10)
-  $0.AudioFormat get audioFormat => $_getN(9);
+  $3.AudioFormat get audioFormat => $_getN(9);
   @$pb.TagNumber(10)
-  set audioFormat($0.AudioFormat v) { setField(10, v); }
+  set audioFormat($3.AudioFormat v) { setField(10, v); }
   @$pb.TagNumber(10)
   $core.bool hasAudioFormat() => $_has(9);
   @$pb.TagNumber(10)
@@ -528,7 +528,7 @@ class STTAudioSource extends $pb.GeneratedMessage {
     $core.String? fileUri,
     $core.String? adapterHandle,
     STTAudioEncoding? encoding,
-    $0.AudioFormat? audioFormat,
+    $3.AudioFormat? audioFormat,
     $core.int? sampleRate,
     $core.int? channels,
     $core.int? bitsPerSample,
@@ -580,7 +580,7 @@ class STTAudioSource extends $pb.GeneratedMessage {
     ..aOS(2, _omitFieldNames ? '' : 'fileUri')
     ..aOS(3, _omitFieldNames ? '' : 'adapterHandle')
     ..e<STTAudioEncoding>(4, _omitFieldNames ? '' : 'encoding', $pb.PbFieldType.OE, defaultOrMaker: STTAudioEncoding.STT_AUDIO_ENCODING_UNSPECIFIED, valueOf: STTAudioEncoding.valueOf, enumValues: STTAudioEncoding.values)
-    ..e<$0.AudioFormat>(5, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $0.AudioFormat.valueOf, enumValues: $0.AudioFormat.values)
+    ..e<$3.AudioFormat>(5, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $3.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $3.AudioFormat.valueOf, enumValues: $3.AudioFormat.values)
     ..a<$core.int>(6, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
     ..a<$core.int>(7, _omitFieldNames ? '' : 'channels', $pb.PbFieldType.O3)
     ..a<$core.int>(8, _omitFieldNames ? '' : 'bitsPerSample', $pb.PbFieldType.O3)
@@ -649,9 +649,9 @@ class STTAudioSource extends $pb.GeneratedMessage {
   void clearEncoding() => clearField(4);
 
   @$pb.TagNumber(5)
-  $0.AudioFormat get audioFormat => $_getN(4);
+  $3.AudioFormat get audioFormat => $_getN(4);
   @$pb.TagNumber(5)
-  set audioFormat($0.AudioFormat v) { setField(5, v); }
+  set audioFormat($3.AudioFormat v) { setField(5, v); }
   @$pb.TagNumber(5)
   $core.bool hasAudioFormat() => $_has(4);
   @$pb.TagNumber(5)

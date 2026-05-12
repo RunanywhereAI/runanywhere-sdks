@@ -15,7 +15,7 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'model_types.pbenum.dart' as $0;
+import 'model_types.pbenum.dart' as $3;
 import 'tts_options.pbenum.dart';
 
 export 'tts_options.pbenum.dart';
@@ -46,11 +46,11 @@ class TTSConfiguration extends $pb.GeneratedMessage {
     $core.double? speakingRate,
     $core.double? pitch,
     $core.double? volume,
-    $0.AudioFormat? audioFormat,
+    $3.AudioFormat? audioFormat,
     $core.int? sampleRate,
     $core.bool? enableNeuralVoice,
     $core.bool? enableSsml,
-    $0.InferenceFramework? preferredFramework,
+    $3.InferenceFramework? preferredFramework,
   }) {
     final $result = create();
     if (modelId != null) {
@@ -99,11 +99,11 @@ class TTSConfiguration extends $pb.GeneratedMessage {
     ..a<$core.double>(4, _omitFieldNames ? '' : 'speakingRate', $pb.PbFieldType.OF)
     ..a<$core.double>(5, _omitFieldNames ? '' : 'pitch', $pb.PbFieldType.OF)
     ..a<$core.double>(6, _omitFieldNames ? '' : 'volume', $pb.PbFieldType.OF)
-    ..e<$0.AudioFormat>(7, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $0.AudioFormat.valueOf, enumValues: $0.AudioFormat.values)
+    ..e<$3.AudioFormat>(7, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $3.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $3.AudioFormat.valueOf, enumValues: $3.AudioFormat.values)
     ..a<$core.int>(8, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
     ..aOB(9, _omitFieldNames ? '' : 'enableNeuralVoice')
     ..aOB(10, _omitFieldNames ? '' : 'enableSsml')
-    ..e<$0.InferenceFramework>(11, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $0.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $0.InferenceFramework.valueOf, enumValues: $0.InferenceFramework.values)
+    ..e<$3.InferenceFramework>(11, _omitFieldNames ? '' : 'preferredFramework', $pb.PbFieldType.OE, defaultOrMaker: $3.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED, valueOf: $3.InferenceFramework.valueOf, enumValues: $3.InferenceFramework.values)
     ..hasRequiredFields = false
   ;
 
@@ -193,9 +193,9 @@ class TTSConfiguration extends $pb.GeneratedMessage {
 
   /// Output audio format.
   @$pb.TagNumber(7)
-  $0.AudioFormat get audioFormat => $_getN(6);
+  $3.AudioFormat get audioFormat => $_getN(6);
   @$pb.TagNumber(7)
-  set audioFormat($0.AudioFormat v) { setField(7, v); }
+  set audioFormat($3.AudioFormat v) { setField(7, v); }
   @$pb.TagNumber(7)
   $core.bool hasAudioFormat() => $_has(6);
   @$pb.TagNumber(7)
@@ -235,9 +235,9 @@ class TTSConfiguration extends $pb.GeneratedMessage {
   /// Preferred framework for the component. Absent = auto. Mirrors the C
   /// ABI rac_tts_config_t preferred_framework field.
   @$pb.TagNumber(11)
-  $0.InferenceFramework get preferredFramework => $_getN(10);
+  $3.InferenceFramework get preferredFramework => $_getN(10);
   @$pb.TagNumber(11)
-  set preferredFramework($0.InferenceFramework v) { setField(11, v); }
+  set preferredFramework($3.InferenceFramework v) { setField(11, v); }
   @$pb.TagNumber(11)
   $core.bool hasPreferredFramework() => $_has(10);
   @$pb.TagNumber(11)
@@ -262,7 +262,7 @@ class TTSOptions extends $pb.GeneratedMessage {
     $core.double? pitch,
     $core.double? volume,
     $core.bool? enableSsml,
-    $0.AudioFormat? audioFormat,
+    $3.AudioFormat? audioFormat,
     $core.int? sampleRate,
     $core.int? speakerId,
     $core.double? speed,
@@ -315,7 +315,7 @@ class TTSOptions extends $pb.GeneratedMessage {
     ..a<$core.double>(4, _omitFieldNames ? '' : 'pitch', $pb.PbFieldType.OF)
     ..a<$core.double>(5, _omitFieldNames ? '' : 'volume', $pb.PbFieldType.OF)
     ..aOB(6, _omitFieldNames ? '' : 'enableSsml')
-    ..e<$0.AudioFormat>(7, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $0.AudioFormat.valueOf, enumValues: $0.AudioFormat.values)
+    ..e<$3.AudioFormat>(7, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $3.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $3.AudioFormat.valueOf, enumValues: $3.AudioFormat.values)
     ..a<$core.int>(8, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
     ..a<$core.int>(9, _omitFieldNames ? '' : 'speakerId', $pb.PbFieldType.O3)
     ..a<$core.double>(10, _omitFieldNames ? '' : 'speed', $pb.PbFieldType.OF)
@@ -411,9 +411,9 @@ class TTSOptions extends $pb.GeneratedMessage {
 
   /// Output audio format.
   @$pb.TagNumber(7)
-  $0.AudioFormat get audioFormat => $_getN(6);
+  $3.AudioFormat get audioFormat => $_getN(6);
   @$pb.TagNumber(7)
-  set audioFormat($0.AudioFormat v) { setField(7, v); }
+  set audioFormat($3.AudioFormat v) { setField(7, v); }
   @$pb.TagNumber(7)
   $core.bool hasAudioFormat() => $_has(6);
   @$pb.TagNumber(7)
@@ -800,7 +800,7 @@ class TTSSynthesisMetadata extends $pb.GeneratedMessage {
 class TTSOutput extends $pb.GeneratedMessage {
   factory TTSOutput({
     $core.List<$core.int>? audioData,
-    $0.AudioFormat? audioFormat,
+    $3.AudioFormat? audioFormat,
     $core.int? sampleRate,
     $fixnum.Int64? durationMs,
     $core.Iterable<TTSPhonemeTimestamp>? phonemeTimestamps,
@@ -857,7 +857,7 @@ class TTSOutput extends $pb.GeneratedMessage {
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'TTSOutput', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..a<$core.List<$core.int>>(1, _omitFieldNames ? '' : 'audioData', $pb.PbFieldType.OY)
-    ..e<$0.AudioFormat>(2, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $0.AudioFormat.valueOf, enumValues: $0.AudioFormat.values)
+    ..e<$3.AudioFormat>(2, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $3.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $3.AudioFormat.valueOf, enumValues: $3.AudioFormat.values)
     ..a<$core.int>(3, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
     ..aInt64(4, _omitFieldNames ? '' : 'durationMs')
     ..pc<TTSPhonemeTimestamp>(5, _omitFieldNames ? '' : 'phonemeTimestamps', $pb.PbFieldType.PM, subBuilder: TTSPhonemeTimestamp.create)
@@ -904,9 +904,9 @@ class TTSOutput extends $pb.GeneratedMessage {
 
   /// Audio format of the bytes in `audio_data`.
   @$pb.TagNumber(2)
-  $0.AudioFormat get audioFormat => $_getN(1);
+  $3.AudioFormat get audioFormat => $_getN(1);
   @$pb.TagNumber(2)
-  set audioFormat($0.AudioFormat v) { setField(2, v); }
+  set audioFormat($3.AudioFormat v) { setField(2, v); }
   @$pb.TagNumber(2)
   $core.bool hasAudioFormat() => $_has(1);
   @$pb.TagNumber(2)
@@ -1021,7 +1021,7 @@ class TTSOutput extends $pb.GeneratedMessage {
 ///  ---------------------------------------------------------------------------
 class TTSSpeakResult extends $pb.GeneratedMessage {
   factory TTSSpeakResult({
-    $0.AudioFormat? audioFormat,
+    $3.AudioFormat? audioFormat,
     $core.int? sampleRate,
     $fixnum.Int64? durationMs,
     $fixnum.Int64? audioSizeBytes,
@@ -1062,7 +1062,7 @@ class TTSSpeakResult extends $pb.GeneratedMessage {
   factory TTSSpeakResult.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'TTSSpeakResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..e<$0.AudioFormat>(1, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $0.AudioFormat.valueOf, enumValues: $0.AudioFormat.values)
+    ..e<$3.AudioFormat>(1, _omitFieldNames ? '' : 'audioFormat', $pb.PbFieldType.OE, defaultOrMaker: $3.AudioFormat.AUDIO_FORMAT_UNSPECIFIED, valueOf: $3.AudioFormat.valueOf, enumValues: $3.AudioFormat.values)
     ..a<$core.int>(2, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
     ..aInt64(3, _omitFieldNames ? '' : 'durationMs')
     ..aInt64(4, _omitFieldNames ? '' : 'audioSizeBytes')
@@ -1096,9 +1096,9 @@ class TTSSpeakResult extends $pb.GeneratedMessage {
 
   /// Audio format used during synthesis.
   @$pb.TagNumber(1)
-  $0.AudioFormat get audioFormat => $_getN(0);
+  $3.AudioFormat get audioFormat => $_getN(0);
   @$pb.TagNumber(1)
-  set audioFormat($0.AudioFormat v) { setField(1, v); }
+  set audioFormat($3.AudioFormat v) { setField(1, v); }
   @$pb.TagNumber(1)
   $core.bool hasAudioFormat() => $_has(0);
   @$pb.TagNumber(1)
@@ -1344,6 +1344,53 @@ class TTSVoiceInfo extends $pb.GeneratedMessage {
 
   @$pb.TagNumber(9)
   $core.List<$core.String> get supportedStyles => $_getList(8);
+}
+
+/// Wire envelope returned by rac_tts_list_voices_lifecycle_proto. Replaces the
+/// per-voice callback pattern used by the legacy handle-based ABI so the
+/// lifecycle-driven listing call returns a single serialized message.
+class TTSVoiceList extends $pb.GeneratedMessage {
+  factory TTSVoiceList({
+    $core.Iterable<TTSVoiceInfo>? voices,
+  }) {
+    final $result = create();
+    if (voices != null) {
+      $result.voices.addAll(voices);
+    }
+    return $result;
+  }
+  TTSVoiceList._() : super();
+  factory TTSVoiceList.fromBuffer($core.List<$core.int> i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromBuffer(i, r);
+  factory TTSVoiceList.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
+
+  static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'TTSVoiceList', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
+    ..pc<TTSVoiceInfo>(1, _omitFieldNames ? '' : 'voices', $pb.PbFieldType.PM, subBuilder: TTSVoiceInfo.create)
+    ..hasRequiredFields = false
+  ;
+
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.deepCopy] instead. '
+  'Will be removed in next major version')
+  TTSVoiceList clone() => TTSVoiceList()..mergeFromMessage(this);
+  @$core.Deprecated(
+  'Using this can add significant overhead to your binary. '
+  'Use [GeneratedMessageGenericExtensions.rebuild] instead. '
+  'Will be removed in next major version')
+  TTSVoiceList copyWith(void Function(TTSVoiceList) updates) => super.copyWith((message) => updates(message as TTSVoiceList)) as TTSVoiceList;
+
+  $pb.BuilderInfo get info_ => _i;
+
+  @$core.pragma('dart2js:noInline')
+  static TTSVoiceList create() => TTSVoiceList._();
+  TTSVoiceList createEmptyInstance() => create();
+  static $pb.PbList<TTSVoiceList> createRepeated() => $pb.PbList<TTSVoiceList>();
+  @$core.pragma('dart2js:noInline')
+  static TTSVoiceList getDefault() => _defaultInstance ??= $pb.GeneratedMessage.$_defaultFor<TTSVoiceList>(create);
+  static TTSVoiceList? _defaultInstance;
+
+  @$pb.TagNumber(1)
+  $core.List<TTSVoiceInfo> get voices => $_getList(0);
 }
 
 class TTSStreamEvent extends $pb.GeneratedMessage {

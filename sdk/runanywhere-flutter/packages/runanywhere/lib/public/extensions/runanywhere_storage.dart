@@ -5,9 +5,11 @@
 
 import 'package:fixnum/fixnum.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/generated/download_service.pb.dart'
     show DownloadProgress;
 import 'package:runanywhere/generated/storage_types.pb.dart';
+import 'package:runanywhere/native/dart_bridge_file_manager.dart';
 import 'package:runanywhere/native/dart_bridge_storage.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_downloads.dart';
 
@@ -76,6 +78,35 @@ class RunAnywhereStorage {
 
   /// Low-level download stream. Emits proto-generated `DownloadProgress`
   /// events driven by the C++ `rac_download_orchestrate` state machine.
+  /// Mirrors Swift's `downloadModel(_:onProgress:)`.
   static Stream<DownloadProgress> downloadModel(String modelId) =>
       RunAnywhereDownloads.shared.start(modelId);
+
+  /// Get storage information as the canonical generated proto result.
+  /// Mirrors Swift's `getStorageInfo(_:) -> RAStorageInfoResult`.
+  static Future<StorageInfoResult> getStorageInfo([
+    StorageInfoRequest? request,
+  ]) =>
+      DartBridgeStorage.instance.infoProto(request);
+
+  /// Execute or dry-run storage deletion as canonical generated proto data.
+  /// Mirrors Swift's `deleteStorage(_:) -> RAStorageDeleteResult`.
+  static Future<StorageDeleteResult> deleteStorage(
+    StorageDeleteRequest request,
+  ) =>
+      DartBridgeStorage.instance.deleteProto(request);
+
+  /// Clear the SDK's Cache directory. Mirrors Swift's `clearCache()`.
+  static Future<void> clearCache() async {
+    if (!DartBridgeFileManager.clearCache()) {
+      throw SDKException.storageError('Failed to clear cache');
+    }
+  }
+
+  /// Clear the SDK's Temp directory. Mirrors Swift's `cleanTempFiles()`.
+  static Future<void> cleanTempFiles() async {
+    if (!DartBridgeFileManager.clearTemp()) {
+      throw SDKException.storageError('Failed to clean temp files');
+    }
+  }
 }

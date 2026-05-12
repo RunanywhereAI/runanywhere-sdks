@@ -23,7 +23,7 @@ import 'dart:typed_data';
 
 import 'package:ffi/ffi.dart';
 import 'package:runanywhere/core/native/rac_native.dart';
-import 'package:runanywhere/foundation/configuration/sdk_constants.dart';
+import 'package:runanywhere/foundation/constants/sdk_constants.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/public/configuration/sdk_environment.dart';
 

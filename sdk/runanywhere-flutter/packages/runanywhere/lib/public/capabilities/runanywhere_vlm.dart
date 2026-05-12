@@ -5,7 +5,7 @@
 import 'dart:async';
 
 import 'package:protobuf/protobuf.dart' show GeneratedMessageGenericExtensions;
-import 'package:runanywhere/foundation/error_types/sdk_exception.dart';
+import 'package:runanywhere/foundation/errors/sdk_exception.dart';
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/component_types.pbenum.dart' show ComponentLifecycleState;
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
@@ -13,10 +13,8 @@ import 'package:runanywhere/generated/sdk_events.pb.dart'
     show ComponentLifecycleSnapshot;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
 import 'package:runanywhere/generated/vlm_options.pb.dart';
-import 'package:runanywhere/internal/sdk_event_factories.dart';
 import 'package:runanywhere/native/dart_bridge.dart';
 import 'package:runanywhere/public/capabilities/runanywhere_model_lifecycle.dart';
-import 'package:runanywhere/public/events/event_bus.dart';
 
 /// VLM (vision-language model) capability surface.
 ///
@@ -56,8 +54,7 @@ class RunAnywhereVLM {
     final logger = SDKLogger('RunAnywhere.LoadVLMModel');
     logger.info('Loading VLM model: $modelId');
 
-    EventBus.shared.publish(SdkEventFactory.modelLoadStarted(modelId));
-
+    // C++ commons auto-emits VLM model load started/completed/failed events.
     try {
       final lifecycleResult = await RunAnywhereModelLifecycle.shared.load(
         model_pb.ModelLoadRequest(
@@ -75,11 +72,8 @@ class RunAnywhereVLM {
       }
 
       logger.info('VLM model loaded successfully: $modelId');
-
-      EventBus.shared.publish(SdkEventFactory.modelLoadCompleted(modelId));
     } catch (e) {
       logger.error('Failed to load VLM model: $e');
-      EventBus.shared.publish(SdkEventFactory.modelLoadFailed(modelId, e));
       rethrow;
     }
   }
@@ -114,7 +108,9 @@ class RunAnywhereVLM {
   }
 
   /// Cancel any in-flight VLM generation.
-  Future<void> cancel() async {
+  ///
+  /// Mirrors Swift `RunAnywhere.cancelVLMGeneration()`.
+  Future<void> cancelVLMGeneration() async {
     DartBridge.vlm.cancel();
   }
 

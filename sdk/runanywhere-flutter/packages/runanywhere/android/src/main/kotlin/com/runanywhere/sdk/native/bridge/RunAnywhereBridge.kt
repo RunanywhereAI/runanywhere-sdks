@@ -26,13 +26,21 @@ package com.runanywhere.sdk.native.bridge
 
 object RunAnywhereBridge {
     /**
+     * Canonical success code returned by the underlying C ABI. Matches
+     * `RAC_SUCCESS` in `rac/core/rac_error.h` (and the Kotlin SDK's
+     * `CommonsErrorMapping.RAC_SUCCESS`). Exposing it as a named constant lets
+     * call sites compare against the symbolic value instead of bare `0`.
+     */
+    const val RAC_SUCCESS: Int = 0
+
+    /**
      * Install the OkHttp-backed platform HTTP transport. Subsequent
      * `rac_http_request_*` calls route through OkHttp instead of libcurl.
      *
      * Idempotent: subsequent calls are no-ops (guarded by the C++ adapter's
      * `globals().initialized` flag).
      *
-     * @return RAC_SUCCESS (0) on success, negative error code on failure.
+     * @return [RAC_SUCCESS] on success, negative error code on failure.
      */
     @JvmStatic
     external fun racHttpTransportRegisterOkHttp(): Int

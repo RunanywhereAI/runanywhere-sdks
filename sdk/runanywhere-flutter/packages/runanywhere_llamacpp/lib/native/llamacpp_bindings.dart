@@ -1,8 +1,9 @@
 import 'dart:ffi';
 import 'dart:io';
 
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
+import 'package:runanywhere/native/types/core_function_types.dart';
 
 /// Minimal LlamaCPP backend FFI bindings.
 ///

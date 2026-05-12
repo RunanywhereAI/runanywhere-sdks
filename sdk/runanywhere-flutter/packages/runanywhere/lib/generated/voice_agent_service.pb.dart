@@ -15,12 +15,12 @@ import 'dart:core' as $core;
 import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'component_types.pbenum.dart' as $3;
-import 'errors.pbenum.dart' as $4;
-import 'stt_options.pb.dart' as $2;
-import 'tts_options.pb.dart' as $1;
-import 'voice_events.pb.dart' as $0;
-import 'voice_events.pbenum.dart' as $0;
+import 'component_types.pbenum.dart' as $12;
+import 'errors.pbenum.dart' as $13;
+import 'stt_options.pb.dart' as $21;
+import 'tts_options.pb.dart' as $22;
+import 'voice_events.pb.dart' as $14;
+import 'voice_events.pbenum.dart' as $14;
 
 /// Empty request type — the voice agent already has its config set via
 /// `rac_voice_agent_init()` at handle creation time. The Stream rpc just
@@ -29,8 +29,8 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
   factory VoiceAgentRequest({
     $core.String? eventFilter,
     $core.String? sessionId,
-    $core.Iterable<$3.EventCategory>? categories,
-    $4.ErrorSeverity? minSeverity,
+    $core.Iterable<$12.EventCategory>? categories,
+    $13.ErrorSeverity? minSeverity,
     $fixnum.Int64? replayFromSeq,
     $core.bool? includeAudio,
   }) {
@@ -62,8 +62,8 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceAgentRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'eventFilter')
     ..aOS(2, _omitFieldNames ? '' : 'sessionId')
-    ..pc<$3.EventCategory>(3, _omitFieldNames ? '' : 'categories', $pb.PbFieldType.KE, valueOf: $3.EventCategory.valueOf, enumValues: $3.EventCategory.values, defaultEnumValue: $3.EventCategory.EVENT_CATEGORY_UNSPECIFIED)
-    ..e<$4.ErrorSeverity>(4, _omitFieldNames ? '' : 'minSeverity', $pb.PbFieldType.OE, defaultOrMaker: $4.ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED, valueOf: $4.ErrorSeverity.valueOf, enumValues: $4.ErrorSeverity.values)
+    ..pc<$12.EventCategory>(3, _omitFieldNames ? '' : 'categories', $pb.PbFieldType.KE, valueOf: $12.EventCategory.valueOf, enumValues: $12.EventCategory.values, defaultEnumValue: $12.EventCategory.EVENT_CATEGORY_UNSPECIFIED)
+    ..e<$13.ErrorSeverity>(4, _omitFieldNames ? '' : 'minSeverity', $pb.PbFieldType.OE, defaultOrMaker: $13.ErrorSeverity.ERROR_SEVERITY_UNSPECIFIED, valueOf: $13.ErrorSeverity.valueOf, enumValues: $13.ErrorSeverity.values)
     ..a<$fixnum.Int64>(5, _omitFieldNames ? '' : 'replayFromSeq', $pb.PbFieldType.OU6, defaultOrMaker: $fixnum.Int64.ZERO)
     ..aOB(6, _omitFieldNames ? '' : 'includeAudio')
     ..hasRequiredFields = false
@@ -111,12 +111,12 @@ class VoiceAgentRequest extends $pb.GeneratedMessage {
   void clearSessionId() => clearField(2);
 
   @$pb.TagNumber(3)
-  $core.List<$3.EventCategory> get categories => $_getList(2);
+  $core.List<$12.EventCategory> get categories => $_getList(2);
 
   @$pb.TagNumber(4)
-  $4.ErrorSeverity get minSeverity => $_getN(3);
+  $13.ErrorSeverity get minSeverity => $_getN(3);
   @$pb.TagNumber(4)
-  set minSeverity($4.ErrorSeverity v) { setField(4, v); }
+  set minSeverity($13.ErrorSeverity v) { setField(4, v); }
   @$pb.TagNumber(4)
   $core.bool hasMinSeverity() => $_has(3);
   @$pb.TagNumber(4)
@@ -158,10 +158,10 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
     $core.String? assistantResponse,
     $core.String? thinkingContent,
     $core.List<$core.int>? synthesizedAudio,
-    $0.VoiceAgentComponentStates? finalState,
+    $14.VoiceAgentComponentStates? finalState,
     $core.int? synthesizedAudioSampleRateHz,
     $core.int? synthesizedAudioChannels,
-    $0.AudioEncoding? synthesizedAudioEncoding,
+    $14.AudioEncoding? synthesizedAudioEncoding,
     $core.String? sessionId,
     $core.String? turnId,
     $fixnum.Int64? sttTimeMs,
@@ -235,10 +235,10 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
     ..aOS(3, _omitFieldNames ? '' : 'assistantResponse')
     ..aOS(4, _omitFieldNames ? '' : 'thinkingContent')
     ..a<$core.List<$core.int>>(5, _omitFieldNames ? '' : 'synthesizedAudio', $pb.PbFieldType.OY)
-    ..aOM<$0.VoiceAgentComponentStates>(6, _omitFieldNames ? '' : 'finalState', subBuilder: $0.VoiceAgentComponentStates.create)
+    ..aOM<$14.VoiceAgentComponentStates>(6, _omitFieldNames ? '' : 'finalState', subBuilder: $14.VoiceAgentComponentStates.create)
     ..a<$core.int>(7, _omitFieldNames ? '' : 'synthesizedAudioSampleRateHz', $pb.PbFieldType.O3)
     ..a<$core.int>(8, _omitFieldNames ? '' : 'synthesizedAudioChannels', $pb.PbFieldType.O3)
-    ..e<$0.AudioEncoding>(9, _omitFieldNames ? '' : 'synthesizedAudioEncoding', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED, valueOf: $0.AudioEncoding.valueOf, enumValues: $0.AudioEncoding.values)
+    ..e<$14.AudioEncoding>(9, _omitFieldNames ? '' : 'synthesizedAudioEncoding', $pb.PbFieldType.OE, defaultOrMaker: $14.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED, valueOf: $14.AudioEncoding.valueOf, enumValues: $14.AudioEncoding.values)
     ..aOS(10, _omitFieldNames ? '' : 'sessionId')
     ..aOS(11, _omitFieldNames ? '' : 'turnId')
     ..aInt64(12, _omitFieldNames ? '' : 'sttTimeMs')
@@ -330,15 +330,15 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
   /// surfacing readiness / partial-failure breakdowns alongside the
   /// final result. Unset when the caller does not ask for it.
   @$pb.TagNumber(6)
-  $0.VoiceAgentComponentStates get finalState => $_getN(5);
+  $14.VoiceAgentComponentStates get finalState => $_getN(5);
   @$pb.TagNumber(6)
-  set finalState($0.VoiceAgentComponentStates v) { setField(6, v); }
+  set finalState($14.VoiceAgentComponentStates v) { setField(6, v); }
   @$pb.TagNumber(6)
   $core.bool hasFinalState() => $_has(5);
   @$pb.TagNumber(6)
   void clearFinalState() => clearField(6);
   @$pb.TagNumber(6)
-  $0.VoiceAgentComponentStates ensureFinalState() => $_ensure(5);
+  $14.VoiceAgentComponentStates ensureFinalState() => $_ensure(5);
 
   /// Audio metadata for synthesized_audio. 0/UNSPECIFIED = backend default
   /// or unknown.
@@ -361,9 +361,9 @@ class VoiceAgentResult extends $pb.GeneratedMessage {
   void clearSynthesizedAudioChannels() => clearField(8);
 
   @$pb.TagNumber(9)
-  $0.AudioEncoding get synthesizedAudioEncoding => $_getN(8);
+  $14.AudioEncoding get synthesizedAudioEncoding => $_getN(8);
   @$pb.TagNumber(9)
-  set synthesizedAudioEncoding($0.AudioEncoding v) { setField(9, v); }
+  set synthesizedAudioEncoding($14.AudioEncoding v) { setField(9, v); }
   @$pb.TagNumber(9)
   $core.bool hasSynthesizedAudioEncoding() => $_has(8);
   @$pb.TagNumber(9)
@@ -449,7 +449,7 @@ class VoiceAgentTurnRequest extends $pb.GeneratedMessage {
     $core.List<$core.int>? audioData,
     $core.int? sampleRateHz,
     $core.int? channels,
-    $0.AudioEncoding? encoding,
+    $14.AudioEncoding? encoding,
     VoiceSessionConfig? sessionConfig,
     $core.Map<$core.String, $core.String>? metadata,
   }) {
@@ -490,7 +490,7 @@ class VoiceAgentTurnRequest extends $pb.GeneratedMessage {
     ..a<$core.List<$core.int>>(3, _omitFieldNames ? '' : 'audioData', $pb.PbFieldType.OY)
     ..a<$core.int>(4, _omitFieldNames ? '' : 'sampleRateHz', $pb.PbFieldType.O3)
     ..a<$core.int>(5, _omitFieldNames ? '' : 'channels', $pb.PbFieldType.O3)
-    ..e<$0.AudioEncoding>(6, _omitFieldNames ? '' : 'encoding', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED, valueOf: $0.AudioEncoding.valueOf, enumValues: $0.AudioEncoding.values)
+    ..e<$14.AudioEncoding>(6, _omitFieldNames ? '' : 'encoding', $pb.PbFieldType.OE, defaultOrMaker: $14.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED, valueOf: $14.AudioEncoding.valueOf, enumValues: $14.AudioEncoding.values)
     ..aOM<VoiceSessionConfig>(7, _omitFieldNames ? '' : 'sessionConfig', subBuilder: VoiceSessionConfig.create)
     ..m<$core.String, $core.String>(8, _omitFieldNames ? '' : 'metadata', entryClassName: 'VoiceAgentTurnRequest.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
     ..hasRequiredFields = false
@@ -563,9 +563,9 @@ class VoiceAgentTurnRequest extends $pb.GeneratedMessage {
   void clearChannels() => clearField(5);
 
   @$pb.TagNumber(6)
-  $0.AudioEncoding get encoding => $_getN(5);
+  $14.AudioEncoding get encoding => $_getN(5);
   @$pb.TagNumber(6)
-  set encoding($0.AudioEncoding v) { setField(6, v); }
+  set encoding($14.AudioEncoding v) { setField(6, v); }
   @$pb.TagNumber(6)
   $core.bool hasEncoding() => $_has(5);
   @$pb.TagNumber(6)
@@ -1257,7 +1257,7 @@ class VoiceAgentTranscribeProtoRequest extends $pb.GeneratedMessage {
     $core.int? sampleRate,
     $core.String? languageHint,
     $core.int? channels,
-    $0.AudioEncoding? encoding,
+    $14.AudioEncoding? encoding,
   }) {
     final $result = create();
     if (audioData != null) {
@@ -1290,7 +1290,7 @@ class VoiceAgentTranscribeProtoRequest extends $pb.GeneratedMessage {
     ..a<$core.int>(3, _omitFieldNames ? '' : 'sampleRate', $pb.PbFieldType.O3)
     ..aOS(4, _omitFieldNames ? '' : 'languageHint')
     ..a<$core.int>(5, _omitFieldNames ? '' : 'channels', $pb.PbFieldType.O3)
-    ..e<$0.AudioEncoding>(6, _omitFieldNames ? '' : 'encoding', $pb.PbFieldType.OE, defaultOrMaker: $0.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED, valueOf: $0.AudioEncoding.valueOf, enumValues: $0.AudioEncoding.values)
+    ..e<$14.AudioEncoding>(6, _omitFieldNames ? '' : 'encoding', $pb.PbFieldType.OE, defaultOrMaker: $14.AudioEncoding.AUDIO_ENCODING_UNSPECIFIED, valueOf: $14.AudioEncoding.valueOf, enumValues: $14.AudioEncoding.values)
     ..hasRequiredFields = false
   ;
 
@@ -1361,9 +1361,9 @@ class VoiceAgentTranscribeProtoRequest extends $pb.GeneratedMessage {
   void clearChannels() => clearField(5);
 
   @$pb.TagNumber(6)
-  $0.AudioEncoding get encoding => $_getN(5);
+  $14.AudioEncoding get encoding => $_getN(5);
   @$pb.TagNumber(6)
-  set encoding($0.AudioEncoding v) { setField(6, v); }
+  set encoding($14.AudioEncoding v) { setField(6, v); }
   @$pb.TagNumber(6)
   $core.bool hasEncoding() => $_has(5);
   @$pb.TagNumber(6)
@@ -1374,7 +1374,7 @@ class VoiceAgentSynthesizeSpeechProtoRequest extends $pb.GeneratedMessage {
   factory VoiceAgentSynthesizeSpeechProtoRequest({
     $core.String? text,
     $core.String? sessionId,
-    $1.TTSOptions? options,
+    $22.TTSOptions? options,
   }) {
     final $result = create();
     if (text != null) {
@@ -1395,7 +1395,7 @@ class VoiceAgentSynthesizeSpeechProtoRequest extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'VoiceAgentSynthesizeSpeechProtoRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'text')
     ..aOS(2, _omitFieldNames ? '' : 'sessionId')
-    ..aOM<$1.TTSOptions>(3, _omitFieldNames ? '' : 'options', subBuilder: $1.TTSOptions.create)
+    ..aOM<$22.TTSOptions>(3, _omitFieldNames ? '' : 'options', subBuilder: $22.TTSOptions.create)
     ..hasRequiredFields = false
   ;
 
@@ -1439,32 +1439,32 @@ class VoiceAgentSynthesizeSpeechProtoRequest extends $pb.GeneratedMessage {
   void clearSessionId() => clearField(2);
 
   @$pb.TagNumber(3)
-  $1.TTSOptions get options => $_getN(2);
+  $22.TTSOptions get options => $_getN(2);
   @$pb.TagNumber(3)
-  set options($1.TTSOptions v) { setField(3, v); }
+  set options($22.TTSOptions v) { setField(3, v); }
   @$pb.TagNumber(3)
   $core.bool hasOptions() => $_has(2);
   @$pb.TagNumber(3)
   void clearOptions() => clearField(3);
   @$pb.TagNumber(3)
-  $1.TTSOptions ensureOptions() => $_ensure(2);
+  $22.TTSOptions ensureOptions() => $_ensure(2);
 }
 
 class VoiceAgentApi {
   $pb.RpcClient _client;
   VoiceAgentApi(this._client);
 
-  $async.Future<$0.VoiceEvent> stream($pb.ClientContext? ctx, VoiceAgentRequest request) =>
-    _client.invoke<$0.VoiceEvent>(ctx, 'VoiceAgent', 'Stream', request, $0.VoiceEvent())
+  $async.Future<$14.VoiceEvent> stream($pb.ClientContext? ctx, VoiceAgentRequest request) =>
+    _client.invoke<$14.VoiceEvent>(ctx, 'VoiceAgent', 'Stream', request, $14.VoiceEvent())
   ;
   $async.Future<VoiceAgentResult> processTurn($pb.ClientContext? ctx, VoiceAgentTurnRequest request) =>
     _client.invoke<VoiceAgentResult>(ctx, 'VoiceAgent', 'ProcessTurn', request, VoiceAgentResult())
   ;
-  $async.Future<$2.STTOutput> transcribe($pb.ClientContext? ctx, VoiceAgentTranscribeProtoRequest request) =>
-    _client.invoke<$2.STTOutput>(ctx, 'VoiceAgent', 'Transcribe', request, $2.STTOutput())
+  $async.Future<$21.STTOutput> transcribe($pb.ClientContext? ctx, VoiceAgentTranscribeProtoRequest request) =>
+    _client.invoke<$21.STTOutput>(ctx, 'VoiceAgent', 'Transcribe', request, $21.STTOutput())
   ;
-  $async.Future<$1.TTSOutput> synthesizeSpeech($pb.ClientContext? ctx, VoiceAgentSynthesizeSpeechProtoRequest request) =>
-    _client.invoke<$1.TTSOutput>(ctx, 'VoiceAgent', 'SynthesizeSpeech', request, $1.TTSOutput())
+  $async.Future<$22.TTSOutput> synthesizeSpeech($pb.ClientContext? ctx, VoiceAgentSynthesizeSpeechProtoRequest request) =>
+    _client.invoke<$22.TTSOutput>(ctx, 'VoiceAgent', 'SynthesizeSpeech', request, $22.TTSOutput())
   ;
   $async.Future<VoiceAgentResult> configure($pb.ClientContext? ctx, VoiceAgentComposeConfig request) =>
     _client.invoke<VoiceAgentResult>(ctx, 'VoiceAgent', 'Configure', request, VoiceAgentResult())

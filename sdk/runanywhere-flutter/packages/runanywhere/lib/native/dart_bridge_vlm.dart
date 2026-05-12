@@ -16,8 +16,8 @@ import 'package:runanywhere/generated/sdk_events.pb.dart' show SDKEvent;
 import 'package:runanywhere/generated/vlm_options.pb.dart'
     show VLMGenerationRequest, VLMResult, VLMStreamEvent;
 import 'package:runanywhere/native/dart_bridge_proto_utils.dart';
-import 'package:runanywhere/native/ffi_types.dart';
 import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 typedef _RacVlmGenerateProtoNative = ffi.Int32 Function(
   ffi.Pointer<ffi.Uint8>,

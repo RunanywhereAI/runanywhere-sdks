@@ -36,7 +36,7 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart'
     show InferenceFramework;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
-import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere_genie/native/genie_bindings.dart';
 
 // Re-export for backward compatibility
@@ -61,8 +61,21 @@ class Genie implements RunAnywhereModule {
   // Module Info (matches Swift exactly)
   // ============================================================================
 
-  /// Current version of the Genie Runtime module
-  static const String version = '1.0.0';
+  /// Current version of the Genie Runtime Dart module.
+  ///
+  /// Matches the version convention used by `LlamaCpp.version` and
+  /// `Onnx.version` ('2.0.0' per CLAUDE.md Flutter SDK rules).
+  static const String version = '2.0.0';
+
+  /// Qualcomm Genie native backend version (single source of truth).
+  ///
+  /// Used by:
+  /// - Android `binary_config.gradle` (`genieVersion = '0.3.0'`) for release URL.
+  /// - iOS `GeniePlugin.swift` `getBackendVersion` method-channel handshake.
+  ///
+  /// Native code should read this value via the `runanywhere_genie` method
+  /// channel `getNativeBackendVersion` rather than hard-coding it.
+  static const String genieNativeVersion = '0.3.0';
 
   // ============================================================================
   // RunAnywhereModule Conformance (matches Swift exactly)

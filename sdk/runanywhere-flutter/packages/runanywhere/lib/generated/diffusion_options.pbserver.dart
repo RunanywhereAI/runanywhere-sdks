@@ -15,27 +15,27 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'diffusion_options.pb.dart' as $1;
+import 'diffusion_options.pb.dart' as $7;
 import 'diffusion_options.pbjson.dart';
 
 export 'diffusion_options.pb.dart';
 
 abstract class DiffusionServiceBase extends $pb.GeneratedService {
-  $async.Future<$1.DiffusionResult> generate($pb.ServerContext ctx, $1.DiffusionGenerationRequest request);
-  $async.Future<$1.DiffusionStreamEvent> stream($pb.ServerContext ctx, $1.DiffusionGenerationRequest request);
+  $async.Future<$7.DiffusionResult> generate($pb.ServerContext ctx, $7.DiffusionGenerationRequest request);
+  $async.Future<$7.DiffusionStreamEvent> stream($pb.ServerContext ctx, $7.DiffusionGenerationRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
-      case 'Generate': return $1.DiffusionGenerationRequest();
-      case 'Stream': return $1.DiffusionGenerationRequest();
+      case 'Generate': return $7.DiffusionGenerationRequest();
+      case 'Stream': return $7.DiffusionGenerationRequest();
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }
 
   $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx, $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
-      case 'Generate': return this.generate(ctx, request as $1.DiffusionGenerationRequest);
-      case 'Stream': return this.stream(ctx, request as $1.DiffusionGenerationRequest);
+      case 'Generate': return this.generate(ctx, request as $7.DiffusionGenerationRequest);
+      case 'Stream': return this.stream(ctx, request as $7.DiffusionGenerationRequest);
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }

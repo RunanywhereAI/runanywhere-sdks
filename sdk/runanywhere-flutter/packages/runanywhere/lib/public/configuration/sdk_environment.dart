@@ -1,7 +1,7 @@
 import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart'
     show SDKEnvironment;
-import 'package:runanywhere/native/dart_bridge_dev_config.dart';
+import 'package:runanywhere/native/dart_bridge_environment.dart';
 
 export 'package:runanywhere/generated/model_types.pbenum.dart'
     show SDKEnvironment;

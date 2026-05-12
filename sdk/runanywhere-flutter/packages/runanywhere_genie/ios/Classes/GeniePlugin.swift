@@ -22,7 +22,10 @@ public class GeniePlugin: NSObject, FlutterPlugin {
         case "getPlatformVersion":
             result("iOS " + UIDevice.current.systemVersion)
         case "getBackendVersion":
-            result("0.1.6")
+            // Aligns with `Genie.genieNativeVersion` in lib/genie.dart and the
+            // `genieVersion` constant in android/binary_config.gradle (the
+            // single source of truth for the Qualcomm Genie native binary).
+            result("0.3.0")
         case "getBackendName":
             result("Genie")
         default:

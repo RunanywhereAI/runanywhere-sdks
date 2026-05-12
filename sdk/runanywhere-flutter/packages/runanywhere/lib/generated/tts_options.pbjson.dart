@@ -57,14 +57,14 @@ const TTSConfiguration$json = {
   '1': 'TTSConfiguration',
   '2': [
     {'1': 'model_id', '3': 1, '4': 1, '5': 9, '10': 'modelId'},
-    {'1': 'voice', '3': 2, '4': 1, '5': 9, '10': 'voice'},
-    {'1': 'language_code', '3': 3, '4': 1, '5': 9, '10': 'languageCode'},
-    {'1': 'speaking_rate', '3': 4, '4': 1, '5': 2, '10': 'speakingRate'},
-    {'1': 'pitch', '3': 5, '4': 1, '5': 2, '10': 'pitch'},
-    {'1': 'volume', '3': 6, '4': 1, '5': 2, '10': 'volume'},
+    {'1': 'voice', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'voice'},
+    {'1': 'language_code', '3': 3, '4': 1, '5': 9, '8': {}, '10': 'languageCode'},
+    {'1': 'speaking_rate', '3': 4, '4': 1, '5': 2, '8': {}, '10': 'speakingRate'},
+    {'1': 'pitch', '3': 5, '4': 1, '5': 2, '8': {}, '10': 'pitch'},
+    {'1': 'volume', '3': 6, '4': 1, '5': 2, '8': {}, '10': 'volume'},
     {'1': 'audio_format', '3': 7, '4': 1, '5': 14, '6': '.runanywhere.v1.AudioFormat', '10': 'audioFormat'},
-    {'1': 'sample_rate', '3': 8, '4': 1, '5': 5, '10': 'sampleRate'},
-    {'1': 'enable_neural_voice', '3': 9, '4': 1, '5': 8, '10': 'enableNeuralVoice'},
+    {'1': 'sample_rate', '3': 8, '4': 1, '5': 5, '8': {}, '10': 'sampleRate'},
+    {'1': 'enable_neural_voice', '3': 9, '4': 1, '5': 8, '8': {}, '10': 'enableNeuralVoice'},
     {'1': 'enable_ssml', '3': 10, '4': 1, '5': 8, '10': 'enableSsml'},
     {'1': 'preferred_framework', '3': 11, '4': 1, '5': 14, '6': '.runanywhere.v1.InferenceFramework', '9': 0, '10': 'preferredFramework', '17': true},
   ],
@@ -75,28 +75,29 @@ const TTSConfiguration$json = {
 
 /// Descriptor for `TTSConfiguration`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List tTSConfigurationDescriptor = $convert.base64Decode(
-    'ChBUVFNDb25maWd1cmF0aW9uEhkKCG1vZGVsX2lkGAEgASgJUgdtb2RlbElkEhQKBXZvaWNlGA'
-    'IgASgJUgV2b2ljZRIjCg1sYW5ndWFnZV9jb2RlGAMgASgJUgxsYW5ndWFnZUNvZGUSIwoNc3Bl'
-    'YWtpbmdfcmF0ZRgEIAEoAlIMc3BlYWtpbmdSYXRlEhQKBXBpdGNoGAUgASgCUgVwaXRjaBIWCg'
-    'Z2b2x1bWUYBiABKAJSBnZvbHVtZRI+CgxhdWRpb19mb3JtYXQYByABKA4yGy5ydW5hbnl3aGVy'
-    'ZS52MS5BdWRpb0Zvcm1hdFILYXVkaW9Gb3JtYXQSHwoLc2FtcGxlX3JhdGUYCCABKAVSCnNhbX'
-    'BsZVJhdGUSLgoTZW5hYmxlX25ldXJhbF92b2ljZRgJIAEoCFIRZW5hYmxlTmV1cmFsVm9pY2US'
-    'HwoLZW5hYmxlX3NzbWwYCiABKAhSCmVuYWJsZVNzbWwSWAoTcHJlZmVycmVkX2ZyYW1ld29yax'
-    'gLIAEoDjIiLnJ1bmFueXdoZXJlLnYxLkluZmVyZW5jZUZyYW1ld29ya0gAUhJwcmVmZXJyZWRG'
-    'cmFtZXdvcmuIAQFCFgoUX3ByZWZlcnJlZF9mcmFtZXdvcms=');
+    'ChBUVFNDb25maWd1cmF0aW9uEhkKCG1vZGVsX2lkGAEgASgJUgdtb2RlbElkEiEKBXZvaWNlGA'
+    'IgASgJQguKtRgHZGVmYXVsdFIFdm9pY2USLgoNbGFuZ3VhZ2VfY29kZRgDIAEoCUIJirUYBWVu'
+    'LVVTUgxsYW5ndWFnZUNvZGUSLAoNc3BlYWtpbmdfcmF0ZRgEIAEoAkIHirUYAzEuMFIMc3BlYW'
+    'tpbmdSYXRlEh0KBXBpdGNoGAUgASgCQgeKtRgDMS4wUgVwaXRjaBIfCgZ2b2x1bWUYBiABKAJC'
+    'B4q1GAMxLjBSBnZvbHVtZRI+CgxhdWRpb19mb3JtYXQYByABKA4yGy5ydW5hbnl3aGVyZS52MS'
+    '5BdWRpb0Zvcm1hdFILYXVkaW9Gb3JtYXQSKgoLc2FtcGxlX3JhdGUYCCABKAVCCYq1GAUyMjA1'
+    'MFIKc2FtcGxlUmF0ZRI4ChNlbmFibGVfbmV1cmFsX3ZvaWNlGAkgASgIQgiKtRgEdHJ1ZVIRZW'
+    '5hYmxlTmV1cmFsVm9pY2USHwoLZW5hYmxlX3NzbWwYCiABKAhSCmVuYWJsZVNzbWwSWAoTcHJl'
+    'ZmVycmVkX2ZyYW1ld29yaxgLIAEoDjIiLnJ1bmFueXdoZXJlLnYxLkluZmVyZW5jZUZyYW1ld2'
+    '9ya0gAUhJwcmVmZXJyZWRGcmFtZXdvcmuIAQFCFgoUX3ByZWZlcnJlZF9mcmFtZXdvcms=');
 
 @$core.Deprecated('Use tTSOptionsDescriptor instead')
 const TTSOptions$json = {
   '1': 'TTSOptions',
   '2': [
     {'1': 'voice', '3': 1, '4': 1, '5': 9, '10': 'voice'},
-    {'1': 'language_code', '3': 2, '4': 1, '5': 9, '10': 'languageCode'},
-    {'1': 'speaking_rate', '3': 3, '4': 1, '5': 2, '10': 'speakingRate'},
-    {'1': 'pitch', '3': 4, '4': 1, '5': 2, '10': 'pitch'},
-    {'1': 'volume', '3': 5, '4': 1, '5': 2, '10': 'volume'},
+    {'1': 'language_code', '3': 2, '4': 1, '5': 9, '8': {}, '10': 'languageCode'},
+    {'1': 'speaking_rate', '3': 3, '4': 1, '5': 2, '8': {}, '10': 'speakingRate'},
+    {'1': 'pitch', '3': 4, '4': 1, '5': 2, '8': {}, '10': 'pitch'},
+    {'1': 'volume', '3': 5, '4': 1, '5': 2, '8': {}, '10': 'volume'},
     {'1': 'enable_ssml', '3': 6, '4': 1, '5': 8, '10': 'enableSsml'},
-    {'1': 'audio_format', '3': 7, '4': 1, '5': 14, '6': '.runanywhere.v1.AudioFormat', '10': 'audioFormat'},
-    {'1': 'sample_rate', '3': 8, '4': 1, '5': 5, '10': 'sampleRate'},
+    {'1': 'audio_format', '3': 7, '4': 1, '5': 14, '6': '.runanywhere.v1.AudioFormat', '8': {}, '10': 'audioFormat'},
+    {'1': 'sample_rate', '3': 8, '4': 1, '5': 5, '8': {}, '10': 'sampleRate'},
     {'1': 'speaker_id', '3': 9, '4': 1, '5': 5, '10': 'speakerId'},
     {'1': 'speed', '3': 10, '4': 1, '5': 2, '10': 'speed'},
     {'1': 'style', '3': 11, '4': 1, '5': 9, '9': 0, '10': 'style', '17': true},
@@ -108,13 +109,15 @@ const TTSOptions$json = {
 
 /// Descriptor for `TTSOptions`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List tTSOptionsDescriptor = $convert.base64Decode(
-    'CgpUVFNPcHRpb25zEhQKBXZvaWNlGAEgASgJUgV2b2ljZRIjCg1sYW5ndWFnZV9jb2RlGAIgAS'
-    'gJUgxsYW5ndWFnZUNvZGUSIwoNc3BlYWtpbmdfcmF0ZRgDIAEoAlIMc3BlYWtpbmdSYXRlEhQK'
-    'BXBpdGNoGAQgASgCUgVwaXRjaBIWCgZ2b2x1bWUYBSABKAJSBnZvbHVtZRIfCgtlbmFibGVfc3'
-    'NtbBgGIAEoCFIKZW5hYmxlU3NtbBI+CgxhdWRpb19mb3JtYXQYByABKA4yGy5ydW5hbnl3aGVy'
-    'ZS52MS5BdWRpb0Zvcm1hdFILYXVkaW9Gb3JtYXQSHwoLc2FtcGxlX3JhdGUYCCABKAVSCnNhbX'
-    'BsZVJhdGUSHQoKc3BlYWtlcl9pZBgJIAEoBVIJc3BlYWtlcklkEhQKBXNwZWVkGAogASgCUgVz'
-    'cGVlZBIZCgVzdHlsZRgLIAEoCUgAUgVzdHlsZYgBAUIICgZfc3R5bGU=');
+    'CgpUVFNPcHRpb25zEhQKBXZvaWNlGAEgASgJUgV2b2ljZRIuCg1sYW5ndWFnZV9jb2RlGAIgAS'
+    'gJQgmKtRgFZW4tVVNSDGxhbmd1YWdlQ29kZRIsCg1zcGVha2luZ19yYXRlGAMgASgCQgeKtRgD'
+    'MS4wUgxzcGVha2luZ1JhdGUSHQoFcGl0Y2gYBCABKAJCB4q1GAMxLjBSBXBpdGNoEh8KBnZvbH'
+    'VtZRgFIAEoAkIHirUYAzEuMFIGdm9sdW1lEh8KC2VuYWJsZV9zc21sGAYgASgIUgplbmFibGVT'
+    'c21sElQKDGF1ZGlvX2Zvcm1hdBgHIAEoDjIbLnJ1bmFueXdoZXJlLnYxLkF1ZGlvRm9ybWF0Qh'
+    'SKtRgQQVVESU9fRk9STUFUX1BDTVILYXVkaW9Gb3JtYXQSKgoLc2FtcGxlX3JhdGUYCCABKAVC'
+    'CYq1GAUyMjA1MFIKc2FtcGxlUmF0ZRIdCgpzcGVha2VyX2lkGAkgASgFUglzcGVha2VySWQSFA'
+    'oFc3BlZWQYCiABKAJSBXNwZWVkEhkKBXN0eWxlGAsgASgJSABSBXN0eWxliAEBQggKBl9zdHls'
+    'ZQ==');
 
 @$core.Deprecated('Use tTSSynthesisRequestDescriptor instead')
 const TTSSynthesisRequest$json = {
@@ -275,6 +278,19 @@ final $typed_data.Uint8List tTSVoiceInfoDescriptor = $convert.base64Decode(
     'JpcHRpb24YBSABKAlSC2Rlc2NyaXB0aW9uEhsKCWlzX25ldXJhbBgGIAEoCFIIaXNOZXVyYWwS'
     'GwoJaXNfc3lzdGVtGAcgASgIUghpc1N5c3RlbRIfCgtzYW1wbGVfcmF0ZRgIIAEoBVIKc2FtcG'
     'xlUmF0ZRIpChBzdXBwb3J0ZWRfc3R5bGVzGAkgAygJUg9zdXBwb3J0ZWRTdHlsZXM=');
+
+@$core.Deprecated('Use tTSVoiceListDescriptor instead')
+const TTSVoiceList$json = {
+  '1': 'TTSVoiceList',
+  '2': [
+    {'1': 'voices', '3': 1, '4': 3, '5': 11, '6': '.runanywhere.v1.TTSVoiceInfo', '10': 'voices'},
+  ],
+};
+
+/// Descriptor for `TTSVoiceList`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List tTSVoiceListDescriptor = $convert.base64Decode(
+    'CgxUVFNWb2ljZUxpc3QSNAoGdm9pY2VzGAEgAygLMhwucnVuYW55d2hlcmUudjEuVFRTVm9pY2'
+    'VJbmZvUgZ2b2ljZXM=');
 
 @$core.Deprecated('Use tTSStreamEventDescriptor instead')
 const TTSStreamEvent$json = {

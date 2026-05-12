@@ -42,11 +42,11 @@ const RAGConfiguration$json = {
   '2': [
     {'1': 'embedding_model_id', '3': 1, '4': 1, '5': 9, '10': 'embeddingModelId'},
     {'1': 'llm_model_id', '3': 2, '4': 1, '5': 9, '10': 'llmModelId'},
-    {'1': 'embedding_dimension', '3': 3, '4': 1, '5': 5, '10': 'embeddingDimension'},
-    {'1': 'top_k', '3': 4, '4': 1, '5': 5, '10': 'topK'},
-    {'1': 'similarity_threshold', '3': 5, '4': 1, '5': 2, '10': 'similarityThreshold'},
-    {'1': 'chunk_size', '3': 6, '4': 1, '5': 5, '10': 'chunkSize'},
-    {'1': 'chunk_overlap', '3': 7, '4': 1, '5': 5, '10': 'chunkOverlap'},
+    {'1': 'embedding_dimension', '3': 3, '4': 1, '5': 5, '8': {}, '10': 'embeddingDimension'},
+    {'1': 'top_k', '3': 4, '4': 1, '5': 5, '8': {}, '10': 'topK'},
+    {'1': 'similarity_threshold', '3': 5, '4': 1, '5': 2, '8': {}, '10': 'similarityThreshold'},
+    {'1': 'chunk_size', '3': 6, '4': 1, '5': 5, '8': {}, '10': 'chunkSize'},
+    {'1': 'chunk_overlap', '3': 7, '4': 1, '5': 5, '8': {}, '10': 'chunkOverlap'},
     {'1': 'max_context_tokens', '3': 8, '4': 1, '5': 5, '10': 'maxContextTokens'},
     {'1': 'prompt_template', '3': 9, '4': 1, '5': 9, '9': 0, '10': 'promptTemplate', '17': true},
     {'1': 'embedding_config_json', '3': 10, '4': 1, '5': 9, '9': 1, '10': 'embeddingConfigJson', '17': true},
@@ -68,19 +68,20 @@ const RAGConfiguration$json = {
 /// Descriptor for `RAGConfiguration`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List rAGConfigurationDescriptor = $convert.base64Decode(
     'ChBSQUdDb25maWd1cmF0aW9uEiwKEmVtYmVkZGluZ19tb2RlbF9pZBgBIAEoCVIQZW1iZWRkaW'
-    '5nTW9kZWxJZBIgCgxsbG1fbW9kZWxfaWQYAiABKAlSCmxsbU1vZGVsSWQSLwoTZW1iZWRkaW5n'
-    'X2RpbWVuc2lvbhgDIAEoBVISZW1iZWRkaW5nRGltZW5zaW9uEhMKBXRvcF9rGAQgASgFUgR0b3'
-    'BLEjEKFHNpbWlsYXJpdHlfdGhyZXNob2xkGAUgASgCUhNzaW1pbGFyaXR5VGhyZXNob2xkEh0K'
-    'CmNodW5rX3NpemUYBiABKAVSCWNodW5rU2l6ZRIjCg1jaHVua19vdmVybGFwGAcgASgFUgxjaH'
-    'Vua092ZXJsYXASLAoSbWF4X2NvbnRleHRfdG9rZW5zGAggASgFUhBtYXhDb250ZXh0VG9rZW5z'
-    'EiwKD3Byb21wdF90ZW1wbGF0ZRgJIAEoCUgAUg5wcm9tcHRUZW1wbGF0ZYgBARI3ChVlbWJlZG'
-    'RpbmdfY29uZmlnX2pzb24YCiABKAlIAVITZW1iZWRkaW5nQ29uZmlnSnNvbogBARIrCg9sbG1f'
-    'Y29uZmlnX2pzb24YCyABKAlIAlINbGxtQ29uZmlnSnNvbogBARIiCgppbmRleF9wYXRoGAwgAS'
-    'gJSANSCWluZGV4UGF0aIgBARIjCg1wZXJzaXN0X2luZGV4GA0gASgIUgxwZXJzaXN0SW5kZXgS'
-    'JQoOcmVyYW5rX3Jlc3VsdHMYDiABKAhSDXJlcmFua1Jlc3VsdHMSLwoRcmVyYW5rZXJfbW9kZW'
-    'xfaWQYDyABKAlIBFIPcmVyYW5rZXJNb2RlbElkiAEBQhIKEF9wcm9tcHRfdGVtcGxhdGVCGAoW'
-    'X2VtYmVkZGluZ19jb25maWdfanNvbkISChBfbGxtX2NvbmZpZ19qc29uQg0KC19pbmRleF9wYX'
-    'RoQhQKEl9yZXJhbmtlcl9tb2RlbF9pZA==');
+    '5nTW9kZWxJZBIgCgxsbG1fbW9kZWxfaWQYAiABKAlSCmxsbU1vZGVsSWQSOAoTZW1iZWRkaW5n'
+    'X2RpbWVuc2lvbhgDIAEoBUIHirUYAzM4NFISZW1iZWRkaW5nRGltZW5zaW9uEhoKBXRvcF9rGA'
+    'QgASgFQgWKtRgBNVIEdG9wSxJQChRzaW1pbGFyaXR5X3RocmVzaG9sZBgFIAEoAkIdirUYAzAu'
+    'N7G1GAAAAAAAAAAAubUYAAAAAAAA8D9SE3NpbWlsYXJpdHlUaHJlc2hvbGQSJgoKY2h1bmtfc2'
+    'l6ZRgGIAEoBUIHirUYAzUxMlIJY2h1bmtTaXplEisKDWNodW5rX292ZXJsYXAYByABKAVCBoq1'
+    'GAI2NFIMY2h1bmtPdmVybGFwEiwKEm1heF9jb250ZXh0X3Rva2VucxgIIAEoBVIQbWF4Q29udG'
+    'V4dFRva2VucxIsCg9wcm9tcHRfdGVtcGxhdGUYCSABKAlIAFIOcHJvbXB0VGVtcGxhdGWIAQES'
+    'NwoVZW1iZWRkaW5nX2NvbmZpZ19qc29uGAogASgJSAFSE2VtYmVkZGluZ0NvbmZpZ0pzb26IAQ'
+    'ESKwoPbGxtX2NvbmZpZ19qc29uGAsgASgJSAJSDWxsbUNvbmZpZ0pzb26IAQESIgoKaW5kZXhf'
+    'cGF0aBgMIAEoCUgDUglpbmRleFBhdGiIAQESIwoNcGVyc2lzdF9pbmRleBgNIAEoCFIMcGVyc2'
+    'lzdEluZGV4EiUKDnJlcmFua19yZXN1bHRzGA4gASgIUg1yZXJhbmtSZXN1bHRzEi8KEXJlcmFu'
+    'a2VyX21vZGVsX2lkGA8gASgJSARSD3JlcmFua2VyTW9kZWxJZIgBAUISChBfcHJvbXB0X3RlbX'
+    'BsYXRlQhgKFl9lbWJlZGRpbmdfY29uZmlnX2pzb25CEgoQX2xsbV9jb25maWdfanNvbkINCgtf'
+    'aW5kZXhfcGF0aEIUChJfcmVyYW5rZXJfbW9kZWxfaWQ=');
 
 @$core.Deprecated('Use rAGDocumentDescriptor instead')
 const RAGDocument$json = {
@@ -164,9 +165,9 @@ const RAGQueryOptions$json = {
   '2': [
     {'1': 'question', '3': 1, '4': 1, '5': 9, '10': 'question'},
     {'1': 'system_prompt', '3': 2, '4': 1, '5': 9, '9': 0, '10': 'systemPrompt', '17': true},
-    {'1': 'max_tokens', '3': 3, '4': 1, '5': 5, '10': 'maxTokens'},
-    {'1': 'temperature', '3': 4, '4': 1, '5': 2, '10': 'temperature'},
-    {'1': 'top_p', '3': 5, '4': 1, '5': 2, '10': 'topP'},
+    {'1': 'max_tokens', '3': 3, '4': 1, '5': 5, '8': {}, '10': 'maxTokens'},
+    {'1': 'temperature', '3': 4, '4': 1, '5': 2, '8': {}, '10': 'temperature'},
+    {'1': 'top_p', '3': 5, '4': 1, '5': 2, '8': {}, '10': 'topP'},
     {'1': 'top_k', '3': 6, '4': 1, '5': 5, '10': 'topK'},
     {'1': 'retrieval_top_k', '3': 7, '4': 1, '5': 5, '10': 'retrievalTopK'},
     {'1': 'similarity_threshold', '3': 8, '4': 1, '5': 2, '10': 'similarityThreshold'},
@@ -180,11 +181,12 @@ const RAGQueryOptions$json = {
 /// Descriptor for `RAGQueryOptions`. Decode as a `google.protobuf.DescriptorProto`.
 final $typed_data.Uint8List rAGQueryOptionsDescriptor = $convert.base64Decode(
     'Cg9SQUdRdWVyeU9wdGlvbnMSGgoIcXVlc3Rpb24YASABKAlSCHF1ZXN0aW9uEigKDXN5c3RlbV'
-    '9wcm9tcHQYAiABKAlIAFIMc3lzdGVtUHJvbXB0iAEBEh0KCm1heF90b2tlbnMYAyABKAVSCW1h'
-    'eFRva2VucxIgCgt0ZW1wZXJhdHVyZRgEIAEoAlILdGVtcGVyYXR1cmUSEwoFdG9wX3AYBSABKA'
-    'JSBHRvcFASEwoFdG9wX2sYBiABKAVSBHRvcEsSJgoPcmV0cmlldmFsX3RvcF9rGAcgASgFUg1y'
-    'ZXRyaWV2YWxUb3BLEjEKFHNpbWlsYXJpdHlfdGhyZXNob2xkGAggASgCUhNzaW1pbGFyaXR5VG'
-    'hyZXNob2xkEhYKBnN0cmVhbRgJIAEoCFIGc3RyZWFtQhAKDl9zeXN0ZW1fcHJvbXB0');
+    '9wcm9tcHQYAiABKAlIAFIMc3lzdGVtUHJvbXB0iAEBEiYKCm1heF90b2tlbnMYAyABKAVCB4q1'
+    'GAM1MTJSCW1heFRva2VucxIpCgt0ZW1wZXJhdHVyZRgEIAEoAkIHirUYAzAuN1ILdGVtcGVyYX'
+    'R1cmUSHAoFdG9wX3AYBSABKAJCB4q1GAMxLjBSBHRvcFASEwoFdG9wX2sYBiABKAVSBHRvcEsS'
+    'JgoPcmV0cmlldmFsX3RvcF9rGAcgASgFUg1yZXRyaWV2YWxUb3BLEjEKFHNpbWlsYXJpdHlfdG'
+    'hyZXNob2xkGAggASgCUhNzaW1pbGFyaXR5VGhyZXNob2xkEhYKBnN0cmVhbRgJIAEoCFIGc3Ry'
+    'ZWFtQhAKDl9zeXN0ZW1fcHJvbXB0');
 
 @$core.Deprecated('Use rAGQueryRequestDescriptor instead')
 const RAGQueryRequest$json = {

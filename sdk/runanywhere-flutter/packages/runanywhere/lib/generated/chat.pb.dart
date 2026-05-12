@@ -16,7 +16,7 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'chat.pbenum.dart';
-import 'llm_options.pb.dart' as $4;
+import 'llm_options.pb.dart' as $5;
 import 'tool_calling.pb.dart' as $0;
 
 export 'chat.pbenum.dart';
@@ -406,7 +406,7 @@ class ChatGenerationRequest extends $pb.GeneratedMessage {
     $core.String? requestId,
     $core.String? conversationId,
     $core.Iterable<ChatMessage>? messages,
-    $4.LLMGenerationOptions? options,
+    $5.LLMGenerationOptions? options,
     $0.ToolCallingOptions? toolCalling,
     $core.Map<$core.String, $core.String>? metadata,
   }) {
@@ -439,7 +439,7 @@ class ChatGenerationRequest extends $pb.GeneratedMessage {
     ..aOS(1, _omitFieldNames ? '' : 'requestId')
     ..aOS(2, _omitFieldNames ? '' : 'conversationId')
     ..pc<ChatMessage>(3, _omitFieldNames ? '' : 'messages', $pb.PbFieldType.PM, subBuilder: ChatMessage.create)
-    ..aOM<$4.LLMGenerationOptions>(4, _omitFieldNames ? '' : 'options', subBuilder: $4.LLMGenerationOptions.create)
+    ..aOM<$5.LLMGenerationOptions>(4, _omitFieldNames ? '' : 'options', subBuilder: $5.LLMGenerationOptions.create)
     ..aOM<$0.ToolCallingOptions>(5, _omitFieldNames ? '' : 'toolCalling', subBuilder: $0.ToolCallingOptions.create)
     ..m<$core.String, $core.String>(6, _omitFieldNames ? '' : 'metadata', entryClassName: 'ChatGenerationRequest.MetadataEntry', keyFieldType: $pb.PbFieldType.OS, valueFieldType: $pb.PbFieldType.OS, packageName: const $pb.PackageName('runanywhere.v1'))
     ..hasRequiredFields = false
@@ -488,15 +488,15 @@ class ChatGenerationRequest extends $pb.GeneratedMessage {
   $core.List<ChatMessage> get messages => $_getList(2);
 
   @$pb.TagNumber(4)
-  $4.LLMGenerationOptions get options => $_getN(3);
+  $5.LLMGenerationOptions get options => $_getN(3);
   @$pb.TagNumber(4)
-  set options($4.LLMGenerationOptions v) { setField(4, v); }
+  set options($5.LLMGenerationOptions v) { setField(4, v); }
   @$pb.TagNumber(4)
   $core.bool hasOptions() => $_has(3);
   @$pb.TagNumber(4)
   void clearOptions() => clearField(4);
   @$pb.TagNumber(4)
-  $4.LLMGenerationOptions ensureOptions() => $_ensure(3);
+  $5.LLMGenerationOptions ensureOptions() => $_ensure(3);
 
   @$pb.TagNumber(5)
   $0.ToolCallingOptions get toolCalling => $_getN(4);
@@ -517,7 +517,7 @@ class ChatGenerationResult extends $pb.GeneratedMessage {
   factory ChatGenerationResult({
     $core.String? conversationId,
     ChatMessage? message,
-    $4.LLMGenerationResult? generation,
+    $5.LLMGenerationResult? generation,
     $core.Iterable<$0.ToolCall>? toolCalls,
     $core.Iterable<$0.ToolResult>? toolResults,
     $core.String? errorMessage,
@@ -554,7 +554,7 @@ class ChatGenerationResult extends $pb.GeneratedMessage {
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'ChatGenerationResult', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'conversationId')
     ..aOM<ChatMessage>(2, _omitFieldNames ? '' : 'message', subBuilder: ChatMessage.create)
-    ..aOM<$4.LLMGenerationResult>(3, _omitFieldNames ? '' : 'generation', subBuilder: $4.LLMGenerationResult.create)
+    ..aOM<$5.LLMGenerationResult>(3, _omitFieldNames ? '' : 'generation', subBuilder: $5.LLMGenerationResult.create)
     ..pc<$0.ToolCall>(4, _omitFieldNames ? '' : 'toolCalls', $pb.PbFieldType.PM, subBuilder: $0.ToolCall.create)
     ..pc<$0.ToolResult>(5, _omitFieldNames ? '' : 'toolResults', $pb.PbFieldType.PM, subBuilder: $0.ToolResult.create)
     ..aOS(6, _omitFieldNames ? '' : 'errorMessage')
@@ -604,15 +604,15 @@ class ChatGenerationResult extends $pb.GeneratedMessage {
   ChatMessage ensureMessage() => $_ensure(1);
 
   @$pb.TagNumber(3)
-  $4.LLMGenerationResult get generation => $_getN(2);
+  $5.LLMGenerationResult get generation => $_getN(2);
   @$pb.TagNumber(3)
-  set generation($4.LLMGenerationResult v) { setField(3, v); }
+  set generation($5.LLMGenerationResult v) { setField(3, v); }
   @$pb.TagNumber(3)
   $core.bool hasGeneration() => $_has(2);
   @$pb.TagNumber(3)
   void clearGeneration() => clearField(3);
   @$pb.TagNumber(3)
-  $4.LLMGenerationResult ensureGeneration() => $_ensure(2);
+  $5.LLMGenerationResult ensureGeneration() => $_ensure(2);
 
   @$pb.TagNumber(4)
   $core.List<$0.ToolCall> get toolCalls => $_getList(3);
@@ -650,7 +650,7 @@ class ChatStreamEvent extends $pb.GeneratedMessage {
     ChatMessage? message,
     $0.ToolCall? toolCall,
     $0.ToolResult? toolResult,
-    $4.LLMGenerationResult? finalResult,
+    $5.LLMGenerationResult? finalResult,
     $core.String? errorMessage,
     $core.int? errorCode,
   }) {
@@ -707,7 +707,7 @@ class ChatStreamEvent extends $pb.GeneratedMessage {
     ..aOM<ChatMessage>(7, _omitFieldNames ? '' : 'message', subBuilder: ChatMessage.create)
     ..aOM<$0.ToolCall>(8, _omitFieldNames ? '' : 'toolCall', subBuilder: $0.ToolCall.create)
     ..aOM<$0.ToolResult>(9, _omitFieldNames ? '' : 'toolResult', subBuilder: $0.ToolResult.create)
-    ..aOM<$4.LLMGenerationResult>(10, _omitFieldNames ? '' : 'finalResult', subBuilder: $4.LLMGenerationResult.create)
+    ..aOM<$5.LLMGenerationResult>(10, _omitFieldNames ? '' : 'finalResult', subBuilder: $5.LLMGenerationResult.create)
     ..aOS(11, _omitFieldNames ? '' : 'errorMessage')
     ..a<$core.int>(12, _omitFieldNames ? '' : 'errorCode', $pb.PbFieldType.O3)
     ..hasRequiredFields = false
@@ -822,15 +822,15 @@ class ChatStreamEvent extends $pb.GeneratedMessage {
   $0.ToolResult ensureToolResult() => $_ensure(8);
 
   @$pb.TagNumber(10)
-  $4.LLMGenerationResult get finalResult => $_getN(9);
+  $5.LLMGenerationResult get finalResult => $_getN(9);
   @$pb.TagNumber(10)
-  set finalResult($4.LLMGenerationResult v) { setField(10, v); }
+  set finalResult($5.LLMGenerationResult v) { setField(10, v); }
   @$pb.TagNumber(10)
   $core.bool hasFinalResult() => $_has(9);
   @$pb.TagNumber(10)
   void clearFinalResult() => clearField(10);
   @$pb.TagNumber(10)
-  $4.LLMGenerationResult ensureFinalResult() => $_ensure(9);
+  $5.LLMGenerationResult ensureFinalResult() => $_ensure(9);
 
   @$pb.TagNumber(11)
   $core.String get errorMessage => $_getSZ(10);

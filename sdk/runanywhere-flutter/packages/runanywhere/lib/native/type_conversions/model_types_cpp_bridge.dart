@@ -3,14 +3,22 @@
 /// Conversion extensions for Dart model types to C++ model types.
 /// Used by DartBridgeModelRegistry to convert between Dart and C++ types.
 ///
-/// Mirrors Swift's ModelTypes+CppBridge.swift exactly.
+/// Mirrors Swift's ModelTypes+CppBridge.swift exactly. Enum mappers
+/// (proto integer ↔ C integer) delegate to commons' `rac_*_from_proto` /
+/// `rac_*_to_proto` ABIs (T15a + Wave 7A) so the conversion logic stays
+/// single-sourced in C++.
 library model_types_cpp_bridge;
 
+import 'dart:ffi';
 import 'dart:io';
 
+import 'package:ffi/ffi.dart';
 import 'package:fixnum/fixnum.dart' as fixnum;
+import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pb.dart' as model_pb;
 import 'package:runanywhere/generated/model_types.pbenum.dart' as pb;
+import 'package:runanywhere/native/platform_loader.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 
 // =============================================================================
 // C++ Constants (from rac_model_types.h)
@@ -72,87 +80,113 @@ abstract class RacArtifactKind {
   static const int builtIn = 4;
 }
 
-/// Archive type constants (rac_archive_type_t)
+/// Archive type constants (rac_archive_type_t).
+/// Values mirror commons' `rac_archive_type_t` enum:
+///   `RAC_ARCHIVE_TYPE_NONE = -1` (no archive / direct file),
+///   ZIP = 0, TAR_BZ2 = 1, TAR_GZ = 2, TAR_XZ = 3.
 abstract class RacArchiveType {
-  static const int none = 0;
-  static const int zip = 1;
+  static const int none = -1;
+  static const int zip = 0;
+  static const int tarBz2 = 1;
   static const int tarGz = 2;
-  static const int tarBz2 = 3;
-  static const int tarXz = 4;
-  static const int tar = 5;
+  static const int tarXz = 3;
 }
 
-/// Archive structure constants (rac_archive_structure_t)
+/// Archive structure constants (rac_archive_structure_t).
+/// Values mirror commons' `rac_archive_structure_t` enum:
+///   SINGLE_FILE_NESTED = 0, DIRECTORY_BASED = 1, NESTED_DIRECTORY = 2,
+///   UNKNOWN = 99.
 abstract class RacArchiveStructure {
-  static const int unknown = 0;
-  static const int flat = 1;
-  static const int nested = 2;
-  static const int rootFolder = 3;
+  static const int singleFileNested = 0;
+  static const int directoryBased = 1;
+  static const int nestedDirectory = 2;
+  static const int unknown = 99;
+}
+
+// =============================================================================
+// FFI bindings for commons enum mappers (T15a + Wave 7A)
+//
+// Each pair maps a Dart proto enum integer (e.g.
+// `pb.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP.value`) to/from the
+// platform-native `rac_*_t` integer. Signature for every ABI:
+//   `rac_result_t rac_*_from_proto(int32_t proto_value, int32_t* out);`
+//   `rac_result_t rac_*_to_proto  (int32_t value,       int32_t* out);`
+// (The C enums are `int` so they pass through Dart FFI as `Int32`.)
+// =============================================================================
+
+typedef _RacEnumMapperNative = Int32 Function(Int32, Pointer<Int32>);
+typedef _RacEnumMapperDart = int Function(int, Pointer<Int32>);
+
+final SDKLogger _mapperLogger = SDKLogger('ModelTypesCppBridge');
+
+class _EnumMapperCache {
+  _EnumMapperCache._();
+  static final _EnumMapperCache instance = _EnumMapperCache._();
+
+  final Map<String, _RacEnumMapperDart?> _cache = <String, _RacEnumMapperDart?>{};
+
+  _RacEnumMapperDart? lookup(String symbol) {
+    if (_cache.containsKey(symbol)) return _cache[symbol];
+    try {
+      final lib = PlatformLoader.loadCommons();
+      final fn =
+          lib.lookupFunction<_RacEnumMapperNative, _RacEnumMapperDart>(symbol);
+      _cache[symbol] = fn;
+      return fn;
+    } catch (e) {
+      _mapperLogger.debug('FFI mapper $symbol not available: $e');
+      _cache[symbol] = null;
+      return null;
+    }
+  }
+}
+
+/// Invoke a `rac_*_from_proto` / `rac_*_to_proto` mapper. Returns the mapped
+/// integer on success, or `fallback` when the symbol is missing or the C
+/// call rejects the input (preserves prior hand-written fallback behavior).
+int _invokeEnumMapper(String symbol, int input, int fallback) {
+  final fn = _EnumMapperCache.instance.lookup(symbol);
+  if (fn == null) return fallback;
+  final outPtr = calloc<Int32>();
+  try {
+    final result = fn(input, outPtr);
+    if (result == RacResultCode.success) {
+      return outPtr.value;
+    }
+    return fallback;
+  } finally {
+    calloc.free(outPtr);
+  }
 }
 
 pb.ModelCategory _categoryProtoFromC(int cCategory) {
-  switch (cCategory) {
-    case RacModelCategory.language:
-      return pb.ModelCategory.MODEL_CATEGORY_LANGUAGE;
-    case RacModelCategory.speechRecognition:
-      return pb.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION;
-    case RacModelCategory.speechSynthesis:
-      return pb.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS;
-    case RacModelCategory.vision:
-      return pb.ModelCategory.MODEL_CATEGORY_VISION;
-    case RacModelCategory.imageGeneration:
-      return pb.ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION;
-    case RacModelCategory.multimodal:
-      return pb.ModelCategory.MODEL_CATEGORY_MULTIMODAL;
-    case RacModelCategory.audio:
-      return pb.ModelCategory.MODEL_CATEGORY_AUDIO;
-    case RacModelCategory.embedding:
-      return pb.ModelCategory.MODEL_CATEGORY_EMBEDDING;
-    case RacModelCategory.voiceActivityDetection:
-      return pb.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION;
-    default:
-      return pb.ModelCategory.MODEL_CATEGORY_UNSPECIFIED;
-  }
+  final protoValue = _invokeEnumMapper(
+    'rac_model_category_to_proto',
+    cCategory,
+    pb.ModelCategory.MODEL_CATEGORY_UNSPECIFIED.value,
+  );
+  return pb.ModelCategory.valueOf(protoValue) ??
+      pb.ModelCategory.MODEL_CATEGORY_UNSPECIFIED;
 }
 
 pb.ModelFormat _formatProtoFromC(int cFormat) {
-  switch (cFormat) {
-    case RacModelFormat.onnx:
-      return pb.ModelFormat.MODEL_FORMAT_ONNX;
-    case RacModelFormat.ort:
-      return pb.ModelFormat.MODEL_FORMAT_ORT;
-    case RacModelFormat.gguf:
-      return pb.ModelFormat.MODEL_FORMAT_GGUF;
-    case RacModelFormat.bin:
-      return pb.ModelFormat.MODEL_FORMAT_BIN;
-    default:
-      return pb.ModelFormat.MODEL_FORMAT_UNKNOWN;
-  }
+  final protoValue = _invokeEnumMapper(
+    'rac_model_format_to_proto',
+    cFormat,
+    pb.ModelFormat.MODEL_FORMAT_UNKNOWN.value,
+  );
+  return pb.ModelFormat.valueOf(protoValue) ??
+      pb.ModelFormat.MODEL_FORMAT_UNKNOWN;
 }
 
 pb.InferenceFramework _frameworkProtoFromC(int cFramework) {
-  switch (cFramework) {
-    case RacInferenceFramework.onnx:
-      return pb.InferenceFramework.INFERENCE_FRAMEWORK_ONNX;
-    case RacInferenceFramework.llamaCpp:
-      return pb.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP;
-    case RacInferenceFramework.foundationModels:
-      return pb.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS;
-    case RacInferenceFramework.systemTts:
-      return pb.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS;
-    case RacInferenceFramework.fluidAudio:
-      return pb.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO;
-    case RacInferenceFramework.builtIn:
-      return pb.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN;
-    case RacInferenceFramework.none:
-      return pb.InferenceFramework.INFERENCE_FRAMEWORK_NONE;
-    case RacInferenceFramework.genie:
-      return pb.InferenceFramework.INFERENCE_FRAMEWORK_GENIE;
-    case RacInferenceFramework.sherpa:
-      return pb.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA;
-    default:
-      return pb.InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
-  }
+  final protoValue = _invokeEnumMapper(
+    'rac_inference_framework_to_proto',
+    cFramework,
+    pb.InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN.value,
+  );
+  return pb.InferenceFramework.valueOf(protoValue) ??
+      pb.InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN;
 }
 
 // =============================================================================
@@ -161,31 +195,12 @@ pb.InferenceFramework _frameworkProtoFromC(int cFramework) {
 
 extension ProtoModelCategoryCppBridge on pb.ModelCategory {
   /// Convert a generated model category enum to C++ rac_model_category_t.
-  int toC() {
-    switch (this) {
-      case pb.ModelCategory.MODEL_CATEGORY_LANGUAGE:
-        return RacModelCategory.language;
-      case pb.ModelCategory.MODEL_CATEGORY_SPEECH_RECOGNITION:
-        return RacModelCategory.speechRecognition;
-      case pb.ModelCategory.MODEL_CATEGORY_SPEECH_SYNTHESIS:
-        return RacModelCategory.speechSynthesis;
-      case pb.ModelCategory.MODEL_CATEGORY_VISION:
-        return RacModelCategory.vision;
-      case pb.ModelCategory.MODEL_CATEGORY_IMAGE_GENERATION:
-        return RacModelCategory.imageGeneration;
-      case pb.ModelCategory.MODEL_CATEGORY_MULTIMODAL:
-        return RacModelCategory.multimodal;
-      case pb.ModelCategory.MODEL_CATEGORY_AUDIO:
-        return RacModelCategory.audio;
-      case pb.ModelCategory.MODEL_CATEGORY_EMBEDDING:
-        return RacModelCategory.embedding;
-      case pb.ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION:
-        return RacModelCategory.voiceActivityDetection;
-      case pb.ModelCategory.MODEL_CATEGORY_UNSPECIFIED:
-      default:
-        return RacModelCategory.unknown;
-    }
-  }
+  /// Delegates to commons' `rac_model_category_from_proto`.
+  int toC() => _invokeEnumMapper(
+        'rac_model_category_from_proto',
+        value,
+        RacModelCategory.unknown,
+      );
 
   String get displayName {
     switch (this) {
@@ -216,22 +231,12 @@ extension ProtoModelCategoryCppBridge on pb.ModelCategory {
 
 extension ProtoModelFormatCppBridge on pb.ModelFormat {
   /// Convert a generated model format enum to C++ rac_model_format_t.
-  int toC() {
-    switch (this) {
-      case pb.ModelFormat.MODEL_FORMAT_ONNX:
-        return RacModelFormat.onnx;
-      case pb.ModelFormat.MODEL_FORMAT_ORT:
-        return RacModelFormat.ort;
-      case pb.ModelFormat.MODEL_FORMAT_GGUF:
-        return RacModelFormat.gguf;
-      case pb.ModelFormat.MODEL_FORMAT_BIN:
-        return RacModelFormat.bin;
-      case pb.ModelFormat.MODEL_FORMAT_UNKNOWN:
-      case pb.ModelFormat.MODEL_FORMAT_UNSPECIFIED:
-      default:
-        return RacModelFormat.unknown;
-    }
-  }
+  /// Delegates to commons' `rac_model_format_from_proto`.
+  int toC() => _invokeEnumMapper(
+        'rac_model_format_from_proto',
+        value,
+        RacModelFormat.unknown,
+      );
 
   String get rawValue {
     switch (this) {
@@ -257,40 +262,12 @@ extension ProtoModelFormatCppBridge on pb.ModelFormat {
 
 extension ProtoInferenceFrameworkCppBridge on pb.InferenceFramework {
   /// Convert a generated inference framework enum to C++ rac_inference_framework_t.
-  int toC() {
-    switch (this) {
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_ONNX:
-        return RacInferenceFramework.onnx;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_LLAMA_CPP:
-        return RacInferenceFramework.llamaCpp;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_FOUNDATION_MODELS:
-        return RacInferenceFramework.foundationModels;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_SYSTEM_TTS:
-        return RacInferenceFramework.systemTts;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_FLUID_AUDIO:
-        return RacInferenceFramework.fluidAudio;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_BUILT_IN:
-        return RacInferenceFramework.builtIn;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_NONE:
-        return RacInferenceFramework.none;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_GENIE:
-        return RacInferenceFramework.genie;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_SHERPA:
-        return RacInferenceFramework.sherpa;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_COREML:
-        return RacInferenceFramework.coreml;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_MLX:
-        return RacInferenceFramework.mlx;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_WHISPERKIT_COREML:
-        return RacInferenceFramework.whisperkitCoreml;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_METALRT:
-        return RacInferenceFramework.metalrt;
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_UNKNOWN:
-      case pb.InferenceFramework.INFERENCE_FRAMEWORK_UNSPECIFIED:
-      default:
-        return RacInferenceFramework.unknown;
-    }
-  }
+  /// Delegates to commons' `rac_inference_framework_from_proto`.
+  int toC() => _invokeEnumMapper(
+        'rac_inference_framework_from_proto',
+        value,
+        RacInferenceFramework.unknown,
+      );
 
   String get displayName {
     switch (this) {
@@ -327,16 +304,13 @@ extension ProtoInferenceFrameworkCppBridge on pb.InferenceFramework {
 }
 
 extension ProtoModelSourceCppBridge on pb.ModelSource {
-  int toC() {
-    switch (this) {
-      case pb.ModelSource.MODEL_SOURCE_LOCAL:
-        return RacModelSource.local;
-      case pb.ModelSource.MODEL_SOURCE_REMOTE:
-      case pb.ModelSource.MODEL_SOURCE_UNSPECIFIED:
-      default:
-        return RacModelSource.remote;
-    }
-  }
+  /// Convert a generated model source enum to C++ rac_model_source_t.
+  /// Delegates to commons' `rac_model_source_from_proto`.
+  int toC() => _invokeEnumMapper(
+        'rac_model_source_from_proto',
+        value,
+        RacModelSource.remote,
+      );
 }
 
 extension ProtoModelInfoHelpers on model_pb.ModelInfo {
@@ -409,12 +383,34 @@ model_pb.ModelInfo protoModelInfoFromCFields({
 }
 
 pb.ModelSource _sourceProtoFromC(int cSource) {
-  switch (cSource) {
-    case RacModelSource.remote:
-      return pb.ModelSource.MODEL_SOURCE_REMOTE;
-    case RacModelSource.local:
-      return pb.ModelSource.MODEL_SOURCE_LOCAL;
-    default:
-      return pb.ModelSource.MODEL_SOURCE_UNSPECIFIED;
-  }
+  final protoValue = _invokeEnumMapper(
+    'rac_model_source_to_proto',
+    cSource,
+    pb.ModelSource.MODEL_SOURCE_UNSPECIFIED.value,
+  );
+  return pb.ModelSource.valueOf(protoValue) ??
+      pb.ModelSource.MODEL_SOURCE_UNSPECIFIED;
+}
+
+extension ProtoArchiveTypeCppBridge on pb.ArchiveType {
+  /// Convert a generated archive type enum to C++ rac_archive_type_t.
+  /// Delegates to commons' `rac_archive_type_from_proto`. Returns
+  /// `RAC_ARCHIVE_TYPE_NONE` (-1) on UNSPECIFIED / unrecognized inputs.
+  int toC() => _invokeEnumMapper(
+        'rac_archive_type_from_proto',
+        value,
+        RacArchiveType.none,
+      );
+}
+
+extension ProtoArchiveStructureCppBridge on pb.ArchiveStructure {
+  /// Convert a generated archive structure enum to C++
+  /// rac_archive_structure_t. Delegates to commons'
+  /// `rac_archive_structure_from_proto`. Falls back to
+  /// `RAC_ARCHIVE_STRUCTURE_UNKNOWN` (99) on UNSPECIFIED / unrecognized.
+  int toC() => _invokeEnumMapper(
+        'rac_archive_structure_from_proto',
+        value,
+        RacArchiveStructure.unknown,
+      );
 }

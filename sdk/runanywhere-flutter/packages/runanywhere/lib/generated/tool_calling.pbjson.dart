@@ -162,6 +162,18 @@ final $typed_data.Uint8List toolValueObjectDescriptor = $convert.base64Decode(
     'ASgJUgNrZXkSLwoFdmFsdWUYAiABKAsyGS5ydW5hbnl3aGVyZS52MS5Ub29sVmFsdWVSBXZhbH'
     'VlOgI4AQ==');
 
+@$core.Deprecated('Use toolValueJSONDescriptor instead')
+const ToolValueJSON$json = {
+  '1': 'ToolValueJSON',
+  '2': [
+    {'1': 'json', '3': 1, '4': 1, '5': 9, '10': 'json'},
+  ],
+};
+
+/// Descriptor for `ToolValueJSON`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List toolValueJSONDescriptor = $convert.base64Decode(
+    'Cg1Ub29sVmFsdWVKU09OEhIKBGpzb24YASABKAlSBGpzb24=');
+
 @$core.Deprecated('Use toolParameterDescriptor instead')
 const ToolParameter$json = {
   '1': 'ToolParameter',

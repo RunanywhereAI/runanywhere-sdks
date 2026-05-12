@@ -77,10 +77,10 @@ class _ToolsViewState extends State<ToolsView> {
 
   /// Register demo tools matching iOS/Android examples
   void _registerDemoTools() {
-    sdk.RunAnywhereSDK.instance.tools.clear();
+    sdk.RunAnywhereSDK.instance.tools.clearTools();
 
     // 1. Weather tool
-    sdk.RunAnywhereSDK.instance.tools.register(
+    sdk.RunAnywhereSDK.instance.tools.registerTool(
       ToolDefinition(
         name: 'get_weather',
         description: 'Get current weather for a location',
@@ -96,7 +96,7 @@ class _ToolsViewState extends State<ToolsView> {
     );
 
     // 2. Calculator tool
-    sdk.RunAnywhereSDK.instance.tools.register(
+    sdk.RunAnywhereSDK.instance.tools.registerTool(
       ToolDefinition(
         name: 'calculate',
         description: 'Perform basic arithmetic calculations',
@@ -112,7 +112,7 @@ class _ToolsViewState extends State<ToolsView> {
     );
 
     // 3. Time tool
-    sdk.RunAnywhereSDK.instance.tools.register(
+    sdk.RunAnywhereSDK.instance.tools.registerTool(
       ToolDefinition(
         name: 'get_current_time',
         description: 'Get the current date and time',
@@ -122,7 +122,7 @@ class _ToolsViewState extends State<ToolsView> {
     );
 
     setState(() {
-      _registeredTools = sdk.RunAnywhereSDK.instance.tools.registeredTools();
+      _registeredTools = sdk.RunAnywhereSDK.instance.tools.getRegisteredTools();
     });
   }
 

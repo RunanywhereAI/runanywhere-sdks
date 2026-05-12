@@ -16,7 +16,7 @@ import 'package:fixnum/fixnum.dart' as $fixnum;
 import 'package:protobuf/protobuf.dart' as $pb;
 
 import 'download_service.pbenum.dart';
-import 'model_types.pb.dart' as $7;
+import 'model_types.pb.dart' as $3;
 
 export 'download_service.pbenum.dart';
 
@@ -403,7 +403,7 @@ class DownloadProgress extends $pb.GeneratedMessage {
 class DownloadPlanRequest extends $pb.GeneratedMessage {
   factory DownloadPlanRequest({
     $core.String? modelId,
-    $7.ModelInfo? model,
+    $3.ModelInfo? model,
     $core.bool? resumeExisting,
     $fixnum.Int64? availableStorageBytes,
     $core.bool? allowMeteredNetwork,
@@ -448,7 +448,7 @@ class DownloadPlanRequest extends $pb.GeneratedMessage {
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'DownloadPlanRequest', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
     ..aOS(1, _omitFieldNames ? '' : 'modelId')
-    ..aOM<$7.ModelInfo>(2, _omitFieldNames ? '' : 'model', subBuilder: $7.ModelInfo.create)
+    ..aOM<$3.ModelInfo>(2, _omitFieldNames ? '' : 'model', subBuilder: $3.ModelInfo.create)
     ..aOB(3, _omitFieldNames ? '' : 'resumeExisting')
     ..aInt64(4, _omitFieldNames ? '' : 'availableStorageBytes')
     ..aOB(5, _omitFieldNames ? '' : 'allowMeteredNetwork')
@@ -490,15 +490,15 @@ class DownloadPlanRequest extends $pb.GeneratedMessage {
   void clearModelId() => clearField(1);
 
   @$pb.TagNumber(2)
-  $7.ModelInfo get model => $_getN(1);
+  $3.ModelInfo get model => $_getN(1);
   @$pb.TagNumber(2)
-  set model($7.ModelInfo v) { setField(2, v); }
+  set model($3.ModelInfo v) { setField(2, v); }
   @$pb.TagNumber(2)
   $core.bool hasModel() => $_has(1);
   @$pb.TagNumber(2)
   void clearModel() => clearField(2);
   @$pb.TagNumber(2)
-  $7.ModelInfo ensureModel() => $_ensure(1);
+  $3.ModelInfo ensureModel() => $_ensure(1);
 
   @$pb.TagNumber(3)
   $core.bool get resumeExisting => $_getBF(2);
@@ -566,7 +566,7 @@ class DownloadPlanRequest extends $pb.GeneratedMessage {
 
 class DownloadFilePlan extends $pb.GeneratedMessage {
   factory DownloadFilePlan({
-    $7.ModelFileDescriptor? file,
+    $3.ModelFileDescriptor? file,
     $core.String? storageKey,
     $core.String? destinationPath,
     $fixnum.Int64? expectedBytes,
@@ -603,7 +603,7 @@ class DownloadFilePlan extends $pb.GeneratedMessage {
   factory DownloadFilePlan.fromJson($core.String i, [$pb.ExtensionRegistry r = $pb.ExtensionRegistry.EMPTY]) => create()..mergeFromJson(i, r);
 
   static final $pb.BuilderInfo _i = $pb.BuilderInfo(_omitMessageNames ? '' : 'DownloadFilePlan', package: const $pb.PackageName(_omitMessageNames ? '' : 'runanywhere.v1'), createEmptyInstance: create)
-    ..aOM<$7.ModelFileDescriptor>(1, _omitFieldNames ? '' : 'file', subBuilder: $7.ModelFileDescriptor.create)
+    ..aOM<$3.ModelFileDescriptor>(1, _omitFieldNames ? '' : 'file', subBuilder: $3.ModelFileDescriptor.create)
     ..aOS(2, _omitFieldNames ? '' : 'storageKey')
     ..aOS(3, _omitFieldNames ? '' : 'destinationPath')
     ..aInt64(4, _omitFieldNames ? '' : 'expectedBytes')
@@ -635,15 +635,15 @@ class DownloadFilePlan extends $pb.GeneratedMessage {
   static DownloadFilePlan? _defaultInstance;
 
   @$pb.TagNumber(1)
-  $7.ModelFileDescriptor get file => $_getN(0);
+  $3.ModelFileDescriptor get file => $_getN(0);
   @$pb.TagNumber(1)
-  set file($7.ModelFileDescriptor v) { setField(1, v); }
+  set file($3.ModelFileDescriptor v) { setField(1, v); }
   @$pb.TagNumber(1)
   $core.bool hasFile() => $_has(0);
   @$pb.TagNumber(1)
   void clearFile() => clearField(1);
   @$pb.TagNumber(1)
-  $7.ModelFileDescriptor ensureFile() => $_ensure(0);
+  $3.ModelFileDescriptor ensureFile() => $_ensure(0);
 
   @$pb.TagNumber(2)
   $core.String get storageKey => $_getSZ(1);

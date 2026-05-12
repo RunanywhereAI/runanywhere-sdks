@@ -34,7 +34,7 @@ import 'package:runanywhere/foundation/logging/sdk_logger.dart';
 import 'package:runanywhere/generated/model_types.pbenum.dart'
     show InferenceFramework;
 import 'package:runanywhere/generated/sdk_events.pbenum.dart' show SDKComponent;
-import 'package:runanywhere/native/ffi_types.dart';
+import 'package:runanywhere/native/types/basic_types.dart';
 import 'package:runanywhere_onnx/native/onnx_bindings.dart';
 
 /// ONNX Runtime module for STT, TTS, and VAD services.

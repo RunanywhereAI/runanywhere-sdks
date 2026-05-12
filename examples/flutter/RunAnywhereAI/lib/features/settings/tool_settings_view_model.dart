@@ -51,14 +51,14 @@ class ToolSettingsViewModel extends ChangeNotifier {
   }
 
   Future<void> refreshRegisteredTools() async {
-    _registeredTools = RunAnywhereSDK.instance.tools.registeredTools();
+    _registeredTools = RunAnywhereSDK.instance.tools.getRegisteredTools();
     notifyListeners();
   }
 
   /// Register demo tools (matches iOS implementation)
   Future<void> registerDemoTools() async {
     // 1. Weather Tool - Uses Open-Meteo API (free, no API key required)
-    RunAnywhereSDK.instance.tools.register(
+    RunAnywhereSDK.instance.tools.registerTool(
       ToolDefinition(
         name: 'get_weather',
         description:
@@ -75,7 +75,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
     );
 
     // 2. Time Tool - Real system time with timezone
-    RunAnywhereSDK.instance.tools.register(
+    RunAnywhereSDK.instance.tools.registerTool(
       ToolDefinition(
         name: 'get_current_time',
         description: 'Gets the current date, time, and timezone information',
@@ -85,7 +85,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
     );
 
     // 3. Calculator Tool - Real math evaluation
-    RunAnywhereSDK.instance.tools.register(
+    RunAnywhereSDK.instance.tools.registerTool(
       ToolDefinition(
         name: 'calculate',
         description:
@@ -105,7 +105,7 @@ class ToolSettingsViewModel extends ChangeNotifier {
   }
 
   Future<void> clearAllTools() async {
-    RunAnywhereSDK.instance.tools.clear();
+    RunAnywhereSDK.instance.tools.clearTools();
     await refreshRegisteredTools();
   }
 

@@ -13,32 +13,34 @@ import 'dart:convert' as $convert;
 import 'dart:core' as $core;
 import 'dart:typed_data' as $typed_data;
 
-import 'thinking_tag_pattern.pbjson.dart' as $0;
+import 'thinking_tag_pattern.pbjson.dart' as $2;
 
 @$core.Deprecated('Use audioFormatDescriptor instead')
 const AudioFormat$json = {
   '1': 'AudioFormat',
   '2': [
-    {'1': 'AUDIO_FORMAT_UNSPECIFIED', '2': 0},
-    {'1': 'AUDIO_FORMAT_PCM', '2': 1},
-    {'1': 'AUDIO_FORMAT_WAV', '2': 2},
-    {'1': 'AUDIO_FORMAT_MP3', '2': 3},
-    {'1': 'AUDIO_FORMAT_OPUS', '2': 4},
-    {'1': 'AUDIO_FORMAT_AAC', '2': 5},
-    {'1': 'AUDIO_FORMAT_FLAC', '2': 6},
-    {'1': 'AUDIO_FORMAT_OGG', '2': 7},
-    {'1': 'AUDIO_FORMAT_M4A', '2': 8},
-    {'1': 'AUDIO_FORMAT_PCM_S16LE', '2': 9},
+    {'1': 'AUDIO_FORMAT_UNSPECIFIED', '2': 0, '3': {}},
+    {'1': 'AUDIO_FORMAT_PCM', '2': 1, '3': {}},
+    {'1': 'AUDIO_FORMAT_WAV', '2': 2, '3': {}},
+    {'1': 'AUDIO_FORMAT_MP3', '2': 3, '3': {}},
+    {'1': 'AUDIO_FORMAT_OPUS', '2': 4, '3': {}},
+    {'1': 'AUDIO_FORMAT_AAC', '2': 5, '3': {}},
+    {'1': 'AUDIO_FORMAT_FLAC', '2': 6, '3': {}},
+    {'1': 'AUDIO_FORMAT_OGG', '2': 7, '3': {}},
+    {'1': 'AUDIO_FORMAT_M4A', '2': 8, '3': {}},
+    {'1': 'AUDIO_FORMAT_PCM_S16LE', '2': 9, '3': {}},
   ],
 };
 
 /// Descriptor for `AudioFormat`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List audioFormatDescriptor = $convert.base64Decode(
-    'CgtBdWRpb0Zvcm1hdBIcChhBVURJT19GT1JNQVRfVU5TUEVDSUZJRUQQABIUChBBVURJT19GT1'
-    'JNQVRfUENNEAESFAoQQVVESU9fRk9STUFUX1dBVhACEhQKEEFVRElPX0ZPUk1BVF9NUDMQAxIV'
-    'ChFBVURJT19GT1JNQVRfT1BVUxAEEhQKEEFVRElPX0ZPUk1BVF9BQUMQBRIVChFBVURJT19GT1'
-    'JNQVRfRkxBQxAGEhQKEEFVRElPX0ZPUk1BVF9PR0cQBxIUChBBVURJT19GT1JNQVRfTTRBEAgS'
-    'GgoWQVVESU9fRk9STUFUX1BDTV9TMTZMRRAJ');
+    'CgtBdWRpb0Zvcm1hdBItChhBVURJT19GT1JNQVRfVU5TUEVDSUZJRUQQABoP4rUYC3Vuc3BlY2'
+    'lmaWVkEh0KEEFVRElPX0ZPUk1BVF9QQ00QARoH4rUYA3BjbRIdChBBVURJT19GT1JNQVRfV0FW'
+    'EAIaB+K1GAN3YXYSHQoQQVVESU9fRk9STUFUX01QMxADGgfitRgDbXAzEh8KEUFVRElPX0ZPUk'
+    '1BVF9PUFVTEAQaCOK1GARvcHVzEh0KEEFVRElPX0ZPUk1BVF9BQUMQBRoH4rUYA2FhYxIfChFB'
+    'VURJT19GT1JNQVRfRkxBQxAGGgjitRgEZmxhYxIdChBBVURJT19GT1JNQVRfT0dHEAcaB+K1GA'
+    'NvZ2cSHQoQQVVESU9fRk9STUFUX000QRAIGgfitRgDbTRhEikKFkFVRElPX0ZPUk1BVF9QQ01f'
+    'UzE2TEUQCRoN4rUYCXBjbV9zMTZsZQ==');
 
 @$core.Deprecated('Use modelFormatDescriptor instead')
 const ModelFormat$json = {
@@ -128,62 +130,67 @@ final $typed_data.Uint8List inferenceFrameworkDescriptor = $convert.base64Decode
 const ModelCategory$json = {
   '1': 'ModelCategory',
   '2': [
-    {'1': 'MODEL_CATEGORY_UNSPECIFIED', '2': 0},
-    {'1': 'MODEL_CATEGORY_LANGUAGE', '2': 1},
-    {'1': 'MODEL_CATEGORY_SPEECH_RECOGNITION', '2': 2},
-    {'1': 'MODEL_CATEGORY_SPEECH_SYNTHESIS', '2': 3},
-    {'1': 'MODEL_CATEGORY_VISION', '2': 4},
-    {'1': 'MODEL_CATEGORY_IMAGE_GENERATION', '2': 5},
-    {'1': 'MODEL_CATEGORY_MULTIMODAL', '2': 6},
-    {'1': 'MODEL_CATEGORY_AUDIO', '2': 7},
-    {'1': 'MODEL_CATEGORY_EMBEDDING', '2': 8},
-    {'1': 'MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION', '2': 9},
+    {'1': 'MODEL_CATEGORY_UNSPECIFIED', '2': 0, '3': {}},
+    {'1': 'MODEL_CATEGORY_LANGUAGE', '2': 1, '3': {}},
+    {'1': 'MODEL_CATEGORY_SPEECH_RECOGNITION', '2': 2, '3': {}},
+    {'1': 'MODEL_CATEGORY_SPEECH_SYNTHESIS', '2': 3, '3': {}},
+    {'1': 'MODEL_CATEGORY_VISION', '2': 4, '3': {}},
+    {'1': 'MODEL_CATEGORY_IMAGE_GENERATION', '2': 5, '3': {}},
+    {'1': 'MODEL_CATEGORY_MULTIMODAL', '2': 6, '3': {}},
+    {'1': 'MODEL_CATEGORY_AUDIO', '2': 7, '3': {}},
+    {'1': 'MODEL_CATEGORY_EMBEDDING', '2': 8, '3': {}},
+    {'1': 'MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION', '2': 9, '3': {}},
   ],
 };
 
 /// Descriptor for `ModelCategory`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List modelCategoryDescriptor = $convert.base64Decode(
-    'Cg1Nb2RlbENhdGVnb3J5Eh4KGk1PREVMX0NBVEVHT1JZX1VOU1BFQ0lGSUVEEAASGwoXTU9ERU'
-    'xfQ0FURUdPUllfTEFOR1VBR0UQARIlCiFNT0RFTF9DQVRFR09SWV9TUEVFQ0hfUkVDT0dOSVRJ'
-    'T04QAhIjCh9NT0RFTF9DQVRFR09SWV9TUEVFQ0hfU1lOVEhFU0lTEAMSGQoVTU9ERUxfQ0FURU'
-    'dPUllfVklTSU9OEAQSIwofTU9ERUxfQ0FURUdPUllfSU1BR0VfR0VORVJBVElPThAFEh0KGU1P'
-    'REVMX0NBVEVHT1JZX01VTFRJTU9EQUwQBhIYChRNT0RFTF9DQVRFR09SWV9BVURJTxAHEhwKGE'
-    '1PREVMX0NBVEVHT1JZX0VNQkVERElORxAIEisKJ01PREVMX0NBVEVHT1JZX1ZPSUNFX0FDVElW'
-    'SVRZX0RFVEVDVElPThAJ');
+    'Cg1Nb2RlbENhdGVnb3J5Ei8KGk1PREVMX0NBVEVHT1JZX1VOU1BFQ0lGSUVEEAAaD+K1GAt1bn'
+    'NwZWNpZmllZBIpChdNT0RFTF9DQVRFR09SWV9MQU5HVUFHRRABGgzitRgIbGFuZ3VhZ2USPQoh'
+    'TU9ERUxfQ0FURUdPUllfU1BFRUNIX1JFQ09HTklUSU9OEAIaFuK1GBJzcGVlY2gtcmVjb2duaX'
+    'Rpb24SOQofTU9ERUxfQ0FURUdPUllfU1BFRUNIX1NZTlRIRVNJUxADGhTitRgQc3BlZWNoLXN5'
+    'bnRoZXNpcxIlChVNT0RFTF9DQVRFR09SWV9WSVNJT04QBBoK4rUYBnZpc2lvbhI5Ch9NT0RFTF'
+    '9DQVRFR09SWV9JTUFHRV9HRU5FUkFUSU9OEAUaFOK1GBBpbWFnZS1nZW5lcmF0aW9uEi0KGU1P'
+    'REVMX0NBVEVHT1JZX01VTFRJTU9EQUwQBhoO4rUYCm11bHRpbW9kYWwSIwoUTU9ERUxfQ0FURU'
+    'dPUllfQVVESU8QBxoJ4rUYBWF1ZGlvEisKGE1PREVMX0NBVEVHT1JZX0VNQkVERElORxAIGg3i'
+    'tRgJZW1iZWRkaW5nEkkKJ01PREVMX0NBVEVHT1JZX1ZPSUNFX0FDVElWSVRZX0RFVEVDVElPTh'
+    'AJGhzitRgYdm9pY2UtYWN0aXZpdHktZGV0ZWN0aW9u');
 
 @$core.Deprecated('Use sDKEnvironmentDescriptor instead')
 const SDKEnvironment$json = {
   '1': 'SDKEnvironment',
   '2': [
-    {'1': 'SDK_ENVIRONMENT_UNSPECIFIED', '2': 0},
-    {'1': 'SDK_ENVIRONMENT_DEVELOPMENT', '2': 1},
-    {'1': 'SDK_ENVIRONMENT_STAGING', '2': 2},
-    {'1': 'SDK_ENVIRONMENT_PRODUCTION', '2': 3},
+    {'1': 'SDK_ENVIRONMENT_UNSPECIFIED', '2': 0, '3': {}},
+    {'1': 'SDK_ENVIRONMENT_DEVELOPMENT', '2': 1, '3': {}},
+    {'1': 'SDK_ENVIRONMENT_STAGING', '2': 2, '3': {}},
+    {'1': 'SDK_ENVIRONMENT_PRODUCTION', '2': 3, '3': {}},
   ],
 };
 
 /// Descriptor for `SDKEnvironment`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List sDKEnvironmentDescriptor = $convert.base64Decode(
-    'Cg5TREtFbnZpcm9ubWVudBIfChtTREtfRU5WSVJPTk1FTlRfVU5TUEVDSUZJRUQQABIfChtTRE'
-    'tfRU5WSVJPTk1FTlRfREVWRUxPUE1FTlQQARIbChdTREtfRU5WSVJPTk1FTlRfU1RBR0lORxAC'
-    'Eh4KGlNES19FTlZJUk9OTUVOVF9QUk9EVUNUSU9OEAM=');
+    'Cg5TREtFbnZpcm9ubWVudBIwChtTREtfRU5WSVJPTk1FTlRfVU5TUEVDSUZJRUQQABoP4rUYC3'
+    'Vuc3BlY2lmaWVkEjAKG1NES19FTlZJUk9OTUVOVF9ERVZFTE9QTUVOVBABGg/itRgLZGV2ZWxv'
+    'cG1lbnQSKAoXU0RLX0VOVklST05NRU5UX1NUQUdJTkcQAhoL4rUYB3N0YWdpbmcSLgoaU0RLX0'
+    'VOVklST05NRU5UX1BST0RVQ1RJT04QAxoO4rUYCnByb2R1Y3Rpb24=');
 
 @$core.Deprecated('Use modelSourceDescriptor instead')
 const ModelSource$json = {
   '1': 'ModelSource',
   '2': [
-    {'1': 'MODEL_SOURCE_UNSPECIFIED', '2': 0},
-    {'1': 'MODEL_SOURCE_REMOTE', '2': 1},
-    {'1': 'MODEL_SOURCE_LOCAL', '2': 2},
-    {'1': 'MODEL_SOURCE_BUILT_IN', '2': 3},
+    {'1': 'MODEL_SOURCE_UNSPECIFIED', '2': 0, '3': {}},
+    {'1': 'MODEL_SOURCE_REMOTE', '2': 1, '3': {}},
+    {'1': 'MODEL_SOURCE_LOCAL', '2': 2, '3': {}},
+    {'1': 'MODEL_SOURCE_BUILT_IN', '2': 3, '3': {}},
   ],
 };
 
 /// Descriptor for `ModelSource`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List modelSourceDescriptor = $convert.base64Decode(
-    'CgtNb2RlbFNvdXJjZRIcChhNT0RFTF9TT1VSQ0VfVU5TUEVDSUZJRUQQABIXChNNT0RFTF9TT1'
-    'VSQ0VfUkVNT1RFEAESFgoSTU9ERUxfU09VUkNFX0xPQ0FMEAISGQoVTU9ERUxfU09VUkNFX0JV'
-    'SUxUX0lOEAM=');
+    'CgtNb2RlbFNvdXJjZRItChhNT0RFTF9TT1VSQ0VfVU5TUEVDSUZJRUQQABoP4rUYC3Vuc3BlY2'
+    'lmaWVkEiMKE01PREVMX1NPVVJDRV9SRU1PVEUQARoK4rUYBnJlbW90ZRIhChJNT0RFTF9TT1VS'
+    'Q0VfTE9DQUwQAhoJ4rUYBWxvY2FsEicKFU1PREVMX1NPVVJDRV9CVUlMVF9JThADGgzitRgIYn'
+    'VpbHQtaW4=');
 
 @$core.Deprecated('Use archiveTypeDescriptor instead')
 const ArchiveType$json = {
@@ -207,20 +214,22 @@ final $typed_data.Uint8List archiveTypeDescriptor = $convert.base64Decode(
 const ArchiveStructure$json = {
   '1': 'ArchiveStructure',
   '2': [
-    {'1': 'ARCHIVE_STRUCTURE_UNSPECIFIED', '2': 0},
-    {'1': 'ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED', '2': 1},
-    {'1': 'ARCHIVE_STRUCTURE_DIRECTORY_BASED', '2': 2},
-    {'1': 'ARCHIVE_STRUCTURE_NESTED_DIRECTORY', '2': 3},
-    {'1': 'ARCHIVE_STRUCTURE_UNKNOWN', '2': 4},
+    {'1': 'ARCHIVE_STRUCTURE_UNSPECIFIED', '2': 0, '3': {}},
+    {'1': 'ARCHIVE_STRUCTURE_SINGLE_FILE_NESTED', '2': 1, '3': {}},
+    {'1': 'ARCHIVE_STRUCTURE_DIRECTORY_BASED', '2': 2, '3': {}},
+    {'1': 'ARCHIVE_STRUCTURE_NESTED_DIRECTORY', '2': 3, '3': {}},
+    {'1': 'ARCHIVE_STRUCTURE_UNKNOWN', '2': 4, '3': {}},
   ],
 };
 
 /// Descriptor for `ArchiveStructure`. Decode as a `google.protobuf.EnumDescriptorProto`.
 final $typed_data.Uint8List archiveStructureDescriptor = $convert.base64Decode(
-    'ChBBcmNoaXZlU3RydWN0dXJlEiEKHUFSQ0hJVkVfU1RSVUNUVVJFX1VOU1BFQ0lGSUVEEAASKA'
-    'okQVJDSElWRV9TVFJVQ1RVUkVfU0lOR0xFX0ZJTEVfTkVTVEVEEAESJQohQVJDSElWRV9TVFJV'
-    'Q1RVUkVfRElSRUNUT1JZX0JBU0VEEAISJgoiQVJDSElWRV9TVFJVQ1RVUkVfTkVTVEVEX0RJUk'
-    'VDVE9SWRADEh0KGUFSQ0hJVkVfU1RSVUNUVVJFX1VOS05PV04QBA==');
+    'ChBBcmNoaXZlU3RydWN0dXJlEjIKHUFSQ0hJVkVfU1RSVUNUVVJFX1VOU1BFQ0lGSUVEEAAaD+'
+    'K1GAt1bnNwZWNpZmllZBI+CiRBUkNISVZFX1NUUlVDVFVSRV9TSU5HTEVfRklMRV9ORVNURUQQ'
+    'ARoU4rUYEHNpbmdsZUZpbGVOZXN0ZWQSOQohQVJDSElWRV9TVFJVQ1RVUkVfRElSRUNUT1JZX0'
+    'JBU0VEEAIaEuK1GA5kaXJlY3RvcnlCYXNlZBI7CiJBUkNISVZFX1NUUlVDVFVSRV9ORVNURURf'
+    'RElSRUNUT1JZEAMaE+K1GA9uZXN0ZWREaXJlY3RvcnkSKgoZQVJDSElWRV9TVFJVQ1RVUkVfVU'
+    '5LTk9XThAEGgvitRgHdW5rbm93bg==');
 
 @$core.Deprecated('Use modelArtifactTypeDescriptor instead')
 const ModelArtifactType$json = {
@@ -684,31 +693,6 @@ final $typed_data.Uint8List modelQueryDescriptor = $convert.base64Decode(
     'cmFtZXdvcmtCCwoJX2NhdGVnb3J5QgkKB19mb3JtYXRCEgoQX2Rvd25sb2FkZWRfb25seUIRCg'
     '9fYXZhaWxhYmxlX29ubHlCEQoPX21heF9zaXplX2J5dGVzQgkKB19zb3VyY2VCDQoLX3NvcnRf'
     'ZmllbGRCDQoLX3NvcnRfb3JkZXJCEgoQX3JlZ2lzdHJ5X3N0YXR1cw==');
-
-@$core.Deprecated('Use modelCompatibilityResultDescriptor instead')
-const ModelCompatibilityResult$json = {
-  '1': 'ModelCompatibilityResult',
-  '2': [
-    {'1': 'is_compatible', '3': 1, '4': 1, '5': 8, '10': 'isCompatible'},
-    {'1': 'can_run', '3': 2, '4': 1, '5': 8, '10': 'canRun'},
-    {'1': 'can_fit', '3': 3, '4': 1, '5': 8, '10': 'canFit'},
-    {'1': 'required_memory_bytes', '3': 4, '4': 1, '5': 3, '10': 'requiredMemoryBytes'},
-    {'1': 'available_memory_bytes', '3': 5, '4': 1, '5': 3, '10': 'availableMemoryBytes'},
-    {'1': 'required_storage_bytes', '3': 6, '4': 1, '5': 3, '10': 'requiredStorageBytes'},
-    {'1': 'available_storage_bytes', '3': 7, '4': 1, '5': 3, '10': 'availableStorageBytes'},
-    {'1': 'reasons', '3': 8, '4': 3, '5': 9, '10': 'reasons'},
-  ],
-};
-
-/// Descriptor for `ModelCompatibilityResult`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List modelCompatibilityResultDescriptor = $convert.base64Decode(
-    'ChhNb2RlbENvbXBhdGliaWxpdHlSZXN1bHQSIwoNaXNfY29tcGF0aWJsZRgBIAEoCFIMaXNDb2'
-    '1wYXRpYmxlEhcKB2Nhbl9ydW4YAiABKAhSBmNhblJ1bhIXCgdjYW5fZml0GAMgASgIUgZjYW5G'
-    'aXQSMgoVcmVxdWlyZWRfbWVtb3J5X2J5dGVzGAQgASgDUhNyZXF1aXJlZE1lbW9yeUJ5dGVzEj'
-    'QKFmF2YWlsYWJsZV9tZW1vcnlfYnl0ZXMYBSABKANSFGF2YWlsYWJsZU1lbW9yeUJ5dGVzEjQK'
-    'FnJlcXVpcmVkX3N0b3JhZ2VfYnl0ZXMYBiABKANSFHJlcXVpcmVkU3RvcmFnZUJ5dGVzEjYKF2'
-    'F2YWlsYWJsZV9zdG9yYWdlX2J5dGVzGAcgASgDUhVhdmFpbGFibGVTdG9yYWdlQnl0ZXMSGAoH'
-    'cmVhc29ucxgIIAMoCVIHcmVhc29ucw==');
 
 @$core.Deprecated('Use modelRegistryRefreshRequestDescriptor instead')
 const ModelRegistryRefreshRequest$json = {
@@ -1181,9 +1165,9 @@ final $typed_data.Uint8List modelCompatibilityRequestDescriptor = $convert.base6
     'cm9maWxlQhkKF19hY2NlbGVyYXRvcl9wcmVmZXJlbmNlQhYKFF9wcmVmZXJyZWRfZnJhbWV3b3'
     'Jr');
 
-@$core.Deprecated('Use modelCompatibilityCheckResultDescriptor instead')
-const ModelCompatibilityCheckResult$json = {
-  '1': 'ModelCompatibilityCheckResult',
+@$core.Deprecated('Use modelCompatibilityResultDescriptor instead')
+const ModelCompatibilityResult$json = {
+  '1': 'ModelCompatibilityResult',
   '2': [
     {'1': 'is_compatible', '3': 1, '4': 1, '5': 8, '10': 'isCompatible'},
     {'1': 'can_run', '3': 2, '4': 1, '5': 8, '10': 'canRun'},
@@ -1200,18 +1184,18 @@ const ModelCompatibilityCheckResult$json = {
   ],
 };
 
-/// Descriptor for `ModelCompatibilityCheckResult`. Decode as a `google.protobuf.DescriptorProto`.
-final $typed_data.Uint8List modelCompatibilityCheckResultDescriptor = $convert.base64Decode(
-    'Ch1Nb2RlbENvbXBhdGliaWxpdHlDaGVja1Jlc3VsdBIjCg1pc19jb21wYXRpYmxlGAEgASgIUg'
-    'xpc0NvbXBhdGlibGUSFwoHY2FuX3J1bhgCIAEoCFIGY2FuUnVuEhcKB2Nhbl9maXQYAyABKAhS'
-    'BmNhbkZpdBIyChVyZXF1aXJlZF9tZW1vcnlfYnl0ZXMYBCABKANSE3JlcXVpcmVkTWVtb3J5Qn'
-    'l0ZXMSNAoWYXZhaWxhYmxlX21lbW9yeV9ieXRlcxgFIAEoA1IUYXZhaWxhYmxlTWVtb3J5Qnl0'
-    'ZXMSNAoWcmVxdWlyZWRfc3RvcmFnZV9ieXRlcxgGIAEoA1IUcmVxdWlyZWRTdG9yYWdlQnl0ZX'
-    'MSNgoXYXZhaWxhYmxlX3N0b3JhZ2VfYnl0ZXMYByABKANSFWF2YWlsYWJsZVN0b3JhZ2VCeXRl'
-    'cxIYCgdyZWFzb25zGAggAygJUgdyZWFzb25zEjUKFnN1Z2dlc3RlZF9hbHRlcm5hdGl2ZXMYCS'
-    'ADKAlSFXN1Z2dlc3RlZEFsdGVybmF0aXZlcxIZCghtb2RlbF9pZBgKIAEoCVIHbW9kZWxJZBId'
-    'CgplcnJvcl9jb2RlGAsgASgFUgllcnJvckNvZGUSIwoNZXJyb3JfbWVzc2FnZRgMIAEoCVIMZX'
-    'Jyb3JNZXNzYWdl');
+/// Descriptor for `ModelCompatibilityResult`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List modelCompatibilityResultDescriptor = $convert.base64Decode(
+    'ChhNb2RlbENvbXBhdGliaWxpdHlSZXN1bHQSIwoNaXNfY29tcGF0aWJsZRgBIAEoCFIMaXNDb2'
+    '1wYXRpYmxlEhcKB2Nhbl9ydW4YAiABKAhSBmNhblJ1bhIXCgdjYW5fZml0GAMgASgIUgZjYW5G'
+    'aXQSMgoVcmVxdWlyZWRfbWVtb3J5X2J5dGVzGAQgASgDUhNyZXF1aXJlZE1lbW9yeUJ5dGVzEj'
+    'QKFmF2YWlsYWJsZV9tZW1vcnlfYnl0ZXMYBSABKANSFGF2YWlsYWJsZU1lbW9yeUJ5dGVzEjQK'
+    'FnJlcXVpcmVkX3N0b3JhZ2VfYnl0ZXMYBiABKANSFHJlcXVpcmVkU3RvcmFnZUJ5dGVzEjYKF2'
+    'F2YWlsYWJsZV9zdG9yYWdlX2J5dGVzGAcgASgDUhVhdmFpbGFibGVTdG9yYWdlQnl0ZXMSGAoH'
+    'cmVhc29ucxgIIAMoCVIHcmVhc29ucxI1ChZzdWdnZXN0ZWRfYWx0ZXJuYXRpdmVzGAkgAygJUh'
+    'VzdWdnZXN0ZWRBbHRlcm5hdGl2ZXMSGQoIbW9kZWxfaWQYCiABKAlSB21vZGVsSWQSHQoKZXJy'
+    'b3JfY29kZRgLIAEoBVIJZXJyb3JDb2RlEiMKDWVycm9yX21lc3NhZ2UYDCABKAlSDGVycm9yTW'
+    'Vzc2FnZQ==');
 
 @$core.Deprecated('Use modelFormatFromUrlRequestDescriptor instead')
 const ModelFormatFromUrlRequest$json = {
@@ -1317,6 +1301,58 @@ final $typed_data.Uint8List modelRegistryFetchAssignmentsResultDescriptor = $con
     'VuaXhfbXMYBCABKANSD2ZldGNoZWRBdFVuaXhNcxIdCgplcnJvcl9jb2RlGAUgASgFUgllcnJv'
     'ckNvZGUSIwoNZXJyb3JfbWVzc2FnZRgGIAEoCVIMZXJyb3JNZXNzYWdl');
 
+@$core.Deprecated('Use modelInfoMakeRequestDescriptor instead')
+const ModelInfoMakeRequest$json = {
+  '1': 'ModelInfoMakeRequest',
+  '2': [
+    {'1': 'url', '3': 1, '4': 1, '5': 9, '10': 'url'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'framework', '3': 3, '4': 1, '5': 14, '6': '.runanywhere.v1.InferenceFramework', '9': 0, '10': 'framework', '17': true},
+    {'1': 'category', '3': 4, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelCategory', '9': 1, '10': 'category', '17': true},
+    {'1': 'source', '3': 5, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelSource', '9': 2, '10': 'source', '17': true},
+  ],
+  '8': [
+    {'1': '_framework'},
+    {'1': '_category'},
+    {'1': '_source'},
+  ],
+};
+
+/// Descriptor for `ModelInfoMakeRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List modelInfoMakeRequestDescriptor = $convert.base64Decode(
+    'ChRNb2RlbEluZm9NYWtlUmVxdWVzdBIQCgN1cmwYASABKAlSA3VybBISCgRuYW1lGAIgASgJUg'
+    'RuYW1lEkUKCWZyYW1ld29yaxgDIAEoDjIiLnJ1bmFueXdoZXJlLnYxLkluZmVyZW5jZUZyYW1l'
+    'd29ya0gAUglmcmFtZXdvcmuIAQESPgoIY2F0ZWdvcnkYBCABKA4yHS5ydW5hbnl3aGVyZS52MS'
+    '5Nb2RlbENhdGVnb3J5SAFSCGNhdGVnb3J5iAEBEjgKBnNvdXJjZRgFIAEoDjIbLnJ1bmFueXdo'
+    'ZXJlLnYxLk1vZGVsU291cmNlSAJSBnNvdXJjZYgBAUIMCgpfZnJhbWV3b3JrQgsKCV9jYXRlZ2'
+    '9yeUIJCgdfc291cmNl');
+
+@$core.Deprecated('Use registerModelFromUrlRequestDescriptor instead')
+const RegisterModelFromUrlRequest$json = {
+  '1': 'RegisterModelFromUrlRequest',
+  '2': [
+    {'1': 'url', '3': 1, '4': 1, '5': 9, '10': 'url'},
+    {'1': 'name', '3': 2, '4': 1, '5': 9, '10': 'name'},
+    {'1': 'framework', '3': 3, '4': 1, '5': 14, '6': '.runanywhere.v1.InferenceFramework', '9': 0, '10': 'framework', '17': true},
+    {'1': 'category', '3': 4, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelCategory', '9': 1, '10': 'category', '17': true},
+    {'1': 'source', '3': 5, '4': 1, '5': 14, '6': '.runanywhere.v1.ModelSource', '9': 2, '10': 'source', '17': true},
+  ],
+  '8': [
+    {'1': '_framework'},
+    {'1': '_category'},
+    {'1': '_source'},
+  ],
+};
+
+/// Descriptor for `RegisterModelFromUrlRequest`. Decode as a `google.protobuf.DescriptorProto`.
+final $typed_data.Uint8List registerModelFromUrlRequestDescriptor = $convert.base64Decode(
+    'ChtSZWdpc3Rlck1vZGVsRnJvbVVybFJlcXVlc3QSEAoDdXJsGAEgASgJUgN1cmwSEgoEbmFtZR'
+    'gCIAEoCVIEbmFtZRJFCglmcmFtZXdvcmsYAyABKA4yIi5ydW5hbnl3aGVyZS52MS5JbmZlcmVu'
+    'Y2VGcmFtZXdvcmtIAFIJZnJhbWV3b3JriAEBEj4KCGNhdGVnb3J5GAQgASgOMh0ucnVuYW55d2'
+    'hlcmUudjEuTW9kZWxDYXRlZ29yeUgBUghjYXRlZ29yeYgBARI4CgZzb3VyY2UYBSABKA4yGy5y'
+    'dW5hbnl3aGVyZS52MS5Nb2RlbFNvdXJjZUgCUgZzb3VyY2WIAQFCDAoKX2ZyYW1ld29ya0ILCg'
+    'lfY2F0ZWdvcnlCCQoHX3NvdXJjZQ==');
+
 const $core.Map<$core.String, $core.dynamic> ModelRegistryServiceBase$json = {
   '1': 'ModelRegistry',
   '2': [
@@ -1334,7 +1370,7 @@ const $core.Map<$core.String, $core.dynamic> ModelRegistryServiceBase$json = {
 @$core.Deprecated('Use modelRegistryServiceDescriptor instead')
 const $core.Map<$core.String, $core.Map<$core.String, $core.dynamic>> ModelRegistryServiceBase$messageJson = {
   '.runanywhere.v1.ModelInfo': ModelInfo$json,
-  '.runanywhere.v1.ThinkingTagPattern': $0.ThinkingTagPattern$json,
+  '.runanywhere.v1.ThinkingTagPattern': $2.ThinkingTagPattern$json,
   '.runanywhere.v1.ModelInfoMetadata': ModelInfoMetadata$json,
   '.runanywhere.v1.SingleFileArtifact': SingleFileArtifact$json,
   '.runanywhere.v1.ExpectedModelFiles': ExpectedModelFiles$json,

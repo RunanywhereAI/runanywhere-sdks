@@ -15,27 +15,27 @@ import 'dart:core' as $core;
 
 import 'package:protobuf/protobuf.dart' as $pb;
 
-import 'stt_options.pb.dart' as $15;
+import 'stt_options.pb.dart' as $21;
 import 'stt_options.pbjson.dart';
 
 export 'stt_options.pb.dart';
 
 abstract class STTServiceBase extends $pb.GeneratedService {
-  $async.Future<$15.STTOutput> transcribe($pb.ServerContext ctx, $15.STTTranscriptionRequest request);
-  $async.Future<$15.STTStreamEvent> stream($pb.ServerContext ctx, $15.STTTranscriptionRequest request);
+  $async.Future<$21.STTOutput> transcribe($pb.ServerContext ctx, $21.STTTranscriptionRequest request);
+  $async.Future<$21.STTStreamEvent> stream($pb.ServerContext ctx, $21.STTTranscriptionRequest request);
 
   $pb.GeneratedMessage createRequest($core.String methodName) {
     switch (methodName) {
-      case 'Transcribe': return $15.STTTranscriptionRequest();
-      case 'Stream': return $15.STTTranscriptionRequest();
+      case 'Transcribe': return $21.STTTranscriptionRequest();
+      case 'Stream': return $21.STTTranscriptionRequest();
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }
 
   $async.Future<$pb.GeneratedMessage> handleCall($pb.ServerContext ctx, $core.String methodName, $pb.GeneratedMessage request) {
     switch (methodName) {
-      case 'Transcribe': return this.transcribe(ctx, request as $15.STTTranscriptionRequest);
-      case 'Stream': return this.stream(ctx, request as $15.STTTranscriptionRequest);
+      case 'Transcribe': return this.transcribe(ctx, request as $21.STTTranscriptionRequest);
+      case 'Stream': return this.stream(ctx, request as $21.STTTranscriptionRequest);
       default: throw $core.ArgumentError('Unknown method: $methodName');
     }
   }
