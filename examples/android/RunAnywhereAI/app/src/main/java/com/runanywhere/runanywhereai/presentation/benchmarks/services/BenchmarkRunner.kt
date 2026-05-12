@@ -1,5 +1,6 @@
 package com.runanywhere.runanywhereai.presentation.benchmarks.services
 
+import ai.runanywhere.proto.v1.ModelListRequest
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkCategory
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkDeviceInfo
 import com.runanywhere.runanywhereai.presentation.benchmarks.models.BenchmarkMetrics
@@ -11,7 +12,7 @@ import com.runanywhere.runanywhereai.presentation.benchmarks.utilities.Synthetic
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.extensions.Models.isBuiltIn
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
-import com.runanywhere.sdk.public.extensions.availableModels
+import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.types.RAModelInfo
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.ensureActive
@@ -71,7 +72,7 @@ class BenchmarkRunner {
     suspend fun preflight(categories: Set<BenchmarkCategory>): BenchmarkPreflightResult {
         val allModels: List<RAModelInfo> =
             try {
-                RunAnywhere.availableModels()
+                RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
             } catch (e: Exception) {
                 throw BenchmarkRunnerError.FetchModelsFailed(e)
             }

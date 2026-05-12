@@ -12,16 +12,14 @@ import com.runanywhere.runanywhereai.models.ModelSelectionContext
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.extensions.Models.displayName
-import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.currentModel
-import com.runanywhere.sdk.public.extensions.downloadModel
+import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.types.RAModelInfo
 import com.runanywhere.sdk.public.types.RAModelLoadRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.mapNotNull
@@ -106,8 +104,9 @@ class ModelSelectionViewModel(
             try {
                 Timber.d("🔄 Loading models and frameworks for context: $context")
 
-                // Call SDK to get available models
-                val allModels = RunAnywhere.availableModels()
+                // Call SDK to get available models via the proto-backed registry.
+                // `listModels()` replaced the removed `availableModels()` helper.
+                val allModels = RunAnywhere.listModels().models?.models.orEmpty()
                 Timber.d("📦 Fetched ${allModels.size} total models from SDK")
 
                 // Filter models by context - matches iOS relevantCategories filtering
@@ -260,83 +259,69 @@ class ModelSelectionViewModel(
 
     /**
      * Download model with progress
+     *
+     * TODO(B10-storage-cleanup): `RunAnywhere.downloadModel(id)` was removed in the
+     * B10 storage cleanup wave. The Kotlin SDK no longer exposes a public download
+     * extension — the iOS-parity `RunAnywhere+Storage.swift` surface (download
+     * planning/start/progress) has not yet been re-introduced on Kotlin. For now
+     * we listen for SDK-driven `MODEL_EVENT_KIND_DOWNLOAD_*` events (already wired
+     * via [subscribeToDownloadEvents]) but cannot kick off a download from here.
+     * Restore this call site once the storage-aligned download API ships.
      */
     fun startDownload(modelId: String) {
         viewModelScope.launch {
-            try {
-                Timber.d("⬇️ Starting download for model: $modelId")
+            Timber.e(
+                "❌ startDownload($modelId) is a no-op: SDK download API removed " +
+                    "in B10 storage cleanup. Awaiting storage-aligned re-introduction.",
+            )
 
-                _uiState.update {
-                    it.copy(
-                        selectedModelId = modelId,
-                        isLoadingModel = true,
-                        loadingProgress = "Starting download...",
-                    )
-                }
+            _uiState.update {
+                it.copy(
+                    selectedModelId = modelId,
+                    isLoadingModel = true,
+                    loadingProgress = "Waiting for download…",
+                )
+            }
 
-                // Call SDK download API - it returns a Flow<DownloadProgress>
-                RunAnywhere.downloadModel(modelId)
-                    .catch { e ->
-                        Timber.e("❌ Download stream error: ${e.message}")
-                        _uiState.update {
-                            it.copy(
-                                isLoadingModel = false,
-                                selectedModelId = null,
-                                loadingProgress = "",
-                                error = e.message ?: "Download failed",
-                            )
+            // KOT-DOWNLOAD-001: Even without a kick-off API we can still observe
+            // the SDK's MODEL_EVENT_KIND_DOWNLOAD_COMPLETED event in case another
+            // surface starts the download. A 30s timeout falls through to a
+            // graceful UI reset so the spinner does not hang forever.
+            val completed =
+                withTimeoutOrNull(30_000L) {
+                    EventBus.events
+                        .mapNotNull { it.model }
+                        .filter {
+                            it.model_id == modelId &&
+                                it.kind == ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED
                         }
-                    }
-                    .collect { progress ->
-                        val percent = (progress.stage_progress * 100).toInt()
-                        Timber.d("📥 Download progress: $percent%")
-                        _uiState.update {
-                            it.copy(loadingProgress = "Downloading... $percent%")
-                        }
-                    }
-
-                Timber.d("✅ Download completed for $modelId")
-
-                // KOT-DOWNLOAD-001: Wait for the SDK to publish the
-                // MODEL_EVENT_KIND_DOWNLOAD_COMPLETED event for this model
-                // before refreshing the catalog. This avoids racing the
-                // registry update (previously a 500ms blind sleep) and
-                // returns immediately once the event lands. A 30s timeout
-                // guards against the event never firing.
-                val completed =
-                    withTimeoutOrNull(30_000L) {
-                        EventBus.events
-                            .mapNotNull { it.model }
-                            .filter {
-                                it.model_id == modelId &&
-                                    it.kind == ModelEventKind.MODEL_EVENT_KIND_DOWNLOAD_COMPLETED
-                            }
-                            .first()
-                    }
-                if (completed == null) {
-                    Timber.w("⏱️ Timed out waiting for DOWNLOAD_COMPLETED event for $modelId; refreshing anyway")
+                        .first()
                 }
-
-                // Reload models after download completes
-                loadModelsAndFrameworks()
-
+            if (completed == null) {
+                Timber.w(
+                    "⏱️ No DOWNLOAD_COMPLETED event for $modelId within 30s — the " +
+                        "Kotlin SDK no longer has a public download trigger.",
+                )
                 _uiState.update {
                     it.copy(
                         isLoadingModel = false,
                         selectedModelId = null,
                         loadingProgress = "",
+                        error = "Download API unavailable in this build",
                     )
                 }
-            } catch (e: Exception) {
-                Timber.e(e, "❌ Download failed for $modelId: ${e.message}")
-                _uiState.update {
-                    it.copy(
-                        isLoadingModel = false,
-                        selectedModelId = null,
-                        loadingProgress = "",
-                        error = e.message ?: "Download failed",
-                    )
-                }
+                return@launch
+            }
+
+            // Reload models after download completes
+            loadModelsAndFrameworks()
+
+            _uiState.update {
+                it.copy(
+                    isLoadingModel = false,
+                    selectedModelId = null,
+                    loadingProgress = "",
+                )
             }
         }
     }

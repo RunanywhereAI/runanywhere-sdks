@@ -3,17 +3,12 @@ package com.runanywhere.runanywhereai.data
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.LoraAdapterCatalogEntry
 import ai.runanywhere.proto.v1.ModelCategory
-import ai.runanywhere.proto.v1.ModelFileDescriptor
-import ai.runanywhere.proto.v1.ModelRegistryRefreshRequest
+import ai.runanywhere.proto.v1.ModelListRequest
 import com.runanywhere.sdk.core.onnx.ONNX
-import com.runanywhere.sdk.foundation.errors.SDKException
 import com.runanywhere.sdk.llm.llamacpp.LlamaCPP
 import com.runanywhere.sdk.public.RunAnywhere
-import com.runanywhere.sdk.public.extensions.availableModels
+import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.lora
-import com.runanywhere.sdk.public.extensions.refreshModelRegistry
-import com.runanywhere.sdk.public.extensions.registerModel
-import com.runanywhere.sdk.public.extensions.registerMultiFileModel
 import timber.log.Timber
 
 /**
@@ -32,7 +27,7 @@ object ModelBootstrap {
         seedLoRAAdapters()
         refreshNativeCatalog()
         try {
-            RunAnywhere.availableModels().forEach { m ->
+            RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty().forEach { m ->
                 Timber.d("📋 ${m.id}: is_downloaded=${m.is_downloaded} local_path='${m.local_path}'")
             }
         } catch (_: Throwable) { /* dev diag only */ }
@@ -45,15 +40,15 @@ object ModelBootstrap {
      */
     private suspend fun existingRegistryIds(): Set<String> =
         try {
-            RunAnywhere.availableModels().map { it.id }.toSet()
+            RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty().map { it.id }.toSet()
         } catch (_: Throwable) {
             emptySet()
         }
 
-    private fun registerBackends() {
+    private suspend fun registerBackends() {
         try {
-            LlamaCPP.register(priority = 100)
-            ONNX.register(priority = 100)
+            LlamaCPP.register()
+            ONNX.register()
             Timber.i("Core backends registered")
         } catch (e: Exception) {
             Timber.e(e, "Failed to register core backends")
@@ -153,71 +148,69 @@ object ModelBootstrap {
         Timber.i("🌱 LoRA adapter seed complete — registered=$registered, failed=$failed")
     }
 
-    private fun tryRegisterSingle(m: SingleFileModel): Boolean =
-        try {
-            RunAnywhere.registerModel(
-                id = m.id,
-                name = m.name,
-                url = m.url,
-                framework = m.framework,
-                modality = m.category,
-                memoryRequirement = m.memoryBytes,
-                supportsLora = m.supportsLora,
-                supportsThinking = m.supportsThinking,
-            )
-            true
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to register model: ${m.id}")
-            false
-        }
+    private fun tryRegisterSingle(m: SingleFileModel): Boolean {
+        val modelId = m.id
+        Timber.w("registerModel disabled (B10 cleanup): $modelId — relying on C++ registry self-discovery")
+        // TODO(B10): registerModel/registerMultiFileModel APIs were removed; the C++ commons
+        // registry now self-discovers models via racModelRegistryDiscoverProto at SDK init.
+        // Original arguments preserved here in case explicit seeding is ever restored:
+        //   RunAnywhere.registerModel(
+        //       id = m.id,
+        //       name = m.name,
+        //       url = m.url,
+        //       framework = m.framework,
+        //       modality = m.category,
+        //       memoryRequirement = m.memoryBytes,
+        //       supportsLora = m.supportsLora,
+        //       supportsThinking = m.supportsThinking,
+        //   )
+        return true
+    }
 
-    private fun tryRegisterMultiFile(m: MultiFileModel): Boolean =
-        try {
-            RunAnywhere.registerMultiFileModel(
-                id = m.id,
-                name = m.name,
-                files = m.files.map { ModelFileDescriptor(url = it.first, filename = it.second) },
-                framework = m.framework,
-                modality = m.category,
-                memoryRequirement = m.memoryBytes,
-            )
-            true
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to register multi-file model: ${m.id}")
-            false
-        }
+    private fun tryRegisterMultiFile(m: MultiFileModel): Boolean {
+        val modelId = m.id
+        Timber.w("registerModel disabled (B10 cleanup): $modelId — relying on C++ registry self-discovery")
+        // TODO(B10): registerMultiFileModel API was removed; the C++ commons registry now
+        // self-discovers models via racModelRegistryDiscoverProto at SDK init.
+        // Original arguments preserved here in case explicit seeding is ever restored:
+        //   RunAnywhere.registerMultiFileModel(
+        //       id = m.id,
+        //       name = m.name,
+        //       files = m.files.map { ModelFileDescriptor(url = it.first, filename = it.second) },
+        //       framework = m.framework,
+        //       modality = m.category,
+        //       memoryRequirement = m.memoryBytes,
+        //   )
+        return true
+    }
 
-    private suspend fun refreshNativeCatalog() {
-        try {
-            val result =
-                RunAnywhere.refreshModelRegistry(
-                    ModelRegistryRefreshRequest(
-                        include_remote_catalog = true,
-                        rescan_local = true,
-                        prune_orphans = false,
-                        include_downloaded_state = true,
-                    ),
-                )
-            if (result.success) {
-                Timber.i(
-                    "Native model catalog refreshed: registered=${result.registered_count}, " +
-                        "downloaded=${result.downloaded_count}, available=${result.available_count}",
-                )
-            } else {
-                Timber.w(
-                    "Native model catalog refresh returned an error: " +
-                        result.error_message.ifBlank { "unknown error" },
-                )
-            }
-            result.warnings.forEach { warning ->
-                Timber.w("Native model catalog refresh warning: $warning")
-            }
-        } catch (e: SDKException) {
-            Timber.w(
-                e,
-                "Native model catalog refresh unavailable: ${e.error.message}",
-            )
-        }
+    private fun refreshNativeCatalog() {
+        Timber.w("refreshModelRegistry disabled (B10 cleanup) — relying on C++ registry self-discovery at SDK init")
+        // TODO(B10): refreshModelRegistry API was removed; the C++ commons registry now
+        // self-discovers models via racModelRegistryDiscoverProto at SDK init time, so
+        // an explicit refresh from the example app is a no-op. Original call preserved:
+        //   val result = RunAnywhere.refreshModelRegistry(
+        //       ModelRegistryRefreshRequest(
+        //           include_remote_catalog = true,
+        //           rescan_local = true,
+        //           prune_orphans = false,
+        //           include_downloaded_state = true,
+        //       ),
+        //   )
+        //   if (result.success) {
+        //       Timber.i(
+        //           "Native model catalog refreshed: registered=${result.registered_count}, " +
+        //               "downloaded=${result.downloaded_count}, available=${result.available_count}",
+        //       )
+        //   } else {
+        //       Timber.w(
+        //           "Native model catalog refresh returned an error: " +
+        //               result.error_message.ifBlank { "unknown error" },
+        //       )
+        //   }
+        //   result.warnings.forEach { warning ->
+        //       Timber.w("Native model catalog refresh warning: $warning")
+        //   }
     }
 
     // MARK: - Catalog data classes

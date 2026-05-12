@@ -1,6 +1,7 @@
 package com.runanywhere.runanywhereai.presentation.settings
 
 import ai.runanywhere.proto.v1.ModelEventKind
+import ai.runanywhere.proto.v1.StorageDeleteRequest
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
@@ -11,7 +12,7 @@ import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.extensions.cleanTempFiles
 import com.runanywhere.sdk.public.extensions.clearCache
-import com.runanywhere.sdk.public.extensions.deleteModel
+import com.runanywhere.sdk.public.extensions.deleteStorage
 import com.runanywhere.sdk.public.extensions.getStorageInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -313,8 +314,27 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             try {
                 Timber.d("Deleting model: $modelId")
-                // Use SDK's deleteModel extension function
-                RunAnywhere.deleteModel(modelId)
+                // Use SDK's deleteStorage proto API (mirrors iOS RunAnywhere.deleteStorage).
+                val request =
+                    StorageDeleteRequest(
+                        model_ids = listOf(modelId),
+                        delete_files = true,
+                        clear_registry_paths = true,
+                        unload_if_loaded = true,
+                        allow_platform_delete = true,
+                    )
+                val result = RunAnywhere.deleteStorage(request)
+                if (!result.success) {
+                    val message =
+                        if (result.error_message.isEmpty()) {
+                            "Failed to delete model"
+                        } else {
+                            result.error_message
+                        }
+                    Timber.e("Model delete reported failure: $message")
+                    _uiState.update { it.copy(errorMessage = message) }
+                    return@launch
+                }
                 Timber.d("Model deleted successfully: $modelId")
 
                 // Refresh storage data after deletion

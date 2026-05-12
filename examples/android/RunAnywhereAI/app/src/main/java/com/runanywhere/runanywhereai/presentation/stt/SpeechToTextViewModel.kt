@@ -476,17 +476,19 @@ class SpeechToTextViewModel : ViewModel() {
                                     val options = RASTTOptions(language = sttLanguageFromBcp47(_uiState.value.language))
                                     var finalText = ""
                                     RunAnywhere.transcribeStream(
-                                        audioData = flowOf(chunkData),
+                                        audio = flowOf(chunkData),
                                         options = options,
-                                    ).collect { event ->
-                                        val streamText = event.final_output?.text ?: event.partial?.text.orEmpty()
-                                        // Update UI with partial result
+                                    ).collect { partial ->
+                                        // RASTTPartialResult always carries a partial transcript; on the
+                                        // terminal event `is_final=true` and `final_output` is populated.
+                                        val streamText = partial.final_output?.text?.takeIf { it.isNotBlank() }
+                                            ?: partial.text
                                         if (streamText.isNotBlank()) {
                                             val newText = lastTranscription + " " + streamText
                                             withContext(Dispatchers.Main) {
                                                 handleSTTStreamText(newText.trim())
                                             }
-                                            if (event.final_output != null || event.partial?.is_final == true) {
+                                            if (partial.is_final) {
                                                 finalText = streamText
                                             }
                                         }

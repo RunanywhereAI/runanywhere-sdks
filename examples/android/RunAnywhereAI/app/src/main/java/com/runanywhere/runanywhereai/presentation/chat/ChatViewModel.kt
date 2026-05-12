@@ -5,6 +5,7 @@ import ai.runanywhere.proto.v1.GenerationEvent
 import ai.runanywhere.proto.v1.GenerationEventKind
 import ai.runanywhere.proto.v1.InferenceFramework
 import ai.runanywhere.proto.v1.ModelCategory
+import ai.runanywhere.proto.v1.ModelListRequest
 import ai.runanywhere.proto.v1.ToolCallingOptions
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
@@ -22,13 +23,13 @@ import com.runanywhere.runanywhereai.presentation.settings.ToolSettingsViewModel
 import com.runanywhere.sdk.public.RunAnywhere
 import com.runanywhere.sdk.public.events.EventBus
 import com.runanywhere.sdk.public.extensions.Models.isDownloadedOnDisk
-import com.runanywhere.sdk.public.extensions.availableModels
 import com.runanywhere.sdk.public.extensions.cancelGeneration
 import com.runanywhere.sdk.public.extensions.currentModel
 import com.runanywhere.sdk.public.extensions.generate
 import com.runanywhere.sdk.public.extensions.generateStream
 import com.runanywhere.sdk.public.extensions.generateWithTools
 import com.runanywhere.sdk.public.extensions.getRegisteredTools
+import com.runanywhere.sdk.public.extensions.listModels
 import com.runanywhere.sdk.public.extensions.loadModel
 import com.runanywhere.sdk.public.extensions.lora
 import com.runanywhere.sdk.public.types.RALLMGenerationOptions
@@ -804,7 +805,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
                 // Use SDK's model listing API to find chat models
                 // Prefer Genie (NPU) models over CPU models for testing
-                val allModels = RunAnywhere.availableModels()
+                val allModels = RunAnywhere.listModels(ModelListRequest()).models?.models.orEmpty()
                 val chatModel =
                     allModels.firstOrNull { model ->
                         model.category == ModelCategory.MODEL_CATEGORY_LANGUAGE && model.isDownloadedOnDisk &&

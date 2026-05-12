@@ -2,18 +2,18 @@ package com.runanywhere.runanywhereai.presentation.settings
 
 import ai.runanywhere.proto.v1.ToolParameter
 import ai.runanywhere.proto.v1.ToolParameterType
-import ai.runanywhere.proto.v1.ToolValue
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.runanywhere.sdk.public.RunAnywhere
+import com.runanywhere.sdk.public.extensions.LLM.RAToolValue
+import com.runanywhere.sdk.public.extensions.LLM.double
+import com.runanywhere.sdk.public.extensions.LLM.string
 import com.runanywhere.sdk.public.extensions.clearTools
 import com.runanywhere.sdk.public.extensions.getRegisteredTools
 import com.runanywhere.sdk.public.extensions.registerTool
-import com.runanywhere.sdk.public.types.RAToolCall
 import com.runanywhere.sdk.public.types.RAToolDefinition
-import com.runanywhere.sdk.public.types.RAToolResult
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
@@ -30,7 +30,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import org.json.JSONObject
 import timber.log.Timber
 
 /**
@@ -123,11 +122,9 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                                 ),
                             category = "Utility",
                         ),
-                    executor = { call: RAToolCall ->
-                        toolResult(
-                            call,
-                            fetchWeather(call.stringArgument("location", "San Francisco")),
-                        )
+                    executor = { args: Map<String, RAToolValue> ->
+                        val location = args["location"]?.string ?: "San Francisco"
+                        fetchWeather(location)
                     },
                 )
 
@@ -140,7 +137,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                             parameters = emptyList(),
                             category = "Utility",
                         ),
-                    executor = { call: RAToolCall ->
+                    executor = { _: Map<String, RAToolValue> ->
                         val now = Date()
                         val dateFormatter = SimpleDateFormat("EEEE, MMMM d, yyyy 'at' h:mm:ss a", Locale.getDefault())
                         val timeFormatter = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
@@ -150,15 +147,12 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                             }
                         val tz = TimeZone.getDefault()
 
-                        toolResult(
-                            call,
-                            mapOf(
-                                "datetime" to ToolValue(string_value = dateFormatter.format(now)),
-                                "time" to ToolValue(string_value = timeFormatter.format(now)),
-                                "timestamp" to ToolValue(string_value = isoFormatter.format(now)),
-                                "timezone" to ToolValue(string_value = tz.id),
-                                "utc_offset" to ToolValue(string_value = tz.getDisplayName(false, TimeZone.SHORT)),
-                            ),
+                        mapOf(
+                            "datetime" to RAToolValue.string(dateFormatter.format(now)),
+                            "time" to RAToolValue.string(timeFormatter.format(now)),
+                            "timestamp" to RAToolValue.string(isoFormatter.format(now)),
+                            "timezone" to RAToolValue.string(tz.id),
+                            "utc_offset" to RAToolValue.string(tz.getDisplayName(false, TimeZone.SHORT)),
                         )
                     },
                 )
@@ -180,13 +174,12 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                                 ),
                             category = "Utility",
                         ),
-                    executor = { call: RAToolCall ->
+                    executor = { args: Map<String, RAToolValue> ->
                         val expression =
-                            call.stringArgument(
-                                name = "expression",
-                                defaultValue = call.stringArgument("input", "0"),
-                            )
-                        toolResult(call, evaluateMathExpression(expression))
+                            args["expression"]?.string
+                                ?: args["input"]?.string
+                                ?: "0"
+                        evaluateMathExpression(expression)
                     },
                 )
 
@@ -235,48 +228,13 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
 
     // Tool Executor Implementations
 
-    private fun RAToolCall.stringArgument(
-        name: String,
-        defaultValue: String,
-    ): String {
-        return runCatching {
-            JSONObject(arguments_json.ifBlank { "{}" }).optString(name, defaultValue)
-        }.getOrDefault(defaultValue)
-    }
-
-    private fun toolResult(
-        call: RAToolCall,
-        values: Map<String, ToolValue>,
-    ): RAToolResult {
-        val json =
-            JSONObject().apply {
-                values.forEach { (key, value) ->
-                    put(key, value.toJsonValue())
-                }
-            }
-        val callId = call.call_id ?: call.id
-        return RAToolResult(
-            tool_call_id = callId,
-            name = call.name,
-            result_json = json.toString(),
-            success = values["error"]?.string_value == null,
-            call_id = callId,
-        )
-    }
-
-    private fun ToolValue.toJsonValue(): Any =
-        string_value
-            ?: number_value
-            ?: bool_value
-            ?: JSONObject.NULL
-
     /**
      * Fetch weather using Open-Meteo API (free, no API key required)
      *
      * Uses a 15-second timeout for the entire operation (geocoding + weather fetch)
      * to ensure tool execution respects LLM timeout settings.
      */
-    private suspend fun fetchWeather(location: String): Map<String, ToolValue> {
+    private suspend fun fetchWeather(location: String): Map<String, RAToolValue> {
         return withContext(Dispatchers.IO) {
             try {
                 // 15 second timeout for entire weather fetch operation
@@ -293,8 +251,8 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
 
                     if (latMatch == null || lonMatch == null) {
                         return@withTimeout mapOf(
-                            "error" to ToolValue(string_value = "Location not found: $location"),
-                            "location" to ToolValue(string_value = location),
+                            "error" to RAToolValue.string("Location not found: $location"),
+                            "location" to RAToolValue.string(location),
                         )
                     }
 
@@ -331,25 +289,25 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
                         }
 
                     mapOf(
-                        "location" to ToolValue(string_value = resolvedName),
-                        "temperature_celsius" to ToolValue(number_value = temperature),
-                        "temperature_fahrenheit" to ToolValue(number_value = temperature * 9 / 5 + 32),
-                        "humidity_percent" to ToolValue(number_value = humidity.toDouble()),
-                        "wind_speed_kmh" to ToolValue(number_value = windSpeed),
-                        "condition" to ToolValue(string_value = condition),
+                        "location" to RAToolValue.string(resolvedName),
+                        "temperature_celsius" to RAToolValue.double(temperature),
+                        "temperature_fahrenheit" to RAToolValue.double(temperature * 9 / 5 + 32),
+                        "humidity_percent" to RAToolValue.double(humidity.toDouble()),
+                        "wind_speed_kmh" to RAToolValue.double(windSpeed),
+                        "condition" to RAToolValue.string(condition),
                     )
                 }
             } catch (e: TimeoutCancellationException) {
                 Timber.w("Weather API request timed out for location: $location")
                 mapOf(
-                    "error" to ToolValue(string_value = "Weather API request timed out. Please try again."),
-                    "location" to ToolValue(string_value = location),
+                    "error" to RAToolValue.string("Weather API request timed out. Please try again."),
+                    "location" to RAToolValue.string(location),
                 )
             } catch (e: Exception) {
                 Timber.e(e, "Weather fetch failed")
                 mapOf(
-                    "error" to ToolValue(string_value = "Failed to fetch weather: ${e.message}"),
-                    "location" to ToolValue(string_value = location),
+                    "error" to RAToolValue.string("Failed to fetch weather: ${e.message}"),
+                    "location" to RAToolValue.string(location),
                 )
             }
         }
@@ -373,7 +331,7 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
     /**
      * Evaluate a math expression
      */
-    private fun evaluateMathExpression(expression: String): Map<String, ToolValue> {
+    private fun evaluateMathExpression(expression: String): Map<String, RAToolValue> {
         return try {
             // Clean the expression
             val cleaned =
@@ -388,13 +346,13 @@ class ToolSettingsViewModel private constructor(application: Application) : Andr
             val result = evaluateSimpleExpression(cleaned)
 
             mapOf(
-                "result" to ToolValue(number_value = result),
-                "expression" to ToolValue(string_value = expression),
+                "result" to RAToolValue.double(result),
+                "expression" to RAToolValue.string(expression),
             )
         } catch (e: Exception) {
             mapOf(
-                "error" to ToolValue(string_value = "Could not evaluate expression: $expression"),
-                "expression" to ToolValue(string_value = expression),
+                "error" to RAToolValue.string("Could not evaluate expression: $expression"),
+                "expression" to RAToolValue.string(expression),
             )
         }
     }
