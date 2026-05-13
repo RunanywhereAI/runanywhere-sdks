@@ -2,6 +2,8 @@
 
 import 'dart:ffi';
 
+import 'package:runanywhere/generated/errors.pbenum.dart' as errors;
+
 /// =============================================================================
 /// RunAnywhere Commons FFI Type Definitions
 ///
@@ -33,9 +35,9 @@ const int RAC_SUCCESS = 0;
 // =============================================================================
 // Result Codes (from rac_error.h)
 //
-// Manually mirrored from `sdk/runanywhere-commons/include/rac/core/rac_error.h`.
-// Until ffigen is wired in, every commons-side error-code change MUST be
-// reflected here. Audited 2026-05-04 against the current C header.
+// C ABI returns negative rac_result_t values; the canonical error vocabulary is
+// generated from idl/errors.proto as positive ErrorCode values. Keep this class
+// only as the ABI sign-convention boundary for FFI callback return values.
 // =============================================================================
 
 /// Error codes matching rac_error.h
@@ -209,6 +211,21 @@ abstract class RacResultCode {
   static const int errorPluginLoadFailed = -820;
   static const int errorPluginBusy = -821;
 
+  /// Convert a C ABI result code into the generated proto error enum.
+  static errors.ErrorCode? toProtoErrorCode(int code) {
+    if (code == success) return null;
+    return errors.ErrorCode.valueOf(code.abs()) ??
+        errors.ErrorCode.ERROR_CODE_UNKNOWN;
+  }
+
+  /// Convert a generated proto error enum into the C ABI result convention.
+  static int fromProtoErrorCode(errors.ErrorCode code) {
+    if (code == errors.ErrorCode.ERROR_CODE_UNSPECIFIED) {
+      return success;
+    }
+    return -code.value;
+  }
+
   /// Get human-readable message for an error code
   static String getMessage(int code) {
     switch (code) {
@@ -271,8 +288,25 @@ abstract class RacResultCode {
       case errorPluginDuplicate:
         return 'Plugin duplicate';
       default:
+        final protoCode = toProtoErrorCode(code);
+        if (protoCode != null &&
+            protoCode != errors.ErrorCode.ERROR_CODE_UNKNOWN) {
+          return _humanizeProtoError(protoCode.name);
+        }
         return 'Error (code: $code)';
     }
+  }
+
+  static String _humanizeProtoError(String name) {
+    final words = name
+        .replaceFirst('ERROR_CODE_', '')
+        .split('_')
+        .where((word) => word.isNotEmpty)
+        .map((word) => word.toLowerCase())
+        .toList(growable: false);
+    if (words.isEmpty) return 'Error';
+    final first = '${words.first[0].toUpperCase()}${words.first.substring(1)}';
+    return <String>[first, ...words.skip(1)].join(' ');
   }
 }
 

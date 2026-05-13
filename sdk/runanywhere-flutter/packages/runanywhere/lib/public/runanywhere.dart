@@ -125,8 +125,7 @@ abstract final class RunAnywhere {
   /// True if the device has been registered with the backend. Mirrors
   /// Swift's `isDeviceRegistered()`.
   static bool get isDeviceRegistered =>
-      DartBridgeDevice.cachedDeviceId != null &&
-      DartBridgeDevice.cachedDeviceId!.isNotEmpty;
+      DartBridgeDevice.instance.isDeviceRegistered();
 
   /// Awaitable Phase-2 completion. Mirrors Swift's
   /// `completeServicesInitialization()`. [initialize] detaches Phase 2

@@ -2,18 +2,16 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:runanywhere/runanywhere.dart';
 import 'package:runanywhere_ai/app/content_view.dart';
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
-import 'package:runanywhere_ai/core/services/model_manager.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/core/utilities/keychain_helper.dart';
 import 'package:runanywhere_genie/runanywhere_genie.dart';
 import 'package:runanywhere_llamacpp/runanywhere_llamacpp.dart';
 import 'package:runanywhere_onnx/runanywhere_onnx.dart';
 
-/// RunAnywhereAIApp (mirroring iOS RunAnywhereAIApp.swift)
+/// RunAnywhereAIApp
 ///
 /// Main application entry point with SDK initialization.
 class RunAnywhereAIApp extends StatefulWidget {
@@ -87,8 +85,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       debugPrint(
           '🔧 Environment: ${RunAnywhere.environment?.description ?? "Unknown"}');
 
-      await ModelManager.shared.refresh();
-
       debugPrint(
           '💡 Models registered, user can now download and select models');
     } catch (e) {
@@ -123,8 +119,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       // ── Step 1: Download ─────────────────────────────────────────
       debugPrint('▶ Step 1: downloading $testModelId …');
       final sw = Stopwatch()..start();
-      final progressStream =
-          RunAnywhere.downloads.start(testModelId);
+      final progressStream = RunAnywhere.downloads.start(testModelId);
 
       double lastPct = 0;
       await for (final p in progressStream) {
@@ -144,8 +139,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
       // Let the download adapter finalize (path update, registry sync)
       await Future<void>.delayed(const Duration(milliseconds: 500));
-      await ModelManager.shared.refresh();
-
       // Re-run discovery so the SDK sees the downloaded file
       final models = await RunAnywhere.models.available();
       final dlModel = models.where((m) => m.id == testModelId).firstOrNull;
@@ -170,8 +163,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         temperature: 0.7,
         systemPrompt: 'You are a helpful assistant.',
       );
-      final result =
-          await RunAnywhere.llm.generate('Hello!', genOpts);
+      final result = await RunAnywhere.llm.generate('Hello!', genOpts);
       sw.stop();
       debugPrint(
           '✅ generate() => "${result.text.substring(0, result.text.length.clamp(0, 120))}"');
@@ -188,8 +180,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
         temperature: 0.7,
         systemPrompt: 'You are a helpful assistant.',
       );
-      final stream = RunAnywhere.llm
-          .generateStream('What is 2+2?', streamOpts);
+      final stream = RunAnywhere.llm.generateStream('What is 2+2?', streamOpts);
       final buf = StringBuffer();
       int tokenCount = 0;
       await for (final event in stream) {
@@ -222,7 +213,7 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
     }
   }
 
-  /// True once we've registered modules + models exactly once. Without
+  /// True once we've registered modules + models once. Without
   /// this guard, hot-reload (or any second call) re-runs the entire
   /// LLM catalog registration block, which is wasteful (B-FL-3-002).
   static bool _modulesRegistered = false;
@@ -248,7 +239,6 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
   /// Register modules with their associated models
   /// Each module explicitly owns its models - the framework is determined by the module
-  /// Matches iOS registerModulesAndModels pattern exactly
   Future<void> _registerModulesAndModels() async {
     if (_modulesRegistered) {
       debugPrint('📦 Modules already registered — skipping (B-FL-3-002)');
@@ -505,7 +495,8 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
       modality: ModelCategory.MODEL_CATEGORY_VOICE_ACTIVITY_DETECTION,
       memoryRequirement: 5000000,
     );
-    debugPrint('✅ STT/TTS/VAD models registered via Core SDK (incl. system-tts)');
+    debugPrint(
+        '✅ STT/TTS/VAD models registered via Core SDK (incl. system-tts)');
     await Future<void>.delayed(Duration.zero);
 
     // --- RAG EMBEDDINGS ---
@@ -555,42 +546,37 @@ class _RunAnywhereAIAppState extends State<RunAnywhereAIApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider.value(value: ModelManager.shared),
-      ],
-      child: MaterialApp(
-        scaffoldMessengerKey: _messengerKey,
-        title: 'RunAnywhere AI',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: AppColors.primaryBlue,
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-          appBarTheme: const AppBarTheme(
-            centerTitle: true,
-            elevation: 0,
-          ),
-          navigationBarTheme: NavigationBarThemeData(
-            indicatorColor: AppColors.primaryBlue.withValues(alpha: 0.2),
-          ),
+    return MaterialApp(
+      scaffoldMessengerKey: _messengerKey,
+      title: 'RunAnywhere AI',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.primaryBlue,
+          brightness: Brightness.light,
         ),
-        darkTheme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: AppColors.primaryBlue,
-            brightness: Brightness.dark,
-          ),
-          useMaterial3: true,
-          appBarTheme: const AppBarTheme(
-            centerTitle: true,
-            elevation: 0,
-          ),
+        useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          centerTitle: true,
+          elevation: 0,
         ),
-        themeMode: ThemeMode.system,
-        home: _buildHome(),
+        navigationBarTheme: NavigationBarThemeData(
+          indicatorColor: AppColors.primaryBlue.withValues(alpha: 0.2),
+        ),
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: AppColors.primaryBlue,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+        appBarTheme: const AppBarTheme(
+          centerTitle: true,
+          elevation: 0,
+        ),
+      ),
+      themeMode: ThemeMode.system,
+      home: _buildHome(),
     );
   }
 

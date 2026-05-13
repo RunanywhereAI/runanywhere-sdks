@@ -30,8 +30,6 @@ dev_dependencies:
   flutter_lints: ^3.0.0
 
 flutter:
-  uses-material-design: true
-
   # Native plugin configuration
   # RABackendONNX binaries are bundled in ios/ and android/ directories
   plugin:

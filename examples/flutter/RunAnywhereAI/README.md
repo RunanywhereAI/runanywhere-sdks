@@ -118,7 +118,7 @@ This sample app demonstrates the full power of the RunAnywhere Flutter SDK:
 | **Speech-to-Text** | Voice transcription with batch & live modes | `RunAnywhere.stt.transcribe()` |
 | **Text-to-Speech** | Neural voice synthesis with Piper TTS | `RunAnywhere.tts.synthesize()` |
 | **Voice Assistant** | Full STT to LLM to TTS pipeline with auto-detection | `RunAnywhere.voice` |
-| **Model Management** | Download, load, and manage multiple AI models | `ModelManager` |
+| **Model Management** | Download, load, and manage multiple AI models | `RunAnywhere.models` / `RunAnywhere.downloads` |
 | **Storage Management** | View storage usage and delete models | `RunAnywhere.downloads.getStorageInfo()` |
 | **Offline Support** | All features work without internet | On-device inference |
 
@@ -138,8 +138,8 @@ The app follows Flutter best practices with a clean architecture pattern:
 ├───────┼────────────┼────────────┼────────────┼─────────────┼────────┤
 │       ▼            ▼            ▼            ▼             ▼        │
 │  ┌──────────────────────────────────────────────────────────────┐   │
-│  │                   Provider State Management                   │   │
-│  │                   (ModelManager, Services)                    │   │
+│  │                 Feature ViewModels + UI State                 │   │
+│  │           (SDK facades, Services, ListenableBuilder)          │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
@@ -161,9 +161,9 @@ The app follows Flutter best practices with a clean architecture pattern:
 
 ### Key Architecture Decisions
 
-- **Provider Pattern** — `ChangeNotifier` + `Provider` for state management
+- **Feature-Local State** — Screens keep ephemeral UI state local and call SDK facades directly
 - **Feature-First Structure** — Each feature is self-contained with its own views and logic
-- **Shared Core Services** — `ModelManager`, `AudioRecordingService`, `AudioPlayerService`
+- **Shared Core Services** — `AudioRecordingService`, `AudioPlayerService`, persistence and device helpers
 - **Design System** — Consistent `AppColors`, `AppTypography`, `AppSpacing` tokens
 - **SDK Integration** — Direct SDK calls with async/await and Stream support
 
@@ -190,7 +190,6 @@ RunAnywhereAI/
 │   │   │   └── app_types.dart         # Shared type definitions
 │   │   │
 │   │   ├── services/
-│   │   │   ├── model_manager.dart     # SDK model management wrapper
 │   │   │   ├── audio_recording_service.dart  # Microphone capture
 │   │   │   ├── audio_player_service.dart     # TTS playback
 │   │   │   ├── permission_service.dart       # Permission handling

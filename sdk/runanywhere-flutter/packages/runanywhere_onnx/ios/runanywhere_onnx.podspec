@@ -27,7 +27,7 @@ RABackendONNX.xcframework.
   s.author           = { 'RunAnywhere' => 'team@runanywhere.ai' }
   s.source           = { :path => '.' }
 
-  s.ios.deployment_target = '15.1'
+  s.ios.deployment_target = '17.0'
   s.swift_version = '5.0'
 
   # Source files (plugin entry point only — native logic lives in xcframework).

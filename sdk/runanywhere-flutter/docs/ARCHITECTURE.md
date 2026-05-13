@@ -109,7 +109,7 @@ lib/
 │   ├── errors/                        # sdk_exception.dart (40+ factory constructors)
 │   ├── logging/                       # sdk_logger.dart
 │   └── security/                      # keychain_manager.dart + secure_storage_keys.dart
-├── generated/                         # 116 protobuf-generated files (DO NOT EDIT)
+├── generated/                         # 58 runtime proto files
 ├── internal/                          # small internal helpers; stale SDK mirror state is deletion scope
 ├── native/                            # 33 dart_bridge_*.dart slices + native_functions + platform_loader + types/ + type_conversions/
 └── public/
@@ -195,8 +195,8 @@ Plus supporting modules:
 ## 4. Key Architectural Patterns
 
 1. **Proto-driven public surface.** All public types are protobuf-generated.
-   116 `.pb*.dart` files under `lib/generated/`. Never hand-edit; modify the
-   `.proto` and regenerate.
+   58 runtime `.pb.dart` / `.pbenum.dart` files live under `lib/generated/`.
+   Never hand-edit; modify the `.proto` and regenerate.
 
 2. **Worker-isolate usage is gated by event-publish safety.** Blocking FFI ops
    may use `Isolate.run` only when the C++ path cannot publish back through an

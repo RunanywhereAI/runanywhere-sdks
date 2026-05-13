@@ -2,11 +2,10 @@
 ///
 /// The generated protobuf modules are the canonical data-contract surface.
 /// Hand-written exports below are limited to platform glue, capability facades,
-/// and Dart convenience helpers that mirror the Swift SDK.
+/// and Dart helpers that expose real SDK behavior.
 library runanywhere;
 
 export 'adapters/voice_agent_stream_adapter.dart' show VoiceAgentStreamAdapter;
-export 'core/module/runanywhere_module.dart';
 export 'foundation/constants/sdk_constants.dart';
 export 'foundation/errors/sdk_exception.dart';
 export 'foundation/logging/sdk_logger.dart';

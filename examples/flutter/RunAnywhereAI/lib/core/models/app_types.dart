@@ -1,4 +1,4 @@
-// App Types (mirroring iOS AppTypes.swift)
+// App Types
 //
 // Contains core data models used throughout the app.
 
@@ -64,43 +64,16 @@ extension FileSizeFormatter on int {
   }
 }
 
-/// Message role for conversation history
-enum MessageRole { system, user, assistant }
-
-/// Completion status for message generation
-enum CompletionStatus {
-  complete,
-  interrupted,
-  failed,
-  timeout,
-}
-
-/// Generation mode for LLM inference
-enum GenerationMode {
-  streaming,
-  nonStreaming,
-}
-
-/// Routing policy for model selection
-enum RoutingPolicy {
-  automatic,
-  deviceOnly,
-  preferDevice,
-  preferCloud,
-}
-
-// ModelLoadState is now provided by the RunAnywhere SDK
-// import 'package:runanywhere/runanywhere.dart' show ModelLoadState;
-// Use AppModelLoadState for app-specific states to avoid conflict
-enum AppModelLoadState {
+/// UI-only load state used by example screens while querying SDK component state.
+enum UiModelLoadState {
   notLoaded,
   loading,
   loaded,
   failed,
 }
 
-/// Voice session state for voice assistant
-enum VoiceSessionState {
+/// UI-only voice state derived from generated VoiceEvent payloads.
+enum UiVoiceSessionState {
   disconnected,
   connecting,
   connected,

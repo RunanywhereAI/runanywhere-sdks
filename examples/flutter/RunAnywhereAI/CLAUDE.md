@@ -80,15 +80,13 @@ App startup runs a multi-phase sequence in `initState` via `addPostFrameCallback
 1. **Eager .so loading** (Android only) — `DynamicLibrary.open()` on 6 `.so` files to preload before any SDK call
 2. **SDK init** — reads API key / base URL from secure storage (`KeychainHelper`); calls `RunAnywhere.initialize(...)` with or without credentials
 3. **Module registration** — guarded by a static `_modulesRegistered` flag to survive hot-reload. Registers: LlamaCpp (9 GGUF models), Genie NPU (Android/Snapdragon only, chip-conditional models), VLM (SmolVLM 500M), Sherpa STT/TTS (Whisper + Piper models), RAG embeddings (MiniLM), ONNX backend, RAG backend
-4. **Model refresh** — `ModelManager.shared.refresh()` notifies all listeners
 
 ### State Management
 
-Three patterns coexist:
+Two patterns coexist:
 
-1. **Provider** (app-wide) — only `ModelManager.shared` is in the `MultiProvider` tree at the root
-2. **Singleton ChangeNotifier + ListenableBuilder** (feature-level) — `ModelListViewModel.shared`, `ToolSettingsViewModel.shared`, `ConversationStore.shared`, `DeviceInfoService.shared` are accessed directly, not through Provider
-3. **Local setState** (per-screen ephemeral state) — recording flags, streaming text buffers, error messages
+1. **Singleton ChangeNotifier + ListenableBuilder** (feature-level) — `ModelListViewModel.shared`, `ToolSettingsViewModel.shared`, `ConversationStore.shared`, `DeviceInfoService.shared` are accessed directly
+2. **Local setState** (per-screen UI state) — recording flags, streaming text buffers, error messages, voice setup state
 
 ### Navigation
 
@@ -135,6 +133,7 @@ All AI calls go through `RunAnywhere`:
 - **RAG**: `DocumentService` uses `syncfusion_flutter_pdf` for PDF text extraction. The RAG model selection flow does NOT pre-load models into memory — it only passes paths to `RAGConfiguration`.
 - **Tools**: three demo tools registered (`get_weather`, `calculate`, `get_current_time`). Weather tool uses Open-Meteo free API via `package:http`.
 - **Structured Output**: uses `LLMGenerationOptions(jsonSchema:)` with predefined schemas.
+- **Remaining SDK-owned cleanup**: the large model catalog still lives in app startup because moving it safely requires shared SDK/package ownership beyond this example-app lane.
 
 ## Build Configuration Gotchas
 

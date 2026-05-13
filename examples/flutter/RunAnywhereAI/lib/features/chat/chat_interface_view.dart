@@ -8,7 +8,6 @@ import 'package:runanywhere/runanywhere.dart'
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
 import 'package:runanywhere_ai/core/design_system/typography.dart';
-import 'package:runanywhere_ai/core/models/app_types.dart';
 import 'package:runanywhere_ai/core/services/conversation_store.dart';
 import 'package:runanywhere_ai/core/utilities/constants.dart';
 import 'package:runanywhere_ai/features/chat/tool_call_views.dart';
@@ -20,7 +19,7 @@ import 'package:runanywhere_ai/features/settings/tool_settings_view_model.dart';
 import 'package:runanywhere_ai/features/structured_output/structured_output_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// ChatInterfaceView (mirroring iOS ChatInterfaceView.swift)
+/// ChatInterfaceView
 ///
 /// Full chat interface with streaming, analytics, and model status.
 class ChatInterfaceView extends StatefulWidget {
@@ -46,7 +45,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
   String? _errorMessage;
   final bool _isLoading = false;
 
-  // Model state (from SDK - matches Swift pattern)
+  // Model state synced from SDK.
   String? _loadedModelName;
   sdk.InferenceFramework? _loadedFramework;
 
@@ -102,7 +101,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     setState(() {
       _messages.add(ChatMessage(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
-        role: MessageRole.user,
+        role: sdk.MessageRole.MESSAGE_ROLE_USER,
         content: userMessage,
         timestamp: DateTime.now(),
       ));
@@ -188,7 +187,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     int maxTokens,
     double temperature,
   ) async {
-    // Capture model name from local state (matches Swift pattern)
+    // Capture model name from local state
     final modelName = _loadedModelName;
 
     // Auto-detect the tool calling format based on the loaded model
@@ -199,7 +198,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     // Add empty assistant message
     final assistantMessage = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      role: MessageRole.assistant,
+      role: sdk.MessageRole.MESSAGE_ROLE_ASSISTANT,
       content: '',
       timestamp: DateTime.now(),
     );
@@ -284,13 +283,13 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     String prompt,
     sdk.LLMGenerationOptions options,
   ) async {
-    // Capture model name from local state (matches Swift pattern)
+    // Capture model name from local state
     final modelName = _loadedModelName;
 
     // Add empty assistant message for streaming
     final assistantMessage = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      role: MessageRole.assistant,
+      role: sdk.MessageRole.MESSAGE_ROLE_ASSISTANT,
       content: '',
       timestamp: DateTime.now(),
     );
@@ -305,8 +304,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     try {
       // v2 close-out Phase G-2: generateStream returns Stream<LLMStreamEvent>;
       // collect token text off each non-terminal event.
-      final eventStream =
-          sdk.RunAnywhere.llm.generateStream(prompt, options);
+      final eventStream = sdk.RunAnywhere.llm.generateStream(prompt, options);
 
       await for (final event in eventStream) {
         if (event.isFinal) {
@@ -376,12 +374,11 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
     String prompt,
     sdk.LLMGenerationOptions options,
   ) async {
-    // Capture model name from local state (matches Swift pattern)
+    // Capture model name from local state
     final modelName = _loadedModelName;
 
     try {
-      final result =
-          await sdk.RunAnywhere.llm.generate(prompt, options);
+      final result = await sdk.RunAnywhere.llm.generate(prompt, options);
 
       final totalTime = _generationStartTime != null
           ? DateTime.now().difference(_generationStartTime!).inMilliseconds /
@@ -403,7 +400,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       setState(() {
         _messages.add(ChatMessage(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
-          role: MessageRole.assistant,
+          role: sdk.MessageRole.MESSAGE_ROLE_ASSISTANT,
           content: result.text,
           thinkingContent: result.thinkingContent,
           timestamp: DateTime.now(),
@@ -551,7 +548,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
       framework ?? LLMFramework.INFERENCE_FRAMEWORK_UNKNOWN;
 
   Widget _buildModelStatusBanner() {
-    // Use local state synced from SDK (matches Swift pattern)
+    // Use local state synced from SDK
     LLMFramework? framework;
     if (sdk.RunAnywhere.llm.isLoaded && _loadedFramework != null) {
       framework = _mapInferenceFramework(_loadedFramework);
@@ -711,7 +708,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
               ),
             ],
 
-            // Tool calling badge (matches iOS)
+            // Tool calling badge
             if (showToolBadge) ...[
               ToolCallingBadge(toolCount: toolSettings.registeredTools.length),
               const SizedBox(height: AppSpacing.smallMedium),
@@ -766,7 +763,7 @@ class _ChatInterfaceViewState extends State<ChatInterfaceView> {
 /// Chat message model
 class ChatMessage {
   final String id;
-  final MessageRole role;
+  final sdk.MessageRole role;
   final String content;
   final String? thinkingContent;
   final DateTime timestamp;
@@ -785,7 +782,7 @@ class ChatMessage {
 
   ChatMessage copyWith({
     String? id,
-    MessageRole? role,
+    sdk.MessageRole? role,
     String? content,
     String? thinkingContent,
     DateTime? timestamp,
@@ -819,7 +816,7 @@ class _MessageBubbleState extends State<_MessageBubble> {
 
   @override
   Widget build(BuildContext context) {
-    final isUser = widget.message.role == MessageRole.user;
+    final isUser = widget.message.role == sdk.MessageRole.MESSAGE_ROLE_USER;
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,

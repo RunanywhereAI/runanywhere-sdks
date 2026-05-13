@@ -4,11 +4,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:runanywhere/runanywhere_protos.dart' as proto;
 
-import 'package:runanywhere_ai/core/models/app_types.dart';
-
-/// ConversationStore (mirroring iOS ConversationStore.swift)
-///
 /// File-based persistence for conversation history with search and CRUD operations.
 class ConversationStore extends ChangeNotifier {
   static final ConversationStore shared = ConversationStore._();
@@ -91,7 +88,7 @@ class ConversationStore extends ChangeNotifier {
 
     // Auto-generate title from first user message
     if (updated.title == 'New Chat' &&
-        message.role == MessageRole.user &&
+        message.role == proto.MessageRole.MESSAGE_ROLE_USER &&
         message.content.isNotEmpty) {
       updated = updated.copyWith(title: _generateTitle(message.content));
     }
@@ -256,10 +253,12 @@ class Conversation {
     if (messages.isEmpty) return 'No messages';
 
     final messageCount = messages.length;
-    final userMessages =
-        messages.where((m) => m.role == MessageRole.user).length;
-    final assistantMessages =
-        messages.where((m) => m.role == MessageRole.assistant).length;
+    final userMessages = messages
+        .where((m) => m.role == proto.MessageRole.MESSAGE_ROLE_USER)
+        .length;
+    final assistantMessages = messages
+        .where((m) => m.role == proto.MessageRole.MESSAGE_ROLE_ASSISTANT)
+        .length;
 
     return '$messageCount messages • $userMessages from you, $assistantMessages from AI';
   }
@@ -299,7 +298,7 @@ class Conversation {
 /// Message model
 class Message {
   final String id;
-  final MessageRole role;
+  final proto.MessageRole role;
   final String content;
   final String? thinkingContent;
   final DateTime timestamp;
@@ -316,7 +315,7 @@ class Message {
 
   Message copyWith({
     String? id,
-    MessageRole? role,
+    proto.MessageRole? role,
     String? content,
     String? thinkingContent,
     DateTime? timestamp,
@@ -343,10 +342,7 @@ class Message {
 
   factory Message.fromJson(Map<String, dynamic> json) => Message(
         id: json['id'] as String,
-        role: MessageRole.values.firstWhere(
-          (r) => r.name == json['role'],
-          orElse: () => MessageRole.user,
-        ),
+        role: _messageRoleFromJson(json['role'] as String?),
         content: json['content'] as String,
         thinkingContent: json['thinkingContent'] as String?,
         timestamp: DateTime.parse(json['timestamp'] as String),
@@ -368,7 +364,7 @@ class MessageAnalytics {
   final int outputTokens;
   final double? tokensPerSecond;
   final bool wasThinkingMode;
-  final CompletionStatus completionStatus;
+  final proto.ChatMessageStatus completionStatus;
 
   const MessageAnalytics({
     required this.messageId,
@@ -380,7 +376,8 @@ class MessageAnalytics {
     this.outputTokens = 0,
     this.tokensPerSecond,
     this.wasThinkingMode = false,
-    this.completionStatus = CompletionStatus.complete,
+    this.completionStatus =
+        proto.ChatMessageStatus.CHAT_MESSAGE_STATUS_COMPLETE,
   });
 
   Map<String, dynamic> toJson() => {
@@ -407,9 +404,43 @@ class MessageAnalytics {
         outputTokens: json['outputTokens'] as int? ?? 0,
         tokensPerSecond: json['tokensPerSecond'] as double?,
         wasThinkingMode: json['wasThinkingMode'] as bool? ?? false,
-        completionStatus: CompletionStatus.values.firstWhere(
-          (s) => s.name == json['completionStatus'],
-          orElse: () => CompletionStatus.complete,
-        ),
+        completionStatus:
+            _chatMessageStatusFromJson(json['completionStatus'] as String?),
       );
+}
+
+proto.MessageRole _messageRoleFromJson(String? value) {
+  switch (value) {
+    case 'MESSAGE_ROLE_SYSTEM':
+    case 'system':
+      return proto.MessageRole.MESSAGE_ROLE_SYSTEM;
+    case 'MESSAGE_ROLE_ASSISTANT':
+    case 'assistant':
+      return proto.MessageRole.MESSAGE_ROLE_ASSISTANT;
+    case 'MESSAGE_ROLE_USER':
+    case 'user':
+      return proto.MessageRole.MESSAGE_ROLE_USER;
+    default:
+      return proto.MessageRole.MESSAGE_ROLE_USER;
+  }
+}
+
+proto.ChatMessageStatus _chatMessageStatusFromJson(String? value) {
+  switch (value) {
+    case 'CHAT_MESSAGE_STATUS_PENDING':
+      return proto.ChatMessageStatus.CHAT_MESSAGE_STATUS_PENDING;
+    case 'CHAT_MESSAGE_STATUS_STREAMING':
+      return proto.ChatMessageStatus.CHAT_MESSAGE_STATUS_STREAMING;
+    case 'CHAT_MESSAGE_STATUS_FAILED':
+    case 'failed':
+    case 'timeout':
+      return proto.ChatMessageStatus.CHAT_MESSAGE_STATUS_FAILED;
+    case 'CHAT_MESSAGE_STATUS_CANCELLED':
+    case 'interrupted':
+      return proto.ChatMessageStatus.CHAT_MESSAGE_STATUS_CANCELLED;
+    case 'CHAT_MESSAGE_STATUS_COMPLETE':
+    case 'complete':
+    default:
+      return proto.ChatMessageStatus.CHAT_MESSAGE_STATUS_COMPLETE;
+  }
 }

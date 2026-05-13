@@ -76,8 +76,11 @@ fi
 # generated router.pb.dart exists for symmetry.
 #
 # Using `--dart_out=<dir>` (no `grpc:` prefix) skips the gRPC client stubs
-# for services (voice_agent_service, llm_service, download_service) and
-# emits only the .pb.dart message types. Streaming flows through the
+# for services (voice_agent_service, llm_service, download_service). The
+# dart-lang plugin still emits descriptor JSON and server stubs
+# (`*.pbjson.dart` / `*.pbserver.dart`), so this script strips them below.
+# Flutter keeps only the runtime message/enum files (`*.pb.dart` and
+# `*.pbenum.dart`). Streaming flows through the
 # hand-written VoiceAgentStreamAdapter / LLMStreamAdapter over
 # rac_*_set_proto_callback instead.
 if [ -z "${RAC_PROTO_FILES:-}" ]; then
@@ -108,8 +111,11 @@ protoc \
     --dart_out="${OUT_DIR}" \
     "${DART_PROTO_BASENAMES[@]}"
 
-# Belt-and-braces: strip any accidentally-regenerated .pbgrpc.dart files
-# (some older protoc_plugin versions emit them even without the grpc: prefix).
-rm -f "${OUT_DIR}"/*.pbgrpc.dart
+# Belt-and-braces: strip stubs/descriptors that are not runtime SDK surface.
+rm -f \
+    "${OUT_DIR}"/*.pbgrpc.dart \
+    "${OUT_DIR}"/*.pbserver.dart \
+    "${OUT_DIR}"/*.pbjson.dart \
+    "${OUT_DIR}"/ra_convenience.dart
 
-echo "✓ Dart proto codegen → ${OUT_DIR} (gRPC client stubs stripped)"
+echo "✓ Dart proto codegen → ${OUT_DIR} (message/enum bindings; stubs/descriptors stripped)"

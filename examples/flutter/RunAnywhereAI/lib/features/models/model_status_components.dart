@@ -9,7 +9,7 @@ import 'package:runanywhere_ai/core/design_system/typography.dart';
 import 'package:runanywhere_ai/core/models/app_types.dart';
 import 'package:runanywhere_ai/features/models/model_types.dart';
 
-/// ModelStatusBanner (mirroring iOS ModelStatusBanner)
+/// ModelStatusBanner
 ///
 /// A banner that shows the current model status (framework + model name) or prompts to select a model.
 class ModelStatusBanner extends StatelessWidget {
@@ -180,7 +180,7 @@ class ModelStatusBanner extends StatelessWidget {
   }
 }
 
-/// ModelRequiredOverlay (mirroring iOS ModelRequiredOverlay)
+/// ModelRequiredOverlay
 ///
 /// An overlay that covers the screen when no model is selected, prompting the user to select one.
 class ModelRequiredOverlay extends StatelessWidget {
@@ -304,7 +304,7 @@ class ModelRequiredOverlay extends StatelessWidget {
   }
 }
 
-/// AudioLevelIndicator (mirroring iOS audio level visualization)
+/// AudioLevelIndicator
 ///
 /// A 10-bar audio level visualization.
 class AudioLevelIndicator extends StatelessWidget {
@@ -339,7 +339,7 @@ class AudioLevelIndicator extends StatelessWidget {
   }
 }
 
-/// RecordingStatusBadge (mirroring iOS status badges)
+/// RecordingStatusBadge
 ///
 /// A badge showing recording or transcribing status.
 class RecordingStatusBadge extends StatelessWidget {
@@ -416,7 +416,7 @@ class RecordingStatusBadge extends StatelessWidget {
   }
 }
 
-/// TypingIndicatorView (mirroring iOS TypingIndicatorView)
+/// TypingIndicatorView
 ///
 /// Professional typing indicator with animated dots.
 class TypingIndicatorView extends StatefulWidget {
@@ -519,7 +519,7 @@ class _TypingIndicatorViewState extends State<TypingIndicatorView>
   }
 }
 
-/// CompactModelIndicator (mirroring iOS CompactModelIndicator)
+/// CompactModelIndicator
 ///
 /// A compact indicator showing current model status for use in navigation bars/headers.
 class CompactModelIndicator extends StatelessWidget {
@@ -617,7 +617,7 @@ class CompactModelIndicator extends StatelessWidget {
   }
 }
 
-/// VoicePipelineSetupView (mirroring iOS VoicePipelineSetupView)
+/// VoicePipelineSetupView
 ///
 /// A setup view specifically for Voice Assistant which requires 3 models.
 class VoicePipelineSetupView extends StatelessWidget {
@@ -625,9 +625,9 @@ class VoicePipelineSetupView extends StatelessWidget {
   final (LLMFramework, String)? llmModel;
   final (LLMFramework, String)? ttsModel;
 
-  final AppModelLoadState sttLoadState;
-  final AppModelLoadState llmLoadState;
-  final AppModelLoadState ttsLoadState;
+  final UiModelLoadState sttLoadState;
+  final UiModelLoadState llmLoadState;
+  final UiModelLoadState ttsLoadState;
 
   final VoidCallback onSelectSTT;
   final VoidCallback onSelectLLM;
@@ -652,9 +652,9 @@ class VoicePipelineSetupView extends StatelessWidget {
       sttModel != null && llmModel != null && ttsModel != null;
 
   bool get allModelsLoaded =>
-      sttLoadState == AppModelLoadState.loaded &&
-      llmLoadState == AppModelLoadState.loaded &&
-      ttsLoadState == AppModelLoadState.loaded;
+      sttLoadState == UiModelLoadState.loaded &&
+      llmLoadState == UiModelLoadState.loaded &&
+      ttsLoadState == UiModelLoadState.loaded;
 
   @override
   Widget build(BuildContext context) {
@@ -789,7 +789,7 @@ class ModelSetupCard extends StatelessWidget {
   final Color color;
   final LLMFramework? selectedFramework;
   final String? selectedModel;
-  final AppModelLoadState loadState;
+  final UiModelLoadState loadState;
   final VoidCallback onSelect;
 
   const ModelSetupCard({
@@ -806,8 +806,8 @@ class ModelSetupCard extends StatelessWidget {
   });
 
   bool get isConfigured => selectedFramework != null && selectedModel != null;
-  bool get isLoaded => loadState == AppModelLoadState.loaded;
-  bool get isLoading => loadState == AppModelLoadState.loading;
+  bool get isLoaded => loadState == UiModelLoadState.loaded;
+  bool get isLoading => loadState == UiModelLoadState.loading;
 
   @override
   Widget build(BuildContext context) {

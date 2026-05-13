@@ -138,10 +138,8 @@ class DartBridge {
       ));
       _logger.debug('SDK Phase 1 (proto) initialized');
     } catch (e) {
-      // Non-fatal in Phase 1: log and continue. Phase 2 will surface a hard
-      // failure if the C++ state really cannot be initialized. This mirrors
-      // the legacy behaviour where rac_sdk_init failures were warning-level.
-      _logger.warning('SDK Phase 1 proto init error: $e');
+      _logger.error('SDK Phase 1 proto init failed: $e');
+      rethrow;
     }
 
     // Step 5: Register events callback (analytics routing)

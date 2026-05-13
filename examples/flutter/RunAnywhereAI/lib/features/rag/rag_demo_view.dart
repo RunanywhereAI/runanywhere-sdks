@@ -1,7 +1,5 @@
 // RAG Demo View
 //
-// Full-screen RAG document Q&A UI.
-// Mirrors iOS DocumentRAGView.swift adapted for Material Design.
 // Allows model selection, document ingestion, chat Q&A with expandable
 // retrieved chunks and timing metrics.
 
@@ -11,6 +9,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:runanywhere/runanywhere.dart' as sdk;
+import 'package:runanywhere/runanywhere_protos.dart' as proto;
 
 import 'package:runanywhere_ai/core/design_system/app_colors.dart';
 import 'package:runanywhere_ai/core/design_system/app_spacing.dart';
@@ -38,13 +37,9 @@ class _RagDemoViewState extends State<RagDemoView> {
   ModelInfo? _selectedEmbeddingModel;
   ModelInfo? _selectedLLMModel;
 
-  // MARK: - Computed
-
   bool get _areModelsReady =>
       (_selectedEmbeddingModel?.localPath.isNotEmpty ?? false) &&
       (_selectedLLMModel?.localPath.isNotEmpty ?? false);
-
-  // MARK: - Lifecycle
 
   @override
   void initState() {
@@ -73,8 +68,6 @@ class _RagDemoViewState extends State<RagDemoView> {
     _scrollToBottom();
   }
 
-  // MARK: - RAG Configuration
-
   /// Build a generated [sdk.RAGConfiguration] from selected registry models.
   Future<sdk.RAGConfiguration?> _buildRagConfig() async {
     final embeddingModel = _selectedEmbeddingModel;
@@ -84,8 +77,7 @@ class _RagDemoViewState extends State<RagDemoView> {
     }
 
     // Ensure model files resolve (they may not exist for registry-only models)
-    await sdk.RunAnywhere.models
-        .resolveModelFilePath(embeddingModel);
+    await sdk.RunAnywhere.models.resolveModelFilePath(embeddingModel);
     await sdk.RunAnywhere.models.resolveModelFilePath(llmModel);
 
     // RAGConfiguration now carries model ids — commons resolves paths via the
@@ -95,8 +87,6 @@ class _RagDemoViewState extends State<RagDemoView> {
       llmModelId: llmModel.id,
     );
   }
-
-  // MARK: - Actions
 
   void _showEmbeddingModelSheet() {
     unawaited(showModalBottomSheet<void>(
@@ -173,8 +163,6 @@ class _RagDemoViewState extends State<RagDemoView> {
     });
   }
 
-  // MARK: - Build
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -199,8 +187,6 @@ class _RagDemoViewState extends State<RagDemoView> {
       ),
     );
   }
-
-  // MARK: - Model Setup Section
 
   Widget _buildModelSetupSection() {
     return Container(
@@ -291,8 +277,6 @@ class _RagDemoViewState extends State<RagDemoView> {
       ),
     );
   }
-
-  // MARK: - Document Status Bar
 
   Widget _buildDocumentStatusBar() {
     if (_viewModel.isLoadingDocument) {
@@ -387,8 +371,6 @@ class _RagDemoViewState extends State<RagDemoView> {
     );
   }
 
-  // MARK: - Error Banner
-
   Widget _buildErrorBanner() {
     return Container(
       margin: const EdgeInsets.symmetric(
@@ -432,8 +414,6 @@ class _RagDemoViewState extends State<RagDemoView> {
       ),
     );
   }
-
-  // MARK: - Messages Area
 
   Widget _buildMessagesArea() {
     final messages = _viewModel.messages;
@@ -530,8 +510,6 @@ class _RagDemoViewState extends State<RagDemoView> {
     );
   }
 
-  // MARK: - Input Bar
-
   Widget _buildInputBar() {
     final canSend = _viewModel.canAskQuestion;
     final isQuerying = _viewModel.isQuerying;
@@ -595,8 +573,6 @@ class _RagDemoViewState extends State<RagDemoView> {
   }
 }
 
-// MARK: - RAG Message Bubble
-
 /// Chat bubble widget for a single RAG conversation message.
 ///
 /// User messages: right-aligned blue gradient bubble.
@@ -614,7 +590,8 @@ class _RAGMessageBubble extends StatefulWidget {
 class _RAGMessageBubbleState extends State<_RAGMessageBubble> {
   bool _showChunks = false;
 
-  bool get _isUser => widget.message.role == RAGMessageRole.user;
+  bool get _isUser =>
+      widget.message.role == proto.MessageRole.MESSAGE_ROLE_USER;
 
   @override
   Widget build(BuildContext context) {

@@ -45,7 +45,7 @@ flutter pub get
 
 | Platform | Minimum Version | Acceleration |
 |----------|-----------------|--------------|
-| iOS      | 15.1+           | Metal GPU    |
+| iOS      | 17.0+           | Metal GPU    |
 | Android  | API 24+         | NEON SIMD    |
 
 ---

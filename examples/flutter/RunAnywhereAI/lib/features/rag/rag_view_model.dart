@@ -1,28 +1,21 @@
 // RAG View Model
 //
-// ViewModel for the RAG feature. Orchestrates document loading,
-// text extraction, SDK pipeline lifecycle, and query flow.
-// Mirrors iOS RAGViewModel.swift adapted for Flutter ChangeNotifier pattern.
+// Coordinates document extraction, SDK pipeline lifecycle, and query state.
 
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:runanywhere/runanywhere.dart';
+import 'package:runanywhere/runanywhere_protos.dart' as proto;
 
 import 'package:runanywhere_ai/features/rag/document_service.dart';
-
-// MARK: - Message Role
-
-enum RAGMessageRole { user, assistant }
-
-// MARK: - RAG Message
 
 /// A single message in the RAG conversation.
 ///
 /// User messages contain only text. Assistant messages also carry
 /// the [RAGResult] for displaying retrieved chunks and timing info.
 class RAGMessage {
-  final RAGMessageRole role;
+  final proto.MessageRole role;
   final String text;
 
   /// The RAG result associated with this assistant message.
@@ -36,15 +29,10 @@ class RAGMessage {
   });
 }
 
-// MARK: - RAG View Model
-
 /// ViewModel managing the full RAG pipeline lifecycle, document state, and query flow.
 ///
-/// Mirrors iOS RAGViewModel.swift. Exposes observable state via ChangeNotifier
-/// for use with Flutter's ListenableBuilder / ChangeNotifierProvider.
+/// Exposes observable state via ChangeNotifier for ListenableBuilder.
 class RAGViewModel extends ChangeNotifier {
-  // MARK: - Document State
-
   String? _documentName;
   String? get documentName => _documentName;
 
@@ -53,8 +41,6 @@ class RAGViewModel extends ChangeNotifier {
 
   bool _isLoadingDocument = false;
   bool get isLoadingDocument => _isLoadingDocument;
-
-  // MARK: - Query State
 
   List<RAGMessage> _messages = [];
   List<RAGMessage> get messages => List.unmodifiable(_messages);
@@ -70,8 +56,6 @@ class RAGViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // MARK: - Input
-
   String _currentQuestion = '';
   String get currentQuestion => _currentQuestion;
   set currentQuestion(String value) {
@@ -79,17 +63,11 @@ class RAGViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  // MARK: - Last Result
-
   RAGResult? _lastResult;
   RAGResult? get lastResult => _lastResult;
 
-  // MARK: - Computed Properties
-
   bool get canAskQuestion =>
       _isDocumentLoaded && !_isQuerying && _currentQuestion.trim().isNotEmpty;
-
-  // MARK: - Public Methods
 
   /// Load a document: extract text, create RAG pipeline, ingest text.
   ///
@@ -127,7 +105,7 @@ class RAGViewModel extends ChangeNotifier {
 
     _messages = [
       ..._messages,
-      RAGMessage(role: RAGMessageRole.user, text: question)
+      RAGMessage(role: proto.MessageRole.MESSAGE_ROLE_USER, text: question)
     ];
     _currentQuestion = '';
     _isQuerying = true;
@@ -140,7 +118,7 @@ class RAGViewModel extends ChangeNotifier {
       _messages = [
         ..._messages,
         RAGMessage(
-            role: RAGMessageRole.assistant,
+            role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT,
             text: result.answer,
             result: result),
       ];
@@ -149,7 +127,8 @@ class RAGViewModel extends ChangeNotifier {
       _error = e.toString();
       _messages = [
         ..._messages,
-        RAGMessage(role: RAGMessageRole.assistant, text: 'Error: $e'),
+        RAGMessage(
+            role: proto.MessageRole.MESSAGE_ROLE_ASSISTANT, text: 'Error: $e'),
       ];
     } finally {
       _isQuerying = false;
